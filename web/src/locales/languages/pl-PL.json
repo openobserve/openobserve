@@ -6679,6 +6679,8 @@
       "refresh": "Odśwież",
       "refreshCacheReload": "Odśwież pamięć podręczną i przeładuj",
       "moreRefreshOptions": "Więcej opcji odświeżania",
+      "autoRunDescription": "Uruchamia zapytania przy otwarciu oraz przy zmianach filtra/czasu",
+      "autoRunScope": "Dotyczy wszystkich pulpitów, Logów i Trace",
       "dashboard": "Pulpit nawigacyjny",
       "dashboardNotFound": "Pulpit nawigacyjny nie został znaleziony lub został usunięty. Przekierowanie do listy pulpitów nawigacyjnych.",
       "failedToLoadDashboard": "Nie udało się załadować pulpitu nawigacyjnego. Przekierowanie do listy pulpitów nawigacyjnych.",
@@ -6961,6 +6963,8 @@
     "exitAnnotationsMode": "Wyjdź z trybu adnotacji",
     "addAnnotations": "Dodaj adnotacje",
     "refreshToApplyVariables": "Odśwież, aby zastosować najnowsze zmiany zmiennych",
+    "refreshToApplyTimeRange": "Odśwież, aby zastosować zakres czasu",
+    "refreshToApplyTimeRangeAndVariables": "Odśwież, aby zastosować zakres czasu i zmiany zmiennych",
     "moveToAnotherFolder": "Przenieś {type} do innego folderu",
     "rawQueryBuilder": {
       "query": "Zapytanie",

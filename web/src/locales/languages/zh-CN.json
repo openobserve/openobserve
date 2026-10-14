@@ -6679,6 +6679,8 @@
       "refresh": "刷新",
       "refreshCacheReload": "刷新缓存并重新加载",
       "moreRefreshOptions": "更多刷新选项",
+      "autoRunDescription": "打开时以及过滤器/时间变更时运行查询",
+      "autoRunScope": "适用于所有仪表盘、日志和追踪",
       "dashboard": "仪表盘",
       "dashboardNotFound": "未找到仪表盘或已被删除。正在重定向到仪表盘列表。",
       "failedToLoadDashboard": "加载仪表盘失败。正在重定向到仪表盘列表。",
@@ -6961,6 +6963,8 @@
     "exitAnnotationsMode": "退出标注模式",
     "addAnnotations": "添加标注",
     "refreshToApplyVariables": "刷新以应用最新的变量更改",
+    "refreshToApplyTimeRange": "刷新以应用时间范围",
+    "refreshToApplyTimeRangeAndVariables": "刷新以应用时间范围和变量变更",
     "moveToAnotherFolder": "将 {type} 移动到另一个文件夹",
     "rawQueryBuilder": {
       "query": "查询",

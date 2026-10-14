@@ -6679,6 +6679,8 @@
       "refresh": "Aktualisieren",
       "refreshCacheReload": "Cache aktualisieren & neu laden",
       "moreRefreshOptions": "Weitere Aktualisierungsoptionen",
+      "autoRunDescription": "Führt Abfragen beim Öffnen und bei Filter-/Zeitänderungen aus",
+      "autoRunScope": "Gilt für alle Dashboards, Logs und Traces",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard nicht gefunden oder wurde gelöscht. Weiterleitung zur Dashboard-Liste.",
       "failedToLoadDashboard": "Dashboard konnte nicht geladen werden. Weiterleitung zur Dashboard-Liste.",
@@ -6961,6 +6963,8 @@
     "exitAnnotationsMode": "Anmerkungsmodus beenden",
     "addAnnotations": "Anmerkungen hinzufügen",
     "refreshToApplyVariables": "Aktualisieren, um die neuesten Variablenänderungen anzuwenden",
+    "refreshToApplyTimeRange": "Aktualisieren, um den Zeitbereich anzuwenden",
+    "refreshToApplyTimeRangeAndVariables": "Aktualisieren, um den Zeitbereich und Variablenänderungen anzuwenden",
     "moveToAnotherFolder": "{type} in einen anderen Ordner verschieben",
     "rawQueryBuilder": {
       "query": "Abfrage",

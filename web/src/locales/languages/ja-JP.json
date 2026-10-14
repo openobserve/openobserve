@@ -6679,6 +6679,8 @@
       "refresh": "更新",
       "refreshCacheReload": "キャッシュを更新して再読み込み",
       "moreRefreshOptions": "その他の更新オプション",
+      "autoRunDescription": "開いたときとフィルター/時間変更時にクエリを実行します",
+      "autoRunScope": "すべてのダッシュボード、ログ、トレースに適用されます",
       "dashboard": "ダッシュボード",
       "dashboardNotFound": "ダッシュボードが見つからないか、削除されました。ダッシュボード一覧にリダイレクトします。",
       "failedToLoadDashboard": "ダッシュボードの読み込みに失敗しました。ダッシュボード一覧にリダイレクトします。",
@@ -6961,6 +6963,8 @@
     "exitAnnotationsMode": "注釈モードを終了",
     "addAnnotations": "注釈を追加",
     "refreshToApplyVariables": "最新の変数変更を適用するには更新してください",
+    "refreshToApplyTimeRange": "時間範囲を適用するには更新してください",
+    "refreshToApplyTimeRangeAndVariables": "時間範囲と変数の変更を適用するには更新してください",
     "moveToAnotherFolder": "{type}を別のフォルダーに移動",
     "rawQueryBuilder": {
       "query": "クエリ",

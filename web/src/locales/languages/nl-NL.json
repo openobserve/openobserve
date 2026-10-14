@@ -6679,6 +6679,8 @@
       "refresh": "Vernieuwen",
       "refreshCacheReload": "Cache vernieuwen en herladen",
       "moreRefreshOptions": "Meer vernieuwingsopties",
+      "autoRunDescription": "Voert query's uit bij openen en bij filter- of tijdwijzigingen.",
+      "autoRunScope": "Geldt voor alle dashboards, Logboeken en Traces.",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard niet gevonden of is verwijderd. Doorverwijzen naar dashboardlijst.",
       "failedToLoadDashboard": "Kan dashboard niet laden. Doorverwijzen naar dashboardlijst.",
@@ -6961,6 +6963,8 @@
     "exitAnnotationsMode": "Annotatiemodus verlaten",
     "addAnnotations": "Annotaties toevoegen",
     "refreshToApplyVariables": "Vernieuwen om de nieuwste variabelwijzigingen toe te passen",
+    "refreshToApplyTimeRange": "Vernieuwen om het tijdsbereik toe te passen.",
+    "refreshToApplyTimeRangeAndVariables": "Vernieuwen om het tijdsbereik en wijzigingen aan variabelen toe te passen.",
     "moveToAnotherFolder": "Verplaats {type} naar een andere map",
     "rawQueryBuilder": {
       "query": "Query",

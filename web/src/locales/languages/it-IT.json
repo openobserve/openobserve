@@ -6679,6 +6679,8 @@
       "refresh": "Aggiorna",
       "refreshCacheReload": "Aggiorna cache e ricarica",
       "moreRefreshOptions": "Altre opzioni di aggiornamento",
+      "autoRunDescription": "Esegue le query all'apertura e quando cambiano filtri o intervallo di tempo",
+      "autoRunScope": "Si applica a tutte le dashboard, Log e Tracce",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard non trovato o è stato eliminato. Reindirizzamento all'elenco dei dashboard.",
       "failedToLoadDashboard": "Impossibile caricare il dashboard. Reindirizzamento all'elenco dei dashboard.",
@@ -6961,6 +6963,8 @@
     "exitAnnotationsMode": "Esci dalla modalità annotazioni",
     "addAnnotations": "Aggiungi annotazioni",
     "refreshToApplyVariables": "Aggiorna per applicare le ultime modifiche alle variabili",
+    "refreshToApplyTimeRange": "Aggiorna per applicare l'intervallo di tempo",
+    "refreshToApplyTimeRangeAndVariables": "Aggiorna per applicare l'intervallo di tempo e le modifiche alle variabili",
     "moveToAnotherFolder": "Sposta {type} in un'altra cartella",
     "rawQueryBuilder": {
       "query": "Query",

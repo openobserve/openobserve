@@ -6679,6 +6679,8 @@
       "refresh": "Làm mới",
       "refreshCacheReload": "Làm mới cache & tải lại",
       "moreRefreshOptions": "Thêm tùy chọn làm mới",
+      "autoRunDescription": "Chạy truy vấn khi mở và khi bộ lọc/thời gian thay đổi",
+      "autoRunScope": "Áp dụng cho tất cả bảng điều khiển, Nhật ký và Trace",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Không tìm thấy dashboard hoặc đã bị xóa. Đang chuyển hướng đến danh sách dashboard.",
       "failedToLoadDashboard": "Không thể tải dashboard. Đang chuyển hướng đến danh sách dashboard.",
@@ -6961,6 +6963,8 @@
     "exitAnnotationsMode": "Thoát chế độ chú thích",
     "addAnnotations": "Thêm chú thích",
     "refreshToApplyVariables": "Làm mới để áp dụng các thay đổi biến mới nhất",
+    "refreshToApplyTimeRange": "Làm mới để áp dụng phạm vi thời gian",
+    "refreshToApplyTimeRangeAndVariables": "Làm mới để áp dụng phạm vi thời gian và các thay đổi biến",
     "moveToAnotherFolder": "Di chuyển {type} đến thư mục khác",
     "rawQueryBuilder": {
       "query": "Truy vấn",

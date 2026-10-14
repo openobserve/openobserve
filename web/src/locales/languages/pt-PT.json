@@ -6679,6 +6679,8 @@
       "refresh": "Atualizar",
       "refreshCacheReload": "Atualizar cache e recarregar",
       "moreRefreshOptions": "Mais opções de atualização",
+      "autoRunDescription": "Executa consultas ao abrir e em alterações de filtro/tempo",
+      "autoRunScope": "Aplica-se a todos os painéis, Registros e Rastros",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard não encontrado ou foi excluído. Redirecionando para a lista de dashboards.",
       "failedToLoadDashboard": "Falha ao carregar o dashboard. Redirecionando para a lista de dashboards.",
@@ -6961,6 +6963,8 @@
     "exitAnnotationsMode": "Sair do modo de anotações",
     "addAnnotations": "Adicionar anotações",
     "refreshToApplyVariables": "Atualizar para aplicar as últimas alterações de variáveis",
+    "refreshToApplyTimeRange": "Atualize para aplicar o intervalo de tempo",
+    "refreshToApplyTimeRangeAndVariables": "Atualize para aplicar o intervalo de tempo e as alterações de variáveis",
     "moveToAnotherFolder": "Mover {type} para outra pasta",
     "rawQueryBuilder": {
       "query": "Consulta",

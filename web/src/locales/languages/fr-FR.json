@@ -6679,6 +6679,8 @@
       "refresh": "Actualiser",
       "refreshCacheReload": "Actualiser le cache et recharger",
       "moreRefreshOptions": "Plus d'options d'actualisation",
+      "autoRunDescription": "Exécute les requêtes à l'ouverture et lors des modifications de filtre ou de plage horaire",
+      "autoRunScope": "S'applique à tous les tableaux de bord, Logs et Traces",
       "dashboard": "Tableau de bord",
       "dashboardNotFound": "Tableau de bord introuvable ou supprimé. Redirection vers la liste des tableaux de bord.",
       "failedToLoadDashboard": "Échec du chargement du tableau de bord. Redirection vers la liste des tableaux de bord.",
@@ -6961,6 +6963,8 @@
     "exitAnnotationsMode": "Quitter le mode annotations",
     "addAnnotations": "Ajouter des annotations",
     "refreshToApplyVariables": "Actualiser pour appliquer les dernières modifications de variables",
+    "refreshToApplyTimeRange": "Actualisez pour appliquer la plage horaire",
+    "refreshToApplyTimeRangeAndVariables": "Actualisez pour appliquer la plage horaire et les modifications de variables",
     "moveToAnotherFolder": "Déplacer {type} vers un autre dossier",
     "rawQueryBuilder": {
       "query": "Requête",

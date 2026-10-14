@@ -6679,6 +6679,8 @@
       "refresh": "Yenile",
       "refreshCacheReload": "Önbelleği yenile ve yeniden yükle",
       "moreRefreshOptions": "Daha fazla yenileme seçeneği",
+      "autoRunDescription": "Açıldığında ve filtre/zaman değişikliklerinde sorguları çalıştırır",
+      "autoRunScope": "Tüm gösterge panoları, Günlükler ve İzler için geçerlidir",
       "dashboard": "Pano",
       "dashboardNotFound": "Pano bulunamadı veya silinmiş. Pano listesine yönlendiriliyor.",
       "failedToLoadDashboard": "Pano yüklenemedi. Pano listesine yönlendiriliyor.",
@@ -6961,6 +6963,8 @@
     "exitAnnotationsMode": "Açıklama Modundan Çık",
     "addAnnotations": "Açıklama Ekle",
     "refreshToApplyVariables": "En son değişken değişikliklerini uygulamak için yenileyin",
+    "refreshToApplyTimeRange": "Zaman aralığını uygulamak için yenileyin",
+    "refreshToApplyTimeRangeAndVariables": "Zaman aralığını ve değişken değişikliklerini uygulamak için yenileyin",
     "moveToAnotherFolder": "{type} Başka Bir Klasöre Taşı",
     "rawQueryBuilder": {
       "query": "Sorgu",

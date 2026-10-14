@@ -6679,6 +6679,8 @@
       "refresh": "새로고침",
       "refreshCacheReload": "캐시 새로 고침 및 다시 로드",
       "moreRefreshOptions": "추가 새로 고침 옵션",
+      "autoRunDescription": "열 때와 필터/시간 변경 시 쿼리를 실행합니다",
+      "autoRunScope": "모든 대시보드, 로그 및 트레이스에 적용됩니다",
       "dashboard": "대시보드",
       "dashboardNotFound": "대시보드를 찾을 수 없거나 삭제되었습니다. 대시보드 목록으로 이동합니다.",
       "failedToLoadDashboard": "대시보드를 불러오지 못했습니다. 대시보드 목록으로 이동합니다.",
@@ -6961,6 +6963,8 @@
     "exitAnnotationsMode": "주석 모드 종료",
     "addAnnotations": "주석 추가",
     "refreshToApplyVariables": "최신 변수 변경 사항을 적용하려면 새로고침하세요",
+    "refreshToApplyTimeRange": "시간 범위를 적용하려면 새로고침하세요",
+    "refreshToApplyTimeRangeAndVariables": "시간 범위와 변수 변경 사항을 적용하려면 새로고침하세요",
     "moveToAnotherFolder": "{type}을(를) 다른 폴더로 이동",
     "rawQueryBuilder": {
       "query": "쿼리",

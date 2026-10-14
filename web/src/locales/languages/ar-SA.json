@@ -6679,6 +6679,8 @@
       "refresh": "تحديث",
       "refreshCacheReload": "تحديث ذاكرة التخزين المؤقت وإعادة التحميل",
       "moreRefreshOptions": "خيارات تحديث إضافية",
+      "autoRunDescription": "يشغّل الاستعلامات عند الفتح وعند تغييرات عامل التصفية/الوقت",
+      "autoRunScope": "ينطبق على جميع لوحات المعلومات والسجلات والآثار",
       "dashboard": "لوحة المعلومات",
       "dashboardNotFound": "لم يتم العثور على لوحة المعلومات أو تم حذفها. إعادة التوجيه إلى قائمة لوحة التحكم.",
       "failedToLoadDashboard": "فشل تحميل لوحة التحكم. إعادة التوجيه إلى قائمة لوحة التحكم.",
@@ -6961,6 +6963,8 @@
     "exitAnnotationsMode": "وضع التعليقات التوضيحية للخروج",
     "addAnnotations": "إضافة تعليقات توضيحية",
     "refreshToApplyVariables": "تحديث لتطبيق أحدث تغييرات المتغيرات",
+    "refreshToApplyTimeRange": "تحديث لتطبيق النطاق الزمني",
+    "refreshToApplyTimeRangeAndVariables": "تحديث لتطبيق النطاق الزمني وتغييرات المتغيرات",
     "moveToAnotherFolder": "نقل {type} إلى مجلد آخر",
     "rawQueryBuilder": {
       "query": "استعلام",

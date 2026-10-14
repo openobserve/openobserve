@@ -6674,6 +6674,8 @@
       "refresh": "重新整理",
       "refreshCacheReload": "重新整理快取並重新載入",
       "moreRefreshOptions": "更多重新整理選項",
+      "autoRunDescription": "開啟時以及篩選/時間變更時執行查詢",
+      "autoRunScope": "適用於所有儀表板、日誌與追蹤",
       "dashboard": "儀表板",
       "dashboardNotFound": "找不到儀表板或已被刪除。正在重新導向至儀表板清單。",
       "failedToLoadDashboard": "載入儀表板失敗。正在重新導向至儀表板清單。",
@@ -6956,6 +6958,8 @@
     "exitAnnotationsMode": "退出註解模式",
     "addAnnotations": "新增註解",
     "refreshToApplyVariables": "重新整理以套用最新的變數變更",
+    "refreshToApplyTimeRange": "重新整理以套用時間範圍",
+    "refreshToApplyTimeRangeAndVariables": "重新整理以套用時間範圍與變數變更",
     "moveToAnotherFolder": "將 {type} 移至另一個資料夾",
     "rawQueryBuilder": {
       "query": "查詢",
