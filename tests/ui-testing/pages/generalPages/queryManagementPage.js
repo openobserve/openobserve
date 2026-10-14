@@ -25,6 +25,10 @@ export class QueryManagementPage {
     this.queryListButton = page.locator('[data-test="queryList-btn"]');
     this.queryDetailsTable = page.locator('[data-test="queryList-table"]');
     this.tooltipBubble = page.locator('[data-test="o-tooltip-content"]');
+    this.queryTypeTabs = page.locator('[data-test="running-queries-query-type-tabs"]');
+    this.summaryList = page.locator('[data-test="running-queries-summary-list"]');
+    this.allQueriesList = page.locator('[data-test="running-queries-all-queries-list"]');
+    this.searchTypeFilter = this.allQueriesList.locator('[data-otoggle-value="dashboards"]');
   }
 
   async mockRunningQueries(queries) {
@@ -100,5 +104,36 @@ export class QueryManagementPage {
   async expectEnterpriseLockedPage() {
     await expect(this.enterpriseLockedPage).toBeVisible({ timeout: 15000 });
     await expect(this.page).toHaveURL(/enterprise-locked\?feature=queryManagement/);
+  }
+
+  async stubRunningQueries(org, queries) {
+    await this.page.route(`**/api/${org}/query_manager/status`, (route) =>
+      route.fulfill({ json: { status: queries } })
+    );
+  }
+
+  async navigateToRunningQueries(org) {
+    await this.navigateToQueryManagement(org);
+    await expect(this.queryTypeTabs).toBeVisible({ timeout: 15000 });
+  }
+
+  queryTypeTab(value) {
+    return this.queryTypeTabs.locator(`[data-otoggle-value="${value}"]`);
+  }
+
+  async selectQueryTypeTab(value) {
+    await this.queryTypeTab(value).click();
+  }
+
+  async drillIntoUser(email) {
+    await this.summaryList.getByText(email, { exact: true }).first().click();
+  }
+
+  async expectAllQueriesViewFor(email) {
+    await expect(this.queryTypeTab('all')).toHaveAttribute('data-state', 'on');
+    await expect(this.allQueriesList).toBeVisible();
+    await expect(this.summaryList).toBeHidden();
+    await expect(this.searchTypeFilter).toBeVisible();
+    await expect(this.allQueriesList.getByText(email).first()).toBeVisible();
   }
 }
