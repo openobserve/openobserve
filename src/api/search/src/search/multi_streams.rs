@@ -1635,6 +1635,7 @@ pub async fn report_to_audit(
                 error_msg: error_message,
                 trace_id: Some(trace_id.to_string()),
             },
+            delegated: None,
         })
         .await;
     }

@@ -75,6 +75,7 @@ pub async fn report_http(
                 error_msg: error_message,
                 trace_id: Some(trace_id),
             },
+            delegated: None,
         })
         .await;
     }
