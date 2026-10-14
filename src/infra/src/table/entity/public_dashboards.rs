@@ -1,9 +1,23 @@
-//! `SeaORM` Entity for the public_dashboards table.
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! `SeaORM` Entity for the public_dashboards table: one public link to a dashboard.
 //!
-//! A public (unauthenticated) share of a dashboard. `slug` is the globally
-//! unique, unguessable public identifier that resolves the tenant without an
-//! org in the URL; the rebuilder materializes results into
-//! `public_dashboard_snapshots` under the `published_by` identity.
+//! `slug` is the globally unique, unguessable public identifier that resolves the org without an
+//! org in the URL. `rev` changes only on semantic writes; `deleted_at` keeps a revoked link as a
+//! soft-deleted row for 30 days so a replicated older write cannot bring it back.
 
 use sea_orm::entity::prelude::*;
 
@@ -23,20 +37,17 @@ pub struct Model {
     pub time_ranges: Option<String>,
     pub default_range_key: Option<String>,
     pub frozen_variables: Option<String>,
-    pub rebuild_secs: i32,
-    pub last_rebuilt_at: Option<i64>,
-    // 0 pending, 1 ok, 2 error.
-    pub rebuild_state: i32,
-    pub unauthorized_streams: Option<String>,
+    pub refresh_secs: i32,
     pub dashboard_version: i32,
     pub published_by: String,
-    pub last_authorized_streams: Option<String>,
     pub enabled: bool,
     pub expires_at: Option<i64>,
     pub created_by: String,
     pub updated_by: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
+    pub rev: i64,
+    pub deleted_at: Option<i64>,
     pub last_accessed_at: Option<i64>,
     pub access_count: i64,
 }
