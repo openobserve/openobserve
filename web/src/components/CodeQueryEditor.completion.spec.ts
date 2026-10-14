@@ -1522,6 +1522,25 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
   );
 
   it(
+    "a value typed across a line break never gets a range before column 1",
+    { timeout: 30000 },
+    async () => {
+      const { provide, model } = await mountWith(
+        "v-multiline",
+        vi.fn(async () => ["\nerror"]),
+      );
+      model.getValueInRange.mockReturnValue("SELECT * FROM t WHERE level = '\ner");
+      model.getWordUntilPosition.mockReturnValue({ word: "er", startColumn: 1, endColumn: 3 });
+      const result = await provide(model, { lineNumber: 2, column: 3 }, CTRL_SPACE, {});
+      for (const row of result.suggestions) {
+        if (row.range?.startColumn !== undefined)
+          expect(row.range.startColumn).toBeGreaterThanOrEqual(1);
+        if (row.range?.insert) expect(row.range.insert.startColumn).toBeGreaterThanOrEqual(1);
+      }
+    },
+  );
+
+  it(
     "a qualified column after = is filtered by the name after the dot",
     { timeout: 30000 },
     async () => {

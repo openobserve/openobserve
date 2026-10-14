@@ -1679,7 +1679,9 @@ export default defineComponent({
           const highlighted = config.mode() === "off" || context?.triggerKind !== 1;
 
           if (language === "sql") {
-            const valueContext = parseValueContext(textUntilPosition);
+            const parsedValue = parseValueContext(textUntilPosition);
+            // A literal typed across a line break has no one-line range to replace, so it gets no value menu.
+            const valueContext = parsedValue?.typed.includes("\n") ? null : parsedValue;
             if (valueContext) {
               const entries = await sqlValueEntries(
                 model,
@@ -1711,6 +1713,7 @@ export default defineComponent({
 
           const promqlValue =
             language === "promql" ? parsePromqlValueContext(textUntilPosition) : null;
+          if (promqlValue?.typed.includes("\n")) return reply([]);
           if (promqlValue) {
             const entries = await promqlValueEntries(
               model,
