@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="rcaError && !isRunning && rcaError.remedy"
       data-test="rca-error-banner"
+      role="alert"
       class="rounded-default border-border-default bg-surface-subtle mb-2 flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border px-3 py-2 text-xs"
     >
       <div class="min-w-0 flex-1">
@@ -53,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="rcaError && !isRunning"
       data-test="rca-error-banner"
       variant="error-soft"
+      role="alert"
       icon="error-outline"
       class="mb-2 flex-shrink-0 border-0!"
     >

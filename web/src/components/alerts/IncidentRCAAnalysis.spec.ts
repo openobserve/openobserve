@@ -563,6 +563,15 @@ describe("IncidentRCAAnalysis", () => {
       expect(existsByTestId(wrapper, "rca-error-details")).toBe(false);
     });
 
+    it("should announce both failure banners to screen readers", () => {
+      wrapper = mountComponent({ rcaError: failure });
+      expect(findByTestId(wrapper, "rca-error-banner").attributes("role")).toBe("alert");
+
+      wrapper.unmount();
+      wrapper = mountComponent({ rcaError: { ...failure, remedy: "plans" } });
+      expect(findByTestId(wrapper, "rca-error-banner").attributes("role")).toBe("alert");
+    });
+
     it("should keep an existing report visible alongside a failed reanalysis", () => {
       wrapper = mountComponent({
         rcaError: failure,

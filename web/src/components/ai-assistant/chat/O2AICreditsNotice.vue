@@ -3,6 +3,7 @@
 <template>
   <div
     v-if="exhausted || low"
+    role="status"
     class="rounded-default border-border-default bg-surface-subtle mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 border px-3 py-2 text-xs"
     :data-test="exhausted ? 'o2-ai-credits-exhausted' : 'o2-ai-credits-low'"
   >

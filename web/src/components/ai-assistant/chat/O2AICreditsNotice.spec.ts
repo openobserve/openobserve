@@ -88,6 +88,12 @@ describe("O2AICreditsNotice", () => {
     expect(mockPush).toHaveBeenCalledWith({ name: "plans", query: { org_identifier: "org1" } });
   });
 
+  it("is a live region, so screen readers announce it", async () => {
+    mockGetAiUsage.mockResolvedValue(usage({ mode: "exhausted", credits_remaining: 0 }));
+    const w = await mountNotice();
+    expect(w.get('[data-test="o2-ai-credits-exhausted"]').attributes("role")).toBe("status");
+  });
+
   it("names a member's payer by its name, not its identifier", async () => {
     mockGetAiUsage.mockResolvedValue(
       usage({
