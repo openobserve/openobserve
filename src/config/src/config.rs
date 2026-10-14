@@ -1575,6 +1575,18 @@ pub struct Auth {
         help = "Secret used to sign stateless alert-chart render URLs. When empty (the default), a key is derived from the root user's stored password hash, which every node shares via the meta DB. Set explicitly to control rotation; rotating invalidates in-flight chart URLs (bounded by ZO_ALERT_CHART_URL_TTL)."
     )]
     pub alert_chart_signing_key: String,
+    #[env_config(
+        name = "ZO_DELEGATION_SIGNING_KEY",
+        default = "",
+        help = "Base64 key (32 bytes or more) that signs delegated Slack user tokens. Empty derives the key from O2_MASTER_ENCRYPTION_KEY; set it only to rotate independently of the master key."
+    )]
+    pub delegation_signing_key: String,
+    #[env_config(
+        name = "ZO_DELEGATION_SIGNING_KEY_PREVIOUS",
+        default = "",
+        help = "Previous delegation signing key, accepted for verification only during a rotation. Set to 'derived' to keep accepting the key derived from O2_MASTER_ENCRYPTION_KEY."
+    )]
+    pub delegation_signing_key_previous: String,
     #[env_config(name = "ZO_SERVICE_ACCOUNT_ENABLED", default = true)]
     pub service_account_enabled: bool,
     /// Session cleanup interval in seconds (default: 3600 = 1 hour)
