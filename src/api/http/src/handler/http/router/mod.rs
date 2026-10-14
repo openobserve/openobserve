@@ -31,7 +31,7 @@ use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
     kv, metrics_usage, model_pricing, organization, query_history, rum_analytics, service_accounts,
-    short_url, slos, sourcemaps, status, status_pages, stream, synthetics, users,
+    short_url, slack, slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -440,6 +440,9 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
     if method == Method::PUT && segments.ends_with(&["prompts", "settings", "secret"]) {
         return true;
     }
+    if let Some(slack) = slack_path(&segments) {
+        return is_slack_secret_write(method, slack);
+    }
     let Some(tasks) = segments.iter().position(|segment| *segment == "tasks") else {
         return false;
     };
@@ -448,6 +451,28 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
         || task_path
             .iter()
             .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
+}
+
+/// The segments after `api/{org}/slack/`, so a stream or folder named `slack` never matches.
+#[cfg(any(feature = "enterprise", test))]
+fn slack_path<'a>(segments: &'a [&'a str]) -> Option<&'a [&'a str]> {
+    let at = segments.iter().position(|s| *s == "api")?;
+    (segments.get(at + 2) == Some(&"slack")).then(|| &segments[at + 3..])
+}
+
+/// Slack bodies that carry an OAuth code, a connect ticket or app credentials.
+#[cfg(any(feature = "enterprise", test))]
+fn is_slack_secret_write(method: &Method, slack: &[&str]) -> bool {
+    matches!(
+        (method, slack),
+        (
+            &Method::POST,
+            ["install", "exchange"]
+                | ["installations"]
+                | ["connection", "confirm"]
+                | ["installations", _, "connection"]
+        ) | (&Method::PUT, ["installations", _, "credentials"])
+    )
 }
 
 /// The request body as the audit trail may store it.
@@ -980,8 +1005,8 @@ pub fn service_routes() -> Router {
     #[cfg(not(feature = "enterprise"))]
     let server = cfg.common.instance_name_short.to_string();
 
-    // Downtimes live in their own table to keep this function under the line limit.
-    let mut router = Router::new().merge(downtime_routes());
+    // Downtimes and Slack live in their own tables to keep this function under the line limit.
+    let mut router = Router::new().merge(downtime_routes()).merge(slack_routes());
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));
@@ -2239,6 +2264,33 @@ fn oncall_routes(router: Router) -> Router {
         )
 }
 
+/// Slack install and settings routes (section 7.2); the paths match the ENT `SLACK_ROUTE_ROWS`.
+#[rustfmt::skip]
+pub fn slack_routes() -> Router {
+    use slack::{installations as inst, settings as set};
+    Router::new()
+        .route("/{org_id}/slack/install/start", post(inst::install_start))
+        .route("/{org_id}/slack/install/exchange", post(inst::install_exchange))
+        .route("/{org_id}/slack/prerequisites", get(inst::prerequisites))
+        .route("/{org_id}/slack/connectivity", post(inst::connectivity))
+        .route("/{org_id}/slack/manifest", get(inst::manifest))
+        .route("/{org_id}/slack/connection/confirm", post(inst::connection_confirm))
+        .route("/{org_id}/slack/installations", get(inst::list_installations).post(inst::create_installation))
+        .route("/{org_id}/slack/installations/{installation_id}", delete(inst::uninstall))
+        .route("/{org_id}/slack/installations/{installation_id}/install-url", post(inst::install_url))
+        .route("/{org_id}/slack/installations/{installation_id}/credentials", put(inst::update_credentials))
+        .route("/{org_id}/slack/installations/{installation_id}/test", post(inst::test_installation))
+        .route("/{org_id}/slack/installations/{installation_id}/connection/start", post(inst::connection_start))
+        .route("/{org_id}/slack/installations/{installation_id}/connection", post(inst::connect).delete(inst::disconnect))
+        .route("/{org_id}/slack/installations/{installation_id}/linking", get(set::get_linking).put(set::put_linking))
+        .route("/{org_id}/slack/installations/{installation_id}/links/matches", get(set::link_matches))
+        .route("/{org_id}/slack/installations/{installation_id}/link-all", post(set::link_all))
+        .route("/{org_id}/slack/installations/{installation_id}/channels", get(set::channels))
+        .route("/{org_id}/slack/installations/{installation_id}/channel-defaults", get(set::channel_defaults))
+        .route("/{org_id}/slack/installations/{installation_id}/channel-defaults/{channel_id}", get(set::get_channel_default).put(set::put_channel_default).delete(set::delete_channel_default))
+        .route("/{org_id}/slack/installations/{installation_id}/help-contact", get(set::get_help_contact).put(set::put_help_contact))
+}
+
 /// Create other service routes (AWS, GCP, RUM)
 pub fn other_service_routes() -> Router {
     let aws_routes = Router::new()
@@ -2511,6 +2563,105 @@ mod tests {
             &Method::GET,
             "api/org/prompts/settings/secret"
         ));
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn every_slack_route_reaches_its_oss_stub() {
+        let routes = [
+            (Method::POST, "/default/slack/install/start"),
+            (Method::POST, "/default/slack/install/exchange"),
+            (Method::GET, "/default/slack/prerequisites"),
+            (Method::POST, "/default/slack/connectivity"),
+            (Method::GET, "/default/slack/manifest"),
+            (Method::POST, "/default/slack/connection/confirm"),
+            (Method::GET, "/default/slack/installations"),
+            (Method::POST, "/default/slack/installations"),
+            (Method::DELETE, "/default/slack/installations/I1"),
+            (Method::POST, "/default/slack/installations/I1/install-url"),
+            (Method::PUT, "/default/slack/installations/I1/credentials"),
+            (Method::POST, "/default/slack/installations/I1/test"),
+            (
+                Method::POST,
+                "/default/slack/installations/I1/connection/start",
+            ),
+            (Method::POST, "/default/slack/installations/I1/connection"),
+            (Method::DELETE, "/default/slack/installations/I1/connection"),
+            (Method::GET, "/default/slack/installations/I1/linking"),
+            (Method::PUT, "/default/slack/installations/I1/linking"),
+            (Method::GET, "/default/slack/installations/I1/links/matches"),
+            (Method::POST, "/default/slack/installations/I1/link-all"),
+            (Method::GET, "/default/slack/installations/I1/channels"),
+            (
+                Method::GET,
+                "/default/slack/installations/I1/channel-defaults",
+            ),
+            (
+                Method::GET,
+                "/default/slack/installations/I1/channel-defaults/C1",
+            ),
+            (
+                Method::PUT,
+                "/default/slack/installations/I1/channel-defaults/C1",
+            ),
+            (
+                Method::DELETE,
+                "/default/slack/installations/I1/channel-defaults/C1",
+            ),
+            (Method::GET, "/default/slack/installations/I1/help-contact"),
+            (Method::PUT, "/default/slack/installations/I1/help-contact"),
+        ];
+        for (method, path) in routes {
+            let req = Request::builder()
+                .method(method.clone())
+                .uri(path)
+                .header("user_id", "root@example.com")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from("{}"))
+                .unwrap();
+            let response = slack_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{method} {path}");
+        }
+        let req = Request::builder()
+            .method(Method::PATCH)
+            .uri("/default/slack/installations")
+            .body(Body::empty())
+            .unwrap();
+        let response = slack_routes().oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    #[test]
+    fn slack_secret_writes_are_redacted() {
+        for (method, path) in [
+            (Method::POST, "api/org/slack/install/exchange"),
+            (Method::POST, "api/org/slack/installations"),
+            (Method::PUT, "api/org/slack/installations/I1/credentials"),
+            (Method::POST, "api/org/slack/connection/confirm"),
+            (Method::POST, "api/org/slack/installations/I1/connection"),
+            (Method::POST, "base/api/org/slack/installations"),
+        ] {
+            assert!(is_secret_write(&method, path), "{method} {path}");
+            assert_eq!(
+                audited(method, path, r#"{"code":"c-1","state":"s-1"}"#),
+                "[REDACTED: secret write]"
+            );
+        }
+        for (method, path) in [
+            (Method::GET, "api/org/slack/installations"),
+            (Method::POST, "api/org/slack/install/start"),
+            (
+                Method::POST,
+                "api/org/slack/installations/I1/connection/start",
+            ),
+            (Method::DELETE, "api/org/slack/installations/I1/connection"),
+            (Method::POST, "api/org/slack/installations/I1/link-all"),
+            (Method::PUT, "api/org/slack/installations/I1/linking"),
+            (Method::GET, "api/org/slack/installations/I1/credentials"),
+            (Method::POST, "api/org/streams/slack/installations"),
+        ] {
+            assert!(!is_secret_write(&method, path), "{method} {path}");
+        }
     }
 
     fn audited(method: Method, path: &str, body: &str) -> String {
