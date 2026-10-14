@@ -16,8 +16,10 @@ const {
   ensureRumStateOrg,
   buildUsersModeSeed,
   buildSyntheticMixSeed,
+  SessionBuilder,
   runAppId,
   DAY_MS,
+  HOUR_MS,
 } = require('../utils/rum-analytics-ingestion.js');
 
 const NOW = Date.now();
@@ -602,8 +604,7 @@ test.describe('RUM Product Analytics', () => {
     await pa.openNamedEvents();
     try {
       for (const [name, url] of created) {
-        await expect(pa.newEventBtn).toBeEnabled({ timeout: 20000 });
-        await pa.newEventBtn.click();
+        await pa.clickNewEvent();
         await expect(pa.eventSaveBtn).not.toHaveAttribute('aria-busy', 'true');
         await pa.fillPageEvent(name, url);
         await pa.eventSaveBtn.click();
@@ -1308,9 +1309,9 @@ test.describe('RUM Product Analytics', () => {
     await expect.poll(() => pa.query().get('per')).toBe('week');
   });
 
-  test.describe('open defects (do not assert current behaviour)', () => {
-    // These fixmes track o2-enterprise#2809; un-fixme each one when its item closes.
-    test.fixme('o2-enterprise#2809 (M1): the date picker label follows the URL range after a reload', {
+  test.describe('o2-enterprise#2809 release-QA items', () => {
+    // M3 and the M5 KPI flash are still open in o2-enterprise#2809; un-fixme them when they close.
+    test('o2-enterprise#2809 (M1): the date picker label follows the URL range after a reload', {
       tag: PA_TAGS('@P2'),
     }, async ({ page }) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
@@ -1322,15 +1323,14 @@ test.describe('RUM Product Analytics', () => {
       await expect(pa.datePicker).not.toContainText(/7 Days/i);
     });
 
-    test.fixme('o2-enterprise#2809 (M2): the Sessions KPI excludes the synthetic sessions the strip says it excludes', {
+    test('o2-enterprise#2809 (M2): the Sessions KPI excludes the synthetic sessions the strip says it excludes', {
       tag: PA_TAGS('@P2'),
     }, async ({ page }) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
       const mix = await seedBuilt(page, buildSyntheticMixSeed(`${facts.appId}-syn`, Date.now()));
       await pa.goto('overview', { app: mix.appId, period: '7d' });
       await expect(pa.syntheticExcluded).toContainText(String(mix.synthetic), { timeout: 30000 });
-      await expect(pa.kpiSessions).toContainText(new RegExp(`\\b${mix.real}\\b`), { timeout: 30000 });
-      await expect(pa.kpiSessions).not.toContainText(new RegExp(`\\b${mix.real + mix.synthetic}\\b`));
+      await expect.poll(() => pa.kpiValue('sessions'), { timeout: 30000 }).toBe(String(mix.real));
     });
 
     test.fixme('o2-enterprise#2809 (M3): retention data-start follows current data, so the earliest cohort shows without a stats pin', {
@@ -1343,23 +1343,30 @@ test.describe('RUM Product Analytics', () => {
       expect(await pa.retentionPct(0, 1)).toBe(50);
     });
 
-    test.fixme('o2-enterprise#2809 (M4): View in Sessions without a _sessionreplay stream opens the Sessions list', {
+    test('o2-enterprise#2809 (M4): View in Sessions without a _sessionreplay stream opens the Sessions list', {
       tag: PA_TAGS('@P2'),
     }, async ({ page }) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
       const { identifier: org } = await ensureRumStateOrg(page, 'pa_noreplay');
       const now = Date.now();
       const seed = await seedBuilt(page, buildUsersModeSeed(runAppId('pa-noreplay'), now), { nowMs: now, orgId: org });
+      // Retention starts at the stream's first ingest once stats catch up, which leaves a fresh org under the 2-day minimum.
+      await pa.pinRumDataStart((now - 7 * DAY_MS) * 1000);
       await pa.goto('retention', { app: seed.appId, period: '7d' }, { org });
-      await expect(pa.retentionCell(0, 0)).toBeVisible({ timeout: 45000 });
-      await pa.retentionCell(0, 0).click();
+      await expect(pa.firstRetentionCell).toBeVisible({ timeout: 45000 });
+      await pa.firstRetentionCell.click();
       await expect(pa.retentionUser0).toBeVisible({ timeout: 30000 });
+      const user = (await pa.retentionUser0.innerText()).trim();
       await pa.retentionUser0SessionsBtn.click();
       await expect(page).toHaveURL(/\/rum\/sessions(\?|$)/, { timeout: 30000 });
       await expect(pa.sessionsTable).toBeVisible({ timeout: 30000 });
+      await expect(pa.sessionsRows.first()).toBeVisible({ timeout: 45000 });
+      await expect(pa.sessionsNoData).toBeHidden();
+      await expect(pa.sessionsRows.first()).toContainText(user);
     });
 
-    test.fixme('o2-enterprise#2809 (M5): KPIs never flash "No user id set" while an app with users loads', {
+    // Still broken on main: the Users KPI reads "No user id set" under its loading skeleton until the summary answers.
+    test.fixme('o2-enterprise#2809 (M5, KPIs): KPIs never flash "No user id set" while an app with users loads', {
       tag: PA_TAGS('@P2'),
     }, async ({ page }) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
@@ -1370,19 +1377,39 @@ test.describe('RUM Product Analytics', () => {
       expect(await pa.kpiTextSeen(), 'the KPI strip showed the no-identity placeholder').toBe(false);
     });
 
-    test.fixme('o2-enterprise#2809 (m1): drop-off durations carry no floating-point noise', {
+    test('o2-enterprise#2809 (M5, Trends): Trends shows a skeleton, not empty axes, until its query answers', {
       tag: PA_TAGS('@P2'),
     }, async ({ page }) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
-      await pa.goto('funnels', {
-        app: facts.appId,
-        period: '7d',
-        funnel: funnelParam([['p', facts.funnel.a], ['c', facts.funnel.b], ['p', facts.funnel.c]]),
-      });
-      await pa.expectFunnelCounts([6, 3, 1]);
+      const held = await pa.holdTrendsQuery();
+      try {
+        await pa.goto('overview', { app: facts.appId, period: '7d' });
+        await held.sent;
+        await expect(pa.trendsLoading).toBeVisible({ timeout: 30000 });
+        await expect(pa.trendsCanvas.first()).toBeHidden();
+      } finally {
+        await held.release();
+      }
+      await expect(pa.trendsCanvas.first()).toBeVisible({ timeout: 30000 });
+      await expect(pa.trendsLoading).toHaveCount(0);
+    });
+
+    test('o2-enterprise#2809 (m1): a drop-off duration of 123.885 s reads 2m 4s, with no floating-point noise', {
+      tag: PA_TAGS('@P2'),
+    }, async ({ page }) => {
+      const pa = new PageManager(page).rumProductAnalyticsPage;
+      const appId = `${facts.appId}-m1`;
+      const now = Date.now();
+      const session = new SessionBuilder(appId, `${appId}-s1`, now - 2 * HOUR_MS, { user: 'd1@e2e.test' });
+      // Each view adds 5 s, so this puts the second view 123.885 s after the first, the issue's 2m 3.885000000000005s.
+      session.view('https://shop.example.com/web/a').wait(118885).view('https://shop.example.com/web/help');
+      await seedBuilt(page, { rows: session.rows, facts: { appId } }, { nowMs: now });
+      await pa.goto('funnels', { app: appId, period: '7d', funnel: funnelParam([['p', facts.funnel.a], ['p', facts.funnel.c]]) });
+      await pa.expectFunnelCounts([1, 0]);
       await pa.openDropoff(0);
-      await expect(pa.dropoffSessionsCap).toContainText('3', { timeout: 30000 });
-      await expect(pa.dropoffDrawer).not.toContainText(/\d\.\d{4,}s/);
+      await expect(pa.dropoffSessionsCap).toContainText('All 1 session listed', { timeout: 30000 });
+      await expect(pa.dropoffDurationCells).toHaveCount(1, { timeout: 30000 });
+      await expect(pa.dropoffDurationCells.first()).toHaveText('2m 4s');
     });
 
     /** A saved funnel whose first step is a named event deleted with force. */
@@ -1402,21 +1429,22 @@ test.describe('RUM Product Analytics', () => {
       return { ev, funnel };
     }
 
-    test.fixme('o2-enterprise#2809 (m2): a deleted-event step reads Deleted event, never the raw id', {
+    test('o2-enterprise#2809 (m2): a deleted-event step reads its last name and Deleted event, never the raw id', {
       tag: PA_TAGS('@P2'),
     }, async ({ page }) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
       const { ev, funnel } = await funnelWithDeletedEvent(page, `${facts.appId.slice(-4)}m2`);
       try {
         await pa.goto('funnels', { app: facts.appId, period: '7d', sf: funnel.id });
-        await expect(pa.step(0)).toContainText('Deleted event', { timeout: 30000 });
+        await expect(pa.stepDeletedTag(0)).toHaveText('Deleted event', { timeout: 30000 });
+        await expect(pa.step(0)).toContainText(ev.name, { timeout: 30000 });
         await expect(pa.step(0)).not.toContainText(ev.id);
       } finally {
         await cleanupAnalytics(page, facts.appId, { events: new Set(), funnels: new Set([funnel.id]) });
       }
     });
 
-    test.fixme('o2-enterprise#2809 (m3): the Save tooltip on a deleted-event funnel names the deleted step', {
+    test('o2-enterprise#2809 (m3): the Save tooltip on a deleted-event funnel names the deleted step', {
       tag: PA_TAGS('@P2'),
     }, async ({ page }) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
@@ -1424,6 +1452,9 @@ test.describe('RUM Product Analytics', () => {
       try {
         await pa.goto('funnels', { app: facts.appId, period: '7d', sf: funnel.id });
         await expect(pa.funnelSavedName).toHaveText(funnel.name, { timeout: 30000 });
+        // The tooltip mounts only once Save is blocked, and a pointer already resting there would never open it.
+        await expect(pa.stepDeletedTag(0)).toBeVisible({ timeout: 30000 });
+        await expect(pa.funnelSaveBtn).toBeDisabled();
         const tip = await pa.saveBtnTooltip();
         await expect(tip).toContainText('Remove the deleted event step first');
         await expect(tip).not.toContainText('No changes to save');

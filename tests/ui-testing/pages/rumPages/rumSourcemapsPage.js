@@ -15,6 +15,79 @@ export class RumSourcemapsPage {
             name: /delete|confirm|ok/i,
         });
         this.toastMessage = page.locator('[data-test="o-toast-message"]');
+        // The list's filters carry no data-test and their label is not tied to the trigger, so the label's wrapper finds it.
+        this.serviceFilter = page.locator('div:has(> label:text-is("Service")) [role="combobox"]');
+        this.filterOptions = page.getByRole('option');
+        this.applyFiltersBtn = page.getByRole('button', { name: 'Apply Filters' });
+        this.uploadPageBtn = page.getByRole('button', { name: 'Upload Source Maps' });
+        this.uploadCancelBtn = page.locator('[data-test="rum-upload-source-maps-cancel-btn"]');
+        this.versionCells = page.locator('[data-test="o2-table-cell-version"]');
+        this.pageSizeTrigger = page.locator('[data-test="o2-table-page-size-select-trigger"]');
+        this.sourceMapsTab = page.locator('[data-test="rum-tab-source-maps"]');
+        this.rumMenuLink = page.locator('[data-test="nav-group-experience"] [data-test="menu-link-/rum-item"]');
+    }
+
+    sortTrigger(column) {
+        return this.page.locator(`[data-test="o2-table-th-${column}"] [data-test="o2-table-th-sort-trigger"]`);
+    }
+
+    sortIcon(column) {
+        return this.page.locator(`[data-test="o2-table-th-${column}"] [data-test^="o2-table-sort-icon-"]`);
+    }
+
+    /** Picks one uploaded service in the Service filter and applies it. */
+    async filterByService(service) {
+        await this.serviceFilter.click();
+        // The list ignores typed values it does not offer, so the service is picked from the offered options.
+        await this.page.keyboard.type(service);
+        await this.filterOptions.filter({ hasText: service }).click();
+        await expect(this.serviceFilter).toHaveAttribute('data-test-selected-value', service);
+        const listed = this.page.waitForResponse(
+            (r) => r.request().method() === 'GET' && /\/sourcemaps\?/.test(r.url()) && r.url().includes(`service=${encodeURIComponent(service)}`),
+        );
+        await this.applyFiltersBtn.click();
+        expect((await listed).status()).toBe(200);
+    }
+
+    /** Clicks a column's sort control until the list is sorted that way. */
+    async sortBy(column, direction) {
+        const icon = this.sortIcon(column);
+        for (let i = 0; i < 3 && (await icon.getAttribute('data-test-sort-direction')) !== direction; i++) {
+            const before = await icon.getAttribute('data-test-sort-direction');
+            await this.sortTrigger(column).click();
+            await expect(icon).not.toHaveAttribute('data-test-sort-direction', before);
+        }
+        await expect(icon).toHaveAttribute('data-test-sort-direction', direction);
+    }
+
+    async setPageSize(size) {
+        await this.pageSizeTrigger.click();
+        await this.page.locator(`[data-test="o2-table-page-size-select-option"][data-test-value="${size}"]`).click();
+        await expect(this.pageSizeTrigger).toHaveText(String(size));
+    }
+
+    /** Opens the Upload page from the list and cancels back to the list. */
+    async openUploadAndCancel() {
+        await this.uploadPageBtn.click();
+        await this.expectOnUploadPage();
+        await this.uploadCancelBtn.click();
+        await this.expectOnListPage();
+    }
+
+    /** Re-enters RUM from the Experience menu and opens its Source Maps tab, as a user coming back from another module would. */
+    async returnViaRumMenu() {
+        await this.rumMenuLink.click();
+        await expect(this.page).toHaveURL(/\/rum\//, { timeout: 30000 });
+        await this.sourceMapsTab.click();
+        await this.expectOnListPage();
+    }
+
+    /** The list shows the service filter, the sort, the page size and exactly these versions in this order. */
+    async expectListState({ service, column, direction, pageSize, versions }) {
+        await expect(this.serviceFilter).toHaveAttribute('data-test-selected-value', service, { timeout: 15000 });
+        await expect(this.sortIcon(column)).toHaveAttribute('data-test-sort-direction', direction);
+        await expect(this.pageSizeTrigger).toHaveText(String(pageSize));
+        await expect(this.versionCells).toHaveText(versions, { timeout: 15000 });
     }
 
     groupRow(service) {
