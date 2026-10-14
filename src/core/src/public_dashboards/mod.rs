@@ -13,10 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The public-dashboard rebuilder: runs each panel's saved query server-side
-//! **as the publisher** (RBAC-checked), materializing one snapshot per allowed
-//! preset for the anonymous plane to point-read. The anonymous plane never runs
-//! a query — all query execution lives here, in a trusted background job.
+//! Public dashboard links: CRUD with compare-and-set revisions and soft delete, validation, and
+//! the panel build that runs each saved query server-side, checked against the publisher's access.
 
 mod defaults;
 mod variables;
@@ -24,12 +22,13 @@ mod variables;
 use std::collections::{BTreeMap, BTreeSet};
 
 use config::{
-    ider,
+    get_config, ider,
     meta::{
         dashboards::Dashboard,
         public_dashboards::{
-            PanelSnapshot, PanelState, PublicDashboardConfig, PublicLinkState, PublicLinkStatus,
-            PublicVariable, SnapshotData, TimeRange, TimeRangePolicy,
+            MAX_REFRESH_SECS, MIN_REFRESH_SECS, NotAvailableReason, PanelResult, PanelState,
+            PublicDashboardConfig, PublicLinkState, PublicLinkStatus, PublicVariable, ResultBody,
+            TimeRange, TimeRangePolicy, Window,
         },
         search,
         sql::{TableReferenceExt, resolve_stream_names_with_type},
@@ -41,22 +40,29 @@ use config::{
     },
 };
 use defaults::{Defaults, ValuesQuery};
-use infra::table::{
-    dashboards, entity::public_dashboards::Model as PublicDashboard, public_dashboards as pd_table,
+use infra::{
+    db::{get_orm_client_ro, get_orm_client_rw},
+    table::{
+        dashboards,
+        entity::{
+            public_dashboard_org_settings::Model as OrgSettings,
+            public_dashboards::Model as PublicDashboard,
+        },
+        public_dashboards::{self as pd_table, CreateOutcome},
+    },
 };
 use variables::{PanelVars, QueryVars};
 
-const REBUILD_STATE_OK: i32 = 1;
-const REBUILD_STATE_ERROR: i32 = 2;
 const MAX_RANGES: usize = 10;
 const MIN_RANGE_SECS: i64 = 60;
 const MAX_RANGE_SECS: i64 = 365 * 86_400;
-/// How often a link of only absolute ranges is checked for expiry and a departed publisher.
-const ABSOLUTE_CHECK_SECS: i64 = 86_400;
 const MAX_FROZEN_VARIABLES_BYTES: usize = 64 * 1024;
-/// Refusal for a dashboard the rebuilder can't build; the admin API maps it to 400.
+/// A lost compare-and-set re-reads and re-applies the edit at most this many times.
+const EDIT_ATTEMPTS: usize = 5;
+/// Refusal for a dashboard the build can't render; the admin API maps it to 400.
 pub const OLDER_FORMAT_ERROR: &str =
     "This dashboard uses an older format. Open it and save it once, then publish.";
+pub const LINK_NOT_FOUND: &str = "public link not found";
 
 /// Search-response fields the renderer reads; SQL, VRL errors and trace ids stay private.
 const PUBLIC_META_FIELDS: [&str; 6] = [
@@ -68,95 +74,403 @@ const PUBLIC_META_FIELDS: [&str; 6] = [
     "new_end_time",
 ];
 
-/// Rebuild every preset snapshot for one public dashboard. Reads the LIVE
-/// dashboard config (edits auto-sync), executes each panel query as the
-/// publisher, and upserts a snapshot per allowed preset.
-pub async fn rebuild_one(pd: &PublicDashboard) -> Result<(), anyhow::Error> {
-    let now = now_micros();
-    // Expired data is never stored again, even for a caller still holding an enabled link.
-    if is_expired(pd.expires_at, now) {
-        return Ok(());
-    }
-    let conn = infra::db::get_orm_client_rw().await;
+/// A request the admin API refuses with 400 and this message.
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub struct Invalid(pub String);
 
-    let Some((_folder, dash)) = dashboards::get_by_id(&pd.org_id, &pd.dashboard_id).await? else {
-        pd_table::mark_rebuilt(conn, &pd.id, REBUILD_STATE_ERROR, None, None, now).await?;
-        return Ok(());
-    };
+/// Identifiers returned after publishing.
+pub struct PublishResult {
+    pub id: String,
+    pub slug: String,
+}
 
-    // An absolute range is built once, then again only after the link changes.
-    let built: BTreeMap<String, i64> = pd_table::list_snapshot_keys(conn, &pd.id)
-        .await?
-        .into_iter()
-        .collect();
-    let due: Vec<TimeRange> = time_ranges(pd)
-        .ranges
-        .into_iter()
-        .filter(|r| r.is_relative() || built.get(&r.key()).is_none_or(|at| *at < pd.updated_at))
-        .collect();
-    if due.is_empty() {
-        return Ok(());
-    }
+/// A link as the admin API returns it; the slug is a bearer secret for authenticated routes only.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct PublicLinkView {
+    pub id: String,
+    pub name: String,
+    pub slug: String,
+    pub dashboard_id: String,
+    pub dashboard_title: Option<String>,
+    pub folder_id: Option<String>,
+    pub folder_name: Option<String>,
+    pub status: PublicLinkStatus,
+    pub enabled: bool,
+    pub time_range: TimeRangePolicy,
+    pub frozen_variables: BTreeMap<String, serde_json::Value>,
+    pub refresh_secs: i32,
+    pub expires_at: Option<i64>,
+    pub published_by: String,
+    pub updated_by: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub last_accessed_at: Option<i64>,
+    pub access_count: i64,
+}
 
-    let scrape = db::organization::get_org_setting(&pd.org_id)
+/// Builds one range's panels from the captured link and dashboard; nothing is stored here.
+pub async fn build_one(
+    link: &PublicDashboard,
+    dash: &Dashboard,
+    range: &TimeRange,
+    now: i64,
+) -> ResultBody {
+    let scrape = db::organization::get_org_setting(&link.org_id)
         .await
         .ok()
         .map(|s| f64::from(s.scrape_interval));
-    let frozen = parse_frozen_vars(pd.frozen_variables.as_deref());
+    let (start, end) = range.window(now);
     let mut authorized: BTreeSet<String> = BTreeSet::new();
     let mut unauthorized: BTreeSet<String> = BTreeSet::new();
-
-    for range in &due {
-        let (start, end) = range.window(now);
-        let values = fill_defaults(
-            &pd.org_id,
-            &pd.published_by,
-            &dash,
-            frozen.clone(),
-            start,
-            end,
-            &mut authorized,
-            &mut unauthorized,
-        )
-        .await;
-        let variables = PublicVariable::list(&dash, &values);
-        let vars = QueryVars::new(&dash, values, scrape);
-        let panels = build_panels(
-            &pd.org_id,
-            &pd.published_by,
-            &dash,
-            &vars,
-            start,
-            end,
-            &mut authorized,
-            &mut unauthorized,
-        )
-        .await;
-        let json = serde_json::to_string(&SnapshotData {
-            panels,
-            built_at: now,
-            variables,
-        })?;
-        // A revoke or pause mid-build already deleted the snapshots, so none may be written back.
-        if !still_enabled(&pd.id).await? {
-            return Ok(());
-        }
-        pd_table::upsert_snapshot(conn, &pd.id, &range.key(), &json, now).await?;
-    }
-
-    let auth_json =
-        (!authorized.is_empty()).then(|| serde_json::to_string(&authorized).unwrap_or_default());
-    let unauth_json = (!unauthorized.is_empty())
-        .then(|| serde_json::to_string(&unauthorized).unwrap_or_default());
-    pd_table::mark_rebuilt(
-        conn,
-        &pd.id,
-        REBUILD_STATE_OK,
-        auth_json.as_deref(),
-        unauth_json.as_deref(),
-        now,
+    let values = fill_defaults(
+        &link.org_id,
+        &link.published_by,
+        dash,
+        parse_frozen_vars(link.frozen_variables.as_deref()),
+        start,
+        end,
+        &mut authorized,
+        &mut unauthorized,
     )
-    .await?;
+    .await;
+    let variables = PublicVariable::list(dash, &values);
+    let vars = QueryVars::new(dash, values, scrape);
+    let mut panels = build_panels(
+        &link.org_id,
+        &link.published_by,
+        dash,
+        &vars,
+        start,
+        end,
+        &mut authorized,
+        &mut unauthorized,
+    )
+    .await;
+    for panel in panels.values_mut() {
+        if matches!(panel.state, PanelState::Ok { .. }) {
+            panel.built_at = Some(now);
+        }
+    }
+    ResultBody { panels, variables }
+}
+
+/// Publish a link; it runs no query until someone opens it.
+pub async fn create(
+    org: &str,
+    dashboard_id: &str,
+    cfg: PublicDashboardConfig,
+    publisher: &str,
+) -> Result<PublishResult, anyhow::Error> {
+    let Some((folder, dash)) = dashboards::get_by_id(org, dashboard_id).await? else {
+        return Err(anyhow::anyhow!("dashboard not found"));
+    };
+    check_format(&dash)?;
+    let now = now_micros();
+    validate_dashboard(&dash, &cfg.frozen_variables, now).map_err(Invalid)?;
+
+    let db = get_orm_client_rw().await;
+    let org_max = org_link_limit(pd_table::get_settings(db, org).await?.as_ref());
+    let dashboard_max = get_config().public_dashboards.max_links_per_dashboard;
+    let id = ider::uuid();
+    let slug = gen_unique_slug().await?;
+    let model = PublicDashboard {
+        id: id.clone(),
+        org_id: org.to_string(),
+        folder_id: folder.folder_id.clone(),
+        dashboard_id: dashboard_id.to_string(),
+        slug: slug.clone(),
+        name: cfg.name.trim().to_string(),
+        visibility: cfg.visibility.to_i32(),
+        time_ranges: Some(serde_json::to_string(&cfg.time_range.ranges)?),
+        default_range_key: Some(cfg.time_range.default.key()),
+        frozen_variables: Some(serde_json::to_string(&cfg.frozen_variables)?),
+        refresh_secs: cfg.refresh_secs,
+        dashboard_version: dash.version,
+        published_by: publisher.to_string(),
+        enabled: true,
+        expires_at: cfg.expires_at,
+        created_by: publisher.to_string(),
+        updated_by: None,
+        created_at: now,
+        updated_at: now,
+        rev: now,
+        deleted_at: None,
+        last_accessed_at: None,
+        access_count: 0,
+    };
+    match pd_table::insert_capped(db, &model, org_max, dashboard_max).await? {
+        CreateOutcome::Created => Ok(PublishResult { id, slug }),
+        CreateOutcome::OrgFull => Err(Invalid(format!(
+            "This organization has reached its limit of {org_max} public links. Revoke one to add another."
+        ))
+        .into()),
+        CreateOutcome::DashboardFull => Err(Invalid(format!(
+            "This dashboard has reached its limit of {dashboard_max} public links. Revoke one to add another."
+        ))
+        .into()),
+    }
+}
+
+pub async fn list(org: &str) -> Result<Vec<PublicDashboard>, anyhow::Error> {
+    Ok(pd_table::list(get_orm_client_ro().await, org).await?)
+}
+
+pub async fn list_for_dashboard(
+    org: &str,
+    dashboard_id: &str,
+) -> Result<Vec<PublicDashboard>, anyhow::Error> {
+    Ok(pd_table::list_by_dashboard(get_orm_client_ro().await, org, dashboard_id).await?)
+}
+
+/// Attach each link's dashboard title, current folder and lifecycle status, with one dashboard
+/// lookup.
+pub async fn views(
+    org: &str,
+    links: Vec<PublicDashboard>,
+) -> Result<Vec<PublicLinkView>, anyhow::Error> {
+    let ids: Vec<String> = links
+        .iter()
+        .map(|l| l.dashboard_id.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let labels = dashboards::labels_by_ids(org, &ids).await?;
+    let now = now_micros();
+    Ok(links
+        .into_iter()
+        .map(|link| {
+            let label = labels.get(&link.dashboard_id);
+            let status = PublicLinkStatus::derive(
+                &PublicLinkState {
+                    dashboard_exists: label.is_some(),
+                    enabled: link.enabled,
+                    expires_at: link.expires_at,
+                    access_count: link.access_count,
+                },
+                now,
+            );
+            PublicLinkView {
+                dashboard_title: label.map(|l| l.title.clone()),
+                folder_id: label.map(|l| l.folder_id.clone()),
+                folder_name: label.map(|l| l.folder_name.clone()),
+                status,
+                enabled: link.enabled,
+                time_range: time_ranges(&link),
+                frozen_variables: parse_frozen_vars(link.frozen_variables.as_deref()),
+                refresh_secs: link.refresh_secs,
+                expires_at: link.expires_at,
+                published_by: link.published_by,
+                updated_by: link.updated_by,
+                created_at: link.created_at,
+                updated_at: link.updated_at,
+                last_accessed_at: link.last_accessed_at,
+                access_count: link.access_count,
+                id: link.id,
+                name: link.name,
+                slug: link.slug,
+                dashboard_id: link.dashboard_id,
+            }
+        })
+        .collect())
+}
+
+/// A live link only when it belongs to both this org and this dashboard, so an id from another
+/// dashboard can't be reached by editing the URL. Read from the primary, as every edit starts here.
+pub async fn get_link(
+    org: &str,
+    dashboard_id: &str,
+    id: &str,
+) -> Result<Option<PublicDashboard>, anyhow::Error> {
+    Ok(pd_table::get_on_dashboard(get_orm_client_rw().await, org, dashboard_id, id).await?)
+}
+
+/// Replace a link's settings in place; its slug never changes.
+pub async fn update_link(
+    link: PublicDashboard,
+    cfg: PublicDashboardConfig,
+    user_id: &str,
+) -> Result<PublicDashboard, anyhow::Error> {
+    let dash = current_dashboard(&link.org_id, &link.dashboard_id).await?;
+    let now = now_micros();
+    validate_dashboard(&dash, &cfg.frozen_variables, now).map_err(Invalid)?;
+    // The Enterprise editor stream check for changed frozen variables (design 6.3) belongs here.
+    let ranges = serde_json::to_string(&cfg.time_range.ranges)?;
+    let frozen = serde_json::to_string(&cfg.frozen_variables)?;
+    edit(&link.org_id, &link.id, |l| {
+        l.updated_by = Some(user_id.to_string());
+        l.name = cfg.name.trim().to_string();
+        l.visibility = cfg.visibility.to_i32();
+        l.time_ranges = Some(ranges.clone());
+        l.default_range_key = Some(cfg.time_range.default.key());
+        l.frozen_variables = Some(frozen.clone());
+        l.refresh_secs = cfg.refresh_secs;
+        l.expires_at = cfg.expires_at;
+        l.updated_at = now;
+        Ok(())
+    })
+    .await
+}
+
+/// Stop serving; the slug and settings are kept.
+pub async fn pause_link(
+    link: PublicDashboard,
+    user_id: &str,
+) -> Result<PublicDashboard, anyhow::Error> {
+    set_paused(&link, Some(user_id.to_string())).await
+}
+
+/// Whether the publisher has left the link's org; a failed lookup isn't treated as leaving.
+pub async fn publisher_left(link: &PublicDashboard) -> bool {
+    if db::user::is_root_user(&link.published_by) {
+        return false;
+    }
+    matches!(
+        infra::table::org_users::get_optional(&link.org_id, &link.published_by).await,
+        Ok(None)
+    )
+}
+
+/// Pause a link whose publisher left the org; the queries ran with that person's access.
+pub async fn pause_for_departed_publisher(link: PublicDashboard) -> Result<(), anyhow::Error> {
+    let updated_by = link.updated_by.clone();
+    set_paused(&link, updated_by).await.map(|_| ())
+}
+
+/// Serve again at the same address; the next view builds.
+pub async fn resume_link(
+    link: PublicDashboard,
+    user_id: &str,
+) -> Result<PublicDashboard, anyhow::Error> {
+    let now = now_micros();
+    if is_expired(link.expires_at, now) {
+        return Err(Invalid(
+            "this link has expired; extend its expiry date to bring it back".to_string(),
+        )
+        .into());
+    }
+    current_dashboard(&link.org_id, &link.dashboard_id).await?;
+    edit(&link.org_id, &link.id, |l| {
+        l.enabled = true;
+        l.updated_by = Some(user_id.to_string());
+        l.updated_at = now;
+        Ok(())
+    })
+    .await
+}
+
+/// Make every result of the link due on its next view; runs no query.
+pub async fn refresh_now(link: PublicDashboard) -> Result<PublicDashboard, anyhow::Error> {
+    if !link.enabled {
+        return Err(Invalid("resume this link before refreshing it".to_string()).into());
+    }
+    if is_expired(link.expires_at, now_micros()) {
+        return Err(Invalid(
+            "this link has expired; extend its expiry date to bring it back".to_string(),
+        )
+        .into());
+    }
+    edit(&link.org_id, &link.id, |_| Ok(())).await
+}
+
+/// Revoke: soft-delete the link, so its slug stays reserved and replicas cannot revive it.
+pub async fn delete(org: &str, id: &str) -> Result<bool, anyhow::Error> {
+    let now = now_micros();
+    match edit(org, id, |l| {
+        l.deleted_at = Some(now);
+        Ok(())
+    })
+    .await
+    {
+        Ok(_) => Ok(true),
+        Err(e) if e.to_string() == LINK_NOT_FOUND => Ok(false),
+        Err(e) => Err(e),
+    }
+}
+
+/// Revoke every link on a dashboard; called when the dashboard is deleted.
+pub async fn revoke_all_for_dashboard(org: &str, dashboard_id: &str) -> Result<(), anyhow::Error> {
+    for link in pd_table::list_by_dashboard(get_orm_client_rw().await, org, dashboard_id).await? {
+        delete(org, &link.id).await?;
+    }
+    Ok(())
+}
+
+/// Revoke every link in an org; called by org cleanup.
+pub async fn revoke_all_for_org(org: &str) -> Result<(), anyhow::Error> {
+    for link in pd_table::list(get_orm_client_rw().await, org).await? {
+        delete(org, &link.id).await?;
+    }
+    Ok(())
+}
+
+/// Hard-delete links whose 30-day soft-delete memory has run out.
+pub async fn purge_deleted() -> Result<u64, anyhow::Error> {
+    let before = now_micros() - pd_table::DELETED_RETENTION_MICROS;
+    Ok(pd_table::purge_deleted(get_orm_client_rw().await, before).await?)
+}
+
+/// Reject a create request the server would otherwise have to rewrite or store unbounded.
+pub fn validate_config(cfg: &PublicDashboardConfig) -> Result<(), String> {
+    let now = now_micros();
+    check_expiry(cfg.expires_at, now)?;
+    validate_limits(cfg, now)
+}
+
+/// An edit that keeps an expired link's date is allowed, so only a changed expiry must be in the
+/// future.
+pub fn validate_edit(cfg: &PublicDashboardConfig, link: &PublicDashboard) -> Result<(), String> {
+    let now = now_micros();
+    if cfg.expires_at != link.expires_at {
+        check_expiry(cfg.expires_at, now)?;
+    }
+    validate_limits(cfg, now)
+}
+
+/// The dashboard as a link would show it: at most `MAX_PANELS` panels across every tab, and no
+/// SQL panel with an explicit LIMIT above the default row cap.
+pub fn validate_dashboard(
+    dash: &Dashboard,
+    frozen: &BTreeMap<String, serde_json::Value>,
+    now: i64,
+) -> Result<(), String> {
+    let cfg = get_config();
+    let Some(v8) = dash.v8.as_ref() else {
+        return Ok(());
+    };
+    let panels: Vec<_> = v8
+        .tabs
+        .iter()
+        .flat_map(|tab| tab.panels.iter().map(move |panel| (tab, panel)))
+        .collect();
+    let max = cfg.public_dashboards.max_panels as usize;
+    if panels.len() > max {
+        return Err(format!(
+            "This dashboard has {} panels; a public link can show at most {max}.",
+            panels.len()
+        ));
+    }
+    let cap = cfg.limit.query_default_limit;
+    let vars = QueryVars::new(dash, frozen.clone(), None);
+    let (start, end) = (now - 3_600_000_000, now);
+    for (tab, panel) in panels {
+        if panel.query_type == "promql" || panel.typ == "custom_chart" {
+            continue;
+        }
+        let panel_vars = vars.for_panel(&tab.tab_id, &panel.id);
+        let over = panel
+            .queries
+            .iter()
+            .filter_map(|q| q.query.as_deref())
+            .filter_map(|sql| explicit_limit(&panel_vars.substitute(sql, "sql", start, end)))
+            .find(|n| *n > cap);
+        if let Some(n) = over {
+            return Err(format!(
+                "Panel \"{}\" has LIMIT {n}, above the public cap of {cap} rows. Lower it or aggregate.",
+                panel.title
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -176,14 +490,81 @@ pub fn time_ranges(link: &PublicDashboard) -> TimeRangePolicy {
     TimeRangePolicy { ranges, default }
 }
 
-/// When a link of only absolute ranges is next checked: daily, or at expiry if that is sooner.
-pub fn next_absolute_check(expires_at: Option<i64>, now: i64) -> i64 {
-    let daily = now + ABSOLUTE_CHECK_SECS * 1_000_000;
-    expires_at.map_or(daily, |exp| daily.min(exp.max(now)))
+/// Applies `change` to the live row and writes it with a compare-and-set on rev; a lost race
+/// re-reads the row and applies the change again.
+async fn edit<F>(org: &str, id: &str, mut change: F) -> Result<PublicDashboard, anyhow::Error>
+where
+    F: FnMut(&mut PublicDashboard) -> Result<(), anyhow::Error>,
+{
+    let db = get_orm_client_rw().await;
+    for _ in 0..EDIT_ATTEMPTS {
+        let Some(mut row) = pd_table::get(db, id)
+            .await?
+            .filter(|l| l.org_id == org && l.deleted_at.is_none())
+        else {
+            return Err(anyhow::anyhow!(LINK_NOT_FOUND));
+        };
+        let seen = row.rev;
+        change(&mut row)?;
+        row.rev = pd_table::next_rev(seen, now_micros());
+        if pd_table::update_cas(db, &row, seen).await? {
+            return Ok(row);
+        }
+    }
+    Err(anyhow::anyhow!(
+        "the public link kept changing while saving; try again"
+    ))
 }
 
-/// Enumerate v8 panels → queries and materialize each. Non-v8 dashboards are
-/// not supported in this cut (they yield an empty panel set).
+async fn set_paused(
+    link: &PublicDashboard,
+    updated_by: Option<String>,
+) -> Result<PublicDashboard, anyhow::Error> {
+    let now = now_micros();
+    edit(&link.org_id, &link.id, |l| {
+        l.enabled = false;
+        l.updated_by = updated_by.clone();
+        l.updated_at = now;
+        Ok(())
+    })
+    .await
+}
+
+/// The org's link limit: its settings row's, never above the env limit.
+fn org_link_limit(settings: Option<&OrgSettings>) -> u32 {
+    let env = get_config().public_dashboards.max_links_per_org;
+    settings
+        .and_then(|s| s.max_links)
+        .map_or(env, |max| u32::try_from(max).unwrap_or(0).min(env))
+}
+
+/// The outermost explicit LIMIT of a SQL query; None without one or when it does not parse.
+fn explicit_limit(sql: &str) -> Option<i64> {
+    use sqlparser::{
+        ast::{Expr, LimitClause, Statement, Value, ValueWithSpan},
+        dialect::PostgreSqlDialect,
+        parser::Parser,
+    };
+    let sql = replace_o2_custom_patterns(sql).unwrap_or_else(|_| sql.to_string());
+    let Statement::Query(query) = Parser::parse_sql(&PostgreSqlDialect {}, &sql).ok()?.pop()?
+    else {
+        return None;
+    };
+    let LimitClause::LimitOffset {
+        limit:
+            Some(Expr::Value(ValueWithSpan {
+                value: Value::Number(n, _),
+                ..
+            })),
+        ..
+    } = query.limit_clause?
+    else {
+        return None;
+    };
+    n.parse().ok()
+}
+
+/// Runs every v8 panel's queries for one window; a non-v8 dashboard yields no panels.
 #[allow(clippy::too_many_arguments)]
 async fn build_panels(
     org: &str,
@@ -194,7 +575,7 @@ async fn build_panels(
     end: i64,
     authorized: &mut BTreeSet<String>,
     unauthorized: &mut BTreeSet<String>,
-) -> BTreeMap<String, PanelSnapshot> {
+) -> BTreeMap<String, PanelResult> {
     let mut out = BTreeMap::new();
     let Some(v8) = dash.v8.as_ref() else {
         return out;
@@ -209,14 +590,10 @@ async fn build_panels(
         // A custom chart runs the author's JavaScript in the viewer's origin, so it is never
         // public.
         if panel.typ == "custom_chart" {
-            let snapshot = panel_snapshot(
-                &panel.query_type,
-                start,
-                end,
-                Vec::new(),
-                Some("unsupported".to_string()),
+            out.insert(
+                panel.id.clone(),
+                PanelResult::not_available(NotAvailableReason::Unsupported),
             );
-            out.insert(panel.id.clone(), snapshot);
             continue;
         }
         let is_promql = panel.query_type == "promql";
@@ -248,31 +625,26 @@ async fn build_panels(
                 }
             }
         }
-        let snapshot = panel_snapshot(&panel.query_type, start, end, results, failure);
-        out.insert(panel.id.clone(), snapshot);
+        out.insert(
+            panel.id.clone(),
+            panel_result(&panel.query_type, start, end, results, failure),
+        );
     }
     out
 }
 
-/// SQL needs every query; PromQL needs one, with the rest stored as empty results.
-fn panel_snapshot(
+/// SQL needs every query; PromQL needs one, with the rest served as empty results.
+fn panel_result(
     query_type: &str,
     start: i64,
     end: i64,
     results: Vec<Option<(serde_json::Value, serde_json::Value)>>,
-    failure: Option<String>,
-) -> PanelSnapshot {
+    failure: Option<NotAvailableReason>,
+) -> PanelResult {
     let is_promql = query_type == "promql";
     let any_ok = results.iter().any(Option::is_some);
     if !any_ok || (!is_promql && failure.is_some()) {
-        return PanelSnapshot {
-            state: PanelState::NotAvailable {
-                reason: failure.unwrap_or_else(|| "no_query".to_string()),
-            },
-            data: Vec::new(),
-            result_meta_data: Vec::new(),
-            metadata: serde_json::Value::Null,
-        };
+        return PanelResult::not_available(failure.unwrap_or(NotAvailableReason::NoQuery));
     }
     // Same per-query metadata the live loader builds for an unshifted query.
     let queries_meta = (0..results.len())
@@ -298,8 +670,11 @@ fn panel_snapshot(
             })
         })
         .unzip();
-    PanelSnapshot {
-        state: PanelState::Ok,
+    PanelResult {
+        state: PanelState::ok(),
+        intent: String::new(),
+        built_at: None,
+        window: Some(Window { start, end }),
         data,
         result_meta_data,
         metadata: serde_json::json!({ "queries": queries_meta }),
@@ -317,7 +692,7 @@ async fn run_query(
     end: i64,
     authorized: &mut BTreeSet<String>,
     unauthorized: &mut BTreeSet<String>,
-) -> Result<(serde_json::Value, serde_json::Value), String> {
+) -> Result<(serde_json::Value, serde_json::Value), NotAvailableReason> {
     if query_type == "promql" {
         run_promql(
             org,
@@ -356,9 +731,9 @@ async fn run_sql(
     end: i64,
     authorized: &mut BTreeSet<String>,
     unauthorized: &mut BTreeSet<String>,
-) -> Result<(serde_json::Value, serde_json::Value), String> {
+) -> Result<(serde_json::Value, serde_json::Value), NotAvailableReason> {
     let Some(sql_tmpl) = q.query.as_ref() else {
-        return Err("no_query".to_string());
+        return Err(NotAvailableReason::NoQuery);
     };
     let sql = vars.substitute(sql_tmpl, "sql", start, end);
     let stream_type = q.fields.stream_type;
@@ -393,8 +768,8 @@ async fn run_sql(
             Ok((hits, serde_json::Value::Array(vec![public_meta(&full)])))
         }
         Err(e) => {
-            log::warn!("public dashboard rebuild query failed: {e}");
-            Err("query_error".to_string())
+            log::warn!("public dashboard panel query failed: {e}");
+            Err(NotAvailableReason::BuildError)
         }
     }
 }
@@ -418,9 +793,9 @@ async fn run_promql(
     end: i64,
     authorized: &mut BTreeSet<String>,
     unauthorized: &mut BTreeSet<String>,
-) -> Result<(serde_json::Value, serde_json::Value), String> {
+) -> Result<(serde_json::Value, serde_json::Value), NotAvailableReason> {
     let Some(expr_tmpl) = q.query.as_ref() else {
-        return Err("no_query".to_string());
+        return Err(NotAvailableReason::NoQuery);
     };
     let expr = vars.substitute(expr_tmpl, "promql", start, end);
     let target = (q.fields.stream_type, q.fields.stream.as_str());
@@ -464,16 +839,16 @@ async fn run_promql(
     )
     .await
     {
-        Ok(value) => {
+        Ok(resp) => {
             let data = serde_json::json!({
-                "resultType": value.get_type().to_string(),
-                "result": value,
+                "resultType": resp.value.get_type().to_string(),
+                "result": resp.value,
             });
             Ok((data, serde_json::Value::Null))
         }
         Err(e) => {
-            log::warn!("public dashboard promql rebuild failed: {e}");
-            Err("query_error".to_string())
+            log::warn!("public dashboard promql query failed: {e}");
+            Err(NotAvailableReason::BuildError)
         }
     }
 }
@@ -593,13 +968,6 @@ fn parse_frozen_vars(json: Option<&str>) -> BTreeMap<String, serde_json::Value> 
         .unwrap_or_default()
 }
 
-async fn still_enabled(id: &str) -> Result<bool, anyhow::Error> {
-    let conn = infra::db::get_orm_client_rw().await;
-    Ok(pd_table::get(conn, id)
-        .await?
-        .is_some_and(|link| link.enabled))
-}
-
 /// Checks every stream the final query reads, since SQL and PromQL can read beyond the picked one.
 #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
 async fn authorize_query(
@@ -610,15 +978,15 @@ async fn authorize_query(
     target: (StreamType, &str),
     authorized: &mut BTreeSet<String>,
     unauthorized: &mut BTreeSet<String>,
-) -> Result<(), String> {
+) -> Result<(), NotAvailableReason> {
     #[cfg(feature = "enterprise")]
     {
         use crate::authz::{
             StreamPermissionResourceType, check_cipher_key_permissions, check_stream_permissions,
         };
         // An unreadable query can't be proven safe, so it is withheld rather than run.
-        let streams =
-            query_streams(query_type, text, target.0).map_err(|_| "unauthorized".to_string())?;
+        let streams = query_streams(query_type, text, target.0)
+            .map_err(|_| NotAvailableReason::Unauthorized)?;
         for (stream, stream_type) in &streams {
             let denied = check_stream_permissions(
                 stream,
@@ -631,7 +999,7 @@ async fn authorize_query(
             .is_some();
             if denied {
                 unauthorized.insert(stream.clone());
-                return Err("unauthorized".to_string());
+                return Err(NotAvailableReason::Unauthorized);
             }
         }
         if query_type != "promql"
@@ -639,7 +1007,7 @@ async fn authorize_query(
                 .await
                 .is_some()
         {
-            return Err("unauthorized".to_string());
+            return Err(NotAvailableReason::Unauthorized);
         }
         authorized.extend(streams.into_iter().map(|(stream, _)| stream));
     }
@@ -678,367 +1046,16 @@ fn query_streams(
     Ok(out)
 }
 
-/// Identifiers returned after publishing.
-pub struct PublishResult {
-    pub id: String,
-    pub slug: String,
-}
-
-/// Publish a link; the rebuild withholds panels on streams the publisher can't read.
-pub async fn create(
-    org: &str,
-    dashboard_id: &str,
-    cfg: PublicDashboardConfig,
-    publisher: &str,
-) -> Result<PublishResult, anyhow::Error> {
-    let Some((folder, dash)) = dashboards::get_by_id(org, dashboard_id).await? else {
-        return Err(anyhow::anyhow!("dashboard not found"));
-    };
-    check_format(&dash)?;
-
-    let id = ider::uuid();
-    let slug = gen_unique_slug().await?;
-    let now = now_micros();
-    let model = PublicDashboard {
-        id: id.clone(),
-        org_id: org.to_string(),
-        folder_id: folder.folder_id.clone(),
-        dashboard_id: dashboard_id.to_string(),
-        slug: slug.clone(),
-        name: cfg.name.trim().to_string(),
-        visibility: cfg.visibility.to_i32(),
-        time_ranges: Some(serde_json::to_string(&cfg.time_range.ranges)?),
-        default_range_key: Some(cfg.time_range.default.key()),
-        frozen_variables: Some(serde_json::to_string(&cfg.frozen_variables)?),
-        rebuild_secs: cfg.rebuild_secs,
-        last_rebuilt_at: None,
-        rebuild_state: 0,
-        unauthorized_streams: None,
-        dashboard_version: dash.version,
-        published_by: publisher.to_string(),
-        last_authorized_streams: None,
-        enabled: true,
-        expires_at: cfg.expires_at,
-        created_by: publisher.to_string(),
-        updated_by: None,
-        created_at: now,
-        updated_at: now,
-        last_accessed_at: None,
-        access_count: 0,
-    };
-    pd_table::insert(&model).await?;
-    if let Err(e) = register_trigger(org, &id, now).await {
-        // A link with no trigger would never build and stay "Preparing", so the insert is undone.
-        if let Err(undo) = pd_table::delete(org, &id).await {
-            log::error!("public dashboard {id} left without a trigger: {undo}");
-        }
-        return Err(e);
-    }
-    if let Err(e) = rebuild_one(&model).await {
-        log::warn!("public dashboard initial build failed for {id}: {e}");
-    }
-    Ok(PublishResult { id, slug })
-}
-
-pub async fn list(org: &str) -> Result<Vec<PublicDashboard>, anyhow::Error> {
-    Ok(pd_table::list(org).await?)
-}
-
-pub async fn list_for_dashboard(
-    org: &str,
-    dashboard_id: &str,
-) -> Result<Vec<PublicDashboard>, anyhow::Error> {
-    Ok(pd_table::list_by_dashboard(org, dashboard_id).await?)
-}
-
-/// A link as the admin API returns it; the slug is a bearer secret for authenticated routes only.
-#[derive(Clone, Debug, serde::Serialize)]
-pub struct PublicLinkView {
-    pub id: String,
-    pub name: String,
-    pub slug: String,
-    pub dashboard_id: String,
-    pub dashboard_title: Option<String>,
-    pub folder_id: Option<String>,
-    pub folder_name: Option<String>,
-    pub status: PublicLinkStatus,
-    pub enabled: bool,
-    pub time_range: TimeRangePolicy,
-    pub frozen_variables: BTreeMap<String, serde_json::Value>,
-    pub rebuild_secs: i32,
-    pub last_rebuilt_at: Option<i64>,
-    pub rebuild_state: i32,
-    pub expires_at: Option<i64>,
-    pub published_by: String,
-    pub updated_by: Option<String>,
-    pub created_at: i64,
-    pub updated_at: i64,
-}
-
-/// Attach each link's dashboard title, current folder and derived status, with one dashboard
-/// lookup.
-pub async fn views(
-    org: &str,
-    links: Vec<PublicDashboard>,
-) -> Result<Vec<PublicLinkView>, anyhow::Error> {
-    let ids: Vec<String> = links
-        .iter()
-        .map(|l| l.dashboard_id.clone())
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect();
-    let labels = dashboards::labels_by_ids(org, &ids).await?;
-    let now = now_micros();
-    Ok(links
-        .into_iter()
-        .map(|link| {
-            let label = labels.get(&link.dashboard_id);
-            let time_range = time_ranges(&link);
-            let status = PublicLinkStatus::derive(
-                &PublicLinkState {
-                    dashboard_exists: label.is_some(),
-                    enabled: link.enabled,
-                    expires_at: link.expires_at,
-                    last_rebuilt_at: link.last_rebuilt_at,
-                    rebuild_failed: link.rebuild_state == REBUILD_STATE_ERROR,
-                    rebuild_secs: link.rebuild_secs,
-                    has_relative: time_range.has_relative(),
-                },
-                now,
-            );
-            PublicLinkView {
-                dashboard_title: label.map(|l| l.title.clone()),
-                folder_id: label.map(|l| l.folder_id.clone()),
-                folder_name: label.map(|l| l.folder_name.clone()),
-                status,
-                enabled: link.enabled,
-                time_range,
-                frozen_variables: parse_frozen_vars(link.frozen_variables.as_deref()),
-                rebuild_secs: link.rebuild_secs,
-                last_rebuilt_at: link.last_rebuilt_at,
-                rebuild_state: link.rebuild_state,
-                expires_at: link.expires_at,
-                published_by: link.published_by,
-                updated_by: link.updated_by,
-                created_at: link.created_at,
-                updated_at: link.updated_at,
-                id: link.id,
-                name: link.name,
-                slug: link.slug,
-                dashboard_id: link.dashboard_id,
-            }
-        })
-        .collect())
-}
-
-/// A link only when it belongs to both this org and this dashboard, so an id from
-/// another dashboard can't be reached by editing the URL.
-pub async fn get_link(
-    org: &str,
-    dashboard_id: &str,
-    id: &str,
-) -> Result<Option<PublicDashboard>, anyhow::Error> {
-    Ok(pd_table::get_on_dashboard(org, dashboard_id, id).await?)
-}
-
-/// Replace a link's settings in place; its slug never changes.
-pub async fn update_link(
-    mut link: PublicDashboard,
-    cfg: PublicDashboardConfig,
-    user_id: &str,
-) -> Result<PublicDashboard, anyhow::Error> {
-    ensure_current_format(&link.org_id, &link.dashboard_id).await?;
-    link.updated_by = Some(user_id.to_string());
-    link.name = cfg.name.trim().to_string();
-    link.time_ranges = Some(serde_json::to_string(&cfg.time_range.ranges)?);
-    link.default_range_key = Some(cfg.time_range.default.key());
-    link.frozen_variables = Some(serde_json::to_string(&cfg.frozen_variables)?);
-    link.rebuild_secs = cfg.rebuild_secs;
-    link.expires_at = cfg.expires_at;
-    link.updated_at = now_micros();
-    pd_table::update(&link).await?;
-
-    let keep: Vec<String> = cfg.time_range.ranges.iter().map(TimeRange::key).collect();
-    pd_table::prune_snapshots(infra::db::get_orm_client_rw().await, &link.id, &keep).await?;
-    if link.enabled {
-        restart_rebuilds(&link).await?;
-    }
-    Ok(link)
-}
-
-/// Stop serving and rebuilding and delete the snapshots; the slug and settings are kept.
-pub async fn pause_link(
-    link: PublicDashboard,
-    user_id: &str,
-) -> Result<PublicDashboard, anyhow::Error> {
-    set_paused(link, Some(user_id.to_string())).await
-}
-
-/// Whether the publisher has left the link's org; a failed lookup isn't treated as leaving.
-pub async fn publisher_left(link: &PublicDashboard) -> bool {
-    if db::user::is_root_user(&link.published_by) {
-        return false;
-    }
-    matches!(
-        infra::table::org_users::get_optional(&link.org_id, &link.published_by).await,
-        Ok(None)
-    )
-}
-
-/// Pause a link whose publisher left the org; the queries ran with that person's access.
-pub async fn pause_for_departed_publisher(link: PublicDashboard) -> Result<(), anyhow::Error> {
-    let updated_by = link.updated_by.clone();
-    set_paused(link, updated_by).await.map(|_| ())
-}
-
-async fn set_paused(
-    mut link: PublicDashboard,
-    updated_by: Option<String>,
-) -> Result<PublicDashboard, anyhow::Error> {
-    link.enabled = false;
-    link.updated_by = updated_by;
-    link.updated_at = now_micros();
-    pd_table::update(&link).await?;
-    let _ = db::scheduler::delete(
-        &link.org_id,
-        db::scheduler::TriggerModule::PublicDashboard,
-        &link.id,
-    )
-    .await;
-    // Nothing serves or expires a paused link's data, so it isn't kept at rest; resume rebuilds it.
-    pd_table::delete_snapshots(infra::db::get_orm_client_rw().await, &link.id).await?;
-    Ok(link)
-}
-
-/// Serve and rebuild again at the same address, with a fresh build straight away.
-pub async fn resume_link(
-    mut link: PublicDashboard,
-    user_id: &str,
-) -> Result<PublicDashboard, anyhow::Error> {
-    if is_expired(link.expires_at, now_micros()) {
-        return Err(anyhow::anyhow!(
-            "this link has expired; extend its expiry date to bring it back"
-        ));
-    }
-    ensure_current_format(&link.org_id, &link.dashboard_id).await?;
-    link.enabled = true;
-    link.updated_by = Some(user_id.to_string());
-    link.updated_at = now_micros();
-    pd_table::update(&link).await?;
-    restart_rebuilds(&link).await?;
-    Ok(link)
-}
-
-/// Build every range of a link now, picking up dashboard edits and late data.
-pub async fn rebuild_now(
-    mut link: PublicDashboard,
-    user_id: &str,
-) -> Result<PublicDashboard, anyhow::Error> {
-    if !link.enabled {
-        return Err(anyhow::anyhow!("resume this link before rebuilding it"));
-    }
-    if is_expired(link.expires_at, now_micros()) {
-        return Err(anyhow::anyhow!(
-            "this link has expired; extend its expiry date to bring it back"
-        ));
-    }
-    ensure_current_format(&link.org_id, &link.dashboard_id).await?;
-    link.updated_by = Some(user_id.to_string());
-    link.updated_at = now_micros();
-    pd_table::update(&link).await?;
-    restart_rebuilds(&link).await?;
-    Ok(link)
-}
-
-/// Revoke: delete the share, its snapshots, and its rebuild trigger.
-pub async fn delete(org: &str, id: &str) -> Result<bool, anyhow::Error> {
-    let existed = pd_table::delete(org, id).await?;
-    if existed {
-        let _ = db::scheduler::delete(org, db::scheduler::TriggerModule::PublicDashboard, id).await;
-    }
-    Ok(existed)
-}
-
-/// Revoke every link on a dashboard; called when the dashboard is deleted.
-pub async fn revoke_all_for_dashboard(org: &str, dashboard_id: &str) -> Result<(), anyhow::Error> {
-    for link in pd_table::list_by_dashboard(org, dashboard_id).await? {
-        delete(org, &link.id).await?;
-    }
-    Ok(())
-}
-
-/// Revoke every link in an org; called by org cleanup.
-pub async fn revoke_all_for_org(org: &str) -> Result<(), anyhow::Error> {
-    for link in pd_table::list(org).await? {
-        delete(org, &link.id).await?;
-    }
-    Ok(())
-}
-
-/// Replace the link's trigger with one due now and build synchronously, so edits and
-/// resumes show fresh data at once instead of after the next cadence tick.
-async fn restart_rebuilds(link: &PublicDashboard) -> Result<(), anyhow::Error> {
-    let _ = db::scheduler::delete(
-        &link.org_id,
-        db::scheduler::TriggerModule::PublicDashboard,
-        &link.id,
-    )
-    .await;
-    let now = now_micros();
-    if is_expired(link.expires_at, now) {
-        // With its trigger gone the scheduler never runs the expiry cleanup, so it happens here.
-        pd_table::delete_snapshots(infra::db::get_orm_client_rw().await, &link.id).await?;
-        return Ok(());
-    }
-    register_trigger(&link.org_id, &link.id, now).await?;
-    if let Err(e) = rebuild_one(link).await {
-        log::warn!(
-            "public dashboard rebuild after change failed for {}: {e}",
-            link.id
-        );
-    }
-    Ok(())
-}
-
-async fn register_trigger(org: &str, id: &str, next_run_at: i64) -> Result<(), anyhow::Error> {
-    let trigger = db::scheduler::Trigger {
-        org: org.to_string(),
-        module: db::scheduler::TriggerModule::PublicDashboard,
-        module_key: id.to_string(),
-        next_run_at,
-        ..Default::default()
-    };
-    db::scheduler::push(trigger)
-        .await
-        .map_err(|e| anyhow::anyhow!("failed to register rebuild trigger: {e}"))
-}
-
-async fn ensure_current_format(org: &str, dashboard_id: &str) -> Result<(), anyhow::Error> {
+async fn current_dashboard(org: &str, dashboard_id: &str) -> Result<Dashboard, anyhow::Error> {
     let Some((_folder, dash)) = dashboards::get_by_id(org, dashboard_id).await? else {
         return Err(anyhow::anyhow!("dashboard not found"));
     };
-    check_format(&dash)
-}
-
-/// Reject a create request the server would otherwise have to rewrite or store unbounded.
-pub fn validate_config(cfg: &PublicDashboardConfig) -> Result<(), String> {
-    let now = now_micros();
-    check_expiry(cfg.expires_at, now)?;
-    validate_limits(cfg, now)
-}
-
-/// An edit that keeps an expired link's date is allowed, so only a changed expiry must be in the
-/// future.
-pub fn validate_edit(cfg: &PublicDashboardConfig, link: &PublicDashboard) -> Result<(), String> {
-    let now = now_micros();
-    if cfg.expires_at != link.expires_at {
-        check_expiry(cfg.expires_at, now)?;
-    }
-    validate_limits(cfg, now)
+    check_format(&dash)?;
+    Ok(dash)
 }
 
 fn validate_limits(cfg: &PublicDashboardConfig, now: i64) -> Result<(), String> {
-    check_rebuild_secs(cfg.rebuild_secs)?;
+    check_refresh_secs(cfg.refresh_secs)?;
     let name = cfg.name.trim();
     if name.is_empty() {
         return Err("name is required".to_string());
@@ -1099,10 +1116,10 @@ fn check_range(range: &TimeRange, now: i64) -> Result<(), String> {
     Ok(())
 }
 
-// A zero or negative cadence would reschedule the trigger in a tight loop.
-fn check_rebuild_secs(secs: i32) -> Result<(), String> {
-    if secs < 1 {
-        return Err("rebuild_secs must be at least 1 second".to_string());
+// Range floors and the operator minimum apply at read and build time, never at save.
+fn check_refresh_secs(secs: i32) -> Result<(), String> {
+    if !(MIN_REFRESH_SECS..=MAX_REFRESH_SECS).contains(&secs) {
+        return Err("refresh_secs must be between 60 seconds and 30 days".to_string());
     }
     Ok(())
 }
@@ -1118,10 +1135,10 @@ fn is_expired(expires_at: Option<i64>, now: i64) -> bool {
     expires_at.is_some_and(|exp| exp <= now)
 }
 
-// The rebuilder only builds v8 panels, so an older dashboard would publish as an empty page.
+// The build only renders v8 panels, so an older dashboard would publish as an empty page.
 fn check_format(dash: &Dashboard) -> Result<(), anyhow::Error> {
     if dash.v8.is_none() {
-        return Err(anyhow::anyhow!(OLDER_FORMAT_ERROR));
+        return Err(Invalid(OLDER_FORMAT_ERROR.to_string()).into());
     }
     Ok(())
 }
@@ -1129,7 +1146,10 @@ fn check_format(dash: &Dashboard) -> Result<(), anyhow::Error> {
 async fn gen_unique_slug() -> Result<String, anyhow::Error> {
     for _ in 0..5 {
         let slug = generate_random_string(22);
-        if pd_table::get_by_slug_any(&slug).await?.is_none() {
+        if pd_table::get_by_slug(get_orm_client_rw().await, &slug)
+            .await?
+            .is_none()
+        {
             return Ok(slug);
         }
     }
@@ -1138,6 +1158,7 @@ async fn gen_unique_slug() -> Result<String, anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::public_dashboards::Visibility;
     use serde_json::json;
 
     use super::*;
@@ -1166,10 +1187,9 @@ mod tests {
             version: 3,
             ..Default::default()
         };
-        assert_eq!(
-            check_format(&old).unwrap_err().to_string(),
-            OLDER_FORMAT_ERROR
-        );
+        let err = check_format(&old).unwrap_err();
+        assert_eq!(err.to_string(), OLDER_FORMAT_ERROR);
+        assert!(err.downcast_ref::<Invalid>().is_some());
         let current = Dashboard {
             version: 8,
             v8: Some(Default::default()),
@@ -1179,14 +1199,16 @@ mod tests {
     }
 
     #[test]
-    fn rebuild_secs_must_be_positive() {
-        assert!(check_rebuild_secs(1).is_ok());
-        assert!(check_rebuild_secs(5).is_ok());
+    fn refresh_secs_is_one_minute_to_thirty_days() {
+        assert!(check_refresh_secs(60).is_ok());
+        assert!(check_refresh_secs(300).is_ok());
+        assert!(check_refresh_secs(30 * 86_400).is_ok());
         assert_eq!(
-            check_rebuild_secs(0).unwrap_err(),
-            "rebuild_secs must be at least 1 second"
+            check_refresh_secs(59).unwrap_err(),
+            "refresh_secs must be between 60 seconds and 30 days"
         );
-        assert!(check_rebuild_secs(-5).is_err());
+        assert!(check_refresh_secs(30 * 86_400 + 1).is_err());
+        assert!(check_refresh_secs(-5).is_err());
     }
 
     #[test]
@@ -1195,7 +1217,6 @@ mod tests {
         assert_eq!(req.query.query_fn.as_deref(), Some("del(.email)"));
         assert_eq!((req.query.start_time, req.query.end_time), (10, 20));
         assert_eq!(req.query.size, -1);
-        assert!(!req.use_cache);
         assert!(
             sql_request("SELECT 1".to_string(), 0, 1, None)
                 .query
@@ -1208,14 +1229,6 @@ mod tests {
                 .query_fn
                 .is_none()
         );
-    }
-
-    #[test]
-    fn next_absolute_check_is_daily_or_at_expiry() {
-        let day = ABSOLUTE_CHECK_SECS * 1_000_000;
-        assert_eq!(next_absolute_check(None, 10), 10 + day);
-        assert_eq!(next_absolute_check(Some(500), 10), 500);
-        assert_eq!(next_absolute_check(Some(5), 10), 10);
     }
 
     #[test]
@@ -1279,55 +1292,68 @@ mod tests {
     }
 
     #[test]
-    fn panel_snapshot_sql_needs_every_query() {
+    fn panel_result_sql_needs_every_query() {
         let ok = |n: i64| Some((json!([{ "n": n }]), json!({ "took": n })));
 
-        let all = panel_snapshot("sql", 1, 2, vec![ok(1), ok(2)], None);
-        assert_eq!(all.state, PanelState::Ok);
+        let all = panel_result("sql", 1, 2, vec![ok(1), ok(2)], None);
+        assert_eq!(all.state, PanelState::ok());
+        assert_eq!(all.window, Some(Window { start: 1, end: 2 }));
         assert_eq!(all.data, [json!([{ "n": 1 }]), json!([{ "n": 2 }])]);
         assert_eq!(all.metadata["queries"][1]["panelQueryIndex"], json!(1));
 
-        let partial = panel_snapshot("sql", 1, 2, vec![ok(1)], Some("unauthorized".into()));
+        let denied = panel_result(
+            "sql",
+            1,
+            2,
+            vec![ok(1)],
+            Some(NotAvailableReason::Unauthorized),
+        );
         assert_eq!(
-            partial.state,
+            denied.state,
             PanelState::NotAvailable {
-                reason: "unauthorized".into()
+                reason: NotAvailableReason::Unauthorized
             }
         );
-        assert!(partial.data.is_empty() && partial.result_meta_data.is_empty());
+        assert!(denied.data.is_empty() && denied.result_meta_data.is_empty());
 
-        let none = panel_snapshot("sql", 1, 2, vec![], None);
+        let none = panel_result("sql", 1, 2, vec![], None);
         assert_eq!(
             none.state,
             PanelState::NotAvailable {
-                reason: "no_query".into()
+                reason: NotAvailableReason::NoQuery
             }
         );
     }
 
     #[test]
-    fn panel_snapshot_promql_serves_the_queries_that_ran() {
+    fn panel_result_promql_serves_the_queries_that_ran() {
         let hit = json!({ "resultType": "matrix", "result": [1] });
         let ok = Some((hit.clone(), json!(null)));
         let empty = json!({ "resultType": "matrix", "result": [] });
 
-        let partial = panel_snapshot("promql", 1, 2, vec![None, ok], Some("unauthorized".into()));
-        assert_eq!(partial.state, PanelState::Ok);
+        let partial = panel_result(
+            "promql",
+            1,
+            2,
+            vec![None, ok],
+            Some(NotAvailableReason::Unauthorized),
+        );
+        assert_eq!(partial.state, PanelState::ok());
         assert_eq!(partial.data[0], empty);
         assert_eq!(partial.data[1], hit);
         assert_eq!(partial.metadata["queries"].as_array().unwrap().len(), 2);
 
-        let all_failed = panel_snapshot(
+        let all_failed = panel_result(
             "promql",
             1,
             2,
             vec![None, None],
-            Some("unauthorized".into()),
+            Some(NotAvailableReason::BuildError),
         );
         assert_eq!(
             all_failed.state,
             PanelState::NotAvailable {
-                reason: "unauthorized".into()
+                reason: NotAvailableReason::BuildError
             }
         );
     }
@@ -1393,24 +1419,126 @@ mod tests {
         );
     }
 
-    #[test]
-    fn name_is_required_and_capped() {
-        let cfg = |name: &str| PublicDashboardConfig {
+    fn cfg(name: &str, refresh_secs: i32) -> PublicDashboardConfig {
+        PublicDashboardConfig {
             name: name.to_string(),
-            visibility: Default::default(),
+            visibility: Visibility::Public,
             time_range: TimeRangePolicy {
                 ranges: vec![rel(3600)],
                 default: rel(3600),
             },
             frozen_variables: BTreeMap::new(),
-            rebuild_secs: 3600,
+            refresh_secs,
             expires_at: None,
-        };
+        }
+    }
+
+    #[test]
+    fn name_is_required_and_capped() {
         assert_eq!(
-            validate_limits(&cfg("   "), 0).unwrap_err(),
+            validate_limits(&cfg("   ", 300), 0).unwrap_err(),
             "name is required"
         );
-        assert!(validate_limits(&cfg(&"x".repeat(257)), 0).is_err());
-        assert!(validate_limits(&cfg("NOC wall"), 0).is_ok());
+        assert!(validate_limits(&cfg(&"x".repeat(257), 300), 0).is_err());
+        assert!(validate_limits(&cfg("NOC wall", 300), 0).is_ok());
+    }
+
+    #[test]
+    fn a_range_floor_above_the_selection_is_not_refused_at_save() {
+        let mut long = cfg("wall", 60);
+        long.time_range = TimeRangePolicy {
+            ranges: vec![rel(30 * 86_400)],
+            default: rel(30 * 86_400),
+        };
+        assert!(validate_limits(&long, 0).is_ok());
+        assert!(validate_limits(&cfg("wall", 30), 0).is_err());
+    }
+
+    #[test]
+    fn the_org_limit_comes_from_settings_but_never_exceeds_the_env() {
+        let row = |max_links| OrgSettings {
+            org_id: "o".into(),
+            rev: 1,
+            enabled: true,
+            max_links,
+            updated_at: 1,
+            updated_by: "a".into(),
+        };
+        assert_eq!(org_link_limit(None), 50);
+        assert_eq!(org_link_limit(Some(&row(None))), 50);
+        assert_eq!(org_link_limit(Some(&row(Some(3)))), 3);
+        assert_eq!(org_link_limit(Some(&row(Some(80)))), 50);
+        assert_eq!(org_link_limit(Some(&row(Some(-1)))), 0);
+    }
+
+    #[test]
+    fn explicit_limit_reads_only_the_outermost_numeric_limit() {
+        assert_eq!(explicit_limit("SELECT * FROM t LIMIT 50000"), Some(50_000));
+        assert_eq!(
+            explicit_limit("SELECT * FROM (SELECT * FROM t LIMIT 9) LIMIT 20 OFFSET 5"),
+            Some(20)
+        );
+        assert_eq!(
+            explicit_limit("SELECT * FROM (SELECT * FROM t LIMIT 9)"),
+            None
+        );
+        assert_eq!(explicit_limit("SELECT * FROM t"), None);
+        assert_eq!(explicit_limit("SELEC * FRM"), None);
+    }
+
+    fn panel(id: &str, sql: Option<&str>) -> serde_json::Value {
+        let queries = sql.map_or_else(Vec::new, |sql| {
+            vec![json!({
+                "query": sql, "customQuery": true,
+                "fields": { "stream": "s", "stream_type": "logs", "x": [], "y": [],
+                            "filter": { "filterType": "group", "logicalOperator": "AND", "conditions": [] } },
+                "config": { "promql_legend": "" }
+            })]
+        });
+        json!({
+            "id": id, "type": "table", "title": format!("Panel {id}"), "description": "",
+            "config": { "show_legends": false, "legends_position": null },
+            "queries": queries
+        })
+    }
+
+    fn dashboard(tabs: Vec<Vec<serde_json::Value>>) -> Dashboard {
+        let tabs: Vec<_> = tabs
+            .into_iter()
+            .enumerate()
+            .map(|(i, panels)| json!({ "tabId": format!("t{i}"), "name": "", "panels": panels }))
+            .collect();
+        Dashboard {
+            version: 8,
+            v8: Some(serde_json::from_value(json!({ "tabs": tabs })).unwrap()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn panels_are_counted_across_every_tab() {
+        let ten: Vec<_> = (0..10).map(|i| panel(&format!("p{i}"), None)).collect();
+        let frozen = BTreeMap::new();
+        assert!(validate_dashboard(&dashboard(vec![ten.clone()]), &frozen, 0).is_ok());
+        let four: Vec<_> = (10..14).map(|i| panel(&format!("p{i}"), None)).collect();
+        assert_eq!(
+            validate_dashboard(&dashboard(vec![ten, four]), &frozen, 0).unwrap_err(),
+            "This dashboard has 14 panels; a public link can show at most 10."
+        );
+    }
+
+    #[test]
+    fn a_limit_above_the_default_is_refused_naming_the_panel() {
+        let frozen = BTreeMap::new();
+        let ok = dashboard(vec![vec![panel("a", Some("SELECT * FROM s LIMIT 1000"))]]);
+        assert!(validate_dashboard(&ok, &frozen, 0).is_ok());
+        let big = dashboard(vec![
+            vec![panel("a", Some("SELECT * FROM s"))],
+            vec![panel("b", Some("SELECT * FROM s LIMIT 50000"))],
+        ]);
+        assert_eq!(
+            validate_dashboard(&big, &frozen, 0).unwrap_err(),
+            "Panel \"Panel b\" has LIMIT 50000, above the public cap of 1000 rows. Lower it or aggregate."
+        );
     }
 }

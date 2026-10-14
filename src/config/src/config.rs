@@ -1175,21 +1175,99 @@ pub struct DatabaseMonitoring {
     pub rollup_interval_secs: u64,
 }
 
-/// Public (unauthenticated) dashboards: the master switch and the per-IP rate limit.
+/// Public (unauthenticated) dashboards; clamped in `check_public_dashboards_config`.
 #[derive(Debug, Serialize, EnvConfig, Default)]
 pub struct PublicDashboards {
     #[env_config(
         name = "ZO_PUBLIC_DASHBOARD_ENABLED",
-        default = false,
-        help = "Master switch for public dashboards. Off by default; the public HTTP routes and the snapshot rebuilder only exist when this is true."
+        default = true,
+        help = "Master switch for public dashboards. The public routes always exist and answer 404 while this is false."
     )]
     pub enabled: bool,
     #[env_config(
         name = "ZO_PUBLIC_DASHBOARD_RPM",
         default = 240,
-        help = "Per-IP requests-per-minute limit on the unauthenticated public-dashboard routes (0 disables)."
+        help = "Per-IP requests-per-minute limit on the public dashboard routes (0 disables)."
     )]
-    pub rpm: u64,
+    pub rpm: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_SLUG_RPM",
+        default = 1200,
+        help = "Per-link requests-per-minute limit on public data responses that carry a body (0 disables)."
+    )]
+    pub slug_rpm: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_LINKS_PER_ORG",
+        default = 50,
+        help = "Public links an org may have; the org settings row can lower it (at least 1)."
+    )]
+    pub max_links_per_org: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_PANELS",
+        default = 10,
+        help = "Panels a public link can show, counted across every tab (at least 1)."
+    )]
+    pub max_panels: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_LINKS_PER_DASHBOARD",
+        default = 10,
+        help = "Public links one dashboard may have (at least 1)."
+    )]
+    pub max_links_per_dashboard: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MIN_REFRESH_SECS",
+        default = 60,
+        help = "Shortest effective refresh interval of a public link range, in seconds (at least 60)."
+    )]
+    pub min_refresh_secs: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_PANEL_AGE_HOURS",
+        default = 24,
+        help = "Oldest retained panel data a public link may serve after failed refreshes, in hours (at least 1)."
+    )]
+    pub max_panel_age_hours: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_COLD_WAITERS",
+        default = 200,
+        help = "Requests that may wait on one cold build per querier; later ones get 202 (at least 1)."
+    )]
+    pub max_cold_waiters: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_INFLIGHT_BUILDS",
+        default = 8,
+        help = "Public dashboard builds running at once per querier (at least 1)."
+    )]
+    pub max_inflight_builds: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_MAX_INFLIGHT_BUILDS_PER_ORG",
+        default = 1,
+        help = "Public dashboard builds of one org running at once per querier (at least 1)."
+    )]
+    pub max_inflight_builds_per_org: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_PANEL_CONCURRENCY",
+        default = 1,
+        help = "Panel queries one public dashboard build runs at once (at least 1)."
+    )]
+    pub panel_concurrency: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_QUERY_TIMEOUT_SECS",
+        default = 60,
+        help = "Timeout of one public dashboard panel query, in seconds (1 to ZO_QUERY_TIMEOUT)."
+    )]
+    pub query_timeout_secs: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_BUILD_TIMEOUT_SECS",
+        default = 300,
+        help = "Timeout of one whole public dashboard build, in seconds (at least the query timeout)."
+    )]
+    pub build_timeout_secs: u32,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_TIME_SHIFTS",
+        default = true,
+        help = "Run time-shifted panel queries on public links; false shows those panels as unsupported."
+    )]
+    pub time_shifts: bool,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
@@ -2879,12 +2957,6 @@ pub struct Limit {
         help = "Max query-recommendation jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
     )]
     pub scheduler_query_reco_concurrency: i64,
-    #[env_config(
-        name = "ZO_SCHEDULER_PUBLIC_DASHBOARD_CONCURRENCY",
-        default = 0,
-        help = "Max public-dashboard rebuild jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
-    )]
-    pub scheduler_public_dashboard_concurrency: i64,
     // Per-module poll cadence in seconds. 0 = inherit ZO_ALERT_SCHEDULE_INTERVAL (the alert pull
     // frequency). Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. One var per module so each
     // puller can poll at its own rate (e.g. backfill slower, synthetics faster). The alert lane
@@ -2937,12 +3009,6 @@ pub struct Limit {
         help = "Poll cadence in seconds for the query-recommendation puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
     )]
     pub scheduler_query_reco_interval: i64,
-    #[env_config(
-        name = "ZO_SCHEDULER_PUBLIC_DASHBOARD_INTERVAL",
-        default = 0, // seconds
-        help = "Poll cadence in seconds for the public-dashboard rebuild puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
-    )]
-    pub scheduler_public_dashboard_interval: i64,
     #[env_config(
         name = "ZO_SCHEDULER_ALERT_CALIBRATION_INTERVAL",
         default = 0, // seconds
@@ -3901,6 +3967,8 @@ pub fn init() -> Config {
 
     // check synthetics config — infallible on purpose, see the function
     check_synthetics_config(&mut cfg);
+
+    check_public_dashboards_config(&mut cfg);
 
     cfg
 }
@@ -5078,6 +5146,34 @@ fn validate_synthetics_ceilings(cfg: &Synthetics) -> Result<(), String> {
 /// be the worse outage. On rejection the built-in ceilings stand, so the failure
 /// mode is "stricter than the operator intended", never "accepts checks that get
 /// killed mid-run".
+/// Clamps the public dashboard keys into their valid ranges; runs after the query timeout is set.
+fn check_public_dashboards_config(cfg: &mut Config) {
+    let query_timeout = u32::try_from(cfg.limit.query_timeout).unwrap_or(u32::MAX);
+    let pd = &mut cfg.public_dashboards;
+    for v in [
+        &mut pd.max_links_per_org,
+        &mut pd.max_panels,
+        &mut pd.max_links_per_dashboard,
+        &mut pd.max_panel_age_hours,
+        &mut pd.max_cold_waiters,
+        &mut pd.max_inflight_builds,
+        &mut pd.max_inflight_builds_per_org,
+        &mut pd.panel_concurrency,
+    ] {
+        *v = (*v).max(1);
+    }
+    pd.min_refresh_secs = pd.min_refresh_secs.max(60);
+    pd.query_timeout_secs = pd.query_timeout_secs.clamp(1, query_timeout.max(1));
+    pd.build_timeout_secs = pd.build_timeout_secs.max(pd.query_timeout_secs);
+    // The Enterprise default Long user cap is 2; more panel queries per build queue behind it.
+    if pd.panel_concurrency > 2 {
+        log::warn!(
+            "ZO_PUBLIC_DASHBOARD_PANEL_CONCURRENCY={} is above the default Enterprise Long user cap of 2",
+            pd.panel_concurrency
+        );
+    }
+}
+
 fn check_synthetics_config(cfg: &mut Config) {
     if let Err(e) = validate_synthetics_ceilings(&cfg.synthetics) {
         log::error!(
@@ -6583,5 +6679,56 @@ mod tests {
         assert_eq!(select_ext_auth_salt("env", "stored"), "env");
         assert_eq!(select_ext_auth_salt("", "stored"), "stored");
         assert_eq!(select_ext_auth_salt("", ""), LEGACY_EXT_AUTH_SALT);
+    }
+
+    #[test]
+    fn public_dashboard_defaults_and_clamps() {
+        let mut cfg = Config::init().expect("config init");
+        let pd = &cfg.public_dashboards;
+        assert!(pd.enabled && pd.time_shifts);
+        assert_eq!(
+            (pd.rpm, pd.slug_rpm, pd.max_links_per_org, pd.max_panels),
+            (240, 1200, 50, 10)
+        );
+        assert_eq!(
+            (
+                pd.max_links_per_dashboard,
+                pd.min_refresh_secs,
+                pd.max_panel_age_hours
+            ),
+            (10, 60, 24)
+        );
+        assert_eq!(
+            (
+                pd.max_cold_waiters,
+                pd.max_inflight_builds,
+                pd.max_inflight_builds_per_org
+            ),
+            (200, 8, 1)
+        );
+        assert_eq!(
+            (
+                pd.panel_concurrency,
+                pd.query_timeout_secs,
+                pd.build_timeout_secs
+            ),
+            (1, 60, 300)
+        );
+
+        cfg.limit.query_timeout = 30;
+        cfg.public_dashboards.min_refresh_secs = 10;
+        cfg.public_dashboards.max_panels = 0;
+        cfg.public_dashboards.query_timeout_secs = 90;
+        cfg.public_dashboards.build_timeout_secs = 5;
+        check_public_dashboards_config(&mut cfg);
+        let pd = &cfg.public_dashboards;
+        assert_eq!(pd.min_refresh_secs, 60);
+        assert_eq!(pd.max_panels, 1);
+        assert_eq!(pd.query_timeout_secs, 30);
+        assert_eq!(pd.build_timeout_secs, 30);
+
+        cfg.public_dashboards.query_timeout_secs = 0;
+        check_public_dashboards_config(&mut cfg);
+        assert_eq!(cfg.public_dashboards.query_timeout_secs, 1);
     }
 }

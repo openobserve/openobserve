@@ -13,15 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The public serving plane. Registered in `basic_routes` — no auth middleware,
-//! no OpenFGA. Contract: nothing here runs a query or hits the search engine;
-//! it does indexed point-reads against the meta store only. All query execution
-//! lives in the background rebuilder.
+//! The public serving plane. Registered in `basic_routes` without auth middleware or OpenFGA;
+//! the slug is the only credential. Every gate reads the link and org settings rows from the
+//! primary, so revoke, pause, expiry and the org switch apply on the next request.
 
-use std::{
-    sync::{LazyLock, RwLock},
-    time::Duration,
-};
+use std::{collections::BTreeMap, sync::LazyLock, time::Duration};
 
 use axum::{
     Json,
@@ -38,17 +34,17 @@ use config::{
     utils::time::now_micros,
 };
 use infra::{
-    db::get_orm_client_ro,
+    db::get_orm_client_rw,
     table::{dashboards, entity::public_dashboards::Model, public_dashboards as table},
 };
 use serde::Deserialize;
 
-use crate::request::public_rate_limit::{Counters, client_ip, over_budget};
+use crate::request::public_rate_limit::{Counters, client_ip, too_many_requests};
 
 const READ_WINDOW: Duration = Duration::from_secs(60);
 
 /// Per-IP read counters for both public dashboard routes.
-static READ_RPM: LazyLock<Counters> = LazyLock::new(|| RwLock::new(Default::default()));
+static READS: LazyLock<Counters> = LazyLock::new(Counters::default);
 
 #[derive(Deserialize)]
 pub struct DataParams {
@@ -60,17 +56,18 @@ enum Servable {
     Unavailable,
     Expired,
     Error,
-    Ok(Box<Model>),
+    Ok(Box<Model>, i64),
 }
 
-/// Resolve a slug to a servable link, or why it isn't served: unknown / draft → uniform 404
-/// (no existence oracle); paused → 503; expired → 410. Only a slug holder sees the latter two.
+/// Resolve a slug to a servable link and its org's settings rev, or why it isn't served: unknown,
+/// revoked, draft or switched off gives a uniform 404 (no existence oracle); paused 503; expired
+/// 410.
 async fn resolve(slug: &str) -> Servable {
     if !config::get_config().public_dashboards.enabled {
         return Servable::NotFound;
     }
-    let conn = get_orm_client_ro().await;
-    let pd = match table::get_by_slug(conn, slug).await {
+    let db = get_orm_client_rw().await;
+    let pd = match table::get_by_slug(db, slug).await {
         Ok(Some(pd)) => pd,
         Ok(None) => return Servable::NotFound,
         Err(e) => {
@@ -78,14 +75,29 @@ async fn resolve(slug: &str) -> Servable {
             return Servable::Error;
         }
     };
+    let settings = match table::get_settings(db, &pd.org_id).await {
+        Ok(settings) => settings,
+        Err(e) => {
+            log::error!("public dashboard settings lookup failed: {e}");
+            return Servable::Error;
+        }
+    };
+    let org_enabled = settings.as_ref().is_none_or(|s| s.enabled);
+    let settings_rev = settings.map_or(0, |s| s.rev);
     let blocked = db::org_status::is_blocked(&pd.org_id);
-    servable(pd, blocked, now_micros())
+    servable(pd, settings_rev, org_enabled, blocked, now_micros())
 }
 
 /// Whether a loaded link may be served; it is read fresh per request, so changes apply at once.
-fn servable(pd: Model, org_blocked: bool, now: i64) -> Servable {
+fn servable(
+    pd: Model,
+    settings_rev: i64,
+    org_enabled: bool,
+    org_blocked: bool,
+    now: i64,
+) -> Servable {
     // visibility: 0 draft, 1 public.
-    if pd.visibility != 1 {
+    if !org_enabled || pd.deleted_at.is_some() || pd.visibility != 1 {
         return Servable::NotFound;
     }
     if org_blocked {
@@ -97,13 +109,13 @@ fn servable(pd: Model, org_blocked: bool, now: i64) -> Servable {
     if !pd.enabled {
         return Servable::Unavailable;
     }
-    Servable::Ok(Box::new(pd))
+    Servable::Ok(Box::new(pd), settings_rev)
 }
 
 /// GET /api/public_dashboards/{slug} — the sanitized config the viewer renders.
 pub async fn config(ip: Option<Extension<RealIp>>, Path(slug): Path<String>) -> Response {
     if rate_limited(ip.map(|e| e.0)) {
-        return with_headers(too_many_requests());
+        return with_headers(too_many_requests(READ_WINDOW));
     }
     with_headers(serve_config(&slug).await)
 }
@@ -115,20 +127,19 @@ pub async fn data(
     Query(params): Query<DataParams>,
 ) -> Response {
     if rate_limited(ip.map(|e| e.0)) {
-        return with_headers(too_many_requests());
+        return with_headers(too_many_requests(READ_WINDOW));
     }
     with_headers(serve_data(&slug, params.range.as_deref()).await)
 }
 
 async fn serve_config(slug: &str) -> Response {
-    let pd = match resolve(slug).await {
-        Servable::Ok(pd) => pd,
+    let (pd, settings_rev) = match resolve(slug).await {
+        Servable::Ok(pd, settings_rev) => (pd, settings_rev),
         Servable::Unavailable => return unavailable(),
         Servable::Expired => return expired(),
         Servable::NotFound => return StatusCode::NOT_FOUND.into_response(),
         Servable::Error => return server_error(),
     };
-    let conn = get_orm_client_ro().await;
     let dash = match dashboards::get_by_id(&pd.org_id, &pd.dashboard_id).await {
         Ok(Some((_folder, dash))) => dash,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
@@ -138,13 +149,9 @@ async fn serve_config(slug: &str) -> Response {
         }
     };
     let (title, layout) = project_layout(&dash);
-    let available_keys = table::list_snapshot_keys(conn, &pd.id)
-        .await
-        .unwrap_or_default()
-        .into_iter()
-        .map(|(key, _)| key)
-        .collect();
     let policy = openobserve_core::public_dashboards::time_ranges(&pd);
+    let min_refresh = i64::from(config::get_config().public_dashboards.min_refresh_secs);
+    let selected = i64::from(pd.refresh_secs);
     Json(SanitizedDashboard {
         title,
         layout,
@@ -154,43 +161,35 @@ async fn serve_config(slug: &str) -> Response {
             .map(|range| KeyedRange {
                 key: range.key(),
                 range: *range,
+                refresh_secs: range.effective_refresh_secs(selected, min_refresh),
             })
             .collect(),
         default_key: policy.default.key(),
-        available_keys,
-        built_at: pd.last_rebuilt_at,
         timestamp_column: config::TIMESTAMP_COL_NAME.to_string(),
-        refresh_secs: i64::from(pd.rebuild_secs),
+        refresh_secs: policy.default.effective_refresh_secs(selected, min_refresh),
         variables: public_variables(&dash, pd.frozen_variables.as_deref()),
+        dashboard_updated_at: dash.updated_at,
+        link_rev: pd.rev,
+        settings_rev,
+        intents: BTreeMap::new(),
     })
     .into_response()
 }
 
 async fn serve_data(slug: &str, range_key: Option<&str>) -> Response {
     let pd = match resolve(slug).await {
-        Servable::Ok(pd) => pd,
+        Servable::Ok(pd, _) => pd,
         Servable::Unavailable => return unavailable(),
         Servable::Expired => return expired(),
         Servable::NotFound => return StatusCode::NOT_FOUND.into_response(),
         Servable::Error => return server_error(),
     };
     let range_key = range_key.map_or_else(|| default_range_key(&pd), str::to_string);
-    // Only an offered range is ever built, so any other key would answer "preparing" forever.
     if !offers_range(&pd, &range_key) {
         return StatusCode::NOT_FOUND.into_response();
     }
-    let conn = get_orm_client_ro().await;
-    match table::get_snapshot(conn, &pd.id, &range_key).await {
-        Ok(Some(snap)) => match serde_json::from_str::<serde_json::Value>(&snap.data) {
-            Ok(v) => Json(v).into_response(),
-            Err(_) => (StatusCode::ACCEPTED, "preparing").into_response(),
-        },
-        Ok(None) => (StatusCode::ACCEPTED, "preparing").into_response(),
-        Err(e) => {
-            log::error!("public dashboard snapshot read failed: {e}");
-            server_error()
-        }
-    }
+    // No result exists until the materializer serves this range.
+    StatusCode::NOT_FOUND.into_response()
 }
 
 /// The range a request without `range` gets: the link's default, as the page opens on.
@@ -217,8 +216,8 @@ fn public_variables(dash: &Dashboard, frozen: Option<&str>) -> Vec<PublicVariabl
 
 /// True if this IP is over its per-minute budget; 0 rpm disables the limiter.
 fn rate_limited(ip: Option<RealIp>) -> bool {
-    let rpm = u32::try_from(config::get_config().public_dashboards.rpm).unwrap_or(u32::MAX);
-    rpm != 0 && over_budget(&READ_RPM, client_ip(ip), READ_WINDOW, rpm)
+    let rpm = config::get_config().public_dashboards.rpm;
+    rpm != 0 && READS.over_budget(&client_ip(ip), READ_WINDOW, rpm)
 }
 
 /// The slug is a bearer secret, so no response is indexed or leaks it through `Referer`.
@@ -239,10 +238,6 @@ fn with_headers(mut resp: Response) -> Response {
     // A CDN or proxy copy would outlive a revoke, pause or expiry and serve stale data.
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     resp
-}
-
-fn too_many_requests() -> Response {
-    (StatusCode::TOO_MANY_REQUESTS, "Too many requests").into_response()
 }
 
 fn expired() -> Response {
@@ -443,19 +438,17 @@ mod tests {
             time_ranges: None,
             default_range_key: None,
             frozen_variables: None,
-            rebuild_secs: 60,
-            last_rebuilt_at: None,
-            rebuild_state: 0,
-            unauthorized_streams: None,
+            refresh_secs: 300,
             dashboard_version: 1,
             published_by: "p".into(),
-            last_authorized_streams: None,
             enabled: true,
             expires_at: None,
             created_by: "p".into(),
             updated_by: None,
             created_at: 0,
             updated_at: 0,
+            rev: 7,
+            deleted_at: None,
             last_accessed_at: None,
             access_count: 0,
         }
@@ -465,31 +458,36 @@ mod tests {
     fn only_a_live_public_link_is_served() {
         let now = 1_000_000;
         let live = link;
-        assert!(matches!(servable(live(), false, now), Servable::Ok(_)));
+        let check = |pd, org_enabled, blocked| servable(pd, 3, org_enabled, blocked, now);
+        assert!(matches!(check(live(), true, false), Servable::Ok(_, 3)));
         let draft = Model {
             visibility: 0,
             ..live()
         };
-        assert!(matches!(servable(draft, false, now), Servable::NotFound));
+        assert!(matches!(check(draft, true, false), Servable::NotFound));
+        let revoked = Model {
+            deleted_at: Some(1),
+            ..live()
+        };
+        assert!(matches!(check(revoked, true, false), Servable::NotFound));
+        // The org switch wins over every other state, so a switched-off org leaks nothing.
+        assert!(matches!(check(live(), false, true), Servable::NotFound));
         let paused = Model {
             enabled: false,
             ..live()
         };
-        assert!(matches!(
-            servable(paused, false, now),
-            Servable::Unavailable
-        ));
-        assert!(matches!(servable(live(), true, now), Servable::Unavailable));
+        assert!(matches!(check(paused, true, false), Servable::Unavailable));
+        assert!(matches!(check(live(), true, true), Servable::Unavailable));
         let expired = Model {
             expires_at: Some(now),
             ..live()
         };
-        assert!(matches!(servable(expired, false, now), Servable::Expired));
+        assert!(matches!(check(expired, true, false), Servable::Expired));
         let not_yet = Model {
             expires_at: Some(now + 1),
             ..live()
         };
-        assert!(matches!(servable(not_yet, false, now), Servable::Ok(_)));
+        assert!(matches!(check(not_yet, true, false), Servable::Ok(_, _)));
     }
 
     #[test]
@@ -532,7 +530,7 @@ mod tests {
             StatusCode::NOT_FOUND.into_response(),
             expired(),
             unavailable(),
-            too_many_requests(),
+            too_many_requests(READ_WINDOW),
             server_error(),
         ] {
             let resp = with_headers(resp);
