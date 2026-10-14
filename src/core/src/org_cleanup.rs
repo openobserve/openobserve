@@ -454,9 +454,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // under #[cfg(not(feature = "enterprise"))] above. Importing it twice would
     // collide on the OSS build.
     use infra::table::{
-        alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards, destinations,
-        distinct_values, enrichment_table_urls, enrichment_tables, folders, incident_events,
-        kv_store, llm_prompts, org_storage_providers, query_history, re_pattern,
+        alert_calibration, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
+        destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
+        incident_events, kv_store, llm_prompts, org_storage_providers, query_history, re_pattern,
         re_pattern_stream_map, reports, rum_pa, search_queue, short_urls, slo, slo_backfill_jobs,
         slo_budget, slos, system_settings, templates, timed_annotations,
     };
@@ -642,6 +642,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     compactor_manual_jobs::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/compactor_manual_jobs: {e}"))?;
+    // Org ids are reused, and a leftover row would hand the next org the deleted org's settings.
+    alert_calibration::delete_by_org(get_orm_client_rw().await, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alert_calibration: {e}"))?;
     // Delete the S3 result objects backing this org's search jobs BEFORE dropping
     // the DB rows — the result paths are derived from each job's created_at/trace_id,
     // so once the rows are gone the objects can no longer be located and would leak.

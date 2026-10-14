@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import { applyPickedDateTime } from "./dashboard-time.js";
 
 /**
  * Page Object for Panel Time Range operations
@@ -529,9 +530,7 @@ export default class DashboardPanelTime {
     await timeOptionBtn.waitFor({ state: "visible", timeout: 5000 });
     await timeOptionBtn.click();
 
-    // Click apply button within the dialog
-    const applyBtn = this.dateTimeMenu.locator('[data-test="date-time-apply-btn"]');
-    await applyBtn.click();
+    await applyPickedDateTime(this.page);
 
     // Wait for dialog to close and network to settle
     await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 });
@@ -655,9 +654,7 @@ export default class DashboardPanelTime {
    * Click the Apply button in an open date time picker
    */
   async clickDateTimeApply() {
-    const applyBtn = this.dateTimeMenu.locator('[data-test="date-time-apply-btn"]');
-    await applyBtn.scrollIntoViewIfNeeded();
-    await applyBtn.click();
+    await applyPickedDateTime(this.page);
     await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 });
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   }

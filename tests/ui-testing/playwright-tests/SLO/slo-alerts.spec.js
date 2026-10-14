@@ -51,7 +51,7 @@ test.describe('SLO burn-rate alerts', { tag: ['@slo', '@sloAlerts', '@all'] }, (
     shared.stream = uniqueName(`${PREFIX}_stream`);
     await seedSloStream(page, shared.stream);
 
-    // A burn-rate alert cannot be saved without a destination.
+    // The tests that pick a destination share this one.
     shared.destination = await seedNotificationDestination(page, uniqueName(PREFIX));
 
     shared.slo = await createSloViaApi(page, timeSliceDefinition({
@@ -286,28 +286,18 @@ test.describe('SLO burn-rate alerts', { tag: ['@slo', '@sloAlerts', '@all'] }, (
 
   // -------------------------------------------------------- negative / edge
 
-  /**
-   * A destination is mandatory: an alert nobody hears about is not an alert.
-   *
-   * This used to reach the server, which answered "Alert destination or
-   * workflows is required" in a banner attached to nothing on screen. The
-   * reason now lands on the field, and the banner only says that SOMETHING is
-   * highlighted — so both are asserted, at their new homes.
-   */
-  test('submitting without a destination is refused with the reason', {
-    tag: ['@P1', '@validation', '@negative'],
-  }, async ({ page }) => {
+  /** A destination is optional: the alert saves, evaluates and notifies nobody until one is added. */
+  test('submitting without a destination saves the alert', {
+    tag: ['@P1', '@validation'],
+  }, async () => {
     const name = uniqueName(`${PREFIX}_nodest`);
     await pm.sloAlertsPage.clickAdd();
     await pm.sloAlertsPage.setName(name);
     await pm.sloAlertsPage.applyPreset('fast');
-    // No destination selected.
-    await pm.sloAlertsPage.submitExpectingClientRejection();
+    await pm.sloAlertsPage.expectNoDestinationNote();
+    await pm.sloAlertsPage.submit();
 
-    await expect(
-      page.locator('[data-test="alert-settings-destinations-error"]'),
-    ).toContainText(/at least one destination or workflow/i);
-    await pm.sloAlertsPage.expectFormError(/highlighted fields/i);
+    await pm.sloAlertsPage.expectAlertListed(name);
   });
 
   /** Cancel must not create anything. */

@@ -17,8 +17,12 @@ use std::ops::Range;
 
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::promql::{
-        BUCKET_LABEL, HASH_LABEL, NAME_LABEL, STALE_NAN_BITS, VALUE_LABEL, value::Sample,
+    meta::{
+        promql::{
+            BUCKET_LABEL, HASH_LABEL, NAME_LABEL, STALE_NAN_BITS, VALUE_LABEL,
+            exemplars_stream_name, histogram_family, value::Sample,
+        },
+        stream::StreamType,
     },
 };
 use datafusion::{
@@ -98,6 +102,20 @@ pub fn apply_label_selector(
         };
     }
     Some(df)
+}
+
+/// The stream an exemplar query reads for `selector_name`: a histogram's bucket stream (named
+/// `_bucket` and carrying `le`) reads the family's, where every protocol writes a histogram's
+/// exemplars; any other metric reads its own. The schema comes from the in-memory cache only.
+pub async fn exemplars_stream_for(org_id: &str, selector_name: &str) -> String {
+    if let Some(family) = histogram_family(selector_name)
+        && infra::schema::get_stream_schema_from_cache(org_id, selector_name, StreamType::Metrics)
+            .await
+            .is_some_and(|schema| schema.field_with_name(BUCKET_LABEL).is_ok())
+    {
+        return exemplars_stream_name(family);
+    }
+    exemplars_stream_name(selector_name)
 }
 
 /// Zeroes the step of local exemplar loads only; older peers divide by the forwarded step.
@@ -238,6 +256,40 @@ mod tests {
         };
         assert_eq!(exemplar_load_step(&ctx(true), 300_000_000), 0);
         assert_eq!(exemplar_load_step(&ctx(false), 300_000_000), 300_000_000);
+    }
+
+    #[tokio::test]
+    async fn test_exemplars_stream_for_joins_a_family_only_through_a_bucket_stream_with_le() {
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache, insert_latest};
+
+        let seed = |name: &str, fields: Vec<Field>| {
+            let key = infra::schema::mk_key("exemplar_org", StreamType::Metrics, name);
+            let key = key
+                .strip_prefix(infra::schema::SCHEMA_KEY)
+                .unwrap()
+                .to_string();
+            let schema = SchemaCache::new(ArrowSchema::new(fields));
+            async move {
+                let mut w = STREAM_SCHEMAS_LATEST.write().await;
+                insert_latest(&mut w, key, schema);
+            }
+        };
+        let label = |name: &str| Field::new(name, DataType::Utf8, true);
+        seed("rpc_latency_bucket", vec![label("le"), label("job")]).await;
+        seed("queue_count", vec![label("job")]).await;
+        seed("plain_bucket", vec![label("job")]).await;
+
+        assert_eq!(
+            exemplars_stream_for("exemplar_org", "rpc_latency_bucket").await,
+            "rpc_latency_exemplars"
+        );
+        for name in ["queue_count", "plain_bucket", "unknown_bucket", "up"] {
+            assert_eq!(
+                exemplars_stream_for("exemplar_org", name).await,
+                format!("{name}_exemplars"),
+                "{name}"
+            );
+        }
     }
 
     #[test]
