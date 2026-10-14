@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="info-outline" size="xs" :aria-label="caption" />
         <OTooltip :content="caption" />
       </span>
-      <span class="ms-auto flex items-center"><slot name="action" /></span>
+      <span class="ms-auto flex items-center gap-1"><slot name="action" /></span>
     </div>
     <div
       v-if="boxed"

@@ -19,94 +19,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('rum.analytics.funnel.exclusionStepsTitle')"
     :caption="t('rum.analytics.funnel.exclusionStepsCaption')"
     :stacked="stacked"
+    :boxed="!!def.x?.length"
     test-id="rum-analytics-funnel-exclusions"
   >
-    <template #action>
-      <span>
-        <OButton
-          v-if="stacked"
-          variant="ghost"
-          size="icon-sm"
-          icon-left="add"
-          :disabled="!!blocked"
-          :aria-label="t('rum.analytics.funnel.addExclusionStep')"
-          data-test="rum-analytics-funnel-add-exclusion-btn"
-          @click="picking = true"
-          ><OTooltip :content="blocked ?? t('rum.analytics.funnel.addExclusionStep')"
-        /></OButton>
-        <template v-else>
-          <OButton
-            variant="ghost-primary"
-            size="sm"
-            icon-left="add"
-            :disabled="!!blocked"
-            data-test="rum-analytics-funnel-add-exclusion-btn"
-            @click="picking = true"
-            >{{ t("rum.analytics.funnel.addExclusionStep") }}</OButton
-          >
-          <OTooltip v-if="blocked" :content="blocked" />
-        </template>
-      </span>
-    </template>
-    <template #body>
-      <div
-        v-for="(x, j) in exclusions"
-        :key="j"
-        :class="stacked ? 'border-border-default rounded-default border' : ''"
+    <span
+      v-for="(x, j) in def.x ?? []"
+      :key="j"
+      class="flex min-w-0 flex-wrap items-center gap-1.5"
+      :class="stacked ? 'basis-full' : ''"
+    >
+      <span class="text-text-secondary shrink-0 text-xs">{{
+        j === 0 ? t("rum.analytics.funnel.didNotSee") : t("rum.analytics.funnel.filterAnd")
+      }}</span>
+      <OTag
+        :label="chipLabel(x)"
+        variant="primary-outline"
+        size="sm"
+        clickable
+        removable
+        class="max-w-full min-w-0"
+        :remove-label="t('rum.analytics.funnel.removeExclusion')"
+        :data-test="`rum-analytics-funnel-exclusion-${j}`"
+        @click="edit(j)"
+        @remove="remove(j)"
       >
-        <ExclusionRow
-          :x="x"
-          :test-id="`rum-analytics-funnel-exclusion-${j}`"
-          :step-count="def.steps.length"
-          :removed="removed[j] ?? null"
-          :problem="rowProblems[j] ?? null"
-          :sampled="sampled"
-          :events="events"
-          :events-status="eventsStatus"
-          @update="(next) => editRow(j, next)"
-          @remove="removeRow(j)"
-        />
-      </div>
-      <div v-if="pending" :class="stacked ? 'border-accent rounded-default border' : ''">
-        <ExclusionRow
-          :x="pending"
-          test-id="rum-analytics-funnel-exclusion-pending"
-          :step-count="def.steps.length"
-          :removed="null"
-          :problem="exclusionProblem(def.steps, pending)"
-          :sampled="sampled"
-          :events="events"
-          :events-status="eventsStatus"
-          @update="editPending"
-          @remove="pending = null"
-        />
-      </div>
-
+        <OTag :label="kindLabel(x.step)" :variant="kindVariant(x.step)" size="xs" />
+        <span class="min-w-0 truncate">{{ chipLabel(x) }}</span>
+        <OTooltip :content="chipLabel(x)" />
+      </OTag>
       <span
-        v-if="picking"
-        class="flex items-center gap-1.5 max-md:w-full"
-        :class="stacked ? 'border-accent bg-surface-accent rounded-default border p-1.5' : 'px-2'"
+        v-if="removed[j] !== null && removed[j] !== undefined"
+        class="text-text-secondary basis-full text-xs"
+        :data-test="`rum-analytics-funnel-exclusion-${j}-removed`"
+        >{{
+          t("rum.analytics.funnel.exclusionRemoved", {
+            count: formatCount(removed[j], sampled),
+            step: x.b ?? x.a,
+          })
+        }}</span
       >
-        <span class="max-md:w-full" :class="stacked ? 'min-w-0 flex-1' : 'w-72'">
-          <StepPicker
-            :model-value="null"
-            :placeholder="t('rum.analytics.funnel.exclusionPick')"
-            :events="events"
-            :kinds="STEP_KINDS"
-            data-test="rum-analytics-funnel-exclusion-select"
-            @update:model-value="(s) => s && pick(s)"
-          />
-        </span>
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="close"
-          :aria-label="t('common.cancel')"
-          data-test="rum-analytics-funnel-exclusion-cancel"
-          @click="picking = false"
-          ><OTooltip :content="t('common.cancel')"
-        /></OButton>
-      </span>
+    </span>
+    <template #action>
+      <OPopover
+        :open="open"
+        :side="stacked ? 'right' : 'bottom'"
+        align="start"
+        content-class="p-3 w-96 max-w-[calc(100vw-1.5rem)]"
+        @update:open="setOpen"
+      >
+        <template #trigger>
+          <span>
+            <OButton
+              v-if="stacked"
+              variant="ghost"
+              size="icon-sm"
+              icon-left="add"
+              :active="open"
+              :disabled="!!blocked"
+              :aria-label="t('rum.analytics.funnel.addExclusionStep')"
+              data-test="rum-analytics-funnel-add-exclusion-btn"
+              @click="editing = null"
+              ><OTooltip :content="blocked ?? t('rum.analytics.funnel.addExclusionStep')"
+            /></OButton>
+            <template v-else>
+              <OButton
+                variant="ghost-primary"
+                size="sm"
+                icon-left="add"
+                :active="open"
+                :disabled="!!blocked"
+                data-test="rum-analytics-funnel-add-exclusion-btn"
+                @click="editing = null"
+                >{{ t("rum.analytics.funnel.addExclusionStep") }}</OButton
+              >
+              <OTooltip v-if="blocked" :content="blocked" />
+            </template>
+          </span>
+        </template>
+        <ExclusionPicker
+          v-if="open"
+          :key="editing ?? '+'"
+          :def="def"
+          :events="events"
+          :events-status="eventsStatus"
+          :initial="editing !== null ? def.x?.[editing] : undefined"
+          @apply="apply"
+          @cancel="setOpen(false)"
+        />
+      </OPopover>
     </template>
   </FunnelSectionRow>
 </template>
@@ -114,25 +114,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import StepPicker from "@/components/rum/productAnalytics/StepPicker.vue";
 import FunnelSectionRow from "@/components/rum/productAnalytics/funnelParts/FunnelSectionRow.vue";
-import ExclusionRow from "@/components/rum/productAnalytics/funnelParts/ExclusionRow.vue";
-import { fitsSteps, newExclusion } from "@/components/rum/productAnalytics/funnelParts/funnelEdits";
+import ExclusionPicker from "@/components/rum/productAnalytics/funnelParts/ExclusionPicker.vue";
+import useStepLabels from "@/components/rum/productAnalytics/funnelParts/useStepLabels";
+import { isWholeFunnel } from "@/components/rum/productAnalytics/funnelParts/funnelEdits";
 import type { NamedEventsStatus } from "@/composables/rum/useNamedEvents";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import {
-  exclusionProblem,
-  type ExclusionProblem,
-  type NamedEvent,
-} from "@/utils/rum/productAnalyticsModel";
-import type {
-  ExclusionStep,
-  FunnelDef,
-  SampleRatio,
-  StepKind,
-  StepRef,
-} from "@/utils/rum/productAnalyticsQueries";
+import { formatCount, type NamedEvent } from "@/utils/rum/productAnalyticsModel";
+import type { ExclusionStep, FunnelDef, SampleRatio } from "@/utils/rum/productAnalyticsQueries";
+
+defineOptions({ name: "ExclusionSection" });
+
+const MAX_EXCLUSIONS = 5;
 
 const props = defineProps<{
   def: FunnelDef;
@@ -144,61 +140,57 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ "update:def": [FunnelDef] }>();
 const { t } = useI18nTyped();
-const STEP_KINDS: StepKind[] = ["e", "p", "c", "r"];
-const MAX_EXCLUSIONS = 5;
-const picking = ref(false);
-// An invalid exclusion is held here, never in the funnel, until its range or target is fixed.
-const pending = ref<ExclusionStep | null>(null);
-const rowProblems = ref<Record<number, ExclusionProblem>>({});
+const { labelOf, kindLabel, kindVariant } = useStepLabels(
+  () => props.events,
+  () => props.eventsStatus,
+);
 
-const exclusions = computed(() => props.def.x ?? []);
+const open = ref(false);
+// Index 0 is a valid edit, so every check is against null, never truthiness.
+const editing = ref<number | null>(null);
 
 const blocked = computed<I18nText | null>(() => {
   if (props.def.steps.length < 2) return t("rum.analytics.funnel.exclusionNeedsSteps");
-  return exclusions.value.length + (pending.value ? 1 : 0) >= MAX_EXCLUSIONS
+  return (props.def.x?.length ?? 0) >= MAX_EXCLUSIONS
     ? t("rum.analytics.funnel.maxExclusions", { max: MAX_EXCLUSIONS })
     : null;
 });
 
+const rangeLabel = (x: ExclusionStep): I18nText => {
+  if (isWholeFunnel(x, props.def.steps.length)) return t("rum.analytics.funnel.exclusionChipWhole");
+  return x.b !== undefined
+    ? t("rum.analytics.funnel.exclusionBetween", { a: x.a, b: x.b })
+    : t("rum.analytics.funnel.exclusionWithin", { seconds: (x.withinMs ?? 0) / 1000, a: x.a });
+};
+
+const chipLabel = (x: ExclusionStep): I18nText =>
+  t("rum.analytics.funnel.exclusionChip", { step: labelOf(x.step), range: rangeLabel(x) });
+
 const updateX = (x: ExclusionStep[]) => emit("update:def", { ...props.def, x });
 
-const pick = (step: StepRef) => {
-  picking.value = false;
-  if (blocked.value) return;
-  const x = newExclusion(props.def, step);
-  if (exclusionProblem(props.def.steps, x)) pending.value = x;
-  else updateX([...exclusions.value, x]);
+const setOpen = (v: boolean) => {
+  open.value = v;
+  if (!v) editing.value = null;
 };
 
-const editPending = (x: ExclusionStep) => {
-  if (!fitsSteps(x, props.def.steps.length)) return;
-  if (exclusionProblem(props.def.steps, x)) {
-    pending.value = x;
-    return;
-  }
-  pending.value = null;
-  updateX([...exclusions.value, x]);
+const edit = (j: number) => {
+  editing.value = j;
+  open.value = true;
 };
 
-const editRow = (j: number, x: ExclusionStep) => {
-  if (!fitsSteps(x, props.def.steps.length)) return;
-  const problem = exclusionProblem(props.def.steps, x);
-  const { [j]: _, ...rest } = rowProblems.value;
-  rowProblems.value = problem ? { ...rest, [j]: problem } : rest;
-  if (!problem) updateX(exclusions.value.map((e, k) => (k === j ? x : e)));
+const apply = (x: ExclusionStep) => {
+  const current = props.def.x ?? [];
+  updateX(
+    editing.value !== null ? current.map((e, k) => (k === editing.value ? x : e)) : [...current, x],
+  );
+  setOpen(false);
 };
 
-const removeRow = (j: number) => {
-  rowProblems.value = {};
-  updateX(exclusions.value.filter((_, k) => k !== j));
-};
+const remove = (j: number) => updateX((props.def.x ?? []).filter((_, k) => k !== j));
 
-// A held row's step numbers belong to the steps it was picked against.
+// The picker's step numbers belong to the steps it was opened against.
 watch(
   () => props.def.steps,
-  () => {
-    pending.value = null;
-    rowProblems.value = {};
-  },
+  () => setOpen(false),
 );
 </script>
