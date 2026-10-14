@@ -262,6 +262,22 @@ Object.defineProperty(navigator, "clipboard", {
   writable: true,
 });
 
+// Specs that do not exercise permissions get allow-all; permission specs vi.unmock this.
+vi.mock("@/composables/useCan", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/composables/useCan")>();
+  const { computed } = await import("vue");
+  return {
+    ...actual,
+    useCan: () => ({
+      can: () => true,
+      status: () => "allowed",
+      enforced: computed(() => false),
+      ready: computed(() => true),
+      noteWriteDenied: () => {},
+    }),
+  };
+});
+
 beforeAll(() => {
   server.listen();
 

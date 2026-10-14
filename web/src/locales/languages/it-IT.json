@@ -1,4 +1,18 @@
 {
+  "authz": {
+    "viewOnly": "Solo visualizzazione",
+    "viewOnlyTooltip": "Il tuo ruolo non può modificarlo. Chiedi a un amministratore dell'organizzazione.",
+    "viewJsonReadOnly": "Visualizza JSON della dashboard (sola lettura)",
+    "viewDashboardJson": "Visualizza JSON della dashboard",
+    "viewPipelineReadOnly": "Visualizza pipeline (sola lettura)",
+    "viewPipelineJson": "Visualizza JSON della pipeline",
+    "viewPipelineJsonReadOnly": "Visualizza JSON della pipeline (sola lettura)",
+    "viewFunction": "Visualizza funzione",
+    "viewFunctionReadOnly": "Visualizza funzione (sola lettura)",
+    "bulkDeletePartial": "Elimina {count} di {total} — {skipped} saltati (nessuna autorizzazione)",
+    "skippedNames": "Saltati: {names}",
+    "skippedNamesMore": "Saltati: {names} +{count} altri"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "Nessuna cronologia ancora",
@@ -12982,6 +12996,7 @@
     "fields": "Campi",
     "fieldsHint": "Mostra il link solo quando nel record è presente almeno un campo",
     "fieldInputPlaceholder": "Inserisci il nome del campo e premi Invio o fai clic su +",
+    "emptyStateReadOnly": "Nessun collegamento incrociato configurato.",
     "emptyState": "Nessun collegamento incrociato configurato. Fai clic su «{addLabel}» per crearne uno.",
     "update": "Aggiornamento",
     "add": "Inserisci",

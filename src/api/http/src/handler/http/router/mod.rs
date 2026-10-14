@@ -1289,6 +1289,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/users/roles/all", get(authz::fga::get_roles_for_all_users))
         .route("/{org_id}/users/{user_id}/roles", get(authz::fga::get_roles_for_user))
         .route("/{org_id}/users/{user_id}/groups", get(authz::fga::get_groups_for_user))
+        .route("/{org_id}/authz/check", post(authz::check::check_access))
 
         // Clusters
         .route("/clusters", get(clusters::list_clusters))

@@ -1,4 +1,18 @@
 {
+  "authz": {
+    "viewOnly": "Только просмотр",
+    "viewOnlyTooltip": "Ваша роль не позволяет это изменять. Обратитесь к администратору организации.",
+    "viewJsonReadOnly": "Просмотр JSON дашборда (только чтение)",
+    "viewDashboardJson": "Просмотр JSON дашборда",
+    "viewPipelineReadOnly": "Просмотр конвейера (только чтение)",
+    "viewPipelineJson": "Просмотр JSON конвейера",
+    "viewPipelineJsonReadOnly": "Просмотр JSON конвейера (только чтение)",
+    "viewFunction": "Просмотр функции",
+    "viewFunctionReadOnly": "Просмотр функции (только чтение)",
+    "bulkDeletePartial": "Удалить {count} из {total} — пропущено {skipped} (нет прав)",
+    "skippedNames": "Пропущено: {names}",
+    "skippedNamesMore": "Пропущено: {names} и ещё {count}"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "Истории пока нет",
@@ -12982,6 +12996,7 @@
     "fields": "Поля",
     "fieldsHint": "Показывать ссылку только если хотя бы одно поле присутствует в записи",
     "fieldInputPlaceholder": "Введите имя поля и нажмите Enter или щелкните +",
+    "emptyStateReadOnly": "Нет настроенных перекрестных ссылок.",
     "emptyState": "Нет настроенных перекрестных ссылок. Нажмите \"{addLabel}\", чтобы создать.",
     "update": "Обновить",
     "add": "Добавить",

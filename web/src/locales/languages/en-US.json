@@ -1,4 +1,18 @@
 {
+  "authz": {
+    "viewOnly": "View only",
+    "viewOnlyTooltip": "Your role can't edit this. Ask an org admin.",
+    "viewJsonReadOnly": "View dashboard JSON (read-only)",
+    "viewDashboardJson": "View dashboard JSON",
+    "viewPipelineReadOnly": "View pipeline (read-only)",
+    "viewPipelineJson": "View pipeline JSON",
+    "viewPipelineJsonReadOnly": "View pipeline JSON (read-only)",
+    "viewFunction": "View function",
+    "viewFunctionReadOnly": "View function (read-only)",
+    "bulkDeletePartial": "Delete {count} of {total} — {skipped} skipped (no permission)",
+    "skippedNames": "Skipped: {names}",
+    "skippedNamesMore": "Skipped: {names} +{count} more"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "No history yet",
@@ -12982,6 +12996,7 @@
     "fields": "Fields",
     "fieldsHint": "Show link only when at least one field is present in the record",
     "fieldInputPlaceholder": "Enter field name and press Enter or click +",
+    "emptyStateReadOnly": "No cross-links configured.",
     "emptyState": "No cross-links configured. Click \"{addLabel}\" to create one.",
     "update": "Update",
     "add": "Add",

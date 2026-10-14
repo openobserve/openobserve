@@ -32,6 +32,20 @@ vi.mock("@/services/alerts", async (importOriginal) => {
 
 // The view reads its identity from the route; a hermetic route beats standing
 // up the whole app router with its guards.
+// Per-test permission answer for the edit check.
+const { canState } = vi.hoisted(() => ({ canState: { status: "allowed" } }));
+vi.mock("@/composables/useCan", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    useCan: () => ({
+      status: () => canState.status,
+      can: () => canState.status === "allowed",
+      noteWriteDenied: () => {},
+    }),
+  };
+});
+
 const mockRouterPush = vi.fn();
 // Mutable so a test can arrive from a non-default folder, the way the list
 // navigates here.
@@ -490,6 +504,26 @@ describe("AlertDetail — History tab", () => {
       await wrapper.find('[data-test="alerts-alertdetail-edit"]').trigger("click");
 
       expect(mockRouterPush.mock.calls[0][0].query.folder).toBe("default");
+    });
+  });
+
+  describe("when the user cannot edit", () => {
+    afterEach(() => {
+      canState.status = "allowed";
+    });
+
+    it("hides Edit and shows the view-only badge", async () => {
+      canState.status = "denied";
+      const wrapper = await mountView({});
+      expect(wrapper.find('[data-test="alerts-alertdetail-edit"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alerts-alertdetail-view-only-badge"]').exists()).toBe(true);
+    });
+
+    it("shows neither Edit nor the badge while the answer is pending", async () => {
+      canState.status = "pending";
+      const wrapper = await mountView({});
+      expect(wrapper.find('[data-test="alerts-alertdetail-edit"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alerts-alertdetail-view-only-badge"]').exists()).toBe(false);
     });
   });
 

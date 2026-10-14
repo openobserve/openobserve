@@ -251,6 +251,7 @@ use crate::{
         openobserve_api_management::request::authz::fga::get_groups,
         openobserve_api_management::request::authz::fga::get_group_details,
         openobserve_api_management::request::authz::fga::delete_group,
+        openobserve_api_management::request::authz::check::check_access,
         keys::save,
         keys::get,
         keys::list,
@@ -514,6 +515,12 @@ use crate::{
             config::meta::short_url::ShortenUrlRequest,
             config::meta::short_url::ShortenUrlResponse,
             config::meta::user::UserRole,
+            openobserve_api_management::request::authz::check::AuthzCheckRequest,
+            openobserve_api_management::request::authz::check::AuthzCheckItem,
+            openobserve_api_management::request::authz::check::AuthzCheckResource,
+            openobserve_api_management::request::authz::check::AuthzCheckAction,
+            openobserve_api_management::request::authz::check::AuthzCheckResponse,
+            openobserve_api_management::request::authz::check::AuthzCheckResult,
             ingestion_common::RecordStatus,
             ingestion_common::StreamStatus,
             ingestion_common::IngestionResponse,
@@ -1054,6 +1061,25 @@ mod tests {
             .collect();
         assert!(tags.contains(&"Product Analytics"), "{tags:?}");
         assert!(!tags.contains(&"RUM"), "{tags:?}");
+    }
+
+    #[test]
+    fn authz_check_path_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/authz/check"]["post"];
+        assert_eq!(op["operationId"], "CheckAccess", "{op}");
+        assert!(op["responses"].get("400").is_some(), "{op}");
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "AuthzCheckRequest",
+            "AuthzCheckItem",
+            "AuthzCheckResource",
+            "AuthzCheckAction",
+            "AuthzCheckResponse",
+            "AuthzCheckResult",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
     }
 
     #[test]

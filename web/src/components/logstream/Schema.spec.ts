@@ -34,6 +34,20 @@ const {
   mockUpdateSettings: vi.fn().mockResolvedValue({ data: { code: 200 } }),
 }));
 
+// Per-test permission answer for the stream edit check.
+const { canState } = vi.hoisted(() => ({ canState: { status: "allowed" } }));
+vi.mock("@/composables/useCan", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    useCan: () => ({
+      status: () => canState.status,
+      can: () => canState.status === "allowed",
+      noteWriteDenied: () => {},
+    }),
+  };
+});
+
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
   useToast: () => ({ toast: mockToast, toasts: [] }),
@@ -1602,6 +1616,90 @@ describe("Schema Component Tests", () => {
   // ==========================================
   // Phase 2 tests — Configuration Tab
   // ==========================================
+  describe("read-only when stream edit is denied", () => {
+    let w: any;
+    const modelValue = {
+      name: "ro-stream",
+      stream_type: "logs",
+      storage_type: "s3",
+      stats: {
+        doc_time_min: 0,
+        doc_time_max: 0,
+        doc_num: 1,
+        file_num: 1,
+        storage_size: 1,
+        compressed_size: 1,
+      },
+      schema: [
+        { name: "_timestamp", type: "Int64" },
+        { name: "message", type: "Utf8" },
+      ],
+      settings: {
+        full_text_search_keys: [],
+        index_fields: [],
+        bloom_filter_fields: [],
+        data_retention: 30,
+        max_query_range: 24,
+        store_original_data: false,
+        approx_partition: false,
+        defined_schema_fields: [],
+        extended_retention_days: [],
+        pattern_associations: [],
+      },
+    };
+
+    beforeEach(async () => {
+      canState.status = "denied";
+      mockGetStream.mockResolvedValue({ ...modelValue, pattern_associations: [] });
+      w = mount(LogStream, {
+        props: { modelValue },
+        global: { provide: { store }, plugins: [i18n], stubs: { ODrawer: ODrawerStub } },
+      });
+      await flushPromises();
+    });
+
+    afterEach(() => {
+      canState.status = "allowed";
+      w.unmount();
+    });
+
+    it("shows the badge, Close, and no save, add-field or delete controls", () => {
+      expect(w.find('[data-test="schema-view-only-badge"]').exists()).toBe(true);
+      expect(w.find('[data-test="schema-update-settings-button"]').exists()).toBe(false);
+      expect(w.find('[data-test="schema-delete-button"]').exists()).toBe(false);
+      expect(w.find('[data-test="schema-add-fields-title"]').exists()).toBe(false);
+      expect(w.find('[data-test="schema-cancel-button"]').text()).toBe("Close");
+    });
+
+    it("disables index types, row selection and the Add pattern link", () => {
+      const select = w
+        .findAllComponents({ name: "OSelect" })
+        .find((c: any) => c.attributes("data-test") === "schema-field-message-index-type-select");
+      expect(select?.props("disabled")).toBe(true);
+      const table = w
+        .findAllComponents({ name: "OTable" })
+        .find((c: any) => c.props("rowKey") === "name");
+      expect(table?.props("selection")).toBe("none");
+      expect(w.find('[data-test="schema-field-message-pattern-action"]').exists()).toBe(false);
+    });
+
+    it("disables the configuration inputs and toggles", async () => {
+      w.vm.updateActiveMainTab("configuration");
+      await w.vm.$nextTick();
+      for (const dt of [
+        "stream-details-data-retention-input",
+        "stream-details-max-query-range-input",
+        "log-stream-use_approx-toggle-btn",
+      ]) {
+        const el = w.find(`[data-test="${dt}"]`);
+        const control = ["INPUT", "BUTTON"].includes(el.element.tagName)
+          ? el
+          : el.find("input, button");
+        expect(control.attributes("disabled"), dt).toBeDefined();
+      }
+    });
+  });
+
   describe("Configuration Tab", () => {
     let w: any;
 

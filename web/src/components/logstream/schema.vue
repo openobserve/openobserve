@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          close button; the stream name is the title and "Stream Detail" the
          subtitle (structured ODrawer header). -->
     <template #header-right>
+      <ViewOnlyBadge v-if="streamEditStatus === 'denied'" data-test="schema-view-only-badge" />
       <div
         v-if="indexData.name"
         class="rounded-default bg-surface-panel border-border-default flex items-center gap-1.5 border px-2 py-1 max-md:hidden"
@@ -288,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :placeholder="t('search.searchField')"
                         />
                         <OButton
-                          v-if="isSchemaUDSEnabled"
+                          v-if="isSchemaUDSEnabled && !streamReadOnly"
                           data-test="schema-add-fields-title"
                           :disabled="isDialogOpen"
                           variant="outline"
@@ -345,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :columns="columns"
                         horizontal-scroll
                         row-key="name"
-                        selection="multiple"
+                        :selection="streamReadOnly ? 'none' : 'multiple'"
                         :selected-ids="selectedSchemaIds"
                         :is-row-selectable="isSchemaRowSelectable"
                         @update:selected-ids="handleSchemaSelectedIdsUpdate"
@@ -410,6 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               multiple
                               clearable
                               size="sm"
+                              :disabled="streamReadOnly"
                               :data-test="`schema-field-${row.name}-index-type-select`"
                               style="width: 11.875rem"
                               @update:model-value="
@@ -433,7 +435,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <template
                             v-if="
                               !(row.name == store.state.zoConfig.timestamp_column) &&
-                              (row.type == 'Utf8' || row.type == 'utf8')
+                              (row.type == 'Utf8' || row.type == 'utf8') &&
+                              (!streamReadOnly || patternAssociations[row.name]?.length)
                             "
                           >
                             <span
@@ -474,6 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </label>
                           <OInput
                             data-test="stream-details-data-retention-input"
+                            :disabled="streamReadOnly"
                             v-model="dataRetentionDays"
                             type="number"
                             min="1"
@@ -503,6 +507,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </label>
                           <OInput
                             data-test="stream-details-max-query-range-input"
+                            :disabled="streamReadOnly"
                             v-model="maxQueryRange"
                             type="number"
                             min="0"
@@ -519,6 +524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </label>
                           <OInput
                             data-test="stream-details-flatten-level-input"
+                            :disabled="streamReadOnly"
                             v-model="flattenLevel"
                             type="number"
                             min="0"
@@ -537,6 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span>{{ t("logStream.approxPartition") }}</span>
                           <OSwitch
                             data-test="log-stream-use_approx-toggle-btn"
+                            :disabled="streamReadOnly"
                             v-model="approxPartition"
                             @update:model-value="formDirtyFlag = true"
                           />
@@ -549,6 +556,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span>{{ t("logStream.storeOriginalData") }}</span>
                           <OSwitch
                             data-test="log-stream-store-original-data-toggle-btn"
+                            :disabled="streamReadOnly"
                             v-model="storeOriginalData"
                             @update:model-value="formDirtyFlag = true"
                           />
@@ -558,6 +566,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span>{{ t("logStream.enableDistinctValues") }}</span>
                           <OSwitch
                             data-test="log-stream-enabled-distinct-values-toggle-btn"
+                            :disabled="streamReadOnly"
                             v-model="enableDistinctFields"
                             @update:model-value="formDirtyFlag = true"
                           />
@@ -587,7 +596,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div class="mt-2 flex min-h-0 flex-1 flex-col">
                       <div class="mt-2 flex items-center text-center">
-                        <div class="flex items-center">
+                        <div v-if="!streamReadOnly" class="flex items-center">
                           <span class="font-bold"> {{ t("logStream.selectDate") }}</span>
                           <DateTime
                             class="mx-2"
@@ -608,7 +617,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :columns="redBtnColumns"
                           horizontal-scroll
                           row-key="index"
-                          selection="multiple"
+                          :selection="streamReadOnly ? 'none' : 'multiple'"
                           v-model:selected-ids="selectedDateIds"
                           @selection-change="handleDateSelectionChange"
                           pagination="client"
@@ -629,6 +638,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Stream-level cross-links (editable) -->
                       <CrossLinkManager
                         v-model="streamCrossLinks"
+                        :readonly="streamReadOnly"
                         :title="t('crossLinks.streamCrossLinks')"
                         :subtitle="t('crossLinks.streamCrossLinksSubtitle')"
                         :availableFields="streamFieldNames"
@@ -662,7 +672,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("logStream.fieldsSelected") }}</span
                       >
                       <OButton
-                        v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
+                        v-if="
+                          isSchemaUDSEnabled &&
+                          activeMainTab == 'schemaSettings' &&
+                          streamEditStatus === 'allowed'
+                        "
                         data-test="schema-add-field-button"
                         variant="outline"
                         size="sm-action"
@@ -685,7 +699,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </OButton>
                       <OButton
-                        v-if="activeMainTab != 'configuration' && activeMainTab != 'crossLinking'"
+                        v-if="
+                          activeMainTab != 'configuration' &&
+                          activeMainTab != 'crossLinking' &&
+                          streamEditStatus === 'allowed'
+                        "
                         :disabled="!selectedFields.length && !selectedDateFields.length"
                         data-test="schema-delete-button"
                         variant="outline"
@@ -707,9 +725,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm-action"
                         @click="$emit('close')"
                       >
-                        {{ t("logStream.cancel") }}
+                        {{
+                          streamEditStatus === "denied" ? t("common.close") : t("logStream.cancel")
+                        }}
                       </OButton>
                       <OButton
+                        v-if="streamEditStatus === 'allowed'"
                         :disabled="!formDirtyFlag"
                         data-test="schema-update-settings-button"
                         variant="primary"
@@ -755,9 +776,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="schema-pattern-association-cancel-btn"
           @click="patternAssociationDialog.show = false"
         >
-          {{ t("common.cancel") }}
+          {{ streamReadOnly ? t("common.close") : t("common.cancel") }}
         </OButton>
         <OButton
+          v-if="!streamReadOnly"
           variant="primary"
           size="sm-action"
           data-test="schema-pattern-association-update-btn"
@@ -851,6 +873,8 @@ import { makeSchemaFieldsSchema } from "./Schema.schema";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
+import ViewOnlyBadge from "@/components/common/ViewOnlyBadge.vue";
+import { useCan } from "@/composables/useCan";
 import type { AcceptableValue } from "reka-ui";
 
 const defaultValue: any = () => {
@@ -877,6 +901,7 @@ export default defineComponent({
     },
   },
   components: {
+    ViewOnlyBadge,
     OSeparator,
     OTabs,
     OTab,
@@ -948,6 +973,19 @@ export default defineComponent({
       () => store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
     );
     const indexData: any = ref(defaultValue());
+    const { status: canStatus } = useCan();
+    const streamEditStatus = computed(() =>
+      modelValue?.name
+        ? canStatus(
+            "stream",
+            String(modelValue.name),
+            "edit",
+            undefined,
+            String(modelValue.stream_type ?? ""),
+          )
+        : "allowed",
+    );
+    const streamReadOnly = computed(() => streamEditStatus.value !== "allowed");
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
     const dataRetentionDays = ref(0);
@@ -1479,6 +1517,7 @@ export default defineComponent({
     };
 
     const onSubmit = async () => {
+      if (streamEditStatus.value !== "allowed") return;
       // Gate the save on the "Add Field(s)" rows (parity with AddStream): when the
       // dialog has rows, they must pass the schema (name required + valid chars
       // after normalization, data type required) before we merge them into
@@ -2488,6 +2527,8 @@ export default defineComponent({
       dateChangeValue,
       isCloud,
       indexData,
+      streamEditStatus,
+      streamReadOnly,
       isCrossLinkingEnabledForStream,
       getSchema,
       onSubmit,

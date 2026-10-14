@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="h-full max-h-full overflow-hidden">
     <AddAlert
-      v-if="!isLoadingAlert"
+      v-if="!isLoadingAlert && editStatus === 'allowed'"
       :modelValue="editedAlert"
       :isUpdated="isUpdated"
       :destinations="destinations"
@@ -34,13 +34,14 @@ import { alertKeys } from "@/services/alerts.querykeys";
 import { destinationKeys } from "@/services/alert_destination.querykeys";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { defineComponent, ref, onBeforeMount, onBeforeUnmount } from "vue";
+import { computed, defineComponent, ref, onBeforeMount, onBeforeUnmount, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { clearAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
+import { useCan } from "@/composables/useCan";
 
 export default defineComponent({
   name: "AddAlertView",
@@ -54,6 +55,32 @@ export default defineComponent({
     const route = useRoute();
     const destinations = ref([]);
     const isUpdated = ref(false);
+
+    const { status: canStatus } = useCan();
+    const editedId = computed(
+      () => (route.params.alert_id || route.params.anomaly_id || "") as string,
+    );
+    const editStatus = computed(() =>
+      editedId.value
+        ? canStatus("alert", editedId.value, "edit", (route.query.folder as string) || "default")
+        : "allowed",
+    );
+    // A deep link into the editor for an alert the user cannot edit lands on its read-only detail page.
+    watch(
+      editStatus,
+      (value) => {
+        if (value !== "denied") return;
+        router.replace({
+          name: "alertDetail",
+          params: { alert_id: editedId.value },
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+            folder: (route.query.folder as string) || "default",
+          },
+        });
+      },
+      { immediate: true },
+    );
 
     /**
      * False once this view is gone. An async continuation that outlives the
@@ -176,6 +203,7 @@ export default defineComponent({
     });
 
     return {
+      editStatus,
       destinations,
       isUpdated,
       editedAlert,

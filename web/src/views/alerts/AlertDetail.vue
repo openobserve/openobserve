@@ -37,6 +37,10 @@
   >
     <template #title-trail>
       <div v-if="!notFound" class="flex items-center gap-2">
+        <ViewOnlyBadge
+          v-if="editStatus === 'denied'"
+          data-test="alerts-alertdetail-view-only-badge"
+        />
         <OTag
           v-if="isMultiAlert"
           variant="purple-soft"
@@ -73,7 +77,7 @@
 
     <template #actions>
       <OButton
-        v-if="!notFound"
+        v-if="!notFound && editStatus === 'allowed'"
         variant="outline"
         size="sm-action"
         icon-left="edit"
@@ -160,6 +164,7 @@
           }}
           <template #actions>
             <OButton
+              v-if="editStatus === 'allowed'"
               variant="outline"
               size="sm"
               data-test="alerts-alertdetail-enable-multi"
@@ -353,6 +358,8 @@ import {
   sloIdOf,
 } from "@/utils/alerts/sloAlertRouting";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import ViewOnlyBadge from "@/components/common/ViewOnlyBadge.vue";
+import { useCan } from "@/composables/useCan";
 import type {
   AlertGroup,
   AlertGroupsResponse,
@@ -367,6 +374,12 @@ const store = useStore();
 
 const alertId = computed(() => String(route.params.alert_id || ""));
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
+const { status: canStatus } = useCan();
+const editStatus = computed(() =>
+  alertId.value
+    ? canStatus("alert", alertId.value, "edit", String(route.query.folder || "default"))
+    : "allowed",
+);
 
 const alert = ref<any>(null);
 const groupData = ref<AlertGroupsResponse | null>(null);

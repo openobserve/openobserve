@@ -9,7 +9,13 @@
        navigation, so drop this component's own back chevron + "Add Function"
        subtitle — they read as a competing, mid-flow page header. -->
   <OPageHeader
-    :subtitle="embedded ? undefined : t('function.addFunction')"
+    :subtitle="
+      embedded
+        ? undefined
+        : editStatus === 'denied'
+          ? t('authz.viewFunction')
+          : t('function.addFunction')
+    "
     title-overflow="visible"
     :back="
       embedded
@@ -33,6 +39,11 @@
         :edit-hint="t('function.renameHint')"
         :readonly="disableName"
         :disabled="disableName"
+      />
+      <ViewOnlyBadge
+        v-if="editStatus === 'denied'"
+        class="ms-2 shrink-0"
+        data-test="function-view-only-badge"
       />
     </template>
     <template #tabs>
@@ -226,9 +237,10 @@
         :disabled="isSubmitting"
         @click="emit('cancel')"
       >
-        {{ t("function.cancel") }}
+        {{ editStatus === "denied" ? t("common.close") : t("function.cancel") }}
       </OButton>
       <OButton
+        v-if="editStatus === 'allowed'"
         data-test="add-function-save-btn"
         variant="primary"
         size="sm-action"
@@ -257,6 +269,8 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import ViewOnlyBadge from "@/components/common/ViewOnlyBadge.vue";
+import type { CanStatus } from "@/composables/useCan";
 import { toggleFullscreen } from "@/utils/dom";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
@@ -311,6 +325,11 @@ defineProps({
   isSubmitting: {
     type: Boolean,
     default: false,
+  },
+  /** Save shows only when `allowed`; `denied` turns the page into a read-only view. */
+  editStatus: {
+    type: String as PropType<CanStatus>,
+    default: "allowed",
   },
 });
 

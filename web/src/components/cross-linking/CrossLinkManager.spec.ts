@@ -151,6 +151,18 @@ describe("CrossLinkManager Component", () => {
       expect(empty.text()).toContain("No cross-links configured");
     });
 
+    it("does not point a read-only user at the hidden Add button", () => {
+      wrapper = createWrapper({ modelValue: [], readonly: true });
+      const empty = wrapper.find('[data-test="cross-link-empty"]');
+      expect(empty.text()).toBe("No cross-links configured.");
+      expect(empty.text()).not.toContain("Click");
+    });
+
+    it("keeps the Add hint for a user who can edit", () => {
+      wrapper = createWrapper({ modelValue: [], readonly: false });
+      expect(wrapper.find('[data-test="cross-link-empty"]').text()).toContain("Click");
+    });
+
     it("should hide links list when empty", () => {
       wrapper = createWrapper({ modelValue: [] });
       const list = wrapper.find('[data-test="cross-link-list"]');

@@ -1,4 +1,18 @@
 {
+  "authz": {
+    "viewOnly": "Chỉ xem",
+    "viewOnlyTooltip": "Vai trò của bạn không thể chỉnh sửa mục này. Hãy hỏi quản trị viên tổ chức.",
+    "viewJsonReadOnly": "Xem JSON bảng điều khiển (chỉ đọc)",
+    "viewDashboardJson": "Xem JSON bảng điều khiển",
+    "viewPipelineReadOnly": "Xem pipeline (chỉ đọc)",
+    "viewPipelineJson": "Xem JSON pipeline",
+    "viewPipelineJsonReadOnly": "Xem JSON pipeline (chỉ đọc)",
+    "viewFunction": "Xem hàm",
+    "viewFunctionReadOnly": "Xem hàm (chỉ đọc)",
+    "bulkDeletePartial": "Xóa {count} trên {total} — bỏ qua {skipped} (không có quyền)",
+    "skippedNames": "Đã bỏ qua: {names}",
+    "skippedNamesMore": "Đã bỏ qua: {names} +{count} mục khác"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "Chưa có lịch sử",
@@ -12982,6 +12996,7 @@
     "fields": "Trường",
     "fieldsHint": "Chỉ hiển thị liên kết khi có ít nhất một trường trong bản ghi",
     "fieldInputPlaceholder": "Nhập tên trường và nhấn Enter hoặc nhấp vào +",
+    "emptyStateReadOnly": "Chưa cấu hình liên kết chéo.",
     "emptyState": "Chưa cấu hình liên kết chéo. Nhấp vào \"{addLabel}\" để tạo một liên kết.",
     "update": "Cập nhật",
     "add": "Thêm",

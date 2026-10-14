@@ -250,6 +250,25 @@ describe("FunctionsToolbar", () => {
     expect(saveBtn.attributes("type")).toBe("submit");
   });
 
+  it("hides Save and shows the view-only badge when edit is denied", () => {
+    const wrapper = mountToolbar({
+      transformTypeOptions: [{ label: "VRL", value: "0" }],
+      editStatus: "denied",
+    });
+    expect(wrapper.find('[data-test="add-function-save-btn"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="function-view-only-badge"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="add-function-cancel-btn"]').text()).toBe("Close");
+  });
+
+  it("hides Save without a badge while the permission is still pending", () => {
+    const wrapper = mountToolbar({
+      transformTypeOptions: [{ label: "VRL", value: "0" }],
+      editStatus: "pending",
+    });
+    expect(wrapper.find('[data-test="add-function-save-btn"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="function-view-only-badge"]').exists()).toBe(false);
+  });
+
   it("blocks submit for an invalid (empty) name — save NOT called", async () => {
     const onSubmit = vi.fn();
     const wrapper = mountToolbar(

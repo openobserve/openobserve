@@ -1,4 +1,18 @@
 {
+  "authz": {
+    "viewOnly": "仅查看",
+    "viewOnlyTooltip": "您的角色无法编辑此项。请联系组织管理员。",
+    "viewJsonReadOnly": "查看仪表板 JSON（只读）",
+    "viewDashboardJson": "查看仪表板 JSON",
+    "viewPipelineReadOnly": "查看管道（只读）",
+    "viewPipelineJson": "查看管道 JSON",
+    "viewPipelineJsonReadOnly": "查看管道 JSON（只读）",
+    "viewFunction": "查看函数",
+    "viewFunctionReadOnly": "查看函数（只读）",
+    "bulkDeletePartial": "删除 {total} 项中的 {count} 项 — 已跳过 {skipped} 项（无权限）",
+    "skippedNames": "已跳过：{names}",
+    "skippedNamesMore": "已跳过：{names} 等另外 {count} 项"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "暂无历史记录",
@@ -12982,6 +12996,7 @@
     "fields": "字段",
     "fieldsHint": "仅当记录中至少存在一个字段时才显示链接",
     "fieldInputPlaceholder": "输入字段名称并按 Enter 键或单击 +",
+    "emptyStateReadOnly": "未配置交叉链接。",
     "emptyState": "未配置交叉链接。单击 “{addLabel}” 创建一个。",
     "update": "更新",
     "add": "添加",

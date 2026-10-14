@@ -1,4 +1,18 @@
 {
+  "authz": {
+    "viewOnly": "Yalnızca görüntüleme",
+    "viewOnlyTooltip": "Rolünüz bunu düzenleyemez. Bir kuruluş yöneticisine başvurun.",
+    "viewJsonReadOnly": "Pano JSON'unu görüntüle (salt okunur)",
+    "viewDashboardJson": "Pano JSON'unu görüntüle",
+    "viewPipelineReadOnly": "İşlem hattını görüntüle (salt okunur)",
+    "viewPipelineJson": "İşlem hattı JSON'unu görüntüle",
+    "viewPipelineJsonReadOnly": "İşlem hattı JSON'unu görüntüle (salt okunur)",
+    "viewFunction": "Fonksiyonu görüntüle",
+    "viewFunctionReadOnly": "Fonksiyonu görüntüle (salt okunur)",
+    "bulkDeletePartial": "{total} öğeden {count} tanesini sil — {skipped} atlandı (izin yok)",
+    "skippedNames": "Atlandı: {names}",
+    "skippedNamesMore": "Atlandı: {names} +{count} daha"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "Henüz geçmiş yok",
@@ -12982,6 +12996,7 @@
     "fields": "Tarlalar",
     "fieldsHint": "Bağlantıyı yalnızca kayıtta en az bir alan varsa göster",
     "fieldInputPlaceholder": "Alan adını girin ve Enter tuşuna basın veya + düğmesine tıklayın",
+    "emptyStateReadOnly": "Yapılandırılmış çapraz bağlantı yok.",
     "emptyState": "Yapılandırılmış çapraz bağlantı yok. Bir tane oluşturmak için “{addLabel}” yi tıklayın.",
     "update": "Güncelleme",
     "add": "Ekle",

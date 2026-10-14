@@ -1,4 +1,18 @@
 {
+  "authz": {
+    "viewOnly": "Solo lectura",
+    "viewOnlyTooltip": "Tu rol no puede editar esto. Pide ayuda a un administrador de la organización.",
+    "viewJsonReadOnly": "Ver JSON del panel (solo lectura)",
+    "viewDashboardJson": "Ver JSON del panel",
+    "viewPipelineReadOnly": "Ver pipeline (solo lectura)",
+    "viewPipelineJson": "Ver JSON del pipeline",
+    "viewPipelineJsonReadOnly": "Ver JSON del pipeline (solo lectura)",
+    "viewFunction": "Ver función",
+    "viewFunctionReadOnly": "Ver función (solo lectura)",
+    "bulkDeletePartial": "Eliminar {count} de {total} — {skipped} omitidos (sin permiso)",
+    "skippedNames": "Omitidos: {names}",
+    "skippedNamesMore": "Omitidos: {names} +{count} más"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "Aún no hay historial",
@@ -12982,6 +12996,7 @@
     "fields": "Campos",
     "fieldsHint": "Mostrar enlace solo cuando hay al menos un campo en el registro",
     "fieldInputPlaceholder": "Introduzca el nombre del campo y pulse Entrar o haga clic en +",
+    "emptyStateReadOnly": "No hay enlaces cruzados configurados.",
     "emptyState": "No hay enlaces cruzados configurados. Haga clic en «{addLabel}» para crear uno.",
     "update": "Actualización",
     "add": "Añadir",

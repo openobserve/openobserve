@@ -84,7 +84,11 @@
 
     <!-- Empty State -->
     <div v-else class="text-text-muted py-4 text-center text-sm" data-test="cross-link-empty">
-      {{ t("crossLinks.emptyState", { addLabel: t("crossLinks.addCrossLink") }) }}
+      {{
+        readonly
+          ? t("crossLinks.emptyStateReadOnly")
+          : t("crossLinks.emptyState", { addLabel: t("crossLinks.addCrossLink") })
+      }}
     </div>
 
     <!-- Add/Edit Dialog -->

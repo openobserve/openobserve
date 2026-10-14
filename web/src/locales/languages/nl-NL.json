@@ -1,4 +1,18 @@
 {
+  "authz": {
+    "viewOnly": "Alleen bekijken",
+    "viewOnlyTooltip": "Je rol kan dit niet bewerken. Vraag een org-beheerder.",
+    "viewJsonReadOnly": "Dashboard-JSON bekijken (alleen-lezen)",
+    "viewDashboardJson": "Dashboard-JSON bekijken",
+    "viewPipelineReadOnly": "Pipeline bekijken (alleen-lezen)",
+    "viewPipelineJson": "Pipeline-JSON bekijken",
+    "viewPipelineJsonReadOnly": "Pipeline-JSON bekijken (alleen-lezen)",
+    "viewFunction": "Functie bekijken",
+    "viewFunctionReadOnly": "Functie bekijken (alleen-lezen)",
+    "bulkDeletePartial": "{count} van {total} verwijderen — {skipped} overgeslagen (geen toestemming)",
+    "skippedNames": "Overgeslagen: {names}",
+    "skippedNamesMore": "Overgeslagen: {names} +{count} meer"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "Nog geen geschiedenis",
@@ -12982,6 +12996,7 @@
     "fields": "Velden",
     "fieldsHint": "Link alleen tonen als er minstens één veld in de record aanwezig is",
     "fieldInputPlaceholder": "Voer de veldnaam in en druk op Enter of klik op +",
+    "emptyStateReadOnly": "Er zijn geen kruislinks geconfigureerd.",
     "emptyState": "Er zijn geen kruislinks geconfigureerd. Klik op „{addLabel}” om er een aan te maken.",
     "update": "Bijwerken",
     "add": "Toevoegen",

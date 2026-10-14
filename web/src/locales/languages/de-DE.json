@@ -1,4 +1,18 @@
 {
+  "authz": {
+    "viewOnly": "Nur ansehen",
+    "viewOnlyTooltip": "Ihre Rolle kann dies nicht bearbeiten. Wenden Sie sich an einen Org-Admin.",
+    "viewJsonReadOnly": "Dashboard-JSON ansehen (schreibgeschützt)",
+    "viewDashboardJson": "Dashboard-JSON ansehen",
+    "viewPipelineReadOnly": "Pipeline ansehen (schreibgeschützt)",
+    "viewPipelineJson": "Pipeline-JSON ansehen",
+    "viewPipelineJsonReadOnly": "Pipeline-JSON ansehen (schreibgeschützt)",
+    "viewFunction": "Funktion ansehen",
+    "viewFunctionReadOnly": "Funktion ansehen (schreibgeschützt)",
+    "bulkDeletePartial": "{count} von {total} löschen — {skipped} übersprungen (keine Berechtigung)",
+    "skippedNames": "Übersprungen: {names}",
+    "skippedNamesMore": "Übersprungen: {names} +{count} weitere"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "Noch kein Verlauf",
@@ -12982,6 +12996,7 @@
     "fields": "Felder",
     "fieldsHint": "Link nur anzeigen, wenn mindestens ein Feld im Datensatz vorhanden ist",
     "fieldInputPlaceholder": "Geben Sie den Feldnamen ein und drücken Sie die Eingabetaste oder klicken Sie auf +",
+    "emptyStateReadOnly": "Keine Querlinks konfiguriert.",
     "emptyState": "Keine Querlinks konfiguriert. Klicken Sie auf „{addLabel}“, um eines zu erstellen.",
     "update": "Aktualisieren",
     "add": "Hinzufügen",

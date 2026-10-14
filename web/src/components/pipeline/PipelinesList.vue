@@ -157,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <div class="actions-container flex items-center">
               <OButton
+                v-if="canPipeline(row, 'edit')"
                 :data-test="`pipeline-list-${row.name}-pause-start-action`"
                 :data-row-action="row.enabled ? 'pause' : 'resume'"
                 :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
@@ -173,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <!-- Hover-only preview with no click action, so it has no menu counterpart below md. -->
               <OButton
+                v-if="!isReadOnlyRealtime(row)"
                 :data-test="`pipeline-list-${row.name}-view-pipeline`"
                 variant="ghost"
                 size="icon-sm"
@@ -185,6 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </OButton>
               <OButton
+                v-if="canPipeline(row, 'edit')"
                 :data-test="`pipeline-list-${row.name}-update-pipeline`"
                 data-row-action="edit"
                 variant="ghost"
@@ -199,6 +202,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   shortcut-id="pipelinesRowEdit"
                 />
               </OButton>
+              <OButton
+                v-else-if="isReadOnlyRealtime(row)"
+                :data-test="`pipeline-list-${row.name}-view-pipeline-readonly`"
+                variant="ghost"
+                size="icon-sm"
+                class="max-md:hidden"
+                @click.stop="editPipeline(row)"
+                icon-left="visibility"
+              >
+                <OTooltip side="bottom" :content="t('authz.viewPipelineReadOnly')" />
+              </OButton>
               <!-- Hidden proxies so the row-hover shortcuts reach the more-menu
                  actions (teleported out of the row): x = export, Del = delete. -->
               <button
@@ -210,6 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="exportPipeline(row)"
               />
               <button
+                v-if="canPipeline(row, 'delete')"
                 type="button"
                 data-row-action="delete"
                 class="hidden"
@@ -228,6 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 <ODropdownItem
+                  v-if="canPipeline(row, 'edit')"
                   :data-test="`pipeline-list-${row.name}-pause-start-action-menu`"
                   class="md:hidden"
                   @select="togglePipeline(row)"
@@ -238,6 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ row.enabled ? t("alerts.pause") : t("alerts.start") }}
                 </ODropdownItem>
                 <ODropdownItem
+                  v-if="canPipeline(row, 'edit')"
                   :data-test="`pipeline-list-${row.name}-update-pipeline-menu`"
                   class="md:hidden"
                   @select="editPipeline(row)"
@@ -246,6 +263,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon size="sm" name="edit" />
                   </template>
                   {{ t("alerts.edit") }}
+                </ODropdownItem>
+                <ODropdownItem
+                  v-else-if="isReadOnlyRealtime(row)"
+                  :data-test="`pipeline-list-${row.name}-view-pipeline-readonly-menu`"
+                  class="md:hidden"
+                  @select="editPipeline(row)"
+                >
+                  <template #icon-left>
+                    <OIcon size="sm" name="visibility" />
+                  </template>
+                  {{ t("authz.viewPipelineReadOnly") }}
                 </ODropdownItem>
                 <ODropdownSeparator class="md:hidden" />
                 <ODropdownItem
@@ -258,8 +286,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   {{ t("pipeline.export") }}
                 </ODropdownItem>
-                <ODropdownSeparator />
+                <ODropdownSeparator v-if="canPipeline(row, 'delete')" />
                 <ODropdownItem
+                  v-if="canPipeline(row, 'delete')"
                   :data-test="`pipeline-list-${row.name}-delete-pipeline`"
                   shortcut-id="pipelinesRowDelete"
                   @select="openDeleteDialog(row)"
@@ -351,6 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("pipeline_list.export") }}
             </OButton>
             <OButton
+              v-if="showBulkEdit"
               data-test="pipeline-list-pause-pipelines-btn"
               variant="outline"
               size="sm"
@@ -360,6 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("pipeline_list.pause") }}
             </OButton>
             <OButton
+              v-if="showBulkEdit"
               data-test="pipeline-list-resume-pipelines-btn"
               variant="outline"
               size="sm"
@@ -369,6 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("pipeline_list.resume") }}
             </OButton>
             <OButton
+              v-if="!bulkDeleteSplit.skipped.length || bulkDeleteSplit.allowed.length > 0"
               data-test="pipeline-list-delete-pipelines-btn"
               variant="outline-destructive"
               size="sm"
@@ -397,6 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
+    :detail="confirmDialogMeta.detail"
     @update:ok="confirmDialogMeta.onConfirm()"
     @update:cancel="resetConfirmDialog"
     v-model="confirmDialogMeta.show"
@@ -555,6 +588,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { skippedNamesText, splitByPermission, useCan } from "@/composables/useCan";
+import type { AuthzAction } from "@/composables/useCan";
 
 const { t } = useI18nTyped();
 const router = useRouter();
@@ -712,6 +747,23 @@ const exportLoading = ref(false);
 const bulkDeleteLoading = ref(false);
 const selectedPipelines = computed(() =>
   filteredPipelines.value.filter((p: any) => selectedPipelineIds.value.includes(p.pipeline_id)),
+);
+
+const { can, status: canStatus, noteWriteDenied } = useCan();
+const canPipeline = (row: any, action: AuthzAction): boolean =>
+  can("pipeline", row.pipeline_id, action);
+// Realtime pipelines have no row expansion, so the editor is their only read path.
+const isReadOnlyRealtime = (row: any): boolean =>
+  row.source?.source_type !== "scheduled" &&
+  canStatus("pipeline", row.pipeline_id, "edit") === "denied";
+const bulkDeleteSplit = computed(() =>
+  splitByPermission(selectedPipelines.value, (row: any) => canPipeline(row, "delete")),
+);
+const bulkEditSplit = computed(() =>
+  splitByPermission(selectedPipelines.value, (row: any) => canPipeline(row, "edit")),
+);
+const showBulkEdit = computed(
+  () => !bulkEditSplit.value.skipped.length || bulkEditSplit.value.allowed.length > 0,
 );
 const expandedId = ref<string[]>([]);
 
@@ -1195,6 +1247,7 @@ const deletePipeline = async () => {
       );
     })
     .catch((error) => {
+      noteWriteDenied(error, "pipeline", pipeline_id, "delete");
       if (error.response.status != 403) {
         toast({
           message: error.response?.data?.message || t("pipeline.deletePipelineError"),
@@ -1216,6 +1269,7 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.show = false;
   confirmDialogMeta.value.title = "";
   confirmDialogMeta.value.message = "";
+  confirmDialogMeta.value.detail = "";
   confirmDialogMeta.value.onConfirm = () => {};
   confirmDialogMeta.value.data = null;
 };
@@ -1375,8 +1429,7 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
   });
   try {
     const isResuming = action === "resume";
-    // Filter pipelines based on action
-    const pipelinesToToggle = selectedPipelines.value.filter((pipeline: any) =>
+    const pipelinesToToggle = bulkEditSplit.value.allowed.filter((pipeline: any) =>
       isResuming ? !pipeline.enabled : pipeline.enabled,
     );
 
@@ -1434,9 +1487,18 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
 const openBulkDeleteDialog = () => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("pipeline.deletePipeline");
-  confirmDialogMeta.value.message = t("pipeline.confirmBulkDeleteMsg", {
-    count: selectedPipelines.value.length,
-  });
+  const { allowed, skipped } = bulkDeleteSplit.value;
+  confirmDialogMeta.value.message = skipped.length
+    ? t("authz.bulkDeletePartial", {
+        count: allowed.length,
+        total: selectedPipelines.value.length,
+        skipped: skipped.length,
+      })
+    : t("pipeline.confirmBulkDeleteMsg", { count: selectedPipelines.value.length });
+  confirmDialogMeta.value.detail = skippedNamesText(
+    t,
+    skipped.map((p: any) => p.name),
+  );
   confirmDialogMeta.value.onConfirm = bulkDeletePipelines;
   confirmDialogMeta.value.data = null;
 };
@@ -1459,9 +1521,8 @@ const bulkDeletePipelines = async () => {
       return;
     }
 
-    // Extract pipeline ids
     const payload = {
-      ids: selectedPipelines.value.map((p: any) => p.pipeline_id),
+      ids: bulkDeleteSplit.value.allowed.map((p: any) => p.pipeline_id),
     };
 
     const response = await pipelineService.bulkDelete(
