@@ -106,7 +106,8 @@ export function useSqlEditorDiagnostics({
         // The key marks only blur's own next write; a later server error with equal ranges is a run marker.
         runMarkersShown = !!ranges?.length && JSON.stringify(ranges) !== blurRangesKey;
         blurRangesKey = "";
-        runMarkersQuery = runMarkersShown ? rawQuery() : "";
+        // The server located its ranges in the committed query, which lags the editor while an edit is still debounced.
+        runMarkersQuery = runMarkersShown ? (query.value ?? "") : "";
         pushToEditor(ranges ?? []);
       },
       { deep: true },
