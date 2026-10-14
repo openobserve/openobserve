@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Native Slack for on-call: connecting, showing and disconnecting the org's workspace, the
-//! deployment's app manifest URLs, people linking their own Slack account, and button presses.
+//! deployment's app manifest URLs, people linking their own Slack account, presses and `/oncall`.
 
 use axum::{body::Bytes, extract::Path, http::HeaderMap, response::Response};
 use common::meta::http::HttpResponse as MetaHttpResponse;
@@ -22,8 +22,10 @@ use common::meta::http::HttpResponse as MetaHttpResponse;
 use o2_enterprise::enterprise::{
     common::config::get_config as get_o2_config,
     oncall::chat::{
-        payload::{Click, ParsedClick},
+        command,
+        payload::{Click, Command, ParsedClick, ParsedCommand},
         press,
+        signature::Rejected,
     },
 };
 #[cfg(feature = "enterprise")]
@@ -467,32 +469,51 @@ pub async fn slack_interact(headers: HeaderMap, body: Bytes) -> Response {
     {
         use axum::{http::StatusCode, response::IntoResponse};
 
-        let header = |name: &str| {
-            headers
-                .get(name)
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or_default()
-        };
-        let secret = get_o2_config().oncall.slack_signing_secret.clone();
-        let now_secs = config::utils::time::now_micros() / 1_000_000;
         // Verified before any parse or I/O, so an unsigned request costs one HMAC (CL-8).
-        let parsed = press::accept_press(
-            secret.as_bytes(),
-            header(SLACK_TIMESTAMP_HEADER),
-            &body,
-            header(SLACK_SIGNATURE_HEADER),
-            now_secs,
-        );
-        match parsed {
-            Err(_) => MetaHttpResponse::error(
-                StatusCode::UNAUTHORIZED.as_u16(),
-                "Unauthorized".to_string(),
-            )
-            .into_response(),
+        match accept_signed(&headers, &body, press::accept_press) {
+            Err(unauthorized) => unauthorized,
             Ok(ParsedClick::Ignore) => StatusCode::OK.into_response(),
             Ok(ParsedClick::Click(click)) => {
                 // Slack wants the 200 within 3 s; the work and any reply follow on their own.
                 tokio::spawn(press_worker(click));
+                StatusCode::OK.into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (headers, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Slack's `/oncall`: verified, answered at once with an empty 200, then worked (CL-1, RB-9).
+#[utoipa::path(
+    post,
+    path = "/v2/oncall/chat/slack/command",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "OnCallSlackCommand",
+    summary = "Receive the Slack /oncall command",
+    request_body(content = String, content_type = "application/x-www-form-urlencoded", description = "Slack's signed slash-command form"),
+    responses(
+        (status = 200, description = "Accepted; the reply goes to Slack's response_url"),
+        (status = 401, description = "Not signed by Slack, or too old", content_type = "application/json", body = Object),
+        (status = 403, description = "Not Supported", content_type = "application/json", body = Object),
+        (status = 413, description = "Body over 64 KiB"),
+    ),
+)]
+pub async fn slack_command(headers: HeaderMap, body: Bytes) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use axum::{http::StatusCode, response::IntoResponse};
+
+        match accept_signed(&headers, &body, command::accept_command) {
+            Err(unauthorized) => unauthorized,
+            Ok(ParsedCommand::SslCheck | ParsedCommand::Ignore) => StatusCode::OK.into_response(),
+            Ok(ParsedCommand::Command(slash)) => {
+                // Slack wants the 200 within 3 s; the reply follows through its response_url.
+                tokio::spawn(command_worker(slash));
                 StatusCode::OK.into_response()
             }
         }
@@ -529,6 +550,39 @@ fn link_refusal(e: o2_enterprise::enterprise::oncall::chat::link_flow::LinkFlowE
     MetaHttpResponse::error(e.http_status(), e.to_string()).into_response()
 }
 
+/// Runs `accept` on the body with the deployment's signing secret and Slack's headers; else 401.
+#[cfg(feature = "enterprise")]
+fn accept_signed<T>(
+    headers: &HeaderMap,
+    body: &[u8],
+    accept: impl FnOnce(&[u8], &str, &[u8], &str, i64) -> Result<T, Rejected>,
+) -> Result<T, Response> {
+    use axum::{http::StatusCode, response::IntoResponse};
+
+    let header = |name: &str| {
+        headers
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+    };
+    let secret = get_o2_config().oncall.slack_signing_secret.clone();
+    let now_secs = config::utils::time::now_micros() / 1_000_000;
+    accept(
+        secret.as_bytes(),
+        header(SLACK_TIMESTAMP_HEADER),
+        body,
+        header(SLACK_SIGNATURE_HEADER),
+        now_secs,
+    )
+    .map_err(|_| {
+        MetaHttpResponse::error(
+            StatusCode::UNAUTHORIZED.as_u16(),
+            "Unauthorized".to_string(),
+        )
+        .into_response()
+    })
+}
+
 /// Answers one press as the linked person, then posts any private reply (CL-5 to CL-7).
 #[cfg(feature = "enterprise")]
 async fn press_worker(click: Click) {
@@ -546,8 +600,44 @@ async fn press_worker(click: Click) {
     press::send_reply(&click.response_url, &reply).await;
 }
 
+/// Answers one `/oncall` command privately through Slack's reply address (C21). [no-fail]
+#[cfg(feature = "enterprise")]
+async fn command_worker(slash: Command) {
+    // The on-call client secret keys link tokens, as for presses (C7).
+    let link_key = get_o2_config().oncall.slack_client_secret.clone();
+    let may = async |org_id: &str, email: &str, method: &str| {
+        allowed(org_id, email, CONFIG, method).await
+    };
+    let reply = command::answer_command(
+        &slash,
+        link_key.as_bytes(),
+        may,
+        config::utils::time::now_micros(),
+    )
+    .await;
+    press::send_text(&slash.response_url, &reply).await;
+}
+
 #[cfg(test)]
 mod tests {
+    /// CL-1, RB-9: an unsigned command is refused with 401; an `ssl_check` probe gets 200.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_slack_command_refuses_unsigned_and_answers_ssl_check() {
+        use axum::http::StatusCode;
+
+        use super::*;
+
+        let cases = [
+            ("command=%2Foncall&text=help", StatusCode::UNAUTHORIZED),
+            ("ssl_check=1&token=x", StatusCode::OK),
+        ];
+        for (body, status) in cases {
+            let resp = slack_command(HeaderMap::new(), Bytes::from(body)).await;
+            assert_eq!(resp.status(), status, "{body}");
+        }
+    }
+
     /// RB-11: without the enterprise build every handler answers 403 "Not Supported".
     #[cfg(not(feature = "enterprise"))]
     #[tokio::test]
@@ -591,6 +681,10 @@ mod tests {
             (
                 "slack interact",
                 Box::pin(slack_interact(HeaderMap::new(), Bytes::new())),
+            ),
+            (
+                "slack command",
+                Box::pin(slack_command(HeaderMap::new(), Bytes::new())),
             ),
             ("link start", Box::pin(start_slack_link(org()))),
             (

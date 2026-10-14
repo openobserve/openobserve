@@ -259,6 +259,33 @@ pub async fn update_channel(
     Ok(Some(team))
 }
 
+/// Stores the Slack channel `/oncall here` named for the team (RO-1, CM-5); `None` if no team.
+/// [strong]
+pub async fn set_slack_room(
+    org_id: &str,
+    id: &str,
+    workspace_id: &str,
+    channel_id: &str,
+    channel_name: &str,
+) -> Result<Option<Team>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let Some(existing) = oncall_teams::Entity::find_by_id(id)
+        .filter(oncall_teams::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+    else {
+        return Ok(None);
+    };
+    let mut model: oncall_teams::ActiveModel = existing.into();
+    model.slack_workspace_id = Set(Some(workspace_id.to_string()));
+    model.slack_channel_id = Set(Some(channel_id.to_string()));
+    model.slack_channel_name = Set(Some(channel_name.to_string()));
+    model.updated_at = Set(now_micros());
+    let team = to_team(model.update(client).await?);
+    invalidate_and_publish_team(org_id, id).await;
+    Ok(Some(team))
+}
+
 pub async fn get(org_id: &str, id: &str) -> Result<Option<Team>, errors::Error> {
     let client = get_orm_client_rw().await;
     Ok(oncall_teams::Entity::find_by_id(id)
