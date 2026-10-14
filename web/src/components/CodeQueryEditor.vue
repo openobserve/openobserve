@@ -1433,7 +1433,10 @@ export default defineComponent({
           const status = outcome === "failed" ? "failed" : "empty";
           return withStatus(config, status, context.field, position, fields, shape);
         }
-        const fieldType = named(context.field)?.detail;
+        // The stream can change during the lookup, so quoting follows the column type as it is now.
+        const fieldType = fieldEntriesOf(config.keywords(), config.suggestions()).find(
+          (f) => (f.name ?? f.label).toLowerCase() === context.field.toLowerCase(),
+        )?.detail;
         const chosen = new Set(context.chosen);
         const offered = orderValues(outcome, fieldType).filter((value) => !chosen.has(value));
         // Every value is already in the IN list, so the column is the only help left.
