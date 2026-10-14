@@ -19957,11 +19957,12 @@
       "valuesFailed": "Couldn't load values for {field}",
       "chainedMenuAnnouncement": "{count} suggestion, Tab to accept | {count} suggestions, Tab to accept",
       "valuesCap": "{count} value shown · type to filter | {count} values shown · type to filter",
-      "groupValues": "Values · last {minutes} min",
+      "groupValues": "Values · recent",
       "groupValuesName": "Values",
       "groupFields": "Fields",
       "groupOperators": "Operators",
       "groupFunctionsAndFields": "Functions and fields",
+      "groupFunctions": "Functions",
       "wrapStrMatch": "substring",
       "wrapReMatch": "regex",
       "wrapReNotMatch": "regex, negated"

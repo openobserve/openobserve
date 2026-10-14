@@ -968,6 +968,16 @@ const matchText = (entry: LooseEntry): string =>
   String(entryName(entry)).replace(/^'|'$/g, "").toLowerCase();
 
 /** Case-insensitive prefix of the name or of any `_` segment; LIKE wildcards around the typed text are ignored. */
+// CAST is catalogued as a keyword but is a call, and an aggregate is never a comparison operand.
+const VALUE_KEYWORD_CALLS = new Set(["cast"]);
+
+/** A catalog row that may stand as a comparison operand: a scalar function or CAST. */
+export const isValueFunction = (entry: LooseEntry | null | undefined): boolean => {
+  if (!entry) return false;
+  if (entry.kind === "Function") return !entry.aggregate;
+  return entry.kind === "Keyword" && VALUE_KEYWORD_CALLS.has(entryName(entry).toLowerCase());
+};
+
 export const matchesTyped = (entry: LooseEntry, typed: string): boolean => {
   const word = typed.replace(/^%+|%+$/g, "").toLowerCase();
   if (!word) return true;

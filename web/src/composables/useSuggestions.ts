@@ -298,11 +298,19 @@ const useSqlSuggestions = () => {
     // Guarded by fetchedOrg, so this is a no-op after the first call.
     void ensureServerFunctions();
 
+    // The server knows which functions aggregate, including the local catalog's own count or avg.
+    const aggregates = new Set(
+      (serverFunctions.value as any[])
+        .filter((f: any) => f?.kind === "aggregate" || f?.kind === "window")
+        .map((f: any) => String(f.name).toLowerCase()),
+    );
     autoCompleteSuggestions.value = mergeServerFunctions(
       defaultSuggestions,
       (serverFunctions.value as any[]).filter(
         (f: any) => !alreadyOffered.has(String(f?.name).toLowerCase()),
       ),
+    ).map((entry) =>
+      aggregates.has(entry.name.toLowerCase()) ? { ...entry, aggregate: true } : entry,
     );
   };
 

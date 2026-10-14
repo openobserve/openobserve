@@ -1126,10 +1126,9 @@ describe("completion results invite monaco to ask again", () => {
       fieldValueResolver: async () => ["error"],
     });
     const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
-    expect(result.suggestions.filter((s: any) => !isHeader(s)).map(nameOf)).toEqual([
-      "'error'",
-      "level",
-    ]);
+    const rows = result.suggestions.filter((s: any) => !isHeader(s)).map(nameOf);
+    expect(rows.slice(0, 2)).toEqual(["'error'", "level"]);
+    expect(rows).toContain("spath");
     expect(result.incomplete).toBe(true);
   });
 
@@ -1144,11 +1143,12 @@ describe("completion results invite monaco to ask again", () => {
     expect(before.suggestions.filter((s: any) => !isHeader(s)).map(nameOf)).toContain("level");
 
     const after = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
-    expect(after.suggestions.filter((s: any) => !isHeader(s)).map(nameOf)).toEqual([
-      "'error'",
-      "'warn'",
-      "level",
-    ]);
+    expect(
+      after.suggestions
+        .filter((s: any) => !isHeader(s))
+        .map(nameOf)
+        .slice(0, 3),
+    ).toEqual(["'error'", "'warn'", "level"]);
   });
 });
 
@@ -1260,7 +1260,7 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
     { name: "code", label: "code", kind: "Field", insertText: "code", detail: "Int64" },
   ];
 
-  const mountWith = async (editorId: string, fieldValueResolver: any) => {
+  const mountWith = async (editorId: string, fieldValueResolver: any, suggestions: any[] = []) => {
     const api = await import("monaco-editor/esm/vs/editor/editor.api");
     const createFn = vi.mocked(api.editor.create);
     const registerFn = vi.mocked(api.languages.registerCompletionItemProvider);
@@ -1274,7 +1274,7 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
         language: "sql",
         query: "",
         keywords: FIELDS,
-        suggestions: [],
+        suggestions,
         fieldValueResolver,
       },
       global: { plugins: [storeV] },
@@ -1540,6 +1540,85 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
       }
     },
   );
+
+  describe("functions after the columns in a value position", () => {
+    const CATALOG = [
+      { name: "lower", label: "lower", kind: "Function", insertText: "lower(x)" },
+      { name: "now", label: "now", kind: "Function", insertText: "now()" },
+      { name: "count", label: "count", kind: "Function", insertText: "count(x)", aggregate: true },
+      { name: "CAST", label: "CAST", kind: "Keyword", insertText: "CAST(x AS t)" },
+      { name: "SELECT", label: "SELECT", kind: "Keyword", insertText: "SELECT" },
+    ];
+    const headersOf = (r: any) => r.suggestions.filter(isHeader).map(nameOf);
+    const resolve = () => vi.fn(async () => ["error"]);
+
+    it(
+      "a comparison offers values, then columns, then functions, never an aggregate or a keyword",
+      { timeout: 30000 },
+      async () => {
+        const { provide, model } = await mountWith("v-fn-order", resolve(), CATALOG);
+        const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
+        expect(labels(result)).toEqual([
+          "'error'",
+          "level",
+          "status_text",
+          "code",
+          "lower",
+          "now",
+          "CAST",
+        ]);
+        expect(headersOf(result)).toEqual([
+          "sqlEditor.completion.groupValues",
+          "sqlEditor.completion.groupFields",
+          "sqlEditor.completion.groupFunctions",
+        ]);
+      },
+    );
+
+    it("code = CAS offers CAST alone, over the typed letters", { timeout: 30000 }, async () => {
+      const { provide, model } = await mountWith("v-fn-cast", resolve(), CATALOG);
+      const text = "SELECT * FROM logs WHERE code = CAS";
+      const result = await ask(provide, model, text, {}, CTRL_SPACE);
+      expect(labels(result)).toEqual(["CAST"]);
+      expect(headersOf(result)).toEqual(["sqlEditor.completion.groupFunctions"]);
+      const cast = result.suggestions.find((s: any) => nameOf(s) === "CAST");
+      expect(cast.range.startColumn).toBe(text.length + 1 - "CAS".length);
+    });
+
+    it("inside an open quote only values are offered", { timeout: 30000 }, async () => {
+      const { provide, model } = await mountWith("v-fn-quote", resolve(), CATALOG);
+      const result = await ask(provide, model, "SELECT * FROM logs WHERE level = '");
+      expect(labels(result)).toEqual(["'error'"]);
+    });
+
+    it(
+      "an IN list offers values, then columns, then functions after each comma",
+      { timeout: 30000 },
+      async () => {
+        const { provide, model } = await mountWith(
+          "v-fn-in",
+          vi.fn(async () => ["error", "warn"]),
+          CATALOG,
+        );
+        const result = await ask(provide, model, "SELECT * FROM logs WHERE level IN ('error', ");
+        expect(labels(result)).toEqual([
+          "'warn'",
+          "level",
+          "status_text",
+          "code",
+          "lower",
+          "now",
+          "CAST",
+        ]);
+      },
+    );
+
+    it("LIKE takes a pattern, so it offers no functions", { timeout: 30000 }, async () => {
+      const { provide, model } = await mountWith("v-fn-like", resolve(), CATALOG);
+      const result = await ask(provide, model, "SELECT * FROM logs WHERE level LIKE ");
+      expect(labels(result)).not.toContain("lower");
+    });
+  });
 
   it(
     "quotes a value by the column type current when the lookup returns",
@@ -2053,6 +2132,24 @@ describe("P0-2 / P0-3 / W0-B — the chain, the operator lane and comments", () 
         .find((p: any) => p?.lane_offered_operator !== undefined);
       expect(summary?.lane_offered_operator).toBe(1);
       track.mockRestore();
+    },
+  );
+
+  it(
+    "a value position offers functions after the columns, except under off",
+    { timeout: 30000 },
+    async () => {
+      const keywords = [
+        ...FIELDS,
+        { name: "lower", label: "lower", kind: "Function", insertText: "lower(x)" },
+      ];
+      const rowsIn = async (mode: string) => {
+        const { registration, editor } = await mountIn(`fn-mode-${mode}`, mode, { keywords });
+        const result = await ask(registration, editor, "SELECT * FROM t WHERE level = ");
+        return result.suggestions.filter((s: any) => !isHeader(s)).map(nameOf);
+      };
+      expect(await rowsIn("automatic")).toEqual(["level", "code", "lower"]);
+      expect(await rowsIn("off")).toEqual(["level", "code"]);
     },
   );
 

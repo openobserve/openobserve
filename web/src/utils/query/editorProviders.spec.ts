@@ -50,6 +50,7 @@ import {
   logicalLeadNames,
   buildLogicalLead,
   groupEntries,
+  isValueFunction,
   matchesTyped,
   type LogicalLeadContext,
   OPERATORS_BY_TYPE,
@@ -1524,7 +1525,7 @@ describe("groupEntries — header rows over provider-filtered groups", () => {
     detail: type,
   });
   const groups = (values: any[], fields: any[]) => [
-    { header: "Values · last 15 min", name: "Values", entries: values },
+    { header: "Values · recent", name: "Values", entries: values },
     { header: "Fields", name: "Fields", entries: fields },
   ];
   const build = (typed: string, preselect = false, values = ["error", "warn", "fatal_error"]) =>
@@ -1543,7 +1544,7 @@ describe("groupEntries — header rows over provider-filtered groups", () => {
   it("a header is a Folder row: accepting it changes nothing and reopens the same menu", () => {
     const [header] = build("e");
     expect(header.kind).toBe("Folder");
-    expect(header.label).toBe("Values · last 15 min");
+    expect(header.label).toBe("Values · recent");
     expect(accepted(LINE, header)).toBe(LINE);
     expect(
       header.additionalTextEdits,
@@ -1556,14 +1557,14 @@ describe("groupEntries — header rows over provider-filtered groups", () => {
   it("filters by prefix or `_` segment, and every row filters by the typed token so the scores tie", () => {
     const rows = build("e");
     expect(names(rows)).toEqual([
-      "H:Values · last 15 min",
+      "H:Values · recent",
       "'error'",
       "'fatal_error'",
       "H:Fields",
       "error_code",
     ]);
     expect(rows.every((r) => r.filterText === "e")).toBe(true);
-    expect(names(build("f"))).toEqual(["H:Values · last 15 min", "'fatal_error'"]);
+    expect(names(build("f"))).toEqual(["H:Values · recent", "'fatal_error'"]);
   });
 
   it("drops a group whose rows all filter out, header included", () => {
@@ -1611,7 +1612,7 @@ describe("groupEntries — header rows over provider-filtered groups", () => {
       range,
       preselect: true,
     });
-    expect(names(rows)).toEqual(["H:Values · last 15 min", "Still loading"]);
+    expect(names(rows)).toEqual(["H:Values · recent", "Still loading"]);
     expect(accepted("level = x", rows[1]), "accepting it changes nothing").toBe("level = x");
     expect(rows[1].preselect).toBeUndefined();
   });
@@ -1623,7 +1624,7 @@ describe("groupEntries — header rows over provider-filtered groups", () => {
       range,
       preselect: false,
     });
-    expect(names(withValues)).toEqual(["H:Values · last 15 min", "'error'", "10 values shown"]);
+    expect(names(withValues)).toEqual(["H:Values · recent", "'error'", "10 values shown"]);
     const none = groupEntries(groups([value("error"), cap], [field("level")]), {
       typed: "lev",
       range,
@@ -1637,5 +1638,18 @@ describe("groupEntries — header rows over provider-filtered groups", () => {
     expect(matchesTyped({ name: "warn", label: "warn" } as any, "%wa")).toBe(true);
     expect(matchesTyped({ name: "kubernetes_pod_name", label: "x" } as any, "pod")).toBe(true);
     expect(matchesTyped({ name: "level", label: "level" } as any, "ev")).toBe(false);
+  });
+});
+
+describe("isValueFunction — what may stand as a comparison operand", () => {
+  it("is a scalar function or CAST, never an aggregate, a keyword or a field", () => {
+    expect(isValueFunction({ name: "lower", label: "lower", kind: "Function" })).toBe(true);
+    expect(isValueFunction({ name: "CAST", label: "CAST", kind: "Keyword" })).toBe(true);
+    expect(
+      isValueFunction({ name: "count", label: "count", kind: "Function", aggregate: true }),
+    ).toBe(false);
+    expect(isValueFunction({ name: "SELECT", label: "SELECT", kind: "Keyword" })).toBe(false);
+    expect(isValueFunction({ name: "level", label: "level", kind: "Field" })).toBe(false);
+    expect(isValueFunction(null)).toBe(false);
   });
 });
