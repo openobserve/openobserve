@@ -1069,10 +1069,6 @@ const journeySelectionState = ref<{ count: number; isRecording: boolean; ids: st
 });
 const showBulkDeleteDialog = ref(false);
 
-// `=== true` so an unknown flag hides the action, as the journey editor does.
-const isCompositionEnabled = computed(
-  () => store.state.zoConfig?.synthetics_subtests_enabled === true,
-);
 const maxSteps = computed(() => browserMaxSteps(store.state.zoConfig));
 
 /** Load-time lookup only; the save-time `checkUsageThenSave` asks again on its own. */
@@ -2220,38 +2216,36 @@ function onClearResults() {
                 <template #icon-left><OIcon name="delete" size="sm" /></template>
                 {{ t("synthetics.journey.delete") }}
               </OButton>
-              <template v-if="isCompositionEnabled">
+              <OButton
+                variant="outline"
+                size="sm"
+                :aria-disabled="!extractEligibilityResult.ok"
+                data-test="synthetics-extract-open-btn"
+                @click="openExtractDialog"
+              >
+                <template #icon-left><OIcon name="git-branch" size="sm" /></template>
+                {{ t("synthetics.journey.extract.action") }}
+              </OButton>
+              <span
+                v-if="!extractEligibilityResult.ok"
+                class="text-text-secondary text-xs"
+                data-test="synthetics-extract-reason"
+              >
+                {{
+                  t(`synthetics.journey.extract.reason.${extractEligibilityResult.reason}`, {
+                    name: extractEligibilityResult.placeholder,
+                  })
+                }}
                 <OButton
-                  variant="outline"
+                  v-if="extractEligibilityResult.reason === 'referenced-unknown'"
+                  variant="ghost"
                   size="sm"
-                  :aria-disabled="!extractEligibilityResult.ok"
-                  data-test="synthetics-extract-open-btn"
-                  @click="openExtractDialog"
+                  data-test="synthetics-extract-retry-btn"
+                  @click="retryReferencedBy"
                 >
-                  <template #icon-left><OIcon name="git-branch" size="sm" /></template>
-                  {{ t("synthetics.journey.extract.action") }}
+                  {{ t("common.retry") }}
                 </OButton>
-                <span
-                  v-if="!extractEligibilityResult.ok"
-                  class="text-text-secondary text-xs"
-                  data-test="synthetics-extract-reason"
-                >
-                  {{
-                    t(`synthetics.journey.extract.reason.${extractEligibilityResult.reason}`, {
-                      name: extractEligibilityResult.placeholder,
-                    })
-                  }}
-                  <OButton
-                    v-if="extractEligibilityResult.reason === 'referenced-unknown'"
-                    variant="ghost"
-                    size="sm"
-                    data-test="synthetics-extract-retry-btn"
-                    @click="retryReferencedBy"
-                  >
-                    {{ t("common.retry") }}
-                  </OButton>
-                </span>
-              </template>
+              </span>
             </template>
             <span
               v-if="hasUnsavedChanges"
@@ -2343,7 +2337,7 @@ function onClearResults() {
         </div>
 
         <ExtractSubtestDialog
-          v-if="isCompositionEnabled && extractEligibilityResult.ok"
+          v-if="extractEligibilityResult.ok"
           v-model:open="showExtractDialog"
           :range="extractRange"
           :anchor="extractAnchor"
