@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::LazyLock as Lazy;
+use std::sync::{Arc, LazyLock as Lazy};
 
+use config::meta::stream::StreamType;
 use hashbrown::{HashMap, HashSet};
+use tokio::sync::{Mutex, RwLock};
 
 // SEARCHING_FILES for searching files, in use, should not move to s3
 static SEARCHING_FILES: Lazy<parking_lot::RwLock<SearchingFileLocker>> =
@@ -24,6 +26,11 @@ static SEARCHING_FILES: Lazy<parking_lot::RwLock<SearchingFileLocker>> =
 // SEARCHING_REQUESTS for searching requests, in use, should not move to s3
 static SEARCHING_REQUESTS: Lazy<parking_lot::RwLock<HashMap<String, Vec<String>>>> =
     Lazy::new(Default::default);
+
+static STREAM_INVENTORY_LOCKS: Lazy<Mutex<HashMap<StreamInventoryKey, Arc<RwLock<()>>>>> =
+    Lazy::new(Default::default);
+
+type StreamInventoryKey = (String, StreamType, String);
 
 struct SearchingFileLocker {
     inner: HashMap<String, usize>,
@@ -121,6 +128,20 @@ impl Drop for SearchingFiles {
 pub fn init() -> Result<(), anyhow::Error> {
     _ = SEARCHING_FILES.read().len();
     Ok(())
+}
+
+/// Coordinates a local stream's catalogue/WAL snapshot with publication and source retirement.
+pub async fn stream_inventory_lock(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Arc<RwLock<()>> {
+    STREAM_INVENTORY_LOCKS
+        .lock()
+        .await
+        .entry((org_id.to_string(), stream_type, stream_name.to_string()))
+        .or_default()
+        .clone()
 }
 
 fn lock_files<I: IntoIterator<Item = S>, S: AsRef<str>>(files: I) {

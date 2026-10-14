@@ -70,9 +70,38 @@ pub async fn search(
         index.mode,
     );
 
+    // The leader's IDs can predate publication and retirement of the same WAL files.
+    let (local_file_ids, inventory_guard) = if config::get_config().common.local_mode {
+        let guard = common::infra::wal::stream_inventory_lock(
+            &query.org_id,
+            query.stream_type,
+            &query.stream_name,
+        )
+        .await
+        .read_owned()
+        .await;
+        let ids = crate::file_list::query_ids(
+            &query.trace_id,
+            &query.org_id,
+            query.stream_type,
+            &query.stream_name,
+            query.time_range,
+        )
+        .await?
+        .into_iter()
+        .map(|file| file.id)
+        .collect::<Vec<_>>();
+        (Some(ids), Some(guard))
+    } else {
+        (None, None)
+    };
+    let file_ids = local_file_ids
+        .as_deref()
+        .unwrap_or(&req.search_info.file_id_list);
+
     let mut scan_stats = ScanStats::new();
     let (aggregates, scan_files) =
-        route_files(&query, req, &settings, &index, &mut scan_stats).await?;
+        route_files(&query, req, &settings, &index, file_ids, &mut scan_stats).await?;
     // Moved in so the file list is freed right after the storage load, before the WAL.
     let tables = search_tables(
         &query,
@@ -84,6 +113,9 @@ pub async fn search(
         &mut scan_stats,
     )
     .await?;
+
+    // SearchingFiles pins protect the captured WAL sources during physical execution.
+    drop(inventory_guard);
 
     let physical_plan = finalize_plan(
         &query,
@@ -97,3 +129,6 @@ pub async fn search(
     .await?;
     Ok((ctx, physical_plan, scan_stats))
 }
+
+#[cfg(test)]
+mod tests;

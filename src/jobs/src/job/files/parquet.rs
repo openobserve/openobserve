@@ -207,6 +207,9 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
         // delete file from disk
         if let Err(e) = remove_file(&file).await {
             log::error!("[INGESTER:JOB] Failed to remove parquet file: {file_key}, {e}");
+            if cfg.common.local_mode {
+                continue;
+            }
         }
         // need release the file
         PROCESSING_FILES.write().await.remove(&file_key);
@@ -548,6 +551,17 @@ async fn move_files(
             }
         }
 
+        let inventory_guard = if cfg.common.local_mode {
+            Some(
+                wal::stream_inventory_lock(&org_id, stream_type, &stream_name)
+                    .await
+                    .write_owned()
+                    .await,
+            )
+        } else {
+            None
+        };
+
         // write file list to storage
         let new_file_min_ts = new_file_meta.min_ts;
         if let Err(e) =
@@ -560,17 +574,22 @@ async fn move_files(
             for file in files_with_size.iter() {
                 PROCESSING_FILES.write().await.remove(&file.key);
             }
+            if cfg.common.local_mode {
+                return Err(e.into());
+            }
             return Ok(());
         };
 
         // trigger an incremental merge of the current hour once enough files have piled up
-        compaction::incremental::incr_pending_file(
-            &org_id,
-            stream_type,
-            &stream_name,
-            new_file_min_ts,
-        )
-        .await;
+        if !cfg.common.local_mode {
+            compaction::incremental::incr_pending_file(
+                &org_id,
+                stream_type,
+                &stream_name,
+                new_file_min_ts,
+            )
+            .await;
+        }
 
         // check if allowed to delete the file
         for file in new_file_list.iter() {
@@ -579,6 +598,10 @@ async fn move_files(
                 log::warn!(
                     "[INGESTER:JOB:{thread_id}] the file is in use, set to pending delete list: {file_key}",
                 );
+                // A persistence failure must not expose both the published file and its source.
+                if cfg.common.local_mode {
+                    infra::file_list::pending_delete::register(file_key).await;
+                }
                 // add to pending delete list
                 if let Err(e) =
                     db::file_list::local::add_pending_delete(&org_id, &file.account, file_key).await
@@ -602,6 +625,9 @@ async fn move_files(
                         log::warn!(
                             "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk, set to pending delete list: {file_key}, {e}",
                         );
+                        if cfg.common.local_mode {
+                            infra::file_list::pending_delete::register(file_key).await;
+                        }
                         // add to pending delete list
                         if let Err(e) = db::file_list::local::add_pending_delete(
                             &org_id,
@@ -633,6 +659,17 @@ async fn move_files(
             metrics::INGEST_WAL_READ_BYTES
                 .with_label_values(&[org_id.as_str(), stream_type.as_str()])
                 .inc_by(file.meta.compressed_size as u64);
+        }
+
+        drop(inventory_guard);
+        if cfg.common.local_mode {
+            compaction::incremental::incr_pending_file(
+                &org_id,
+                stream_type,
+                &stream_name,
+                new_file_min_ts,
+            )
+            .await;
         }
 
         // delete files from file list

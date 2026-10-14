@@ -155,14 +155,14 @@ pub(super) async fn route_files(
     req: &FlightSearchRequest,
     settings: &StreamSearchSettings,
     index: &IndexPlan,
+    file_ids: &[i64],
     scan_stats: &mut ScanStats,
 ) -> Result<(PrecomputedAggregates, Option<Vec<FileKey>>), Error> {
-    if req.search_info.file_id_list.is_empty() {
+    if file_ids.is_empty() {
         return Ok((PrecomputedAggregates::default(), None));
     }
     let trace_id = query.trace_id.as_str();
-    let (mut scan_files, file_list_took) =
-        get_file_list_by_ids(query, settings, &req.search_info.file_id_list).await?;
+    let (mut scan_files, file_list_took) = get_file_list_by_ids(query, settings, file_ids).await?;
     log::info!(
         "{}",
         search_inspector_fields(

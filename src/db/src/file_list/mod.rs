@@ -55,13 +55,16 @@ pub async fn set(account: &str, key: &str, meta: Option<FileMeta>, deleted: bool
 
     // write into file_list storage
     // retry 5 times
-    for _ in 0..5 {
+    for attempt in 0..5 {
         match progress(account, key, meta.as_ref(), deleted).await {
             Ok(id) => {
                 file_data.id = id;
                 break;
             }
             Err(e) => {
+                if config::get_config().common.local_mode && attempt == 4 {
+                    return Err(e);
+                }
                 log::error!("[FILE_LIST] Error saving file to storage, retrying: {e}");
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             }
@@ -92,6 +95,9 @@ async fn progress(account: &str, key: &str, data: Option<&FileMeta>, delete: boo
             }
             Err(e) => {
                 log::error!("service:db:file_list: add {key}, add error: {e}");
+                if config::get_config().common.local_mode {
+                    return Err(e);
+                }
             }
         }
         // update stream stats realtime
@@ -179,6 +185,68 @@ mod tests {
         let result = progress("test_org", "test_file.parquet", None, false).await;
         assert!(result.is_ok()); // Should return 0 when no operation is performed
         assert_eq!(result.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_set_local_insert_failure_is_not_acknowledged() {
+        use sea_orm::{ConnectionTrait, DbBackend, Statement};
+
+        assert!(config::get_config().common.local_mode);
+        infra::db::create_table().await.unwrap();
+        infra::file_list::create_table().await.unwrap();
+        let org_id = format!("set_failure_{}", config::utils::time::now_micros());
+        let trigger = format!("reject_{org_id}");
+        let stream = format!("{org_id}/logs/visibility");
+        let key = format!("files/{stream}/2026/10/13/23/default/test.parquet");
+        let database = infra::db::get_orm_client_rw().await;
+        let backend = database.get_database_backend();
+        let create_trigger = if backend == DbBackend::Postgres {
+            database.execute(Statement::from_string(backend, format!(
+                "CREATE FUNCTION {trigger}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'catalogue insert failure'; END; $$"
+            ))).await.unwrap();
+            format!(
+                "CREATE TRIGGER {trigger} BEFORE INSERT ON file_list FOR EACH ROW WHEN (NEW.stream = '{stream}') EXECUTE FUNCTION {trigger}()"
+            )
+        } else {
+            format!(
+                "CREATE TRIGGER {trigger} BEFORE INSERT ON file_list WHEN NEW.stream = '{stream}' BEGIN SELECT RAISE(ABORT, 'catalogue insert failure'); END"
+            )
+        };
+        database
+            .execute(Statement::from_string(backend, create_trigger))
+            .await
+            .unwrap();
+        let result = set("", &key, Some(create_test_file_meta()), false).await;
+        let drop_trigger = if backend == DbBackend::Postgres {
+            format!("DROP TRIGGER {trigger} ON file_list")
+        } else {
+            format!("DROP TRIGGER {trigger}")
+        };
+        database
+            .execute(Statement::from_string(backend, drop_trigger))
+            .await
+            .unwrap();
+        if backend == DbBackend::Postgres {
+            database
+                .execute(Statement::from_string(
+                    backend,
+                    format!("DROP FUNCTION {trigger}()"),
+                ))
+                .await
+                .unwrap();
+        }
+        assert!(!infra::file_list::contains(&key).await.unwrap());
+        let error = result
+            .expect_err("A failed local catalogue insertion must not acknowledge publication");
+        assert!(
+            error.to_string().contains("catalogue insert failure"),
+            "{error}"
+        );
+        set("", &key, Some(create_test_file_meta()), false)
+            .await
+            .unwrap();
+        assert!(infra::file_list::contains(&key).await.unwrap());
+        infra::file_list::remove(&key).await.unwrap();
     }
 
     #[test]

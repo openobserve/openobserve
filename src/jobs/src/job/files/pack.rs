@@ -303,22 +303,45 @@ async fn move_stream_segments(
             )
             .await?;
 
+            let inventory_guard = if cfg.common.local_mode {
+                Some(
+                    common::infra::wal::stream_inventory_lock(&org_id, stream_type, &stream_name)
+                        .await
+                        .write_owned()
+                        .await,
+                )
+            } else {
+                None
+            };
+
             // write file list to storage
             let new_file_min_ts = new_file_meta.min_ts;
             db::file_list::set(&account, &new_file_key, Some(new_file_meta), false).await?;
 
             // trigger an incremental merge of the current hour once enough
             // files have piled up
-            compaction::incremental::incr_pending_file(
-                &org_id,
-                stream_type,
-                &stream_name,
-                new_file_min_ts,
-            )
-            .await;
+            if !cfg.common.local_mode {
+                compaction::incremental::incr_pending_file(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    new_file_min_ts,
+                )
+                .await;
+            }
 
             // remove the segments from the index, delete fully consumed packs
             consume_segments(&org_id, stream_type, &stream_name, chunk).await?;
+            drop(inventory_guard);
+            if cfg.common.local_mode {
+                compaction::incremental::incr_pending_file(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    new_file_min_ts,
+                )
+                .await;
+            }
 
             // metrics
             for seg in chunk.iter() {
@@ -786,5 +809,170 @@ mod tests {
                 .unwrap();
         let ps = pending_stream(1024, 512, expired);
         assert!(should_flush(&ps, &cfg));
+    }
+
+    #[tokio::test]
+    async fn test_local_pack_publication_waits_for_search_inventory() {
+        use arrow_schema::{DataType, Field};
+        use config::utils::hash::{Sum64, gxhash};
+        use datafusion::arrow::{
+            array::{Float64Array, Int64Array, UInt64Array},
+            record_batch::RecordBatch,
+        };
+        use tokio::time::{Duration, timeout};
+
+        assert!(get_config().common.local_mode && config::is_local_disk_storage());
+        let timestamp = now_micros();
+        let org_id = format!("pack_visibility_{timestamp}");
+        let stream_name = "visibility";
+        let prefix = format!("files/{org_id}/metrics/{stream_name}/");
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("value", DataType::Float64, false),
+            Field::new("_hash", DataType::UInt64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![timestamp, timestamp + 1])),
+                Arc::new(Float64Array::from(vec![1.0, 2.0])),
+                Arc::new(UInt64Array::from(vec![7, 7])),
+            ],
+        )
+        .unwrap();
+        let mut data = Vec::new();
+        let mut writer = config::utils::parquet::new_parquet_writer(
+            &mut data,
+            &schema,
+            &[],
+            &FileMeta {
+                min_ts: timestamp,
+                max_ts: timestamp + 1,
+                records: 2,
+                original_size: 48,
+                ..Default::default()
+            },
+            false,
+            None,
+        );
+        writer.write(&batch).await.unwrap();
+        writer.close().await.unwrap();
+        let footer = serde_json::json!({
+            "memtable_id": timestamp as u64,
+            "stream_type": "metrics",
+            "segments": [{
+                "org_id": org_id.clone(), "stream_name": stream_name,
+                "partition_key": chrono::DateTime::from_timestamp_micros(timestamp).unwrap().format("%Y/%m/%d/%H/default").to_string(),
+                "offset": 0, "length": data.len() as u64, "min_ts": timestamp,
+                "max_ts": timestamp + 1, "records": 2, "original_size": 48,
+            }]
+        });
+        let footer_data = serde_json::to_string(&footer).unwrap();
+        data.extend_from_slice(footer_data.as_bytes());
+        data.extend_from_slice(&(footer_data.len() as u32).to_le_bytes());
+        data.extend_from_slice(&gxhash::new().sum64(&footer_data).to_le_bytes());
+        data.extend_from_slice(&1u16.to_le_bytes());
+        data.extend_from_slice(b"O2PACK\x00\x01");
+        let pack_path = std::path::Path::new(&get_config().common.data_wal_dir)
+            .join("pack/0")
+            .join(format!("{timestamp}.0.pack"));
+        std::fs::create_dir_all(pack_path.parent().unwrap()).unwrap();
+        std::fs::write(&pack_path, data).unwrap();
+        infra::db::create_table().await.unwrap();
+        infra::file_list::create_table().await.unwrap();
+        infra::db::get_db()
+            .await
+            .put(
+                &infra::schema::mk_key(&org_id, StreamType::Metrics, stream_name),
+                serde_json::to_vec(schema.as_ref()).unwrap().into(),
+                false,
+                None,
+            )
+            .await
+            .unwrap();
+        ingester::init().await.unwrap();
+        let pending = ingester::get_pending_stream_stats()
+            .await
+            .into_iter()
+            .find(|stream| stream.org_id == org_id)
+            .unwrap();
+        let inventory =
+            common::infra::wal::stream_inventory_lock(&org_id, StreamType::Metrics, stream_name)
+                .await
+                .read_owned()
+                .await;
+        let mut mover = tokio::spawn(move_stream_segments(0, pending));
+        timeout(Duration::from_secs(10), async {
+            loop {
+                if storage::list("", &prefix)
+                    .await
+                    .unwrap()
+                    .iter()
+                    .any(|key| key.ends_with(".parquet") || key.ends_with(".vortex"))
+                {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .expect("The mover must upload its object before waiting for the inventory");
+        assert!(
+            timeout(Duration::from_millis(500), &mut mover)
+                .await
+                .is_err(),
+            "Publication must wait for the active search snapshot"
+        );
+        assert!(
+            infra::file_list::query_ids(
+                &org_id,
+                StreamType::Metrics,
+                stream_name,
+                (timestamp, timestamp + 2)
+            )
+            .await
+            .unwrap()
+            .is_empty()
+        );
+        assert_eq!(
+            ingester::get_stream_segments(&org_id, "metrics", stream_name)
+                .await
+                .len(),
+            1
+        );
+        drop(inventory);
+        timeout(Duration::from_secs(10), mover)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let files = infra::file_list::query_ids(
+            &org_id,
+            StreamType::Metrics,
+            stream_name,
+            (timestamp, timestamp + 2),
+        )
+        .await
+        .unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].records, 2);
+        assert!(
+            ingester::get_stream_segments(&org_id, "metrics", stream_name)
+                .await
+                .is_empty()
+        );
+        assert!(!pack_path.exists());
+        for file in infra::file_list::list()
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|file| file.key.starts_with(&prefix))
+        {
+            infra::file_list::remove(&file.key).await.unwrap();
+        }
+        let keys = storage::list("", &prefix).await.unwrap();
+        storage::del(keys.iter().map(|key| ("", key.as_str())).collect())
+            .await
+            .unwrap();
     }
 }
