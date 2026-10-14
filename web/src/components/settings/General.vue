@@ -423,37 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("settings.customLogoDarkDescription") }}
           </span>
         </div>
-
-        <!-- Authoring banners needs far more room than a settings row, so the
-             row is just the entry point into a drawer. Out of scope for the
-             customBranding gate above (no FeatureKey of its own) — kept on the
-             same allowed check it always implicitly had via the outer wrapper. -->
-        <div
-          v-if="customBrandingAccess.allowed"
-          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
-        >
-          <span class="individual-setting-title text-sm leading-5 font-medium">
-            {{ t("announcements.settings.label") }}
-          </span>
-          <div class="flex items-center">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              data-test="settings_ent_announcement_banners_btn"
-              @click="showAnnouncementBanners = true"
-            >
-              {{ t("announcements.settings.configure") }}
-            </OButton>
-          </div>
-          <span class="individual-setting-description text-compact opacity-70">
-            {{ t("announcements.settings.description") }}
-          </span>
-        </div>
       </div>
-
-      <!-- The drawer belongs to the component that fills it — its header toggle
-           and footer actions are part of the same surface. -->
-      <AnnouncementBanners v-model:open="showAnnouncementBanners" />
     </div>
 
     <!-- Danger Zone: delete this organization (owner/admin only).
@@ -666,7 +636,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import AnnouncementBanners from "./AnnouncementBanners.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -693,7 +662,6 @@ export default defineComponent({
     },
   },
   components: {
-    AnnouncementBanners,
     GroupHeader,
     OButton,
     ODialog,
@@ -746,7 +714,6 @@ export default defineComponent({
     );
     const customText = ref("");
     const editingText = ref(false);
-    const showAnnouncementBanners = ref(false);
     const files = ref(null);
     const filesLight = ref(null);
     const filesDark = ref(null);
@@ -1440,7 +1407,6 @@ export default defineComponent({
       store,
       config,
       router,
-      showAnnouncementBanners,
       // Form wiring (Options-API: schema + defaults MUST be returned so :schema
       // resolves and validation runs).
       generalSettingsSchema,

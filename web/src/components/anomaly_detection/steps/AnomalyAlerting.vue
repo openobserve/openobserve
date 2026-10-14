@@ -82,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="config.alert_enabled" class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
         <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.destination") }}
-          <span class="text-status-error-text ms-1">*</span>
         </div>
         <div class="flex min-w-0 flex-1 basis-60 flex-col">
           <div class="flex flex-wrap items-center gap-y-1">
@@ -93,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               valueKey="name"
               multiple
               searchable
+              :placeholder="t('alerts.summary.noDestination')"
               class="h-auto! min-h-auto! max-w-105 min-w-0 flex-1 basis-75"
               data-test="anomaly-destination"
             >
@@ -137,13 +137,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.anomaly.addNewDestination") }}
             </OButton>
           </div>
-          <div
-            v-if="config.alert_enabled && config.alert_destination_ids.length === 0"
-            class="text-input-error-text pt-1 text-xs"
-            data-test="anomaly-destination-error"
+          <!-- Same field hint as the alert form's Destination field. -->
+          <p
+            class="text-input-help-text pt-1 text-xs"
+            :data-test="
+              config.alert_destination_ids.length === 0
+                ? 'anomaly-destination-note'
+                : 'anomaly-destination-status'
+            "
           >
-            {{ t("alerts.anomaly.destinationRequired") }}
-          </div>
+            {{ destinationStatus }}
+          </p>
         </div>
       </div>
 
@@ -332,6 +336,17 @@ export default defineComponent({
       t("alerts.anomaly.windowShareHint", anomalyWindowShareEffective(props.config)),
     );
 
+    // One name reads better than "1 destination"; more than one is a count.
+    const destinationStatus = computed(() => {
+      const ids = props.config.alert_destination_ids;
+      if (ids.length === 0) return t("alerts.anomaly.noDestinationNote");
+      const targets =
+        ids.length === 1
+          ? ids[0]
+          : t("alert_dependencies.countDestinations", { count: ids.length }, ids.length);
+      return t("alerts.anomaly.sendsToStatus", { targets });
+    });
+
     // Dynamically decide how many chips to show based on text length.
     // Restored from pre-refactor version; the template still depends on it.
     const MAX_CHARS = 42;
@@ -369,6 +384,7 @@ export default defineComponent({
       tagsModel,
       openAddDestination,
       visibleChipCount,
+      destinationStatus,
       directionOptions,
       directionModel,
       windowShareErrors,

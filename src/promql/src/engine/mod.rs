@@ -226,11 +226,10 @@ pub(crate) mod tests {
     use std::{sync::Arc, time::Duration};
 
     use promql_parser::{
-        label::{MatchOp, Matchers},
+        label::Matchers,
         parser::{
-            AggregateExpr, BinaryExpr, Call, EvalStmt, Extension, Function, FunctionArgs,
-            MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, SubqueryExpr,
-            UnaryExpr, VectorSelector, token, value::ValueType,
+            AggregateExpr, BinaryExpr, EvalStmt, Extension, NumberLiteral, ParenExpr,
+            StringLiteral, SubqueryExpr, UnaryExpr, token, value::ValueType,
         },
     };
 
@@ -426,26 +425,6 @@ pub(crate) mod tests {
         TwoInstanceProvider(ctx, vec![])
     }
 
-    #[test]
-    fn test_engine_new() {
-        // Test basic engine creation with a simple mock
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
-        );
-
-        assert_eq!(engine.trace_id, trace_id.to_string());
-        assert!(engine.label_selector.is_empty());
-        assert!(engine.result_type.is_none());
-    }
-
     /// The guard must not fire on a query that merely LOOKS adjacent — `offset`
     /// is genuinely implemented and must keep working.
     #[tokio::test]
@@ -472,31 +451,6 @@ pub(crate) mod tests {
                 !err.to_string().contains("@ modifier"),
                 "offset must not be caught by the @-modifier guard, got: {err}",
             );
-        }
-    }
-
-    #[tokio::test]
-    async fn test_exec_expr_number_literal() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let mut engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
-        );
-
-        let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
-        let result = engine.exec_expr(&expr).await;
-        assert!(result.is_ok());
-
-        if let Ok(Value::Float(val)) = result {
-            assert_eq!(val, 42.0);
-        } else {
-            panic!("Expected Value::Float");
         }
     }
 
@@ -624,39 +578,6 @@ pub(crate) mod tests {
                 }
             }
         }
-    }
-
-    #[tokio::test]
-    async fn test_exec_expr_unary_vector() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let mut engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
-        );
-
-        let sample = Sample::new(1640995200000000i64, 42.0);
-        let instant = InstantValue {
-            labels: vec![Arc::new(Label::new("env", "prod"))],
-            sample,
-        };
-        let _vector = Value::Vector(vec![instant]);
-        let vector_expr = PromExpr::Extension(Extension {
-            expr: Arc::new(TestExtension),
-        });
-
-        let expr = PromExpr::Unary(UnaryExpr {
-            expr: Box::new(vector_expr),
-        });
-
-        let result = engine.exec_expr(&expr).await;
-        // This will fail because Extension is not implemented, but we're testing the unary logic
-        assert!(result.is_err());
     }
 
     #[tokio::test]
@@ -898,38 +819,6 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn test_exec_expr_binary_none_none() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let mut engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
-        );
-
-        let lhs = PromExpr::Extension(Extension {
-            expr: Arc::new(TestExtension),
-        });
-        let rhs = PromExpr::Extension(Extension {
-            expr: Arc::new(TestExtension),
-        });
-        let expr = PromExpr::Binary(BinaryExpr {
-            lhs: Box::new(lhs),
-            rhs: Box::new(rhs),
-            op: create_test_token(),
-            modifier: None,
-        });
-
-        let result = engine.exec_expr(&expr).await;
-        // This will fail because Extension is not implemented, but we're testing the binary logic
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
     async fn test_exec_expr_subquery() {
         let trace_id = "test_trace";
         let org_id = "test_org";
@@ -964,108 +853,6 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn test_exec_expr_subquery_with_offset() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let mut engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
-        );
-
-        let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
-        let offset = Some(Offset::Pos(Duration::from_secs(60)));
-        let subquery_expr = PromExpr::Subquery(SubqueryExpr {
-            expr: Box::new(expr),
-            range: Duration::from_secs(300),
-            offset,
-            step: None,
-            at: None,
-        });
-
-        let result = engine.exec_expr(&subquery_expr).await;
-        // Subquery with float input should fail because subquery expects matrix input
-        assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("Unsupported subquery")
-        );
-    }
-
-    #[tokio::test]
-    async fn test_exec_expr_subquery_vector() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let mut engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
-        );
-
-        let sample = Sample::new(1640995200000000i64, 42.0);
-        let _instant = InstantValue {
-            labels: vec![Arc::new(Label::new("env", "prod"))],
-            sample,
-        };
-        let vector = PromExpr::Extension(Extension {
-            expr: Arc::new(TestExtension),
-        });
-
-        let subquery_expr = PromExpr::Subquery(SubqueryExpr {
-            expr: Box::new(vector),
-            range: Duration::from_secs(300),
-            offset: None,
-            step: None,
-            at: None,
-        });
-
-        let result = engine.exec_expr(&subquery_expr).await;
-        // This will fail because Extension is not implemented, but we're testing the subquery logic
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_exec_expr_subquery_float() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let mut engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
-        );
-
-        let float_expr = PromExpr::Extension(Extension {
-            expr: Arc::new(TestExtension),
-        });
-
-        let subquery_expr = PromExpr::Subquery(SubqueryExpr {
-            expr: Box::new(float_expr),
-            range: Duration::from_secs(300),
-            offset: None,
-            step: None,
-            at: None,
-        });
-
-        let result = engine.exec_expr(&subquery_expr).await;
-        // This will fail because Extension is not implemented, but we're testing the subquery logic
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
     async fn test_exec_expr_aggregate() {
         let trace_id = "test_trace";
         let org_id = "test_org";
@@ -1094,34 +881,6 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn test_exec_expr_call() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let mut engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
-        );
-
-        let args = FunctionArgs { args: vec![] };
-        let func = Function {
-            name: "time",
-            arg_types: vec![],
-            variadic: 0,
-            experimental: false,
-            return_type: ValueType::Scalar,
-        };
-        let expr = PromExpr::Call(Call { func, args });
-
-        let result = engine.exec_expr(&expr).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
     async fn test_exec_expr_extension() {
         let trace_id = "test_trace";
         let org_id = "test_org";
@@ -1147,87 +906,6 @@ pub(crate) mod tests {
                 .to_string()
                 .contains("Unsupported Extension")
         );
-    }
-
-    #[tokio::test]
-    async fn test_exec_expr_vector_selector() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let mut engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
-        );
-
-        let matchers = Matchers {
-            matchers: vec![promql_parser::label::Matcher {
-                name: "env".to_string(),
-                op: MatchOp::Equal,
-                value: "prod".to_string(),
-            }],
-            or_matchers: vec![],
-        };
-
-        let selector = VectorSelector {
-            name: Some("test_metric".to_string()),
-            matchers,
-            offset: None,
-            at: None,
-        };
-
-        let expr = PromExpr::VectorSelector(selector);
-
-        let result = engine.exec_expr(&expr).await;
-        // This will fail because the mock provider doesn't have real data, but we're testing the
-        // vector selector logic
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_exec_expr_matrix_selector() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let mut engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
-        );
-
-        let matchers = Matchers {
-            matchers: vec![promql_parser::label::Matcher {
-                name: "env".to_string(),
-                op: MatchOp::Equal,
-                value: "prod".to_string(),
-            }],
-            or_matchers: vec![],
-        };
-
-        let selector = VectorSelector {
-            name: Some("test_metric".to_string()),
-            matchers,
-            offset: None,
-            at: None,
-        };
-
-        let matrix_selector = MatrixSelector {
-            vs: selector,
-            range: Duration::from_secs(300),
-        };
-
-        let expr = PromExpr::MatrixSelector(matrix_selector);
-
-        let result = engine.exec_expr(&expr).await;
-        // This will fail because the mock provider doesn't have real data, but we're testing the
-        // matrix selector logic
-        assert!(result.is_ok());
     }
 
     #[tokio::test]

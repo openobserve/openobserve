@@ -66,7 +66,7 @@ impl From<AlertError> for Response {
             AlertError::AlertNameMissing
             | AlertError::AlertNameOfgaUnsupported
             | AlertError::AlertNameContainsForwardSlash
-            | AlertError::AlertDestinationMissing
+            | AlertError::ProtectedStream(_)
             | AlertError::TemplateNotConfigured { .. }
             | AlertError::RealtimeMissingCustomQuery
             // Both are user input errors -> 400, same as the other
@@ -112,6 +112,7 @@ impl From<AlertError> for Response {
             // name them, so the 409 body says what to change.
             AlertError::CreateAlreadyExists
             | AlertError::AlertSourceOfSlos { .. }
+            | AlertError::BuiltinAlert { .. }
             | AlertError::AlertReferencedByComposites { .. }
             | AlertError::AlertSourceEditBreaksSlos { .. } => MetaHttpResponse::conflict(value),
             AlertError::CompositeGraphLockUnavailable(_) => (

@@ -101,7 +101,11 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 101: create downtimes; muted_by_downtime_id, last_downtime_id, slo_backfill_jobs kind/attempts.
 // 102: create downtime_notifications.
 // 103: create alert_calibration_configs.
-pub const DB_SCHEMA_VERSION: u64 = 103;
+// 104: create ai_chat_sessions (server-side AI chat persistence).
+// 105: create ai_chat_shares and add fork columns to ai_chat_sessions.
+// 106: create ai_chat_turns and add replica_purged_at to ai_chat_sessions.
+// 107: add redact_tools to ai_chat_shares.
+pub const DB_SCHEMA_VERSION: u64 = 107;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -220,8 +224,14 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-const _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS: [&str; 3] =
-    ["trace_id", "service_name", "operation_name"];
+const _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS: [&str; 6] = [
+    "trace_id",
+    "service_name",
+    "operation_name",
+    "_o2_trace_id",
+    "view_id",
+    "action_id",
+];
 pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let cfg = get_config();
     let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {
@@ -463,7 +473,6 @@ pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
         "ZO_SYNTHETICS_ENABLED",
         SyntheticsReloadClass::RestartRequired,
     ),
-    ("ZO_SYNTHETICS_SUBTESTS_ENABLED", SyntheticsReloadClass::Hot),
     (
         "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
         SyntheticsReloadClass::Hot,
@@ -526,7 +535,6 @@ pub(crate) fn synthetics_restart_required_changes(
     // compiling here until someone decides whether a reload can carry it.
     let Synthetics {
         enabled,
-        subtests_enabled: _,
         subtests_replication_grace_secs: _,
         status_page_rebuild_interval,
         status_page_domain_verify_interval,
@@ -1043,6 +1051,40 @@ pub struct Config {
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
     pub self_profiles: SelfProfiles,
+    pub public_ai_chat: PublicAiChat,
+}
+
+/// Unauthenticated read-only links to shared AI chats.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct PublicAiChat {
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_ENABLED",
+        default = false,
+        help = "Allow AI chats to be shared through public links. Off by default; the public route only exists when this is true."
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_RPM",
+        default = 60,
+        help = "Per-IP requests-per-minute limit on the public shared-chat route (0 disables)."
+    )]
+    pub rpm: u64,
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_MAX_EXPIRY_DAYS",
+        default = 90,
+        help = "Longest expiry, in days, a public AI chat link may have; public links must expire (0 means 90)."
+    )]
+    pub max_expiry_days: u64,
+}
+
+impl PublicAiChat {
+    /// Longest expiry of a public link in days: `max_expiry_days`, 90 when unset, at most 365.
+    pub fn expiry_limit_days(&self) -> u64 {
+        match self.max_expiry_days {
+            0 => 90,
+            days => days.min(365),
+        }
+    }
 }
 
 /// Background self CPU/memory profile ingest into `_meta.self_profiles`.
@@ -1140,13 +1182,6 @@ pub struct Synthetics {
         help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
     )]
     pub enabled: bool,
-    /// Off by default so no composed check can exist until an org opts in.
-    #[env_config(
-        name = "ZO_SYNTHETICS_SUBTESTS_ENABLED",
-        default = false,
-        help = "Enables subtest references in browser checks. Off by default; while false the server refuses composition writes and the UI hides Insert subtest."
-    )]
-    pub subtests_enabled: bool,
     /// Super-cluster only: how long a parent may reference a child that has not replicated yet.
     #[env_config(
         name = "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
@@ -2879,6 +2914,12 @@ pub struct Limit {
         help = "Poll cadence in seconds for the query-recommendation puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
     )]
     pub scheduler_query_reco_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_ALERT_CALIBRATION_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the alert calibration puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_alert_calibration_interval: i64,
     #[env_config(name = "ZO_SEARCH_JOB_WORKS", default = 1)]
     pub search_job_workers: i64,
     #[env_config(name = "ZO_SEARCH_JOB_SCHEDULE_INTERVAL", default = 10)] // seconds
@@ -5151,7 +5192,6 @@ mod tests {
     /// `synthetics_restart_required_changes`.
     const ALL_SYNTHETICS_ENV_VARS: &[&str] = &[
         "ZO_SYNTHETICS_ENABLED",
-        "ZO_SYNTHETICS_SUBTESTS_ENABLED",
         "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
         "ZO_SYNTHETICS_LAMBDA_BROWSER",
         "ZO_SYNTHETICS_LAMBDA_NET",
@@ -5186,8 +5226,8 @@ mod tests {
     fn synthetics_reload_classification_is_pinned() {
         assert_eq!(
             SYNTHETICS_RELOAD_CLASSES.len(),
-            17,
-            "Synthetics has 17 keys; every one needs a reload class"
+            16,
+            "Synthetics has 16 keys; every one needs a reload class"
         );
 
         let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
@@ -5224,7 +5264,6 @@ mod tests {
                 "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
                 "ZO_SYNTHETICS_RECORDER_EXTENSION_URL",
                 "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
-                "ZO_SYNTHETICS_SUBTESTS_ENABLED",
                 "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
             ]
         );
@@ -5263,21 +5302,11 @@ mod tests {
         );
     }
 
-    #[test]
-    fn composition_is_off_by_default() {
-        let cfg = Config::init().unwrap();
-        assert!(
-            !cfg.synthetics.subtests_enabled,
-            "composition must ship dark: a fresh deployment must refuse subtest writes"
-        );
-    }
-
     /// Mutates every field away from its current value, so the two tests below
     /// run against the whole struct — an implementation that warns about an
     /// extra key cannot hide in the fields a subset forgot to touch.
     fn mutate_every_synthetics_field(cfg: &mut Synthetics) {
         cfg.enabled = !cfg.enabled;
-        cfg.subtests_enabled = !cfg.subtests_enabled;
         cfg.subtests_replication_grace_secs += 1;
         cfg.lambda_browser.push_str("-changed");
         cfg.lambda_net.push_str("-changed");

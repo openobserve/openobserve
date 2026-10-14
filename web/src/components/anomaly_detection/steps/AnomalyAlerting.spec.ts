@@ -76,18 +76,20 @@ describe("AnomalyAlerting - rendering", () => {
     expect(w.text()).toContain("_anomalies");
   });
 
-  it("shows required field error when alert_enabled and no destination", async () => {
+  it("notes that no destination is notified when alerting is on with none", async () => {
     const w = await mountComp({
       config: makeConfig({ alert_enabled: true, alert_destination_ids: [] }),
     });
-    expect(w.text()).toContain("At least one destination is required!");
+    expect(w.find('[data-test="anomaly-destination-note"]').exists()).toBe(true);
+    expect(w.text()).not.toContain("*");
   });
 
-  it("does not show required field error when destination is selected", async () => {
+  it("swaps the note for where it sends once a destination is selected", async () => {
     const w = await mountComp({
       config: makeConfig({ alert_enabled: true, alert_destination_ids: ["slack-dest"] }),
     });
-    expect(w.text()).not.toContain("At least one destination is required!");
+    expect(w.find('[data-test="anomaly-destination-note"]').exists()).toBe(false);
+    expect(w.find('[data-test="anomaly-destination-status"]').text()).toContain("slack-dest");
   });
 });
 
