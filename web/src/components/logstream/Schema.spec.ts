@@ -2124,22 +2124,6 @@ describe("Schema Component Tests", () => {
       ).toBe(false);
     });
 
-    it("should treat the stream's own default index fields like env defaults", () => {
-      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = [];
-      wrapper.vm.store.state.zoConfig.default_stream_index_fields = {
-        "logs/_rumdata": ["view_id"],
-      };
-      const option = { value: "secondaryIndexKey" };
-
-      wrapper.vm.indexData.stream_type = "logs";
-      wrapper.vm.indexData.name = "_rumdata";
-      expect(wrapper.vm.checkIfOptionPresentInDefaultEnv("view_id", option)).toBe(true);
-      expect(wrapper.vm.disableOptions({ name: "view_id" }, option)).toBe(true);
-
-      wrapper.vm.indexData.name = "other";
-      expect(wrapper.vm.checkIfOptionPresentInDefaultEnv("view_id", option)).toBe(false);
-    });
-
     it("should compute indexTypeOptionsForRow with disabled flags", () => {
       const options = wrapper.vm.indexTypeOptionsForRow({
         name: "message",

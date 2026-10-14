@@ -33,7 +33,7 @@ use config::{
             BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, QUANTILE_LABEL,
             VALUE_LABEL,
         },
-        stream::{StreamSettings, StreamType, stream_default_index_fields},
+        stream::{StreamSettings, StreamType},
         traces::ALL_INFER_FIELDS,
     },
     metrics,
@@ -763,9 +763,6 @@ pub async fn handle_diff_schema(
         }
         // add secondary index fields (default SQL secondary index fields)
         for field in SQL_SECONDARY_INDEX_SEARCH_FIELDS.iter() {
-            keep_fields.insert(field.to_string());
-        }
-        for field in stream_default_index_fields(stream_type, stream_name) {
             keep_fields.insert(field.to_string());
         }
         // add user-configured FTS fields

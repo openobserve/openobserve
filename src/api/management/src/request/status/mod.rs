@@ -34,7 +34,6 @@ use config::{
         cluster::{NodeStatus, Role, RoleGroup},
         function::ZoFunction,
         search::{HashFileRequest, HashFileResponse},
-        stream::STREAM_DEFAULT_INDEX_FIELDS,
     },
     stats::{CacheStats, CacheStatsAsync},
     utils::{base64, json},
@@ -150,8 +149,6 @@ struct ConfigResponse<'a> {
     build_type: String,
     default_fts_keys: Vec<String>,
     default_secondary_index_fields: Vec<String>,
-    /// Keyed by `{stream_type}/{stream_name}`.
-    default_stream_index_fields: HashMap<String, Vec<String>>,
     default_quick_mode_fields: Vec<String>,
     telemetry_enabled: bool,
     default_functions: Vec<ZoFunction<'a>>,
@@ -557,15 +554,6 @@ pub async fn zo_config(
         default_secondary_index_fields: SQL_SECONDARY_INDEX_SEARCH_FIELDS
             .iter()
             .map(|s| s.to_string())
-            .collect(),
-        default_stream_index_fields: STREAM_DEFAULT_INDEX_FIELDS
-            .iter()
-            .map(|(stream_type, stream_name, fields)| {
-                (
-                    format!("{stream_type}/{stream_name}"),
-                    fields.iter().map(|f| f.to_string()).collect(),
-                )
-            })
             .collect(),
         default_quick_mode_fields: QUICK_MODEL_FIELDS.to_vec(),
         default_functions: DEFAULT_FUNCTIONS.to_vec(),

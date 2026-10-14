@@ -19,7 +19,7 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::{
         search::{Query, Request, Response as SearchResponse, SearchEventType, default_use_cache},
-        stream::{RUM_DATA_STREAM, StreamType},
+        stream::StreamType,
         traces::session::{key_in_predicate, quote_identifier},
     },
     utils::json,
@@ -30,7 +30,7 @@ use serde::Serialize;
 use tokio::time::Instant;
 use utoipa::ToSchema;
 
-use super::HOUR_US;
+use super::{HOUR_US, RUM_DATA_STREAM};
 
 #[derive(Clone, Copy, Debug)]
 pub(super) enum RumQuery {

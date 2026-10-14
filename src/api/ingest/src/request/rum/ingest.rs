@@ -22,7 +22,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use config::{meta::stream::RUM_DATA_STREAM, utils::json};
+use config::utils::json;
 use flate2::read::ZlibDecoder;
 use ingestion_common::{IngestUser, IngestionRequest};
 use openobserve_api_common::extractors::Headers;
@@ -37,6 +37,7 @@ use crate::{
 
 pub const RUM_LOG_STREAM: &str = "_rumlog";
 pub const RUM_SESSION_REPLAY_STREAM: &str = "_sessionreplay";
+pub const RUM_DATA_STREAM: &str = "_rumdata";
 
 /// Multipart form data being ingested in the form of session-replay
 #[derive(ToSchema)]

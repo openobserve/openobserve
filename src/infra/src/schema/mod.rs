@@ -27,7 +27,7 @@ use config::{
     ider::SnowflakeIdGenerator,
     meta::{
         self_reporting::usage::INTERNAL_STREAM_NAMES,
-        stream::{PartitionTimeLevel, StreamSettings, StreamType, stream_default_index_fields},
+        stream::{PartitionTimeLevel, StreamSettings, StreamType},
     },
     stats::MemorySize,
     utils::{
@@ -457,8 +457,6 @@ pub fn get_stream_setting_fts_fields<T: std::borrow::Borrow<StreamSettings>>(
 
 pub fn get_stream_setting_index_fields<T: std::borrow::Borrow<StreamSettings>>(
     settings: &Option<T>,
-    stream_type: StreamType,
-    stream_name: &str,
 ) -> Vec<String> {
     // Bloom filter is built on top of the secondary index, so every bloom
     // field must also be a secondary-index field. Fold the default bloom
@@ -467,23 +465,12 @@ pub fn get_stream_setting_index_fields<T: std::borrow::Borrow<StreamSettings>>(
     // persisted before bloom fields were merged into index_fields on update).
     let mut default_fields = SQL_SECONDARY_INDEX_SEARCH_FIELDS.clone();
     default_fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
-    let stream_fields = stream_default_index_fields(stream_type, stream_name);
     let mut fields = match settings {
         Some(settings) => {
             let settings = settings.borrow();
             let mut fields = settings.index_fields.clone();
             fields.extend(default_fields);
             fields.extend(settings.bloom_filter_fields.clone());
-            // an FTS key or partition key cannot also be a secondary index
-            fields.extend(
-                stream_fields
-                    .iter()
-                    .filter(|&&field| {
-                        !settings.full_text_search_keys.iter().any(|f| f == field)
-                            && !settings.partition_keys.iter().any(|p| p.field == field)
-                    })
-                    .map(|field| field.to_string()),
-            );
             // distinct value fields are secondary index fields while enabled;
             // fields that cannot be indexed (fts / partition keys / reserved) are skipped
             if settings.enable_distinct_fields && !settings.distinct_value_fields.is_empty() {
@@ -511,10 +498,7 @@ pub fn get_stream_setting_index_fields<T: std::borrow::Borrow<StreamSettings>>(
             }
             fields
         }
-        None => {
-            default_fields.extend(stream_fields.iter().map(|field| field.to_string()));
-            default_fields
-        }
+        None => default_fields,
     };
     fields.sort();
     fields.dedup();
@@ -1348,8 +1332,7 @@ mod tests {
     #[test]
     fn test_get_stream_setting_index_fields() {
         // Test with None
-        let fields =
-            get_stream_setting_index_fields(&None::<StreamSettings>, StreamType::Logs, "test");
+        let fields = get_stream_setting_index_fields(&None::<StreamSettings>);
         assert!(!fields.is_empty()); // Should have default fields
 
         // Test with custom index fields
@@ -1357,7 +1340,7 @@ mod tests {
             index_fields: vec!["index_field1".to_string(), "index_field2".to_string()],
             ..Default::default()
         };
-        let fields = get_stream_setting_index_fields(&Some(settings), StreamType::Logs, "test");
+        let fields = get_stream_setting_index_fields(&Some(settings));
         assert!(fields.contains(&"index_field1".to_string()));
         assert!(fields.contains(&"index_field2".to_string()));
 
@@ -1387,40 +1370,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_stream_setting_index_fields_adds_stream_defaults() {
-        let fields = get_stream_setting_index_fields(
-            &None::<StreamSettings>,
-            StreamType::Logs,
-            config::meta::stream::RUM_DATA_STREAM,
-        );
-        for field in config::meta::stream::RUM_DATA_INDEX_FIELDS {
-            assert!(fields.contains(&field.to_string()));
-        }
-
-        let settings = StreamSettings {
-            full_text_search_keys: vec!["view_id".to_string()],
-            partition_keys: vec![config::meta::stream::StreamPartition::new("action_id")],
-            ..Default::default()
-        };
-        let fields = get_stream_setting_index_fields(
-            &Some(settings),
-            StreamType::Logs,
-            config::meta::stream::RUM_DATA_STREAM,
-        );
-        assert!(fields.contains(&"_o2_trace_id".to_string()));
-        assert!(fields.contains(&"_oo_trace_id".to_string()));
-        assert!(!fields.contains(&"view_id".to_string()));
-        assert!(!fields.contains(&"action_id".to_string()));
-
-        let fields = get_stream_setting_index_fields(
-            &None::<StreamSettings>,
-            StreamType::Traces,
-            config::meta::stream::RUM_DATA_STREAM,
-        );
-        assert!(!fields.contains(&"view_id".to_string()));
-    }
-
-    #[test]
     fn test_get_stream_setting_index_fields_includes_distinct_fields() {
         use config::meta::stream::{DistinctField, StreamPartition};
 
@@ -1444,8 +1393,7 @@ mod tests {
             ..Default::default()
         };
 
-        let fields =
-            get_stream_setting_index_fields(&Some(settings.clone()), StreamType::Logs, "test");
+        let fields = get_stream_setting_index_fields(&Some(settings.clone()));
         assert!(fields.contains(&"index_field".to_string()));
         assert!(fields.contains(&"svc".to_string()));
         assert!(!fields.contains(&"fts".to_string()));
@@ -1459,7 +1407,7 @@ mod tests {
             enable_distinct_fields: false,
             ..settings
         };
-        let fields = get_stream_setting_index_fields(&Some(settings), StreamType::Logs, "test");
+        let fields = get_stream_setting_index_fields(&Some(settings));
         assert!(fields.contains(&"index_field".to_string()));
         assert!(!fields.contains(&"svc".to_string()));
     }

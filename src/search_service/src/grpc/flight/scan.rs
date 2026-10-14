@@ -24,7 +24,7 @@ use config::{
         inverted_index::IndexOptimizeMode,
         search::ScanStats,
         sql::TableReferenceExt,
-        stream::{FileKey, StreamSettings, stream_default_index_fields},
+        stream::{FileKey, StreamSettings},
     },
 };
 use hashbrown::HashMap;
@@ -56,7 +56,6 @@ pub(super) struct StreamSearchSettings {
     pub(super) created_at: Option<i64>,
     pub(super) fts_fields: Vec<String>,
     pub(super) index_fields: Vec<String>,
-    pub(super) default_index_fields: &'static [&'static str],
     pub(super) bloom_fields: Vec<String>,
     /// The request's `equal_keys` filters, not the stream's partition key settings.
     pub(super) search_partition_keys: Vec<(String, String)>,
@@ -90,12 +89,10 @@ impl StreamSearchSettings {
                     .unwrap_or_default()
             })
             .collect_vec();
-        let stream_name = source.stream.stream_name();
-        let index_fields =
-            get_stream_setting_index_fields(&settings, source.stream_type, &stream_name)
-                .into_iter()
-                .filter(|v| schema_fields.contains_key(v))
-                .collect_vec();
+        let index_fields = get_stream_setting_index_fields(&settings)
+            .into_iter()
+            .filter(|v| schema_fields.contains_key(v))
+            .collect_vec();
         let bloom_fields = get_stream_setting_bloom_filter_fields(&settings)
             .into_iter()
             .filter(|v| schema_fields.contains_key(v))
@@ -112,7 +109,6 @@ impl StreamSearchSettings {
             settings,
             fts_fields,
             index_fields,
-            default_index_fields: stream_default_index_fields(source.stream_type, &stream_name),
             bloom_fields,
             search_partition_keys,
         }
@@ -123,21 +119,12 @@ impl StreamSearchSettings {
     pub(super) async fn index_updated_at(&self, mode: &IndexOptimizeMode) -> i64 {
         let distinct_fields_updated_at =
             infra::db::tantivy_index::get_ttv_distinct_fields_updated_at().await;
-        let referenced_fields = mode.referenced_fields();
-        let mut index_updated_at = get_stream_setting_index_updated_at_for_fields(
+        let index_updated_at = get_stream_setting_index_updated_at_for_fields(
             &self.settings,
             self.created_at,
-            &referenced_fields,
+            &mode.referenced_fields(),
             distinct_fields_updated_at,
         );
-        if referenced_fields
-            .iter()
-            .any(|f| self.default_index_fields.contains(&f.as_str()))
-        {
-            let rum_data_index_updated_at =
-                infra::db::tantivy_index::get_ttv_rum_data_index_updated_at().await;
-            index_updated_at = index_updated_at.max(rum_data_index_updated_at);
-        }
         let ttv_timestamp_updated_at =
             infra::db::tantivy_index::get_ttv_timestamp_updated_at().await;
         let index_updated_at = index_updated_at.max(ttv_timestamp_updated_at);
