@@ -42,9 +42,10 @@ test.describe("Logs Reset Filters button (o2-enterprise#1734)", () => {
     await pm.logsPage.clickResetFiltersButton();
 
     await expect.poll(async () => ((await pm.logsPage.getQueryEditorText()) || '').trim(), { timeout: 10000 }).toBe('');
-    await expect.poll(() => new URL(page.url()).searchParams.has('query'), { timeout: 10000 }).toBe(false);
 
+    // The URL mirrors the last executed search (#15234), so query= only drops once the reset search runs.
     await pm.logsPage.runQueryAndWaitForResults();
+    await expect.poll(() => new URL(page.url()).searchParams.has('query'), { timeout: 10000 }).toBe(false);
     const restoredCount = await pm.logsPage.getResultHitsCount();
     testLogger.info('Restored hits count', { restoredCount });
     expect(restoredCount).toBe(baselineCount);

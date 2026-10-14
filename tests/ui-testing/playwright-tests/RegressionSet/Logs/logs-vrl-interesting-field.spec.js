@@ -46,12 +46,15 @@ test.describe("Logs VRL-derived field in quick mode", () => {
   }, async () => {
     // The control side: without it, a sidebar that rendered no toggles at all would pass.
     await pm.logsPage.searchFieldByName(SCHEMA_FIELD);
-    const schemaToggles = await pm.logsPage.countInterestingFieldButtons(SCHEMA_FIELD);
-    testLogger.info(`Schema field "${SCHEMA_FIELD}" offers ${schemaToggles} interesting toggles`);
-    expect(
-      schemaToggles,
-      `Precondition: the schema field "${SCHEMA_FIELD}" must offer the interesting-field toggle`
+    // The row renders before the field is marked schema-backed, so the toggle can lag it.
+    await expect.poll(
+      () => pm.logsPage.countInterestingFieldButtons(SCHEMA_FIELD),
+      {
+        message: `Precondition: the schema field "${SCHEMA_FIELD}" must offer the interesting-field toggle`,
+        timeout: 15000,
+      }
     ).toBeGreaterThan(0);
+    testLogger.info(`Schema field "${SCHEMA_FIELD}" offers the interesting toggle`);
 
     // The VRL field is listed — extractFields() reads it off the hits — but it is not
     // schema-backed, so it must not be offerable as an interesting field.

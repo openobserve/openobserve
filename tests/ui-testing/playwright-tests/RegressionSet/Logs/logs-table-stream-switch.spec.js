@@ -29,6 +29,9 @@ test.describe("Logs table across a stream switch", () => {
     // stopping at the explorer never reaches it.
     await pm.logsPage.navigateToLogsFromSidebar();
 
+    // Returning to Logs lands idle on "Run a query" (#15234); a hidden histogram still stays hidden after a run.
+    await pm.logsPage.selectRunQuery();
+
     // Asserting wrap before the page has rendered reads back the value the test
     // set itself, so the results have to land first.
     await pm.logsPage.expectHistogramChartVisible();
