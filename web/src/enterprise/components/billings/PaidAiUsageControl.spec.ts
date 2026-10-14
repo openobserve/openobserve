@@ -157,4 +157,21 @@ describe("PaidAiUsageControl", () => {
     const w = await mountControl();
     expect(w.text()).toContain("Waiting for acme to turn it on");
   });
+
+  it("shows a member's own consent while it waits, so the member can turn it off", async () => {
+    services.getConsent.mockResolvedValue({
+      data: consentStatus({
+        organization: { org_id: "member", enabled: true, can_manage: true },
+        payer: { org_id: "acme", enabled: false, can_manage: false },
+        effective: false,
+      }),
+    });
+    const w = await mountControl();
+    expect(w.getComponent({ name: "OSwitch" }).props("modelValue")).toBe(true);
+
+    await toggle(w).trigger("click");
+    await flushPromises();
+    expect(services.updateConsent).toHaveBeenCalledWith("default", "ai_credits", false);
+    expect(services.promptForConsent).not.toHaveBeenCalled();
+  });
 });

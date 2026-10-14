@@ -65,7 +65,8 @@ async function loadStatus() {
   if (!orgId.value) return;
   try {
     status.value = (await paidOverage.get(orgId.value)).data;
-    displayEnabled.value = status.value.effective;
+    // This org's own choice: a billing-group member stays on while it waits for its payer.
+    displayEnabled.value = status.value.organization.enabled;
   } catch {
     // Unknown consent state: show no switch rather than a wrong one.
     status.value = null;
@@ -74,7 +75,7 @@ async function loadStatus() {
 
 async function updateEnabled(value: SwitchValue) {
   if (typeof value !== "boolean" || !status.value || saving.value) return;
-  const previous = status.value.effective;
+  const previous = status.value.organization.enabled;
   displayEnabled.value = value;
   saving.value = true;
   try {
