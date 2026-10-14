@@ -8315,6 +8315,7 @@
     "summaryActive": "활성",
     "summaryPaused": "일시 중지됨",
     "summaryFailed": "실패",
+    "summaryFiring": "발화 중",
     "summaryRecent": "트리거됨 < 15분",
     "summaryTotal": "전체",
     "webhook": "웹 후크",

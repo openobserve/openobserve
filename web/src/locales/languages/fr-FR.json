@@ -8315,6 +8315,7 @@
     "summaryActive": "Actif",
     "summaryPaused": "En pause",
     "summaryFailed": "Échoué",
+    "summaryFiring": "Déclenchée",
     "summaryRecent": "Déclenché < 15m",
     "summaryTotal": "Total",
     "webhook": "Crochet Web",

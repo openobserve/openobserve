@@ -8315,6 +8315,7 @@
     "summaryActive": "Активный",
     "summaryPaused": "Приостановлен",
     "summaryFailed": "Сбой",
+    "summaryFiring": "Сработало",
     "summaryRecent": "Сработало < 15m",
     "summaryTotal": "Всего",
     "webhook": "Вебхук",

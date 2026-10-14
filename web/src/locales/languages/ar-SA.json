@@ -8315,6 +8315,7 @@
     "summaryActive": "نشط",
     "summaryPaused": "توقف",
     "summaryFailed": "فشل",
+    "summaryFiring": "قيد التنبيه",
     "summaryRecent": "تم تفعيله < 15 دقيقة",
     "summaryTotal": "المجموع",
     "webhook": "هوك ويب",
