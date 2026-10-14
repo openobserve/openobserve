@@ -80,11 +80,28 @@ export const COVERAGE_BADGE: Record<
   CoverageVerdict,
   {
     labelKey: I18nKey;
+    /** The same verdict where a "Coverage" label already names it. */
+    shortKey: I18nKey;
     variant: "success-soft" | "warning-soft" | "error-soft";
     tone: "success" | "warning" | "error";
   }
 > = {
-  full: { labelKey: "alertCalibration.coverage.full", variant: "success-soft", tone: "success" },
-  gap: { labelKey: "alertCalibration.coverage.gap", variant: "warning-soft", tone: "warning" },
-  none: { labelKey: "alertCalibration.coverage.none", variant: "error-soft", tone: "error" },
+  full: {
+    labelKey: "alertCalibration.coverage.full",
+    shortKey: "alertCalibration.coverage.fullShort",
+    variant: "success-soft",
+    tone: "success",
+  },
+  gap: {
+    labelKey: "alertCalibration.coverage.gap",
+    shortKey: "alertCalibration.coverage.gapShort",
+    variant: "warning-soft",
+    tone: "warning",
+  },
+  none: {
+    labelKey: "alertCalibration.coverage.none",
+    shortKey: "alertCalibration.coverage.noneShort",
+    variant: "error-soft",
+    tone: "error",
+  },
 };

@@ -232,7 +232,7 @@ const latestStats = computed<StatItem[]>(() => {
     {
       key: "coverage",
       label: t("alertCalibration.dashboard.coverage"),
-      value: t(verdict.labelKey),
+      value: t(verdict.shortKey),
       icon: "verified-user",
       tone: verdict.tone,
     },
