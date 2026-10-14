@@ -634,15 +634,18 @@ const singleClusterName = computed(() => {
 
 // The "no data" state and the phase-tile subtitle both render ON the tile (§6.3), so PanelContainer owns them.
 
-/** Navigation only — it creates, copies, imports and forks nothing (§6.5). */
-const openDashboardsList = () => {
+/** The picked window as the `period` or `from`/`to` keys a dashboard reads on open. */
+const windowParams = (): Record<string, string> => {
   const window = selectedWindow.value;
   // A relative window travels as its PERIOD, so the destination re-anchors it rather than inheriting our materialized bounds.
-  const query =
-    window.kind === "relative"
-      ? { org_identifier: orgId.value, period: window.period }
-      : { org_identifier: orgId.value, from: String(window.from), to: String(window.to) };
-  router.push({ name: "dashboards", query });
+  return window.kind === "relative"
+    ? { period: window.period }
+    : { from: String(window.from), to: String(window.to) };
+};
+
+/** Navigation only — it creates, copies, imports and forks nothing (§6.5). */
+const openDashboardsList = () => {
+  router.push({ name: "dashboards", query: { org_identifier: orgId.value, ...windowParams() } });
 };
 
 // ── Edit as dashboard ───────────────────────────────────────────────────────
@@ -673,9 +676,10 @@ const editAsDashboard = async () => {
   if (editingAsDashboard.value) return;
   editingAsDashboard.value = true;
   const org = orgId.value;
-  // Read before the first await: the tab and picks at the click are the ones to mirror.
+  // Read before the first await: the tab, window and picks at the click are the ones to mirror.
   const target = kubernetesDashboardForPageTab(selectedTabId.value);
   const picks = scopeParams(selectedTabId.value, target.variables);
+  const timeParams = windowParams();
   try {
     const result = await installReadyMade(org, "kubernetes", {
       userId: store.state.userInfo?.email,
@@ -704,6 +708,7 @@ const editAsDashboard = async () => {
         dashboard: copy.dashboardId,
         folder: copy.folderId,
         tab: target.tabId,
+        ...timeParams,
         ...picks,
       },
     });

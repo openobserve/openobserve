@@ -2366,6 +2366,7 @@ describe("CuratedPageView — Edit as dashboard", () => {
         dashboard: "k8s-cluster",
         folder: "f-k8s",
         tab: "inventory",
+        period: "3h",
         "var-cluster": "prod-eu-1",
         "var-namespace": ["payments", "checkout"],
       },
@@ -2423,6 +2424,50 @@ describe("CuratedPageView — Edit as dashboard", () => {
       "var-namespace": "shop",
       "var-pod": "web-1",
     });
+  });
+
+  it("opens the dashboard on the relative range picked on the page, as a period", async () => {
+    wrapper = await mountPage("kubernetes", fullPage(), { tab: "nodes" });
+    wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+      startTime: 1,
+      endTime: 2,
+      relativeTimePeriod: "1d",
+      valueType: "relative",
+      userChangedValue: true,
+    });
+    await button().trigger("click");
+    await flushPromises();
+    const query = router.push.mock.calls.at(-1)[0].query;
+    expect(query).toMatchObject({ dashboard: "k8s-node", tab: "nodes", period: "1d" });
+    expect(query.from).toBeUndefined();
+    expect(query.to).toBeUndefined();
+  });
+
+  it("opens the dashboard on the absolute range picked on the page, as from and to", async () => {
+    const from = 1_760_000_000_000_000;
+    const to = from + 2 * 60 * 60 * 1_000_000;
+    wrapper = await mountPage("kubernetes", fullPage(), {
+      tab: "health",
+      "var-namespace.t.health": "shop",
+    });
+    wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+      startTime: from,
+      endTime: to,
+      relativeTimePeriod: null,
+      valueType: "absolute",
+      userChangedValue: true,
+    });
+    await button().trigger("click");
+    await flushPromises();
+    const query = router.push.mock.calls.at(-1)[0].query;
+    expect(query).toMatchObject({
+      dashboard: "k8s-cluster",
+      tab: "health",
+      from: String(from),
+      to: String(to),
+      "var-namespace": "shop",
+    });
+    expect(query.period).toBeUndefined();
   });
 
   it("names a deleted dashboard it puts back, and opens the one for this tab", async () => {

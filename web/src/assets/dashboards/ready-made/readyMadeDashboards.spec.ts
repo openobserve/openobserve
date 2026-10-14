@@ -29,6 +29,10 @@ import otelCollector from "./otel_collector.dashboard.json";
 
 const NOTE =
   "Ready-made by OpenObserve. Charts fill in within a few minutes of new data. Edit or delete anything, including this note.";
+const OTEL_SETUP_POINTER =
+  "Setup help for the collector's own metrics is at the end of this dashboard.";
+const noteOf = (id: ReadyMadeSourceId) =>
+  id === "otelcol" ? `${NOTE} ${OTEL_SETUP_POINTER}` : NOTE;
 const PG_OPTIONAL =
   "Needs `postgresql.deadlocks` / `postgresql.blks_hit` + `postgresql.blks_read` enabled in your collector config (off by default).";
 
@@ -220,10 +224,10 @@ describe.each(CASES)("ready-made $id dashboard", ({ id, prefix, doc, variable, m
   });
 
   describe("panels", () => {
-    it("starts with the one-line ready-made note across the full width", () => {
+    it("starts with the ready-made note across the full width", () => {
       const first = panels[0];
       expect(first.type).toBe("markdown");
-      expect(first.markdownContent).toBe(NOTE);
+      expect(first.markdownContent).toBe(noteOf(id));
       expect(first.layout).toMatchObject({ x: 0, y: 0, w: 192 });
     });
 
@@ -464,6 +468,14 @@ describe("ready-made OTel Collector dashboard", () => {
     const bottom = Math.max(...all.filter((p) => p !== setup).map((p) => p.layout.y + p.layout.h));
     expect(setup.layout.y).toBe(bottom);
     expect(setup.layout).toMatchObject({ x: 0, w: 192 });
+  });
+
+  it("opens with the shared note, then points at the setup panel at the end", () => {
+    const [note] = all;
+    expect(note.markdownContent.startsWith(`${NOTE} `)).toBe(true);
+    expect(note.markdownContent.endsWith(OTEL_SETUP_POINTER)).toBe(true);
+    expect(note.layout.h).toBe(6);
+    expect(Math.min(...all.slice(1).map((p) => p.layout.y))).toBe(note.layout.h);
   });
 
   it("explains in its last panel how to make the collector send its own metrics", () => {
