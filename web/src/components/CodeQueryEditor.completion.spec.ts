@@ -2136,6 +2136,23 @@ describe("P0-2 / P0-3 / W0-B — the chain, the operator lane and comments", () 
   );
 
   it(
+    "level NOT offers every NOT operator, replacing the typed words",
+    { timeout: 30000 },
+    async () => {
+      const { registration, editor } = await mountIn("not-partial");
+      const text = "SELECT * FROM t WHERE level NOT ";
+      const result = await ask(registration, editor, text);
+      const rows = result.suggestions.filter((s: any) => !isHeader(s));
+      for (const label of ["NOT IN", "NOT LIKE", "NOT ILIKE", "NOT BETWEEN"]) {
+        expect(rows.map(nameOf)).toContain(label);
+      }
+      expect(rows.find((s: any) => nameOf(s) === "NOT IN").range.startColumn).toBe(
+        text.length + 1 - "NOT ".length,
+      );
+    },
+  );
+
+  it(
     "a value position offers functions after the columns, except under off",
     { timeout: 30000 },
     async () => {

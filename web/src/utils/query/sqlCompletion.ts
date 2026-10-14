@@ -1035,6 +1035,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "sum",
     label: "sum",
     kind: "Function",
+    aggregate: true,
     detail: "(field)",
     get documentation() {
       return gt("sqlEditor.completion.sumDoc");
@@ -1047,6 +1048,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "avg",
     label: "avg",
     kind: "Function",
+    aggregate: true,
     detail: "(field)",
     get documentation() {
       return gt("sqlEditor.completion.avgDoc");
@@ -1059,6 +1061,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "count",
     label: "count",
     kind: "Function",
+    aggregate: true,
     detail: "(field)",
     get documentation() {
       return gt("sqlEditor.completion.countDoc");
@@ -1071,6 +1074,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "max",
     label: "max",
     kind: "Function",
+    aggregate: true,
     detail: "(field)",
     get documentation() {
       return gt("sqlEditor.completion.maxDoc");
@@ -1083,6 +1087,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "min",
     label: "min",
     kind: "Function",
+    aggregate: true,
     detail: "(field)",
     get documentation() {
       return gt("sqlEditor.completion.minDoc");
@@ -1107,6 +1112,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "approx_topk",
     label: "approx_topk",
     kind: "Function",
+    aggregate: true,
     detail: raw("(field, k)"),
     get documentation() {
       return gt("sqlEditor.completion.approxTopkDoc");
@@ -1119,6 +1125,7 @@ export const SQL_FUNCTIONS: SqlCompletionEntry[] = [
     name: "approx_topk_distinct",
     label: "approx_topk_distinct",
     kind: "Function",
+    aggregate: true,
     detail: raw("(field, distinct_field, k)"),
     get documentation() {
       return gt("sqlEditor.completion.approxTopkDistinctDoc");

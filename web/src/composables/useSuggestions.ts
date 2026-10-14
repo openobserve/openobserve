@@ -165,9 +165,12 @@ const useSqlSuggestions = () => {
     fieldName: string,
     options: ValueLookupOptions = {},
   ): Promise<string[]> => {
-    const inSession = Array.from(
-      autoCompleteData.value.fieldValues[fieldName] || new Set(),
-    ) as string[];
+    // Search hits put raw values here, null and numbers included, and the menu works on text.
+    const inSession = (
+      Array.from(autoCompleteData.value.fieldValues[fieldName] || new Set()) as unknown[]
+    )
+      .filter((v) => typeof v === "string" || typeof v === "number" || typeof v === "boolean")
+      .map(String);
     const ctx = readStreamContext();
     if (!ctx) {
       if (inSession.length) return inSession;
