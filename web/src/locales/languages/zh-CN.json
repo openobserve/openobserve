@@ -9450,6 +9450,9 @@
     "sloLongWindow": "长窗口",
     "sloShortWindow": "短窗口",
     "sloCloneDisabled": "SLO 告警是在其 SLO 页面上创建的，因此无法从此处克隆。",
+    "builtinBadge": "系统",
+    "builtinBadgeHint": "内置告警：您可以关闭或编辑它，但不能删除或重命名。",
+    "builtinDeleteDisabled": "内置告警，无法删除",
     "seconds": "秒",
     "downtimes": {
       "newTitle": "新建静默期",
