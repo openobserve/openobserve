@@ -9450,6 +9450,9 @@
     "sloLongWindow": "긴 기간",
     "sloShortWindow": "짧은 기간",
     "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다.",
+    "builtinBadge": "시스템",
+    "builtinBadgeHint": "기본 제공 알림: 끄거나 편집할 수 있지만 삭제하거나 이름을 변경할 수는 없습니다.",
+    "builtinDeleteDisabled": "기본 제공 알림은 삭제할 수 없습니다",
     "seconds": "초",
     "downtimes": {
       "newTitle": "새 다운타임",

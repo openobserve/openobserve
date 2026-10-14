@@ -9450,6 +9450,9 @@
     "sloLongWindow": "Long window",
     "sloShortWindow": "Short window",
     "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here.",
+    "builtinBadge": "System",
+    "builtinBadgeHint": "A built-in alert: you can switch it off or edit it, but not delete or rename it.",
+    "builtinDeleteDisabled": "Built-in alert, cannot be deleted",
     "seconds": "Seconds",
     "downtimes": {
       "newTitle": "New downtime",

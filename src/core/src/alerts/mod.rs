@@ -58,6 +58,8 @@ pub mod incidents;
 pub mod notifications;
 #[cfg(feature = "enterprise")]
 pub mod org_config;
+#[cfg(feature = "enterprise")]
+pub mod prebuilt;
 mod prom_rule;
 pub mod recovery;
 pub mod scheduler;
