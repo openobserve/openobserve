@@ -621,6 +621,40 @@ describe("AnalyticsFunnels", () => {
     expect(useProductAnalytics().paths.value.cohort?.stepIndex).toBe(2);
   });
 
+  it("See paths of dropped sessions stores the open saved funnel's name on the cohort", async () => {
+    await mountFunnels();
+    await setSteps([
+      ["p", "/a"],
+      ["c", "b"],
+      ["p", "/c"],
+    ]);
+    const pa = useProductAnalytics();
+    pa.openSavedFunnel(
+      {
+        id: "Checkout0000000000000000001",
+        app: "web",
+        name: "Checkout drop-off",
+        def: pa.funnel.value,
+        sql: "SELECT 1",
+        eventIds: [],
+        version: 1,
+        createdBy: "a@x.com",
+        createdAt: 1,
+        updatedBy: "a@x.com",
+        updatedAt: 1,
+      },
+      true,
+    );
+    await flushPromises();
+    await wrapper!.find('[data-test="rum-analytics-funnel-dropoff-1"]').trigger("click");
+    await flushPromises();
+    const drawer = wrapper!.findComponent({ name: "DropoffDrawer" });
+    drawer.vm.$emit("paths", drawer.props("cohort"));
+    await flushPromises();
+    expect(pa.paths.value.cohort?.name).toBe("Checkout drop-off");
+    expect(pa.paths.value.cohort?.funnelId).toBe("Checkout0000000000000000001");
+  });
+
   it("Add to dashboard does not reopen when the user comes back from the dashboard it opened (AC-53)", async () => {
     const shown = ref(true);
     await mountFunnels({}, shown);

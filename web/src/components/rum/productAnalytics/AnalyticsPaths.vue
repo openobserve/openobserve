@@ -17,76 +17,166 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="px-page-edge flex flex-col gap-3 py-3" data-test="rum-analytics-paths">
     <OCard variant="outlined" class="rounded-surface flex flex-col">
-      <div class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-2">
-        <span v-if="!def.cohort" class="flex w-80 items-center gap-2 max-md:w-full">
-          <span class="text-text-secondary text-xs">{{ t("rum.analytics.pathsView.from") }}</span>
-          <StepPicker
-            class="min-w-0 flex-1"
-            :model-value="def.anchor"
-            :placeholder="t('rum.analytics.pathsView.pickAnchor')"
-            :events="events"
-            data-test="rum-analytics-paths-anchor-select"
-            @update:model-value="(s) => s && update({ anchor: s })"
-          />
-        </span>
-        <OTag
-          v-else
-          :label="cohortLabel"
-          variant="warning-soft"
-          size="md"
-          removable
-          data-test="rum-analytics-paths-session-filter"
-          @remove="clearCohort"
-        />
-        <OToggleGroup
-          :model-value="def.direction"
-          type="single"
-          data-test="rum-analytics-paths-direction-toggle"
-          @update:model-value="(v) => v && update({ direction: v as 'next' | 'prev' })"
+      <div
+        class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-2"
+        data-test="rum-analytics-paths-toolbar"
+      >
+        <span
+          v-if="def.cohort"
+          class="flex min-w-0 items-center gap-2 self-stretch"
+          data-test="rum-analytics-paths-cohort-source"
         >
-          <OToggleGroupItem value="next" size="xs" data-test="rum-analytics-paths-direction-next">{{
-            t("rum.analytics.pathsView.next")
-          }}</OToggleGroupItem>
-          <OToggleGroupItem value="prev" size="xs" data-test="rum-analytics-paths-direction-prev">{{
-            t("rum.analytics.pathsView.previous")
-          }}</OToggleGroupItem>
-        </OToggleGroup>
-        <OSelect
-          :model-value="def.depth"
-          :options="depthOptions"
-          size="sm"
-          class="w-28"
-          data-test="rum-analytics-paths-depth-select"
-          @update:model-value="(v) => update({ depth: Number(v) })"
-        />
-        <OToggleGroup
-          :model-value="def.include"
-          type="single"
-          mobile-dropdown
-          data-test="rum-analytics-paths-include-toggle"
-          @update:model-value="(v) => v && update({ include: v as PathsInclude })"
-        >
-          <OToggleGroupItem value="all" size="xs" data-test="rum-analytics-paths-include-all">{{
-            t("rum.analytics.pathsView.includeAll")
-          }}</OToggleGroupItem>
-          <OToggleGroupItem value="pages" size="xs" data-test="rum-analytics-paths-include-pages">{{
-            t("rum.analytics.pathsView.includePages")
-          }}</OToggleGroupItem>
-          <OToggleGroupItem
-            value="clicks"
-            size="xs"
-            data-test="rum-analytics-paths-include-clicks"
-            >{{ t("rum.analytics.pathsView.includeClicks") }}</OToggleGroupItem
+          <OButton
+            variant="ghost"
+            size="icon-sm"
+            icon-left="chevron-left"
+            :aria-label="t('rum.analytics.pathsView.backToFunnel')"
+            data-test="rum-analytics-paths-cohort-back-btn"
+            @click="backToFunnel"
+            ><OTooltip :content="t('rum.analytics.pathsView.backToFunnel')"
+          /></OButton>
+          <OIcon name="filter-alt" size="sm" class="text-text-secondary shrink-0" />
+          <span
+            class="text-text-heading max-w-60 truncate text-sm font-semibold"
+            data-test="rum-analytics-paths-cohort-funnel"
+            >{{ cohortFunnelName }}</span
           >
-        </OToggleGroup>
-        <span class="ms-auto flex items-center gap-1 text-xs"
-          ><span class="text-text-secondary max-lg:hidden">{{
-            t("rum.analytics.pathsView.caption")
-          }}</span
-          ><span class="text-text-body" data-test="rum-analytics-paths-click-hint">{{
-            t("rum.analytics.pathsView.clickHint")
-          }}</span></span
+          <OSeparator vertical class="my-1" />
+        </span>
+        <i18n-t
+          keypath="rum.analytics.pathsView.sentence"
+          tag="span"
+          class="text-text-secondary contents text-xs"
         >
+          <template #from>
+            <span v-if="!def.cohort" class="flex w-80 items-center gap-2 max-md:w-full">
+              <span class="text-text-secondary text-xs">{{
+                t("rum.analytics.pathsView.from")
+              }}</span>
+              <StepPicker
+                class="min-w-0 flex-1"
+                :model-value="def.anchor"
+                :placeholder="t('rum.analytics.pathsView.pickAnchor')"
+                :events="events"
+                data-test="rum-analytics-paths-anchor-select"
+                @update:model-value="(s) => s && update({ anchor: s })"
+              />
+            </span>
+            <span v-else class="flex min-w-0 items-center gap-2 max-md:w-full">
+              <span
+                class="text-text-secondary text-xs whitespace-nowrap"
+                data-test="rum-analytics-paths-cohort-word"
+                >{{ t("rum.analytics.pathsView.cohortWord") }}</span
+              >
+              <OPopover
+                :open="cohortOpen"
+                side="bottom"
+                align="start"
+                content-class="p-3 w-80 max-w-[calc(100vw-1.5rem)]"
+                @update:open="(v) => (cohortOpen = v)"
+              >
+                <template #trigger>
+                  <span class="flex min-w-0">
+                    <OTag
+                      :label="raw(anchorLabel)"
+                      variant="primary-outline"
+                      size="md"
+                      icon="filter-alt"
+                      clickable
+                      removable
+                      class="max-w-full min-w-0"
+                      :remove-label="t('rum.analytics.pathsView.clearScope')"
+                      data-test="rum-analytics-paths-session-filter"
+                      @click="cohortOpen = !cohortOpen"
+                      @remove="clearCohort"
+                    >
+                      <span class="text-text-secondary shrink-0">{{
+                        t("rum.analytics.pathsView.cohortStep", { step: def.cohort.stepIndex })
+                      }}</span>
+                      <span class="min-w-0 truncate font-mono">{{ anchorLabel }}</span>
+                      <OTooltip :content="cohortCondition" />
+                    </OTag>
+                  </span>
+                </template>
+                <div
+                  class="flex flex-col gap-2 text-sm"
+                  data-test="rum-analytics-paths-cohort-popover"
+                >
+                  <span class="text-text-heading font-semibold">{{
+                    t("rum.analytics.pathsView.cohortTitle")
+                  }}</span>
+                  <span class="text-text-body">{{ cohortCondition }}</span>
+                  <span class="text-text-secondary text-xs">{{ cohortCount }}</span>
+                  <div class="flex flex-wrap gap-2">
+                    <OButton
+                      variant="ghost"
+                      size="sm-action"
+                      data-test="rum-analytics-paths-cohort-clear-btn"
+                      @click="clearCohort"
+                      >{{ t("rum.analytics.pathsView.clearScope") }}</OButton
+                    >
+                  </div>
+                </div>
+              </OPopover>
+            </span>
+          </template>
+          <template #direction>
+            <OToggleGroup
+              :model-value="def.direction"
+              type="single"
+              data-test="rum-analytics-paths-direction-toggle"
+              @update:model-value="(v) => v && update({ direction: v as 'next' | 'prev' })"
+            >
+              <OToggleGroupItem
+                value="next"
+                size="xs"
+                data-test="rum-analytics-paths-direction-next"
+                >{{ t("rum.analytics.pathsView.next") }}</OToggleGroupItem
+              >
+              <OToggleGroupItem
+                value="prev"
+                size="xs"
+                data-test="rum-analytics-paths-direction-prev"
+                >{{ t("rum.analytics.pathsView.previous") }}</OToggleGroupItem
+              >
+            </OToggleGroup>
+          </template>
+          <template #depth>
+            <OSelect
+              :model-value="def.depth"
+              :options="depthOptions"
+              size="sm"
+              width="xs"
+              data-test="rum-analytics-paths-depth-select"
+              @update:model-value="(v) => update({ depth: Number(v) })"
+            />
+          </template>
+          <template #include>
+            <OToggleGroup
+              :model-value="def.include"
+              type="single"
+              mobile-dropdown
+              data-test="rum-analytics-paths-include-toggle"
+              @update:model-value="(v) => v && update({ include: v as PathsInclude })"
+            >
+              <OToggleGroupItem value="all" size="xs" data-test="rum-analytics-paths-include-all">{{
+                t("rum.analytics.pathsView.includeAll")
+              }}</OToggleGroupItem>
+              <OToggleGroupItem
+                value="pages"
+                size="xs"
+                data-test="rum-analytics-paths-include-pages"
+                >{{ t("rum.analytics.pathsView.includePages") }}</OToggleGroupItem
+              >
+              <OToggleGroupItem
+                value="clicks"
+                size="xs"
+                data-test="rum-analytics-paths-include-clicks"
+                >{{ t("rum.analytics.pathsView.includeClicks") }}</OToggleGroupItem
+              >
+            </OToggleGroup>
+          </template>
+        </i18n-t>
       </div>
       <div class="px-4 py-3">
         <OBanner
@@ -155,11 +245,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!flow || !flow.anchorSessions"
             preset="no-search-results"
             size="block"
-            :title="t('rum.analytics.pathsView.emptyTitle', { anchor: raw(anchorLabel) })"
-            :description="t('rum.analytics.pathsView.emptyDescription')"
+            :title="
+              def.cohort
+                ? t('rum.analytics.pathsView.emptyCohortTitle', { anchor: raw(anchorLabel) })
+                : t('rum.analytics.pathsView.emptyTitle', { anchor: raw(anchorLabel) })
+            "
+            :description="
+              def.cohort
+                ? t('rum.analytics.pathsView.emptyCohortDescription')
+                : t('rum.analytics.pathsView.emptyDescription')
+            "
             data-test="rum-analytics-paths-empty"
           >
             <template #actions>
+              <OButton
+                v-if="def.cohort"
+                variant="outline"
+                size="md"
+                icon-left="arrow-back"
+                data-test="rum-analytics-paths-empty-back-btn"
+                @click="backToFunnel"
+                >{{ t("rum.analytics.pathsView.backToFunnel") }}</OButton
+              >
               <OButton
                 variant="outline"
                 size="md"
@@ -255,10 +362,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -271,6 +383,7 @@ import TopPathsTable from "@/components/rum/productAnalytics/TopPathsTable.vue";
 import PathSessionsDrawer from "@/components/rum/productAnalytics/PathSessionsDrawer.vue";
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
 import useFunnelDraft, { emptyFunnel } from "@/composables/rum/useFunnelDraft";
+import useSavedFunnels from "@/composables/rum/useSavedFunnels";
 import useAnalyticsSearch, { type PanelState } from "@/composables/rum/useAnalyticsSearch";
 import useNamedEvents from "@/composables/rum/useNamedEvents";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -294,6 +407,7 @@ import {
   type StepRef,
 } from "@/utils/rum/productAnalyticsQueries";
 import { stepLabel } from "@/utils/rum/productAnalyticsPanels";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 
 defineOptions({ name: "AnalyticsPaths" });
 
@@ -308,8 +422,10 @@ interface Branch {
 const emit = defineEmits<{ "open-exclusions": [] }>();
 const { t } = useI18nTyped();
 const router = useRouter();
+const store = useStore();
 const pa = useProductAnalytics();
 const funnelDraft = useFunnelDraft();
+const savedFunnels = useSavedFunnels();
 const runner = useAnalyticsSearch();
 
 const pathsPanel = runner.panel<Record<string, string | number | null>>("paths");
@@ -318,6 +434,7 @@ const namedEvents = useNamedEvents();
 const events = computed<NamedEvent[]>(() => [...namedEvents.events.value]);
 const branch = ref<Branch | null>(null);
 const selectedLink = ref<string | null>(null);
+const cohortOpen = ref(false);
 // Why no default anchor could be picked: a failed lookup, or no entry page in range.
 const anchorIssue = ref<PanelState<unknown> | "none" | null>(null);
 let lastKey = "";
@@ -339,7 +456,7 @@ const ratio = computed<SampleRatio>(() =>
 
 const depthOptions = computed(() =>
   [1, 2, 3, 4, 5].map((d) => ({
-    label: t("rum.analytics.pathsView.steps", { count: d }),
+    label: t("rum.analytics.pathsView.steps", { count: d }, d),
     value: d,
   })),
 );
@@ -394,26 +511,39 @@ const shownPct = computed(() => {
   return ((shown / f.anchorSessions) * 100).toFixed(1);
 });
 
-const cohortLabel = computed(() => {
+const cohortFunnelName = computed(() => {
+  const name = def.value.cohort?.name;
+  return name ? raw(name) : t("rum.analytics.pathsView.unsavedFunnel");
+});
+
+const cohortCondition = computed(() => {
   const c = def.value.cohort;
-  if (!c) return raw("");
+  const next = c ? c.funnel.steps[c.stepIndex] : null;
+  return t("rum.analytics.dropoff.subtitle", {
+    step: raw(anchorLabel.value),
+    next: raw(next ? stepLabel(next, events.value) : ""),
+  });
+});
+
+// The health query groups by outcome, so a cohort nobody dropped out of has no "dropped" row at all.
+const cohortCount = computed(() => {
+  const c = def.value.cohort;
+  if (!c || cohortPanel.value.status !== "ok") return t("rum.analytics.pathsView.cohortCounting");
   const dropped = cohortPanel.value.rows.find((r) => r.side === "dropped");
-  const unit =
-    c.funnel.unit === "users" && pa.identitySql.value
-      ? pa.usersUnit.value.noun
-      : t("rum.analytics.funnel.sessionNoun");
-  return dropped
-    ? t("rum.analytics.pathsView.cohort", {
-        step: c.stepIndex,
-        label: raw(anchorLabel.value),
-        sessions: formatCount(Number(dropped.sessions), ratio.value),
-        units: formatCount(Number(dropped.units), ratio.value),
-        unit,
-      })
-    : t("rum.analytics.pathsView.cohortPending", {
-        step: c.stepIndex,
-        label: raw(anchorLabel.value),
-      });
+  const sessions = Number(dropped?.sessions ?? 0);
+  const units = Number(dropped?.units ?? 0);
+  if (c.funnel.unit === "users" && pa.identitySql.value) {
+    return t("rum.analytics.pathsView.cohortCountUsers", {
+      units: formatCount(units, ratio.value),
+      unit: pa.usersUnit.value.noun,
+      sessions: formatCount(sessions, ratio.value),
+    });
+  }
+  return t(
+    "rum.analytics.pathsView.cohortCount",
+    { count: formatCount(sessions, ratio.value) },
+    sessions,
+  );
 });
 
 const update = (patch: Partial<PathsDef>) => {
@@ -421,9 +551,33 @@ const update = (patch: Partial<PathsDef>) => {
 };
 
 const clearCohort = () => {
+  cohortOpen.value = false;
   const c = def.value.cohort;
   const s = c ? c.funnel.steps[c.stepIndex - 1] : null;
   update({ cohort: null, anchor: s ?? def.value.anchor });
+};
+
+const backToFunnel = async () => {
+  cohortOpen.value = false;
+  const c = def.value.cohort;
+  const id = c?.funnelId;
+  if (!c || (id && pa.openedFunnel.value?.id === id)) {
+    await pa.pushSubTab(router, PA_ROUTES.funnelBuilder);
+    return;
+  }
+  if (id) {
+    const saved = await savedFunnels.fetchOne(
+      store.state.selectedOrganization?.identifier ?? "",
+      pa.state.app,
+      id,
+    );
+    if (saved && saved !== "failed") {
+      await funnelDraft.openSaved(saved);
+      return;
+    }
+  }
+  // An unsaved funnel, or a saved one since deleted: rebuild the definition the cohort carries.
+  await funnelDraft.startNew({ ...c.funnel, steps: [...c.funnel.steps] });
 };
 
 const ensureAnchor = async (): Promise<boolean> => {

@@ -1097,7 +1097,13 @@ const expectedDropped = computed(() => {
 
 const openCohortPaths = (cohort: FunnelCohort) => {
   dropoffCohort.value = null;
-  pa.paths.value = { ...pa.paths.value, anchor: null, cohort };
+  // Captured now: the open funnel can change later while Paths keeps this cohort.
+  const opened = pa.openedFunnel.value;
+  pa.paths.value = {
+    ...pa.paths.value,
+    anchor: null,
+    cohort: opened ? { ...cohort, name: opened.name, funnelId: opened.id } : cohort,
+  };
   pa.lastSubTab.value = "paths";
   void pa.pushSubTab(router, PA_ROUTES.paths);
 };

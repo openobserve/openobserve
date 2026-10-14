@@ -50,6 +50,7 @@ import {
   isEntityId,
   MAX_SQL_BYTES,
   parsePathsDef,
+  cohortParam,
   parseRetentionDef,
   parseScope,
   parseStepRef,
@@ -848,6 +849,34 @@ describe("URL codec and validators (D-45, AC-14, AC-20)", () => {
     expect(parsePathsDef({ anchor: encodeDef(["p", "/"]), depth: "500" })).toBeNull();
     expect(parsePathsDef({ anchor: encodeDef(["p", "/"]), dir: "up" })).toBeNull();
     expect(parsePathsDef({ anchor: encodeDef(["p", "/"]), inc: "all", depth: "3" })?.depth).toBe(3);
+  });
+
+  it("a cohort link carries its funnel's name, and an older link without one still parses", () => {
+    const funnel = {
+      steps: [
+        { kind: "p" as const, key: "/a" },
+        { kind: "p" as const, key: "/b" },
+      ],
+      unit: "sessions" as const,
+      window: "session" as const,
+      breakdown: null,
+    };
+    const named = {
+      funnel,
+      stepIndex: 1,
+      side: "dropped" as const,
+      name: "Signup",
+      funnelId: "Checkout0000000000000000001",
+    };
+    const back = parsePathsDef({ cohort: cohortParam(named) })?.cohort;
+    expect(back?.name).toBe("Signup");
+    expect(back?.funnelId).toBe("Checkout0000000000000000001");
+    const forged = { ...named, funnelId: "../../etc" };
+    expect(parsePathsDef({ cohort: cohortParam(forged) })?.cohort?.funnelId).toBeUndefined();
+    const unnamed = { funnel, stepIndex: 1, side: "dropped" as const };
+    const parsed = parsePathsDef({ cohort: cohortParam(unnamed) })?.cohort;
+    expect(parsed?.stepIndex).toBe(1);
+    expect(parsed?.name).toBeUndefined();
     const cohort = encodeDef({
       s: [
         ["p", "/a"],
