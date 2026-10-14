@@ -315,9 +315,9 @@ pub async fn search(
             tasks.push(task);
         }
 
-        for task in tasks {
-            results.push(task.await.map_err(|e| Error::Message(e.to_string()))??);
-        }
+        // A public dashboard build owns its children: no delta may outlive a failed call.
+        let drain = in_req.search_type == Some(search::SearchEventType::PublicDashboard);
+        results = join_deltas(tasks, drain, || crate::abort_trace_family(trace_id)).await?;
         for res in &results {
             work_group_set.push(res.work_group.clone());
         }
@@ -547,6 +547,36 @@ pub async fn search(
 }
 
 #[tracing::instrument(name = "service:search:cacher:prepare_cache_response", skip_all)]
+/// Awaits every delta; with `drain` the first error aborts the rest and waits for them to end.
+async fn join_deltas<T, F, Fut>(
+    tasks: Vec<tokio::task::JoinHandle<Result<T, Error>>>,
+    drain: bool,
+    abort: F,
+) -> Result<Vec<T>, Error>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    let mut results = Vec::with_capacity(tasks.len());
+    let mut abort = Some(abort);
+    let mut first_err = None;
+    for task in tasks {
+        match task.await.map_err(|e| Error::Message(e.to_string())) {
+            Ok(Ok(res)) => results.push(res),
+            Ok(Err(e)) | Err(e) => {
+                if !drain {
+                    return Err(e);
+                }
+                if let Some(abort) = abort.take() {
+                    abort().await;
+                }
+                first_err.get_or_insert(e);
+            }
+        }
+    }
+    first_err.map_or(Ok(results), Err)
+}
+
 pub async fn prepare_cache_response(
     trace_id: &str,
     org_id: &str,
@@ -1666,6 +1696,48 @@ mod tests {
             .unwrap();
         assert!(!is_range_already_cached(&query_key, file_path, &inner).await);
         assert!(!QUERY_RESULT_CACHE.read().await.contains_key(&query_key));
+    }
+
+    #[tokio::test]
+    async fn gate09_a_failed_delta_aborts_and_drains_its_siblings_before_returning() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+        let long_done = Arc::new(AtomicBool::new(false));
+        let aborted = Arc::new(AtomicBool::new(false));
+        let done = long_done.clone();
+        let tasks = vec![
+            tokio::spawn(async { Err::<u8, Error>(Error::Message("early".into())) }),
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+                done.store(true, Ordering::SeqCst);
+                Ok(1)
+            }),
+        ];
+        let flag = aborted.clone();
+        let err = join_deltas(tasks, true, || async move {
+            flag.store(true, Ordering::SeqCst);
+        })
+        .await
+        .unwrap_err();
+        assert_eq!(err.to_string(), Error::Message("early".into()).to_string());
+        assert!(aborted.load(Ordering::SeqCst), "siblings are aborted");
+        assert!(
+            long_done.load(Ordering::SeqCst),
+            "the long delta was drained"
+        );
+
+        let tasks = vec![
+            tokio::spawn(async { Err::<u8, Error>(Error::Message("early".into())) }),
+            tokio::spawn(async { Ok(1) }),
+        ];
+        assert!(join_deltas(tasks, false, || async {}).await.is_err());
+        let tasks = vec![
+            tokio::spawn(async { Ok::<u8, Error>(1) }),
+            tokio::spawn(async { Ok(2) }),
+        ];
+        assert_eq!(join_deltas(tasks, true, || async {}).await.unwrap(), [1, 2]);
     }
 
     fn response_with_ts(ts: &[i64]) -> search::Response {
