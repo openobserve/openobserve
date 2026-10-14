@@ -23,8 +23,6 @@ use crate::traces::service_graph::v4::writer::{ReplyClass, chunk, classify, max_
 
 /// The `_o2_` prefix is load-bearing: `is_internal_rollup_stream` guards user ingest by it.
 const DIGEST_STREAM: &str = "_o2_alert_calibration_digests";
-/// Left unset, the stream would keep digests for the deployment default of ten years.
-const DIGEST_RETENTION_DAYS: i64 = 365;
 
 /// The stream is a pass's only record, so a lost chunk fails the pass rather than shortening it.
 pub(crate) async fn write_digest_records(
@@ -46,7 +44,6 @@ pub(crate) async fn write_digest_records(
     if lost > 0 {
         anyhow::bail!("{lost} of {total} digest chunks were not written for {org_id}");
     }
-    seed_retention(org_id).await;
     Ok(())
 }
 
@@ -68,26 +65,5 @@ async fn write_chunk(org_id: &str, data: Vec<u8>) -> Result<(), anyhow::Error> {
             response.status_code,
             response.message
         ),
-    }
-}
-
-/// Only fills an unset retention, so an operator's own setting always wins.
-async fn seed_retention(org_id: &str) {
-    let Some(settings) = infra::schema::get_settings(org_id, DIGEST_STREAM, StreamType::Logs).await
-    else {
-        // The settings row can trail the first write; the next run seeds it.
-        return;
-    };
-    if settings.data_retention != 0 {
-        return;
-    }
-    let mut settings = (*settings).clone();
-    settings.data_retention = DIGEST_RETENTION_DAYS;
-    if let Err(e) =
-        schema::save_stream_settings(org_id, DIGEST_STREAM, StreamType::Logs, settings).await
-    {
-        log::warn!(
-            "[alert_calibration] could not set the digest stream's retention for {org_id}: {e}"
-        );
     }
 }
