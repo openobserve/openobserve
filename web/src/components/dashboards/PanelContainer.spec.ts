@@ -21,6 +21,8 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import config from "@/aws-exports";
+import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
+import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 
 // Mock shortURL service
 vi.mock("@/services/short_url", () => ({
@@ -939,6 +941,9 @@ describe("PanelContainer", () => {
         'avg(disk_used{host=~"a"})',
         "sum(rate(io_ops[1m]))",
       ]);
+      // The panel menu always opens the query-only dialog for a multi-query panel.
+      expect(needsConfirmation(normalizePrefill(first))).toBe(true);
+      expect(getAlertSource(first.source).pickQueryOnly).toBe(true);
 
       const second = wrapper.vm.buildPanelAlertPrefill({ queryIndex: 1 });
       expect(second.promql).toBe("sum(rate(io_ops[1m]))");

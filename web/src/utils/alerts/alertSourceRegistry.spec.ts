@@ -38,6 +38,14 @@ describe("alertSourceRegistry", () => {
     }
   });
 
+  it("keeps the query-only dialog to the dashboard panel and metrics explorer flows", () => {
+    const pickers = Object.values(ALERT_SOURCES)
+      .filter((definition) => definition.pickQueryOnly)
+      .map((definition) => definition.id);
+    expect(pickers).toEqual(["panel", "explorer"]);
+    expect(DEFAULT_ALERT_SOURCE.pickQueryOnly).toBeFalsy();
+  });
+
   it("names the Metrics Explorer in an Explorer alert's toast", () => {
     expect(getAlertSource("explorer").toastKey).toBe("alerts.prefill.sources.explorer.toast");
     expect(i18n.global.t(getAlertSource("explorer").toastKey)).toBe(

@@ -170,6 +170,51 @@ describe("usePanelActions", () => {
       expect(alertCreationDialog.value?.prefill.warnings.map((w) => w.key)).toContain("noStream");
     });
 
+    it("moves a SQL series' threshold onto the chosen query's own y-axis column", () => {
+      closeAlertCreationDialog();
+      const args = makeBase();
+      args.panelSchema.value.queries.push({
+        query: 'select count(*) as "warns" from logs',
+        fields: { stream: "logs", stream_type: "logs", y: [{ column: "warns", alias: "warns" }] },
+      });
+      const api = usePanelAlertCreation(args as any);
+      args.contextMenuData.value = { seriesName: "errors" };
+
+      api.handleCreateAlert({ condition: "above", threshold: 10, panelQueryIndex: 0 });
+      expect(args.router.push).not.toHaveBeenCalled();
+      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toEqual({
+        column: "errors",
+        operator: ">=",
+        value: 10,
+      });
+
+      rebuildAlertPrefill({ queryIndex: 1 });
+      expect(alertCreationDialog.value?.prefill.sql).toBe('select count(*) as "warns" from logs');
+      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toEqual({
+        column: "warns",
+        operator: ">=",
+        value: 10,
+      });
+      closeAlertCreationDialog();
+    });
+
+    it("keeps a builder query's right-clicked threshold in the SQL the form saves", () => {
+      closeAlertCreationDialog();
+      const args = makeBase();
+      const built = args.panelSchema.value.queries[0] as any;
+      built.customQuery = false;
+      built.fields.y[0].aggregationFunction = "count";
+      args.panelSchema.value.queries.push({ ...built });
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({ condition: "above", threshold: 4.42 });
+
+      const prefill = alertCreationDialog.value?.prefill;
+      expect(prefill?.queryIndex).toBe(0);
+      expect(prefill?.meta?.sqlHaving).toEqual({ column: "errors", operator: ">=", value: 4.42 });
+      closeAlertCreationDialog();
+    });
+
     it("does nothing when query is missing", () => {
       const args = makeBase();
       args.panelSchema.value.queries = [];
@@ -224,7 +269,7 @@ describe("usePanelActions", () => {
 
     beforeEach(() => closeAlertCreationDialog());
 
-    it("prefills the clicked series' query with its executed text", () => {
+    it("asks which query on a series click too, preselecting the clicked series' query", () => {
       const args = makePromql();
       const api = usePanelAlertCreation(args as any);
 
@@ -235,11 +280,26 @@ describe("usePanelActions", () => {
         seriesRole: "primary",
       });
 
-      expect(args.router.push).toHaveBeenCalledTimes(1);
-      const stored = readAlertPrefill();
-      expect(stored?.streamName).toBe("io_ops");
-      expect(stored?.promql).toBe("sum(rate(io_ops[1m]))");
-      expect(stored?.promqlCondition).toEqual({ column: "value", operator: ">=", value: 5 });
+      expect(args.router.push).not.toHaveBeenCalled();
+      const prefill = alertCreationDialog.value?.prefill;
+      expect(prefill?.queryChoices?.map((c) => c.index)).toEqual([0, 1]);
+      expect(prefill?.queryIndex).toBe(1);
+      expect(prefill?.streamName).toBe("io_ops");
+      expect(prefill?.promql).toBe("sum(rate(io_ops[1m]))");
+      expect(prefill?.promqlCondition).toEqual({ column: "value", operator: ">=", value: 5 });
+    });
+
+    it("carries the right-clicked threshold into whichever query is chosen", () => {
+      const args = makePromql();
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({ condition: "below", threshold: 3, panelQueryIndex: 1 });
+      rebuildAlertPrefill({ queryIndex: 0 });
+
+      const prefill = alertCreationDialog.value?.prefill;
+      expect(prefill?.queryIndex).toBe(0);
+      expect(prefill?.promql).toBe("avg(disk_used)");
+      expect(prefill?.promqlCondition).toEqual({ column: "value", operator: "<=", value: 3 });
     });
 
     it("alerts a shifted series on its parent's current-period query", () => {
@@ -253,9 +313,32 @@ describe("usePanelActions", () => {
         seriesRole: "shifted",
       });
 
-      const stored = readAlertPrefill();
-      expect(stored?.promql).toBe("sum(rate(io_ops[1m]))");
-      expect(stored?.promqlCondition?.operator).toBe("<=");
+      const prefill = alertCreationDialog.value?.prefill;
+      expect(prefill?.queryIndex).toBe(1);
+      expect(prefill?.promql).toBe("sum(rate(io_ops[1m]))");
+      expect(prefill?.promqlCondition?.operator).toBe("<=");
+    });
+
+    it("keeps the source override through a query switch, so the explorer dialog stays minimal", () => {
+      const args = { ...makePromql(), alertSource: { value: "explorer" } };
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({ condition: "above", threshold: 5, panelQueryIndex: 0 });
+      expect(alertCreationDialog.value?.prefill.source).toBe("explorer");
+
+      rebuildAlertPrefill({ queryIndex: 1 });
+      expect(alertCreationDialog.value?.prefill.source).toBe("explorer");
+    });
+
+    it("skips the dialog for a clicked series when only its query is visible", () => {
+      const args = { ...makePromql(), visibleQueryIndexes: { value: [1] } };
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({ condition: "above", threshold: 5, panelQueryIndex: 1 });
+
+      expect(alertCreationDialog.value).toBeNull();
+      expect(args.router.push).toHaveBeenCalledTimes(1);
+      expect(readAlertPrefill()?.promqlCondition?.value).toBe(5);
     });
 
     it("asks which query when the click hit no series and the panel has several", () => {
@@ -476,6 +559,34 @@ describe("usePanelActions", () => {
         W: "6h",
         H: 3,
       });
+    });
+
+    it("stays on the clicked query of a multi-query card, since the forecast is fitted to it", () => {
+      closeAlertCreationDialog();
+      const args = explorerPanel("avg(node_disk_used_ratio)", "node_disk_used_ratio");
+      args.panelSchema.value.queries.push({
+        query: "max(node_disk_used_ratio)",
+        fields: { stream: "node_disk_used_ratio", stream_type: "metrics" },
+      });
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({
+        condition: "forecast",
+        threshold: 0.9,
+        panelQueryIndex: 0,
+        seriesRole: "forecast",
+      });
+
+      expect(alertCreationDialog.value).toBeNull();
+      expect(args.router.push).toHaveBeenCalledTimes(1);
+      expect(readAlertPrefill()?.promql).toBe(
+        buildForecastAlertPromql({
+          U: executed("avg(node_disk_used_ratio)"),
+          T: 0.9,
+          direction: "rises",
+          W: "6h",
+        }),
+      );
     });
   });
 

@@ -212,9 +212,14 @@ export function usePanelAlertCreation({
 
     const queries: any[] = panelSchema.value.queries ?? [];
     const visible = visibleQueryIndexes?.value ?? queries.map((_, index) => index);
-    // A click on empty chart area hit no series, so only a lone visible query is certain.
-    const queryIndex = selection.panelQueryIndex ?? (visible.length === 1 ? visible[0] : undefined);
-    const query = queries[queryIndex ?? visible[0]];
+    const point = contextMenuData.value?.forecastPoint;
+    const isForecast = selection.condition === "forecast" && !!point;
+    // A forecast is fitted to the clicked series, so it cannot move to another query.
+    const offerChoice = visible.length > 1 && !isForecast;
+    const clicked = selection.panelQueryIndex;
+    const queryIndex =
+      clicked !== undefined && (!offerChoice || visible.includes(clicked)) ? clicked : visible[0];
+    const query = queries[queryIndex];
     if (!query) {
       return;
     }
@@ -239,12 +244,11 @@ export function usePanelAlertCreation({
         : null;
 
     // The menu already chose the threshold, so the dialog is only for which query, which stream, or why not.
-    const queryChoices =
-      queryIndex === undefined
-        ? panelQueryChoices(queries, metadata.value?.queries, visible)
-        : undefined;
+    const queryChoices = offerChoice
+      ? panelQueryChoices(queries, metadata.value?.queries, visible)
+      : undefined;
     const build = (options: AlertBuildOptions = {}) => {
-      const index = options.queryIndex ?? queryIndex ?? visible[0] ?? 0;
+      const index = options.queryIndex ?? queryIndex;
       const prefill = buildPrefillFromPanel({
         panelTitle: panelSchema.value.title || "Unnamed Panel",
         panelId: panelSchema.value.id,
@@ -262,11 +266,8 @@ export function usePanelAlertCreation({
       return alertSource?.value ? { ...prefill, source: alertSource.value } : prefill;
     };
 
-    const point = contextMenuData.value?.forecastPoint;
     const prefill = normalizePrefill(
-      selection.condition === "forecast" && point
-        ? forecastPrefill(build(), selection.threshold, point)
-        : build(),
+      isForecast ? forecastPrefill(build(), selection.threshold, point) : build(),
     );
     if (needsConfirmation(prefill)) {
       requestAlertCreation(prefill, {}, build);

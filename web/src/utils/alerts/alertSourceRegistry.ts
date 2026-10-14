@@ -39,6 +39,8 @@ export interface AlertSourceDefinition {
   defaultThreshold: AlertPrefillThresholdShape;
   /** Whether the confirm dialog shows the resolved query. */
   showQueryPreview: boolean;
+  /** With several queries to choose from, the confirm dialog asks only which one. */
+  pickQueryOnly?: boolean;
 }
 
 export const DEFAULT_ALERT_SOURCE: AlertSourceDefinition = {
@@ -87,6 +89,7 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     icon: "shield-alert-outline",
     defaultThreshold: "matching-rows",
     showQueryPreview: true,
+    pickQueryOnly: true,
   },
   explorer: {
     id: "explorer",
@@ -95,6 +98,7 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     icon: "shield-alert-outline",
     defaultThreshold: "matching-rows",
     showQueryPreview: true,
+    pickQueryOnly: true,
   },
   dbm: {
     id: "dbm",

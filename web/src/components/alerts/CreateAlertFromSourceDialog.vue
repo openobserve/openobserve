@@ -42,15 +42,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div v-if="prefill" class="flex flex-col gap-5">
       <!-- Query picker — only when the surface had several queries and could not tell which. -->
-      <OSelect
-        v-if="queryOptions.length > 1"
-        :model-value="prefill.queryIndex"
-        :options="queryOptions"
-        :label="t('alerts.prefill.dialog.queryChoiceLabel')"
-        :searchable="false"
-        data-test="create-alert-query-picker"
-        @update:model-value="onQueryChange"
-      />
+      <div v-if="queryOptions.length > 1" class="flex flex-col gap-2">
+        <label
+          v-if="pickQueryOnly"
+          :for="queryPickerId"
+          class="text-text-body text-sm"
+          data-test="create-alert-query-picker-intro"
+        >
+          {{ t("alerts.prefill.dialog.pickQueryIntro") }}
+        </label>
+        <OSelect
+          :id="queryPickerId"
+          :model-value="prefill.queryIndex"
+          :options="queryOptions"
+          :label="pickQueryOnly ? undefined : t('alerts.prefill.dialog.queryChoiceLabel')"
+          :searchable="false"
+          :dropdown-style="QUERY_PICKER_DROPDOWN"
+          data-test="create-alert-query-picker"
+          @update:model-value="onQueryChange"
+        />
+      </div>
 
       <!-- Stream picker — only when the surface offered a choice. Alerts are
            single-stream; silently taking the first one is a trap. -->
@@ -116,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- How the alert counts what the query returns. -->
-      <div class="flex flex-col gap-2">
+      <div v-if="!pickQueryOnly" class="flex flex-col gap-2">
         <span class="text-text-secondary text-xs font-medium">
           {{ t("alerts.prefill.dialog.thresholdLabel") }}
         </span>
@@ -136,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- The rolling window the alert will evaluate. -->
-      <div v-if="prefill.periodMinutes" class="flex flex-col gap-1">
+      <div v-if="!pickQueryOnly && prefill.periodMinutes" class="flex flex-col gap-1">
         <span class="text-text-secondary text-xs font-medium">
           {{ t("alerts.prefill.dialog.windowLabel") }}
         </span>
@@ -162,9 +173,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Every lossy transform the adapters performed, stated plainly. -->
-      <div v-if="prefill.warnings.length" class="flex flex-col gap-2">
+      <div v-if="shownWarnings.length" class="flex flex-col gap-2">
         <OBanner
-          v-for="(warning, index) in prefill.warnings"
+          v-for="(warning, index) in shownWarnings"
           :key="`${warning.key}-${index}`"
           dense
           :variant="bannerVariant(warning.level)"
@@ -177,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, useId, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
@@ -199,7 +210,8 @@ import { isPrefillBlocked } from "@/utils/alerts/alertPrefill";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { formatSqlForDisplay } from "@/utils/query/formatSql";
 
-const QUERY_LABEL_MAX = 60;
+// Pinned to the field's width so each option cuts to one line and shows its whole query on hover.
+const QUERY_PICKER_DROPDOWN = { width: "var(--reka-select-trigger-width)" };
 
 const props = defineProps<{
   open: boolean;
@@ -238,17 +250,31 @@ const onPatternModeChange = (value: unknown) => {
 
 const queryOptions = computed(() =>
   (props.prefill?.queryChoices ?? []).map((choice) => {
-    const query = choice.query.replace(/\s+/g, " ").trim();
     return {
       value: choice.index,
       label: t("alerts.prefill.dialog.queryChoiceOption", {
         name:
           choice.tabName || choice.legend || choice.ref || String.fromCharCode(65 + choice.index),
-        query: query.length > QUERY_LABEL_MAX ? `${query.slice(0, QUERY_LABEL_MAX - 1)}…` : query,
+        query: choice.query.replace(/\s+/g, " ").trim(),
       }),
     };
   }),
 );
+
+const queryPickerId = useId();
+
+const pickQueryOnly = computed(
+  () =>
+    !!props.prefill &&
+    !!getAlertSource(props.prefill.source).pickQueryOnly &&
+    queryOptions.value.length > 1,
+);
+
+// Non-blocking warnings still ride the prefill to the form's banner; only a blocker must stop here.
+const shownWarnings = computed(() => {
+  const warnings = props.prefill?.warnings ?? [];
+  return pickQueryOnly.value ? warnings.filter((w) => w.level === "blocking") : warnings;
+});
 
 const onQueryChange = (value: unknown) => {
   if (typeof value !== "number" || value === props.prefill?.queryIndex) return;
@@ -256,7 +282,7 @@ const onQueryChange = (value: unknown) => {
 };
 
 const showQuery = computed(() => {
-  if (!props.prefill) return false;
+  if (!props.prefill || pickQueryOnly.value) return false;
   return getAlertSource(props.prefill.source).showQueryPreview && !!previewQuery.value;
 });
 
