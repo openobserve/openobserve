@@ -2871,12 +2871,6 @@ pub struct Limit {
         help = "Max query-recommendation jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
     )]
     pub scheduler_query_reco_concurrency: i64,
-    #[env_config(
-        name = "ZO_SCHEDULER_ALERT_CALIBRATION_CONCURRENCY",
-        default = 0,
-        help = "Max alert calibration jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
-    )]
-    pub scheduler_alert_calibration_concurrency: i64,
     // Per-module poll cadence in seconds. 0 = inherit ZO_ALERT_SCHEDULE_INTERVAL (the alert pull
     // frequency). Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. One var per module so each
     // puller can poll at its own rate (e.g. backfill slower, synthetics faster). The alert lane
