@@ -89,6 +89,9 @@ export function useSqlEditorDiagnostics({
   let runMarkersQuery = "";
   let blurRangesKey = "";
   const rawQuery = (): string => queryEditorRef.value?.getValue?.() ?? query.value ?? "";
+  // A run commits the query trimmed while the editor keeps its trailing space, so only a real edit counts.
+  const unchangedSinceRun = (): boolean =>
+    runMarkersShown && rawQuery().trim() === runMarkersQuery.trim();
 
   function clearAll() {
     runMarkersShown = false;
@@ -132,7 +135,7 @@ export function useSqlEditorDiagnostics({
     // Read live content directly from the editor to bypass the v-model debounce lag
     // (user may blur within the debounce window, leaving query.value stale).
     // Fall back to the reactive prop when getValue is not available.
-    if (runMarkersShown && rawQuery() === runMarkersQuery) return;
+    if (unchangedSinceRun()) return;
     const q = rawQuery().trim();
     if (!q) {
       clearAll();
@@ -163,7 +166,7 @@ export function useSqlEditorDiagnostics({
   /** Bind to @update:query. Clears stale markers after the user starts typing. */
   const onQueryChange = debounce(() => {
     // The debounce can land after a run's markers arrived; only an edit made since then clears them.
-    if (runMarkersShown && rawQuery() === runMarkersQuery) return;
+    if (unchangedSinceRun()) return;
     clearAll();
   }, 500);
 

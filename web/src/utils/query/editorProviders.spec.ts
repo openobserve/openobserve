@@ -1292,6 +1292,15 @@ describe("buildOperatorLane — operators by type, ranked, never filtered", () =
     expect(rows.find((e) => e.label === "str_match")!.labelDetail).toBe("(level, …)");
   });
 
+  it("marks the match-function rows as edits, so Enter on an arrowed row accepts it", () => {
+    // Monaco's smart Enter skips a row whose insertText already equals the text under its range, unless it has additionalTextEdits.
+    for (const name of ["str_match", "re_match", "re_not_match"]) {
+      expect(
+        lane("level", "Utf8", CHAIN).find((e) => e.name === name)!.additionalTextEdits,
+      ).toEqual([]);
+    }
+  });
+
   it("wraps a qualified field whole, from its qualifier", () => {
     const rows = buildOperatorLane({
       context: ctx("level", "", "t.level"),

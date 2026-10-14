@@ -870,6 +870,8 @@ export const buildOperatorLane = ({
         ...entry,
         labelDetail: `(${context.qualified}, …)`,
         insertText: "",
+        // The command does the edit; without this Monaco's smart Enter sees an empty insert over an empty range and types a newline.
+        additionalTextEdits: [],
         command: wrapFieldCommand({
           fn: spec.label,
           field: context.qualified,
