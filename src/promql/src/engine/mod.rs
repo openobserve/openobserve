@@ -51,6 +51,8 @@ pub struct Engine {
     /// `sum(rate(m[5m]))` without a modifier), so series labels are never
     /// loaded at all.
     skip_labels: bool,
+    /// The result type of the query
+    result_type: Option<String>,
     /// Whether the expression may still carry an `@`; `exec_expr` skips the pin check without one.
     has_at_modifier: bool,
 }
@@ -62,12 +64,13 @@ impl Engine {
             eval_ctx,
             label_selector: HashSet::new(),
             skip_labels: false,
+            result_type: None,
             has_at_modifier: true,
             trace_id: trace_id.to_string(),
         }
     }
 
-    pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<Value> {
+    pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
         self.label_selector = grouping_labels(prom_expr);
         self.skip_labels = !self.ctx.query_ctx.query_exemplars
             && !self.ctx.query_ctx.query_data
@@ -80,7 +83,7 @@ impl Engine {
                 None => self.exec_expr(prom_expr).await?,
             },
         };
-        Ok(value)
+        Ok((value, self.result_type.clone()))
     }
 
     #[async_recursion]
@@ -923,7 +926,9 @@ pub(crate) mod tests {
         let result = engine.exec(&expr).await;
         assert!(result.is_ok());
 
-        assert!(matches!(result.unwrap(), Value::Float(42.0)));
+        let (value, result_type) = result.unwrap();
+        assert!(matches!(value, Value::Float(42.0)));
+        assert!(result_type.is_none());
     }
 
     #[tokio::test]
@@ -949,7 +954,7 @@ pub(crate) mod tests {
             let eval_ctx = EvalContext::new(T0, T0, 0, trace_id.to_string());
             let mut engine = Engine::new(trace_id, Arc::new(ctx), eval_ctx);
             let expr = promql_parser::parser::parse(query).unwrap();
-            let value = engine
+            let (value, _) = engine
                 .exec(&expr)
                 .await
                 .unwrap_or_else(|err| panic!("{query}: {err}"));

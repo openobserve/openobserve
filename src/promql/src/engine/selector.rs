@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Vector/matrix selector evaluation and data loading. Reads `ctx`,
-//! `label_selector`, and `skip_labels`.
+//! `label_selector`, and `skip_labels`; writes `result_type`.
 
 use std::time::Duration;
 
@@ -141,6 +141,10 @@ impl Engine {
         ctxs: Option<SelectorContexts>,
         output: SelectorOutput,
     ) -> Result<Vec<RangeValue>> {
+        if self.result_type.is_none() {
+            self.result_type = Some("vector".to_string());
+        }
+
         let selector = named_selector(selector.clone(), "VectorSelector")?;
 
         let metrics_cache = self.selector_load_data_owned(&selector, None, ctxs).await?;
@@ -227,6 +231,10 @@ impl Engine {
         range: Duration,
         ctxs: Option<SelectorContexts>,
     ) -> Result<Vec<RangeValue>> {
+        if self.result_type.is_none() {
+            self.result_type = Some("matrix".to_string());
+        }
+
         let selector = named_selector(selector.clone(), "MatrixSelector")?;
 
         let mut values = self

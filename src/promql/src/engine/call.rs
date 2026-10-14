@@ -61,22 +61,23 @@ impl Engine {
         let start = std::time::Instant::now();
         let result = if let Some(range_func) = func_name.range_func() {
             let returns_sample_time = range_func.returns_sample_time();
-            let range_func: Arc<dyn RangeFunc> = Arc::from(range_func);
             // a range function over a plain matrix selector streams its series one at a time
-            let streamed = if let [arg] = args.args.as_slice()
+            let value = if let [arg] = args.args.as_slice()
                 && let PromExpr::MatrixSelector(MatrixSelector { vs, range }) = arg.as_ref()
             {
-                self.try_streaming_range_func(vs, *range, Arc::clone(&range_func))
+                let range_func: Arc<dyn RangeFunc> = Arc::from(range_func);
+                if let Some(value) = self
+                    .try_streaming_range_func(vs, *range, Arc::clone(&range_func))
                     .await?
-            } else {
-                None
-            };
-            let value = match streamed {
-                Some(value) => value,
-                None => {
+                {
+                    value
+                } else {
                     let input = self.call_expr_arg(args, 0).await?;
                     functions::eval_range(input, range_func, &self.eval_ctx)?
                 }
+            } else {
+                let input = self.call_expr_arg(args, 0).await?;
+                functions::eval_range(input, range_func, &self.eval_ctx)?
             };
             match args.args.first() {
                 Some(arg) if returns_sample_time => {

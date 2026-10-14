@@ -128,7 +128,10 @@ mod tests {
 
     async fn eval(query: &str, start: i64, end: i64, step: i64) -> Result<Value> {
         let expr = parser::parse(query).unwrap();
-        engine(start, end, step).exec(&expr).await
+        engine(start, end, step)
+            .exec(&expr)
+            .await
+            .map(|(value, _)| value)
     }
 
     async fn samples(query: &str, start: i64, end: i64, step: i64) -> Vec<(i64, f64)> {

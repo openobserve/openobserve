@@ -139,6 +139,9 @@ impl Engine {
             self.trace_id,
             func.name()
         );
+        if self.result_type.is_none() {
+            self.result_type = Some("matrix".to_string());
+        }
         Ok(Some(value))
     }
 
@@ -167,6 +170,9 @@ impl Engine {
             return functions::eval_range(input, func, &self.eval_ctx).map(Some);
         };
         let (series, scanned) = self.stream_range_func(&scan, ctx, func, range).await?;
+        if self.result_type.is_none() {
+            self.result_type = Some("matrix".to_string());
+        }
         // the generic path evaluates an empty selector to None, not to an empty matrix
         Ok(Some(match scanned {
             0 => Value::None,
@@ -195,6 +201,9 @@ impl Engine {
             offset: scan.offset,
         });
         let (mut series, _) = self.stream_range_func(&scan, ctx, func, lookback).await?;
+        if self.result_type.is_none() {
+            self.result_type = Some("vector".to_string());
+        }
         // an instant vector carries no window: the lookback is the query's, not the selector's
         series
             .iter_mut()
@@ -556,10 +565,20 @@ mod tests {
         Engine::new("test_trace", Arc::new(ctx), eval_ctx)
     }
 
-    async fn eval_query(provider: StreamingProvider, timeout: u64, query: &str) -> Result<Value> {
+    async fn exec_query(
+        provider: StreamingProvider,
+        timeout: u64,
+        query: &str,
+    ) -> Result<(Value, Option<String>)> {
         let mut engine = engine(provider, timeout);
         let expr = promql_parser::parser::parse(query).unwrap();
         engine.exec(&expr).await
+    }
+
+    async fn eval_query(provider: StreamingProvider, timeout: u64, query: &str) -> Result<Value> {
+        exec_query(provider, timeout, query)
+            .await
+            .map(|(value, _)| value)
     }
 
     /// The generic instant path on its own: `eval_vector_selector` over the plain table.
@@ -868,12 +887,14 @@ mod tests {
         }
     }
 
-    /// The bare selector under `topk` streams as `last_over_time`; the winners carry no window,
-    /// and a computed k streams like a literal one.
+    /// The bare selector under `topk` streams as `last_over_time` and reports a matrix, where
+    /// the generic instant path reports a vector; the winners carry no window, and a computed
+    /// k streams like a literal one.
     #[tokio::test]
     async fn test_topk_takes_the_streaming_path() {
         for query in ["topk(1, m)", "topk(2 - 1, m)"] {
-            let value = eval_query(provider(true, false), 30, query).await.unwrap();
+            let (value, result_type) = exec_query(provider(true, false), 30, query).await.unwrap();
+            assert_eq!(result_type.as_deref(), Some("matrix"), "{query}");
             let Value::Matrix(matrix) = value else {
                 panic!("{query}: expected a matrix");
             };
@@ -896,12 +917,13 @@ mod tests {
         }
     }
 
-    /// `without()` stays on the generic path.
+    /// `without()` stays on the generic path, which reports the instant selector as a vector.
     #[tokio::test]
     async fn test_topk_bails_to_the_generic_path() {
         let query = "topk without(instance) (1, m)";
         let expected = generic_topk(provider(false, false), query).await;
-        let value = eval_query(provider(true, false), 30, query).await.unwrap();
+        let (value, result_type) = exec_query(provider(true, false), 30, query).await.unwrap();
+        assert_eq!(result_type.as_deref(), Some("vector"), "{query}");
         assert_same_matrix(expected, value, query);
     }
 
@@ -985,9 +1007,14 @@ mod tests {
     async fn test_instant_selector_matches_generic_streaming_and_materialized() {
         for selector in ["m", "m offset 30s", "m{instance=\"a\"}"] {
             let expected = generic_instant_selector(provider(false, false), selector).await;
-            let streamed = eval_query(provider(true, false), 30, selector)
+            let (streamed, result_type) = exec_query(provider(true, false), 30, selector)
                 .await
                 .unwrap();
+            assert_eq!(
+                result_type.as_deref(),
+                Some("vector"),
+                "streamed {selector}"
+            );
             let Value::Matrix(matrix) = &streamed else {
                 panic!("expected a matrix, got {}", streamed.get_type());
             };
@@ -996,9 +1023,14 @@ mod tests {
                 "streamed {selector}: an instant vector carries no window"
             );
             assert_same_matrix(expected.clone(), streamed, &format!("streamed {selector}"));
-            let materialized = eval_query(provider(false, false), 30, selector)
+            let (materialized, result_type) = exec_query(provider(false, false), 30, selector)
                 .await
                 .unwrap();
+            assert_eq!(
+                result_type.as_deref(),
+                Some("vector"),
+                "materialized {selector}"
+            );
             assert_same_matrix(expected, materialized, &format!("materialized {selector}"));
         }
     }
@@ -1031,12 +1063,12 @@ mod tests {
             let expected = generic_instant_selector_on(generic, selector).await;
             let mut streaming = engine_at(provider(true, false), 30, start, step, lookback);
             let expr = promql_parser::parser::parse(selector).unwrap();
-            let streamed = streaming.exec(&expr).await.unwrap();
+            let (streamed, _) = streaming.exec(&expr).await.unwrap();
             assert_same_matrix(expected, streamed, selector);
         }
         let mut streaming = engine_at(provider(true, false), 30, start, step, lookback);
         let expr = promql_parser::parser::parse("m{instance=\"a\"}").unwrap();
-        let value = streaming.exec(&expr).await.unwrap();
+        let (value, _) = streaming.exec(&expr).await.unwrap();
         let series = canonical(value);
         assert_eq!(series.len(), 1);
         assert_eq!(
@@ -1204,7 +1236,7 @@ mod tests {
             for streams in [true, false] {
                 let mut engine = engine_at(provider_off_the_second(streams), 30, start, step, None);
                 let expr = promql_parser::parser::parse(query).unwrap();
-                let value = engine.exec(&expr).await.unwrap();
+                let (value, _) = engine.exec(&expr).await.unwrap();
                 let series = canonical(value);
                 assert_eq!(series.len(), 2, "{query}, streams {streams}");
                 for (labels, samples) in series {
@@ -1260,7 +1292,7 @@ mod tests {
             for streams in [true, false] {
                 let mut engine = engine_at(provider_off_the_second(streams), 30, start, step, None);
                 let expr = promql_parser::parser::parse(query).unwrap();
-                let value = engine.exec(&expr).await.unwrap();
+                let (value, _) = engine.exec(&expr).await.unwrap();
                 let series = canonical(value);
                 assert_eq!(series.len(), count, "{query}, streams {streams}");
                 for (_, samples) in series {
@@ -1275,7 +1307,7 @@ mod tests {
                 let mut engine = engine_at(provider_off_the_second(streams), 30, instant, 0, None);
                 let query = format!("ts_of_first_over_time(m[{range}])");
                 let expr = promql_parser::parser::parse(&query).unwrap();
-                let value = engine.exec(&expr).await.unwrap();
+                let (value, _) = engine.exec(&expr).await.unwrap();
                 let first = match value {
                     Value::None => None,
                     value => canonical(value).first().map(|(_, samples)| samples[0].1),
@@ -1301,7 +1333,7 @@ mod tests {
             for streams in [true, false] {
                 let mut engine = engine_at(provider_off_the_second(streams), 30, start, step, None);
                 let expr = promql_parser::parser::parse(query).unwrap();
-                let value = engine.exec(&expr).await.unwrap();
+                let (value, _) = engine.exec(&expr).await.unwrap();
                 let series = canonical(value);
                 assert_eq!(series.len(), count, "{query}, streams {streams}");
                 for (labels, samples) in series {
@@ -1337,7 +1369,7 @@ mod tests {
         for streams in [true, false] {
             let mut engine = engine_at(provider_off_the_second(streams), 30, instant, 0, None);
             let expr = promql_parser::parser::parse("time() - timestamp(m)").unwrap();
-            let value = engine.exec(&expr).await.unwrap();
+            let (value, _) = engine.exec(&expr).await.unwrap();
             for (_, samples) in canonical(value) {
                 assert_eq!(samples, [(instant, 1180.0 - 1168.7)], "streams {streams}");
             }
@@ -1393,7 +1425,7 @@ mod tests {
                 let provider = provider_rows(streams, false, &[(BASE + sample_time, 7, 1.0)]);
                 let mut engine = engine_at(provider, 30, BASE + 180 * SECOND, 0, Some(30 * SECOND));
                 let expr = promql_parser::parser::parse("timestamp(m)").unwrap();
-                let value = engine.exec(&expr).await.unwrap();
+                let (value, _) = engine.exec(&expr).await.unwrap();
                 let series = if matches!(value, Value::None) {
                     vec![]
                 } else {
@@ -1429,7 +1461,7 @@ mod tests {
             );
             let expr =
                 promql_parser::parser::parse("max_over_time(timestamp(m)[30s:20s])").unwrap();
-            let value = engine.exec(&expr).await.unwrap();
+            let (value, _) = engine.exec(&expr).await.unwrap();
             let series = canonical(value);
             assert_eq!(series.len(), 2);
             for (labels, samples) in series {
@@ -1502,8 +1534,9 @@ mod tests {
             let expr = promql_parser::parser::parse(query).unwrap();
             engine.exec(&expr).await.unwrap()
         };
-        let expected = exec_instant(BASE + 100 * SECOND, "m[1m]").await;
-        let pinned = exec_instant(BASE + 180 * SECOND, "m[1m] @ 1100").await;
+        let (expected, _) = exec_instant(BASE + 100 * SECOND, "m[1m]").await;
+        let (pinned, result_type) = exec_instant(BASE + 180 * SECOND, "m[1m] @ 1100").await;
+        assert_eq!(result_type.as_deref(), Some("matrix"));
         let last = canonical(pinned.clone())[0].1.last().copied();
         assert_eq!(last, Some((BASE + 100 * SECOND, 15.0)));
         assert_same_matrix(expected, pinned, "m[1m] @ 1100");
@@ -1553,7 +1586,7 @@ mod tests {
         // `sum(m)` is 54 at the instant, so the parameter is 0.5 without being pinned itself
         let query = "quantile_over_time(scalar(sum(m)) / 108, m[1m] @ 1100)";
         let expr = promql_parser::parser::parse(query).unwrap();
-        let value = engine.exec(&expr).await.unwrap();
+        let (value, _) = engine.exec(&expr).await.unwrap();
         for (_, samples) in canonical(value) {
             assert_eq!(samples, vec![(instant, 12.0)]);
         }
@@ -1565,7 +1598,7 @@ mod tests {
         let mut engine = engine_at(provider(false, false), 30, instant, 0, None);
         // `sum(m @ 1100)` is 30, so k is 1 and only the parameter carries an `@`
         let expr = promql_parser::parser::parse("topk(scalar(sum(m @ 1100)) / 30, m)").unwrap();
-        let value = engine.exec(&expr).await.unwrap();
+        let (value, _) = engine.exec(&expr).await.unwrap();
         let series = canonical(value);
         assert_eq!(series.len(), 1);
         assert_eq!(series[0].1, vec![(instant, 27.0)]);
@@ -1604,7 +1637,7 @@ mod tests {
                     Some(20 * SECOND),
                 );
                 let expr = promql_parser::parser::parse(query).unwrap();
-                let value = engine.exec(&expr).await.unwrap();
+                let (value, _) = engine.exec(&expr).await.unwrap();
                 let series = canonical(value);
                 assert_eq!(series.len(), 2, "{query}");
                 for (_, samples) in series {
@@ -1747,7 +1780,7 @@ mod tests {
         ctx.end = at;
         let mut engine = Engine::new("test_trace", Arc::new(ctx), eval_ctx);
         let expr = promql_parser::parser::parse(query).unwrap();
-        match engine.exec(&expr).await.unwrap() {
+        match engine.exec(&expr).await.unwrap().0 {
             Value::None => vec![],
             value => canonical(value)
                 .into_iter()

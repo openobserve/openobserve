@@ -106,15 +106,7 @@ impl MetadataLoad<'_> {
                     }
                     let binding = seed.as_ref().map(|entry| entry.binding.clone());
                     let prior = seed.clone();
-                    let loaded = metrics_index::fetch_parsed_index(
-                        &file.account,
-                        &sidecar,
-                        key.parent.metadata(),
-                        file.meta.mindex_size,
-                        labels,
-                        seed,
-                    )
-                    .await;
+                    let loaded = load_entry(file, labels, &key.parent, &sidecar, seed).await;
                     match loaded {
                         Ok(entry) => {
                             let admitted = if prior
@@ -413,7 +405,7 @@ impl SeriesStream for BlockSeriesStream {
             self.samples.sort_unstable_by_key(|sample| sample.timestamp);
             let mut signature = gxhash::new_hasher();
             for name in &self.columns.group {
-                if let Some(value) = head.0.label_value(head.1, name).map_err(external)? {
+                if let Some(value) = label_value(&head.0, head.1, name).map_err(external)? {
                     signature.write(name.as_bytes());
                     signature.write(value.as_bytes());
                 }
@@ -431,8 +423,7 @@ impl SeriesStream for BlockSeriesStream {
             .iter()
             .zip(&mut self.interners)
             .filter_map(|(name, interner)| {
-                index
-                    .label_value(*row, name)
+                label_value(index, *row, name)
                     .expect("preflight checked label columns")
                     .map(|value| interner.intern(value))
             })
@@ -673,6 +664,10 @@ fn external(error: anyhow::Error) -> DataFusionError {
     DataFusionError::External(error.into())
 }
 
+fn label_value<'a>(index: &'a Index, row: usize, name: &str) -> Result<Option<&'a str>> {
+    index.label_value(row, name)
+}
+
 async fn load_metadata(
     files: &[FileKey],
     labels: Arc<Vec<String>>,
@@ -753,6 +748,24 @@ async fn load_index_cached(
         flights,
     }
     .run(cached, complete)
+    .await
+}
+
+async fn load_entry(
+    file: &FileKey,
+    labels: &[String],
+    parent: &ParentIdentity,
+    sidecar: &str,
+    cached: Option<Arc<CachedIndex>>,
+) -> Result<Arc<CachedIndex>> {
+    metrics_index::fetch_parsed_index(
+        &file.account,
+        sidecar,
+        parent.metadata(),
+        file.meta.mindex_size,
+        labels,
+        cached,
+    )
     .await
 }
 
@@ -862,11 +875,11 @@ async fn validate_partition(
                         if previous.first_file != file_id {
                             for name in labels.iter() {
                                 ensure!(
-                                    files[previous.first_file]
-                                        .file
-                                        .index
-                                        .label_value(previous.first_block, name)?
-                                        == file.file.index.label_value(id, name)?,
+                                    label_value(
+                                        &files[previous.first_file].file.index,
+                                        previous.first_block,
+                                        name
+                                    )? == label_value(&file.file.index, id, name)?,
                                     "same-hash fragments have different projected labels"
                                 );
                             }
