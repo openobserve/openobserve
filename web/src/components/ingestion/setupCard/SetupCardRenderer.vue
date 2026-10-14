@@ -623,7 +623,6 @@ function fireConfetti() {
               :reveal-tooltip="t('ingestion.setupCard.revealToken')"
               :hide-tooltip="t('ingestion.setupCard.hideToken')"
               :token-name="displayCode(step)?.masked ? tokenName : undefined"
-              copy-on-click
               @copy="(payload: CodeBlockCopyPayload) => onStepCopy(step, i, payload)"
               @token-click="openTokenPicker?.()"
             >
@@ -773,7 +772,6 @@ function fireConfetti() {
               :reveal-tooltip="t('ingestion.setupCard.revealToken')"
               :hide-tooltip="t('ingestion.setupCard.hideToken')"
               :token-name="extras.advanced.code.masked ? tokenName : undefined"
-              copy-on-click
               @token-click="openTokenPicker?.()"
             />
           </div>

@@ -101,6 +101,7 @@ export const PAGE_LIMIT = 200;
 const DAY_US = 86400000000;
 const WHOLE = "ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING";
 const ROOT_URL_RE = "^[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*/?(?:[?#].*)?$";
+const NOT_SYNTHETIC = "(session_type IS NULL OR session_type <> 'synthetics')";
 const hrExpr = (scope: AnalyticsScope): string =>
   has(scope, "session_has_replay")
     ? "MAX(CASE WHEN session_has_replay IS NOT NULL THEN 1 ELSE 0 END) AS hr"
@@ -215,8 +216,7 @@ export function scopeClause(scope: AnalyticsScope, sample: SampleRatio = 1): str
   const parts = [`application_id = ${lit(scope.app)}`, "session_id IS NOT NULL"];
   if (has(scope, "env") && scope.env.length) parts.push(sqlIn("env", scope.env));
   if (has(scope, "version") && scope.version.length) parts.push(sqlIn("version", scope.version));
-  if (has(scope, "session_type"))
-    parts.push("(session_type IS NULL OR session_type <> 'synthetics')");
+  if (has(scope, "session_type")) parts.push(NOT_SYNTHETIC);
   if (sample > 1) parts.push(samplePredicate("session_id", sample));
   return parts.join(" AND ");
 }
@@ -326,25 +326,22 @@ export function summarySql(scope: AnalyticsScope, currentStartUs: number): strin
   const synthetic = hasSessionType
     ? `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs} AND session_type = 'synthetics' THEN session_id END) AS synthetic_sessions`
     : "0 AS synthetic_sessions";
-  // The caption says synthetics are excluded, so the sessions KPI (and its prior-period base) must
-  // actually drop them here too, not just report their count via `synthetic_sessions`.
-  const notSynthetic = hasSessionType
-    ? " AND (session_type IS NULL OR session_type <> 'synthetics')"
-    : "";
+  // The WHERE keeps bots for synthetic_sessions, so every other count must drop them itself.
+  const notSynthetic = hasSessionType ? ` AND ${NOT_SYNTHETIC}` : "";
   const cols = [
     `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs}${notSynthetic} THEN session_id END) AS sessions`,
     `COUNT(DISTINCT CASE WHEN _timestamp < ${cs}${notSynthetic} THEN session_id END) AS prev_sessions`,
-    `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs} AND type = 'view' THEN view_id END) AS views`,
-    `COUNT(CASE WHEN _timestamp >= ${cs} AND type IN ('view', 'action') THEN 1 END) AS va_rows`,
+    `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs}${notSynthetic} AND type = 'view' THEN view_id END) AS views`,
+    `COUNT(CASE WHEN _timestamp >= ${cs}${notSynthetic} AND type IN ('view', 'action') THEN 1 END) AS va_rows`,
     synthetic,
     "MAX(_timestamp) AS data_through_us",
   ];
   for (const f of presentCandidates(scope)) {
     cols.push(
-      `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs} THEN NULLIF(${f}, '') END) AS ${f}__values`,
+      `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs}${notSynthetic} THEN NULLIF(${f}, '') END) AS ${f}__values`,
     );
     cols.push(
-      `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs} AND NULLIF(${f}, '') IS NOT NULL THEN session_id END) AS ${f}__sessions`,
+      `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs}${notSynthetic} AND NULLIF(${f}, '') IS NOT NULL THEN session_id END) AS ${f}__sessions`,
     );
   }
   return `SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${unfilteredScope(scope)} LIMIT 1`;

@@ -23,7 +23,7 @@ const barStart = vi.fn();
 vi.mock("@/lib/core/Code/OCodeBlock.vue", () => ({
   default: {
     name: "OCodeBlock",
-    props: ["code", "copyOnClick", "inset"],
+    props: ["code", "inset"],
     emits: ["copy"],
     template: "<div class='copy-content-mock'>{{ code }}</div>",
   },
@@ -215,12 +215,6 @@ describe("SplunkHec", () => {
     it("should render one copy block per snippet", () => {
       wrapper = createWrapper();
       expect(wrapper.findAll(".copy-content-mock")).toHaveLength(4);
-    });
-
-    it("should render every snippet as a copy-on-click OCodeBlock", () => {
-      wrapper = createWrapper();
-      const blocks = wrapper.findAllComponents({ name: "OCodeBlock" });
-      expect(blocks.every((b: any) => b.props("copyOnClick") !== undefined)).toBe(true);
     });
 
     it("should inset every snippet from the block border, as CopyContent did", () => {
