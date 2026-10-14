@@ -76,6 +76,8 @@ mod scheduler;
 #[cfg(feature = "enterprise")]
 mod service_graph;
 mod session_cleanup;
+#[cfg(feature = "enterprise")]
+pub mod slack_hooks;
 mod slo_maintenance;
 mod stats;
 
@@ -1094,6 +1096,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::start_eval_task_consumers();
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::start_eval_scheduler();
         o2_enterprise::enterprise::llm_evaluations::experiments::runner::start();
+        slack_hooks::init().await;
 
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
             |org_id, sql, start, end, cfg_id, stream_type| {
