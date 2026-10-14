@@ -595,6 +595,25 @@ mod tests {
     }
 
     #[test]
+    fn test_resolve_stream_names_deeply_nested_calls_parse_quickly() {
+        // Unpatched sqlparser 0.62 re-parses every function argument under PostgreSqlDialect.
+        let sql = format!(
+            "SELECT {}view_url{} AS k FROM \"_rumdata\"",
+            "lower(".repeat(30),
+            ")".repeat(30)
+        );
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(resolve_stream_names(&sql));
+        });
+        let names = rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("nested calls must not parse in exponential time")
+            .unwrap();
+        assert_eq!(names, vec!["_rumdata"]);
+    }
+
+    #[test]
     fn test_resolve_stream_names_error() {
         let sql = "";
         let names = resolve_stream_names_with_type(sql);

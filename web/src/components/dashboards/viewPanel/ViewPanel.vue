@@ -262,6 +262,10 @@ import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
+import {
+  DASHBOARD_FRESH_PANEL_TIME,
+  freshTimeFromAppliedRange,
+} from "@/composables/dashboard/dashboardFreshPanelTime";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
@@ -624,6 +628,15 @@ export default defineComponent({
     const showApplyHint = computed(() => isVariablesChanged.value && !isAutoRunOn.value);
 
     watch(isAutoRunOn, (on) => variablesManager.setLiveMode(on), { immediate: true });
+
+    // Resolved from this view's own range, which the dashboard's resolver knows nothing about.
+    provide(
+      DASHBOARD_FRESH_PANEL_TIME,
+      freshTimeFromAppliedRange(
+        () => isAutoRunOn.value,
+        () => selectedDate.value,
+      ),
+    );
 
     // The chart reads the selector snapshot, not the manager's committed state, so apply it here.
     const stopAutoCommit = variablesManager.onAutoCommit(async () => {

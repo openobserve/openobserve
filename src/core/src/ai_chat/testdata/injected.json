@@ -1,0 +1,261 @@
+{
+ "events": [
+  {
+   "id": "evt_0",
+   "aggregateID": "ses_T",
+   "seq": 0,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_u",
+     "sessionID": "ses_T",
+     "role": "user",
+     "time": {
+      "created": 1
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_1",
+   "aggregateID": "ses_T",
+   "seq": 1,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_u0",
+     "sessionID": "ses_T",
+     "messageID": "msg_u",
+     "type": "text",
+     "text": "[Context]\norg_id: x",
+     "metadata": {
+      "o2_injected": true
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_2",
+   "aggregateID": "ses_T",
+   "seq": 2,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_u1",
+     "sessionID": "ses_T",
+     "messageID": "msg_u",
+     "type": "text",
+     "text": "why is p99 up?",
+     "metadata": null
+    }
+   }
+  },
+  {
+   "id": "evt_3",
+   "aggregateID": "ses_T",
+   "seq": 3,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_u2",
+     "sessionID": "ses_T",
+     "role": "user",
+     "time": {
+      "created": 1
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_4",
+   "aggregateID": "ses_T",
+   "seq": 4,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "p1",
+     "sessionID": "ses_T",
+     "messageID": "msg_u2",
+     "type": "text",
+     "text": "first"
+    }
+   }
+  },
+  {
+   "id": "evt_5",
+   "aggregateID": "ses_T",
+   "seq": 5,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "p2",
+     "sessionID": "ses_T",
+     "messageID": "msg_u2",
+     "type": "text",
+     "text": ""
+    }
+   }
+  },
+  {
+   "id": "evt_6",
+   "aggregateID": "ses_T",
+   "seq": 6,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "p3",
+     "sessionID": "ses_T",
+     "messageID": "msg_u2",
+     "type": "text",
+     "text": "  second  "
+    }
+   }
+  },
+  {
+   "id": "evt_7",
+   "aggregateID": "ses_T",
+   "seq": 7,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_u3",
+     "sessionID": "ses_T",
+     "role": "user",
+     "time": {
+      "created": 1
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_8",
+   "aggregateID": "ses_T",
+   "seq": 8,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "p1",
+     "sessionID": "ses_T",
+     "messageID": "msg_u3",
+     "type": "text",
+     "text": "[Restored conversation]\nno end marker"
+    }
+   }
+  },
+  {
+   "id": "evt_9",
+   "aggregateID": "ses_T",
+   "seq": 9,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_u4",
+     "sessionID": "ses_T",
+     "role": "user",
+     "time": {
+      "created": 1
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_10",
+   "aggregateID": "ses_T",
+   "seq": 10,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "p1",
+     "sessionID": "ses_T",
+     "messageID": "msg_u4",
+     "type": "text",
+     "text": "ctx",
+     "metadata": {
+      "o2_injected": true
+     }
+    }
+   }
+  }
+ ],
+ "expected": {
+  "turns": [
+   {
+    "user_message_id": "msg_u",
+    "created": 1,
+    "user": {
+     "text": "why is p99 up?",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "first_seq": 0,
+    "last_seq": 2
+   },
+   {
+    "user_message_id": "msg_u2",
+    "created": 1,
+    "user": {
+     "text": "first\n\n  second",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "first_seq": 3,
+    "last_seq": 6
+   },
+   {
+    "user_message_id": "msg_u3",
+    "created": 1,
+    "user": {
+     "text": "[Restored conversation]\nno end marker",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "first_seq": 7,
+    "last_seq": 8
+   },
+   {
+    "user_message_id": "msg_u4",
+    "created": 1,
+    "user": {
+     "text": "",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "first_seq": 9,
+    "last_seq": 10
+   }
+  ],
+  "title": null,
+  "last_seq": 10
+ }
+}

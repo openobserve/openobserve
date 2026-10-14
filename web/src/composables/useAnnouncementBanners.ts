@@ -21,6 +21,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import announcements from "@/services/announcements";
 import { announcementKeys } from "@/services/announcements.querykeys";
 import { raw, type I18nText } from "@/types/i18n";
+import type { BannerColors, BannerTextSize } from "@/utils/announcementAppearance";
 import { orderBanners, type BannerVariantName } from "@/utils/announcementOrder";
 
 export type BannerVariant = BannerVariantName;
@@ -39,15 +40,20 @@ export interface Banner {
   starts_at?: number;
   ends_at?: number;
   dismissible: boolean;
-  cta?: BannerCta;
+  /** Link buttons, in order; older servers send only `cta`, which is folded in here. */
+  ctas: BannerCta[];
+  text_size?: BannerTextSize;
+  colors?: BannerColors;
+  icon?: string;
   /** Per-module counts, set only on the generated downtime banners (D19). */
   counts?: { module: string; count: number }[];
 }
 
 /** The banner as it arrives from the API, before its copy is branded via `raw()`. */
-interface WireBanner extends Omit<Banner, "message" | "cta"> {
+interface WireBanner extends Omit<Banner, "message" | "ctas"> {
   message: string;
   cta?: { text: string; url: string };
+  ctas?: { text: string; url: string }[];
 }
 
 /** Poll cadence. The server reads these from an in-memory cache, so this is cheap. */
@@ -219,7 +225,10 @@ export function useAnnouncementBanners() {
         ? data.banners.map((banner: WireBanner) => ({
             ...banner,
             message: raw(banner.message),
-            cta: banner.cta ? { text: raw(banner.cta.text), url: banner.cta.url } : undefined,
+            ctas: (banner.ctas ?? (banner.cta ? [banner.cta] : [])).map((cta) => ({
+              text: raw(cta.text),
+              url: cta.url,
+            })),
           }))
         : [];
 

@@ -100,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :frame="false"
               v-model:selected-ids="selectedAlertIds"
               selection="multiple"
+              :is-row-selectable="isAlertRowSelectable"
               data-test="alert-list-table"
               :data="displayedAlerts"
               :columns="columns"
@@ -250,6 +251,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="row.active_downtime"
                     :downtime="row.active_downtime"
                     :data-test="`alert-list-${row.name}-muted`"
+                  />
+                  <OTag
+                    v-if="row.is_builtin"
+                    variant="default-soft"
+                    size="sm"
+                    icon="lock"
+                    :label="t('alerts.builtinBadge')"
+                    :title="t('alerts.builtinBadgeHint')"
+                    :data-test="`alert-list-${row.name}-builtin-badge`"
                   />
                   <template v-if="row.alert_type === 'Composite'">
                     <OTag
@@ -607,6 +617,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click.stop="exportAlert(row)"
                   />
                   <button
+                    v-if="!row.is_builtin"
                     type="button"
                     data-row-action="delete"
                     class="hidden"
@@ -679,12 +690,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`alert-list-${row.name}-delete-alert`"
                       variant="destructive"
                       shortcut-id="alertsRowDelete"
+                      :disabled="row.is_builtin"
                       @select="showDeleteDialogFn({ row })"
                     >
                       <template #icon-left>
                         <OIcon name="delete" size="sm" />
                       </template>
-                      {{ t("alerts.delete") }}
+                      {{ row.is_builtin ? t("alerts.builtinDeleteDisabled") : t("alerts.delete") }}
                     </ODropdownItem>
                     <ODropdownSeparator />
                     <ODropdownItem
@@ -1821,10 +1833,14 @@ export default defineComponent({
     const destinations = ref([]);
     const templates = ref([0]);
     const selectedAlertIds = ref<string[]>([]);
+    // Built-ins cannot be deleted, so they stay out of every bulk action.
+    const isAlertRowSelectable = (row: any) => !row.is_builtin;
     const selectedAlerts = computed({
       get: () =>
         filteredResults.value.filter(
-          (row: any) => selectedAlertIds.value.includes(row.alert_id) || row.selected === true,
+          (row: any) =>
+            !row.is_builtin &&
+            (selectedAlertIds.value.includes(row.alert_id) || row.selected === true),
         ),
       set: (val) => {
         if (val.length === 0) {
@@ -2116,6 +2132,7 @@ export default defineComponent({
               id: data.folder_id,
             },
             is_real_time: data.is_real_time,
+            is_builtin: data.is_builtin === true,
           };
         });
 
@@ -3888,6 +3905,7 @@ export default defineComponent({
       showAddUpdateFn,
       handleActionQuery,
       showDeleteDialogFn,
+      isAlertRowSelectable,
       duplicateAlert,
       showAddAlertDialog,
       showForm,

@@ -20,7 +20,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use config::meta::{
     synthetics::{BrowserConfig, Synthetic, SyntheticType, validate_expanded_steps},
     synthetics_composition::{
-        ChildJourney, ExpansionError, added_references, expand_steps, placeholders_in, subtest_refs,
+        ChildJourney, ExpansionError, expand_steps, placeholders_in, subtest_refs,
     },
 };
 use infra::table::{
@@ -33,8 +33,6 @@ use sea_orm::ConnectionTrait;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CompositionError {
-    #[error("composition writes are disabled (ZO_SYNTHETICS_SUBTESTS_ENABLED=false)")]
-    WritesDisabled,
     #[error("validation: {0}")]
     Invalid(String),
     #[error("this check is referenced by other checks")]
@@ -93,15 +91,6 @@ struct Violation {
     name: String,
 }
 
-/// The write gate (§5.9): refuses a new reference while the flag is off.
-pub(crate) fn ensure_composition_writes_allowed() -> Result<(), CompositionError> {
-    if config::get_config().synthetics.subtests_enabled {
-        Ok(())
-    } else {
-        Err(CompositionError::WritesDisabled)
-    }
-}
-
 pub(crate) async fn validate_for_save<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -109,20 +98,6 @@ pub(crate) async fn validate_for_save<C: ConnectionTrait>(
     body: &Synthetic,
 ) -> Result<(), CompositionError> {
     let refs = synthetics_refs::refs_of(body);
-    // Gated here, not in `check_rules`, so the rules stay testable with the flag off.
-    if !refs.is_empty() {
-        let stored = match own_id {
-            Some(id) => synthetics_refs::refs_for_parents(conn, org_id, &[id.to_owned()])
-                .await
-                .map_err(|e| CompositionError::Invalid(e.to_string()))?
-                .remove(id)
-                .unwrap_or_default(),
-            None => Vec::new(),
-        };
-        if !added_references(&stored, &refs).is_empty() {
-            ensure_composition_writes_allowed()?;
-        }
-    }
     let parents = match own_id {
         Some(id) if !refs.is_empty() => synthetics_refs::list_parents(conn, org_id, id)
             .await
@@ -878,15 +853,6 @@ pub(crate) mod tests {
         assert_eq!(left[0].id, "p2");
     }
 
-    /// Flag tests hold this, so no other config swap can revert the flag mid-test.
-    pub(crate) async fn subtests_flag(enabled: bool) -> tokio::sync::MutexGuard<'static, ()> {
-        let guard = crate::CONFIG_SWAP_LOCK.lock().await;
-        let mut cfg = config::config::init();
-        cfg.synthetics.subtests_enabled = enabled;
-        config::CONFIG.store(std::sync::Arc::new(cfg));
-        guard
-    }
-
     /// `synthetics_checks::create` relies on migration column defaults that entities omit.
     pub(crate) async fn db_with_synthetics_defaults() -> sea_orm::DatabaseConnection {
         use sea_orm::{ConnectOptions, ConnectionTrait, Database, Schema};
@@ -1046,8 +1012,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn the_disabled_flag_gates_only_an_added_reference() {
-        let _flag = subtests_flag(false).await;
+    async fn a_new_or_added_reference_saves_with_no_feature_switch() {
         let db = db_with_synthetics_defaults().await;
         for id in ["login", "logout"] {
             synthetics_checks::create(&db, "org1", child_row(id), true)
@@ -1056,36 +1021,15 @@ pub(crate) mod tests {
         }
         let mut parent = parent_with(&["login"], 0);
         parent.org_id = "org1".into();
-        parent.name = "before".into();
-        synthetics_checks::create(&db, "org1", parent.clone(), true)
-            .await
-            .unwrap();
-
-        parent.name = "after".into();
-        validate_for_save(&db, "org1", Some("p"), &parent)
-            .await
-            .unwrap();
-
-        let mut repeated = parent_with(&["login", "login"], 0);
-        repeated.org_id = "org1".into();
-        validate_for_save(&db, "org1", Some("p"), &repeated)
-            .await
-            .unwrap();
-
-        validate_for_save(&db, "org1", Some("p"), &child_row("p"))
+        validate_for_save(&db, "org1", None, &parent).await.unwrap();
+        synthetics_checks::create(&db, "org1", parent, true)
             .await
             .unwrap();
 
         let mut added = parent_with(&["login", "logout"], 0);
         added.org_id = "org1".into();
-        let err = validate_for_save(&db, "org1", Some("p"), &added)
+        validate_for_save(&db, "org1", Some("p"), &added)
             .await
-            .unwrap_err();
-        assert!(matches!(err, CompositionError::WritesDisabled), "{err:?}");
-
-        let err = validate_for_save(&db, "org1", None, &parent)
-            .await
-            .unwrap_err();
-        assert!(matches!(err, CompositionError::WritesDisabled), "{err:?}");
+            .unwrap();
     }
 }

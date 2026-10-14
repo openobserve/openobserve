@@ -159,6 +159,26 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
   },
 ];
 
+/** A light/dark background pair an announcement banner can be painted with. */
+export interface BannerColorPreset {
+  key: string;
+  light: string;
+  dark: string;
+}
+
+/** Stored as the resolved hex pair, so a banner keeps its colours if a preset changes. */
+export const BANNER_COLOR_PRESETS: BannerColorPreset[] = [
+  { key: "blue", light: "#DBEAFE", dark: "#1E3A8A" },
+  { key: "indigo", light: "#E0E7FF", dark: "#312E81" },
+  { key: "teal", light: "#CCFBF1", dark: "#134E4A" },
+  { key: "green", light: "#DCFCE7", dark: "#14532D" },
+  { key: "amber", light: "#FEF3C7", dark: "#78350F" },
+  { key: "red", light: "#FEE2E2", dark: "#7F1D1D" },
+  { key: "purple", light: "#F3E8FF", dark: "#581C87" },
+  { key: "slate", light: "#1E293B", dark: "#E2E8F0" },
+  { key: "brand", light: "#2563EB", dark: "#3B82F6" },
+];
+
 /** Find a predefined theme by its stable name. */
 export const getThemeByName = (name: string | null | undefined): PredefinedTheme | undefined =>
   name ? PREDEFINED_THEMES.find((t) => t.name === name) : undefined;
