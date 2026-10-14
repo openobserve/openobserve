@@ -84,8 +84,8 @@ const CATEGORY_GLYPH = {
   qa: "🧪", test: "🧪",
 };
 const MAX_DIFF_TOKENS = 150_000;
-const AGENT_TIMEOUT_MS = 5 * 60 * 1000;
-const OVERALL_TIMEOUT_MS = 20 * 60 * 1000;
+const AGENT_TIMEOUT_MS = 10 * 60 * 1000;
+const OVERALL_TIMEOUT_MS = 25 * 60 * 1000;
 const TRACE_SERVICE_NAME = "github-actions.ai-code-review";
 const TRACE_SCOPE_NAME = "scripts/ai-review/run-review.mjs";
 const DEFAULT_TRACE_STREAM = "github_ai_code_review";
