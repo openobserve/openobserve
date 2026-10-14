@@ -43,13 +43,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tableRendererData"
           :config="panelSchema.config"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
-          @row-click="onChartClick"
+          @row-click="onPanelClick"
         />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
           :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
-          @row-click="onChartClick"
+          @row-click="onPanelClick"
           @explore-cell="(params) => exploreCellInLogs(params.columnId, params.value, params.row)"
           @format-column="onFormatColumn"
           ref="tableRendererRef"
@@ -58,8 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
           :enable-column-format="enableColumnFormat"
-          :drilldown-columns="store.state.printMode ? [] : drilldownColumnAliases"
-          :drilldown-all-columns="!store.state.printMode && drilldownAllColumns"
+          :drilldown-columns="
+            store.state.printMode || !allowDrilldown ? [] : drilldownColumnAliases
+          "
+          :drilldown-all-columns="!store.state.printMode && allowDrilldown && drilldownAllColumns"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -100,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
           @updated:data-zoom="onDataZoom"
           @error="errorDetail = $event"
-          @click="onChartClick"
+          @click="onPanelClick"
           @contextmenu="onChartContextMenu"
           @domcontextmenu="onChartDomContextMenu"
           :find-line-on-context-menu="findsLineOnContextMenu"
@@ -472,6 +474,12 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
+    // Off where the viewer can't follow a drilldown, such as the anonymous public page.
+    allowDrilldown: {
+      default: true,
+      required: false,
+      type: Boolean,
+    },
     allowAnnotationsAPI: {
       default: true,
       required: false,
@@ -760,6 +768,7 @@ export default defineComponent({
       allowAnnotationsAdd,
       allowAnnotationsAPI,
       allowAlertCreation,
+      allowDrilldown,
       alertSource,
       runId,
       tabId,
@@ -1288,7 +1297,8 @@ export default defineComponent({
     // ======= [END] dashboard PrintMode =======
 
     onMounted(async () => {
-      // fetch all panels
+      // The panel list only feeds annotation editing; injected-data panels have no live dashboard to fetch.
+      if (injectedPromqlData?.value) return;
       await fetchAllPanels();
     });
 
@@ -2000,6 +2010,10 @@ export default defineComponent({
       onExemplarClick: exemplarInteraction.onExemplarClick,
     });
 
+    // A chart or table click opens the drilldown menu, so it does nothing where drilldowns are off.
+    const onPanelClick = (...args: Parameters<typeof onChartClick>) =>
+      allowDrilldown.value ? onChartClick(...args) : undefined;
+
     const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
       panelSchema,
       data,
@@ -2238,6 +2252,7 @@ export default defineComponent({
       tableRendererRef,
       tableRendererData,
       onChartClick,
+      onPanelClick,
       onFormatColumn,
       onDataZoom,
       drilldownColumnAliases,

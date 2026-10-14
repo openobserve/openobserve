@@ -1843,6 +1843,18 @@ describe("ViewDashboard", () => {
     });
   });
 
+  it("hands the live variables manager to the template, so public links seed from it", async () => {
+    wrapper = createWrapper();
+    await flushPromises();
+    const manager = {
+      committedVariablesData: { global: [], tabs: {}, panels: {} },
+      getUrlParams: () => ({ "var-qns": "ingress-nginx" }),
+    };
+    await wrapper.vm.onVariablesManagerReady(manager);
+
+    expect(wrapper.vm.variablesManager.getUrlParams()).toEqual({ "var-qns": "ingress-nginx" });
+  });
+
   describe("layout edit mode", () => {
     const mockSaveExecute = vi.fn();
     const mockSyncGrid = vi.fn();

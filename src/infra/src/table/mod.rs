@@ -74,6 +74,7 @@ pub mod org_telephony;
 pub mod org_users;
 pub mod organizations;
 pub mod providers;
+pub mod public_dashboards;
 pub mod query_history;
 pub mod ratelimit;
 pub mod re_pattern;
