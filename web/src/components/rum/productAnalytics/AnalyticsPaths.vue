@@ -521,7 +521,7 @@ const cohortCondition = computed(() => {
   const next = c ? c.funnel.steps[c.stepIndex] : null;
   return t("rum.analytics.dropoff.subtitle", {
     step: raw(anchorLabel.value),
-    next: raw(next ? stepLabel(next, events.value) : ""),
+    next: raw(next ? stepLabel(next, events.value, namedEvents.deletedNames.value) : ""),
   });
 });
 

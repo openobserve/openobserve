@@ -102,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :def="def"
           :events="events"
           :events-status="eventsStatus"
+          :deleted-names="deletedNames"
           :initial="editing !== null ? def.x?.[editing] : undefined"
           @apply="apply"
           @cancel="setOpen(false)"
@@ -136,6 +137,7 @@ const props = defineProps<{
   sampled: SampleRatio;
   events: NamedEvent[];
   eventsStatus: NamedEventsStatus;
+  deletedNames?: Readonly<Record<string, string>>;
   stacked?: boolean;
 }>();
 const emit = defineEmits<{ "update:def": [FunnelDef] }>();
@@ -143,6 +145,7 @@ const { t } = useI18nTyped();
 const { labelOf, kindLabel, kindVariant } = useStepLabels(
   () => props.events,
   () => props.eventsStatus,
+  () => props.deletedNames ?? {},
 );
 
 const open = ref(false);

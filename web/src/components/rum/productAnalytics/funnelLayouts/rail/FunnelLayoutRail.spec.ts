@@ -122,6 +122,16 @@ describe("FunnelLayoutRail", () => {
     document.body.innerHTML = "";
   });
 
+  it("names a deleted named-event step by its last known name", () => {
+    const w = mountRail({
+      def: { ...DEF, steps: [DEF.steps[0], { kind: "e", key: "gone-id" }] },
+      deletedNames: { "gone-id": "Old checkout" },
+    });
+    expect(w.find('[data-test="rum-analytics-funnel-rail-step-1"]').text()).toContain(
+      "Old checkout",
+    );
+  });
+
   it("shows the rail sections beside the steps table", () => {
     const w = mountRail();
     const steps = w.find('[data-test="rum-analytics-funnel-rail-steps"]').text();

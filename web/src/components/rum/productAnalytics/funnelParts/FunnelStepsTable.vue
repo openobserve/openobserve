@@ -266,6 +266,7 @@ const props = defineProps<{
   sampled: SampleRatio;
   events: NamedEvent[];
   eventsStatus: NamedEventsStatus;
+  deletedNames?: Readonly<Record<string, string>>;
   unitLabel: I18nText;
   unitNoun: I18nText;
   hideTime: boolean;
@@ -279,6 +280,7 @@ const { t } = useI18nTyped();
 const { labelOf, kindLabel, kindVariant, filterChips } = useStepLabels(
   () => props.events,
   () => props.eventsStatus,
+  () => props.deletedNames ?? {},
 );
 const dash = raw("—");
 
