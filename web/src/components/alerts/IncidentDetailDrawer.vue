@@ -1899,13 +1899,18 @@ export default defineComponent({
 
         // Keep the failure visible until the next run starts. Only the most recent
         // terminal event matters: a later success or cancel clears a older failure.
-        rcaError.value =
-          !nowInFlight && lastTerminalEvent?.type === "ai_analysis_failed"
-            ? {
-                reason: lastTerminalEvent.data?.reason || t("alerts.incidents.rcaFailed"),
-                details: lastTerminalEvent.data?.error_details || "",
-              }
-            : null;
+        // A refused run (no AI credits, consent declined) writes no event, so its
+        // remedy banner stays until a run starts or the user retries.
+        const refused = rcaError.value?.remedy ? rcaError.value : null;
+        rcaError.value = nowInFlight
+          ? null
+          : (refused ??
+            (lastTerminalEvent?.type === "ai_analysis_failed"
+              ? {
+                  reason: lastTerminalEvent.data?.reason || t("alerts.incidents.rcaFailed"),
+                  details: lastTerminalEvent.data?.error_details || "",
+                }
+              : null));
 
         // Transition: banner was showing and analysis just finished — reload to pick up
         // the new report. Skipped when the run failed, since there is nothing new to fetch.

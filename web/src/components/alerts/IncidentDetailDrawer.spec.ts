@@ -1526,6 +1526,29 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.analysisInFlight).toBe(true);
     });
 
+    it("keeps a refused run's remedy banner, which the event log never records", async () => {
+      const refused = { reason: "out of credits", details: "", remedy: "plans" };
+      wrapper.vm.rcaError = refused;
+      (incidentsService.getEvents as any).mockResolvedValue({ data: { events: [] } });
+
+      await wrapper.vm.checkAnalysisInFlight("1");
+      await flushPromises();
+
+      expect(wrapper.vm.rcaError).toEqual(refused);
+    });
+
+    it("clears a refused run's remedy banner once a run starts", async () => {
+      wrapper.vm.rcaError = { reason: "out of credits", details: "", remedy: "plans" };
+      (incidentsService.getEvents as any).mockResolvedValue({
+        data: { events: [{ type: "ai_analysis_begin", timestamp: 300 }] },
+      });
+
+      await wrapper.vm.checkAnalysisInFlight("1");
+      await flushPromises();
+
+      expect(wrapper.vm.rcaError).toBeNull();
+    });
+
     it("sets analysisInFlight false when lastComplete >= lastBegin", async () => {
       (incidentsService.getEvents as any).mockResolvedValue({
         data: {
