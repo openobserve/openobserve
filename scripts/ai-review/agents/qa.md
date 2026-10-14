@@ -37,6 +37,8 @@ Do not flag selectors you cannot resolve because the component lives in enterpri
 These hurt maintainability or make tests flaky, but do not by themselves void coverage, so they are `warning`, not `critical`.
 
 - **Raw selectors in spec files** — `page.locator(`, `page.getByRole(`, `page.getByText(`, `page.getByTestId(`, `page.$(` in a `.spec.js`, **including inside assertions** (`await expect(page.locator('[data-test="x"]')).toContainText(...)`). Selectors belong in page objects.
+- **Helper functions in spec files** — under the Page Object Model a `.spec.js` only describes the flow. Flag each **added** named function: `function x(` / `async function x(` at module or `describe` scope, or a function/arrow assigned to a name (`const seed = async (page) => {…}`). Seeding, id lookup, cleanup tracking, payload builders and API read-back belong in a page-object method (or a `utils/` helper) the spec calls.
+- **Raw HTTP in spec files** — added `page.request.*`, `request.newContext(`, `request.get|post|put|patch|delete(`, `fetch(`, `axios` in a `.spec.js`; route API setup/verification through a page object or `utils/` helper.
 - **`console.log` / `console.info` / `console.warn`** in test or page-object code — must use `testLogger`. (critical only if it leaks a credential/token.)
 - **Brittle selectors** — xpath, `nth-child`, `:nth(`, or framework-generated classes (`.q-…`, hashed CSS modules) where a `data-test` exists.
 - **Excessive hardcoded waits** — more than ~3 `waitForTimeout(` in one test, or a `waitForTimeout` standing in for a real condition wait.
@@ -46,6 +48,7 @@ These hurt maintainability or make tests flaky, but do not by themselves void co
 ## What NOT to Flag
 
 - Raw selectors *inside page-object files* — that is where selectors are supposed to live.
+- Callbacks passed to `test` / `test.describe` / hooks / `test.step`, inline callbacks (`.map(x => …)`, `expect(async () => …).toPass()`), a `for` loop that generates tests, or calls to helpers imported from `pages/` / `utils/` — none of these are spec helpers. Helpers a spec already had before this PR are out of scope (most older specs predate the rule).
 - Fixture/throwaway strings, long payloads, or deliberately odd test data.
 - Style/formatting, import ordering, naming preferences — ESLint owns these.
 - Tagging/structure nitpicks unless a tag is clearly wrong or missing on a new spec.
@@ -54,4 +57,4 @@ These hurt maintainability or make tests flaky, but do not by themselves void co
 
 ## Severity discipline
 
-`critical` is reserved for **coverage-integrity failures** (a test that passes while asserting nothing real — missing/vacuous/soft/un-awaited assertion, or a selector that matches no component) and **hardcoded credentials**. Everything else — POM violations, `console.log`, brittle selectors, missing cleanup — is `warning`; the coordinator owns any further escalation. Be certain before flagging critical: quote the exact line, and for selector mismatches name the components you searched. When unsure whether a test genuinely asserts the intended behavior, prefer a `warning` over silence, but never invent a mismatch you did not actually grep for.
+`critical` is reserved for **coverage-integrity failures** (a test that passes while asserting nothing real — missing/vacuous/soft/un-awaited assertion, or a selector that matches no component) and **hardcoded credentials**. Everything else — POM violations (raw selectors, helper functions or raw HTTP in specs), `console.log`, brittle selectors, missing cleanup — is `warning`; the coordinator owns any further escalation. Be certain before flagging critical: quote the exact line, and for selector mismatches name the components you searched. When unsure whether a test genuinely asserts the intended behavior, prefer a `warning` over silence, but never invent a mismatch you did not actually grep for.
