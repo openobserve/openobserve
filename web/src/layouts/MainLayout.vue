@@ -480,6 +480,10 @@ export default defineComponent({
       return Boolean(store.state.zoConfig?.profiling_enabled);
     });
 
+    const isProductAnalyticsEnabled = computed(() => {
+      return Boolean(store.state.zoConfig?.product_analytics_enabled);
+    });
+
     // Real entries carry `identifier`; the placeholder literal only sets label/value.
     const orgOptions = ref<Array<{ identifier?: string; [key: string]: unknown }>>([
       { label: Number, value: String },
@@ -783,6 +787,25 @@ export default defineComponent({
       }
     };
 
+    const updateProductAnalyticsMenu = () => {
+      const existingIndex = linksList.value.findIndex((l: any) => l.name === "productAnalytics");
+      if (!isProductAnalyticsEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+      const rumIndex = linksList.value.findIndex((l: any) => l.name === "rum");
+      linksList.value.splice(rumIndex === -1 ? linksList.value.length : rumIndex + 1, 0, {
+        title: t("menu.productAnalytics"),
+        icon: "insights",
+        link: "/product-analytics",
+        name: "productAnalytics",
+      });
+    };
+
+    // Re-run the whole filter so custom_hide_menus still applies to a re-inserted entry.
+    watch(isProductAnalyticsEnabled, () => filterMenus(), { immediate: false });
+
     // Insert the Workflows entry after Alerts. Idempotent.
     const updateWorkflowsMenu = () => {
       const existingIndex = linksList.value.findIndex((link) => link.name === "workflows");
@@ -904,6 +927,7 @@ export default defineComponent({
       updateWorkflowsMenu();
       updateSyntheticMenu();
       updateProfilesMenu();
+      updateProductAnalyticsMenu();
       updateAIObservabilityMenu();
 
       const disableMenus = new Set(

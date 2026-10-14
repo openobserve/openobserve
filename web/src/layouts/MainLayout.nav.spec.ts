@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import store from "@/test/unit/helpers/store";
@@ -69,11 +69,16 @@ describe("MainLayout — Product Analytics menu entry", () => {
     return wrapper.findAllComponents(NavbarStub)[0].props("linksList") as NavItem[];
   };
 
+  beforeEach(() => {
+    store.state.zoConfig.product_analytics_enabled = true;
+  });
+
   afterEach(() => {
     wrapper?.unmount();
     wrapper = undefined;
     store.state.zoConfig.custom_hide_menus = "";
     store.state.zoConfig.synthetics_enabled = false;
+    store.state.zoConfig.product_analytics_enabled = false;
   });
 
   const rail = async (): Promise<RailEntry[]> => groupNavLinks(await railItems());
@@ -98,6 +103,67 @@ describe("MainLayout — Product Analytics menu entry", () => {
   it("keeps Reports right after Streams", async () => {
     const names = (await railItems()).map((l) => l.name);
     expect(names[names.indexOf("streams") + 1]).toBe("reports");
+  });
+
+  it("is hidden when product_analytics_enabled is absent from the config", async () => {
+    delete store.state.zoConfig.product_analytics_enabled;
+    const names = (await railItems()).map((l) => l.name);
+    expect(names).toContain("rum");
+    expect(names).not.toContain("productAnalytics");
+  });
+
+  it("is hidden when product_analytics_enabled is false", async () => {
+    store.state.zoConfig.product_analytics_enabled = false;
+    const names = (await railItems()).map((l) => l.name);
+    expect(names).toContain("rum");
+    expect(names).not.toContain("productAnalytics");
+  });
+
+  it("drops only the Product Analytics child from Experience when the flag is off", async () => {
+    store.state.zoConfig.product_analytics_enabled = false;
+    store.state.zoConfig.synthetics_enabled = true;
+    expect(experienceChildren(await rail())).toEqual(["RUM", "synthetics"]);
+  });
+
+  it("appears once the flag arrives after mount, as when /config resolves late", async () => {
+    delete store.state.zoConfig.product_analytics_enabled;
+    store.state.zoConfig.synthetics_enabled = true;
+    const navbar = () => wrapper!.findAllComponents(NavbarStub)[0];
+    const names = () => (navbar().props("linksList") as NavItem[]).map((l) => l.name);
+    await railItems();
+    expect(names()).not.toContain("productAnalytics");
+
+    store.state.zoConfig.product_analytics_enabled = true;
+    await flushPromises();
+    const items = navbar().props("linksList") as NavItem[];
+    expect(items[items.findIndex((l) => l.name === "rum") + 1]?.name).toBe("productAnalytics");
+    expect(experienceChildren(groupNavLinks(items))).toEqual([
+      "RUM",
+      "synthetics",
+      "productAnalytics",
+    ]);
+
+    store.state.zoConfig.product_analytics_enabled = false;
+    await flushPromises();
+    expect(names()).not.toContain("productAnalytics");
+  });
+
+  it("stays hidden when the flag arrives late but custom_hide_menus names it", async () => {
+    delete store.state.zoConfig.product_analytics_enabled;
+    store.state.zoConfig.custom_hide_menus = "productAnalytics";
+    await railItems();
+    store.state.zoConfig.product_analytics_enabled = true;
+    await flushPromises();
+    const names = (wrapper!.findAllComponents(NavbarStub)[0].props("linksList") as NavItem[]).map(
+      (l) => l.name,
+    );
+    expect(names).toContain("rum");
+    expect(names).not.toContain("productAnalytics");
+  });
+
+  it("stays visible with the flag on and no custom_hide_menus", async () => {
+    const names = (await railItems()).map((l) => l.name);
+    expect(names).toContain("productAnalytics");
   });
 
   it("hides with custom_hide_menus like every other rail item", async () => {

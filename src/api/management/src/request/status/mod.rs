@@ -247,6 +247,7 @@ struct ConfigResponse<'a> {
     search_inspector_enabled: bool,
     auto_query_enabled: bool,
     profiling_enabled: bool,
+    product_analytics_enabled: bool,
     #[cfg(feature = "enterprise")]
     last_usage_report_ts: i64,
     #[cfg(feature = "enterprise")]
@@ -623,6 +624,7 @@ pub async fn zo_config(
         search_inspector_enabled,
         auto_query_enabled: cfg.common.auto_query_enabled,
         profiling_enabled: cfg.common.profiling_enabled,
+        product_analytics_enabled: cfg.common.product_analytics_enabled,
         #[cfg(feature = "enterprise")]
         last_usage_report_ts,
         #[cfg(feature = "enterprise")]
@@ -2433,5 +2435,22 @@ mod tests {
             consume_login_state(Some(&state), Some("abd")).await,
             Err("invalid state in request")
         );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_product_analytics_enabled_under_that_key() {
+        let cfg = get_config();
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            json["product_analytics_enabled"],
+            serde_json::Value::Bool(cfg.common.product_analytics_enabled)
+        );
+        assert_eq!(json["product_analytics_enabled"], false);
     }
 }
