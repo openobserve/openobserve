@@ -48,7 +48,7 @@ These hurt maintainability or make tests flaky, but do not by themselves void co
 ## What NOT to Flag
 
 - Raw selectors *inside page-object files* — that is where selectors are supposed to live.
-- Callbacks passed to `test` / `test.describe` / hooks / `test.step`, inline callbacks (`.map(x => …)`, `expect(async () => …).toPass()`), a `for` loop that generates tests, or calls to helpers imported from `pages/` / `utils/` — none of these are spec helpers. Helpers a spec already had before this PR are out of scope (most older specs predate the rule).
+- Callbacks passed to `test` / `test.describe` / hooks / `test.step`, inline callbacks (`.map(x => …)`, `expect(async () => …).toPass()`), a `for` loop that generates tests, or calls to helpers imported from `pages/` / `utils/` — none of these are spec helpers. Helpers and raw HTTP calls a spec already had before this PR are out of scope (most older specs predate the rule).
 - Fixture/throwaway strings, long payloads, or deliberately odd test data.
 - Style/formatting, import ordering, naming preferences — ESLint owns these.
 - Tagging/structure nitpicks unless a tag is clearly wrong or missing on a new spec.
