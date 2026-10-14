@@ -93,3 +93,67 @@ pub static SLACK_TURNS_INFLIGHT: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+
+pub(super) fn register(registry: &prometheus::Registry) {
+    registry
+        .register(Box::new(SLACK_SOCKETS_UP.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SLACK_LAST_EVENT_AGE_SECONDS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SLACK_API_429_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SLACK_SEND_FAILURES_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SLACK_INBOUND_EVENTS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SLACK_TURNS_INFLIGHT.clone()))
+        .expect("Metric registered");
+}
+
+#[cfg(test)]
+mod tests {
+    use prometheus::{Encoder, Registry, TextEncoder};
+
+    use super::*;
+
+    #[test]
+    fn every_slack_metric_registers_under_the_zo_namespace() {
+        let registry = Registry::new();
+        register(&registry);
+        SLACK_SOCKETS_UP.with_label_values(&["i1"]).set(2);
+        SLACK_LAST_EVENT_AGE_SECONDS
+            .with_label_values(&["i1"])
+            .set(5);
+        SLACK_API_429_TOTAL
+            .with_label_values(&["chat.postMessage"])
+            .inc();
+        SLACK_SEND_FAILURES_TOTAL
+            .with_label_values(&["rate_limited"])
+            .inc();
+        SLACK_INBOUND_EVENTS_TOTAL
+            .with_label_values(&["event", "accepted"])
+            .inc();
+        SLACK_TURNS_INFLIGHT.with_label_values(&["acme"]).set(1);
+
+        let mut buffer = vec![];
+        TextEncoder::new()
+            .encode(&registry.gather(), &mut buffer)
+            .unwrap();
+        let text = String::from_utf8(buffer).unwrap();
+        for name in [
+            "zo_slack_sockets_up{",
+            "zo_slack_last_event_age_seconds{",
+            "zo_slack_api_429_total{",
+            "zo_slack_send_failures_total{",
+            "zo_slack_inbound_events_total{",
+            "zo_slack_turns_inflight{",
+        ] {
+            assert!(text.contains(name), "{name} missing from:\n{text}");
+        }
+    }
+}

@@ -164,16 +164,7 @@ impl super::Queue for NatsQueue {
         let client = get_nats_client().await.clone();
         let jetstream = jetstream::new(client);
         let topic_name = format!("{}{}", self.prefix, format_key(topic));
-        let stream_config = jetstream::stream::Config {
-            name: topic_name.to_string(),
-            subjects: vec![topic_name.to_string(), format!("{}.*", topic_name)],
-            retention: config.retention_policy.into(),
-            storage: config.storage_type.into(),
-            num_replicas: cfg.nats.replicas,
-            max_bytes: cfg.nats.queue_max_size,
-            max_age,
-            ..Default::default()
-        };
+        let stream_config = stream_config(&topic_name, &config, max_age, &cfg.nats);
         let stream = jetstream.get_or_create_stream(stream_config).await?;
         // create() passes no max_age and must leave existing streams untouched
         if config.max_age.is_some() {
@@ -300,6 +291,28 @@ impl super::Queue for NatsQueue {
     }
 }
 
+fn stream_config(
+    topic_name: &str,
+    config: &queue::QueueConfig,
+    max_age: Duration,
+    nats: &config::Nats,
+) -> jetstream::stream::Config {
+    let mut stream = jetstream::stream::Config {
+        name: topic_name.to_string(),
+        subjects: vec![topic_name.to_string(), format!("{topic_name}.*")],
+        retention: config.retention_policy.into(),
+        storage: config.storage_type.into(),
+        num_replicas: nats.replicas,
+        max_bytes: nats.queue_max_size,
+        max_age,
+        ..Default::default()
+    };
+    if let Some(window) = config.duplicate_window {
+        stream.duplicate_window = window;
+    }
+    stream
+}
+
 // failure only warns: the stream still works, and an update can time out while a replica is down
 async fn reconcile_max_age(
     jetstream: &jetstream::Context,
@@ -386,6 +399,27 @@ mod tests {
             max_age,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn stream_config_carries_the_duplicate_window() {
+        let cfg = config::get_config();
+        let nats = &cfg.nats;
+        let windowed = queue::QueueConfigBuilder::new()
+            .duplicate_window(Duration::from_secs(3600))
+            .build();
+        let built = stream_config("o2_slack_inbound", &windowed, Duration::from_secs(60), nats);
+        assert_eq!(built.duplicate_window, Duration::from_secs(3600));
+        assert_eq!(built.max_age, Duration::from_secs(60));
+        assert_eq!(built.subjects, ["o2_slack_inbound", "o2_slack_inbound.*"]);
+
+        let plain = queue::QueueConfigBuilder::new().build();
+        let built = stream_config("o2_other", &plain, Duration::from_secs(60), nats);
+        assert_eq!(
+            built.duplicate_window,
+            jetstream::stream::Config::default().duplicate_window,
+            "without a window the server default applies"
+        );
     }
 
     #[test]

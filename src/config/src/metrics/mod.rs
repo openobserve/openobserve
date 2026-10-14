@@ -32,6 +32,7 @@ pub fn init() {
     base::register(registry);
     promql::register(registry);
     oncall::register(registry);
+    slack::register(registry);
 }
 
 pub fn create_const_labels() -> HashMap<String, String> {
