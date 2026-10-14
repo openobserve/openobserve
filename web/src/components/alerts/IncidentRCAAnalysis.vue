@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rca-credit-cost"
         class="text-text-secondary ms-2 text-xs"
       >
-        {{ t("alerts.incidents.rcaCreditCost", { cost: analyzeCreditCost }) }}
+        {{ t("alerts.incidents.rcaCreditCost", { cost: analyzeCreditCost }, analyzeCreditCost) }}
       </span>
     </div>
 
@@ -240,7 +240,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="flex flex-col">
             <span>{{ t("alerts.incidents.rcaFreshAnalysis") }}</span>
             <span v-if="reanalyzeCreditCost" class="text-text-secondary text-xs">
-              {{ t("alerts.incidents.rcaCreditCost", { cost: reanalyzeCreditCost }) }}
+              {{
+                t(
+                  "alerts.incidents.rcaCreditCost",
+                  { cost: reanalyzeCreditCost },
+                  reanalyzeCreditCost,
+                )
+              }}
             </span>
             <span class="text-text-secondary text-xs">
               {{ t("alerts.incidents.rcaFreshAnalysisHint") }}
@@ -254,7 +260,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="flex flex-col">
             <span>{{ t("alerts.incidents.rcaBuildOnPrevious") }}</span>
             <span v-if="reanalyzeCreditCost" class="text-text-secondary text-xs">
-              {{ t("alerts.incidents.rcaCreditCost", { cost: reanalyzeCreditCost }) }}
+              {{
+                t(
+                  "alerts.incidents.rcaCreditCost",
+                  { cost: reanalyzeCreditCost },
+                  reanalyzeCreditCost,
+                )
+              }}
             </span>
             <span class="text-text-secondary text-xs">
               {{ t("alerts.incidents.rcaBuildOnPreviousHint") }}

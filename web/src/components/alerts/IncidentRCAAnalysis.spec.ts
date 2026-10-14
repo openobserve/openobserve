@@ -535,6 +535,17 @@ describe("IncidentRCAAnalysis", () => {
     });
   });
 
+  describe("Credit cost", () => {
+    it("uses the singular for one credit and the plural otherwise", () => {
+      wrapper = mountComponent({ analyzeCreditCost: 1 });
+      expect(findByTestId(wrapper, "rca-credit-cost").text()).toBe("Uses 1 AI credit");
+
+      wrapper.unmount();
+      wrapper = mountComponent({ analyzeCreditCost: 50 });
+      expect(findByTestId(wrapper, "rca-credit-cost").text()).toBe("Uses 50 AI credits");
+    });
+  });
+
   describe("Failure State", () => {
     const failure = { reason: "Agent unavailable", details: "connection refused" };
 

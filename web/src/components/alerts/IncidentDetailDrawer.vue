@@ -3111,9 +3111,11 @@ export default defineComponent({
             const ok = await confirm({
               title: t("alerts.incidents.rerunAnalysisTitle"),
               message: aiCreditCosts.value
-                ? t("alerts.incidents.rerunAnalysisMessageWithCost", {
-                    cost: aiCreditCosts.value.incident_reanalysis,
-                  })
+                ? t(
+                    "alerts.incidents.rerunAnalysisMessageWithCost",
+                    { cost: aiCreditCosts.value.incident_reanalysis },
+                    aiCreditCosts.value.incident_reanalysis,
+                  )
                 : t("alerts.incidents.rerunAnalysisMessage"),
               confirmLabel: t("alerts.incidents.rerunAnalysisConfirmLabel"),
               cancelLabel: t("alerts.incidents.rerunAnalysisCancelLabel"),

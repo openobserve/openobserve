@@ -88,6 +88,20 @@ describe("O2AICreditsNotice", () => {
     expect(mockPush).toHaveBeenCalledWith({ name: "plans", query: { org_identifier: "org1" } });
   });
 
+  it("names the unit after the message cost, singular or plural", async () => {
+    mockGetAiUsage.mockResolvedValue(usage({ credits_used: 4, credits_remaining: 1 }));
+    expect((await mountNotice()).text()).toContain("A message uses 1 credit.");
+
+    mockGetAiUsage.mockResolvedValue(
+      usage({
+        credits_used: 4,
+        credits_remaining: 1,
+        costs: { chat: 2, incident: 50, incident_reanalysis: 50 },
+      }),
+    );
+    expect((await mountNotice()).text()).toContain("A message uses 2 credits.");
+  });
+
   it("is a live region, so screen readers announce it", async () => {
     mockGetAiUsage.mockResolvedValue(usage({ mode: "exhausted", credits_remaining: 0 }));
     const w = await mountNotice();

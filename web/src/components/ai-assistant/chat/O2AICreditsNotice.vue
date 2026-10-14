@@ -35,10 +35,11 @@
         </div>
         <div class="text-text-secondary">
           {{
-            t("aiAssistant.creditsCosts", {
-              chat: usage!.costs.chat,
-              incident: usage!.costs.incident,
-            })
+            t(
+              "aiAssistant.creditsCosts",
+              { chat: usage!.costs.chat, incident: usage!.costs.incident },
+              usage!.costs.chat,
+            )
           }}
         </div>
       </template>
