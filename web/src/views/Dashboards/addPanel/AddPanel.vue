@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             onClick: goBack,
             dataTest: 'dashboard-back-btn',
           }"
-          :subtitle="editMode ? t('panel.editPanel') : t('panel.addPanel')"
+          :subtitle="panelSubtitle"
           title-overflow="visible"
         >
           <template #title>
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('panel.namePlaceholder')"
               :aria-label="t('panel.name')"
               :edit-hint="
-                panelAutoName.isAuto.value ? t('common.inlineEdit.autoHint') : t('panel.renameHint')
+                panelAutoName.isAuto.value ? t('common.inlineEdit.autoHint') : panelRenameHint
               "
               @update:model-value="panelAutoName.markManual"
               @commit="panelAutoName.onCommit"
@@ -327,6 +327,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import { readableTemplate } from "@/utils/dashboard/repeatByVariable";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -458,6 +459,17 @@ export default defineComponent({
       currentValue: () => (form.state.values.title ?? "") as string,
       apply: (name: string) => form.setFieldValue("title", name, { dontUpdateMeta: true }),
       enabled: () => !editMode.value,
+    });
+    const panelRenameHint = t("panel.renameHintVariables", { example: raw("$variable") });
+    // Opened from a per-value tab: the panel lives on the source tab and shows in all of its copies.
+    const panelSubtitle = computed(() => {
+      const tabName = route.query.fromTab
+        ? currentDashboardData.data?.tabs?.find((tab: any) => tab.tabId === route.query.tab)?.name
+        : null;
+      if (!tabName) return editMode.value ? t("panel.editPanel") : t("panel.addPanel");
+      return editMode.value
+        ? t("panel.editPanelRepeatedTab", { tab: raw(readableTemplate(tabName)) })
+        : t("panel.addPanelRepeatedTab", { tab: raw(readableTemplate(tabName)) });
     });
 
     let variablesData: any = reactive({});
@@ -1203,7 +1215,8 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
-          tab: route.query.tab ?? currentDashboardData?.data?.tabs?.[0]?.tabId,
+          tab:
+            route.query.fromTab ?? route.query.tab ?? currentDashboardData?.data?.tabs?.[0]?.tabId,
         },
       });
     };
@@ -1465,7 +1478,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
             dashboard: dashId,
             folder: route.query.folder ?? "default",
-            tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+            tab: route.query.fromTab ?? route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
           },
         });
       } catch (error: any) {
@@ -1921,6 +1934,8 @@ export default defineComponent({
 
     return {
       t,
+      panelRenameHint,
+      panelSubtitle,
       isMobile,
       updateDateTime,
       goBack,

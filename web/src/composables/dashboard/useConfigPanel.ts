@@ -431,6 +431,12 @@ export function useConfigPanel(
         visible: dashboardPanelData.data.type === "metric",
       },
     },
+    repeat: {
+      repeat: {
+        label: [t("dashboard.configSectionRepeat"), t("dashboard.repeat.searchKeywords")],
+        visible: dashboardPanelDataPageKey === "dashboard",
+      },
+    },
   }));
 
   // ── Search state ──────────────────────────────────────────────────────────

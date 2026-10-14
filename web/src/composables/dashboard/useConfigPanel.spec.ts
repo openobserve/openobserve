@@ -197,10 +197,11 @@ describe("ORDERED_SECTION_IDS", () => {
     "markLines",
     "background",
     "sparkline",
+    "repeat",
   ];
 
-  it("contains all 21 sections", () => {
-    expect(ORDERED_SECTION_IDS).toHaveLength(21);
+  it("contains all 22 sections", () => {
+    expect(ORDERED_SECTION_IDS).toHaveLength(22);
   });
 
   it("contains every expected section id", () => {
@@ -1112,5 +1113,26 @@ describe("useConfigPanel – show exemplars option", () => {
   ])("stays hidden for %s/%s with promqlMode=%s", (type, queryType, promql) => {
     const c = makeComposable(promqlPanel(type, queryType), ref(promql));
     expect(c.isConfigOptionVisible("general", "show-exemplars")).toBe(false);
+  });
+});
+
+describe("useConfigPanel – repeat section", () => {
+  it("is found by searching 'repeat' in the dashboard panel editor", async () => {
+    const c = makeComposable();
+    c.searchQuery.value = "repeat";
+    await nextTick();
+    expect(c.isSectionVisible("repeat")).toBe(true);
+  });
+
+  it("is hidden outside dashboards", () => {
+    const c = useConfigPanel(
+      makePanelData(),
+      ref(false),
+      "logs",
+      computed(() => false),
+      computed(() => false),
+      computed(() => false),
+    );
+    expect(c.isSectionVisible("repeat")).toBe(false);
   });
 });

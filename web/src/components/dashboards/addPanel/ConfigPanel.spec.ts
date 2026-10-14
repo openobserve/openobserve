@@ -2678,4 +2678,23 @@ describe("ConfigPanel", () => {
       expect(expansionItems.length).toBeGreaterThan(0);
     });
   });
+
+  describe("Repeat section", () => {
+    it("scrolls the repeat section into view once it has opened", async () => {
+      vi.useFakeTimers();
+      try {
+        wrapper = createWrapper();
+        const section = wrapper.find('[data-test="dashboard-config-repeat-section"]').element;
+        const scrollIntoView = vi.fn();
+        (section as any).scrollIntoView = scrollIntoView;
+        wrapper.vm.onRepeatSectionToggle(true);
+        expect(wrapper.vm.expandedSections.repeat).toBe(true);
+        expect(scrollIntoView).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(250);
+        expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
 });

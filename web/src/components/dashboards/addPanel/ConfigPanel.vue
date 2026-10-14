@@ -1809,6 +1809,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <SparklineConfig />
       </div>
     </OCollapsible>
+
+    <!-- Section: Repeat for each value -->
+    <OCollapsible
+      variant="config"
+      v-if="dashboardPanelDataPageKey === 'dashboard'"
+      v-show="isSectionVisible('repeat')"
+      :model-value="isExpanded('repeat')"
+      :icon="SECTION_ICONS.repeat"
+      ref="repeatSectionRef"
+      @update:modelValue="onRepeatSectionToggle"
+      :label="t('dashboard.configSectionRepeat')"
+      class="border-card-glass-border border-t border-solid"
+      data-test="dashboard-config-repeat-section"
+    >
+      <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+        <RepeatConfig :variablesData="variablesData" />
+      </div>
+    </OCollapsible>
   </div>
 </template>
 
@@ -1831,6 +1849,7 @@ import {
   inject,
   nextTick,
   onBeforeMount,
+  onBeforeUnmount,
   onMounted,
   ref,
   markRaw,
@@ -1849,6 +1868,7 @@ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import SparklineConfig from "./SparklineConfig.vue";
+import RepeatConfig from "./RepeatConfig.vue";
 import ConfigPanelSearch from "./ConfigPanelSearch.vue";
 import { useConfigPanel } from "../../../composables/dashboard/useConfigPanel";
 import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
@@ -1911,6 +1931,7 @@ export default defineComponent({
     ColorPaletteDropDown,
     BackGroundColorConfig,
     SparklineConfig,
+    RepeatConfig,
     PromQLChartConfig,
     OButton,
     OTooltip,
@@ -2644,6 +2665,21 @@ export default defineComponent({
       isPivotMode,
     );
 
+    const repeatSectionRef = ref<{ $el?: HTMLElement } | null>(null);
+    let repeatScrollTimer: ReturnType<typeof setTimeout> | undefined;
+    // The section is the last one, so it opens below the fold; scroll once its 200ms open animation ends.
+    const onRepeatSectionToggle = (open: boolean) => {
+      expandedSections.value.repeat = open;
+      clearTimeout(repeatScrollTimer);
+      if (!open) return;
+      repeatScrollTimer = setTimeout(
+        () =>
+          repeatSectionRef.value?.$el?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }),
+        220,
+      );
+    };
+    onBeforeUnmount(() => clearTimeout(repeatScrollTimer));
+
     // Focus the search box when the config panel opens so users can start
     // filtering settings right away.
     onMounted(() => {
@@ -2753,6 +2789,8 @@ export default defineComponent({
       onCancelPanelTime,
       searchQuery,
       expandedSections,
+      repeatSectionRef,
+      onRepeatSectionToggle,
       isExpanded,
       isSectionVisible,
       exemplarsSwitchEligible,
