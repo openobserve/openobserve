@@ -178,6 +178,11 @@ vi.mock("@/utils/date", () => ({
   })),
 }));
 
+vi.mock("@/utils/semanticGroupsCache", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/semanticGroupsCache")>()),
+  getCachedSemanticGroups: vi.fn(() => mockSemanticGroups.value),
+}));
+
 vi.mock("@/composables/useServiceCorrelation", () => ({
   useServiceCorrelation: vi.fn(() => ({
     semanticGroups: mockSemanticGroups,
@@ -656,6 +661,17 @@ describe("useSearchQuery › validateFilterForMultiStream", () => {
     it("should clear missingStreamMultiStreamFilter for the resolved stream", () => {
       validateFilterForMultiStream();
 
+      expect(mockState.searchObj.data.stream.missingStreamMultiStreamFilter).toEqual([]);
+    });
+
+    it("should map with groups that loaded after an earlier resolution found none", () => {
+      const groups = mockSemanticGroups.value;
+      mockSemanticGroups.value = [];
+      validateFilterForMultiStream();
+      expect(mockState.searchObj.data.stream.missingStreamMultiStreamFilter).toEqual(["streamB"]);
+
+      mockSemanticGroups.value = groups;
+      validateFilterForMultiStream();
       expect(mockState.searchObj.data.stream.missingStreamMultiStreamFilter).toEqual([]);
     });
   });

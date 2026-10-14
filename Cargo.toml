@@ -633,3 +633,4 @@ zstd = "0.13"
 [patch.crates-io]
 object_store = { git = "https://github.com/openobserve/arrow-rs-object-store", branch = "openobserve-v0.13.2" }
 tantivy = { git = "https://github.com/openobserve/tantivy", branch = "perf/openobserve" }
+sqlparser = { git = "https://github.com/openobserve/sqlparser-rs", branch = "0.62.0-patch" }

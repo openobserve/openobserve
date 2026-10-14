@@ -112,8 +112,16 @@ vi.mock("@/composables/useLogs/useStreamFields", () => ({
   default: () => ({ extractFields: vi.fn().mockResolvedValue(undefined) }),
 }));
 
-vi.mock("@/aws-exports", () => ({
-  default: { isEnterprise: "false", isCloud: "false" },
+const { mockConfig, mockLoadSemanticGroups, mockGetCachedSemanticGroups } = vi.hoisted(() => ({
+  mockConfig: { isEnterprise: "false", isCloud: "false" },
+  mockLoadSemanticGroups: vi.fn(),
+  mockGetCachedSemanticGroups: vi.fn(() => null as unknown[] | null),
+}));
+vi.mock("@/aws-exports", () => ({ default: mockConfig }));
+vi.mock("@/utils/semanticGroupsCache", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/semanticGroupsCache")>()),
+  loadSemanticGroups: mockLoadSemanticGroups,
+  getCachedSemanticGroups: mockGetCachedSemanticGroups,
 }));
 
 const { mockSavedViewsGet } = vi.hoisted(() => ({
@@ -241,6 +249,64 @@ describe("useSearchBar Composable", () => {
       const searchObj = prime(false);
       await (wrapper.vm as any).getQueryData(true);
       expect(searchObj.meta.showDetailTab).toBe(false);
+    });
+  });
+
+  describe("getQueryData — semantic groups a filter needs", () => {
+    let releaseGroups: (groups: unknown[]) => void;
+
+    const prime = (query: string) => {
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamLists = [{ label: "app", value: "app" }];
+      searchObj.data.stream.selectedStream = ["app"];
+      searchObj.data.query = query;
+    };
+
+    beforeEach(() => {
+      mockConfig.isEnterprise = "true";
+      mockGetCachedSemanticGroups.mockReturnValue(null);
+      mockLoadSemanticGroups.mockReturnValue(
+        new Promise((resolve) => {
+          releaseGroups = resolve;
+        }),
+      );
+    });
+
+    afterEach(() => {
+      mockConfig.isEnterprise = "false";
+      searchState().searchObj.data.query = "";
+    });
+
+    it("waits for uncached groups before building a filtered search", async () => {
+      prime("host = 'a'");
+      const run = (wrapper.vm as any).getQueryData(false);
+      await flushPromises();
+      expect(mockGetDataThroughStream).not.toHaveBeenCalled();
+
+      releaseGroups([]);
+      await run;
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ["no filter", "", null, "true"],
+      ["cached groups", "host = 'a'", [], "true"],
+      ["an OSS build", "host = 'a'", null, "false"],
+    ])("dispatches in the same tick with %s", (_case, query, cached, enterprise) => {
+      mockConfig.isEnterprise = enterprise as string;
+      mockGetCachedSemanticGroups.mockReturnValue(cached as unknown[] | null);
+      prime(query as string);
+      void (wrapper.vm as any).getQueryData(false);
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+      expect(mockLoadSemanticGroups).not.toHaveBeenCalled();
+    });
+
+    it("does not send a search superseded while it waited", async () => {
+      prime("host = 'a'");
+      const run = (wrapper.vm as any).getQueryData(false, { generationId: 987654 });
+      releaseGroups([]);
+      await run;
+      expect(mockGetDataThroughStream).not.toHaveBeenCalled();
     });
   });
 
