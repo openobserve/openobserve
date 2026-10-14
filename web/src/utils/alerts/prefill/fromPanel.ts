@@ -212,6 +212,14 @@ const formulaInputStreams = (
   return [...new Set(names)].map((name) => ({ name, type: "metrics" }));
 };
 
+/** The metrics a code-mode query's text selects, when its inherited `fields.stream` is not one of them. */
+const codeModeStreams = (query: any, text: string): AlertPrefillStreamCandidate[] => {
+  if (query?.customQuery !== true) return [];
+  const names = selectorMetricNames(withoutComments(text));
+  if (names.includes(query?.fields?.stream)) return [];
+  return names.map((name) => ({ name, type: "metrics" }));
+};
+
 /** The executed text of a panel query's current-period window; shifted windows follow the primaries. */
 export const executedPanelQuery = (
   metadataQueries: any[] | undefined,
@@ -255,11 +263,12 @@ export const buildPrefillFromPanel = (
   }
 
   const isPromql = input.queryType === "promql";
-  const inputStreams =
-    isPromql && isFormulaQuery(query)
-      ? formulaInputStreams(input.queries ?? [], query.config.formula, input.metadataQueries)
-      : [];
   const sourceQuery = input.executedQuery || query?.query || "";
+  const inputStreams = !isPromql
+    ? []
+    : isFormulaQuery(query)
+      ? formulaInputStreams(input.queries ?? [], query.config.formula, input.metadataQueries)
+      : codeModeStreams(query, sourceQuery);
   // Raw text from a query that never ran may still hold dashboard variables the evaluator cannot fill.
   if (!input.executedQuery && /\$(\w|\{)/.test(sourceQuery)) {
     warnings.push(warn("unresolvedQuery", "blocking"));
@@ -317,9 +326,8 @@ export const buildPrefillFromPanel = (
     }
   } else {
     prefill.sql = sourceQuery;
-    // Raw-SQL panels get their threshold as a HAVING clause injected into the
-    // query text, which needs the SQL parser — the consumer applies this.
-    if (hasThreshold && !aggregation && input.yAxisColumn) {
+    // The threshold rides as a HAVING the consumer injects with its SQL parser; the form saves SQL, not the aggregation.
+    if (hasThreshold && input.yAxisColumn) {
       prefill.meta = {
         ...prefill.meta,
         sqlHaving: {
