@@ -21,7 +21,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::meta::dashboards::Dashboard;
+use crate::meta::{dashboards::Dashboard, stream::StreamType};
 
 /// The refresh interval a new link gets when the request names none.
 pub const DEFAULT_REFRESH_SECS: i32 = 300;
@@ -224,8 +224,40 @@ impl PanelState {
     }
 }
 
-/// A window in UTC micros.
+/// A panel the result file masks on every serve, and why.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WithheldPanel {
+    pub panel_id: String,
+    pub reason: NotAvailableReason,
+}
+
+/// One range's result on the querier that owns the link, as the publisher's status call reports.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RangeState {
+    Cached,
+    NotCached,
+    Building,
+    NeedsAttention,
+}
+
+/// Status of one offered range, read from the owning querier's result file.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RangeStatus {
+    pub key: String,
+    pub state: RangeState,
+    pub built_at: Option<i64>,
+    pub withheld_panels: Vec<WithheldPanel>,
+    pub unavailable_count: u16,
+    pub incomplete_count: u16,
+    pub last_error: Option<String>,
+    /// Panel id to the typed streams its data was read from; left out of the batch call.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sources: Option<BTreeMap<String, Vec<(StreamType, String)>>>,
+}
+
+/// A window in UTC micros.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Window {
     pub start: i64,
     pub end: i64,
@@ -666,5 +698,44 @@ mod tests {
             r#"{"type":"absolute","start":1000000,"end":61000000}"#
         );
         assert_eq!(serde_json::from_str::<TimeRange>(&json).unwrap(), abs);
+    }
+
+    #[test]
+    fn range_status_uses_the_status_contract() {
+        let mut sources = BTreeMap::new();
+        sources.insert(
+            "p1".to_string(),
+            vec![(StreamType::Logs, "default".to_string())],
+        );
+        let status = RangeStatus {
+            key: "r3600".into(),
+            state: RangeState::NeedsAttention,
+            built_at: Some(5),
+            withheld_panels: vec![WithheldPanel {
+                panel_id: "p2".into(),
+                reason: NotAvailableReason::Unauthorized,
+            }],
+            unavailable_count: 1,
+            incomplete_count: 0,
+            last_error: None,
+            sources: Some(sources),
+        };
+        assert_eq!(
+            serde_json::to_value(&status).unwrap(),
+            serde_json::json!({
+                "key": "r3600", "state": "needs_attention", "built_at": 5,
+                "withheld_panels": [{ "panel_id": "p2", "reason": "unauthorized" }],
+                "unavailable_count": 1, "incomplete_count": 0, "last_error": null,
+                "sources": { "p1": [["logs", "default"]] }
+            })
+        );
+        let batch = RangeStatus {
+            sources: None,
+            state: RangeState::NotCached,
+            ..status
+        };
+        let json = serde_json::to_value(&batch).unwrap();
+        assert!(json.get("sources").is_none());
+        assert_eq!(json["state"], "not_cached");
     }
 }

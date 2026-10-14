@@ -61,6 +61,33 @@ impl QueryVars {
         }
     }
 
+    /// `(name, frozen key)` of each in-scope variable that one of `texts` references.
+    pub fn referenced(
+        &self,
+        tab_id: &str,
+        panel_id: &str,
+        texts: &[&str],
+    ) -> Vec<(String, String)> {
+        let names: Vec<&str> = self.vars.iter().map(|v| v.name.as_str()).collect();
+        let Some(re) = placeholder_regex(&names) else {
+            return vec![];
+        };
+        let used: std::collections::BTreeSet<String> = texts
+            .iter()
+            .flat_map(|t| {
+                re.captures_iter(&normalize_syntax(t))
+                    .filter_map(|c| c.get(1).or_else(|| c.get(3)).or_else(|| c.get(5)))
+                    .map(|m| m.as_str().to_string())
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        self.vars
+            .iter()
+            .filter(|v| used.contains(&v.name))
+            .filter_map(|v| Some((v.name.clone(), v.key_for(tab_id, panel_id)?)))
+            .collect()
+    }
+
     /// The values one panel sees: each variable's global, tab or panel value, as its scope says.
     pub fn for_panel(&self, tab_id: &str, panel_id: &str) -> PanelVars {
         let values = self

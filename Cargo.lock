@@ -8408,6 +8408,7 @@ dependencies = [
  "utoipa",
  "version-compare",
  "vrl",
+ "zstd",
 ]
 
 [[package]]

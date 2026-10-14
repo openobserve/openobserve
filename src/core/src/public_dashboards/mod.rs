@@ -16,22 +16,37 @@
 //! Public dashboard links: CRUD with compare-and-set revisions and soft delete, validation, and
 //! the panel build that runs each saved query server-side, checked against the publisher's access.
 
+pub mod access;
+mod authz_check;
 mod defaults;
+pub mod flight;
+pub mod intent;
+mod mask;
+pub mod materialize;
+pub mod store;
 mod variables;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
+use async_trait::async_trait;
 use config::{
     get_config, ider,
     meta::{
-        dashboards::Dashboard,
+        dashboards::{
+            Dashboard,
+            usage_report::DashboardInfo,
+            v8::{Panel, Tab},
+        },
         public_dashboards::{
             MAX_REFRESH_SECS, MIN_REFRESH_SECS, NotAvailableReason, PanelResult, PanelState,
-            PublicDashboardConfig, PublicLinkState, PublicLinkStatus, PublicVariable, ResultBody,
-            TimeRange, TimeRangePolicy, Window,
+            PublicDashboardConfig, PublicLinkState, PublicLinkStatus, PublicVariable, TimeRange,
+            TimeRangePolicy, Window, public_dashboard_identity,
         },
         search,
-        sql::{TableReferenceExt, resolve_stream_names_with_type},
+        sql::{TableReferenceExt, resolve_stream_names, resolve_stream_names_with_type},
         stream::StreamType,
     },
     utils::{
@@ -40,6 +55,8 @@ use config::{
     },
 };
 use defaults::{Defaults, ValuesQuery};
+use flight::{Flight, TraceFamily};
+use futures::StreamExt;
 use infra::{
     db::{get_orm_client_ro, get_orm_client_rw},
     table::{
@@ -51,6 +68,8 @@ use infra::{
         public_dashboards::{self as pd_table, CreateOutcome},
     },
 };
+use materialize::{Capture, Class, Engine, PanelRun, Run};
+use store::{ExecutedQuery, ManifestPanel, ValuesDependency};
 use variables::{PanelVars, QueryVars};
 
 const MAX_RANGES: usize = 10;
@@ -73,6 +92,77 @@ const PUBLIC_META_FIELDS: [&str; 6] = [
     "new_start_time",
     "new_end_time",
 ];
+
+/// The engine the public routes use.
+pub static ENGINE: SearchEngine = SearchEngine;
+
+/// The search engine, the primary database and the authorizer the materializer runs on.
+pub struct SearchEngine;
+
+#[async_trait]
+impl Engine for SearchEngine {
+    async fn capture(&self, link_id: &str) -> Result<Option<Capture>, anyhow::Error> {
+        let db = get_orm_client_rw().await;
+        let Some(link) = pd_table::get(db, link_id).await? else {
+            return Ok(None);
+        };
+        let settings = pd_table::get_settings(db, &link.org_id).await?;
+        let dashboard = dashboards::get_by_id_primary(&link.org_id, &link.dashboard_id)
+            .await?
+            .map(|(_, dash)| dash);
+        Ok(Some(Capture {
+            settings_rev: settings.as_ref().map_or(0, |s| s.rev),
+            org_enabled: settings.as_ref().is_none_or(|s| s.enabled),
+            link,
+            dashboard,
+        }))
+    }
+
+    async fn run_panels(
+        &self,
+        cap: &Capture,
+        range: &TimeRange,
+        range_key: &str,
+        now: i64,
+        family: &TraceFamily,
+        flight: &Flight,
+    ) -> Run {
+        run_panels(cap, range, range_key, now, family, flight).await
+    }
+
+    async fn is_member(&self, org: &str, user: &str) -> Result<bool, anyhow::Error> {
+        publisher_is_member(org, user).await
+    }
+
+    async fn pause_departed(&self, link: &PublicDashboard) {
+        if let Err(e) = pause_for_departed_publisher(link.clone()).await {
+            log::error!(
+                "pausing public link {} of a departed publisher: {e}",
+                link.id
+            );
+        }
+    }
+
+    async fn authorize(
+        &self,
+        org: &str,
+        user: &str,
+        panel: &ManifestPanel,
+    ) -> Result<bool, anyhow::Error> {
+        authorize_manifest(org, user, panel).await
+    }
+
+    #[cfg_attr(not(feature = "cloud"), allow(unused_variables))]
+    async fn trial_ok(&self, org: &str) -> bool {
+        #[cfg(feature = "cloud")]
+        return matches!(
+            crate::organization::is_org_in_free_trial_period(org).await,
+            Ok(true)
+        );
+        #[cfg(not(feature = "cloud"))]
+        true
+    }
+}
 
 /// A request the admin API refuses with 400 and this message.
 #[derive(Debug, thiserror::Error)]
@@ -109,50 +199,153 @@ pub struct PublicLinkView {
     pub access_count: i64,
 }
 
-/// Builds one range's panels from the captured link and dashboard; nothing is stored here.
-pub async fn build_one(
-    link: &PublicDashboard,
-    dash: &Dashboard,
-    range: &TimeRange,
+/// One build's fixed inputs for its searches.
+struct Ctx<'a> {
+    link: &'a PublicDashboard,
+    dash: &'a Dashboard,
+    identity: String,
+    range_key: &'a str,
+    start: i64,
+    end: i64,
     now: i64,
-) -> ResultBody {
-    let scrape = db::organization::get_org_setting(&link.org_id)
-        .await
-        .ok()
-        .map(|s| f64::from(s.scrape_interval));
-    let (start, end) = range.window(now);
-    let mut authorized: BTreeSet<String> = BTreeSet::new();
-    let mut unauthorized: BTreeSet<String> = BTreeSet::new();
-    let values = fill_defaults(
-        &link.org_id,
-        &link.published_by,
-        dash,
-        parse_frozen_vars(link.frozen_variables.as_deref()),
-        start,
-        end,
-        &mut authorized,
-        &mut unauthorized,
-    )
-    .await;
-    let variables = PublicVariable::list(dash, &values);
-    let vars = QueryVars::new(dash, values, scrape);
-    let mut panels = build_panels(
-        &link.org_id,
-        &link.published_by,
-        dash,
-        &vars,
-        start,
-        end,
-        &mut authorized,
-        &mut unauthorized,
-    )
-    .await;
-    for panel in panels.values_mut() {
-        if matches!(panel.state, PanelState::Ok { .. }) {
-            panel.built_at = Some(now);
+    family: &'a TraceFamily,
+}
+
+impl Ctx<'_> {
+    /// Names the link, range and panel on the usage row and in the query list.
+    fn event_context(&self, panel_id: Option<&str>) -> search::SearchEventContext {
+        search::SearchEventContext {
+            dashboard_id: Some(self.link.dashboard_id.clone()),
+            dashboard_name: self.dash.v8.as_ref().map(|v8| v8.title.clone()),
+            dashboard_folder_id: Some(self.link.folder_id.clone()),
+            public_dashboard_link_id: Some(self.link.id.clone()),
+            range_key: Some(self.range_key.to_string()),
+            panel_id: panel_id.map(str::to_string),
+            ..Default::default()
         }
     }
-    ResultBody { panels, variables }
+
+    fn dashboard_info(&self, tab: &Tab, panel: &Panel) -> DashboardInfo {
+        DashboardInfo {
+            run_id: self.family.id().to_string(),
+            panel_id: panel.id.clone(),
+            panel_name: panel.title.clone(),
+            tab_id: tab.tab_id.clone(),
+            tab_name: tab.name.clone(),
+        }
+    }
+
+    fn timeout(&self) -> i64 {
+        i64::from(get_config().public_dashboards.query_timeout_secs)
+    }
+
+    fn panel_failed(&self, panel: &Panel, manifest: ManifestPanel, error: String) -> PanelRun {
+        log::warn!(
+            "public dashboard {} panel {} failed: {error}",
+            self.link.id,
+            panel.id
+        );
+        PanelRun::not_available(
+            &panel.id,
+            Class::Transient,
+            NotAvailableReason::BuildError,
+            manifest,
+            Some(error),
+        )
+    }
+}
+
+/// What every panel of one build shares.
+struct PanelScope<'a> {
+    ctx: &'a Ctx<'a>,
+    vars: &'a QueryVars,
+    frozen: &'a BTreeMap<String, serde_json::Value>,
+    values: &'a Values,
+    flight: &'a Flight,
+    done: &'a AtomicUsize,
+    total: usize,
+    max: usize,
+}
+
+impl PanelScope<'_> {
+    /// Panels past `MAX_PANELS`, counted across tabs in order, are withheld as too many.
+    async fn run(&self, i: usize, tab: &Tab, panel: &Panel) -> PanelRun {
+        let run = if i < self.max {
+            run_panel(self.ctx, self.vars, self.frozen, self.values, tab, panel).await
+        } else {
+            let manifest =
+                panel_manifest(self.ctx, self.vars, self.frozen, self.values, tab, panel);
+            PanelRun::not_available(
+                &panel.id,
+                Class::Structural,
+                NotAvailableReason::TooManyPanels,
+                manifest,
+                None,
+            )
+        };
+        let done = self.done.fetch_add(1, Ordering::Relaxed) + 1;
+        self.flight.set_progress(done, self.total);
+        run
+    }
+}
+
+/// The link's values, missing ones filled as the live picker would, and denied or failed keys.
+#[derive(Default)]
+struct Values {
+    values: BTreeMap<String, serde_json::Value>,
+    denied: BTreeSet<String>,
+    failed: BTreeSet<String>,
+    deps: BTreeMap<String, ValuesDependency>,
+}
+
+/// One time shift: the gap in milliseconds and its label, as the live renderer names them.
+#[derive(Clone, Debug, PartialEq)]
+struct Shift {
+    gap_ms: i64,
+    label: String,
+}
+
+/// Panel results the run collected so far.
+#[derive(Default)]
+struct Collected {
+    data: Vec<serde_json::Value>,
+    meta: Vec<serde_json::Value>,
+    queries: Vec<serde_json::Value>,
+    partial: bool,
+    truncated: bool,
+    window: Option<Window>,
+}
+
+impl Collected {
+    fn into_run(self, panel: &Panel, manifest: ManifestPanel, now: i64) -> PanelRun {
+        let class = if self.partial {
+            Class::Partial
+        } else if self.truncated {
+            Class::Truncated
+        } else {
+            Class::Fresh
+        };
+        PanelRun {
+            id: panel.id.clone(),
+            class,
+            result: PanelResult {
+                state: PanelState::Ok {
+                    retained: false,
+                    error_since: None,
+                    partial: self.partial,
+                    truncated: self.truncated,
+                },
+                intent: manifest.intent.clone(),
+                built_at: Some(now),
+                window: self.window,
+                data: self.data,
+                result_meta_data: self.meta,
+                metadata: serde_json::json!({ "queries": self.queries }),
+            },
+            manifest,
+            error: None,
+        }
+    }
 }
 
 /// Publish a link; it runs no query until someone opens it.
@@ -320,15 +513,22 @@ pub async fn pause_link(
     set_paused(&link, Some(user_id.to_string())).await
 }
 
-/// Whether the publisher has left the link's org; a failed lookup isn't treated as leaving.
+/// Whether the publisher left the link's org, from the primary; a failed lookup is not leaving.
 pub async fn publisher_left(link: &PublicDashboard) -> bool {
-    if db::user::is_root_user(&link.published_by) {
-        return false;
-    }
     matches!(
-        infra::table::org_users::get_optional(&link.org_id, &link.published_by).await,
-        Ok(None)
+        publisher_is_member(&link.org_id, &link.published_by).await,
+        Ok(false)
     )
+}
+
+/// Org membership from the primary, so a departure is never read from a lagging replica.
+pub async fn publisher_is_member(org: &str, user: &str) -> Result<bool, anyhow::Error> {
+    if db::user::is_root_user(user) {
+        return Ok(true);
+    }
+    Ok(infra::table::org_users::get_optional_primary(org, user)
+        .await?
+        .is_some())
 }
 
 /// Pause a link whose publisher left the org; the queries ran with that person's access.
@@ -490,6 +690,169 @@ pub fn time_ranges(link: &PublicDashboard) -> TimeRangePolicy {
     TimeRangePolicy { ranges, default }
 }
 
+/// Runs every panel of the captured dashboard for one window (design 5.4 steps 3 to 6).
+pub(crate) async fn run_panels(
+    cap: &Capture,
+    range: &TimeRange,
+    range_key: &str,
+    now: i64,
+    family: &TraceFamily,
+    flight: &Flight,
+) -> Run {
+    let Some(dash) = cap.dashboard.as_ref() else {
+        return Run::default();
+    };
+    let link = &cap.link;
+    let (start, end) = materialize::window(range, now);
+    let ctx = Ctx {
+        link,
+        dash,
+        identity: public_dashboard_identity(&link.org_id),
+        range_key,
+        start,
+        end,
+        now,
+        family,
+    };
+    let scrape = db::organization::get_org_setting(&link.org_id)
+        .await
+        .ok()
+        .map(|s| f64::from(s.scrape_interval));
+    let frozen = parse_frozen_vars(link.frozen_variables.as_deref());
+    let values = fill_defaults(&ctx, frozen.clone()).await;
+    let variables = PublicVariable::list(dash, &values.values);
+    let vars = QueryVars::new(dash, values.values.clone(), scrape);
+    let Some(v8) = dash.v8.as_ref() else {
+        return Run {
+            variables,
+            panels: vec![],
+        };
+    };
+    // Collected up front: an iterator adapter held across the awaits below isn't Send.
+    let panels: Vec<(&Tab, &Panel)> = v8
+        .tabs
+        .iter()
+        .flat_map(|tab| tab.panels.iter().map(move |panel| (tab, panel)))
+        .collect();
+    let cfg = &get_config().public_dashboards;
+    let max = cfg.max_panels as usize;
+    publish_estimate(&ctx, &vars, &panels[..panels.len().min(max)], flight).await;
+    let total = panels.len();
+    let done = AtomicUsize::new(0);
+    let scope = PanelScope {
+        ctx: &ctx,
+        vars: &vars,
+        frozen: &frozen,
+        values: &values,
+        flight,
+        done: &done,
+        total,
+        max,
+    };
+    let pending: Vec<_> = panels
+        .into_iter()
+        .enumerate()
+        .map(|(i, (tab, panel))| scope.run(i, tab, panel))
+        .collect();
+    let runs = futures::stream::iter(pending)
+        .buffered(cfg.panel_concurrency.max(1) as usize)
+        .collect()
+        .await;
+    Run {
+        variables,
+        panels: runs,
+    }
+}
+
+/// Checks every stream the final query reads and returns them; OSS has no stream permissions.
+#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+pub async fn authorize_query(
+    org: &str,
+    user_id: &str,
+    query_type: &str,
+    text: &str,
+    target: (StreamType, &str),
+) -> Result<Vec<(StreamType, String)>, NotAvailableReason> {
+    #[cfg(feature = "enterprise")]
+    {
+        use crate::authz::{
+            StreamPermissionResourceType, check_cipher_key_permissions, check_stream_permissions,
+        };
+        // An unreadable query can't be proven safe, so it is withheld rather than run.
+        let streams = query_streams(query_type, text, target.0)
+            .map_err(|_| NotAvailableReason::Unauthorized)?;
+        for (stream, stream_type) in &streams {
+            let denied = check_stream_permissions(
+                stream,
+                org,
+                user_id,
+                stream_type,
+                StreamPermissionResourceType::Search,
+            )
+            .await
+            .is_some();
+            if denied {
+                return Err(NotAvailableReason::Unauthorized);
+            }
+        }
+        if query_type != "promql"
+            && check_cipher_key_permissions(org, user_id, text)
+                .await
+                .is_some()
+        {
+            return Err(NotAvailableReason::Unauthorized);
+        }
+        Ok(streams.into_iter().map(|(s, t)| (t, s)).collect())
+    }
+    #[cfg(not(feature = "enterprise"))]
+    Ok(typed_sources(query_type, text, target))
+}
+
+/// Re-authorizes the data one panel was built from, from its manifest, as `user`.
+#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+pub async fn authorize_manifest(
+    org: &str,
+    user_id: &str,
+    panel: &ManifestPanel,
+) -> Result<bool, anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        use crate::authz::{
+            StreamPermissionResourceType, check_stream_permissions, denied_cipher_keys,
+        };
+        let streams = panel.sources.iter().chain(
+            panel
+                .values_dependencies
+                .iter()
+                .flat_map(|d| d.sources.iter()),
+        );
+        for (stream_type, stream) in streams {
+            let denied = check_stream_permissions(
+                stream,
+                org,
+                user_id,
+                stream_type,
+                StreamPermissionResourceType::Search,
+            )
+            .await
+            .is_some();
+            if denied {
+                return Ok(false);
+            }
+        }
+        let sqls: Vec<&str> = panel
+            .queries
+            .iter()
+            .filter(|q| q.query_type == "sql")
+            .map(|q| q.text.as_str())
+            .collect();
+        if !matches!(denied_cipher_keys(org, user_id, &sqls).await, Ok(d) if d.is_empty()) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 /// Applies `change` to the live row and writes it with a compare-and-set on rev; a lost race
 /// re-reads the row and applies the change again.
 async fn edit<F>(org: &str, id: &str, mut change: F) -> Result<PublicDashboard, anyhow::Error>
@@ -564,213 +927,656 @@ fn explicit_limit(sql: &str) -> Option<i64> {
     n.parse().ok()
 }
 
-/// Runs every v8 panel's queries for one window; a non-v8 dashboard yields no panels.
-#[allow(clippy::too_many_arguments)]
-async fn build_panels(
-    org: &str,
-    publisher: &str,
-    dash: &Dashboard,
+async fn run_panel(
+    ctx: &Ctx<'_>,
     vars: &QueryVars,
-    start: i64,
-    end: i64,
-    authorized: &mut BTreeSet<String>,
-    unauthorized: &mut BTreeSet<String>,
-) -> BTreeMap<String, PanelResult> {
-    let mut out = BTreeMap::new();
-    let Some(v8) = dash.v8.as_ref() else {
-        return out;
+    frozen: &BTreeMap<String, serde_json::Value>,
+    values: &Values,
+    tab: &Tab,
+    panel: &Panel,
+) -> PanelRun {
+    let manifest = panel_manifest(ctx, vars, frozen, values, tab, panel);
+    let structural = |reason, manifest| {
+        PanelRun::not_available(&panel.id, Class::Structural, reason, manifest, None)
     };
-    // Collected up front: an iterator adapter held across the awaits below isn't Send.
-    let panels: Vec<_> = v8
-        .tabs
+    // A custom chart runs the author's JavaScript in the viewer's origin, so it is never public.
+    if panel.typ == "custom_chart" {
+        return structural(NotAvailableReason::Unsupported, manifest);
+    }
+    let used: Vec<String> = manifest.resolved_variables.keys().cloned().collect();
+    if used.iter().any(|k| values.denied.contains(k)) {
+        return PanelRun::not_available(
+            &panel.id,
+            Class::Denied,
+            NotAvailableReason::Unauthorized,
+            manifest,
+            None,
+        );
+    }
+    if used.iter().any(|k| values.failed.contains(k)) {
+        let error = "a variable's values query failed".to_string();
+        return ctx.panel_failed(panel, manifest, error);
+    }
+    if !panel.queries.iter().any(|q| query_text(q).is_some()) {
+        return structural(NotAvailableReason::NoQuery, manifest);
+    }
+    let is_promql = panel.query_type == "promql";
+    let shifted = panel
+        .queries
         .iter()
-        .flat_map(|tab| tab.panels.iter().map(move |panel| (tab, panel)))
+        .any(|q| !time_shifts(q, ctx.end, is_promql).is_empty());
+    if shifted && !get_config().public_dashboards.time_shifts {
+        return structural(NotAvailableReason::Unsupported, manifest);
+    }
+    let panel_vars = vars.for_panel(&tab.tab_id, &panel.id);
+    if is_promql {
+        run_promql_panel(ctx, panel, &panel_vars, manifest).await
+    } else {
+        run_sql_panel(ctx, tab, panel, &panel_vars, manifest).await
+    }
+}
+
+/// The panel's provenance before any query: its intent and the scoped values it reads.
+fn panel_manifest(
+    ctx: &Ctx<'_>,
+    vars: &QueryVars,
+    frozen: &BTreeMap<String, serde_json::Value>,
+    values: &Values,
+    tab: &Tab,
+    panel: &Panel,
+) -> ManifestPanel {
+    let texts: Vec<&str> = panel
+        .queries
+        .iter()
+        .flat_map(|q| [q.query.as_deref(), q.vrl_function_query.as_deref()])
+        .flatten()
         .collect();
-    for (tab, panel) in panels {
-        // A custom chart runs the author's JavaScript in the viewer's origin, so it is never
-        // public.
-        if panel.typ == "custom_chart" {
-            out.insert(
-                panel.id.clone(),
-                PanelResult::not_available(NotAvailableReason::Unsupported),
-            );
+    let used = vars.referenced(&tab.tab_id, &panel.id, &texts);
+    ManifestPanel {
+        intent: intent::panel_intent(ctx.dash, vars, frozen, tab, panel),
+        resolved_variables: used
+            .iter()
+            .map(|(_, key)| {
+                let value = values.values.get(key).cloned();
+                (key.clone(), value.unwrap_or(serde_json::Value::Null))
+            })
+            .collect(),
+        values_dependencies: used
+            .iter()
+            .filter_map(|(_, key)| values.deps.get(key).cloned())
+            .collect(),
+        built_at: Some(ctx.now),
+        ..Default::default()
+    }
+}
+
+async fn run_sql_panel(
+    ctx: &Ctx<'_>,
+    tab: &Tab,
+    panel: &Panel,
+    vars: &PanelVars,
+    mut manifest: ManifestPanel,
+) -> PanelRun {
+    let cap = get_config().limit.query_default_limit;
+    let mut out = Collected::default();
+    for (qi, q) in panel.queries.iter().enumerate() {
+        let Some(tmpl) = query_text(q) else {
             continue;
+        };
+        let base = vars.substitute(tmpl, "sql", ctx.start, ctx.end);
+        let limit = explicit_limit(&base);
+        if limit.is_some_and(|n| n > cap) {
+            return PanelRun::not_available(
+                &panel.id,
+                Class::Structural,
+                NotAvailableReason::TooLarge,
+                manifest,
+                None,
+            );
         }
-        let is_promql = panel.query_type == "promql";
-        let panel_vars = vars.for_panel(&tab.tab_id, &panel.id);
-        let mut results = Vec::with_capacity(panel.queries.len());
-        let mut failure = None;
-        for q in &panel.queries {
-            match run_query(
-                org,
-                publisher,
-                &panel.query_type,
-                q,
-                &panel_vars,
+        let target = (q.fields.stream_type, q.fields.stream.as_str());
+        record_sources(&mut manifest, "sql", &base, target);
+        if let Err(reason) = authorize_query(
+            &ctx.link.org_id,
+            &ctx.link.published_by,
+            "sql",
+            &base,
+            target,
+        )
+        .await
+        {
+            return PanelRun::not_available(&panel.id, Class::Denied, reason, manifest, None);
+        }
+        let shifts = time_shifts(q, ctx.end, false);
+        for shift in std::iter::once(None).chain(shifts.iter().map(Some)) {
+            if ctx.family.is_cancelled() {
+                return ctx.panel_failed(panel, manifest, "the build timed out".to_string());
+            }
+            let gap = shift.map_or(0, |s| s.gap_ms * 1000);
+            let (start, end) = (ctx.start - gap, ctx.end - gap);
+            let sql = vars.substitute(tmpl, "sql", start, end);
+            let (start, range_error) = clamp_start(
+                &ctx.link.org_id,
+                &ctx.identity,
+                &sql,
+                q.fields.stream_type,
                 start,
                 end,
-                authorized,
-                unauthorized,
+            )
+            .await;
+            let req = sql_request(
+                ctx,
+                &panel.id,
+                sql.clone(),
+                start,
+                end,
+                q.vrl_function_query.as_deref(),
+            );
+            let trace_id = ctx.family.child();
+            let clamped = !range_error.is_empty();
+            let resp = match search_service::cache::search(
+                &trace_id,
+                &ctx.link.org_id,
+                q.fields.stream_type,
+                Some(ctx.identity.clone()),
+                &req,
+                range_error,
+                false,
+                Some(ctx.dashboard_info(tab, panel)),
+                false,
             )
             .await
             {
-                Ok(result) => results.push(Some(result)),
-                // As on the live dashboard: SQL is one request, PromQL queries are independent.
-                Err(reason) => {
-                    failure = Some(reason);
-                    if !is_promql {
-                        break;
-                    }
-                    results.push(None);
-                }
+                Ok(resp) => resp,
+                Err(e) => return ctx.panel_failed(panel, manifest, e.to_string()),
+            };
+            let hits = resp.hits.len();
+            // The wrapper also flags a clamped window as partial; only a real gap is retried.
+            let partial = resp.is_partial
+                && (!clamped
+                    || resp
+                        .function_error
+                        .iter()
+                        .any(|e| e == search::PARTIAL_ERROR_RESPONSE_MESSAGE));
+            out.partial |= partial;
+            out.truncated |= limit.is_none() && i64::try_from(hits).unwrap_or(i64::MAX) >= cap;
+            if shift.is_none() && out.window.is_none() {
+                out.window = Some(Window { start, end });
             }
-        }
-        out.insert(
-            panel.id.clone(),
-            panel_result(&panel.query_type, start, end, results, failure),
-        );
-    }
-    out
-}
-
-/// SQL needs every query; PromQL needs one, with the rest served as empty results.
-fn panel_result(
-    query_type: &str,
-    start: i64,
-    end: i64,
-    results: Vec<Option<(serde_json::Value, serde_json::Value)>>,
-    failure: Option<NotAvailableReason>,
-) -> PanelResult {
-    let is_promql = query_type == "promql";
-    let any_ok = results.iter().any(Option::is_some);
-    if !any_ok || (!is_promql && failure.is_some()) {
-        return PanelResult::not_available(failure.unwrap_or(NotAvailableReason::NoQuery));
-    }
-    // Same per-query metadata the live loader builds for an unshifted query.
-    let queries_meta = (0..results.len())
-        .map(|qi| {
-            serde_json::json!({
-                "startTime": start,
-                "endTime": end,
-                "queryType": query_type,
-                "timeRangeGap": { "seconds": 0, "periodAsStr": "" },
-                "panelQueryIndex": qi,
-            })
-        })
-        .collect::<Vec<_>>();
-    // An empty matrix, not null, since the PromQL converter reads `.result` on every entry.
-    let (data, result_meta_data) = results
-        .into_iter()
-        .map(|r| {
-            r.unwrap_or_else(|| {
-                (
-                    serde_json::json!({ "resultType": "matrix", "result": [] }),
-                    serde_json::Value::Null,
-                )
-            })
-        })
-        .unzip();
-    PanelResult {
-        state: PanelState::ok(),
-        intent: String::new(),
-        built_at: None,
-        window: Some(Window { start, end }),
-        data,
-        result_meta_data,
-        metadata: serde_json::json!({ "queries": queries_meta }),
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn run_query(
-    org: &str,
-    publisher: &str,
-    query_type: &str,
-    q: &config::meta::dashboards::v8::Query,
-    vars: &PanelVars,
-    start: i64,
-    end: i64,
-    authorized: &mut BTreeSet<String>,
-    unauthorized: &mut BTreeSet<String>,
-) -> Result<(serde_json::Value, serde_json::Value), NotAvailableReason> {
-    if query_type == "promql" {
-        run_promql(
-            org,
-            publisher,
-            q,
-            vars,
-            start,
-            end,
-            authorized,
-            unauthorized,
-        )
-        .await
-    } else {
-        run_sql(
-            org,
-            publisher,
-            q,
-            vars,
-            start,
-            end,
-            authorized,
-            unauthorized,
-        )
-        .await
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
-async fn run_sql(
-    org: &str,
-    publisher: &str,
-    q: &config::meta::dashboards::v8::Query,
-    vars: &PanelVars,
-    start: i64,
-    end: i64,
-    authorized: &mut BTreeSet<String>,
-    unauthorized: &mut BTreeSet<String>,
-) -> Result<(serde_json::Value, serde_json::Value), NotAvailableReason> {
-    let Some(sql_tmpl) = q.query.as_ref() else {
-        return Err(NotAvailableReason::NoQuery);
-    };
-    let sql = vars.substitute(sql_tmpl, "sql", start, end);
-    let stream_type = q.fields.stream_type;
-    let target = (q.fields.stream_type, q.fields.stream.as_str());
-    authorize_query(
-        org,
-        publisher,
-        "sql",
-        &sql,
-        target,
-        authorized,
-        unauthorized,
-    )
-    .await?;
-
-    let req = sql_request(sql, start, end, q.vrl_function_query.as_deref());
-    match search_service::search(
-        &config::ider::generate_trace_id(),
-        org,
-        stream_type,
-        Some(publisher.to_string()),
-        &req,
-    )
-    .await
-    {
-        Ok(resp) => {
+            manifest.queries.push(ExecutedQuery {
+                text: sql,
+                query_type: "sql".to_string(),
+                window: Window { start, end },
+                time_shift_micros: gap,
+                is_partial: partial,
+                hits,
+                trace_id,
+            });
             let mut full = serde_json::to_value(&resp).unwrap_or_default();
             let hits = full
                 .as_object_mut()
                 .and_then(|obj| obj.remove("hits"))
                 .unwrap_or_else(|| serde_json::Value::Array(vec![]));
-            Ok((hits, serde_json::Value::Array(vec![public_meta(&full)])))
+            out.data.push(hits);
+            out.meta.push(public_meta(&full));
+            out.queries.push(query_meta(start, end, "sql", qi, shift));
         }
-        Err(e) => {
-            log::warn!("public dashboard panel query failed: {e}");
-            Err(NotAvailableReason::BuildError)
+    }
+    out.into_run(panel, manifest, ctx.now)
+}
+
+async fn run_promql_panel(
+    ctx: &Ctx<'_>,
+    panel: &Panel,
+    vars: &PanelVars,
+    mut manifest: ManifestPanel,
+) -> PanelRun {
+    let max_series = get_config().limit.max_dashboard_series;
+    let queries: Vec<(usize, &config::meta::dashboards::v8::Query, String)> = panel
+        .queries
+        .iter()
+        .enumerate()
+        .filter_map(|(qi, q)| {
+            let expr = vars.substitute(query_text(q)?, "promql", ctx.start, ctx.end);
+            Some((qi, q, expr))
+        })
+        .collect();
+    for (_, q, expr) in &queries {
+        let target = (q.fields.stream_type, q.fields.stream.as_str());
+        record_sources(&mut manifest, "promql", expr, target);
+        if let Err(reason) = authorize_query(
+            &ctx.link.org_id,
+            &ctx.link.published_by,
+            "promql",
+            expr,
+            target,
+        )
+        .await
+        {
+            return PanelRun::not_available(&panel.id, Class::Denied, reason, manifest, None);
         }
+    }
+    let mut out = Collected {
+        window: Some(Window {
+            start: ctx.start,
+            end: ctx.end,
+        }),
+        ..Default::default()
+    };
+    let mut kept: Vec<Vec<serde_json::Value>> = Vec::with_capacity(queries.len());
+    // The live renderer sends every unshifted query first, then each query's shifts.
+    let shifted: Vec<(usize, &str, Option<Shift>)> = queries
+        .iter()
+        .enumerate()
+        .map(|(i, (_, _, expr))| (i, expr.as_str(), None))
+        .chain(queries.iter().enumerate().flat_map(|(i, (_, q, expr))| {
+            time_shifts(q, ctx.end, true)
+                .into_iter()
+                .map(move |s| (i, expr.as_str(), Some(s)))
+        }))
+        .collect();
+    for (i, expr, shift) in shifted {
+        if ctx.family.is_cancelled() {
+            return ctx.panel_failed(panel, manifest, "the build timed out".to_string());
+        }
+        let gap = shift.as_ref().map_or(0, |s| s.gap_ms * 1000);
+        let (start, end) = (ctx.start - gap, ctx.end - gap);
+        let trace_id = ctx.family.child();
+        let (mut data, partial) =
+            match run_promql(ctx, &panel.id, &trace_id, expr, start, end).await {
+                Ok(v) => v,
+                Err(e) => return ctx.panel_failed(panel, manifest, e),
+            };
+        let keep = shift.as_ref().and_then(|_| kept.get(i)).map(Vec::as_slice);
+        let metrics = cut_series(&mut data, max_series, keep);
+        if shift.is_none() {
+            kept.push(metrics);
+        }
+        out.partial |= partial;
+        manifest.queries.push(ExecutedQuery {
+            text: expr.to_string(),
+            query_type: "promql".to_string(),
+            window: Window { start, end },
+            time_shift_micros: gap,
+            is_partial: partial,
+            hits: data["result"].as_array().map_or(0, Vec::len),
+            trace_id,
+        });
+        out.data.push(data);
+        out.meta.push(serde_json::Value::Null);
+        out.queries.push(query_meta(
+            start,
+            end,
+            "promql",
+            queries[i].0,
+            shift.as_ref(),
+        ));
+    }
+    out.into_run(panel, manifest, ctx.now)
+}
+
+/// One PromQL range query as the public identity; a response with warnings is partial.
+async fn run_promql(
+    ctx: &Ctx<'_>,
+    panel_id: &str,
+    trace_id: &str,
+    expr: &str,
+    start: i64,
+    end: i64,
+) -> Result<(serde_json::Value, bool), String> {
+    let req = promql_request(ctx, panel_id, expr, start, end);
+    #[cfg(not(feature = "enterprise"))]
+    let is_super_cluster = false;
+    #[cfg(feature = "enterprise")]
+    let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled;
+    let resp = promql_service::search::search(
+        trace_id,
+        &ctx.link.org_id,
+        &req,
+        &ctx.identity,
+        ctx.timeout(),
+        is_super_cluster,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    let data = serde_json::json!({
+        "resultType": resp.value.get_type().to_string(),
+        "result": resp.value,
+    });
+    Ok((data, !resp.warnings.is_empty()))
+}
+
+/// The search a PromQL panel query runs: its cache on, typed and timed for public dashboards.
+fn promql_request(
+    ctx: &Ctx<'_>,
+    panel_id: &str,
+    expr: &str,
+    start: i64,
+    end: i64,
+) -> promql_service::MetricsQueryRequest {
+    promql_service::MetricsQueryRequest {
+        query: expr.to_string(),
+        start,
+        end,
+        step: ((end - start) / 400).max(1_000_000),
+        query_exemplars: false,
+        use_cache: Some(true),
+        search_type: Some(search::SearchEventType::PublicDashboard),
+        search_event_context: Some(ctx.event_context(Some(panel_id))),
+        regions: vec![],
+        clusters: vec![],
+    }
+}
+
+/// The search a SQL panel query runs, with the panel's VRL function applied as on the live panel.
+fn sql_request(
+    ctx: &Ctx<'_>,
+    panel_id: &str,
+    sql: String,
+    start: i64,
+    end: i64,
+    vrl: Option<&str>,
+) -> search::Request {
+    search::Request {
+        query: search::Query {
+            sql,
+            start_time: start,
+            end_time: end,
+            // Same as the live panel loader; the server caps it at ZO_QUERY_DEFAULT_LIMIT.
+            size: -1,
+            track_total_hits: false,
+            // Stored as plain text; search() expects it decoded, unlike the HTTP API.
+            query_fn: vrl
+                .map(str::trim)
+                .filter(|f| !f.is_empty())
+                .map(str::to_string),
+            ..Default::default()
+        },
+        use_cache: true,
+        timeout: ctx.timeout(),
+        search_type: Some(search::SearchEventType::PublicDashboard),
+        search_event_context: Some(ctx.event_context(Some(panel_id))),
+        ..Default::default()
+    }
+}
+
+/// Fills each missing variable as the live picker would, through the panels' path and identity.
+async fn fill_defaults(ctx: &Ctx<'_>, frozen: BTreeMap<String, serde_json::Value>) -> Values {
+    let mut defaults = Defaults::new(ctx.dash, frozen);
+    let mut out = Values::default();
+    while let Some(pending) = defaults.next_query() {
+        let key = pending.key.clone();
+        if pending.depends_on.iter().any(|k| out.denied.contains(k)) {
+            out.denied.insert(key);
+            defaults.settle(pending, None);
+            continue;
+        }
+        let q = &pending.query;
+        let sources = typed_sources("sql", &q.sql, (q.stream_type, q.stream.as_str()));
+        out.deps.insert(
+            key.clone(),
+            ValuesDependency {
+                variable: key.clone(),
+                sources: sources.clone(),
+            },
+        );
+        let target = (q.stream_type, q.stream.as_str());
+        let keys = match authorize_query(
+            &ctx.link.org_id,
+            &ctx.link.published_by,
+            "sql",
+            &q.sql,
+            target,
+        )
+        .await
+        {
+            Err(_) => {
+                out.denied.insert(key);
+                None
+            }
+            Ok(_) => match run_values(ctx, q).await {
+                Ok(keys) => Some(keys),
+                Err(e) => {
+                    log::warn!("public dashboard variable values query failed: {e}");
+                    out.failed.insert(key);
+                    None
+                }
+            },
+        };
+        defaults.settle(pending, keys);
+    }
+    out.values = defaults.into_values();
+    out
+}
+
+async fn run_values(ctx: &Ctx<'_>, q: &ValuesQuery) -> Result<Vec<String>, String> {
+    let req = search::Request {
+        query: search::Query {
+            sql: q.sql.clone(),
+            start_time: ctx.start,
+            end_time: ctx.end,
+            size: q.size,
+            track_total_hits: false,
+            ..Default::default()
+        },
+        use_cache: true,
+        timeout: ctx.timeout(),
+        search_type: Some(search::SearchEventType::PublicDashboard),
+        search_event_context: Some(ctx.event_context(None)),
+        ..Default::default()
+    };
+    let resp = search_service::cache::search(
+        &ctx.family.child(),
+        &ctx.link.org_id,
+        q.stream_type,
+        Some(ctx.identity.clone()),
+        &req,
+        String::new(),
+        false,
+        None,
+        false,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(resp
+        .hits
+        .iter()
+        .filter_map(|hit| hit.get("zo_sql_key"))
+        .filter(|key| !key.is_null())
+        .map(variables::js_string)
+        .collect())
+}
+
+/// Publishes the build's estimate from the search partition call before any panel runs.
+async fn publish_estimate(
+    ctx: &Ctx<'_>,
+    vars: &QueryVars,
+    panels: &[(&Tab, &Panel)],
+    flight: &Flight,
+) {
+    let cfg = get_config();
+    let mut size = 0usize;
+    for (tab, panel) in panels.iter().filter(|(_, p)| p.query_type != "promql") {
+        let panel_vars = vars.for_panel(&tab.tab_id, &panel.id);
+        for q in &panel.queries {
+            let Some(tmpl) = query_text(q) else {
+                continue;
+            };
+            let req = search::SearchPartitionRequest {
+                sql: panel_vars.substitute(tmpl, "sql", ctx.start, ctx.end),
+                start_time: ctx.start,
+                end_time: ctx.end,
+                encoding: Default::default(),
+                regions: vec![],
+                clusters: vec![],
+                query_fn: None,
+                streaming_output: false,
+                histogram_interval: 0,
+                sampling_ratio: None,
+                search_type: Some(search::SearchEventType::PublicDashboard),
+            };
+            if let Ok(resp) = search_service::search_partition(
+                &ctx.family.child(),
+                &ctx.link.org_id,
+                Some(&ctx.identity),
+                q.fields.stream_type,
+                &req,
+                false,
+                true,
+            )
+            .await
+            {
+                size += resp.original_size;
+            }
+        }
+    }
+    let speed = cfg.limit.query_group_base_speed.max(1) * cfg.limit.cpu_num.max(1);
+    flight.set_estimate(u64::try_from(size.div_ceil(speed)).unwrap_or(u64::MAX));
+}
+
+/// The window start after each stream's max_query_range, as the HTTP search handler clamps it.
+async fn clamp_start(
+    org: &str,
+    identity: &str,
+    sql: &str,
+    stream_type: StreamType,
+    start: i64,
+    end: i64,
+) -> (i64, String) {
+    let Ok(names) = resolve_stream_names(sql) else {
+        return (start, String::new());
+    };
+    let (mut start, mut range_error) = (start, String::new());
+    for name in names {
+        let Some(settings) = infra::schema::get_settings(org, &name, stream_type).await else {
+            continue;
+        };
+        let max_hours = search_service::query_range::get_settings_max_query_range(
+            settings.max_query_range,
+            org,
+            Some(identity),
+        )
+        .await;
+        if let Some(clamped) = clamped_start(stream_type, start, end, max_hours) {
+            start = clamped;
+            range_error = format!(
+                "Query duration is modified due to query range restriction of {max_hours} hours"
+            );
+        }
+    }
+    (start, range_error)
+}
+
+fn clamped_start(stream_type: StreamType, start: i64, end: i64, max_hours: i64) -> Option<i64> {
+    let max = max_hours * 3600 * 1_000_000;
+    (stream_type != StreamType::EnrichmentTables && max_hours > 0 && end - start > max)
+        .then_some(end - max)
+}
+
+/// The shifts the live renderer runs; PromQL takes fixed units only and none when instant.
+fn time_shifts(q: &config::meta::dashboards::v8::Query, end: i64, promql: bool) -> Vec<Shift> {
+    let cfg = serde_json::to_value(&q.config).unwrap_or_default();
+    if promql && cfg.get("query_type").and_then(|v| v.as_str()) == Some("instant") {
+        return vec![];
+    }
+    cfg.get("time_shift")
+        .and_then(|v| v.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|s| s.get("offSet").and_then(|v| v.as_str()))
+        .filter_map(|off| shift_gap(off, end, promql))
+        .collect()
+}
+
+/// `1h` → 3,600,000 ms "1 Hour ago"; `M` is a calendar month back from the window end.
+fn shift_gap(offset: &str, end: i64, fixed_only: bool) -> Option<Shift> {
+    let unit = offset.chars().last()?;
+    let n: i64 = offset[..offset.len() - unit.len_utf8()].parse().ok()?;
+    let (gap_ms, word) = match unit {
+        's' => (n * 1_000, "Second"),
+        'm' => (n * 60_000, "Minute"),
+        'h' => (n * 3_600_000, "Hour"),
+        'd' => (n * 86_400_000, "Day"),
+        'w' => (n * 604_800_000, "Week"),
+        'M' if !fixed_only => {
+            let end_at = chrono::DateTime::from_timestamp_micros(end)?;
+            let back = end_at.checked_sub_months(chrono::Months::new(u32::try_from(n).ok()?))?;
+            ((end_at - back).num_milliseconds(), "Month")
+        }
+        _ => return None,
+    };
+    (gap_ms > 0).then(|| Shift {
+        gap_ms,
+        label: format!("{n} {word}{} ago", if n == 1 { "" } else { "s" }),
+    })
+}
+
+/// The per-query metadata the live loader builds; `timeRangeGap.seconds` holds milliseconds.
+fn query_meta(
+    start: i64,
+    end: i64,
+    query_type: &str,
+    qi: usize,
+    shift: Option<&Shift>,
+) -> serde_json::Value {
+    serde_json::json!({
+        "startTime": start,
+        "endTime": end,
+        "queryType": query_type,
+        "timeRangeGap": {
+            "seconds": shift.map_or(0, |s| s.gap_ms),
+            "periodAsStr": shift.map_or("", |s| s.label.as_str()),
+        },
+        "panelQueryIndex": qi,
+    })
+}
+
+/// Keeps the series the live chart keeps (a shifted query keeps its base's) and returns them.
+fn cut_series(
+    data: &mut serde_json::Value,
+    max: usize,
+    keep: Option<&[serde_json::Value]>,
+) -> Vec<serde_json::Value> {
+    let Some(series) = data.get_mut("result").and_then(|r| r.as_array_mut()) else {
+        return vec![];
+    };
+    if let Some(keep) = keep {
+        series.retain(|s| s.get("metric").is_some_and(|m| keep.contains(m)));
+    }
+    series.truncate(max);
+    series
+        .iter()
+        .map(|s| s.get("metric").cloned().unwrap_or_default())
+        .collect()
+}
+
+fn query_text(q: &config::meta::dashboards::v8::Query) -> Option<&str> {
+    q.query.as_deref().filter(|t| !t.trim().is_empty())
+}
+
+/// Records the streams and cipher keys a query reads, denied or not, for the deadline check.
+fn record_sources(
+    manifest: &mut ManifestPanel,
+    query_type: &str,
+    text: &str,
+    target: (StreamType, &str),
+) {
+    manifest
+        .sources
+        .extend(typed_sources(query_type, text, target));
+    manifest
+        .sources
+        .sort_by(|a, b| (a.0.as_str(), &a.1).cmp(&(b.0.as_str(), &b.1)));
+    manifest.sources.dedup();
+    #[cfg(feature = "enterprise")]
+    if query_type != "promql"
+        && let Ok(keys) = ::search::sql::visitor::cipher_key::get_cipher_key_names(text)
+    {
+        manifest.cipher_keys.extend(keys);
+        manifest.cipher_keys.sort();
+        manifest.cipher_keys.dedup();
     }
 }
 
@@ -782,244 +1588,25 @@ fn public_meta(full: &serde_json::Value) -> serde_json::Value {
     serde_json::Value::Object(kept)
 }
 
-#[allow(clippy::too_many_arguments)]
-#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
-async fn run_promql(
-    org: &str,
-    publisher: &str,
-    q: &config::meta::dashboards::v8::Query,
-    vars: &PanelVars,
-    start: i64,
-    end: i64,
-    authorized: &mut BTreeSet<String>,
-    unauthorized: &mut BTreeSet<String>,
-) -> Result<(serde_json::Value, serde_json::Value), NotAvailableReason> {
-    let Some(expr_tmpl) = q.query.as_ref() else {
-        return Err(NotAvailableReason::NoQuery);
-    };
-    let expr = vars.substitute(expr_tmpl, "promql", start, end);
-    let target = (q.fields.stream_type, q.fields.stream.as_str());
-    authorize_query(
-        org,
-        publisher,
-        "promql",
-        &expr,
-        target,
-        authorized,
-        unauthorized,
-    )
-    .await?;
-
-    let step = ((end - start) / 400).max(1_000_000);
-    let req = promql_service::MetricsQueryRequest {
-        query: expr,
-        start,
-        end,
-        step,
-        query_exemplars: false,
-        use_cache: Some(false),
-        search_type: Some(config::meta::search::SearchEventType::DerivedStream),
-        search_event_context: None,
-        regions: vec![],
-        clusters: vec![],
-    };
-    #[cfg(not(feature = "enterprise"))]
-    let is_super_cluster = false;
-    #[cfg(feature = "enterprise")]
-    let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled;
-    match promql_service::search::search(
-        &config::ider::generate_trace_id(),
-        org,
-        &req,
-        publisher,
-        0,
-        is_super_cluster,
-    )
-    .await
-    {
-        Ok(resp) => {
-            let data = serde_json::json!({
-                "resultType": resp.value.get_type().to_string(),
-                "result": resp.value,
-            });
-            Ok((data, serde_json::Value::Null))
-        }
-        Err(e) => {
-            log::warn!("public dashboard promql query failed: {e}");
-            Err(NotAvailableReason::BuildError)
-        }
-    }
-}
-
-/// The search a SQL panel query runs, with the panel's VRL function applied as on the live panel.
-fn sql_request(sql: String, start: i64, end: i64, vrl: Option<&str>) -> search::Request {
-    search::Request {
-        query: search::Query {
-            sql,
-            start_time: start,
-            end_time: end,
-            // Same as the live panel loader; the default (10) truncated every panel's result.
-            size: -1,
-            track_total_hits: false,
-            // Stored as plain text; search() expects it decoded, unlike the HTTP API.
-            query_fn: vrl
-                .map(str::trim)
-                .filter(|f| !f.is_empty())
-                .map(str::to_string),
-            ..Default::default()
-        },
-        use_cache: false,
-        ..Default::default()
-    }
-}
-
-/// The link's values, each missing one picked as the live dashboard would for this window.
-#[allow(clippy::too_many_arguments)]
-async fn fill_defaults(
-    org: &str,
-    publisher: &str,
-    dash: &Dashboard,
-    frozen: BTreeMap<String, serde_json::Value>,
-    start: i64,
-    end: i64,
-    authorized: &mut BTreeSet<String>,
-    unauthorized: &mut BTreeSet<String>,
-) -> BTreeMap<String, serde_json::Value> {
-    let mut defaults = Defaults::new(dash, frozen);
-    while let Some(pending) = defaults.next_query() {
-        let keys = run_values(
-            org,
-            publisher,
-            &pending.query,
-            start,
-            end,
-            authorized,
-            unauthorized,
-        )
-        .await;
-        defaults.settle(pending, keys);
-    }
-    defaults.into_values()
-}
-
-/// A picker's values query run as the publisher; None when it is denied or fails, as on the page.
-#[allow(clippy::too_many_arguments)]
-async fn run_values(
-    org: &str,
-    publisher: &str,
-    q: &ValuesQuery,
-    start: i64,
-    end: i64,
-    authorized: &mut BTreeSet<String>,
-    unauthorized: &mut BTreeSet<String>,
-) -> Option<Vec<String>> {
-    let target = (q.stream_type, q.stream.as_str());
-    authorize_query(
-        org,
-        publisher,
-        "sql",
-        &q.sql,
-        target,
-        authorized,
-        unauthorized,
-    )
-    .await
-    .ok()?;
-    let req = search::Request {
-        query: search::Query {
-            sql: q.sql.clone(),
-            start_time: start,
-            end_time: end,
-            size: q.size,
-            track_total_hits: false,
-            ..Default::default()
-        },
-        use_cache: false,
-        ..Default::default()
-    };
-    match search_service::search(
-        &ider::generate_trace_id(),
-        org,
-        q.stream_type,
-        Some(publisher.to_string()),
-        &req,
-    )
-    .await
-    {
-        Ok(resp) => Some(
-            resp.hits
-                .iter()
-                .filter_map(|hit| hit.get("zo_sql_key"))
-                .filter(|key| !key.is_null())
-                .map(variables::js_string)
-                .collect(),
-        ),
-        Err(e) => {
-            log::warn!("public dashboard variable values query failed: {e}");
-            None
-        }
-    }
-}
-
 fn parse_frozen_vars(json: Option<&str>) -> BTreeMap<String, serde_json::Value> {
     json.and_then(|s| serde_json::from_str(s).ok())
         .unwrap_or_default()
 }
 
-/// Checks every stream the final query reads, since SQL and PromQL can read beyond the picked one.
-#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
-async fn authorize_query(
-    org: &str,
-    user_id: &str,
+/// The typed streams a query reads; one that does not parse falls back to the panel's stream.
+fn typed_sources(
     query_type: &str,
     text: &str,
     target: (StreamType, &str),
-    authorized: &mut BTreeSet<String>,
-    unauthorized: &mut BTreeSet<String>,
-) -> Result<(), NotAvailableReason> {
-    #[cfg(feature = "enterprise")]
-    {
-        use crate::authz::{
-            StreamPermissionResourceType, check_cipher_key_permissions, check_stream_permissions,
-        };
-        // An unreadable query can't be proven safe, so it is withheld rather than run.
-        let streams = query_streams(query_type, text, target.0)
-            .map_err(|_| NotAvailableReason::Unauthorized)?;
-        for (stream, stream_type) in &streams {
-            let denied = check_stream_permissions(
-                stream,
-                org,
-                user_id,
-                stream_type,
-                StreamPermissionResourceType::Search,
-            )
-            .await
-            .is_some();
-            if denied {
-                unauthorized.insert(stream.clone());
-                return Err(NotAvailableReason::Unauthorized);
-            }
-        }
-        if query_type != "promql"
-            && check_cipher_key_permissions(org, user_id, text)
-                .await
-                .is_some()
-        {
-            return Err(NotAvailableReason::Unauthorized);
-        }
-        authorized.extend(streams.into_iter().map(|(stream, _)| stream));
+) -> Vec<(StreamType, String)> {
+    match query_streams(query_type, text, target.0) {
+        Ok(streams) => streams.into_iter().map(|(s, t)| (t, s)).collect(),
+        Err(_) if target.1.is_empty() => vec![],
+        Err(_) => vec![(target.0, target.1.to_string())],
     }
-    #[cfg(not(feature = "enterprise"))]
-    if !target.1.is_empty() {
-        authorized.insert(target.1.to_string());
-    }
-    Ok(())
 }
 
 /// The distinct streams a SQL or PromQL query reads; an unqualified table takes `default_type`.
-#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 fn query_streams(
     query_type: &str,
     text: &str,
@@ -1212,26 +1799,6 @@ mod tests {
     }
 
     #[test]
-    fn sql_request_carries_the_panel_vrl_function() {
-        let req = sql_request("SELECT 1".to_string(), 10, 20, Some("  del(.email)\n "));
-        assert_eq!(req.query.query_fn.as_deref(), Some("del(.email)"));
-        assert_eq!((req.query.start_time, req.query.end_time), (10, 20));
-        assert_eq!(req.query.size, -1);
-        assert!(
-            sql_request("SELECT 1".to_string(), 0, 1, None)
-                .query
-                .query_fn
-                .is_none()
-        );
-        assert!(
-            sql_request("SELECT 1".to_string(), 0, 1, Some("  "))
-                .query
-                .query_fn
-                .is_none()
-        );
-    }
-
-    #[test]
     fn parse_frozen_vars_handles_valid_invalid_and_none() {
         let m = parse_frozen_vars(Some(r#"{"a":"b"}"#));
         assert_eq!(m.get("a").unwrap(), &json!("b"));
@@ -1289,73 +1856,6 @@ mod tests {
     fn query_streams_rejects_what_it_cant_tie_to_a_stream() {
         assert!(query_streams("promql", r#"{job="x"}"#, StreamType::Logs).is_err());
         assert!(query_streams("sql", "SELEC * FRM", StreamType::Logs).is_err());
-    }
-
-    #[test]
-    fn panel_result_sql_needs_every_query() {
-        let ok = |n: i64| Some((json!([{ "n": n }]), json!({ "took": n })));
-
-        let all = panel_result("sql", 1, 2, vec![ok(1), ok(2)], None);
-        assert_eq!(all.state, PanelState::ok());
-        assert_eq!(all.window, Some(Window { start: 1, end: 2 }));
-        assert_eq!(all.data, [json!([{ "n": 1 }]), json!([{ "n": 2 }])]);
-        assert_eq!(all.metadata["queries"][1]["panelQueryIndex"], json!(1));
-
-        let denied = panel_result(
-            "sql",
-            1,
-            2,
-            vec![ok(1)],
-            Some(NotAvailableReason::Unauthorized),
-        );
-        assert_eq!(
-            denied.state,
-            PanelState::NotAvailable {
-                reason: NotAvailableReason::Unauthorized
-            }
-        );
-        assert!(denied.data.is_empty() && denied.result_meta_data.is_empty());
-
-        let none = panel_result("sql", 1, 2, vec![], None);
-        assert_eq!(
-            none.state,
-            PanelState::NotAvailable {
-                reason: NotAvailableReason::NoQuery
-            }
-        );
-    }
-
-    #[test]
-    fn panel_result_promql_serves_the_queries_that_ran() {
-        let hit = json!({ "resultType": "matrix", "result": [1] });
-        let ok = Some((hit.clone(), json!(null)));
-        let empty = json!({ "resultType": "matrix", "result": [] });
-
-        let partial = panel_result(
-            "promql",
-            1,
-            2,
-            vec![None, ok],
-            Some(NotAvailableReason::Unauthorized),
-        );
-        assert_eq!(partial.state, PanelState::ok());
-        assert_eq!(partial.data[0], empty);
-        assert_eq!(partial.data[1], hit);
-        assert_eq!(partial.metadata["queries"].as_array().unwrap().len(), 2);
-
-        let all_failed = panel_result(
-            "promql",
-            1,
-            2,
-            vec![None, None],
-            Some(NotAvailableReason::BuildError),
-        );
-        assert_eq!(
-            all_failed.state,
-            PanelState::NotAvailable {
-                reason: NotAvailableReason::BuildError
-            }
-        );
     }
 
     #[test]
@@ -1540,5 +2040,263 @@ mod tests {
             validate_dashboard(&big, &frozen, 0).unwrap_err(),
             "Panel \"Panel b\" has LIMIT 50000, above the public cap of 1000 rows. Lower it or aggregate."
         );
+    }
+
+    fn ctx_parts() -> (PublicDashboard, Dashboard, TraceFamily) {
+        let link = PublicDashboard {
+            id: "l1".into(),
+            org_id: "o1".into(),
+            folder_id: "f1".into(),
+            dashboard_id: "d1".into(),
+            slug: "s".into(),
+            name: "n".into(),
+            visibility: 1,
+            time_ranges: None,
+            default_range_key: None,
+            frozen_variables: None,
+            refresh_secs: 300,
+            dashboard_version: 8,
+            published_by: "p@x".into(),
+            enabled: true,
+            expires_at: None,
+            created_by: "p@x".into(),
+            updated_by: None,
+            created_at: 0,
+            updated_at: 0,
+            rev: 1,
+            deleted_at: None,
+            last_accessed_at: None,
+            access_count: 0,
+        };
+        (
+            link,
+            dashboard(vec![vec![panel("a", Some("SELECT 1"))]]),
+            TraceFamily::default(),
+        )
+    }
+
+    fn ctx<'a>(link: &'a PublicDashboard, dash: &'a Dashboard, family: &'a TraceFamily) -> Ctx<'a> {
+        Ctx {
+            link,
+            dash,
+            identity: public_dashboard_identity(&link.org_id),
+            range_key: "r3600",
+            start: 10,
+            end: 20,
+            now: 20,
+            family,
+        }
+    }
+
+    #[test]
+    fn gate16_the_sql_request_is_the_live_panels_with_cache_type_identity_and_timeout() {
+        let (link, dash, family) = ctx_parts();
+        let ctx = ctx(&link, &dash, &family);
+        let req = sql_request(
+            &ctx,
+            "a",
+            "SELECT 1".into(),
+            10,
+            20,
+            Some("  del(.email)\n "),
+        );
+        assert_eq!(req.query.query_fn.as_deref(), Some("del(.email)"));
+        assert_eq!((req.query.start_time, req.query.end_time), (10, 20));
+        assert_eq!(req.query.size, -1);
+        assert!(req.use_cache);
+        assert_eq!(req.timeout, 60);
+        assert_eq!(
+            req.search_type,
+            Some(search::SearchEventType::PublicDashboard)
+        );
+        let ec = req.search_event_context.unwrap();
+        assert_eq!(ec.public_dashboard_link_id.as_deref(), Some("l1"));
+        assert_eq!(ec.dashboard_id.as_deref(), Some("d1"));
+        assert_eq!(ec.range_key.as_deref(), Some("r3600"));
+        assert_eq!(ec.panel_id.as_deref(), Some("a"));
+        assert!(
+            sql_request(&ctx, "a", "SELECT 1".into(), 0, 1, Some("  "))
+                .query
+                .query_fn
+                .is_none()
+        );
+        let info = ctx.dashboard_info(
+            &dash.v8.as_ref().unwrap().tabs[0],
+            &dash.v8.as_ref().unwrap().tabs[0].panels[0],
+        );
+        assert_eq!((info.panel_id.as_str(), info.tab_id.as_str()), ("a", "t0"));
+        assert_eq!(info.run_id, family.id());
+        assert_eq!(ctx.identity, "public-dashboard.org-o1@openobserve.internal");
+    }
+
+    #[test]
+    fn gate16_the_promql_request_uses_its_cache_the_public_type_and_the_live_step() {
+        let (link, dash, family) = ctx_parts();
+        let ctx = ctx(&link, &dash, &family);
+        let req = promql_request(&ctx, "a", "up", 0, 4_000_000_000);
+        assert_eq!(req.use_cache, Some(true));
+        assert_eq!(
+            req.search_type,
+            Some(search::SearchEventType::PublicDashboard)
+        );
+        assert_eq!(req.step, 10_000_000);
+        assert_eq!(
+            promql_request(&ctx, "a", "up", 0, 60_000_000).step,
+            1_000_000
+        );
+        assert_eq!(
+            req.search_event_context.unwrap().panel_id.as_deref(),
+            Some("a")
+        );
+    }
+
+    fn query_with_shifts(shifts: &[&str], instant: bool) -> config::meta::dashboards::v8::Query {
+        let mut config = json!({ "promql_legend": "" });
+        config["time_shift"] = json!(
+            shifts
+                .iter()
+                .map(|s| json!({ "offSet": s }))
+                .collect::<Vec<_>>()
+        );
+        if instant {
+            config["query_type"] = json!("instant");
+        }
+        serde_json::from_value(json!({
+            "query": "SELECT 1", "customQuery": true,
+            "fields": { "stream": "s", "stream_type": "logs", "x": [], "y": [],
+                        "filter": { "filterType": "group", "logicalOperator": "AND", "conditions": [] } },
+            "config": config
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn gate16_time_shifts_run_as_the_live_renderer_names_them() {
+        // 2026-03-31T00:00:00Z: a calendar month back is February's end.
+        let end = 1_774_915_200_000_000;
+        let q = query_with_shifts(&["1h", "2d", "1w", "1M", "bad", "0h"], false);
+        let sql: Vec<(i64, String)> = time_shifts(&q, end, false)
+            .into_iter()
+            .map(|s| (s.gap_ms, s.label))
+            .collect();
+        assert_eq!(
+            sql,
+            [
+                (3_600_000, "1 Hour ago".to_string()),
+                (172_800_000, "2 Days ago".to_string()),
+                (604_800_000, "1 Week ago".to_string()),
+                (31 * 86_400_000, "1 Month ago".to_string()),
+            ]
+        );
+        // PromQL takes fixed units only, and none for an instant query.
+        assert_eq!(time_shifts(&q, end, true).len(), 3);
+        assert!(time_shifts(&query_with_shifts(&["1h"], true), end, true).is_empty());
+        let shift = Shift {
+            gap_ms: 3_600_000,
+            label: "1 Hour ago".into(),
+        };
+        assert_eq!(
+            query_meta(1, 2, "sql", 0, Some(&shift)),
+            json!({ "startTime": 1, "endTime": 2, "queryType": "sql",
+                    "timeRangeGap": { "seconds": 3_600_000, "periodAsStr": "1 Hour ago" },
+                    "panelQueryIndex": 0 })
+        );
+        assert_eq!(
+            query_meta(1, 2, "promql", 1, None)["timeRangeGap"]["seconds"],
+            0
+        );
+    }
+
+    #[test]
+    fn gate16_series_are_cut_as_the_chart_cuts_them() {
+        let series = |names: &[&str]| json!({ "resultType": "matrix", "result": names.iter().map(|n| json!({ "metric": { "pod": n }, "values": [] })).collect::<Vec<_>>() });
+        let mut base = series(&["a", "b", "c"]);
+        let kept = cut_series(&mut base, 2, None);
+        assert_eq!(kept, [json!({ "pod": "a" }), json!({ "pod": "b" })]);
+        assert_eq!(base["result"].as_array().unwrap().len(), 2);
+        let mut shifted = series(&["c", "b", "z", "a"]);
+        cut_series(&mut shifted, 2, Some(&kept));
+        let pods: Vec<_> = shifted["result"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s["metric"]["pod"].clone())
+            .collect();
+        assert_eq!(pods, [json!("b"), json!("a")]);
+    }
+
+    #[test]
+    fn gate16_a_window_is_clamped_per_stream_as_the_search_handler_clamps_it() {
+        let hour = 3_600_000_000;
+        assert_eq!(
+            clamped_start(StreamType::Logs, 0, 48 * hour, 24),
+            Some(24 * hour)
+        );
+        assert_eq!(
+            clamped_start(StreamType::Logs, 30 * hour, 48 * hour, 24),
+            None
+        );
+        assert_eq!(clamped_start(StreamType::Logs, 0, 48 * hour, 0), None);
+        assert_eq!(
+            clamped_start(StreamType::EnrichmentTables, 0, 48 * hour, 24),
+            None
+        );
+    }
+
+    #[test]
+    fn gate16_partial_and_truncated_results_are_served_and_flagged() {
+        let (_, dash, _) = ctx_parts();
+        let panel = &dash.v8.as_ref().unwrap().tabs[0].panels[0];
+        let run = |partial, truncated| {
+            Collected {
+                data: vec![json!([1])],
+                partial,
+                truncated,
+                ..Default::default()
+            }
+            .into_run(panel, ManifestPanel::default(), 5)
+        };
+        let partial = run(true, false);
+        assert_eq!(partial.class, Class::Partial);
+        assert_eq!(
+            serde_json::to_value(&partial.result.state).unwrap(),
+            json!({ "state": "ok", "partial": true })
+        );
+        let truncated = run(false, true);
+        assert_eq!(truncated.class, Class::Truncated);
+        assert_eq!(
+            serde_json::to_value(&truncated.result.state).unwrap(),
+            json!({ "state": "ok", "truncated": true })
+        );
+        assert_eq!(truncated.result.data, [json!([1])]);
+        assert_eq!(run(false, false).class, Class::Fresh);
+    }
+
+    #[test]
+    fn gate05_the_build_and_the_config_route_compute_the_same_intent() {
+        let (link, mut dash, family) = ctx_parts();
+        let v8 = dash.v8.as_mut().unwrap();
+        v8.tabs[0].panels[0].queries[0].query =
+            Some("SELECT * FROM s WHERE svc = '$svc' AND _timestamp > $__range".into());
+        v8.variables = Some(
+            serde_json::from_value(
+                json!({ "list": [{ "type": "query_values", "name": "svc", "label": "Svc",
+                "query_data": { "stream_type": "logs", "stream": "s", "field": "svc" } }] }),
+            )
+            .unwrap(),
+        );
+        let frozen = BTreeMap::new();
+        let config_side = intent::intents(&dash, &frozen);
+        // The build resolves the unset default with a values query; the intent ignores values.
+        let values = Values {
+            values: [("svc".to_string(), json!("api"))].into_iter().collect(),
+            ..Default::default()
+        };
+        let vars = QueryVars::new(&dash, values.values.clone(), None);
+        let ctx = ctx(&link, &dash, &family);
+        let tab = &dash.v8.as_ref().unwrap().tabs[0];
+        let manifest = panel_manifest(&ctx, &vars, &frozen, &values, tab, &tab.panels[0]);
+        assert_eq!(manifest.intent, config_side["a"]);
+        assert_eq!(manifest.resolved_variables["svc"], json!("api"));
     }
 }

@@ -613,6 +613,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(usage_reporting::run());
 
+    // Public dashboard reads are counted on the querier that owns the slug.
+    if LOCAL_NODE.is_querier() {
+        spawn_pausable_job!(
+            "public_dashboards_access_flush",
+            openobserve_core::public_dashboards::access::FLUSH_INTERVAL_SECS,
+            {
+                openobserve_core::public_dashboards::access::flush().await;
+            }
+        );
+    }
+
     // cache short_urls
     tokio::task::spawn(db::short_url::watch());
     db::short_url::cache()

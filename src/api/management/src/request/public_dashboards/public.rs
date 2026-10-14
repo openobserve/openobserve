@@ -17,34 +17,50 @@
 //! the slug is the only credential. Every gate reads the link and org settings rows from the
 //! primary, so revoke, pause, expiry and the org switch apply on the next request.
 
-use std::{collections::BTreeMap, sync::LazyLock, time::Duration};
+use std::{sync::LazyLock, time::Duration};
 
 use axum::{
     Json,
     extract::{Extension, Path, Query},
-    http::{HeaderValue, StatusCode, header},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
 use config::{
     axum::middlewares::RealIp,
     meta::{
         dashboards::Dashboard,
-        public_dashboards::{KeyedRange, PublicVariable, SanitizedDashboard},
+        public_dashboards::{
+            KeyedRange, NotReadyResponse, PublicVariable, SanitizedDashboard, TimeRange,
+        },
     },
     utils::time::now_micros,
 };
 use infra::{
     db::get_orm_client_rw,
-    table::{dashboards, entity::public_dashboards::Model, public_dashboards as table},
+    table::{
+        dashboards,
+        entity::{public_dashboard_org_settings::Model as OrgSettings, public_dashboards::Model},
+        public_dashboards as table,
+    },
+};
+use openobserve_core::public_dashboards::{
+    self as core_pd, ENGINE, access,
+    flight::FLIGHTS,
+    materialize::{self, MIN_RETRY_SECS, ReadRequest, Served},
+    store,
 };
 use serde::Deserialize;
 
 use crate::request::public_rate_limit::{Counters, client_ip, too_many_requests};
 
 const READ_WINDOW: Duration = Duration::from_secs(60);
+/// Slugs are 22 alphanumeric characters (`generate_random_string(22)`).
+const SLUG_LEN: usize = 22;
 
 /// Per-IP read counters for both public dashboard routes.
 static READS: LazyLock<Counters> = LazyLock::new(Counters::default);
+/// Per-link counters of data responses that carry a body.
+static SLUG_READS: LazyLock<Counters> = LazyLock::new(Counters::default);
 
 #[derive(Deserialize)]
 pub struct DataParams {
@@ -63,7 +79,7 @@ enum Servable {
 /// revoked, draft or switched off gives a uniform 404 (no existence oracle); paused 503; expired
 /// 410.
 async fn resolve(slug: &str) -> Servable {
-    if !config::get_config().public_dashboards.enabled {
+    if !config::get_config().public_dashboards.enabled || !valid_slug(slug) {
         return Servable::NotFound;
     }
     let db = get_orm_client_rw().await;
@@ -82,10 +98,41 @@ async fn resolve(slug: &str) -> Servable {
             return Servable::Error;
         }
     };
-    let org_enabled = settings.as_ref().is_none_or(|s| s.enabled);
-    let settings_rev = settings.map_or(0, |s| s.rev);
-    let blocked = db::org_status::is_blocked(&pd.org_id);
-    servable(pd, settings_rev, org_enabled, blocked, now_micros())
+    let (org_enabled, settings_rev) = org_gate(settings.as_ref());
+    let blocked = db::org_status::is_blocked(&pd.org_id) || !trial_ok(&pd.org_id).await;
+    let verdict = servable(pd.clone(), settings_rev, org_enabled, blocked, now_micros());
+    if !matches!(verdict, Servable::Ok(..)) {
+        // This querier owns the slug, so its files go on the first read that finds the link off.
+        evict_link(&pd).await;
+    }
+    verdict
+}
+
+/// The org switch and settings revision; a missing row means enabled at revision 0.
+fn org_gate(settings: Option<&OrgSettings>) -> (bool, i64) {
+    settings.map_or((true, 0), |s| (s.enabled, s.rev))
+}
+
+/// Cloud: an org past its trial is served nothing, warm results and 304s included.
+#[cfg_attr(not(feature = "cloud"), allow(unused_variables))]
+async fn trial_ok(org: &str) -> bool {
+    #[cfg(feature = "cloud")]
+    return matches!(
+        openobserve_core::organization::is_org_in_free_trial_period(org).await,
+        Ok(true)
+    );
+    #[cfg(not(feature = "cloud"))]
+    true
+}
+
+async fn evict_link(pd: &Model) {
+    for range in core_pd::time_ranges(pd).ranges {
+        store::evict(&store::key(&pd.org_id, &pd.id, &range.key())).await;
+    }
+}
+
+fn valid_slug(slug: &str) -> bool {
+    slug.len() == SLUG_LEN && slug.bytes().all(|b| b.is_ascii_alphanumeric())
 }
 
 /// Whether a loaded link may be served; it is read fresh per request, so changes apply at once.
@@ -120,16 +167,20 @@ pub async fn config(ip: Option<Extension<RealIp>>, Path(slug): Path<String>) -> 
     with_headers(serve_config(&slug).await)
 }
 
-/// GET /api/public_dashboards/{slug}/data?range= — point-read one range's snapshot.
+/// GET /api/public_dashboards/{slug}/data?range= — one range's result, built on first read.
 pub async fn data(
     ip: Option<Extension<RealIp>>,
     Path(slug): Path<String>,
     Query(params): Query<DataParams>,
+    headers: HeaderMap,
 ) -> Response {
     if rate_limited(ip.map(|e| e.0)) {
         return with_headers(too_many_requests(READ_WINDOW));
     }
-    with_headers(serve_data(&slug, params.range.as_deref()).await)
+    let if_none_match = headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok());
+    with_headers(serve_data(&slug, params.range.as_deref(), if_none_match).await)
 }
 
 async fn serve_config(slug: &str) -> Response {
@@ -140,7 +191,7 @@ async fn serve_config(slug: &str) -> Response {
         Servable::NotFound => return StatusCode::NOT_FOUND.into_response(),
         Servable::Error => return server_error(),
     };
-    let dash = match dashboards::get_by_id(&pd.org_id, &pd.dashboard_id).await {
+    let dash = match dashboards::get_by_id_primary(&pd.org_id, &pd.dashboard_id).await {
         Ok(Some((_folder, dash))) => dash,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
         Err(e) => {
@@ -149,6 +200,11 @@ async fn serve_config(slug: &str) -> Response {
         }
     };
     let (title, layout) = project_layout(&dash);
+    let frozen = pd
+        .frozen_variables
+        .as_deref()
+        .and_then(|s| serde_json::from_str(s).ok())
+        .unwrap_or_default();
     let policy = openobserve_core::public_dashboards::time_ranges(&pd);
     let min_refresh = i64::from(config::get_config().public_dashboards.min_refresh_secs);
     let selected = i64::from(pd.refresh_secs);
@@ -171,25 +227,133 @@ async fn serve_config(slug: &str) -> Response {
         dashboard_updated_at: dash.updated_at,
         link_rev: pd.rev,
         settings_rev,
-        intents: BTreeMap::new(),
+        intents: core_pd::intent::intents(&dash, &frozen),
     })
     .into_response()
 }
 
-async fn serve_data(slug: &str, range_key: Option<&str>) -> Response {
-    let pd = match resolve(slug).await {
-        Servable::Ok(pd, _) => pd,
+/// The materializer entry point (design 4.2); ETag and 304 are decided on the masked result.
+async fn serve_data(slug: &str, range_key: Option<&str>, if_none_match: Option<&str>) -> Response {
+    let (pd, settings_rev) = match resolve(slug).await {
+        Servable::Ok(pd, settings_rev) => (pd, settings_rev),
         Servable::Unavailable => return unavailable(),
         Servable::Expired => return expired(),
         Servable::NotFound => return StatusCode::NOT_FOUND.into_response(),
         Servable::Error => return server_error(),
     };
     let range_key = range_key.map_or_else(|| default_range_key(&pd), str::to_string);
-    if !offers_range(&pd, &range_key) {
+    let Some(range) = offered_range(&pd, &range_key) else {
+        // A range removed by an edit leaves its file behind until someone asks for it.
+        store::evict(&store::key(&pd.org_id, &pd.id, &range_key)).await;
         return StatusCode::NOT_FOUND.into_response();
+    };
+    let dash = match dashboards::get_by_id_primary(&pd.org_id, &pd.dashboard_id).await {
+        Ok(Some((_folder, dash))) => dash,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(e) => {
+            log::error!("public dashboard load failed: {e}");
+            return server_error();
+        }
+    };
+    let now = now_micros();
+    access::record(&pd.id, now);
+    let served = materialize::read(
+        &ENGINE,
+        &FLIGHTS,
+        ReadRequest {
+            link: &pd,
+            settings_rev,
+            dashboard: &dash,
+            range,
+            now,
+        },
+    )
+    .await;
+    respond(&pd, served, if_none_match, now)
+}
+
+/// Turns a read into its response: 304 on a matching ETag, else the body, counted per slug.
+fn respond(pd: &Model, served: Served, if_none_match: Option<&str>, now: i64) -> Response {
+    if let Served::Data {
+        response, outcome, ..
+    } = &served
+    {
+        let etag = format!("\"{}\"", response.rev);
+        if if_none_match.is_some_and(|v| etag_matches(v, &response.rev)) {
+            materialize::count_read(&pd.org_id, "not_modified");
+            let mut resp = StatusCode::NOT_MODIFIED.into_response();
+            set_header(&mut resp, header::ETAG, &etag);
+            return resp;
+        }
+        materialize::count_read(&pd.org_id, outcome);
     }
-    // No result exists until the materializer serves this range.
-    StatusCode::NOT_FOUND.into_response()
+    if !matches!(served, Served::Gone) && slug_limited(&pd.slug) {
+        return too_many_requests(READ_WINDOW);
+    }
+    match served {
+        Served::Data {
+            response,
+            retry_hint,
+            ..
+        } => {
+            let etag = format!("\"{}\"", response.rev);
+            let mut resp = Json(response).into_response();
+            set_header(&mut resp, header::ETAG, &etag);
+            if let Some(secs) = retry_hint {
+                set_header(&mut resp, header::RETRY_AFTER, &secs.to_string());
+            }
+            resp
+        }
+        Served::Building(body) => {
+            let secs = match &body {
+                NotReadyResponse::Building { estimated_secs, .. } => *estimated_secs,
+                NotReadyResponse::Cooldown { .. } => 0,
+            };
+            not_ready(StatusCode::ACCEPTED, body, secs.max(MIN_RETRY_SECS))
+        }
+        Served::Cooldown(body) => {
+            let secs = match &body {
+                NotReadyResponse::Cooldown { next_retry_at, .. } => {
+                    u64::try_from(next_retry_at - now).map_or(0, |us| us.div_ceil(1_000_000))
+                }
+                NotReadyResponse::Building { .. } => 0,
+            };
+            not_ready(StatusCode::SERVICE_UNAVAILABLE, body, secs.max(1))
+        }
+        Served::Unavailable { retry_after } => {
+            let mut resp = unavailable();
+            set_header(&mut resp, header::RETRY_AFTER, &retry_after.to_string());
+            resp
+        }
+        Served::Gone => unavailable(),
+    }
+}
+
+fn not_ready(status: StatusCode, body: NotReadyResponse, retry_after: u64) -> Response {
+    let mut resp = (status, Json(body)).into_response();
+    set_header(&mut resp, header::RETRY_AFTER, &retry_after.to_string());
+    resp
+}
+
+fn set_header(resp: &mut Response, name: header::HeaderName, value: &str) {
+    if let Ok(value) = HeaderValue::from_str(value) {
+        resp.headers_mut().insert(name, value);
+    }
+}
+
+/// `If-None-Match` names this rev, weak or strong, alone or in a list.
+fn etag_matches(header_value: &str, rev: &str) -> bool {
+    header_value.split(',').any(|tag| {
+        let tag = tag.trim();
+        let tag = tag.strip_prefix("W/").unwrap_or(tag);
+        tag == "*" || tag.trim_matches('"') == rev
+    })
+}
+
+/// True if this link is over its per-minute budget of responses with a body; 0 rpm disables it.
+fn slug_limited(slug: &str) -> bool {
+    let rpm = config::get_config().public_dashboards.slug_rpm;
+    rpm != 0 && SLUG_READS.over_budget(slug, READ_WINDOW, rpm)
 }
 
 /// The range a request without `range` gets: the link's default, as the page opens on.
@@ -199,11 +363,11 @@ fn default_range_key(pd: &Model) -> String {
         .key()
 }
 
-fn offers_range(pd: &Model, range_key: &str) -> bool {
-    openobserve_core::public_dashboards::time_ranges(pd)
+fn offered_range(pd: &Model, range_key: &str) -> Option<TimeRange> {
+    core_pd::time_ranges(pd)
         .ranges
-        .iter()
-        .any(|range| range.key() == range_key)
+        .into_iter()
+        .find(|range| range.key() == range_key)
 }
 
 /// Visible variables with their frozen values; one missing from the capture shows as null.
@@ -499,11 +663,11 @@ mod tests {
             ),
             ..link()
         };
-        assert!(offers_range(&pd, "r3600"));
-        assert!(offers_range(&pd, "a10-20"));
-        assert!(!offers_range(&pd, "r86400"));
-        assert!(!offers_range(&pd, "a10-21"));
-        assert!(!offers_range(&link(), "r3600"));
+        assert!(offered_range(&pd, "r3600").is_some());
+        assert!(offered_range(&pd, "a10-20").is_some());
+        assert!(offered_range(&pd, "r86400").is_none());
+        assert!(offered_range(&pd, "a10-21").is_none());
+        assert!(offered_range(&link(), "r3600").is_none());
     }
 
     #[test]
@@ -540,5 +704,116 @@ mod tests {
             assert_eq!(h[header::REFERRER_POLICY], "no-referrer");
             assert_eq!(h[header::CACHE_CONTROL], "no-store", "{}", resp.status());
         }
+    }
+
+    #[test]
+    fn gate12_a_missing_settings_row_means_enabled_and_a_disabled_row_stops_serving() {
+        assert_eq!(org_gate(None), (true, 0));
+        let row = |enabled| OrgSettings {
+            org_id: "o".into(),
+            rev: 9,
+            enabled,
+            max_links: None,
+            updated_at: 1,
+            updated_by: "a".into(),
+        };
+        assert_eq!(org_gate(Some(&row(true))), (true, 9));
+        let (enabled, rev) = org_gate(Some(&row(false)));
+        assert!(matches!(
+            servable(link(), rev, enabled, false, 1),
+            Servable::NotFound
+        ));
+    }
+
+    #[test]
+    fn a_slug_is_twenty_two_alphanumerics() {
+        assert!(valid_slug("k8Zt2mR7aB3cD4eF5gH6Qx"));
+        assert!(!valid_slug("k8Zt2mR7aB3cD4eF5gH6Q"));
+        assert!(!valid_slug("k8Zt2mR7aB3cD4eF5gH6Q/"));
+        assert!(!valid_slug("../../etc/passwd000000"));
+    }
+
+    #[test]
+    fn if_none_match_accepts_weak_strong_and_listed_tags() {
+        assert!(etag_matches("\"abc\"", "abc"));
+        assert!(etag_matches("W/\"abc\"", "abc"));
+        assert!(etag_matches("\"x\", \"abc\"", "abc"));
+        assert!(!etag_matches("\"abd\"", "abc"));
+    }
+
+    fn data_response(rev: &str) -> Served {
+        Served::Data {
+            response: Box::new(config::meta::public_dashboards::DataResponse {
+                rev: rev.into(),
+                built_at: 1,
+                window: config::meta::public_dashboards::Window { start: 0, end: 1 },
+                refresh_secs: 300,
+                fresh_until: Some(2),
+                stale: true,
+                stale_reason: None,
+                refreshing: true,
+                next_retry_at: None,
+                last_error_at: None,
+                dashboard_updated_at: 1,
+                link_rev: 1,
+                settings_rev: 0,
+                variables: vec![],
+                panels: Default::default(),
+            }),
+            retry_hint: Some(4),
+            outcome: "stale",
+        }
+    }
+
+    #[test]
+    fn gate12_the_slug_limit_counts_bodies_and_never_a_304() {
+        let pd = Model {
+            slug: config::ider::uuid(),
+            ..link()
+        };
+        let rpm = config::get_config().public_dashboards.slug_rpm as usize;
+        for _ in 0..rpm + 50 {
+            let resp = respond(&pd, data_response("r1"), Some("\"r1\""), 0);
+            assert_eq!(resp.status(), StatusCode::NOT_MODIFIED);
+            assert_eq!(resp.headers()[header::ETAG], "\"r1\"");
+        }
+        let resp = respond(&pd, data_response("r2"), Some("\"r1\""), 0);
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.headers()[header::ETAG], "\"r2\"");
+        assert_eq!(resp.headers()[header::RETRY_AFTER], "4");
+        for _ in 1..rpm {
+            assert_eq!(
+                respond(&pd, data_response("r2"), None, 0).status(),
+                StatusCode::OK
+            );
+        }
+        let resp = respond(&pd, data_response("r2"), None, 0);
+        assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[test]
+    fn not_ready_responses_carry_retry_after() {
+        let pd = Model {
+            slug: config::ider::uuid(),
+            ..link()
+        };
+        let building = Served::Building(NotReadyResponse::Building {
+            started_at: 1,
+            estimated_secs: 1,
+            progress: 0.5,
+        });
+        let resp = respond(&pd, building, None, 0);
+        assert_eq!(resp.status(), StatusCode::ACCEPTED);
+        assert_eq!(resp.headers()[header::RETRY_AFTER], "3");
+        let cooldown = Served::Cooldown(NotReadyResponse::Cooldown {
+            last_error_at: Some(1),
+            next_retry_at: 90_500_000,
+        });
+        let resp = respond(&pd, cooldown, None, 0);
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(resp.headers()[header::RETRY_AFTER], "91");
+        let resp = respond(&pd, Served::Unavailable { retry_after: 6 }, None, 0);
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(resp.headers()[header::RETRY_AFTER], "6");
     }
 }
