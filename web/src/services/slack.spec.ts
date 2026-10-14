@@ -42,7 +42,7 @@ const cases: Case[] = [
     "row 1 install/start",
     () => slack.installStart(ORG, { source: "settings" }),
     "post",
-    [`${BASE}/install/start`, { source: "settings" }],
+    [`${BASE}/install/start`, { source: "settings" }, undefined],
   ],
   [
     "row 2 install/exchange",
@@ -50,7 +50,12 @@ const cases: Case[] = [
     "post",
     [`${BASE}/install/exchange`, { code: "c", state: "s" }],
   ],
-  ["row 3 prerequisites", () => slack.getPrerequisites(ORG), "get", [`${BASE}/prerequisites`]],
+  [
+    "row 3 prerequisites",
+    () => slack.getPrerequisites(ORG),
+    "get",
+    [`${BASE}/prerequisites`, undefined],
+  ],
   [
     "row 4 connectivity",
     () => slack.checkConnectivity(ORG, { installation_id: ID }),
@@ -236,6 +241,18 @@ describe("slack service", () => {
 
     await slack.listInstallations(ORG);
     expect(client.get).toHaveBeenLastCalledWith(`${BASE}/installations`, undefined);
+  });
+
+  it("passes silentForbidden for the form's install start and the disabled screen's checks", async () => {
+    await slack.installStart(ORG, { source: "destination_form" }, { silentForbidden: true });
+    expect(client.post).toHaveBeenCalledWith(
+      `${BASE}/install/start`,
+      { source: "destination_form" },
+      { silentForbidden: true },
+    );
+
+    await slack.getPrerequisites(ORG, { silentForbidden: true });
+    expect(client.get).toHaveBeenCalledWith(`${BASE}/prerequisites`, { silentForbidden: true });
   });
 
   it("encodes org, installation, channel and link ids into the path", async () => {

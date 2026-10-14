@@ -14,6 +14,15 @@ import {
 } from "./AddDestination.schema";
 import SlackDestinationSetup from "./SlackDestinationSetup.vue";
 import { buildSlackManifest, buildSlackManifestUrl } from "@/utils/slackManifest";
+import slack from "@/services/slack";
+import { createMemoryHistory, createRouter } from "vue-router";
+import {
+  axiosError,
+  makeSlackStore,
+  ok,
+  selfHostedSettingsExchange,
+} from "@/test/unit/helpers/slack";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 vi.mock("@/services/alert_destination", () => ({
   default: {
@@ -21,6 +30,28 @@ vi.mock("@/services/alert_destination", () => ({
     exchangeSlackOAuth: vi.fn(),
   },
 }));
+
+vi.mock("@/services/slack", () => ({
+  default: {
+    installStart: vi.fn(),
+    installExchange: vi.fn(),
+    listInstallations: vi.fn(),
+    connectInstallation: vi.fn(),
+  },
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
+  toast: vi.fn(),
+}));
+
+const testRouter = createRouter({
+  history: createMemoryHistory(),
+  routes: [
+    { path: "/", component: { template: "<div />" } },
+    { path: "/settings/slack", name: "slack", component: { template: "<div />" } },
+  ],
+});
 
 const authorizationUrl =
   "https://slack.com/oauth/v2/authorize?client_id=123&scope=incoming-webhook&state=signed";
@@ -76,11 +107,11 @@ const makePopup = (): Window =>
     location: { href: "about:blank" },
   }) as unknown as Window;
 
-const mountSetup = (isCloud = true, isEnterprise = true) =>
+const mountSetup = (isCloud = true, isEnterprise = true, zoConfig: Record<string, unknown> = {}) =>
   mount(Host, {
     props: { isCloud, isEnterprise },
     attachTo: document.body,
-    global: { plugins: [i18n] },
+    global: { plugins: [i18n, makeSlackStore(zoConfig), testRouter] },
   });
 
 let wrapper: ReturnType<typeof mountSetup> | null = null;
@@ -510,5 +541,211 @@ describe("SlackDestinationSetup open source", () => {
     await wrapper.vm.$nextTick();
 
     expect(wrapper.find('[data-test="slack-manifest-stepper"]').exists()).toBe(false);
+  });
+});
+
+const APP_AUTH_URL =
+  "https://slack.com/oauth/v2/authorize?client_id=123&scope=app_mentions:read&state=app";
+const formExchange = (source: "manual" | "mapping" = "manual", domains = ["acme.example"]) => ({
+  webhookUrl: "https://hooks.slack.com/services/T123/C123/app-secret",
+  channel: "sre-prod",
+  channelId: "C123",
+  teamId: "T123",
+  teamName: "Acme Corp",
+  installation: {
+    id: "inst-1",
+    team_name: "Acme Corp",
+    status: "healthy",
+    linking: { enabled: source === "mapping", source, domains },
+  },
+});
+
+const connectAndCallback = async (w: ReturnType<typeof mountSetup>) => {
+  await w.find('[data-test="slack-oauth-connect-button"]').trigger("click");
+  await flushPromises();
+  window.dispatchEvent(
+    new MessageEvent("message", {
+      origin: window.location.origin,
+      source: popup,
+      data: oauthMessage,
+    }),
+  );
+  await flushPromises();
+};
+
+describe("SlackDestinationSetup with the two-way Slack app", () => {
+  beforeEach(() => {
+    vi.mocked(slack.installStart).mockReturnValue(ok({ authorization_url: APP_AUTH_URL }) as any);
+    vi.mocked(slack.installExchange).mockReturnValue(ok(formExchange()) as any);
+    vi.mocked(slack.listInstallations).mockReturnValue(ok({ installations: [] }) as any);
+    vi.mocked(slack.connectInstallation).mockReturnValue(
+      ok({ connected: true, destination: null, channel_default_set: true }) as any,
+    );
+  });
+
+  it("AC-1.4 disabled: keeps calling the webhook endpoints and offers no banner", async () => {
+    wrapper = mountSetup(true, true, { slack_enabled: false, slack_disabled_reason: "flag" });
+    await connectAndCallback(wrapper);
+    expect(destinationService.startSlackOAuth).toHaveBeenCalledWith({ org_identifier: "acme" });
+    expect(destinationService.exchangeSlackOAuth).toHaveBeenCalled();
+    expect(slack.installStart).not.toHaveBeenCalled();
+    expect(slack.listInstallations).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="slack-form-upgrade-banner"]').exists()).toBe(false);
+  });
+
+  it("allowlist: an org outside O2_SLACK_ALLOWED_ORGS keeps the webhook flow (AC-1.7)", async () => {
+    wrapper = mountSetup(true, true, { slack_enabled: false, slack_disabled_reason: "allowlist" });
+    await connectAndCallback(wrapper);
+    expect(slack.installStart).not.toHaveBeenCalled();
+    expect(destinationService.startSlackOAuth).toHaveBeenCalled();
+    expect(wrapper.find('[data-test="slack-oauth-permission-note"]').text()).toContain(
+      "cannot read workspace messages",
+    );
+  });
+
+  it("AC-6.1 runs install/start with source destination_form and fills the form from install/exchange", async () => {
+    wrapper = mountSetup(true, true, { slack_enabled: true });
+    await connectAndCallback(wrapper);
+    expect(slack.installStart).toHaveBeenCalledWith(
+      "acme",
+      { source: "destination_form" },
+      { silentForbidden: true },
+    );
+    expect(popup.location.href).toBe(APP_AUTH_URL);
+    expect(slack.installExchange).toHaveBeenCalledWith("acme", {
+      code: "temporary-code",
+      state: "signed-state",
+    });
+    expect(destinationService.startSlackOAuth).not.toHaveBeenCalled();
+    expect(wrapper.vm.form.state.values.credentials.webhookUrl).toBe(
+      "https://hooks.slack.com/services/T123/C123/app-secret",
+    );
+    expect(wrapper.vm.form.state.values.slack_team_id).toBe("T123");
+    expect(wrapper.find('[data-test="slack-oauth-connected"]').text()).toContain("Acme Corp");
+  });
+
+  it("no_slack_put_falls_back: a 403 from install/start reuses the popup for the webhook endpoints (AC-6.12)", async () => {
+    vi.mocked(slack.installStart).mockRejectedValue(axiosError(403));
+    wrapper = mountSetup(true, true, { slack_enabled: true });
+    await connectAndCallback(wrapper);
+    expect(window.open).toHaveBeenCalledTimes(1);
+    expect(destinationService.startSlackOAuth).toHaveBeenCalledWith({ org_identifier: "acme" });
+    expect(popup.location.href).toBe(authorizationUrl);
+    expect(destinationService.exchangeSlackOAuth).toHaveBeenCalled();
+    expect(slack.installExchange).not.toHaveBeenCalled();
+    expect(wrapper.vm.form.state.values.slack_team_id).toBe("T123");
+    expect(wrapper.find('[data-test="slack-oauth-permission-note"]').text()).toContain(
+      "cannot read workspace messages",
+    );
+  });
+
+  it("decision 6: a settings-shaped exchange with destination null fills nothing and raises no error", async () => {
+    vi.mocked(slack.installExchange).mockReturnValue(ok(selfHostedSettingsExchange()) as any);
+    wrapper = mountSetup(true, true, { slack_enabled: true });
+    await connectAndCallback(wrapper);
+    expect(slack.installExchange).toHaveBeenCalled();
+    expect(toast).not.toHaveBeenCalled();
+    expect(wrapper.vm.form.state.values.credentials.webhookUrl).toBe("");
+    expect(wrapper.vm.form.state.values.slack_team_id ?? "").toBe("");
+    expect(wrapper.find('[data-test="slack-oauth-connected"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="slack-form-link-people"]').exists()).toBe(false);
+    expect(slack.connectInstallation).not.toHaveBeenCalled();
+  });
+
+  it("AC-6.10 shows the two-way consent on the app path instead of the webhook sentence", () => {
+    wrapper = mountSetup(true, true, { slack_enabled: true });
+    const note = wrapper.find('[data-test="slack-oauth-permission-note"]').text();
+    expect(note).toContain("Two-way Slack also reads your direct messages with OpenObserve");
+    expect(note).not.toContain("cannot read workspace messages");
+  });
+
+  it("AC-6.11 offers to link people automatically after a manual-linking install", async () => {
+    wrapper = mountSetup(true, true, { slack_enabled: true });
+    await connectAndCallback(wrapper);
+    const banner = wrapper.find('[data-test="slack-form-link-people"]');
+    expect(banner.text()).toContain("Link people automatically for acme.example");
+    expect(banner.find("a").attributes("href")).toContain("/settings/slack");
+    expect(banner.find("a").attributes("target")).toBe("_blank");
+  });
+
+  it("AC-6.11 shows no linking banner when the domains come from a mapping", async () => {
+    vi.mocked(slack.installExchange).mockReturnValue(ok(formExchange("mapping")) as any);
+    wrapper = mountSetup(true, true, { slack_enabled: true });
+    await connectAndCallback(wrapper);
+    expect(wrapper.find('[data-test="slack-form-link-people"]').exists()).toBe(false);
+  });
+
+  it("AC-6.13 the Upgrade banner reads upgrade candidates silently and fills this form from the popup", async () => {
+    vi.mocked(slack.listInstallations).mockReturnValue(
+      ok({
+        installations: [],
+        upgrade_candidates: [
+          { team_id: "T123", team_name: "Acme Corp", destinations: [{ id: "d1", name: "alerts" }] },
+        ],
+      }) as any,
+    );
+    wrapper = mountSetup(true, true, { slack_enabled: true });
+    await flushPromises();
+    expect(slack.listInstallations).toHaveBeenCalledWith("acme", { silentForbidden: true });
+    const banner = wrapper.find('[data-test="slack-form-upgrade-banner"]');
+    expect(banner.text()).toContain("Upgrade to two-way Slack");
+    await banner.find('[data-test="slack-form-upgrade-button"]').trigger("click");
+    await flushPromises();
+    expect(slack.installStart).toHaveBeenCalledWith(
+      "acme",
+      { source: "destination_form" },
+      { silentForbidden: true },
+    );
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        origin: window.location.origin,
+        source: popup,
+        data: oauthMessage,
+      }),
+    );
+    await flushPromises();
+    expect(wrapper.vm.form.state.values.credentials.channel).toBe("sre-prod");
+    expect(slack.connectInstallation).not.toHaveBeenCalled();
+  });
+
+  it("AC-6.13 a member without Admin LIST gets no banner and no access toast", async () => {
+    vi.mocked(slack.listInstallations).mockRejectedValue(axiosError(403));
+    wrapper = mountSetup(true, true, { slack_enabled: true });
+    await flushPromises();
+    expect(wrapper.find('[data-test="slack-form-upgrade-banner"]').exists()).toBe(false);
+  });
+
+  it("AC-6.8 connects this org with the ticket when the workspace is already installed", async () => {
+    vi.mocked(slack.installExchange).mockReturnValue(
+      ok({
+        ...formExchange(),
+        installation: undefined,
+        already_installed: {
+          installation_id: "inst-7",
+          team_name: "Acme Corp",
+          this_org_connected: false,
+        },
+        connect_ticket: "ticket-1",
+      }) as any,
+    );
+    wrapper = mountSetup(true, true, { slack_enabled: true });
+    await connectAndCallback(wrapper);
+    expect(slack.connectInstallation).toHaveBeenCalledWith("acme", "inst-7", {
+      connect_ticket: "ticket-1",
+    });
+    expect(wrapper.vm.form.state.values.slack_team_id).toBe("T123");
+  });
+
+  it("self-hosted with Slack enabled points to Settings › Slack and keeps the manifest flow", () => {
+    wrapper = mountSetup(false, true, { slack_enabled: true });
+    const banner = wrapper.find('[data-test="slack-form-app-banner"]');
+    expect(banner.text()).toContain("two-way Slack app");
+    expect(banner.find("a").attributes("href")).toContain("/settings/slack");
+    expect(wrapper.find('[data-test="slack-manifest-stepper"]').exists()).toBe(true);
+  });
+
+  it("self-hosted with Slack disabled shows no app banner", () => {
+    wrapper = mountSetup(false, true, { slack_enabled: false, slack_disabled_reason: "flag" });
+    expect(wrapper.find('[data-test="slack-form-app-banner"]').exists()).toBe(false);
   });
 });

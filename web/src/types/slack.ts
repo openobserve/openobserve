@@ -162,10 +162,10 @@ export interface SlackFormExchangeResponse extends SlackOAuthConnection {
   installation: InstallationSummary;
 }
 
-/** `source: settings` or `upgrade_banner`: the server created the destination itself. */
+/** `source: settings` or `upgrade_banner`; `destination` is null on self-hosted, whose app has no incoming webhook. */
 export interface SlackSettingsExchangeResponse {
   installation: InstallationView;
-  destination: SlackCreatedDestination;
+  destination: SlackCreatedDestination | null;
   channel_default_set: boolean;
   linking: LinkingView;
   link_all: SlackLinkAllResult | null;
