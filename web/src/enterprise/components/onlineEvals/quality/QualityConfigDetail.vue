@@ -19,8 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex min-h-0 min-w-0 flex-1 flex-col max-lg:overflow-y-auto"
     data-test="quality-detail"
   >
+    <!-- Any failure, including one with no HTTP status (server unreachable), so it never reads as "no scores". -->
     <div
-      v-if="errorStatus"
+      v-if="scoresQuery.error.value"
       class="flex min-h-0 flex-1 items-center justify-center"
       data-test="quality-detail-error"
     >
