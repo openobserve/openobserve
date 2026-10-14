@@ -13733,6 +13733,7 @@
         "costScoringOnly": "alleen scoringkosten",
         "costConfirmTitle": "Dit dure experiment uitvoeren?",
         "costConfirmMessage": "Dit experiment kost naar schatting ongeveer {cost}, boven de waarschuwingsdrempel van {threshold}. Toch aanmaken en uitvoeren?",
+        "costConfirmMessageUnpriced": "De geschatte kosten van dit experiment overschrijden de waarschuwingsdrempel. Toch aanmaken en uitvoeren?",
         "costConfirmOk": "Toch aanmaken",
         "skippedFully": "{count} rijen volledig overgeslagen — elke geselecteerde scorer heeft een verwachte output nodig. Overgeslagen rijen kosten niets om uit te voeren.",
         "skippedPartially": "{count} rijen gedeeltelijk overgeslagen — de taak wordt nog steeds uitgevoerd, maar referentiegebaseerde scorers kunnen geen rijen scoren zonder een verwachte output.",
@@ -14357,7 +14358,8 @@
       },
       "testPanel": {
         "title": "Verbinding testen",
-        "storedCredentialsHint": "Test de gepubliceerde versie met de opgeslagen inloggegevens. Je niet-opgeslagen wijzigingen worden getest wanneer je publiceert.",
+        "storedCredentialsHint": "Test gepubliceerde v{version} ({endpoint}) met de opgeslagen inloggegevens. Je niet-opgeslagen wijzigingen worden getest wanneer je publiceert.",
+        "unpublishedSecretHint": "Deze taak is nog niet gepubliceerd, dus er is geen opgeslagen versie om te testen. Wijzigingen publiceren test het opgeslagen concept met de opgeslagen inloggegevens en publiceert het als de test slaagt.",
         "sourceLabel": "Voorbeeldinvoer",
         "sourceDataset": "Uit een dataset",
         "sourceManual": "Handmatig",
@@ -14379,7 +14381,15 @@
         "rawRequest": "Verzonden verzoek",
         "rawResponse": "Ontvangen antwoord",
         "idle": "Het verzoek en het antwoord verschijnen hier beide wanneer je een test uitvoert.",
-        "disabledHint": "Vul eerst de naam en het eindpunt in."
+        "disabledHint": "Vul eerst de naam en het eindpunt in.",
+        "failure": {
+          "transport": "Kon het eindpunt niet bereiken.",
+          "deadlineExceeded": "Het eindpunt heeft niet op tijd geantwoord.",
+          "httpStatus": "Het eindpunt antwoordde met HTTP {status}.",
+          "badResponse": "Het antwoord kon niet worden gelezen met het antwoordpad.",
+          "outputTooLarge": "Het antwoord is te groot.",
+          "requestError": "Het verzoek kon niet worden opgebouwd uit de taak."
+        }
       },
       "detail": {
         "backTo": "Externe taken",

@@ -13733,6 +13733,7 @@
         "costScoringOnly": "chỉ tính chi phí chấm điểm",
         "costConfirmTitle": "Chạy thí nghiệm tốn kém này?",
         "costConfirmMessage": "Thí nghiệm này ước tính tốn khoảng {cost}, vượt ngưỡng cảnh báo {threshold}. Vẫn tạo và chạy?",
+        "costConfirmMessageUnpriced": "Thí nghiệm này được ước tính có chi phí vượt ngưỡng cảnh báo. Vẫn tạo và chạy?",
         "costConfirmOk": "Vẫn tạo",
         "skippedFully": "{count} dòng bị bỏ qua hoàn toàn — mọi bộ chấm điểm đã chọn đều cần đầu ra dự kiến. Các dòng bị bỏ qua không tốn chi phí để chạy.",
         "skippedPartially": "{count} dòng bị bỏ qua một phần — tác vụ vẫn chạy, nhưng các bộ chấm điểm dựa trên tham chiếu không thể chấm điểm các dòng thiếu đầu ra dự kiến.",
@@ -14357,7 +14358,8 @@
       },
       "testPanel": {
         "title": "Kiểm tra kết nối",
-        "storedCredentialsHint": "Kiểm thử phiên bản đã phát hành bằng thông tin xác thực đã lưu. Các chỉnh sửa chưa lưu sẽ được kiểm thử khi bạn phát hành.",
+        "storedCredentialsHint": "Kiểm thử bản đã phát hành v{version} ({endpoint}) bằng thông tin xác thực đã lưu. Các chỉnh sửa chưa lưu của bạn sẽ được kiểm thử khi bạn phát hành.",
+        "unpublishedSecretHint": "Tác vụ này chưa được phát hành, nên không có phiên bản đã lưu để kiểm thử. Phát hành thay đổi sẽ kiểm thử bản nháp đã lưu bằng thông tin xác thực đã lưu và phát hành nếu kiểm thử đạt.",
         "sourceLabel": "Đầu vào mẫu",
         "sourceDataset": "Từ một tập dữ liệu",
         "sourceManual": "Thủ công",
@@ -14379,7 +14381,15 @@
         "rawRequest": "Yêu cầu đã gửi",
         "rawResponse": "Phản hồi đã nhận",
         "idle": "Yêu cầu và phản hồi sẽ hiển thị tại đây sau khi bạn chạy thử.",
-        "disabledHint": "Vui lòng nhập tên và điểm cuối trước."
+        "disabledHint": "Vui lòng nhập tên và điểm cuối trước.",
+        "failure": {
+          "transport": "Không thể kết nối tới endpoint.",
+          "deadlineExceeded": "Endpoint không phản hồi kịp thời.",
+          "httpStatus": "Endpoint phản hồi với HTTP {status}.",
+          "badResponse": "Không thể đọc phản hồi bằng đường dẫn phản hồi.",
+          "outputTooLarge": "Phản hồi quá lớn.",
+          "requestError": "Không thể tạo yêu cầu từ tác vụ."
+        }
       },
       "detail": {
         "backTo": "Tác vụ từ xa",

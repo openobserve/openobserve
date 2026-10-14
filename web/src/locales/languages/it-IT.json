@@ -13733,6 +13733,7 @@
         "costScoringOnly": "solo costo di scoring",
         "costConfirmTitle": "Eseguire questo esperimento costoso?",
         "costConfirmMessage": "Questo esperimento è stimato costare circa {cost}, oltre la soglia di avviso di {threshold}. Crearlo ed eseguirlo comunque?",
+        "costConfirmMessageUnpriced": "Si stima che questo esperimento costi più della soglia di avviso. Crearlo ed eseguirlo comunque?",
         "costConfirmOk": "Crea comunque",
         "skippedFully": "{count} righe completamente saltate — ogni valutatore selezionato richiede un output atteso. Le righe saltate non costano nulla da eseguire.",
         "skippedPartially": "{count} righe parzialmente saltate — l'attività viene comunque eseguita, ma i valutatori basati su riferimento non possono valutare righe senza un output atteso.",
@@ -14357,7 +14358,8 @@
       },
       "testPanel": {
         "title": "Prova connessione",
-        "storedCredentialsHint": "Verifica la versione pubblicata con le credenziali memorizzate. Le modifiche non salvate vengono verificate al momento della pubblicazione.",
+        "storedCredentialsHint": "Verifica la v{version} pubblicata ({endpoint}) con le sue credenziali memorizzate. Le modifiche non salvate vengono verificate al momento della pubblicazione.",
+        "unpublishedSecretHint": "Questa attività non è ancora stata pubblicata, quindi non esiste una versione memorizzata da verificare. Pubblica modifiche verifica la bozza salvata con le sue credenziali memorizzate e la pubblica se il test ha esito positivo.",
         "sourceLabel": "Input di esempio",
         "sourceDataset": "Da un dataset",
         "sourceManual": "Manuale",
@@ -14379,7 +14381,15 @@
         "rawRequest": "Richiesta inviata",
         "rawResponse": "Risposta ricevuta",
         "idle": "La richiesta e la risposta compaiono entrambe qui dopo aver eseguito un test.",
-        "disabledHint": "Compila prima il nome e l'endpoint."
+        "disabledHint": "Compila prima il nome e l'endpoint.",
+        "failure": {
+          "transport": "Impossibile raggiungere l'endpoint.",
+          "deadlineExceeded": "L'endpoint non ha risposto in tempo.",
+          "httpStatus": "L'endpoint ha risposto con HTTP {status}.",
+          "badResponse": "Impossibile leggere la risposta con il percorso di risposta.",
+          "outputTooLarge": "La risposta è troppo grande.",
+          "requestError": "Impossibile costruire la richiesta dall'attività."
+        }
       },
       "detail": {
         "backTo": "Attività remote",

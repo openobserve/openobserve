@@ -13733,6 +13733,7 @@
         "costScoringOnly": "solo costo de puntuación",
         "costConfirmTitle": "¿Ejecutar este experimento costoso?",
         "costConfirmMessage": "Se estima que este experimento cuesta aproximadamente {cost}, por encima del umbral de advertencia de {threshold}. ¿Crearlo y ejecutarlo de todos modos?",
+        "costConfirmMessageUnpriced": "Este experimento se estima que costará más que el umbral de advertencia. ¿Crearlo y ejecutarlo de todos modos?",
         "costConfirmOk": "Crear de todos modos",
         "skippedFully": "{count} filas omitidas por completo: cada evaluador seleccionado necesita una salida esperada. Las filas omitidas no cuestan nada al ejecutarse.",
         "skippedPartially": "{count} filas omitidas parcialmente: la tarea aún se ejecuta, pero los evaluadores basados en referencia no pueden puntuar filas sin una salida esperada.",
@@ -14357,7 +14358,8 @@
       },
       "testPanel": {
         "title": "Probar conexión",
-        "storedCredentialsHint": "Prueba la versión publicada con sus credenciales almacenadas. Tus cambios sin guardar se prueban cuando publicas.",
+        "storedCredentialsHint": "Prueba la versión publicada v{version} ({endpoint}) con sus credenciales almacenadas. Tus cambios sin guardar se prueban cuando publicas.",
+        "unpublishedSecretHint": "Esta tarea aún no se ha publicado, por lo que no hay una versión almacenada que probar. Publicar cambios prueba el borrador guardado con sus credenciales almacenadas y lo publica si la prueba pasa.",
         "sourceLabel": "Entrada de muestra",
         "sourceDataset": "De un conjunto de datos",
         "sourceManual": "Manual",
@@ -14379,7 +14381,15 @@
         "rawRequest": "Solicitud enviada",
         "rawResponse": "Respuesta recibida",
         "idle": "La solicitud y la respuesta aparecen aquí cuando ejecutes una prueba.",
-        "disabledHint": "Primero completa el nombre y el endpoint."
+        "disabledHint": "Primero completa el nombre y el endpoint.",
+        "failure": {
+          "transport": "No se pudo alcanzar el endpoint.",
+          "deadlineExceeded": "El endpoint no respondió a tiempo.",
+          "httpStatus": "El endpoint respondió con HTTP {status}.",
+          "badResponse": "No se pudo leer la respuesta con la ruta de respuesta.",
+          "outputTooLarge": "La respuesta es demasiado grande.",
+          "requestError": "No se pudo construir la solicitud a partir de la tarea."
+        }
       },
       "detail": {
         "backTo": "Tareas remotas",

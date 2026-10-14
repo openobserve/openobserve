@@ -13733,6 +13733,7 @@
         "costScoringOnly": "仅评分成本",
         "costConfirmTitle": "运行这个高成本的实验？",
         "costConfirmMessage": "该实验预计成本约为 {cost}，超过 {threshold} 警告阈值。仍要创建并运行吗？",
+        "costConfirmMessageUnpriced": "该实验的预估成本超过警告阈值。仍要创建并运行吗？",
         "costConfirmOk": "仍然创建",
         "skippedFully": "{count} 行被完全跳过——每个选定的评分器都需要预期输出。跳过的行运行无需成本。",
         "skippedPartially": "{count} 行被部分跳过——任务仍会运行，但基于参考的评分器无法对没有预期输出的行进行评分。",
@@ -14357,7 +14358,8 @@
       },
       "testPanel": {
         "title": "测试连接",
-        "storedCredentialsHint": "使用已存储的凭据测试已发布版本。未保存的编辑会在发布时进行测试。",
+        "storedCredentialsHint": "使用已存储的凭据测试已发布的 v{version}（{endpoint}）。您未保存的修改会在发布时进行测试。",
+        "unpublishedSecretHint": "此任务尚未发布，因此没有可测试的已存储版本。发布更改会使用已存储的凭据测试已保存的草稿，若测试通过则发布它。",
         "sourceLabel": "示例输入",
         "sourceDataset": "来自数据集",
         "sourceManual": "手动",
@@ -14379,7 +14381,15 @@
         "rawRequest": "已发送的请求",
         "rawResponse": "已收到的响应",
         "idle": "运行测试后，请求和响应都会显示在此处。",
-        "disabledHint": "请先填写名称和端点。"
+        "disabledHint": "请先填写名称和端点。",
+        "failure": {
+          "transport": "无法访问端点。",
+          "deadlineExceeded": "端点未及时响应。",
+          "httpStatus": "端点返回 HTTP {status}。",
+          "badResponse": "无法通过响应路径读取该响应。",
+          "outputTooLarge": "响应过大。",
+          "requestError": "无法根据该任务构建请求。"
+        }
       },
       "detail": {
         "backTo": "远程任务",

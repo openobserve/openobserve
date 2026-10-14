@@ -13733,6 +13733,7 @@
         "costScoringOnly": "nur Bewertungskosten",
         "costConfirmTitle": "Dieses kostspielige Experiment ausführen?",
         "costConfirmMessage": "Für dieses Experiment werden Kosten von etwa {cost} geschätzt, was über dem Warnschwellenwert von {threshold} liegt. Trotzdem erstellen und ausführen?",
+        "costConfirmMessageUnpriced": "Für dieses Experiment werden voraussichtlich Kosten über dem Warnschwellenwert anfallen. Trotzdem erstellen und ausführen?",
         "costConfirmOk": "Trotzdem erstellen",
         "skippedFully": "{count} Zeilen vollständig übersprungen — jeder ausgewählte Scorer benötigt eine erwartete Ausgabe. Übersprungene Zeilen kosten nichts bei der Ausführung.",
         "skippedPartially": "{count} Zeilen teilweise übersprungen — die Aufgabe wird weiterhin ausgeführt, aber referenzbasierte Scorer können Zeilen ohne erwartete Ausgabe nicht bewerten.",
@@ -14357,7 +14358,8 @@
       },
       "testPanel": {
         "title": "Verbindung testen",
-        "storedCredentialsHint": "Testet die veröffentlichte Version mit ihren gespeicherten Anmeldedaten. Ihre nicht gespeicherten Änderungen werden beim Veröffentlichen getestet.",
+        "storedCredentialsHint": "Testet die veröffentlichte Version v{version} ({endpoint}) mit ihren gespeicherten Anmeldedaten. Ihre ungespeicherten Änderungen werden beim Veröffentlichen getestet.",
+        "unpublishedSecretHint": "Diese Aufgabe wurde noch nicht veröffentlicht, daher gibt es keine gespeicherte Version zum Testen. Änderungen veröffentlichen testet den gespeicherten Entwurf mit den gespeicherten Anmeldedaten und veröffentlicht ihn, wenn der Test bestanden wird.",
         "sourceLabel": "Beispieleingabe",
         "sourceDataset": "Aus einem Datensatz",
         "sourceManual": "Manuell",
@@ -14379,7 +14381,15 @@
         "rawRequest": "Gesendete Anfrage",
         "rawResponse": "Empfangene Antwort",
         "idle": "Die Anfrage und die Antwort erscheinen beide hier, sobald Sie einen Test ausführen.",
-        "disabledHint": "Geben Sie zuerst Name und Endpunkt an."
+        "disabledHint": "Geben Sie zuerst Name und Endpunkt an.",
+        "failure": {
+          "transport": "Der Endpunkt konnte nicht erreicht werden.",
+          "deadlineExceeded": "Der Endpunkt hat nicht rechtzeitig geantwortet.",
+          "httpStatus": "Der Endpunkt hat mit HTTP {status} geantwortet.",
+          "badResponse": "Die Antwort konnte mit dem Antwortpfad nicht gelesen werden.",
+          "outputTooLarge": "Die Antwort ist zu groß.",
+          "requestError": "Die Anfrage konnte nicht aus der Aufgabe erstellt werden."
+        }
       },
       "detail": {
         "backTo": "Remote-Aufgaben",
