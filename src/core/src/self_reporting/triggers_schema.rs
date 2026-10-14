@@ -136,6 +136,9 @@ async fn initialize_triggers_stream_schema(org_id: &str) -> Result<()> {
                 "[SELF-REPORTING] Successfully created triggers stream schema for {org_id}/{stream_name} with {} fields",
                 expected_schema.fields().len()
             );
+            // The org now gets trigger rows, so its built-in alerts have something to watch.
+            #[cfg(feature = "enterprise")]
+            crate::alerts::prebuilt::seed_org_in_background(org_id);
             Ok(())
         }
         Err(e) => {

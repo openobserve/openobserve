@@ -745,7 +745,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         log::error!("[TEMPLATES] default_alert_template backfill failed: {e}");
     }
 
-    // In the background: an upgrade seeds every org, and serving must not wait for that.
+    // Backgrounded: the first boot after an upgrade seeds every org; serving must not wait.
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_scheduler() {
         tokio::task::spawn(async {

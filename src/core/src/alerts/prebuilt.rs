@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Seeds three self-monitoring alerts over the `triggers` stream into each org, switched off.
+//! Built-in self-monitoring alerts over each org's `triggers` stream, seeded switched off.
 
 use common::utils::sql::escape_like;
 use config::{
@@ -26,13 +26,16 @@ use config::{
         stream::StreamType,
         system_settings::{SettingCategory, SettingScope, SystemSetting},
     },
-    utils::{json, sql::quote_sql_string},
+    utils::sql::quote_sql_string,
 };
 use db::system_settings;
+use infra::dist_lock;
 
-/// The names an org was ever seeded, so an alert its users delete is never planted again.
-const SEEDED_KEY: &str = "prebuilt_alerts_seeded";
-const LOCK_KEY: &str = "/system/alerts/prebuilt_seed";
+/// Bumped when a built-in is added, so the next upgrade sweeps every org once more.
+const SHIPPED_REVISION: u32 = 1;
+const REVISION_KEY: &str = "prebuilt_alerts_revision";
+const SWEEP_LOCK_KEY: &str = "/system/alerts/prebuilt_sweep";
+const ORG_LOCK_PREFIX: &str = "/system/alerts/prebuilt_org/";
 const PREBUILT: [Prebuilt; 3] = [
     Prebuilt {
         name: "o2_alert_evaluation_failures",
@@ -105,16 +108,53 @@ impl Prebuilt {
     }
 }
 
-/// One lock across nodes, because two seeding the same org would both create its alerts.
-pub async fn seed_prebuilt_alerts() -> Result<(), anyhow::Error> {
-    use infra::dist_lock;
+/// Whether `alert` is a built-in, which can be switched off or edited but not deleted or renamed.
+pub fn is_builtin(alert: &Alert) -> bool {
+    alert.stream_type == StreamType::Logs
+        && alert.stream_name == TRIGGERS_STREAM
+        && PREBUILT.iter().any(|prebuilt| prebuilt.name == alert.name)
+}
 
-    let locker = dist_lock::lock(LOCK_KEY, 0).await?;
-    let orgs = crate::organization::list_all_orgs(None)
-        .await
-        .unwrap_or_default();
+/// Once per shipped revision, every org that already has a `triggers` stream.
+pub async fn seed_prebuilt_alerts() -> Result<(), anyhow::Error> {
+    if applied_revision().await? >= SHIPPED_REVISION {
+        return Ok(());
+    }
+    let locker = dist_lock::lock(SWEEP_LOCK_KEY, 0).await?;
+    let result = sweep().await;
+    dist_lock::unlock(&locker).await?;
+    drop(locker);
+    result
+}
+
+/// For an org whose `triggers` stream was just created, so it is seeded without a restart.
+pub fn seed_org_in_background(org_id: &str) {
+    let org_id = org_id.to_string();
+    tokio::task::spawn(async move {
+        if let Err(e) = seed_org(&org_id).await {
+            log::error!("[PREBUILT_ALERTS] seeding failed for org {org_id}: {e}");
+        }
+    });
+}
+
+async fn sweep() -> Result<(), anyhow::Error> {
+    // Another node may have finished the sweep while this one waited for the lock.
+    if applied_revision().await? >= SHIPPED_REVISION {
+        return Ok(());
+    }
+    let orgs = crate::organization::list_all_orgs(None).await?;
     let mut failed = 0;
     for org in &orgs {
+        // In-memory only: `schema::exists` queries the database for every org without the stream.
+        let stream = infra::schema::get_stream_schema_from_cache(
+            &org.identifier,
+            TRIGGERS_STREAM,
+            StreamType::Logs,
+        )
+        .await;
+        if stream.is_none() {
+            continue;
+        }
         if let Err(e) = seed_org(&org.identifier).await {
             failed += 1;
             log::error!(
@@ -123,48 +163,33 @@ pub async fn seed_prebuilt_alerts() -> Result<(), anyhow::Error> {
             );
         }
     }
-    dist_lock::unlock(&locker).await?;
-    drop(locker);
     log::info!(
-        "[PREBUILT_ALERTS] seeding complete: {}/{} orgs without error",
-        orgs.len() - failed,
+        "[PREBUILT_ALERTS] sweep complete: {failed} of {} orgs failed",
         orgs.len()
     );
-    Ok(())
-}
-
-/// Only an org that already has the stream: creating it would make an empty org look ingested.
-async fn seed_org(org_id: &str) -> Result<(), anyhow::Error> {
-    let mut seeded = read_seeded(org_id).await?;
-    let pending: Vec<&Prebuilt> = PREBUILT
-        .iter()
-        .filter(|prebuilt| !seeded.iter().any(|name| name == prebuilt.name))
-        .collect();
-    if pending.is_empty() || !infra::schema::exists(org_id, StreamType::Logs, TRIGGERS_STREAM).await
-    {
-        return Ok(());
-    }
-    let seeded_before = seeded.len();
-    for prebuilt in pending {
-        match seed_one(org_id, prebuilt).await {
-            Ok(()) => seeded.push(prebuilt.name.to_string()),
-            Err(e) => log::error!(
-                "[PREBUILT_ALERTS] failed to seed '{}' into org {org_id}: {e}",
-                prebuilt.name
-            ),
-        }
-    }
-    if seeded.len() > seeded_before {
-        let value = json::to_value(&seeded)?;
-        let setting = SystemSetting::new_org(org_id, SEEDED_KEY, value)
+    // A failed org has no other way to be seeded, so the revision waits for a clean sweep.
+    if failed == 0 {
+        let setting = SystemSetting::new_system(REVISION_KEY, SHIPPED_REVISION.into())
             .with_category(SettingCategory::Alerts)
-            .with_description("Prebuilt alerts ever seeded into this org");
+            .with_description("Revision of the built-in alerts every org has been seeded with");
         system_settings::set(&setting).await?;
     }
     Ok(())
 }
 
-/// An alert the org already has under the name counts as seeded, so deleting it later is final.
+/// Per org, because the sweep and a stream creation on another node can seed the same org at once.
+async fn seed_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let locker = dist_lock::lock(&format!("{ORG_LOCK_PREFIX}{org_id}"), 0).await?;
+    let mut result = Ok(());
+    for prebuilt in &PREBUILT {
+        if let Err(e) = seed_one(org_id, prebuilt).await {
+            result = Err(e);
+        }
+    }
+    dist_lock::unlock(&locker).await?;
+    result
+}
+
 async fn seed_one(org_id: &str, prebuilt: &Prebuilt) -> Result<(), anyhow::Error> {
     let existing =
         db::alerts::alert::get_by_name(org_id, StreamType::Logs, TRIGGERS_STREAM, prebuilt.name)
@@ -177,12 +202,12 @@ async fn seed_one(org_id: &str, prebuilt: &Prebuilt) -> Result<(), anyhow::Error
     Ok(())
 }
 
-/// A failed read is returned, not defaulted, or the write would forget names seeded before.
-async fn read_seeded(org_id: &str) -> Result<Vec<String>, anyhow::Error> {
-    let stored = system_settings::get(&SettingScope::Org, Some(org_id), None, SEEDED_KEY).await?;
+async fn applied_revision() -> Result<u32, anyhow::Error> {
+    let stored = system_settings::get(&SettingScope::System, None, None, REVISION_KEY).await?;
     Ok(stored
-        .and_then(|setting| json::from_value(setting.setting_value).ok())
-        .unwrap_or_default())
+        .and_then(|setting| setting.setting_value.as_u64())
+        .and_then(|revision| u32::try_from(revision).ok())
+        .unwrap_or(0))
 }
 
 #[cfg(test)]
@@ -196,7 +221,7 @@ mod tests {
             TriggerData,
             TriggerDataType::{self, Alert as AlertJob, Report},
         },
-        utils::record_batch_ext::convert_json_to_record_batch,
+        utils::{json, record_batch_ext::convert_json_to_record_batch},
     };
     use search::datafusion::exec::DataFusionContextBuilder;
 
@@ -267,6 +292,17 @@ mod tests {
             let sql = prebuilt.sql("acme");
             assert_eq!(matching_keys(&sql, &rows).await, keys, "{}", prebuilt.name);
         }
+    }
+
+    #[test]
+    fn a_built_in_is_known_by_its_name_on_the_triggers_stream() {
+        let mut alert = PREBUILT[0].definition("acme");
+        assert!(is_builtin(&alert));
+        alert.stream_name = "default".to_string();
+        assert!(!is_builtin(&alert));
+        let mut renamed = PREBUILT[0].definition("acme");
+        renamed.name = "cpu_high".to_string();
+        assert!(!is_builtin(&renamed));
     }
 
     #[tokio::test]
