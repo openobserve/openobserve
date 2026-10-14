@@ -92,6 +92,10 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     defineTheme: vi.fn(),
     setTheme: vi.fn(),
     setModelMarkers: vi.fn(),
+    addCommand: vi.fn(() => ({ dispose: vi.fn() })),
+    addKeybindingRule: vi.fn(() => ({ dispose: vi.fn() })),
+    registerCommand: vi.fn(() => ({ dispose: vi.fn() })),
+    getEditors: vi.fn(() => []),
   },
   languages: {
     // Real values, mirroring monaco-editor/esm/vs/editor/common/languages.js
@@ -116,7 +120,7 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     registerHoverProvider: vi.fn(() => ({ dispose: vi.fn() })),
   },
   KeyMod: { CtrlCmd: 1 },
-  KeyCode: { Enter: 13 },
+  KeyCode: { Backspace: 1, Tab: 2, Enter: 13, Escape: 9, KeyZ: 56 },
   // Real values from monaco-editor/esm/vs/editor/editor.api. Omitting this
   // made validateDoubleQuotes throw on `monaco.MarkerSeverity.Warning` the
   // moment it found anything to report, so it published NOTHING and looked
@@ -1093,5 +1097,96 @@ describe("completion results invite monaco to ask again", () => {
 
     const after = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
     expect(after.suggestions.map((s: any) => s.label)).toEqual(["error", "warn"]);
+  });
+});
+
+describe("P0-1 — the Enter fix follows ZO_EDITOR_SUGGEST_MODE", () => {
+  let spy: ReturnType<typeof vi.spyOn>;
+  afterAll(() => spy?.mockRestore());
+
+  const optionsFor = async (mode: string | undefined, language = "sql") => {
+    const api = await import("monaco-editor/esm/vs/editor/editor.api");
+    const createFn = vi.mocked(api.editor.create);
+    const before = createFn.mock.calls.length;
+    spy = vi
+      .spyOn(document, "getElementById")
+      .mockImplementation(() => document.createElement("div"));
+    const store = createStore({
+      state: { theme: "light", zoConfig: mode === undefined ? {} : { editor_suggest_mode: mode } },
+    });
+    mount(CodeQueryEditor, {
+      props: { editorId: `mode-${mode}-${language}`, language, query: "" },
+      global: { plugins: [store] },
+    });
+    await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+      timeout: 15000,
+      interval: 25,
+    });
+    return createFn.mock.calls.at(-1)![1] as any;
+  };
+
+  it(
+    "automatic opens trigger-character menus unhighlighted and uses smart Enter",
+    { timeout: 30000 },
+    async () => {
+      const opts = await optionsFor("automatic");
+      expect(opts.suggest).toEqual({ selectionMode: "whenQuickSuggestion" });
+      expect(opts.acceptSuggestionOnEnter).toBe("smart");
+    },
+  );
+
+  it("a missing flag is automatic", { timeout: 30000 }, async () => {
+    const opts = await optionsFor(undefined);
+    expect(opts.suggest).toEqual({ selectionMode: "whenQuickSuggestion" });
+    expect(opts.acceptSuggestionOnEnter).toBe("smart");
+  });
+
+  it("typing keeps the same Enter fix", { timeout: 30000 }, async () => {
+    const opts = await optionsFor("typing");
+    expect(opts.suggest).toEqual({ selectionMode: "whenQuickSuggestion" });
+    expect(opts.acceptSuggestionOnEnter).toBe("smart");
+  });
+
+  it("off is Monaco's own defaults, today's editor", { timeout: 30000 }, async () => {
+    const opts = await optionsFor("off");
+    expect(opts.suggest).toEqual({ selectionMode: "always" });
+    expect(opts.acceptSuggestionOnEnter).toBe("on");
+    expect(opts.quickSuggestions).toEqual({ other: "on", comments: "off", strings: "on" });
+  });
+
+  it(
+    "a mode that arrives after the editor mounted is applied to it",
+    { timeout: 30000 },
+    async () => {
+      const api = await import("monaco-editor/esm/vs/editor/editor.api");
+      const createFn = vi.mocked(api.editor.create);
+      const before = createFn.mock.calls.length;
+      spy = vi
+        .spyOn(document, "getElementById")
+        .mockImplementation(() => document.createElement("div"));
+      const store = createStore({ state: { theme: "light", zoConfig: {} as any } });
+      mount(CodeQueryEditor, {
+        props: { editorId: "mode-late", language: "sql", query: "" },
+        global: { plugins: [store] },
+      });
+      await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+        timeout: 15000,
+        interval: 25,
+      });
+      const editor = createdEditors.at(-1)!;
+      store.state.zoConfig = { editor_suggest_mode: "off" };
+      await vi.waitFor(() =>
+        expect(editor.updateOptions).toHaveBeenCalledWith({
+          suggest: { selectionMode: "always" },
+          acceptSuggestionOnEnter: "on",
+        }),
+      );
+    },
+  );
+
+  it("non-query editors are never touched", { timeout: 30000 }, async () => {
+    const opts = await optionsFor("automatic", "javascript");
+    expect(opts.suggest).toBeUndefined();
+    expect(opts.acceptSuggestionOnEnter).toBeUndefined();
   });
 });

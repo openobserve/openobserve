@@ -116,6 +116,12 @@ import {
   rankNumericFieldsFirst,
 } from "@/utils/query/editorProviders";
 import { findDoubleQuoteIssues } from "@/utils/query/doubleQuoteWarnings";
+import {
+  isQueryLanguage,
+  setTabPicksFirst,
+  suggestKeyOptions,
+} from "@/utils/query/editorKeyContract";
+import { useEditorSuggestMode } from "@/composables/useEditorSuggestMode";
 import { loadPromqlLanguage } from "@/utils/query/promqlLanguageDefinition";
 
 import { useStore } from "vuex";
@@ -243,6 +249,7 @@ export default defineComponent({
     const { isDark } = useTheme();
     const { t } = useI18nTyped();
     const { showErrorNotification } = useNotifications();
+    const { mode: suggestMode } = useEditorSuggestMode();
     const editorRef: any = ref();
     let editorObj: any = null;
     let programmatic = false;
@@ -492,6 +499,7 @@ export default defineComponent({
 
       // One provider set per language, shared by every editor of that language.
       registerLanguageProviders(props.language);
+      if (isQueryLanguage(props.language)) setTabPicksFirst(monaco, suggestMode.value !== "off");
 
       // Faces load lazily on first use, so without this the first measurement can hit the fallback font.
       await document.fonts?.load?.(`1rem ${getFontMono()}`).catch(() => {});
@@ -600,6 +608,7 @@ export default defineComponent({
         stickyScroll: {
           enabled: props.stickyScroll,
         },
+        ...suggestKeyOptions(suggestMode.value, props.language),
       });
 
       publishEditorConfig();
@@ -829,6 +838,13 @@ export default defineComponent({
 
     const enableCodeFolding = computed(() => {
       return ["json", "html", "javascript"].includes(props.language);
+    });
+
+    // The editor can mount before the config that carries the mode, so a late mode is applied live.
+    watch(suggestMode, (mode) => {
+      if (!monaco || !isQueryLanguage(props.language)) return;
+      setTabPicksFirst(monaco, mode !== "off");
+      editorObj?.updateOptions(suggestKeyOptions(mode, props.language));
     });
 
     // update readonly when prop value changes

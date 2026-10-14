@@ -191,6 +191,7 @@ struct ConfigResponse<'a> {
     streaming_enabled: bool,
     histogram_enabled: bool,
     timechart_enabled: bool,
+    editor_suggest_mode: String,
     max_query_range: i64,
     cluster_name: String,
     /// Hours back the ingester accepts a record's timestamp.
@@ -273,6 +274,8 @@ struct ConfigBootstrapResponse {
     custom_logo_img: Option<String>,
     custom_logo_dark_img: Option<String>,
     custom_hide_self_logo: bool,
+    /// The editors need it before the authenticated config lands, or `off` arrives too late.
+    editor_suggest_mode: String,
     rum: Rum,
 }
 
@@ -415,6 +418,7 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
         custom_logo_img,
         custom_logo_dark_img,
         custom_hide_self_logo,
+        editor_suggest_mode: cfg.limit.editor_suggest_mode.clone(),
         rum: Rum::from_cfg(cfg.clone()),
     })
 }
@@ -577,6 +581,7 @@ pub async fn zo_config(
         streaming_enabled: cfg.http_streaming.streaming_enabled,
         histogram_enabled: cfg.limit.histogram_enabled,
         timechart_enabled: cfg.limit.timechart_enabled,
+        editor_suggest_mode: cfg.limit.editor_suggest_mode.clone(),
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         cluster_name: cfg.common.cluster_name.clone(),
         ingest_allowed_upto: cfg.limit.ingest_allowed_upto,
