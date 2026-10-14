@@ -907,6 +907,24 @@ describe("rangesFromServerError — bare operand in a logical operation (20008)"
     ).toBe("flag");
   });
 
+  it("looks only at the operator the error names", () => {
+    const detail = "logical boolean operation Boolean AND Utf8";
+    expect(locateNotACondition(detail, "(flag OR active) AND message", null)?.field).toBe(
+      "message",
+    );
+  });
+
+  it("never blames a column the schema says is Boolean, and gives no marker when nothing else fits", () => {
+    const types: Record<string, string> = { enabled: "Boolean", healthy: "Boolean", body: "Utf8" };
+    const detail = "logical boolean operation Boolean OR Utf8";
+    expect(
+      locateNotACondition(detail, "enabled AND healthy OR lower(body)", (f) => types[f]),
+    ).toBeNull();
+    expect(locateNotACondition(detail, "enabled OR healthy OR body", (f) => types[f])?.field).toBe(
+      "body",
+    );
+  });
+
   it("skips BETWEEN bounds, calls and comparisons, and returns null when nothing is bare", () => {
     const query = "a BETWEEN lo AND hi AND contains(body, 'x') AND level = 'y'";
     expect(locateNotACondition(DETAIL, query)).toBeNull();
