@@ -62,10 +62,18 @@ in **both** repos automatically — no more hand-syncing two workflow files.
 | `run_files`           | spec filenames run by this shard                                         |
 | `disabled`            | *(optional)* specs intentionally turned off — see below                 |
 | `quick_mode_enabled`  | *(optional)* `true` starts this shard's server with `ZO_QUICK_MODE_ENABLED` |
+| `synthetics_enabled`  | *(optional)* `true` starts this shard's server with `ZO_SYNTHETICS_ENABLED` |
 | `ingest_allowed_upto` | *(optional)* hours of backdated ingestion this shard's server accepts    |
+| `slo_backfill_chunk_secs` | *(optional)* seconds of history one SLO backfill chunk covers on this shard's server |
 | `workers`             | *(optional)* pin `--workers=N` for this shard                            |
 
-The last three exist because a shard is the smallest unit that can change them.
+Every *(optional)* key except `disabled` exists because a shard is the smallest
+unit that can change it: each shard starts its own server, and these settings are
+read once at server start (or, for `workers`, once per Playwright run).
+
+- `synthetics_enabled` — synthetics is off by default and its `/api/{org}/synthetics*`
+  routes register only when the flag is `true` at start, so only the `Synthetics`
+  shard sets it. Every other shard omits it and keeps the product default (off).
 
 - `ingest_allowed_upto` — the workflow default is **5 hours**, and older rows are
   dropped while ingestion still answers `200`. A suite that seeds history needs a

@@ -645,6 +645,7 @@ use crate::{
         (name = "Synthetics", description = "Synthetic monitoring — uptime and browser checks (enterprise)"),
         (name = "Downtimes", description = "Scheduled windows that keep evaluating alerts, anomaly detections, synthetics checks and SLOs but notify nobody (enterprise)"),
         (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
+        (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -716,6 +717,9 @@ pub struct ApiDoc;
     openobserve_api_management::request::organization::password_policy::get_policy,
     openobserve_api_management::request::organization::password_policy::set_policy,
     openobserve_api_management::request::organization::password_policy::get_password_complexity,
+    openobserve_api_management::request::alert_calibration::config::get_alert_calibration_config,
+    openobserve_api_management::request::alert_calibration::config::update_alert_calibration_config,
+    openobserve_api_management::request::alert_calibration::digests::run_alert_calibration,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,

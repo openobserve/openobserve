@@ -56,9 +56,10 @@ use {
         config::get_config as get_o2_config,
     },
     openobserve_api_management::request::{
-        ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
-        domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall, playground,
-        prompts, providers, remote_tasks, score_configs, scorers, service_streams, workflows,
+        ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
+        discovery, domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall,
+        playground, prompts, providers, remote_tasks, score_configs, scorers, service_streams,
+        workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1262,7 +1263,11 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/anomaly_detection/{config_id}/train", post(anomaly_detection::train_model).delete(anomaly_detection::cancel_training))
             .route("/{org_id}/anomaly_detection/{config_id}/detect", post(anomaly_detection::detect_anomalies))
             .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history))
-            .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history));
+            .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history))
+
+            // Alert Calibration
+            .route("/v2/{org_id}/alert_calibration/config", get(alert_calibration::config::get_alert_calibration_config).put(alert_calibration::config::update_alert_calibration_config))
+            .route("/v2/{org_id}/alert_calibration/digests/run", post(alert_calibration::digests::run_alert_calibration));
     }
 
     router = router

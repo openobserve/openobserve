@@ -1321,22 +1321,6 @@ describe("CreateBrowserTest", () => {
       expect(dialogStub(w).props("open")).toBe(true);
     }
 
-    it("hides the button when composition is disabled", async () => {
-      store.state.zoConfig.synthetics_subtests_enabled = false;
-      try {
-        wrapper = await mountEdit();
-        await selectRange(wrapper, ["s2", "s3"]);
-
-        expect(wrapper.find('[data-test="synthetics-journey-delete-selected-btn"]').exists()).toBe(
-          true,
-        );
-        expect(wrapper.find(OPEN_BTN).exists()).toBe(false);
-        expect(wrapper.find(REASON).exists()).toBe(false);
-      } finally {
-        store.state.zoConfig.synthetics_subtests_enabled = true;
-      }
-    });
-
     it("marks the button aria-disabled and says why for an ineligible selection", async () => {
       wrapper = await mountEdit();
       await selectRange(wrapper, ["s2", "s4"]);

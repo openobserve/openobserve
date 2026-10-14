@@ -339,12 +339,17 @@ pub async fn host_route_middleware(
         HostRouteDecision, PageRoute, resolve_host_route,
     };
 
-    if !config::get_config().synthetics.enabled {
+    let cfg = config::get_config();
+    if !cfg.synthetics.enabled {
         return next.run(request).await;
     }
     let Some(host) = host_header(request.headers()) else {
         return next.run(request).await;
     };
+    // Keeps the app's own traffic off the meta store; read per request so a config reload applies.
+    if own_host_of(&cfg.common.web_url).as_deref() == Some(host.as_str()) {
+        return next.run(request).await;
+    }
     let method = request.method().as_str().to_owned();
     match resolve_host_route(&host, &method, request.uri().path()).await {
         HostRouteDecision::Fallthrough => next.run(request).await,
@@ -649,7 +654,18 @@ async fn auth_body(request: axum::extract::Request) -> Option<AuthBody> {
 #[cfg(feature = "enterprise")]
 fn host_header(headers: &HeaderMap) -> Option<String> {
     let host = headers.get(header::HOST)?.to_str().ok()?;
-    Some(host.split(':').next().unwrap_or(host).to_ascii_lowercase())
+    Some(normalize_host(host))
+}
+
+#[cfg(feature = "enterprise")]
+fn normalize_host(host: &str) -> String {
+    host.split(':').next().unwrap_or(host).to_ascii_lowercase()
+}
+
+#[cfg(feature = "enterprise")]
+fn own_host_of(web_url: &str) -> Option<String> {
+    let url = url::Url::parse(web_url).ok()?;
+    url.host_str().map(normalize_host)
 }
 
 /// A domain that hasn't cleared ownership verification (or was released)
@@ -851,5 +867,25 @@ mod tests {
         );
         assert_eq!(unlock_cookie(&headers), Some("tok"));
         assert_eq!(unlock_cookie(&HeaderMap::new()), None);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn normalize_host_lowercases_and_strips_the_port() {
+        assert_eq!(
+            normalize_host("Status.Example.COM:8443"),
+            "status.example.com"
+        );
+        assert_eq!(normalize_host("o2.example.com"), "o2.example.com");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn own_host_matches_the_web_url_host_only() {
+        let own = own_host_of("https://O2.Example.com:5080/base");
+        assert_eq!(own, Some(normalize_host("o2.example.com:5080")));
+        assert_ne!(own, Some(normalize_host("status.example.com")));
+        assert_eq!(own_host_of(""), None);
+        assert_eq!(own_host_of("not a url"), None);
     }
 }
