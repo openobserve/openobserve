@@ -221,14 +221,18 @@ export class SyntheticsRegressionPage {
   }
 
   async setPageSize(tableName, size) {
+    const trigger = this.table(tableName).locator(this.locators.pageSizeTrigger);
     const option = this.page.locator(`${this.locators.pageSizeOption}[data-test-value="${size}"]`);
-    // A click that lands while the table re-renders after a sort focuses the select without opening it.
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await this.table(tableName).locator(this.locators.pageSizeSelect).click();
-      if (await option.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false)) break;
+    const sizeText = new RegExp(`^\\s*${size}\\s*$`);
+    // A table re-render (after a sort, or while runs load) can swallow the opening click or rebuild the open list under the option.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (!(await option.isVisible())) await this.table(tableName).locator(this.locators.pageSizeSelect).click();
+      const opened = await option.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
+      const picked = opened && (await option.click({ timeout: 5000 }).then(() => true).catch(() => false));
+      if (picked && (await expect(trigger).toHaveText(sizeText, { timeout: 3000 }).then(() => true).catch(() => false))) break;
+      await this.page.keyboard.press('Escape');
     }
-    await option.click();
-    await expect(this.table(tableName).locator(this.locators.pageSizeTrigger)).toHaveText(new RegExp(`^\\s*${size}\\s*$`));
+    await expect(trigger).toHaveText(sizeText);
   }
 
   async goToNextPage(tableName) {
