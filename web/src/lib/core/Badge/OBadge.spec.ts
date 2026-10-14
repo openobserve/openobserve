@@ -184,6 +184,15 @@ describe("OBadge", () => {
     expect(wrapper.classes().join(" ")).toContain("px-2");
   });
 
+  it("applies lg size classes with a larger status dot", () => {
+    const wrapper = mount(OBadge, {
+      props: { size: "lg", dot: true },
+      slots: { default: "x" },
+    });
+    expect(wrapper.classes()).toContain("text-lg");
+    expect(wrapper.find('[aria-hidden="true"]').classes()).toContain("size-2.5");
+  });
+
   // ── Root element tag ────────────────────────────────────────────────────
 
   it("renders as <span> by default", () => {
