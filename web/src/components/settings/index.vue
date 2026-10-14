@@ -96,6 +96,8 @@ export default defineComponent({
       query_management: "queryManagement",
       domainManagement: "domain_management",
       passwordPolicy: "password_policy",
+      announcementBanners: "announcements",
+      announcementBannerEditor: "announcements",
       pipelineDestinations: "pipeline_destinations",
       alertTemplates: "templates",
       modelPricing: "model_pricing",
@@ -138,14 +140,16 @@ export default defineComponent({
           query: { org_identifier: store.state.selectedOrganization?.identifier },
         });
       };
-      // Nodes, License, Password policy and Query Management are enterprise-only meta-org pages.
+      // Nodes, License, Password policy, Query Management and Announcements are enterprise-only meta-org pages.
       const notMeta =
         store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false");
       if (
         (name === "nodes" ||
           name === "license" ||
           name === "passwordPolicy" ||
-          name === "query_management") &&
+          name === "query_management" ||
+          name === "announcementBanners" ||
+          name === "announcementBannerEditor") &&
         notMeta
       ) {
         toGeneral();
@@ -268,6 +272,16 @@ export default defineComponent({
           lockedMessage: domainManagementAccess.message,
           dataTest: "domain-management-tab",
           group: "Access & Security",
+        },
+        {
+          key: "announcements",
+          label: t("announcements.settings.label"),
+          description: t("announcements.settings.description"),
+          icon: "campaign",
+          to: { name: "announcementBanners", query: { org_identifier: org } },
+          visible: config.isEnterprise == "true" && meta,
+          dataTest: "announcement-banners-tab",
+          group: "General",
         },
         {
           key: "password_policy",

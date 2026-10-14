@@ -248,6 +248,9 @@ pub enum ErrorCodes {
     /// The o2-ai replica holding a conversation is unreachable; carries the
     /// session id. Recoverable — the UI restores it into a fresh session.
     AiSessionOwnerUnavailable(String),
+    /// Another turn is already running in this AI chat session; carries the
+    /// session id. Retry once it finishes.
+    AiChatSessionBusy(String),
 }
 
 impl From<sea_orm::DbErr> for Error {
@@ -317,7 +320,7 @@ impl ErrorCodes {
         match self {
             ErrorCodes::SearchCancelQuery(_) | ErrorCodes::RatelimitExceeded(_) => 429,
             ErrorCodes::SearchTimeout(_) => 408,
-            ErrorCodes::AiSessionOwnerUnavailable(_) => 409,
+            ErrorCodes::AiSessionOwnerUnavailable(_) | ErrorCodes::AiChatSessionBusy(_) => 409,
             ErrorCodes::ServerInternalError(_) | ErrorCodes::SearchParquetFileNotFound => 500,
             ErrorCodes::InvalidParams(_)
             | ErrorCodes::SearchSQLExecuteError(_)
@@ -348,6 +351,7 @@ impl ErrorCodes {
             ErrorCodes::RatelimitExceeded(_) => 20012,
             ErrorCodes::SearchHistogramNotAvailable(_) => 20013,
             ErrorCodes::AiSessionOwnerUnavailable(_) => 30001,
+            ErrorCodes::AiChatSessionBusy(_) => 30002,
         }
     }
 
@@ -380,6 +384,9 @@ impl ErrorCodes {
             ErrorCodes::AiSessionOwnerUnavailable(_) => {
                 "The replica serving this conversation is unavailable".to_string()
             }
+            ErrorCodes::AiChatSessionBusy(_) => {
+                "Another turn is already running in this conversation".to_string()
+            }
         }
     }
 
@@ -400,6 +407,7 @@ impl ErrorCodes {
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
             ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
+            ErrorCodes::AiChatSessionBusy(session_id) => session_id.to_owned(),
         }
     }
 
@@ -420,6 +428,7 @@ impl ErrorCodes {
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
             ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
+            ErrorCodes::AiChatSessionBusy(session_id) => session_id.to_owned(),
         }
     }
 
@@ -473,6 +482,7 @@ impl ErrorCodes {
             20012 => Ok(ErrorCodes::RatelimitExceeded(message)),
             20013 => Ok(ErrorCodes::SearchHistogramNotAvailable(message)),
             30001 => Ok(ErrorCodes::AiSessionOwnerUnavailable(message)),
+            30002 => Ok(ErrorCodes::AiChatSessionBusy(message)),
             _ => Ok(ErrorCodes::ServerInternalError(json.to_string())),
         }
     }
