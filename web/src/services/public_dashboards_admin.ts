@@ -16,7 +16,7 @@
 import http from "./http";
 
 export type PublicLinkStatus =
-  "live" | "paused" | "preparing" | "needs_attention" | "expired" | "dashboard_deleted";
+  "live" | "paused" | "not_viewed" | "needs_attention" | "expired" | "dashboard_deleted";
 
 /** A rolling window rebuilt every refresh, or a fixed one (UTC micros) built once. */
 export type PublicLinkRange =
@@ -33,7 +33,7 @@ export interface PublicLinkConfig {
   visibility: "public";
   time_range: PublicLinkTimeRange;
   frozen_variables: Record<string, unknown>;
-  rebuild_secs: number;
+  refresh_secs: number;
   expires_at?: number | null;
 }
 
@@ -50,14 +50,35 @@ export interface PublicLink {
   enabled: boolean;
   time_range: PublicLinkTimeRange;
   frozen_variables: Record<string, unknown>;
-  rebuild_secs: number;
-  last_rebuilt_at: number | null;
-  rebuild_state: number;
+  refresh_secs: number;
   expires_at: number | null;
   published_by: string;
   updated_by: string | null;
   created_at: number;
   updated_at: number;
+  last_accessed_at: number | null;
+  access_count: number;
+}
+
+/** A range's result on the querier that owns the link; best effort, so a fail-over reads as not cached. */
+export type PublicLinkRangeState = "cached" | "not_cached" | "building" | "needs_attention";
+
+export interface PublicLinkRangeStatus {
+  key: string;
+  state: PublicLinkRangeState;
+  built_at: number | null;
+  withheld_panels: Array<{ panel_id: string; reason: string }>;
+  unavailable_count: number;
+  incomplete_count: number;
+  last_error: string | null;
+  sources?: Record<string, Array<[string, string]>>;
+}
+
+export interface PublicLinkStatusReport {
+  link_id: string;
+  ranges: PublicLinkRangeStatus[];
+  access_count: number;
+  last_accessed_at: number | null;
 }
 
 const linksPath = (org: string, dashboardId: string) =>
@@ -79,8 +100,15 @@ const public_dashboards_admin = {
     http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/pause`, undefined, silent),
   resume: (org: string, dashboardId: string, linkId: string) =>
     http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/resume`, undefined, silent),
-  rebuild: (org: string, dashboardId: string, linkId: string) =>
-    http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/rebuild`, undefined, silent),
+  refresh: (org: string, dashboardId: string, linkId: string) =>
+    http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/refresh`, undefined, silent),
+  status: (org: string, dashboardId: string, linkId: string) =>
+    http().get<PublicLinkStatusReport>(`${linksPath(org, dashboardId)}/${linkId}/status`, silent),
+  statusBatch: (org: string, ids: string[]) =>
+    http().get(`/api/${org}/public_dashboards/status`, {
+      ...silent,
+      params: { ids: ids.join(",") },
+    }),
   revoke: (org: string, dashboardId: string, linkId: string) =>
     http().delete(`${linksPath(org, dashboardId)}/${linkId}`, silent),
 };

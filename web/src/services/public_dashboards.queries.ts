@@ -14,9 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
-import admin, { type PublicLink, type PublicLinkConfig } from "./public_dashboards_admin";
+import admin, {
+  type PublicLink,
+  type PublicLinkConfig,
+  type PublicLinkStatusReport,
+} from "./public_dashboards_admin";
 import { publicLinkKeys } from "./public_dashboards.querykeys";
-import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
+import { LIVE_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
+
+/** The most links one batch status call may name. */
+export const STATUS_BATCH_MAX = 50;
 
 export const publicLinksForDashboardQuery = (org: string, dashboardId: string) =>
   queryOptions({
@@ -31,6 +38,30 @@ export const publicLinksListQuery = (org: string) =>
     queryKey: publicLinkKeys.org(org),
     queryFn: async (): Promise<PublicLink[]> => (await admin.listOrg(org)).data?.list ?? [],
     staleTime: NORMAL_STALE_TIME,
+  });
+
+// Build state moves with viewers, not with writes, so it takes the live tier.
+export const publicLinkStatusQuery = (org: string, dashboardId: string, linkId: string) =>
+  queryOptions({
+    queryKey: publicLinkKeys.status(org, linkId),
+    queryFn: async (): Promise<PublicLinkStatusReport> =>
+      (await admin.status(org, dashboardId, linkId)).data,
+    staleTime: LIVE_STALE_TIME,
+  });
+
+export const publicLinksStatusBatchQuery = (org: string, ids: string[]) =>
+  queryOptions({
+    queryKey: publicLinkKeys.statusBatch(org, ids),
+    queryFn: async (): Promise<Record<string, PublicLinkStatusReport>> => {
+      const data = (await admin.statusBatch(org, ids.slice(0, STATUS_BATCH_MAX))).data;
+      const list: PublicLinkStatusReport[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.list)
+          ? data.list
+          : Object.values(data ?? {});
+      return Object.fromEntries(list.map((report) => [report.link_id, report]));
+    },
+    staleTime: LIVE_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────
@@ -60,10 +91,10 @@ export const setPublicLinkPausedMutation = (org: string) =>
     meta: { invalidates: [publicLinkKeys.all(org)], silentError: true },
   });
 
-export const rebuildPublicLinkMutation = (org: string) =>
+export const refreshPublicLinkMutation = (org: string) =>
   mutationOptions({
     mutationFn: async (link: PublicLink): Promise<PublicLink> =>
-      (await admin.rebuild(org, link.dashboard_id, link.id)).data,
+      (await admin.refresh(org, link.dashboard_id, link.id)).data,
     meta: { invalidates: [publicLinkKeys.all(org)], silentError: true },
   });
 

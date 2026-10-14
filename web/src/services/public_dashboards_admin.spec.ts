@@ -29,7 +29,7 @@ const cfg: PublicLinkConfig = {
     default: { type: "relative", secs: 3600 },
   },
   frozen_variables: {},
-  rebuild_secs: 60,
+  refresh_secs: 300,
   expires_at: null,
 };
 
@@ -70,10 +70,10 @@ describe("public_dashboards_admin service", () => {
     );
   });
 
-  it("pauses, resumes, rebuilds and revokes one link", async () => {
+  it("pauses, resumes, marks for refresh and revokes one link", async () => {
     await service.pause("org1", "dash1", "l1");
     await service.resume("org1", "dash1", "l1");
-    await service.rebuild("org1", "dash1", "l1");
+    await service.refresh("org1", "dash1", "l1");
     await service.revoke("org1", "dash1", "l1");
     expect(mockHttp.post).toHaveBeenCalledWith(
       "/api/org1/dashboards/dash1/public_links/l1/pause",
@@ -86,12 +86,24 @@ describe("public_dashboards_admin service", () => {
       { silentForbidden: true },
     );
     expect(mockHttp.post).toHaveBeenCalledWith(
-      "/api/org1/dashboards/dash1/public_links/l1/rebuild",
+      "/api/org1/dashboards/dash1/public_links/l1/refresh",
       undefined,
       { silentForbidden: true },
     );
     expect(mockHttp.delete).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1", {
       silentForbidden: true,
+    });
+  });
+
+  it("reads one link's status and a batch of them for the org list", async () => {
+    await service.status("org1", "dash1", "l1");
+    await service.statusBatch("org1", ["l1", "l2"]);
+    expect(mockHttp.get).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1/status", {
+      silentForbidden: true,
+    });
+    expect(mockHttp.get).toHaveBeenCalledWith("/api/org1/public_dashboards/status", {
+      silentForbidden: true,
+      params: { ids: "l1,l2" },
     });
   });
 });

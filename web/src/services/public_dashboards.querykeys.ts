@@ -20,4 +20,7 @@ export const publicLinkKeys = {
   org: (org: string) => orgKey(org, "public_links", "org"),
   byDashboard: (org: string, dashboardId: string) =>
     orgKey(org, "public_links", "dashboard", dashboardId),
+  status: (org: string, linkId: string) => orgKey(org, "public_links", "status", linkId),
+  statusBatch: (org: string, ids: string[]) =>
+    orgKey(org, "public_links", "status_batch", [...ids].sort().join(",")),
 };

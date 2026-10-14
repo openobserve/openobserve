@@ -16,6 +16,8 @@
 import { describe, expect, it } from "vitest";
 import { gt } from "@/types/i18n";
 import {
+  REFRESH_SECONDS,
+  effectiveRefreshSecs,
   endOfDayMicros,
   expiryDate,
   makePublicLinkSchema,
@@ -26,6 +28,7 @@ import {
   rangeError,
   rangeFromPicker,
   rangeKey,
+  slowerRanges,
   sortRanges,
   todayIn,
   toPublicLinkConfig,
@@ -49,8 +52,10 @@ describe("PublicLinkForm schema", () => {
     expect(r.error?.issues[0].path).toEqual(["name"]);
   });
 
-  it("defaults the refresh to 1 minute", () => {
-    expect(publicLinkDefaults().rebuildSecs).toBe(60);
+  it("defaults the refresh to 5 minutes and offers nothing under 1 minute", () => {
+    expect(publicLinkDefaults().refreshSecs).toBe(300);
+    expect(REFRESH_SECONDS[0]).toBe(60);
+    expect(REFRESH_SECONDS.some((s) => s < 60)).toBe(false);
   });
 
   it("rejects an expiry before today but allows today", () => {
@@ -79,7 +84,28 @@ describe("PublicLinkForm schema", () => {
 
   it("allows any refresh for a long relative range", () => {
     const long = { ...named(), ranges: [rel(90 * 86400)], defaultKey: "r7776000" };
-    expect(schema.safeParse({ ...long, rebuildSecs: 60 }).success).toBe(true);
+    expect(schema.safeParse({ ...long, refreshSecs: 60 }).success).toBe(true);
+  });
+});
+
+describe("PublicLinkForm effective refresh", () => {
+  it("refreshes a range at ceil_to_minute(max(selected, window / 288, 60))", () => {
+    expect(effectiveRefreshSecs(300, 3600)).toBe(300);
+    expect(effectiveRefreshSecs(300, 86_400)).toBe(300);
+    expect(effectiveRefreshSecs(300, 30 * 86_400)).toBe(9000);
+    expect(effectiveRefreshSecs(60, 7 * 86_400)).toBe(2100);
+    // A floor between minutes rounds up to the next minute.
+    expect(effectiveRefreshSecs(60, 86_401 * 288)).toBe(86_460);
+    expect(effectiveRefreshSecs(30, 60)).toBe(60);
+  });
+
+  it("names only the relative ranges whose floor is above the selection", () => {
+    const ranges = [abs(1, 2), rel(30 * 86_400), rel(3600), rel(7 * 86_400)];
+    expect(slowerRanges(ranges, 300)).toEqual([
+      { range: rel(7 * 86_400), secs: 2100 },
+      { range: rel(30 * 86_400), secs: 9000 },
+    ]);
+    expect(slowerRanges(ranges, 21_600)).toEqual([]);
   });
 });
 
@@ -170,7 +196,7 @@ describe("PublicLinkForm payload", () => {
       visibility: "public",
       time_range: { ranges: [rel(900)], default: rel(900) },
       frozen_variables: { env: "prod" },
-      rebuild_secs: 60,
+      refresh_secs: 300,
       expires_at: null,
     });
   });
@@ -191,7 +217,7 @@ describe("PublicLinkForm payload", () => {
   it("edits a link with its ranges and default", () => {
     const link = {
       name: "a",
-      rebuild_secs: 60,
+      refresh_secs: 60,
       expires_at: null,
       time_range: { ranges: [abs(1, 2), rel(900)], default: abs(1, 2) },
     } as unknown as PublicLink;
@@ -204,7 +230,7 @@ describe("PublicLinkForm payload", () => {
     const expires_at = endOfDayMicros("2026-12-31", "America/New_York");
     const link = {
       name: "a",
-      rebuild_secs: 120,
+      refresh_secs: 120,
       expires_at,
       time_range: { ranges: [rel(3600), rel(86400)], default: rel(86400) },
     } as PublicLink;

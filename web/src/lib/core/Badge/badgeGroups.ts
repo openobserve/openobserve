@@ -168,7 +168,10 @@ export const BADGE_GROUPS = {
     values: {
       live: { variant: "success-soft", labelKey: "components.badge.publicLinkStatus.live" },
       paused: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.paused" },
-      preparing: { variant: "blue-soft", labelKey: "components.badge.publicLinkStatus.preparing" },
+      notviewed: {
+        variant: "default-soft",
+        labelKey: "components.badge.publicLinkStatus.notViewed",
+      },
       needsattention: {
         variant: "warning-soft",
         labelKey: "components.badge.publicLinkStatus.needsAttention",
@@ -177,6 +180,31 @@ export const BADGE_GROUPS = {
       dashboarddeleted: {
         variant: "error-soft",
         labelKey: "components.badge.publicLinkStatus.dashboardDeleted",
+      },
+    },
+  },
+
+  // One range of a public link, as its owning querier reports it; never viewed is a not-cached link nobody opened.
+  publicLinkRangeState: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      cached: { variant: "success-soft", labelKey: "components.badge.publicLinkRangeState.cached" },
+      building: {
+        variant: "blue-soft",
+        labelKey: "components.badge.publicLinkRangeState.building",
+      },
+      notcached: {
+        variant: "default-soft",
+        labelKey: "components.badge.publicLinkRangeState.notCached",
+      },
+      neverviewed: {
+        variant: "default-soft",
+        labelKey: "components.badge.publicLinkRangeState.neverViewed",
+      },
+      needsattention: {
+        variant: "warning-soft",
+        labelKey: "components.badge.publicLinkRangeState.needsAttention",
       },
     },
   },
