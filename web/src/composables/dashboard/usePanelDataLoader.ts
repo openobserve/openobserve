@@ -30,6 +30,7 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 
 import { usePanelCache } from "./usePanelCache";
+import { parseRepeatId } from "@/utils/dashboard/repeatByVariable";
 import { isEqual, omit } from "lodash-es";
 
 import { useAnnotations } from "./useAnnotations";
@@ -866,6 +867,16 @@ export const usePanelDataLoader = (
     const cachedIncompleteLoad =
       tempPanelCacheValue?.loading === true || tempPanelCacheValue?.isPartialData === true;
 
+    const cachedRangeDiffers =
+      selectedTimeObj?.value?.end_time - selectedTimeObj?.value?.start_time !==
+      cache?.cacheTimeRange?.end_time - cache?.cacheTimeRange?.start_time;
+
+    // A repeat copy mounts fresh whenever the selection changes, so another range's result would pass for this one.
+    if (cachedRangeDiffers && parseRepeatId(panelSchema.value?.id) !== null) {
+      log("usePanelDataLoader: panelcache: repeat copy cached for another time range");
+      return false;
+    }
+
     // Check if it is stale or not
     if (
       tempPanelCacheValue &&
@@ -896,10 +907,7 @@ export const usePanelDataLoader = (
       }
 
       // if selected time range is not matched with the cache time range
-      if (
-        selectedTimeObj?.value?.end_time - selectedTimeObj?.value?.start_time !==
-        cache?.cacheTimeRange?.end_time - cache?.cacheTimeRange?.start_time
-      ) {
+      if (cachedRangeDiffers) {
         state.isCachedDataDifferWithCurrentTimeRange = true;
       }
 

@@ -586,6 +586,7 @@ import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
 import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { hasPanelTime, queryChangeAffectsPanelTimes } from "@/utils/dashboard/panelTimeUtils";
+import { getRepeatSourceId } from "@/utils/dashboard/repeatByVariable";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import {
@@ -794,6 +795,9 @@ export default defineComponent({
 
     // selected tab
     const selectedTabId: any = ref(route.query.tab ?? null);
+    // Saved data is addressed by real tab ids; a virtual tab resolves to its source.
+    const currentSourceTabId = () =>
+      selectedTabId.value ? getRepeatSourceId(String(selectedTabId.value)) : undefined;
     // provide it to child components
     provide("selectedTabId", selectedTabId);
 
@@ -1003,9 +1007,13 @@ export default defineComponent({
       currentDashboardData.data = dashboard;
 
       // set selected tab from query params
-      const selectedTab = dashboard?.tabs?.find((tab: any) => tab.tabId === route.query.tab);
+      // A virtual tab id is kept; RenderDashboardCharts moves it on if its value is gone.
+      const requestedTab = route.query.tab ? String(route.query.tab) : null;
+      const selectedTab = dashboard?.tabs?.find(
+        (tab: any) => requestedTab && tab.tabId === getRepeatSourceId(requestedTab),
+      );
 
-      selectedTabId.value = selectedTab ? selectedTab.tabId : dashboard?.tabs?.[0]?.tabId;
+      selectedTabId.value = selectedTab ? requestedTab : dashboard?.tabs?.[0]?.tabId;
 
       // if variables data is null, set it to empty list
       if (!(dashboard?.variables && dashboard?.variables?.list.length)) {
@@ -1060,7 +1068,7 @@ export default defineComponent({
     const openLayoutConfig = (id: string) => {
       selectedPanelConfig.value.show = true;
 
-      const panelData = getPanelFromTab(selectedTabId.value, id);
+      const panelData = getPanelFromTab(currentSourceTabId(), id);
 
       if (!panelData) {
         return;
@@ -1071,7 +1079,7 @@ export default defineComponent({
 
     // The layout dialog only exists in edit mode, so its result is one draft step, never a save.
     const savePanelLayout = async (layout) => {
-      const panel = getPanelFromTab(selectedTabId.value, selectedPanelConfig.value.data?.id);
+      const panel = getPanelFromTab(currentSourceTabId(), selectedPanelConfig.value.data?.id);
 
       selectedPanelConfig.value.show = false;
       selectedPanelConfig.value.data = null;
@@ -1240,10 +1248,11 @@ export default defineComponent({
         return;
       }
 
-      // Find the panel across all tabs
+      // Find the panel across all tabs; a repeat copy takes its source's time settings.
+      const sourceId = getRepeatSourceId(panelId);
       let targetPanel: any = null;
       for (const tab of currentDashboardData.data.tabs) {
-        const found = tab.panels?.find((p: any) => p.id === panelId);
+        const found = tab.panels?.find((p: any) => p.id === sourceId);
         if (found) {
           targetPanel = found;
           break;
@@ -1575,10 +1584,13 @@ export default defineComponent({
         path: "/dashboards/add_panel",
         query: {
           ...route.query,
+          // The editor returns with these, so it must carry the selection the panels show.
+          ...getVariableParamsFromManager(),
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
-          tab: route.query.tab ?? currentDashboardData?.data?.tabs?.[0]?.tabId,
+          tab: currentSourceTabId() ?? currentDashboardData?.data?.tabs?.[0]?.tabId,
+          ...(currentSourceTabId() !== selectedTabId.value ? { fromTab: selectedTabId.value } : {}),
         },
       });
     };
@@ -1748,7 +1760,7 @@ export default defineComponent({
 
         // Find the currently active tab and iterate through its panels only
         const activeTab = currentDashboardData?.data?.tabs?.find(
-          (tab: any) => tab.tabId === selectedTabId.value,
+          (tab: any) => tab.tabId === currentSourceTabId(),
         );
         if (currentDashboardData?.data?.tabs && selectedTabId.value) {
           if (activeTab?.panels) {
@@ -1902,7 +1914,7 @@ export default defineComponent({
           route.query.dashboard,
           panelId,
           route.query.folder ?? "default",
-          route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+          currentSourceTabId() ?? currentDashboardData.data.tabs[0].tabId,
         );
         await loadDashboard();
 
@@ -1936,7 +1948,7 @@ export default defineComponent({
           route.query.dashboard,
           panelId,
           route.query.folder ?? "default",
-          route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+          currentSourceTabId() ?? currentDashboardData.data.tabs[0].tabId,
           newTabId,
         );
         await loadDashboard();

@@ -180,7 +180,8 @@ vi.mock("@/aws-exports", () => ({
 }));
 
 // Mock lodash-es
-vi.mock("lodash-es", () => ({
+vi.mock("lodash-es", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
   isEqual: vi.fn((a, b) => JSON.stringify(a) === JSON.stringify(b)),
 }));
 
@@ -999,6 +1000,49 @@ describe("ViewPanel", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.isVariablesChanged).toBeDefined();
+    });
+  });
+
+  describe("Repeated copy", () => {
+    it("keeps the copy's value instead of the whole URL selection", async () => {
+      const originalQuery = { ...mockRoute.query };
+      Object.assign(mockRoute.query, { "var-host": ["api", "web"] });
+      mockGetDashboard.mockResolvedValue({
+        title: "Test Dashboard",
+        tabs: [{ tabId: "test-tab", panels: [] }],
+        variables: {
+          showDynamicFilters: false,
+          list: [
+            {
+              name: "host",
+              type: "custom",
+              scope: "global",
+              multiSelect: true,
+              value: ["api", "web"],
+              options: [
+                { label: "api", value: "api", selected: true },
+                { label: "web", value: "web", selected: true },
+              ],
+            },
+          ],
+        },
+      });
+      try {
+        wrapper = createWrapper({
+          repeat: { variable: "host", value: "web" },
+          pins: [{ variable: "host", value: "web" }],
+        });
+        await flushPromises();
+        await vi.waitFor(() => {
+          const host = wrapper.vm.liveVariablesData.values.find((v: any) => v.name === "host");
+          expect(host.value).toEqual(["web"]);
+        });
+        expect(wrapper.find('[data-test="dashboard-viewpanel-title"]').text()).toBe(
+          "Test Panel — web",
+        );
+      } finally {
+        mockRoute.query = originalQuery as any;
+      }
     });
   });
 

@@ -80,6 +80,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { getRepeatSourceId } from "@/utils/dashboard/repeatByVariable";
 
 export default defineComponent({
   name: "SinglePanelMove",
@@ -122,7 +123,7 @@ export default defineComponent({
       const newMoveTabOptions: any = [];
       currentDashboardData.data.tabs?.forEach((tab: any) => {
         // if tab is to be deleted, do not include it in the options
-        if (tab.tabId != route.query.tab) {
+        if (tab.tabId != getRepeatSourceId(String(route.query.tab ?? ""))) {
           newMoveTabOptions.push({
             label: tab.name,
             value: tab.tabId,

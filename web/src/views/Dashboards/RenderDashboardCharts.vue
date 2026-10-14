@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <VariablesValueSelector
         v-if="globalVariables.length > 0 || dashboardData?.variables?.showDynamicFilters"
         :scope="'global'"
-        :tabId="selectedTabId"
+        :tabId="sourceTabId"
         :variablesConfig="{ list: globalVariables }"
         :variablesManager="variablesManager"
         :selectedTimeDate="currentTimeObj['__global']"
@@ -51,17 +51,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="showTabs && selectedTabId !== null"
         class="mt-2"
         :dashboardData="dashboardData"
+        :renderedTabs="renderedTabs"
         :viewOnly="viewOnly"
         :layoutMode="layoutMode"
         @refresh="refreshDashboard"
         @layoutChange="$emit('layoutChange')"
       />
 
+      <OTruncatedText
+        v-for="notice in tabCapNotices"
+        :key="notice.tabId"
+        class="text-text-secondary mt-1 text-xs"
+        :data-test="`dashboard-tab-repeat-cap-${notice.tabId}`"
+        >{{ notice.label }}</OTruncatedText
+      >
+
       <!-- Tab-scoped Variables (for active tab, if using manager) -->
       <VariablesValueSelector
         v-if="variablesManager && currentTabVariables.length > 0 && selectedTabId"
         :scope="'tabs'"
-        :tabId="selectedTabId"
+        :tabId="sourceTabId"
         :variablesConfig="{ list: currentTabVariables }"
         :variablesManager="variablesManager"
         :selectedTimeDate="currentTimeObj['__global']"
@@ -80,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="variablesManager && getPanelVariables(panels[0].id).length > 0"
             :scope="'panels'"
             :panelId="panels[0].id"
-            :tabId="selectedTabId"
+            :tabId="sourceTabId"
             :variablesConfig="{ list: getPanelVariables(panels[0].id) }"
             :variablesManager="variablesManager"
             :selectedTimeDate="currentTimeObj?.[panels[0].id] || currentTimeObj['__global'] || {}"
@@ -113,8 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :forceLoad="forceLoad"
             :searchType="searchType"
             :runId="runId"
-            :tabId="selectedTabId"
-            :tabName="dashboardData?.tabs?.find((tab: any) => tab.tabId === selectedTabId)?.name"
+            :tabId="sourceTabId"
+            :tabName="currentTabName"
             :dashboardName="dashboardName"
             :folderName="folderName"
             :showLegendsButton="showLegendsButton"
@@ -129,6 +138,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
           />
         </div>
+        <!-- A repeated tab with no values must not fall back to the tab's unfiltered panels. -->
+        <OEmptyState
+          v-else-if="currentTabEmptyRepeat"
+          size="block"
+          icon="repeat"
+          data-test="dashboard-tab-repeat-empty"
+          :title="
+            currentTabEmptyRepeat.pending
+              ? t('dashboard.repeat.loadingValues', {
+                  variable: `$${currentTabEmptyRepeat.variable}`,
+                })
+              : t('dashboard.repeat.noValues', {
+                  variable: `$${currentTabEmptyRepeat.variable}`,
+                })
+          "
+          :description="
+            currentTabEmptyRepeat.pending ? undefined : t('dashboard.repeat.noValuesHint')
+          "
+        />
         <div
           v-else-if="panels.length > 0"
           ref="gridStackContainer"
@@ -136,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="{ 'grid-interacting': isGridInteracting, 'layout-editing': isLayoutEditing }"
         >
           <div
-            v-for="item in panels"
+            v-for="item in renderedPanels"
             :key="item.id + selectedTabId"
             :gs-id="item.id"
             :gs-x="getPanelLayout(item, 'x')"
@@ -171,6 +199,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      is an anonymous flex item and never picks up the ellipsis. -->
                 <OTruncatedText>{{ item.title }}</OTruncatedText>
               </h2>
+              <!-- A repeat with no values must not fall back to the panel's unfiltered data. -->
+              <div
+                v-else-if="getEmptyRepeat(item)"
+                class="drag-cancel flex h-full flex-col p-2"
+                :data-test="`dashboard-panel-repeat-empty-${item.id}`"
+              >
+                <OTruncatedText class="text-text-heading text-compact font-medium">
+                  {{ getPanelTitle(item) }}
+                </OTruncatedText>
+                <OEmptyState
+                  size="inline"
+                  icon="repeat"
+                  class="min-h-0 flex-1"
+                  :title="
+                    getEmptyRepeat(item).pending
+                      ? t('dashboard.repeat.loadingValues', {
+                          variable: `$${getEmptyRepeat(item).variable}`,
+                        })
+                      : t('dashboard.repeat.noValues', {
+                          variable: `$${getEmptyRepeat(item).variable}`,
+                        })
+                  "
+                  :description="
+                    getEmptyRepeat(item).pending ? undefined : t('dashboard.repeat.noValuesHint')
+                  "
+                />
+              </div>
               <!-- Off-screen panels render this lightweight placeholder; the
                    real panel mounts only when it comes near the viewport.
                    Mounting everything up front froze large dashboards. -->
@@ -179,9 +234,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="drag-cancel flex h-full flex-col p-2"
                 :data-test="`dashboard-panel-placeholder-${item.id}`"
               >
-                <span class="text-text-secondary truncate text-sm" :title="item.title">
-                  {{ item.title }}
-                </span>
+                <OTruncatedText class="text-text-secondary text-sm">
+                  {{ getPanelTitle(item) }}
+                </OTruncatedText>
                 <div class="bg-surface-subtle rounded-default mt-2 min-h-0 flex-1"></div>
               </div>
               <!-- Panel with Panel-Level Variables -->
@@ -194,12 +249,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :viewOnly="viewOnly"
                   :layoutMode="layoutMode"
                   :data="item"
+                  :repeat="getPanelRepeat(item)"
                   :dashboardId="dashboardData.dashboardId"
                   :folderId="folderId"
                   :reportId="reportId"
-                  :selectedTimeDate="currentTimeObj?.[item?.id] || currentTimeObj['__global'] || {}"
+                  :selectedTimeDate="
+                    currentTimeObj?.[item?.id] ||
+                    currentTimeObj?.[getRepeatSourceId(item.id)] ||
+                    currentTimeObj['__global'] ||
+                    {}
+                  "
                   :shouldRefreshWithoutCache="
                     shouldRefreshWithoutCacheObj?.[item?.id] ??
+                    shouldRefreshWithoutCacheObj?.[getRepeatSourceId(item.id)] ??
                     shouldRefreshWithoutCacheObj?.__global ??
                     false
                   "
@@ -210,10 +272,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :forceLoad="forceLoad"
                   :searchType="searchType"
                   :runId="runId"
-                  :tabId="selectedTabId"
-                  :tabName="
-                    dashboardData?.tabs?.find((tab: any) => tab.tabId === selectedTabId)?.name
-                  "
+                  :tabId="sourceTabId"
+                  :tabName="currentTabName"
                   :dashboardName="dashboardName"
                   :folderName="folderName"
                   :allowAlertCreation="allowAlertCreation"
@@ -231,40 +291,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <!-- Panel-Level Variables (shown below drag-allow section) -->
                   <template #panel-variables>
+                    <!-- Panel controls belong to the source, so only its first copy carries them. -->
                     <div
+                      v-if="ownsPanelControls(item)"
                       class="panel-variables-container px-1"
                       :data-test="`dashboard-panel-${item.id}-variables`"
                     >
                       <!-- Panel Time Picker (NEW) -->
                       <div
-                        v-if="hasPanelTime(item) && panelTimeValues[item.id]"
+                        v-if="hasPanelTime(item) && panelTimeValues[getRepeatSourceId(item.id)]"
                         class="panel-time-picker-wrapper mt-1 mb-2"
                         :data-test="`dashboard-panel-${item.id}-time-picker`"
                       >
                         <DateTimePickerDashboard
-                          :modelValue="panelTimeValues[item.id]"
+                          :modelValue="panelTimeValues[getRepeatSourceId(item.id)]"
                           :auto-apply-dashboard="false"
                           size="sm"
                           class="panel-time-picker-widget"
-                          @update:modelValue="(val) => onPanelTimeApply(item.id, val)"
+                          @update:modelValue="
+                            (val) => onPanelTimeApply(getRepeatSourceId(item.id), val)
+                          "
                           :data-test="`panel-time-picker-${item.id}`"
                           :ref="
                             (el) => {
-                              if (el) panelDateTimePickerRefs.set(item.id, el);
+                              if (el) panelDateTimePickerRefs.set(getRepeatSourceId(item.id), el);
                             }
                           "
                         />
                       </div>
 
                       <VariablesValueSelector
-                        v-if="variablesManager && getPanelVariables(item.id).length > 0"
+                        v-if="
+                          variablesManager &&
+                          getPanelVariables(getRepeatSourceId(item.id)).length > 0
+                        "
                         :scope="'panels'"
-                        :panelId="item.id"
-                        :tabId="selectedTabId"
-                        :variablesConfig="{ list: getPanelVariables(item.id) }"
+                        :panelId="getRepeatSourceId(item.id)"
+                        :tabId="sourceTabId"
+                        :variablesConfig="{ list: getPanelVariables(getRepeatSourceId(item.id)) }"
                         :variablesManager="variablesManager"
                         :selectedTimeDate="
-                          currentTimeObj?.[item.id] || currentTimeObj['__global'] || {}
+                          currentTimeObj?.[getRepeatSourceId(item.id)] ||
+                          currentTimeObj['__global'] ||
+                          {}
                         "
                         :initialVariableValues="initialVariableValues"
                         class="panel-variables-margin mb-2"
@@ -295,16 +364,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ViewPanel
             :folderId="folderId"
             :dashboardId="dashboardData.dashboardId"
-            :panelId="viewPanelId"
+            :panelId="getRepeatSourceId(viewPanelId)"
             :selectedDateForViewPanel="viewPanelSelectedDate"
             :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
+            :repeat="getRepeatPin(viewPanelId)"
+            :pins="getViewPins(viewPanelId)"
             :searchType="searchType"
             @close-panel="() => (showViewPanel = false)"
             @update:initial-variable-values="updateInitialVariableValues"
           />
         </div>
       </ODialog>
-      <div v-if="!panels.length">
+      <div v-if="!panels.length && !currentTabEmptyRepeat">
         <!-- if data not available show nodata component -->
         <NoPanel
           @update:Panel="addPanelData"
@@ -328,6 +399,7 @@ import {
   provide,
   ref,
   watch,
+  watchEffect,
   nextTick,
   reactive,
   inject,
@@ -335,7 +407,8 @@ import {
   type Ref,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { useRouter } from "vue-router";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import DateTimePickerDashboard from "../../components/DateTimePickerDashboard.vue";
@@ -359,6 +432,26 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 import type { LayoutMode } from "@/components/dashboards/layoutMode";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { useRepeatAllValues } from "@/composables/dashboard/useRepeatAllValues";
+import {
+  expandRepeatTabs,
+  expandRepeats,
+  getRepeatId,
+  parseRepeatId,
+  readableTemplate,
+  resolveSelectedTab,
+  findRepeatVariable,
+  formatRepeatTitle,
+  getRepeatSourceId,
+  pinRepeatValue,
+  resolveRepeatValues,
+  type EmptyRepeat,
+  type ExpandedPanel,
+  type ExpandedTab,
+  type GridLayout,
+  type RepeatMeta,
+} from "@/utils/dashboard/repeatByVariable";
 
 export default defineComponent({
   name: "RenderDashboardCharts",
@@ -453,6 +546,7 @@ export default defineComponent({
     TabList,
     ODialog,
     OTruncatedText,
+    OEmptyState,
   },
   setup(props: any, { emit }) {
     const { t } = useI18nTyped();
@@ -505,12 +599,13 @@ export default defineComponent({
         (entries) => {
           entries.forEach((entry) => {
             const panelId = entry.target.getAttribute("gs-id");
-            if (panelId && entry.isIntersecting) {
+            const sourceId = panelId ? getRepeatSourceId(panelId) : panelId;
+            if (sourceId && entry.isIntersecting) {
               // Mark panel as visible - variables will load if ready
-              variablesManager.setPanelVisibility(panelId, true);
-            } else if (panelId && !entry.isIntersecting) {
-              // Panel is leaving viewport
-              variablesManager.setPanelVisibility(panelId, false);
+              variablesManager.setPanelVisibility(sourceId, true);
+            } else if (sourceId && sourceId === panelId && !entry.isIntersecting) {
+              // One copy leaving the viewport says nothing about its siblings.
+              variablesManager.setPanelVisibility(sourceId, false);
             }
           });
         },
@@ -576,11 +671,26 @@ export default defineComponent({
       );
     });
 
+    // A virtual tab reads and writes its source tab's tab-scoped variables.
+    const sourceTabId = computed(() =>
+      selectedTabId.value ? getRepeatSourceId(selectedTabId.value) : selectedTabId.value,
+    );
+    const sourceTab = computed(() =>
+      props.dashboardData?.tabs?.find((tab: any) => tab.tabId === sourceTabId.value),
+    );
+    const tabPin = computed(() => {
+      const parsed = selectedTabId.value ? parseRepeatId(selectedTabId.value) : null;
+      const variable = sourceTab.value?.repeat?.variable;
+      return parsed && variable ? { variable, value: parsed.value } : null;
+    });
+    const pinTab = (values: any[]) =>
+      tabPin.value ? pinRepeatValue(values, tabPin.value.variable, tabPin.value.value) : values;
+
     const currentTabVariables = computed(() => {
-      if (!selectedTabId.value) return [];
+      if (!sourceTabId.value) return [];
       return (
         props.dashboardData?.variables?.list?.filter(
-          (v: any) => v.scope === "tabs" && v.tabs?.includes(selectedTabId.value),
+          (v: any) => v.scope === "tabs" && v.tabs?.includes(sourceTabId.value),
         ) || []
       );
     });
@@ -592,6 +702,12 @@ export default defineComponent({
           (v: any) => v.scope === "panels" && v.panels?.includes(panelId),
         ) || []
       );
+    };
+
+    const pinForCopy = (panelId: string, values: any[]) => {
+      const meta = repeatMetaById.value.get(panelId);
+      const tabPinned = pinTab(values);
+      return meta ? pinRepeatValue(tabPinned, meta.variable, meta.value) : tabPinned;
     };
 
     // Helper to get merged variables for a panel (global + tab + panel)
@@ -607,15 +723,15 @@ export default defineComponent({
       // This prevents panels from reloading on every variable change
       // Panels only reload when user clicks Refresh (which commits the changes)
       const mergedVars = variablesManager.getCommittedVariablesForPanel(
-        panelId,
-        selectedTabId.value,
+        getRepeatSourceId(panelId),
+        sourceTabId.value,
       );
 
       // Convert to old format for backward compatibility
       // Panel expects: { isVariablesLoading: boolean, values: Array<VariableRuntimeState> }
       return {
         isVariablesLoading: variablesManager.isLoading.value,
-        values: mergedVars,
+        values: pinForCopy(panelId, mergedVars),
       };
     };
 
@@ -624,21 +740,301 @@ export default defineComponent({
     const getLiveVariablesForPanel = (panelId: string) => {
       // Get live variables for the selected tab and panel
       // This allows panel to detect uncommitted changes including panel-scoped ones
-      const liveVars = variablesManager.getVariablesForPanel(panelId, selectedTabId.value);
+      const liveVars = variablesManager.getVariablesForPanel(
+        getRepeatSourceId(panelId),
+        sourceTabId.value,
+      );
 
       // Convert to old format for backward compatibility
       return {
         isVariablesLoading: variablesManager.isLoading.value,
-        values: liveVars,
+        values: pinForCopy(panelId, liveVars),
       };
     };
 
+    // In a virtual tab every panel id carries the tab's value, so cache and lazy mount stay per tab.
+    const tabScopedCache = new Map<string, { source: any; scoped: any }>();
+    const scopeToTab = (panel: any, value: string) => {
+      const id = getRepeatId(panel.id, value);
+      const cached = tabScopedCache.get(id);
+      if (cached?.source === panel) return cached.scoped;
+      const scoped = { ...panel, id, layout: panel.layout ? { ...panel.layout } : panel.layout };
+      tabScopedCache.set(id, { source: panel, scoped });
+      return scoped;
+    };
+
     const panels: any = computed(() => {
-      return selectedTabId.value !== null
-        ? (props.dashboardData?.tabs?.find((it: any) => it.tabId === selectedTabId.value)?.panels ??
-            [])
-        : [];
+      if (selectedTabId.value === null) return [];
+      const list = sourceTab.value?.panels ?? [];
+      const pin = tabPin.value;
+      return pin ? list.map((panel: any) => scopeToTab(panel, pin.value)) : list;
     });
+
+    // Copies exist only while the layout is locked; editing it shows the saved sources alone.
+    const expandRepeatCopies = computed(() => props.layoutMode === "view" || !!props.viewOnly);
+
+    const repeatAllValues = useRepeatAllValues(
+      () => store.state.selectedOrganization?.identifier ?? "",
+      () => {
+        const range = props.currentTimeObj?.__global;
+        const start = range?.start_time?.getTime?.();
+        const end = range?.end_time?.getTime?.();
+        return Number.isFinite(start) && Number.isFinite(end) ? { start, end } : null;
+      },
+    );
+
+    const findPanelRepeatVariable = (panel: any) =>
+      findRepeatVariable(
+        pinTab(
+          variablesManager.getCommittedVariablesForPanel(
+            getRepeatSourceId(panel.id),
+            sourceTabId.value,
+          ),
+        ),
+        panel.repeat.variable,
+      );
+
+    // The committed value decides which values are selected; "All" reads the live options, which load after the commit.
+    const resolvePanelRepeat = (panel: any) => {
+      if (!panel?.repeat?.variable) return null;
+      const variable = findPanelRepeatVariable(panel);
+      const live = findRepeatVariable(
+        variablesManager.getVariablesForPanel(getRepeatSourceId(panel.id), sourceTabId.value),
+        panel.repeat.variable,
+      );
+      return resolveRepeatValues(variable, undefined, {
+        options: live?.options?.length ? live.options : variable?.options,
+        ...repeatAllValues.sourcesFor(variable),
+      });
+    };
+
+    watchEffect(() => {
+      if (!expandRepeatCopies.value) return;
+      panels.value
+        .filter((panel: any) => panel?.repeat?.variable)
+        .forEach((panel: any) => repeatAllValues.ensure(findPanelRepeatVariable(panel)));
+    });
+
+    const findTabRepeatVariable = (tab: any) =>
+      findRepeatVariable(variablesManager.committedVariablesData.global, tab.repeat.variable);
+
+    // A tab repeats by a global variable only: a tab-scoped one would depend on the tab it creates.
+    const resolveTabRepeat = (tab: any) => {
+      if (!tab?.repeat?.variable) return null;
+      const variable = findTabRepeatVariable(tab);
+      // Until the variable is committed, a tab URL naming one of its values must not be redirected away.
+      const configured = props.dashboardData?.variables?.list?.some(
+        (v: any) => v.name === tab.repeat.variable && (!v.scope || v.scope === "global"),
+      );
+      if (!variable && configured) return { values: [], total: 0, pending: true };
+      const live = findRepeatVariable(variablesManager.variablesData.global, tab.repeat.variable);
+      return resolveRepeatValues(variable, undefined, {
+        options: live?.options?.length ? live.options : variable?.options,
+        ...repeatAllValues.sourcesFor(variable),
+      });
+    };
+
+    watchEffect(() => {
+      if (!expandRepeatCopies.value) return;
+      (props.dashboardData?.tabs ?? [])
+        .filter((tab: any) => tab?.repeat?.variable)
+        .forEach((tab: any) => repeatAllValues.ensure(findTabRepeatVariable(tab)));
+    });
+
+    const expandedTabs = computed<ExpandedTab<any>[]>(() => {
+      const tabs = props.dashboardData?.tabs ?? [];
+      return expandRepeatCopies.value
+        ? expandRepeatTabs(tabs, resolveTabRepeat)
+        : tabs.map((tab: any) => ({ tabId: tab.tabId, tab }));
+    });
+
+    const tabTitleVariables = (tabId: string, pin?: { variable: string; value: string }) => {
+      const values = variablesManager.getCommittedVariablesForPanel("", tabId);
+      return { values: pin ? pinRepeatValue(values, pin.variable, pin.value) : values };
+    };
+
+    const renderedTabs = computed(() =>
+      expandedTabs.value.map((entry) => {
+        const pin = entry.repeat
+          ? { variable: entry.repeat.variable, value: entry.repeat.value }
+          : undefined;
+        const editChip =
+          isLayoutEditing.value && entry.tab?.repeat?.variable
+            ? {
+                variable: entry.tab.repeat.variable,
+                count: resolveTabRepeat(entry.tab)?.values.length ?? 0,
+              }
+            : null;
+        return {
+          tabId: entry.tabId,
+          sourceTabId: entry.tab.tabId,
+          sourceName: entry.tab.name,
+          // While its values load, a repeated tab shows its template, never a passing "All".
+          name: entry.emptyRepeat?.pending
+            ? readableTemplate(entry.tab.name)
+            : formatRepeatTitle(
+                entry.tab.name,
+                tabTitleVariables(entry.tab.tabId, pin),
+                pin,
+                t("dashboard.repeat.allValue"),
+                t("dashboard.repeat.noneValue"),
+              ),
+          panels: entry.tab.panels ?? [],
+          repeat: entry.repeat ?? null,
+          emptyRepeat: entry.emptyRepeat ?? null,
+          editChip,
+        };
+      }),
+    );
+
+    const currentTabName = computed(
+      () => renderedTabs.value.find((tab) => tab.tabId === selectedTabId.value)?.name,
+    );
+
+    // Same wording as the panel cap notice: the tab strip shows only the first values.
+    const capNoticeFor = ({ count, total, more }: RepeatMeta) => {
+      if (more && total > count) return t("dashboard.repeat.capNoticeAtLeast", { count, total });
+      if (more) return t("dashboard.repeat.capNoticeMore", { count });
+      return total > count ? t("dashboard.repeat.capNotice", { count, total }) : null;
+    };
+
+    // Shown on every tab, since the capped tabs sit in the tab bar whichever tab is open.
+    const tabCapNotices = computed(() =>
+      expandedTabs.value.flatMap((entry) => {
+        const notice = entry.repeat?.index === 0 ? capNoticeFor(entry.repeat) : null;
+        return notice
+          ? [
+              {
+                tabId: entry.tab.tabId,
+                label: t("dashboard.repeat.tabCapNotice", {
+                  tab: raw(readableTemplate(entry.tab.name)),
+                  notice,
+                }),
+              },
+            ]
+          : [];
+      }),
+    );
+
+    const currentTabEmptyRepeat = computed(
+      () => expandedTabs.value.find((entry) => entry.tabId === selectedTabId.value)?.emptyRepeat,
+    );
+
+    // A stale tab URL lands on the first copy of its tab; editing the layout shows the source tab.
+    watch(
+      () => [expandedTabs.value, selectedTabId.value, expandRepeatCopies.value] as const,
+      () => {
+        if (selectedTabId.value === null) return;
+        const requested = selectedTabId.value;
+        const next = expandRepeatCopies.value
+          ? resolveSelectedTab(requested, expandedTabs.value)
+          : getRepeatSourceId(requested);
+        if (!next || next === requested) return;
+        const gone = expandRepeatCopies.value ? parseRepeatId(requested) : null;
+        // Only a move to another value's tab is news; an empty selection shows its own empty state.
+        if (gone && parseRepeatId(next)?.sourceId === gone.sourceId) {
+          toast({
+            variant: "info",
+            message: t("dashboard.repeat.tabValueGone", { value: raw(gone.value) }),
+          });
+        }
+        selectedTabId.value = next;
+      },
+      { immediate: true },
+    );
+
+    const expandedPanels = computed<ExpandedPanel<any>[]>(() =>
+      expandRepeatCopies.value ? expandRepeats(panels.value, resolvePanelRepeat) : [],
+    );
+
+    const repeatMetaById = computed(() => {
+      const byId = new Map<string, RepeatMeta>();
+      expandedPanels.value.forEach((entry) => {
+        if (entry.repeat) byId.set(entry.id, entry.repeat);
+      });
+      return byId;
+    });
+
+    const derivedLayoutById = computed(() => {
+      const byId = new Map<string, GridLayout>();
+      expandedPanels.value.forEach((entry) => byId.set(entry.id, entry.layout));
+      return byId;
+    });
+
+    const emptyRepeatById = computed(() => {
+      const byId = new Map<string, EmptyRepeat>();
+      expandedPanels.value.forEach((entry) => {
+        if (entry.emptyRepeat) byId.set(entry.id, entry.emptyRepeat);
+      });
+      return byId;
+    });
+
+    const getEmptyRepeat = (panel: any) => emptyRepeatById.value.get(panel?.id) ?? null;
+
+    const hasRepeatCopies = computed(() => repeatMetaById.value.size > 0);
+
+    // A copy object is reused while its source is unchanged, so a commit does not re-query it.
+    const copyCache = new Map<string, { source: any; copy: any }>();
+    const getCopy = (id: string, source: any) => {
+      const cached = copyCache.get(id);
+      if (cached?.source === source) return cached.copy;
+      const copy = { ...source, id };
+      copyCache.set(id, { source, copy });
+      return copy;
+    };
+
+    const renderedPanels: any = computed(() => {
+      if (!expandRepeatCopies.value) return panels.value;
+      const rendered = expandedPanels.value.map((entry) =>
+        entry.repeat ? getCopy(entry.id, entry.panel) : entry.panel,
+      );
+      const live = new Set(rendered.map((panel: any) => panel.id));
+      [...copyCache.keys()].forEach((id) => {
+        if (!live.has(id)) copyCache.delete(id);
+      });
+      return rendered;
+    });
+
+    const getPanelRepeat = (panel: any) => {
+      const meta = repeatMetaById.value.get(panel?.id);
+      if (meta) {
+        return { ...meta, sourceId: getRepeatSourceId(meta.sourceId), sourceTitle: panel.title };
+      }
+      if (!isLayoutEditing.value || !panel?.repeat?.variable) return null;
+      const resolved = resolvePanelRepeat(panel);
+      return {
+        sourceId: panel.id,
+        variable: panel.repeat.variable,
+        count: resolved?.values.length ?? 0,
+        total: resolved?.total ?? 0,
+      };
+    };
+
+    const getRepeatPin = (panelId: string) => {
+      const meta = repeatMetaById.value.get(panelId);
+      return meta ? { variable: meta.variable, value: meta.value } : null;
+    };
+
+    const getViewPins = (panelId: string) =>
+      [tabPin.value, getRepeatPin(panelId)].filter(
+        (pin): pin is { variable: string; value: string } => !!pin,
+      );
+
+    const ownsPanelControls = (panel: any) => {
+      const meta = repeatMetaById.value.get(panel?.id);
+      return !meta || meta.index === 0;
+    };
+
+    const getPanelTitle = (panel: any) => {
+      const meta = repeatMetaById.value.get(panel?.id);
+      return formatRepeatTitle(
+        panel?.title,
+        getMergedVariablesForPanel(panel?.id),
+        meta ? { variable: meta.variable, value: meta.value } : null,
+        t("dashboard.repeat.allValue"),
+        t("dashboard.repeat.noneValue"),
+      );
+    };
 
     // Print/forceLoad: mount remaining panels a batch per tick. Print capture
     // waits on the all-panels-loaded flag, so this never truncates a report.
@@ -649,7 +1045,7 @@ export default defineComponent({
       const step = () => {
         mountAllTimer = null;
         if (!mountAllPanels.value) return;
-        const pending = panels.value
+        const pending = renderedPanels.value
           .map((p: any) => p.id)
           .filter((id: string) => id && !mountedPanelIds.has(id));
         pending.slice(0, BATCH_SIZE).forEach((id: string) => mountedPanelIds.add(id));
@@ -662,7 +1058,7 @@ export default defineComponent({
 
     watch(
       // re-fill when print mode turns on or the panel list changes
-      () => [mountAllPanels.value, panels.value],
+      () => [mountAllPanels.value, renderedPanels.value],
       () => {
         if (mountAllPanels.value) mountRemainingPanelsInBatches();
       },
@@ -889,7 +1285,9 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
-          tab: route.query.tab ?? props.dashboardData.panels[0]?.tabId,
+          tab: sourceTabId.value ?? props.dashboardData.panels[0]?.tabId,
+          ...variablesManager.getUrlParams({ useLive: false }),
+          ...(tabPin.value ? { fromTab: selectedTabId.value } : {}),
         },
       });
     };
@@ -945,6 +1343,11 @@ export default defineComponent({
           return;
         }
 
+        // Positions on screen are derived from the repeat expansion, so none may be saved.
+        if (hasRepeatCopies.value || tabPin.value) {
+          return;
+        }
+
         if (items && items.length > 0) {
           updatePanelLayouts(items); // Update panel layout data
           if (props.layoutMode === "edit") {
@@ -987,6 +1390,7 @@ export default defineComponent({
     const updatePanelLayouts = (items) => {
       items.forEach((item) => {
         const panelId = item.id;
+        if (repeatMetaById.value.has(panelId)) return;
         const panel = panels.value.find((p) => p.id === panelId);
         if (panel && panel.layout) {
           // Update panel layout coordinates
@@ -1048,19 +1452,30 @@ export default defineComponent({
         return;
       }
 
+      // The expanded layout is already packed; GridStack's own packing would float copies one by one and break their rows.
+      grid.float(hasRepeatCopies.value);
+
       grid.batchUpdate();
       // Clear any auto-discovered widgets to ensure we add them explicitly with correct config
       grid.removeAll(false);
 
-      if (panels.value.length === 0) {
+      if (renderedPanels.value.length === 0) {
         grid.batchUpdate(false);
         gridStackUpdateInProgress = false;
         return;
       }
 
+      const elementsById = new Map(
+        Array.from(gridStackContainer.value.querySelectorAll("[gs-id]")).map((el: Element) => [
+          el.getAttribute("gs-id"),
+          el,
+        ]),
+      );
+
       // Explicitly add widgets with correct layout configuration
-      for (const panel of panels.value) {
-        const element = gridStackContainer.value.querySelector(`[gs-id="${panel.id}"]`);
+      for (const panel of renderedPanels.value) {
+        const element = elementsById.get(panel.id);
+        const isCopy = repeatMetaById.value.has(panel.id);
 
         if (element) {
           try {
@@ -1072,8 +1487,8 @@ export default defineComponent({
               minW: getMinimumWidth(panel.type),
               minH: getMinimumHeight(panel.type),
               id: panel.id,
-              noMove: props.viewOnly,
-              noResize: props.viewOnly,
+              noMove: props.viewOnly || isCopy,
+              noResize: props.viewOnly || isCopy,
             };
 
             // Make widget with explicit layout
@@ -1108,6 +1523,8 @@ export default defineComponent({
     };
 
     const getPanelLayout = (panelData, position) => {
+      const derived = derivedLayoutById.value.get(panelData?.id);
+      if (derived && ["x", "y", "w", "h"].includes(position)) return derived[position];
       if (position == "x") {
         return panelData.layout?.x || 0;
       } else if (position == "y") {
@@ -1262,7 +1679,7 @@ export default defineComponent({
     watch(
       () => ({
         tabId: selectedTabId.value,
-        ids: panels.value
+        ids: renderedPanels.value
           .map((panel: any) => panel.id)
           .sort()
           .join(","),
@@ -1342,8 +1759,8 @@ export default defineComponent({
           emit("variablesManagerReady", variablesManager);
 
           // Set the selected tab as visible if available
-          if (selectedTabId.value) {
-            variablesManager.setTabVisibility(selectedTabId.value, true);
+          if (sourceTabId.value) {
+            variablesManager.setTabVisibility(sourceTabId.value, true);
           }
         } catch (error: any) {
           console.error("Error initializing variables manager:", error);
@@ -1422,7 +1839,7 @@ export default defineComponent({
 
     // Watch for tab visibility changes
     watch(
-      () => selectedTabId.value,
+      () => sourceTabId.value,
       (newTabId, oldTabId) => {
         if (newTabId) {
           // Mark new tab as visible - variables will load if ready
@@ -1555,7 +1972,7 @@ export default defineComponent({
       const panelsWithTime: string[] = [];
       panels.value?.forEach((panel: any) => {
         if (hasPanelTime(panel)) {
-          panelsWithTime.push(panel.id);
+          panelsWithTime.push(getRepeatSourceId(panel.id));
         }
       });
 
@@ -1571,13 +1988,14 @@ export default defineComponent({
     };
 
     const refreshPanelRequest = async (panelId, shouldRefreshWithoutCache = false) => {
+      const sourceId = getRepeatSourceId(panelId);
       // Sync panel datetime picker state before refreshing
-      syncPanelDateTimePickerState(panelId);
+      syncPanelDateTimePickerState(sourceId);
 
       // Update URL with panel time if panel has a time value set
-      const timeValue = panelTimeValues.value[panelId];
+      const timeValue = panelTimeValues.value[sourceId];
       if (timeValue) {
-        await updateURLWithPanelTime(panelId, timeValue);
+        await updateURLWithPanelTime(sourceId, timeValue);
       }
 
       emit("refreshPanelRequest", panelId, shouldRefreshWithoutCache);
@@ -1585,16 +2003,16 @@ export default defineComponent({
       // Panel-specific refresh: creates a snapshot for this panel only
       // Commit ONLY the panel scope if needed,
       // but the main reload driver is the local override in currentVariablesDataRef
-      variablesManager.commitScope("panels", panelId);
+      variablesManager.commitScope("panels", sourceId);
 
       // Get merged variables for this panel and store as override
-      const panelVars = variablesManager.getVariablesForPanel(panelId, selectedTabId.value);
+      const panelVars = variablesManager.getVariablesForPanel(sourceId, sourceTabId.value);
       currentVariablesDataRef.value = {
         ...currentVariablesDataRef.value,
         [panelId]: JSON.parse(
           JSON.stringify({
             isVariablesLoading: variablesManager.isLoading.value,
-            values: panelVars,
+            values: pinForCopy(panelId, panelVars),
           }),
         ),
       };
@@ -1648,7 +2066,7 @@ export default defineComponent({
       }
 
       // Check if this panel has a custom time value
-      const panelTimeValue = panelTimeValues.value[viewPanelId.value];
+      const panelTimeValue = panelTimeValues.value[getRepeatSourceId(viewPanelId.value)];
       if (panelTimeValue) {
         // Return the panel-specific time
         return panelTimeValue;
@@ -1682,7 +2100,7 @@ export default defineComponent({
       panels.value?.forEach((panel: any) => {
         // Only initialize picker for panels that have panel_time_enabled enabled
         if (hasPanelTime(panel)) {
-          const panelId = panel.id;
+          const panelId = getRepeatSourceId(panel.id);
 
           // Mark this panel as initializing to prevent change events
           panelsInitializing.value.add(panelId);
@@ -1883,6 +2301,19 @@ export default defineComponent({
       viewPanelId,
       selectedTabId,
       panels,
+      renderedPanels,
+      getPanelRepeat,
+      getRepeatPin,
+      getViewPins,
+      getEmptyRepeat,
+      sourceTabId,
+      renderedTabs,
+      currentTabName,
+      currentTabEmptyRepeat,
+      tabCapNotices,
+      getPanelTitle,
+      getRepeatSourceId,
+      ownsPanelControls,
       refreshDashboard,
       onMovePanel,
       refreshPanelRequest,
