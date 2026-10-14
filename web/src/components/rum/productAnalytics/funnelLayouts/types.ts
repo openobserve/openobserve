@@ -38,6 +38,7 @@ export interface FunnelLayoutProps {
   sampled: SampleRatio;
   events: NamedEvent[];
   eventsStatus: NamedEventsStatus;
+  deletedNames?: Readonly<Record<string, string>>;
   unitLabel: I18nText;
   unitNoun: I18nText;
   hideTime: boolean;

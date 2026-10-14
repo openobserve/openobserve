@@ -105,7 +105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="min-w-0 flex-1 py-1.5 pe-1.5"
                     :data-test="`rum-analytics-funnel-rail-step-${i}`"
                   >
-                    <RailStepLine :step="step" :events="events" :events-status="eventsStatus" />
+                    <RailStepLine
+                      :step="step"
+                      :events="events"
+                      :events-status="eventsStatus"
+                      :deleted-names="deletedNames"
+                    />
                   </span>
                   <OButton
                     v-if="step.kind === 'p'"
@@ -171,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sampled="sampled"
           :events="events"
           :events-status="eventsStatus"
+          :deleted-names="deletedNames"
           stacked
           @update:def="(d) => emit('update:def', d)"
         />
@@ -222,6 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :sampled="sampled"
               :events="events"
               :events-status="eventsStatus"
+              :deleted-names="deletedNames"
               :unit-label="unitLabel"
               :unit-noun="unitNoun"
               :hide-time="hideTime"
@@ -278,6 +285,7 @@ const { t } = useI18nTyped();
 const { labelOf } = useStepLabels(
   () => props.events,
   () => props.eventsStatus,
+  () => props.deletedNames ?? {},
 );
 const separator = raw("·");
 const COLLAPSED_KEY = "o2.rum.analytics.funnelRailCollapsed";
