@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { reactive, ref } from "vue";
 // Mock the zincutils utilities completely
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -84,6 +84,7 @@ vi.mock("@/components/CodeQueryEditor.vue", () => ({
 import DashboardQueryEditor from "@/components/dashboards/addPanel/DashboardQueryEditor.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -1019,5 +1020,40 @@ describe("formula letters and the saved hide flag", () => {
     const button = wrapper.find('[data-test="dashboard-panel-query-tab-add-formula"]');
     expect(button.attributes("aria-label")).toBe("Add formula");
     expect(button.find(".max-md\\:hidden").text()).toBe("Add formula");
+  });
+});
+
+describe("DashboardQueryEditor focus=vrl deep link", () => {
+  it("opens the function editor beside the query and focuses it", async () => {
+    const mock: any = createMockDashboardPanelData();
+    mock.dashboardPanelData.layout.showQueryBar = false;
+    mock.dashboardPanelData.data.queries[0].vrlFunctionQuery = ".x = parse_json(";
+    (useDashboardPanelData as any).mockImplementation(() => mock);
+    const { requestFocus, pendingFocus } = usePanelEditorFocus();
+    requestFocus("vrl");
+
+    const wrapper = mount(DashboardQueryEditor, {
+      attachTo: document.body,
+      global: {
+        plugins: [i18n, store, router],
+        provide: { dashboardPanelDataPageKey: "dashboard" },
+        stubs: {
+          QueryTypeSelector: true,
+          QueryEditor: {
+            template: "<div><textarea /></div>",
+            methods: { resetEditorLayout() {}, setValue() {}, getValue: () => "" },
+          },
+        },
+      },
+    });
+    await flushPromises();
+    await new Promise((r) => setTimeout(r, 120));
+
+    expect(pendingFocus.value).toBeNull();
+    expect(mock.dashboardPanelData.layout.showQueryBar).toBe(true);
+    expect(mock.dashboardPanelData.layout.vrlFunctionToggle).toBe(true);
+    const vrl = document.querySelector('[data-test="dashboard-vrl-function-editor"]');
+    expect(vrl?.contains(document.activeElement)).toBe(true);
+    wrapper.unmount();
   });
 });
