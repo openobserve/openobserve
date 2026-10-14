@@ -99,6 +99,23 @@ pub fn resolve_write_method(method: &str, path_columns: &[&str]) -> String {
     resolved
 }
 
+/// The route-table stream type a request's `type` query param authorizes against.
+#[cfg(feature = "enterprise")]
+pub fn route_stream_type(
+    stream_type: config::meta::stream::StreamType,
+) -> o2_openfga::meta::route_permissions::StreamType {
+    use config::meta::stream::StreamType;
+    use o2_openfga::meta::route_permissions::StreamType as RpStreamType;
+
+    match stream_type {
+        StreamType::Logs => RpStreamType::Logs,
+        StreamType::Metrics => RpStreamType::Metrics,
+        StreamType::Traces => RpStreamType::Traces,
+        StreamType::EnrichmentTables => RpStreamType::EnrichmentTables,
+        _ => RpStreamType::Logs,
+    }
+}
+
 // Email validation and OpenFGA name sanitization live in the shared `config` crate so the OSS
 // auth layer, the enterprise domain-management blocklist, and the enterprise OpenFGA route checks
 // all use identical logic. Re-exported here to preserve the existing
@@ -258,9 +275,8 @@ where
     #[cfg(feature = "enterprise")]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         use common::utils::http::{get_folder, get_stream_type_from_request};
-        use config::meta::stream::StreamType;
         use hashbrown::HashMap;
-        use o2_openfga::meta::route_permissions::{self as rp, StreamType as RpStreamType};
+        use o2_openfga::meta::route_permissions as rp;
 
         let start = std::time::Instant::now();
         let cfg = config::get_config();
@@ -356,13 +372,7 @@ where
             &method,
             &org_id,
             &folder,
-            stream_type.map(|st| match st {
-                StreamType::Logs => RpStreamType::Logs,
-                StreamType::Metrics => RpStreamType::Metrics,
-                StreamType::Traces => RpStreamType::Traces,
-                StreamType::EnrichmentTables => RpStreamType::EnrichmentTables,
-                _ => RpStreamType::Logs,
-            }),
+            stream_type.map(route_stream_type),
         ) {
             Some(r) => r,
             None => {
