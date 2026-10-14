@@ -256,6 +256,10 @@ async fn run() -> Result<(), anyhow::Error> {
 
             // flush WAL cache to disk
             _ = ingester::flush_all().await;
+            // upload WAL to object storage if the disk does not survive a restart
+            if let Err(e) = job::upload_wal_on_shutdown().await {
+                log::error!("upload wal on shutdown error: {e}");
+            }
             // flush compact offset cache to disk disk
             _ = db::compact::files::sync_cache_to_db().await;
             // flush db

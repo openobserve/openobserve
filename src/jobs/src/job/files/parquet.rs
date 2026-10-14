@@ -30,7 +30,7 @@ use config::{
     },
     metrics,
     utils::{
-        async_file::{get_file_meta, get_file_size},
+        async_file::{get_file_meta, get_file_size, scan_files},
         file::scan_files_with_channel,
         parquet::{read_metadata_from_file, read_schema_from_file},
         schema_ext::SchemaExt,
@@ -97,7 +97,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         break;
                     }
                     Some((prefix, files)) => {
-                        if let Err(e) = move_files(thread_id, &prefix, files).await {
+                        if let Err(e) = move_files(thread_id, &prefix, files, false).await {
                             log::error!("[INGESTER:JOB] Error moving parquet files to remote: {e}");
                         }
                     }
@@ -182,6 +182,56 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
     }
     log::info!("[INGESTER:JOB] job::files::parquet is stopped");
+    Ok(())
+}
+
+/// Upload every WAL parquet file now, ignoring the size and age thresholds,
+/// and wait for uploads already in flight.
+///
+/// Used on shutdown, after the memtables are persisted, when the periodic
+/// upload job has already stopped because the node is offline.
+pub async fn flush_all() -> Result<(), anyhow::Error> {
+    // keep the files on disk rather than leave orphaned objects in storage
+    infra::file_list::health_check().await?;
+
+    let wal_dir = Path::new(&get_config().common.data_wal_dir).canonicalize()?;
+    let files = match scan_files(wal_dir.join("files/"), "parquet", None).await {
+        Ok(files) => files,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e.into()),
+    };
+    log::info!(
+        "[INGESTER:JOB] uploading {} wal files on shutdown",
+        files.len()
+    );
+    for (prefix, files) in prepare_files(files).await? {
+        if let Err(e) = move_files(0, &prefix, files, true).await {
+            log::error!("[INGESTER:JOB] Error moving parquet files to remote on shutdown: {e}");
+        }
+    }
+
+    // files still marked as processing are either being uploaded by the
+    // background workers or already uploaded and waiting to be deleted
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    loop {
+        let pending_delete = db::file_list::local::get_pending_delete()
+            .await
+            .into_iter()
+            .collect::<HashSet<_>>();
+        let uploading = PROCESSING_FILES
+            .read()
+            .await
+            .iter()
+            .any(|f| !pending_delete.contains(f));
+        if !uploading {
+            break;
+        }
+        if std::time::Instant::now() >= deadline {
+            log::warn!("[INGESTER:JOB] timed out waiting for in-flight wal file uploads");
+            break;
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    }
     Ok(())
 }
 
@@ -360,6 +410,7 @@ async fn move_files(
     thread_id: usize,
     prefix: &str,
     files: Vec<FileKey>,
+    force: bool,
 ) -> Result<(), anyhow::Error> {
     if files.is_empty() {
         return Ok(());
@@ -474,11 +525,12 @@ async fn move_files(
         .iter()
         .map(|f| f.meta.original_size)
         .sum::<i64>();
-    if total_original_size
-        < std::cmp::min(
-            cfg.limit.max_file_size_on_disk as i64,
-            cfg.compact.max_file_size as i64,
-        )
+    if !force
+        && total_original_size
+            < std::cmp::min(
+                cfg.limit.max_file_size_on_disk as i64,
+                cfg.compact.max_file_size as i64,
+            )
         && (cfg.limit.file_move_fields_limit == 0
             || stream_fields_num < cfg.limit.file_move_fields_limit)
     {

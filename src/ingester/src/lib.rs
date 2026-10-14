@@ -34,7 +34,7 @@ use arrow_schema::Schema;
 use config::RwAHashMap;
 pub use entry::Entry;
 pub use immutable::{
-    check_persist_done, get_immutables_cache_stats, get_processing_tables_cache_stats,
+    check_persist_done, get_immutables_cache_stats, get_processing_tables_cache_stats, persist_all,
     read_from_immutable,
 };
 pub use pack::{

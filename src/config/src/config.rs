@@ -2578,6 +2578,12 @@ pub struct Limit {
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
     pub file_push_limit: usize,
+    #[env_config(
+        name = "ZO_WAL_UPLOAD_ON_SHUTDOWN",
+        default = false,
+        help = "On graceful shutdown, persist all memtables and upload every WAL file to object storage, ignoring the size and age thresholds. Enable when the data directory does not survive a restart, for example on ephemeral container storage."
+    )]
+    pub wal_upload_on_shutdown: bool,
     // over this limit will skip merging on ingester
     #[env_config(name = "ZO_FILE_MOVE_FIELDS_LIMIT", default = 2000)]
     pub file_move_fields_limit: usize,

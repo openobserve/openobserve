@@ -341,6 +341,42 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
     Ok(())
 }
 
+/// Persist every immutable to disk now and wait for persists already in flight.
+///
+/// Used on shutdown, after `writer::flush_all`, when the periodic persist job
+/// has already stopped because the node is offline.
+pub async fn persist_all() -> Result<()> {
+    let paths = IMMUTABLES
+        .read()
+        .await
+        .iter()
+        .map(|(path, _)| path.clone())
+        .collect::<Vec<_>>();
+    for path in paths {
+        if !PROCESSING_TABLES.write().await.insert(path.clone()) {
+            continue; // the background job is persisting it
+        }
+        if let Err(e) = persist_table(0, path.clone()).await {
+            log::error!(
+                "[INGESTER:MEM] persist file on shutdown error: {}, {e}",
+                path.to_string_lossy()
+            );
+        }
+        // persist_table returns early without releasing the path when the
+        // background job persisted it in the meantime
+        PROCESSING_TABLES.write().await.remove(&path);
+    }
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    while !PROCESSING_TABLES.read().await.is_empty() {
+        if std::time::Instant::now() >= deadline {
+            log::warn!("[INGESTER:MEM] timed out waiting for in-flight memtable persists");
+            break;
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    }
+    Ok(())
+}
+
 // check if the persist is done for the given seq_id
 // if there is no id less than the given seq_id, return true
 pub async fn check_persist_done(seq_id: u64) -> bool {

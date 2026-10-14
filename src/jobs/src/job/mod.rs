@@ -409,6 +409,12 @@ fn synthetics_step_pool() -> Option<openobserve_synthetics::pool::StepPoolHooks>
     None
 }
 
+/// Upload the WAL to object storage on shutdown when `ZO_WAL_UPLOAD_ON_SHUTDOWN`
+/// is enabled; see `files::flush_all`.
+pub async fn upload_wal_on_shutdown() -> Result<(), anyhow::Error> {
+    files::flush_all().await
+}
+
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
         r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",

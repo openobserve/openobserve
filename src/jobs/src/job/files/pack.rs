@@ -149,6 +149,42 @@ pub async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Upload every pending pack segment now, ignoring the size and age
+/// thresholds, and wait for uploads already in flight.
+///
+/// Used on shutdown, after the memtables are persisted, when the periodic
+/// upload job has already stopped because the node is offline.
+pub async fn flush_all() -> Result<(), anyhow::Error> {
+    // keep the segments on disk rather than leave orphaned objects in storage
+    infra::file_list::health_check().await?;
+
+    let pending = ingester::get_pending_stream_stats().await;
+    log::info!(
+        "[INGESTER:PACK:JOB] uploading {} pending streams on shutdown",
+        pending.len()
+    );
+    for ps in pending.into_iter() {
+        let stream_key = format!("{}/{}/{}", ps.org_id, ps.stream_type, ps.stream_name);
+        if !PROCESSING_STREAMS.write().await.insert(stream_key.clone()) {
+            continue; // a background worker is moving it
+        }
+        if let Err(e) = move_stream_segments(0, ps).await {
+            log::error!("[INGESTER:PACK:JOB] error moving stream {stream_key} on shutdown: {e}");
+        }
+        PROCESSING_STREAMS.write().await.remove(&stream_key);
+    }
+
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    while !PROCESSING_STREAMS.read().await.is_empty() {
+        if std::time::Instant::now() >= deadline {
+            log::warn!("[INGESTER:PACK:JOB] timed out waiting for in-flight segment uploads");
+            break;
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    }
+    Ok(())
+}
+
 /// Flush when pending segments are big enough or the oldest exceeded the
 /// retention time (same thresholds as the legacy mover).
 fn should_flush(ps: &PendingStreamStats, cfg: &config::Config) -> bool {
