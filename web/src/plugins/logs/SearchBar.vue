@@ -2309,10 +2309,13 @@ export default defineComponent({
     });
 
     // A server type error names only types, so the squiggle needs the stream's column types to pick its operand.
-    const releaseFieldTypes = setFieldTypeOf(
-      (name) =>
-        (searchObj.data.stream.selectedStreamFields ?? []).find((f: any) => f.name === name)?.type,
-    );
+    const releaseFieldTypes = setFieldTypeOf((name) => {
+      // The field loader stores dataType; a raw stream schema written straight in carries type.
+      const field = (searchObj.data.stream.selectedStreamFields ?? []).find(
+        (f: any) => f.name === name,
+      );
+      return field?.dataType || field?.type;
+    });
     onBeforeUnmount(releaseFieldTypes);
 
     const onQueryEditorFocus = () => {

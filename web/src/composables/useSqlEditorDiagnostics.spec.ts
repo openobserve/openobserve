@@ -114,4 +114,18 @@ describe("useSqlEditorDiagnostics — markers from a run", () => {
     await nextTick();
     expect(markers.value).toEqual([]);
   });
+
+  it("keep a server marker that equals an earlier blur marker when the editor gains focus", async () => {
+    validateSql.mockResolvedValue(SERVER_RANGE);
+    const { diag, markers, externalErrors } = setup("level =");
+    await diag.onBlur();
+    await nextTick();
+    diag.onFocus();
+    await nextTick();
+    externalErrors.value = [{ ...SERVER_RANGE }];
+    await nextTick();
+    diag.onFocus();
+    await nextTick();
+    expect(markers.value).toEqual([SERVER_RANGE]);
+  });
 });
