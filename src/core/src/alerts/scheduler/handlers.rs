@@ -760,6 +760,9 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::OncallEscalation => {
             handle_oncall_escalation_triggers(trigger).await
         }
+        db::scheduler::TriggerModule::AlertCalibration => {
+            super::calibration::handle_triggers(trace_id, trigger).await
+        }
     }
 }
 

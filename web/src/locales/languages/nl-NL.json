@@ -9450,6 +9450,9 @@
     "sloLongWindow": "Lang venster",
     "sloShortWindow": "Kort venster",
     "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond.",
+    "builtinBadge": "Systeem",
+    "builtinBadgeHint": "Een ingebouwd alarm: je kunt het uitschakelen of bewerken, maar niet verwijderen of hernoemen.",
+    "builtinDeleteDisabled": "Ingebouwd alarm, kan niet worden verwijderd",
     "seconds": "Seconden",
     "downtimes": {
       "newTitle": "Nieuwe downtime",

@@ -9450,6 +9450,9 @@
     "sloLongWindow": "Janela longa",
     "sloShortWindow": "Janela curta",
     "sloCloneDisabled": "Os alertas de SLO são criados em sua página de SLO, portanto não podem ser clonados daqui.",
+    "builtinBadge": "Sistema",
+    "builtinBadgeHint": "Um alerta integrado: você pode desativá-lo ou editá-lo, mas não excluí-lo nem renomeá-lo.",
+    "builtinDeleteDisabled": "Alerta integrado, não pode ser excluído",
     "seconds": "Segundos",
     "downtimes": {
       "newTitle": "Nova janela de manutenção",
