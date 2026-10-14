@@ -10,6 +10,7 @@
 //   • selectedTabs       → required when scope is "tabs" | "panels"
 //   • selectedPanels     → required when scope is "panels"
 //   • query_data.stream_type / stream / field → required when type === "query_values"
+//   • query_data.query   → required when type === "query"
 //   • value (constant)   → required+trim when type === "constant"
 //
 // Dynamic arrays are form-owned field-arrays; their row rules are enforced in
@@ -51,6 +52,10 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
           max_record_size: z.union([z.number(), z.string(), z.null()]).optional(),
           // form-owned filter rows; row rules enforced in superRefine below.
           filter: z.array(z.record(z.string(), z.any())).optional().default([]),
+          query_type: z.string().optional().default("sql"),
+          query: z.string().optional().default(""),
+          value_field: z.string().nullable().optional().default(""),
+          label_field: z.string().nullable().optional().default(""),
         })
         .optional()
         // Fully-shaped default: zod v4's .default() returns the value as-is
@@ -60,6 +65,10 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
           stream: "",
           field: "",
           filter: [],
+          query_type: "sql",
+          query: "",
+          value_field: "",
+          label_field: "",
         }),
       value: z.string().optional().default(""),
       // form-owned custom option rows; row rules enforced in superRefine below.
@@ -111,6 +120,13 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
             message: t("dashboard.fieldRequired"),
           });
         }
+      }
+      if (val.type === "query" && !String(val.query_data?.query ?? "").trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["query_data", "query"],
+          message: t("dashboard.queryVariable.queryRequired"),
+        });
       }
       if (val.type === "constant" && !String(val.value ?? "").trim()) {
         ctx.addIssue({

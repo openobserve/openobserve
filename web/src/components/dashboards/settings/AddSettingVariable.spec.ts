@@ -174,6 +174,14 @@ vi.mock("./common/DashboardHeader.vue", () => ({
   },
 }));
 
+vi.mock("./QueryVariableEditor.vue", () => ({
+  default: {
+    name: "QueryVariableEditor",
+    template: '<div data-test="query-variable-editor-mock"></div>',
+    props: ["dashboardVariablesList", "streamTypeOptions"],
+  },
+}));
+
 vi.mock("../addPanel/CommonAutoComplete.vue", () => ({
   default: {
     name: "CommonAutoComplete",
@@ -244,12 +252,56 @@ describe("AddSettingVariable", () => {
 
     it("should have correct variable type options", () => {
       const expectedTypes = [
-        { label: "Query Values", value: "query_values" },
-        { label: "Constant", value: "constant" },
-        { label: "Textbox", value: "textbox" },
-        { label: "Custom", value: "custom" },
+        {
+          label: "Query Values",
+          value: "query_values",
+          subLabel: "dashboard.queryVariable.typeQueryValuesDescription",
+        },
+        {
+          label: "dashboard.queryVariable.typeQuery",
+          value: "query",
+          subLabel: "dashboard.queryVariable.typeQueryDescription",
+        },
+        {
+          label: "Constant",
+          value: "constant",
+          subLabel: "dashboard.queryVariable.typeConstantDescription",
+        },
+        {
+          label: "Textbox",
+          value: "textbox",
+          subLabel: "dashboard.queryVariable.typeTextboxDescription",
+        },
+        {
+          label: "Custom",
+          value: "custom",
+          subLabel: "dashboard.queryVariable.typeCustomDescription",
+        },
       ];
       expect(wrapper.vm.variableTypes).toEqual(expectedTypes);
+    });
+
+    it("describes the selected type below the type picker", async () => {
+      wrapper.vm.variableData.type = "query";
+      await nextTick();
+      expect(wrapper.vm.selectedTypeDescription).toBe(
+        "dashboard.queryVariable.typeQueryDescription",
+      );
+    });
+
+    it("renders the query editor and the shared multi-select options for a query variable", async () => {
+      wrapper.vm.variableData.type = "query";
+      await nextTick();
+      expect(wrapper.find('[data-test="query-variable-editor-mock"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-variable-stream-select"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="dashboard-query_values-show_multiple_values"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="dashboard-multi-select-default-value-toggle-first-value"]')
+          .exists(),
+      ).toBe(true);
     });
 
     it("should show appropriate fields based on variable type", async () => {
@@ -918,6 +970,85 @@ describe("AddSettingVariable", () => {
       expect(wrapper.vm.buildVariablePayload(baseQuery("abc")).query_data.max_record_size).toBe(
         null,
       );
+    });
+  });
+
+  describe("query variable payload", () => {
+    const queryVariable = (query_data: Record<string, unknown>, type = "query") => ({
+      scope: "global",
+      selectedTabs: [],
+      selectedPanels: [],
+      name: "service",
+      type,
+      query_data: {
+        stream_type: "logs",
+        stream: "old_stream",
+        field: "old_field",
+        max_record_size: "20",
+        filter: [{ name: "a", operator: "=", value: "b" }],
+        query_type: "sql",
+        query: "SELECT service FROM logs",
+        value_field: "service",
+        label_field: "",
+        ...query_data,
+      },
+      options: [],
+      multiSelect: true,
+      selectAllValueForMultiSelect: "all",
+      customMultiSelectValue: [],
+    });
+
+    it("keeps the SQL query, its columns and multi-select, and drops the stream fields", () => {
+      const payload = wrapper.vm.buildVariablePayload(queryVariable({ label_field: "name" }));
+      expect(payload.query_data).toEqual({
+        stream_type: "logs",
+        stream: "",
+        field: "",
+        filter: [],
+        max_record_size: 20,
+        query_type: "sql",
+        query: "SELECT service FROM logs",
+        value_field: "service",
+        label_field: "name",
+      });
+      expect(payload.multiSelect).toBe(true);
+      expect(payload.selectAllValueForMultiSelect).toBe("all");
+    });
+
+    it("omits empty column choices and SQL-only fields for PromQL", () => {
+      const payload = wrapper.vm.buildVariablePayload(
+        queryVariable({ query_type: "promql", query: "label_values(job)", value_field: "" }),
+      );
+      expect(payload.query_data.query_type).toBe("promql");
+      expect(payload.query_data.query).toBe("label_values(job)");
+      expect(payload.query_data).not.toHaveProperty("value_field");
+      expect(payload.query_data).not.toHaveProperty("label_field");
+    });
+
+    it("saves a PromQL query variable with the metrics stream type", () => {
+      const payload = wrapper.vm.buildVariablePayload(
+        queryVariable({ query_type: "promql", query: "label_values(job)", stream_type: "logs" }),
+      );
+      expect(payload.query_data.stream_type).toBe("metrics");
+    });
+
+    it("drops the form's placeholder option from a query variable", () => {
+      const payload = wrapper.vm.buildVariablePayload({
+        ...queryVariable({}),
+        options: [{ label: "", value: "", selected: true }],
+      });
+      expect(payload.options).toEqual([]);
+    });
+
+    it("leaves a query_values variable without the query fields", () => {
+      const payload = wrapper.vm.buildVariablePayload(queryVariable({}, "query_values"));
+      expect(payload.query_data).toEqual({
+        stream_type: "logs",
+        stream: "old_stream",
+        field: "old_field",
+        max_record_size: 20,
+        filter: [{ name: "a", operator: "=", value: "b" }],
+      });
     });
   });
 

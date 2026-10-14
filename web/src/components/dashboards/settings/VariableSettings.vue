@@ -387,6 +387,10 @@ export default defineComponent({
     const selectedDelete: any = ref(null);
     const variableTypes = [
       {
+        label: t("dashboard.queryVariable.typeQuery"),
+        value: "query",
+      },
+      {
         label: t("dashboard.queryValues"),
         value: "query_values",
       },

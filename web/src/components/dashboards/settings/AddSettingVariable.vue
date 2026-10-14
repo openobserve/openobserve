@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="showLabelOnTop"
                 :options="variableTypes"
                 :label="t('dashboard.typeOfVariable')"
+                :help-text="selectedTypeDescription"
                 data-test="dashboard-variable-type-select"
               />
             </div>
@@ -273,6 +274,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
+          <div v-if="variableData.type === 'query'" class="mt-3">
+            <QueryVariableEditor
+              :dashboard-variables-list="dashboardVariablesList"
+              :stream-type-options="streamTypeOptions"
+            />
+            <div
+              v-show="filterCycleError"
+              class="text-status-error-text mt-2"
+              data-test="dashboard-variable-query-cycle-error"
+            >
+              {{ filterCycleError }}
+            </div>
+          </div>
           <div class="mt-3" v-if="['constant'].includes(variableData.type)">
             <OFormInput
               name="value"
@@ -361,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- multiselect toggle for query values and custom variables-->
-          <div v-if="['query_values', 'custom'].includes(variableData.type)" class="mt-4">
+          <div v-if="['query_values', 'query', 'custom'].includes(variableData.type)" class="mt-4">
             <OFormSwitch
               name="multiSelect"
               :label="t('dashboard.multiSelect')"
@@ -371,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- default value for multi select variables -->
           <!-- it can be first value or all values -->
-          <div v-if="['query_values'].includes(variableData.type)">
+          <div v-if="isQueryBackedVariable(variableData)">
             <div class="mt-1.5 mb-1.5">
               <div class="text-text-secondary mt-1.25 mb-1.25 text-sm font-semibold">
                 {{ t("dashboard.byDefaultSelect") }}
@@ -401,7 +415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="
                 variableData.selectAllValueForMultiSelect === 'custom' &&
-                variableData.type === 'query_values'
+                isQueryBackedVariable(variableData)
               "
             >
               <div
@@ -538,6 +552,8 @@ import {
   isGraphHasCycle,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
+import { isQueryBackedVariable } from "@/utils/dashboard/variables/queryVariableUtils";
+import QueryVariableEditor from "./QueryVariableEditor.vue";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
 import useNotifications from "@/composables/useNotifications";
 import analytics from "@/services/product_analytics";
@@ -547,6 +563,7 @@ export default defineComponent({
   props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
   components: {
     DashboardHeader,
+    QueryVariableEditor,
     OFormCombobox,
     OButton,
     OFormToggleGroup,
@@ -586,6 +603,10 @@ export default defineComponent({
         field: "",
         max_record_size: null,
         filter: [],
+        query_type: "sql",
+        query: "",
+        value_field: "",
+        label_field: "",
       },
       value: "",
       options: [{ label: raw(""), value: "", selected: true }],
@@ -767,24 +788,37 @@ export default defineComponent({
       useNotifications();
     // const model = ref(null)
     // const filteredStreams = ref([]);
-    const variableTypes = ref([
+    const variableTypes = computed(() => [
       {
         label: t("dashboard.queryValues"),
         value: "query_values",
+        subLabel: t("dashboard.queryVariable.typeQueryValuesDescription"),
+      },
+      {
+        label: t("dashboard.queryVariable.typeQuery"),
+        value: "query",
+        subLabel: t("dashboard.queryVariable.typeQueryDescription"),
       },
       {
         label: t("dashboard.constant"),
         value: "constant",
+        subLabel: t("dashboard.queryVariable.typeConstantDescription"),
       },
       {
         label: t("dashboard.textbox"),
         value: "textbox",
+        subLabel: t("dashboard.queryVariable.typeTextboxDescription"),
       },
       {
         label: t("dashboard.custom"),
         value: "custom",
+        subLabel: t("dashboard.queryVariable.typeCustomDescription"),
       },
     ]);
+
+    const selectedTypeDescription = computed(
+      () => variableTypes.value.find((type) => type.value === variableData.type)?.subLabel,
+    );
 
     const filterCycleError: any = ref("");
 
@@ -879,6 +913,10 @@ export default defineComponent({
           field: variable.query_data?.field ?? "",
           max_record_size: variable.query_data?.max_record_size ?? null,
           filter: variable.query_data?.filter ?? [],
+          query_type: variable.query_data?.query_type ?? "sql",
+          query: variable.query_data?.query ?? "",
+          value_field: variable.query_data?.value_field ?? "",
+          label_field: variable.query_data?.label_field ?? "",
         },
         value: variable.value ?? "",
         options,
@@ -1106,8 +1144,11 @@ export default defineComponent({
       delete v.selectedTabs;
       delete v.selectedPanels;
 
-      if (v.type !== "query_values") delete v.query_data;
-      if (v.type !== "query_values" && v.type !== "custom") {
+      if (!isQueryBackedVariable(v)) delete v.query_data;
+      if (v.query_data) v.query_data = buildQueryDataPayload(v.type, v.query_data);
+      // A query variable's options come from its query; the form's placeholder option would show as a blank row.
+      if (v.type === "query") v.options = [];
+      if (!isQueryBackedVariable(v) && v.type !== "custom") {
         v.multiSelect = false;
         v.selectAllValueForMultiSelect = "";
         v.customMultiSelectValue = [];
@@ -1123,6 +1164,28 @@ export default defineComponent({
           mrs === "" || mrs === null || mrs === undefined || Number.isNaN(n) ? null : n;
       }
       return v;
+    };
+
+    // query_values keeps its stored shape; a query variable drops the stream/field/filter it never reads.
+    const buildQueryDataPayload = (type: string, queryData: any) => {
+      const { query_type, query, value_field, label_field, ...rest } = queryData;
+      if (type !== "query") return rest;
+      const payload: any = {
+        ...rest,
+        stream: "",
+        field: "",
+        filter: [],
+        query_type: query_type === "promql" ? "promql" : "sql",
+        query,
+      };
+      if (payload.query_type === "sql") {
+        payload.stream_type = rest.stream_type || "logs";
+        if (value_field) payload.value_field = value_field;
+        if (label_field) payload.label_field = label_field;
+      } else {
+        payload.stream_type = "metrics";
+      }
+      return payload;
     };
 
     const saveVariableApiCall = useLoading(async () => {
@@ -1560,6 +1623,8 @@ export default defineComponent({
       streamsFilteredOptions,
       fieldsFilteredOptions,
       variableTypes,
+      selectedTypeDescription,
+      isQueryBackedVariable,
       streamTypeUpdated,
       streamUpdated,
       onActivated,
