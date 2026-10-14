@@ -23,6 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="dashboard" size="md" class="text-accent shrink-0" />
         <OTruncatedText data-test="dashboard-kiosk-title">{{ title }}</OTruncatedText>
       </span>
+      <OBadge
+        v-if="position"
+        variant="default-outline"
+        size="lg"
+        class="shrink-0 tabular-nums"
+        data-test="dashboard-kiosk-position"
+        >{{ position }}</OBadge
+      >
       <span
         v-if="tabName"
         class="text-text-secondary min-w-0 max-md:hidden"
@@ -117,6 +125,8 @@ const props = withDefaults(
     lastSuccessAt?: number | null;
     timezone?: string;
     exitVisible?: boolean;
+    /** "2 of 5" when this screen is one slide of a TV playlist. */
+    position?: I18nText | null;
   }>(),
   {
     title: "",
@@ -125,6 +135,7 @@ const props = withDefaults(
     lastSuccessAt: null,
     timezone: undefined,
     exitVisible: false,
+    position: null,
   },
 );
 
