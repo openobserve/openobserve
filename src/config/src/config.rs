@@ -2460,6 +2460,12 @@ pub struct Common {
         help = "Show the Profiles module in the UI. Early-stage feature, hidden by default; ingestion and APIs stay available regardless"
     )]
     pub profiling_enabled: bool,
+    #[env_config(
+        name = "ZO_PRODUCT_ANALYTICS_ENABLED",
+        default = false,
+        help = "Show the Product Analytics module in the UI. Hidden by default; RUM ingestion and APIs stay available regardless"
+    )]
+    pub product_analytics_enabled: bool,
 }
 
 impl Common {
@@ -5223,6 +5229,12 @@ mod tests {
             vec!["ZO_SYNTHETICS_ENABLED"],
             "the warning has to name the env var, not just say 'synthetics changed'"
         );
+    }
+
+    #[test]
+    fn product_analytics_is_off_by_default() {
+        let cfg = Config::init().unwrap();
+        assert!(!cfg.common.product_analytics_enabled);
     }
 
     #[test]
