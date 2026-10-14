@@ -46,6 +46,8 @@ const mockEditorObj = {
   onDidFocusEditorWidget: vi.fn(),
   onDidBlurEditorWidget: vi.fn(),
   onDidBlurEditorText: vi.fn(),
+  onDidChangeCursorPosition: vi.fn(),
+  createDecorationsCollection: vi.fn(() => ({ set: vi.fn(), clear: vi.fn() })),
   dispose: vi.fn(),
   getValue: vi.fn(() => ""),
   setValue: vi.fn(),

@@ -34,7 +34,16 @@ import {
   rankNumericFieldsFirst,
   parseValueContext,
   buildValueEntries,
+  buildValueStatusEntry,
+  orderValues,
+  columnKind,
+  fieldEntriesOf,
+  isValueAnswerStale,
+  literalStateAtEnd,
+  takeValueGuardSnapshot,
+  VALUE_WAIT_BUDGET_MS,
 } from "./editorProviders";
+import { validateSql } from "./sqlDiagnostics";
 import { gt } from "@/types/i18n";
 
 const fn = (name: string) => SQL_FUNCTIONS.find((f) => f.name === name)!;
@@ -606,18 +615,28 @@ describe("parseValueContext — where a value belongs", () => {
   });
 
   it("reports an open quote so the inserted value can close it", () => {
-    expect(parseValueContext("WHERE level = '")).toEqual({ field: "level", hasOpenQuote: true });
-    expect(parseValueContext("WHERE level = ")).toEqual({ field: "level", hasOpenQuote: false });
+    expect(parseValueContext("WHERE level = '")).toMatchObject({
+      field: "level",
+      hasOpenQuote: true,
+    });
+    expect(parseValueContext("WHERE level = ")).toMatchObject({
+      field: "level",
+      hasOpenQuote: false,
+    });
   });
 
   it("stays open while the value is being typed", () => {
-    expect(parseValueContext("WHERE level = 'err")).toEqual({ field: "level", hasOpenQuote: true });
+    expect(parseValueContext("WHERE level = 'err")).toMatchObject({
+      field: "level",
+      hasOpenQuote: true,
+      typed: "err",
+    });
   });
 
   it("is not fooled by a CLOSED quote from an earlier condition", () => {
     // `http = 'te'` has no unterminated quote; the new condition must not
     // inherit one, or its value would be inserted with a stray closer.
-    expect(parseValueContext("WHERE http = 'te' AND level = ")).toEqual({
+    expect(parseValueContext("WHERE http = 'te' AND level = ")).toMatchObject({
       field: "level",
       hasOpenQuote: false,
     });
@@ -676,11 +695,10 @@ describe("buildValueEntries — inserting a value", () => {
       expect(entry.range).toEqual({ ...RANGE, endColumn: RANGE.endColumn + 1 });
     });
 
-    it("does NOT extend it for a numeric value, which inserts no closer", () => {
-      // Swallowing the quote there would leave `status = '200` unterminated.
+    it("closes a quoted number too: the user chose a string literal", () => {
       const [entry] = buildValueEntries(["200"], opts);
-      expect(entry.range).toBeUndefined();
-      expect(entry.insertText).toBe("200");
+      expect(entry.insertText).toBe("200'");
+      expect(entry.range).toEqual({ ...RANGE, endColumn: RANGE.endColumn + 1 });
     });
 
     it("does not touch the range when no quote is ahead", () => {
@@ -694,5 +712,365 @@ describe("buildValueEntries — inserting a value", () => {
       expect(entry.insertText).toBe("error'");
       expect(entry.range).toBeUndefined();
     });
+  });
+});
+
+// P0-4 / P0-5: values without a quote, quoting by column type, the wait budget.
+
+describe("parseValueContext — never inside someone else's string", () => {
+  it("does not treat `key=` inside a string literal as a comparison", () => {
+    expect(parseValueContext("WHERE match_all('user=")).toBeNull();
+    expect(parseValueContext("WHERE match_all('code > 5")).toBeNull();
+  });
+
+  it("still opens values for a quote the comparison itself opened", () => {
+    expect(parseValueContext("WHERE a = 'x' AND level = 'er")).toMatchObject({
+      field: "level",
+      hasOpenQuote: true,
+      typed: "er",
+    });
+  });
+
+  it("is not fooled by a comment", () => {
+    expect(parseValueContext("SELECT 1 -- level = ")).toBeNull();
+  });
+});
+
+describe("parseValueContext — bare values and the wider operator set", () => {
+  it("keeps value help while a bare value is typed", () => {
+    expect(parseValueContext("WHERE code = 50")).toMatchObject({
+      field: "code",
+      hasOpenQuote: false,
+      typed: "50",
+      operator: "compare",
+    });
+    expect(parseValueContext("WHERE host = api-g")).toMatchObject({ typed: "api-g" });
+  });
+
+  it("recognises = and comparison operators typed without spaces", () => {
+    expect(parseValueContext("WHERE level=")?.field).toBe("level");
+    expect(parseValueContext("WHERE code>")?.field).toBe("code");
+    expect(parseValueContext("WHERE code>=")?.field).toBe("code");
+  });
+
+  it("gives ILIKE and NOT LIKE values, as a pattern", () => {
+    expect(parseValueContext("WHERE body ILIKE ")).toMatchObject({
+      field: "body",
+      operator: "like",
+    });
+    expect(parseValueContext("WHERE body NOT LIKE '")).toMatchObject({
+      field: "body",
+      operator: "like",
+      hasOpenQuote: true,
+    });
+  });
+
+  it("offers values for a later IN element once its quote is typed", () => {
+    expect(parseValueContext("WHERE service IN ('checkout', '")).toMatchObject({
+      field: "service",
+      operator: "in",
+      hasOpenQuote: true,
+    });
+    expect(parseValueContext("WHERE service IN ('checkout', 'ca")).toMatchObject({ typed: "ca" });
+  });
+
+  it("continues an IN list after each comma, bare or quoted, for IN and NOT IN", () => {
+    expect(parseValueContext("WHERE service IN ('checkout',c")).toMatchObject({
+      field: "service",
+      operator: "in",
+      hasOpenQuote: false,
+      typed: "c",
+      chosen: ["checkout"],
+    });
+    expect(parseValueContext("WHERE service IN ('checkout', ")).toMatchObject({
+      typed: "",
+      chosen: ["checkout"],
+    });
+    expect(parseValueContext("WHERE service NOT IN ('a', 'b', 'ca")).toMatchObject({
+      hasOpenQuote: true,
+      typed: "ca",
+      chosen: ["a", "b"],
+    });
+    expect(parseValueContext("WHERE service in (c")).toMatchObject({ typed: "c", chosen: [] });
+    expect(parseValueContext("WHERE code IN (200, 4")).toMatchObject({
+      field: "code",
+      typed: "4",
+      chosen: ["200"],
+    });
+    expect(parseValueContext("WHERE t.k8s_cluster IN ('a', ")?.field).toBe("k8s_cluster");
+  });
+
+  it("unescapes a chosen value with a doubled quote", () => {
+    expect(parseValueContext("WHERE name IN ('O''Brien', ")?.chosen).toEqual(["O'Brien"]);
+  });
+
+  it("ends the IN value position at a finished element, a closed list or a call", () => {
+    for (const text of [
+      "WHERE s IN ('a'",
+      "WHERE s IN ('a' ",
+      "WHERE s IN ('a') ",
+      "WHERE s IN (lower('a'), ",
+      "WHERE s IN (SELECT a FROM t WHERE b",
+      "WHERE match_all('s IN ('a', ",
+    ]) {
+      expect(parseValueContext(text), text).toBeNull();
+    }
+  });
+
+  it("gives every non-IN operator an empty chosen list", () => {
+    expect(parseValueContext("WHERE level = 'e")?.chosen).toEqual([]);
+    expect(parseValueContext("WHERE level LIKE 'e")?.chosen).toEqual([]);
+  });
+
+  it("ends the value position at whitespace after a bare value", () => {
+    expect(parseValueContext("WHERE code = 50 ")).toBeNull();
+    expect(parseValueContext("WHERE level = 'error' ")).toBeNull();
+  });
+});
+
+describe("literalStateAtEnd — never identifiers inside a string", () => {
+  it("knows an open single-quoted string", () => {
+    expect(literalStateAtEnd("WHERE zone = 'z")).toBe("string");
+    expect(literalStateAtEnd("WHERE match_all('err")).toBe("string");
+    expect(literalStateAtEnd("WHERE name = 'O''Br")).toBe("string");
+  });
+
+  it("is code after a closed string or inside a double-quoted identifier's close", () => {
+    expect(literalStateAtEnd("WHERE zone = 'z' ")).toBe("code");
+    expect(literalStateAtEnd('SELECT * FROM "default" ')).toBe("code");
+    expect(literalStateAtEnd("WHERE name = 'O''Brien' AND ")).toBe("code");
+  });
+
+  it("does not call a double-quoted identifier a string", () => {
+    expect(literalStateAtEnd('SELECT * FROM "def')).toBe("code");
+  });
+
+  it("knows a comment, and that a quote inside one opens nothing", () => {
+    expect(literalStateAtEnd("SELECT 1 -- it's here")).toBe("comment");
+    expect(literalStateAtEnd("SELECT /* note ")).toBe("comment");
+    expect(literalStateAtEnd("SELECT 1 -- it's\nWHERE ")).toBe("code");
+  });
+});
+
+describe("columnKind", () => {
+  it("groups Arrow types the way quoting needs them", () => {
+    expect(columnKind("Utf8")).toBe("text");
+    expect(columnKind("LargeUtf8")).toBe("text");
+    expect(columnKind("Int64")).toBe("number");
+    expect(columnKind("Float64")).toBe("number");
+    expect(columnKind("Boolean")).toBe("boolean");
+    expect(columnKind(undefined)).toBe("unknown");
+    expect(columnKind("Timestamp(Microsecond, None)")).toBe("unknown");
+  });
+});
+
+describe("buildValueEntries — quoting by column type (P0-5)", () => {
+  const insert = (v: string[], o: any) => buildValueEntries(v, o).map((e) => e.insertText);
+
+  it("quotes a Utf8 value that looks like a number", () => {
+    expect(insert(["200"], { hasOpenQuote: false, fieldType: "Utf8" })).toEqual(["'200'"]);
+  });
+
+  it("leaves numeric and boolean columns bare", () => {
+    expect(insert(["500"], { hasOpenQuote: false, fieldType: "Int64" })).toEqual(["500"]);
+    expect(insert(["true"], { hasOpenQuote: false, fieldType: "Boolean" })).toEqual(["true"]);
+  });
+
+  it("doubles a quote inside a string value", () => {
+    expect(insert(["O'Brien"], { hasOpenQuote: false, fieldType: "Utf8" })).toEqual(["'O''Brien'"]);
+    expect(insert(["O'Brien"], { hasOpenQuote: true, fieldType: "Utf8" })).toEqual(["O''Brien'"]);
+  });
+
+  it("falls back to looking at the value when the type is missing", () => {
+    expect(insert(["200", "error"], { hasOpenQuote: false })).toEqual(["200", "'error'"]);
+  });
+
+  it("filters a quoted value with its quote, so a late answer matches 'e and e", () => {
+    const [entry] = buildValueEntries(["error"], { hasOpenQuote: false, fieldType: "Utf8" });
+    expect(entry.filterText).toBe("'error'");
+  });
+
+  it("inserts a complete contains-pattern for LIKE and ILIKE", () => {
+    expect(insert(["warn"], { hasOpenQuote: false, pattern: true })).toEqual(["'%warn%'"]);
+    expect(insert(["warn"], { hasOpenQuote: true, pattern: true })).toEqual(["%warn%'"]);
+  });
+
+  it("escapes LIKE wildcards with DataFusion's implicit backslash, and no ESCAPE clause", () => {
+    expect(insert(["50%"], { hasOpenQuote: false, pattern: true })).toEqual(["'%50\\%%'"]);
+    expect(insert(["user_id"], { hasOpenQuote: false, pattern: true })).toEqual(["'%user\\_id%'"]);
+    expect(insert(["a\\b"], { hasOpenQuote: true, pattern: true })).toEqual(["%a\\\\b%'"]);
+  });
+
+  it("the inserted LIKE patterns parse as SQL in the editor", async () => {
+    for (const value of ["50%", "checkout_service", "a\\b", "O'Brien"]) {
+      const [pattern] = insert([value], { hasOpenQuote: false, pattern: true });
+      const sql = `SELECT * FROM t WHERE body LIKE ${pattern}`;
+      expect(await validateSql(sql), sql).toBeNull();
+      expect(literalStateAtEnd(sql), sql).toBe("code");
+    }
+  });
+
+  it("quotes a numeric-looking value inside a LIKE pattern", () => {
+    expect(insert(["500"], { hasOpenQuote: false, pattern: true, fieldType: "Int64" })).toEqual([
+      "'%500%'",
+    ]);
+  });
+});
+
+describe("buildValueStatusEntry — rows that insert nothing", () => {
+  const t = ((key: string, params?: any) => `${key}:${JSON.stringify(params ?? {})}`) as any;
+
+  it("reads as loading, with what to do next in the label's own description", () => {
+    const entry = buildValueStatusEntry(t, "loading", "level", { minutes: 15 });
+    expect(entry.insertText).toBe("");
+    expect(entry.kind).toBe("Event");
+    expect(entry.label).toContain("valuesLoading");
+    expect(entry.description).toContain("valuesLoadingHint");
+  });
+
+  it("names the field and window when there are no values", () => {
+    const entry = buildValueStatusEntry(t, "empty", "trace_id", { minutes: 15 });
+    expect(entry.kind).toBe("Issue");
+    expect(entry.label).toContain('"field":"trace_id"');
+    expect(entry.label).toContain('"minutes":15');
+  });
+
+  it("says it could not load on a failure", () => {
+    expect(buildValueStatusEntry(t, "failed", "zone").label).toContain("valuesFailed");
+  });
+
+  it("a cut-short list says how many it shows and sorts after the values, before the fields", () => {
+    const entry = buildValueStatusEntry(t, "cap", "level", { count: 10 });
+    expect(entry.label).toContain('"count":10');
+    const [lastValue] = buildValueEntries(["999"], { hasOpenQuote: false }).slice(-1);
+    expect(entry.sortText! > lastValue.sortText!).toBe(true);
+    expect(entry.sortText! < "\u0001level").toBe(true);
+    expect(entry.insertText).toBe("");
+  });
+});
+
+describe("orderValues — the same order every run", () => {
+  it("sorts text alphabetically and drops repeats", () => {
+    expect(orderValues(["warn", "error", "warn", "info"], "Utf8")).toEqual([
+      "error",
+      "info",
+      "warn",
+    ]);
+  });
+
+  it("sorts a numeric column by value, not as text", () => {
+    expect(orderValues(["10", "9", "100", "0.5"], "Int64")).toEqual(["0.5", "9", "10", "100"]);
+  });
+
+  it("treats an untyped all-number list as numbers and a mixed one as text", () => {
+    expect(orderValues(["10", "9"])).toEqual(["9", "10"]);
+    expect(orderValues(["b10", "b9", "a"])).toEqual(["a", "b9", "b10"]);
+  });
+});
+
+describe("buildValueEntries — the label shows what goes in", () => {
+  it("quotes text values in the label and leaves numbers bare", () => {
+    expect(buildValueEntries(["200"], { hasOpenQuote: false, fieldType: "Utf8" })[0].label).toBe(
+      "'200'",
+    );
+    expect(buildValueEntries(["200"], { hasOpenQuote: false, fieldType: "Int64" })[0].label).toBe(
+      "200",
+    );
+  });
+
+  it("filters an in-quote value by the bare text typed after the quote", () => {
+    const [entry] = buildValueEntries(["error"], { hasOpenQuote: true, fieldType: "Utf8" });
+    expect(entry.label).toBe("'error'");
+    expect(entry.filterText).toBe("error");
+  });
+});
+
+describe("fieldEntriesOf — columns for comparisons in a value position", () => {
+  it("keeps fields only, from both lists, after every value", () => {
+    const entries = fieldEntriesOf(
+      [
+        { name: "level", label: "level", kind: "Field", insertText: "level" },
+        { name: "and", label: "and", kind: "Keyword", insertText: "and " },
+        "host",
+      ],
+      [{ name: "count", label: "count", kind: "Function", insertText: "count()" }],
+    );
+    expect(entries.map((e) => e.label)).toEqual(["level", "host"]);
+    expect(entries.every((e) => e.sortText!.startsWith("\u0001"))).toBe(true);
+  });
+});
+
+describe("guard v2 — dropping a late value answer", () => {
+  const makeEditor = (text: string, column: number) => {
+    const state = { text, column, focus: true };
+    const editor = {
+      getPosition: () => ({ lineNumber: 1, column: state.column }),
+      hasTextFocus: () => state.focus,
+      getModel: () => ({
+        getValueInRange: (r: any) => state.text.slice(r.startColumn - 1, r.endColumn - 1),
+      }),
+    };
+    return { state, editor };
+  };
+  const BASE = "SELECT * FROM t WHERE level = ";
+
+  it("waits up to 1000 ms before it shows the loading row", () => {
+    expect(VALUE_WAIT_BUDGET_MS).toBe(1000);
+  });
+
+  it("keeps the answer when nothing happened", () => {
+    const { editor } = makeEditor(BASE, BASE.length + 1);
+    const snap = takeValueGuardSnapshot(editor, 0);
+    expect(isValueAnswerStale(snap, editor, 0)).toBe(false);
+  });
+
+  it("drops it after Esc", () => {
+    const { editor } = makeEditor(BASE, BASE.length + 1);
+    const snap = takeValueGuardSnapshot(editor, 0);
+    expect(isValueAnswerStale(snap, editor, 1)).toBe(true);
+  });
+
+  it("drops it after blur", () => {
+    const { state, editor } = makeEditor(BASE, BASE.length + 1);
+    const snap = takeValueGuardSnapshot(editor, 0);
+    state.focus = false;
+    expect(isValueAnswerStale(snap, editor, 0)).toBe(true);
+  });
+
+  it("drops it when the cursor moves left", () => {
+    const { state, editor } = makeEditor(BASE, BASE.length + 1);
+    const snap = takeValueGuardSnapshot(editor, 0);
+    state.column -= 1;
+    expect(isValueAnswerStale(snap, editor, 0)).toBe(true);
+  });
+
+  it("drops it after an edit before the cursor", () => {
+    const { state, editor } = makeEditor(BASE, BASE.length + 1);
+    const snap = takeValueGuardSnapshot(editor, 0);
+    state.text = BASE.replace("level", "lever");
+    expect(isValueAnswerStale(snap, editor, 0)).toBe(true);
+  });
+
+  it("drops it when whitespace was typed after the request point", () => {
+    const { state, editor } = makeEditor(BASE, BASE.length + 1);
+    const snap = takeValueGuardSnapshot(editor, 0);
+    state.text = BASE + "x ";
+    state.column += 2;
+    expect(isValueAnswerStale(snap, editor, 0)).toBe(true);
+  });
+
+  it("keeps it while the user types forward in the same token", () => {
+    const { state, editor } = makeEditor(BASE, BASE.length + 1);
+    const snap = takeValueGuardSnapshot(editor, 0);
+    state.text = BASE + "'e";
+    state.column += 2;
+    expect(isValueAnswerStale(snap, editor, 0)).toBe(false);
+    state.text = BASE + "e";
+    state.column -= 1;
+    expect(isValueAnswerStale(snap, editor, 0)).toBe(false);
+  });
+
+  it("never drops an answer it cannot check", () => {
+    expect(isValueAnswerStale(null, null, 3)).toBe(false);
   });
 });

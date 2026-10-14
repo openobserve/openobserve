@@ -57,6 +57,8 @@ const makeEditorStub = (model: any) => ({
   onDidFocusEditorWidget: vi.fn(),
   onDidBlurEditorWidget: vi.fn(),
   onDidBlurEditorText: vi.fn(),
+  onDidChangeCursorPosition: vi.fn(),
+  createDecorationsCollection: vi.fn(() => ({ set: vi.fn(), clear: vi.fn() })),
   dispose: vi.fn(),
   getValue: vi.fn(() => ""),
   setValue: vi.fn(),
@@ -67,6 +69,7 @@ const makeEditorStub = (model: any) => ({
   getRawOptions: vi.fn(() => ({ readOnly: false })),
   deltaDecorations: vi.fn(() => []),
   getPosition: vi.fn(() => ({ lineNumber: 1, column: 1 })),
+  hasTextFocus: vi.fn(() => true),
   trigger: vi.fn(),
   getAction: vi.fn(() => ({ run: vi.fn(() => Promise.resolve()) })),
 });
@@ -108,19 +111,27 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
       Operator: 11,
       Value: 13,
       Keyword: 17,
+      Event: 10,
       Text: 18,
+      Issue: 26,
       Snippet: 27,
     },
     CompletionItemInsertTextRule: { None: 0, KeepWhitespace: 1, InsertAsSnippet: 4 },
     CompletionItemTag: { Deprecated: 1 },
     register: vi.fn(),
     setMonarchTokensProvider: vi.fn(),
+    setLanguageConfiguration: vi.fn(),
     registerCompletionItemProvider: vi.fn(() => ({ dispose: vi.fn() })),
     registerSignatureHelpProvider: vi.fn(() => ({ dispose: vi.fn() })),
     registerHoverProvider: vi.fn(() => ({ dispose: vi.fn() })),
   },
   KeyMod: { CtrlCmd: 1 },
   KeyCode: { Backspace: 1, Tab: 2, Enter: 13, Escape: 9, KeyZ: 56 },
+  Range: class {
+    constructor(...args: number[]) {
+      Object.assign(this, { args });
+    }
+  },
   // Real values from monaco-editor/esm/vs/editor/editor.api. Omitting this
   // made validateDoubleQuotes throw on `monaco.MarkerSeverity.Warning` the
   // moment it found anything to report, so it published NOTHING and looked
@@ -175,6 +186,15 @@ vi.mock("@/utils/zincutils", () => ({
 
 vi.mock("@/utils/query/vrlLanguageDefinition", () => ({
   vrlLanguageDefinition: {},
+}));
+
+vi.mock("@/utils/query/promqlLanguageDefinition", () => ({
+  loadPromqlLanguage: async () => ({ language: {}, languageConfiguration: {} }),
+}));
+
+vi.mock("@/composables/usePromqlSuggestions", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/usePromqlSuggestions")>()),
+  resolvePromqlLabelValues: vi.fn(async () => ["api-gateway", "chat-service"]),
 }));
 
 // ─── Phase 1 integration (tmp/code.md A2/A4/A5/N7/C1) ─────────────────────────
@@ -716,7 +736,7 @@ describe("Phase 3 — C4: the value lookup is awaited inside the provider", () =
       );
       const labels = result.suggestions.map((s: any) => s.label);
       expect(labels, "values did not make the first result — they were not awaited").toEqual(
-        expect.arrayContaining(["error", "warn"]),
+        expect.arrayContaining(["'error'", "'warn'"]),
       );
       expect(resolverCalls).toBe(1);
     },
@@ -1081,7 +1101,7 @@ describe("completion results invite monaco to ask again", () => {
       fieldValueResolver: async () => ["error"],
     });
     const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
-    expect(result.suggestions.map((s: any) => s.label)).toEqual(["error"]);
+    expect(result.suggestions.map((s: any) => s.label)).toEqual(["'error'", "level"]);
     expect(result.incomplete).toBe(true);
   });
 
@@ -1096,7 +1116,7 @@ describe("completion results invite monaco to ask again", () => {
     expect(before.suggestions.map((s: any) => s.label)).toContain("level");
 
     const after = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
-    expect(after.suggestions.map((s: any) => s.label)).toEqual(["error", "warn"]);
+    expect(after.suggestions.map((s: any) => s.label)).toEqual(["'error'", "'warn'", "level"]);
   });
 });
 
@@ -1189,4 +1209,490 @@ describe("P0-1 — the Enter fix follows ZO_EDITOR_SUGGEST_MODE", () => {
     expect(opts.suggest).toBeUndefined();
     expect(opts.acceptSuggestionOnEnter).toBeUndefined();
   });
+});
+
+describe("P0-4 — values awaited within a budget, guarded, never identifiers in a string", () => {
+  const storeV = createStore({ state: { theme: "light" } });
+  let spy: ReturnType<typeof vi.spyOn>;
+  afterAll(() => spy?.mockRestore());
+
+  const FIELDS = [
+    { name: "level", label: "level", kind: "Field", insertText: "level", detail: "Utf8" },
+    {
+      name: "status_text",
+      label: "status_text",
+      kind: "Field",
+      insertText: "status_text",
+      detail: "Utf8",
+    },
+    { name: "code", label: "code", kind: "Field", insertText: "code", detail: "Int64" },
+  ];
+
+  const mountWith = async (editorId: string, fieldValueResolver: any) => {
+    const api = await import("monaco-editor/esm/vs/editor/editor.api");
+    const createFn = vi.mocked(api.editor.create);
+    const registerFn = vi.mocked(api.languages.registerCompletionItemProvider);
+    const before = createFn.mock.calls.length;
+    spy = vi
+      .spyOn(document, "getElementById")
+      .mockImplementation(() => document.createElement("div"));
+    mount(CodeQueryEditor, {
+      props: {
+        editorId,
+        language: "sql",
+        query: "",
+        keywords: FIELDS,
+        suggestions: [],
+        fieldValueResolver,
+      },
+      global: { plugins: [storeV] },
+    });
+    await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+      timeout: 15000,
+      interval: 25,
+    });
+    const editor = createdEditors.at(-1)!;
+    return {
+      provide: registerFn.mock.calls.filter((c) => c[0] === "sql").at(-1)![1]
+        .provideCompletionItems,
+      model: editor.getModel(),
+      editor,
+    };
+  };
+
+  const TYPED_SPACE = { triggerKind: 1, triggerCharacter: " " };
+  const CTRL_SPACE = { triggerKind: 0 };
+  const ask = (
+    provide: any,
+    model: any,
+    text: string,
+    token: any = {},
+    context: any = TYPED_SPACE,
+  ) => {
+    model.getValueInRange.mockReturnValue(text);
+    model.getWordUntilPosition.mockReturnValue({ word: "", startColumn: 1, endColumn: 1 });
+    return provide(model, { lineNumber: 1, column: text.length + 1 }, context, token);
+  };
+  const labels = (r: any) => r.suggestions.map((s: any) => s.label);
+  const noLookup = () =>
+    vi.fn(async () =>
+      Promise.reject(Object.assign(new Error("no lookup"), { name: "NoValueLookup" })),
+    );
+
+  it("never claims there are no values when no lookup ran", { timeout: 30000 }, async () => {
+    const { provide, model } = await mountWith("v-nolookup", noLookup());
+    const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
+    expect(labels(result)).toEqual(["level", "status_text", "code"]);
+  });
+
+  it("does not look values up for a word that is not a field", { timeout: 30000 }, async () => {
+    const resolver = vi.fn(async () => ["x"]);
+    const { provide, model } = await mountWith("v-unknown", resolver);
+    await ask(provide, model, "SELECT * FROM logs WHERE nope = ");
+    expect(resolver).not.toHaveBeenCalled();
+  });
+
+  it("offers nothing for `key=` written inside a string", { timeout: 30000 }, async () => {
+    const resolver = vi.fn(async () => ["bob"]);
+    const { provide, model } = await mountWith("v-instring", resolver);
+    const result = await ask(provide, model, "SELECT * FROM logs WHERE match_all('level=");
+    expect(result.suggestions).toEqual([]);
+    expect(resolver).not.toHaveBeenCalled();
+  });
+
+  it("in a highlighted menu a status row is never row 1", { timeout: 30000 }, async () => {
+    const { provide, model } = await mountWith(
+      "v-hl-empty",
+      vi.fn(async () => []),
+    );
+    const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ", {}, CTRL_SPACE);
+    const sorted = [...result.suggestions].sort((a: any, b: any) =>
+      String(a.sortText).localeCompare(String(b.sortText)),
+    );
+    expect(JSON.stringify(sorted[0].label)).not.toContain("valuesEmpty");
+    expect(JSON.stringify(sorted.at(-1).label)).toContain("valuesEmpty");
+  });
+
+  it("in a highlighted menu a slow lookup shows no row at all", { timeout: 30000 }, async () => {
+    const { provide, model } = await mountWith("v-hl-slow", delayed(2500, ["error"]));
+    const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ", {}, CTRL_SPACE);
+    expect(result.suggestions).toEqual([]);
+  });
+  const delayed = (ms: number, values: string[]) =>
+    vi.fn(() => new Promise<string[]>((r) => setTimeout(() => r(values), ms)));
+
+  it("a fast resolver puts values above fields", { timeout: 30000 }, async () => {
+    const { provide, model } = await mountWith("v-fast", delayed(60, ["error", "warn"]));
+    const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
+    expect(labels(result)).toEqual(["'error'", "'warn'", "level", "status_text", "code"]);
+    expect(result.suggestions.every((s: any) => s.kind !== 1 && s.kind !== 17)).toBe(true);
+  });
+
+  it(
+    "a resolver slower than the budget gives one row that inserts nothing",
+    { timeout: 30000 },
+    async () => {
+      const { provide, model } = await mountWith("v-slow", delayed(2500, ["error"]));
+      const started = Date.now();
+      const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
+      expect(Date.now() - started).toBeLessThan(2000);
+      expect(result.suggestions).toHaveLength(1);
+      expect(result.suggestions[0].label.label).toContain("valuesLoading");
+      expect(result.suggestions[0].label.description).toContain("valuesLoadingHint");
+      expect(result.suggestions[0].kind).toBe(10);
+      expect(result.suggestions[0].insertText).toBe("");
+    },
+  );
+
+  it("an empty answer says so, and still offers the fields", { timeout: 30000 }, async () => {
+    const { provide, model } = await mountWith(
+      "v-empty",
+      vi.fn(async () => []),
+    );
+    const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
+    expect(result.suggestions[0].label).toContain("valuesEmpty");
+    expect(result.suggestions[0].insertText).toBe("");
+    expect(labels(result)).toContain("level");
+  });
+
+  it("a failed lookup says it could not load", { timeout: 30000 }, async () => {
+    const { provide, model } = await mountWith(
+      "v-fail",
+      vi.fn(async () => Promise.reject(new Error("x"))),
+    );
+    const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
+    expect(result.suggestions[0].label).toContain("valuesFailed");
+  });
+
+  it("drops a late answer after Esc", { timeout: 30000 }, async () => {
+    const { provide, model, editor } = await mountWith("v-esc", delayed(150, ["error"]));
+    const onKey = editor.onKeyDown.mock.calls.at(-1)![0];
+    const pending = ask(provide, model, "SELECT * FROM logs WHERE level = ");
+    onKey({ keyCode: 9 });
+    expect((await pending).suggestions).toEqual([]);
+  });
+
+  it("drops a late answer after blur", { timeout: 30000 }, async () => {
+    const { provide, model, editor } = await mountWith("v-blur", delayed(150, ["error"]));
+    const pending = ask(provide, model, "SELECT * FROM logs WHERE level = ");
+    editor.hasTextFocus.mockReturnValue(false);
+    expect((await pending).suggestions).toEqual([]);
+  });
+
+  it("drops it when Monaco cancelled the request", { timeout: 30000 }, async () => {
+    const { provide, model } = await mountWith("v-token", delayed(50, ["error"]));
+    const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ", {
+      isCancellationRequested: true,
+    });
+    expect(result.suggestions).toEqual([]);
+  });
+
+  it("offers values only, never fields, inside an open string", { timeout: 30000 }, async () => {
+    const { provide, model } = await mountWith(
+      "v-quote",
+      vi.fn(async () => ["error"]),
+    );
+    expect(labels(await ask(provide, model, "SELECT * FROM logs WHERE level = 'e"))).toEqual([
+      "'error'",
+    ]);
+  });
+
+  it("ILIKE ' offers values and no fields", { timeout: 30000 }, async () => {
+    const { provide, model } = await mountWith(
+      "v-ilike",
+      vi.fn(async () => ["warn"]),
+    );
+    const result = await ask(provide, model, "SELECT * FROM logs WHERE level ILIKE '");
+    expect(labels(result)).toEqual(["'%warn%'"]);
+    expect(result.suggestions[0].insertText).toBe("%warn%'");
+  });
+
+  it("a bare = 50 keeps value help", { timeout: 30000 }, async () => {
+    const resolver = vi.fn(async () => ["500", "404"]);
+    const { provide, model } = await mountWith("v-bare", resolver);
+    const result = await ask(provide, model, "SELECT * FROM logs WHERE code = 50");
+    expect(resolver).toHaveBeenCalledWith("code");
+    expect(labels(result).slice(0, 2)).toEqual(["404", "500"]);
+    expect(result.suggestions[0].insertText).toBe("404");
+    expect(result.suggestions[0].range.startColumn).toBe(
+      "SELECT * FROM logs WHERE code = ".length + 1,
+    );
+  });
+
+  it("quotes by column type: a Utf8 200 is quoted", { timeout: 30000 }, async () => {
+    const { provide, model } = await mountWith(
+      "v-type",
+      vi.fn(async () => ["200"]),
+    );
+    const result = await ask(provide, model, "SELECT * FROM logs WHERE status_text = ");
+    expect(result.suggestions[0].insertText).toBe("'200'");
+  });
+
+  it("skips the lookup when the typed text is a column", { timeout: 30000 }, async () => {
+    const resolver = vi.fn(async () => ["x"]);
+    const { provide, model } = await mountWith("v-col", resolver);
+    const result = await ask(provide, model, "SELECT * FROM a JOIN b ON a.level = code");
+    expect(resolver).not.toHaveBeenCalled();
+    expect(labels(result)).toContain("code");
+  });
+
+  it(
+    "a full list says it may be cut short, in a row that inserts nothing",
+    { timeout: 30000 },
+    async () => {
+      const many = Array.from({ length: 10 }, (_, i) => `v${i}`);
+      const { provide, model } = await mountWith(
+        "v-cap",
+        vi.fn(async () => many),
+      );
+      const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
+      const last = result.suggestions.at(-1);
+      expect(last.label).toContain("valuesCap");
+      expect(last.insertText).toBe("");
+      expect(last.kind).toBe(26);
+    },
+  );
+
+  it("orders values the same way every time", { timeout: 30000 }, async () => {
+    const { provide, model } = await mountWith(
+      "v-order",
+      vi.fn(async () => ["warn", "error", "info"]),
+    );
+    const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
+    expect(labels(result).slice(0, 3)).toEqual(["'error'", "'info'", "'warn'"]);
+  });
+
+  it(
+    "inside a quote with no values, says so after the caret and never as a row",
+    {
+      timeout: 30000,
+    },
+    async () => {
+      const { provide, model, editor } = await mountWith(
+        "v-hint",
+        vi.fn(async () => []),
+      );
+      const result = await ask(provide, model, "SELECT * FROM logs WHERE level = 'zz");
+      expect(result.suggestions).toEqual([]);
+      const set = editor.createDecorationsCollection.mock.results.at(-1).value.set;
+      expect(JSON.stringify(set.mock.calls.at(-1)[0])).toContain("valuesEmpty");
+    },
+  );
+
+  it(
+    "typing forward past the budget still says it is loading, after the caret",
+    {
+      timeout: 30000,
+    },
+    async () => {
+      const { provide, model, editor } = await mountWith("v-forward", delayed(2500, ["error"]));
+      const result = await ask(
+        provide,
+        model,
+        "SELECT * FROM logs WHERE level = 'e",
+        {},
+        CTRL_SPACE,
+      );
+      expect(result.suggestions).toEqual([]);
+      const set = editor.createDecorationsCollection.mock.results.at(-1).value.set;
+      expect(JSON.stringify(set.mock.calls.at(-1)[0])).toContain("valuesLoading");
+    },
+  );
+
+  it(
+    "a menu opened by a quote highlights row 1, so Enter takes the value",
+    {
+      timeout: 30000,
+    },
+    async () => {
+      const { provide, model, editor } = await mountWith(
+        "v-quote-enter",
+        vi.fn(async () => ["error"]),
+      );
+      editor.trigger.mockClear();
+      await ask(
+        provide,
+        model,
+        "SELECT * FROM logs WHERE level = '",
+        {},
+        {
+          triggerKind: 1,
+          triggerCharacter: "'",
+        },
+      );
+      await new Promise((r) => setTimeout(r, 200));
+      expect(editor.trigger.mock.calls.some((c: any[]) => c[1] === "focusSuggestion")).toBe(true);
+    },
+  );
+
+  it(
+    "an edit made after the quote voids its highlight, so a later menu stays unhighlighted",
+    { timeout: 30000 },
+    async () => {
+      const { provide, model, editor } = await mountWith(
+        "v-quote-stale",
+        vi.fn(async () => ["error"]),
+      );
+      let version = 1;
+      model.getVersionId = vi.fn(() => version);
+      editor.trigger.mockClear();
+      await ask(
+        provide,
+        model,
+        "SELECT * FROM logs WHERE level = '",
+        {},
+        {
+          triggerKind: 1,
+          triggerCharacter: "'",
+        },
+      );
+      version = 2;
+      await new Promise((r) => setTimeout(r, 200));
+      expect(editor.trigger.mock.calls.some((c: any[]) => c[1] === "focusSuggestion")).toBe(false);
+    },
+  );
+
+  it(
+    "a menu opened by a space outside a quote stays unhighlighted",
+    { timeout: 30000 },
+    async () => {
+      const { provide, model, editor } = await mountWith(
+        "v-space-enter",
+        vi.fn(async () => ["error"]),
+      );
+      editor.trigger.mockClear();
+      await ask(provide, model, "SELECT * FROM logs WHERE level = ");
+      await new Promise((r) => setTimeout(r, 200));
+      expect(editor.trigger.mock.calls.some((c: any[]) => c[1] === "focusSuggestion")).toBe(false);
+    },
+  );
+
+  it(
+    "never offers identifiers inside a string that is not a value",
+    { timeout: 30000 },
+    async () => {
+      const { provide, model } = await mountWith(
+        "v-str",
+        vi.fn(async () => ["x"]),
+      );
+      expect(
+        (await ask(provide, model, "SELECT * FROM logs WHERE match_all('err")).suggestions,
+      ).toEqual([]);
+    },
+  );
+
+  describe("an IN list continues after each comma", () => {
+    const resolve = () => vi.fn(async () => ["checkout", "cart", "search"]);
+
+    it(
+      "a bare letter after a comma offers the values, quoted, over the letter",
+      { timeout: 30000 },
+      async () => {
+        const { provide, model } = await mountWith("v-in-letter", resolve());
+        const text = "SELECT * FROM logs WHERE level IN ('checkout',c";
+        const result = await ask(provide, model, text, {}, CTRL_SPACE);
+        const values = result.suggestions.filter((s: any) => String(s.label).startsWith("'"));
+        expect(values.map((s: any) => s.label)).toEqual(["'cart'", "'search'"]);
+        expect(values[0].range).toMatchObject({
+          startColumn: text.length,
+          endColumn: text.length + 1,
+        });
+        expect(labels(result)).toEqual(expect.arrayContaining(["level", "code"]));
+        expect(labels(result)).not.toContain("count");
+      },
+    );
+
+    it("never offers a value the list already has", { timeout: 30000 }, async () => {
+      const { provide, model } = await mountWith("v-in-chosen", resolve());
+      const result = await ask(provide, model, "SELECT * FROM logs WHERE level IN ('checkout', ");
+      expect(labels(result)).toContain("'cart'");
+      expect(labels(result)).not.toContain("'checkout'");
+    });
+
+    it("a numeric list offers bare numbers", { timeout: 30000 }, async () => {
+      const { provide, model } = await mountWith(
+        "v-in-num",
+        vi.fn(async () => ["200", "404"]),
+      );
+      const result = await ask(provide, model, "SELECT * FROM logs WHERE code IN (200, ");
+      const values = result.suggestions.filter((s: any) => /^\d+$/.test(String(s.label)));
+      expect(values.map((s: any) => s.insertText)).toEqual(["404"]);
+    });
+
+    it(
+      "falls back to the fields, with no status row, once every value is chosen",
+      { timeout: 30000 },
+      async () => {
+        const { provide, model } = await mountWith("v-in-all", resolve());
+        const result = await ask(
+          provide,
+          model,
+          "SELECT * FROM logs WHERE level IN ('checkout', 'cart', 'search', ",
+        );
+        expect(labels(result)).toEqual(["level", "status_text", "code"]);
+      },
+    );
+  });
+});
+
+describe("P0-4 — PromQL label values come from the provider", () => {
+  let spy: ReturnType<typeof vi.spyOn>;
+  afterAll(() => spy?.mockRestore());
+
+  it(
+    "awaits label values in a value position and closes the quote",
+    { timeout: 30000 },
+    async () => {
+      const api = await import("monaco-editor/esm/vs/editor/editor.api");
+      const createFn = vi.mocked(api.editor.create);
+      const registerFn = vi.mocked(api.languages.registerCompletionItemProvider);
+      const before = createFn.mock.calls.length;
+      spy = vi
+        .spyOn(document, "getElementById")
+        .mockImplementation(() => document.createElement("div"));
+      const store = createStore({
+        state: { theme: "light", selectedOrganization: { identifier: "myorg" } },
+      });
+      mount(CodeQueryEditor, {
+        props: { editorId: "promql-values", language: "promql", query: "", keywords: [] },
+        global: { plugins: [store] },
+      });
+      await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+        timeout: 15000,
+        interval: 25,
+      });
+      const model = createdEditors.at(-1)!.getModel();
+      const provide = registerFn.mock.calls.filter((c) => c[0] === "promql").at(-1)![1]
+        .provideCompletionItems;
+      const text = 'cpu_utilization_percent{service="';
+      model.getValueInRange.mockReturnValue(text);
+      model.getLineContent.mockReturnValue(`${text}"}`);
+      model.getWordUntilPosition.mockReturnValue({ word: "", startColumn: 1, endColumn: 1 });
+      const result = await provide(model, { lineNumber: 1, column: text.length + 1 }, {}, {});
+      expect(result.suggestions.map((s: any) => s.label)).toEqual([
+        '"api-gateway"',
+        '"chat-service"',
+      ]);
+      expect(result.suggestions[0].insertText).toBe('api-gateway"');
+      expect(result.suggestions[0].range.endColumn).toBe(text.length + 2);
+
+      const bare = "cpu_utilization_percent{service=api-g";
+      model.getValueInRange.mockReturnValue(bare);
+      model.getLineContent.mockReturnValue(`${bare}}`);
+      const typedBare = await provide(model, { lineNumber: 1, column: bare.length + 1 }, {}, {});
+      expect(typedBare.suggestions[0].insertText).toBe('"api-gateway"');
+      expect(typedBare.suggestions[0].range.startColumn).toBe(bare.length + 1 - "api-g".length);
+
+      const comparison = "rate(http_total[5m]) =";
+      model.getValueInRange.mockReturnValue(comparison);
+      model.getLineContent.mockReturnValue(comparison);
+      const noMenu = await provide(
+        model,
+        { lineNumber: 1, column: comparison.length + 1 },
+        { triggerKind: 1, triggerCharacter: "=" },
+        {},
+      );
+      expect(noMenu.suggestions).toEqual([]);
+    },
+  );
 });
