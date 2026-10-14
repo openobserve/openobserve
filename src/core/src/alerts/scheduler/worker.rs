@@ -689,7 +689,7 @@ fn resolve_module_configs(
         },
         ModuleSchedulerConfig {
             module: TriggerModule::AlertCalibration,
-            concurrency: pick_concurrency(cfg.limit.scheduler_alert_calibration_concurrency),
+            concurrency: std::cmp::max(1, cfg.limit.cpu_num as i64),
             poll_interval_secs: pick_interval(cfg.limit.scheduler_alert_calibration_interval),
             lease_timeout_secs: None,
         },
@@ -1039,6 +1039,26 @@ mod tests {
         assert_eq!(
             find_module(&configs, TriggerModule::SloBackfill).concurrency,
             2
+        );
+    }
+
+    #[test]
+    fn test_alert_calibration_lane_is_sized_by_the_cpu_count() {
+        let base = make_config(); // alert concurrency 3
+        let mut cfg = config::Config::default();
+        cfg.limit.cpu_num = 6;
+        let configs = resolve_module_configs(&cfg, &base);
+        assert_eq!(
+            find_module(&configs, TriggerModule::AlertCalibration).concurrency,
+            6
+        );
+
+        cfg.limit.cpu_num = 0;
+        let configs = resolve_module_configs(&cfg, &base);
+        assert_eq!(
+            find_module(&configs, TriggerModule::AlertCalibration).concurrency,
+            1,
+            "a lane with no workers would never pull"
         );
     }
 
