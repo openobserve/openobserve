@@ -1,8 +1,10 @@
+import type { AxiosRequestConfig } from "axios";
 import http from "./http";
 
 const common = {
-  list_Folders: (organization: string, folder_type: string) => {
-    return http().get(`/api/v2/${organization}/folders/${folder_type}`);
+  list_Folders: (organization: string, folder_type: string, options?: AxiosRequestConfig) => {
+    const url = `/api/v2/${organization}/folders/${folder_type}`;
+    return options ? http().get(url, options) : http().get(url);
   },
   new_Folder: (organization: string, folder_type: string, data: any) => {
     return http().post(`/api/v2/${organization}/folders/${folder_type}`, data, {

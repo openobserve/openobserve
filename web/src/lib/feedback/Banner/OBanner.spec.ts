@@ -26,6 +26,17 @@ describe("OBanner — preserveWhitespace", () => {
   // The actual fix: preserve newlines/spaces, allow a long unbroken token to
   // wrap, and let the flex row shrink far enough for that wrapping to ever
   // kick in (min-w-0) — without min-w-0 the wrap classes alone do nothing.
+  it("separates adjacent actions with the spacing scale", () => {
+    const wrapper = mount(OBanner, {
+      slots: { actions: "<button>Retry</button><button>Dismiss</button>" },
+      global: { stubs },
+    });
+    const actions = wrapper.get(":scope > div:last-child");
+    expect(actions.classes()).toEqual(
+      expect.arrayContaining(["flex", "flex-wrap", "items-center", "gap-2"]),
+    );
+  });
+
   it("wraps content and lets the row shrink when set", () => {
     const wrapper = mount(OBanner, {
       props: { variant: "error", preserveWhitespace: true },
@@ -38,5 +49,66 @@ describe("OBanner — preserveWhitespace", () => {
     expect(content.classes()).toContain("min-w-0");
     expect(content.classes()).toContain("whitespace-pre-wrap");
     expect(content.classes()).toContain("wrap-break-word");
+  });
+});
+
+describe("OBanner — textSize and colors", () => {
+  it("keeps the compact bar scale unless a size is asked for", () => {
+    const bar = mount(OBanner, {
+      props: { bar: true },
+      slots: { default: "m" },
+      global: { stubs },
+    });
+    expect(bar.classes()).not.toContain("text-base");
+    expect(bar.html()).toContain("text-compact");
+
+    const large = mount(OBanner, {
+      props: { bar: true, textSize: "large" },
+      slots: { default: "m" },
+      global: { stubs },
+    });
+    expect(large.classes()).toContain("text-base");
+    expect(large.html()).not.toContain("text-compact");
+  });
+
+  it("matches the bar's default scale at medium", () => {
+    const medium = mount(OBanner, {
+      props: { bar: true, textSize: "medium" },
+      slots: { default: "m" },
+      global: { stubs },
+    });
+    expect(medium.classes()).toContain("text-compact");
+  });
+
+  it("paints runtime colours in place of the variant's tokens", () => {
+    const wrapper = mount(OBanner, {
+      props: { bar: true, variant: "info", colors: { background: "#1E3A8A", text: "#FFFFFF" } },
+      global: { stubs },
+    });
+
+    expect(wrapper.classes()).not.toContain("bg-banner-info-bg");
+    expect(wrapper.classes()).toContain("bg-banner-custom-bg");
+    expect(wrapper.attributes("style")).toContain("--color-banner-custom-bg: #1E3A8A");
+  });
+});
+
+describe("OBanner — meta and footer slots", () => {
+  it("renders neither wrapper when the slots are not used", () => {
+    const wrapper = mount(OBanner, { slots: { default: "Message" }, global: { stubs } });
+    expect(wrapper.find('[data-test="o-banner-meta"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="o-banner-footer"]').exists()).toBe(false);
+  });
+
+  it("puts meta to the right of the message and footer under it", () => {
+    const wrapper = mount(OBanner, {
+      props: { variant: "warning" },
+      slots: { default: "Message", meta: "ends in 1 h", footer: "Alerts 7" },
+      global: { stubs },
+    });
+    const row = wrapper.get(":scope > div:first-child");
+    expect(row.get(":scope > div:last-child").text()).toBe("ends in 1 h");
+    const content = wrapper.get('[data-test="o-banner-footer"]');
+    expect(content.text()).toBe("Alerts 7");
+    expect(content.element.parentElement?.textContent).toContain("Message");
   });
 });

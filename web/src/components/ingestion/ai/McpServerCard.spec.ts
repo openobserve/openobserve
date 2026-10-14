@@ -129,7 +129,7 @@ describe("McpServerCard", () => {
       await wrapper.find('[data-test="ai-integrations-mcp-skills-repo-btn"]').trigger("click");
 
       expect(open).toHaveBeenCalledWith(
-        "https://github.com/openobserve/skills",
+        "https://www.npmjs.com/package/@openobserve/skills",
         "_blank",
         "noopener,noreferrer",
       );

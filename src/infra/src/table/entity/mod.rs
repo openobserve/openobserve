@@ -2,6 +2,10 @@
 
 pub mod prelude;
 
+pub mod ai_chat_sessions;
+pub mod ai_chat_shares;
+pub mod ai_chat_turns;
+pub mod alert_calibration_configs;
 pub mod alert_composite_children;
 pub mod alert_composites;
 pub mod alert_dedup_state;
@@ -19,6 +23,8 @@ pub mod compactor_manual_jobs;
 pub mod dashboards;
 pub mod destinations;
 pub mod distinct_value_fields;
+pub mod downtime_notifications;
+pub mod downtimes;
 pub mod enrichment_table_urls;
 pub mod enrichment_tables;
 pub mod external_alerts;

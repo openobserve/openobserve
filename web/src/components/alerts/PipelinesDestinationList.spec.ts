@@ -49,6 +49,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
 }));
 
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
@@ -136,6 +137,8 @@ function mountComponent() {
 }
 
 // ── tests ──────────────────────────────────────────────────────────────────────
+
+beforeEach(() => resetListViewState());
 
 describe("PipelinesDestinationList", () => {
   let wrapper: ReturnType<typeof mountComponent> | null = null;
@@ -596,6 +599,43 @@ describe("PipelinesDestinationList", () => {
       expect((wrapper.vm as any).showDestinationEditor).toBe(false);
       // Forced: creating a destination does not expire the cached scope.
       expect(destinationService.list).toHaveBeenCalled();
+    });
+  });
+});
+
+describe("list view state", () => {
+  it("restores search, page size, page and sort from the saved view", async () => {
+    Object.assign(useListViewState("pipeline-destinations", {}), {
+      filterQuery: "abc",
+      pageSize: 50,
+      currentPage: 2,
+      sortBy: "name",
+      sortOrder: "desc",
+    });
+    const w: any = mountComponent();
+    await flushPromises();
+    expect(w.vm.filterQuery).toBe("abc");
+    expect(w.vm.pageSize).toBe(50);
+    expect(w.vm.currentPage).toBe(2);
+    expect(w.vm.sortBy).toBe("name");
+    expect(w.vm.sortOrder).toBe("desc");
+    w.unmount();
+  });
+
+  it("saves list state so it survives unmount", async () => {
+    const w: any = mountComponent();
+    await flushPromises();
+    w.vm.filterQuery = "xyz";
+    w.vm.pageSize = 100;
+    w.vm.sortBy = "name";
+    w.vm.sortOrder = "desc";
+    await flushPromises();
+    w.unmount();
+    expect(useListViewState("pipeline-destinations", {})).toMatchObject({
+      filterQuery: "xyz",
+      pageSize: 100,
+      sortBy: "name",
+      sortOrder: "desc",
     });
   });
 });

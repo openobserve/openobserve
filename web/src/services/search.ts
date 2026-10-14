@@ -71,10 +71,11 @@ const search = {
     },
     search_type: string = "ui",
     is_multi_stream_search: boolean = false,
+    useCache?: boolean,
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
-      (window as any).use_cache !== undefined ? (window as any).use_cache : true;
+      useCache ?? ((window as any).use_cache !== undefined ? (window as any).use_cache : true);
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
@@ -177,6 +178,7 @@ const search = {
     is_multistream,
     traceparent,
     body,
+    signal,
   }: {
     org_identifier: string;
     index: string;
@@ -190,6 +192,7 @@ const search = {
     is_multistream: boolean;
     traceparent: string;
     body: any;
+    signal?: AbortSignal;
   }) => {
     // let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
     let url: string = "";
@@ -209,7 +212,8 @@ const search = {
     if (clusters.trim() != "") {
       url = url + `&clusters=${clusters}`;
     }
-    return http({ headers: { traceparent } }).post(url, body);
+    const client = http({ headers: { traceparent } });
+    return signal ? client.post(url, body, { signal }) : client.post(url, body);
   },
   metrics_query_range: ({
     org_identifier,

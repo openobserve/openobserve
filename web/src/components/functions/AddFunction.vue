@@ -364,20 +364,18 @@ export default defineComponent({
         store.state.selectedOrganization?.identifier === "_meta",
     );
 
-    // Transform type options for the VRL/JS radio group.
+    // Transform type options for the VRL/JS radio group. JavaScript is
+    // always present (shown locked, not hidden, when not entitled) — except
+    // an already-JS function keeps it genuinely unlocked even where JS isn't
+    // offered (e.g. a build that lost the entitlement), so editing it renders
+    // the right language instead of a locked option under the active value.
     const transformTypeOptions = computed(() => {
-      const options = [{ label: t("function.vrl"), value: "0" }];
-
-      // An already-JS function keeps the JS option even where JS isn't offered
-      // (e.g. a build that lost the entitlement), so editing it renders the right
-      // language instead of a radio group with nothing selected.
       const editingJsFunction = String((props.modelValue as any)?.transType ?? "0") === "1";
-
-      if (isJsAllowed.value || editingJsFunction) {
-        options.push({ label: raw("JavaScript"), value: "1" });
-      }
-
-      return options;
+      const jsUnlocked = isJsAllowed.value || editingJsFunction;
+      return [
+        { label: t("function.vrl"), value: "0" },
+        { label: raw("JavaScript"), value: "1", disabled: !jsUnlocked },
+      ];
     });
 
     const beingUpdated = computed(() => props.isUpdated);
@@ -486,6 +484,19 @@ export default defineComponent({
     // `function`/`params` (Monaco body / hidden constant) come from formData.
     // Awaited so OForm's isSubmitting drives the Save spinner.
     const onSubmit = async (value: AddFunctionForm) => {
+      // Defense in depth — the JS toggle option's own `disabled` already
+      // blocks selecting it, but that attribute can be stripped via
+      // devtools. The backend also rejects a JS function on a build that
+      // doesn't unlock it, but fail fast here instead of round-tripping.
+      const editingJsFunction = String((props.modelValue as any)?.transType ?? "0") === "1";
+      if (value.transType === "1" && !isJsAllowed.value && !editingJsFunction) {
+        toast({
+          variant: "error",
+          message: t("enterpriseFeature.locked", { feature: raw("JavaScript") }),
+        });
+        return;
+      }
+
       const loadingNotification = toast({
         variant: "loading",
         message: t("toastMessages.functions.pleaseWait"),

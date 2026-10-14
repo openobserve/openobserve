@@ -5,6 +5,10 @@ import streamService from "@/services/stream";
 import analytics from "@/services/product_analytics";
 import i18n from "@/locales";
 
+vi.mock("@/stores", () => ({
+  default: { state: { selectedOrganization: { identifier: "test-org" } } },
+}));
+
 // Mock zincutils
 vi.mock("@/utils/zincutils", () => ({
   formatSizeFromMB: vi.fn((size) => `${size} MB`),

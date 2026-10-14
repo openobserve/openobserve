@@ -1,4 +1,5 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -74,6 +75,8 @@ afterEach(() => {
 });
 
 // 1. Rendering
+beforeEach(() => resetListViewState());
+
 describe("AppRoles - rendering", () => {
   it("renders the section title", async () => {
     const wrapper = await mountAppRoles();
@@ -577,6 +580,14 @@ describe("AppRoles - ODialog/ODrawer Migration", () => {
 // "Assign a role" link (?member=<email>), which used to just redirect here
 // with no way to actually add the account to a role.
 describe("AppRoles - quick-assign via ?member=", () => {
+  // Earlier tests leave real navigations in flight; one awaited navigation cancels them first.
+  beforeEach(async () => {
+    await router.replace({
+      name: "roles",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    });
+  });
+
   afterEach(() => {
     router.currentRoute.value.query = {};
   });
@@ -637,5 +648,42 @@ describe("AppRoles - quick-assign via ?member=", () => {
     await flushPromises();
 
     expect(router.currentRoute.value.query.member).toBeUndefined();
+  });
+});
+
+describe("list view state", () => {
+  it("restores search, page size, page and sort from the saved view", async () => {
+    Object.assign(useListViewState("iam-roles", {}), {
+      filterQuery: "abc",
+      pageSize: 50,
+      currentPage: 2,
+      sortBy: "role_name",
+      sortOrder: "desc",
+    });
+    const w: any = await mountAppRoles();
+    await flushPromises();
+    expect(w.vm.filterQuery).toBe("abc");
+    expect(w.vm.pageSize).toBe(50);
+    expect(w.vm.currentPage).toBe(2);
+    expect(w.vm.sortBy).toBe("role_name");
+    expect(w.vm.sortOrder).toBe("desc");
+    w.unmount();
+  });
+
+  it("saves list state so it survives unmount", async () => {
+    const w: any = await mountAppRoles();
+    await flushPromises();
+    w.vm.filterQuery = "xyz";
+    w.vm.pageSize = 100;
+    w.vm.sortBy = "role_name";
+    w.vm.sortOrder = "desc";
+    await flushPromises();
+    w.unmount();
+    expect(useListViewState("iam-roles", {})).toMatchObject({
+      filterQuery: "xyz",
+      pageSize: 100,
+      sortBy: "role_name",
+      sortOrder: "desc",
+    });
   });
 });

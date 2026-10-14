@@ -550,6 +550,8 @@
 
   /* Banner (OBanner) */
   --color-banner-default-bg: var(--color-grey-800);
+  --color-banner-preview-page-bg: var(--color-grey-950);
+  --color-banner-preview-page-line: var(--color-grey-800);
   --color-banner-default-text: var(--color-grey-200);
   --color-banner-info-bg: color-mix(in srgb, var(--color-blue-800) 20%, transparent);
   --color-banner-info-border: var(--color-blue-700);
@@ -851,6 +853,16 @@
   --color-json-object: #d1d5db;
   --color-json-string: #6ee7b7;
   --color-latency-p95: #5586f7;
+  --color-log-severity-emergency-indicator: #e07070;
+  --color-log-severity-alert-indicator: #ea580c;
+  --color-log-severity-critical-indicator: #dc6030;
+  --color-log-severity-error-indicator: #d95c5c;
+  --color-log-severity-warning-indicator: #d4944a;
+  --color-log-severity-notice-indicator: #16a34a;
+  --color-log-severity-info-indicator: #4d8fd4;
+  --color-log-severity-debug-indicator: #3daab8;
+  --color-log-severity-trace-indicator: #7a9baa;
+  --color-log-severity-ok-indicator: #4dad55;
   --color-log-table-header-bg: var(--color-table-header-bg);
   --color-log-table-row-bg: #21242c;
   --color-log-table-row-border: rgba(255, 255, 255, 0.14);

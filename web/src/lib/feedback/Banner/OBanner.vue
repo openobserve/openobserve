@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { I18nText } from "@/types/i18n";
-import { computed, useSlots } from "vue";
+import { computed, useSlots, type CSSProperties } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 export interface Props {
@@ -38,6 +38,10 @@ export interface Props {
    * stay on one line.
    */
   preserveWhitespace?: boolean;
+  /** Text scale for the message and actions; unset keeps the layout's own. */
+  textSize?: "small" | "medium" | "large";
+  /** Runtime-chosen background and text colour, painted instead of the variant's tokens. */
+  colors?: { background: string; text: string };
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -51,6 +55,23 @@ const props = withDefaults(defineProps<Props>(), {
 
 const slots = useSlots();
 
+// Medium is the bar's own default scale, so a banner with no size set looks the same as before sizes existed.
+const TEXT_SIZE_CLASS = {
+  small: "text-xs",
+  medium: "text-compact",
+  large: "text-base",
+} as const;
+
+// The colour is data, so it travels as the custom token's value rather than a literal style property.
+const colorStyle = computed<CSSProperties | undefined>(() =>
+  props.colors
+    ? {
+        "--color-banner-custom-bg": props.colors.background,
+        "--color-banner-custom-text": props.colors.text,
+      }
+    : undefined,
+);
+
 const ariaRole = computed(
   () =>
     props.role ?? (props.variant === "error" || props.variant === "warning" ? "alert" : "status"),
@@ -59,6 +80,8 @@ const ariaRole = computed(
 const hasDefaultSlot = computed(() => !!slots.default);
 const hasIconSlot = computed(() => !!slots.icon);
 const hasActionsSlot = computed(() => !!slots.actions);
+const hasMetaSlot = computed(() => !!slots.meta);
+const hasFooterSlot = computed(() => !!slots.footer);
 const showContentProp = computed(() => !hasDefaultSlot.value && !!props.content);
 const showIconArea = computed(() => !!props.icon || hasIconSlot.value);
 
@@ -114,7 +137,9 @@ const barVariantClass = computed(() => {
   <div
     :role="ariaRole"
     :data-test="dataTest"
+    :style="colorStyle"
     :class="[
+      textSize ? TEXT_SIZE_CLASS[textSize] : '',
       'flex',
       bar ? 'w-full flex-row flex-wrap items-center gap-3 px-4' : '',
       bar ? (dense ? 'py-1' : 'py-2') : '',
@@ -122,7 +147,7 @@ const barVariantClass = computed(() => {
       bar ? '' : 'rounded-default',
       bar ? '' : inlineActions ? 'flex-row items-center gap-3 max-md:flex-wrap' : 'flex-col gap-2',
       bar ? '' : dense ? 'p-2' : 'p-4',
-      bar ? barVariantClass : variantClass,
+      colors ? 'bg-banner-custom-bg text-banner-custom-text' : bar ? barVariantClass : variantClass,
     ]"
   >
     <!-- `inlineActions` is the one-line layout — the outer row already centres,
@@ -153,23 +178,37 @@ const barVariantClass = computed(() => {
         :class="['flex shrink-0', bar ? 'items-center' : 'min-h-5 items-center']"
       >
         <slot name="icon">
-          <OIcon :name="icon" size="sm" />
+          <OIcon :name="icon" :size="textSize === 'large' ? 'md' : 'sm'" />
         </slot>
       </div>
 
       <div
         :class="[
-          bar ? 'text-compact' : inlineActions ? 'min-w-0 flex-1 text-sm' : 'flex-1 text-sm',
+          bar ? '' : inlineActions ? 'min-w-0 flex-1' : 'flex-1',
+          textSize ? '' : bar ? 'text-compact' : 'text-sm',
           preserveWhitespace ? 'min-w-0 wrap-break-word whitespace-pre-wrap' : '',
         ]"
       >
         <slot />
         <template v-if="showContentProp">{{ content }}</template>
+        <div v-if="hasFooterSlot" class="mt-1" data-test="o-banner-footer">
+          <slot name="footer" />
+        </div>
+      </div>
+
+      <div v-if="hasMetaSlot" class="shrink-0" data-test="o-banner-meta">
+        <slot name="meta" />
       </div>
     </div>
 
     <!-- A phone keeps the message at least 12rem wide; past that the actions wrap under it, end-aligned. -->
-    <div v-if="hasActionsSlot" :class="bar ? 'shrink-0' : inlineActions ? 'max-md:ms-auto' : ''">
+    <div
+      v-if="hasActionsSlot"
+      :class="[
+        'flex flex-wrap items-center gap-2',
+        bar ? 'shrink-0' : inlineActions ? 'max-md:ms-auto' : '',
+      ]"
+    >
       <slot name="actions" />
     </div>
   </div>

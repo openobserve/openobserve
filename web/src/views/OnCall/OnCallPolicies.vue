@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
   >
     <OTable
+      ref="oTableRef"
       :frame="false"
       :data="rows"
       :columns="columns"
@@ -51,7 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :show-global-filter="false"
       :enable-column-resize="true"
       data-test="oncall-policies-table"
+      :page-size="pageSize"
+      :current-page="currentPage"
+      :sort-by="sortBy"
+      :sort-order="sortOrder"
       @row-click="openTeam"
+      @update:current-page="currentPage = $event"
+      @update:page-size="pageSize = $event"
+      @update:sort-by="sortBy = $event"
+      @update:sort-order="sortOrder = $event"
     >
       <template #subheader>
         <div class="px-page-edge border-table-row-divider border-b py-1.5">
@@ -134,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -150,6 +159,7 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { queryClient } from "@/composables/query/queryClient";
+import { useListViewState } from "@/composables/useListViewState";
 import { oncallTeamsQuery, teamPolicyQuery, whoIsOnCallQuery } from "@/services/oncall.queries";
 import type { OnCallPolicy, OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -175,7 +185,39 @@ const ABSENT = raw("—");
 const allRows = ref<PolicyRow[]>([]);
 const loading = ref(false);
 const lastUpdatedAt = ref<number | null>(null);
-const search = ref("");
+const savedView = useListViewState("oncall-policies", {
+  search: "",
+  currentPage: 1,
+  pageSize: 20,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const search = ref(savedView.search);
+const currentPage = ref(savedView.currentPage);
+const pageSize = ref(savedView.pageSize);
+const sortBy = ref(savedView.sortBy);
+const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+const oTableRef = ref<any>(null);
+
+watch(search, () => {
+  currentPage.value = 1;
+});
+watch([search, currentPage, pageSize, sortBy, sortOrder], () => {
+  Object.assign(savedView, {
+    search: search.value,
+    currentPage: currentPage.value,
+    pageSize: pageSize.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
+// The first load lands after mount and TanStack resets to page 0 on its own deferred queue; setTimeout(0) runs after it so the restored page wins.
+let pageRestored = false;
+watch(loading, (isLoading) => {
+  if (isLoading || pageRestored) return;
+  pageRestored = true;
+  setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+});
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 

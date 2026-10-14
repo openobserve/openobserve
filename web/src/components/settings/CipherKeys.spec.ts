@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import CipherKeys from "./CipherKeys.vue";
@@ -43,7 +44,8 @@ vi.mock("@/services/product_analytics", () => ({
   },
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<any>()),
   convertToTitleCase: vi.fn((str) => str),
 }));
 
@@ -198,6 +200,8 @@ const createWrapperAndWait = async (options = {}) => {
   await wrapper.vm.$nextTick();
   return wrapper;
 };
+
+beforeEach(() => resetListViewState());
 
 describe("CipherKeys", () => {
   const mockCipherKeysData = {
@@ -682,6 +686,43 @@ describe("CipherKeys", () => {
         // If data processing fails, component should handle it gracefully
         expect(wrapper.vm.tabledata).toHaveLength(0);
       }
+    });
+  });
+});
+
+describe("list view state", () => {
+  it("restores search, page size, page and sort from the saved view", async () => {
+    Object.assign(useListViewState("cipher-keys", {}), {
+      filterQuery: "abc",
+      pageSize: 50,
+      currentPage: 2,
+      sortBy: "name",
+      sortOrder: "desc",
+    });
+    const w: any = await createWrapperAndWait();
+    await flushPromises();
+    expect(w.vm.filterQuery).toBe("abc");
+    expect(w.vm.pageSize).toBe(50);
+    expect(w.vm.currentPage).toBe(2);
+    expect(w.vm.sortBy).toBe("name");
+    expect(w.vm.sortOrder).toBe("desc");
+    w.unmount();
+  });
+
+  it("saves list state so it survives unmount", async () => {
+    const w: any = await createWrapperAndWait();
+    await flushPromises();
+    w.vm.filterQuery = "xyz";
+    w.vm.pageSize = 100;
+    w.vm.sortBy = "name";
+    w.vm.sortOrder = "desc";
+    await flushPromises();
+    w.unmount();
+    expect(useListViewState("cipher-keys", {})).toMatchObject({
+      filterQuery: "xyz",
+      pageSize: 100,
+      sortBy: "name",
+      sortOrder: "desc",
     });
   });
 });

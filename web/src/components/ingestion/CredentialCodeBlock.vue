@@ -78,17 +78,12 @@ const onCopy = ({ partial }: CodeBlockCopyPayload) => {
       :wrap="wrap"
       :data-test="dataTest"
       inset
-      copy-on-click
       class="mb-1"
       @copy="onCopy"
       @token-click="openTokenPicker?.()"
     />
-    <p class="text-text-secondary m-0 text-xs" :data-test="`${dataTest}-hint`">
-      {{
-        needsPasscode
-          ? t("components.codeBlock.clickToCopyWithToken")
-          : t("components.codeBlock.clickToCopy")
-      }}
+    <p v-if="needsPasscode" class="text-text-secondary m-0 text-xs" :data-test="`${dataTest}-hint`">
+      {{ t("components.codeBlock.tokenIncludedHint") }}
     </p>
   </div>
 </template>

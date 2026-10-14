@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex items-start max-md:flex-col max-md:gap-1">
     <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-      {{ required ? labelText + " *" : labelText }}
+      {{ labelText }}
       <template v-if="tooltipText">
         <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
         <OTooltip :content="tooltipText" side="right" />
@@ -42,6 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :destination-options="destinationOptions"
         :workflow-options="workflowOptions"
         :workflows-enabled="workflowsEnabled"
+        :workflows-locked="workflowsLocked"
+        :workflows-lock-message="workflowsAccess.message"
+        :placeholder="placeholder"
         :error="!!error"
         @update:destinations="emit('update:destinations', $event)"
         @update:workflows="emit('update:workflows', $event)"
@@ -60,6 +63,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ error }}
       </div>
+      <!-- Always rendered when asked for, so picking or clearing a target only
+           swaps the text and nothing below moves. Styled as a field hint. -->
+      <p
+        v-else-if="showStatus"
+        class="text-input-help-text pt-1 text-xs"
+        :data-test="
+          notifiesNobody ? 'alert-settings-destinations-note' : 'alert-settings-destinations-status'
+        "
+      >
+        {{ statusText }}
+      </p>
     </div>
   </div>
 </template>
@@ -75,7 +89,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
 import { workflowsQuery } from "@/services/workflows.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import config from "@/aws-exports";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 
 type RawOption = string | { label: I18nText; value: string };
 
@@ -88,8 +102,12 @@ const props = withDefaults(
     error?: string;
     /** Override the label; defaults to the alert form's "Destination". */
     label?: string;
-    /** Whether this alert family requires a destination; drives the "*". */
-    required?: boolean;
+    /** The alert has nowhere to send, so the status line says no destination is notified. */
+    notifiesNobody?: boolean;
+    /** Show the one-line status under the field: where the alert sends, or that it sends nowhere. */
+    showStatus?: boolean;
+    /** Shown in the empty picker. Omit where empty means something else (recovery destinations). */
+    placeholder?: I18nText;
     /** Override the tooltip; pass "" for alert families that need none. */
     tooltip?: string;
     /** False for alert families with no workflow routing (e.g. synthetics
@@ -97,7 +115,7 @@ const props = withDefaults(
      *  enterprise, so the picker cannot offer options that would not save. */
     supportsWorkflows?: boolean;
   }>(),
-  { required: true, supportsWorkflows: true },
+  { supportsWorkflows: true, notifiesNobody: false, showStatus: false },
 );
 
 const emit = defineEmits<{
@@ -107,7 +125,7 @@ const emit = defineEmits<{
   (e: "refresh"): void;
 }>();
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
@@ -119,15 +137,19 @@ const tooltipText = computed<I18nText>(() =>
   props.tooltip === undefined ? t("alerts.alertSettings.destinationsTooltip") : raw(props.tooltip),
 );
 
-// The family must support workflows AND the deployment must serve them —
-// build gate plus the backend /config flag, the same combined test the
-// sidebar and routes use.
+// Edition entitlement and the backend /config runtime flag are separate
+// gates — same split MainLayout's nav-rail Workflows entry uses: an edition
+// that doesn't unlock workflows stays visible but LOCKED (upgrading fixes
+// it); a deployment that simply hasn't turned the runtime flag on stays
+// HIDDEN (upgrading wouldn't change that).
+const workflowsAccess = useLockedAffordance("workflows");
+const workflowsRuntimeEnabled = computed(() => store.state.zoConfig?.workflows_enabled === true);
 const workflowsEnabled = computed(
-  () =>
-    props.supportsWorkflows &&
-    (config.isEnterprise === "true" || config.isCloud === "true") &&
-    store.state.zoConfig?.workflows_enabled === true,
+  () => props.supportsWorkflows && workflowsAccess.value.allowed && workflowsRuntimeEnabled.value,
 );
+// Shown (disabled) instead of hidden outright when the family supports
+// workflows but this edition doesn't unlock them.
+const workflowsLocked = computed(() => props.supportsWorkflows && !workflowsAccess.value.allowed);
 
 const workflowOptions = ref<{ label: I18nText; value: string }[]>([]);
 const fetchWorkflows = async (force = false) => {
@@ -152,6 +174,39 @@ const fetchWorkflows = async (force = false) => {
     workflowOptions.value = [];
   }
 };
+
+// One name reads better than "1 destination"; more than one is a count.
+const statusText = computed<I18nText>(() => {
+  if (props.notifiesNobody) return t("alerts.alertSettings.noDestinationNote");
+  const parts: string[] = [];
+  const { destinations } = props;
+  if (destinations.length === 1) parts.push(destinations[0]);
+  else if (destinations.length > 1) {
+    parts.push(
+      t(
+        "alert_dependencies.countDestinations",
+        { count: destinations.length },
+        destinations.length,
+      ),
+    );
+  }
+  const workflows = workflowsEnabled.value ? props.workflows : [];
+  const workflowName =
+    workflows.length === 1
+      ? workflowOptions.value.find((option) => option.value === workflows[0])?.label
+      : undefined;
+  if (workflowName) parts.push(workflowName);
+  else if (workflows.length > 0) {
+    parts.push(
+      t("alert_dependencies.countWorkflow", { count: workflows.length }, workflows.length),
+    );
+  }
+  // A target the picker does not show: the on-call team set on the Advanced tab.
+  if (parts.length === 0) parts.push(t("alerts.alertSettings.oncallTeamTarget"));
+  const targets = new Intl.ListFormat(locale.value, { type: "conjunction" }).format(parts);
+  return t("alerts.alertSettings.sendsToStatus", { targets });
+});
+
 onMounted(() => fetchWorkflows());
 
 // The combined field's single refresh reloads both lists.
