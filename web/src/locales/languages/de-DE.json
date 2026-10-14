@@ -8315,6 +8315,7 @@
     "summaryActive": "Aktiv",
     "summaryPaused": "Pausiert",
     "summaryFailed": "Fehlgeschlagen",
+    "summaryFiring": "Im Alarm",
     "summaryRecent": "Ausgelöst < 15m",
     "summaryTotal": "Gesamt",
     "webhook": "Web-Hook",
