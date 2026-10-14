@@ -21,7 +21,7 @@ use config::{
         alerts::{
             Operator, QueryCondition, QueryType, TriggerCondition, alert::Alert, default_align_time,
         },
-        folder::FolderType,
+        folder::{Folder, FolderType},
         self_reporting::usage::TRIGGERS_STREAM,
         stream::StreamType,
         system_settings::{SettingCategory, SettingScope, SystemSetting},
@@ -36,6 +36,7 @@ const SHIPPED_REVISION: u32 = 1;
 const REVISION_KEY: &str = "prebuilt_alerts_revision";
 const ORG_LOCK_PREFIX: &str = "/system/alerts/prebuilt_org/";
 const SYSTEM_FOLDER: &str = "system";
+const SYSTEM_FOLDER_ICON: &str = "🔒";
 const PREBUILT: [Prebuilt; 3] = [
     Prebuilt {
         name: "o2_alert_evaluation_failures",
@@ -210,7 +211,13 @@ async fn system_folder(org_id: &str) -> Result<String, anyhow::Error> {
     {
         return Ok(folder.folder_id);
     }
-    let folder = db::folders::ensure_folder(org_id, SYSTEM_FOLDER, FolderType::Alerts).await?;
+    let system_folder = Folder {
+        folder_id: SYSTEM_FOLDER.to_string(),
+        name: SYSTEM_FOLDER.to_string(),
+        description: SYSTEM_FOLDER.to_string(),
+        icon: Some(SYSTEM_FOLDER_ICON.to_string()),
+    };
+    let folder = db::folders::ensure_folder(org_id, system_folder, FolderType::Alerts).await?;
     Ok(folder.folder_id)
 }
 
