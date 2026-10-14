@@ -110,9 +110,7 @@ def fanout(oncall: OnCallClient, owners: dict[str, str]) -> dict[str, object]:
 
     def _create(name: str, aggregation: dict | None, on: str = stream) -> str:
         # No `oncall_team`: an alert that names its team explicitly short-circuits
-        # routing, and ownership rules then never get a say. A destination is
-        # still required — an alert with no destination, no workflow and no team
-        # is refused at save (§4.2).
+        # routing, and ownership rules then never get a say.
         payload = paging_alert(uniq(name), on, destinations=[SINK_DEST],
                                aggregation=aggregation)
         resp = oncall.create_alert(payload)

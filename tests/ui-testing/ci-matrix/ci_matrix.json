@@ -28,7 +28,8 @@
       "alertTemplatesPagination.spec.js",
       "alertDestinationsPagination.spec.js",
       "alerts-destinations-usage.spec.js",
-      "alerts-save-query-mode.spec.js"
+      "alerts-save-query-mode.spec.js",
+      "alerts-no-destination.spec.js"
     ],
     "disabled": [
       {
