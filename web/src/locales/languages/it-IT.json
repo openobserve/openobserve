@@ -9450,6 +9450,9 @@
     "sloLongWindow": "Finestra lunga",
     "sloShortWindow": "Finestra breve",
     "sloCloneDisabled": "Gli avvisi SLO vengono creati nella loro pagina SLO, quindi non possono essere clonati da qui.",
+    "builtinBadge": "Sistema",
+    "builtinBadgeHint": "Un avviso integrato: puoi disattivarlo o modificarlo, ma non eliminarlo o rinominarlo.",
+    "builtinDeleteDisabled": "Avviso integrato, impossibile eliminarlo",
     "seconds": "Secondi",
     "downtimes": {
       "newTitle": "Nuovo downtime",

@@ -9450,6 +9450,9 @@
     "sloLongWindow": "Ventana larga",
     "sloShortWindow": "Ventana corta",
     "sloCloneDisabled": "Las alertas SLO se crean en su página SLO, por lo que no se pueden clonar desde aquí.",
+    "builtinBadge": "Sistema",
+    "builtinBadgeHint": "Una alerta integrada: puedes desactivarla o editarla, pero no eliminarla ni cambiarle el nombre.",
+    "builtinDeleteDisabled": "Alerta integrada, no se puede eliminar",
     "seconds": "Segundos",
     "downtimes": {
       "newTitle": "Nueva inactividad",

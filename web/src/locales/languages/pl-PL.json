@@ -9450,6 +9450,9 @@
     "sloLongWindow": "Długie okno",
     "sloShortWindow": "Krótkie okno",
     "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować.",
+    "builtinBadge": "System",
+    "builtinBadgeHint": "Wbudowany alert: możesz go wyłączyć lub edytować, ale nie możesz go usunąć ani zmienić jego nazwy.",
+    "builtinDeleteDisabled": "Wbudowany alert, nie można go usunąć",
     "seconds": "Sekundy",
     "downtimes": {
       "newTitle": "Nowa przerwa",

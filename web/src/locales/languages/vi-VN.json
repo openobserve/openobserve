@@ -9450,6 +9450,9 @@
     "sloLongWindow": "Cửa sổ dài",
     "sloShortWindow": "Cửa sổ ngắn",
     "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây.",
+    "builtinBadge": "Hệ thống",
+    "builtinBadgeHint": "Cảnh báo tích hợp sẵn: bạn có thể tắt hoặc chỉnh sửa, nhưng không thể xóa hay đổi tên.",
+    "builtinDeleteDisabled": "Cảnh báo tích hợp sẵn, không thể xóa",
     "seconds": "Giây",
     "downtimes": {
       "newTitle": "Thời gian tạm dừng mới",

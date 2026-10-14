@@ -9450,6 +9450,9 @@
     "sloLongWindow": "Uzun pencere",
     "sloShortWindow": "Kısa pencere",
     "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz.",
+    "builtinBadge": "Sistem",
+    "builtinBadgeHint": "Yerleşik bir uyarı: kapatabilir veya düzenleyebilirsiniz, ancak silemez veya yeniden adlandıramazsınız.",
+    "builtinDeleteDisabled": "Yerleşik uyarı, silinemez",
     "seconds": "Saniye",
     "downtimes": {
       "newTitle": "Yeni kesinti",
