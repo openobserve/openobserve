@@ -177,7 +177,9 @@ test.describe("Pre-Test Cleanup", () => {
         /^condition-pipeline-/,         // condition-pipeline-* (scheduled pipeline tests)
         /^metrics-condition-pipeline-/,  // metrics-condition-pipeline-* (scheduled pipeline tests)
         /^e2e_backfill_test_\d+$/,      // e2e_backfill_test_<timestamp> (pipeline-backfill.spec.js)
-        /^fn_e2e_pl_/                   // functions-import-export.spec.js (pipeline holding an imported function)
+        /^fn_e2e_pl_/,                  // functions-import-export.spec.js (pipeline holding an imported function)
+        /^pl_bundle_/,                  // pipeline-function-bundling.spec.js (exported and re-imported pipelines)
+        /^ui_auto_pfb_/                 // pipeline-function-bundling-rbac.spec.js (enterprise shard)
       ]
     );
 
@@ -221,6 +223,8 @@ test.describe("Pre-Test Cleanup", () => {
       /^fn_clash_/,                  // seeded functions used to provoke a name clash
       /^fn_regr_nonobj_/,            // non-object entry repaired by the inline fixers
       /^fn_regr_reject_/,            // rejections that cannot be fixed inline (#15069)
+      /^fn_bundle_/,                 // pipeline-function-bundling.spec.js (bundled functions and their _N copies)
+      /^ui_auto_pfb_/                // pipeline-function-bundling-rbac.spec.js (enterprise shard)
     ];
 
     // Patterns from Functions folder tests (row-expansion.spec.js)

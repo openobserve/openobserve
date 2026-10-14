@@ -8567,13 +8567,26 @@ export class LogsPage {
      */
     async clickRelative1HourOrFallback() {
         const oneHourButton = this.page.locator('[data-test="date-time-relative-1-h-btn"]');
+        let picked;
         if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
             await oneHourButton.click();
-            return 'Last 1 hour';
+            picked = 'Last 1 hour';
         } else {
             await this.clickRelative15MinButton();
-            return 'Last 15 minutes';
+            picked = 'Last 15 minutes';
         }
+        await this.closeDateTimePickerIfOpen();
+        return picked;
+    }
+
+    /** The auto-apply picker stays open after a pick, and force-clicks behind it land on the panel. */
+    async closeDateTimePickerIfOpen() {
+        const panel = this.page.locator('#date-time-menu');
+        if (!(await panel.isVisible().catch(() => false))) return;
+        await this.page.keyboard.press('Escape');
+        const closed = await panel.waitFor({ state: 'hidden', timeout: 2000 }).then(() => true).catch(() => false);
+        if (!closed) await this.page.locator(this.dateTimeButton).click();
+        await expect(panel).toBeHidden({ timeout: 5000 });
     }
 
     /**

@@ -81,14 +81,17 @@ impl JsonColumnar {
         if settings.partition_keys.iter().any(|key| !key.disabled) {
             return None;
         }
-        let mut alerts = HashMap::new();
-        crate::ingestion::get_stream_alerts(
-            &[StreamParams::new(org_id, stream_name, StreamType::Logs)],
-            &mut alerts,
-        )
-        .await;
-        if alerts.values().any(|alerts| !alerts.is_empty()) {
-            return None;
+        // The protected chat stream evaluates no realtime alerts, so cached ones do not apply.
+        if !config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(stream_name) {
+            let mut alerts = HashMap::new();
+            crate::ingestion::get_stream_alerts(
+                &[StreamParams::new(org_id, stream_name, StreamType::Logs)],
+                &mut alerts,
+            )
+            .await;
+            if alerts.values().any(|alerts| !alerts.is_empty()) {
+                return None;
+            }
         }
         Self::for_schema(
             stream_name,

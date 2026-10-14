@@ -590,6 +590,10 @@ import {
   useDashboardSaveConflictDialog,
 } from "@/composables/dashboard/useDashboardSaveConflict";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
+import {
+  DASHBOARD_FRESH_PANEL_TIME,
+  resolveAppliedRangeNow,
+} from "@/composables/dashboard/dashboardFreshPanelTime";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import reports from "@/services/reports";
 import config from "@/aws-exports";
@@ -1318,6 +1322,16 @@ export default defineComponent({
         currentTimeObjPerPanel.value[panelId] = globalTime;
       }
     };
+
+    provide(DASHBOARD_FRESH_PANEL_TIME, (panelId) => {
+      if (!isAutoRunOn.value) return undefined;
+      const panel = currentDashboardData.data?.tabs
+        ?.flatMap((tab: any) => tab.panels ?? [])
+        .find((p: any) => p.id === panelId);
+      const globalTime = panel && resolveAppliedRangeNow(selectedDate.value);
+      if (!globalTime) return undefined;
+      return hasPanelTime(panel) ? computePanelTime(panel, globalTime) : globalTime;
+    });
 
     // Helper: Check if two time objects are equal
     const areTimesEqual = (time1: any, time2: any) => {

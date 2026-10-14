@@ -21,7 +21,7 @@ Bias toward approval. A single warning in an otherwise clean PR still gets `appr
 
 ## Severity Definitions
 
-- **critical**: Will cause an outage, data loss, or is exploitable. Must block merge.
+- **critical**: Will cause an outage, data loss, or is exploitable — or, for test changes, a coverage-integrity failure (a test that passes while asserting nothing real: a missing/vacuous/soft/un-awaited assertion, or a selector that matches no component). Must block merge.
 - **warning**: Measurable regression, concrete risk, or pattern that leads to bugs. Should be addressed.
 - **suggestion**: An improvement worth considering. Does not block merge.
 
@@ -60,7 +60,7 @@ line, not a heading. Each finding is exactly **one line**: no separate descripti
 the concrete fix inline in parentheses, terse — not a "Fix:" sub-bullet.
 
 Prefix each finding line with its **category glyph**:
-🔒 Security · 🧩 Code Quality · ⚡ Performance · 📝 Documentation · 📦 Release · 🎨 Frontend.
+🔒 Security · 🧩 Code Quality · ⚡ Performance · 📝 Documentation · 📦 Release · 🎨 Frontend · 🧪 QA.
 
 Line format: `- <glyph> \`file:line\` **[Category]** One-sentence summary of the bug/risk (→ concrete fix).`
 
@@ -98,7 +98,7 @@ If findings exist:
 | | |
 |---|---|
 | **Risk tier** | [trivial \| lite \| full] |
-| **Reviewers** | [list of agents that ran, each with its glyph] |
+| **Reviewers** | [exactly the agents listed in `<reviewers_ran>`, each with its glyph] |
 
 </details>
 ```
@@ -121,7 +121,7 @@ If NO issues across all reviewers:
 | | |
 |---|---|
 | **Risk tier** | [trivial \| lite \| full] |
-| **Reviewers** | [list of agents that ran, each with its glyph] |
+| **Reviewers** | [exactly the agents listed in `<reviewers_ran>`, each with its glyph] |
 
 </details>
 ```
@@ -138,6 +138,7 @@ Add a `#### ✅ Previously Flagged (resolved)` section (inside the same `<detail
 
 ## Rules
 
+- The **Reviewers** row must list EXACTLY the agents named in `<reviewers_ran>`, each with its category glyph — in that order. Never add, rename, drop, or infer a reviewer that is not in that list (a reviewer that found nothing still ran and still belongs there; one that is absent did not run and must not appear).
 - Do NOT include any commentary about how the review was produced
 - Do NOT name, hint at, or identify the model or provider behind the review — yours or any other
 - Do NOT include XML tags in your output

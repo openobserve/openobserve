@@ -199,7 +199,8 @@
       "dashboard-variables-custom-parents.spec.js",
       "dashboard-variables-stream-field.spec.js",
       "dashboard-mustache-variables.spec.js",
-      "dashboard-variable-select-all.spec.js"
+      "dashboard-variable-select-all.spec.js",
+      "dashboard-variables-auto-run.spec.js"
     ],
     "disabled": []
   },
@@ -427,7 +428,8 @@
       "pipeline-backfill.spec.js",
       "pipeline-history.spec.js",
       "scheduled-pipeline-query-builder.spec.js",
-      "pipelines-form-validation.spec.js"
+      "pipelines-form-validation.spec.js",
+      "pipeline-function-bundling.spec.js"
     ],
     "disabled": [
       {

@@ -1655,6 +1655,24 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("AI shared chat routes", () => {
+    it("serves org shares inside the main layout with the token as a prop", () => {
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "sharedChat");
+      expect(route.path).toBe("ai/shared/:token");
+      expect(route.props({ params: { token: "t1" } })).toEqual({ token: "t1" });
+      expect(route.meta?.public).toBeUndefined();
+    });
+
+    it("serves public links outside the layout and marks them public", () => {
+      const { parentRoutes } = useRoutes();
+      const route = findRoute(parentRoutes, "publicSharedChat");
+      expect(route.path).toBe("/ai/public/:token");
+      expect(route.meta.public).toBe(true);
+      expect(route.props({ params: { token: "t2" } })).toEqual({ token: "t2", isPublic: true });
+    });
+  });
+
   // =========================================================================
   // 16. homeChildRoutes — shortUrl route
   // =========================================================================
@@ -2185,9 +2203,9 @@ describe("useRoutes (router.ts)", () => {
   // 23. Edge cases
   // =========================================================================
   describe("Edge Cases", () => {
-    it("should have exactly 5 parentRoutes", () => {
+    it("should have exactly 6 parentRoutes", () => {
       const { parentRoutes } = useRoutes();
-      expect(parentRoutes).toHaveLength(5);
+      expect(parentRoutes).toHaveLength(6);
     });
 
     it("should have unique paths in parentRoutes", () => {
