@@ -334,7 +334,7 @@ import type { ArchivedRcaReport } from "@/services/incidents";
 export interface RcaError {
   reason: string;
   details: string;
-  /** Set when AI credits blocked the run: what unblocks it, shown instead of Retry. */
+  /** Set when AI credits blocked the run: what unblocks it, shown first with Retry beside it. */
   remedy?: "plans" | "contact";
 }
 
