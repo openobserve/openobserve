@@ -853,6 +853,24 @@ pub fn basic_routes() -> Router {
             alerts::external_events::MAX_BODY_BYTES,
         ));
 
+    // Slack signs these requests; ENT verifies the signature, so they stay out of auth_middleware.
+    router = router
+        .route(
+            "/api/slack/events",
+            post(slack::inbound::events)
+                .layer(DefaultBodyLimit::max(slack::inbound::MAX_BODY_BYTES)),
+        )
+        .route(
+            "/api/slack/commands",
+            post(slack::inbound::commands)
+                .layer(DefaultBodyLimit::max(slack::inbound::MAX_BODY_BYTES)),
+        )
+        .route(
+            "/api/slack/interactions",
+            post(slack::inbound::interactions)
+                .layer(DefaultBodyLimit::max(slack::inbound::MAX_BODY_BYTES)),
+        );
+
     // Public status pages — unauthenticated by design, like chart_render
     // above: existence and visibility are checked inside the handler, and the
     // handlers are pure meta-store point-reads (no search, storage, or
@@ -4307,5 +4325,54 @@ mod tests {
             wrong.is_empty(),
             "add the literal to RESERVED_STREAM_SLOTS in api/common auth/delegation.rs: {wrong:#?}"
         );
+    }
+
+    // Router-role pods merge basic_routes the same way, so this covers both node shapes.
+    #[tokio::test]
+    async fn slack_inbound_routes_need_no_o2_auth_and_cap_the_body_at_1_mib() {
+        let app = Router::new()
+            .merge(basic_routes())
+            .nest("/api", service_routes());
+        for path in [
+            "/api/slack/events",
+            "/api/slack/commands",
+            "/api/slack/interactions",
+        ] {
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri(path)
+                .body(Body::from("{}"))
+                .unwrap();
+            let resp = app.clone().oneshot(req).await.unwrap();
+            assert_eq!(resp.status(), StatusCode::NOT_FOUND, "{path}");
+            let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let body: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(body["message"], "Slack is not enabled", "{path}");
+
+            let big = vec![b' '; slack::inbound::MAX_BODY_BYTES + 1];
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri(path)
+                .body(Body::from(big))
+                .unwrap();
+            let status = app.clone().oneshot(req).await.unwrap().status();
+            assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE, "{path}");
+        }
+    }
+
+    #[tokio::test]
+    async fn an_org_named_slack_still_reaches_its_own_routes() {
+        let app = Router::new()
+            .merge(basic_routes())
+            .nest("/api", service_routes());
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri("/api/slack/streams")
+            .body(Body::empty())
+            .unwrap();
+        let status = app.oneshot(req).await.unwrap().status();
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
     }
 }

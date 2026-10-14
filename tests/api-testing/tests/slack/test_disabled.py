@@ -4,7 +4,10 @@ Runs against a server with ``O2_SLACK_ENABLED`` off; skips itself when Slack is 
 """
 from __future__ import annotations
 
+from urllib.parse import urljoin
+
 import pytest
+import requests
 
 from support.client import OpenObserveClient
 
@@ -92,3 +95,16 @@ def test_prerequisites_are_404_for_an_org_admin_while_the_flag_is_off(
         pytest.skip("OSS answers 403")
     resp = member.get("slack/prerequisites", org=slack_org)
     assert resp.status_code == 404, resp.text
+
+
+@pytest.mark.parametrize("kind", ["events", "commands", "interactions"])
+def test_inbound_slack_routes_are_404(client: OpenObserveClient, slack_off: dict, kind: str) -> None:
+    """AC-1.1 and AC-1.10: Slack's own requests carry no O2 credentials and still get 404."""
+    resp = requests.post(
+        urljoin(client.base_url, f"api/slack/{kind}"),
+        data=b'{"type": "url_verification", "challenge": "c"}',
+        headers={"Content-Type": "application/json", "X-Slack-Request-Timestamp": "1", "X-Slack-Signature": "v0=00"},
+        timeout=10,
+    )
+    assert resp.status_code == 404, resp.text
+    assert resp.json() == {"code": 404, "message": "Slack is not enabled"}
