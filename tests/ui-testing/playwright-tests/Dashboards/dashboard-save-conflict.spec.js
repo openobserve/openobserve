@@ -1,5 +1,5 @@
 // Dashboard save conflicts (PR #15272, o2-enterprise#2875): a save that loses to another user's save must not lose either edit.
-const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
+const { test, expect, navigateToBase, newAppContext } = require("../utils/enhanced-baseFixtures.js");
 const testLogger = require("../utils/test-logger.js");
 import PageManager from "../../pages/page-manager";
 import { ingestion } from "./utils/dashIngestion.js";
@@ -25,7 +25,6 @@ test.describe("Dashboard save conflict", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
-    await ingestion(page);
     pm = new PageManager(page);
     dashboardId = null;
   });
@@ -131,6 +130,7 @@ test.describe("Dashboard save conflict", () => {
       await expect(conflict.myChange).toContainText("Latency");
 
       const confirmText = await conflict.startOverwrite();
+      expect(confirmText).toContain("Overwrite replaces their save");
       // Before the fix this promised to restore Latency, which I had just deleted.
       expect(confirmText).not.toContain("Latency");
 
@@ -180,7 +180,9 @@ test.describe("Dashboard save conflict", () => {
   test(
     "Merge from the panel editor keeps my panel edit and their changes to other panels",
     { tag: ["@dashboardSaveConflict", "@P1", "@all"] },
-    async () => {
+    async ({ page }) => {
+      // The panel editor loads the stream's fields, so the stream must exist.
+      await ingestion(page);
       const conflict = pm.dashboardSaveConflict;
       dashboardId = await createConflictDashboard(pm.apiCleanup, uniqueTitle("SaveConflict"), PANELS);
       await conflict.openDashboard(dashboardId);
@@ -213,7 +215,9 @@ test.describe("Dashboard save conflict", () => {
   test(
     "Merge is not offered when the other user changed the same panel",
     { tag: ["@dashboardSaveConflict", "@P1", "@all"] },
-    async () => {
+    async ({ page }) => {
+      // The panel editor loads the stream's fields, so the stream must exist.
+      await ingestion(page);
       const conflict = pm.dashboardSaveConflict;
       dashboardId = await createConflictDashboard(pm.apiCleanup, uniqueTitle("SaveConflict"), PANELS);
       await conflict.openDashboard(dashboardId);
@@ -236,16 +240,75 @@ test.describe("Dashboard save conflict", () => {
   );
 
   test(
+    "renaming the dashboard in General settings after someone else saved: Overwrite saves my title and undoes their settings change",
+    { tag: ["@dashboardSaveConflict", "@P1", "@all"] },
+    async () => {
+      const conflict = pm.dashboardSaveConflict;
+      dashboardId = await createConflictDashboard(pm.apiCleanup, uniqueTitle("SaveConflict"), PANELS, {
+        description: "original",
+      });
+      await conflict.openDashboard(dashboardId);
+
+      await otherUserSaves(pm.apiCleanup, dashboardId, (d) => {
+        d.description = "changed by B";
+      });
+
+      const myTitle = uniqueTitle("SaveConflictRenamed");
+      await pm.dashboardSetting.openSetting();
+      await pm.dashboardSetting.dashboardNameChange(myTitle);
+      await pm.dashboardSetting.saveSetting();
+      await conflict.waitForDialog();
+      await expect(conflict.myChange).toContainText("Changed dashboard settings");
+      await expect(conflict.changeRow("settings")).toContainText("description");
+
+      const confirmText = await conflict.startOverwrite();
+      expect(confirmText).toContain("description");
+      await conflict.confirmOverwrite();
+
+      const { dashboard } = await getServerDashboard(pm.apiCleanup, dashboardId);
+      expect(dashboard.title).toBe(myTitle);
+      expect(dashboard.description).toBe("original");
+    },
+  );
+
+  test(
+    "adding a variable after someone else added one: the dialog shows theirs and Overwrite warns it will remove it",
+    { tag: ["@dashboardSaveConflict", "@P1", "@all"] },
+    async () => {
+      const conflict = pm.dashboardSaveConflict;
+      dashboardId = await createConflictDashboard(pm.apiCleanup, uniqueTitle("SaveConflict"), PANELS);
+      await conflict.openDashboard(dashboardId);
+
+      await otherUserSaves(pm.apiCleanup, dashboardId, (d) => {
+        d.variables.list.push({ name: "regionB", type: "constant", label: "regionB", value: "us", query_data: {}, options: [] });
+      });
+
+      await pm.dashboardSetting.openSetting();
+      await pm.dashboardSetting.openVariables();
+      await pm.dashboardSetting.selectConstantType("Constant", "envA", "prod");
+      await pm.dashboardSetting.saveVariable();
+      await conflict.waitForDialog();
+      await expect(conflict.myChange).toContainText("envA");
+      await expect(conflict.changeRow("variable", "added")).toContainText("regionB");
+
+      const confirmText = await conflict.startOverwrite();
+      expect(confirmText).toContain("regionB");
+      await conflict.confirmOverwrite();
+
+      const names = (await getServerDashboard(pm.apiCleanup, dashboardId)).dashboard.variables.list.map((v) => v.name);
+      expect(names).toContain("envA");
+      expect(names).not.toContain("regionB");
+    },
+  );
+
+  test(
     "two users in separate browsers: the second user's Overwrite after closing the dialog saves exactly their screen",
     { tag: ["@dashboardSaveConflict", "@regression", "@P1", "@all"] },
     async ({ page, browser }) => {
       const conflict = pm.dashboardSaveConflict;
       dashboardId = await createConflictDashboard(pm.apiCleanup, uniqueTitle("SaveConflict"), PANELS);
 
-      const contextB = await browser.newContext({
-        storageState: await page.context().storageState(),
-        viewport: { width: 1500, height: 1024 },
-      });
+      const contextB = await newAppContext(browser, await page.context().storageState());
       try {
         const pageB = await contextB.newPage();
         const conflictB = new PageManager(pageB).dashboardSaveConflict;

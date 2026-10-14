@@ -16,6 +16,43 @@ function generateUUID() {
 }
 
 /**
+ * A browser context set up like the test fixture's: app viewport, clipboard permissions and first-run popups suppressed.
+ * Specs that need a second user in their own browser use this so both sessions behave the same.
+ * @param {import('@playwright/test').Browser} browser
+ * @param {string|object} [storageState] - auth state file or object; omitted means a logged-out context
+ */
+async function newAppContext(browser, storageState) {
+  const context = await browser.newContext({
+    ...(storageState ? { storageState } : {}),
+    viewport: { width: 1500, height: 1024 },
+    // browser.newContext() does NOT inherit the project's `use.permissions`,
+    // so overriding this fixture silently drops them. Specs that read the
+    // clipboard (share-link, legends-copy, table-copy-cell) then fail on a
+    // rejected navigator.clipboard.readText().
+    permissions: ['clipboard-read', 'clipboard-write']
+  });
+
+  // A storageState older than a day makes the cloud day-2 Slack invite modal open on every page load.
+  // The connect-data popup is per-session, and opens whenever an org has no streams yet (navigateToBase runs before ingestion).
+  let cloudUserEmail = null;
+  try {
+    cloudUserEmail = isCloudEnvironment() ? getCloudConfig()?.userEmail || null : null;
+  } catch (_) {}
+  await context.addInitScript((email) => {
+    try {
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith('slackCommunityInvite:')) {
+          localStorage.setItem(key, JSON.stringify({ status: 'resolved', shownAt: null, dismissCount: 0 }));
+        }
+      }
+      if (email) sessionStorage.setItem(`connectDataSourcePromptShown:${email}`, 'true');
+    } catch (_) {}
+  }, cloudUserEmail);
+
+  return context;
+}
+
+/**
  * Enhanced test fixture with global session management
  * Uses saved authentication state from global setup
  */
@@ -23,44 +60,16 @@ const test = baseTest.extend({
   // Enhanced context with saved authentication state
   context: async ({ browser }, use) => {
     let context;
-    
+
     try {
       // Check if auth file exists from global setup
       if (fs.existsSync(authFile)) {
         testLogger.info('Using saved authentication state');
-        context = await browser.newContext({
-          storageState: authFile,
-          viewport: { width: 1500, height: 1024 },
-          // browser.newContext() does NOT inherit the project's `use.permissions`,
-          // so overriding this fixture silently drops them. Specs that read the
-          // clipboard (share-link, legends-copy, table-copy-cell) then fail on a
-          // rejected navigator.clipboard.readText().
-          permissions: ['clipboard-read', 'clipboard-write']
-        });
+        context = await newAppContext(browser, authFile);
       } else {
         testLogger.warn('No saved auth state found, creating fresh context');
-        context = await browser.newContext({
-          viewport: { width: 1500, height: 1024 },
-          permissions: ['clipboard-read', 'clipboard-write']
-        });
+        context = await newAppContext(browser);
       }
-      
-      // A storageState older than a day makes the cloud day-2 Slack invite modal open on every page load.
-      // The connect-data popup is per-session, and opens whenever an org has no streams yet (navigateToBase runs before ingestion).
-      let cloudUserEmail = null;
-      try {
-        cloudUserEmail = isCloudEnvironment() ? getCloudConfig()?.userEmail || null : null;
-      } catch (_) {}
-      await context.addInitScript((email) => {
-        try {
-          for (const key of Object.keys(localStorage)) {
-            if (key.startsWith('slackCommunityInvite:')) {
-              localStorage.setItem(key, JSON.stringify({ status: 'resolved', shownAt: null, dismissCount: 0 }));
-            }
-          }
-          if (email) sessionStorage.setItem(`connectDataSourcePromptShown:${email}`, 'true');
-        } catch (_) {}
-      }, cloudUserEmail);
 
       // Add coverage collection (from original baseFixtures)
       await context.addInitScript(() =>
@@ -211,5 +220,6 @@ module.exports = {
   expect,
   generateUUID,
   verifyAuthentication,
-  navigateToBase
+  navigateToBase,
+  newAppContext
 };
