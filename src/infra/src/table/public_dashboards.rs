@@ -110,6 +110,44 @@ pub async fn list_by_dashboard<C: ConnectionTrait>(
         .await?)
 }
 
+/// Live links per org, split into (enabled and not expired, paused and not expired, expired).
+pub async fn count_by_org_status<C: ConnectionTrait>(
+    db: &C,
+    now: i64,
+) -> Result<Vec<(String, &'static str, i64)>, errors::Error> {
+    let not_expired = links::Column::ExpiresAt
+        .is_null()
+        .or(links::Column::ExpiresAt.gt(now));
+    let mut out = Vec::new();
+    for (filter, enabled) in [(not_expired.clone(), true), (not_expired, false)] {
+        let rows: Vec<(String, i64)> = links::Entity::find()
+            .select_only()
+            .column(links::Column::OrgId)
+            .column_as(links::Column::Id.count(), "n")
+            .filter(links::Column::DeletedAt.is_null())
+            .filter(links::Column::Enabled.eq(enabled))
+            .filter(filter)
+            .group_by(links::Column::OrgId)
+            .into_tuple()
+            .all(db)
+            .await?;
+        let status = if enabled { "live" } else { "paused" };
+        out.extend(rows.into_iter().map(|(org, n)| (org, status, n)));
+    }
+    let expired: Vec<(String, i64)> = links::Entity::find()
+        .select_only()
+        .column(links::Column::OrgId)
+        .column_as(links::Column::Id.count(), "n")
+        .filter(links::Column::DeletedAt.is_null())
+        .filter(links::Column::ExpiresAt.lte(now))
+        .group_by(links::Column::OrgId)
+        .into_tuple()
+        .all(db)
+        .await?;
+    out.extend(expired.into_iter().map(|(org, n)| (org, "expired", n)));
+    Ok(out)
+}
+
 /// Inserts the link unless its org or dashboard is at its cap; the count and the insert run under
 /// a per-org advisory lock on Postgres and behind SQLite's single writer, so no create overshoots.
 pub async fn insert_capped(
@@ -523,5 +561,39 @@ mod tests {
         assert_eq!(outbox_list_due(&db, 40, 10).await.unwrap()[0].rev, 7);
         outbox_delete(&db, "l", 7).await.unwrap();
         assert!(outbox_list_due(&db, 100, 10).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn links_are_counted_per_org_by_lifecycle_status() {
+        let db = db().await;
+        let mut paused = link("b", "o1", "d");
+        paused.enabled = false;
+        let mut expired = link("c", "o1", "d");
+        expired.expires_at = Some(5);
+        let mut deleted = link("d", "o2", "d");
+        deleted.deleted_at = Some(1);
+        for model in [
+            link("a", "o1", "d"),
+            paused,
+            expired,
+            deleted,
+            link("e", "o2", "d"),
+        ] {
+            assert_eq!(
+                insert_capped(&db, &model, 50, 50).await.unwrap(),
+                CreateOutcome::Created
+            );
+        }
+        let mut got = count_by_org_status(&db, 10).await.unwrap();
+        got.sort();
+        assert_eq!(
+            got,
+            [
+                ("o1".to_string(), "expired", 1),
+                ("o1".to_string(), "live", 1),
+                ("o1".to_string(), "paused", 1),
+                ("o2".to_string(), "live", 1),
+            ]
+        );
     }
 }

@@ -150,6 +150,18 @@ pub async fn get_by_id(
     Ok(Some((folder, dash)))
 }
 
+/// [`get_by_id`] from the primary, for a build that must see the latest saved dashboard.
+pub async fn get_by_id_primary(
+    org_id: &str,
+    dashboard_id: &str,
+) -> Result<Option<(Folder, Dashboard)>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let Some((folder_m, dash_m)) = get_model_by_id(client, org_id, dashboard_id).await? else {
+        return Ok(None);
+    };
+    Ok(Some((folder_m.into(), dash_m.try_into()?)))
+}
+
 /// Lists dashboards.
 pub async fn list(params: ListDashboardsParams) -> Result<Vec<(Folder, Dashboard)>, errors::Error> {
     let client = get_orm_client_ro().await;

@@ -84,6 +84,8 @@ impl<'a> Defaults<'a> {
         let idx = self.pending.remove(pos);
         Some(Pending {
             idx,
+            key: self.instances[idx].key.clone(),
+            depends_on: self.dependencies(idx),
             query: self.values_query(idx),
         })
     }
@@ -209,6 +211,10 @@ struct Instance<'a> {
 /// A values query handed out by [`Defaults::next_query`], to give back to [`Defaults::settle`].
 pub struct Pending {
     idx: usize,
+    /// The frozen-value key this query fills.
+    pub key: String,
+    /// Keys whose values the query text was built from.
+    pub depends_on: Vec<String>,
     pub query: ValuesQuery,
 }
 
