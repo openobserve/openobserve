@@ -45,8 +45,19 @@ describe("public_dashboards viewer service", () => {
 
   it("getData() passes the range key as a query param", async () => {
     await service.getData("slug1", "r3600");
-    expect(mockGet).toHaveBeenCalledWith("/api/public_dashboards/slug1/data", {
-      params: { range: "r3600" },
-    });
+    expect(mockGet).toHaveBeenCalledWith(
+      "/api/public_dashboards/slug1/data",
+      expect.objectContaining({ params: { range: "r3600" }, headers: undefined }),
+    );
+  });
+
+  it("getData() sends the body on screen as If-None-Match and treats 304 as an answer", async () => {
+    await service.getData("slug1", "r3600", "a1f3");
+    const options = mockGet.mock.calls[0][1];
+    expect(options.headers).toEqual({ "If-None-Match": '"a1f3"' });
+    expect(options.validateStatus(304)).toBe(true);
+    expect(options.validateStatus(202)).toBe(true);
+    expect(options.validateStatus(503)).toBe(false);
+    expect(options.validateStatus(429)).toBe(false);
   });
 });

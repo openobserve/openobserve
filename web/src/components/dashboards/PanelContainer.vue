@@ -79,6 +79,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <OTooltip :content="curatedBadgeTooltip" side="bottom" />
         </OTag>
+        <!-- A note the injected result carries about itself, such as the public view's retained or truncated data. -->
+        <OTag
+          v-if="injectedNotice"
+          variant="default-soft"
+          size="sm"
+          class="shrink-0 @max-[8rem]/panelbar:hidden"
+          data-test="dashboard-panel-injected-notice"
+        >
+          {{ injectedNotice }}
+        </OTag>
         <OTag
           v-if="
             exemplarsEligible && exemplarsOn && PanleSchemaRendererRef?.exemplarsStatus === 'empty'
@@ -393,7 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       class="drag-cancel relative min-h-0 flex-1"
-      :class="curatedBadge ? 'opacity-60' : undefined"
+      :class="curatedBadge || props.injectedPanelData?.dimmed ? 'opacity-60' : undefined"
       data-test="dashboard-panel-body"
       :data-curated-stale="curatedBadge ? 'true' : 'false'"
     >
@@ -668,6 +678,7 @@ export default defineComponent({
       curatedBadge.value ? t(curatedBadge.value.key as never, curatedBadgeParams.value) : raw(""),
     );
     // Both halves are already translated; joining them widens to string without untranslating either.
+    const injectedNotice = computed(() => props.injectedPanelData?.notice);
     const curatedBadgeTooltip = computed(() =>
       raw(`${curatedBadgeText.value} · ${t("infra.curated.staleBadgeTooltip")}`),
     );
@@ -1238,6 +1249,7 @@ export default defineComponent({
       curatedBadgeParams,
       curatedBadgeText,
       curatedBadgeTooltip,
+      injectedNotice,
       curatedNoData,
       curatedAllClear,
       curatedTile,
