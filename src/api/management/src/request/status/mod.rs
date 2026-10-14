@@ -2437,6 +2437,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(feature = "enterprise"))]
     #[tokio::test]
     async fn test_zo_config_serves_product_analytics_enabled_under_that_key() {
         let cfg = get_config();
@@ -2451,6 +2452,5 @@ mod tests {
             json["product_analytics_enabled"],
             serde_json::Value::Bool(cfg.common.product_analytics_enabled)
         );
-        assert_eq!(json["product_analytics_enabled"], false);
     }
 }

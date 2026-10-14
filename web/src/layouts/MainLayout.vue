@@ -527,13 +527,6 @@ export default defineComponent({
         link: "/rum",
         name: "rum",
       },
-      // Experience absorbs this tile; it stays here so custom_hide_menus and the group's `requires` can see it.
-      {
-        title: t("menu.productAnalytics"),
-        icon: "insights",
-        link: "/product-analytics",
-        name: "productAnalytics",
-      },
       {
         title: t("menu.dashboard"),
         icon: "dashboard",
