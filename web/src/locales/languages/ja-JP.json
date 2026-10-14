@@ -13818,6 +13818,14 @@
         "previewEmpty": "実行内容を確認するにはデータセットを選択してください。",
         "previewLoading": "スロットを計算中…",
         "previewSlots": "実行するスロット",
+        "costEstimate": "推定 ~{cost}（概算）",
+        "costUnknown": "コストを推定できませんでした",
+        "costLowerBound": "下限値、一部のモデルには価格がありません",
+        "costScoringOnly": "スコアリングのコストのみ",
+        "costConfirmTitle": "コストの高い実験を実行しますか？",
+        "costConfirmMessage": "この実験のコストは約 {cost} と推定され、警告しきい値 {threshold} を超えています。それでも作成して実行しますか？",
+        "costConfirmMessageUnpriced": "この実験は警告しきい値を超えるコストが見込まれます。それでも作成して実行しますか？",
+        "costConfirmOk": "それでも作成",
         "skippedFully": "{count} 行が完全にスキップされました — 選択したすべてのスコアラーには期待される出力が必要です。スキップされた行の実行にはコストはかかりません。",
         "skippedPartially": "{count} 行が部分的にスキップされました — タスクは引き続き実行されますが、参照ベースのスコアラーは期待される出力のない行をスコアリングできません。",
         "skippedNone": "一致するすべての行は、少なくとも1つの次元でスコアリングできます。",
@@ -14441,6 +14449,8 @@
       },
       "testPanel": {
         "title": "接続テスト",
+        "storedCredentialsHint": "公開済みの v{version}（{endpoint}）を保存済みの認証情報でテストします。未保存の編集内容は公開時にテストされます。",
+        "unpublishedSecretHint": "このタスクはまだ公開されていないため、テストできる保存済みバージョンがありません。「変更を公開」は保存済みの下書きを保存済みの認証情報でテストし、テストに成功した場合は公開します。",
         "sourceLabel": "サンプル入力",
         "sourceDataset": "データセットから",
         "sourceManual": "手動",
@@ -14462,7 +14472,15 @@
         "rawRequest": "送信されたリクエスト",
         "rawResponse": "受信したレスポンス",
         "idle": "テストを実行すると、リクエストとレスポンスの両方がここに表示されます。",
-        "disabledHint": "最初に名前とエンドポイントを入力してください。"
+        "disabledHint": "最初に名前とエンドポイントを入力してください。",
+        "failure": {
+          "transport": "エンドポイントに到達できませんでした。",
+          "deadlineExceeded": "エンドポイントが時間内に応答しませんでした。",
+          "httpStatus": "エンドポイントが HTTP {status} を返しました。",
+          "badResponse": "レスポンスパスではレスポンスを読み取れませんでした。",
+          "outputTooLarge": "レスポンスが大きすぎます。",
+          "requestError": "タスクからリクエストを構築できませんでした。"
+        }
       },
       "detail": {
         "backTo": "リモートタスク",
@@ -14565,6 +14583,14 @@
         },
         "attemptsValue": "{count} / {max}",
         "resultsTitle": "結果"
+      },
+      "credentialsDialog": {
+        "open": "認証情報を置き換え",
+        "title": "認証情報を置き換え",
+        "body": "新しい値は保存済みの値をその場で置き換えます。タスクのバージョンは変わらず、保存済みの値が表示されることはありません。",
+        "submit": "置き換え",
+        "success": "認証情報を置き換えました",
+        "error": "認証情報を置き換えできませんでした"
       },
       "signingPanel": {
         "title": "署名キー",
