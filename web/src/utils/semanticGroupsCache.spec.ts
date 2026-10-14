@@ -60,6 +60,20 @@ describe("semanticGroupsCache — concurrent failure reporting", () => {
     expect(getSemanticGroupsMock).toHaveBeenCalledTimes(1);
   });
 
+  it("does not log a cancelled load as an error", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    getSemanticGroupsMock.mockImplementation(() => new Promise(() => {}));
+    const errors: any[] = [];
+    const loading = loadSemanticGroups("org-cancel", (e) => errors.push(e));
+    await new Promise((r) => setTimeout(r, 0));
+    queryClient.removeQueries({ queryKey: serviceStreamKeys.semanticGroups("org-cancel") });
+
+    expect(await loading).toEqual([]);
+    expect(errors).toHaveLength(1);
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
   it("a successful shared request reports NO error to either caller", async () => {
     // Paired with the case above so it cannot pass by always invoking onError.
     const groups = [{ id: "host", display: "Host", fields: ["host_name"] }];

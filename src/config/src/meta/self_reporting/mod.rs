@@ -23,6 +23,7 @@ use tokio::{
 };
 use usage::{TriggerData, UsageData};
 
+pub mod ai_chat;
 pub mod error;
 pub mod evaluator;
 pub mod llm_experiments;
