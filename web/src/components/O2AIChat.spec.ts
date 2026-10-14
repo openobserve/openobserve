@@ -974,6 +974,26 @@ describe("O2AIChat", () => {
 
         expect((wrapper.vm as any).inputMessage).toBe("count errors");
       });
+
+      it("resending replaces the refused prompt instead of repeating it", async () => {
+        await sendAndGetLast("subscribe");
+        const vm = wrapper.vm as any;
+        mockFetchAiChat.mockResolvedValueOnce({
+          ok: false,
+          status: 402,
+          json: vi
+            .fn()
+            .mockResolvedValue({ error_type: "ai_credits_exhausted", remedy: "subscribe" }),
+        });
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        const sent = mockFetchAiChat.mock.calls.at(-1)![0] as Array<{ role: string }>;
+        expect(sent.filter((m) => m.role === "user")).toHaveLength(1);
+        expect(vm.chatMessages.filter((m: any) => m.role === "user")).toHaveLength(1);
+        expect(vm.chatMessages).toHaveLength(2);
+      });
     });
 
     describe("streamOwnerUnavailable lifecycle", () => {

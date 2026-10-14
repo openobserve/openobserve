@@ -1103,6 +1103,17 @@ export default defineComponent({
       if ((!hasText && !hasImages) || isLoading.value) return;
       turnLimitError.value = false;
 
+      // A credits-refused turn (prompt plus a reply of only ephemeral notices) is replaced, not repeated.
+      const [prev, last] = chatMessages.value.slice(-2);
+      if (
+        prev?.role === "user" &&
+        last?.role === "assistant" &&
+        last.contentBlocks?.length &&
+        last.contentBlocks.every((block) => block.ephemeral)
+      ) {
+        chatMessages.value.splice(-2, 2);
+      }
+
       let backendMessage = inputMessage.value;
       if (chatInput.value && typeof chatInput.value.getMessageForBackend === "function") {
         backendMessage = chatInput.value.getMessageForBackend();
