@@ -70,6 +70,7 @@
                 })
               "
               size="sm"
+              class="min-w-0 flex-1"
               :data-test="`test-match-attribute-key-${aIdx}`"
             />
             <OInput
@@ -77,6 +78,7 @@
               :label="t('modelPricing.testAttributeValue')"
               :placeholder="t('modelPricing.ruleValuesPlaceholder', { example: raw('flex') })"
               size="sm"
+              class="min-w-0 flex-1"
               :data-test="`test-match-attribute-value-${aIdx}`"
             />
             <OButton
