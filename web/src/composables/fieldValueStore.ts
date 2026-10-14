@@ -52,7 +52,8 @@ const MAX_FIELDS_STORED = Number((import.meta as any).env?.VITE_MAX_FIELDS_STORE
 // How far back to look when asking the server for values a cold cache has never
 // seen. Recent values are the useful ones for completion, and a narrow window
 // keeps the scan small.
-const VALUES_LOOKBACK_MS = 15 * 60 * 1000;
+export const FIELD_VALUES_LOOKBACK_MINUTES = 15;
+const VALUES_LOOKBACK_MS = FIELD_VALUES_LOOKBACK_MINUTES * 60 * 1000;
 
 // How many values one request asks for. A dropdown shows a handful; the
 // endpoint charges for the rest.
@@ -261,6 +262,20 @@ export const getFieldValuesForSuggestion = async (
 // questions, and the point of both maps is that the second asker pays nothing.
 const inFlightRequests = new Map<string, Promise<string[]>>();
 const suppressedUntil = new Map<string, number>();
+const failedKeys = new Set<string>();
+
+const NO_VALUE_LOOKUP = "NoValueLookup";
+
+/** Rejects a lookup that never ran, e.g. before the stream is known, so the editor never claims there are no values. */
+export const noValueLookup = (): Error =>
+  Object.assign(new Error("no field value lookup ran"), { name: NO_VALUE_LOOKUP });
+
+export const isNoValueLookup = (error: unknown): boolean =>
+  (error as Error | undefined)?.name === NO_VALUE_LOOKUP;
+
+/** True while the last server lookup for this field failed, so "no values" would be a lie. */
+export const fieldValuesUnavailable = (ctx: StreamContext, fieldName: string): boolean =>
+  failedKeys.has(makeKey(ctx, fieldName));
 
 /**
  * Ask the server for a field's recent values, and leave them in the cache.
@@ -275,8 +290,7 @@ const suppressedUntil = new Map<string, number>();
  * this key and primed it with an EMPTY list, and without invalidation the next
  * keystroke would still see nothing for a minute.
  *
- * Never throws, and never blocks anything that matters — see the callers, which
- * do not await it.
+ * Never throws; the editor races it against a wait budget and a late answer still fills the cache.
  */
 export const requestFieldValues = async (
   ctx: StreamContext,
@@ -325,6 +339,7 @@ export const requestFieldValues = async (
         .map((entry: any) => String(entry?.zo_sql_key ?? ""))
         .filter((value: string) => value.length > 0);
 
+      failedKeys.delete(key);
       if (values.length) {
         // The read cache is filled HERE, synchronously, so the next keystroke
         // is local. captureFromValuesApi persists to IndexedDB on
@@ -342,6 +357,7 @@ export const requestFieldValues = async (
       return values;
     } catch {
       // Failed, or took too long to matter. Either way, wait before asking again.
+      failedKeys.add(key);
       suppressedUntil.set(key, Date.now() + VALUES_RETRY_COOLDOWN_MS);
       return [];
     } finally {

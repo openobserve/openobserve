@@ -2762,15 +2762,28 @@ export default defineComponent({
       return searchObj.data.transformType === "function" ? "Function" : "Transform";
     });
 
+    // Set as soon as the stream is chosen, so a value lookup on the first keystroke is not left without one.
+    const syncSuggestStreamContext = () => {
+      autoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
+      autoCompleteData.value.streamType = searchObj.data.stream.streamType ?? "logs";
+      autoCompleteData.value.streamName = searchObj.data.stream.selectedStream?.[0] ?? "";
+    };
+    watch(
+      () => [
+        store.state.selectedOrganization?.identifier,
+        searchObj.data.stream.streamType,
+        searchObj.data.stream.selectedStream?.[0],
+      ],
+      syncSuggestStreamContext,
+      { immediate: true },
+    );
+
     const updateAutoComplete = (value) => {
       autoCompleteData.value.query = value;
       autoCompleteData.value.cursorIndex = queryEditorRef?.value?.getCursorIndex();
       autoCompleteData.value.fieldValues = props.fieldValues;
       autoCompleteData.value.popup.open = queryEditorRef?.value?.triggerAutoComplete;
-      // [NEW] Pass stream context for IndexedDB value lookups
-      autoCompleteData.value.org = store.state.selectedOrganization.identifier;
-      autoCompleteData.value.streamType = searchObj.data.stream.streamType ?? "logs";
-      autoCompleteData.value.streamName = searchObj.data.stream.selectedStream?.[0] ?? "";
+      syncSuggestStreamContext();
       getSuggestions();
     };
 

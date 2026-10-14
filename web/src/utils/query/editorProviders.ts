@@ -28,7 +28,10 @@ import type { SqlCompletionEntry } from "./sqlCompletion";
 
 /** An entry as it may arrive from either list. Org VRL functions come through
  *  `updateFunctionKeywords` carrying a `label` and no `name`. */
-type LooseEntry = Partial<SqlCompletionEntry> & { label: string; kind?: string };
+type LooseEntry = Partial<SqlCompletionEntry> & {
+  label: string;
+  kind?: string;
+};
 
 /** The identity of an entry, whichever key it happens to carry. */
 const entryName = (entry: LooseEntry): string => entry.name ?? entry.label ?? "";
@@ -271,82 +274,285 @@ export const rankNumericFieldsFirst = (entries: LooseEntry[]): LooseEntry[] =>
       : entry,
   );
 
-/**
- * Detect that the cursor sits where a field VALUE belongs.
- *
- * Mirrors the operator set the composable has always recognised. Returned so
- * the completion provider can await the value lookup itself instead of the
- * parent debouncing, fetching, pushing a prop down and re-opening the widget.
- */
-export const parseValueContext = (
-  textUntilCursor: string,
-): { field: string; hasOpenQuote: boolean } | null => {
-  const regex =
-    /(\w+)\s*(?:!=|<>|>=|<=|=|>|<)\s*(?:'[^']*)?$|(\w+)\s+(?:NOT\s+)?IN\s*\(\s*(?:'[^']*)?$|(\w+)\s+(?:NOT\s+)?LIKE\s*(?:'[^']*)?$|(?:str_match|fuzzy_match)\s*\(\s*(\w+)\s*,\s*(?:'[^']*)?$/i;
-  const match = regex.exec(textUntilCursor);
-  if (!match) return null;
-  const field = match[1] ?? match[2] ?? match[3] ?? match[4];
-  if (!field) return null;
-  return {
-    field,
-    hasOpenQuote: /'[^']*$/.test(textUntilCursor.slice(match.index)),
-  };
+export const VALUE_WAIT_BUDGET_MS = 1000;
+
+/** A list this long may be cut short by the lookup, so the menu says so. */
+export const VALUES_SHOWN_CAP = 10;
+
+export type ValueOperator = "compare" | "in" | "like" | "match";
+
+export interface ValueContext {
+  field: string;
+  hasOpenQuote: boolean;
+  typed: string;
+  operator: ValueOperator;
+  /** Earlier elements of the IN list being typed; empty for every other operator. */
+  chosen: string[];
+}
+
+const BARE_OR_QUOTED = String.raw`(?:'([^']*)|([\w.\-]*))`;
+// A finished IN element: a quoted literal ('' is an escaped quote) or a bare number, boolean or word.
+const IN_ELEMENT = String.raw`(?:'(?:[^']|'')*'|[\w.\-+]+)`;
+const IN_ELEMENT_EACH = /'((?:[^']|'')*)'|([\w.\-+]+)/g;
+
+const VALUE_PATTERNS: [ValueOperator, RegExp][] = [
+  ["compare", new RegExp(String.raw`(\w+)\s*(?:!=|<>|>=|<=|=|>|<)\s*${BARE_OR_QUOTED}$`)],
+  [
+    "in",
+    new RegExp(
+      String.raw`(\w+)\s+(?:NOT\s+)?IN\s*\(\s*(?:${IN_ELEMENT}\s*,\s*)*${BARE_OR_QUOTED}$`,
+      "i",
+    ),
+  ],
+  ["like", new RegExp(String.raw`(\w+)\s+(?:NOT\s+)?I?LIKE\s*${BARE_OR_QUOTED}$`, "i")],
+  ["match", /(?:str_match|fuzzy_match)\s*\(\s*(\w+)\s*,\s*(?:'([^']*)|())$/i],
+];
+
+const chosenInValues = (list: string): string[] =>
+  [...list.matchAll(IN_ELEMENT_EACH)].map(
+    ([, quoted, bare]) => quoted?.replace(/''/g, "'") ?? bare,
+  );
+
+export const parseValueContext = (textUntilCursor: string): ValueContext | null => {
+  for (const [operator, pattern] of VALUE_PATTERNS) {
+    const match = pattern.exec(textUntilCursor);
+    if (!match) continue;
+    const quoted = match[2];
+    // `match_all('user=` is text inside a string, not a comparison: only the match's own quote may open one.
+    const codeUpTo =
+      quoted === undefined ? textUntilCursor.length : match.index + match[0].lastIndexOf("'");
+    if (literalStateAtEnd(textUntilCursor.slice(0, codeUpTo)) !== "code") continue;
+    const typed = quoted ?? match[3] ?? "";
+    // The finished elements run from the IN paren to where the element being typed starts.
+    const listEnd = match[0].length - typed.length - (quoted === undefined ? 0 : 1);
+    return {
+      field: match[1],
+      hasOpenQuote: quoted !== undefined,
+      typed,
+      operator,
+      chosen:
+        operator === "in" ? chosenInValues(match[0].slice(match[0].indexOf("(") + 1, listEnd)) : [],
+    };
+  }
+  return null;
+};
+
+export const literalStateAtEnd = (text: string): "code" | "string" | "comment" => {
+  let state: "code" | "string" | "identifier" | "line" | "block" = "code";
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (state === "line") {
+      if (ch === "\n") state = "code";
+    } else if (state === "block") {
+      if (ch === "*" && next === "/") {
+        state = "code";
+        i++;
+      }
+    } else if (state === "string" || state === "identifier") {
+      const quote = state === "string" ? "'" : '"';
+      // A doubled quote is an escaped quote, not the end of the literal.
+      if (ch === quote && next === quote) i++;
+      else if (ch === quote) state = "code";
+    } else if (ch === "'") state = "string";
+    else if (ch === '"') state = "identifier";
+    else if (ch === "-" && next === "-") state = "line";
+    else if (ch === "/" && next === "*") {
+      state = "block";
+      i++;
+    }
+  }
+  if (state === "string") return "string";
+  return state === "line" || state === "block" ? "comment" : "code";
+};
+
+export type ColumnKind = "text" | "number" | "boolean" | "unknown";
+
+export const columnKind = (type?: string): ColumnKind => {
+  if (!type) return "unknown";
+  if (NUMERIC_TYPE.test(type)) return "number";
+  if (/^bool/i.test(type)) return "boolean";
+  if (/utf8|string|binary|text|varchar/i.test(type)) return "text";
+  return "unknown";
 };
 
 export interface ValueEntryOptions {
   /** The user has typed an opening quote, so the value only needs closing. */
   hasOpenQuote: boolean;
-  /**
-   * Monaco's auto-closed quote sits immediately after the cursor.
-   *
-   * Invisible to a parser that sees only the text BEFORE the cursor: typing a
-   * quote makes the text `level = ''` with the cursor between them, and
-   * appending our own closer produced `level = 'error''`.
-   */
+  /** Monaco's auto-closed quote sits right after the cursor and must be swallowed. */
   closingQuoteAhead?: boolean;
-  /** The replacement range monaco reported. Needed to swallow that quote. */
   range?: Record<string, number>;
+  /** Without it the value itself decides whether to quote. */
+  fieldType?: string;
+  pattern?: boolean;
 }
 
-/**
- * Build completion entries for resolved field values, quoted appropriately.
- *
- * When monaco has already auto-closed the quote, the entry EXTENDS its
- * replacement range over that quote and inserts its own. Simply omitting the
- * closer produces the right TEXT but leaves the cursor inside the string, so
- * the next thing typed lands inside the quotes -- which is how
- * `severity = 'INFO AND service_name = INFO'` happened while testing this.
- * Numeric values keep the plain range: they insert no closer, so swallowing
- * the quote would leave the literal unterminated.
- */
+const looksBare = (value: string): boolean =>
+  (value !== "" && !Number.isNaN(Number(value))) || value === "true" || value === "false";
+
+/** % and _ are wildcards and \ is DataFusion's implicit LIKE escape; an ESCAPE '\' literal would read as unterminated to the editor's scanners. */
+const likeLiteral = (value: string): string =>
+  `%${value.replace(/[\\%_]/g, "\\$&").replace(/'/g, "''")}%`;
+
 export const buildValueEntries = (
   values: string[],
-  { hasOpenQuote, closingQuoteAhead = false, range }: ValueEntryOptions,
-): LooseEntry[] =>
-  values.map((value, index) => {
-    const isNumeric = value !== "" && !Number.isNaN(Number(value));
-    const isBoolean = value === "true" || value === "false";
-
+  { hasOpenQuote, closingQuoteAhead = false, range, fieldType, pattern = false }: ValueEntryOptions,
+): LooseEntry[] => {
+  const kind = columnKind(fieldType);
+  return values.map((value, index) => {
     const entry: LooseEntry = {
       name: value,
       label: value,
       kind: "Value",
       insertText: value,
-      // Values sort above every other lane. Written as an ESCAPE, not a raw
-      // control character: a literal NUL in the source makes the file binary
-      // to git and grep, and is silently easy to mangle in an edit.
+      // An escape, not a raw NUL: a literal one makes the file binary to git.
       sortText: `\u0000${String(index).padStart(6, "0")}`,
+      filterText: value,
     };
 
-    if (isNumeric || isBoolean) return entry;
+    const bareByType = kind === "number" || kind === "boolean";
+    const bare =
+      !hasOpenQuote && !pattern && (bareByType || (kind === "unknown" && looksBare(value)));
+    if (bare) return entry;
+
+    const literal = pattern ? likeLiteral(value) : value.replace(/'/g, "''");
+    // The label shows what goes in, so `'200'` and `200` read differently before they are picked.
+    entry.label = `'${literal}'`;
     if (!hasOpenQuote) {
-      entry.insertText = `'${value}'`;
+      entry.insertText = `'${literal}'`;
+      // Filtered as typed, quote included: a late answer is matched against `'e` as well as `e`.
+      entry.filterText = `'${value}'`;
       return entry;
     }
 
-    entry.insertText = `${value}'`;
+    entry.insertText = `${literal}'`;
+    entry.filterText = pattern ? literal : value;
+    // Swallow Monaco's auto-closed quote, or the caret is left inside the string.
     if (closingQuoteAhead && range) {
       entry.range = { ...range, endColumn: (range.endColumn ?? 1) + 1 };
     }
     return entry;
   });
+};
+
+export type ValueStatus = "loading" | "empty" | "failed" | "cap";
+
+export const valueStatusText = (
+  t: TranslateFn,
+  status: ValueStatus,
+  field: string,
+  { minutes = 0, count = 0 }: { minutes?: number; count?: number } = {},
+): string => {
+  if (status === "loading") return t("sqlEditor.completion.valuesLoading", { field });
+  if (status === "empty") return t("sqlEditor.completion.valuesEmpty", { field, minutes });
+  if (status === "failed") return t("sqlEditor.completion.valuesFailed", { field });
+  return t("sqlEditor.completion.valuesCap", { count }, count);
+};
+
+/** A row that inserts nothing; a loading row's hint sits in the label's description. */
+export const buildValueStatusEntry = (
+  t: TranslateFn,
+  status: ValueStatus,
+  field: string,
+  details: { minutes?: number; count?: number } = {},
+): LooseEntry => ({
+  name: `\u0000${status}`,
+  // The row sits under the field's own value position, so a loading row leaves the name out and its hint never truncates.
+  label:
+    status === "loading"
+      ? t("sqlEditor.completion.valuesLoadingRow")
+      : valueStatusText(t, status, field, details),
+  description: status === "loading" ? t("sqlEditor.completion.valuesLoadingHint") : undefined,
+  kind: status === "loading" ? "Event" : "Issue",
+  insertText: "",
+  // The cap row trails the values it counts, above the fields that follow them.
+  sortText: status === "cap" ? "\u0000\uffff" : "\u0000",
+});
+
+const NUMERIC_TEXT = /^-?\d+(\.\d+)?([eE][-+]?\d+)?$/;
+
+/** A stable order between runs: numbers by value, everything else alphabetically. */
+export const orderValues = (values: string[], fieldType?: string): string[] => {
+  const unique = [...new Set(values)];
+  const kind = columnKind(fieldType);
+  const numeric =
+    kind === "number" || (kind === "unknown" && unique.every((v) => NUMERIC_TEXT.test(v)));
+  return numeric
+    ? unique.sort((a, b) => Number(a) - Number(b))
+    : unique.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+};
+
+export const fieldEntriesOf = (
+  keywords: (LooseEntry | string)[] = [],
+  suggestions: (LooseEntry | string)[] = [],
+): LooseEntry[] =>
+  [...keywords, ...suggestions]
+    .map((e): LooseEntry =>
+      typeof e === "string" ? { name: e, label: e, kind: "Field", insertText: e } : e,
+    )
+    .filter((e): e is LooseEntry => !!e && e.kind === "Field" && !!entryName(e))
+    // After every value: in a value position the column is the fallback, not the answer.
+    .map((e) => ({ ...e, sortText: `\u0001${entryName(e)}` }));
+
+export interface GuardedEditor {
+  getPosition: () => { lineNumber: number; column: number } | null;
+  getModel: () => {
+    getValueInRange: (range: Record<string, number>) => string;
+  } | null;
+  hasTextFocus?: () => boolean;
+}
+
+export interface ValueGuardSnapshot {
+  line: number;
+  column: number;
+  prefix: string;
+  escapes: number;
+}
+
+const textBetween = (
+  editor: GuardedEditor,
+  from: { line: number; column: number },
+  to: { line: number; column: number },
+): string =>
+  editor.getModel()?.getValueInRange({
+    startLineNumber: from.line,
+    startColumn: from.column,
+    endLineNumber: to.line,
+    endColumn: to.column,
+  }) ?? "";
+
+export const takeValueGuardSnapshot = (
+  editor: GuardedEditor | null,
+  escapes: number,
+): ValueGuardSnapshot | null => {
+  const position = editor?.getPosition();
+  if (!editor || !position) return null;
+  const at = { line: position.lineNumber, column: position.column };
+  return {
+    ...at,
+    prefix: textBetween(editor, { line: 1, column: 1 }, at),
+    escapes,
+  };
+};
+
+/** Guard v2: drop a late answer on Esc, blur, a move left, an edit before the cursor or typed whitespace. */
+export const isValueAnswerStale = (
+  snapshot: ValueGuardSnapshot | null,
+  editor: GuardedEditor | null,
+  escapes: number,
+): boolean => {
+  if (!snapshot || !editor) return false;
+  if (escapes !== snapshot.escapes) return true;
+  if (editor.hasTextFocus && !editor.hasTextFocus()) return true;
+  const position = editor.getPosition();
+  if (!position) return true;
+  if (position.lineNumber !== snapshot.line || position.column < snapshot.column) return true;
+  if (textBetween(editor, { line: 1, column: 1 }, snapshot) !== snapshot.prefix) return true;
+  if (position.column === snapshot.column) return false;
+  // Typing forward in the same token keeps the answer; Monaco filters it by what was typed.
+  const typed = textBetween(editor, snapshot, {
+    line: position.lineNumber,
+    column: position.column,
+  });
+  return /\s/.test(typed.replace(/^'/, ""));
+};

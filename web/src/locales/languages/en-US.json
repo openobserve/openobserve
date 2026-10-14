@@ -19949,7 +19949,13 @@
       "maxDoc": "Largest value in the field. Aggregate — pair with GROUP BY.",
       "minDoc": "Smallest value in the field. Aggregate — pair with GROUP BY.",
       "arrayExtractDoc": "Extract a single element from an array by 1-based index, e.g. `array_extract(regexp_match(log, '...'), 1)`.",
-      "approxTopkDoc": "Approximate the k most frequent values of a field. Much cheaper than an exact GROUP BY ... ORDER BY count DESC on high-cardinality fields."
+      "approxTopkDoc": "Approximate the k most frequent values of a field. Much cheaper than an exact GROUP BY ... ORDER BY count DESC on high-cardinality fields.",
+      "valuesLoading": "Still loading values for {field}",
+      "valuesLoadingRow": "Still loading values",
+      "valuesLoadingHint": "Keep typing, or press Esc then Ctrl+Space",
+      "valuesEmpty": "No values for {field} in the last {minutes} minutes",
+      "valuesFailed": "Couldn't load values for {field}",
+      "valuesCap": "{count} value shown · type to filter | {count} values shown · type to filter"
     },
     "diagnostics": {
       "incompleteAnd": "Incomplete condition — expected an expression after AND",

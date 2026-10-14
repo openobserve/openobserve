@@ -355,3 +355,50 @@ describe("requestFieldValues — when things go wrong", () => {
     ]);
   });
 });
+
+describe("fieldValuesUnavailable — telling a failure from an empty answer", () => {
+  it("is false before anything was asked and after an empty answer", async () => {
+    const store = await freshStore();
+    expect(store.fieldValuesUnavailable(ctx, "region")).toBe(false);
+    vi.mocked(streamService.fieldValues).mockResolvedValue(apiResponse([]) as any);
+    await store.requestFieldValues(ctx, "region");
+    expect(store.fieldValuesUnavailable(ctx, "region")).toBe(false);
+  });
+
+  it("is true after a failed request, and stays true through the cooldown", async () => {
+    const store = await freshStore();
+    vi.mocked(streamService.fieldValues).mockRejectedValue(new Error("500"));
+    await store.requestFieldValues(ctx, "region");
+    expect(store.fieldValuesUnavailable(ctx, "region")).toBe(true);
+    await expect(store.requestFieldValues(ctx, "region")).resolves.toEqual([]);
+    expect(store.fieldValuesUnavailable(ctx, "region")).toBe(true);
+  });
+
+  it("clears once a later request answers", async () => {
+    vi.useFakeTimers();
+    try {
+      const store = await freshStore();
+      vi.mocked(streamService.fieldValues).mockRejectedValueOnce(new Error("500"));
+      await store.requestFieldValues(ctx, "region");
+      vi.advanceTimersByTime(61_000);
+      vi.mocked(streamService.fieldValues).mockResolvedValue(apiResponse(["us-east-1"]) as any);
+      await store.requestFieldValues(ctx, "region");
+      expect(store.fieldValuesUnavailable(ctx, "region")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("names the lookback window the editor quotes", async () => {
+    const store = await freshStore();
+    expect(store.FIELD_VALUES_LOOKBACK_MINUTES).toBe(15);
+  });
+});
+
+describe("noValueLookup — a lookup that never ran", () => {
+  it("is recognisable, so the editor never turns it into 'no values'", async () => {
+    const store = await freshStore();
+    expect(store.isNoValueLookup(store.noValueLookup())).toBe(true);
+    expect(store.isNoValueLookup(new Error("500"))).toBe(false);
+  });
+});

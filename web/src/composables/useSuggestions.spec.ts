@@ -12,12 +12,12 @@ vi.mock("vuex", async (importOriginal) => {
 });
 
 // ─── Mock IDB so no real storage is touched ───────────────────────────────────
-vi.mock("@/composables/fieldValueStore", () => ({
+vi.mock("@/composables/fieldValueStore", async (importOriginal) => ({
+  noValueLookup: (await importOriginal<typeof import("@/composables/fieldValueStore")>())
+    .noValueLookup,
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue([]),
-  // Phase 5 (D9): the resolver asks the server when the cache is cold. Stubbed
-  // to a promise that NEVER settles by default, so any test that accidentally
-  // awaits it hangs visibly instead of passing by luck.
-  requestFieldValues: vi.fn(() => new Promise(() => {})),
+  requestFieldValues: vi.fn().mockResolvedValue([]),
+  fieldValuesUnavailable: vi.fn(() => false),
 }));
 
 // getSuggestions now lazily loads the server function catalog. Stub it to an
@@ -30,7 +30,11 @@ vi.mock("@/services/query_functions", async (importOriginal) => {
   });
 });
 
-import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
+import {
+  fieldValuesUnavailable,
+  getFieldValuesForSuggestion,
+  requestFieldValues,
+} from "@/composables/fieldValueStore";
 import useSqlSuggestions from "./useSuggestions";
 
 // ─── helper: build composable with common defaults ────────────────────────────
@@ -90,7 +94,7 @@ describe("resolveFieldValues — in-session and stored value merge", () => {
     const c = useSqlSuggestions();
     // org/streamType/streamName left as empty strings
     c.autoCompleteData.value.fieldValues = {};
-    await c.resolveFieldValues("status");
+    await expect(c.resolveFieldValues("status")).rejects.toMatchObject({ name: "NoValueLookup" });
     expect(getFieldValuesForSuggestion).not.toHaveBeenCalled();
   });
 
@@ -482,27 +486,44 @@ describe("Phase 3 — resolveFieldValues is exposed for the editor to await", ()
     await expect((c as any).resolveFieldValues("level")).resolves.toEqual([]);
   });
 
-  it("resolves to an empty list when no stream context is set", async () => {
+  it("says no lookup ran, rather than no values, when no stream context ever arrives", async () => {
     const c = makeComposable({ storedValues: ["error"] });
     c.autoCompleteData.value.streamName = "";
-    await expect((c as any).resolveFieldValues("level")).resolves.toEqual([]);
+    await expect((c as any).resolveFieldValues("level")).rejects.toMatchObject({
+      name: "NoValueLookup",
+    });
+  });
+
+  it("never waits for a stream context: without one, no lookup runs", async () => {
+    const c = makeComposable({ storedValues: ["error"] });
+    c.autoCompleteData.value.streamName = "";
+    const started = Date.now();
+    await expect((c as any).resolveFieldValues("level")).rejects.toMatchObject({
+      name: "NoValueLookup",
+    });
+    expect(Date.now() - started).toBeLessThan(100);
+  });
+
+  it("still answers from in-session values without a stream context", async () => {
+    const c = makeComposable({ inSessionValues: { level: ["warn"] } });
+    c.autoCompleteData.value.streamName = "";
+    await expect((c as any).resolveFieldValues("level")).resolves.toEqual(["warn"]);
   });
 });
 
-// ─── Phase 5 (tmp/code.md D9) — values for a stream nobody has searched ──────
-// The resolver may now ask the server, and the one rule that matters is that it
-// must NOT make the dropdown wait for the answer: the completion provider
-// awaits this function, so a blocking fetch puts a network round trip between
-// the user and their list on every value position.
+// ─── P0-4: a cold cache is awaited; the provider owns the wait budget ────────
 
 describe("resolveFieldValues — asking the server when the cache is cold", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(requestFieldValues).mockResolvedValue([]);
+    vi.mocked(fieldValuesUnavailable).mockReturnValue(false);
+  });
 
-  it("returns without waiting for the network", async () => {
-    // requestFieldValues is stubbed to never settle. If the resolver awaits it,
-    // this test times out — which is the failure worth having.
+  it("waits for the server's answer instead of returning an empty list", async () => {
+    vi.mocked(requestFieldValues).mockResolvedValue(["warn", "error"]);
     const c = makeComposable({ storedValues: [] });
-    await expect(c.resolveFieldValues("level")).resolves.toEqual([]);
+    await expect(c.resolveFieldValues("level")).resolves.toEqual(["warn", "error"]);
   });
 
   it("still returns the local values immediately when there are some", async () => {
@@ -520,7 +541,6 @@ describe("resolveFieldValues — asking the server when the cache is cold", () =
   });
 
   it("does NOT ask when the cache already has values", async () => {
-    // The cache is the whole point; a hit must cost nothing.
     const c = makeComposable({ storedValues: ["error", "warn"] });
     await c.resolveFieldValues("level");
     expect(requestFieldValues).not.toHaveBeenCalled();
@@ -535,24 +555,18 @@ describe("resolveFieldValues — asking the server when the cache is cold", () =
   it("does not ask without a stream to ask about", async () => {
     const c = useSqlSuggestions();
     c.autoCompleteData.value.fieldValues = {};
-    await c.resolveFieldValues("level");
+    await c.resolveFieldValues("level").catch(() => {});
     expect(requestFieldValues).not.toHaveBeenCalled();
   });
 
-  it("picks up the values on the NEXT call, once the fetch has landed", async () => {
-    // This is how they reach the user: the fetch writes to the cache, the
-    // provider is invoked again on the next keystroke, and the local read now
-    // answers. Nothing forces the popup open.
-    const c = makeComposable({ storedValues: [] });
-    await c.resolveFieldValues("level");
-
-    vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(["error", "warn"]);
-    await expect(c.resolveFieldValues("level")).resolves.toEqual(["error", "warn"]);
-  });
-
-  it("survives a rejected request without taking completion down", async () => {
-    vi.mocked(requestFieldValues).mockRejectedValueOnce(new Error("500"));
+  it("an empty answer is an empty list, so the editor can say there are none", async () => {
     const c = makeComposable({ storedValues: [] });
     await expect(c.resolveFieldValues("level")).resolves.toEqual([]);
+  });
+
+  it("a failed lookup rejects, so the editor can say it could not load", async () => {
+    vi.mocked(fieldValuesUnavailable).mockReturnValue(true);
+    const c = makeComposable({ storedValues: [] });
+    await expect(c.resolveFieldValues("level")).rejects.toThrow();
   });
 });

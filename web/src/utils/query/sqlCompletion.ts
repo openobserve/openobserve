@@ -41,7 +41,16 @@ import { gt, raw } from "@/types/i18n";
 
 /** Names of monaco's CompletionItemKind members that we actually use. */
 export type CompletionKindName =
-  "Function" | "Keyword" | "Operator" | "Field" | "Value" | "Variable" | "Snippet" | "Text";
+  | "Function"
+  | "Keyword"
+  | "Operator"
+  | "Field"
+  | "Value"
+  | "Variable"
+  | "Snippet"
+  | "Text"
+  | "Event"
+  | "Issue";
 
 /** Names of monaco's CompletionItemInsertTextRule members. */
 export type InsertTextRuleName = "InsertAsSnippet" | "KeepWhitespace" | "None";
@@ -68,6 +77,9 @@ export interface SqlCompletionEntry {
    * shared range is right for everything else, so leaving it unset is normal.
    */
   range?: Record<string, number>;
+  /** What Monaco filters by when it is not the label, e.g. a value matched with its quote. */
+  filterText?: string;
+  description?: string;
 }
 
 /** An entry as it may arrive from the `suggestions` prop — callers outside this
@@ -1167,7 +1179,7 @@ const toMonacoItem = (
       : (entry.insertText ?? String(label));
 
   const item: Record<string, unknown> = {
-    label,
+    label: entry.description ? { label, description: entry.description } : label,
     kind: kinds[entry.kind ?? "Text"],
     insertText,
     // An entry may widen its own range — a field value swallows monaco's
@@ -1190,6 +1202,7 @@ const toMonacoItem = (
         : entry.documentation;
   }
   if (entry.sortText !== undefined) item.sortText = entry.sortText;
+  if (entry.filterText !== undefined) item.filterText = entry.filterText;
 
   // Renders the label with a strikethrough. match_all_raw and friends are still
   // accepted (sql/rewriter rewrites them) but should not be reached for.

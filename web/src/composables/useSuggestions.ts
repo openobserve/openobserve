@@ -2,7 +2,13 @@ import { queryFunctionsQuery } from "@/services/query_functions.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed } from "vue";
 import { useStore } from "vuex";
-import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
+import {
+  fieldValuesUnavailable,
+  getFieldValuesForSuggestion,
+  noValueLookup,
+  requestFieldValues,
+  type StreamContext,
+} from "@/composables/fieldValueStore";
 import {
   SQL_KEYWORDS,
   SQL_CLAUSE_KEYWORDS,
@@ -138,6 +144,11 @@ const useSqlSuggestions = () => {
     contextKeywords.value.length ? [] : autoCompleteSuggestions.value,
   );
 
+  const readStreamContext = (): StreamContext | null => {
+    const { org, streamType, streamName } = autoCompleteData.value;
+    return org && streamType && streamName ? { org, streamType, streamName } : null;
+  };
+
   /**
    * Field values for one column, for the completion provider to await directly.
    *
@@ -147,39 +158,31 @@ const useSqlSuggestions = () => {
    * as a prop and force-reopening the widget.
    */
   const resolveFieldValues = async (fieldName: string): Promise<string[]> => {
-    if (!fieldName) return [];
     const inSession = Array.from(
       autoCompleteData.value.fieldValues[fieldName] || new Set(),
     ) as string[];
+    const ctx = readStreamContext();
+    if (!ctx) {
+      if (inSession.length) return inSession;
+      throw noValueLookup();
+    }
 
-    const { org, streamType, streamName } = autoCompleteData.value;
     let stored: string[] = [];
-    // Without the composite key there is nothing to look up; the in-session
-    // values are still perfectly good on their own.
-    if (org && streamType && streamName) {
-      try {
-        stored = await getFieldValuesForSuggestion({ org, streamType, streamName }, fieldName);
-      } catch {
-        // A failed lookup must not take completion down with it.
-        stored = [];
-      }
+    try {
+      stored = await getFieldValuesForSuggestion(ctx, fieldName);
+    } catch {
+      // A failed lookup must not take completion down with it.
+      stored = [];
     }
 
     const merged = [...new Set([...inSession, ...stored])];
+    if (merged.length) return merged;
 
-    // Nothing cached: ask the server, and do NOT wait for the answer. The
-    // completion provider awaits this function, so awaiting here would put a
-    // network round trip between the user and their dropdown on every value
-    // position. The fetch writes to the cache; the provider is invoked again on
-    // the next keystroke (its results are marked incomplete for exactly this
-    // reason), and that call reads the values locally.
-    if (!merged.length && org && streamType && streamName) {
-      void Promise.resolve(requestFieldValues({ org, streamType, streamName }, fieldName)).catch(
-        () => {},
-      );
+    const fetched = await requestFieldValues(ctx, fieldName);
+    if (!fetched.length && fieldValuesUnavailable(ctx, fieldName)) {
+      throw new Error("field values unavailable");
     }
-
-    return merged;
+    return fetched;
   };
 
   /**

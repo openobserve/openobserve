@@ -1394,6 +1394,59 @@ test.describe("Autocomplete key contract — Enter never inserts from a menu it 
         expect(await editorText(page)).toMatch(/^SELECT \*[ \t]+$/);
     });
 
+    // P0-4: a value position offers values (or an honest status row), never the catalog.
+    test("a space after = opens values with no quote typed, and no functions", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values']
+    }, async ({ page }) => {
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE level =`);
+        await page.keyboard.type(' ');
+        const menu = await waitForMenu(page);
+        if (mode !== 'off') expect(menu.focused, 'a typed-space menu opens unhighlighted').toBeNull();
+        for (const notAValue of ['match_all', 'count', 'SELECT', 'and']) {
+            expect(menu.rows, `${notAValue} offered in a value position`).not.toContain(notAValue);
+        }
+    });
+
+    test("a bare = 50 keeps value help", {
+        tag: ['@all', '@autosuggestions', '@logs', '@values']
+    }, async ({ page }) => {
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE code = `);
+        await page.keyboard.type('5');
+        const menu = await waitForMenu(page).catch(() => ({ visible: false, rows: [] }));
+        for (const notAValue of ['match_all', 'count', 'SELECT']) {
+            expect(menu.rows, `${notAValue} offered after = 5`).not.toContain(notAValue);
+        }
+    });
+
+    test("ILIKE ' offers values or nothing, never fields", {
+        tag: ['@all', '@autosuggestions', '@logs', '@values']
+    }, async ({ page }) => {
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE level ILIKE `);
+        await page.keyboard.type("'");
+        const menu = await waitForMenu(page).catch(() => ({ visible: false, rows: [] }));
+        for (const field of ['code', 'log', 'kubernetes_pod_name', 'level']) {
+            expect(menu.rows, `field ${field} offered inside a string`).not.toContain(field);
+        }
+        if (menu.rows.length) {
+            await page.keyboard.press('Tab');
+            const text = await editorText(page);
+            expect(text, 'an ILIKE value is inserted as a complete pattern').toMatch(/ILIKE '(%.*%')?/);
+        }
+    });
+
+    test("a Utf8 value that looks numeric is quoted", {
+        tag: ['@all', '@autosuggestions', '@logs', '@values', '@quoting']
+    }, async ({ page }) => {
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE kubernetes_labels_app_kubernetes_io_version = `);
+        await page.keyboard.press('Control+Space');
+        const menu = await waitForMenu(page).catch(() => ({ visible: false, rows: [] }));
+        test.skip(!menu.rows.some((r) => /^[0-9.]+$/.test(r)), 'no numeric-looking value captured for this field');
+        const row = menu.rows.findIndex((r) => /^[0-9.]+$/.test(r));
+        for (let i = 0; i < row; i++) await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toMatch(/= '[0-9.]+'/);
+    });
+
     test("typed letters still highlight row 1 and Enter accepts it", {
         tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
     }, async ({ page }) => {
