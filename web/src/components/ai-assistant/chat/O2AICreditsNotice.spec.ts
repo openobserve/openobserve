@@ -23,9 +23,12 @@ const mockPush = vi.hoisted(() => vi.fn());
 
 vi.mock("@/services/billings", () => ({ default: { get_ai_usage: mockGetAiUsage } }));
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: mockPush }) }));
-vi.mock("vuex", () => ({
-  useStore: () => ({ state: { selectedOrganization: { identifier: "org1" } } }),
-}));
+const storeState = vi.hoisted(() => ({ value: null as any }));
+vi.mock("vuex", async () => {
+  const { reactive } = await import("vue");
+  storeState.value = reactive({ selectedOrganization: { identifier: "org1" } });
+  return { useStore: () => ({ state: storeState.value }) };
+});
 
 const usage = (over: Record<string, unknown>) => ({
   data: {
@@ -100,6 +103,21 @@ describe("O2AICreditsNotice", () => {
       }),
     );
     expect((await mountNotice()).text()).toContain("A message uses 2 credits.");
+  });
+
+  it("ignores a balance that arrives after the org changed", async () => {
+    let resolveOld: (value: unknown) => void = () => {};
+    mockGetAiUsage.mockReturnValueOnce(new Promise((resolve) => (resolveOld = resolve)));
+    mockGetAiUsage.mockResolvedValueOnce(usage({ credits_used: 3, credits_remaining: 2 }));
+    const w = mount(O2AICreditsNotice, { global: { plugins: [i18n] }, props: { busy: false } });
+
+    storeState.value.selectedOrganization.identifier = "org2";
+    await flushPromises();
+    resolveOld(usage({ mode: "exhausted", credits_remaining: 0 }));
+    await flushPromises();
+
+    expect(w.text()).toBe("");
+    storeState.value.selectedOrganization.identifier = "org1";
   });
 
   it("is a live region, so screen readers announce it", async () => {

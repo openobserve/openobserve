@@ -184,6 +184,22 @@ describe("Plans Component", () => {
     vi.clearAllMocks();
   });
 
+  it("bounds the pricing request, so a host that never answers cannot leave Plans loading", async () => {
+    const fetchSpy = vi.fn(() => new Promise<Response>(() => {}));
+    vi.stubGlobal("fetch", fetchSpy);
+    const bounded = mount(Plans, {
+      global: { plugins: [i18n], provide: { store }, mocks: { $router: mockRouter } },
+    });
+    await flushPromises();
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    bounded.unmount();
+    vi.unstubAllGlobals();
+  });
+
   it("fires billing_checkout_returned once with the plan when Stripe sends the user back", async () => {
     vi.mocked(analytics.track).mockClear();
     Object.defineProperty(document, "referrer", {

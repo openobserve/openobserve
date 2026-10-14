@@ -594,6 +594,19 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(errCall).toBeTruthy();
     });
 
+    it("should keep the AI-credits remedy when Analyze Incident gets a 402", async () => {
+      (incidentsService.triggerRca as any).mockRejectedValue({
+        response: {
+          status: 402,
+          data: { error_type: "ai_credits_exhausted", remedy: "subscribe" },
+        },
+      });
+
+      await wrapper.vm.triggerRca();
+
+      expect(wrapper.vm.rcaError?.remedy).toBe("plans");
+    });
+
     it("should clear RCA content on error", async () => {
       (incidentsService.triggerRca as any).mockRejectedValue(new Error("RCA failed"));
 
@@ -1685,6 +1698,24 @@ describe("IncidentDetailDrawer.vue", () => {
         vi.mocked(incidentsService.triggerRca).mock.calls[0],
       );
     });
+    it("keeps the AI-credits remedy when a severity reanalysis gets a 402", async () => {
+      vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
+        data: { severity: "P2", analysis_in_flight: false },
+      });
+      vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce({
+        isAxiosError: true,
+        response: {
+          status: 402,
+          data: { error_type: "ai_credits_exhausted", remedy: "contact_account_manager" },
+        },
+      });
+
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+
+      expect(wrapper.vm.rcaError?.remedy).toBe("contact");
+    });
+
     it("does not call updateIncident when no incidentDetails", async () => {
       wrapper.vm.incidentDetails = null;
       await wrapper.vm.updateSeverity("P3");
