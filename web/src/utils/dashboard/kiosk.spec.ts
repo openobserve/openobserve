@@ -29,6 +29,7 @@ import {
   staleAfterMs,
   stripKioskParams,
   summarizeVariables,
+  summarizePanelError,
 } from "./kiosk";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -156,6 +157,8 @@ describe("kiosk helpers", () => {
     expect(retryDelayMs(3, 60)).toBe(20000);
     expect(retryDelayMs(6, 60)).toBe(60000);
     expect(retryDelayMs(10, 0)).toBe(60000);
+    // A slow refresh must not leave the screen stale for minutes after the backend is back.
+    expect(retryDelayMs(10, 300)).toBe(60000);
   });
 
   it("only calls a cycle hung after twice the interval, and never under 30s", () => {
@@ -183,5 +186,15 @@ describe("kiosk helpers", () => {
     expect(formatRelativePeriod("2d", t)).toBe('common.pastDay:{"count":2}');
     expect(formatRelativePeriod("now-1h", t)).toBeNull();
     expect(formatRelativePeriod(undefined, t)).toBeNull();
+  });
+
+  it("summarizes a panel error to its first meaningful line", () => {
+    expect(
+      summarizePanelError('Error# SQL error: ParserError("Expected: X at Line: 1")\nmore'),
+    ).toBe("Expected: X at Line: 1");
+    expect(summarizePanelError("\n  stream k8s_events not found\n")).toBe(
+      "stream k8s_events not found",
+    );
+    expect(summarizePanelError("")).toBe("");
   });
 });

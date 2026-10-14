@@ -79,6 +79,8 @@ const NO_LOAD_FALLBACK_MS = 2000;
 // Panels restored from the browser cache never flip the loading flag, so the first cycle forces a real load after this.
 const INITIAL_LOAD_FALLBACK_MS = 3000;
 const CLOCK_MS = 1000;
+// One slow health check (a page still loading its own assets) must not read as an outage, so a miss is asked again.
+const PROBE_CONFIRM_MS = 2000;
 
 const isClientError = (error: KioskPanelError) => String(error.code ?? "").startsWith("4");
 
@@ -133,6 +135,14 @@ export const useKioskRefresh = (options: UseKioskRefreshOptions): UseKioskRefres
     return errors.every((error) => error && !isClientError(error));
   };
 
+  const confirmReachable = async () => {
+    if (!options.probe) return true;
+    if (await options.probe()) return true;
+    if (isOffline()) return false;
+    await new Promise((resolve) => setTimeout(resolve, PROBE_CONFIRM_MS));
+    return options.probe();
+  };
+
   const scheduleRetry = () => {
     retryTimer = clearTimer(retryTimer);
     const delay = retryDelayMs(consecutiveFailures.value, options.intervalSeconds.value);
@@ -167,7 +177,7 @@ export const useKioskRefresh = (options: UseKioskRefreshOptions): UseKioskRefres
     if (isUnreachable()) return recordOutage();
     if (options.probe) {
       const started = epoch;
-      const reachable = await options.probe();
+      const reachable = await confirmReachable();
       if (started !== epoch) return;
       if (!reachable) return recordOutage();
     }
@@ -219,7 +229,7 @@ export const useKioskRefresh = (options: UseKioskRefreshOptions): UseKioskRefres
     if (!options.probe) return runCycle(forced);
     const started = epoch;
     probing = true;
-    void options.probe().then((reachable) => {
+    void confirmReachable().then((reachable) => {
       probing = false;
       if (started !== epoch) return;
       if (reachable) runCycle(forced);
