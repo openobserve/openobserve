@@ -19949,7 +19949,23 @@
       "maxDoc": "Giá trị lớn nhất trong trường. Hàm tổng hợp — kết hợp với GROUP BY.",
       "minDoc": "Giá trị nhỏ nhất trong trường. Hàm tổng hợp — kết hợp với GROUP BY.",
       "arrayExtractDoc": "Trích xuất một phần tử duy nhất từ mảng theo chỉ mục bắt đầu từ 1, ví dụ: `array_extract(regexp_match(log, '...'), 1)`.",
-      "approxTopkDoc": "Xấp xỉ k giá trị phổ biến nhất của một trường. Tiết kiệm hơn nhiều so với GROUP BY ... ORDER BY count DESC chính xác trên các trường có bản số cao."
+      "approxTopkDoc": "Xấp xỉ k giá trị phổ biến nhất của một trường. Tiết kiệm hơn nhiều so với GROUP BY ... ORDER BY count DESC chính xác trên các trường có bản số cao.",
+      "valuesLoading": "Đang tải giá trị cho {field}",
+      "valuesLoadingRow": "Đang tải giá trị",
+      "valuesLoadingHint": "Tiếp tục nhập, hoặc nhấn Esc rồi Ctrl+Space",
+      "valuesEmpty": "Không có giá trị cho {field} trong {minutes} phút qua",
+      "valuesFailed": "Không thể tải giá trị cho {field}",
+      "chainedMenuAnnouncement": "{count} gợi ý, nhấn Tab để chấp nhận | {count} gợi ý, nhấn Tab để chấp nhận",
+      "valuesCap": "Đã hiển thị {count} giá trị · nhập để lọc | Đã hiển thị {count} giá trị · nhập để lọc",
+      "groupValues": "Giá trị · gần đây",
+      "groupValuesName": "Giá trị",
+      "groupFields": "Trường",
+      "groupOperators": "Toán tử",
+      "groupFunctionsAndFields": "Hàm và trường",
+      "groupFunctions": "Hàm",
+      "wrapStrMatch": "chuỗi con",
+      "wrapReMatch": "regex",
+      "wrapReNotMatch": "regex, phủ định"
     },
     "diagnostics": {
       "incompleteAnd": "Điều kiện chưa hoàn chỉnh — mong đợi một biểu thức sau AND",
@@ -20005,6 +20021,8 @@
       "duplicateColumn": "Cột '{col}' được định nghĩa nhiều hơn một lần — hãy xóa hoặc đặt bí danh cho cột trùng lặp",
       "tableNotFound": "Không biết bảng '{tbl}' — bảng hoặc CTE này không tồn tại",
       "functionSignature": "Hàm '{fn}' được gọi với (các) kiểu đối số sai — hãy thêm một phép ép kiểu tường minh",
+      "notACondition": "`{field}` là văn bản, không phải điều kiện. Hãy so sánh nó: `{field} = '…'` hoặc `str_match({field}, '…')`",
+      "notAConditionValue": "`{field}` không phải là điều kiện. Hãy so sánh nó, ví dụ `{field} = …`",
       "syntaxError": "Lỗi cú pháp SQL"
     },
     "hover": {

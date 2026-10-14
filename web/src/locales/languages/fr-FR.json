@@ -19949,7 +19949,23 @@
       "maxDoc": "Plus grande valeur du champ. Agrégat — à associer avec GROUP BY.",
       "minDoc": "Plus petite valeur du champ. Agrégat — à associer avec GROUP BY.",
       "arrayExtractDoc": "Extrait un seul élément d'un tableau par index basé sur 1, ex. `array_extract(regexp_match(log, '...'), 1)`.",
-      "approxTopkDoc": "Approxime les k valeurs les plus fréquentes d'un champ. Beaucoup moins coûteux qu'un GROUP BY ... ORDER BY count DESC exact sur les champs à haute cardinalité."
+      "approxTopkDoc": "Approxime les k valeurs les plus fréquentes d'un champ. Beaucoup moins coûteux qu'un GROUP BY ... ORDER BY count DESC exact sur les champs à haute cardinalité.",
+      "valuesLoading": "Chargement des valeurs pour {field} en cours",
+      "valuesLoadingRow": "Chargement des valeurs en cours",
+      "valuesLoadingHint": "Continuez à saisir, ou appuyez sur Échap puis Ctrl+Espace",
+      "valuesEmpty": "Aucune valeur pour {field} au cours des {minutes} dernières minutes",
+      "valuesFailed": "Impossible de charger les valeurs pour {field}",
+      "chainedMenuAnnouncement": "{count} suggestion, Tab pour accepter | {count} suggestions, Tab pour accepter",
+      "valuesCap": "{count} valeur affichée · saisissez pour filtrer | {count} valeurs affichées · saisissez pour filtrer",
+      "groupValues": "Valeurs · récentes",
+      "groupValuesName": "Valeurs",
+      "groupFields": "Champs",
+      "groupOperators": "Opérateurs",
+      "groupFunctionsAndFields": "Fonctions et champs",
+      "groupFunctions": "Fonctions",
+      "wrapStrMatch": "sous-chaîne",
+      "wrapReMatch": "regex",
+      "wrapReNotMatch": "regex, négation"
     },
     "diagnostics": {
       "incompleteAnd": "Condition incomplète — expression attendue après AND",
@@ -20005,6 +20021,8 @@
       "duplicateColumn": "La colonne '{col}' est définie plus d'une fois — supprimez ou alias le doublon",
       "tableNotFound": "Table inconnue '{tbl}' — cette table ou CTE n'existe pas",
       "functionSignature": "La fonction '{fn}' a été appelée avec un ou des types d'arguments incorrects — ajoutez un cast explicite",
+      "notACondition": "`{field}` est du texte, pas une condition. Comparez-le : `{field} = '…'` ou `str_match({field}, '…')`",
+      "notAConditionValue": "`{field}` n'est pas une condition. Comparez-le, par ex. `{field} = …`",
       "syntaxError": "Erreur de syntaxe SQL"
     },
     "hover": {

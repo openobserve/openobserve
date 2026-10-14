@@ -19944,7 +19944,23 @@
       "maxDoc": "欄位中的最大值。彙總函式 — 搭配 GROUP BY 使用。",
       "minDoc": "欄位中的最小值。彙總函式 — 搭配 GROUP BY 使用。",
       "arrayExtractDoc": "從陣列中以 1 為起始索引擷取單一元素，例如 `array_extract(regexp_match(log, '...'), 1)`。",
-      "approxTopkDoc": "近似計算某欄位最常見的 k 個值。在基數高的欄位上，比精確的 GROUP BY ... ORDER BY count DESC 便宜得多。"
+      "approxTopkDoc": "近似計算某欄位最常見的 k 個值。在基數高的欄位上，比精確的 GROUP BY ... ORDER BY count DESC 便宜得多。",
+      "valuesLoading": "仍在載入 {field} 的值",
+      "valuesLoadingRow": "仍在載入值",
+      "valuesLoadingHint": "繼續輸入，或按 Esc 然後按 Ctrl+Space",
+      "valuesEmpty": "最近 {minutes} 分鐘內沒有 {field} 的值",
+      "valuesFailed": "無法載入 {field} 的值",
+      "chainedMenuAnnouncement": "{count} 個建議，按 Tab 接受 | {count} 個建議，按 Tab 接受",
+      "valuesCap": "顯示 {count} 個值 · 輸入以篩選 | 顯示 {count} 個值 · 輸入以篩選",
+      "groupValues": "值 · 最近",
+      "groupValuesName": "值",
+      "groupFields": "欄位",
+      "groupOperators": "運算子",
+      "groupFunctionsAndFields": "函式與欄位",
+      "groupFunctions": "函式",
+      "wrapStrMatch": "子字串",
+      "wrapReMatch": "正規表達式",
+      "wrapReNotMatch": "正規表達式，否定"
     },
     "diagnostics": {
       "incompleteAnd": "條件不完整 — AND 之後應有表達式",
@@ -20000,6 +20016,8 @@
       "duplicateColumn": "欄位 '{col}' 被定義多次 — 請移除或為重複者加上別名。",
       "tableNotFound": "不明的資料表 '{tbl}' — 此資料表或 CTE 不存在。",
       "functionSignature": "函式 '{fn}' 以錯誤的引數型別被呼叫 — 請加入明確的型別轉換。",
+      "notACondition": "`{field}` 是文字，不是條件。請加以比較：`{field} = '…'` 或 `str_match({field}, '…')`",
+      "notAConditionValue": "`{field}` 不是條件。請加以比較，例如 `{field} = …`",
       "syntaxError": "SQL 語法錯誤"
     },
     "hover": {

@@ -19949,7 +19949,23 @@
       "maxDoc": "Größter Wert im Feld. Aggregatfunktion — mit GROUP BY kombinieren.",
       "minDoc": "Kleinster Wert im Feld. Aggregatfunktion — mit GROUP BY kombinieren.",
       "arrayExtractDoc": "Extrahiert ein einzelnes Element aus einem Array über einen 1-basierten Index, z. B. `array_extract(regexp_match(log, '...'), 1)`.",
-      "approxTopkDoc": "Nähert die k häufigsten Werte eines Felds an. Viel günstiger als ein exaktes GROUP BY ... ORDER BY count DESC bei Feldern mit hoher Kardinalität."
+      "approxTopkDoc": "Nähert die k häufigsten Werte eines Felds an. Viel günstiger als ein exaktes GROUP BY ... ORDER BY count DESC bei Feldern mit hoher Kardinalität.",
+      "valuesLoading": "Werte für {field} werden noch geladen",
+      "valuesLoadingRow": "Werte werden noch geladen",
+      "valuesLoadingHint": "Weitertippen oder Esc und dann Strg+Leertaste drücken",
+      "valuesEmpty": "Keine Werte für {field} in den letzten {minutes} Minuten",
+      "valuesFailed": "Werte für {field} konnten nicht geladen werden",
+      "chainedMenuAnnouncement": "{count} Vorschlag, Tab zum Übernehmen | {count} Vorschläge, Tab zum Übernehmen",
+      "valuesCap": "{count} Wert angezeigt · zum Filtern tippen | {count} Werte angezeigt · zum Filtern tippen",
+      "groupValues": "Werte · kürzlich",
+      "groupValuesName": "Werte",
+      "groupFields": "Felder",
+      "groupOperators": "Operatoren",
+      "groupFunctionsAndFields": "Funktionen und Felder",
+      "groupFunctions": "Funktionen",
+      "wrapStrMatch": "Teilstring",
+      "wrapReMatch": "Regex",
+      "wrapReNotMatch": "Regex, negiert"
     },
     "diagnostics": {
       "incompleteAnd": "Unvollständige Bedingung — Ausdruck nach AND erwartet",
@@ -20005,6 +20021,8 @@
       "duplicateColumn": "Spalte '{col}' ist mehr als einmal definiert — Duplikat entfernen oder mit Alias versehen",
       "tableNotFound": "Unbekannte Tabelle '{tbl}' — diese Tabelle oder dieses CTE existiert nicht",
       "functionSignature": "Funktion '{fn}' wurde mit falschen Argumenttyp(en) aufgerufen — explizite Typumwandlung hinzufügen",
+      "notACondition": "`{field}` ist Text, keine Bedingung. Vergleichen Sie es: `{field} = '…'` oder `str_match({field}, '…')`",
+      "notAConditionValue": "`{field}` ist keine Bedingung. Vergleichen Sie es, z. B. `{field} = …`",
       "syntaxError": "SQL-Syntaxfehler"
     },
     "hover": {
