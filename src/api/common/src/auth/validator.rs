@@ -310,7 +310,7 @@ pub async fn validate_token(token: &str, org_id: &str) -> Result<(), AuthError> 
 /// `is_external` short-circuit means native/internal principals (incl. root, which is internal)
 /// skip the cache lookup entirely. Kept as one helper so the validator call sites stay identical.
 #[cfg(feature = "enterprise")]
-async fn blocked_external(user: &config::meta::user::User) -> bool {
+pub(crate) async fn blocked_external(user: &config::meta::user::User) -> bool {
     use o2_enterprise::enterprise::domain_management::{self, meta::AccessDecision};
     user.is_external
         && matches!(
@@ -1319,6 +1319,19 @@ async fn oo_validator_internal(
             is_from_session,
         )
         .await
+    } else if let Some(token) = auth_str
+        .strip_prefix("Bearer ")
+        .map(str::trim)
+        .filter(|token| token.starts_with(config::utils::delegation::TOKEN_PREFIX))
+    {
+        let result = super::delegation::validate_delegated(
+            token,
+            req_data.uri.path(),
+            path_prefix,
+            &req_data.method,
+        )
+        .await?;
+        super::delegation::authorize(result, auth_info).await
     } else if auth_str.starts_with("Bearer") {
         log::debug!("Bearer token found");
         // token_validator unwraps a "Bearer" prefix, so it must not see the session marker.
@@ -2642,5 +2655,20 @@ mod tests {
         assert!(!is_org_agnostic_read("acme/streams"));
         assert!(!is_org_agnostic_read("password_complexity"));
         assert!(!is_org_agnostic_read("license/keys"));
+    }
+
+    #[tokio::test]
+    async fn an_o2dt_bearer_token_goes_to_the_delegated_validator() {
+        let req_data = RequestData {
+            uri: "/api/default/streams".parse::<Uri>().unwrap(),
+            method: Method::GET,
+            headers: HeaderMap::new(),
+        };
+        let auth_info = AuthExtractor::bypass("Bearer o2dt.e30.bWFj".to_string(), String::new());
+        match oo_validator(&req_data, &auth_info).await {
+            Err(AuthError::Unauthorized(msg)) => assert_eq!(msg, "Unauthorized Access"),
+            Err(other) => panic!("expected 401, got {other}"),
+            Ok(_) => panic!("a forged delegated token was accepted"),
+        }
     }
 }
