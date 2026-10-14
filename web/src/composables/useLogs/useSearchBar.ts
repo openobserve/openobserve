@@ -440,7 +440,7 @@ export const useSearchBar = (t: TranslateFn) => {
       const superseded =
         options.generationId !== undefined &&
         !useLogsAutoRun().engine.isCurrent(options.generationId);
-      if (!superseded) return run();
+      return superseded ? undefined : run();
     });
   };
 
