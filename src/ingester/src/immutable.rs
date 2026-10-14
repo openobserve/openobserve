@@ -341,40 +341,42 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
     Ok(())
 }
 
-/// Persist every immutable to disk now and wait for persists already in flight.
-///
-/// Used on shutdown, after `writer::flush_all`, when the periodic persist job
-/// has already stopped because the node is offline.
+/// Persist every immutable now; used on shutdown, after the periodic persist job has stopped.
 pub async fn persist_all() -> Result<()> {
-    let paths = IMMUTABLES
-        .read()
-        .await
-        .iter()
-        .map(|(path, _)| path.clone())
-        .collect::<Vec<_>>();
-    for path in paths {
-        if !PROCESSING_TABLES.write().await.insert(path.clone()) {
-            continue; // the background job is persisting it
-        }
-        if let Err(e) = persist_table(0, path.clone()).await {
-            log::error!(
-                "[INGESTER:MEM] persist file on shutdown error: {}, {e}",
-                path.to_string_lossy()
-            );
-        }
-        // persist_table returns early without releasing the path when the
-        // background job persisted it in the meantime
-        PROCESSING_TABLES.write().await.remove(&path);
-    }
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
-    while !PROCESSING_TABLES.read().await.is_empty() {
+    let mut failed = HashSet::new();
+    loop {
+        let paths = IMMUTABLES
+            .read()
+            .await
+            .iter()
+            .map(|(path, _)| path.clone())
+            .filter(|path| !failed.contains(path))
+            .collect::<Vec<_>>();
+        if paths.is_empty() {
+            return Ok(());
+        }
+        for path in paths {
+            // a path that is already marked is being persisted by the background job
+            if !PROCESSING_TABLES.write().await.insert(path.clone()) {
+                continue;
+            }
+            if let Err(e) = persist_table(0, path.clone()).await {
+                log::error!(
+                    "[INGESTER:MEM] persist file on shutdown error: {}, {e}",
+                    path.to_string_lossy()
+                );
+                failed.insert(path.clone());
+            }
+            // persist_table keeps the mark when the background job already removed the immutable
+            PROCESSING_TABLES.write().await.remove(&path);
+        }
         if std::time::Instant::now() >= deadline {
-            log::warn!("[INGESTER:MEM] timed out waiting for in-flight memtable persists");
-            break;
+            log::warn!("[INGESTER:MEM] timed out persisting memtables on shutdown");
+            return Ok(());
         }
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
-    Ok(())
 }
 
 // check if the persist is done for the given seq_id

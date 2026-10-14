@@ -409,8 +409,7 @@ fn synthetics_step_pool() -> Option<openobserve_synthetics::pool::StepPoolHooks>
     None
 }
 
-/// Upload the WAL to object storage on shutdown when `ZO_WAL_UPLOAD_ON_SHUTDOWN`
-/// is enabled; see `files::flush_all`.
+/// Upload the WAL to object storage on shutdown when `ZO_WAL_UPLOAD_ON_SHUTDOWN` is enabled.
 pub async fn upload_wal_on_shutdown() -> Result<(), anyhow::Error> {
     files::flush_all().await
 }

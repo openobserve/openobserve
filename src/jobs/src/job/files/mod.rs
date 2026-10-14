@@ -40,9 +40,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Persist all memtables and upload every WAL file to object storage, for
-/// nodes whose data directory does not survive a restart. Runs on shutdown,
-/// after `ingester::flush_all`, when `ZO_WAL_UPLOAD_ON_SHUTDOWN` is enabled.
+/// Persist and upload the whole WAL on shutdown, for data directories lost on restart.
 pub async fn flush_all() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_ingester() || !config::get_config().limit.wal_upload_on_shutdown {
         return Ok(());

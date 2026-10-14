@@ -185,11 +185,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Upload every WAL parquet file now, ignoring the size and age thresholds,
-/// and wait for uploads already in flight.
-///
-/// Used on shutdown, after the memtables are persisted, when the periodic
-/// upload job has already stopped because the node is offline.
+/// Upload every WAL parquet file now, ignoring the size and age thresholds; used on shutdown.
 pub async fn flush_all() -> Result<(), anyhow::Error> {
     // keep the files on disk rather than leave orphaned objects in storage
     infra::file_list::health_check().await?;
@@ -210,8 +206,7 @@ pub async fn flush_all() -> Result<(), anyhow::Error> {
         }
     }
 
-    // files still marked as processing are either being uploaded by the
-    // background workers or already uploaded and waiting to be deleted
+    // a marked file is either uploading in a background worker or uploaded and pending delete
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
     loop {
         let pending_delete = db::file_list::local::get_pending_delete()
