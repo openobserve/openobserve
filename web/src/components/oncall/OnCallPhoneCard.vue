@@ -85,12 +85,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="primary"
           size="sm-action"
-          :disabled="state === 'noProvider'"
+          :disabled="state === 'noProvider' || !draftPhone.trim()"
           :loading="sending"
           data-test="oncall-phone-send"
           @click="sendCode"
         >
           {{ t("oncall.phoneSendCode") }}
+        </OButton>
+        <OButton
+          v-if="editing && contact.phone"
+          variant="outline"
+          size="sm-action"
+          data-test="oncall-phone-cancel"
+          @click="cancelChange"
+        >
+          {{ t("common.cancel") }}
         </OButton>
         <OText v-if="state === 'empty'" variant="meta">{{ t("oncall.phoneSendHint") }}</OText>
       </span>
@@ -261,6 +270,12 @@ function startChange() {
   draftPhone.value = contact.value?.phone ?? "";
   error.value = null;
   editing.value = true;
+}
+
+function cancelChange() {
+  draftPhone.value = contact.value?.phone ?? "";
+  error.value = null;
+  editing.value = false;
 }
 
 async function requestCode() {

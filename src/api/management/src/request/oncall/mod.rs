@@ -200,6 +200,7 @@ pub struct SetContactRequest {
     pub quiet_hours: Option<Option<String>>,
 }
 
+/// The code texted to the person's phone, as they typed it.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct ConfirmContactCodeRequest {
     pub code: String,
@@ -1575,6 +1576,7 @@ pub async fn acknowledge(
         let claims = match service::ack_claims(
             &form.token,
             &org_id,
+            token::TokenPurpose::Link,
             config::utils::time::now_micros(),
         )
         .await
@@ -1640,11 +1642,16 @@ fn ack_redirect(org_id: &str, response_id: &str) -> Response {
 pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::oncall::service;
+        use o2_enterprise::enterprise::oncall::{service, token::TokenPurpose};
 
         // Checked on the GET too: a leaver never sees the button, nor the record's title.
-        let claims = match service::ack_claims(&q.token, &org_id, config::utils::time::now_micros())
-            .await
+        let claims = match service::ack_claims(
+            &q.token,
+            &org_id,
+            TokenPurpose::Link,
+            config::utils::time::now_micros(),
+        )
+        .await
         {
             Ok(c) => c,
             Err(e) => {
@@ -3711,6 +3718,8 @@ pub async fn get_contact(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        // One identity per person: a profile saved as `Ana@` must not split from `ana@`.
+        let subject_email = subject_email.to_lowercase();
         let caller = &user_email.user_id;
         let is_member =
             o2_enterprise::enterprise::oncall::service::is_org_member(&org_id, caller).await;
@@ -3770,6 +3779,7 @@ pub async fn set_contact(
     {
         use infra::table::oncall_user_contacts::ContactPatch;
 
+        let subject_email = subject_email.to_lowercase();
         let caller = &user_email.user_id;
         let is_member =
             o2_enterprise::enterprise::oncall::service::is_org_member(&org_id, caller).await;
@@ -3857,6 +3867,7 @@ pub async fn send_contact_code(
     {
         use o2_enterprise::enterprise::oncall::service;
 
+        let subject_email = subject_email.to_lowercase();
         let caller = &user_email.user_id;
         let is_member = service::is_org_member(&org_id, caller).await;
         if !own_contact(is_member, caller, &subject_email) {
@@ -3902,6 +3913,7 @@ pub async fn confirm_contact_code(
     {
         use o2_enterprise::enterprise::oncall::service;
 
+        let subject_email = subject_email.to_lowercase();
         let caller = &user_email.user_id;
         let is_member = service::is_org_member(&org_id, caller).await;
         if !own_contact(is_member, caller, &subject_email) {
@@ -3940,6 +3952,7 @@ pub async fn delete_contact(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        let subject_email = subject_email.to_lowercase();
         let caller = &user_email.user_id;
         let is_member =
             o2_enterprise::enterprise::oncall::service::is_org_member(&org_id, caller).await;

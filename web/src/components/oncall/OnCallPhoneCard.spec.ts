@@ -187,8 +187,38 @@ describe("OnCallPhoneCard", () => {
   it("empty: offers a number box and Send code", async () => {
     const w = await render(contact());
     expect(find(w, "input").exists()).toBe(true);
+    await find(w, "input").setValue(PHONE);
     expect(find(w, "send").attributes("disabled")).toBeUndefined();
     expect(w.text()).toContain("We text a 6-digit code to confirm it is yours.");
+  });
+
+  it("an empty box cannot be sent, so Send code never clears a number", async () => {
+    const w = await render(VERIFIED);
+    await find(w, "change").trigger("click");
+
+    for (const blank of ["", "   "]) {
+      await find(w, "input").setValue(blank);
+      expect(find(w, "send").attributes("disabled"), JSON.stringify(blank)).toBeDefined();
+      await find(w, "send").trigger("click");
+      await flushPromises();
+    }
+
+    expect(service.setContact).not.toHaveBeenCalled();
+  });
+
+  it("Cancel ends a change without saving and keeps the number", async () => {
+    const w = await render(VERIFIED);
+    await find(w, "change").trigger("click");
+    await find(w, "input").setValue("+14155550199");
+
+    await find(w, "cancel").trigger("click");
+    await flushPromises();
+
+    expect(service.setContact).not.toHaveBeenCalled();
+    expect(find(w, "input").exists()).toBe(false);
+    expect(find(w, "number").text()).toBe(PHONE);
+    await find(w, "change").trigger("click");
+    expect((find(w, "input").element as HTMLInputElement).value).toBe(PHONE);
   });
 
   it("Send code saves the number, then texts a code, then shows the code box", async () => {

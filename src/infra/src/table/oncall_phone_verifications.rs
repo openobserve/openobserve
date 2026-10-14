@@ -91,23 +91,24 @@ pub async fn reserve_code(
     .await
 }
 
-/// Counts one attempt against (user, number) if its code is unspent, unexpired and under the
-/// cap; false means no attempt was left to claim. [strong]
+/// Counts one try on the code sent at `sent_at` if still unspent, live and under the cap. [strong]
 pub async fn claim_attempt(
     user_email: &str,
     target: &str,
+    sent_at: i64,
     now: i64,
 ) -> Result<bool, errors::Error> {
-    claim_attempt_in(get_orm_client_rw().await, user_email, target, now).await
+    claim_attempt_in(get_orm_client_rw().await, user_email, target, sent_at, now).await
 }
 
-/// Verifies the number in each org and spends the code; returns each (org, stored email). [strong]
+/// Spends the code sent at `sent_at`, verifying its number per org; `None` if not current. [strong]
 pub async fn confirm(
     user_email: &str,
     target: &str,
+    sent_at: i64,
     now: i64,
-) -> Result<Vec<(String, String)>, errors::Error> {
-    confirm_in(get_orm_client_rw().await, user_email, target, now).await
+) -> Result<Option<Vec<(String, String)>>, errors::Error> {
+    confirm_in(get_orm_client_rw().await, user_email, target, sent_at, now).await
 }
 
 fn to_stored(m: Model) -> Result<StoredCode, errors::Error> {
@@ -283,6 +284,7 @@ async fn claim_attempt_in<C: ConnectionTrait>(
     conn: &C,
     user_email: &str,
     target: &str,
+    sent_at: i64,
     now: i64,
 ) -> Result<bool, errors::Error> {
     // One statement, so concurrent confirms cannot all read the same count and pass the cap.
@@ -290,6 +292,7 @@ async fn claim_attempt_in<C: ConnectionTrait>(
         .col_expr(Column::Attempts, Expr::col(Column::Attempts).add(1))
         .filter(Column::UserEmail.eq(user_email.to_lowercase()))
         .filter(Column::Target.eq(target))
+        .filter(Column::SentAt.eq(sent_at))
         .filter(Column::CodeHash.is_not_null())
         .filter(Column::Attempts.lt(i64::from(CODE_MAX_ATTEMPTS)))
         .filter(Column::SentAt.gt(now - CODE_TTL_MICROS))
@@ -303,9 +306,24 @@ async fn confirm_in<C: TransactionTrait>(
     db: &C,
     user_email: &str,
     target: &str,
+    sent_at: i64,
     now: i64,
-) -> Result<Vec<(String, String)>, errors::Error> {
+) -> Result<Option<Vec<(String, String)>>, errors::Error> {
     let txn = db.begin().await?;
+    // Spent first: a code a resend replaced, or another confirm spent, verifies nothing.
+    let spent = Entity::update_many()
+        .col_expr(Column::CodeHash, Expr::value(Option::<String>::None))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::UserEmail.eq(user_email.to_lowercase()))
+        .filter(Column::Target.eq(target))
+        .filter(Column::SentAt.eq(sent_at))
+        .filter(Column::CodeHash.is_not_null())
+        .exec(&txn)
+        .await?
+        .rows_affected;
+    if spent != 1 {
+        return Ok(None);
+    }
     // Write before reading: a number changed concurrently no longer matches and is never marked.
     oncall_user_contacts::Entity::update_many()
         .col_expr(
@@ -320,18 +338,13 @@ async fn confirm_in<C: TransactionTrait>(
         .filter(oncall_user_contacts::Column::PhoneVerifiedAt.eq(now))
         .all(&txn)
         .await?;
-    Entity::update_many()
-        .col_expr(Column::CodeHash, Expr::value(Option::<String>::None))
-        .col_expr(Column::UpdatedAt, Expr::value(now))
-        .filter(Column::UserEmail.eq(user_email.to_lowercase()))
-        .filter(Column::Target.eq(target))
-        .exec(&txn)
-        .await?;
     txn.commit().await?;
-    Ok(marked
-        .into_iter()
-        .map(|p| (p.org_id, p.user_email))
-        .collect())
+    Ok(Some(
+        marked
+            .into_iter()
+            .map(|p| (p.org_id, p.user_email))
+            .collect(),
+    ))
 }
 
 /// This person's profiles in any org that hold this number.
@@ -437,7 +450,7 @@ mod tests {
                 .unwrap()
         );
         assert!(
-            claim_attempt_in(&db, "ana@o2.ai", NUMBER, 150)
+            claim_attempt_in(&db, "ana@o2.ai", NUMBER, 100, 150)
                 .await
                 .unwrap()
         );
@@ -521,28 +534,32 @@ mod tests {
     #[tokio::test]
     async fn test_an_attempt_is_claimed_only_while_the_code_can_be_tried() {
         let db = db().await;
-        assert!(!claim_attempt_in(&db, "ana@o2.ai", NUMBER, 1).await.unwrap());
+        assert!(
+            !claim_attempt_in(&db, "ana@o2.ai", NUMBER, 100, 1)
+                .await
+                .unwrap()
+        );
 
         store_code_in(&db, "ana@o2.ai", NUMBER, "h", None, 1, 100, 100)
             .await
             .unwrap();
         let last_valid = 100 + CODE_TTL_MICROS - 1;
         assert!(
-            !claim_attempt_in(&db, "ana@o2.ai", NUMBER, last_valid + 1)
+            !claim_attempt_in(&db, "ana@o2.ai", NUMBER, 100, last_valid + 1)
                 .await
                 .unwrap(),
             "expired"
         );
         for n in 0..CODE_MAX_ATTEMPTS {
             assert!(
-                claim_attempt_in(&db, "ANA@o2.ai", NUMBER, last_valid)
+                claim_attempt_in(&db, "ANA@o2.ai", NUMBER, 100, last_valid)
                     .await
                     .unwrap(),
                 "attempt {n}"
             );
         }
         assert!(
-            !claim_attempt_in(&db, "ana@o2.ai", NUMBER, last_valid)
+            !claim_attempt_in(&db, "ana@o2.ai", NUMBER, 100, last_valid)
                 .await
                 .unwrap(),
             "over the cap"
@@ -552,9 +569,11 @@ mod tests {
         store_code_in(&db, "ana@o2.ai", NUMBER, "h", Some(100), 1, 100, 200)
             .await
             .unwrap();
-        confirm_in(&db, "ana@o2.ai", NUMBER, 300).await.unwrap();
+        confirm_in(&db, "ana@o2.ai", NUMBER, 200, 300)
+            .await
+            .unwrap();
         assert!(
-            !claim_attempt_in(&db, "ana@o2.ai", NUMBER, 300)
+            !claim_attempt_in(&db, "ana@o2.ai", NUMBER, 200, 300)
                 .await
                 .unwrap(),
             "spent"
@@ -638,7 +657,11 @@ mod tests {
             .unwrap();
         fail_writes(&db).await;
 
-        assert!(claim_attempt_in(&db, "ana@o2.ai", NUMBER, 2).await.is_err());
+        assert!(
+            claim_attempt_in(&db, "ana@o2.ai", NUMBER, 1, 2)
+                .await
+                .is_err()
+        );
 
         assert_eq!(all(&db).await[0].row.attempts, 0);
     }
@@ -681,7 +704,10 @@ mod tests {
             .await
             .unwrap();
 
-        let mut marked = confirm_in(&db, "ANA@o2.ai", NUMBER, 500).await.unwrap();
+        let mut marked = confirm_in(&db, "ANA@o2.ai", NUMBER, 1, 500)
+            .await
+            .unwrap()
+            .expect("the code is current");
 
         marked.sort();
         assert_eq!(
@@ -711,7 +737,10 @@ mod tests {
             .await
             .unwrap();
 
-        let marked = confirm_in(&db, "ana@o2.ai", NUMBER, 500).await.unwrap();
+        let marked = confirm_in(&db, "ana@o2.ai", NUMBER, 1, 500)
+            .await
+            .unwrap()
+            .expect("the code is current");
 
         assert_eq!(marked, vec![("acme".to_string(), "ana@o2.ai".to_string())]);
         assert_eq!(verified_at(&db, "beta", "ana@o2.ai").await, None);
@@ -726,9 +755,39 @@ mod tests {
             .unwrap();
         fail_writes(&db).await;
 
-        assert!(confirm_in(&db, "ana@o2.ai", NUMBER, 500).await.is_err());
+        assert!(confirm_in(&db, "ana@o2.ai", NUMBER, 1, 500).await.is_err());
 
         assert_eq!(verified_at(&db, "acme", "ana@o2.ai").await, None);
         assert_eq!(all(&db).await[0].code_hash.as_deref(), Some("h"));
+    }
+
+    /// V8: a code checked before a resend replaced it neither claims an attempt nor verifies.
+    #[tokio::test]
+    async fn test_a_code_replaced_by_a_resend_neither_claims_nor_confirms() {
+        let db = db().await;
+        contact(&db, "acme", "ana@o2.ai", NUMBER).await;
+        store_code_in(&db, "ana@o2.ai", NUMBER, "hA", None, 1, 100, 100)
+            .await
+            .unwrap();
+        let code_a = all(&db).await[0].row.sent_at;
+        store_code_in(&db, "ana@o2.ai", NUMBER, "hB", Some(code_a), 2, 100, 200)
+            .await
+            .unwrap();
+        let resent = all(&db).await;
+
+        assert!(
+            !claim_attempt_in(&db, "ana@o2.ai", NUMBER, code_a, 250)
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            confirm_in(&db, "ana@o2.ai", NUMBER, code_a, 250)
+                .await
+                .unwrap(),
+            None
+        );
+
+        assert_eq!(verified_at(&db, "acme", "ana@o2.ai").await, None);
+        assert_eq!(all(&db).await, resent, "code B is still stored, untried");
     }
 }
