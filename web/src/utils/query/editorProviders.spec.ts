@@ -1270,6 +1270,27 @@ describe("buildOperatorLane — operators by type, ranked, never filtered", () =
     expect(lane("ok", "Boolean").map((e) => e.label)).toEqual(["= true", "= false", "IS NULL"]);
   });
 
+  it("a multi-word partial still reaches IS NOT NULL on a Boolean or numeric field", () => {
+    for (const [field, type] of [
+      ["flag", "Boolean"],
+      ["code", "Int64"],
+    ]) {
+      const rows = buildOperatorLane({
+        context: ctx(field, "IS NOT N"),
+        fieldType: type,
+        lineNumber: 1,
+        column: 30,
+      });
+      expect(
+        rows.map((e) => e.label),
+        type,
+      ).toContain("IS NOT NULL");
+      expect(rows.find((e) => e.label === "IS NOT NULL")!.range.startColumn).toBe(
+        30 - "IS NOT N".length,
+      );
+    }
+  });
+
   it("uses one neutral order when the type is unknown", () => {
     expect(lane("x", undefined).map((e) => e.label)).toEqual(OPERATORS_BY_TYPE.neutral);
   });

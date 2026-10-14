@@ -1268,7 +1268,7 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
     spy = vi
       .spyOn(document, "getElementById")
       .mockImplementation(() => document.createElement("div"));
-    mount(CodeQueryEditor, {
+    const wrapper = mount(CodeQueryEditor, {
       props: {
         editorId,
         language: "sql",
@@ -1295,6 +1295,7 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
         ])),
       model: editor.getModel(),
       editor,
+      wrapper,
     };
   };
 
@@ -1537,6 +1538,26 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
           expect(row.range.startColumn).toBeGreaterThanOrEqual(1);
         if (row.range?.insert) expect(row.range.insert.startColumn).toBeGreaterThanOrEqual(1);
       }
+    },
+  );
+
+  it(
+    "quotes a value by the column type current when the lookup returns",
+    { timeout: 30000 },
+    async () => {
+      let finish!: (values: string[]) => void;
+      const resolver = vi.fn(() => new Promise<string[]>((resolve) => (finish = resolve)));
+      const { provide, model, wrapper } = await mountWith("v-type-switch", resolver);
+      const pending = ask(provide, model, "SELECT * FROM logs WHERE code = ");
+      await vi.waitFor(() => expect(resolver).toHaveBeenCalled());
+      await wrapper.setProps({
+        keywords: FIELDS.map((f) => (f.name === "code" ? { ...f, detail: "Utf8" } : f)),
+      });
+      finish(["service-unavailable"]);
+      const value = (await pending).suggestions.find(
+        (s: any) => nameOf(s) === "'service-unavailable'",
+      );
+      expect(value?.insertText).toBe("'service-unavailable'");
     },
   );
 

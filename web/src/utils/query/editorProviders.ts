@@ -840,7 +840,17 @@ export const buildOperatorLane = ({
   chainCommand,
 }: OperatorLaneOptions): LooseEntry[] => {
   const kind = columnKind(fieldType);
-  const order = OPERATORS_BY_TYPE[kind === "unknown" ? "neutral" : kind];
+  const lane = OPERATORS_BY_TYPE[kind === "unknown" ? "neutral" : kind];
+  const typed = context.partial.toLowerCase().replace(/\s+/g, " ");
+  // A multi-word partial drops the catalog, so an operator it spells stays offered even off this type's lane.
+  const order = /\s/.test(context.partial)
+    ? [
+        ...lane,
+        ...Object.keys(OPERATOR_SPECS).filter(
+          (l) => !lane.includes(l) && l.toLowerCase().startsWith(typed),
+        ),
+      ]
+    : lane;
   const partialRange = {
     startLineNumber: lineNumber,
     endLineNumber: lineNumber,
