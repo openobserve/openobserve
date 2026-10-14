@@ -9450,6 +9450,9 @@
     "sloLongWindow": "Uzun pencere",
     "sloShortWindow": "Kısa pencere",
     "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz.",
+    "builtinBadge": "Sistem",
+    "builtinBadgeHint": "Yerleşik bir uyarı: kapatabilir veya düzenleyebilirsiniz, ancak silemez veya yeniden adlandıramazsınız.",
+    "builtinDeleteDisabled": "Yerleşik uyarı, silinemez",
     "seconds": "Saniye",
     "downtimes": {
       "newTitle": "Yeni kesinti",
@@ -13818,6 +13821,14 @@
         "previewEmpty": "Ne çalışacağını görmek için bir veri kümesi seçin.",
         "previewLoading": "Yuvalar hesaplanıyor…",
         "previewSlots": "çalıştırılacak yuva",
+        "costEstimate": "~{cost} tahmini (büyüklük mertebesi)",
+        "costUnknown": "Maliyet tahmin edilemedi",
+        "costLowerBound": "alt sınır, bazı modellerin fiyatı yok",
+        "costScoringOnly": "yalnızca puanlama maliyeti",
+        "costConfirmTitle": "Bu maliyetli deney çalıştırılsın mı?",
+        "costConfirmMessage": "Bu deneyin maliyetinin yaklaşık {cost} olacağı tahmin ediliyor ve bu, {threshold} uyarı eşiğinin üzerinde. Yine de oluşturulup çalıştırılsın mı?",
+        "costConfirmMessageUnpriced": "Bu deneyin tahmini maliyeti uyarı eşiğini aşıyor. Yine de oluşturup çalıştırılsın mı?",
+        "costConfirmOk": "Yine de Oluştur",
         "skippedFully": "{count} satır tamamen atlandı — seçilen her puanlayıcı beklenen bir çıktı gerektirir. Atlanan satırların çalıştırılması hiçbir maliyet gerektirmez.",
         "skippedPartially": "{count} satır kısmen atlandı — görev yine de çalışır, ancak referans tabanlı puanlayıcılar beklenen çıktısı olmayan satırları puanlayamaz.",
         "skippedNone": "Eşleşen her satır en az bir boyutta puanlanabilir.",
@@ -14441,6 +14452,8 @@
       },
       "testPanel": {
         "title": "Bağlantıyı Test Et",
+        "storedCredentialsHint": "Yayımlanmış v{version} ({endpoint}) sürümünü kayıtlı kimlik bilgileriyle test eder. Kaydedilmemiş düzenlemeleriniz yayımladığınızda test edilir.",
+        "unpublishedSecretHint": "Bu görev henüz yayımlanmadı, bu nedenle test edilecek kayıtlı bir sürüm yok. Değişiklikleri Yayımla, kaydedilmiş taslağı kayıtlı kimlik bilgileriyle test eder ve test başarılı olursa yayımlar.",
         "sourceLabel": "Örnek Girdi",
         "sourceDataset": "Bir Veri Kümesinden",
         "sourceManual": "Manuel",
@@ -14462,7 +14475,15 @@
         "rawRequest": "Gönderilen İstek",
         "rawResponse": "Alınan Yanıt",
         "idle": "Bir test çalıştırdığınızda istek ve yanıt burada görünür.",
-        "disabledHint": "Önce adı ve uç noktayı doldurun."
+        "disabledHint": "Önce adı ve uç noktayı doldurun.",
+        "failure": {
+          "transport": "Uç noktaya ulaşılamadı.",
+          "deadlineExceeded": "Uç nokta zamanında yanıt vermedi.",
+          "httpStatus": "Uç nokta HTTP {status} ile yanıt verdi.",
+          "badResponse": "Yanıt, yanıt yoluyla okunamadı.",
+          "outputTooLarge": "Yanıt çok büyük.",
+          "requestError": "İstek, görevden oluşturulamadı."
+        }
       },
       "detail": {
         "backTo": "Uzak Görevler",
@@ -14565,6 +14586,14 @@
         },
         "attemptsValue": "{count} / {max}",
         "resultsTitle": "Sonuçlar"
+      },
+      "credentialsDialog": {
+        "open": "Kimlik Bilgilerini Değiştir",
+        "title": "Kimlik Bilgilerini Değiştir",
+        "body": "Yeni değer, kayıtlı değerin yerini alır. Görev sürümünü korur ve kayıtlı değer hiçbir zaman gösterilmez.",
+        "submit": "Değiştir",
+        "success": "Kimlik bilgileri değiştirildi",
+        "error": "Kimlik bilgileri değiştirilemedi"
       },
       "signingPanel": {
         "title": "İmzalama Anahtarları",
@@ -16767,7 +16796,6 @@
         "previewLabel": "Burada çalıştırdığı adımlar",
         "openChild": "\"{name}\" testini aç",
         "noAccessRemedy": "Klasörüne okuma erişimi isteyin veya referansı kaldırın.",
-        "disabledTooltip": "Bu dağıtımda alt testler etkin değil.",
         "loadFailed": "Bu alt test yüklenemedi, bu nedenle adımları ve adım sayısı bilinmiyor.",
         "missing": "Bu alt test artık mevcut değil. Referansı kaldırın veya başka bir test seçin.",
         "noAccessBadge": "erişim yok",
