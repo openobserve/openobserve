@@ -205,6 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="listSchema({ row })"
               />
               <OButton
+                v-if="canDeleteStream(row)"
                 icon-left="delete"
                 :title="t('logStream.delete')"
                 data-test="log-stream-delete-btn"
@@ -242,6 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("logStream.schemaHeader") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
+                  v-if="canDeleteStream(row)"
                   icon-left="delete"
                   variant="destructive"
                   class="md:hidden"
@@ -338,6 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #selection-actions>
             <OButton
+              v-if="!bulkDeleteSplit.skipped.length || bulkDeleteSplit.allowed.length > 0"
               icon-left="delete"
               variant="outline-destructive"
               size="sm"
@@ -409,7 +412,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div class="flex flex-col gap-3 py-1">
-        <p class="text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
+        <p class="text-sm">
+          {{
+            bulkDeleteSplit.skipped.length
+              ? t("authz.bulkDeletePartial", {
+                  count: bulkDeleteSplit.allowed.length,
+                  total: selectedItems.length,
+                  skipped: bulkDeleteSplit.skipped.length,
+                })
+              : t("logStream.confirmBatchDeleteMsg")
+          }}
+        </p>
+        <p
+          v-if="bulkDeleteSplit.skipped.length"
+          class="text-text-secondary text-xs"
+          data-test="log-stream-batch-delete-skipped"
+        >
+          {{
+            skippedNamesText(
+              t,
+              bulkDeleteSplit.skipped.map((s: any) => s.name),
+            )
+          }}
+        </p>
         <div class="text-text-secondary flex w-full items-center gap-2 text-sm">
           <OCheckbox v-model="deleteAssociatedAlertsPipelines" />
           <span class="text-text-secondary text-xs font-medium">
@@ -463,6 +488,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { skippedNamesText, splitByPermission, useCan } from "@/composables/useCan";
 export default defineComponent({
   name: "PageLogStream",
   components: {
@@ -531,6 +557,11 @@ export default defineComponent({
     const selectedItems = computed(() =>
       logStream.value.filter((s: any) => selectedIds.value.includes(s._rowKey)),
     );
+
+    const { can, noteWriteDenied } = useCan();
+    const canDeleteStream = (row: any): boolean =>
+      can("stream", row.name, "delete", undefined, row.stream_type);
+    const bulkDeleteSplit = computed(() => splitByPermission(selectedItems.value, canDeleteStream));
 
     const streamTabs: never[] = [];
     const { removeStream, getStream, addNewStreams } = useStreams(t);
@@ -1089,6 +1120,7 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
+          noteWriteDenied(err, "stream", deleteStreamName, "delete", undefined, deleteStreamType);
           if (err.response.status != 403) {
             toast({
               message: t("toastMessages.views.errorWhileDeletingStream"),
@@ -1103,7 +1135,7 @@ export default defineComponent({
     };
     const deleteBatchStream = () => {
       isDeleting.value = true;
-      const items = selectedItems.value;
+      const items = bulkDeleteSplit.value.allowed;
       const promises: Promise<any>[] = [];
 
       items.forEach((stream: any) => {
@@ -1370,6 +1402,9 @@ export default defineComponent({
       },
     ]);
     return {
+      canDeleteStream,
+      bulkDeleteSplit,
+      skippedNamesText,
       t,
       raw,
       router,
