@@ -14,7 +14,7 @@
   >
     <div
       v-if="notices.length"
-      class="flex shrink-0 flex-nowrap items-center gap-1 pe-1"
+      class="my-0.5 flex shrink-0 flex-nowrap items-center gap-1 pe-1"
       data-test="panel-notice-chips"
     >
       <span
