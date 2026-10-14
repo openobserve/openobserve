@@ -1177,15 +1177,29 @@ export default defineComponent({
       hideChartTooltip: () => chartRendererRef.value?.chart?.dispatchAction({ type: "hideTip" }),
       alertSource,
     });
+    // SQL drops hidden queries' data but not their metadata, so a series' position counts the kept entries only.
+    const sqlPanelQueryIndex = (position: number): number | undefined => {
+      const kept = (Array.isArray(data.value) ? data.value : [])
+        .map((_: unknown, index: number) => index)
+        .filter((index: number) => !isHiddenAt(index));
+      const index = kept[position];
+      return index === undefined
+        ? undefined
+        : (metadata.value?.queries?.[index]?.panelQueryIndex ?? index);
+    };
     // ECharts' seriesIndex is the position in the series we rendered, which carry their query.
     const onChartDomContextMenu = (event: any) => {
       const series =
         typeof event?.seriesIndex === "number"
           ? panelData.value?.options?.series?.[event.seriesIndex]
           : undefined;
+      const panelQueryIndex =
+        panelSchema.value?.queryType !== "promql" && typeof series?._queryIndex === "number"
+          ? sqlPanelQueryIndex(series._queryIndex)
+          : series?._panelQueryIndex;
       openAlertContextMenu({
         ...event,
-        panelQueryIndex: series?._panelQueryIndex,
+        panelQueryIndex,
         seriesRole: series?._seriesRole,
         ...(series?._seriesRole === "forecast"
           ? { forecastPoint: forecastPointOf(series, event.dataIndex) }

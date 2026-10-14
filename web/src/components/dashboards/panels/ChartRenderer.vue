@@ -115,6 +115,11 @@ import {
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import { withChartFont } from "@/utils/fonts";
+import {
+  lineSeriesAtPoint,
+  type LineSeriesPixels,
+  type PixelPoint,
+} from "@/utils/dashboard/lineSeriesAtPoint";
 
 echarts.use([
   TitleComponent,
@@ -147,6 +152,14 @@ echarts.use([
 
 // Right-click reads a y-axis value, so only cartesian series types can answer it
 const CONTEXT_MENU_SERIES_TYPES = ["bar", "line", "scatter"];
+
+// A line datum is `[x, y]`, `{ value: [x, y] }`, or a bare y on a category axis.
+const datumValue = (datum: unknown, dataIndex: number): (string | number)[] => {
+  if (Array.isArray(datum)) return datum;
+  const inner = (datum as { value?: unknown } | null)?.value;
+  if (Array.isArray(inner)) return inner;
+  return [dataIndex, (inner ?? datum) as string | number];
+};
 
 export default defineComponent({
   name: "ChartRenderer",
@@ -387,6 +400,33 @@ export default defineComponent({
       }
     };
 
+    const linePixels = (): LineSeriesPixels[] =>
+      ((chart?.getOption()?.series ?? []) as { type?: string; data?: unknown }[]).map(
+        (series, seriesIndex) => ({
+          seriesIndex,
+          points:
+            series?.type !== "line" || !Array.isArray(series.data)
+              ? []
+              : series.data.map((datum: unknown, dataIndex: number) => {
+                  const value = datumValue(datum, dataIndex);
+                  if (value[1] === null || value[1] === undefined || value[1] === "") return null;
+                  const pixel = chart?.convertToPixel({ seriesIndex }, value);
+                  return Array.isArray(pixel) && pixel.every(Number.isFinite)
+                    ? (pixel as PixelPoint)
+                    : null;
+                }),
+        }),
+      );
+
+    // The series lookup only refines the menu; a failure must not cost the user the menu itself.
+    const lineSeriesHit = (pixelPoint: PixelPoint) => {
+      try {
+        return lineSeriesAtPoint(pixelPoint, linePixels());
+      } catch {
+        return null;
+      }
+    };
+
     // Handle native DOM contextmenu event for alert creation
     // This handles right-clicks anywhere on the chart (including empty space)
     const handleNativeContextMenu = async (event: MouseEvent) => {
@@ -420,10 +460,13 @@ export default defineComponent({
 
           // Emit domcontextmenu event for alert creation
           if (yAxisValue !== null && yAxisValue !== undefined && !isNaN(Number(yAxisValue))) {
+            // A line hides its symbols until hovered, so a click on the line itself hits no series.
+            const hit = lineSeriesHit(pixelPoint as PixelPoint);
             emit("domcontextmenu", {
               x: event.clientX,
               y: event.clientY,
               value: Number(yAxisValue),
+              ...(hit ?? {}),
             });
           }
         }

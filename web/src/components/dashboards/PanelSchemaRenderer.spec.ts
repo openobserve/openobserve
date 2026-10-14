@@ -2256,6 +2256,47 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuData.panelQueryIndex).toBeUndefined();
     });
 
+    it("maps a SQL series past a hidden query to its own panel query", () => {
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([[], [], []]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({
+          queries: [{ panelQueryIndex: 0 }, { panelQueryIndex: 1 }, { panelQueryIndex: 2 }],
+        }),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+      const query = defaultProps.panelSchema.queries[0];
+      wrapper = createWrapper({
+        allowAlertCreation: true,
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          queries: [query, { ...query, config: { hide: true } }, query],
+        },
+      });
+      // convertSQLData read the unfiltered metadata, so the second kept series claims query 1.
+      wrapper.vm.panelData = {
+        options: {
+          series: [
+            { name: "a", _queryIndex: 0, _panelQueryIndex: 0 },
+            { name: "c", _queryIndex: 1, _panelQueryIndex: 1 },
+          ],
+        },
+      };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 1 });
+      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(2);
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0 });
+      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(0);
+    });
+
     it("reads a forecast line's start and the clicked point's time, for the forecast alert", () => {
       wrapper = createWrapper({ allowAlertCreation: true });
       wrapper.vm.panelData = {
