@@ -31,7 +31,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import type { SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import paidOverage, { type PaidOverageStatus } from "@/services/paidOverage";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { usePaidOverageConsent } from "@/composables/usePaidOverageConsent";
 
 const props = defineProps<{ mode: string }>();
@@ -90,9 +90,11 @@ async function updateEnabled(value: SwitchValue) {
     }
     await loadStatus();
     emit("change");
-  } catch {
+  } catch (e: any) {
     displayEnabled.value = previous;
-    toast({ variant: "error", message: t("paidUsage.updateFailed") });
+    // The server says why it refused (not an admin, not eligible); "try again" cannot fix those.
+    const reason = e?.response?.data?.message;
+    toast({ variant: "error", message: reason ? raw(reason) : t("paidUsage.updateFailed") });
   } finally {
     saving.value = false;
   }

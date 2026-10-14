@@ -10,7 +10,10 @@ const services = vi.hoisted(() => ({
   getConsent: vi.fn(),
   updateConsent: vi.fn(),
   promptForConsent: vi.fn(),
+  toast: vi.fn(),
 }));
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: services.toast }));
 
 vi.mock("@/services/paidOverage", () => ({
   default: { get: services.getConsent, update: services.updateConsent },
@@ -125,6 +128,45 @@ describe("PaidAiUsageControl", () => {
     await flushPromises();
     expect(services.updateConsent).toHaveBeenCalledWith("default", "ai_credits", false);
     expect(services.promptForConsent).not.toHaveBeenCalled();
+  });
+
+  it("shows why the server refused a change, and keeps the switch as it was", async () => {
+    services.getConsent.mockResolvedValue({
+      data: consentStatus({
+        organization: { org_id: "default", enabled: true, can_manage: true },
+        effective: true,
+      }),
+    });
+    services.updateConsent.mockRejectedValue({
+      response: { status: 409, data: { message: "This organization cannot use paid AI usage." } },
+    });
+    const w = await mountControl();
+    await toggle(w).trigger("click");
+    await flushPromises();
+
+    expect(services.toast).toHaveBeenCalledWith({
+      variant: "error",
+      message: "This organization cannot use paid AI usage.",
+    });
+    expect(w.getComponent({ name: "OSwitch" }).props("modelValue")).toBe(true);
+  });
+
+  it("falls back to the generic message when the server gives no reason", async () => {
+    services.getConsent.mockResolvedValue({
+      data: consentStatus({
+        organization: { org_id: "default", enabled: true, can_manage: true },
+        effective: true,
+      }),
+    });
+    services.updateConsent.mockRejectedValue(new Error("Network Error"));
+    const w = await mountControl();
+    await toggle(w).trigger("click");
+    await flushPromises();
+
+    expect(services.toast).toHaveBeenCalledWith({
+      variant: "error",
+      message: "Couldn't update paid AI usage. Try again.",
+    });
   });
 
   it("keeps the switch read-only for non-admins", async () => {
