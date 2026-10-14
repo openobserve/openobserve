@@ -260,7 +260,8 @@ struct ConfigResponse<'a> {
     workflows_enabled: bool,
 }
 
-/// Unauthenticated `GET /config`: every field is public, so only what the login page consumes, plus `editor_suggest_mode`.
+/// Unauthenticated `GET /config`: every field is public, so only what the login page consumes, plus
+/// `editor_suggest_mode`.
 #[derive(Serialize)]
 struct ConfigBootstrapResponse {
     /// `enterprise` / `cloud` / `opensource`; the o2 CLI and o2-operator read it here.
