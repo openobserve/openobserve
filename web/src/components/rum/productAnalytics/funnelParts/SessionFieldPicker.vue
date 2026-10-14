@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex h-104 flex-col gap-2 max-lg:h-auto"
+    class="flex h-104 flex-col gap-2 max-lg:h-auto lg:max-h-[calc(var(--reka-popper-available-height,26rem)-1.625rem)]"
     data-test="rum-analytics-funnel-field-picker"
   >
     <template v-if="!field">

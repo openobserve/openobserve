@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #action>
       <OPopover
         :open="open"
-        side="bottom"
-        :align="stacked ? 'end' : 'start'"
+        :side="stacked ? 'right' : 'bottom'"
+        align="start"
         content-class="p-3 w-96 max-w-[calc(100vw-1.5rem)]"
         @update:open="setOpen"
       >
@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               icon-left="add"
+              :active="open"
               :disabled="!!blocked"
               :aria-label="t('rum.analytics.funnel.addFilter')"
               data-test="rum-analytics-funnel-add-filter-btn"
@@ -73,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost-primary"
                 size="sm"
                 icon-left="add"
+                :active="open"
                 :disabled="!!blocked"
                 data-test="rum-analytics-funnel-add-filter-btn"
                 @click="editing = null"
