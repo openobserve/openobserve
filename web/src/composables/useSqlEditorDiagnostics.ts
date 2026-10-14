@@ -103,7 +103,9 @@ export function useSqlEditorDiagnostics({
     watch(
       externalErrors,
       (ranges) => {
+        // The key marks only blur's own next write; a later server error with equal ranges is a run marker.
         runMarkersShown = !!ranges?.length && JSON.stringify(ranges) !== blurRangesKey;
+        blurRangesKey = "";
         runMarkersQuery = runMarkersShown ? rawQuery() : "";
         pushToEditor(ranges ?? []);
       },
