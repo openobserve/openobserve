@@ -1522,6 +1522,31 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
   );
 
   it(
+    "a qualified column after = is filtered by the name after the dot",
+    { timeout: 30000 },
+    async () => {
+      const { provide, model } = await mountWith(
+        "v-qualified",
+        vi.fn(async () => ["x"]),
+      );
+      const text = "SELECT * FROM a JOIN b ON a.level = b.le";
+      model.getValueInRange.mockReturnValue(text);
+      model.getWordUntilPosition.mockReturnValue({
+        word: "le",
+        startColumn: text.length - 1,
+        endColumn: text.length + 1,
+      });
+      const result = await provide(
+        model,
+        { lineNumber: 1, column: text.length + 1 },
+        CTRL_SPACE,
+        {},
+      );
+      expect(labels(result)).toEqual(["level"]);
+    },
+  );
+
+  it(
     "a retry at the same caret that finds values clears the no-values hint",
     { timeout: 30000 },
     async () => {

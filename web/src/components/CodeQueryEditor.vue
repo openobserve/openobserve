@@ -1689,14 +1689,14 @@ export default defineComponent({
                 valueContext,
                 highlighted,
               );
-              const typedRange = isQualified(valueContext.typed)
+              const qualified = isQualified(valueContext.typed);
+              const typedRange = qualified
                 ? range
                 : caretRange(position, valueContext.typed.length);
               if (!entries || !groupsMenus(config)) return reply(entries, typedRange);
-              return reply(
-                groupValueMenu(entries, valueContext.typed, typedRange, highlighted),
-                typedRange,
-              );
+              // `b.tr` names column `tr…` of table b, so only the part after the dot filters.
+              const typed = qualified ? word.word : valueContext.typed;
+              return reply(groupValueMenu(entries, typed, typedRange, highlighted), typedRange);
             }
             if (literalStateAtEnd(textUntilPosition) === "string") return reply([]);
             const operators = operatorEntries(

@@ -592,7 +592,8 @@ const scanFrames = (text: string): Frame => {
     const ch = text[i];
     const spanEnd = maskedSpanEnd(text, i);
     if (spanEnd !== null) {
-      frame.tokens.push("'");
+      // A quoted span is an operand; a comment is nothing, so WHERE before it stays the last token.
+      if (ch === "'" || ch === '"') frame.tokens.push("'");
       i = spanEnd;
     } else if (ch === "(") {
       const prev = frame.tokens.at(-1) ?? "";
