@@ -141,19 +141,42 @@ test.describe('Logs toolbar pins', () => {
   });
 
   test('logs pins do not leak into the traces toolbar scope', {
-    tag: ['@toolbarPins', '@logs', '@P1', '@all'],
+    tag: ['@toolbarPins', '@logs', '@traces', '@P1', '@all'],
   }, async () => {
-    // useToolbarPins is shared with traces but keyed per scope, and functionEditor
-    // is not even a traces key — a leak here would corrupt another module.
-    await pm.logsToolbarPinsPage.seedPinStorage();
-    await pm.logsToolbarPinsPage.navigateToLogs(getOrgIdentifier());
+    // useToolbarPins keeps one module-level scopeStates map for both scopes, so
+    // the isolation only becomes observable once BOTH scopes are live in the same
+    // session. Visiting only Logs would leave traces storage null no matter what,
+    // which is already asserted by useToolbarPins.spec.ts — this test earns its
+    // place by driving the two pages in one session instead.
+    const pins = pm.logsToolbarPinsPage;
+    await pins.seedPinStorage();
+    await pins.navigateToLogs(getOrgIdentifier());
 
-    await pm.logsToolbarPinsPage.togglePin('functionEditor');
-    expect(await pm.logsToolbarPinsPage.readPins()).toContain('functionEditor');
+    // quickMode is a logs-only key: it is not in the traces scope's key list.
+    await pins.togglePin('quickMode');
+    expect(await pins.readPins()).toContain('quickMode');
 
-    expect(await pm.logsToolbarPinsPage.readTracesPins()).toBeNull();
+    await pins.navigateToTraces(getOrgIdentifier());
+    // The traces scope is really instantiated — its own default is pinned — so
+    // the assertions below are about isolation, not about an absent scope.
+    await pins.expectTracesPinState('savedViews', true);
+    await pins.expectTracesPinState('histogram', false);
+    await pins.expectTracesMetricsPinnedHidden();
 
-    testLogger.info('Traces pin storage untouched by a logs pin');
+    // Writing the traces scope must persist only traces keys, and must not pick
+    // up the logs-only pin through the shared map.
+    await pins.toggleTracesPin('histogram');
+    const tracesPins = JSON.parse((await pins.readTracesPins()) ?? 'null');
+    expect(tracesPins).toContain('savedViews');
+    expect(tracesPins).toContain('histogram');
+    expect(tracesPins).not.toContain('quickMode');
+
+    // And the traces write left the logs scope alone.
+    await pins.navigateToLogs(getOrgIdentifier());
+    expect(await pins.readPins()).toContain('quickMode');
+    await pins.expectPinnedVisible('quickMode');
+
+    testLogger.info('Logs and traces pin scopes stayed isolated across both pages');
   });
 
   test('pinned controls render in canonical order, not click order', {
@@ -193,12 +216,13 @@ test.describe('Logs toolbar pins', () => {
     const widths = [1700, 1300, 1100, 900, 700];
     const kept = [];
     for (const width of widths) {
-      await pins.setViewportWidth(width);
-      const visible = await pins.getVisiblePinnedOrder();
+      // Resizing recomputes availableLeftWidth off a ResizeObserver, so the set
+      // has to settle before it is read — otherwise this races the recompute.
+      const visible = await pins.setViewportWidthAndSettle(width);
       expect(visible, `pinned items at ${width}px must be a priority prefix`).toEqual(
         pins.assertablePinOrder.slice(0, visible.length),
       );
-      kept.push({ width, count: visible.length });
+      kept.push({ width, visible, count: visible.length });
     }
     const counts = kept.map((entry) => entry.count);
     // All of them fit when there is room, and some width in the sweep drops one —
@@ -206,8 +230,12 @@ test.describe('Logs toolbar pins', () => {
     expect(kept[0].count).toBe(pins.assertablePinOrder.length);
     expect(Math.min(...counts)).toBeLessThan(pins.assertablePinOrder.length);
 
-    // Nothing is lost: a collapsed control stays reachable in the More menu.
-    await pins.expectSavedViewsReachableInMenu();
+    // Nothing is lost: saved views has dropped off the toolbar at the narrowest
+    // width, yet the More menu still reports it as pinned — only the rendering
+    // collapsed. Asserted on the set rather than on a count, so no pixel
+    // threshold is baked in.
+    expect(kept[kept.length - 1].visible).not.toContain('savedViews');
+    await pins.expectCollapsedButStillPinned('savedViews');
 
     testLogger.info(
       `Pinned items kept per width: ${kept.map((e) => `${e.width}px:${e.count}`).join(', ')}`,

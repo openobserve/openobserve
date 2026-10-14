@@ -22,6 +22,19 @@ export class LogsToolbarPinsPage {
     this.moreMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
     this.savedViewsMenuListButton = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
 
+    // Traces runs the same composable under its own scope, so cross-scope
+    // isolation is only observable with both pages visited in one session.
+    this.tracesMoreMenuButton = '[data-test="traces-search-bar-more-menu-btn"]';
+    this.tracesPinToggle = {
+      histogram: '[data-test="traces-search-bar-menu-pin-metrics-btn"]',
+      savedViews: '[data-test="traces-search-bar-menu-pin-saved-views-btn"]',
+    };
+    this.tracesMetricsPinnedControl = '[data-test="traces-search-bar-metrics-pinned-btn"]';
+
+    // The pin button's title is the only rendered signal of pin state, so it is
+    // how a collapsed-but-still-pinned control is told from an unpinned one.
+    this.pinTitle = { pinned: 'Unpin from toolbar', unpinned: 'Pin to toolbar' };
+
     // Pin toggle for each control, inside the More menu.
     this.pinToggle = {
       histogram: '[data-test="logs-search-bar-menu-pin-histogram-btn"]',
@@ -102,8 +115,60 @@ export class LogsToolbarPinsPage {
     await this.expectToolbarReady();
   }
 
-  async setViewportWidth(width) {
+  async navigateToTraces(orgIdentifier) {
+    await this.page.goto(
+      `${process.env.ZO_BASE_URL}/web/traces?org_identifier=${orgIdentifier}`,
+    );
+    await expect(this.page.locator(this.tracesMoreMenuButton)).toBeVisible();
+  }
+
+  async openTracesMoreMenu() {
+    await this.page.locator(this.tracesMoreMenuButton).click();
+    await expect(this.page.locator(this.tracesPinToggle.savedViews)).toBeVisible();
+  }
+
+  async toggleTracesPin(key) {
+    await this.openTracesMoreMenu();
+    await this.page.locator(this.tracesPinToggle[key]).click();
+    await this.page.keyboard.press('Escape');
+    await expect(this.page.locator(this.tracesPinToggle.savedViews)).toBeHidden();
+    testLogger.debug(`Toggled traces toolbar pin: ${key}`);
+  }
+
+  /**
+   * Resizes, then waits for the pinned set to stop changing.
+   * availableLeftWidth is recomputed from a ResizeObserver, so the fitted set
+   * settles a frame or more after the viewport changes — reading layout straight
+   * away races that recompute and flakes the prefix assertion on a slower host.
+   */
+  async setViewportWidthAndSettle(width) {
     await this.page.setViewportSize({ width, height: 1024 });
+    // Two frames lets the observer fire and Vue flush before polling starts.
+    await this.page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))),
+        ),
+    );
+    let previous = null;
+    let settled = null;
+    await expect
+      .poll(
+        async () => {
+          const current = (await this.getVisiblePinnedOrder()).join(',');
+          const isStable = current === previous;
+          previous = current;
+          if (isStable) settled = current;
+          return isStable;
+        },
+        {
+          timeout: 15000,
+          intervals: [150, 250, 400, 600, 800],
+          message: `pinned set never settled at ${width}px`,
+        },
+      )
+      .toBe(true);
+    return settled ? settled.split(',').filter(Boolean) : [];
   }
 
   // ===== ACTIONS =====
@@ -174,10 +239,34 @@ export class LogsToolbarPinsPage {
     await expect(this.page.locator(this.pinnedControl[key])).toBeHidden();
   }
 
-  /** A control collapsed off the toolbar must still be reachable in the More menu. */
-  async expectSavedViewsReachableInMenu() {
+  /**
+   * A control collapsed off the toolbar must still be *pinned* — only its
+   * rendering moved. The More menu's pin button title is the rendered signal:
+   * asserting the menu entry alone would pass whatever the pin state, since that
+   * entry is unconditional.
+   */
+  async expectCollapsedButStillPinned(key) {
+    await this.expectPinnedHidden(key);
     await this.openMoreMenu();
     await expect(this.page.locator(this.savedViewsMenuListButton)).toBeVisible();
+    await expect(this.page.locator(this.pinToggle[key])).toHaveAttribute(
+      'title',
+      this.pinTitle.pinned,
+    );
+    await this.closeMoreMenu();
+  }
+
+  async expectTracesPinState(key, pinned) {
+    await this.openTracesMoreMenu();
+    await expect(this.page.locator(this.tracesPinToggle[key])).toHaveAttribute(
+      'title',
+      pinned ? this.pinTitle.pinned : this.pinTitle.unpinned,
+    );
+    await this.page.keyboard.press('Escape');
+  }
+
+  async expectTracesMetricsPinnedHidden() {
+    await expect(this.page.locator(this.tracesMetricsPinnedControl)).toBeHidden();
   }
 }
 
