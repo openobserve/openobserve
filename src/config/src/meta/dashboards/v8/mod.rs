@@ -94,6 +94,8 @@ pub struct Tab {
     pub name: String,
     #[serde(default)]
     pub panels: Vec<Panel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repeat: Option<Repeat>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
@@ -116,6 +118,28 @@ pub struct Panel {
     pub markdown_content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custom_chart_content: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repeat: Option<Repeat>,
+}
+
+/// Renders one copy of a panel or tab per selected value of a multi-select variable.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Repeat {
+    pub variable: String,
+    #[serde(default)]
+    pub direction: RepeatDirection,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_per_row: Option<i64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, Default)]
+pub enum RepeatDirection {
+    #[default]
+    #[serde(rename = "h")]
+    Horizontal,
+    #[serde(rename = "v")]
+    Vertical,
 }
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -986,6 +1010,39 @@ mod tests {
         assert_eq!(layout.h, 5);
         let back = serde_json::to_value(&layout).unwrap();
         assert_eq!(back["w"], 10);
+    }
+
+    #[test]
+    fn test_panel_repeat_roundtrip_and_absent_when_none() {
+        let mut json = serde_json::json!({
+            "id": "p1", "type": "bar", "title": "", "description": "",
+            "config": {"show_legends": false, "legends_position": null},
+            "queries": []
+        });
+        let plain: Panel = serde_json::from_value(json.clone()).unwrap();
+        assert!(plain.repeat.is_none());
+        assert!(serde_json::to_value(&plain).unwrap().get("repeat").is_none());
+
+        json["repeat"] = serde_json::json!({"variable": "host", "direction": "v", "maxPerRow": 6});
+        let panel: Panel = serde_json::from_value(json).unwrap();
+        let repeat = panel.repeat.clone().unwrap();
+        assert_eq!(repeat.variable, "host");
+        assert_eq!(repeat.direction, RepeatDirection::Vertical);
+        assert_eq!(repeat.max_per_row, Some(6));
+        let back = serde_json::to_value(&panel).unwrap();
+        assert_eq!(back["repeat"]["direction"], "v");
+        assert_eq!(back["repeat"]["maxPerRow"], 6);
+    }
+
+    #[test]
+    fn test_tab_repeat_defaults_direction_to_horizontal() {
+        let tab: Tab = serde_json::from_value(serde_json::json!({
+            "tabId": "t1", "name": "Service", "repeat": {"variable": "service"}
+        }))
+        .unwrap();
+        let repeat = tab.repeat.unwrap();
+        assert_eq!(repeat.direction, RepeatDirection::Horizontal);
+        assert!(repeat.max_per_row.is_none());
     }
 
     #[test]
