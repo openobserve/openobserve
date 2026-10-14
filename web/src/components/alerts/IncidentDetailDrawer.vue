@@ -3347,7 +3347,30 @@ export default defineComponent({
       return result.join("\n");
     };
 
-    const formatRcaContent = (content: string) => {
+    // Agents don't always emit `##` section headings — some reports mark sections
+    // with a bold line on its own ("**Evidence**"), which leaves the TOC empty.
+    // Promote those standalone bold lines (outside code fences) to `##` so the
+    // TOC and the rendered heading ids both pick them up. Inline bold such as
+    // "**Issue**: High CPU" is untouched because the whole line must be bold.
+    const promoteBoldLinesToHeadings = (content: string): string => {
+      let inCodeBlock = false;
+      return content
+        .split("\n")
+        .map((line) => {
+          if (line.trim().startsWith("```")) {
+            inCodeBlock = !inCodeBlock;
+            return line;
+          }
+          if (inCodeBlock) return line;
+          const match = line.match(/^\s*(?:\*\*|__)([^*_\n][^*\n]*?)(?:\*\*|__)\s*:?\s*$/);
+          return match ? `## ${match[1].trim()}` : line;
+        })
+        .join("\n");
+    };
+
+    const formatRcaContent = (rawContent: string) => {
+      const content = promoteBoldLinesToHeadings(rawContent);
+
       // First, extract table of contents - only update if content changed
       const newToc = extractTableOfContents(content);
       if (JSON.stringify(newToc) !== JSON.stringify(tableOfContents.value)) {
