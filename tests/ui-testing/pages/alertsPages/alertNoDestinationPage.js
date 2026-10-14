@@ -6,6 +6,9 @@ import os from 'os';
 import path from 'path';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const {
+  simpleAlert, createAlert, findAlertId, getAlert, deleteAlertInFolder,
+} = require('../../playwright-tests/utils/alerts-api-helpers.js');
 
 /**
  * AlertNoDestinationPage — the alert-form surfaces that change when an alert has
@@ -15,6 +18,7 @@ const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js
 export class AlertNoDestinationPage {
   constructor(page) {
     this.page = page;
+    this.createdAlertIds = [];
     this.locators = {
       destinationTrigger: '[data-test="alert-destinations-select-trigger"]',
       selectedOption: '[role="option"][aria-selected="true"]',
@@ -31,6 +35,48 @@ export class AlertNoDestinationPage {
       importErrors: '[data-test="alert-import-error-0"]',
     };
   }
+
+  // ── API setup / verification ───────────────────────────────────────────
+
+  /** Creates a canonical alert (with a destination) through the API and tracks it for cleanup. */
+  async seedAlert(name) {
+    const response = await createAlert(this.page, simpleAlert(name));
+    expect(response.status(), await response.text()).toBe(200);
+    return this.trackCreatedAlert(name);
+  }
+
+  /** Resolves the id of an alert the test just saved and tracks it for cleanup. */
+  async trackCreatedAlert(name) {
+    const id = await findAlertId(this.page, name);
+    expect(id, `alert ${name} must exist after save`).toBeTruthy();
+    this.createdAlertIds.push(id);
+    return id;
+  }
+
+  async deleteCreatedAlerts() {
+    for (const id of [...this.createdAlertIds].reverse()) {
+      await deleteAlertInFolder(this.page, id, 'default');
+    }
+    this.createdAlertIds = [];
+  }
+
+  async expectStoredDestinations(alertId, expected) {
+    expect((await getAlert(this.page, alertId)).destinations).toEqual(expected);
+  }
+
+  async expectAlertNotCreated(name) {
+    expect(await findAlertId(this.page, name), `alert ${name} must not exist`).toBeFalsy();
+  }
+
+  /** An importable alert for this org; `destinations` undefined leaves the key out entirely. */
+  importPayload(name, destinations) {
+    const alert = { ...simpleAlert(name), org_id: getOrgIdentifier() };
+    if (destinations === undefined) delete alert.destinations;
+    else alert.destinations = destinations;
+    return alert;
+  }
+
+  // ── form ───────────────────────────────────────────────────────────────
 
   /** Unpicks every selected destination; the multi-select toggles an option off when it is re-picked. */
   async clearDestinations() {
