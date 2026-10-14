@@ -9450,6 +9450,9 @@
     "sloLongWindow": "Lang venster",
     "sloShortWindow": "Kort venster",
     "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond.",
+    "builtinBadge": "Systeem",
+    "builtinBadgeHint": "Een ingebouwd alarm: je kunt het uitschakelen of bewerken, maar niet verwijderen of hernoemen.",
+    "builtinDeleteDisabled": "Ingebouwd alarm, kan niet worden verwijderd",
     "seconds": "Seconden",
     "downtimes": {
       "newTitle": "Nieuwe downtime",
@@ -16793,7 +16796,6 @@
         "previewLabel": "Stappen die hier draaien",
         "openChild": "\"{name}\" openen",
         "noAccessRemedy": "Vraag leestoegang tot de map, of verwijder de verwijzing.",
-        "disabledTooltip": "Subtests zijn niet ingeschakeld in deze implementatie.",
         "loadFailed": "Deze subtest kon niet worden geladen, dus de stappen en het aantal stappen zijn onbekend.",
         "missing": "Deze subtest bestaat niet meer. Verwijder de verwijzing of kies een andere test.",
         "noAccessBadge": "geen toegang",

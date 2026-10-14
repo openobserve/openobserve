@@ -9450,6 +9450,9 @@
     "sloLongWindow": "Fenêtre longue",
     "sloShortWindow": "Fenêtre courte",
     "sloCloneDisabled": "Les alertes SLO sont créées sur leur page SLO, elles ne peuvent donc pas être clonées depuis ici.",
+    "builtinBadge": "Système",
+    "builtinBadgeHint": "Une alerte intégrée : vous pouvez la désactiver ou la modifier, mais pas la supprimer ni la renommer.",
+    "builtinDeleteDisabled": "Alerte intégrée, suppression impossible",
     "seconds": "Secondes",
     "downtimes": {
       "newTitle": "Nouvelle indisponibilité",
@@ -16793,7 +16796,6 @@
         "previewLabel": "Étapes exécutées ici",
         "openChild": "Ouvrir « {name} »",
         "noAccessRemedy": "Demandez l'accès en lecture à son dossier, ou supprimez la référence.",
-        "disabledTooltip": "Les sous-tests ne sont pas activés sur ce déploiement.",
         "loadFailed": "Impossible de charger ce sous-test : ses étapes et leur nombre sont inconnus.",
         "missing": "Ce sous-test n’existe plus. Supprimez la référence ou choisissez un autre test.",
         "noAccessBadge": "pas d'accès",

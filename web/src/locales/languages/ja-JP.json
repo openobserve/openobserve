@@ -9450,6 +9450,9 @@
     "sloLongWindow": "長期ウィンドウ",
     "sloShortWindow": "短期ウィンドウ",
     "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。",
+    "builtinBadge": "システム",
+    "builtinBadgeHint": "組み込みアラート: 無効化や編集はできますが、削除や名前の変更はできません。",
+    "builtinDeleteDisabled": "組み込みアラートのため削除できません",
     "seconds": "秒",
     "downtimes": {
       "newTitle": "新規ダウンタイム",
@@ -16793,7 +16796,6 @@
         "previewLabel": "ここで実行されるステップ",
         "openChild": "「{name}」を開く",
         "noAccessRemedy": "そのフォルダーへの読み取りアクセスを依頼するか、参照を削除してください。",
-        "disabledTooltip": "このデプロイではサブテストが有効になっていません。",
         "loadFailed": "このサブテストを読み込めなかったため、ステップとステップ数は不明です。",
         "missing": "このサブテストはもう存在しません。参照を削除するか、別のテストを選択してください。",
         "noAccessBadge": "アクセス不可",

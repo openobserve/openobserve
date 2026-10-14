@@ -697,8 +697,7 @@ async function seedNotificationDestination(page, baseName) {
  *
  * `oncall_team` is an on-call team's **id**. It is a destination in its own
  * right (§4.1): an alert carrying it saves with `destinations: []` and
- * `workflows: []`, where an alert carrying none of the three is rejected
- * `400 Alert destination or workflows is required` (§4.2).
+ * `workflows: []`.
  *
  * `multiAlert` is the §5 distinction and it is NOT cosmetic. With
  * `aggregation.multi_alert: true` a result set spanning two owning teams opens

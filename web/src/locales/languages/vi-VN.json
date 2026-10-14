@@ -9450,6 +9450,9 @@
     "sloLongWindow": "Cửa sổ dài",
     "sloShortWindow": "Cửa sổ ngắn",
     "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây.",
+    "builtinBadge": "Hệ thống",
+    "builtinBadgeHint": "Cảnh báo tích hợp sẵn: bạn có thể tắt hoặc chỉnh sửa, nhưng không thể xóa hay đổi tên.",
+    "builtinDeleteDisabled": "Cảnh báo tích hợp sẵn, không thể xóa",
     "seconds": "Giây",
     "downtimes": {
       "newTitle": "Thời gian tạm dừng mới",
@@ -16793,7 +16796,6 @@
         "previewLabel": "Các bước chạy tại đây",
         "openChild": "Mở \"{name}\"",
         "noAccessRemedy": "Hãy xin quyền đọc thư mục của nó, hoặc bỏ tham chiếu.",
-        "disabledTooltip": "Bài test con chưa được bật trên bản triển khai này.",
         "loadFailed": "Không thể tải bài test con này, nên chưa biết các bước và số bước của nó.",
         "missing": "Bài test con này không còn tồn tại. Hãy xóa tham chiếu hoặc chọn bài test khác.",
         "noAccessBadge": "không có quyền",

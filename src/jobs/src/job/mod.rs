@@ -747,6 +747,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
         log::error!("[TEMPLATES] default_alert_template backfill failed: {e}");
     }
 
+    // Backgrounded: the first boot after an upgrade seeds every org; serving must not wait.
+    #[cfg(feature = "enterprise")]
+    if LOCAL_NODE.is_scheduler() {
+        tokio::task::spawn(async {
+            if let Err(e) = alerts::prebuilt::seed_prebuilt_alerts().await {
+                log::error!("[PREBUILT_ALERTS] seeding failed: {e}");
+            }
+        });
+    }
+
     // cache alerts (this will include the system templates we just created)
     db::alerts::templates::cache()
         .await

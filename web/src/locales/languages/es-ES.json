@@ -9450,6 +9450,9 @@
     "sloLongWindow": "Ventana larga",
     "sloShortWindow": "Ventana corta",
     "sloCloneDisabled": "Las alertas SLO se crean en su página SLO, por lo que no se pueden clonar desde aquí.",
+    "builtinBadge": "Sistema",
+    "builtinBadgeHint": "Una alerta integrada: puedes desactivarla o editarla, pero no eliminarla ni cambiarle el nombre.",
+    "builtinDeleteDisabled": "Alerta integrada, no se puede eliminar",
     "seconds": "Segundos",
     "downtimes": {
       "newTitle": "Nueva inactividad",
@@ -16793,7 +16796,6 @@
         "previewLabel": "Pasos que ejecuta aquí",
         "openChild": "Abrir \"{name}\"",
         "noAccessRemedy": "Pida acceso de lectura a su carpeta, o elimine la referencia.",
-        "disabledTooltip": "Los subtests no están habilitados en esta implementación.",
         "loadFailed": "No se pudo cargar este subtest, así que sus pasos y el número de pasos son desconocidos.",
         "missing": "Este subtest ya no existe. Quita la referencia o elige otro test.",
         "noAccessBadge": "sin acceso",
