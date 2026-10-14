@@ -149,6 +149,26 @@ test.describe('Alert Library', () => {
     expect(created.trigger_condition?.silence).toBe(20);
   });
 
+  test('install with no destination adds the alert without one', async () => {
+    const ready = entries[0];
+
+    await lib.openViaUrl();
+    await lib.openCard(ready.id);
+    await lib.installFromDrawer();
+    await lib.next(); // → alerts, with no destination picked
+    await lib.next(); // → folder
+    await lib.next(); // → tune
+    await lib.next(); // → review
+    await lib.expectSummaryDestination('None');
+    await lib.run();
+    await lib.waitResult(ready.id, 'installed');
+    await lib.done();
+
+    const created = await lib.getInstalledAlert(ready.name);
+    expect(created, 'installed alert should be readable via API').toBeTruthy();
+    expect(created.destinations).toEqual([]);
+  });
+
   test('bulk select via select-all-in-view triggers the >50 large-batch guard', async () => {
     await lib.openViaUrl();
 
