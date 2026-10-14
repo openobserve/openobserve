@@ -38,6 +38,10 @@ test.describe("Logs Reset Filters button (o2-enterprise#1734)", () => {
     const filteredEditor = await pm.logsPage.getQueryEditorTextWhenReady('ziox');
     expect(filteredEditor).toContain('ziox');
     await expect.poll(() => new URL(page.url()).searchParams.has('query'), { timeout: 10000 }).toBe(true);
+    const filteredCount = await pm.logsPage.getResultHitsCount();
+    testLogger.info('Filtered hits count', { filteredCount });
+    // Without a narrower filtered set, a sticky filter would still match the baseline count below.
+    expect(filteredCount).toBeLessThan(baselineCount);
 
     await pm.logsPage.clickResetFiltersButton();
 
@@ -46,6 +50,7 @@ test.describe("Logs Reset Filters button (o2-enterprise#1734)", () => {
     // The URL mirrors the last executed search (#15234), so query= only drops once the reset search runs.
     await pm.logsPage.runQueryAndWaitForResults();
     await expect.poll(() => new URL(page.url()).searchParams.has('query'), { timeout: 10000 }).toBe(false);
+    expect(((await pm.logsPage.getQueryEditorText()) || '').trim()).toBe('');
     const restoredCount = await pm.logsPage.getResultHitsCount();
     testLogger.info('Restored hits count', { restoredCount });
     expect(restoredCount).toBe(baselineCount);

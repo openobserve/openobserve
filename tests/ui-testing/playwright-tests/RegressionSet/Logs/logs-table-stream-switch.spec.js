@@ -1,4 +1,4 @@
-const { test, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
 
@@ -29,7 +29,10 @@ test.describe("Logs table across a stream switch", () => {
     // stopping at the explorer never reaches it.
     await pm.logsPage.navigateToLogsFromSidebar();
 
-    // Returning to Logs lands idle on "Run a query" (#15234); a hidden histogram still stays hidden after a run.
+    // #7460 dropped the histogram on this hop; the toggle must survive it before any run can restore it.
+    await expect.poll(() => pm.logsPage.isHistogramOn(), { timeout: 15000 }).toBe(true);
+
+    // Returning to Logs lands idle on "Run a query" (#15234), so the chart only renders after a run.
     await pm.logsPage.selectRunQuery();
 
     // Asserting wrap before the page has rendered reads back the value the test
