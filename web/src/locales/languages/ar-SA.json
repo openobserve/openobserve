@@ -20118,7 +20118,23 @@
       "maxDoc": "أكبر قيمة في الحقل. تجميعي — يُستخدم مع GROUP BY.",
       "minDoc": "أصغر قيمة في الحقل. تجميعي — يُستخدم مع GROUP BY.",
       "arrayExtractDoc": "استخراج عنصر واحد من مصفوفة بواسطة مؤشر يبدأ من 1، على سبيل المثال `array_extract(regexp_match(log, '...'), 1)`.",
-      "approxTopkDoc": "تقريب القيم الأكثر تكرارًا لحقول معينة. أرخص بكثير من استخدام GROUP BY ... ORDER BY count DESC على الحقول ذات الكاردينالية العالية."
+      "approxTopkDoc": "تقريب القيم الأكثر تكرارًا لحقول معينة. أرخص بكثير من استخدام GROUP BY ... ORDER BY count DESC على الحقول ذات الكاردينالية العالية.",
+      "valuesLoading": "لا تزال القيم قيد التحميل لـ {field}",
+      "valuesLoadingRow": "لا تزال القيم قيد التحميل",
+      "valuesLoadingHint": "استمر في الكتابة، أو اضغط Esc ثم Ctrl+Space",
+      "valuesEmpty": "لا توجد قيم لـ {field} في آخر {minutes} دقيقة",
+      "valuesFailed": "تعذّر تحميل القيم لـ {field}",
+      "chainedMenuAnnouncement": "{count} اقتراح، اضغط Tab للقبول | {count} اقتراحات، اضغط Tab للقبول",
+      "valuesCap": "{count} قيمة معروضة · اكتب للتصفية | {count} قيم معروضة · اكتب للتصفية",
+      "groupValues": "القيم · الأحدث",
+      "groupValuesName": "القيم",
+      "groupFields": "الحقول",
+      "groupOperators": "العوامل",
+      "groupFunctionsAndFields": "الدوال والحقول",
+      "groupFunctions": "الدوال",
+      "wrapStrMatch": "سلسلة فرعية",
+      "wrapReMatch": "تعبير نمطي",
+      "wrapReNotMatch": "تعبير نمطي، منفي"
     },
     "diagnostics": {
       "incompleteAnd": "شرط غير مكتمل — تم توقع تعبير بعد AND",
@@ -20174,6 +20190,8 @@
       "duplicateColumn": "يتم تعريف العمود '{col}' أكثر من مرة — إزالة أو تسميته المستقرة",
       "tableNotFound": "جدول غير معروف '{tbl}' — هذا الجدول أو CTE غير موجود",
       "functionSignature": "تم استدعاء الدالة '{fn}' بنوع (أو أنواع وسيط) خاطئة — أضف صالة صريحة",
+      "notACondition": "`{field}` نص، وليس شرطًا. قارنه: `{field} = '…'` أو `str_match({field}, '…')`",
+      "notAConditionValue": "`{field}` ليس شرطًا. قارنه، على سبيل المثال `{field} = …`",
       "syntaxError": "SQL خطأ في الصياغة"
     },
     "hover": {

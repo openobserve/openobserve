@@ -20118,7 +20118,23 @@
       "maxDoc": "Alandaki en büyük değer. Toplama — GROUP BY ile birlikte kullanın.",
       "minDoc": "Alandaki en küçük değer. Toplama — GROUP BY ile birlikte kullanın.",
       "arrayExtractDoc": "Bir diziden 1 tabanlı dizine göre tek bir öğe çıkarır, örn. `array_extract(regexp_match(log, '...'), 1)`.",
-      "approxTopkDoc": "Bir alanın en sık görülen k değerini yaklaşık olarak bulur. Yüksek kardinaliteli alanlarda tam GROUP BY ... ORDER BY count DESC'den çok daha ucuzdur."
+      "approxTopkDoc": "Bir alanın en sık görülen k değerini yaklaşık olarak bulur. Yüksek kardinaliteli alanlarda tam GROUP BY ... ORDER BY count DESC'den çok daha ucuzdur.",
+      "valuesLoading": "{field} için değerler hâlâ yükleniyor",
+      "valuesLoadingRow": "Değerler hâlâ yükleniyor",
+      "valuesLoadingHint": "Yazmaya devam edin veya Esc ardından Ctrl+Space tuşlarına basın",
+      "valuesEmpty": "Son {minutes} dakikada {field} için değer yok",
+      "valuesFailed": "{field} için değerler yüklenemedi",
+      "chainedMenuAnnouncement": "{count} öneri, kabul etmek için Tab | {count} öneri, kabul etmek için Tab",
+      "valuesCap": "{count} değer gösteriliyor · filtrelemek için yazın | {count} değer gösteriliyor · filtrelemek için yazın",
+      "groupValues": "Değerler · son",
+      "groupValuesName": "Değerler",
+      "groupFields": "Alanlar",
+      "groupOperators": "Operatörler",
+      "groupFunctionsAndFields": "Fonksiyonlar ve alanlar",
+      "groupFunctions": "Fonksiyonlar",
+      "wrapStrMatch": "alt dize",
+      "wrapReMatch": "regex",
+      "wrapReNotMatch": "regex, olumsuzlanmış"
     },
     "diagnostics": {
       "incompleteAnd": "Eksik koşul — AND'den sonra bir ifade bekleniyor",
@@ -20174,6 +20190,8 @@
       "duplicateColumn": "'{col}' sütunu birden fazla kez tanımlanmış — kopyayı kaldırın veya takma ad verin",
       "tableNotFound": "Bilinmeyen tablo '{tbl}' — bu tablo veya CTE mevcut değil",
       "functionSignature": "'{fn}' işlevi yanlış bağımsız değişken türü/türleriyle çağrıldı — açık bir dönüştürme ekleyin",
+      "notACondition": "`{field}` bir metindir, koşul değil. Karşılaştırın: `{field} = '…'` veya `str_match({field}, '…')`",
+      "notAConditionValue": "`{field}` bir koşul değil. Örneğin `{field} = …` şeklinde karşılaştırın",
       "syntaxError": "SQL sözdizimi hatası"
     },
     "hover": {

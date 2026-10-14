@@ -20118,7 +20118,23 @@
       "maxDoc": "Valor más grande del campo. Agregado — combinar con GROUP BY.",
       "minDoc": "Valor más pequeño del campo. Agregado — combinar con GROUP BY.",
       "arrayExtractDoc": "Extrae un solo elemento de un arreglo por índice basado en 1, p. ej. `array_extract(regexp_match(log, '...'), 1)`.",
-      "approxTopkDoc": "Aproxima los k valores más frecuentes de un campo. Mucho más económico que un GROUP BY ... ORDER BY count DESC exacto en campos de alta cardinalidad."
+      "approxTopkDoc": "Aproxima los k valores más frecuentes de un campo. Mucho más económico que un GROUP BY ... ORDER BY count DESC exacto en campos de alta cardinalidad.",
+      "valuesLoading": "Aún cargando valores para {field}",
+      "valuesLoadingRow": "Aún cargando valores",
+      "valuesLoadingHint": "Sigue escribiendo, o pulsa Esc y luego Ctrl+Space",
+      "valuesEmpty": "Sin valores para {field} en los últimos {minutes} minutos",
+      "valuesFailed": "No se pudieron cargar los valores para {field}",
+      "chainedMenuAnnouncement": "{count} sugerencia, Tab para aceptar | {count} sugerencias, Tab para aceptar",
+      "valuesCap": "{count} valor mostrado · escribe para filtrar | {count} valores mostrados · escribe para filtrar",
+      "groupValues": "Valores · recientes",
+      "groupValuesName": "Valores",
+      "groupFields": "Campos",
+      "groupOperators": "Operadores",
+      "groupFunctionsAndFields": "Funciones y campos",
+      "groupFunctions": "Funciones",
+      "wrapStrMatch": "subcadena",
+      "wrapReMatch": "regex",
+      "wrapReNotMatch": "regex, negado"
     },
     "diagnostics": {
       "incompleteAnd": "Condición incompleta — se esperaba una expresión después de AND",
@@ -20174,6 +20190,8 @@
       "duplicateColumn": "La columna '{col}' está definida más de una vez — elimine o asigne un alias a la duplicada",
       "tableNotFound": "Tabla '{tbl}' desconocida — esta tabla o CTE no existe",
       "functionSignature": "La función '{fn}' se llamó con tipos de argumento incorrectos — añada una conversión explícita",
+      "notACondition": "`{field}` es texto, no una condición. Compáralo: `{field} = '…'` o `str_match({field}, '…')`",
+      "notAConditionValue": "`{field}` no es una condición. Compáralo, p. ej. `{field} = …`",
       "syntaxError": "Error de sintaxis SQL"
     },
     "hover": {
