@@ -17,12 +17,18 @@ import PipelineEditor from "./PipelineEditor.vue";
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { reactive } from "vue";
+import { createMemoryHistory, createRouter } from "vue-router";
 import useDnD from "@/plugins/pipelines/useDnD";
 import pipelineService from "@/services/pipelines";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
+
+const { canState } = vi.hoisted(() => ({ canState: { status: "allowed" } }));
+vi.mock("@/composables/useCan", () => ({
+  useCan: () => ({ status: () => canState.status, can: () => canState.status === "allowed" }),
+}));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(),
@@ -287,6 +293,70 @@ describe("PipelineEditor", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
+  describe("read-only when edit is denied", () => {
+    const mountDenied = async (sourceType) => {
+      wrapper.unmount();
+      canState.status = "denied";
+      mockPipelineObj.currentSelectedPipeline.source = { source_type: sourceType };
+      mockPipelineObj.showNodePalette = true;
+      vi.mocked(pipelineService.getPipelines).mockResolvedValueOnce({
+        data: {
+          list: [
+            {
+              pipeline_id: "p1",
+              name: "p",
+              nodes: [],
+              edges: [],
+              source: { source_type: sourceType },
+            },
+          ],
+        },
+      });
+      const editorRouter = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/pipeline/edit", name: "pipelineEditor", component: { template: "<div />" } },
+          { path: "/pipelines", name: "pipelines", component: { template: "<div />" } },
+        ],
+      });
+      await editorRouter.push({ name: "pipelineEditor", query: { id: "p1" } });
+      wrapper = mount(PipelineEditor, {
+        attachTo: document.body,
+        global: {
+          provide: { store },
+          plugins: [i18n, editorRouter],
+          stubs: {
+            ODrawer: ODrawerStub,
+            PipelineFlow: true,
+            ConfirmDialog: true,
+            OTooltip: true,
+            NodePalette: { name: "NodePalette", template: '<div data-test="node-palette" />' },
+          },
+        },
+      });
+      await flushPromises();
+    };
+
+    afterEach(() => {
+      canState.status = "allowed";
+    });
+
+    it.each(["realtime", "scheduled"])(
+      "a %s pipeline shows the view-only badge, a View JSON button and no Save",
+      async (sourceType) => {
+        await mountDenied(sourceType);
+        expect(document.querySelector('[data-test="pipeline-view-only-badge"]')).not.toBeNull();
+        expect(document.querySelector('[data-test="pipeline-json-view-btn"]')).not.toBeNull();
+        expect(document.querySelector('[data-test="pipeline-json-edit-btn"]')).toBeNull();
+        expect(document.querySelector('[data-test="add-pipeline-save-btn"]')).toBeNull();
+        expect(
+          document.querySelector('[data-test="add-pipeline-cancel-btn"]')?.textContent,
+        ).toContain("Close");
+        expect(wrapper.find('[data-test="node-palette"]').exists()).toBe(false);
+      },
+    );
+  });
+
   describe("Enterprise gating — locked, not hidden", () => {
     // Test env is OSS (isEnterprise=false, isCloud=false, see web/.env) —
     // neither entitlement applies, so both surfaces below should be locked.

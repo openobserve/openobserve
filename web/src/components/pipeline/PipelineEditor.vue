@@ -21,7 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            header; we contribute the editor actions to it via the portal and the
            pipeline name for NEW pipelines (edit mode shows it in the breadcrumb). -->
       <Teleport defer to="#o2-page-actions">
+        <ViewOnlyBadge v-if="editStatus === 'denied'" data-test="pipeline-view-only-badge" />
         <OButton
+          v-if="!isReadOnly"
           variant="outline"
           size="icon-sm"
           class="hideOnPrintMode"
@@ -32,13 +34,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('pipeline.editPipelineJson')" side="top" />
         </OButton>
         <OButton
+          v-else-if="editStatus === 'denied'"
+          variant="outline"
+          size="icon-sm"
+          class="hideOnPrintMode"
+          data-test="pipeline-json-view-btn"
+          @click="openJsonEditor"
+          icon-left="visibility"
+        >
+          <OTooltip :content="t('authz.viewPipelineJsonReadOnly')" side="top" />
+        </OButton>
+        <OButton
           data-test="add-pipeline-cancel-btn"
           variant="outline"
           size="sm-action"
           @click="openCancelDialog"
-          >{{ t("pipeline.cancel") }}</OButton
+          >{{ editStatus === "denied" ? t("common.close") : t("pipeline.cancel") }}</OButton
         >
         <OButton
+          v-if="!isReadOnly"
           data-test="add-pipeline-save-btn"
           variant="primary"
           size="sm-action"
@@ -73,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Left: docked node palette (shared with Workflows). Same component
              drives both editors, so the two palettes can never drift apart. -->
         <NodePalette
-          v-if="pipelineObj.showNodePalette"
+          v-if="pipelineObj.showNodePalette && !isReadOnly"
           v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
           :items="pipelineObj.nodeTypes"
           test-prefix="pipeline-node-sidebar"
@@ -148,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     v-model:open="showJsonEditorDialog"
     :width="70"
-    :title="t('pipeline.editPipelineJSON')"
+    :title="isReadOnly ? t('authz.viewPipelineJson') : t('pipeline.editPipelineJSON')"
     persistent
   >
     <template v-if="jsonEditorAiButtonVisible" #header-right>
@@ -179,6 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data="pipelineObj.currentSelectedPipeline"
       :title="t('pipeline.editPipelineJSON')"
       :type="'pipelines'"
+      :read-only="isReadOnly"
       :validation-errors="validationErrors"
       @close="showJsonEditorDialog = false"
       @saveJson="savePipelineJson"
@@ -247,6 +262,8 @@ import { MarkerType, useVueFlow } from "@vue-flow/core";
 import ExternalDestination from "./NodeForm/ExternalDestination.vue";
 import { contextRegistry, createPipelinesContextProvider } from "@/composables/contextProviders";
 import JsonEditor from "../common/JsonEditor.vue";
+import ViewOnlyBadge from "@/components/common/ViewOnlyBadge.vue";
+import { useCan } from "@/composables/useCan";
 import { validatePipeline as validatePipelineUtil } from "../../utils/validatePipeline";
 import { useReo } from "@/services/reodotdev_analytics";
 
@@ -515,6 +532,14 @@ const { track } = useReo();
 // through form submission. provide/inject follows the component tree, which a
 // Teleport preserves, so the teleported field still resolves it.
 const isCreatePipeline = computed(() => router.currentRoute.value.name === "createPipeline");
+const { status: canStatus } = useCan();
+// Deep links into the editor open read-only until edit is known to be allowed.
+const editStatus = computed(() => {
+  const route = router.currentRoute.value;
+  if (route.name !== "pipelineEditor" || !route.query.id) return "allowed";
+  return canStatus("pipeline", String(route.query.id), "edit");
+});
+const isReadOnly = computed(() => editStatus.value !== "allowed");
 
 const metaForm = useOForm<PipelineMetaForm>({
   defaultValues: pipelineMetaDefaults(),
@@ -809,6 +834,7 @@ const resetDialog = () => {
 };
 
 const savePipeline = async () => {
+  if (isReadOnly.value) return;
   forceSkipBeforeUnloadListener = true;
   // Name validation is owned by the OForm schema. handleSubmit runs the schema
   // over the form values — this works even in edit mode / the JSON-editor path

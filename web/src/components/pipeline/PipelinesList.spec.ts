@@ -27,6 +27,22 @@ import { createStore } from "vuex";
 
 // Mock services
 const mockDownloadFile = vi.fn();
+// Per-test permission answers keyed "<action>:<pipeline_id>"; anything not listed is allowed.
+const { denied } = vi.hoisted(() => ({ denied: new Set<string>() }));
+vi.mock("@/composables/useCan", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  const status = (_r: string, id: string, action: string) =>
+    denied.has(`${action}:${id}`) ? "denied" : "allowed";
+  return {
+    ...actual,
+    useCan: () => ({
+      status,
+      can: (r: string, id: string, action: string) => status(r, id, action) === "allowed",
+      noteWriteDenied: () => {},
+    }),
+  };
+});
+
 vi.mock("@/utils/dom", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return { ...actual, downloadFile: (...args: any[]) => mockDownloadFile(...args) };
@@ -900,6 +916,45 @@ describe("PipelinesList", () => {
       await wrapper.vm.bulkTogglePipelines("pause");
 
       expect(pipelineService.bulkToggleState).toHaveBeenCalledTimes(1);
+    });
+
+    it("bulk pause and resume act only on the pipelines the user can edit", async () => {
+      (pipelineService.bulkToggleState as MockedFunction<any>).mockResolvedValue({});
+      denied.add(`edit:${mockRealtimePipeline.pipeline_id}`);
+      wrapper.vm.selectedPipelineIds = [
+        mockRealtimePipeline.pipeline_id,
+        mockScheduledPipeline.pipeline_id,
+      ];
+      try {
+        expect(wrapper.vm.bulkEditSplit.allowed.map((p: any) => p.pipeline_id)).toEqual([
+          mockScheduledPipeline.pipeline_id,
+        ]);
+        await wrapper.vm.bulkTogglePipelines("pause");
+        await wrapper.vm.bulkTogglePipelines("resume");
+        const sent = (pipelineService.bulkToggleState as MockedFunction<any>).mock.calls.flatMap(
+          (call: any[]) => call[2].ids,
+        );
+        expect(sent).toEqual([mockScheduledPipeline.pipeline_id]);
+      } finally {
+        denied.clear();
+      }
+    });
+
+    it("names the skipped pipelines under a partial bulk-delete confirm", () => {
+      denied.add(`delete:${mockRealtimePipeline.pipeline_id}`);
+      wrapper.vm.selectedPipelineIds = [
+        mockRealtimePipeline.pipeline_id,
+        mockScheduledPipeline.pipeline_id,
+      ];
+      try {
+        wrapper.vm.openBulkDeleteDialog();
+        expect(wrapper.vm.confirmDialogMeta.message).toBe(
+          "Delete 1 of 2 — 1 skipped (no permission)",
+        );
+        expect(wrapper.vm.confirmDialogMeta.detail).toBe(`Skipped: ${mockRealtimePipeline.name}`);
+      } finally {
+        denied.clear();
+      }
     });
 
     it("openBulkDeleteDialog sets confirmDialogMeta for bulk delete", () => {
