@@ -896,15 +896,35 @@ describe("IncidentDetailDrawer.vue", () => {
         "|---|---|",
         "| **Severity** | P2 |",
         "",
-        "**Evidence**",
+        "**Evidence:**",
         "",
         "**1. `stream_no_events_10m`** — false positive.",
+        "",
+        "- Restart the ingester",
+        "  **Note**",
+        "",
+        "The ingester restarted at 10:02.",
+        "**Inline label**",
+        "This was expected.",
+        "",
+        "** **",
+        "",
+        "**Evidence **",
+        "",
+        "__A__ and __B__",
         "",
         "```json",
         "**not a heading**",
         "```",
         "",
-        "**Executive Summary**",
+        "~~~",
+        "**tilde fence**",
+        "```",
+        "",
+        "**still code**",
+        "~~~",
+        "",
+        "__Executive Summary__",
         "",
         "Root cause: **three** miscalibrated alerts.",
       ].join("\n");
@@ -920,6 +940,27 @@ describe("IncidentDetailDrawer.vue", () => {
         expect(formatted).toContain(`id="${item.id}"`);
       }
       expect(formatted).toContain("**not a heading**");
+      expect(formatted).toContain("**tilde fence**");
+      expect(formatted).toContain("**still code**");
+    });
+
+    it("should leave bold sub-labels alone when the report already has sections", () => {
+      const content = [
+        "## Root Cause",
+        "",
+        "**Timeline:**",
+        "",
+        "- 10:02 ingester restarted",
+        "",
+        "### Contributing factors",
+      ].join("\n");
+      const formatted = wrapper.vm.formatRcaContent(content);
+
+      expect(wrapper.vm.tableOfContents.map((item: any) => item.text)).toEqual(["Root Cause"]);
+      expect(wrapper.vm.tableOfContents[0].children.map((item: any) => item.text)).toEqual([
+        "Contributing factors",
+      ]);
+      expect(formatted).not.toContain('id="section-timeline"');
     });
   });
 
