@@ -13,18 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Characterization tests for everything OUTSIDE the SSE reader loop:
-// persistence, organization switch, feedback, title edit, clear-all, the
-// unmount handoff, the module-scope stream registry, and the props watchers.
-// The SSE protocol itself lives in O2AIChat.stream.spec.ts.
+// Characterization tests for everything OUTSIDE the SSE reader loop: persistence, organization switch, feedback, title edit, clear-all, the unmount handoff, the module-scope stream registry, and the props watchers. The SSE protocol itself lives in O2AIChat.stream.spec.ts.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
 import i18n from "@/locales";
-
-// ── Module mocks (hoisted) ───────────────────────────────────────────────────
 
 vi.mock("highlight.js", () => ({
   default: {
@@ -53,24 +48,30 @@ vi.mock("@/composables/useChatHistory", () => ({
   })),
 }));
 
-// vi.hoisted, not a plain const: O2AIChat.vue destructures useAiChat() at module
-// scope, so the factory runs during import.
-const { mockFetchAiChat, mockSubmitFeedback, mockRouterPush, uuidSeq, routeState } = vi.hoisted(
-  () => ({
-    mockFetchAiChat: vi.fn(),
-    mockSubmitFeedback: vi.fn().mockResolvedValue(true),
-    mockRouterPush: vi.fn().mockResolvedValue(undefined),
-    // A constant uuid makes every session-identity assertion vacuous: the second
-    // session would be indistinguishable from the one it replaced.
-    uuidSeq: { n: 0 },
-    routeState: { fullPath: "/", path: "/", name: "home", query: {}, params: {} },
-  }),
-);
+// vi.hoisted, not a plain const: O2AIChat.vue destructures useAiChat() at module scope, so the factory runs during import.
+const {
+  mockFetchAiChat,
+  mockSubmitFeedback,
+  mockRouterPush,
+  mockCancelAiChat,
+  uuidSeq,
+  routeState,
+} = vi.hoisted(() => ({
+  mockFetchAiChat: vi.fn(),
+  mockCancelAiChat: vi.fn(),
+  mockSubmitFeedback: vi.fn().mockResolvedValue(true),
+  mockRouterPush: vi.fn().mockResolvedValue(undefined),
+  // A constant uuid makes every session-identity assertion vacuous: the second session would be indistinguishable from the one it replaced.
+  uuidSeq: { n: 0 },
+  routeState: { fullPath: "/", path: "/", name: "home", query: {}, params: {} },
+}));
 
 vi.mock("@/composables/useAiChat", () => ({
   default: vi.fn(() => ({
     fetchAiChat: mockFetchAiChat,
     submitFeedback: mockSubmitFeedback,
+    chatHistoryServer: vi.fn(() => ({ enabled: () => false })),
+    cancelAiChat: mockCancelAiChat,
     registerAiChatHandler: vi.fn(),
     removeAiChatHandler: vi.fn(),
     getStructuredContext: vi.fn().mockResolvedValue(null),
@@ -124,8 +125,6 @@ const autoNavKey = async () =>
     store.state.userInfo.email ?? "",
     store.state.selectedOrganization?.identifier ?? "",
   )}`;
-
-// ── Stubs ────────────────────────────────────────────────────────────────────
 
 const baseStubs = {
   RichTextInput: {
@@ -187,8 +186,7 @@ const chipStubs = {
   RichTextInput: {
     ...baseStubs.RichTextInput,
     methods: {
-      // processPendingChips calls focusInput() first; without it the stub takes
-      // the `.focus()` fallback, throws, and no chip is ever inserted.
+      // processPendingChips calls focusInput() first; without it the stub takes the `.focus()` fallback, throws, and no chip is ever inserted.
       focusInput() {},
       insertChip(chip: any) {
         insertedChips.push(chip);
@@ -196,8 +194,6 @@ const chipStubs = {
     },
   },
 };
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
 const encoder = new TextEncoder();
 
@@ -306,8 +302,6 @@ async function switchOrg(identifier: string) {
 
 const lastCall = (m: any) => m.mock.calls[m.mock.calls.length - 1];
 
-// ── Tests ────────────────────────────────────────────────────────────────────
-
 describe("O2AIChat session, persistence and lifecycle", () => {
   let wrapper: VueWrapper | null;
   let vm: any;
@@ -324,8 +318,7 @@ describe("O2AIChat session, persistence and lifecycle", () => {
     store.dispatch("setIsAiChatEnabled", false);
     wrapper = mountO2AIChat();
     vm = wrapper.vm as any;
-    // backgroundStreams / backgroundStreamMap / sessionStreamingState are module
-    // scope and outlive every unmount; this listener is the only public reset.
+    // backgroundStreams / backgroundStreamMap / sessionStreamingState are module scope and outlive every unmount; this listener is the only public reset.
     window.dispatchEvent(new Event("o2:abort-ai-streams"));
   });
 
@@ -341,8 +334,6 @@ describe("O2AIChat session, persistence and lifecycle", () => {
     mockUpdateChatTitle.mockResolvedValue(true);
     mockSubmitFeedback.mockResolvedValue(true);
   });
-
-  // ── 1. Persistence ─────────────────────────────────────────────────────────
 
   describe("saveToHistory", () => {
     it("mints a session id and hands the transcript to the history composable", async () => {
@@ -440,8 +431,6 @@ describe("O2AIChat session, persistence and lifecycle", () => {
     });
   });
 
-  // ── 2. Organization switch ─────────────────────────────────────────────────
-
   describe("organization switch", () => {
     it("drops the current chat identity so no row is written under the new org", async () => {
       await turn(vm);
@@ -498,9 +487,7 @@ describe("O2AIChat session, persistence and lifecycle", () => {
 
       await switchOrg("other-org");
 
-      // abortBackgroundStreams() runs BEFORE addNewChat(), and addNewChat ->
-      // detachCurrentStream() then moves the still-live foreground controller
-      // into the freshly emptied background set, so nothing aborts it.
+      // abortBackgroundStreams() runs BEFORE addNewChat(), and addNewChat -> detachCurrentStream() then moves the still-live foreground controller into the freshly emptied background set, so nothing aborts it.
       expect(signal.aborted).toBe(false);
     });
 
@@ -515,8 +502,6 @@ describe("O2AIChat session, persistence and lifecycle", () => {
       expect(vm.currentChatId).toBe(42);
     });
   });
-
-  // ── 3. Feedback and lastTraceId ────────────────────────────────────────────
 
   describe("feedback", () => {
     const answered = async (v: any, traceId = "trace-abc", text = "q1") =>
@@ -637,8 +622,7 @@ describe("O2AIChat session, persistence and lifecycle", () => {
 
     it("CURRENT BEHAVIOR (BUG): a transcript that is not strictly alternating reports the wrong query index", async () => {
       await answered(vm);
-      // Two assistant messages for one user query is what the error paths leave
-      // behind; floor(index / 2) then attributes the second one to turn 1.
+      // Two assistant messages for one user query is what the error paths leave behind; floor(index / 2) then attributes the second one to turn 1.
       vm.chatMessages.push({ role: "assistant", content: "follow up" });
       await flushPromises();
 
@@ -647,8 +631,6 @@ describe("O2AIChat session, persistence and lifecycle", () => {
       expect(lastCall(mockSubmitFeedback)[3]).toBe(1);
     });
   });
-
-  // ── 4. Title edit round trip ───────────────────────────────────────────────
 
   describe("title editing", () => {
     it("writes the trimmed title and refreshes the sidebar list from storage", async () => {
@@ -718,8 +700,6 @@ describe("O2AIChat session, persistence and lifecycle", () => {
     });
   });
 
-  // ── 5. Clear all ───────────────────────────────────────────────────────────
-
   describe("clear all conversations", () => {
     it("clears storage, empties the sidebar list and resets to a new chat", async () => {
       mockLoadHistory.mockResolvedValueOnce([{ id: 1, title: "Old", timestamp: 1, messages: [] }]);
@@ -759,8 +739,6 @@ describe("O2AIChat session, persistence and lifecycle", () => {
       expect(vm.showClearAllConfirmDialog).toBe(false);
     });
   });
-
-  // ── 6. Unmount ordering ────────────────────────────────────────────────────
 
   describe("unmount handoff", () => {
     it("hands a live turn to the surviving instance through the store pulse", async () => {
@@ -887,8 +865,6 @@ describe("O2AIChat session, persistence and lifecycle", () => {
     });
   });
 
-  // ── 7. Cross-instance stream registry ──────────────────────────────────────
-
   describe("background stream registry", () => {
     // runTurn's cleanup used to sit after try/catch, so a return or throw inside the try skipped it.
     it("clears the spinner when the chat request itself throws", async () => {
@@ -986,8 +962,7 @@ describe("O2AIChat session, persistence and lifecycle", () => {
       await flushPromises();
       await flushPromises();
       expect(vm2.isLoading).toBe(true);
-      // Clear the handshake value loadChat just published so the only writer
-      // left is the registry watcher itself.
+      // Clear the handshake value loadChat just published so the only writer left is the registry watcher itself.
       store.dispatch("setCurrentChatTimestamp", null);
       store.dispatch("setChatUpdated", false);
       await flushPromises();
@@ -1070,8 +1045,6 @@ describe("O2AIChat session, persistence and lifecycle", () => {
     });
   });
 
-  // ── 8. Props ───────────────────────────────────────────────────────────────
-
   describe("props", () => {
     it("sends a payload that asks to be auto sent", async () => {
       mockFetchAiChat.mockResolvedValueOnce(readerResponse([]));
@@ -1151,6 +1124,268 @@ describe("O2AIChat session, persistence and lifecycle", () => {
 
       expect(insertedChips[0].preview.length).toBeLessThanOrEqual(13);
       expect(insertedChips[0].charCount).toBe(200);
+    });
+  });
+
+  describe("loading chats", () => {
+    const chat = (id: number, text: string) => ({
+      id,
+      title: `Chat ${id}`,
+      timestamp: "2026-01-01T00:00:00.000Z",
+      messages: [{ role: "user", content: text }],
+      sessionId: `s-${id}`,
+    });
+
+    it("drops a slower earlier load once a later one has answered", async () => {
+      let landFirst!: (value: unknown) => void;
+      mockLoadChat
+        .mockImplementationOnce(() => new Promise((resolve) => (landFirst = resolve)))
+        .mockResolvedValueOnce(chat(2, "second"));
+      const first = vm.loadChat(1);
+      await vm.loadChat(2);
+      landFirst(chat(1, "first"));
+      await first;
+      await flushPromises();
+      expect(vm.currentChatId).toBe(2);
+      expect(vm.chatMessages[0].content).toBe("second");
+    });
+
+    it("stops a turn that runs on the server from its marker", async () => {
+      await store.dispatch("setConfig", {
+        ...store.state.zoConfig,
+        ai_enabled: true,
+        ai_chat_persistence_enabled: true,
+      });
+      mockCancelAiChat.mockResolvedValue(undefined);
+      const running = {
+        ...chat(3, "go"),
+        messages: [
+          { role: "user", content: "go" },
+          {
+            role: "assistant",
+            content: "",
+            contentBlocks: [{ type: "status", turnStatus: "running", message: "running" }],
+          },
+        ],
+      };
+      mockLoadChat.mockResolvedValue(running);
+      await vm.loadChat(3);
+      await flushPromises();
+      mockLoadChat.mockResolvedValue({
+        ...running,
+        messages: [
+          { role: "user", content: "go" },
+          {
+            role: "assistant",
+            content: "",
+            contentBlocks: [{ type: "status", turnStatus: "stopped", message: "stopped" }],
+          },
+        ],
+      });
+      await wrapper!.find('[data-test="o2-ai-chat-running-stop"]').trigger("click");
+      await flushPromises();
+      expect(mockCancelAiChat).toHaveBeenCalledWith(expect.any(String), "s-3");
+      expect(wrapper!.find('[data-test="o2-ai-chat-turn-status-stopped"]').exists()).toBe(true);
+      await store.dispatch("setConfig", {
+        ...store.state.zoConfig,
+        ai_chat_persistence_enabled: false,
+      });
+    });
+
+    it("leaves the panel open when Escape closes an overlay first", async () => {
+      await store.dispatch("setIsAiChatEnabled", true);
+      const overlay = document.createElement("div");
+      overlay.setAttribute("role", "dialog");
+      overlay.setAttribute("data-state", "open");
+      document.body.appendChild(overlay);
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      await flushPromises();
+      expect(store.state.isAiChatEnabled).toBe(true);
+
+      overlay.remove();
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      await flushPromises();
+      expect(store.state.isAiChatEnabled).toBe(false);
+    });
+  });
+
+  describe("delete confirmation", () => {
+    it("labels the destructive action Delete and starts on Cancel", () => {
+      wrapper!.unmount();
+      wrapper = mountO2AIChat(
+        {},
+        {
+          ...baseStubs,
+          ConfirmDialog: {
+            name: "ConfirmDialog",
+            template: '<div data-test="confirm-dialog" />',
+            props: {
+              modelValue: Boolean,
+              title: String,
+              message: String,
+              okLabel: String,
+              okVariant: String,
+              focusCancel: Boolean,
+            },
+          },
+        },
+      );
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c) => c.props("title") === "Delete Chat")!;
+      expect(dialog.props()).toMatchObject({
+        okLabel: "Delete",
+        okVariant: "destructive",
+        focusCancel: true,
+      });
+    });
+  });
+
+  describe("forks and sharing", () => {
+    const shareStubs = {
+      ...baseStubs,
+      AiChatShareDialog: {
+        name: "AiChatShareDialog",
+        template: '<div data-test="share-dialog-stub" />',
+        props: ["open", "sessionId", "chatTitle", "historyUnavailable"],
+      },
+    };
+
+    it("shows the fork banner with the source title before the first message", async () => {
+      mockLoadChat.mockResolvedValueOnce({
+        id: 8,
+        title: "Error spike",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        messages: [],
+        sessionId: "s-8",
+        forkedFromShare: "share-1",
+      });
+      await vm.loadChat(8);
+      await flushPromises();
+      const banner = wrapper!.find('[data-test="o2-ai-chat-forked-banner"]');
+      expect(banner.exists()).toBe(true);
+      expect(banner.text()).toContain("Error spike");
+    });
+
+    it("flags a chat whose history the server could not read, and warns on Share", async () => {
+      wrapper!.unmount();
+      wrapper = mountO2AIChat({}, shareStubs);
+      vm = wrapper.vm as any;
+      mockLoadChat.mockResolvedValueOnce({
+        id: 5,
+        title: "Broken",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        messages: [],
+        sessionId: "s-5",
+        serverBacked: true,
+        historyUnavailable: true,
+      });
+      await vm.loadChat(5);
+      await flushPromises();
+      expect(wrapper.find('[data-test="o2-ai-chat-history-unavailable"]').exists()).toBe(true);
+
+      vm.shareCurrentChat();
+      await flushPromises();
+      const dialog = wrapper.findComponent({ name: "AiChatShareDialog" });
+      expect(dialog.props()).toMatchObject({ sessionId: "s-5", historyUnavailable: true });
+    });
+
+    it("shows the fork banner on a chat forked from a share, and drops it for a new chat", async () => {
+      mockLoadChat.mockResolvedValueOnce({
+        id: 7,
+        title: "Forked",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        messages: [
+          { role: "user", content: "hi" },
+          { role: "assistant", content: "hello" },
+        ],
+        sessionId: "s-7",
+        forkedFromShare: "share-1",
+      });
+      await vm.loadChat(7);
+      await flushPromises();
+      const banner = '[data-test="o2-ai-chat-forked-banner"]';
+      expect(wrapper!.find(banner).exists()).toBe(true);
+
+      vm.addNewChat();
+      await flushPromises();
+      expect(wrapper!.find(banner).exists()).toBe(false);
+    });
+
+    it("warns on Share from the history menu when that chat's history cannot be read", async () => {
+      wrapper!.unmount();
+      wrapper = mountO2AIChat({}, shareStubs);
+      vm = wrapper.vm as any;
+      vm.chatHistory = [
+        {
+          id: 9,
+          title: "Old chat",
+          timestamp: "2026-01-01T00:00:00.000Z",
+          messages: [],
+          sessionId: "s-9",
+          serverBacked: true,
+        },
+      ];
+      mockLoadChat.mockResolvedValueOnce({
+        id: 9,
+        title: "Old chat",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        messages: [],
+        sessionId: "s-9",
+        serverBacked: true,
+        historyUnavailable: true,
+      });
+      vm.shareHistoryChat(9);
+      await flushPromises();
+      expect(mockLoadChat).toHaveBeenCalledWith(9);
+      const dialog = wrapper.findComponent({ name: "AiChatShareDialog" });
+      expect(dialog.props()).toMatchObject({ sessionId: "s-9", historyUnavailable: true });
+    });
+
+    it("uses the open chat's known history state on Share from the history menu", async () => {
+      wrapper!.unmount();
+      wrapper = mountO2AIChat({}, shareStubs);
+      vm = wrapper.vm as any;
+      const broken = {
+        id: 5,
+        title: "Broken",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        messages: [],
+        sessionId: "s-5",
+        serverBacked: true,
+        historyUnavailable: true,
+      };
+      mockLoadChat.mockResolvedValueOnce(broken);
+      await vm.loadChat(5);
+      await flushPromises();
+      vm.chatHistory = [broken];
+      mockLoadChat.mockClear();
+
+      vm.shareHistoryChat(5);
+      await flushPromises();
+      expect(mockLoadChat).not.toHaveBeenCalled();
+      const dialog = wrapper.findComponent({ name: "AiChatShareDialog" });
+      expect(dialog.props()).toMatchObject({ sessionId: "s-5", historyUnavailable: true });
+    });
+
+    it("opens the share dialog for the chat picked in the history menu", async () => {
+      wrapper!.unmount();
+      wrapper = mountO2AIChat({}, shareStubs);
+      vm = wrapper.vm as any;
+      vm.chatHistory = [
+        {
+          id: 9,
+          title: "Old chat",
+          timestamp: "2026-01-01T00:00:00.000Z",
+          messages: [],
+          sessionId: "s-9",
+          serverBacked: true,
+        },
+      ];
+      vm.shareHistoryChat(9);
+      await flushPromises();
+      const dialog = wrapper.findComponent({ name: "AiChatShareDialog" });
+      expect(dialog.props()).toMatchObject({ open: true, sessionId: "s-9", chatTitle: "Old chat" });
     });
   });
 });

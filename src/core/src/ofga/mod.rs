@@ -76,6 +76,7 @@ struct PendingMigrations {
     prompt_folders: bool,
     query_history: bool,
     downtimes: bool,
+    ai_chat_shares: bool,
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -538,6 +539,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.downtimes {
         keys.extend(["downtime_folders", "downtimes"]);
     }
+    if pending.ai_chat_shares {
+        keys.push("ai_chat_shares");
+    }
     keys
 }
 
@@ -579,6 +583,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_51 = version_compare::Version::from("0.0.51").unwrap();
     let v0_0_53 = version_compare::Version::from("0.0.53").unwrap();
     let v0_0_54 = version_compare::Version::from("0.0.54").unwrap();
+    let v0_0_55 = version_compare::Version::from("0.0.55").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -703,6 +708,10 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] downtimes permissions migration needed");
         pending.downtimes = true;
     }
+    if meta_version >= v0_0_55 && existing_model_version < v0_0_55 {
+        log::info!("[OFGA:Local] AI chat share permissions migration needed");
+        pending.ai_chat_shares = true;
+    }
 
     pending
 }
@@ -739,5 +748,21 @@ mod tests {
         let pending = pending_migrations("0.0.54", "0.0.54");
         assert!(!pending.downtimes);
         assert!(all_org_ownership_keys(&pending).is_empty());
+    }
+
+    #[test]
+    fn test_ai_chat_shares_back_fill_below_0_0_55() {
+        let pending = pending_migrations("0.0.55", "0.0.54");
+        assert!(pending.ai_chat_shares && !pending.downtimes);
+        assert_eq!(all_org_ownership_keys(&pending), vec!["ai_chat_shares"]);
+
+        let pending = pending_migrations("0.0.55", "0.0.53");
+        assert_eq!(
+            all_org_ownership_keys(&pending),
+            vec!["downtime_folders", "downtimes", "ai_chat_shares"]
+        );
+
+        assert!(!pending_migrations("0.0.54", "0.0.53").ai_chat_shares);
+        assert!(all_org_ownership_keys(&pending_migrations("0.0.55", "0.0.55")).is_empty());
     }
 }

@@ -18,15 +18,13 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
-// ── Module mocks (hoisted) ───────────────────────────────────────────────────
-
-// `marked` is deliberately NOT mocked: processTextBlock/processMessageContent
-// run it for real, so rendered DOM is a usable assertion surface here.
+// `marked` is deliberately NOT mocked: processTextBlock/processMessageContent run it for real, so rendered DOM is a usable assertion surface here.
 
 const mockSaveToHistory = vi.fn().mockResolvedValue(42);
 const mockLoadHistory = vi.fn().mockResolvedValue([]);
 const mockLoadChat = vi.fn().mockResolvedValue(null);
 const mockDeleteChatById = vi.fn().mockResolvedValue(true);
+const mockDiscardLocalChat = vi.fn().mockResolvedValue(true);
 const mockClearAllHistory = vi.fn().mockResolvedValue(true);
 const mockUpdateChatTitle = vi.fn().mockResolvedValue(true);
 
@@ -36,26 +34,29 @@ vi.mock("@/composables/useChatHistory", () => ({
     loadHistory: mockLoadHistory,
     loadChat: mockLoadChat,
     deleteChatById: mockDeleteChatById,
+    discardLocalChat: mockDiscardLocalChat,
     clearAllHistory: mockClearAllHistory,
     updateChatTitle: mockUpdateChatTitle,
   })),
 }));
 
-// vi.hoisted, not a plain const: O2AIChat.vue destructures useAiChat() at module
-// scope, so the factory runs during import.
-const { mockFetchAiChat, mockSubmitFeedback, mockRouterPush, uuidSeq } = vi.hoisted(() => ({
-  mockFetchAiChat: vi.fn(),
-  mockSubmitFeedback: vi.fn().mockResolvedValue(true),
-  mockRouterPush: vi.fn().mockResolvedValue(undefined),
-  // A constant uuid makes every session-identity assertion vacuous: a new
-  // session would get the same id as the one it replaced.
-  uuidSeq: { n: 0 },
-}));
+// vi.hoisted, not a plain const: O2AIChat.vue destructures useAiChat() at module scope, so the factory runs during import.
+const { mockFetchAiChat, mockSubmitFeedback, mockRouterPush, mockCancelAiChat, uuidSeq } =
+  vi.hoisted(() => ({
+    mockFetchAiChat: vi.fn(),
+    mockCancelAiChat: vi.fn(),
+    mockSubmitFeedback: vi.fn().mockResolvedValue(true),
+    mockRouterPush: vi.fn().mockResolvedValue(undefined),
+    // A constant uuid makes every session-identity assertion vacuous: a new session would get the same id as the one it replaced.
+    uuidSeq: { n: 0 },
+  }));
 
 vi.mock("@/composables/useAiChat", () => ({
   default: vi.fn(() => ({
     fetchAiChat: mockFetchAiChat,
     submitFeedback: mockSubmitFeedback,
+    chatHistoryServer: vi.fn(() => ({ enabled: () => false })),
+    cancelAiChat: mockCancelAiChat,
     registerAiChatHandler: vi.fn(),
     removeAiChatHandler: vi.fn(),
     getStructuredContext: vi.fn().mockResolvedValue(null),
@@ -103,8 +104,6 @@ vi.mock("@/composables/contextProviders", () => ({
 // Component import must come after all vi.mock() declarations.
 import O2AIChat from "./O2AIChat.vue";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
-
-// ── Stub definitions ─────────────────────────────────────────────────────────
 
 const stubs = {
   RichTextInput: {
@@ -156,8 +155,6 @@ const stubs = {
     emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   },
 };
-
-// ── SSE helpers ──────────────────────────────────────────────────────────────
 
 const encoder = new TextEncoder();
 
@@ -279,8 +276,6 @@ async function waitFor(predicate: () => boolean, timeout = 3000) {
   }
 }
 
-// ── Tests ────────────────────────────────────────────────────────────────────
-
 describe("O2AIChat SSE protocol", () => {
   let wrapper: VueWrapper;
   let vm: any;
@@ -290,15 +285,12 @@ describe("O2AIChat SSE protocol", () => {
     uuidSeq.n = 0;
     wrapper = mountO2AIChat();
     vm = wrapper.vm as any;
-    // backgroundStreams / backgroundStreamMap / sessionStreamingState are module
-    // scope and outlive every unmount; this listener is the only public reset.
+    // backgroundStreams / backgroundStreamMap / sessionStreamingState are module scope and outlive every unmount; this listener is the only public reset.
     window.dispatchEvent(new Event("o2:abort-ai-streams"));
   });
 
   afterEach(async () => {
-    // handleNavigationAction schedules an untracked setTimeout(..., 500) that
-    // calls saveToHistory and is never cleared on unmount. Left pending it fires
-    // inside whatever test is running 500ms later and corrupts its save counts.
+    // handleNavigationAction schedules an untracked setTimeout(..., 500) that calls saveToHistory and is never cleared on unmount. Left pending it fires inside whatever test is running 500ms later and corrupts its save counts.
     if (mockRouterPush.mock.calls.length) {
       await new Promise((r) => setTimeout(r, 550));
     }
@@ -306,7 +298,18 @@ describe("O2AIChat SSE protocol", () => {
     vi.clearAllMocks();
     mockSaveToHistory.mockResolvedValue(42);
     mockSubmitFeedback.mockResolvedValue(true);
+    await store.dispatch("setConfig", {
+      ...store.state.zoConfig,
+      ai_chat_persistence_enabled: false,
+    });
   });
+
+  const enablePersistence = () =>
+    store.dispatch("setConfig", {
+      ...store.state.zoConfig,
+      ai_enabled: true,
+      ai_chat_persistence_enabled: true,
+    });
 
   describe("title events", () => {
     it("stores the streamed title in aiGeneratedTitle", async () => {
@@ -498,8 +501,7 @@ describe("O2AIChat SSE protocol", () => {
       expect(url).toBe(`http://localhost:5080/api/default/ai/confirm/${vm.currentSessionId}`);
       expect(JSON.parse(init.body)).toEqual({ approved: true });
       expect(vm.pendingConfirmation).toBeNull();
-      // `continue` before any block is pushed: the turn leaves no assistant
-      // message at all, not merely an empty block list.
+      // `continue` before any block is pushed: the turn leaves no assistant message at all, not merely an empty block list.
       expect(vm.chatMessages).toHaveLength(1);
     });
 
@@ -649,8 +651,7 @@ describe("O2AIChat SSE protocol", () => {
     });
 
     it("CURRENT BEHAVIOR (BUG): wipes the finalized text block when the stream ends on a tool_call", async () => {
-      // The end-of-stream flush writes the now-empty textSegment back over the
-      // last text block, which localFinalizeTextBlock had already closed.
+      // The end-of-stream flush writes the now-empty textSegment back over the last text block, which localFinalizeTextBlock had already closed.
       await stream(vm, [
         sse({ type: "message_delta", content: "let me check" }),
         sse({ type: "tool_call", tool: "A", message: "a", call_id: "c1" }),
@@ -817,8 +818,7 @@ describe("O2AIChat SSE protocol", () => {
       expect(blocks(vm)).toHaveLength(1);
       expect(blocks(vm)[0].call_id).toBe("c1");
       expect(blocks(vm)[0].resultMessage).toBe("A finished");
-      // B is untouched: the result matched an already-closed block, not the
-      // active one.
+      // B is untouched: the result matched an already-closed block, not the active one.
       expect(vm.activeToolCall.call_id).toBe("c2");
 
       gate.close();
@@ -1197,9 +1197,7 @@ describe("O2AIChat SSE protocol", () => {
 
       expect(mockFetchAiChat).toHaveBeenCalledTimes(2);
       expect(vm.streamOwnerUnavailable).toBe(false);
-      // The restored notice is an `error` block, which carries `.message`;
-      // stream error text lands in a `text` block's `.text`, so both fields
-      // have to be checked against the field the producing path actually sets.
+      // The restored notice is an `error` block, which carries `.message`; stream error text lands in a `text` block's `.text`, so both fields have to be checked against the field the producing path actually sets.
       const notice = blocks(vm).find((b: any) => b.type === "error");
       expect(notice).toBeDefined();
       expect(String(notice.message)).toContain("has been restored");
@@ -1276,8 +1274,7 @@ describe("O2AIChat SSE protocol", () => {
 
       const toolBlock = blocks(vm)[0];
       expect(toolBlock.type).toBe("tool_call");
-      // Neither success:false nor a result — so hasToolCallDetails is false and
-      // the step renders as an un-expandable row with no sign it failed.
+      // Neither success:false nor a result — so hasToolCallDetails is false and the step renders as an un-expandable row with no sign it failed.
       expect(toolBlock.success).toBeUndefined();
       expect(toolBlock.resultMessage).toBeUndefined();
       expect(vm.hasToolCallDetails(toolBlock)).toBe(false);
@@ -1515,9 +1512,7 @@ describe("O2AIChat SSE protocol", () => {
         sse({ type: "message_delta", content: "c" }),
       ]);
 
-      // user message, forced save on assistant creation, final save. The two
-      // later deltas fall inside STREAMING_SAVE_INTERVAL. Counted as a delta,
-      // because an orphan navigation timer can land here from a prior test.
+      // user message, forced save on assistant creation, final save. The two later deltas fall inside STREAMING_SAVE_INTERVAL. Counted as a delta, because an orphan navigation timer can land here from a prior test.
       const calls = mockSaveToHistory.mock.calls.slice(before);
       expect(calls).toHaveLength(3);
       expect(calls[2][0]).toHaveLength(2);
@@ -1736,8 +1731,7 @@ describe("O2AIChat SSE protocol", () => {
       vm.addNewChat();
       await flushPromises();
 
-      // activeToolCall is only assigned while isActive(), so the next tool_call
-      // has no predecessor to close and nothing is ever pushed.
+      // activeToolCall is only assigned while isActive(), so the next tool_call has no predecessor to close and nothing is ever pushed.
       gate.push(sse({ type: "tool_call", tool: "A", message: "a", call_id: "c1" }));
       gate.push(sse({ type: "tool_call", tool: "B", message: "b", call_id: "c2" }));
       gate.push(sse({ type: "message_delta", content: "answer" }));
@@ -1894,10 +1888,10 @@ describe("O2AIChat SSE protocol", () => {
       await flushPromises();
 
       expect(assistant(vm)).toBeDefined();
-      expect(blocks(vm).map((b: any) => b.type)).toEqual(["tool_call", "text"]);
+      expect(blocks(vm).map((b: any) => b.type)).toEqual(["tool_call", "status"]);
       expect(blocks(vm)[0].tool).toBe("A");
       expect(blocks(vm)[0].success).toBe(true);
-      expect(String(assistant(vm).content)).toContain("stopped");
+      expect(blocks(vm)[1].turnStatus).toBe("stopped");
 
       gate.close();
       await turn;
@@ -1916,9 +1910,83 @@ describe("O2AIChat SSE protocol", () => {
       await flushPromises();
 
       expect(blocks(vm)[0].text).toBe("half an ans");
+      expect(blocks(vm).map((b: any) => b.type)).toEqual(["text", "status"]);
+      expect(blocks(vm)[1].turnStatus).toBe("stopped");
 
       gate.close();
       await turn;
+    });
+
+    // Reloading before the Stop's save lands showed a stale copy without the partial answer.
+    it("reloads the chat only after the Stop's save has landed", async () => {
+      const gate = gatedResponse();
+      mockFetchAiChat.mockResolvedValueOnce(gate.response);
+      vm.inputMessage = "first question";
+      const turn = vm.sendMessage();
+      await flushPromises();
+      gate.push(sse({ type: "message_delta", content: "half an ans" }));
+      await flushPromises();
+
+      let landSave!: (id: number) => void;
+      mockSaveToHistory.mockImplementationOnce(
+        () => new Promise<number>((resolve) => (landSave = resolve)),
+      );
+      // The shared store keeps the flag an earlier unmount raised, which would swallow this turn's reload.
+      await store.dispatch("setChatUpdated", false);
+      mockLoadChat.mockClear();
+      const stop = vm.cancelCurrentRequest();
+      gate.close();
+      await flushPromises();
+      expect(mockLoadChat).not.toHaveBeenCalled();
+
+      landSave(42);
+      await stop;
+      await turn;
+      await flushPromises();
+      expect(mockLoadChat).toHaveBeenCalledWith(42);
+    });
+
+    it("asks the server to stop the turn only when chats persist there", async () => {
+      mockCancelAiChat.mockResolvedValue(undefined);
+      const gate = gatedResponse();
+      mockFetchAiChat.mockResolvedValueOnce(gate.response);
+      vm.inputMessage = "first question";
+      const turn = vm.sendMessage();
+      await flushPromises();
+      await vm.cancelCurrentRequest();
+      gate.close();
+      await turn;
+      expect(mockCancelAiChat).not.toHaveBeenCalled();
+
+      await enablePersistence();
+      const second = gatedResponse();
+      mockFetchAiChat.mockResolvedValueOnce(second.response);
+      vm.inputMessage = "second question";
+      const next = vm.sendMessage();
+      await flushPromises();
+      await vm.cancelCurrentRequest();
+      second.close();
+      await next;
+      expect(mockCancelAiChat).toHaveBeenCalledWith(expect.any(String), vm.currentSessionId);
+    });
+
+    it("ends a turn stopped before any answer with a retryable stopped marker", async () => {
+      const gate = gatedResponse();
+      mockFetchAiChat.mockResolvedValueOnce(gate.response);
+      vm.inputMessage = "first question";
+      const turn = vm.sendMessage();
+      await flushPromises();
+      await vm.cancelCurrentRequest();
+      gate.close();
+      await turn;
+
+      expect(vm.chatMessages.map((m: any) => m.role)).toEqual(["user", "assistant"]);
+      expect(blocks(vm)).toEqual([expect.objectContaining({ turnStatus: "stopped" })]);
+      mockFetchAiChat.mockResolvedValueOnce(readerResponse([]));
+      await vm.retryGeneration(1);
+      await flushPromises();
+      expect(mockFetchAiChat).toHaveBeenCalledTimes(2);
+      expect(vm.chatMessages.filter((m: any) => m.role === "user")).toHaveLength(2);
     });
 
     it("exits quietly on an AbortError without adding an error message", async () => {
@@ -1981,8 +2049,7 @@ describe("O2AIChat SSE protocol", () => {
       await vm.sendMessage();
       await flushPromises();
 
-      // Without the early return the cancelled envelope falls into the !ok
-      // branch and a raw JS TypeError is rendered as the assistant reply.
+      // Without the early return the cancelled envelope falls into the !ok branch and a raw JS TypeError is rendered as the assistant reply.
       expect(vm.chatMessages).toHaveLength(1);
       expect(vm.isLoading).toBe(false);
     });
@@ -2034,8 +2101,7 @@ describe("O2AIChat SSE protocol", () => {
       await vm.handleToolConfirm();
       await flushPromises();
 
-      // handleToolConfirm reads currentSessionId, not the session the
-      // confirmation arrived on, so the approval lands on the other chat.
+      // handleToolConfirm reads currentSessionId, not the session the confirmation arrived on, so the approval lands on the other chat.
       const [url] = (global.fetch as any).mock.calls[0];
       expect(url).toBe("http://localhost:5080/api/default/ai/confirm/some-other-session");
       expect(url).not.toContain(originatingSession);
@@ -2051,8 +2117,7 @@ describe("O2AIChat SSE protocol", () => {
       await flushPromises();
       expect(vm.pendingConfirmation).not.toBeNull();
 
-      // handleToolCancel bails on the missing session id BEFORE clearing
-      // pendingConfirmation, so the dialog stays wedged open.
+      // handleToolCancel bails on the missing session id BEFORE clearing pendingConfirmation, so the dialog stays wedged open.
       await vm.handleToolCancel();
       await flushPromises();
 
@@ -2072,8 +2137,7 @@ describe("O2AIChat SSE protocol", () => {
       await vm.sendMessage();
       await flushPromises();
 
-      // The handler flags and `continue`s. Without that the frame falls through
-      // to the generic error branch and paints a raw error at the user.
+      // The handler flags and `continue`s. Without that the frame falls through to the generic error branch and paints a raw error at the user.
       const texts = blocks(vm)
         .filter((b: any) => b.type === "text")
         .map((b: any) => b.text);
@@ -2098,6 +2162,42 @@ describe("O2AIChat SSE protocol", () => {
       expect(dead).toBe("uuid-1");
       expect(fresh).not.toBe(dead);
       expect(vm.currentSessionId).toBe(fresh);
+    });
+
+    it("retries a persisted chat under its own session, which the server restores", async () => {
+      await enablePersistence();
+      mockFetchAiChat
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 409,
+          json: () => Promise.resolve({ code: "session_owner_unavailable" }),
+        })
+        .mockResolvedValueOnce(readerResponse([sse({ type: "message_delta", content: "ok" })]));
+      vm.inputMessage = "hello";
+      await vm.sendMessage();
+      await flushPromises();
+
+      const [first, retry] = mockFetchAiChat.mock.calls.map((c: any[]) => c[5]);
+      expect(retry).toBe(first);
+      expect(vm.currentSessionId).toBe(first);
+      const texts = blocks(vm).map((b: any) => b.message ?? b.text);
+      expect(texts.some((text: string) => String(text).includes("restored"))).toBe(false);
+    });
+
+    it("keeps a persisted chat's session when the owner is lost mid-stream", async () => {
+      await enablePersistence();
+      mockFetchAiChat
+        .mockResolvedValueOnce(
+          readerResponse([sse({ type: "error", code: "session_owner_unavailable" })]),
+        )
+        .mockResolvedValueOnce(readerResponse([sse({ type: "message_delta", content: "again" })]));
+      vm.inputMessage = "hello";
+      await vm.sendMessage();
+      await flushPromises();
+
+      const [first, retry] = mockFetchAiChat.mock.calls.map((c: any[]) => c[5]);
+      expect(retry).toBe(first);
+      expect(vm.isLoading).toBe(false);
     });
 
     // A Stop during the retry used to fall through to the !ok branch and render a server error.
@@ -2179,8 +2279,7 @@ describe("O2AIChat SSE protocol", () => {
       await flushPromises();
       expect(vm.activeToolCall.call_id).toBe("c2");
 
-      // Same tool name, older call_id: this belongs to the block already closed,
-      // not to the call currently in flight.
+      // Same tool name, older call_id: this belongs to the block already closed, not to the call currently in flight.
       gate.push(
         sse({ type: "tool_result", tool: "SearchLogs", call_id: "c1", message: "12 records" }),
       );
@@ -2220,6 +2319,58 @@ describe("O2AIChat SSE protocol", () => {
     });
   });
 
+  describe("turn limit", () => {
+    const refused = () => ({
+      ok: false,
+      status: 429,
+      json: () => Promise.resolve({ code: 429, error_code: "turn_limit", message: "busy" }),
+    });
+
+    it("gives the prompt back with an inline error and leaves no chat behind", async () => {
+      mockFetchAiChat.mockResolvedValueOnce(refused());
+      vm.inputMessage = "count the errors";
+      await vm.sendMessage();
+      await flushPromises();
+
+      expect(vm.chatMessages).toHaveLength(0);
+      expect(vm.inputMessage).toBe("count the errors");
+      expect(vm.turnLimitError).toBe(true);
+      expect(mockDiscardLocalChat).toHaveBeenCalledWith(42);
+      expect(mockDeleteChatById).not.toHaveBeenCalled();
+      expect(vm.currentChatId).toBeNull();
+      expect(wrapper.find('[data-test="o2-ai-chat-turn-limit"]').exists()).toBe(true);
+    });
+
+    it("keeps an existing chat and only drops the refused message", async () => {
+      await stream(vm, [sse({ type: "message_delta", content: "answer" })], "first");
+      mockFetchAiChat.mockResolvedValueOnce(refused());
+      vm.inputMessage = "second";
+      await vm.sendMessage();
+      await flushPromises();
+
+      expect(vm.chatMessages.map((m: any) => m.content)).toEqual(["first", "answer"]);
+      expect(vm.inputMessage).toBe("second");
+      expect(mockDeleteChatById).not.toHaveBeenCalled();
+      expect(mockDiscardLocalChat).not.toHaveBeenCalled();
+    });
+
+    it("sends the kept prompt again on Retry", async () => {
+      mockFetchAiChat.mockResolvedValueOnce(refused());
+      vm.inputMessage = "count the errors";
+      await vm.sendMessage();
+      await flushPromises();
+
+      mockFetchAiChat.mockResolvedValueOnce(
+        readerResponse([sse({ type: "message_delta", content: "ok" })]),
+      );
+      await wrapper.find('[data-test="o2-ai-chat-turn-limit-retry"]').trigger("click");
+      await flushPromises();
+
+      expect(vm.turnLimitError).toBe(false);
+      expect(vm.chatMessages.map((m: any) => m.role)).toEqual(["user", "assistant"]);
+    });
+  });
+
   describe("retry", () => {
     it("resends the preceding user message", async () => {
       await stream(vm, [sse({ type: "message_delta", content: "answer" })], "why is p99 up");
@@ -2245,8 +2396,7 @@ describe("O2AIChat SSE protocol", () => {
   });
 });
 
-// backgroundStreams, backgroundStreamMap and sessionStreamingState are module
-// scope, so these need two live instances rather than one.
+// backgroundStreams, backgroundStreamMap and sessionStreamingState are module scope, so these need two live instances rather than one.
 describe("O2AIChat cross-instance streaming registry", () => {
   const live: VueWrapper[] = [];
 
@@ -2324,8 +2474,7 @@ describe("O2AIChat cross-instance streaming registry", () => {
     const turn = o.sendMessage();
     await flushPromises();
 
-    // Never detached, so this instance loads the IndexedDB snapshot and simply
-    // shares the session id — it is not showing that stream.
+    // Never detached, so this instance loads the IndexedDB snapshot and simply shares the session id — it is not showing that stream.
     const other = mountTracked();
     const s = other.vm as any;
     mockLoadChat.mockResolvedValueOnce({
@@ -2468,9 +2617,7 @@ describe("O2AIChat streaming render throttle", () => {
     await flushPromises();
     expect(blocks(vm)[0].text).toBe(long);
 
-    // The typewriter reveals a growing prefix of the same segment; the
-    // additive-only guard in flushStreamingRenderNow is what stops those
-    // prefixes from replacing the full text that already landed.
+    // The typewriter reveals a growing prefix of the same segment; the additive-only guard in flushStreamingRenderNow is what stops those prefixes from replacing the full text that already landed.
     for (let i = 0; i < 20; i++) {
       await new Promise((r) => setTimeout(r, 12));
       expect(blocks(vm)[0].text).toBe(long);
