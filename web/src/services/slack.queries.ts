@@ -48,10 +48,11 @@ export const slackInstallationsQuery = (org: string, options?: SlackRequestOptio
     staleTime: LIVE_STALE_TIME,
   });
 
-export const slackPrerequisitesQuery = (org: string) =>
+/** The disabled screen passes `silentForbidden`: only some admins may read the checks there. */
+export const slackPrerequisitesQuery = (org: string, options?: SlackRequestOptions) =>
   queryOptions({
     queryKey: slackKeys.prerequisites(org),
-    queryFn: async () => (await slack.getPrerequisites(org)).data,
+    queryFn: async () => (await slack.getPrerequisites(org, options)).data,
     // The admin fixes a variable and restarts, then comes back expecting the new result.
     staleTime: LIVE_STALE_TIME,
   });
@@ -130,10 +131,10 @@ export const slackMyLinksQuery = (org: string) =>
   });
 
 // The popup composable toasts start and exchange failures itself.
-export const installStartMutation = (org: string) =>
+export const installStartMutation = (org: string, options?: SlackRequestOptions) =>
   mutationOptions({
     mutationFn: async (source: SlackInstallSource) =>
-      (await slack.installStart(org, { source })).data,
+      (await slack.installStart(org, { source }, options)).data,
     meta: { silentError: true },
   });
 

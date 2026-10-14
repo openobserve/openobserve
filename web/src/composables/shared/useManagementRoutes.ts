@@ -156,6 +156,16 @@ const useManagementRoutes = () => {
     },
     beforeEnter: withFeatureGate("genAiAgentMapping", routeGuard),
   });
+  // Every build: OSS lands on the locked page; Settings hides the rail item when the org config disables Slack.
+  routes[0].children.push({
+    path: "slack",
+    name: "slack",
+    component: () => import("@/components/settings/Slack.vue"),
+    meta: {
+      titleKey: "routeTitles.slackApp",
+    },
+    beforeEnter: withFeatureGate("slack", routeGuard),
+  });
   // Alert Sources moved to a flat top-level route (router.ts, name
   // "alertSources") — no longer pushed here. It used to be conditional on
   // this same enterprise/cloud check; that gating now lives on the target

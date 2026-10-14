@@ -74,14 +74,14 @@ const definedParams = <T extends object>(params: T): Partial<T> =>
   ) as Partial<T>;
 
 const slack = {
-  installStart: (org: string, body: SlackInstallStartRequest) =>
-    http().post<SlackInstallStartResponse>(`${base(org)}/install/start`, body),
+  installStart: (org: string, body: SlackInstallStartRequest, options?: SlackRequestOptions) =>
+    http().post<SlackInstallStartResponse>(`${base(org)}/install/start`, body, options),
 
   installExchange: (org: string, body: SlackInstallExchangeRequest) =>
     http().post<SlackInstallExchangeResponse>(`${base(org)}/install/exchange`, body),
 
-  getPrerequisites: (org: string) =>
-    http().get<SlackPrerequisitesResponse>(`${base(org)}/prerequisites`),
+  getPrerequisites: (org: string, options?: SlackRequestOptions) =>
+    http().get<SlackPrerequisitesResponse>(`${base(org)}/prerequisites`, options),
 
   checkConnectivity: (org: string, body: SlackConnectivityRequest) =>
     http().post<SlackConnectivityResponse>(`${base(org)}/connectivity`, body),

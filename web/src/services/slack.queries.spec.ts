@@ -19,6 +19,8 @@ import { destinationKeys } from "./alert_destination.querykeys";
 import slack from "./slack";
 import {
   confirmConnectionMutation,
+  installStartMutation,
+  slackPrerequisitesQuery,
   confirmLinkRequestMutation,
   connectInstallationMutation,
   deleteChannelDefaultMutation,
@@ -45,6 +47,8 @@ vi.mock("./slack", () => {
   const ok = () => Promise.resolve({ data: {} });
   const names = [
     "installExchange",
+    "installStart",
+    "getPrerequisites",
     "createInstallation",
     "updateCredentials",
     "listInstallations",
@@ -134,6 +138,21 @@ describe("slack queries", () => {
     await (slackInstallationsQuery(ORG).queryFn as any)();
     expect(slack.listInstallations).toHaveBeenLastCalledWith(ORG, undefined);
     expect(slackInstallationsQuery(ORG).queryKey).toEqual(slackKeys.installations(ORG));
+  });
+
+  it("passes silentForbidden to the prerequisite checks and the form's install start", async () => {
+    await (slackPrerequisitesQuery(ORG, { silentForbidden: true }).queryFn as any)();
+    expect(slack.getPrerequisites).toHaveBeenLastCalledWith(ORG, { silentForbidden: true });
+
+    await installStartMutation(ORG, { silentForbidden: true }).mutationFn!(
+      "destination_form",
+      {} as any,
+    );
+    expect(slack.installStart).toHaveBeenLastCalledWith(
+      ORG,
+      { source: "destination_form" },
+      { silentForbidden: true },
+    );
   });
 
   it("pages cursor lists by `next_cursor` and stops on an empty cursor", () => {
