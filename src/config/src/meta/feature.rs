@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use serde::{Deserialize, Deserializer, Serialize};
-use strum::{EnumIter, EnumString, IntoStaticStr};
+use serde::Serialize;
+use strum::{EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
-/// License-gated enterprise features, one bit each; the snake_case name is the license key.
+/// Product features as tags; the snake_case name is the gate-definition and license key.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, Hash, EnumString, IntoStaticStr, Serialize, EnumIter,
 )]
@@ -24,18 +24,116 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
 #[serde(rename_all = "snake_case")]
 #[repr(u64)]
 pub enum Feature {
-    /// Every bit set, so it also matches features added after the license was issued.
-    All = u64::MAX,
-    Ai = 1 << 0,
-    Incidents = 1 << 1,
-    Oncall = 1 << 2,
-    Workflows = 1 << 3,
+    AiObservability,
+    AiAssistant,
+    Workflows,
+    Oncall,
+    Incidents,
+    Logs,
+    Metrics,
+    Traces,
+    Rum,
+    RumProductAnalytics,
+    RumSourceMaps,
+    Synthetics,
+    StatusPages,
+    DbMonitoring,
+    EnrichmentTables,
+    SavedViews,
+    SearchJobs,
+    CipherKeys,
+    RegexpPatterns,
+    ServiceStreams,
+    SearchInspector,
+    QueryHistory,
+    Dashboards,
+    Reports,
+    Alerts,
+    Templates,
+    Destinations,
+    Functions,
+    Pipelines,
+    AiToolsets,
+    Mcp,
+    LlmModelPricing,
+    LlmProviders,
+    Prompts,
+    PromptProtectedLabels,
+    ScoreConfigs,
+    Scorers,
+    OnlineEvalJobs,
+    AnnotationQueues,
+    Datasets,
+    Experiments,
+    Playground,
+    Users,
+    Roles,
+    Groups,
+    IngestionTokens,
+    ServiceAccounts,
+    Ratelimit,
+    BillingGroup,
+    RemoteTasks,
+    AnomalyDetection,
+    Slos,
+    LogsPatterns,
+    LogsInsights,
+    ContinuousProfiling,
+    ServiceGraph,
+    KubernetesMonitoring,
+    HostMonitoring,
+    SessionReplay,
+    WebVitals,
+    ErrorTracking,
+    Funnels,
+    CompositeAlerts,
+    AlertDeduplication,
+    AlertCorrelation,
+    AlertLibrary,
+    AlertInsights,
+    RootCauseAnalysis,
+    IncidentIntegrations,
+    AiSreAgent,
+    DailyBriefing,
+    AiAgentRegistry,
+    SlackApp,
+    Annotations,
+    SearchHistory,
+    ShortUrls,
+    PromqlBuilder,
+    Backfill,
+    SyslogIngestion,
+    OtlpIngestion,
+    PrometheusRemoteWrite,
+    ElasticsearchCompatibility,
+    SplunkHec,
+    KinesisFirehose,
+    Sso,
+    PasswordPolicy,
+    CustomBranding,
+    DomainManagement,
+    Invitations,
+    AuditTrail,
+    QueryManagement,
+    WorkloadManagement,
+    SuperCluster,
+    ExtendedRetention,
+    Byob,
+    TerraformProvider,
+    AwsMarketplace,
+    AzureMarketplace,
 }
 
-// unknown keys are dropped so a newer license still loads on an older binary
-pub fn deserialize_list<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Vec<Feature>>, D::Error> {
-    Ok(Option::<Vec<String>>::deserialize(d)?
-        .map(|keys| keys.iter().filter_map(|k| k.parse().ok()).collect()))
+impl Feature {
+    /// Key of this feature in the entitlement set.
+    #[inline]
+    pub const fn index(self) -> u64 {
+        self as u64
+    }
+
+    pub fn all() -> impl Iterator<Item = Feature> {
+        <Self as IntoEnumIterator>::iter()
+    }
 }
 
 #[derive(Clone, Copy, Serialize)]
@@ -48,59 +146,30 @@ pub enum FeatureState {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
+    use std::{collections::HashSet, str::FromStr};
 
     use super::*;
-
-    #[derive(Deserialize)]
-    struct Holder {
-        #[serde(default, deserialize_with = "deserialize_list")]
-        features: Option<Vec<Feature>>,
-    }
-
-    fn parse(json: &str) -> Option<Vec<Feature>> {
-        serde_json::from_str::<Holder>(json).unwrap().features
-    }
-
-    #[test]
-    fn deserialize_list_matrix() {
-        assert_eq!(parse("{}"), None);
-        assert_eq!(parse(r#"{"features":["all"]}"#), Some(vec![Feature::All]));
-        assert_eq!(
-            parse(r#"{"features":["ai","oncall"]}"#),
-            Some(vec![Feature::Ai, Feature::Oncall])
-        );
-        assert_eq!(parse(r#"{"features":[]}"#), Some(vec![]));
-        assert_eq!(
-            parse(r#"{"features":["ai","future_thing"]}"#),
-            Some(vec![Feature::Ai])
-        );
-    }
 
     #[test]
     fn keys_round_trip() {
         for (key, f) in [
-            ("all", Feature::All),
-            ("ai", Feature::Ai),
-            ("incidents", Feature::Incidents),
+            ("ai_assistant", Feature::AiAssistant),
             ("oncall", Feature::Oncall),
-            ("workflows", Feature::Workflows),
+            ("rum_source_maps", Feature::RumSourceMaps),
+            ("llm_model_pricing", Feature::LlmModelPricing),
+            ("byob", Feature::Byob),
         ] {
             assert_eq!(Feature::from_str(key).unwrap(), f);
             assert_eq!(<&str>::from(f), key);
         }
-        assert!(Feature::from_str("nope").is_err());
+        assert!(Feature::from_str("ai").is_err());
+        assert!(Feature::from_str("all").is_err());
     }
 
     #[test]
-    fn all_covers_every_bit() {
-        for f in [
-            Feature::Ai,
-            Feature::Incidents,
-            Feature::Oncall,
-            Feature::Workflows,
-        ] {
-            assert_ne!(Feature::All as u64 & f as u64, 0);
-        }
+    fn indices_are_unique() {
+        let indices: HashSet<u64> = Feature::all().map(Feature::index).collect();
+        assert_eq!(indices.len(), Feature::all().count());
+        assert!(Feature::all().count() > 64);
     }
 }
