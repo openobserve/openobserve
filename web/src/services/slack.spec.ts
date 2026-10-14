@@ -33,6 +33,8 @@ const client = (http as unknown as ReturnType<typeof vi.fn>)();
 const ORG = "acme";
 const ID = "inst-1";
 const BASE = `/api/${ORG}/slack`;
+// The pages calling these render a 403 themselves, so it stays out of the grouped access toast.
+const SILENT_403 = { silentForbidden: true };
 
 type Method = "get" | "post" | "put" | "delete";
 type Case = [label: string, call: () => Promise<unknown>, method: Method, args: unknown[]];
@@ -129,7 +131,7 @@ const cases: Case[] = [
     "row 15 connection/confirm",
     () => slack.confirmConnection(ORG, { oidc_code: "c", oidc_state: "s" }),
     "post",
-    [`${BASE}/connection/confirm`, { oidc_code: "c", oidc_state: "s" }],
+    [`${BASE}/connection/confirm`, { oidc_code: "c", oidc_state: "s" }, SILENT_403],
   ],
   [
     "row 16 connect",
@@ -195,19 +197,19 @@ const cases: Case[] = [
     "7.3 link request start",
     () => slack.startLinkRequest(ORG, "req-1", { sig: "sg" }),
     "post",
-    [`${BASE}/link-requests/req-1/start`, { sig: "sg" }],
+    [`${BASE}/link-requests/req-1/start`, { sig: "sg" }, SILENT_403],
   ],
   [
     "7.3 link request confirm",
     () => slack.confirmLinkRequest(ORG, { oidc_code: "c", oidc_state: "s" }),
     "post",
-    [`${BASE}/link-requests/confirm`, { oidc_code: "c", oidc_state: "s" }],
+    [`${BASE}/link-requests/confirm`, { oidc_code: "c", oidc_state: "s" }, SILENT_403],
   ],
   [
     "7.3 link request resend",
     () => slack.resendLinkRequest(ORG, "req-1", { sig: "sg" }),
     "post",
-    [`${BASE}/link-requests/req-1/resend`, { sig: "sg" }],
+    [`${BASE}/link-requests/req-1/resend`, { sig: "sg" }, SILENT_403],
   ],
   ["7.3 links/me", () => slack.getMyLinks(ORG), "get", [`${BASE}/links/me`]],
   ["7.3 unlink", () => slack.deleteLink(ORG, "link-1"), "delete", [`${BASE}/links/link-1`]],

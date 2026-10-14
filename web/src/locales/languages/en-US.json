@@ -1468,7 +1468,8 @@
     "trialPageNeedsPlan": "{page} needs a plan",
     "trialPageNeedsPlanToast": "{page} needs a plan. Choose one on this page to keep using it.",
     "trialChoosePlanToast": "Choose a plan on this page to keep using {product}.",
-    "trialFlyoutNote": "Your trial has ended. Pages with a lock need a plan."
+    "trialFlyoutNote": "Your trial has ended. Pages with a lock need a plan.",
+    "linkedAccounts": "Linked accounts"
   },
   "profiles": {
     "title": "Profiles",
@@ -20631,7 +20632,10 @@
     "regexPatterns": "Regex Patterns",
     "syntheticsLocations": "Synthetics Locations",
     "awsMarketplaceSetup": "AWS Marketplace Setup",
-    "aiMonitoring": "AI Monitoring"
+    "aiMonitoring": "AI Monitoring",
+    "slackLink": "Link Slack account",
+    "slackLinkCallback": "Linking Slack account",
+    "slackConnectCallback": "Signing in with Slack"
   },
   "sqlEditor": {
     "completion": {
@@ -25344,6 +25348,63 @@
       "removeFailed": "Some destinations could not be removed",
       "deleteApp": "Open the app's Delete App page in Slack",
       "done": "Done"
+    },
+    "link": {
+      "pageTitle": "Link your Slack account",
+      "working": "Linking your Slack account…",
+      "workingDetail": "Taking you to Slack to confirm it's you",
+      "finishing": "Finishing linking…",
+      "expiredTitle": "This link expired",
+      "expiredDetail": "Links work once and expire after 30 minutes.",
+      "unknownDetail": "Mention {'@'}OpenObserve in Slack again to get a new link.",
+      "sendNewLink": "Send me a new link",
+      "resentTitle": "We sent you a new link",
+      "resentDetail": "Open your direct messages with OpenObserve in Slack and click Link your account.",
+      "noAccessTitle": "You don't have access to OpenObserve yet",
+      "noAccessDetail": "Your Slack workspace is connected to OpenObserve, but you have no account in its organizations.",
+      "helpContact": "Ask {contact} for access.",
+      "helpContactDefault": "Ask your OpenObserve administrator for access.",
+      "wrongAccountTitle": "Signed in to Slack as another account",
+      "wrongAccountDetail": "This link was sent to someone else. Switch Slack accounts in this browser, then try again.",
+      "rateLimitedTitle": "Too many attempts",
+      "rateLimitedDetail": "Wait a minute, then try again.",
+      "failedTitle": "Couldn't link your Slack account",
+      "failedDetail": "Something went wrong. Try again.",
+      "cancelledTitle": "Linking was cancelled",
+      "cancelledDetail": "Slack did not confirm your account, so nothing was linked.",
+      "tryAgain": "Try again",
+      "linkedTitle": "Linked as {user}",
+      "linkedOrg": "Questions you ask in Slack run in org {org}.",
+      "linkedOrgChange": "Questions you ask in Slack run in org {org}. Change it from the message in Slack.",
+      "returning": "Taking you back to Slack…",
+      "backToSlack": "Back to Slack",
+      "closeTab": "You can close this tab."
+    },
+    "connectCallback": {
+      "pageTitle": "Sign in with Slack",
+      "working": "Checking your Slack sign-in…",
+      "connectedTitle": "This org is connected to Slack",
+      "connectedDetail": "People in this org can now ask OpenObserve from the workspace.",
+      "testTitle": "Sign in with Slack works",
+      "testDetail": "Slack confirmed your account for this workspace.",
+      "expiredTitle": "This sign-in expired",
+      "failedTitle": "Slack sign-in could not be completed",
+      "restart": "Start again from Settings › Slack.",
+      "openSettings": "Open Slack settings"
+    },
+    "linkedAccounts": {
+      "title": "Linked accounts",
+      "description": "Apps that can act as you in OpenObserve",
+      "workspace": "Slack · {team}",
+      "detail": "{'@'}{user} · org {org} · {method}",
+      "linked": "Linked",
+      "lastUsed": "Last used",
+      "unlink": "Unlink",
+      "unlinkAria": "Unlink Slack in {team}",
+      "note": "To link another workspace, mention {'@'}OpenObserve there and click Link your account. Links stop working if your access is removed.",
+      "emptyTitle": "No linked accounts",
+      "emptyDetail": "Mention {'@'}OpenObserve in Slack and click Link your account to link one.",
+      "loadFailed": "Couldn't load your linked accounts"
     }
   }
 }

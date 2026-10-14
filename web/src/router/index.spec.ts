@@ -41,6 +41,19 @@ vi.mock("@/composables/shared/router", () => ({
         component: { template: "<div>Public chat</div>" },
         meta: { public: true },
       },
+      {
+        // Mirrors the Slack link page: it needs a session, so it is not public.
+        path: "/slack/link",
+        name: "slackLink",
+        component: { template: "<div>Slack link</div>" },
+        meta: { titleKey: "routeTitles.slackLink" },
+      },
+      {
+        path: "/slack/oauth/callback",
+        name: "slackOAuthCallback",
+        component: { template: "<div>Slack OAuth callback</div>" },
+        meta: { titleKey: "routeTitles.slackOAuthCallback" },
+      },
     ],
     homeChildRoutes: [
       {
@@ -212,6 +225,18 @@ describe("router/index (factory)", () => {
       await router.push("/ai/public/tok123").catch(() => {});
       expect(router.currentRoute.value.name).toBe("publicSharedChat");
       expect(router.currentRoute.value.params.token).toBe("tok123");
+    });
+
+    it("AC-9.6 sends a signed-out /slack/link to /login and keeps the URL to return to", async () => {
+      window.sessionStorage.clear();
+      await router.push("/slack/link?r=req-1.sig").catch(() => {});
+      expect(router.currentRoute.value.path).toBe("/login");
+      expect(window.sessionStorage.getItem("redirectURI")).not.toBeNull();
+    });
+
+    it("lets the Slack OAuth popup callback through without a session", async () => {
+      await router.push("/slack/oauth/callback?code=c&state=s").catch(() => {});
+      expect(router.currentRoute.value.name).toBe("slackOAuthCallback");
     });
 
     it("should redirect to /login when navigating to a protected route without a session", async () => {
