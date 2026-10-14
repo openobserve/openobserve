@@ -1661,8 +1661,16 @@ export default defineComponent({
       if (rawValue === BREAKDOWN_EMPTY_VALUE) {
         const quote = (f: string) =>
           searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(f) : f;
+        const fieldType = searchObj.data.stream.selectedStreamFields.find(
+          (f: { name: string; dataType?: string }) => f.name === field,
+        )?.dataType;
         searchObj.data.stream.addToFilterMode = "append";
-        searchObj.data.stream.addToFilter = getEmptyBreakdownFilter(field, action, quote);
+        searchObj.data.stream.addToFilter = getEmptyBreakdownFilter(
+          field,
+          action,
+          quote,
+          fieldType,
+        );
         return;
       }
       addSearchTerm(field, rawValue, action);

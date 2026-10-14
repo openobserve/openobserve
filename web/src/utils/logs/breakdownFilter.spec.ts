@@ -32,6 +32,29 @@ describe("getEmptyBreakdownFilter", () => {
     );
   });
 
+  it("matches only NULL for a numeric field, which cannot hold ''", () => {
+    expect(getEmptyBreakdownFilter("status", "include", bare, "Int64")).toBe("status is null");
+    expect(getEmptyBreakdownFilter("status", "exclude", bare, "Int64")).toBe("status is not null");
+  });
+
+  it("matches only NULL for a boolean field", () => {
+    expect(getEmptyBreakdownFilter("ok", "include", bare, "Boolean")).toBe("ok is null");
+  });
+
+  it("keeps the empty string match for every string type", () => {
+    for (const type of ["Utf8", "LargeUtf8", "Utf8View"]) {
+      expect(getEmptyBreakdownFilter("level", "include", bare, type)).toBe(
+        "(level is null OR level = '')",
+      );
+    }
+  });
+
+  it("keeps the empty string match when the type is unknown", () => {
+    expect(getEmptyBreakdownFilter("level", "include", bare, "")).toBe(
+      "(level is null OR level = '')",
+    );
+  });
+
   it("quotes a field that needs quoting in every position", () => {
     const quoted = quoteSqlIdentifierIfNeeded("log level");
     expect(quoted).toBe('"log level"');

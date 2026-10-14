@@ -13,13 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The (empty) breakdown series sums NULL rows and "" rows, so its filter must match both.
+// Same list as the alerts condition builder (utils/alerts/conditionsFormatter.ts).
+const STRING_TYPES = ["String", "Utf8", "LargeUtf8", "Utf8View"];
+
+// The (empty) series sums NULL and "" rows. Only a string column holds "", and
+// '' against any other type fails the query, so a non-string field matches NULL
+// only. An unknown type keeps the string form.
 export const getEmptyBreakdownFilter = (
   field: string,
   action: "include" | "exclude",
   quote: (f: string) => string,
+  fieldType?: string,
 ): string => {
   const quoted = quote(field);
+  if (fieldType && !STRING_TYPES.includes(fieldType)) {
+    return action === "include" ? `${quoted} is null` : `${quoted} is not null`;
+  }
   return action === "include"
     ? `(${quoted} is null OR ${quoted} = '')`
     : `(${quoted} is not null AND ${quoted} != '')`;
