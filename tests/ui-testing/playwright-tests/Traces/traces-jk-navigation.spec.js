@@ -274,11 +274,19 @@ test.describe("Traces J/K navigation (item 4a)", () => {
         "aria-current",
         "true",
       );
+      const pageOneFirstRow = await page.locator(listRow(0)).textContent();
       await page.locator(`${pager} button`, { hasText: /^2$/ }).click();
       await expect(page.locator(`${pager} [aria-current="page"]`)).toHaveText(
         "2",
         { timeout: 30000 },
       );
+      // J is ignored while the page loads, and aria-current flips to 2 before the fetch starts.
+      await expect(page.locator(listRow(0))).not.toHaveText(pageOneFirstRow, {
+        timeout: 30000,
+      });
+      await expect(
+        page.locator('[data-test="traces-search-result-pagination-page-1"]'),
+      ).toBeEnabled({ timeout: 30000 });
       await expect(activeListRows(page)).toHaveCount(0);
       await page.evaluate(
         () =>

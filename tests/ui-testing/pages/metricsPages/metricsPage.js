@@ -1148,6 +1148,8 @@ export class MetricsPage {
         const expanded = await btn.getAttribute('data-test-all-expanded');
         if (expanded === 'true') return;
         await btn.click();
+        // A parked mouse opens this button's tooltip on top of the sidebar collapse button.
+        await this.page.mouse.move(0, 0);
         await this.configToggleAllSectionsBtnExpanded
             .waitFor({ state: 'visible', timeout: 5000 })
             .catch(() => {});
@@ -1194,6 +1196,8 @@ export class MetricsPage {
         if (await btn.isVisible({ timeout: 500 }).catch(() => false)) {
             // A config-control toggle can leave an OSelect popover open over the header, intercepting this click.
             await this.dismissOverlay();
+            // A hovered tooltip stays open over this button while the mouse rests on its trigger.
+            await this.page.mouse.move(0, 0);
             await btn.click();
             await this.panelSidebarExpandedHeader.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
         }
