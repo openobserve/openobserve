@@ -21,7 +21,7 @@ use config::{
         alerts::{
             Operator, QueryCondition, QueryType, TriggerCondition, alert::Alert, default_align_time,
         },
-        folder::DEFAULT_FOLDER,
+        folder::FolderType,
         self_reporting::usage::TRIGGERS_STREAM,
         stream::StreamType,
         system_settings::{SettingCategory, SettingScope, SystemSetting},
@@ -34,8 +34,8 @@ use infra::dist_lock;
 /// Bumped when a built-in is added, so the next upgrade sweeps every org once more.
 const SHIPPED_REVISION: u32 = 1;
 const REVISION_KEY: &str = "prebuilt_alerts_revision";
-const SWEEP_LOCK_KEY: &str = "/system/alerts/prebuilt_sweep";
 const ORG_LOCK_PREFIX: &str = "/system/alerts/prebuilt_org/";
+const SYSTEM_FOLDER: &str = "system";
 const PREBUILT: [Prebuilt; 3] = [
     Prebuilt {
         name: "o2_alert_evaluation_failures",
@@ -120,11 +120,7 @@ pub async fn seed_prebuilt_alerts() -> Result<(), anyhow::Error> {
     if applied_revision().await? >= SHIPPED_REVISION {
         return Ok(());
     }
-    let locker = dist_lock::lock(SWEEP_LOCK_KEY, 0).await?;
-    let result = sweep().await;
-    dist_lock::unlock(&locker).await?;
-    drop(locker);
-    result
+    sweep().await
 }
 
 /// For an org whose `triggers` stream was just created, so it is seeded without a restart.
@@ -138,10 +134,6 @@ pub fn seed_org_in_background(org_id: &str) {
 }
 
 async fn sweep() -> Result<(), anyhow::Error> {
-    // Another node may have finished the sweep while this one waited for the lock.
-    if applied_revision().await? >= SHIPPED_REVISION {
-        return Ok(());
-    }
     let orgs = crate::organization::list_all_orgs(None).await?;
     let mut failed = 0;
     for org in &orgs {
@@ -177,29 +169,49 @@ async fn sweep() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Per org, because the sweep and a stream creation on another node can seed the same org at once.
+/// Per org, because every scheduler node sweeps on an upgrade and a new stream can seed at once.
 async fn seed_org(org_id: &str) -> Result<(), anyhow::Error> {
     let locker = dist_lock::lock(&format!("{ORG_LOCK_PREFIX}{org_id}"), 0).await?;
-    let mut result = Ok(());
-    for prebuilt in &PREBUILT {
-        if let Err(e) = seed_one(org_id, prebuilt).await {
-            result = Err(e);
-        }
-    }
+    let result = seed_missing(org_id).await;
     dist_lock::unlock(&locker).await?;
     result
 }
 
-async fn seed_one(org_id: &str, prebuilt: &Prebuilt) -> Result<(), anyhow::Error> {
-    let existing =
-        db::alerts::alert::get_by_name(org_id, StreamType::Logs, TRIGGERS_STREAM, prebuilt.name)
-            .await?;
-    if existing.is_none() {
-        let conn = infra::db::get_orm_client_rw().await;
+async fn seed_missing(org_id: &str) -> Result<(), anyhow::Error> {
+    let mut missing = vec![];
+    for prebuilt in &PREBUILT {
+        let existing = db::alerts::alert::get_by_name(
+            org_id,
+            StreamType::Logs,
+            TRIGGERS_STREAM,
+            prebuilt.name,
+        )
+        .await?;
+        if existing.is_none() {
+            missing.push(prebuilt);
+        }
+    }
+    if missing.is_empty() {
+        return Ok(());
+    }
+    let folder_id = system_folder(org_id).await?;
+    let conn = infra::db::get_orm_client_rw().await;
+    for prebuilt in missing {
         let alert = prebuilt.definition(org_id);
-        crate::alerts::alert::create(conn, org_id, DEFAULT_FOLDER, alert, false).await?;
+        crate::alerts::alert::create(conn, org_id, &folder_id, alert, false).await?;
     }
     Ok(())
+}
+
+/// Reuses a folder the org already named `system` rather than adding a second one beside it.
+async fn system_folder(org_id: &str) -> Result<String, anyhow::Error> {
+    if let Ok(folder) =
+        db::folders::get_folder_by_name(org_id, SYSTEM_FOLDER, FolderType::Alerts).await
+    {
+        return Ok(folder.folder_id);
+    }
+    let folder = db::folders::ensure_folder(org_id, SYSTEM_FOLDER, FolderType::Alerts).await?;
+    Ok(folder.folder_id)
 }
 
 async fn applied_revision() -> Result<u32, anyhow::Error> {
@@ -216,10 +228,13 @@ mod tests {
 
     use arrow::array::{Array, StringArray};
     use config::{
-        meta::self_reporting::usage::{
-            RunOutcome::{self, Error, Firing, NotifyFailed},
-            TriggerData,
-            TriggerDataType::{self, Alert as AlertJob, Report},
+        meta::{
+            folder::DEFAULT_FOLDER,
+            self_reporting::usage::{
+                RunOutcome::{self, Error, Firing, NotifyFailed},
+                TriggerData,
+                TriggerDataType::{self, Alert as AlertJob, Report},
+            },
         },
         utils::{json, record_batch_ext::convert_json_to_record_batch},
     };
