@@ -94,6 +94,7 @@ pub mod slack_channel_defaults;
 pub mod slack_installations;
 pub mod slack_link_requests;
 pub mod slack_org_connections;
+mod slack_shared;
 pub mod slack_threads;
 pub mod slo;
 pub mod slo_backfill_jobs;

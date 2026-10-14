@@ -14,8 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::slack::SlackLinkRequest;
-use sea_orm::ConnectionTrait;
+use sea_orm::{
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, Iterable, PaginatorTrait, QueryFilter,
+    Select, Set,
+    sea_query::{Expr, OnConflict},
+};
 
+use super::{
+    entity::slack_link_requests::{ActiveModel, Column, Entity, Model},
+    slack_shared::{db_err, open, seal, secrets_key},
+};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors::Error,
@@ -48,6 +56,7 @@ pub async fn mark_redeemed(id: &str, at: i64) -> Result<(), Error> {
     mark_redeemed_with(get_orm_client_rw().await, id, at).await
 }
 
+/// Also drops the held question: Not now must not keep it.
 pub async fn mark_discarded(id: &str, at: i64) -> Result<(), Error> {
     mark_discarded_with(get_orm_client_rw().await, id, at).await
 }
@@ -60,49 +69,338 @@ pub async fn delete_finished_before(at: i64) -> Result<u64, Error> {
     delete_finished_before_with(get_orm_client_rw().await, at).await
 }
 
-pub async fn put_with<C: ConnectionTrait>(_conn: &C, _row: &SlackLinkRequest) -> Result<(), Error> {
-    Err(Error::Message("slack phase0: not implemented".to_string()))
+pub async fn put_with<C: ConnectionTrait>(conn: &C, row: &SlackLinkRequest) -> Result<(), Error> {
+    let key = secrets_key(row.question.is_some()).await?;
+    put_keyed(conn, row, key.as_deref()).await
 }
 
 pub async fn get_with<C: ConnectionTrait>(
-    _conn: &C,
-    _id: &str,
+    conn: &C,
+    id: &str,
 ) -> Result<Option<SlackLinkRequest>, Error> {
-    Err(Error::Message("slack phase0: not implemented".to_string()))
+    let Some(model) = live().filter(Column::Id.eq(id)).one(conn).await? else {
+        return Ok(None);
+    };
+    let key = secrets_key(model.question_enc.is_some()).await?;
+    from_model(model, key.as_deref()).map(Some)
 }
 
 pub async fn count_created_since_with<C: ConnectionTrait>(
-    _conn: &C,
-    _installation_id: &str,
-    _external_user_id: &str,
-    _since: i64,
+    conn: &C,
+    installation_id: &str,
+    external_user_id: &str,
+    since: i64,
 ) -> Result<u64, Error> {
-    Err(Error::Message("slack phase0: not implemented".to_string()))
+    Ok(live()
+        .filter(Column::InstallationId.eq(installation_id))
+        .filter(Column::ExternalUserId.eq(external_user_id))
+        .filter(Column::CreatedAt.gte(since))
+        .count(conn)
+        .await?)
 }
 
 pub async fn mark_redeemed_with<C: ConnectionTrait>(
-    _conn: &C,
-    _id: &str,
-    _at: i64,
+    conn: &C,
+    id: &str,
+    at: i64,
 ) -> Result<(), Error> {
-    Err(Error::Message("slack phase0: not implemented".to_string()))
+    Entity::update_many()
+        .col_expr(Column::RedeemedAt, Expr::value(at))
+        .col_expr(Column::UpdatedAt, Expr::value(at))
+        .filter(Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
 pub async fn mark_discarded_with<C: ConnectionTrait>(
-    _conn: &C,
-    _id: &str,
-    _at: i64,
+    conn: &C,
+    id: &str,
+    at: i64,
 ) -> Result<(), Error> {
-    Err(Error::Message("slack phase0: not implemented".to_string()))
+    Entity::update_many()
+        .col_expr(Column::DiscardedAt, Expr::value(at))
+        .col_expr(Column::QuestionEnc, Expr::value(Option::<String>::None))
+        .col_expr(Column::UpdatedAt, Expr::value(at))
+        .filter(Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
-pub async fn clear_nonce_with<C: ConnectionTrait>(_conn: &C, _id: &str) -> Result<(), Error> {
-    Err(Error::Message("slack phase0: not implemented".to_string()))
+pub async fn clear_nonce_with<C: ConnectionTrait>(conn: &C, id: &str) -> Result<(), Error> {
+    Entity::update_many()
+        .col_expr(Column::OidcNonce, Expr::value(Option::<String>::None))
+        .filter(Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
 pub async fn delete_finished_before_with<C: ConnectionTrait>(
-    _conn: &C,
-    _at: i64,
+    conn: &C,
+    at: i64,
 ) -> Result<u64, Error> {
-    Err(Error::Message("slack phase0: not implemented".to_string()))
+    let result = Entity::delete_many()
+        .filter(
+            Condition::any()
+                .add(Column::ExpiresAt.lt(at))
+                .add(Column::RedeemedAt.lt(at))
+                .add(Column::DiscardedAt.lt(at)),
+        )
+        .exec(conn)
+        .await?;
+    Ok(result.rows_affected)
+}
+
+fn live() -> Select<Entity> {
+    Entity::find().filter(Column::DeletedAt.is_null())
+}
+
+async fn put_keyed<C: ConnectionTrait>(
+    conn: &C,
+    row: &SlackLinkRequest,
+    key: Option<&[u8]>,
+) -> Result<(), Error> {
+    Entity::insert(to_active(row, key)?)
+        .on_conflict(
+            OnConflict::column(Column::Id)
+                .update_columns(Column::iter().filter(|c| !matches!(c, Column::Id)))
+                .to_owned(),
+        )
+        .exec_without_returning(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(())
+}
+
+fn to_active(row: &SlackLinkRequest, key: Option<&[u8]>) -> Result<ActiveModel, Error> {
+    Ok(ActiveModel {
+        id: Set(row.id.clone()),
+        installation_id: Set(row.installation_id.clone()),
+        external_user_id: Set(row.external_user_id.clone()),
+        workspace_user_id: Set(row.workspace_user_id.clone()),
+        channel_id: Set(row.channel_id.clone()),
+        thread_ts: Set(row.thread_ts.clone()),
+        message_ts: Set(row.message_ts.clone()),
+        question_enc: Set(seal(key, row.question.as_deref())?),
+        oidc_nonce: Set(row.oidc_nonce.clone()),
+        created_at: Set(row.created_at),
+        expires_at: Set(row.expires_at),
+        redeemed_at: Set(row.redeemed_at),
+        discarded_at: Set(row.discarded_at),
+        updated_at: Set(row.updated_at),
+        origin_region: Set(row.origin_region.clone()),
+        deleted_at: Set(row.deleted_at),
+    })
+}
+
+/// An undecryptable question reads as none: the request still redeems, only the replay is lost.
+fn from_model(model: Model, key: Option<&[u8]>) -> Result<SlackLinkRequest, Error> {
+    let (question, _) = open(key, model.question_enc.as_deref());
+    Ok(SlackLinkRequest {
+        id: model.id,
+        installation_id: model.installation_id,
+        external_user_id: model.external_user_id,
+        workspace_user_id: model.workspace_user_id,
+        channel_id: model.channel_id,
+        thread_ts: model.thread_ts,
+        message_ts: model.message_ts,
+        question,
+        oidc_nonce: model.oidc_nonce,
+        created_at: model.created_at,
+        expires_at: model.expires_at,
+        redeemed_at: model.redeemed_at,
+        discarded_at: model.discarded_at,
+        updated_at: model.updated_at,
+        origin_region: model.origin_region,
+        deleted_at: model.deleted_at,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use config::utils::encryption::decrypt_secret_value;
+    use sea_orm::{Database, DatabaseConnection, DbBackend, Statement};
+
+    use super::*;
+    use crate::table::slack::create_tables_for_test;
+
+    const KEY: [u8; 64] = [6u8; 64];
+
+    async fn db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        create_tables_for_test(&db).await.unwrap();
+        db
+    }
+
+    fn request(id: &str, user: &str, created_at: i64) -> SlackLinkRequest {
+        SlackLinkRequest {
+            id: id.to_string(),
+            installation_id: "i1".to_string(),
+            external_user_id: user.to_string(),
+            workspace_user_id: format!("W{user}"),
+            channel_id: Some("C1".to_string()),
+            thread_ts: Some("1700000000.000100".to_string()),
+            message_ts: Some("1700000000.000200".to_string()),
+            question: Some("why is checkout slow?".to_string()),
+            oidc_nonce: Some("nonce-1".to_string()),
+            created_at,
+            expires_at: created_at + 1_800,
+            redeemed_at: None,
+            discarded_at: None,
+            updated_at: created_at,
+            origin_region: "default".to_string(),
+            deleted_at: None,
+        }
+    }
+
+    async fn stored_question(db: &DatabaseConnection, id: &str) -> Option<String> {
+        db.query_one(Statement::from_string(
+            DbBackend::Sqlite,
+            format!("SELECT question_enc FROM slack_link_requests WHERE id = '{id}'"),
+        ))
+        .await
+        .unwrap()
+        .unwrap()
+        .try_get::<Option<String>>("", "question_enc")
+        .unwrap()
+    }
+
+    async fn stored_model(db: &DatabaseConnection, id: &str) -> Model {
+        Entity::find_by_id(id).one(db).await.unwrap().unwrap()
+    }
+
+    #[tokio::test]
+    async fn question_is_stored_aesenc_and_every_column_reads_back() {
+        let db = db().await;
+        let row = SlackLinkRequest {
+            redeemed_at: Some(10),
+            discarded_at: Some(11),
+            ..request("r1", "U1", 100)
+        };
+        put_keyed(&db, &row, Some(&KEY)).await.unwrap();
+        let stored = stored_question(&db, "r1").await.unwrap();
+        assert!(stored.starts_with("AESenc:"), "{stored}");
+        assert_eq!(
+            decrypt_secret_value(&KEY, &stored).unwrap(),
+            "why is checkout slow?"
+        );
+        assert!(from_model(stored_model(&db, "r1").await, Some(&KEY)).unwrap() == row);
+    }
+
+    #[tokio::test]
+    async fn no_master_key_stores_null() {
+        assert!(!crate::table::cipher::is_encrypting());
+        let db = db().await;
+        let row = request("r1", "U1", 100);
+        put_with(&db, &row).await.unwrap();
+        assert_eq!(stored_question(&db, "r1").await, None);
+        let read = get_with(&db, "r1").await.unwrap().unwrap();
+        assert!(
+            read == SlackLinkRequest {
+                question: None,
+                ..row
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn count_created_since_includes_discarded_and_skips_deleted() {
+        let db = db().await;
+        put_with(&db, &request("r1", "U1", 100)).await.unwrap();
+        put_with(&db, &request("r2", "U1", 200)).await.unwrap();
+        put_with(&db, &request("r3", "U1", 300)).await.unwrap();
+        mark_discarded_with(&db, "r3", 310).await.unwrap();
+        put_with(&db, &request("r4", "U2", 300)).await.unwrap();
+        put_with(
+            &db,
+            &SlackLinkRequest {
+                deleted_at: Some(1),
+                ..request("r5", "U1", 300)
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            count_created_since_with(&db, "i1", "U1", 200)
+                .await
+                .unwrap(),
+            2
+        );
+        assert_eq!(
+            count_created_since_with(&db, "i1", "U1", 0).await.unwrap(),
+            3
+        );
+        assert_eq!(
+            count_created_since_with(&db, "i2", "U1", 0).await.unwrap(),
+            0
+        );
+        assert!(get_with(&db, "r5").await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn marks_and_nonce_clearing_touch_only_their_columns() {
+        let db = db().await;
+        put_keyed(&db, &request("r1", "U1", 100), Some(&KEY))
+            .await
+            .unwrap();
+        put_keyed(&db, &request("r2", "U1", 100), Some(&KEY))
+            .await
+            .unwrap();
+
+        mark_redeemed_with(&db, "r1", 400).await.unwrap();
+        clear_nonce_with(&db, "r1").await.unwrap();
+        let r1 = from_model(stored_model(&db, "r1").await, Some(&KEY)).unwrap();
+        assert!(
+            r1 == SlackLinkRequest {
+                redeemed_at: Some(400),
+                oidc_nonce: None,
+                updated_at: 400,
+                ..request("r1", "U1", 100)
+            }
+        );
+
+        mark_discarded_with(&db, "r2", 500).await.unwrap();
+        assert_eq!(stored_question(&db, "r2").await, None);
+        let r2 = from_model(stored_model(&db, "r2").await, Some(&KEY)).unwrap();
+        assert!(
+            r2 == SlackLinkRequest {
+                discarded_at: Some(500),
+                question: None,
+                updated_at: 500,
+                ..request("r2", "U1", 100)
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn delete_finished_before_removes_expired_redeemed_and_discarded() {
+        let db = db().await;
+        put_with(&db, &request("expired", "U1", 0)).await.unwrap();
+        put_with(&db, &request("redeemed", "U2", 5_000))
+            .await
+            .unwrap();
+        mark_redeemed_with(&db, "redeemed", 5_100).await.unwrap();
+        put_with(&db, &request("discarded", "U3", 5_000))
+            .await
+            .unwrap();
+        mark_discarded_with(&db, "discarded", 5_100).await.unwrap();
+        put_with(&db, &request("recent", "U4", 5_000))
+            .await
+            .unwrap();
+        put_with(&db, &request("open", "U5", 5_000)).await.unwrap();
+        mark_redeemed_with(&db, "recent", 6_500).await.unwrap();
+
+        assert_eq!(delete_finished_before_with(&db, 6_000).await.unwrap(), 3);
+        let mut left: Vec<String> = Entity::find()
+            .all(&db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|m| m.id)
+            .collect();
+        left.sort();
+        assert_eq!(left, ["open", "recent"]);
+    }
 }
