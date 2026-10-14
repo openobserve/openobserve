@@ -494,6 +494,12 @@ describe("Phase 3 — resolveFieldValues is exposed for the editor to await", ()
     await expect(pending).resolves.toEqual(["new-stream-value"]);
   });
 
+  it("drops null in-session values and passes numbers and booleans on as text", async () => {
+    const c = makeComposable({ storedValues: [] });
+    c.autoCompleteData.value.fieldValues = { level: new Set(["error", null, undefined, 5, true]) };
+    await expect((c as any).resolveFieldValues("level")).resolves.toEqual(["error", "5", "true"]);
+  });
+
   it("resolves to an empty list rather than throwing when the lookup fails", async () => {
     const c = makeComposable({ storedValues: [] });
     vi.mocked(getFieldValuesForSuggestion).mockRejectedValueOnce(new Error("idb down"));

@@ -1292,6 +1292,18 @@ describe("buildOperatorLane — operators by type, ranked, never filtered", () =
     }
   });
 
+  it("a NOT partial reaches NOT IN, NOT LIKE, NOT ILIKE and NOT BETWEEN", () => {
+    const rows = buildOperatorLane({
+      context: ctx("level", "NOT "),
+      fieldType: "Utf8",
+      lineNumber: 1,
+      column: 30,
+    });
+    for (const label of ["NOT IN", "NOT LIKE", "NOT ILIKE", "NOT BETWEEN"]) {
+      expect(rows.map((e) => e.label)).toContain(label);
+    }
+  });
+
   it("uses one neutral order when the type is unknown", () => {
     expect(lane("x", undefined).map((e) => e.label)).toEqual(OPERATORS_BY_TYPE.neutral);
   });
@@ -1651,5 +1663,20 @@ describe("isValueFunction — what may stand as a comparison operand", () => {
     expect(isValueFunction({ name: "SELECT", label: "SELECT", kind: "Keyword" })).toBe(false);
     expect(isValueFunction({ name: "level", label: "level", kind: "Field" })).toBe(false);
     expect(isValueFunction(null)).toBe(false);
+  });
+
+  it("knows the local catalog's aggregates without the server's list", () => {
+    for (const name of [
+      "sum",
+      "avg",
+      "count",
+      "max",
+      "min",
+      "approx_topk",
+      "approx_topk_distinct",
+    ]) {
+      expect(isValueFunction(SQL_FUNCTIONS.find((f) => f.name === name)), name).toBe(false);
+    }
+    expect(isValueFunction(SQL_FUNCTIONS.find((f) => f.name === "spath"))).toBe(true);
   });
 });
