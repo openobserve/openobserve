@@ -130,13 +130,20 @@ vi.mock("@/composables/useLogs/searchState", () => ({
   }),
 }));
 
+const nlq = vi.hoisted(() => ({
+  generateSQL: vi.fn(() => Promise.resolve(null as string | null)),
+  refusalNotice: { value: "" },
+  showErrorNotification: vi.fn(),
+}));
+
 vi.mock("@/composables/useNLQuery", () => ({
   useNLQuery: () => ({
     detectNaturalLanguage: vi.fn(() => false),
-    generateSQL: vi.fn(() => Promise.resolve(null)),
+    generateSQL: nlq.generateSQL,
     transformToSQL: vi.fn((_nl: string, sql: string) => sql),
     isGenerating: { value: false },
     streamingResponse: { value: "" },
+    refusalNotice: nlq.refusalNotice,
   }),
 }));
 
@@ -148,7 +155,7 @@ vi.mock("vue-i18n", () => ({
 
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
-    showErrorNotification: vi.fn(),
+    showErrorNotification: nlq.showErrorNotification,
     showPositiveNotification: vi.fn(),
   }),
 }));
@@ -426,6 +433,27 @@ describe("CodeQueryEditor", () => {
     it("should have empty fields array as default", () => {
       const wrapper = createWrapper({ fields: undefined });
       expect(wrapper.props("fields")).toEqual([]);
+    });
+  });
+
+  describe("query generation refused by the server", () => {
+    afterEach(() => {
+      nlq.refusalNotice.value = "";
+    });
+
+    it("shows the refusal notice a single time and does not throw", async () => {
+      const notice = "Your organization has used all of its AI credits.";
+      nlq.generateSQL.mockImplementationOnce(() => {
+        nlq.refusalNotice.value = notice;
+        return Promise.resolve(null);
+      });
+      const wrapper = createWrapper();
+
+      await expect(wrapper.vm.handleGenerateSQL("show error rows")).resolves.toBeUndefined();
+
+      expect(nlq.showErrorNotification).toHaveBeenCalledTimes(1);
+      expect(nlq.showErrorNotification).toHaveBeenCalledWith(notice);
+      wrapper.unmount();
     });
   });
 

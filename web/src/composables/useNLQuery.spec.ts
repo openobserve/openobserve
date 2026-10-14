@@ -384,6 +384,12 @@ describe("useNLQuery", () => {
       expect(nlq.streamingResponse.value).toBe(
         "Your organization has used all of its AI credits. Subscribe to keep using AI. Further usage is billed on this organization's invoice.",
       );
+      // The editor shows refusalNotice; streamingResponse alone never reaches the user.
+      expect(nlq.refusalNotice.value).toBe(nlq.streamingResponse.value);
+
+      mockFetchAiChat.mockResolvedValue({ cancelled: true });
+      await nlq.generateSQL("query", "default");
+      expect(nlq.refusalNotice.value).toBe("");
     });
 
     it("retries exactly once with the same request after consent", async () => {
@@ -444,6 +450,7 @@ describe("useNLQuery", () => {
       expect(result).toBeNull();
       expect(mockFetchAiChat).toHaveBeenCalledTimes(1);
       expect(nlq.streamingResponse.value).toBe(gt("paidUsage.declinedNotice"));
+      expect(nlq.refusalNotice.value).toBe(gt("paidUsage.declinedNotice"));
     });
 
     it("returns null when fetchAiChat returns cancelled flag", async () => {
