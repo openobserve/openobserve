@@ -160,17 +160,23 @@ def test_the_same_event_id_three_times_is_one_answer(
     assert len(answers_in(ready, ts)) == 2
 
 
-def test_a_command_and_a_click_are_acked_as_slack_expects(client: OpenObserveClient, installed_http: dict[str, Any]) -> None:
+def test_a_command_and_a_click_are_acked_as_slack_expects(
+    client: OpenObserveClient, installed_http: dict[str, Any], ready: SlackMock,
+) -> None:
     secret = f"signing-{installed_http['app_id']}"
+    user = f"U0HLP{uuid.uuid4().hex[:6].upper()}"
     command = urlencode({
         "token": "t", "team_id": MOCK_TEAM, "team_domain": "mock", "channel_id": "C0OPS", "channel_name": "ops",
-        "user_id": "U0ALICE", "user_name": "alice", "command": "/o2", "text": "help",
+        "user_id": user, "user_name": "alice", "command": "/o2", "text": "help",
         "api_app_id": installed_http["app_id"], "is_enterprise_install": "false",
         "response_url": "https://hooks.slack.com/commands/T0MOCK/1/x", "trigger_id": uuid.uuid4().hex,
     }).encode()
     resp = slack_post(client, "commands", command, secret, content_type="application/x-www-form-urlencoded")
     assert resp.status_code == 200, resp.text
-    assert resp.json() == {"response_type": "ephemeral", "text": "Working on it…"}
+    assert resp.content == b"", "LIVE-RESULTS B-LIVE-13: Slack shows any ack text beside the real reply"
+    wait_until(lambda: [c for c in ready.calls("chat.postEphemeral")
+                        if c["form"].get("user") == user and "/o2 ask" in c["form"].get("text", "")],
+               "the /o2 help reply, posted apart from the ack")
     click = {
         "type": "block_actions", "user": {"id": "U0ALICE", "username": "alice", "team_id": MOCK_TEAM},
         "api_app_id": installed_http["app_id"], "trigger_id": uuid.uuid4().hex,
