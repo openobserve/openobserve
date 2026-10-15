@@ -19,6 +19,7 @@ import { vi } from "vitest";
 /** Shared stand-in for `useStepOptions`, so the specs drive the picker's list without a server. */
 export const stepOptions = {
   options: ref<Record<string, unknown>[]>([]),
+  groups: ref<Record<string, unknown>[]>([]),
   loading: ref(false),
   failed: ref(false),
   noCustom: ref(false),
@@ -30,8 +31,12 @@ export const useStepOptionsMock = vi.fn(
   (_opts: { events: () => unknown; kinds: () => unknown }) => stepOptions,
 );
 
-export function resetStepOptions(options: Record<string, unknown>[]) {
+export function resetStepOptions(
+  options: Record<string, unknown>[],
+  groups: Record<string, unknown>[] = [],
+) {
   stepOptions.options.value = options;
+  stepOptions.groups.value = groups;
   stepOptions.loading.value = false;
   stepOptions.failed.value = false;
   stepOptions.noCustom.value = false;
