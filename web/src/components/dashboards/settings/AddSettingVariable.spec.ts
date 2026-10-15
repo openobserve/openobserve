@@ -60,6 +60,14 @@ vi.mock("vue-i18n", () => ({
   }),
 }));
 
+const mockOpenConflict = vi.fn();
+vi.mock("@/composables/dashboard/useDashboardSaveConflict", () => ({
+  useDashboardSaveConflict: () => ({
+    isConflict: (error: any) => error?.response?.status === 409,
+    openConflict: mockOpenConflict,
+  }),
+}));
+
 vi.mock("vuex", () => ({
   useStore: () => ({
     state: {
@@ -938,6 +946,17 @@ describe("AddSettingVariable", () => {
       await wrapper.vm.saveData({ name: "v", type: "constant" });
 
       expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("closes the form on a save conflict so Save cannot add the pending variable twice", async () => {
+      vi.mocked(addVariable).mockRejectedValueOnce({ response: { status: 409 } });
+
+      await wrapper.vm.saveData({ name: "v", type: "constant" });
+
+      expect(mockOpenConflict).toHaveBeenCalledWith(
+        expect.objectContaining({ folderId: expect.any(String) }),
+      );
+      expect(wrapper.emitted("save")).toHaveLength(1);
     });
 
     it("tracks dashboard_variable_saved as not new once updateVariable resolves", async () => {
