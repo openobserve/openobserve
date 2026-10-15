@@ -272,6 +272,9 @@ async fn update_distinct_variables(
 
 macro_rules! _get_variables {
     ($map:ident, $dash:ident) => {
+        _get_variables!($map, $dash, |_qd| false)
+    };
+    ($map:ident, $dash:ident, $runs_own_query:expr) => {
         if let Some(vars) = &$dash.variables {
             for v in vars.list.iter() {
                 if let Some(ref qd) = v.query_data {
@@ -281,8 +284,7 @@ macro_rules! _get_variables {
                     if qd.stream.starts_with("$") {
                         continue;
                     }
-                    // "query" variables run their own query and may leave stream/field empty
-                    if v.type_field == "query" || qd.stream.is_empty() || qd.field.is_empty() {
+                    if $runs_own_query(qd) || qd.stream.is_empty() || qd.field.is_empty() {
                         continue;
                     }
                     $map.entry((qd.stream.clone(), qd.stream_type))
@@ -334,7 +336,9 @@ pub fn get_query_variables(
         }
         8 => {
             let dash = dashboard.v8.as_ref().unwrap();
-            _get_variables!(map, dash);
+            // A custom query variable never reads the distinct values of its stream/field.
+            _get_variables!(map, dash, |qd: &v8::QueryData| qd.custom_query
+                == Some(true));
         }
         _ => {
             unreachable!("we only have 8 dashboard versions")
@@ -1303,7 +1307,7 @@ mod tests {
     }
 
     #[test]
-    fn get_query_variables_skips_query_type_and_empty_stream() {
+    fn get_query_variables_skips_custom_query_and_empty_stream() {
         let dash: v8::Dashboard = serde_json::from_value(serde_json::json!({
             "version": 8,
             "title": "t",
@@ -1311,21 +1315,28 @@ mod tests {
             "variables": {"list": [
                 {"type": "query_values", "name": "a", "label": "a",
                  "query_data": {"stream_type": "logs", "stream": "default", "field": "host"}},
-                {"type": "query", "name": "b", "label": "b",
-                 "query_data": {"stream_type": "logs", "stream": "", "field": "",
-                                "query_type": "sql", "query": "SELECT 1 AS v", "value_field": "v"}},
-                {"type": "query", "name": "c", "label": "c",
+                {"type": "query_values", "name": "b", "label": "b",
                  "query_data": {"stream_type": "logs", "stream": "default", "field": "pod",
-                                "query_type": "promql", "query": "label_values(up, pod)"}}
+                                "custom_query": true, "query_type": "sql",
+                                "query": "SELECT 1 AS v", "value_field": "v"}},
+                {"type": "query_values", "name": "c", "label": "c",
+                 "query_data": {"stream_type": "logs", "stream": "", "field": ""}},
+                {"type": "query_values", "name": "d", "label": "d",
+                 "query_data": {"stream_type": "metrics", "stream": "up", "field": "job",
+                                "query_type": "promql"}}
             ]}
         }))
         .unwrap();
         let dashboard: Dashboard = dash.into();
         let map = get_query_variables(Some(&dashboard));
-        assert_eq!(map.len(), 1);
+        assert_eq!(map.len(), 2);
         assert_eq!(
             map.get(&("default".to_string(), StreamType::Logs)),
             Some(&vec!["host".to_string()])
+        );
+        assert_eq!(
+            map.get(&("up".to_string(), StreamType::Metrics)),
+            Some(&vec!["job".to_string()])
         );
     }
 }

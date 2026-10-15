@@ -790,9 +790,12 @@ pub struct QueryData {
     pub max_record_size: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filter: Option<Vec<Filters>>,
-    /// Language of `query` for a "query" variable: "sql" or "promql".
+    /// Query language of the variable: "sql" (default) or "promql".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub query_type: Option<String>,
+    /// True when options come from the hand-written `query` instead of stream/field/filter.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom_query: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub query: Option<String>,
     /// SQL result column used as the option value.
@@ -1878,48 +1881,58 @@ mod tests {
     }
 
     #[test]
-    fn test_query_variable_sql_and_promql_round_trip() {
+    fn test_query_values_custom_and_promql_round_trip() {
         let promql = r#"label_values(up{cluster="$cluster"}, namespace)"#;
+        let custom_sql = serde_json::json!({
+            "stream_type": "logs",
+            "stream": "default",
+            "field": "service",
+            "max_record_size": null,
+            "custom_query": true,
+            "query_type": "sql",
+            "query": "SELECT DISTINCT service AS v, service_name AS l FROM default",
+            "value_field": "v",
+            "label_field": "l"
+        });
+        let custom_promql = serde_json::json!({
+            "stream_type": "metrics",
+            "stream": "",
+            "field": "",
+            "max_record_size": null,
+            "custom_query": true,
+            "query_type": "promql",
+            "query": promql
+        });
+        let auto_promql = serde_json::json!({
+            "stream_type": "metrics",
+            "stream": "up",
+            "field": "namespace",
+            "max_record_size": 20,
+            "filter": [{"name": "cluster", "operator": "=", "value": "$cluster"}],
+            "query_type": "promql"
+        });
         let d = dashboard_with_variables(serde_json::json!([
-            {
-                "type": "query",
-                "name": "svc",
-                "label": "Service",
-                "query_data": {
-                    "stream_type": "logs",
-                    "stream": "",
-                    "field": "",
-                    "query_type": "sql",
-                    "query": "SELECT DISTINCT service AS v, service_name AS l FROM default",
-                    "value_field": "v",
-                    "label_field": "l"
-                }
-            },
-            {
-                "type": "query",
-                "name": "ns",
-                "label": "Namespace",
-                "query_data": {"query_type": "promql", "query": promql}
-            }
+            {"type": "query_values", "name": "svc", "label": "Service", "query_data": custom_sql},
+            {"type": "query_values", "name": "ns", "label": "Namespace", "query_data": custom_promql},
+            {"type": "query_values", "name": "ns2", "label": "Namespace", "query_data": auto_promql}
         ]));
         let list = &d.variables.as_ref().unwrap().list;
         let sql = list[0].query_data.as_ref().unwrap();
+        assert_eq!(sql.custom_query, Some(true));
         assert_eq!(sql.query_type.as_deref(), Some("sql"));
         assert_eq!(sql.value_field.as_deref(), Some("v"));
         assert_eq!(sql.label_field.as_deref(), Some("l"));
         let prom = list[1].query_data.as_ref().unwrap();
         assert_eq!(prom.query.as_deref(), Some(promql));
-        assert!(prom.stream.is_empty() && prom.field.is_empty());
+        let auto = list[2].query_data.as_ref().unwrap();
+        assert_eq!(auto.custom_query, None);
+        assert_eq!(auto.query_type.as_deref(), Some("promql"));
 
         let json = serde_json::to_value(&d).unwrap();
-        let sql_json = &json["variables"]["list"][0]["query_data"];
-        assert_eq!(sql_json["query_type"], "sql");
-        assert_eq!(sql_json["value_field"], "v");
-        assert_eq!(sql_json["label_field"], "l");
-        let prom_json = &json["variables"]["list"][1]["query_data"];
-        assert_eq!(prom_json["query_type"], "promql");
-        assert_eq!(prom_json["query"], promql);
-        assert!(prom_json.get("value_field").is_none());
+        let saved = &json["variables"]["list"];
+        assert_eq!(saved[0]["query_data"], custom_sql);
+        assert_eq!(saved[1]["query_data"], custom_promql);
+        assert_eq!(saved[2]["query_data"], auto_promql);
         let back: Dashboard = serde_json::from_value(json).unwrap();
         assert_eq!(back.variables, d.variables);
     }
