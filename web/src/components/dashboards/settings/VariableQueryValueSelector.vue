@@ -140,7 +140,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { isQueryVariable } from "@/utils/dashboard/variables/queryVariableUtils";
+import { isCustomQueryVariable } from "@/utils/dashboard/variables/queryVariableUtils";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
@@ -352,7 +352,7 @@ export default defineComponent({
         ? value.includes(SELECT_ALL_VALUE)
         : value === SELECT_ALL_VALUE;
       return (
-        isQueryVariable(props.variableItem) &&
+        isCustomQueryVariable(props.variableItem) &&
         holdsAll &&
         !props.variableItem?.isLoading &&
         !(props.variableItem?.options?.length > 0)

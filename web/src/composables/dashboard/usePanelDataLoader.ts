@@ -32,7 +32,7 @@ import { usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
 import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
 import { parseSearchError } from "@/utils/query/searchError";
 import { PANEL_KEY_IGNORED_PATHS, normalizeVariablesForCache } from "@/composables/query/panelKey";
-import { isQueryVariable } from "@/utils/dashboard/variables/queryVariableUtils";
+import { isCustomQueryVariable } from "@/utils/dashboard/variables/queryVariableUtils";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -850,7 +850,7 @@ export const usePanelDataLoader = (
       cache?.cacheTimeRange?.end_time - cache?.cacheTimeRange?.start_time;
     // A query variable's values come from the time range, so a result from another range was filtered by other values.
     const rangeBoundToQueryVariable =
-      cachedRangeDiffers && (getDependentVariablesData() ?? []).some(isQueryVariable);
+      cachedRangeDiffers && (getDependentVariablesData() ?? []).some(isCustomQueryVariable);
 
     // Check if it is stale or not
     if (

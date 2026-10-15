@@ -63,9 +63,10 @@ const regionVariable = {
 const sqlServiceVariable = {
   name: "service",
   label: "Service",
-  type: "query",
+  type: "query_values",
   multiSelect: false,
   query_data: {
+    custom_query: true,
     query_type: "sql",
     stream_type: "logs",
     query: "SELECT svc, display FROM logs WHERE region = '$region'",
@@ -98,7 +99,7 @@ const mountSelector = (props: Record<string, unknown>) =>
 const findVariable = (wrapper: any, name: string) =>
   wrapper.vm.variablesData.values.find((v: any) => v.name === name);
 
-describe("VariablesValueSelector — query variables", () => {
+describe("VariablesValueSelector — custom and PromQL query_values variables", () => {
   beforeEach(() => {
     streamMock.mockReset();
     labelValues.mockReset();
@@ -176,10 +177,12 @@ describe("VariablesValueSelector — query variables", () => {
   describe("with the variables manager", () => {
     const promNamespace = {
       name: "namespace",
-      type: "query",
+      type: "query_values",
       scope: "global",
       multiSelect: false,
       query_data: {
+        custom_query: true,
+        stream_type: "metrics",
         query_type: "promql",
         query: 'label_values(kube_pod_info{region="$region"}, namespace)',
       },
@@ -246,7 +249,7 @@ describe("VariablesValueSelector — query variables", () => {
       await flushPromises();
 
       expect(labelValues).toHaveBeenCalledWith(
-        expect.objectContaining({ start_time: 1_700_003_300_000, end_time: 1_700_003_600_000 }),
+        expect.objectContaining({ start_time: 1_700_003_300, end_time: 1_700_003_600 }),
       );
       const namespace = manager.getVariable("namespace", "global") as any;
       expect(namespace.value).toBeNull();
@@ -396,6 +399,129 @@ describe("VariablesValueSelector — query variables", () => {
       expect((manager.getVariable("service", "global") as any).options).toEqual([]);
       expect(wrapper.find('[data-test="variable-query-error-service"]').text()).toContain(
         "No field named service_idd",
+      );
+      wrapper.unmount();
+    });
+
+    const autoPromNamespace = {
+      name: "namespace",
+      type: "query_values",
+      scope: "global",
+      multiSelect: false,
+      query_data: {
+        stream_type: "metrics",
+        stream: "kube_pod_info",
+        field: "namespace",
+        query_type: "promql",
+        filter: [{ name: "region", operator: "=", value: "$region" }],
+      },
+    };
+
+    it("runs an auto PromQL variable as label_values with its filters as matchers", async () => {
+      labelValues.mockResolvedValue(promValues(["default", "monitoring"]));
+      const { manager, wrapper } = await mountWith([
+        { ...regionVariable, scope: "global" },
+        autoPromNamespace,
+      ]);
+
+      expect(labelValues).toHaveBeenCalledWith(
+        expect.objectContaining({ label: "namespace", match: 'kube_pod_info{region=~"eu"}' }),
+      );
+      expect(streamMock).not.toHaveBeenCalled();
+      expect(manager.getVariable("namespace", "global")!.value).toBe("default");
+      wrapper.unmount();
+    });
+
+    it("keeps the '_o2_all_' placeholder for an auto PromQL 'All', even over an empty list", async () => {
+      labelValues.mockResolvedValue(promValues([]));
+      const { manager, wrapper } = await mountWith([
+        { ...regionVariable, scope: "global" },
+        { ...autoPromNamespace, multiSelect: true, selectAllValueForMultiSelect: "all" },
+      ]);
+
+      const namespace = manager.getVariable("namespace", "global") as any;
+      expect(namespace.value).toEqual(["_o2_all_"]);
+      expect(resolveQueryVariableValue(namespace)).toEqual(["_o2_all_"]);
+      expect(manager.isLoading.value).toBe(false);
+      wrapper.unmount();
+    });
+
+    const multiCluster = {
+      name: "cluster",
+      type: "custom",
+      scope: "global",
+      multiSelect: true,
+      options: [
+        { label: "prod-eu", value: "prod-eu", selected: true },
+        { label: "prod-us", value: "prod-us", selected: true },
+      ],
+    };
+    const valuesSql = () =>
+      streamMock.mock.calls
+        .filter(([payload]: any) => payload.type === "values")
+        .map(([payload]: any) => b64DecodeUnicode(payload.queryReq.sql));
+
+    it("filters an auto SQL variable on a multi-select parent with IN, not an invalid =", async () => {
+      const { wrapper } = await mountWith([
+        multiCluster,
+        {
+          name: "namespace",
+          type: "query_values",
+          scope: "global",
+          multiSelect: false,
+          query_data: {
+            stream_type: "logs",
+            stream: "default",
+            field: "namespace",
+            filter: [
+              { name: "cluster", operator: "=", value: "$cluster" },
+              { name: "region", operator: "!=", value: "$cluster" },
+            ],
+          },
+        },
+      ]);
+      // The auto query is built with the lazily loaded SQL parser.
+      await vi.waitFor(() => expect(valuesSql()).toHaveLength(1), { timeout: 5000 });
+      const sql = valuesSql()[0];
+      expect(sql).toContain("\"cluster\" IN ('prod-eu', 'prod-us')");
+      expect(sql).toContain("\"region\" NOT IN ('prod-eu', 'prod-us')");
+      wrapper.unmount();
+    });
+
+    it("matches a multi-select parent with a regex in an auto PromQL variable", async () => {
+      labelValues.mockResolvedValue(promValues(["default"]));
+      const { wrapper } = await mountWith([
+        multiCluster,
+        {
+          ...autoPromNamespace,
+          query_data: {
+            ...autoPromNamespace.query_data,
+            filter: [{ name: "cluster", operator: "=", value: "$cluster" }],
+          },
+        },
+      ]);
+      expect(labelValues).toHaveBeenCalledWith(
+        expect.objectContaining({ match: 'kube_pod_info{cluster=~"prod-eu|prod-us"}' }),
+      );
+      wrapper.unmount();
+    });
+
+    it("still loads a legacy auto SQL variable from the field values stream", async () => {
+      const { wrapper } = await mountWith([
+        { ...regionVariable, scope: "global" },
+        {
+          name: "host",
+          type: "query_values",
+          scope: "global",
+          multiSelect: false,
+          query_data: { stream_type: "logs", stream: "default", field: "host" },
+        },
+      ]);
+
+      expect(labelValues).not.toHaveBeenCalled();
+      expect(streamMock).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "values" }),
+        expect.anything(),
       );
       wrapper.unmount();
     });

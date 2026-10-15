@@ -1784,7 +1784,8 @@ describe("usePanelDataLoader", () => {
       describe("a cached result from another time range", () => {
         const svc = {
           name: "svc",
-          type: "query",
+          type: "query_values",
+          query_data: { custom_query: true },
           multiSelect: true,
           value: ["checkout", "payments"],
           options: [],

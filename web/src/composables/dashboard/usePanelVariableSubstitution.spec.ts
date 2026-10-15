@@ -694,9 +694,10 @@ describe("query variable 'All'", () => {
     { label: "Checkout", value: "checkout" },
     { label: "Payments", value: "payments" },
   ];
+  const customQuery = { type: "query_values", query_data: { custom_query: true } };
 
   it("sends the listed option values instead of the placeholder", () => {
-    const { inst } = makeWithVariable({ type: "query", value: ["_o2_all_"], options });
+    const { inst } = makeWithVariable({ ...customQuery, value: ["_o2_all_"], options });
     expect(inst.replaceQueryValue("SELECT * FROM t WHERE svc IN ($svc)", 0, 1, "sql").query).toBe(
       "SELECT * FROM t WHERE svc IN ('checkout','payments')",
     );
@@ -706,7 +707,7 @@ describe("query variable 'All'", () => {
   });
 
   it("filters to nothing, never to everything, when the loaded list is empty", () => {
-    const { inst } = makeWithVariable({ type: "query", value: ["_o2_all_"], options: [] });
+    const { inst } = makeWithVariable({ ...customQuery, value: ["_o2_all_"], options: [] });
     expect(inst.replaceQueryValue("SELECT * FROM t WHERE svc IN ($svc)", 0, 1, "sql").query).toBe(
       "SELECT * FROM t WHERE svc IN ('_o2_no_values_')",
     );
@@ -717,7 +718,7 @@ describe("query variable 'All'", () => {
 
   it("re-runs the panel when an empty list behind 'All' fills in", () => {
     const { inst, variablesData } = makeWithVariable({
-      type: "query",
+      ...customQuery,
       value: ["_o2_all_"],
       options: [],
     });
@@ -735,7 +736,7 @@ describe("query variable 'All'", () => {
 
   it("holds the panel until the options behind 'All' have loaded", () => {
     const { inst, variablesData } = makeWithVariable({
-      type: "query",
+      ...customQuery,
       value: ["_o2_all_"],
       options: [],
       isVariablePartialLoaded: false,
@@ -748,7 +749,7 @@ describe("query variable 'All'", () => {
 
   it("re-runs the panel when the options behind 'All' change", () => {
     const { inst, variablesData } = makeWithVariable({
-      type: "query",
+      ...customQuery,
       value: ["_o2_all_"],
       options,
     });

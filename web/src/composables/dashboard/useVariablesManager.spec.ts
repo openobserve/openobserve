@@ -1324,10 +1324,10 @@ describe("useVariablesManager — query variables", () => {
   const queryVar = (overrides: Record<string, unknown> = {}): VariableConfig =>
     ({
       name: "svc",
-      type: "query",
+      type: "query_values",
       scope: "global",
       multiSelect: true,
-      query_data: { query_type: "sql", query: "SELECT svc FROM logs" },
+      query_data: { custom_query: true, query_type: "sql", query: "SELECT svc FROM logs" },
       options: [{ label: "", value: "", selected: true }],
       ...overrides,
     }) as any;

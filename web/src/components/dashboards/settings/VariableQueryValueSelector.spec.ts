@@ -970,9 +970,17 @@ describe("VariableQueryValueSelector", () => {
       expect(wrapper.vm.displayValue).toBe("<ALL>");
     });
 
-    it("shows the no-values state for 'All' on a query variable with an empty list", () => {
+    const customQuery = { type: "query_values", query_data: { custom_query: true } };
+
+    it("keeps '<ALL>' over an empty list for an auto query_values variable", () => {
+      wrapper = createWrapper({ variableItem: { ...multiSelectVariableItem, options: [] } });
+      wrapper.vm.selectedValue = ["_o2_all_"];
+      expect(wrapper.vm.displayValue).toBe("<ALL>");
+    });
+
+    it("shows the no-values state for 'All' on a custom query variable with an empty list", () => {
       wrapper = createWrapper({
-        variableItem: { ...multiSelectVariableItem, type: "query", options: [] },
+        variableItem: { ...multiSelectVariableItem, ...customQuery, options: [] },
       });
       wrapper.vm.selectedValue = ["_o2_all_"];
       expect(wrapper.vm.displayValue).toBe("(No Data Found)");
@@ -980,11 +988,11 @@ describe("VariableQueryValueSelector", () => {
 
     it("keeps '<ALL>' while the query variable is loading or lists values", () => {
       wrapper = createWrapper({
-        variableItem: { ...multiSelectVariableItem, type: "query", options: [], isLoading: true },
+        variableItem: { ...multiSelectVariableItem, ...customQuery, options: [], isLoading: true },
       });
       wrapper.vm.selectedValue = ["_o2_all_"];
       expect(wrapper.vm.displayValue).toBe("<ALL>");
-      wrapper = createWrapper({ variableItem: { ...multiSelectVariableItem, type: "query" } });
+      wrapper = createWrapper({ variableItem: { ...multiSelectVariableItem, ...customQuery } });
       wrapper.vm.selectedValue = ["_o2_all_"];
       expect(wrapper.vm.displayValue).toBe("<ALL>");
     });

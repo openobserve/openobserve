@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`dashboard-variable-${item.name}-container`"
     >
       <div
-        v-if="isQueryBackedVariable(item)"
+        v-if="item.type == 'query_values'"
         class="max-w-[40rem] min-w-37.5"
         v-show="!isVariableOmitted(item)"
       >
@@ -50,14 +50,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </div>
         <div
-          v-else-if="isQueryVariable(item) && item.queryCapped && !item.queryError"
+          v-else-if="usesQueryVariableLoader(item) && item.queryCapped && !item.queryError"
           class="text-text-secondary text-xs"
           :data-test="`variable-query-capped-${item.name}`"
         >
           {{ t("dashboard.queryVariable.cappedHint", { count: getQueryVariableMaxRecords(item) }) }}
         </div>
         <div
-          v-if="isQueryVariable(item) && item.queryError"
+          v-if="usesQueryVariableLoader(item) && item.queryError"
           class="text-status-error-text me-4 flex w-0 min-w-full items-center gap-1 text-xs"
           :data-test="`variable-query-error-${item.name}`"
         >
@@ -158,14 +158,16 @@ import {
   replaceVariablePlaceholders,
 } from "@/utils/dashboard/variables/variablesUtils";
 import {
+  expandMultiValueFilter,
   getQueryVariableLanguage,
   getQueryVariableMaxRecords,
   isExplicitQuerySelection,
-  isQueryBackedVariable,
-  isQueryVariable,
+  getQueryVariableQuery,
+  isCustomQueryVariable,
   reconcileQueryVariableValue,
   resolveQueryVariableValue,
   substituteQueryVariables,
+  usesQueryVariableLoader,
   type QueryVariableOption,
 } from "@/utils/dashboard/variables/queryVariableUtils";
 import {
@@ -812,10 +814,12 @@ export default defineComponent({
       const newOptions = options.map((option) => ({ ...option }));
       const originalValue = JSON.parse(JSON.stringify(variableObject.value ?? null));
       const originalResolved = resolveQueryVariableValue(variableObject);
-      // A pick that arrives before any options (URL, reload) is checked like a time-range change, so both paths agree.
+      // A custom pick that arrives before any options (URL, reload) is checked like a time-range change, so both paths agree.
       const reconciles =
-        pruneStale ||
-        (!(variableObject.options?.length > 0) && isExplicitQuerySelection(variableObject.value));
+        isCustomQueryVariable(variableObject) &&
+        (pruneStale ||
+          (!(variableObject.options?.length > 0) &&
+            isExplicitQuerySelection(variableObject.value)));
       if (reconciles) {
         variableObject.options = newOptions;
         variableObject.value = reconcileForTimeRange(variableObject, newOptions);
@@ -912,7 +916,7 @@ export default defineComponent({
       try {
         const result = await loadQueryVariableValues({
           query: substituteQueryVariables(
-            variableObject.query_data?.query ?? "",
+            getQueryVariableQuery(variableObject),
             getVariablesForSubstitution(),
             language,
           ),
@@ -942,14 +946,17 @@ export default defineComponent({
       }
     };
 
-    // A new time range reloads query variables like a fresh load, parents before the children that read them.
+    // A new time range reloads custom query variables like a fresh load, parents before the children that read them.
     const reloadQueryVariablesForTimeRange = () => {
       if (!useManager || !manager || isUnmounted) return;
-      const inFlight = variablesData.values.filter((v: any) => isQueryVariable(v) && v.isLoading);
+      const inFlight = variablesData.values.filter(
+        (v: any) => isCustomQueryVariable(v) && v.isLoading,
+      );
       inFlight.forEach((v: any) => void fetchQueryVariableOptions(v));
 
       const targets = variablesData.values.filter(
-        (v: any) => isQueryVariable(v) && v.isVariablePartialLoaded && !v.isVariableLoadingPending,
+        (v: any) =>
+          isCustomQueryVariable(v) && v.isVariablePartialLoaded && !v.isVariableLoadingPending,
       );
       const pending = new Set<string>(targets.map((v: any) => v.name));
       const parentsOf = (v: any): string[] =>
@@ -1029,8 +1036,8 @@ export default defineComponent({
           // if parent variable is not loaded or it's value is changed, isVariableLoadingPending will be true
           isVariableLoadingPending: false,
           isVariablePartialLoaded: true,
-          // Initialize options array for all variables; a query variable's come only from its query
-          options: isQueryVariable(item) ? [] : item.options || [],
+          // Initialize options array for all variables; a custom query variable's come only from its query
+          options: isCustomQueryVariable(item) ? [] : item.options || [],
         };
 
         variableLog(
@@ -1040,7 +1047,7 @@ export default defineComponent({
 
         // Set custom values immediately if they exist and no URL value is present
         if (
-          isQueryBackedVariable(item) &&
+          item.type === "query_values" &&
           item.selectAllValueForMultiSelect === "custom" &&
           item.customMultiSelectValue?.length > 0 &&
           ((Array.isArray(initialValue) && initialValue.length === 0) || !initialValue) // Only set custom value if no URL value exists
@@ -1049,7 +1056,7 @@ export default defineComponent({
             ? item.customMultiSelectValue
             : item.customMultiSelectValue[0];
         } else if (
-          isQueryBackedVariable(item) &&
+          item.type === "query_values" &&
           item.selectAllValueForMultiSelect === "all" &&
           ((Array.isArray(initialValue) && initialValue.length === 0) || !initialValue)
         ) {
@@ -1792,8 +1799,8 @@ export default defineComponent({
           const hasParentVariables = variablesDependencyGraph[name]?.parentVariables;
           const areDatesValid =
             !isInvalidDate(props.selectedTimeDate?.start_time) &&
-            !isInvalidDate(props.selectedTimeDate?.end_time); // Check dates for every query-backed type
-          if (isQueryBackedVariable(variableObject)) {
+            !isInvalidDate(props.selectedTimeDate?.end_time); // Check dates for all query_values type
+          if (variableObject.type === "query_values") {
             if (!areDatesValid) {
               variableObject.isLoading = false;
               variableObject.isVariableLoadingPending = false;
@@ -1940,8 +1947,7 @@ export default defineComponent({
         `Handling variable type: ${variableObject.type},  ${isInitialLoad}`,
       );
       switch (variableObject.type) {
-        case "query_values":
-        case "query": {
+        case "query_values": {
           // Check if variable has custom or "all" default selection
           // If so, skip API call during initial load as the value is already set from settings
           const hasCustomOrAllDefault =
@@ -1996,7 +2002,7 @@ export default defineComponent({
             );
 
             const allNeedsOptions =
-              isQueryVariable(variableObject) &&
+              isCustomQueryVariable(variableObject) &&
               variableObject.selectAllValueForMultiSelect === "all";
             if (hasCustomOrAllDefault && !allNeedsOptions) {
               variableLog(
@@ -2052,7 +2058,7 @@ export default defineComponent({
             // If has value but no options (e.g., from URL), continue to load options below
           }
 
-          if (isQueryVariable(variableObject)) {
+          if (usesQueryVariableLoader(variableObject)) {
             void fetchQueryVariableOptions(variableObject);
             return true;
           }
@@ -2117,9 +2123,9 @@ export default defineComponent({
       if (!useManager) return;
 
       variablesData.values.forEach((variable: any, index: number) => {
-        // Only load query-backed types that are marked as pending and not currently loading
+        // Only load query_values type that are marked as pending and not currently loading
         if (
-          isQueryBackedVariable(variable) &&
+          variable.type === "query_values" &&
           variable.isVariableLoadingPending === true &&
           variable.isLoading !== true
         ) {
@@ -2158,18 +2164,6 @@ export default defineComponent({
         dummyQuery = `SELECT ${timestamp_column} FROM "${resolvedStream}"`;
       }
 
-      // Construct the filter from the query data
-      const constructedFilter = (variableObject.query_data?.filter || []).map((condition: any) => ({
-        name: condition.name,
-        operator: condition.operator,
-        value: condition.value,
-      }));
-
-      // Add labels to the dummy query
-      let queryContext = constructedFilter.length
-        ? await addLabelsToSQlQuery(dummyQuery, constructedFilter)
-        : dummyQuery;
-
       // Replace variable placeholders with actual values
       // When using manager, get all visible variables (global + tab + panel)
       // Otherwise, use local variablesData.values (legacy mode)
@@ -2181,9 +2175,6 @@ export default defineComponent({
           manager.getAllVisibleVariables(props.tabId, props.panelId) || variablesData.values;
       }
 
-      // Normalize spaces inside variable syntax before replacement
-      queryContext = normalizeVariableSyntax(queryContext);
-
       const variablesByName = new Map<string, any>();
       for (const variable of variablesToResolve) {
         // dynamic_filters values are arrays of objects, never placeholder values
@@ -2193,6 +2184,25 @@ export default defineComponent({
           variablesByName.set(variable.name, variable);
         }
       }
+
+      // Construct the filter from the query data
+      const constructedFilter = (variableObject.query_data?.filter || []).map((condition: any) =>
+        expandMultiValueFilter(
+          { name: condition.name, operator: condition.operator, value: condition.value },
+          (name) => {
+            const parent = variablesByName.get(name);
+            return parent?.isVariablePartialLoaded ? parent.value : undefined;
+          },
+        ),
+      );
+
+      // Add labels to the dummy query
+      let queryContext = constructedFilter.length
+        ? await addLabelsToSQlQuery(dummyQuery, constructedFilter)
+        : dummyQuery;
+
+      // Normalize spaces inside variable syntax before replacement
+      queryContext = normalizeVariableSyntax(queryContext);
 
       queryContext = replaceVariablePlaceholders(
         queryContext,
@@ -2381,7 +2391,7 @@ export default defineComponent({
       variablesData.values.forEach((variable: any) => {
         // Check if variable has custom or "all" default selection
         const hasCustomOrAllDefault =
-          isQueryBackedVariable(variable) &&
+          variable.type === "query_values" &&
           (variable.selectAllValueForMultiSelect === "custom" ||
             variable.selectAllValueForMultiSelect === "all");
 
@@ -2661,8 +2671,7 @@ export default defineComponent({
       raw,
       props,
       textboxDebounce,
-      isQueryBackedVariable,
-      isQueryVariable,
+      usesQueryVariableLoader,
       getQueryVariableMaxRecords,
       isVariableCapped,
       isVariableOmitted,

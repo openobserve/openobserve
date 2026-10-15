@@ -18,7 +18,8 @@ import { normalizeVariablesForCache, panelKeyDigest } from "./panelKey";
 
 const svc = (overrides: Record<string, unknown>) => ({
   name: "svc",
-  type: "query",
+  type: "query_values",
+  query_data: { custom_query: true },
   scope: "global",
   multiSelect: true,
   value: ["_o2_all_"],
@@ -44,9 +45,9 @@ describe("panel cache key for query variables", () => {
     );
   });
 
-  it("leaves other variable types keyed on their raw value", () => {
+  it("leaves an auto query_values variable keyed on its raw value", () => {
     const [entry] = normalizeVariablesForCache([
-      svc({ type: "query_values", options: [{ label: "a", value: "a" }] }),
+      svc({ query_data: { stream: "s", field: "f" }, options: [{ label: "a", value: "a" }] }),
     ]);
     expect(entry.value).toEqual(["_o2_all_"]);
   });

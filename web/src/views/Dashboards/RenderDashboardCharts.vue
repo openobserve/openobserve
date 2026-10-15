@@ -347,7 +347,6 @@ import VariablesValueSelector from "../../components/dashboards/VariablesValueSe
 import TabList from "@/components/dashboards/tabs/TabList.vue";
 import useNotifications from "@/composables/useNotifications";
 import { getVariableKey, useVariablesManager } from "@/composables/dashboard/useVariablesManager";
-import { isQueryBackedVariable } from "@/utils/dashboard/variables/queryVariableUtils";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import {
@@ -1400,8 +1399,8 @@ export default defineComponent({
         const firstLoadedKeys: string[] = [];
 
         for (const variable of allVariables) {
-          // Only check query-backed variables that just finished loading
-          if (!isQueryBackedVariable(variable)) continue;
+          // Only check query_values variables that just finished loading
+          if (variable.type !== "query_values") continue;
           if (!variable.isVariablePartialLoaded) continue;
 
           // Not committed yet, or committed before it ever loaded → first load
