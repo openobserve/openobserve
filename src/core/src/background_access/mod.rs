@@ -1887,8 +1887,7 @@ mod tests {
         );
     }
 
-    /// The full PUT body and the dashboards the panel-write guards build all reach the link
-    /// readers.
+    /// The full PUT body and the dashboards the panel-write guards build reach the link readers.
     #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     #[tokio::test]
     async fn gate04_full_put_and_panel_writes_are_guarded_for_public_links() {
@@ -1981,8 +1980,7 @@ mod tests {
         );
     }
 
-    /// A stream picked only by the build's values query cannot be known at save, so the refusal
-    /// names the variable; a value saved on the dashboard is checked as reports check it.
+    /// A values-query stream is checked at its saved value, or the refusal names the variable.
     #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     #[tokio::test]
     async fn gate04_a_values_query_stream_is_checked_at_its_saved_value_or_named() {

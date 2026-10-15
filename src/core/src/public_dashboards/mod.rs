@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Public dashboard links: CRUD with compare-and-set revisions and soft delete, validation, and
-//! the panel build that runs each saved query server-side, checked against the publisher's access.
+//! Public dashboard links: CAS-revisioned CRUD, validation, and the panel build as the publisher.
 
 pub mod access;
 mod authz_check;
@@ -596,8 +595,7 @@ pub async fn list_for_dashboard(
     Ok(pd_table::list_by_dashboard(get_orm_client_ro().await, org, dashboard_id).await?)
 }
 
-/// Attach each link's dashboard title, current folder and lifecycle status, with one dashboard
-/// lookup.
+/// Each link with its dashboard title, folder and lifecycle status, from one dashboard lookup.
 pub async fn views(
     org: &str,
     links: Vec<PublicDashboard>,
@@ -648,8 +646,7 @@ pub async fn views(
         .collect())
 }
 
-/// A live link only when it belongs to both this org and this dashboard, so an id from another
-/// dashboard can't be reached by editing the URL. Read from the primary, as every edit starts here.
+/// A live link of this org and dashboard only, read from the primary as every edit starts here.
 pub async fn get_link(
     org: &str,
     dashboard_id: &str,
@@ -749,8 +746,7 @@ pub async fn set_org_settings(
         let stored = pd_table::get_settings(db, org).await?;
         check_plan_owned_max_links(stored.as_ref().and_then(|s| s.max_links), body.max_links)?;
         if stored.is_none() {
-            // A switch-only row has no limit and would read as the paid one, so write the plan
-            // first.
+            // A switch-only row would read as the paid limit, so the plan limit is written first.
             o2_enterprise::enterprise::cloud::billings::sync_public_dashboard_links(org).await;
         }
         let row =
@@ -883,8 +879,7 @@ pub fn validate_config(cfg: &PublicDashboardConfig) -> Result<(), String> {
     validate_limits(cfg, now)
 }
 
-/// An edit that keeps an expired link's date is allowed, so only a changed expiry must be in the
-/// future.
+/// An edit that keeps an expired link's date is allowed; only a changed expiry must be future.
 pub fn validate_edit(cfg: &PublicDashboardConfig, link: &PublicDashboard) -> Result<(), String> {
     let now = now_micros();
     if cfg.expires_at != link.expires_at {
@@ -893,8 +888,7 @@ pub fn validate_edit(cfg: &PublicDashboardConfig, link: &PublicDashboard) -> Res
     validate_limits(cfg, now)
 }
 
-/// The dashboard as a link would show it: at most `MAX_PANELS` panels across every tab, and no
-/// SQL panel with an explicit LIMIT above the default row cap.
+/// At most `MAX_PANELS` panels over every tab, and no SQL LIMIT above the default row cap.
 pub fn validate_dashboard(
     dash: &Dashboard,
     frozen: &BTreeMap<String, serde_json::Value>,
@@ -2870,8 +2864,7 @@ mod tests {
         assert_eq!(pd_table::list(&*db, "o").await.unwrap().len(), 3);
     }
 
-    /// Each live link of the leaver is paused and queued; a failed Put stays queued until
-    /// delivered.
+    /// Each live link of the leaver is paused and queued; a failed Put stays queued until sent.
     #[tokio::test]
     async fn gate14_the_departure_hook_pauses_the_links_and_recovers_from_a_failed_emit() {
         use std::sync::atomic::Ordering;
@@ -3415,18 +3408,29 @@ mod tests {
         assert!(std::ptr::eq(gate_db().await, get_orm_client_rw().await));
         assert!(!std::ptr::eq(gate_db().await, get_orm_client_ro().await));
         let this = include_str!("mod.rs");
-        for signature in ["    async fn capture(", "pub async fn get_link("] {
-            let body = fn_body(this, signature);
-            assert!(body.contains("gate_db()"), "{signature}");
-        }
-        assert!(
-            fn_body(this, "pub async fn publisher_is_member(").contains("get_optional_primary")
-        );
-        assert!(
-            fn_body(include_str!("status.rs"), "pub async fn live_links(").contains("gate_db()")
-        );
+        let status = include_str!("status.rs");
         let guard = include_str!("../background_access/mod.rs");
-        assert!(fn_body(guard, "async fn guard_stored_edit(").contains("gate_db()"));
+        let gates = [
+            (fn_body(this, "    async fn capture("), "gate_db()"),
+            (fn_body(this, "pub async fn get_link("), "gate_db()"),
+            (
+                fn_body(this, "pub async fn publisher_is_member("),
+                "get_optional_primary",
+            ),
+            (fn_body(status, "pub async fn live_links("), "gate_db()"),
+            (fn_body(guard, "async fn guard_stored_edit("), "gate_db()"),
+        ];
+        // A mixed regression adds a replica read beside the primary one, so both are checked.
+        for (body, primary) in gates {
+            assert!(body.contains(primary), "{body}");
+            for replica in [
+                "get_orm_client_ro",
+                "dashboards::get_by_id(",
+                "org_users::get_optional(",
+            ] {
+                assert!(!body.contains(replica), "{replica} in {body}");
+            }
+        }
         for (file, src) in [
             ("status.rs", include_str!("status.rs")),
             ("materialize.rs", include_str!("materialize.rs")),

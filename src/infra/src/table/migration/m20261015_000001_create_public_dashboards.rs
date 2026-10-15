@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Public dashboards: the link table, the per-org settings and the replication outbox.
-//!
-//! Replaces the four migrations of the first PR draft. A development database that ran those gets
-//! the reset step: their snapshot table and result columns are dropped and `rebuild_secs` becomes
-//! `refresh_secs`; every other table is left as is.
+//! Public dashboard tables, replacing the four draft migrations and resetting draft databases.
 
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 use sea_orm_migration::prelude::*;
@@ -66,8 +62,7 @@ impl MigrationTrait for Migration {
     }
 }
 
-/// Drops the draft migrations from the history; sea-orm refuses to run with an applied migration
-/// whose file is gone, so this must run before `Migrator::up`.
+/// Drops the draft migrations from the history, which `Migrator::up` refuses to run with.
 pub(crate) async fn forget_draft_migrations(db: &DatabaseConnection) -> Result<(), DbErr> {
     if !SchemaManager::new(db).has_table("seaql_migrations").await? {
         return Ok(());

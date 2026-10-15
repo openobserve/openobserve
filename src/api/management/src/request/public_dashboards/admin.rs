@@ -51,8 +51,7 @@ pub(super) fn map_err(ctx: &str, e: anyhow::Error) -> Response {
     .into_response()
 }
 
-/// 404 when the feature flag is off, so the admin surface mirrors the public
-/// plane's gating instead of leaking route existence.
+/// 404 while the feature flag is off, so the admin routes leak no more than the public ones.
 pub(super) fn feature_gate() -> Option<Response> {
     if config::get_config().public_dashboards.enabled {
         None
@@ -61,8 +60,7 @@ pub(super) fn feature_gate() -> Option<Response> {
     }
 }
 
-/// The route grant is org-wide, so managing a link also needs edit access to its dashboard;
-/// `allow_orphan` lets revoke clean up links whose dashboard was deleted.
+/// A link also needs edit access to its dashboard; `allow_orphan` lets revoke clean up orphans.
 #[cfg(feature = "enterprise")]
 async fn edit_access_gate(
     org_id: &str,
@@ -202,8 +200,7 @@ pub async fn get(
     }
 }
 
-/// PUT /{org_id}/dashboards/{dashboard_id}/public_links/{link_id} — edit settings; the slug is
-/// kept.
+/// PUT /{org_id}/dashboards/{dashboard_id}/public_links/{link_id} — the slug is kept.
 pub async fn update(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -270,8 +267,7 @@ pub async fn resume(
     }
 }
 
-/// POST /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/refresh — every range is due
-/// on its next view; no query runs here.
+/// POST .../public_links/{link_id}/refresh — every range is due on its next view; no query runs.
 pub async fn refresh(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
     Headers(user): Headers<UserEmail>,

@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! DTOs for public dashboards. `PublicDashboardConfig` is the admin request body;
-//! `SanitizedDashboard` (GET /config) and `DataResponse` (GET /data) are what the anonymous
-//! plane serves, with no ids, SQL or stream internals.
+//! DTOs for public dashboards: the admin body and the anonymous config and data responses.
 
 use std::collections::BTreeMap;
 
@@ -121,8 +119,7 @@ impl TimeRangePolicy {
     }
 }
 
-/// Admin request body to create/update a public link. Variables are frozen at
-/// the values the author selected when generating the link.
+/// Admin body to create or update a link; variables stay frozen at the author's values.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PublicDashboardConfig {
     /// Label that tells a dashboard's links apart; empty is allowed.
@@ -281,9 +278,7 @@ pub struct Window {
     pub end: i64,
 }
 
-/// One panel's output, shaped for the client renderer: `data` and `result_meta_data` are
-/// per-query (index-aligned to the panel's queries) and `metadata.queries[i]` carries that query's
-/// window. The viewer feeds these into the same `convertPanelData` the live dashboard uses.
+/// One panel's output as the live renderer reads it; `data` is index-aligned to the queries.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PanelResult {
     pub state: PanelState,
@@ -380,8 +375,7 @@ pub enum NotReadyResponse {
     },
 }
 
-/// GET /api/public_dashboards/{slug}: layout, viz specs and the offered ranges only. No ids, no
-/// SQL, no stream internals.
+/// GET /api/public_dashboards/{slug}: layout and offered ranges, with no ids, SQL or streams.
 #[derive(Clone, Debug, Serialize)]
 pub struct SanitizedDashboard {
     pub title: String,

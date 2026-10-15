@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! `SeaORM` Entity for public_dashboard_org_settings: an org's public-link switch and link limit.
-//! A missing row means enabled with the env default limit.
+//! `SeaORM` Entity for public_dashboard_org_settings; a missing row is enabled with env limits.
 
 use sea_orm::entity::prelude::*;
 
