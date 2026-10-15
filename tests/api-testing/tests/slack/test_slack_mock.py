@@ -145,3 +145,81 @@ def test_apps_uninstall_sends_tokens_revoked_then_app_uninstalled_before_it_answ
     finally:
         requests.post(f"{api}/_mock/reset", json={}, timeout=5).raise_for_status()
         receiver.shutdown()
+
+
+def bot_token(api: str) -> str:
+    return slack(api, "oauth.v2.access", client_id="9.9", client_secret="s", code=mock_code(team_id="T0BLOCKS"),
+                 redirect_uri="r")["access_token"]
+
+
+def buttons(*action_ids: str, block_id: str = "o2_actions") -> dict[str, Any]:
+    elements = [{"type": "button", "text": {"type": "plain_text", "text": a}, "action_id": a} for a in action_ids]
+    return {"type": "actions", "block_id": block_id, "elements": elements}
+
+
+def section(n: int) -> dict[str, Any]:
+    return {"type": "section", "block_id": f"s{n}", "text": {"type": "mrkdwn", "text": f"line {n}"}}
+
+
+MESSAGE_FORMS = {
+    "chat.postMessage": {"channel": "C0OPS", "text": "t"},
+    "chat.update": {"channel": "C0OPS", "ts": "1.1", "text": "t"},
+    "chat.postEphemeral": {"channel": "C0OPS", "user": "U0ANN", "text": "t"},
+    "chat.stopStream": {"channel": "C0OPS", "ts": "1.1"},
+}
+
+
+@pytest.mark.parametrize("method", list(MESSAGE_FORMS))
+def test_messages_with_blocks_slack_refuses_answer_invalid_blocks(api: str, method: str) -> None:
+    bot = bot_token(api)
+    form = MESSAGE_FORMS[method]
+    cases = [
+        ([section(0), buttons("o2_ask", "o2_ask")],
+         '[ERROR] `action_id` "o2_ask" already exists [json-pointer:blocks/1/elements/1/action_id]'),
+        ([buttons("o2_a", block_id="o2_answer"), buttons("o2_b", block_id="o2_answer")],
+         '[ERROR] `block_id` "o2_answer" already exists [json-pointer:blocks/1/block_id]'),
+        ([section(n) for n in range(51)], "[ERROR] no more than 50 items allowed [json-pointer:blocks]"),
+    ]
+    for blocks, message in cases:
+        body = slack(api, method, bearer=bot, blocks=json.dumps(blocks), **form)
+        assert body["ok"] is False, (method, body)
+        assert body["error"] == "invalid_blocks", body
+        assert body["response_metadata"]["messages"] == [message], body
+    valid = [section(n) for n in range(49)] + [buttons("o2_a", "o2_b")]
+    assert slack(api, method, bearer=bot, blocks=json.dumps(valid), **form)["ok"] is True
+    apart = [buttons("o2_ask", block_id="a"), buttons("o2_ask", block_id="b")]
+    assert slack(api, method, bearer=bot, blocks=json.dumps(apart), **form)["ok"] is True, "unique per block only"
+
+
+def test_a_home_view_slack_refuses_answers_invalid_arguments_as_live(api: str) -> None:
+    bot = bot_token(api)
+    home = [section(n) for n in range(5)] + [buttons("o2_home_ask", "o2_home_ask")]
+    cases = [
+        (home, '[ERROR] `action_id` "o2_home_ask" already exists [json-pointer:view/blocks/5/elements/1/action_id]'),
+        ([buttons("o2_home_ask", block_id="a"), buttons("o2_home_ask", block_id="b")],
+         '[ERROR] `action_id` "o2_home_ask" already exists [json-pointer:view/blocks/1/elements/0/action_id]'),
+        ([section(0), section(0)], '[ERROR] `block_id` "s0" already exists [json-pointer:view/blocks/1/block_id]'),
+        ([section(n) for n in range(101)], "[ERROR] no more than 100 items allowed [json-pointer:view/blocks]"),
+    ]
+    for blocks, message in cases:
+        body = slack(api, "views.publish", bearer=bot, user_id="U0ANN",
+                     view=json.dumps({"type": "home", "blocks": blocks}))
+        assert body["ok"] is False, body
+        assert body["error"] == "invalid_arguments", body
+        assert body["response_metadata"]["messages"] == [message], body
+    refused = requests.get(f"{api}/_mock/requests", params={"method": "views.publish"}, timeout=5).json()["requests"]
+    assert refused[-1]["error"] == "invalid_arguments", "a refusal is visible to the tests"
+    valid = [section(n) for n in range(99)] + [buttons("o2_home_ask_0", "o2_home_ask_1")]
+    body = slack(api, "views.publish", bearer=bot, user_id="U0ANN", view=json.dumps({"type": "home", "blocks": valid}))
+    assert body["ok"] is True, body
+
+
+def test_files_delete_takes_a_file_the_bot_uploaded_once(api: str) -> None:
+    bot = bot_token(api)
+    file_id = slack(api, "files.getUploadURLExternal", bearer=bot, filename="chart.png", length="4")["file_id"]
+    shared = slack(api, "files.completeUploadExternal", bearer=bot, channel_id="C0OPS", thread_ts="1.1",
+                   files=json.dumps([{"id": file_id, "title": "errors"}]))
+    assert shared["files"] == [{"id": file_id, "title": "errors"}]
+    assert slack(api, "files.delete", bearer=bot, file=file_id) == {"ok": True}
+    assert slack(api, "files.delete", bearer=bot, file=file_id)["error"] == "file_not_found"
+    assert slack(api, "files.delete", file=file_id)["error"] == "not_authed"

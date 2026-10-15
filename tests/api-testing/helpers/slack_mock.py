@@ -18,7 +18,7 @@ Run it standalone::
 Control endpoints (JSON):
 
 - ``GET  /_mock/health``                 liveness
-- ``GET  /_mock/requests[?method=m]``    every recorded call: method, form, bearer, at, response (ok calls)
+- ``GET  /_mock/requests[?method=m]``    every recorded call: method, form, bearer, at, response (ok calls), error
 - ``POST /_mock/reset``                  forget calls, apps, tokens and failures; reseed the team
 - ``POST /_mock/fail``                   ``{"method", "error", "times"?, "http_status"?, "retry_after"?}``
 - ``POST /_mock/apps``                   register an app: ``{"app_id", "client_id", "client_secret", "signing_secret"?}``
@@ -30,6 +30,10 @@ Control endpoints (JSON):
 
 Incoming webhooks are served at ``POST /services/<team>/<id>`` and recorded as method
 ``incoming_webhook``. Uploads from ``files.getUploadURLExternal`` go to ``POST /upload/<file_id>``.
+
+Blocks are refused as Slack refuses them (LIVE-RESULTS B-LIVE-5): more than 50 per message or 100 per view, a
+repeated ``block_id``, an ``action_id`` twice in one block (in a view: twice anywhere in it). Messages answer
+``invalid_blocks``, ``views.publish`` answers ``invalid_arguments``, both with ``response_metadata.messages``.
 """
 from __future__ import annotations
 
@@ -56,16 +60,20 @@ DEFAULT_TEAM = "T0MOCK"
 DEFAULT_TEAM_NAME = "Mock Workspace"
 DEFAULT_USER = "U0MOCK"
 SLACK_ISSUER = "https://slack.com"
+MAX_MESSAGE_BLOCKS = 50
+MAX_VIEW_BLOCKS = 100
 
 
 class SlackError(Exception):
     """An ``ok: false`` answer with Slack's error code."""
 
-    def __init__(self, error: str, http_status: int = 200, retry_after: int | None = None):
+    def __init__(self, error: str, http_status: int = 200, retry_after: int | None = None,
+                 messages: list[str] | None = None):
         super().__init__(error)
         self.error = error
         self.http_status = http_status
         self.retry_after = retry_after
+        self.messages = messages
 
 
 def b64url(raw: bytes) -> str:
@@ -157,6 +165,7 @@ class MockState:
         self.revoked: set[str] = set()
         self.uninstall_settle: float | None = None
         self.outbox: list[tuple[str, str, bytes]] = []
+        self.files: set[str] = set()
 
     def next_id(self, prefix: str) -> str:
         return f"{prefix}{next(self.ids):06d}"
@@ -200,6 +209,52 @@ class MockState:
 
 
 Handler = Any
+
+
+def action_ids(block: dict[str, Any], at: str) -> list[tuple[str, str]]:
+    """Each ``action_id`` of one block with its json-pointer, the accessory's too."""
+    found = [(e["action_id"], f"{at}/elements/{j}/action_id") for j, e in enumerate(block.get("elements") or [])
+             if isinstance(e, dict) and "action_id" in e]
+    accessory = block.get("accessory")
+    if isinstance(accessory, dict) and "action_id" in accessory:
+        found.append((accessory["action_id"], f"{at}/accessory/action_id"))
+    return found
+
+
+def repeated(found: list[tuple[str, str]], what: str) -> list[str]:
+    seen: set[str] = set()
+    errors = []
+    for value, pointer in found:
+        if value in seen:
+            errors.append(f'[ERROR] `{what}` "{value}" already exists [json-pointer:{pointer}]')
+        seen.add(value)
+    return errors
+
+
+def block_errors(blocks: Any, pointer: str, max_blocks: int, view: bool) -> list[str]:
+    """What Slack says about a block list; a view's ``action_id`` must be unique in the whole view."""
+    if not isinstance(blocks, list):
+        return []
+    errors = []
+    if len(blocks) > max_blocks:
+        errors.append(f"[ERROR] no more than {max_blocks} items allowed [json-pointer:{pointer}]")
+    listed = [(i, b) for i, b in enumerate(blocks) if isinstance(b, dict)]
+    errors += repeated([(b["block_id"], f"{pointer}/{i}/block_id") for i, b in listed if "block_id" in b], "block_id")
+    if view:
+        return errors + repeated([a for i, b in listed for a in action_ids(b, f"{pointer}/{i}")], "action_id")
+    for i, b in listed:
+        errors += repeated(action_ids(b, f"{pointer}/{i}"), "action_id")
+    return errors
+
+
+def check_message_blocks(form: dict[str, str]) -> None:
+    try:
+        blocks = json.loads(form.get("blocks") or "null")
+    except ValueError:
+        raise SlackError("invalid_blocks_format") from None
+    errors = block_errors(blocks, "blocks", MAX_MESSAGE_BLOCKS, view=False)
+    if errors:
+        raise SlackError("invalid_blocks", messages=errors)
 
 
 def m_oauth_v2_access(st: MockState, form: dict[str, str], _bearer: str | None) -> dict[str, Any]:
@@ -437,6 +492,7 @@ def m_conversations_info(st: MockState, form: dict[str, str], bearer: str | None
 
 def m_chat_post_message(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
     st.bot(bearer)
+    check_message_blocks(form)
     if not form.get("channel"):
         raise SlackError("channel_not_found")
     ts = f"{time.time():.6f}"
@@ -447,11 +503,13 @@ def m_chat_post_message(st: MockState, form: dict[str, str], bearer: str | None)
 
 def m_chat_update(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
     st.bot(bearer)
+    check_message_blocks(form)
     return {"channel": form.get("channel", ""), "ts": form.get("ts", ""), "text": form.get("text", "")}
 
 
-def m_chat_post_ephemeral(st: MockState, _form: dict[str, str], bearer: str | None) -> dict[str, Any]:
+def m_chat_post_ephemeral(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
     st.bot(bearer)
+    check_message_blocks(form)
     return {"message_ts": f"{time.time():.6f}"}
 
 
@@ -478,6 +536,7 @@ def m_chat_append_stream(st: MockState, form: dict[str, str], bearer: str | None
 
 def m_chat_stop_stream(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
     st.bot(bearer)
+    check_message_blocks(form)
     return {"channel": form.get("channel", ""), "ts": form.get("ts", "")}
 
 
@@ -490,12 +549,20 @@ def m_chat_delete(st: MockState, form: dict[str, str], bearer: str | None) -> di
 
 def m_views_publish(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
     st.bot(bearer)
+    try:
+        view = json.loads(form.get("view") or "{}")
+    except ValueError:
+        raise SlackError("invalid_arguments") from None
+    errors = block_errors(view.get("blocks"), "view/blocks", MAX_VIEW_BLOCKS, view=True)
+    if errors:
+        raise SlackError("invalid_arguments", messages=errors)
     return {"view": {"id": st.next_id("V"), "type": "home", "user_id": form.get("user_id", "")}}
 
 
 def m_files_get_upload_url_external(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
     st.bot(bearer)
     file_id = st.next_id("F")
+    st.files.add(file_id)
     return {"upload_url": f"{st.base_url}/upload/{file_id}", "file_id": file_id, "filename": form.get("filename", "")}
 
 
@@ -503,6 +570,14 @@ def m_files_complete_upload_external(st: MockState, form: dict[str, str], bearer
     st.bot(bearer)
     files = json.loads(form.get("files", "[]"))
     return {"files": [{"id": f.get("id", ""), "title": f.get("title", "")} for f in files]}
+
+
+def m_files_delete(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
+    st.bot(bearer)
+    if form.get("file") not in st.files:
+        raise SlackError("file_not_found")
+    st.files.discard(form["file"])
+    return {}
 
 
 METHODS: dict[str, Handler] = {
@@ -531,6 +606,7 @@ METHODS: dict[str, Handler] = {
     "views.publish": m_views_publish,
     "files.getUploadURLExternal": m_files_get_upload_url_external,
     "files.completeUploadExternal": m_files_complete_upload_external,
+    "files.delete": m_files_delete,
 }
 
 
@@ -590,10 +666,12 @@ class SlackMockHandler(BaseHTTPRequestHandler):
                 body = handler(self.state, form, bearer)
                 self.state.calls[-1]["response"] = body
             except SlackError as e:
+                self.state.calls[-1]["error"] = e.error
                 if e.http_status != 200:
                     headers = {"Retry-After": str(e.retry_after)} if e.retry_after is not None else {}
                     return self.reply(e.http_status, {"ok": False, "error": e.error}, headers)
-                return self.reply(200, {"ok": False, "error": e.error})
+                metadata = {"response_metadata": {"messages": e.messages}} if e.messages else {}
+                return self.reply(200, {"ok": False, "error": e.error, **metadata})
             outbox, self.state.outbox = self.state.outbox, []
             settle = self.state.uninstall_settle or 0
         if outbox:
