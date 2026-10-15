@@ -86,14 +86,30 @@ export function typicalSortValue(row: QualityConfigSummary): number {
   return row.topValue ? row.topValue.count / row.total : -1;
 }
 
-export const formatNumber = (value: number): string => String(Number(value.toFixed(2)));
+// Below 0.01 two decimals collapse distinct values to 0, so tiny values keep 2 significant digits.
+const isTiny = (value: number) => value !== 0 && Math.abs(value) < 0.01;
+
+/** A number for labels and ranges: up to 2 decimals, thousands grouped ("1,000,000"), tiny values kept distinct ("0.00032"). */
+export const formatNumber = (value: number): string =>
+  isTiny(value)
+    ? String(Number(value.toPrecision(2)))
+    : value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+
+/** A score or an average: always 2 decimals ("0.70", "462,522,542.50"), tiny values kept distinct. */
+export const formatFixed = (value: number): string =>
+  isTiny(value)
+    ? String(Number(value.toPrecision(2)))
+    : value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** A count with thousands grouped: "150,000". */
+export const formatCount = (value: number): string => value.toLocaleString("en-US");
 
 export const formatPercent = (part: number, whole: number): string =>
   whole > 0 ? `${((part / whole) * 100).toFixed(1)}%` : "—";
 
 export function formatScoreValue(value: QualityScore["value"], dataType: ScoreDataType): string {
   if (value == null) return "—";
-  if (dataType === "numeric" && typeof value === "number") return value.toFixed(2);
+  if (dataType === "numeric" && typeof value === "number") return formatFixed(value);
   return String(value);
 }
 
@@ -106,7 +122,7 @@ export function typicalScore(
   if (row.dataType === "numeric") {
     if (row.average == null) return null;
     return {
-      value: raw(row.average.toFixed(2)),
+      value: raw(formatFixed(row.average)),
       sub: t("onlineEvals.quality.table.averageRange", {
         min: formatNumber(row.range.min),
         max: formatNumber(row.range.max),
@@ -117,8 +133,8 @@ export function typicalScore(
   return {
     value: raw(String(row.topValue.key)),
     sub: t("onlineEvals.quality.table.mostCommon", {
-      count: row.topValue.count,
-      total: row.total,
+      count: formatCount(row.topValue.count),
+      total: formatCount(row.total),
     }),
   };
 }
@@ -129,7 +145,7 @@ export function scopeMixText(counts: QualityConfigSummary["scopeCounts"], t: Tra
     .map((scope) =>
       t("onlineEvals.quality.scopeCount", {
         scope: t(`onlineEvals.quality.scopes.${scope}`),
-        count: counts[scope],
+        count: formatCount(counts[scope]),
       }),
     )
     .join(" · ");
