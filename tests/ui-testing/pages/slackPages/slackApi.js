@@ -81,17 +81,20 @@ async function finishInstall(request, org, installationId, { teamId, teamName })
   return ok(request, 'post', `/api/${org}/slack/install/exchange`, { code, state });
 }
 
-async function saveAppToken(request, org, installationId) {
+/** An app-level token of `appId`: O2 refuses a token whose xapp-1-<app id>- segment names another app. */
+const appToken = (appId) => `xapp-1-${appId}-1-pw${uniq()}`;
+
+async function saveAppToken(request, org, installationId, appId) {
   return ok(request, 'put', `/api/${org}/slack/installations/${encodeURIComponent(installationId)}/credentials`, {
-    app_token: `xapp-1-pw-${uniq()}`,
+    app_token: appToken(appId),
   });
 }
 
 /** A stored Socket Mode install in `org` for a workspace of its own; returns the InstallationView. */
 async function storedInstall(request, org, { teamId = `T0PW${uniq().toUpperCase()}`, teamName = 'Acme PW Workspace' } = {}) {
   const created = await createPendingInstall(request, org);
-  await finishInstall(request, org, created.installation.id, { teamId, teamName });
-  return saveAppToken(request, org, created.installation.id);
+  const { installation } = await finishInstall(request, org, created.installation.id, { teamId, teamName });
+  return saveAppToken(request, org, created.installation.id, installation.app_id);
 }
 
 /** Rows 14 and 15: connects another org to an installation by a Sign in with Slack proof. */
@@ -226,6 +229,7 @@ module.exports = {
   prerequisites,
   createPendingInstall,
   finishInstall,
+  appToken,
   saveAppToken,
   storedInstall,
   connectOrg,

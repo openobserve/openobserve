@@ -154,7 +154,8 @@ test.describe('Slack self-hosted install wizard', { tag: ['@slack', '@enterprise
     }
 
     await expect(slack.wizard.next).toBeDisabled();
-    await slack.wizard.saveAppToken(`xapp-1-pw-${api.uniq()}`);
+    const { installations: installed } = await api.listInstallations(apiContext, org);
+    await slack.wizard.saveAppToken(api.appToken(installed[0].app_id));
     await expect(slack.wizard.next).toBeEnabled({ timeout: 15000 });
     await slack.wizard.next.click();
     await slack.wizard.expectStep(4);
