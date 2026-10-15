@@ -21,6 +21,7 @@ import { useStore } from "vuex";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -85,13 +86,17 @@ const saveDomains = async (value: LinkingForm): Promise<void> => {
 };
 
 const runLinkAll = async (): Promise<void> => {
-  const result = await linkAll.mutateAsync();
-  toast({
-    variant: "success",
-    message: result.complete
-      ? t("slackApp.linking.linkAllDone", { count: result.linked }, result.linked)
-      : t("slackApp.linking.linkAllRunning", { count: result.linked }),
-  });
+  try {
+    const result = await linkAll.mutateAsync();
+    toast({
+      variant: "success",
+      message: result.complete
+        ? t("slackApp.linking.linkAllDone", { count: result.linked }, result.linked)
+        : t("slackApp.linking.linkAllRunning", { count: result.linked }),
+    });
+  } catch {
+    /* the mutation already toasted the refusal */
+  }
 };
 </script>
 
@@ -115,6 +120,14 @@ const runLinkAll = async (): Promise<void> => {
     </div>
 
     <OSkeleton v-if="linking.isPending.value" class="h-32 w-full" />
+    <OEmptyState
+      v-else-if="linking.isError.value"
+      size="compact"
+      preset="load-error"
+      :backdrop="false"
+      data-test="slack-linking-error"
+      @action="linking.refetch()"
+    />
     <OCard v-else-if="view" variant="outlined" class="divide-border-default divide-y">
       <div class="flex flex-col gap-3 p-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -195,7 +208,7 @@ const runLinkAll = async (): Promise<void> => {
           :loading="linkAll.isPending.value"
           @click="runLinkAll"
         >
-          {{ t("slackApp.linking.linkAll") }}
+          {{ t("slackApp.linking.linkAllMatches", { count: matches }) }}
         </OButton>
       </div>
 

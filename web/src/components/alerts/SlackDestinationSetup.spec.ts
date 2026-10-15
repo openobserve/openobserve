@@ -652,11 +652,33 @@ describe("SlackDestinationSetup with the two-way Slack app", () => {
     expect(slack.connectInstallation).not.toHaveBeenCalled();
   });
 
-  it("AC-6.10 shows the two-way consent on the app path instead of the webhook sentence", () => {
+  it("AC-6.10 shows the two-way consent on the app path instead of the webhook sentence", async () => {
     wrapper = mountSetup(true, true, { slack_enabled: true });
+    await connectAndCallback(wrapper);
     const note = wrapper.find('[data-test="slack-oauth-permission-note"]').text();
     expect(note).toContain("Two-way Slack also reads your direct messages with OpenObserve");
     expect(note).not.toContain("cannot read workspace messages");
+  });
+
+  it("W-S11 says neither consent until install/start has decided the path", () => {
+    wrapper = mountSetup(true, true, { slack_enabled: true });
+    const note = wrapper.find('[data-test="slack-oauth-permission-note"]').text();
+    expect(note).toBe("Slack lists what OpenObserve can access before you allow it.");
+  });
+
+  it("W-S10 a 404 from install/start (Slack turned off since sign-in) falls back to the webhook endpoints", async () => {
+    vi.mocked(slack.installStart).mockRejectedValue(axiosError(404, "Slack is not enabled"));
+    wrapper = mountSetup(true, true, { slack_enabled: true });
+    await connectAndCallback(wrapper);
+    expect(window.open).toHaveBeenCalledTimes(1);
+    expect(destinationService.startSlackOAuth).toHaveBeenCalledWith({ org_identifier: "acme" });
+    expect(popup.location.href).toBe(authorizationUrl);
+    expect(destinationService.exchangeSlackOAuth).toHaveBeenCalled();
+    expect(wrapper.vm.form.state.values.slack_team_id).toBe("T123");
+    expect(toast).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="slack-oauth-permission-note"]').text()).toContain(
+      "cannot read workspace messages",
+    );
   });
 
   it("AC-6.11 offers to link people automatically after a manual-linking install", async () => {

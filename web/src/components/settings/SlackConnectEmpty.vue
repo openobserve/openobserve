@@ -38,10 +38,12 @@ import type {
   SlackAlreadyInstalledResponse,
   SlackAvailableInstallation,
   SlackConnectionConfirmResponse,
+  SlackInstallConfirmation,
   SlackInstallExchangeResponse,
   SlackInstallSource,
   SlackUpgradeCandidate,
 } from "@/types/slack";
+import { statusOf } from "@/utils/slackLink";
 
 type PopupAction =
   { kind: "install"; source: SlackInstallSource } | { kind: "connect"; installationId: string };
@@ -52,7 +54,7 @@ const props = defineProps<{
   upgradeCandidates: SlackUpgradeCandidate[];
 }>();
 
-const emit = defineEmits<{ setup: [] }>();
+const emit = defineEmits<{ setup: []; installed: [confirmation: SlackInstallConfirmation] }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -85,9 +87,25 @@ const popup = useSlackOAuthPopup<SlackInstallExchangeResponse | SlackConnectionC
     action.value.kind === "install"
       ? installExchange.mutateAsync({ code, state })
       : confirmConnection.mutateAsync({ oidc_code: code, oidc_state: state }),
-  // Any other result invalidated the installations list, which swaps this screen for A3.
   onSuccess: (result) => {
-    if ("already_installed" in result) alreadyInstalled.value = result;
+    if ("already_installed" in result) {
+      alreadyInstalled.value = result;
+    } else if ("connected" in result) {
+      const team = props.available.find((a) => a.installation_id === connectingId.value);
+      emit("installed", {
+        team: team?.team_name ?? "",
+        destination: null,
+        linking: null,
+        linkAll: null,
+      });
+    } else if ("linking" in result && "destination" in result) {
+      emit("installed", {
+        team: result.installation.team_name,
+        destination: result.destination,
+        linking: result.linking,
+        linkAll: result.link_all,
+      });
+    }
   },
 });
 
@@ -98,13 +116,24 @@ const runPopup = (next: PopupAction): void => {
   void popup.open();
 };
 
-const connectWithTicket = (): void => {
+const connectWithTicket = async (): Promise<void> => {
   const pending = alreadyInstalled.value;
   if (!pending) return;
-  connectInstallation.mutate({
-    installationId: pending.already_installed.installation_id,
-    body: { connect_ticket: pending.connect_ticket },
-  });
+  try {
+    const result = await connectInstallation.mutateAsync({
+      installationId: pending.already_installed.installation_id,
+      body: { connect_ticket: pending.connect_ticket },
+    });
+    emit("installed", {
+      team: pending.already_installed.team_name,
+      destination: result.destination,
+      linking: null,
+      linkAll: null,
+    });
+  } catch (error) {
+    // The mutation toasts the refusal; a used or expired ticket (410) needs a fresh Add to Slack.
+    if (statusOf(error) === 410) alreadyInstalled.value = null;
+  }
 };
 
 const candidate = computed(() => props.upgradeCandidates[0] ?? null);

@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCode from "@/lib/core/Code/OCode.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -80,11 +81,12 @@ const columns = computed<OTableColumnDef<SlackPrerequisiteCheck>[]>(() => [
           :class="row.status === 'fail' ? 'text-status-error-text' : undefined"
         >
           <span>{{ raw(row.detail) }}</span>
-          <code
+          <OCode
             v-if="row.fix && row.status !== 'pass'"
-            class="bg-surface-subtle text-text-body rounded-default px-2 py-1 text-xs"
+            block
+            copyable
             data-test="slack-prereq-fix"
-            >{{ raw(row.fix) }}</code
+            >{{ raw(row.fix) }}</OCode
           >
         </div>
       </template>

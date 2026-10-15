@@ -21,6 +21,7 @@ import SlackWorkspaceCard from "./SlackWorkspaceCard.vue";
 import {
   ConfirmDialogStub,
   OTableStub,
+  axiosError,
   fakePopup,
   installationView,
   makeSlackStore,
@@ -57,12 +58,15 @@ const CredentialsStub = {
   template: '<div data-test-stub="credentials" :data-open="open" />',
 };
 
+const errorHandler = vi.fn();
+
 const mountCard = (installation: InstallationView = installationView(), isCloud = false) =>
   mount(SlackWorkspaceCard, {
     props: { installation, isCloud },
     attachTo: document.body,
     global: {
       plugins: [i18n, makeSlackStore()],
+      config: { errorHandler },
       stubs: {
         OTable: OTableStub,
         ConfirmDialog: ConfirmDialogStub,
@@ -146,6 +150,40 @@ describe("SlackWorkspaceCard (A3)", () => {
     expect(results).toContain("Posted to #sre-prod");
   });
 
+  it("EC-S20 links the Verify page when the Test result asks for one", async () => {
+    vi.mocked(slack.testInstallation).mockReturnValue(
+      ok({
+        checks: [{ id: "last_event", status: "warn", detail: "No event since the URL changed" }],
+        test_post: null,
+        verify_url: "https://api.slack.com/apps/A0SAMPLE01/app-manifest",
+      }) as any,
+    );
+    const w = mountCard(installationView({ mode: "http" }));
+    await w.find('[data-test="slack-test-connection"]').trigger("click");
+    await flushPromises();
+    expect(w.find('[data-test="slack-test-verify"]').attributes("href")).toBe(
+      "https://api.slack.com/apps/A0SAMPLE01/app-manifest",
+    );
+  });
+
+  it.each([undefined, "javascript:alert(1)", "https://evil.example/app-manifest"])(
+    "EC-S20 shows no Verify link for %s",
+    async (verify_url) => {
+      vi.mocked(slack.testInstallation).mockReturnValue(
+        ok({
+          checks: [{ id: "auth_test", status: "pass", detail: "ok" }],
+          test_post: null,
+          ...(verify_url ? { verify_url } : {}),
+        }) as any,
+      );
+      const w = mountCard(installationView({ mode: "http" }));
+      await w.find('[data-test="slack-test-connection"]').trigger("click");
+      await flushPromises();
+      expect(w.find('[data-test="slack-test-results"]').exists()).toBe(true);
+      expect(w.find('[data-test="slack-test-verify"]').exists()).toBe(false);
+    },
+  );
+
   it("AC-12.1 help contact loads row 23 and saves it", async () => {
     const w = mountCard();
     await flushPromises();
@@ -155,6 +193,11 @@ describe("SlackWorkspaceCard (A3)", () => {
     await w.find('[data-test="slack-help-contact-form"]').trigger("submit");
     await vi.waitFor(() =>
       expect(slack.putHelpContact).toHaveBeenCalledWith("acme", "inst-1", { help_contact: "#ops" }),
+    );
+    await vi.waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success", message: "Help contact saved" }),
+      ),
     );
   });
 
@@ -220,11 +263,48 @@ describe("SlackWorkspaceCard (A3)", () => {
     expect(w.text()).not.toContain("null");
   });
 
-  it("Reinstall on Cloud runs the Cloud popup from settings", async () => {
+  it("Reinstall on Cloud asks for a reinstall, so the server creates no second destination", async () => {
     const w = mountCard(installationView(), true);
     await w.find('[data-test="slack-reinstall"]').trigger("click");
     await flushPromises();
-    expect(slack.installStart).toHaveBeenCalledWith("acme", { source: "settings" }, undefined);
+    expect(slack.installStart).toHaveBeenCalledWith("acme", { source: "reinstall" }, undefined);
+  });
+
+  it("Reinstall shows its result once Slack hands the app back", async () => {
+    vi.mocked(slack.installExchange).mockReturnValue(
+      ok(selfHostedSettingsExchange({ team_name: "Acme Ops" })) as any,
+    );
+    const w = mountCard(installationView(), true);
+    expect(w.find('[data-test="slack-reinstall-result"]').exists()).toBe(false);
+    await w.find('[data-test="slack-reinstall"]').trigger("click");
+    await flushPromises();
+    postCallback(popup);
+    await flushPromises();
+    expect(w.find('[data-test="slack-reinstall-result"]').text()).toContain(
+      "Reinstalled in Acme Ops",
+    );
+  });
+
+  it("credentials unreadable on Cloud offers Reinstall, since Update credentials is self-hosted only", async () => {
+    const w = mountCard(installationView({ credentials_readable: false }), true);
+    const banner = w.find('[data-test="slack-credentials-unreadable"]');
+    expect(banner.text()).not.toContain("Update credentials");
+    await banner.find('[data-test="slack-credentials-reinstall"]').trigger("click");
+    await flushPromises();
+    expect(slack.installStart).toHaveBeenCalledWith("acme", { source: "reinstall" }, undefined);
+    expect(w.find('[data-test-stub="credentials"]').attributes("data-open")).toBe("false");
+  });
+
+  it("a failed Test leaves the card usable without an unhandled rejection", async () => {
+    vi.mocked(slack.testInstallation).mockReturnValue(
+      Promise.reject(axiosError(502, "invalid_auth")) as any,
+    );
+    const w = mountCard();
+    await w.find('[data-test="slack-test-connection"]').trigger("click");
+    await flushPromises();
+    expect(w.find('[data-test="slack-test-results"]').exists()).toBe(false);
+    expect(w.find('[data-test="slack-test-connection"]').attributes("disabled")).toBeUndefined();
+    expect(errorHandler).not.toHaveBeenCalled();
   });
 
   it("AC-12.2 Disconnect this org and Uninstall are separate; Uninstall is hidden on Cloud", async () => {

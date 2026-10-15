@@ -230,11 +230,12 @@ export const uninstallInstallationMutation = (org: string) =>
     meta: { invalidates: [slackKeys.all(org), destinationKeys.all(org)] },
   });
 
+// The drawer renders the refusal in place.
 export const putChannelDefaultMutation = (org: string, id: string) =>
   mutationOptions({
     mutationFn: async (vars: { channelId: string; body: SlackChannelDefaultRequest }) =>
       (await slack.putChannelDefault(org, id, vars.channelId, vars.body)).data,
-    meta: { invalidates: [slackKeys.channelDefaults(org, id)] },
+    meta: { invalidates: [slackKeys.channelDefaults(org, id)], silentError: true },
   });
 
 export const deleteChannelDefaultMutation = (org: string, id: string) =>

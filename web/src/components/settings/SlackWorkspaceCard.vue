@@ -28,6 +28,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { useSlackOAuthPopup } from "@/composables/slack/useSlackOAuthPopup";
@@ -41,8 +42,13 @@ import {
   updateCredentialsMutation,
 } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
-import type { InstallationView, SlackTestResponse } from "@/types/slack";
+import type {
+  InstallationView,
+  SlackInstallExchangeResponse,
+  SlackTestResponse,
+} from "@/types/slack";
 import { formatTimestamp } from "@/utils/date";
+import { isSlackUrl } from "@/utils/slackLink";
 import SlackCheckList, { type SlackCheckItem } from "./SlackCheckList.vue";
 import SlackCredentialsDialog from "./SlackCredentialsDialog.vue";
 import {
@@ -80,14 +86,22 @@ const helpContact = useQuery(() => slackHelpContactQuery(org.value, id.value));
 const credentialsOpen = ref(false);
 const forgetOpen = ref(false);
 const testResult = ref<SlackTestResponse | null>(null);
+const reinstalledTeam = ref<string | null>(null);
 
-const reinstall = useSlackOAuthPopup({
-  start: async () =>
-    props.isCloud
-      ? (await installStart.mutateAsync("settings")).authorization_url
-      : (await installUrl.mutateAsync(id.value)).authorize_url,
+const reinstall = useSlackOAuthPopup<SlackInstallExchangeResponse>({
+  start: async () => {
+    reinstalledTeam.value = null;
+    return props.isCloud
+      ? (await installStart.mutateAsync("reinstall")).authorization_url
+      : (await installUrl.mutateAsync(id.value)).authorize_url;
+  },
   exchange: ({ code, state }) => installExchange.mutateAsync({ code, state }),
-  onSuccess: () => undefined,
+  onSuccess: (result) => {
+    reinstalledTeam.value =
+      "already_installed" in result
+        ? result.already_installed.team_name
+        : result.installation.team_name;
+  },
 });
 
 const selfHosted = computed(() => !props.isCloud);
@@ -135,8 +149,18 @@ const testItems = computed<SlackCheckItem[]>(() => {
   return items;
 });
 
+// The mutation toasts its own failure; the click only keeps the last result.
+const verifyUrl = computed(() => {
+  const url = testResult.value?.verify_url;
+  return isSlackUrl(url, "api.slack.com") ? url : null;
+});
+
 const runTest = async (): Promise<void> => {
-  testResult.value = await testMutation.mutateAsync({});
+  try {
+    testResult.value = await testMutation.mutateAsync({});
+  } catch {
+    testResult.value = null;
+  }
 };
 
 const forget = (): void => {
@@ -175,6 +199,7 @@ const helpContactDefaults = computed<HelpContactForm>(() => ({
 }));
 const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
   await helpContactMutation.mutateAsync(value.help_contact);
+  toast({ variant: "success", message: t("slackApp.card.helpContactSaved") });
 };
 </script>
 
@@ -215,12 +240,41 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
         icon="error-outline"
         data-test="slack-credentials-unreadable"
       >
-        {{ t("slackApp.card.credentialsUnreadable") }}
+        {{
+          selfHosted
+            ? t("slackApp.card.credentialsUnreadable")
+            : t("slackApp.card.credentialsUnreadableCloud")
+        }}
         <template #actions>
-          <OButton variant="outline" size="sm-action" @click="credentialsOpen = true">
+          <OButton
+            v-if="selfHosted"
+            variant="outline"
+            size="sm-action"
+            @click="credentialsOpen = true"
+          >
             {{ t("slackApp.card.updateCredentials") }}
           </OButton>
+          <OButton
+            v-else
+            variant="outline"
+            size="sm-action"
+            :loading="reinstall.connecting.value"
+            data-test="slack-credentials-reinstall"
+            @click="reinstall.open()"
+          >
+            {{ t("slackApp.card.reinstall") }}
+          </OButton>
         </template>
+      </OBanner>
+
+      <OBanner
+        v-if="reinstalledTeam"
+        variant="success"
+        dense
+        icon="check-circle"
+        data-test="slack-reinstall-result"
+      >
+        {{ t("slackApp.card.reinstalled", { team: reinstalledTeam }) }}
       </OBanner>
 
       <div class="border-border-default grid grid-cols-1 gap-2 border-t pt-4 md:grid-cols-2">
@@ -353,6 +407,24 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           {{ t("slackApp.card.testResults") }}
         </span>
         <SlackCheckList :items="testItems" />
+        <div v-if="verifyUrl" class="flex flex-col gap-1">
+          <OButton
+            as="a"
+            :href="verifyUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="outline"
+            size="sm-action"
+            icon-right="open-in-new"
+            class="w-fit"
+            data-test="slack-test-verify"
+          >
+            {{ t("slackApp.wizard.install.verifyTitle") }}
+          </OButton>
+          <span class="text-text-secondary text-xs">
+            {{ t("slackApp.wizard.install.verifyHelp") }}
+          </span>
+        </div>
       </div>
     </OCard>
 

@@ -21,6 +21,7 @@ import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -38,6 +39,7 @@ import { useSlackOAuthPopup } from "@/composables/slack/useSlackOAuthPopup";
 import {
   checkConnectivityMutation,
   confirmConnectionMutation,
+  connectInstallationMutation,
   createInstallationMutation,
   installExchangeMutation,
   installUrlMutation,
@@ -51,9 +53,10 @@ import {
   updateCredentialsMutation,
   updateLinkingMutation,
 } from "@/services/slack.queries";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
   InstallationView,
+  SlackAlreadyInstalledResponse,
   SlackConnectionConfirmResponse,
   SlackConnectivityResponse,
   SlackCreateInstallationRequest,
@@ -62,6 +65,7 @@ import type {
   SlackTestResponse,
 } from "@/types/slack";
 import { buildSlackManifestUrlFrom } from "@/utils/slackManifest";
+import { isSlackUrl, serverMessageOf, statusOf } from "@/utils/slackLink";
 import { installerDomainDefault } from "@/utils/slackSettings";
 import SlackCheckList, { type SlackCheckItem } from "./SlackCheckList.vue";
 import SlackPrerequisites from "./SlackPrerequisites.vue";
@@ -99,8 +103,14 @@ const current = computed<InstallationView | null>(
 const installationId = computed(() => current.value?.id ?? "");
 const appUrl = (page: string): string =>
   `${SLACK_APPS_URL}/${encodeURIComponent(current.value?.app_id ?? "")}/${page}`;
+// Slack's own refusal (another app's credentials, a Slack error code) says more than a generic line.
+const serverReason =
+  (fallback: () => I18nText) =>
+  (error?: unknown): I18nText => {
+    const message = serverMessageOf(error);
+    return message ? raw(message) : fallback();
+  };
 
-// Step 0
 const prerequisites = useQuery(() =>
   Object.assign(slackPrerequisitesQuery(org.value), {
     enabled: step.value === 0 && !!org.value,
@@ -112,11 +122,15 @@ const prereqBlocked = computed(
     prerequisites.data.value.checks.some((check) => check.status === "fail"),
 );
 
-// Step 1
 const connectivity = useMutation(() => checkConnectivityMutation(org.value));
 const connectivityResult = ref<SlackConnectivityResponse | null>(null);
+// The mutation toasts a failure itself; Next then stays blocked without a result.
 const runConnectivity = async (): Promise<void> => {
-  connectivityResult.value = await connectivity.mutateAsync({});
+  try {
+    connectivityResult.value = await connectivity.mutateAsync({});
+  } catch {
+    connectivityResult.value = null;
+  }
 };
 const connectivityItems = computed<SlackCheckItem[]>(() =>
   (connectivityResult.value?.checks ?? []).map((check) => ({
@@ -139,7 +153,6 @@ watch(
   { immediate: true },
 );
 
-// Step 2
 const manual = ref(false);
 const createInstallation = useMutation(() => createInstallationMutation(org.value));
 const createApp = async (value: CreateAppForm): Promise<void> => {
@@ -182,13 +195,14 @@ const manifestCode = computed(() =>
   manifest.data.value ? JSON.stringify(manifest.data.value, null, 2) : "",
 );
 
-// Step 3
 const installedTeam = ref<string | null>(null);
+const alreadyInstalled = ref<SlackAlreadyInstalledResponse | null>(null);
 const appTokenSaved = ref(false);
 const startOverOpen = ref(false);
 const installUrl = useMutation(() => installUrlMutation(org.value));
 const installExchange = useMutation(() => installExchangeMutation(org.value));
 const uninstall = useMutation(() => uninstallInstallationMutation(org.value));
+const connectInstallation = useMutation(() => connectInstallationMutation(org.value));
 const updateCredentials = useMutation(() =>
   updateCredentialsMutation(org.value, installationId.value),
 );
@@ -200,10 +214,15 @@ const installPopup = useSlackOAuthPopup<SlackInstallExchangeResponse>({
   },
   exchange: ({ code, state }) => installExchange.mutateAsync({ code, state }),
   onSuccess: (result) => {
-    installedTeam.value =
-      "already_installed" in result
-        ? result.already_installed.team_name
-        : result.installation.team_name;
+    if ("already_installed" in result) {
+      alreadyInstalled.value = result;
+      return;
+    }
+    installedTeam.value = result.installation.team_name;
+  },
+  messages: {
+    startFailed: serverReason(() => t("alert_destinations.slackOAuth.startFailed")),
+    exchangeFailed: serverReason(() => t("alert_destinations.slackOAuth.exchangeFailed")),
   },
 });
 const pendingInstall = computed(
@@ -223,14 +242,35 @@ const saveAppToken = async (value: AppTokenForm): Promise<void> => {
 };
 const startOver = async (): Promise<void> => {
   if (!installationId.value) return;
-  await uninstall.mutateAsync(installationId.value);
+  try {
+    await uninstall.mutateAsync(installationId.value);
+  } catch {
+    return;
+  }
   created.value = null;
   installedTeam.value = null;
+  alreadyInstalled.value = null;
   appTokenSaved.value = false;
   step.value = 2;
 };
+// The team already runs this app for another org: join that installation, then drop the unused pending one.
+const connectWithTicket = async (): Promise<void> => {
+  const ticket = alreadyInstalled.value;
+  const pendingId = installationId.value;
+  if (!ticket) return;
+  try {
+    await connectInstallation.mutateAsync({
+      installationId: ticket.already_installed.installation_id,
+      body: { connect_ticket: ticket.connect_ticket },
+    });
+  } catch (error) {
+    if (statusOf(error) === 410) alreadyInstalled.value = null;
+    return;
+  }
+  if (pendingId) await uninstall.mutateAsync(pendingId).catch(() => undefined);
+  emit("done");
+};
 
-// Step 4
 const testResult = ref<SlackTestResponse | null>(null);
 const signInPassed = ref(false);
 const testInstallation = useMutation(() =>
@@ -246,21 +286,35 @@ const linking = useQuery(() =>
   }),
 );
 const signInPopup = useSlackOAuthPopup<SlackConnectionConfirmResponse>({
-  start: async () =>
-    (
+  start: async () => {
+    signInPassed.value = false;
+    return (
       await startConnection.mutateAsync({
         installationId: installationId.value,
         purpose: "test",
       })
-    ).url,
+    ).url;
+  },
   exchange: ({ code, state }) =>
     confirmConnection.mutateAsync({ oidc_code: code, oidc_state: state }),
   onSuccess: (result) => {
     signInPassed.value = "test" in result && result.test === "pass";
   },
+  messages: {
+    startFailed: serverReason(() => t("alert_destinations.slackOAuth.startFailed")),
+    exchangeFailed: serverReason(() => t("alert_destinations.slackOAuth.exchangeFailed")),
+  },
+});
+const testVerifyUrl = computed(() => {
+  const url = testResult.value?.verify_url;
+  return isSlackUrl(url, "api.slack.com") ? url : null;
 });
 const runChecks = async (): Promise<void> => {
-  testResult.value = await testInstallation.mutateAsync({});
+  try {
+    testResult.value = await testInstallation.mutateAsync({});
+  } catch {
+    testResult.value = null;
+  }
 };
 const testItems = computed<SlackCheckItem[]>(() =>
   (testResult.value?.checks ?? []).map((check) => ({
@@ -311,6 +365,15 @@ const nextBlocked = computed(() => {
           </h3>
           <p class="text-text-secondary m-0 text-sm">{{ t("slackApp.prereq.subtitle") }}</p>
           <OSpinner v-if="prerequisites.isPending.value" size="sm" />
+          <OEmptyState
+            v-else-if="prerequisites.isError.value"
+            size="compact"
+            preset="load-error"
+            :title="t('slackApp.prereq.loadFailed')"
+            :backdrop="false"
+            data-test="slack-wizard-prereq-error"
+            @action="prerequisites.refetch()"
+          />
           <SlackPrerequisites
             v-else-if="prerequisites.data.value"
             :checks="prerequisites.data.value.checks"
@@ -568,7 +631,30 @@ const nextBlocked = computed(() => {
             {{ t("slackApp.wizard.install.created", { appId: current?.app_id ?? "" }) }}
           </span>
 
-          <OCard v-if="installedTeam === null" variant="outlined" class="gap-3 p-4">
+          <OBanner
+            v-if="alreadyInstalled"
+            variant="warning"
+            icon="info"
+            data-test="slack-wizard-already-installed"
+          >
+            {{
+              t("slackApp.connect.alreadyInstalled", {
+                team: alreadyInstalled.already_installed.team_name,
+              })
+            }}
+            <template #actions>
+              <OButton
+                variant="primary"
+                size="sm-action"
+                :loading="connectInstallation.isPending.value || uninstall.isPending.value"
+                data-test="slack-wizard-connect-ticket"
+                @click="connectWithTicket"
+              >
+                {{ t("slackApp.connect.connectExisting") }}
+              </OButton>
+            </template>
+          </OBanner>
+          <OCard v-else-if="installedTeam === null" variant="outlined" class="gap-3 p-4">
             <p class="text-text-secondary m-0 text-sm">
               {{ t("slackApp.wizard.install.allowHint") }}
             </p>
@@ -694,6 +780,20 @@ const nextBlocked = computed(() => {
             t("slackApp.wizard.test.signInHelp")
           }}</span>
           <SlackCheckList v-if="testItems.length" :items="testItems" />
+          <OButton
+            v-if="testVerifyUrl"
+            as="a"
+            :href="testVerifyUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="outline"
+            size="sm-action"
+            icon-right="open-in-new"
+            class="w-fit"
+            data-test="slack-wizard-test-verify"
+          >
+            {{ t("slackApp.wizard.install.verifyTitle") }}
+          </OButton>
           <span v-if="signInPassed" class="flex items-center gap-2 text-sm">
             <OIcon name="check-circle" size="sm" class="text-status-positive" />
             {{ t("slackApp.wizard.test.signInPassed") }}

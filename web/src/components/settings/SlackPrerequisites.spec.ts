@@ -68,6 +68,9 @@ describe("SlackPrerequisites", () => {
     expect(rows[3].find('[data-test="slack-prereq-fix"]').text()).toContain(
       "O2_AI_INTERNAL_SECRET",
     );
+    const fix = rows[3].findComponent({ name: "OCode" });
+    expect(fix.exists()).toBe(true);
+    expect(fix.props()).toMatchObject({ block: true, copyable: true });
     expect(rows[3].find('[data-test="slack-prereq-result"]').attributes("data-status")).toBe(
       "fail",
     );

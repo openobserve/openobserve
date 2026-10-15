@@ -19,8 +19,15 @@ import i18n from "@/locales";
 import config from "@/aws-exports";
 import slack from "@/services/slack";
 import { queryClient } from "@/composables/query/queryClient";
+import { slackInstallationsQuery } from "@/services/slack.queries";
 import Slack from "./Slack.vue";
-import { axiosError, installationView, makeSlackStore, ok } from "@/test/unit/helpers/slack";
+import {
+  axiosError,
+  installationView,
+  linkingView,
+  makeSlackStore,
+  ok,
+} from "@/test/unit/helpers/slack";
 
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
 
@@ -46,6 +53,11 @@ const STUBS = {
   SlackChannelDefaults: stub("SlackChannelDefaults", ["installationId"]),
   SlackUninstallDialog: stub("SlackUninstallDialog", ["open", "mode", "installation"]),
   SlackPrerequisites: stub("SlackPrerequisites", ["checks"]),
+};
+
+const switchOrg = async (store: ReturnType<typeof makeSlackStore>, identifier: string) => {
+  store.state.selectedOrganization = { identifier, name: identifier };
+  await flushPromises();
 };
 
 const prereqs = {
@@ -268,5 +280,99 @@ describe("Slack settings: enabled", () => {
     w.findComponent({ name: "SlackWorkspaceCard" }).vm.$emit("disconnect");
     await flushPromises();
     expect(w.findComponent({ name: "SlackUninstallDialog" }).props("mode")).toBe("disconnect");
+  });
+
+  it("W-S4 switching org mid-wizard closes the wizard and remounts the screen for the new org", async () => {
+    vi.mocked(slack.listInstallations).mockImplementation(
+      (org: string) => ok({ installations: [], available: [], org }) as any,
+    );
+    const store = makeSlackStore({ slack_enabled: true });
+    const w = mount(Slack, { global: { plugins: [i18n, store], stubs: STUBS } });
+    await flushPromises();
+    w.findComponent({ name: "SlackConnectEmpty" }).vm.$emit("setup");
+    await flushPromises();
+    expect(w.find('[data-test-stub="SlackSelfHostedWizard"]').exists()).toBe(true);
+
+    await switchOrg(store, "beta");
+    expect(slack.listInstallations).toHaveBeenCalledWith("beta", undefined);
+    expect(w.find('[data-test-stub="SlackSelfHostedWizard"]').exists()).toBe(false);
+    expect(w.find('[data-test-stub="SlackConnectEmpty"]').exists()).toBe(true);
+  });
+
+  it("W-S4 a pending install in both orgs gets a fresh wizard after the switch", async () => {
+    vi.mocked(slack.listInstallations).mockImplementation(
+      (org: string) =>
+        ok({
+          installations: [installationView({ id: `pending-${org}`, status: "pending" })],
+        }) as any,
+    );
+    const store = makeSlackStore({ slack_enabled: true });
+    const w = mount(Slack, { global: { plugins: [i18n, store], stubs: STUBS } });
+    await flushPromises();
+    const first = w.findComponent({ name: "SlackSelfHostedWizard" });
+    expect(first.props("installation").id).toBe("pending-acme");
+
+    await queryClient.prefetchQuery(slackInstallationsQuery("beta"));
+    await switchOrg(store, "beta");
+    const second = w.findComponent({ name: "SlackSelfHostedWizard" });
+    expect(second.props("installation").id).toBe("pending-beta");
+    expect(second.vm).not.toBe(first.vm);
+  });
+
+  it("W-S4 switching org drops the dialog opened for the other org's workspace", async () => {
+    vi.mocked(slack.listInstallations).mockReturnValue(
+      ok({ installations: [installationView()] }) as any,
+    );
+    const store = makeSlackStore({ slack_enabled: true });
+    const w = mount(Slack, { global: { plugins: [i18n, store], stubs: STUBS } });
+    await flushPromises();
+    w.findComponent({ name: "SlackWorkspaceCard" }).vm.$emit("uninstall");
+    await flushPromises();
+    expect(w.findComponent({ name: "SlackUninstallDialog" }).exists()).toBe(true);
+
+    await switchOrg(store, "beta");
+    expect(w.findComponent({ name: "SlackUninstallDialog" }).exists()).toBe(false);
+  });
+
+  it("W-S9 shows the post-install confirmation before the workspace card, then continues to it", async () => {
+    const w = mountSlack({ slack_enabled: true });
+    await flushPromises();
+    w.findComponent({ name: "SlackConnectEmpty" }).vm.$emit("installed", {
+      team: "Acme Corp",
+      destination: { id: "d1", name: "sre-prod", channel: "sre-prod", channel_id: "C1" },
+      linking: linkingView({ source: "mapping", domains: ["acme.com"] }),
+      linkAll: null,
+    });
+    vi.mocked(slack.listInstallations).mockReturnValue(
+      ok({ installations: [installationView()] }) as any,
+    );
+    await queryClient.refetchQueries();
+    await flushPromises();
+
+    const confirmation = w.find('[data-test="slack-install-confirmation"]');
+    expect(confirmation.text()).toContain("Connected to Acme Corp");
+    expect(confirmation.text()).toContain("Automatic for acme.com");
+    expect(confirmation.text()).toContain("Alerts post to #sre-prod");
+    expect(w.find('[data-test-stub="SlackWorkspaceCard"]').exists()).toBe(false);
+
+    await w.find('[data-test="slack-install-continue"]').trigger("click");
+    expect(w.find('[data-test="slack-install-confirmation"]').exists()).toBe(false);
+    expect(w.find('[data-test-stub="SlackWorkspaceCard"]').exists()).toBe(true);
+  });
+
+  it("W-S9 leaves out the alert line when a self-hosted install created no destination", async () => {
+    const w = mountSlack({ slack_enabled: true });
+    await flushPromises();
+    w.findComponent({ name: "SlackConnectEmpty" }).vm.$emit("installed", {
+      team: "Acme Corp",
+      destination: null,
+      linking: null,
+      linkAll: null,
+    });
+    await flushPromises();
+    const confirmation = w.find('[data-test="slack-install-confirmation"]');
+    expect(confirmation.text()).toContain("Connected to Acme Corp");
+    expect(confirmation.text()).not.toContain("Alerts post to");
+    expect(confirmation.text()).not.toContain("null");
   });
 });

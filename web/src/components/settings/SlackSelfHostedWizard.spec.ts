@@ -21,6 +21,7 @@ import SlackSelfHostedWizard from "./SlackSelfHostedWizard.vue";
 import {
   ConfirmDialogStub,
   OTableStub,
+  axiosError,
   fakePopup,
   installationView,
   linkingView,
@@ -48,6 +49,7 @@ vi.mock("@/services/slack", () => ({
     getLinking: vi.fn(),
     updateLinking: vi.fn(),
     linkAll: vi.fn(),
+    connectInstallation: vi.fn(),
   },
 }));
 
@@ -77,6 +79,8 @@ const passing = [
   },
 ];
 
+const errorHandler = vi.fn();
+
 const mountWizard = async (
   installation: InstallationView | null = null,
   email = "ana@acme.example",
@@ -86,6 +90,7 @@ const mountWizard = async (
     attachTo: document.body,
     global: {
       plugins: [i18n, makeSlackStore({ slack_enabled: true }, email)],
+      config: { errorHandler },
       stubs: { OTable: OTableStub, ConfirmDialog: ConfirmDialogStub },
     },
   });
@@ -153,7 +158,12 @@ beforeEach(() => {
   );
   vi.mocked(slack.updateLinking).mockReturnValue(ok(linkingView()) as any);
   vi.mocked(slack.linkAll).mockReturnValue(ok({ linked: 4, complete: true }) as any);
+  vi.mocked(slack.connectInstallation).mockReturnValue(
+    ok({ connected: true, destination: null, channel_default_set: false }) as any,
+  );
 });
+
+const lastToast = () => vi.mocked(toast).mock.calls.at(-1)?.[0];
 
 afterEach(() => {
   document.body.innerHTML = "";
@@ -161,6 +171,21 @@ afterEach(() => {
 });
 
 describe("SlackSelfHostedWizard Step 0", () => {
+  it("W-S6 shows a retryable load error when the checks cannot be read", async () => {
+    vi.mocked(slack.getPrerequisites).mockReturnValue(Promise.reject(axiosError(500)) as any);
+    const w = await mountWizard();
+    const error = w.find('[data-test="slack-wizard-prereq-error"]');
+    expect(error.text()).toContain("The prerequisite checks could not run.");
+    expect(w.find('[data-test="slack-wizard-next"]').attributes("disabled")).toBeDefined();
+
+    vi.mocked(slack.getPrerequisites).mockReturnValue(ok({ checks: passing }) as any);
+    await error.find("button").trigger("click");
+    await flushPromises();
+    expect(slack.getPrerequisites).toHaveBeenCalledTimes(2);
+    expect(w.find('[data-test="slack-wizard-prereq-error"]').exists()).toBe(false);
+    expect(w.find('[data-test="slack-wizard-next"]').attributes("disabled")).toBeUndefined();
+  });
+
   it("AC-7.1 runs the prerequisite checks and lets a warning through", async () => {
     const w = await mountWizard();
     expect(step(w)).toBe("0");
@@ -321,7 +346,72 @@ describe("SlackSelfHostedWizard Step 2", () => {
   });
 });
 
+describe("SlackSelfHostedWizard Step 1 failures", () => {
+  it("NIT-7 a connectivity check that fails to run blocks Next without an unhandled rejection", async () => {
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => rejections.push(reason);
+    process.on("unhandledRejection", onRejection);
+    vi.mocked(slack.checkConnectivity).mockImplementation(() => Promise.reject(axiosError(500)));
+    try {
+      const w = await mountWizard();
+      await next(w);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(step(w)).toBe("1");
+      expect(w.find('[data-test="slack-wizard-next"]').attributes("disabled")).toBeDefined();
+    } finally {
+      process.off("unhandledRejection", onRejection);
+    }
+    expect(rejections).toEqual([]);
+  });
+});
+
 describe("SlackSelfHostedWizard Step 3", () => {
+  it("W-S5 an already-installed workspace connects with the ticket and removes the pending app", async () => {
+    vi.mocked(slack.installExchange).mockReturnValue(
+      ok({
+        already_installed: {
+          installation_id: "inst-7",
+          team_name: "Acme Corp",
+          this_org_connected: false,
+        },
+        connect_ticket: "ticket-1",
+      }) as any,
+    );
+    const w = await mountWizard(pending);
+    await w.find('[data-test="slack-wizard-allow"]').trigger("click");
+    await flushPromises();
+    postCallback(popup);
+    await flushPromises();
+
+    expect(w.find('[data-test="slack-wizard-installed"]').exists()).toBe(false);
+    expect(w.find('[data-test="slack-wizard-next"]').attributes("disabled")).toBeDefined();
+    const banner = w.find('[data-test="slack-wizard-already-installed"]');
+    expect(banner.text()).toContain("Acme Corp is already installed for another organization");
+
+    await banner.find('[data-test="slack-wizard-connect-ticket"]').trigger("click");
+    await flushPromises();
+    expect(slack.connectInstallation).toHaveBeenCalledWith("acme", "inst-7", {
+      connect_ticket: "ticket-1",
+    });
+    expect(slack.uninstallInstallation).toHaveBeenCalledWith("acme", "inst-1");
+    expect(w.emitted("done")).toHaveLength(1);
+  });
+
+  it("NIT-13 shows the server's reason when Slack refuses the install", async () => {
+    vi.mocked(slack.installExchange).mockReturnValue(
+      Promise.reject(axiosError(409, "These credentials belong to another Slack app")) as any,
+    );
+    const w = await mountWizard(pending);
+    await w.find('[data-test="slack-wizard-allow"]').trigger("click");
+    await flushPromises();
+    postCallback(popup);
+    await flushPromises();
+    expect(lastToast()).toMatchObject({
+      variant: "error",
+      message: "These credentials belong to another Slack app",
+    });
+  });
+
   it("AC-7.8 resumes a pending install with Finish install", async () => {
     const w = await mountWizard(pending);
     expect(step(w)).toBe("3");
@@ -427,6 +517,50 @@ describe("SlackSelfHostedWizard Step 4", () => {
       oidc_state: "signed-state",
     });
     expect(w.text()).toContain("Sign in with Slack works");
+  });
+
+  it("NIT-6 a failed second Sign in with Slack test clears the earlier pass", async () => {
+    const w = await mountWizard(installed);
+    await w.find('[data-test="slack-wizard-signin-test"]').trigger("click");
+    await flushPromises();
+    postCallback(popup);
+    await flushPromises();
+    expect(w.text()).toContain("Sign in with Slack works");
+
+    vi.mocked(slack.confirmConnection).mockReturnValue(
+      Promise.reject(axiosError(502, "invalid_code")) as any,
+    );
+    await w.find('[data-test="slack-wizard-signin-test"]').trigger("click");
+    await flushPromises();
+    expect(w.text()).not.toContain("Sign in with Slack works");
+    postCallback(popup);
+    await flushPromises();
+    expect(w.text()).not.toContain("Sign in with Slack works");
+    expect(lastToast()).toMatchObject({ variant: "error", message: "invalid_code" });
+  });
+
+  it("EC-S20 the Step 4 checks link the Verify page when Slack needs one", async () => {
+    vi.mocked(slack.testInstallation).mockReturnValue(
+      ok({
+        checks: [{ id: "last_event", status: "warn", detail: "No event yet" }],
+        test_post: null,
+        verify_url: "https://api.slack.com/apps/A0SAMPLE01/app-manifest",
+      }) as any,
+    );
+    const w = await mountWizard(installed);
+    await w.find('[data-test="slack-wizard-run-checks"]').trigger("click");
+    await flushPromises();
+    expect(w.find('[data-test="slack-wizard-test-verify"]').attributes("href")).toBe(
+      "https://api.slack.com/apps/A0SAMPLE01/app-manifest",
+    );
+  });
+
+  it("NIT-7 a health check that fails to run leaves no unhandled rejection", async () => {
+    vi.mocked(slack.testInstallation).mockReturnValue(Promise.reject(axiosError(502)) as any);
+    const w = await mountWizard(installed);
+    await w.find('[data-test="slack-wizard-run-checks"]').trigger("click");
+    await flushPromises();
+    expect(errorHandler).not.toHaveBeenCalled();
   });
 
   it("prefills linking with the admin's company domain and saves it on Finish", async () => {
