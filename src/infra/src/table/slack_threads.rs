@@ -70,6 +70,10 @@ pub async fn delete_by_org(org_id: &str) -> Result<u64, Error> {
     delete_by_org_with(get_orm_client_rw().await, org_id).await
 }
 
+pub async fn delete_by_installation(installation_id: &str) -> Result<u64, Error> {
+    delete_by_installation_with(get_orm_client_rw().await, installation_id).await
+}
+
 pub async fn put_with<C: ConnectionTrait>(conn: &C, row: &SlackThread) -> Result<(), Error> {
     let key = [Column::InstallationId, Column::ChannelId, Column::ThreadTs];
     Entity::insert(to_active(row)?)
@@ -155,6 +159,17 @@ pub async fn delete_with<C: ConnectionTrait>(conn: &C, key: &SlackThreadKey) -> 
 pub async fn delete_by_org_with<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result<u64, Error> {
     let result = Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await?;
+    Ok(result.rows_affected)
+}
+
+pub async fn delete_by_installation_with<C: ConnectionTrait>(
+    conn: &C,
+    installation_id: &str,
+) -> Result<u64, Error> {
+    let result = Entity::delete_many()
+        .filter(Column::InstallationId.eq(installation_id))
         .exec(conn)
         .await?;
     Ok(result.rows_affected)
@@ -337,5 +352,22 @@ mod tests {
             tss(list_expired_with(&db, 1_000, 10).await.unwrap()),
             ["1.3"]
         );
+    }
+
+    #[tokio::test]
+    async fn delete_by_installation_keeps_other_installations() {
+        let db = db().await;
+        put_with(&db, &thread("1.1", "acme", 100)).await.unwrap();
+        put_with(&db, &thread("1.2", "globex", 100)).await.unwrap();
+        let other = SlackThread {
+            installation_id: "i2".to_string(),
+            ..thread("1.1", "acme", 100)
+        };
+        put_with(&db, &other).await.unwrap();
+        assert_eq!(delete_by_installation_with(&db, "i1").await.unwrap(), 2);
+        assert_eq!(get_with(&db, "i1", "C1", "1.1").await.unwrap(), None);
+        assert_eq!(get_with(&db, "i1", "C1", "1.2").await.unwrap(), None);
+        assert_eq!(get_with(&db, "i2", "C1", "1.1").await.unwrap(), Some(other));
+        assert_eq!(delete_by_installation_with(&db, "i1").await.unwrap(), 0);
     }
 }
