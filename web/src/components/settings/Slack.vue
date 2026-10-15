@@ -25,10 +25,11 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { slackInstallationsQuery, slackPrerequisitesQuery } from "@/services/slack.queries";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import type { InstallationView } from "@/types/slack";
+import type { InstallationView, SlackInstallConfirmation as Confirmation } from "@/types/slack";
 import { readSlackOrgConfig, slackDisabledVariable } from "@/utils/slackSettings";
 import SlackChannelDefaults from "./SlackChannelDefaults.vue";
 import SlackConnectEmpty from "./SlackConnectEmpty.vue";
+import SlackInstallConfirmation from "./SlackInstallConfirmation.vue";
 import SlackLinkingSection from "./SlackLinkingSection.vue";
 import SlackPrerequisites from "./SlackPrerequisites.vue";
 import SlackSelfHostedWizard from "./SlackSelfHostedWizard.vue";
@@ -109,20 +110,27 @@ const current = computed<InstallationView | null>(
 );
 
 const wizardActive = ref(false);
+const confirmation = ref<Confirmation | null>(null);
+const dialogMode = ref<DialogMode>("uninstall");
+const dialogOpen = ref(false);
+// The dialog keeps its own copy: its result outlives the installation it removed.
+const dialogInstallation = ref<InstallationView | null>(null);
+
 // A pending install keeps the wizard up past its own install step, until the wizard says done.
 watch(
-  () => current.value?.status,
-  (status) => {
+  () => [org.value, current.value?.status] as const,
+  ([orgId, status], previous) => {
+    if (previous && previous[0] !== orgId) {
+      wizardActive.value = false;
+      confirmation.value = null;
+      dialogOpen.value = false;
+      dialogInstallation.value = null;
+    }
     if (status === "pending") wizardActive.value = true;
   },
   { immediate: true },
 );
 const showWizard = computed(() => !isCloud.value && wizardActive.value);
-
-const dialogMode = ref<DialogMode>("uninstall");
-const dialogOpen = ref(false);
-// The dialog keeps its own copy: its result outlives the installation it removed.
-const dialogInstallation = ref<InstallationView | null>(null);
 
 const openDialog = (mode: DialogMode): void => {
   if (!current.value) return;
@@ -178,7 +186,8 @@ const openDialog = (mode: DialogMode): void => {
       />
     </OCard>
 
-    <template v-else-if="slackState.enabled">
+    <!-- Keyed by org: every step, ticket and popup below belongs to the org it started in. -->
+    <div v-else-if="slackState.enabled" :key="org" class="flex flex-col gap-6">
       <div v-if="installations.isPending.value" class="flex justify-center py-16">
         <OSpinner size="md" />
       </div>
@@ -194,6 +203,11 @@ const openDialog = (mode: DialogMode): void => {
         preset="load-error"
         data-test="slack-load-error"
         @action="installations.refetch()"
+      />
+      <SlackInstallConfirmation
+        v-else-if="confirmation"
+        :confirmation="confirmation"
+        @continue="confirmation = null"
       />
       <SlackSelfHostedWizard
         v-else-if="showWizard"
@@ -218,8 +232,9 @@ const openDialog = (mode: DialogMode): void => {
         :available="installations.data.value?.available ?? []"
         :upgrade-candidates="installations.data.value?.upgrade_candidates ?? []"
         @setup="wizardActive = true"
+        @installed="confirmation = $event"
       />
-    </template>
+    </div>
 
     <SlackUninstallDialog
       v-if="dialogInstallation"

@@ -20,8 +20,13 @@ import slack from "@/services/slack";
 import SlackCredentialsDialog from "./SlackCredentialsDialog.vue";
 import { installationView, makeSlackStore, ok } from "@/test/unit/helpers/slack";
 import type { InstallationView } from "@/types/slack";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 vi.mock("@/services/slack", () => ({ default: { updateCredentials: vi.fn() } }));
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
+  toast: vi.fn(),
+}));
 
 const body = () => new DOMWrapper(document.body);
 
@@ -81,6 +86,9 @@ describe("SlackCredentialsDialog (row 8)", () => {
     );
     await flushPromises();
     expect(w.emitted("update:open")?.at(-1)).toEqual([false]);
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "success", message: "Credentials updated" }),
+    );
   });
 
   it("refuses an empty update", async () => {

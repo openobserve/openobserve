@@ -19,6 +19,7 @@ import { computed } from "vue";
 import { useMutation } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -67,6 +68,7 @@ const submit = async (value: CredentialsForm): Promise<void> => {
   }
   await update.mutateAsync(body);
   emit("update:open", false);
+  toast({ variant: "success", message: t("slackApp.credentials.saved") });
 };
 </script>
 

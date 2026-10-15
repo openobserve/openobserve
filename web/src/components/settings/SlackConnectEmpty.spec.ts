@@ -21,6 +21,8 @@ import SlackConnectEmpty from "./SlackConnectEmpty.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   fakePopup,
+  installationView,
+  linkingView,
   makeSlackStore,
   ok,
   postCallback,
@@ -120,6 +122,74 @@ describe("SlackConnectEmpty on Cloud (A1)", () => {
     expect(w.text()).not.toContain("null");
   });
 
+  it("W-S9 hands the exchange result on as the post-install confirmation", async () => {
+    const linking = linkingView({ source: "mapping", domains: ["acme.com"] });
+    const destination = {
+      id: "d1",
+      name: "slack-sre-prod",
+      channel: "#sre-prod",
+      channel_id: "C1",
+    };
+    vi.mocked(slack.installExchange).mockReturnValue(
+      ok({
+        installation: installationView({ team_name: "Acme Corp" }),
+        destination,
+        channel_default_set: true,
+        linking,
+        link_all: { linked: 12, complete: true },
+      }) as any,
+    );
+    const w = mountEmpty();
+    await w.find('[data-test="slack-add-to-slack"]').trigger("click");
+    await flushPromises();
+    postCallback(popup);
+    await flushPromises();
+    expect(w.emitted("installed")).toEqual([
+      [{ team: "Acme Corp", destination, linking, linkAll: { linked: 12, complete: true } }],
+    ]);
+  });
+
+  it("W-S9 confirms a self-hosted exchange without a destination", async () => {
+    vi.mocked(slack.installExchange).mockReturnValue(ok(selfHostedSettingsExchange()) as any);
+    const w = mountEmpty();
+    await w.find('[data-test="slack-add-to-slack"]').trigger("click");
+    await flushPromises();
+    postCallback(popup);
+    await flushPromises();
+    expect(w.emitted("installed")?.[0]?.[0]).toMatchObject({
+      team: "Acme Corp",
+      destination: null,
+    });
+  });
+
+  it("W-S9 confirms a ticket connect with the destination it created", async () => {
+    const destination = { id: "d2", name: "slack-ops", channel: "ops", channel_id: "C2" };
+    vi.mocked(slack.installExchange).mockReturnValue(
+      ok({
+        already_installed: {
+          installation_id: "inst-7",
+          team_name: "Acme Corp",
+          this_org_connected: false,
+        },
+        connect_ticket: "ticket-1",
+      }) as any,
+    );
+    vi.mocked(slack.connectInstallation).mockReturnValue(
+      ok({ connected: true, destination, channel_default_set: true }) as any,
+    );
+    const w = mountEmpty();
+    await w.find('[data-test="slack-add-to-slack"]').trigger("click");
+    await flushPromises();
+    postCallback(popup);
+    await flushPromises();
+    expect(w.emitted("installed")).toBeUndefined();
+    await w.find('[data-test="slack-connect-ticket"]').trigger("click");
+    await flushPromises();
+    expect(w.emitted("installed")).toEqual([
+      [{ team: "Acme Corp", destination, linking: null, linkAll: null }],
+    ]);
+  });
+
   it("AC-6.8 offers to connect this org when the workspace is already installed", async () => {
     vi.mocked(slack.installExchange).mockReturnValue(
       ok({
@@ -203,5 +273,8 @@ describe("SlackConnectEmpty self-hosted (A1)", () => {
       oidc_state: "signed-state",
     });
     expect(slack.installExchange).not.toHaveBeenCalled();
+    expect(w.emitted("installed")).toEqual([
+      [{ team: "Acme Corp", destination: null, linking: null, linkAll: null }],
+    ]);
   });
 });

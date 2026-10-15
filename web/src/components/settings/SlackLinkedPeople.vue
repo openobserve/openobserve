@@ -27,7 +27,8 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { deleteLinkMutation, slackLinksQuery } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
-import type { SlackLinkRow } from "@/types/slack";
+import type { SlackAdminLink } from "@/types/slack";
+import { statusOf } from "@/utils/slackLink";
 
 const props = defineProps<{
   open: boolean;
@@ -47,18 +48,22 @@ const links = useInfiniteQuery(() =>
 );
 const unlink = useMutation(() => deleteLinkMutation(org.value));
 
-const rows = computed<SlackLinkRow[]>(
+const rows = computed<SlackAdminLink[]>(
   () => links.data.value?.pages.flatMap((page) => page.links) ?? [],
 );
+const forbidden = computed(() => statusOf(links.error.value) === 403);
+const loadError = computed(() =>
+  links.isError.value && !forbidden.value ? t("emptyState.loadError.title") : null,
+);
 // ConfirmDialog closes before it confirms, so the target outlives the open flag.
-const pending = ref<SlackLinkRow | null>(null);
+const pending = ref<SlackAdminLink | null>(null);
 const confirmOpen = ref(false);
-const askUnlink = (row: SlackLinkRow): void => {
+const askUnlink = (row: SlackAdminLink): void => {
   pending.value = row;
   confirmOpen.value = true;
 };
 
-const columns = computed<OTableColumnDef<SlackLinkRow>[]>(() => [
+const columns = computed<OTableColumnDef<SlackAdminLink>[]>(() => [
   {
     id: "user_email",
     header: t("slackApp.people.columnUser"),
@@ -67,11 +72,12 @@ const columns = computed<OTableColumnDef<SlackLinkRow>[]>(() => [
     meta: { flex: true },
   },
   {
-    id: "external_user_id",
+    id: "slack_user_id",
     header: t("slackApp.people.columnSlackUser"),
-    accessorKey: "external_user_id",
+    accessorKey: "slack_user_id",
     size: 140,
   },
+  { id: "default_org", header: t("slackApp.channels.columnDefaultOrg"), size: 120 },
   { id: "link_method", header: t("slackApp.people.columnMethod"), size: 160 },
   { id: "created_at", header: t("slackApp.people.columnLinked"), size: 120 },
   { id: "last_used_at", header: t("slackApp.people.columnLastUsed"), size: 120 },
@@ -100,9 +106,18 @@ const confirmUnlink = (): void => {
         pagination="none"
         :show-global-filter="false"
         :loading="links.isPending.value"
+        :error="loadError"
+        :forbidden="forbidden"
         dense
         class="min-h-0 flex-1"
       >
+        <template #cell-default_org="{ row }">
+          {{
+            row.default_org_is_this_org
+              ? t("slackApp.channels.thisOrg")
+              : t("slackApp.channels.anotherOrg")
+          }}
+        </template>
         <template #cell-link_method="{ row }">
           {{ t(`slackApp.people.method.${row.link_method}`) }}
         </template>
@@ -121,6 +136,15 @@ const confirmUnlink = (): void => {
           >
             {{ t("slackApp.people.unlink") }}
           </OButton>
+        </template>
+        <template #error>
+          <OEmptyState
+            size="compact"
+            preset="load-error"
+            :backdrop="false"
+            data-test="slack-people-error"
+            @action="links.refetch()"
+          />
         </template>
         <template #empty>
           <OEmptyState

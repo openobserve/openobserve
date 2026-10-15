@@ -1908,7 +1908,6 @@ export const BADGE_GROUPS = {
     },
     fallback: { variant: "default-soft" },
   },
-  // Slack workspace installation health on Settings › Slack.
   slackInstallStatus: {
     mode: "dot",
     shape: "pill",

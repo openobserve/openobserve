@@ -173,7 +173,11 @@ const cases: Case[] = [
     "row 22 PUT channel default",
     () => slack.putChannelDefault(ORG, ID, "C1", { org_id: ORG, answer_mode: "private" }),
     "put",
-    [`${BASE}/installations/${ID}/channel-defaults/C1`, { org_id: ORG, answer_mode: "private" }],
+    [
+      `${BASE}/installations/${ID}/channel-defaults/C1`,
+      { org_id: ORG, answer_mode: "private" },
+      { silentForbidden: true },
+    ],
   ],
   [
     "row 22 DELETE channel default",

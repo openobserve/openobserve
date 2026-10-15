@@ -18,7 +18,13 @@ import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import slack from "@/services/slack";
 import SlackChannelDefaults from "./SlackChannelDefaults.vue";
-import { ConfirmDialogStub, OTableStub, makeSlackStore, ok } from "@/test/unit/helpers/slack";
+import {
+  ConfirmDialogStub,
+  OTableStub,
+  axiosError,
+  makeSlackStore,
+  ok,
+} from "@/test/unit/helpers/slack";
 import type { SlackChannelDefaultRow } from "@/types/slack";
 
 vi.mock("@/services/slack", () => ({
@@ -49,14 +55,20 @@ const rows: SlackChannelDefaultRow[] = [
 
 const body = () => new DOMWrapper(document.body);
 
-const mountDefaults = async (list = rows) => {
+const mountDefaults = async (list = rows, realTable = false) => {
   vi.mocked(slack.listChannelDefaults).mockReturnValue(ok({ defaults: list }) as any);
+  return mountWith(realTable);
+};
+
+const mountWith = async (realTable = false) => {
   const w = mount(SlackChannelDefaults, {
     props: { installationId: "inst-1" },
     attachTo: document.body,
     global: {
       plugins: [i18n, makeSlackStore()],
-      stubs: { OTable: OTableStub, ConfirmDialog: ConfirmDialogStub },
+      stubs: realTable
+        ? { ConfirmDialog: ConfirmDialogStub }
+        : { OTable: OTableStub, ConfirmDialog: ConfirmDialogStub },
     },
   });
   await flushPromises();
@@ -88,8 +100,8 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     const [mine, theirs] = w.findAll('[data-test-stub="otable-row"]');
     expect(mine.text()).toContain("#sre-prod");
     expect(mine.text()).toContain("In thread");
-    expect(mine.text()).toContain("This org");
-    expect(mine.text()).toContain("From an alert destination");
+    expect(mine.find('[data-col="default_org"]').text()).toBe("This org");
+    expect(mine.find('[data-col="set_by"]').text()).toBe("From an alert destination");
     expect(mine.find('[data-col="alert_routes"]').text()).toBe("—");
     expect(theirs.text()).toContain("Private only");
     expect(theirs.text()).toContain("Another org");
@@ -126,6 +138,105 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     );
   });
 
+  it("W-S13 shows the server's 403 in the drawer and keeps it open", async () => {
+    vi.mocked(slack.putChannelDefault).mockReturnValue(
+      Promise.reject(
+        axiosError(403, "Only an admin of org prod can change this channel's default"),
+      ) as any,
+    );
+    const w = await mountDefaults();
+    await w.find('[data-test="slack-channel-edit-C1"]').trigger("click");
+    await flushPromises();
+    await body().find("form").trigger("submit");
+    await vi.waitFor(() =>
+      expect(body().find('[data-test="slack-channel-save-error"]').text()).toBe(
+        "Only an admin of org prod can change this channel's default",
+      ),
+    );
+    expect(body().find("form").exists()).toBe(true);
+  });
+
+  it("W-S13 disables channels whose default another org owns", async () => {
+    vi.mocked(slack.listChannels).mockReturnValue(
+      ok({
+        channels: [
+          {
+            id: "C2",
+            name: "staging-alerts",
+            is_private: false,
+            is_member: true,
+            is_shared: false,
+          },
+          {
+            id: "C3",
+            name: "payments-oncall",
+            is_private: false,
+            is_member: true,
+            is_shared: false,
+          },
+        ],
+        next_cursor: null,
+      }) as any,
+    );
+    const w = await mountDefaults();
+    await w.find('[data-test="slack-channel-set-default"]').trigger("click");
+    await flushPromises();
+    const options = w.findComponent({ name: "OSelect" }).props("options") as {
+      value: string;
+      disabled?: boolean;
+    }[];
+    expect(options.find((o) => o.value === "C2")?.disabled).toBe(true);
+    expect(options.find((o) => o.value === "C3")?.disabled).toBeFalsy();
+  });
+
+  it("W-S8 searches channels on the server as the admin types", async () => {
+    const w = await mountDefaults();
+    await w.find('[data-test="slack-channel-set-default"]').trigger("click");
+    await flushPromises();
+    const select = w.findComponent({ name: "OSelect" });
+    expect(select.props("searchDebounce")).toBeGreaterThan(0);
+    select.vm.$emit("search", "pay");
+    await flushPromises();
+    expect(slack.listChannels).toHaveBeenLastCalledWith("acme", "inst-1", { q: "pay", cursor: "" });
+  });
+
+  it("W-S8 loads the next page of channels on demand", async () => {
+    vi.mocked(slack.listChannels)
+      .mockReturnValueOnce(
+        ok({
+          channels: [
+            {
+              id: "C3",
+              name: "payments-oncall",
+              is_private: false,
+              is_member: true,
+              is_shared: false,
+            },
+          ],
+          next_cursor: "c2",
+        }) as any,
+      )
+      .mockReturnValueOnce(
+        ok({
+          channels: [
+            { id: "C4", name: "zz-last", is_private: false, is_member: true, is_shared: false },
+          ],
+          next_cursor: null,
+        }) as any,
+      );
+    const w = await mountDefaults();
+    await w.find('[data-test="slack-channel-set-default"]').trigger("click");
+    await flushPromises();
+    await body().find('[data-test="slack-channel-more"]').trigger("click");
+    await flushPromises();
+    expect(slack.listChannels).toHaveBeenLastCalledWith("acme", "inst-1", { q: "", cursor: "c2" });
+    const values = (
+      w.findComponent({ name: "OSelect" }).props("options") as { value: string }[]
+    ).map((o) => o.value);
+    expect(values).toEqual(expect.arrayContaining(["C3", "C4"]));
+    expect(body().find('[data-test="slack-channel-more"]').exists()).toBe(false);
+  });
+
   it("asks for a channel before setting a new default", async () => {
     const w = await mountDefaults();
     await w.find('[data-test="slack-channel-set-default"]').trigger("click");
@@ -139,5 +250,38 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
   it("explains an empty list", async () => {
     const w = await mountDefaults([]);
     expect(w.text()).toContain("No channel has a default org yet");
+  });
+
+  it("W-S7 shows no empty state while the defaults load", async () => {
+    vi.mocked(slack.listChannelDefaults).mockReturnValue(new Promise(() => undefined) as any);
+    const w = await mountWith();
+    expect(w.find('[data-test-stub="otable-loading"]').exists()).toBe(true);
+    expect(w.text()).not.toContain("No channel has a default org yet");
+  });
+
+  it("W-S6 a failed load shows a retryable error instead of the empty state (real OTable)", async () => {
+    vi.mocked(slack.listChannelDefaults).mockReturnValue(Promise.reject(axiosError(500)) as any);
+    const w = await mountWith(true);
+    // OTable holds its skeleton for 50 ms before any end state.
+    await vi.waitFor(() =>
+      expect(w.find('[data-test="slack-channel-defaults-error"]').exists()).toBe(true),
+    );
+    const error = w.find('[data-test="slack-channel-defaults-error"]');
+    expect(w.text()).not.toContain("No channel has a default org yet");
+
+    vi.mocked(slack.listChannelDefaults).mockReturnValue(ok({ defaults: rows }) as any);
+    await error.find("button").trigger("click");
+    await flushPromises();
+    expect(slack.listChannelDefaults).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() =>
+      expect(w.find('[data-test="slack-channel-defaults-error"]').exists()).toBe(false),
+    );
+  });
+
+  it("W-S6 a 403 shows no access instead of the empty state (real OTable)", async () => {
+    vi.mocked(slack.listChannelDefaults).mockReturnValue(Promise.reject(axiosError(403)) as any);
+    const w = await mountWith(true);
+    await vi.waitFor(() => expect(w.find('[data-test="o2-table-forbidden"]').exists()).toBe(true));
+    expect(w.text()).not.toContain("No channel has a default org yet");
   });
 });

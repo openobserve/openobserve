@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -23,6 +23,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
@@ -35,12 +36,14 @@ import {
   slackChannelsQuery,
 } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
-import type { SlackChannelDefaultRow } from "@/types/slack";
+import type { SlackChannel, SlackChannelDefaultRow } from "@/types/slack";
+import { serverMessageOf, statusOf } from "@/utils/slackLink";
 import { makeChannelDefaultSchema, type ChannelDefaultForm } from "./SlackSettings.schema";
 
 const props = defineProps<{ installationId: string }>();
 
 const FORM_ID = "slack-channel-default-form";
+const SEARCH_DEBOUNCE_MS = 300;
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -54,23 +57,55 @@ const drawerOpen = ref(false);
 const editing = ref<SlackChannelDefaultRow | null>(null);
 const removing = ref<SlackChannelDefaultRow | null>(null);
 const removeOpen = ref(false);
+const saveError = ref<string | null>(null);
+const channelSearch = ref("");
+// Every channel a search or page has shown, so a picked one keeps its name when the next search drops it.
+const seenChannels = ref(new Map<string, SlackChannel>());
 
 const channels = useInfiniteQuery(() =>
-  Object.assign(slackChannelsQuery(org.value, props.installationId, ""), {
+  Object.assign(slackChannelsQuery(org.value, props.installationId, channelSearch.value), {
     enabled: drawerOpen.value,
   }),
 );
+
+const rows = computed<SlackChannelDefaultRow[]>(() => defaults.data.value?.defaults ?? []);
+const otherOrgChannels = computed(
+  () => new Set(rows.value.filter((r) => !r.set_by_this_org).map((r) => r.channel_id)),
+);
+
+watch(
+  () => channels.data.value?.pages,
+  (pages) => {
+    for (const channel of pages?.flatMap((page) => page.channels) ?? []) {
+      seenChannels.value.set(channel.id, channel);
+    }
+  },
+  { immediate: true },
+);
+
 const channelOptions = computed(() => {
   const listed = channels.data.value?.pages.flatMap((page) => page.channels) ?? [];
-  const options = listed.map((c) => ({ label: raw(`#${c.name}`), value: c.id }));
+  const ordered = new Map(listed.map((c) => [c.id, c]));
+  for (const [id, channel] of seenChannels.value) if (!ordered.has(id)) ordered.set(id, channel);
+  const options = [...ordered.values()].map((c) => ({
+    label: raw(`#${c.name}`),
+    value: c.id,
+    disabled: otherOrgChannels.value.has(c.id),
+  }));
   const current = editing.value;
   if (current && !options.some((o) => o.value === current.channel_id)) {
-    options.unshift({ label: raw(`#${current.channel_name}`), value: current.channel_id });
+    options.unshift({
+      label: raw(`#${current.channel_name}`),
+      value: current.channel_id,
+      disabled: false,
+    });
   }
   return options;
 });
-
-const rows = computed<SlackChannelDefaultRow[]>(() => defaults.data.value?.defaults ?? []);
+const forbidden = computed(() => statusOf(defaults.error.value) === 403);
+const loadError = computed(() =>
+  defaults.isError.value && !forbidden.value ? t("emptyState.loadError.title") : null,
+);
 const schema = makeChannelDefaultSchema(t);
 const formDefaults = computed<ChannelDefaultForm>(() => ({
   channel_id: editing.value?.channel_id ?? "",
@@ -88,6 +123,8 @@ const columns = computed<OTableColumnDef<SlackChannelDefaultRow>[]>(() => [
 
 const openDrawer = (row: SlackChannelDefaultRow | null): void => {
   editing.value = row;
+  saveError.value = null;
+  channelSearch.value = "";
   drawerOpen.value = true;
 };
 
@@ -102,11 +139,16 @@ const confirmRemove = (): void => {
 };
 
 const save = async (value: ChannelDefaultForm): Promise<void> => {
-  await put.mutateAsync({
-    channelId: value.channel_id,
-    body: { org_id: org.value, answer_mode: value.answer_mode },
-  });
-  drawerOpen.value = false;
+  saveError.value = null;
+  try {
+    await put.mutateAsync({
+      channelId: value.channel_id,
+      body: { org_id: org.value, answer_mode: value.answer_mode },
+    });
+    drawerOpen.value = false;
+  } catch (error) {
+    saveError.value = serverMessageOf(error) ?? t("slackApp.channels.saveFailed");
+  }
 };
 </script>
 
@@ -136,6 +178,8 @@ const save = async (value: ChannelDefaultForm): Promise<void> => {
       pagination="none"
       :show-global-filter="false"
       :loading="defaults.isPending.value"
+      :error="loadError"
+      :forbidden="forbidden"
       :cell-overflow-tooltip="false"
       dense
     >
@@ -156,18 +200,7 @@ const save = async (value: ChannelDefaultForm): Promise<void> => {
         <span class="text-text-muted">{{ raw("—") }}</span>
       </template>
       <template #cell-set_by="{ row }">
-        <span class="flex flex-col">
-          <span>
-            {{
-              row.set_by_this_org
-                ? t("slackApp.channels.thisOrg")
-                : t("slackApp.channels.anotherOrg")
-            }}
-          </span>
-          <span class="text-text-secondary text-xs">
-            {{ t(`slackApp.channels.setFrom.${row.set_from}`) }}
-          </span>
-        </span>
+        {{ t(`slackApp.channels.setFrom.${row.set_from}`) }}
       </template>
       <template #cell-actions="{ row }">
         <span v-if="row.set_by_this_org" class="flex justify-end gap-1">
@@ -188,6 +221,15 @@ const save = async (value: ChannelDefaultForm): Promise<void> => {
             @click="askRemove(row)"
           />
         </span>
+      </template>
+      <template #error>
+        <OEmptyState
+          size="compact"
+          preset="load-error"
+          :backdrop="false"
+          data-test="slack-channel-defaults-error"
+          @action="defaults.refetch()"
+        />
       </template>
       <template #empty>
         <OEmptyState
@@ -218,17 +260,40 @@ const save = async (value: ChannelDefaultForm): Promise<void> => {
         class="flex flex-col gap-5"
         @submit="save"
       >
-        <OFormSelect
-          name="channel_id"
-          :label="t('slackApp.channels.channel')"
-          :placeholder="t('slackApp.channels.channelPlaceholder')"
-          :options="channelOptions"
-          :loading="channels.isPending.value"
-          :disabled="!!editing"
-          :help-text="t('slackApp.channels.privateHint')"
-          required
-          data-test="slack-channel-select"
-        />
+        <OBanner
+          v-if="saveError"
+          variant="error-soft"
+          dense
+          icon="error-outline"
+          data-test="slack-channel-save-error"
+          >{{ raw(saveError) }}</OBanner
+        >
+        <div class="flex flex-col gap-1">
+          <OFormSelect
+            name="channel_id"
+            :label="t('slackApp.channels.channel')"
+            :placeholder="t('slackApp.channels.channelPlaceholder')"
+            :options="channelOptions"
+            :loading="channels.isFetching.value"
+            :disabled="!!editing"
+            :search-debounce="SEARCH_DEBOUNCE_MS"
+            :help-text="t('slackApp.channels.privateHint')"
+            required
+            data-test="slack-channel-select"
+            @search="channelSearch = $event.trim()"
+          />
+          <OButton
+            v-if="!editing && channels.hasNextPage.value"
+            variant="ghost-primary"
+            size="xs"
+            class="w-fit"
+            :loading="channels.isFetchingNextPage.value"
+            data-test="slack-channel-more"
+            @click="channels.fetchNextPage()"
+          >
+            {{ t("slackApp.channels.loadMore") }}
+          </OButton>
+        </div>
         <div class="flex flex-col gap-2">
           <span class="text-text-label text-compact font-medium">
             {{ t("slackApp.channels.answers") }}

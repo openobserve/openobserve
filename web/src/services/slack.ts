@@ -159,9 +159,11 @@ const slack = {
     channelId: string,
     body: SlackChannelDefaultRequest,
   ) =>
+    // The drawer shows the 403, which names the org whose admin may change the row.
     http().put<SlackChannelDefaultRow>(
       `${installation(org, id)}/channel-defaults/${encodeURIComponent(channelId)}`,
       body,
+      RENDERS_FORBIDDEN,
     ),
 
   deleteChannelDefault: (org: string, id: string, channelId: string) =>

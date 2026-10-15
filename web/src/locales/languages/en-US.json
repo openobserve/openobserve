@@ -24315,6 +24315,7 @@
       "permissionHint": "Needs the Manage Slack permission · org Admins have it by default",
       "consent": "Two-way Slack also reads your direct messages with OpenObserve and replies in threads it is part of. It never reads other channel history.",
       "consentPrivate": "Two-way Slack also reads your direct messages with OpenObserve. It reads channel messages only when you mention {'@'}OpenObserve.",
+      "consentPending": "Slack lists what {product} can access before you allow it.",
       "setupApp": "Set up Slack app",
       "selfHostedHint": "OpenObserve creates your own Slack app from one configuration token",
       "upgradeTitle": "Already sending alerts to Slack? Upgrade to two-way Slack",
@@ -24326,7 +24327,7 @@
       "alreadyInstalled": "{team} is already installed for another organization. Connect this org to use it.",
       "connectedTitle": "Connected to {team}",
       "connectedDestination": "Alerts post to #{channel} · each person gets one DM saying who they are linked as",
-      "connectFailed": "Slack could not connect this org. Try again."
+      "continue": "Continue"
     },
     "wizard": {
       "title": "Set up the Slack app",
@@ -24346,8 +24347,6 @@
         "description": "The check reaches Slack from this server through the same code path production uses.",
         "allPassed": "Slack is reachable from this server",
         "someFailed": "Slack is not reachable from this server. Allow *.slack.com through your proxy or firewall, then Re-check.",
-        "columnHost": "Host",
-        "columnResult": "Result",
         "proxy": "Through proxy {proxy}",
         "caBundle": "Extra CA bundle {path}",
         "socketHost": "WebSocket host {host}"
@@ -24425,7 +24424,6 @@
       "counts": "{auto} linked automatically, {oidc} with Link your account",
       "matches": "{count} Slack member matches an OpenObserve user | {count} Slack members match OpenObserve users",
       "matchesHelp": "Joined before automatic linking was on · each gets one DM",
-      "linkAll": "Link all",
       "linkAllMatches": "Link all matches ({count})",
       "linkAllDone": "Linked {count} person | Linked {count} people",
       "linkAllRunning": "Linked {count} so far; the rest continue in the background",
@@ -24446,9 +24444,11 @@
       "collaborator": "Add a second Slack app collaborator so the app survives one person leaving",
       "openCollaborators": "Open Collaborators",
       "credentialsUnreadable": "Credentials unreadable — re-enter tokens",
+      "credentialsUnreadableCloud": "Credentials unreadable — reinstall to restore them",
       "test": "Test connection",
       "updateCredentials": "Update credentials",
       "reinstall": "Reinstall",
+      "reinstalled": "Reinstalled in {team} · the app has its current permissions",
       "refreshTokenKept": "Configuration refresh token kept",
       "forget": "Forget",
       "forgetTitle": "Forget the configuration refresh token?",
@@ -24503,6 +24503,8 @@
       "channelPlaceholder": "Search channels",
       "channelRequired": "Pick a channel",
       "privateHint": "Private channels appear after /invite {'@'}OpenObserve",
+      "loadMore": "Load more channels",
+      "saveFailed": "The channel default could not be saved.",
       "answers": "Answers",
       "edit": "Edit",
       "remove": "Remove",
@@ -24512,7 +24514,6 @@
     "people": {
       "title": "Linked people",
       "description": "People in this org who linked their Slack account",
-      "count": "Nobody linked yet | {count} person linked their Slack account | {count} people linked their Slack account",
       "columnUser": "OpenObserve user",
       "columnSlackUser": "Slack user",
       "columnMethod": "Linked by",

@@ -45,7 +45,8 @@ export type SlackAppTokenState = "not_applicable" | "missing" | "ok" | "revoked"
 
 export type SlackLinkingSource = "mapping" | "manual";
 
-export type SlackInstallSource = "destination_form" | "settings" | "upgrade_banner";
+/** `reinstall` refreshes the bot token and scopes only: no destination and no channel default. */
+export type SlackInstallSource = "destination_form" | "settings" | "upgrade_banner" | "reinstall";
 
 export type SlackConnectionPurpose = "connect" | "test";
 
@@ -186,6 +187,14 @@ export interface SlackAlreadyInstalledResponse extends Partial<SlackOAuthConnect
 export type SlackInstallExchangeResponse =
   SlackFormExchangeResponse | SlackSettingsExchangeResponse | SlackAlreadyInstalledResponse;
 
+/** What the page confirms right after an install or connect, before it shows the workspace. */
+export interface SlackInstallConfirmation {
+  team: string;
+  destination: SlackCreatedDestination | null;
+  linking: LinkingView | null;
+  linkAll: SlackLinkAllResult | null;
+}
+
 export type SlackPrerequisiteId =
   "master_key" | "delegation_key" | "home_region" | "web_url" | "agent";
 
@@ -302,9 +311,11 @@ export interface SlackTestPost {
   detail: string;
 }
 
+/** `verify_url`: HTTP mode only, the app's App Manifest page while Slack waits for a Verify click. */
 export interface SlackTestResponse {
   checks: SlackTestCheck[];
   test_post: SlackTestPost | null;
+  verify_url?: string;
 }
 
 export interface SlackLinkingUpdateRequest {
@@ -442,21 +453,15 @@ export interface SlackMyLinksResponse {
   links: SlackMyLink[];
 }
 
-/** An `external_identity_links` row as the admin list returns it (`ExternalIdentityLink`). */
-export interface SlackLinkRow {
+/** One row of the admin link list (`links::AdminLinkView`): it never names another org. */
+export interface SlackAdminLink {
   id: string;
-  provider: string;
-  installation_id: string;
-  external_enterprise_id: string;
-  external_team_id: string;
-  external_user_id: string;
+  slack_user_id: string;
   user_email: string;
-  default_org_id: string;
   link_method: SlackLinkMethod;
   created_at: number;
   last_used_at: number;
-  revoked_at: number | null;
-  revoked_reason: SlackRevokedReason | null;
+  default_org_is_this_org: boolean;
 }
 
 export interface SlackLinksParams {
@@ -465,6 +470,6 @@ export interface SlackLinksParams {
 }
 
 export interface SlackLinksResponse {
-  links: SlackLinkRow[];
+  links: SlackAdminLink[];
   next_cursor: string | null;
 }

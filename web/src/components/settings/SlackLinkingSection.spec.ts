@@ -18,7 +18,13 @@ import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import slack from "@/services/slack";
 import SlackLinkingSection from "./SlackLinkingSection.vue";
-import { installationView, linkingView, makeSlackStore, ok } from "@/test/unit/helpers/slack";
+import {
+  axiosError,
+  installationView,
+  linkingView,
+  makeSlackStore,
+  ok,
+} from "@/test/unit/helpers/slack";
 import type { LinkingView } from "@/types/slack";
 
 vi.mock("@/services/slack", () => ({
@@ -105,9 +111,29 @@ describe("SlackLinkingSection (row 11)", () => {
     );
     const matches = w.find('[data-test="slack-linking-matches"]');
     expect(matches.text()).toContain("4 Slack members match OpenObserve users");
+    expect(matches.find("button").text()).toBe("Link all matches (4)");
     await matches.find("button").trigger("click");
     await flushPromises();
     expect(slack.linkAll).toHaveBeenCalledWith("acme", "inst-1");
+  });
+
+  it("NIT-7 a refused Link all leaves no unhandled error", async () => {
+    vi.mocked(slack.linkAll).mockReturnValue(Promise.reject(axiosError(409, "running")) as any);
+    const errorHandler = vi.fn();
+    vi.mocked(slack.getLinking).mockReturnValue(ok(linkingView()) as any);
+    const w = mount(SlackLinkingSection, {
+      props: { installation: installationView() },
+      attachTo: document.body,
+      global: {
+        plugins: [i18n, makeSlackStore()],
+        stubs: { SlackLinkedPeople: PeopleStub },
+        config: { errorHandler },
+      },
+    });
+    await flushPromises();
+    await w.find('[data-test="slack-linking-matches"] button').trigger("click");
+    await flushPromises();
+    expect(errorHandler).not.toHaveBeenCalled();
   });
 
   it("hides Link all when no member is waiting", async () => {
@@ -123,5 +149,23 @@ describe("SlackLinkingSection (row 11)", () => {
     const w = await mountSection(linkingView());
     await w.find('[data-test="slack-linking-manage"]').trigger("click");
     expect(w.find('[data-test-stub="people"]').attributes("data-open")).toBe("true");
+  });
+
+  it("W-S6 a failed load shows a retryable error instead of nothing", async () => {
+    vi.mocked(slack.getLinking).mockReturnValue(Promise.reject(axiosError(500)) as any);
+    const w = mount(SlackLinkingSection, {
+      props: { installation: installationView() },
+      attachTo: document.body,
+      global: { plugins: [i18n, makeSlackStore()], stubs: { SlackLinkedPeople: PeopleStub } },
+    });
+    await flushPromises();
+    const error = w.find('[data-test="slack-linking-error"]');
+    expect(error.exists()).toBe(true);
+
+    vi.mocked(slack.getLinking).mockReturnValue(ok(linkingView()) as any);
+    await error.find("button").trigger("click");
+    await flushPromises();
+    expect(slack.getLinking).toHaveBeenCalledTimes(2);
+    expect(w.find('[data-test="slack-linking-summary"]').exists()).toBe(true);
   });
 });

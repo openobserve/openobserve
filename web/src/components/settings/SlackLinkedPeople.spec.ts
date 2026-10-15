@@ -18,25 +18,26 @@ import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import slack from "@/services/slack";
 import SlackLinkedPeople from "./SlackLinkedPeople.vue";
-import { ConfirmDialogStub, OTableStub, makeSlackStore, ok } from "@/test/unit/helpers/slack";
-import type { SlackLinkRow } from "@/types/slack";
+import {
+  ConfirmDialogStub,
+  OTableStub,
+  axiosError,
+  makeSlackStore,
+  ok,
+} from "@/test/unit/helpers/slack";
+import type { SlackAdminLink } from "@/types/slack";
 
 vi.mock("@/services/slack", () => ({ default: { listLinks: vi.fn(), deleteLink: vi.fn() } }));
 
-const link = (over: Partial<SlackLinkRow> = {}): SlackLinkRow => ({
+// The admin list row (ENT `links::AdminLinkView`): no other org's id, team or enterprise.
+const link = (over: Partial<SlackAdminLink> = {}): SlackAdminLink => ({
   id: "link-1",
-  provider: "slack",
-  installation_id: "inst-1",
-  external_enterprise_id: "",
-  external_team_id: "T0SAMPLE01",
-  external_user_id: "U0SAMPLE01",
+  slack_user_id: "U0SAMPLE01",
   user_email: "dana@acme.example",
-  default_org_id: "acme",
   link_method: "oidc",
   created_at: 1_760_000_000_000_000,
   last_used_at: 1_760_000_500_000_000,
-  revoked_at: null,
-  revoked_reason: null,
+  default_org_is_this_org: true,
   ...over,
 });
 
@@ -46,12 +47,14 @@ const ODrawerStub = {
   template: '<div v-if="open" data-test-stub="drawer"><slot /></div>',
 };
 
-const mountPeople = () =>
+const mountPeople = (realTable = false) =>
   mount(SlackLinkedPeople, {
     props: { open: true, installationId: "inst-1" },
     global: {
       plugins: [i18n, makeSlackStore()],
-      stubs: { OTable: OTableStub, ODrawer: ODrawerStub, ConfirmDialog: ConfirmDialogStub },
+      stubs: realTable
+        ? { ODrawer: ODrawerStub, ConfirmDialog: ConfirmDialogStub }
+        : { OTable: OTableStub, ODrawer: ODrawerStub, ConfirmDialog: ConfirmDialogStub },
     },
   });
 
@@ -81,9 +84,23 @@ describe("SlackLinkedPeople", () => {
     const rows = w.findAll('[data-test-stub="otable-row"]');
     expect(rows).toHaveLength(2);
     expect(rows[0].text()).toContain("dana@acme.example");
+    expect(rows[0].find('[data-col="slack_user_id"]').text()).toBe("U0SAMPLE01");
     expect(rows[0].text()).toContain("Sign in with Slack");
     expect(rows[1].text()).toContain("Link all");
     expect(w.find('[data-test="slack-people-more"]').exists()).toBe(false);
+  });
+
+  it("EC-B2 says whether each person's questions run in this org by default", async () => {
+    vi.mocked(slack.listLinks).mockReturnValue(
+      ok({
+        links: [link(), link({ id: "link-2", default_org_is_this_org: false })],
+        next_cursor: null,
+      }) as any,
+    );
+    const w = mountPeople();
+    await flushPromises();
+    const cells = w.findAll('[data-col="default_org"]').map((c) => c.text());
+    expect(cells).toEqual(["This org", "Another org"]);
   });
 
   it("pages with Load more while the server returns a cursor", async () => {
@@ -122,5 +139,37 @@ describe("SlackLinkedPeople", () => {
     const w = mountPeople();
     await flushPromises();
     expect(w.text()).toContain("Nobody in this org has linked Slack yet");
+  });
+
+  it("W-S7 shows no empty state while the links load", async () => {
+    vi.mocked(slack.listLinks).mockReturnValue(new Promise(() => undefined) as any);
+    const w = mountPeople();
+    await flushPromises();
+    expect(w.find('[data-test-stub="otable-loading"]').exists()).toBe(true);
+    expect(w.text()).not.toContain("Nobody in this org has linked Slack yet");
+  });
+
+  it("W-S6 a failed load shows a retryable error instead of the empty state (real OTable)", async () => {
+    vi.mocked(slack.listLinks).mockReturnValue(Promise.reject(axiosError(500)) as any);
+    const w = mountPeople(true);
+    await flushPromises();
+    // OTable holds its skeleton for 50 ms before any end state.
+    await vi.waitFor(() => expect(w.find('[data-test="slack-people-error"]').exists()).toBe(true));
+    const error = w.find('[data-test="slack-people-error"]');
+    expect(w.text()).not.toContain("Nobody in this org has linked Slack yet");
+
+    vi.mocked(slack.listLinks).mockReturnValue(ok({ links: [link()], next_cursor: null }) as any);
+    await error.find("button").trigger("click");
+    await flushPromises();
+    expect(slack.listLinks).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(w.find('[data-test="slack-people-error"]').exists()).toBe(false));
+  });
+
+  it("W-S6 a 403 shows no access instead of the empty state (real OTable)", async () => {
+    vi.mocked(slack.listLinks).mockReturnValue(Promise.reject(axiosError(403)) as any);
+    const w = mountPeople(true);
+    await flushPromises();
+    await vi.waitFor(() => expect(w.find('[data-test="o2-table-forbidden"]').exists()).toBe(true));
+    expect(w.text()).not.toContain("Nobody in this org has linked Slack yet");
   });
 });

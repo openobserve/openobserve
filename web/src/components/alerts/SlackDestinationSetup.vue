@@ -24,7 +24,7 @@ import {
   installStartMutation,
   slackInstallationsQuery,
 } from "@/services/slack.queries";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { InstallationSummary, SlackInstallExchangeResponse } from "@/types/slack";
 import { isValidSlackWebhookUrl } from "@/utils/prebuilt-templates/slack";
 import {
@@ -32,6 +32,7 @@ import {
   slackManifestJson,
   SLACK_APP_NAME_MAX_LENGTH,
 } from "@/utils/slackManifest";
+import { statusOf } from "@/utils/slackLink";
 import { installerDomainDefault, readSlackOrgConfig } from "@/utils/slackSettings";
 import { isValidResourceName } from "@/utils/zincutils";
 import type { AddDestinationForm } from "./AddDestination.schema";
@@ -71,9 +72,9 @@ const store = useStore();
 const router = useRouter();
 const manifestStep = ref(1);
 const slackState = computed(() => readSlackOrgConfig(store.state.zoConfig));
-// Set once install/start answers 403: the user can create destinations but lacks slack_integration PUT.
-const noSlackPut = ref(false);
-const appPath = computed(() => props.isCloud && slackState.value.enabled && !noSlackPut.value);
+// Set once install/start answers 403 (no slack_integration PUT) or 404 (Slack turned off since sign-in).
+const appUnavailable = ref(false);
+const appPath = computed(() => props.isCloud && slackState.value.enabled && !appUnavailable.value);
 const popupPath = ref<"app" | "webhook">("webhook");
 const formInstallation = ref<InstallationSummary | null>(null);
 
@@ -174,9 +175,9 @@ const startUrl = async (): Promise<string> => {
       popupPath.value = "app";
       return response.authorization_url;
     } catch (error) {
-      const status = (error as { response?: { status?: number } }).response?.status;
-      if (status !== 403) throw error;
-      noSlackPut.value = true;
+      const status = statusOf(error);
+      if (status !== 403 && status !== 404) throw error;
+      appUnavailable.value = true;
     }
   }
   popupPath.value = "webhook";
@@ -226,6 +227,16 @@ const connectSlack = async (): Promise<void> => {
   if (!props.isCloud) return;
   await openPopup();
 };
+
+// Which app a Connect reaches is known only once install/start answers, so the copy waits for it.
+const consentNote = computed<I18nText>(() => {
+  if (!appPath.value) {
+    return t("alert_destinations.slackOAuth.permissionNote", { product: raw("OpenObserve") });
+  }
+  return popupPath.value === "app"
+    ? t("slackApp.connect.consent")
+    : t("slackApp.connect.consentPending", { product: raw("OpenObserve") });
+});
 
 const upgradeCandidate = computed(() => {
   const data = installations.data.value;
@@ -390,11 +401,7 @@ onMounted(() => {
       </OBanner>
 
       <OBanner variant="info" dense icon="verified-user" data-test="slack-oauth-permission-note">
-        {{
-          appPath
-            ? t("slackApp.connect.consent")
-            : t("alert_destinations.slackOAuth.permissionNote", { product: raw("OpenObserve") })
-        }}
+        {{ consentNote }}
       </OBanner>
 
       <OBanner

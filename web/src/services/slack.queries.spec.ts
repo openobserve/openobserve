@@ -290,6 +290,10 @@ describe("slack mutations", () => {
     expect(confirmConnectionMutation(ORG).meta?.silentError).toBe(true);
   });
 
+  it("W-S13 the channel default drawer shows its own refusal, so the save stays silent", () => {
+    expect(putChannelDefaultMutation(ORG, ID).meta?.silentError).toBe(true);
+  });
+
   it("calls the service with the mutation variables", async () => {
     await run(connectInstallationMutation(ORG), {
       installationId: ID,

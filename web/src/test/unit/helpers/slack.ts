@@ -87,23 +87,31 @@ export const axiosError = (status: number, message = "refused") =>
 
 export const ok = <T>(data: T) => Promise.resolve({ data });
 
-/** Renders rows through the same `cell-<id>` slots OTable exposes, so specs read cell output. */
+/** OTable's cell slots and its state ladder (loading, then forbidden, error or empty), without its layout. */
 export const OTableStub = defineComponent({
   name: "OTable",
   props: {
     data: { type: Array, default: () => [] },
     columns: { type: Array, default: () => [] },
     selectedIds: { type: Array, default: () => [] },
+    loading: { type: Boolean, default: false },
+    error: { type: String, default: null },
+    forbidden: { type: Boolean, default: false },
   },
   emits: ["update:selectedIds"],
   template: `
     <div data-test-stub="otable">
-      <div v-for="(row, i) in data" :key="i" data-test-stub="otable-row">
-        <span v-for="col in columns" :key="col.id" :data-col="col.id">
-          <slot :name="'cell-' + col.id" :row="row">{{ col.accessorKey ? row[col.accessorKey] : '' }}</slot>
-        </span>
-      </div>
-      <div v-if="!data.length"><slot name="empty" /></div>
+      <div v-if="loading" data-test-stub="otable-loading" />
+      <template v-else>
+        <div v-for="(row, i) in data" :key="i" data-test-stub="otable-row">
+          <span v-for="col in columns" :key="col.id" :data-col="col.id">
+            <slot :name="'cell-' + col.id" :row="row">{{ col.accessorKey ? row[col.accessorKey] : '' }}</slot>
+          </span>
+        </div>
+        <div v-if="forbidden && !data.length" data-test-stub="otable-forbidden" />
+        <div v-else-if="error" data-test-stub="otable-error"><slot name="error" :message="error" /></div>
+        <div v-else-if="!data.length"><slot name="empty" /></div>
+      </template>
     </div>`,
 });
 
