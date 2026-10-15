@@ -6,10 +6,12 @@ and Sign in with Slack is simulated by folding the nonce and the Slack user into
 """
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Any
 
 import pytest
+import requests
 
 from helpers.slack_mock import mock_code
 from support.client import OpenObserveClient
@@ -186,6 +188,28 @@ def test_a_qualifying_member_links_on_first_mention_and_an_unlink_is_never_undon
     send_mention(client, inst, team, "U0KIM")
     link_prompt(ready, "U0KIM")
     assert my_links(kim, slack_org) == [], "an unlinked user is never linked automatically again"
+
+
+def test_uninstall_revokes_and_counts_the_links_although_slack_reports_revoked_tokens_first(
+    client: OpenObserveClient, slack_org: str, ready: SlackMock
+) -> None:
+    """Live 21:25: Slack's tokens_revoked won the race and Uninstall answered ``links_revoked: 0``."""
+    _, dana = make_user(client, slack_org, "editor", email=f"dana_{uniq()}@acme.test")
+    team = new_team(ready, slack_user("U0DANA", "", f"dana_{uniq()}@elsewhere.test"))
+    inst = http_install(client, slack_org, team)
+    send_mention(client, inst, team, "U0DANA")
+    confirmed = sign_in_with_slack(dana, slack_org, link_prompt(ready, "U0DANA"), slack_user_id="U0DANA", team_id=team)
+    assert confirmed.status_code == 200, confirmed.text
+    links = my_links(dana, slack_org)
+    assert (links[0]["link_method"], links[0]["default_org_id"]) == ("oidc", slack_org)
+
+    requests.post(f"{ready.base_url}/_mock/uninstall_events", json={"settle": 3}, timeout=5).raise_for_status()
+    gone = client.delete(f"slack/installations/{inst['id']}", org=slack_org)
+    assert gone.status_code == 200, gone.text
+    assert gone.json()["affected"]["links_revoked"] == 1, gone.json()
+    first = ready.calls("event_delivery")[0]["form"]
+    assert (json.loads(first["body"])["event"]["type"], first["status"]) == ("tokens_revoked", "200"), first
+    assert my_links(dana, slack_org) == []
 
 
 @pytest.mark.parametrize(

@@ -23,6 +23,8 @@ Control endpoints (JSON):
 - ``POST /_mock/fail``                   ``{"method", "error", "times"?, "http_status"?, "retry_after"?}``
 - ``POST /_mock/apps``                   register an app: ``{"app_id", "client_id", "client_secret", "signing_secret"?}``
 - ``POST /_mock/teams``                  add or replace a team: ``{"team_id", "team_name", "channels"?, "members"?}``
+- ``POST /_mock/uninstall_events``       ``{"settle": s}``: ``apps.uninstall`` first POSTs Slack's signed ``tokens_revoked``
+  and ``app_uninstalled`` events to the app's HTTP request URL, as live Slack does, then waits ``s`` seconds
 - ``GET  /_mock/code?claims=<json>``     the ``mock.`` code for those claims
 - ``GET  /_mock/state``                  apps, issued bot tokens (redacted), refresh tokens used
 
@@ -34,6 +36,7 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
+import hmac
 import itertools
 import json
 import logging
@@ -44,6 +47,8 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 log = logging.getLogger("slack-mock")
 
@@ -150,6 +155,8 @@ class MockState:
         self.config_tokens: set[str] = set()
         self.used_refresh_tokens: set[str] = set()
         self.revoked: set[str] = set()
+        self.uninstall_settle: float | None = None
+        self.outbox: list[tuple[str, str, bytes]] = []
 
     def next_id(self, prefix: str) -> str:
         return f"{prefix}{next(self.ids):06d}"
@@ -348,7 +355,40 @@ def m_apps_uninstall(st: MockState, form: dict[str, str], bearer: str | None) ->
     for token, g in st.bot_tokens.items():
         if g["app_id"] == grant["app_id"] and g["team_id"] == grant["team_id"]:
             st.revoked.add(token)
+    app = st.apps.get(grant["app_id"])
+    url = ((app or {}).get("manifest") or {}).get("settings", {}).get("event_subscriptions", {}).get("request_url")
+    if st.uninstall_settle is not None and url:
+        for event in uninstall_events(grant):
+            st.outbox.append((url, app["signing_secret"], event))
     return {}
+
+
+def uninstall_events(grant: dict[str, Any]) -> list[bytes]:
+    """``tokens_revoked`` for the bot, then ``app_uninstalled``: what live Slack sent on ``apps.uninstall``."""
+    events = [
+        {"type": "tokens_revoked", "tokens": {"oauth": [], "bot": [grant["user_id"]]}},
+        {"type": "app_uninstalled"},
+    ]
+    now = time.time()
+    return [json.dumps({
+        "token": "ignored", "team_id": grant["team_id"], "api_app_id": grant["app_id"],
+        "event": {**event, "event_ts": f"{now:.6f}"}, "type": "event_callback",
+        "event_id": "Ev" + uuid.uuid4().hex[:10].upper(), "event_time": int(now),
+    }).encode() for event in events]
+
+
+def deliver(url: str, secret: str, body: bytes) -> int:
+    stamp = str(int(time.time()))
+    mac = hmac.new(secret.encode(), b"v0:" + stamp.encode() + b":" + body, hashlib.sha256).hexdigest()
+    headers = {"Content-Type": "application/json", "X-Slack-Request-Timestamp": stamp, "X-Slack-Signature": "v0=" + mac}
+    try:
+        with urlopen(Request(url, data=body, headers=headers, method="POST"), timeout=10) as resp:
+            return resp.status
+    except HTTPError as e:
+        return e.code
+    except OSError as e:
+        log.warning("event delivery to %s failed: %s", url, e)
+        return 0
 
 
 def m_apps_connections_open(_st: MockState, _form: dict[str, str], bearer: str | None) -> dict[str, Any]:
@@ -554,7 +594,19 @@ class SlackMockHandler(BaseHTTPRequestHandler):
                     headers = {"Retry-After": str(e.retry_after)} if e.retry_after is not None else {}
                     return self.reply(e.http_status, {"ok": False, "error": e.error}, headers)
                 return self.reply(200, {"ok": False, "error": e.error})
+            outbox, self.state.outbox = self.state.outbox, []
+            settle = self.state.uninstall_settle or 0
+        if outbox:
+            self.deliver_events(outbox, settle)
         self.reply(200, {"ok": True, **{k: v for k, v in body.items() if v is not None}})
+
+    def deliver_events(self, outbox: list[tuple[str, str, bytes]], settle: float) -> None:
+        """Outside the lock, since O2 may call the mock while it handles an event."""
+        for url, secret, event in outbox:
+            status = deliver(url, secret, event)
+            with self.state.lock:
+                self.state.record("event_delivery", {"url": url, "body": event.decode(), "status": str(status)}, None)
+        time.sleep(settle)
 
     def control(self, path: str, body: dict[str, Any]) -> None:
         st = self.state
@@ -566,6 +618,8 @@ class SlackMockHandler(BaseHTTPRequestHandler):
                 st.failures.setdefault(body["method"], []).append(failure)
             elif path == "/_mock/apps":
                 st.apps[body["app_id"]] = {"signing_secret": "", "manifest": {}, **body}
+            elif path == "/_mock/uninstall_events":
+                st.uninstall_settle = float(body.get("settle", 0))
             elif path == "/_mock/teams":
                 team = default_team(body["team_id"], body.get("team_name", body["team_id"]))
                 st.teams[body["team_id"]] = {**team, **body}
