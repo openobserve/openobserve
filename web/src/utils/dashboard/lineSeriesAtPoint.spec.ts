@@ -14,7 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { indexesNearX, lineSeriesAtPoint, type LineSeriesPixels } from "./lineSeriesAtPoint";
+import {
+  indexesNearX,
+  lineSeriesAtPoint,
+  nearestIndexByX,
+  type LineSeriesPixels,
+} from "./lineSeriesAtPoint";
 
 const flat: LineSeriesPixels = {
   seriesIndex: 0,
@@ -93,5 +98,32 @@ describe("indexesNearX", () => {
   it("gives up on a series whose x cannot be placed, or that has no points", () => {
     expect(indexesNearX(10, 50, () => NaN)).toBeNull();
     expect(indexesNearX(0, 50, every10)).toBeNull();
+  });
+});
+
+describe("nearestIndexByX", () => {
+  const xsAt = (xs: (number | null)[]) => (index: number) => xs[index] ?? null;
+
+  it("looks past a run of gaps to the next drawn point on the right", () => {
+    expect(nearestIndexByX(5, 48, xsAt([10, 20, null, null, 50]))).toBe(4);
+    expect(nearestIndexByX(5, 22, xsAt([10, 20, null, null, 50]))).toBe(1);
+  });
+
+  it("takes the first drawn point when the cursor is left of it, past leading gaps", () => {
+    expect(nearestIndexByX(6, 29, xsAt([null, null, null, 30, 40, 50]))).toBe(3);
+  });
+
+  it("takes the last drawn point when the cursor is right of it, before trailing gaps", () => {
+    expect(nearestIndexByX(4, 40, xsAt([10, 20, null, null]))).toBe(1);
+  });
+
+  it("finds the nearer point in rows that run right to left", () => {
+    const descending = xsAt([50, 40, null, 20, 10]);
+    expect(nearestIndexByX(5, 38, descending)).toBe(1);
+    expect(nearestIndexByX(5, 25, descending)).toBe(3);
+  });
+
+  it("finds nothing in a series with no drawn point", () => {
+    expect(nearestIndexByX(3, 10, xsAt([null, null, null]))).toBeUndefined();
   });
 });

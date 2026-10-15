@@ -675,6 +675,7 @@ describe("ChartRenderer", () => {
 
         handlerFor(mockChart, "contextmenu")(strokeEvent(0));
         await flushPromises();
+        expect(mockChart.convertFromPixel).toHaveBeenLastCalledWith({ seriesIndex: 0 }, [75, 81]);
         expect(wrapper.emitted("domcontextmenu")?.at(-1)?.[0]).toEqual({
           x: 7,
           y: 8,

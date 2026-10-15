@@ -188,6 +188,52 @@ describe("a line's drawn stroke as a right-click target", () => {
     expect(lineAt(0.5, 5.5)).toBeUndefined();
   });
 
+  it("reads a trellis subplot's value on its own axis, which the first grid's would misread", () => {
+    const el = document.createElement("div");
+    document.body.appendChild(el);
+    const chart = echarts.init(el, null, { renderer: "svg", width: WIDTH, height: HEIGHT });
+    charts.push(chart);
+    chart.setOption({
+      animation: false,
+      grid: [
+        { left: 0, width: 200, top: 0, bottom: 0 },
+        { left: 200, width: 200, top: 0, bottom: 0 },
+      ],
+      xAxis: [
+        { type: "value", gridIndex: 0, min: 0, max: 2 },
+        { type: "value", gridIndex: 1, min: 0, max: 2 },
+      ],
+      yAxis: [
+        { type: "value", gridIndex: 0, min: 0, max: 10 },
+        { type: "value", gridIndex: 1, min: 0, max: 1000 },
+      ],
+      series: [
+        {
+          type: "line",
+          xAxisIndex: 0,
+          yAxisIndex: 0,
+          data: [
+            [0, 5],
+            [2, 5],
+          ],
+        },
+        {
+          type: "line",
+          xAxisIndex: 1,
+          yAxisIndex: 1,
+          data: [
+            [0, 500],
+            [2, 500],
+          ],
+        },
+      ],
+    });
+    const pixel = chart.convertToPixel({ seriesIndex: 1 }, [1, 500]) as number[];
+
+    expect((chart.convertFromPixel({ seriesIndex: 1 }, pixel) as number[])[1]).toBeCloseTo(500);
+    expect((chart.convertFromPixel({ gridIndex: 0 }, pixel) as number[])[1]).not.toBeCloseTo(500);
+  });
+
   it("stays silent on a stroke while the option is off", () => {
     const at = strokeAt(smooth, 0, 1.5) as number[];
     const { recorded, gesture } = render(smooth, "item", false);

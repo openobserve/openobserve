@@ -141,16 +141,27 @@ export const nearestIndexByX = (
   cursorX: number,
   xAt: (index: number) => number | null,
 ): number | undefined => {
-  const nearby = indexesNearX(count, cursorX, xAt, 0);
-  if (!nearby) return undefined;
-  let best: { index: number; distance: number } | undefined;
-  for (let index = nearby[0]; index <= nearby[1]; index++) {
-    const x = xAt(index);
-    if (x === null || !Number.isFinite(x)) continue;
-    const distance = Math.abs(x - cursorX);
-    if (!best || distance < best.distance) best = { index, distance };
-  }
-  return best?.index;
+  const first = count > 0 ? placedNear(0, 0, count - 1, xAt) : null;
+  const last = count > 0 ? placedNear(count - 1, 0, count - 1, xAt) : null;
+  if (!first || !last) return undefined;
+  // Rows sorted newest first run right to left, so search them mirrored.
+  const descending = first.x > last.x;
+  const toData = (index: number) => (descending ? count - 1 - index : index);
+  const at = (index: number) => {
+    const x = xAt(toData(index));
+    return x !== null && Number.isFinite(x) ? x : null;
+  };
+  const left = lastIndexAtOrBefore(count, cursorX, at);
+  // The neighbour on the right may sit past a run of gaps.
+  let right = left + 1;
+  while (right < count && at(right) === null) right++;
+  const candidates = [left, right].filter((index) => index >= 0 && index < count);
+  const nearest = candidates.reduce((best, index) =>
+    Math.abs((at(index) as number) - cursorX) < Math.abs((at(best) as number) - cursorX)
+      ? index
+      : best,
+  );
+  return toData(nearest);
 };
 
 const gap = (a: PixelPoint, b: PixelPoint): number => Math.hypot(a[0] - b[0], a[1] - b[1]);

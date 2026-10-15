@@ -393,7 +393,11 @@ export default defineComponent({
       const data = Array.isArray(series?.data) ? series.data : [];
       const cursorX = Number(params.event?.offsetX);
       const dataIndex = nearestDataIndex(params.seriesIndex, data, cursorX);
-      const point = chart?.convertFromPixel({ gridIndex: 0 }, [cursorX, params.event?.offsetY]);
+      // The series' own grid, so a trellis subplot reads its own axis.
+      const point = chart?.convertFromPixel({ seriesIndex: params.seriesIndex }, [
+        cursorX,
+        params.event?.offsetY,
+      ]);
       // A stacked line is drawn at the stack total, so its own value is read at the nearest point instead.
       const value = series?.stack
         ? dataIndex === undefined

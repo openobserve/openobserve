@@ -849,7 +849,7 @@ export default defineComponent({
           : index,
       );
 
-    // The data indexes filteredData keeps, or null when it passes data through, holes for empty slots included.
+    // One rule for filteredData and the series mapping; null means data passes through untouched.
     const keptDataIndexes = computed((): number[] | null => {
       if (!data.value || !hiddenQueries.value?.length || !Array.isArray(data.value)) return null;
       return data.value
