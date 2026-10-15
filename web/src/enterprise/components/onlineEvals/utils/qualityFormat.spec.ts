@@ -619,6 +619,16 @@ describe("categorical rule", () => {
 });
 
 describe("precision that matches the data", () => {
+  it("shows a score with 2 to 4 decimals, so it never reads the same as the rule it fails", () => {
+    expect(formatScoreValue(0.019, "numeric")).toBe("0.019");
+    expect(formatScoreValue(0.6999, "numeric")).toBe("0.6999");
+    expect(formatScoreValue(0.5, "numeric")).toBe("0.50");
+    expect(formatScoreValue(1, "numeric")).toBe("1.00");
+    expect(formatScoreValue(0, "numeric")).toBe("0.00");
+    expect(formatScoreValue(0.00032, "numeric")).toBe("0.00032");
+    expect(formatScoreValue(462_522_542.5, "numeric")).toBe("462,522,542.50");
+  });
+
   it("shows a configured threshold exactly, so it never contradicts a score", () => {
     const config = {
       name: "c",

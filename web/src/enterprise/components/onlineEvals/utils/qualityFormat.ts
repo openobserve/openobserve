@@ -92,6 +92,12 @@ const isTiny = (value: number) => value !== 0 && Math.abs(value) < 0.01;
 const formatTiny = (value: number) =>
   value.toLocaleString("en-US", { maximumSignificantDigits: 2 });
 
+/** A score value: 2 to 4 decimals, so 0.50 keeps its look and 0.019 never reads as a 0.02 rule; tiny values kept distinct. */
+export const formatScore = (value: number): string =>
+  isTiny(value)
+    ? formatTiny(value)
+    : value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+
 /** An axis tick: up to 4 decimals, thousands grouped, so float noise like 0.0499999999999996 reads "0.05"; smaller ticks keep 2 significant digits. */
 export const formatAxis = (value: number): string =>
   value !== 0 && Math.abs(value) < 0.0001
@@ -136,7 +142,7 @@ export const barShare = (share: number | null): number =>
 
 export function formatScoreValue(value: QualityScore["value"], dataType: ScoreDataType): string {
   if (value == null) return "—";
-  if (dataType === "numeric" && typeof value === "number") return formatFixed(value);
+  if (dataType === "numeric" && typeof value === "number") return formatScore(value);
   return String(value);
 }
 
