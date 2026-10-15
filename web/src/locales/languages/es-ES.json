@@ -8102,7 +8102,6 @@
       "runNowHeading": "Ejecutar ahora",
       "findingsHeading": "Hallazgos y acceso",
       "findingsDesc": "Cada ejecución escribe sus hallazgos como registros de log en el stream {stream} de esta organización, conservados según la retención de ese stream.",
-      "accessNote": "Los hallazgos no tienen control de acceso por alerta. Cualquiera que pueda buscar en el stream {stream} ve los hallazgos de todas las alertas de la organización, incluidas las alertas que no puede abrir. La calibración de alertas no envía notificaciones.",
       "frequencyRange": "Elige una cadencia entre 1 minuto y 30 días.",
       "windowRange": "Elige una ventana entre 1 minuto y 1 año."
     }

@@ -8102,7 +8102,6 @@
       "runNowHeading": "Jetzt ausführen",
       "findingsHeading": "Befunde und Zugriff",
       "findingsDesc": "Jeder Lauf schreibt seine Befunde als Log-Datensätze in den Stream {stream} dieser Organisation, die gemäß der Aufbewahrung dieses Streams aufbewahrt werden.",
-      "accessNote": "Befunde sind nicht pro Alarm zugriffsgesteuert. Jeder, der den Stream {stream} durchsuchen kann, sieht Befunde zu jedem Alarm der Organisation, auch zu Alarmen, die er nicht öffnen kann. Die Alarmkalibrierung versendet keine Benachrichtigungen.",
       "frequencyRange": "Wählen Sie ein Intervall zwischen 1 Minute und 30 Tagen.",
       "windowRange": "Wählen Sie ein Fenster zwischen 1 Minute und 1 Jahr."
     }

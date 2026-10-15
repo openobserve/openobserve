@@ -8102,7 +8102,6 @@
       "runNowHeading": "Chạy ngay",
       "findingsHeading": "Kết quả và quyền truy cập",
       "findingsDesc": "Mỗi lần chạy ghi kết quả của nó dưới dạng bản ghi nhật ký vào stream {stream} của tổ chức này, được lưu theo thời gian lưu trữ của stream đó.",
-      "accessNote": "Kết quả không được kiểm soát quyền truy cập theo từng cảnh báo. Bất kỳ ai có thể tìm kiếm stream {stream} đều thấy kết quả về mọi cảnh báo trong tổ chức, kể cả những cảnh báo họ không thể mở. Hiệu chuẩn cảnh báo không gửi thông báo nào.",
       "frequencyRange": "Chọn chu kỳ từ 1 phút đến 30 ngày.",
       "windowRange": "Chọn cửa sổ từ 1 phút đến 1 năm."
     }

@@ -8102,7 +8102,6 @@
       "runNowHeading": "Nu uitvoeren",
       "findingsHeading": "Bevindingen en toegang",
       "findingsDesc": "Elke uitvoering schrijft zijn bevindingen als logrecords naar de {stream}-stream van deze organisatie, bewaard volgens de retentie van die stream.",
-      "accessNote": "Voor bevindingen geldt geen toegangscontrole per alarm. Iedereen die de {stream}-stream kan doorzoeken, ziet bevindingen over elk alarm in de organisatie, inclusief alarmen die ze niet kunnen openen. Alarmkalibratie verstuurt geen meldingen.",
       "frequencyRange": "Kies een cadans tussen 1 minuut en 30 dagen.",
       "windowRange": "Kies een venster tussen 1 minuut en 1 jaar."
     }

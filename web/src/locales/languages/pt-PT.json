@@ -8102,7 +8102,6 @@
       "runNowHeading": "Executar agora",
       "findingsHeading": "Achados e acesso",
       "findingsDesc": "Cada execução grava seus achados como registros de log no stream {stream} desta organização, mantidos conforme a retenção desse stream.",
-      "accessNote": "Os achados não têm controle de acesso por alerta. Qualquer pessoa que possa pesquisar o stream {stream} vê achados sobre todos os alertas da organização, incluindo alertas que não pode abrir. A calibração de alertas não envia notificações.",
       "frequencyRange": "Escolha uma cadência entre 1 minuto e 30 dias.",
       "windowRange": "Escolha uma janela entre 1 minuto e 1 ano."
     }

@@ -8102,7 +8102,6 @@
       "runNowHeading": "Uruchom teraz",
       "findingsHeading": "Ustalenia i dostęp",
       "findingsDesc": "Każde uruchomienie zapisuje swoje ustalenia jako rekordy logów w strumieniu {stream} tej organizacji, przechowywane zgodnie z okresem retencji tego strumienia.",
-      "accessNote": "Ustalenia nie mają kontroli dostępu na poziomie poszczególnych alertów. Każdy, kto może przeszukiwać strumień {stream}, widzi ustalenia dotyczące wszystkich alertów w organizacji, w tym alertów, których nie może otworzyć. Kalibracja alertów nie wysyła powiadomień.",
       "frequencyRange": "Wybierz częstotliwość od 1 minuty do 30 dni.",
       "windowRange": "Wybierz okno od 1 minuty do 1 roku."
     }

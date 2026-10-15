@@ -8102,7 +8102,6 @@
       "runNowHeading": "Şimdi çalıştır",
       "findingsHeading": "Bulgular ve erişim",
       "findingsDesc": "Her çalışma, bulgularını bu organizasyonun {stream} akışına günlük kaydı olarak yazar ve bu kayıtlar o akışın saklama süresi boyunca tutulur.",
-      "accessNote": "Bulgular uyarı başına erişim denetimine tabi değildir. {stream} akışını arayabilen herkes, organizasyondaki her uyarıyla ilgili bulguları görür; açamadıkları uyarılar dahil. Uyarı kalibrasyonu hiçbir bildirim göndermez.",
       "frequencyRange": "1 dakika ile 30 gün arasında bir sıklık seçin.",
       "windowRange": "1 dakika ile 1 yıl arasında bir pencere seçin."
     }

@@ -8102,7 +8102,6 @@
       "runNowHeading": "Esegui ora",
       "findingsHeading": "Risultati e accesso",
       "findingsDesc": "Ogni esecuzione scrive i propri risultati come record di log nello stream {stream} di questa organizzazione, conservati secondo la retention di quello stream.",
-      "accessNote": "I risultati non hanno controllo di accesso per singolo avviso. Chiunque possa cercare nello stream {stream} vede i risultati relativi a ogni avviso dell'organizzazione, compresi gli avvisi che non può aprire. La calibrazione degli avvisi non invia notifiche.",
       "frequencyRange": "Scegli una cadenza tra 1 minuto e 30 giorni.",
       "windowRange": "Scegli una finestra tra 1 minuto e 1 anno."
     }
