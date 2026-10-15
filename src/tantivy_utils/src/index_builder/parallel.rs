@@ -280,17 +280,14 @@ mod tests {
         datatypes::{DataType, Field, Schema},
         record_batch::RecordBatch,
     };
-    use config::{FileFormat, TIMESTAMP_COL_NAME};
+    use config::{FileFormat, INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME};
     use parquet::{
         arrow::{AsyncArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder},
         file::properties::WriterProperties,
     };
     use tantivy::directory::RamDirectory;
 
-    use crate::index_builder::{
-        sequential,
-        tests::{create_test_parquet_bytes, make_index_schema},
-    };
+    use crate::index_builder::tests::{create_test_parquet_bytes, make_index_schema};
 
     /// Build a record batch where every row has a globally-unique marker token
     /// in the `marker` column. The marker is what we search to recover the
@@ -473,91 +470,141 @@ mod tests {
         }
     }
 
-    /// Same data through parallel-row_group path and sequential path must
-    /// yield the same `(marker → doc_id)` mapping for every row. Verifies
-    /// behavioural equivalence end-to-end.
-    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    async fn test_row_group_parallel_matches_sequential() {
-        // 750 rows, fixed row_group size 250 ⇒ 3 full row_groups of 250 each.
-        let total = 750usize;
-        let buf_par =
-            create_test_parquet_bytes_fixed_rg(vec![create_marker_batch(0, total)], 250).await;
-        let buf_seq = create_test_parquet_bytes(vec![
-            create_marker_batch(0, 250),
-            create_marker_batch(250, 250),
-            create_marker_batch(500, 250),
-        ])
-        .await;
+    /// Fields configured in the stream schema but absent from the data file
+    /// must still be part of the tantivy schema.
+    #[tokio::test]
+    async fn test_stream_schema_fields_missing_from_data() {
+        let parquet_schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+        let parquet_batch = RecordBatch::try_new(
+            parquet_schema,
+            vec![
+                Arc::new(Int64Array::from(
+                    (0..10).map(|i| 1000 + i).collect::<Vec<i64>>(),
+                )),
+                Arc::new(StringArray::from(
+                    (0..10).map(|i| format!("Name {i}")).collect::<Vec<_>>(),
+                )),
+            ],
+        )
+        .unwrap();
+        let stream_schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("continent", DataType::Utf8, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+        let buf = create_test_parquet_bytes(vec![parquet_batch]).await;
+
+        let index = super::build_index(
+            RamDirectory::create(),
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &[],
+                &["continent".to_string(), "name".to_string()],
+                &stream_schema,
+            ),
+            2,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        let schema = index.schema();
+        assert!(schema.get_field("continent").is_ok());
+        assert!(schema.get_field("name").is_ok());
+        assert!(matches!(
+            schema
+                .get_field_entry(schema.get_field(TIMESTAMP_COL_NAME).unwrap())
+                .field_type(),
+            tantivy::schema::FieldType::I64(_)
+        ));
+        assert_eq!(index.reader().unwrap().searcher().num_docs(), 10);
+    }
+
+    /// FTS columns land in `_all` and numeric index fields are indexed as raw
+    /// text, with doc_ids preserved across a multi-row_group merge.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fts_and_numeric_index_fields() {
+        let total_rows = 10usize;
         let schema = Arc::new(Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-            Field::new("marker", DataType::Utf8, false),
+            Field::new("content", DataType::Utf8, false),
+            Field::new("code", DataType::Int64, false),
         ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(
+                    (0..total_rows as i64).map(|i| 1000 + i).collect::<Vec<_>>(),
+                )),
+                Arc::new(StringArray::from(
+                    (0..total_rows)
+                        .map(|i| {
+                            if i % 2 == 1 {
+                                "request failed"
+                            } else {
+                                "request served"
+                            }
+                        })
+                        .collect::<Vec<_>>(),
+                )),
+                Arc::new(Int64Array::from(
+                    (0..total_rows)
+                        .map(|i| if i % 2 == 1 { 500 } else { 200 })
+                        .collect::<Vec<i64>>(),
+                )),
+            ],
+        )
+        .unwrap();
+        let buf = create_test_parquet_bytes_fixed_rg(vec![batch], 4).await;
 
-        let par = super::build_index(
+        let index = super::build_index(
             RamDirectory::create(),
             FileFormat::Parquet,
-            buf_par,
-            make_index_schema(&[], &["marker".to_string()], &schema),
-            3,
+            buf,
+            make_index_schema(&["content".to_string()], &["code".to_string()], &schema),
+            2,
         )
         .await
         .unwrap()
         .unwrap();
-        let seq = sequential::build_index(
-            RamDirectory::create(),
-            FileFormat::Parquet,
-            buf_seq,
-            make_index_schema(&[], &["marker".to_string()], &schema),
-        )
-        .await
-        .unwrap()
-        .unwrap();
 
-        let par_total: usize = par
-            .searchable_segments()
-            .unwrap()
-            .iter()
-            .map(|s| s.meta().max_doc() as usize)
-            .sum();
-        let seq_total: usize = seq
-            .searchable_segments()
-            .unwrap()
-            .iter()
-            .map(|s| s.meta().max_doc() as usize)
-            .sum();
-        assert_eq!(par_total, total);
-        assert_eq!(seq_total, total);
+        let tantivy_schema = index.schema();
+        let all_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).unwrap();
+        let code_field = tantivy_schema.get_field("code").unwrap();
+        assert!(tantivy_schema.get_field("content").is_err());
 
-        let par_reader = par.reader().unwrap();
-        let par_searcher = par_reader.searcher();
-        let par_marker = par.schema().get_field("marker").unwrap();
-        let seq_reader = seq.reader().unwrap();
-        let seq_searcher = seq_reader.searcher();
-        let seq_marker = seq.schema().get_field("marker").unwrap();
+        let reader = index.reader().unwrap();
+        let searcher = reader.searcher();
+        assert_eq!(searcher.num_docs() as usize, total_rows);
+        let search = |term: tantivy::Term| -> Vec<usize> {
+            let q = tantivy::query::TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
+            let mut ids: Vec<usize> = searcher
+                .search(&q, &tantivy::collector::DocSetCollector)
+                .unwrap()
+                .into_iter()
+                .map(|addr| addr.doc_id as usize)
+                .collect();
+            ids.sort_unstable();
+            ids
+        };
 
-        for row in 0..total {
-            let m = format!("row{:09}", row);
-            let q_par = tantivy::query::TermQuery::new(
-                tantivy::Term::from_field_text(par_marker, &m),
-                tantivy::schema::IndexRecordOption::Basic,
-            );
-            let q_seq = tantivy::query::TermQuery::new(
-                tantivy::Term::from_field_text(seq_marker, &m),
-                tantivy::schema::IndexRecordOption::Basic,
-            );
-            let hits_par = par_searcher
-                .search(&q_par, &tantivy::collector::DocSetCollector)
-                .unwrap();
-            let hits_seq = seq_searcher
-                .search(&q_seq, &tantivy::collector::DocSetCollector)
-                .unwrap();
-            assert_eq!(hits_par.len(), 1);
-            assert_eq!(hits_seq.len(), 1);
-            let addr_par = *hits_par.iter().next().unwrap();
-            let addr_seq = *hits_seq.iter().next().unwrap();
-            assert_eq!(addr_par.doc_id as usize, row);
-            assert_eq!(addr_seq.doc_id as usize, row);
-        }
+        let odd_rows: Vec<usize> = (0..total_rows).filter(|i| i % 2 == 1).collect();
+        assert_eq!(
+            search(tantivy::Term::from_field_text(all_field, "failed")),
+            odd_rows
+        );
+        assert_eq!(
+            search(tantivy::Term::from_field_text(all_field, "request")),
+            (0..total_rows).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            search(tantivy::Term::from_field_text(code_field, "500")),
+            odd_rows
+        );
     }
 
     mod vortex_tests {
