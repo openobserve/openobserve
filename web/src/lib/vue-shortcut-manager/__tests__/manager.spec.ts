@@ -86,6 +86,14 @@ describe("ShortcutManager", () => {
     expect(handler).toHaveBeenCalledOnce();
   });
 
+  it("should ignore a keydown with no key, as browser autofill dispatches", () => {
+    const handler = vi.fn();
+    manager.register({ key: "ctrl+b", handler, description: "test" });
+
+    expect(() => manager.handleKeyDown(fakeEvent({ key: undefined }))).not.toThrow();
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   describe("input-focus guard", () => {
     let input: HTMLInputElement;
 

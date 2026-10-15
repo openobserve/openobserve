@@ -161,6 +161,8 @@ export default defineComponent({
       if (!chartRef.value) return;
 
       await import("echarts-gl");
+      // The component can unmount while echarts-gl loads, nulling the ref.
+      if (!chartRef.value) return;
 
       // Initialize chart if it doesn't exist, otherwise reuse existing instance
       if (!chart) {

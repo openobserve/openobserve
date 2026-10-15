@@ -253,5 +253,16 @@ describe("TrialPeriod.vue", () => {
       expect(error).not.toHaveBeenCalled();
       error.mockRestore();
     });
+
+    it("does not log a 403, which only means the user has no billing access", async () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(BillingService.list_subscription).mockRejectedValue({
+        response: { status: 403 },
+      });
+      await mountStrip({ currentPage: "billing" });
+
+      expect(error).not.toHaveBeenCalled();
+      error.mockRestore();
+    });
   });
 });
