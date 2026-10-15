@@ -66,6 +66,11 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
       cspViolationBlocked: gt("dashboard.utils.cspViolationBlocked"),
     });
 
+    // ?url imports are relative under the production base:"./", so resolve against the
+    // origin to get an absolute path that works from inside srcdoc (no <base> tag).
+    const absoluteEchartsUrl = new URL(echartsUrl, window.location.origin).href;
+    const absoluteDompurifyUrl = new URL(dompurifyUrl, window.location.origin).href;
+
     const scriptContent = `
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'none';
@@ -75,8 +80,8 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     connect-src 'none';
   ">
 
-  <script src="${echartsUrl}" nonce="${nonce}"></script>
-  <script src="${dompurifyUrl}" nonce="${nonce}"></script>
+  <script src="${absoluteEchartsUrl}" nonce="${nonce}"></script>
+  <script src="${absoluteDompurifyUrl}" nonce="${nonce}"></script>
   <script nonce="${nonce}">
     const i18nMessages = ${sandboxMessages};
     let securityPolicyError = false;
