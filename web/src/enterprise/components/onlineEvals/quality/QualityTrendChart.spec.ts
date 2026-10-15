@@ -46,4 +46,19 @@ describe("QualityTrendChart", () => {
       true,
     );
   });
+
+  it("labels the score axis with at most 4 decimals, so float noise never shows", async () => {
+    const wrapper = mount(QualityTrendChart, {
+      props: { timeline: TIMELINE, kind: "score", range: { min: 0, max: 0.05 }, threshold: null },
+      global: { plugins: [store] },
+    });
+    await flushPromises();
+    const { formatter } = wrapper.findComponent({ name: "ChartRenderer" }).props("data").options
+      .yAxis.axisLabel;
+    expect(formatter(0.0499999999999996)).toBe("0.05");
+    expect(formatter(0.0002)).toBe("0.0002");
+    expect(formatter(0.00002)).toBe("0.00002");
+    expect(formatter(250_000_000)).toBe("250,000,000");
+    expect(formatter(0)).toBe("0");
+  });
 });
