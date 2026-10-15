@@ -1059,13 +1059,13 @@ describe("pa gap fixes (Paths ignored pages)", () => {
     expect(picker[0]).toMatch(/NOT \([^)]*'\/web\/cb'/);
   });
 
-  it("P7-R10: a deep link to an ignored anchor says the page is ignored and offers Edit exclusions", async () => {
+  it("P7-R10: a deep link to an ignored anchor says the page is hidden and offers Edit app filters", async () => {
     await mountAt("/web/login");
-    expect(wrapper!.text()).toContain("This page is ignored for this app");
+    expect(wrapper!.text()).toContain("This page is hidden by the app filters");
     expect(
       wrapper!
         .findAll("button, a, [role='button']")
-        .some((b) => b.text().trim() === "Edit exclusions"),
+        .some((b) => b.text().trim() === "Edit app filters"),
     ).toBe(true);
   });
 });

@@ -62,40 +62,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filterFieldLabel(t, field)
         }}</span>
       </span>
-      <span class="flex items-center gap-1.5">
-        <span class="w-44 shrink-0">
-          <OSelect
-            :model-value="condition.id"
-            :options="conditionOptions"
-            :label="t('rum.analytics.funnel.filterCondition')"
-            label-position="inside"
-            size="sm"
-            data-test="rum-analytics-funnel-field-picker-condition"
-            @update:model-value="setCondition"
-          />
-        </span>
-        <OInput
-          v-model="typed"
-          size="sm"
-          class="min-w-0 flex-1"
-          :placeholder="t('rum.analytics.funnel.filterSearchValues')"
-          data-test="rum-analytics-funnel-field-picker-typed"
-          @keydown.enter.prevent="addTyped"
-        />
-      </span>
-      <span v-if="picked.length" class="flex flex-wrap gap-1">
-        <OTag
-          v-for="v in picked"
-          :key="v"
-          :label="raw(v)"
-          variant="primary-outline"
-          size="sm"
-          removable
-          :remove-label="t('rum.analytics.funnel.filterRemoveValue')"
-          :data-test="`rum-analytics-funnel-field-picker-picked-${v}`"
-          @remove="toggle(v, false)"
-        />
-      </span>
+      <OSelect
+        :model-value="condition.id"
+        :options="conditionOptions"
+        :label="t('rum.analytics.funnel.filterCondition')"
+        label-position="inside"
+        size="sm"
+        data-test="rum-analytics-funnel-field-picker-condition"
+        @update:model-value="setCondition"
+      />
+      <OInput
+        v-model="typed"
+        size="sm"
+        :placeholder="t('rum.analytics.funnel.filterSearchValues')"
+        data-test="rum-analytics-funnel-field-picker-typed"
+        @keydown.enter.prevent="addTyped"
+      />
       <span
         v-if="valuesHere.status === 'loading'"
         class="text-text-secondary text-xs"
@@ -128,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="!picked.includes(row.value) && full"
             @update:model-value="(v) => toggle(row.value, v === true)"
           />
-          <span class="text-text-secondary text-xs tabular-nums">{{
+          <span v-if="row.sessions !== null" class="text-text-secondary text-xs tabular-nums">{{
             addCommasToNumber(row.sessions)
           }}</span>
         </span>
@@ -178,7 +160,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -208,6 +189,7 @@ const props = defineProps<{
   values: FilterValuesState;
   initial?: FunnelFilter;
   lockField?: boolean;
+  conditions?: readonly FilterCondition[];
 }>();
 const emit = defineEmits<{
   load: [string];
@@ -247,8 +229,10 @@ const listFields = computed(() => {
   );
 });
 
+const offered = computed(() => props.conditions ?? FILTER_CONDITIONS);
+
 const conditionOptions = computed(() =>
-  FILTER_CONDITIONS.map((c) => ({
+  offered.value.map((c) => ({
     label: t(`rum.analytics.funnel.conditions.${c.id}`),
     value: c.id,
   })),
@@ -260,10 +244,18 @@ const idle: FilterValuesState = { field: null, status: "idle", rows: [] };
 // Rows loaded for another field must never be offered for this one.
 const valuesHere = computed(() => (props.values.field === field.value ? props.values : idle));
 
-const listed = computed(() => {
-  const rows = valuesHere.value.status === "ok" ? valuesHere.value.rows : [];
+const loaded = computed(() => (valuesHere.value.status === "ok" ? valuesHere.value.rows : []));
+
+// A picked value the loaded rows lack (typed, or from an edited filter) stays listed, ticked, on top.
+const listed = computed<{ value: string; sessions: number | null }[]>(() => {
   const q = typed.value.trim().toLowerCase();
-  return q ? rows.filter((r) => r.value.toLowerCase().includes(q)) : rows;
+  const extra = picked.value
+    .filter((v) => !loaded.value.some((r) => r.value === v))
+    .map((value) => ({ value, sessions: null }));
+  return [
+    ...extra,
+    ...(q ? loaded.value.filter((r) => r.value.toLowerCase().includes(q)) : loaded.value),
+  ];
 });
 
 // A typed value no listed row carries is added with Enter.
@@ -290,7 +282,7 @@ const back = () => {
 };
 
 const setCondition = (id: unknown) => {
-  condition.value = FILTER_CONDITIONS.find((c) => c.id === id) ?? FILTER_CONDITIONS[0];
+  condition.value = offered.value.find((c) => c.id === id) ?? offered.value[0];
 };
 
 const toggle = (value: string, on: boolean) => {

@@ -50,13 +50,6 @@ export type AppSettingsForm = {
   pages: PageRule[];
 };
 
-export const emptySessionRule = (): SessionRule => ({
-  field: "usr_email",
-  op: "eq",
-  values: [],
-});
-export const emptyPageRule = (): PageRule => ({ op: "eq", value: "" });
-
 const valueOk = (op: string, v: string) =>
   v.length > 0 && v.length <= MAX_KEY_LENGTH && (op !== "regex" || !regexProblem(v));
 
