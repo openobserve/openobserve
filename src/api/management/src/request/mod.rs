@@ -15,6 +15,8 @@
 
 #[cfg(feature = "enterprise")]
 pub mod ai;
+#[cfg(feature = "enterprise")]
+pub mod alert_calibration;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod annotation_queues;
@@ -61,6 +63,7 @@ pub mod profiling;
 pub mod prompts;
 #[cfg(feature = "enterprise")]
 pub mod providers;
+pub mod public_rate_limit;
 pub mod query_history;
 #[cfg(feature = "enterprise")]
 pub mod remote_tasks;

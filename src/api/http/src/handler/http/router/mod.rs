@@ -26,8 +26,6 @@ use axum::{
 use config::get_config;
 use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
-#[cfg(feature = "cloud")]
-use openobserve_api_management::request::cloud;
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
@@ -35,8 +33,12 @@ use openobserve_api_management::request::{
     kv, metrics_usage, model_pricing, organization, query_history, rum_analytics, service_accounts,
     short_url, slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
+#[cfg(feature = "cloud")]
+use openobserve_api_management::request::{cloud, organization::billing_group};
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
-use openobserve_api_search::{profiles as profiles_query, promql, search, traces};
+use openobserve_api_search::{
+    profiles as profiles_query, promql, rum as rum_query, search, traces,
+};
 use openobserve_core::auth::AuthExtractor;
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
@@ -54,9 +56,10 @@ use {
         config::get_config as get_o2_config,
     },
     openobserve_api_management::request::{
-        ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
-        domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall, playground,
-        prompts, providers, remote_tasks, score_configs, scorers, service_streams, workflows,
+        ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
+        discovery, domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall,
+        playground, prompts, providers, remote_tasks, score_configs, scorers, service_streams,
+        workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -591,7 +594,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                 protocol: Protocol::Http,
                 response_meta: ResponseMeta {
                     http_method: method,
-                    http_path: path,
+                    http_path: config::axum::middlewares::mask_share_tokens(&path),
                     http_body: body,
                     http_query_params: query_params,
                     http_response_code: response.status().as_u16(),
@@ -832,6 +835,15 @@ pub fn basic_routes() -> Router {
             .route("/status/{slug}", get(status_pages::public::page));
     }
 
+    // Unauthenticated like status pages: the share token is checked in the handler.
+    #[cfg(feature = "enterprise")]
+    if get_config().public_ai_chat.enabled {
+        router = router.route(
+            "/api/public/ai_chats/{token}",
+            get(openobserve_api_management::request::ai::shares::get_public),
+        );
+    }
+
     router
 }
 
@@ -863,6 +875,44 @@ pub fn config_routes() -> Router {
 }
 
 /// Create main API service routes
+/// The AI assistant's chat, chat history and chat sharing routes.
+#[cfg(feature = "enterprise")]
+fn ai_chat_routes(router: Router) -> Router {
+    router
+        .route("/{org_id}/ai/chat", post(ai::chat::chat))
+        .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
+        .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
+        .route(
+            "/{org_id}/ai/confirm/{session_id}",
+            post(ai::chat::confirm_action),
+        )
+        .route(
+            "/{org_id}/ai/chats",
+            get(ai::chats::list).delete(ai::chats::delete_all),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}",
+            get(ai::chats::get)
+                .patch(ai::chats::rename)
+                .delete(ai::chats::delete),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}/cancel",
+            post(ai::chat::cancel),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}/shares",
+            get(ai::shares::list_for_chat).post(ai::shares::create),
+        )
+        .route("/{org_id}/ai/shares", get(ai::shares::list_mine))
+        .route(
+            "/{org_id}/ai/shares/{share_id}",
+            patch(ai::shares::update).delete(ai::shares::revoke),
+        )
+        .route("/{org_id}/ai/shared/{token}", get(ai::shares::get_shared))
+        .route("/{org_id}/ai/shared/{token}/fork", post(ai::shares::fork))
+}
+
 pub fn service_routes() -> Router {
     let cfg = get_config();
 
@@ -1213,7 +1263,11 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/anomaly_detection/{config_id}/train", post(anomaly_detection::train_model).delete(anomaly_detection::cancel_training))
             .route("/{org_id}/anomaly_detection/{config_id}/detect", post(anomaly_detection::detect_anomalies))
             .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history))
-            .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history));
+            .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history))
+
+            // Alert Calibration
+            .route("/v2/{org_id}/alert_calibration/config", get(alert_calibration::config::get_alert_calibration_config).put(alert_calibration::config::update_alert_calibration_config))
+            .route("/v2/{org_id}/alert_calibration/digests/run", post(alert_calibration::digests::run_alert_calibration));
     }
 
     router = router
@@ -1275,6 +1329,9 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/sourcemaps",get(sourcemaps::list).post(sourcemaps::upload_maps).delete(sourcemaps::delete))
         .route("/{org_id}/sourcemaps/values",get(sourcemaps::list_values))
         .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace))
+
+        // RUM trace lookup
+        .route("/{org_id}/rum/lookup", post(rum_query::lookup::lookup))
 
         // RUM Product Analytics
         .route("/{org_id}/rum/analytics/named_events", get(rum_analytics::list_named_events).post(rum_analytics::create_named_event))
@@ -1519,10 +1576,6 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/ratelimit/update", put(ratelimit::update_ratelimit))
 
             // AI
-            .route("/{org_id}/ai/chat", post(ai::chat::chat))
-            .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
-            .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
-            .route("/{org_id}/ai/confirm/{session_id}", post(ai::chat::confirm_action))
             .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
             .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
 
@@ -1557,6 +1610,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
             .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
+        router = ai_chat_routes(router);
 
         if get_o2_config().common.workflows_enabled {
             // workflows
@@ -2046,24 +2100,24 @@ pub fn service_routes() -> Router {
             )
             .route(
                 "/{org_id}/billing_group/invites",
-                get(organization::billing_group::list_invites)
-                    .post(organization::billing_group::invite),
+                get(billing_group::list_invites).post(billing_group::invite),
             )
             .route(
                 "/{org_id}/billing_group/invites/{token}/accept",
-                post(organization::billing_group::accept),
+                post(billing_group::accept),
             )
             .route(
                 "/{org_id}/billing_group/invites/{token}/reject",
-                delete(organization::billing_group::reject),
+                delete(billing_group::reject),
             )
             .route(
                 "/{org_id}/billing_group/membership",
-                get(organization::billing_group::check_membership),
+                get(billing_group::check_membership).delete(billing_group::leave_group),
             )
+            .route("/{org_id}/billing_group/members", get(billing_group::check_members))
             .route(
-                "/{org_id}/billing_group/members",
-                get(organization::billing_group::check_members),
+                "/{org_id}/billing_group/members/{member_org_id}",
+                delete(billing_group::remove_member),
             );
     }
 

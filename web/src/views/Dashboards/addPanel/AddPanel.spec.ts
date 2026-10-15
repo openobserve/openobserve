@@ -8,6 +8,8 @@ import { isEqual } from "lodash-es";
 import { addPanel, getDashboard, updatePanel } from "@/utils/commons";
 import analytics from "@/services/product_analytics";
 import useDashboardPanel from "@/composables/dashboard/useDashboardPanel";
+import { DEFAULT_SQL_X_FIELD, DEFAULT_SQL_Y_FIELD_COUNT } from "@/utils/dashboard/defaultFields";
+import config from "@/aws-exports";
 import { createI18n } from "vue-i18n";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
@@ -4881,6 +4883,251 @@ describe("AddPanel.vue", () => {
       expect(validatePanelMock).toHaveBeenCalled();
       expect(notificationMocks.showErrorNotification).not.toHaveBeenCalled();
       expect(wrapper.vm.errorData.errors).toEqual(["Add one field for the X-Axis"]);
+    });
+
+    it("shows the errors and runs nothing when Apply is clicked on an incomplete builder", async () => {
+      wrapper = await mountForValidation();
+      validatePanelMock.mockImplementation(() => {});
+      const editor = {
+        reportValidationErrors: vi.fn(),
+        runQuery: vi.fn(),
+        initChartData: vi.fn(),
+      };
+      wrapper.vm.panelEditorRef = editor;
+      wrapper.vm.dashboardPanelData.data.queries[0].query = "";
+
+      wrapper.vm.runQuery();
+
+      expect(editor.reportValidationErrors).toHaveBeenCalledTimes(1);
+      expect(editor.reportValidationErrors.mock.calls[0][0]).toContain(
+        "dashboard.utils.queryIsEmpty",
+      );
+      expect(editor.runQuery).not.toHaveBeenCalled();
+      expect(editor.initChartData).not.toHaveBeenCalled();
+    });
+
+    it("still runs Apply with a filter that has no value yet, which the query drops", async () => {
+      wrapper = await mountForValidation();
+      validatePanelMock.mockImplementation(() => {});
+      const editor = { reportValidationErrors: vi.fn(), runQuery: vi.fn(), initChartData: vi.fn() };
+      wrapper.vm.panelEditorRef = editor;
+      const query = wrapper.vm.dashboardPanelData.data.queries[0];
+      // The mocked panel's map/sankey placeholders are objects; a real line panel has them null.
+      Object.assign(query.fields, { source: null, target: null, latitude: null, longitude: null });
+      query.fields.x = [DEFAULT_SQL_X_FIELD()];
+      query.fields.y = [DEFAULT_SQL_Y_FIELD_COUNT()];
+      query.query = "SELECT count(*) FROM default";
+      query.fields.filter = {
+        filterType: "group",
+        conditions: [
+          {
+            filterType: "condition",
+            type: "condition",
+            column: { field: "level" },
+            operator: "=",
+            value: "",
+          },
+        ],
+      };
+      wrapper.vm.shouldRefreshWithoutCache = false;
+
+      wrapper.vm.runQuery(true);
+
+      expect(editor.reportValidationErrors).not.toHaveBeenCalled();
+      expect(wrapper.vm.shouldRefreshWithoutCache).toBe(true);
+      query.fields.filter = { conditions: [] };
+    });
+
+    it("holds live runs while a filter is half-built, even one the query drops", async () => {
+      wrapper = await mountForValidation();
+      validatePanelMock.mockImplementation(() => {});
+      const query = wrapper.vm.dashboardPanelData.data.queries[0];
+      Object.assign(query.fields, { source: null, target: null, latitude: null, longitude: null });
+      query.fields.x = [DEFAULT_SQL_X_FIELD()];
+      query.fields.y = [DEFAULT_SQL_Y_FIELD_COUNT()];
+      query.query = "SELECT count(*) FROM default";
+      const withFilter = (condition: Record<string, any>) => ({
+        filterType: "group",
+        conditions: [{ filterType: "condition", column: { field: "level" }, ...condition }],
+      });
+
+      query.fields.filter = withFilter({ type: "list", values: [] });
+      expect(wrapper.vm.isBuilderValidSilently()).toBe(false);
+      query.fields.filter = withFilter({ type: "condition", operator: "=", value: "" });
+      expect(wrapper.vm.isBuilderValidSilently()).toBe(false);
+      query.fields.filter = withFilter({ type: "list", values: ["error"] });
+      expect(wrapper.vm.isBuilderValidSilently()).toBe(true);
+      query.fields.filter = { conditions: [] };
+    });
+
+    it("still runs a custom SQL query that fails validation, as Apply always has", async () => {
+      wrapper = await mountForValidation();
+      validatePanelMock.mockImplementation((errors: string[]) => {
+        errors.push("Alias _timestamp is not allowed");
+      });
+      const editor = {
+        reportValidationErrors: vi.fn(),
+        runQuery: vi.fn(),
+        initChartData: vi.fn(),
+      };
+      wrapper.vm.panelEditorRef = editor;
+      const query = wrapper.vm.dashboardPanelData.data.queries[0];
+      query.customQuery = true;
+      query.query = "SELECT _timestamp AS _timestamp FROM default";
+      query.fields.filter = { filterType: "group", conditions: [] };
+      wrapper.vm.shouldRefreshWithoutCache = false;
+
+      wrapper.vm.runQuery(true);
+
+      expect(editor.reportValidationErrors).not.toHaveBeenCalled();
+      expect(wrapper.vm.shouldRefreshWithoutCache).toBe(true);
+      expect(wrapper.vm.errorData.errors).toEqual(["Alias _timestamp is not allowed"]);
+      query.customQuery = false;
+    });
+  });
+
+  describe("Time range and Auto Run", () => {
+    const mountForTime = async () => {
+      const w = mount(AddPanel, {
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: { query: { dashboard: "test-dashboard" }, params: {} },
+            $router: { push: vi.fn(), replace: vi.fn() },
+          },
+          stubs: {
+            OPageHeader: true,
+            PanelEditor: true,
+            DateTimePickerDashboard: true,
+            QueryInspector: true,
+            AddSettingVariable: true,
+            ConfigDrawer: true,
+          },
+        },
+        props: { metaData: null },
+      });
+      await nextTick();
+      return w;
+    };
+
+    // Stubs replace the template refs on every render, so the fakes go back in before each change.
+    const usePicker = (w: any, startTime: number) => {
+      w.vm.panelEditorRef = { initChartData: vi.fn() };
+      w.vm.dateTimePickerRef = {
+        getConsumableDateTime: () => ({ startTime, endTime: startTime + 60_000 }),
+        refresh: vi.fn(),
+      };
+    };
+
+    const pick = async (w: any, relativeTimePeriod: string, startTime: number) => {
+      usePicker(w, startTime);
+      w.vm.selectedDate = { valueType: "relative", relativeTimePeriod };
+      await nextTick();
+    };
+
+    const chartStart = (w: any) => w.vm.dashboardPanelData.meta.dateTime.start_time.getTime();
+
+    beforeEach(() => {
+      localStorage.removeItem("oo_toggle_auto_run");
+    });
+
+    it("with Auto Run off, holds a picked range until Apply", async () => {
+      wrapper = await mountForTime();
+      await pick(wrapper, "15m", 1_000_000);
+      expect(chartStart(wrapper)).toBe(1_000_000);
+
+      await pick(wrapper, "30m", 2_000_000);
+
+      expect(chartStart(wrapper)).toBe(1_000_000);
+    });
+
+    it("with Auto Run on, applies a picked range directly", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      wrapper = await mountForTime();
+      await pick(wrapper, "15m", 1_000_000);
+
+      await pick(wrapper, "30m", 2_000_000);
+
+      expect(chartStart(wrapper)).toBe(2_000_000);
+    });
+
+    it("applies a range picked while Auto Run was off once it is turned on", async () => {
+      wrapper = await mountForTime();
+      await pick(wrapper, "15m", 1_000_000);
+      await pick(wrapper, "30m", 2_000_000);
+
+      usePicker(wrapper, 2_000_000);
+      store.state.zoConfig.auto_query_enabled = true;
+      await nextTick();
+
+      expect(chartStart(wrapper)).toBe(2_000_000);
+    });
+  });
+
+  describe("Apply menu", () => {
+    const mountForMenu = async () => {
+      const w = mount(AddPanel, {
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: { query: { dashboard: "test-dashboard" }, params: {} },
+            $router: { push: vi.fn(), replace: vi.fn() },
+          },
+          stubs: {
+            OPageHeader: true,
+            PanelEditor: true,
+            DateTimePickerDashboard: true,
+            QueryInspector: true,
+            AddSettingVariable: true,
+            ConfigDrawer: true,
+          },
+        },
+        props: { metaData: null },
+      });
+      await nextTick();
+      return w;
+    };
+
+    const startQuery = async (w: any) => {
+      w.vm.$.provides.variablesAndPanelsDataLoadingState.searchRequestTraceIds = {
+        panel: ["trace-1"],
+      };
+      await nextTick();
+    };
+
+    afterEach(() => {
+      delete (config as any).isEnterprise;
+    });
+
+    it("offers the Apply menu on OSS only when Auto Run is available", async () => {
+      (config as any).isEnterprise = "false";
+      wrapper = await mountForMenu();
+      expect(wrapper.vm.showApplyMenu).toBe(false);
+
+      store.state.zoConfig.auto_query_enabled = true;
+      await nextTick();
+
+      expect(wrapper.vm.showApplyMenu).toBe(true);
+    });
+
+    it("always offers the Apply menu on enterprise, for Refresh Cache & Apply", async () => {
+      (config as any).isEnterprise = "true";
+      wrapper = await mountForMenu();
+      expect(wrapper.vm.showApplyMenu).toBe(true);
+    });
+
+    it("turns Apply into a red Cancel while a query runs on enterprise", async () => {
+      (config as any).isEnterprise = "true";
+      wrapper = await mountForMenu();
+      await startQuery(wrapper);
+      expect(wrapper.vm.applyVariant).toBe("destructive");
+    });
+
+    it("keeps Apply out of red on OSS while a query runs, which it cannot cancel", async () => {
+      (config as any).isEnterprise = "false";
+      wrapper = await mountForMenu();
+      await startQuery(wrapper);
+      expect(wrapper.vm.applyVariant).not.toBe("destructive");
     });
   });
 });

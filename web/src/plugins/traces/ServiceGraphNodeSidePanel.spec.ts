@@ -164,6 +164,7 @@ const ODrawerStub = {
     "open",
     "width",
     "seamless",
+    "modal",
     "portalTarget",
     "title",
     "subTitle",
@@ -308,6 +309,14 @@ describe("ServiceGraphNodeSidePanel", () => {
 
     it("should render the close button", () => {
       expect(wrapper.find('[data-test="o-drawer-close-btn"]').exists()).toBe(true);
+    });
+  });
+
+  describe("drawer behaviour", () => {
+    it("renders a non-modal drawer so the page behind stays interactive", () => {
+      wrapper = mountPanel({ selectedNode: baseNode });
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("modal")).toBe(false);
     });
   });
 

@@ -303,6 +303,9 @@ export class AlertLibraryPage {
     await expect(this.page.locator(this.l.drawer)).toBeHidden();
   }
 
+  async expectSummaryDestination(text) {
+    await expect(this.page.locator(this.l.summary).locator('dd').first()).toHaveText(text);
+  }
   async expectNextDisabled() { await expect(this.page.locator(this.l.next)).toBeDisabled(); }
   async expectNextEnabled() { await expect(this.page.locator(this.l.next)).toBeEnabled(); }
   async expectRunDisabled() { await expect(this.page.locator(this.l.run)).toBeDisabled(); }

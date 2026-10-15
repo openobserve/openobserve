@@ -92,9 +92,11 @@ describe("Nginx.vue web server guide", () => {
     expect(wrapper.html()).not.toContain(PASSCODE);
   });
 
-  it("copies the real config, token included, on the first click on the block", async () => {
+  it("copies the real config, token included, from the copy button", async () => {
     wrapper = await mountPage();
-    await wrapper.find(`[data-test="ingestion-${SERVER}-config-code-block-pre"]`).trigger("click");
+    await wrapper
+      .find(`[data-test="ingestion-${SERVER}-config-code-block-copy-btn"]`)
+      .trigger("click");
     expect(copyMock).toHaveBeenCalledTimes(1);
     const copied = String(copyMock.mock.calls[0][0]);
     expect(copied).toContain(`HTTP_Passwd       ${PASSCODE}`);

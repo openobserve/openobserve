@@ -54,7 +54,7 @@ use crate::{
     alerts::{
         alert::{
             AlertError, AlertExt, NotificationOutcome, get_alert_start_end_time, get_by_id_db,
-            get_row_column_map, send_attempted,
+            get_row_column_map, has_delivery_target, send_attempted,
         },
         derived_streams::DerivedStreamExt,
     },
@@ -332,6 +332,8 @@ async fn load_tracked_group_states(
 struct GroupDispatchOutcome {
     delivered: usize,
     failed: usize,
+    /// Groups that fired this evaluation, whether or not anything was sent for them.
+    fired: usize,
     // how many have transitioned to pending state
     pending: usize,
     errors: Vec<String>,
@@ -355,7 +357,7 @@ impl GroupDispatchOutcome {
         let Some(downtime_id) = self.downtime_id.clone() else {
             return;
         };
-        if self.delivered == 0 && self.failed == 0 && self.pending == 0 {
+        if self.fired == 0 && self.pending == 0 {
             row.status = RunOutcome::Suppressed;
         }
         row.downtime_id = Some(downtime_id);
@@ -374,7 +376,7 @@ impl GroupDispatchOutcome {
     fn rollup_rewrite(&self) -> Option<RunOutcome> {
         if self.failed > 0 {
             Some(RunOutcome::NotifyFailed)
-        } else if self.delivered == 0 && self.pending != 0 {
+        } else if self.fired == 0 && self.pending != 0 {
             Some(RunOutcome::Pending)
         } else {
             None
@@ -450,6 +452,7 @@ async fn dispatch_per_group(
         return Some(GroupDispatchOutcome {
             delivered: 0,
             failed: 0,
+            fired: 0,
             pending: 0,
             errors: vec!["group state did not commit".to_string()],
             delivered_groups: Default::default(),
@@ -466,6 +469,7 @@ async fn dispatch_per_group(
             return Some(GroupDispatchOutcome {
                 delivered: 0,
                 failed: 0,
+                fired: 0,
                 pending: 0,
                 errors: vec![format!("group state read failed: {e}")],
                 delivered_groups: Default::default(),
@@ -548,7 +552,13 @@ async fn dispatch_per_group(
         downtime_suppressed += 1;
         downtime_id.get_or_insert(downtime.id.clone());
     }
-    for item in &plan.items {
+    // Groups with nowhere to send open no silence window for a later destination to inherit.
+    let items: &[_] = if has_delivery_target(alert) {
+        &plan.items
+    } else {
+        &[]
+    };
+    for item in items {
         // The plan already moved muted groups out; this only guards a send.
         if muted_groups.contains_key(&item.group_key) {
             continue;
@@ -653,6 +663,7 @@ async fn dispatch_per_group(
     Some(GroupDispatchOutcome {
         delivered,
         failed,
+        fired: plan.items.len(),
         pending: plan.pending,
         errors,
         delivered_groups,
@@ -724,7 +735,12 @@ pub async fn handle_triggers(
         let mut trigger = trigger;
         trigger.next_run_at = config::utils::time::now_micros() + 3600 * 1_000_000;
         trigger.status = db::scheduler::TriggerStatus::Waiting;
-        db::scheduler::update_trigger(trigger, false, trace_id).await?;
+        // Fenced and local like its own completion: a broadcast write can clobber a newer claim.
+        if trigger.module.completes_by_claim() {
+            infra::scheduler::complete_claim(trigger).await?;
+        } else {
+            db::scheduler::update_trigger(trigger, false, trace_id).await?;
+        }
         return Ok(());
     }
 
@@ -748,6 +764,9 @@ pub async fn handle_triggers(
         }
         db::scheduler::TriggerModule::OncallEscalation => {
             handle_oncall_escalation_triggers(trigger).await
+        }
+        db::scheduler::TriggerModule::AlertCalibration => {
+            super::calibration::handle_triggers(trace_id, trigger).await
         }
     }
 }
@@ -3541,6 +3560,8 @@ async fn handle_alert_triggers(
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
     // send notification
+    // Nowhere to send means no delivery to record: no dedup, silence window or episode.
+    let has_target = has_delivery_target(&alert);
     let delivery = match downtime.as_ref() {
         Some(downtime) => DeliveryDecision::SuppressedByDowntime(downtime.id.clone()),
         None => level_delivery,
@@ -3650,8 +3671,10 @@ async fn handle_alert_triggers(
         let is_multi_alert = alert.query_condition.multi_alert_enabled();
 
         // Check if grouping is enabled BEFORE deduplication (enterprise-only feature)
+        // A batch notifies its first alert's destinations, so one with none must not open it.
         #[cfg(feature = "enterprise")]
         let grouping_enabled = !is_multi_alert
+            && has_target
             && alert
                 .deduplication
                 .as_ref()
@@ -4123,11 +4146,13 @@ async fn handle_alert_triggers(
                     // At least one destination delivered, so the reservations
                     // this evaluation made are now real suppressions — one
                     // send covered every reserved row.
-                    let fingerprints: Vec<String> = dedup_reservations
-                        .iter()
-                        .map(|(_, fingerprint)| fingerprint.clone())
-                        .collect();
-                    confirm_dedup_reservations(&alert.org_id, &fingerprints).await;
+                    if has_target {
+                        let fingerprints: Vec<String> = dedup_reservations
+                            .iter()
+                            .map(|(_, fingerprint)| fingerprint.clone())
+                            .collect();
+                        confirm_dedup_reservations(&alert.org_id, &fingerprints).await;
+                    }
                     let success_msg = success_msg.trim().to_owned();
                     let err_msg = err_msg.trim().to_owned();
                     if !err_msg.is_empty() {
@@ -4221,8 +4246,10 @@ async fn handle_alert_triggers(
                         // IS a delivery for silence/escalation purposes. Stamped
                         // only here, on the terminal branch, so no retry can be
                         // suppressed by a window this same cycle opened.
-                        record_delivery(&mut trigger_data);
-                        episode_delivered = true;
+                        if has_target {
+                            record_delivery(&mut trigger_data);
+                            episode_delivered = true;
+                        }
                         if partial_failure {
                             log::error!(
                                 "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{}: \
@@ -7087,6 +7114,7 @@ mod tests {
         GroupDispatchOutcome {
             delivered,
             failed,
+            fired: delivered + failed,
             pending,
             errors: errors.iter().map(|e| (*e).to_string()).collect(),
             delivered_groups: std::collections::HashSet::new(),
@@ -7144,6 +7172,16 @@ mod tests {
             assert_eq!(dispatch.history_status(), history, "{case}");
             assert_eq!(dispatch.rollup_rewrite(), rollup, "{case}");
         }
+    }
+
+    #[test]
+    fn groups_that_fired_with_nowhere_to_send_keep_the_rollup_firing() {
+        let dispatch = GroupDispatchOutcome {
+            fired: 2,
+            ..dispatch_counts(0, 0, 1, &[])
+        };
+        assert_eq!(dispatch.history_status(), None);
+        assert_eq!(dispatch.rollup_rewrite(), None);
     }
 
     #[cfg(feature = "enterprise")]

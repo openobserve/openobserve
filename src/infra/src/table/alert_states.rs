@@ -29,8 +29,8 @@ use config::meta::{
     self_reporting::usage::RunOutcome,
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
-    TransactionTrait,
+    ActiveModelTrait, ColumnTrait, EntityTrait, FromQueryResult, QueryFilter, QueryOrder,
+    QuerySelect, Set, TransactionTrait,
 };
 
 use super::entity::{alert_state_transitions, alert_states, alerts};
@@ -783,6 +783,22 @@ where
     Ok(())
 }
 
+/// `None` for a row whose outcome this build does not know.
+fn transition_from_model(m: alert_state_transitions::Model) -> Option<StateTransition> {
+    Some(StateTransition {
+        alert_id: m.alert_id,
+        group_key: m.group_key,
+        from_outcome: m.from_outcome.and_then(RunOutcome::from_i32),
+        to_outcome: RunOutcome::from_i32(m.to_outcome)?,
+        from_level: m.from_level.and_then(AlertLevel::from_i32),
+        to_level: m.to_level.and_then(AlertLevel::from_i32),
+        at: m.at,
+        value: m.value,
+        rule_value: m.rule_value,
+        group_labels: m.group_labels,
+    })
+}
+
 /// Transitions for one alert, newest first.
 pub async fn list_transitions(
     alert_id: &str,
@@ -814,20 +830,7 @@ pub async fn list_transitions_filtered(
         .all(client)
         .await?
         .into_iter()
-        .filter_map(|m| {
-            Some(StateTransition {
-                alert_id: m.alert_id,
-                group_key: m.group_key,
-                from_outcome: m.from_outcome.and_then(RunOutcome::from_i32),
-                to_outcome: RunOutcome::from_i32(m.to_outcome)?,
-                from_level: m.from_level.and_then(AlertLevel::from_i32),
-                to_level: m.to_level.and_then(AlertLevel::from_i32),
-                at: m.at,
-                value: m.value,
-                rule_value: m.rule_value,
-                group_labels: m.group_labels,
-            })
-        })
+        .filter_map(transition_from_model)
         .collect())
 }
 
@@ -856,27 +859,11 @@ pub async fn list_transitions_between(
         .all(client)
         .await?
         .into_iter()
-        .filter_map(|m| {
-            Some(StateTransition {
-                alert_id: m.alert_id,
-                group_key: m.group_key,
-                from_outcome: m.from_outcome.and_then(RunOutcome::from_i32),
-                to_outcome: RunOutcome::from_i32(m.to_outcome)?,
-                from_level: m.from_level.and_then(AlertLevel::from_i32),
-                to_level: m.to_level.and_then(AlertLevel::from_i32),
-                at: m.at,
-                value: m.value,
-                rule_value: m.rule_value,
-                group_labels: m.group_labels,
-            })
-        })
+        .filter_map(transition_from_model)
         .collect())
 }
 
-/// Batched counterpart to [`list_transitions_between`]: transitions for many
-/// alerts inside one window, grouped by alert id, oldest first per alert. Each
-/// lane is truncated to `per_alert_limit` in memory — the window itself bounds
-/// the fetch, so no per-alert SQL limit (and no N per-child queries) is needed.
+/// Each alert's transitions in a window, oldest first, at most `per_alert_limit` per alert.
 pub async fn list_transitions_between_many(
     alert_ids: &[String],
     group_key: Option<&str>,
@@ -884,44 +871,62 @@ pub async fn list_transitions_between_many(
     to: i64,
     per_alert_limit: u64,
 ) -> Result<std::collections::HashMap<String, Vec<StateTransition>>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    list_transitions_between_many_with(client, alert_ids, group_key, from, to, per_alert_limit)
+        .await
+}
+
+/// [`list_transitions_between_many`] against a caller-supplied connection.
+pub async fn list_transitions_between_many_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_ids: &[String],
+    group_key: Option<&str>,
+    from: i64,
+    to: i64,
+    per_alert_limit: u64,
+) -> Result<std::collections::HashMap<String, Vec<StateTransition>>, errors::Error> {
+    use alert_state_transitions::Column;
+    use sea_orm::sea_query::{Alias, Asterisk, Expr, Func, Order, Query, WindowStatement};
+
     let mut grouped: std::collections::HashMap<String, Vec<StateTransition>> =
         std::collections::HashMap::new();
     if alert_ids.is_empty() {
         return Ok(grouped);
     }
-    let client = get_orm_client_ro().await;
-    let mut query = alert_state_transitions::Entity::find()
-        .filter(alert_state_transitions::Column::AlertId.is_in(alert_ids.iter().cloned()))
-        .filter(alert_state_transitions::Column::At.gte(from))
-        .filter(alert_state_transitions::Column::At.lte(to));
+    // Ranked per alert, so one flapping alert cannot use up the other alerts' share of the rows.
+    let rank = Alias::new("lane_rank");
+    let lane = WindowStatement::partition_by(Column::AlertId)
+        .order_by(Column::At, Order::Asc)
+        .order_by(Column::Id, Order::Asc)
+        .to_owned();
+    let mut ranked = Query::select();
+    ranked
+        .column(Asterisk)
+        .expr_window_as(Func::cust(Alias::new("ROW_NUMBER")), lane, rank.clone())
+        .from(alert_state_transitions::Entity)
+        .and_where(Column::AlertId.is_in(alert_ids.iter().cloned()))
+        .and_where(Column::At.gte(from))
+        .and_where(Column::At.lte(to));
     if let Some(key) = group_key {
-        query = query.filter(alert_state_transitions::Column::GroupKey.eq(key));
+        ranked.and_where(Column::GroupKey.eq(key));
     }
-    let rows = query
-        .order_by_asc(alert_state_transitions::Column::At)
-        .limit(per_alert_limit.saturating_mul(alert_ids.len() as u64))
-        .all(client)
+    let query = Query::select()
+        .column(Asterisk)
+        .from_subquery(ranked, Alias::new("ranked"))
+        .and_where(Expr::col(rank).lte(per_alert_limit))
+        .order_by(Column::AlertId, Order::Asc)
+        .order_by(Column::At, Order::Asc)
+        .order_by(Column::Id, Order::Asc)
+        .to_owned();
+    let statement = conn.get_database_backend().build(&query);
+    let rows = alert_state_transitions::Model::find_by_statement(statement)
+        .all(conn)
         .await?;
-    for m in rows {
-        let Some(to_outcome) = RunOutcome::from_i32(m.to_outcome) else {
-            continue;
-        };
-        let transition = StateTransition {
-            alert_id: m.alert_id,
-            group_key: m.group_key,
-            from_outcome: m.from_outcome.and_then(RunOutcome::from_i32),
-            to_outcome,
-            from_level: m.from_level.and_then(AlertLevel::from_i32),
-            to_level: m.to_level.and_then(AlertLevel::from_i32),
-            at: m.at,
-            value: m.value,
-            rule_value: m.rule_value,
-            group_labels: m.group_labels,
-        };
-        let lane = grouped.entry(transition.alert_id.clone()).or_default();
-        if lane.len() < per_alert_limit as usize {
-            lane.push(transition);
-        }
+    for transition in rows.into_iter().filter_map(transition_from_model) {
+        grouped
+            .entry(transition.alert_id.clone())
+            .or_default()
+            .push(transition);
     }
     Ok(grouped)
 }
@@ -1935,5 +1940,36 @@ mod tests {
             ["NaN", "+Inf", "-Inf", "0.25"]
         );
         assert!(rows.iter().all(|r| r.value.is_none()));
+    }
+
+    async fn insert_transition(
+        db: &sea_orm::DatabaseConnection,
+        alert_id: &str,
+        group_key: &str,
+        at: i64,
+    ) {
+        let update = update_for(alert_id, group_key, at);
+        write_transition(db, update.transition.as_ref().unwrap())
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_flapping_alert_cannot_crowd_another_out_of_its_transitions() {
+        let db = db().await;
+        for at in 1..=10 {
+            insert_transition(&db, "noisy", "g", at).await;
+        }
+        insert_transition(&db, "quiet", "g", 200).await;
+        insert_transition(&db, "quiet", "other", 19).await;
+        insert_transition(&db, "quiet", "g", 20).await;
+        insert_transition(&db, "quiet", "g", 21).await;
+        let ids = ["noisy".to_string(), "quiet".to_string()];
+        let lanes = list_transitions_between_many_with(&db, &ids, Some("g"), 5, 100, 3)
+            .await
+            .unwrap();
+        let ats = |id: &str| lanes[id].iter().map(|t| t.at).collect::<Vec<_>>();
+        assert_eq!(ats("noisy"), [5, 6, 7]);
+        assert_eq!(ats("quiet"), [20, 21]);
     }
 }

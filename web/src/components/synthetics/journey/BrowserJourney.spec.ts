@@ -172,10 +172,10 @@ const OButtonGroupStub = { template: "<div><slot /></div>" };
 // Emits an already-resolved pick; the menu's own list, search and GET are covered in SubtestMenu.spec.ts.
 const SubtestMenuStub = {
   name: "SubtestMenu",
-  props: ["ownCheckId", "disabled", "compositionEnabled"],
+  props: ["ownCheckId", "disabled"],
   emits: ["pick"],
   template:
-    '<button type="button" data-test="synthetics-journey-add-subtest-btn" :disabled="disabled || !compositionEnabled" />',
+    '<button type="button" data-test="synthetics-journey-add-subtest-btn" :disabled="disabled" />',
 };
 
 const STUBS = {
@@ -1093,7 +1093,7 @@ describe("BrowserJourney Add Subtest menu", () => {
   const CHILD = { id: "child-1", name: "Login flow" };
 
   beforeEach(() => {
-    mockStoreState.zoConfig = { synthetics_subtests_enabled: true };
+    mockStoreState.zoConfig = {};
     mockSyntheticsGet.mockResolvedValue({
       data: { id: CHILD.id, name: CHILD.name, config: { steps: [] } },
     });
@@ -1139,18 +1139,12 @@ describe("BrowserJourney Add Subtest menu", () => {
     expect(wrapper.find(ADD_SUBTEST).attributes("disabled")).toBeDefined();
   });
 
-  it("is told whether composition is on, and which check to leave out", () => {
+  it("is told which check to leave out, and is enabled with no feature switch", () => {
     wrapper = mountWithModel([], { ownCheckId: "self" });
     const menu = wrapper.findComponent(SubtestMenuStub);
-    expect(menu.props("compositionEnabled")).toBe(true);
     expect(menu.props("ownCheckId")).toBe("self");
     expect(menu.props("disabled")).toBe(false);
-    wrapper.unmount();
-
-    mockStoreState.zoConfig = {};
-    wrapper = mountWithModel([]);
-    expect(wrapper.findComponent(SubtestMenuStub).props("compositionEnabled")).toBe(false);
-    expect(wrapper.find(ADD_SUBTEST).attributes("disabled")).toBeDefined();
+    expect(wrapper.find(ADD_SUBTEST).attributes("disabled")).toBeUndefined();
   });
 
   it("a pick appends a filled reference, not a blank subtest row", async () => {
@@ -1228,7 +1222,7 @@ describe("BrowserJourney add menu and step filter", () => {
   ] as any[];
 
   beforeEach(() => {
-    mockStoreState.zoConfig = { synthetics_subtests_enabled: true };
+    mockStoreState.zoConfig = {};
     postMessageSpy = vi.fn();
     vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
     vi.useFakeTimers();
@@ -3766,7 +3760,7 @@ describe("BrowserJourney toolbar while recording", () => {
   ] as any[];
 
   beforeEach(() => {
-    mockStoreState.zoConfig = { synthetics_subtests_enabled: true };
+    mockStoreState.zoConfig = {};
     postMessageSpy = vi.fn();
     vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
     vi.useFakeTimers();
@@ -4485,7 +4479,6 @@ describe("BrowserJourney — a restore that never reached the recording point", 
   });
 
   it("should not offer Add Subtest while the restore runs", async () => {
-    mockStoreState.zoConfig = { synthetics_subtests_enabled: true };
     wrapper = mountAnchored();
     await startAnchoredRestore(wrapper);
     respondToLastCommand({ success: true });
@@ -4691,7 +4684,7 @@ describe("BrowserJourney toolbar on a phone", () => {
   ] as any[];
 
   beforeEach(() => {
-    mockStoreState.zoConfig = { synthetics_subtests_enabled: true };
+    mockStoreState.zoConfig = {};
     originalScrollIntoView = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = vi.fn();
   });

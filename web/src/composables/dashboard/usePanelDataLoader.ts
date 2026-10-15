@@ -13,11 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { ref, watch, reactive, toRefs, onMounted, onUnmounted, toRaw, markRaw } from "vue";
+import {
+  ref,
+  watch,
+  reactive,
+  toRefs,
+  onMounted,
+  onUnmounted,
+  toRaw,
+  markRaw,
+  inject,
+  hasInjectionContext,
+} from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
+import config from "@/aws-exports";
 
 import { usePanelCache } from "./usePanelCache";
+import { usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
 import { isEqual, omit } from "lodash-es";
 
 import { useAnnotations } from "./useAnnotations";
@@ -29,6 +42,7 @@ import { usePanelSQLExecutor } from "./usePanelSQLExecutor";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
 import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
+import { DASHBOARD_FRESH_PANEL_TIME } from "./dashboardFreshPanelTime";
 import { parseSearchError } from "@/utils/query/searchError";
 import { PANEL_KEY_IGNORED_PATHS, normalizeVariablesForCache } from "@/composables/query/panelKey";
 
@@ -66,6 +80,12 @@ export const usePanelDataLoader = (
     }
   };
   let runCount = 0;
+
+  const resolveFreshPanelTime = hasInjectionContext()
+    ? inject(DASHBOARD_FRESH_PANEL_TIME, undefined)
+    : undefined;
+  // A variable change reloads without a new time prop, so that reload resolves its own.
+  let isVariablesTriggeredLoad = false;
 
   const store = useStore();
 
@@ -177,15 +197,31 @@ export const usePanelDataLoader = (
   // is panel currently visible or not
   const isVisible: any = ref(false);
 
+  const refreshAfterRestore = usePanelRefreshAfterRestore({ state, panelSchema, dashboardId });
+
+  // Until the first load settles the panel has no answer yet, so "No Data" would flash over a cached result.
+  const isFirstLoadSettled = ref(false);
+  let latestLoadCall = 0;
+  watch(
+    () => state.loading,
+    (loading) => {
+      if (!loading) isFirstLoadSettled.value = true;
+    },
+    { flush: "sync" },
+  );
+
+  const writeStateToCache = async (cacheTimeRange: { start_time: number; end_time: number }) => {
+    // Restore rejects an incomplete state, so writing one would only delete the last complete entry.
+    if (state.loading || state.isPartialData) return;
+    await savePanelCache(getCacheKey(), { ...toRaw(state) }, cacheTimeRange);
+  };
+
   const saveCurrentStateToCache = async () => {
-    await savePanelCache(
-      getCacheKey(),
-      { ...toRaw(state) },
-      {
-        start_time: selectedTimeObj?.value?.start_time?.getTime(),
-        end_time: selectedTimeObj?.value?.end_time?.getTime(),
-      },
-    );
+    refreshAfterRestore.markIfComplete();
+    await writeStateToCache({
+      start_time: selectedTimeObj?.value?.start_time?.getTime(),
+      end_time: selectedTimeObj?.value?.end_time?.getTime(),
+    });
   };
 
   // The window the displayed data was produced with — the executed range on a
@@ -203,11 +239,7 @@ export const usePanelDataLoader = (
       // Write through, or the cached panel entry restores the stale list. Keep
       // the entry's cacheTimeRange as the data's window — the picker may have
       // moved since the displayed result was produced.
-      await savePanelCache(
-        getCacheKey(),
-        { ...toRaw(state) },
-        { start_time: window.start, end_time: window.end },
-      );
+      await writeStateToCache({ start_time: window.start, end_time: window.end });
     } catch (error) {
       console.error("Failed to refresh annotations:", error);
     }
@@ -319,8 +351,9 @@ export const usePanelDataLoader = (
   };
 
   const cancelQueryAbort = () => {
+    const keptRestoredResult = refreshAfterRestore.release(true);
     // Only set isPartialData to true if the panel was still loading
-    if (state.loading) {
+    if (state.loading && !keptRestoredResult) {
       state.isPartialData = true; // Set to true when cancelled
     }
     state.loading = false;
@@ -343,10 +376,31 @@ export const usePanelDataLoader = (
     if (abortController) {
       abortController?.abort();
     }
-    saveCurrentStateToCache();
+    // The restored entry is still the last complete result; re-saving would stamp it with the new window.
+    if (!keptRestoredResult) saveCurrentStateToCache();
+  };
+
+  // Aborting the controller only stops the client; the superseded searches keep running server-side until cancelled.
+  const cancelSupersededSearches = () => {
+    const traceIds = state.searchRequestTraceIds ?? [];
+    if (!traceIds.length) return;
+    const orgId = store?.state?.selectedOrganization?.identifier;
+    state.searchRequestTraceIds = [];
+    try {
+      traceIds.forEach((traceId: string) => {
+        cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: orgId });
+      });
+      // The query manager cancel route exists only in enterprise and cloud builds; OSS answers 404.
+      if (config.isEnterprise == "true" || config.isCloud == "true") {
+        queryService.delete_running_queries(orgId, traceIds)?.catch?.(() => {});
+      }
+    } catch (error) {
+      console.error("Error cancelling superseded searches:", error);
+    }
   };
 
   const loadData = async () => {
+    const loadCall = ++latestLoadCall;
     log("[usePanelDataLoader] " + panelSchema?.value?.title + ": loadData() PROCEEDING");
 
     // Only reset isPartialData if we're starting a fresh load and not restoring from cache
@@ -362,6 +416,7 @@ export const usePanelDataLoader = (
       // Check and abort the previous call if necessary
       if (abortController) {
         log("loadData: aborting previous function call (if any)");
+        cancelSupersededSearches();
         abortController.abort();
       }
 
@@ -425,7 +480,7 @@ export const usePanelDataLoader = (
           state.isOperationCancelled = false;
           log("loadData: panelcache: restored from cache");
           runCount++;
-          return;
+          if (!refreshAfterRestore.queueRefresh()) return;
         }
       }
 
@@ -436,7 +491,10 @@ export const usePanelDataLoader = (
 
       log("loadData: good to go... starting query executions...");
 
-      const timestamps = selectedTimeObj.value;
+      const timestamps =
+        (isVariablesTriggeredLoad && resolveFreshPanelTime?.(panelSchema.value.id)) ||
+        selectedTimeObj.value;
+      isVariablesTriggeredLoad = false;
 
       let startISOTimestamp: any;
       let endISOTimestamp: any;
@@ -458,6 +516,7 @@ export const usePanelDataLoader = (
 
       runCount++;
 
+      refreshAfterRestore.holdIfQueued();
       state.loading = true;
       state.isCachedDataDifferWithCurrentTimeRange = false;
 
@@ -482,6 +541,9 @@ export const usePanelDataLoader = (
       } else {
         log("logaData: An error occurred:", error);
       }
+    } finally {
+      // Covers every early return: a call that was not superseded and left nothing running has its answer.
+      if (loadCall === latestLoadCall && !state.loading) isFirstLoadSettled.value = true;
     }
   };
 
@@ -643,7 +705,8 @@ export const usePanelDataLoader = (
     searchType,
     searchResponse,
     is_ui_histogram,
-    shouldRefreshWithoutCache,
+    shouldRefreshWithoutCache:
+      refreshAfterRestore.clearCacheUnlessHolding(shouldRefreshWithoutCache),
     dashboardId,
     dashboardName,
     folderId,
@@ -697,6 +760,7 @@ export const usePanelDataLoader = (
       }
 
       if (variablesDataUpdated()) {
+        isVariablesTriggeredLoad = true;
         loadData();
       }
     },
@@ -735,13 +799,6 @@ export const usePanelDataLoader = (
         state.isPartialData = true;
       }
       abortController.abort();
-    }
-    // Save current state to cache only if still loading on unmount ΓÇö
-    // MUST come after isPartialData is set above so the cache stores the correct flag.
-    // (handles tab-switch / navigate-away mid-load scenario)
-    // If loading is already done, the end/complete handlers already saved the cache.
-    if (state.loading) {
-      saveCurrentStateToCache();
     }
     if (observer) {
       observer.disconnect();
@@ -828,7 +885,8 @@ export const usePanelDataLoader = (
       tempPanelCacheValue &&
       Object.keys(tempPanelCacheValue).length > 0 &&
       cacheKeysMatch &&
-      !cachedIncompleteLoad
+      !cachedIncompleteLoad &&
+      refreshAfterRestore.acceptsCachedWindow(cache.cacheTimeRange, selectedTimeObj?.value)
     ) {
       // const cache = getPanelCache();
       state.data = markRaw(tempPanelCacheValue.data ?? []);
@@ -844,6 +902,8 @@ export const usePanelDataLoader = (
 
       // set that the cache is restored
       isRestoredFromCache = true;
+      // Same tick as the restored data, so the renderer's first flush already converts it.
+      isFirstLoadSettled.value = true;
 
       if (cache?.cacheTimeRange?.start_time && cache?.cacheTimeRange?.end_time) {
         renderedTimeRange = {
@@ -868,6 +928,8 @@ export const usePanelDataLoader = (
 
   return {
     ...toRefs(state),
+    ...refreshAfterRestore.shownResult,
+    isFirstLoadSettled,
     loadData,
     reloadAnnotations,
   };

@@ -69,6 +69,8 @@ vi.mock("@/composables/useAiChat", () => ({
     registerAiChatHandler: vi.fn(),
     removeAiChatHandler: vi.fn(),
     getStructuredContext: vi.fn().mockResolvedValue(null),
+    // Server-side chat persistence off: history stays in IndexedDB.
+    chatHistoryServer: vi.fn(() => ({ enabled: () => false })),
   })),
 }));
 

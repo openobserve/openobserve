@@ -483,6 +483,28 @@ describe("Billings Service", () => {
         `/api/${mockOrgId}/billing_group/invites/${token}/reject`,
       );
     });
+
+    it("remove_billing_group_member should DELETE the member endpoint", async () => {
+      mockHttp.mockReturnValue({
+        delete: vi.fn().mockResolvedValue({ data: "removed" }),
+      } as any);
+
+      await billings.remove_billing_group_member(mockOrgId, "child-org");
+
+      expect(mockHttp().delete).toHaveBeenCalledWith(
+        `/api/${mockOrgId}/billing_group/members/child-org`,
+      );
+    });
+
+    it("leave_billing_group should DELETE the membership endpoint", async () => {
+      mockHttp.mockReturnValue({
+        delete: vi.fn().mockResolvedValue({ data: "left" }),
+      } as any);
+
+      await billings.leave_billing_group(mockOrgId);
+
+      expect(mockHttp().delete).toHaveBeenCalledWith(`/api/${mockOrgId}/billing_group/membership`);
+    });
   });
 
   describe("submit_new_user_info", () => {

@@ -1016,8 +1016,7 @@ describe("AlertLibrary", () => {
 
     it("keeps the selection when the wizard is cancelled without running", async () => {
       // Building a twelve-alert batch is real work with no undo; a cancelled
-      // modal must not destroy it. This is what makes the "no destinations in
-      // this org" dead end survivable.
+      // modal must not destroy it.
       const wrapper = await mountView();
       await tick(wrapper, ALL);
       await press(wrapper, "alert-library-add-selected");
