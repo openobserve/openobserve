@@ -30,6 +30,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <BetaBadge />
       </span>
     </template>
+    <template #title-trail>
+      <span
+        tabindex="0"
+        class="text-text-secondary flex items-center"
+        :aria-label="t('rum.analytics.sdkSampled')"
+        data-test="rum-analytics-sdk-sampling"
+      >
+        <OIcon name="info-outline" size="sm" />
+        <OTooltip
+          :content="t('rum.analytics.sdkSampledTip', { field: raw('sessionSampleRate') })"
+        />
+      </span>
+    </template>
     <template #actions>
       <OSelect
         v-if="appOptions.length > 1"
@@ -72,6 +85,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-analytics-version-select"
         @update:model-value="onVersionChange"
       />
+      <OPopover
+        v-if="identityNote"
+        v-model:open="identityOpen"
+        side="bottom"
+        align="end"
+        content-class="p-3 w-80"
+      >
+        <template #trigger>
+          <OTag
+            :label="
+              state.includeAllIdentities
+                ? t('rum.analytics.identityIncluded')
+                : t(
+                    'rum.analytics.identityExcluded',
+                    { count: identityNote.count, pct: sharePct },
+                    identityNote.count,
+                  )
+            "
+            variant="warning-soft"
+            size="md"
+            clickable
+            data-test="rum-analytics-identity-note"
+          />
+        </template>
+        <div class="flex flex-col gap-2 text-sm">
+          <p class="text-text-body" data-test="rum-analytics-identity-help">
+            {{ identityHelp }}
+          </p>
+          <OButton
+            variant="outline"
+            size="sm"
+            data-test="rum-analytics-identity-include-btn"
+            @click="toggleIncludeAll"
+            >{{
+              state.includeAllIdentities
+                ? t("rum.analytics.excludeAgain")
+                : t("rum.analytics.includeIt")
+            }}</OButton
+          >
+        </div>
+      </OPopover>
       <OPopover
         v-if="exclusionCount !== null"
         v-model:open="appFiltersOpen"
@@ -149,7 +203,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-analytics-refresh-btn"
         @click="refresh"
       >
-        <OTooltip :content="t('rum.analytics.refresh')" />
+        <OTooltip
+          :content="
+            dataThrough
+              ? t('rum.analytics.refreshDataThrough', { time: dataThrough })
+              : t('rum.analytics.refresh')
+          "
+        />
       </OButton>
       <ShareButton
         data-test="rum-analytics-share-btn"
@@ -183,75 +243,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <RumNoDataState />
     </div>
     <div v-else class="flex h-full min-h-0 flex-col">
-      <div
-        class="px-page-edge text-text-secondary border-border-default flex shrink-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 border-b py-1 text-xs"
-        data-test="rum-analytics-trust-caption"
-      >
-        <span v-if="dataThrough" data-test="rum-analytics-data-through">{{
-          t("rum.analytics.dataThrough", { time: dataThrough })
-        }}</span>
-        <span v-if="dataThrough" aria-hidden="true">{{ separator }}</span>
-        <OTooltip :content="t('rum.analytics.sdkSampledTip', { field: raw('sessionSampleRate') })">
-          <span
-            tabindex="0"
-            class="underline decoration-dotted underline-offset-2"
-            data-test="rum-analytics-sdk-sampling"
-            >{{ t("rum.analytics.sdkSampled") }}</span
-          >
-        </OTooltip>
-        <template v-if="syntheticCount > 0 && route.name !== PA_ROUTES.funnelBuilder">
-          <span aria-hidden="true">{{ separator }}</span>
-          <span data-test="rum-analytics-synthetic-excluded">{{
-            t(
-              "rum.analytics.syntheticExcluded",
-              { count: addCommasToNumber(syntheticCount) },
-              syntheticCount,
-            )
-          }}</span>
-        </template>
-        <OPopover
-          v-if="identityNote"
-          v-model:open="identityOpen"
-          side="bottom"
-          align="start"
-          content-class="p-3 w-80"
-        >
-          <template #trigger>
-            <OTag
-              :label="
-                state.includeAllIdentities
-                  ? t('rum.analytics.identityIncluded')
-                  : t(
-                      'rum.analytics.identityExcluded',
-                      { count: identityNote.count, pct: sharePct },
-                      identityNote.count,
-                    )
-              "
-              variant="warning-soft"
-              size="sm"
-              clickable
-              data-test="rum-analytics-identity-note"
-            />
-          </template>
-          <div class="flex flex-col gap-2 text-sm">
-            <p class="text-text-body" data-test="rum-analytics-identity-help">
-              {{ identityHelp }}
-            </p>
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="rum-analytics-identity-include-btn"
-              @click="toggleIncludeAll"
-              >{{
-                state.includeAllIdentities
-                  ? t("rum.analytics.excludeAgain")
-                  : t("rum.analytics.includeIt")
-              }}</OButton
-            >
-          </div>
-        </OPopover>
-      </div>
-
       <OBanner
         v-if="invalidParams.length && !invalidDismissed"
         variant="warning"
@@ -347,6 +338,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -420,7 +412,6 @@ const {
   deletedEventLink,
 } = pa;
 
-const separator = raw("·");
 let active = false;
 let activatedOnce = false;
 const invalidDismissed = ref(false);
@@ -508,10 +499,6 @@ const dataThrough = computed(() => {
   if (!us) return "";
   return formatInTimeZone(new Date(us / 1000), store.state.timezone || "UTC", "yyyy-MM-dd HH:mm");
 });
-
-const syntheticCount = computed(() =>
-  pa.schema.value.session_type ? (summary.value?.syntheticSessions ?? 0) : 0,
-);
 
 const sharePct = computed(() => Math.round((identityNote.value?.share ?? 0) * 100));
 const identityHelp = computed(() => {
