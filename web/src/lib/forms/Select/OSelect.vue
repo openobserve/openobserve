@@ -700,7 +700,8 @@ defineExpose({ close, focus });
 function handleTriggerKeydown(e: KeyboardEvent) {
   if (props.disabled) return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.key.length !== 1 || e.key === " ") return;
+  // Browser autofill dispatches keydown events with no `key`.
+  if (typeof e.key !== "string" || e.key.length !== 1 || e.key === " ") return;
   e.preventDefault();
   e.stopPropagation();
   popoverOpen.value = true;

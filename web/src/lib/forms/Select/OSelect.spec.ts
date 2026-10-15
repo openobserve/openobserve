@@ -341,6 +341,24 @@ describe("OSelect", () => {
       expect([input.selectionStart, input.selectionEnd]).toEqual([1, 1]);
     });
 
+    it("should ignore a keydown with no key, as browser autofill dispatches", async () => {
+      const uncaught = vi.fn((e: ErrorEvent) => e.preventDefault());
+      window.addEventListener("error", uncaught);
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          searchable: true,
+          options: [{ label: "sample", value: "s1" }],
+        },
+      });
+      wrapper.find("button").element.dispatchEvent(new Event("keydown", { bubbles: true }));
+      await flushPromises();
+
+      window.removeEventListener("error", uncaught);
+      expect(uncaught).not.toHaveBeenCalled();
+      expect(document.body.querySelector('input[placeholder="Search..."]')).toBeNull();
+    });
+
     it("should not open the dropdown when a modifier combo is pressed on the trigger", async () => {
       wrapper = mount(OSelect, {
         attachTo: document.body,
