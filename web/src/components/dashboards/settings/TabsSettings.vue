@@ -87,8 +87,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
+        <template #cell-repeat="{ row }">
+          <OTag
+            v-if="row.repeat?.variable"
+            variant="indigo-soft"
+            size="sm"
+            icon="repeat"
+            :label="t('dashboard.repeat.tabRepeatsBy', { variable: `$${row.repeat.variable}` })"
+            data-test="dashboard-tab-settings-tab-repeat"
+          />
+          <span v-else class="text-text-muted" data-test="dashboard-tab-settings-tab-repeat-none">{{
+            raw("—")
+          }}</span>
+        </template>
+
         <template #cell-actions="{ row }">
           <div class="flex justify-center gap-1">
+            <OButton
+              variant="ghost"
+              size="icon"
+              :disabled="row.tabId === editTabId"
+              :title="t('dashboard.repeat.tabRepeatSettings')"
+              @click.stop="editRepeat(row.tabId)"
+              data-test="dashboard-tab-settings-tab-repeat-btn"
+              icon-left="repeat"
+              class="max-md:hidden"
+            >
+            </OButton>
             <OButton
               variant="ghost"
               size="icon"
@@ -131,6 +156,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @select="editItem(row.tabId)"
               >
                 <span>{{ t("dashboard.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="repeat"
+                :disabled="row.tabId === editTabId"
+                class="md:hidden"
+                data-test="dashboard-tab-settings-tab-repeat-btn-menu"
+                @select="editRepeat(row.tabId)"
+              >
+                <span>{{ t("dashboard.repeat.tabRepeatSettings") }}</span>
               </ODropdownItem>
               <ODropdownItem
                 v-if="currentDashboardData.data.tabs.length !== 1"
@@ -185,6 +219,7 @@ import { useStore } from "vuex";
 import { deleteTab, editTab, getDashboard, updateDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -206,6 +241,7 @@ export default defineComponent({
     ODropdownItem,
     OIcon,
     OTable,
+    OTag,
   },
   setup(props, { emit }) {
     const store = useStore();
@@ -311,11 +347,17 @@ export default defineComponent({
         meta: { align: "left", isName: true, autoWidth: true },
       },
       {
+        id: "repeat",
+        header: t("dashboard.repeat.tabColumn"),
+        size: 160,
+        meta: { align: "left" },
+      },
+      {
         id: "actions",
         header: t("dashboard.actions"),
         isAction: true,
-        size: 120,
-        meta: { align: "center", actionCount: 2 },
+        size: 140,
+        meta: { align: "center", actionCount: 3 },
       },
     ];
 
@@ -402,6 +444,13 @@ export default defineComponent({
       editTabObj.data = {};
     };
 
+    const editRepeat = (tabId: any) => {
+      cancelEdit();
+      selectedTabIdToEdit.value = tabId;
+      isTabEditMode.value = true;
+      showAddTabDialog.value = true;
+    };
+
     const addNewItem = () => {
       isTabEditMode.value = false;
       showAddTabDialog.value = true;
@@ -456,6 +505,8 @@ export default defineComponent({
 
     return {
       t,
+      raw,
+      editRepeat,
       columns,
       tableWrapper,
       editTabId,

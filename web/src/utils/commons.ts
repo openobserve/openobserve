@@ -888,8 +888,12 @@ export const editTab = async (
   const currentDashboardData = await getDashboard(store, dashboardId, folderId);
   const tab = getTabDataFromTabId(currentDashboardData, tabId);
 
-  // only name will change
   tab.name = tabData.name;
+  // An absent key leaves the repeat alone; an explicit undefined clears it.
+  if ("repeat" in tabData) {
+    if (tabData.repeat?.variable) tab.repeat = tabData.repeat;
+    else delete tab.repeat;
+  }
 
   await updateDashboard(
     store,

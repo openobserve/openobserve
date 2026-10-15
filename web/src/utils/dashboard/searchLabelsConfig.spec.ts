@@ -38,11 +38,12 @@ describe("searchLabelsConfig", () => {
     "markLines",
     "background",
     "sparkline",
+    "repeat",
   ] as const;
 
   describe("ORDERED_SECTION_IDS", () => {
-    it("contains all 21 section IDs", () => {
-      expect(ORDERED_SECTION_IDS).toHaveLength(21);
+    it("contains all 22 section IDs", () => {
+      expect(ORDERED_SECTION_IDS).toHaveLength(22);
     });
 
     it("contains every expected section ID", () => {
@@ -74,8 +75,8 @@ describe("searchLabelsConfig", () => {
       }
     });
 
-    it("has exactly 21 keys", () => {
-      expect(Object.keys(DEFAULT_EXPANDED_SECTIONS)).toHaveLength(21);
+    it("has exactly 22 keys", () => {
+      expect(Object.keys(DEFAULT_EXPANDED_SECTIONS)).toHaveLength(22);
     });
 
     it("has no section set to true", () => {

@@ -21,7 +21,7 @@
         class="me-3 flex min-w-0 items-center text-xl tracking-[0.005em] max-md:me-0 max-md:flex-1 max-md:basis-full"
       >
         <OTruncatedText data-test="dashboard-viewpanel-title">
-          {{ dashboardPanelData.data.title }}
+          {{ viewPanelTitle }}
         </OTruncatedText>
         <ExemplarToggle
           v-if="viewExemplarsEligible"
@@ -240,6 +240,7 @@ import {
   provide,
   computed,
   defineAsyncComponent,
+  type PropType,
 } from "vue";
 
 import { useI18nTyped } from "@/types/i18n";
@@ -282,6 +283,7 @@ import {
 } from "@/composables/dashboard/useExemplarOverride";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { formatRepeatTitle, getRepeatSourceId } from "@/utils/dashboard/repeatByVariable";
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
@@ -331,6 +333,16 @@ export default defineComponent({
     initialVariableValues: {
       type: Object,
     },
+    /** Set when a repeated copy is opened: its value is appended to the title. */
+    repeat: {
+      type: Object as PropType<{ variable: string; value: string } | null>,
+      default: null,
+    },
+    /** Variables pinned by a repeated tab and copy, applied over the URL selection. */
+    pins: {
+      type: Array as PropType<{ variable: string; value: string }[]>,
+      default: () => [],
+    },
     searchType: {
       default: null,
       type: String || null,
@@ -346,6 +358,8 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const route = useRoute();
     const store = useStore();
+    const routeSourceTabId = () =>
+      route.query.tab ? getRepeatSourceId(String(route.query.tab)) : undefined;
 
     // IMPORTANT: Always create a NEW isolated instance for ViewPanel
     // ViewPanel should NEVER share the variables manager with the parent dashboard
@@ -514,7 +528,7 @@ export default defineComponent({
           route.query.dashboard,
           props.panelId,
           route.query.folder,
-          route.query.tab ?? dashboardPanelData.data.panels?.[0]?.tabId,
+          routeSourceTabId() ?? dashboardPanelData.data.panels?.[0]?.tabId,
         );
         Object.assign(dashboardPanelData.data, JSON.parse(JSON.stringify(panelData)));
         await nextTick();
@@ -659,7 +673,7 @@ export default defineComponent({
       // Initialize variables manager with dashboard variables
       try {
         // Get current tab and panel IDs for initialization
-        const tabId = (route.query.tab as string) ?? currentDashboardData.data?.tabs?.[0]?.tabId;
+        const tabId = routeSourceTabId() ?? currentDashboardData.data?.tabs?.[0]?.tabId;
 
         // Initialize with panel-to-tab mapping (3rd parameter is critical for panel variables!)
         await variablesManager.initialize(
@@ -712,6 +726,11 @@ export default defineComponent({
         // - var-myVar.p.panelId (panel-scoped)
         // URL values will OVERRIDE parent-passed values
         variablesManager.loadFromUrl(route);
+
+        // The URL carries the whole selection; a repeated tab or copy shows only its own values.
+        props.pins.forEach((pin) =>
+          variablesManager.loadFromUrl({ query: { [`var-${pin.variable}`]: pin.value } }),
+        );
 
         // Commit the values immediately so they're used by the chart
         variablesManager.commitAll();
@@ -860,7 +879,7 @@ export default defineComponent({
 
     // Computed properties for current tab and panel IDs
     const currentTabId = computed(() => {
-      return (route.query.tab as string) ?? currentDashboardData.data?.tabs?.[0]?.tabId;
+      return routeSourceTabId() ?? currentDashboardData.data?.tabs?.[0]?.tabId;
     });
 
     const currentPanelId = computed(() => {
@@ -911,8 +930,19 @@ export default defineComponent({
       };
     });
 
+    const viewPanelTitle = computed(() =>
+      formatRepeatTitle(
+        dashboardPanelData.data.title,
+        liveVariablesData.value,
+        props.repeat,
+        t("dashboard.repeat.allValue"),
+        t("dashboard.repeat.noneValue"),
+      ),
+    );
+
     return {
       t,
+      viewPanelTitle,
       setTimeForVariables,
       dateTimeForVariables,
       updateDateTime,

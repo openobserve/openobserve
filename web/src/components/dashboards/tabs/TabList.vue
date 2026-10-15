@@ -42,7 +42,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              (px-0.5), the pencil is absolutely positioned (out of flow) in the
              pe-2.5 reserve, and both gutters exist in display AND edit mode, so
              entering/leaving edit never changes the tab's width. -->
-        <div class="flex w-full flex-nowrap items-center" :class="canManage ? 'pe-2.5' : ''">
+        <div
+          class="flex w-full flex-nowrap items-center"
+          :class="canRename ? 'pe-9' : canManage ? 'pe-2.5' : ''"
+        >
+          <OIcon
+            v-if="!tab.repeat && tab.emptyRepeat"
+            name="repeat"
+            size="xs"
+            class="text-text-secondary me-1 shrink-0"
+            :aria-label="
+              t('dashboard.repeat.tabRepeatsBy', { variable: `$${tab.emptyRepeat.variable}` })
+            "
+            :data-test="`dashboard-tab-${tab.tabId}-repeat-icon`"
+          >
+            <OTooltip
+              :content="
+                t('dashboard.repeat.tabRepeatsBy', { variable: `$${tab.emptyRepeat.variable}` })
+              "
+            />
+          </OIcon>
+          <OIcon
+            v-if="tab.repeat"
+            name="repeat"
+            size="xs"
+            class="text-text-secondary me-1 shrink-0"
+            :aria-label="t('dashboard.repeat.tabCopyTooltip', { name: tab.sourceName })"
+            :data-test="`dashboard-tab-${tab.tabId}-repeat-icon`"
+          >
+            <OTooltip :content="t('dashboard.repeat.tabCopyTooltip', { name: tab.sourceName })" />
+          </OIcon>
           <!-- Auto-size the input to its text via an invisible sizer sharing the
                input's grid cell, so the field is exactly as wide as the name.
                `size="1"` neutralises the input's default ~20ch intrinsic width so
@@ -83,6 +112,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <!-- Panel-count badge: conveys how dense each tab is without opening it.
                Section headers are layout labels, not panels, so they're excluded. -->
+          <OTag
+            v-if="tab.editChip"
+            variant="indigo-soft"
+            size="sm"
+            icon="repeat"
+            class="ms-1 shrink-0"
+            :label="
+              t('dashboard.repeat.editChip', {
+                variable: `$${tab.editChip.variable}`,
+                count: tab.editChip.count,
+              })
+            "
+            :data-test="`dashboard-tab-${tab.tabId}-repeat-chip`"
+          />
           <OBadge
             variant="default"
             size="xs"
@@ -99,9 +142,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                reserve, so swapping them never affects the tab's width. -->
           <OIcon
             v-if="canRename && editingTabId !== tab.tabId"
+            name="repeat"
+            size="sm"
+            :aria-label="t('dashboard.repeat.tabRepeatSettings')"
+            class="text-text-secondary absolute top-1/2 right-5 -translate-y-1/2 cursor-pointer opacity-0 transition-opacity duration-150 group-hover/otab:opacity-60 hover:!opacity-100 max-md:opacity-60"
+            :data-test="`dashboard-tab-${tab.tabId}-repeat-btn`"
+            @click.stop="openRepeatSettings(tab)"
+            @mousedown.stop
+            @dblclick.stop
+          >
+            <OTooltip :content="t('dashboard.repeat.tabRepeatSettings')" />
+          </OIcon>
+          <OIcon
+            v-if="canRename && editingTabId !== tab.tabId"
             name="edit"
             size="sm"
-            :aria-label="t('common.edit')"
+            :aria-label="tab.repeat ? t('dashboard.repeat.renameOriginalTab') : t('common.edit')"
             class="text-text-secondary absolute top-1/2 right-0.5 -translate-y-1/2 cursor-pointer opacity-0 transition-opacity duration-150 group-hover/otab:opacity-60 hover:!opacity-100 max-md:opacity-60"
             :data-test="`dashboard-tab-${tab.tabId}-rename-btn`"
             @click.stop="startRename(tab)"
@@ -146,6 +202,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboard-id="dashboardData?.dashboardId"
       @refresh="refreshDashboard"
     />
+    <AddTab
+      v-model:open="showEditTabDialog"
+      edit-mode
+      :tab-id="editDialogTabId as any"
+      :dashboard-id="dashboardData?.dashboardId"
+      @refresh="refreshDashboard"
+    />
   </div>
 </template>
 
@@ -156,6 +219,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { computed, inject, nextTick, ref, defineComponent, type PropType } from "vue";
 import { useStore } from "vuex";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
@@ -175,6 +239,7 @@ export default defineComponent({
     OBadge,
     OIcon,
     OTooltip,
+    OTag,
   },
   props: {
     dashboardData: {
@@ -188,6 +253,11 @@ export default defineComponent({
     layoutMode: {
       type: String as PropType<LayoutMode>,
       default: "live",
+    },
+    /** Tabs as rendered, with repeated tabs expanded; falls back to the saved tabs. */
+    renderedTabs: {
+      type: Array as PropType<any[] | null>,
+      default: null,
     },
   },
   emits: ["refresh", "layoutChange"],
@@ -206,9 +276,17 @@ export default defineComponent({
     // inject selected tab, default will be default tab
     const selectedTabId: any = inject("selectedTabId", ref("default"));
 
-    const tabs: any = computed(() => {
-      return props.dashboardData?.tabs ?? [];
-    });
+    const tabs: any = computed(
+      () =>
+        props.renderedTabs ??
+        (props.dashboardData?.tabs ?? []).map((tab: any) => ({
+          ...tab,
+          sourceTabId: tab.tabId,
+          sourceName: tab.name,
+          repeat: null,
+          editChip: null,
+        })),
+    );
 
     // Reorder and rename affordances are edit-only — a view-only dashboard shows
     // no grip and its names aren't editable.
@@ -226,6 +304,15 @@ export default defineComponent({
     const refreshDashboard = () => {
       emit("refresh");
       showAddTabDialog.value = false;
+      showEditTabDialog.value = false;
+    };
+
+    // Tab settings live on the saved tab, so a virtual tab opens its source.
+    const showEditTabDialog = ref(false);
+    const editDialogTabId = ref<string | null>(null);
+    const openRepeatSettings = (tab: any) => {
+      editDialogTabId.value = tab.sourceTabId;
+      showEditTabDialog.value = true;
     };
 
     // Shared failure handling for both tab operations: surface a 409 with the
@@ -300,7 +387,7 @@ export default defineComponent({
       // input (double-click already selects it; the hover pencil path needs this).
       selectedTabId.value = tab.tabId;
       editingTabId.value = tab.tabId;
-      editingName.value = tab?.name ?? "";
+      editingName.value = tab?.sourceName ?? tab?.name ?? "";
       // Focus (and select) the freshly-mounted input so typing replaces the name.
       await nextTick();
       const el = Array.isArray(renameInputRef.value)
@@ -322,13 +409,19 @@ export default defineComponent({
       const name = editingName.value.trim();
       editingTabId.value = null;
       // Nothing to save: empty or unchanged → keep the old name.
-      if (!name || name === tab?.name) {
+      if (!name || name === (tab?.sourceName ?? tab?.name)) {
         editingName.value = "";
         return;
       }
 
       try {
-        await editTab(store, props.dashboardData?.dashboardId, folderId.value, tab.tabId, { name });
+        await editTab(
+          store,
+          props.dashboardData?.dashboardId,
+          folderId.value,
+          tab.sourceTabId ?? tab.tabId,
+          { name },
+        );
         emit("refresh");
         showPositiveNotification(t("dashboard.tabsSettings.tabUpdated"));
       } catch (error: any) {
@@ -341,6 +434,9 @@ export default defineComponent({
     return {
       t,
       showAddTabDialog,
+      showEditTabDialog,
+      editDialogTabId,
+      openRepeatSettings,
       refreshDashboard,
       tabs,
       route,

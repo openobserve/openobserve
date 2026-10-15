@@ -1865,6 +1865,66 @@ describe("usePanelDataLoader", () => {
         expect(loader.isCachedDataDifferWithCurrentTimeRange.value).toBeDefined();
       });
 
+      describe("cache from another time range", () => {
+        const cacheFor = (panel: any) => ({
+          key: {
+            panelSchema: panel,
+            variablesData: [],
+            forceLoad: false,
+            dashboardId: "test-dashboard",
+            folderId: "test-folder",
+          },
+          value: {
+            data: [{ test: "cached_data" }],
+            loading: false,
+            errorDetail: { message: "", code: "" },
+            metadata: { queries: [] },
+            annotations: [],
+            resultMetaData: [],
+            lastTriggeredAt: Date.now(),
+            isPartialData: false,
+            isOperationCancelled: false,
+          },
+          cacheTimeRange: { start_time: Date.now() - 3600000, end_time: Date.now() },
+        });
+
+        const loadWith = async (panelId: string) => {
+          const panelSchema = createMockPanelSchema({ id: panelId });
+          mockCacheData = cacheFor(panelSchema.value);
+          allowPanelToBecomeVisible();
+          const loader = usePanelDataLoader(
+            panelSchema,
+            ref({ start_time: new Date(Date.now() - 7200000), end_time: new Date() }),
+            createMockVariablesData(),
+            ref({ offsetWidth: 1000 }),
+            ref(false),
+            ref("dashboards"),
+            ref("test-dashboard"),
+            ref("test-folder"),
+            ref(null),
+            ref(null),
+            ref(null),
+            ref(null),
+            ref(null),
+            ref(false),
+          );
+          await loader.loadData();
+          return loader;
+        };
+
+        it("still shows it with the stale warning for a regular panel", async () => {
+          const loader = await loadWith("test-panel");
+          expect(loader.data.value).toEqual([{ test: "cached_data" }]);
+          expect(loader.isCachedDataDifferWithCurrentTimeRange.value).toBe(true);
+        });
+
+        it("refetches instead for a repeat copy", async () => {
+          const loader = await loadWith("test-panel__r__web");
+          expect(loader.data.value).not.toEqual([{ test: "cached_data" }]);
+          expect(loader.isCachedDataDifferWithCurrentTimeRange.value).toBe(false);
+        });
+      });
+
       it("should handle cache retrieval errors", async () => {
         const panelSchema = createMockPanelSchema();
         const selectedTimeObj = createMockSelectedTimeObj();

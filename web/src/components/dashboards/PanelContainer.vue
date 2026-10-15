@@ -42,6 +42,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="shrink-0"
           data-test="dashboard-panel-drag"
         />
+        <OIcon
+          v-if="isRepeatCopy"
+          name="repeat"
+          size="xs"
+          class="text-text-secondary shrink-0"
+          data-test="dashboard-panel-repeat-copy-icon"
+          :aria-label="repeatCopyTooltip"
+        >
+          <OTooltip :content="repeatCopyTooltip" side="bottom" />
+        </OIcon>
         <!-- me-5 is a truncation MARGIN, not decoration. The spacer after this
              collapses to nothing once the title fills the bar, so an ellipsised
              title otherwise ends flush against the first control and reads as
@@ -52,11 +62,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTruncatedText
           as="div"
           class="text-compact text-text-heading me-5 font-medium tracking-[0.02em] max-lg:line-clamp-2 max-lg:whitespace-normal"
-          :class="curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined"
+          :class="[
+            curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined,
+            titleParts.suffix ? 'me-0! shrink-[4]' : undefined,
+          ]"
           data-test="dashboard-panel-header"
         >
-          {{ props.data.title }}
+          {{ titleParts.title }}
         </OTruncatedText>
+        <!-- The value tells copies apart: the title gives way first, and a long value keeps its end. -->
+        <div
+          v-if="titleParts.suffix"
+          class="text-compact text-text-heading me-5 flex min-w-0 items-baseline font-medium tracking-[0.02em] whitespace-nowrap"
+          :class="titleParts.suffix.spaced ? 'ms-1' : undefined"
+          data-test="dashboard-panel-repeat-value"
+        >
+          <span v-if="titleParts.suffix.dash" class="me-1 shrink-0">{{
+            titleParts.suffix.dash
+          }}</span>
+          <OTruncatedText
+            :class="titleParts.suffix.tail ? 'min-w-0' : 'shrink-0'"
+            :tooltip="false"
+            >{{ titleParts.suffix.head }}</OTruncatedText
+          >
+          <span class="shrink-0" data-test="dashboard-panel-repeat-value-tail">{{
+            titleParts.suffix.tail
+          }}</span>
+          <OTruncatedText
+            v-if="titleParts.suffix.rest"
+            class="min-w-0 shrink-[2]"
+            :tooltip="false"
+            >{{ titleParts.suffix.rest }}</OTruncatedText
+          >
+          <OTooltip :content="titleParts.suffix.full" side="bottom" />
+        </div>
+        <OTag
+          v-if="repeatEditChip"
+          variant="indigo-soft"
+          size="sm"
+          icon="repeat"
+          class="shrink-0"
+          data-test="dashboard-panel-repeat-chip"
+          :label="repeatEditChip"
+        />
         <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
           v-if="curatedBadge"
@@ -278,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             shortcut-id="panelEdit"
           >
             <template #icon-left><OIcon name="edit" size="sm" /></template>
-            {{ t("panel.editPanel") }}
+            {{ isRepeatCopy ? t("panel.editOriginalPanel") : t("panel.editPanel") }}
           </ODropdownItem>
           <ODropdownItem
             v-if="!simplifiedPanelView && layoutMode !== 'view'"
@@ -297,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               shortcut-id="panelDuplicate"
             >
               <template #icon-left><OIcon name="content-copy" size="sm" /></template>
-              {{ t("panel.duplicate") }}
+              {{ isRepeatCopy ? t("panel.duplicateOriginalPanel") : t("panel.duplicate") }}
             </ODropdownItem>
             <ODropdownItem
               data-test="dashboard-delete-panel"
@@ -307,8 +355,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left
                 ><OIcon name="delete-outline" size="sm" class="text-current!"
               /></template>
-              {{ t("panel.deletePanel") }}
+              {{ isRepeatCopy ? t("panel.deleteOriginalPanel") : t("panel.deletePanel") }}
             </ODropdownItem>
+            <!-- On a copy, actions on the original come first and the rest are labelled as this copy's. -->
+            <template v-if="isRepeatCopy">
+              <ODropdownItem
+                data-test="dashboard-move-to-another-panel"
+                @select="onPanelModifyClick('MovePanel')"
+              >
+                <template #icon-left><OIcon name="drive-file-move" size="sm" /></template>
+                {{ t("panel.moveOriginalPanel") }}
+              </ODropdownItem>
+              <ODropdownSeparator />
+              <ODropdownGroup
+                :label="t('panel.thisCopyActions')"
+                data-test="dashboard-panel-copy-actions-label"
+              />
+            </template>
             <ODropdownItem
               v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               data-test="dashboard-query-inspector-panel"
@@ -321,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               data-test="dashboard-panel-download-as-csv-btn"
-              @select="PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)"
+              @select="PanleSchemaRendererRef?.downloadDataAsCSV(fullTitle)"
             >
               <template #icon-left><OIcon name="file-download" size="sm" /></template>
               {{ t("panel.downloadAsCSV") }}
@@ -329,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               data-test="dashboard-panel-download-as-json-btn"
-              @select="PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)"
+              @select="PanleSchemaRendererRef?.downloadDataAsJSON(fullTitle)"
             >
               <template #icon-left><OIcon name="data-object" size="sm" /></template>
               {{ t("panel.downloadAsJSON") }}
@@ -352,7 +415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("dashboard.panelContainer.refreshCacheReload") }}
             </ODropdownItem>
             <ODropdownItem
-              v-if="!simplifiedPanelView"
+              v-if="!simplifiedPanelView && !isRepeatCopy"
               data-test="dashboard-move-to-another-panel"
               @select="onPanelModifyClick('MovePanel')"
             >
@@ -376,6 +439,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Panel-Level Variables (shown below drag-allow section) -->
+    <div
+      v-if="repeatCapLabel"
+      class="drag-cancel border-border-default text-text-secondary flex shrink-0 items-center gap-1 border-b px-2 py-0.5 text-xs"
+      data-test="dashboard-panel-repeat-cap"
+    >
+      <OIcon name="info-outline" size="xs" class="shrink-0" :aria-label="repeatCapTooltip">
+        <OTooltip :content="repeatCapTooltip" side="bottom" />
+      </OIcon>
+      <OTruncatedText>{{ repeatCapLabel }}</OTruncatedText>
+    </div>
     <div class="drag-cancel shrink-0">
       <slot name="panel-variables"></slot>
     </div>
@@ -468,7 +541,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('panel.deletePanelTitle')"
-      :message="t('panel.deletePanelMessage')"
+      :message="
+        isRepeatCopy
+          ? t(
+              inRepeatedTab
+                ? 'panel.deleteOriginalPanelInRepeatedTabMessage'
+                : 'panel.deleteOriginalPanelMessage',
+              { title: readablePanelName, count: repeat.count },
+              repeat.count,
+            )
+          : inRepeatedTab
+            ? t('panel.deleteFromRepeatedTabMessage', { title: readablePanelName })
+            : t('panel.deletePanelMessage')
+      "
+      :ok-label="isRepeatCopy || inRepeatedTab ? t('panel.deleteConfirm') : undefined"
       @update:ok="deletePanelDialog"
       @update:cancel="confirmDeletePanelDialog = false"
       v-model="confirmDeletePanelDialog"
@@ -496,6 +582,7 @@ import {
   watch,
   onBeforeUnmount,
   onMounted,
+  inject,
 } from "vue";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
@@ -512,6 +599,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isEqual } from "lodash-es";
@@ -529,6 +618,14 @@ import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
 import { durationParts } from "@/views/Infrastructure/curated/resolve";
 import { getVariablesReferencedInQueries } from "@/utils/dashboard/variables/variablesUtils";
+import {
+  formatRepeatTitle,
+  getRepeatSourceId,
+  parseRepeatId,
+  readableTemplate,
+  splitForMiddleEllipsis,
+  splitRepeatTitle,
+} from "@/utils/dashboard/repeatByVariable";
 import ExemplarToggle from "@/components/dashboards/exemplars/ExemplarToggle.vue";
 import {
   exemplarOverrideKey,
@@ -582,6 +679,7 @@ export default defineComponent({
     "shouldRefreshWithoutCache",
     "showLegendsButton",
     "layoutMode",
+    "repeat",
   ],
   components: {
     OTag,
@@ -595,6 +693,8 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
+    ODropdownGroup,
+    ODropdownSeparator,
     OTooltip,
     OTruncatedText,
     CreateAlertAction,
@@ -796,6 +896,83 @@ export default defineComponent({
       return isCurrentlyHoveredPanel.value || isMobile.value ? "" : "invisible pointer-events-none";
     });
 
+    // Copies are read-only renderings: every action that changes the panel lands on its source.
+    const sourcePanelId = computed(
+      () => props.repeat?.sourceId ?? getRepeatSourceId(String(props.data?.id ?? "")),
+    );
+    // A virtual tab's id names its source tab; every change is saved there.
+    const sourceTabId = () =>
+      route.query.tab ? getRepeatSourceId(String(route.query.tab)) : undefined;
+    const inRepeatedTab = computed(() => !!parseRepeatId(String(route.query.tab ?? "")));
+    // The editor saves to the source tab and returns to the per-value tab it was opened from.
+    const repeatedTabReturn = () => (inRepeatedTab.value ? { fromTab: route.query.tab } : {});
+    // The editor returns with these params, so it must carry the selection the panels show.
+    const dashboardVariables: any = inject("variablesManager", null);
+    const committedVariableParams = () =>
+      dashboardVariables?.getUrlParams?.({ useLive: false }) ?? {};
+    const isRepeatCopy = computed(() => props.repeat?.value !== undefined);
+    const repeatPin = computed(() =>
+      isRepeatCopy.value ? { variable: props.repeat.variable, value: props.repeat.value } : null,
+    );
+    const titleParts = computed(() => {
+      const parts = splitRepeatTitle(
+        props.data?.title,
+        props.variablesData,
+        repeatPin.value,
+        t("dashboard.repeat.allValue"),
+        t("dashboard.repeat.noneValue"),
+      );
+      if (!parts.value) return { title: parts.title, suffix: null };
+      return {
+        title: parts.title,
+        suffix: {
+          dash: parts.dash ? "—" : "",
+          spaced: parts.spaced,
+          ...splitForMiddleEllipsis(parts.value),
+          rest: parts.rest,
+          full: raw(fullTitle.value),
+        },
+      };
+    });
+    const readablePanelName = computed(() => raw(readableTemplate(props.data?.title)));
+    const fullTitle = computed(() =>
+      formatRepeatTitle(
+        props.data?.title,
+        props.variablesData,
+        repeatPin.value,
+        t("dashboard.repeat.allValue"),
+        t("dashboard.repeat.noneValue"),
+      ),
+    );
+    const repeatCopyTooltip = computed(() =>
+      t("dashboard.repeat.copyTooltip", { title: props.repeat?.sourceTitle ?? "" }),
+    );
+    const repeatCapLabel = computed(() => {
+      if (!isRepeatCopy.value || props.repeat.index !== 0) return null;
+      const { count, total, more } = props.repeat;
+      if (more && total > count) return t("dashboard.repeat.capNoticeAtLeast", { count, total });
+      if (more) return t("dashboard.repeat.capNoticeMore", { count });
+      return total > count ? t("dashboard.repeat.capNotice", { count, total }) : null;
+    });
+    const repeatCapTooltip = computed(() => {
+      const params = {
+        count: props.repeat?.count ?? 0,
+        total: props.repeat?.total ?? 0,
+        variable: `$${props.repeat?.variable ?? ""}`,
+      };
+      return props.repeat?.more
+        ? t("dashboard.repeat.capTooltipMore", params)
+        : t("dashboard.repeat.capTooltip", params);
+    });
+    const repeatEditChip = computed(() =>
+      isLayoutEditing.value && props.repeat && !isRepeatCopy.value
+        ? t("dashboard.repeat.editChip", {
+            variable: `$${props.repeat.variable}`,
+            count: props.repeat.count,
+          })
+        : null,
+    );
+
     //for edit panel
     const onEditPanel = (data: any) => {
       return router.push({
@@ -803,9 +980,11 @@ export default defineComponent({
         query: {
           ...route.query,
           dashboard: String(route.query.dashboard),
-          panelId: data.id,
+          panelId: props.repeat?.sourceId ?? getRepeatSourceId(String(data.id)),
           folder: route.query.folder ?? "default",
-          tab: route.query.tab ?? data.panels[0]?.tabId,
+          tab: sourceTabId() ?? data.panels[0]?.tabId,
+          ...committedVariableParams(),
+          ...repeatedTabReturn(),
         },
       });
     };
@@ -926,7 +1105,7 @@ export default defineComponent({
           route.query.dashboard,
           panelData,
           route.query.folder ?? "default",
-          route.query.tab ?? data.panels[0]?.tabId,
+          sourceTabId() ?? data.panels[0]?.tabId,
         );
 
         // Show a success notification.
@@ -940,7 +1119,9 @@ export default defineComponent({
             dashboard: String(route.query.dashboard),
             panelId: panelId,
             folder: route.query.folder ?? "default",
-            tab: route.query.tab ?? data.panels[0]?.tabId,
+            tab: sourceTabId() ?? data.panels[0]?.tabId,
+            ...committedVariableParams(),
+            ...repeatedTabReturn(),
           },
         });
         return;
@@ -961,11 +1142,11 @@ export default defineComponent({
     };
 
     const deletePanelDialog = async () => {
-      emit("onDeletePanel", props.data.id);
+      emit("onDeletePanel", sourcePanelId.value);
     };
 
     const movePanelDialog = async (selectedTabId: any) => {
-      emit("onMovePanel", props.data.id, selectedTabId);
+      emit("onMovePanel", sourcePanelId.value, selectedTabId);
     };
 
     const isPanelLoading = ref(false);
@@ -1158,6 +1339,16 @@ export default defineComponent({
 
     return {
       props,
+      sourcePanelId,
+      isRepeatCopy,
+      titleParts,
+      fullTitle,
+      readablePanelName,
+      inRepeatedTab,
+      repeatCopyTooltip,
+      repeatCapLabel,
+      repeatCapTooltip,
+      repeatEditChip,
       exemplarsEligible,
       exemplarOverride,
       exemplarsOn,
@@ -1231,7 +1422,7 @@ export default defineComponent({
       } else if (evt == "MovePanel") {
         this.confirmMovePanelDialog = true;
       } else if (evt == "EditLayout") {
-        this.$emit("onEditLayout", this.props.data.id);
+        this.$emit("onEditLayout", this.sourcePanelId);
       } else if (evt == "Refresh") {
         this.onRefreshPanel(true);
       }
@@ -1247,8 +1438,8 @@ export default defineComponent({
       const visible = queries.flatMap((query: any, i: number) => (query?.config?.hide ? [] : [i]));
       const queryIndex = options.queryIndex ?? visible[0] ?? 0;
       return buildPrefillFromPanel({
-        panelTitle: this.props.data.title,
-        panelId: this.props.data.id,
+        panelTitle: this.fullTitle,
+        panelId: this.sourcePanelId,
         panelType: this.props.data.type,
         queries,
         queryType: this.props.data.queryType,

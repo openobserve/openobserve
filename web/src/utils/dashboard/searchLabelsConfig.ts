@@ -34,6 +34,7 @@ const SECTION_DEFS = [
   { id: "markLines", icon: "timeline" },
   { id: "background", icon: "color-lens" },
   { id: "sparkline", icon: "show-chart" },
+  { id: "repeat", icon: "repeat" },
 ] as const satisfies ReadonlyArray<SectionDef>;
 
 export type SectionId = (typeof SECTION_DEFS)[number]["id"];

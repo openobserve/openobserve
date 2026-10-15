@@ -483,7 +483,11 @@ describe("TabList", () => {
     it("should compute tabs from dashboardData", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.tabs).toEqual(mockDashboardData.tabs);
+      expect(wrapper.vm.tabs).toEqual(
+        mockDashboardData.tabs.map((tab: any) =>
+          expect.objectContaining({ ...tab, sourceTabId: tab.tabId, sourceName: tab.name }),
+        ),
+      );
     });
 
     it("should return empty array when dashboardData has no tabs", () => {
@@ -847,6 +851,69 @@ describe("TabList", () => {
       expect(mockEditTab).not.toHaveBeenCalled();
       expect(wrapper.vm.editingTabId).toBe(null);
       expect(wrapper.vm.editingName).toBe("");
+    });
+  });
+
+  describe("repeated tabs", () => {
+    const renderedTabs = [
+      {
+        tabId: "tab1__r__api",
+        sourceTabId: "tab1",
+        sourceName: "Service $host",
+        name: "Service api",
+        panels: [],
+        repeat: { sourceId: "tab1", variable: "host", value: "api", index: 0, count: 2, total: 2 },
+        editChip: null,
+      },
+      {
+        tabId: "tab2",
+        sourceTabId: "tab2",
+        sourceName: "Plain",
+        name: "Plain",
+        panels: [],
+        repeat: null,
+        editChip: null,
+      },
+    ];
+
+    it("shows the rendered names and marks virtual tabs", () => {
+      wrapper = createWrapper({ renderedTabs });
+      expect(wrapper.find('[data-test="dashboard-tab-tab1__r__api-name"]').text()).toBe(
+        "Service api",
+      );
+      expect(wrapper.find('[data-test="dashboard-tab-tab1__r__api-repeat-icon"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="dashboard-tab-tab2-repeat-icon"]').exists()).toBe(false);
+    });
+
+    it("renames the original tab from a virtual one, starting from its saved name", async () => {
+      wrapper = createWrapper({ renderedTabs });
+      await wrapper.vm.startRename(renderedTabs[0]);
+      expect(wrapper.vm.editingName).toBe("Service $host");
+      wrapper.vm.editingName = "Service by $host";
+      await wrapper.vm.commitRename(renderedTabs[0]);
+      expect(mockEditTab).toHaveBeenCalledWith(mockStore, "test-dashboard-id", "default", "tab1", {
+        name: "Service by $host",
+      });
+    });
+
+    it("marks a repeated tab that has no values with the repeat icon", () => {
+      const emptyTab = {
+        ...renderedTabs[1],
+        tabId: "tab1",
+        sourceTabId: "tab1",
+        emptyRepeat: { variable: "host", pending: false },
+      };
+      wrapper = createWrapper({ renderedTabs: [emptyTab] });
+      expect(wrapper.find('[data-test="dashboard-tab-tab1-repeat-icon"]').exists()).toBe(true);
+    });
+
+    it("opens the source tab's settings from a virtual tab", async () => {
+      wrapper = createWrapper({ renderedTabs });
+      wrapper.vm.openRepeatSettings(renderedTabs[0]);
+      expect(wrapper.vm.editDialogTabId).toBe("tab1");
+      expect(wrapper.vm.showEditTabDialog).toBe(true);
     });
   });
 });

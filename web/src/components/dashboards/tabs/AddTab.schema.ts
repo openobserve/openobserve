@@ -8,6 +8,7 @@ import { z } from "zod";
 export const makeAddTabSchema = (t: (_key: string) => string) =>
   z.object({
     name: z.string().trim().min(1, t("dashboard.nameRequired")),
+    repeatVariable: z.string().nullable().optional(),
   });
 
 export type AddTabForm = z.infer<ReturnType<typeof makeAddTabSchema>>;
