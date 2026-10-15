@@ -41,6 +41,11 @@ export class ServiceGraphPage {
     this.sidePanelViewRelatedLogsBtn = '[data-test="service-graph-node-panel-view-related-logs-btn"]';
     this.sidePanelViewRelatedTracesBtn = '[data-test="service-graph-node-panel-view-related-traces-btn"]';
     this.sidePanelCloseBtn = '[data-test="service-graph-side-panel"] [data-test="o-drawer-close-btn"]';
+    // ODrawer renders a full-size overlay scrim behind the panel. With `seamless`
+    // (which ServiceGraphNodeSidePanel always sets) it carries
+    // `pointer-events-none bg-transparent`, so the page behind stays interactive
+    // and undimmed — the headline non-modal signal this feature asserts.
+    this.overlay = '[data-test="o-drawer-overlay"]';
 
     // RED charts section (Rate/Errors/Duration dashboards)
     this.sidePanelRedCharts = '[data-test="service-graph-side-panel-red-charts"]';
@@ -55,6 +60,10 @@ export class ServiceGraphPage {
     // data-test on OTabPanel is swallowed by <Transition> — target slot content instead
     this.recentOperations = '[data-test="service-graph-side-panel-operations-table"]';
     this.operationsTable = '[data-test="service-graph-side-panel-operations-table"]';
+    // Operations empty state: a bare translated div (no data-test) rendered when
+    // recentOperations.length === 0 && !loadingOperations. Scoped to the panel so
+    // `text=` does not collide with any other "No operations found" copy on the page.
+    this.operationsEmptyState = '[data-test="service-graph-side-panel"] text=No operations found';
     this.nodesPanel = '[data-test="service-graph-side-panel-nodes"]';
     this.nodesTable = '[data-test="service-graph-side-panel-nodes-table"]';
     this.podsPanel = '[data-test="service-graph-side-panel-pods"]';
@@ -363,6 +372,22 @@ export class ServiceGraphPage {
     await expect(this.page.locator(this.sidePanel)).not.toBeVisible({ timeout: 5000 });
   }
 
+  /**
+   * Assert the drawer overlay is present AND non-blocking. With `seamless` the
+   * overlay carries `pointer-events-none bg-transparent`, so it neither dims the
+   * page behind nor intercepts pointer events. Fails if the overlay is missing or
+   * blocks pointer events (i.e. the old modal behaviour).
+   */
+  async expectOverlayNonBlocking() {
+    const overlay = this.page.locator(this.overlay);
+    await expect(overlay).toBeVisible({ timeout: 10000 });
+    const cls = (await overlay.getAttribute('class').catch(() => '')) || '';
+    const pointerEvents = await overlay
+      .evaluate((el) => getComputedStyle(el).pointerEvents)
+      .catch(() => '');
+    expect(cls.includes('pointer-events-none') || pointerEvents === 'none').toBeTruthy();
+  }
+
   async expectRedChartsSectionVisible() {
     await expect(this.page.locator(this.sidePanelRedCharts)).toBeVisible({ timeout: 10000 });
   }
@@ -379,6 +404,13 @@ export class ServiceGraphPage {
     // also visible as a styled <span> in the header. The <h2> is sr-only but
     // still has textContent. Scope to panel to avoid picking up other headings.
     return await this.page.locator(this.sidePanel).locator('h2').first().textContent();
+  }
+
+  /** Poll until the panel title (sr-only <h2>) contains the expected service name. */
+  async expectSidePanelServiceName(name) {
+    await expect
+      .poll(async () => (await this.getSidePanelServiceName()) || '', { timeout: 10000 })
+      .toContain(name);
   }
 
   async getHealthStatus() {
@@ -423,6 +455,20 @@ export class ServiceGraphPage {
     const table = this.page.locator(this.operationsTable);
     await table.locator('[data-test="service-graph-operations-loading-indicator"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     return await table.locator('tbody tr').count();
+  }
+
+  /**
+   * Whether the operations empty state ("No operations found") is visible. Used
+   * only when getOperationsTableRowCount() reports zero rows — the empty branch
+   * is reached without a hung spinner.
+   */
+  async isOperationsEmptyStateVisible() {
+    return await this.page
+      .locator(this.operationsEmptyState)
+      .first()
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
   }
 
   async closeSidePanel() {
@@ -472,6 +518,26 @@ export class ServiceGraphPage {
   async isMetricsEmptyVisible() {
     return await this.page.locator(this.metricsEmpty)
       .isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  /**
+   * Which terminal state the Metrics tab reached: 'correlation' (the correlation
+   * event header — renders for a resolved correlation object with or without metric
+   * streams), 'error', 'empty', or 'unknown' (none visible = a hung/broken tab).
+   * Re-reads the DOM independently of clickMetricsTabAndWait()'s Promise.race so a
+   * test asserts a SPECIFIC state rather than a re-derived boolean.
+   */
+  async getMetricsTerminalState() {
+    if (await this.page.locator(this.metricsCorrelationHeader).first().isVisible().catch(() => false)) {
+      return 'correlation';
+    }
+    if (await this.page.locator(this.metricsError).first().isVisible().catch(() => false)) {
+      return 'error';
+    }
+    if (await this.page.locator(this.metricsEmpty).first().isVisible().catch(() => false)) {
+      return 'empty';
+    }
+    return 'unknown';
   }
 
   async getSearchInputValue() {

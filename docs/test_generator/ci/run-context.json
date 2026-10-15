@@ -1,0 +1,18 @@
+{
+  "feature_slug": "service-graph-side-panel-non-modal",
+  "feature_title": "Service Graph Side Panel (non-modal drawer)",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "service-graph-side-panel.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/service-graph-side-panel.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/plugins/traces/ServiceGraphNodeSidePanel.vue",
+    "web/src/lib/overlay/Drawer/ODrawer.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
