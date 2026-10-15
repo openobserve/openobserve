@@ -1,6 +1,8 @@
 """AC-7.3, 7.5, 7.6, 7.8 and 7.11: the self-hosted install with a configuration refresh token."""
 from __future__ import annotations
 
+import json
+import time
 import uuid
 from urllib.parse import urlparse
 
@@ -9,7 +11,7 @@ import pytest
 from helpers.slack_mock import mock_code
 from support.client import OpenObserveClient
 
-from .slack_helpers import SlackMock, query_param, self_hosted_install
+from .slack_helpers import SlackMock, audit_rows, make_slack_org, query_param, self_hosted_install, wait_until
 
 pytestmark = [pytest.mark.enterprise]
 
@@ -125,3 +127,17 @@ def test_credentials_from_another_app_are_refused_and_a_valid_update_keeps_the_i
     assert valid.status_code == 200, valid.text
     assert valid.json()["id"] == installation_id
     assert installation_id in installation_ids(client, slack_org)
+
+
+def test_a_secret_write_is_audited_redacted(client: OpenObserveClient, ready: SlackMock) -> None:
+    """OR-B1: the audit layer sees ``{org}/slack/...`` and still redacts the configuration token."""
+    org = make_slack_org(client)
+    since = int(time.time() * 1_000_000) - 5_000_000
+    token = f"xoxe-1-{uuid.uuid4().hex}"
+    status, body = create(client, org, token)
+    assert status == 201, body
+    where = f"org_id = '{org}' AND http_method = 'POST' AND http_path LIKE '%slack/installations'"
+    rec = wait_until(lambda: audit_rows(client, where, since), "the install audit record (O2_AUDIT_PUBLISH_INTERVAL=1)",
+                     timeout=40)[0]
+    assert rec["http_body"] == "[REDACTED: secret write]", rec
+    assert token not in json.dumps(rec)

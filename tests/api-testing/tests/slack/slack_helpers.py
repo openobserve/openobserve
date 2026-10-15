@@ -7,10 +7,13 @@ The server under test is a debug enterprise build in local mode with SQLite, sta
 - flag on (``O2_SLACK_ENABLED=true``, ``O2_MASTER_ENCRYPTION_KEY`` set, ``ZO_SSRF_ALLOW_LOOPBACK=true``):
   the install, RBAC and allowlist tests run and ``test_disabled.py`` skips.
 
-``SLACK_MOCK_URL`` is the mock's root (default ``http://127.0.0.1:5099``).
+``SLACK_MOCK_URL`` is the mock's root (default ``http://127.0.0.1:5099``). ``SLACK_SUITE_REQUIRED=1`` turns
+every harness skip (no enterprise build, a mock unreachable, AI off, no signing key) into a failure; skips
+that only say which server run a test belongs to (flag on or off, allowlist, Cloud) stay skips.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import json
@@ -65,6 +68,13 @@ ROUTES: list[tuple[str, str, dict[str, Any] | None]] = [
     ("DELETE", "slack/links/L1", None),
     ("GET", "slack/links", None),
 ]
+
+
+def harness_skip(reason: str) -> None:
+    """Skips, or fails under ``SLACK_SUITE_REQUIRED=1`` so a misconfigured run cannot pass empty."""
+    if os.environ.get("SLACK_SUITE_REQUIRED") == "1":
+        pytest.fail(f"SLACK_SUITE_REQUIRED=1 but {reason}", pytrace=False)
+    pytest.skip(reason)
 
 
 class SlackMock:
@@ -252,6 +262,21 @@ def wait_until(probe: Callable[[], Any], what: str, timeout: float = 20.0) -> An
     raise AssertionError(f"timed out waiting for {what}")
 
 
+def audit_rows(client: OpenObserveClient, where: str, since_us: int) -> list[dict[str, Any]]:
+    """Rows of the ``_meta`` audit stream matching ``where`` (server needs ``O2_AUDIT_PUBLISH_INTERVAL=1``)."""
+    now = int(time.time() * 1_000_000)
+    body = {"query": {"sql": f'SELECT * FROM "audit" WHERE {where}', "start_time": since_us,
+                      "end_time": now + 60_000_000, "from": 0, "size": 50}}
+    resp = client.post("_search?type=logs", json=body, org="_meta")
+    return resp.json().get("hits", []) if resp.status_code == 200 else []
+
+
+def token_claims(token: str) -> dict[str, Any]:
+    """The claims of an ``o2dt.`` token (its middle segment, base64url JSON)."""
+    segment = token.split(".")[1]
+    return json.loads(base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4)))
+
+
 def signed_post(client: OpenObserveClient, kind: str, body: bytes, secret: str, content_type: str = "application/json") -> requests.Response:
     """POST to ``/api/slack/<kind>`` as Slack does: no O2 credentials, only the v0 signature."""
     stamp = str(int(time.time()))
@@ -275,14 +300,16 @@ def slack_user(user_id: str, team_id: str, email: str, **flags: Any) -> dict[str
     return member(user_id, team_id, user_id[2:].lower(), email, **flags)
 
 
-def mention(inst: dict[str, Any], team_id: str, user_id: str, text: str = "<@U0BOT> errors in checkout?") -> bytes:
+def mention(inst: dict[str, Any], team_id: str, user_id: str, text: str = "<@U0BOT> errors in checkout?", *,
+            event_id: str | None = None) -> bytes:
     """An ``app_mention`` event_callback in the shape Slack sends (ids anonymized)."""
     now = f"{time.time():.6f}"
     event = {"type": "app_mention", "user": user_id, "text": text, "ts": now, "team": team_id,
              "user_team": team_id, "channel": "C0OPS", "event_ts": now}
     return json.dumps({
         "token": "ignored", "team_id": team_id, "api_app_id": inst["app_id"], "event": event,
-        "type": "event_callback", "event_id": "Ev" + uuid.uuid4().hex[:10], "event_time": int(time.time()),
+        "type": "event_callback", "event_id": event_id or "Ev" + uuid.uuid4().hex[:10],
+        "event_time": int(time.time()),
         "authorizations": [{"enterprise_id": None, "team_id": team_id, "user_id": "U0BOT",
                             "is_bot": True, "is_enterprise_install": False}],
         "is_ext_shared_channel": False,

@@ -81,3 +81,14 @@ def test_failures_and_recordings(api: str) -> None:
     assert slack(api, "chat.unknownThing")["error"] == "unknown_method"
     calls = requests.get(f"{api}/_mock/requests", params={"method": "auth.test"}, timeout=5).json()["requests"]
     assert [c["method"] for c in calls] == ["auth.test"]
+
+
+def test_a_harness_skip_fails_when_the_suite_is_required(monkeypatch: pytest.MonkeyPatch) -> None:
+    from .slack_helpers import harness_skip
+
+    monkeypatch.delenv("SLACK_SUITE_REQUIRED", raising=False)
+    with pytest.raises(pytest.skip.Exception):
+        harness_skip("mock unreachable")
+    monkeypatch.setenv("SLACK_SUITE_REQUIRED", "1")
+    with pytest.raises(pytest.fail.Exception, match="SLACK_SUITE_REQUIRED=1 but mock unreachable"):
+        harness_skip("mock unreachable")

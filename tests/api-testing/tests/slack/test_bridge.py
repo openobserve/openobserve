@@ -24,7 +24,7 @@ import requests
 
 from support.client import OpenObserveClient
 
-from .slack_helpers import make_org, wait_until
+from .slack_helpers import audit_rows, harness_skip, make_org, token_claims, wait_until
 from .test_delegated import linked, mint  # noqa: F401
 
 pytestmark = [pytest.mark.enterprise]
@@ -62,17 +62,38 @@ class O2aiMock:
 def o2ai(client: OpenObserveClient, slack_on: None) -> O2aiMock:
     m = O2aiMock()
     if not m.reachable():
-        pytest.skip(f"o2-ai mock not reachable at {m.base_url}; run helpers/o2ai_mock.py")
+        harness_skip(f"o2-ai mock not reachable at {m.base_url}; run helpers/o2ai_mock.py")
     probe = client.post("ai/chat_stream", json={"messages": []}, org="default")
     if probe.status_code == 400 and "not enabled" in probe.text:
-        pytest.skip("start the server with O2_AI_ENABLED=true and O2_AGENT_URL at the o2-ai mock")
+        harness_skip("start the server with O2_AI_ENABLED=true and O2_AGENT_URL at the o2-ai mock")
     m.reset()
     return m
 
 
-def prompt(context: dict[str, Any] | None = None, **extra: Any) -> dict[str, Any]:
-    return {"messages": [{"role": "user", "content": QUESTION}],
+@pytest.fixture
+def persistence_off(client: OpenObserveClient) -> None:
+    """These calls send no session id, which persistence on refuses (400); the Slack turns cover that mode."""
+    resp = client.get("config", org="default")
+    if resp.status_code == 200 and resp.json().get("ai_chat_persistence_enabled"):
+        pytest.skip("direct chat_stream calls without a session id need O2_AI_CHAT_PERSISTENCE_ENABLED off")
+
+
+def prompt(context: dict[str, Any] | None = None, question: str = QUESTION, **extra: Any) -> dict[str, Any]:
+    return {"messages": [{"role": "user", "content": question}],
             "context": {"currentPage": "slack", **(context or {})}, **extra}
+
+
+def tagged_question() -> tuple[str, str]:
+    """A question no other test (or background Slack turn) sends, and its tag."""
+    tag = uuid.uuid4().hex[:8]
+    return f"{QUESTION} {tag}", tag
+
+
+def only_turn(o2ai: O2aiMock, tag: str) -> dict[str, Any]:
+    """The one turn whose question carries ``tag``; the mock also logs other tests' background turns."""
+    turns = [t for t in o2ai.turns() if tag in (t["body"] or {}).get("query", "")]
+    assert len(turns) == 1, turns
+    return turns[0]
 
 
 def chat_stream(client: OpenObserveClient, org: str, body: dict[str, Any], *, token: str | None = None,
@@ -109,23 +130,20 @@ def record(name: str, resp: requests.Response) -> None:
 
 
 def audit_records(client: OpenObserveClient, org: str, since_us: int) -> list[dict[str, Any]]:
-    now = int(time.time() * 1_000_000)
-    sql = f"SELECT * FROM \"audit\" WHERE http_path = '/api/{org}/ai/chat_stream'"
-    body = {"query": {"sql": sql, "start_time": since_us, "end_time": now + 60_000_000, "from": 0,
-                      "size": 50}}
-    resp = client.post("_search?type=logs", json=body, org="_meta")
-    return resp.json().get("hits", []) if resp.status_code == 200 else []
+    return audit_rows(client, f"http_path = '/api/{org}/ai/chat_stream'", since_us)
 
 
 def delegated_token(linked: dict[str, Any]) -> str:  # noqa: F811
     return mint(linked["key"], sub=linked["email"], org=linked["org"], lid=linked["link"]["id"])
 
 
+@pytest.mark.usefixtures("persistence_off")
 def test_a_slack_turn_streams_the_recorded_answer_and_reaches_o2ai_as_sent(
     client: OpenObserveClient, linked: dict[str, Any], o2ai: O2aiMock,  # noqa: F811
 ) -> None:
     token = delegated_token(linked)
-    body = prompt({"o2_fork_seed": True}, confirm_timeout_secs=900)
+    question, tag = tagged_question()
+    body = prompt({"o2_fork_seed": True}, question, confirm_timeout_secs=900)
     resp = chat_stream(client, linked["org"], body, token=token, headers={"x-o2-slack-event": SLACK_EVENT})
     assert resp.status_code == 200, resp.text
     complete = frames(resp)[-1]
@@ -134,25 +152,28 @@ def test_a_slack_turn_streams_the_recorded_answer_and_reaches_o2ai_as_sent(
     assert complete["confidence"] == "high"
     assert complete["searched_range"]["start_us"] < complete["searched_range"]["end_us"]
 
-    sent = o2ai.turns()[-1]
+    sent = only_turn(o2ai, tag)
     assert sent["headers"]["authorization"] == f"Bearer {token}"
-    assert sent["body"]["query"] == QUESTION
+    assert sent["body"]["query"] == question
     assert sent["body"]["confirm_timeout_secs"] == 600
     assert sent["body"]["context"]["currentPage"] == "slack"
     assert sent["body"]["context"]["org_id"] == linked["org"]
     assert sent["body"]["context"]["o2_fork_seed"] is True
 
 
+@pytest.mark.usefixtures("persistence_off")
 def test_a_browser_fork_seed_is_stripped_and_a_short_timeout_kept(
     client: OpenObserveClient, o2ai: O2aiMock,
 ) -> None:
-    resp = chat_stream(client, "default", prompt({"o2_fork_seed": True}, confirm_timeout_secs=45))
+    question, tag = tagged_question()
+    resp = chat_stream(client, "default", prompt({"o2_fork_seed": True}, question, confirm_timeout_secs=45))
     assert resp.status_code == 200, resp.text
-    sent = o2ai.turns()[-1]
+    sent = only_turn(o2ai, tag)
     assert "o2_fork_seed" not in sent["body"]["context"]
     assert sent["body"]["confirm_timeout_secs"] == 45
 
 
+@pytest.mark.usefixtures("persistence_off")
 def test_slack_audit_hides_the_question_and_a_forged_header_changes_nothing(
     client: OpenObserveClient, linked: dict[str, Any], o2ai: O2aiMock,  # noqa: F811
 ) -> None:
@@ -163,26 +184,52 @@ def test_slack_audit_hides_the_question_and_a_forged_header_changes_nothing(
     forged = chat_stream(client, linked["org"], prompt(), headers={"x-o2-slack-event": "T0X:C0X:EvFORGED"})
     assert forged.status_code == 200, forged.text
 
-    records = wait_until(
-        lambda: (r := audit_records(client, linked["org"], since)) and len(r) >= 2 and r,
-        "both chat_stream audit records in the _meta audit stream (O2_AUDIT_PUBLISH_INTERVAL=1)",
-        timeout=40,
-    )
-    by_user = {r["user_email"]: r for r in records}
-    slack_rec = by_user[linked["email"]]
+    def both() -> tuple[dict[str, Any], dict[str, Any]] | None:
+        # The fixture's own mention may add a Slack record for the same user, so match this call's event.
+        records = audit_records(client, linked["org"], since)
+        slack = [r for r in records if r["user_email"] == linked["email"] and SLACK_EVENT in r["http_body"]]
+        browser = [r for r in records if r["user_email"] == client.email]
+        return (slack[0], browser[0]) if slack and browser else None
+
+    slack_rec, browser_rec = wait_until(
+        both, "both chat_stream audit records in the _meta audit stream (O2_AUDIT_PUBLISH_INTERVAL=1)", timeout=40)
     assert slack_rec["protocol"] == "Slack"
     assert QUESTION not in slack_rec["http_body"]
     slack_body = json.loads(slack_rec["http_body"])
     assert slack_body["messages"] == "[REDACTED: slack]"
     assert slack_body["slack_event"] == SLACK_EVENT
+    assert slack_rec["delegated_link_id"] == linked["link"]["id"], slack_rec
+    assert slack_rec["delegated_jti"] == token_claims(token)["jti"], slack_rec
 
-    browser_rec = by_user[client.email]
     assert browser_rec["protocol"] == "Http"
     browser_body = json.loads(browser_rec["http_body"])
     assert browser_body["messages"][0]["content"] == QUESTION
     assert "slack_event" not in browser_body
+    assert browser_rec.get("delegated_link_id") is None, browser_rec
 
 
+def test_a_delegated_non_stream_chat_is_audited_like_a_slack_turn(
+    client: OpenObserveClient, linked: dict[str, Any], o2ai: O2aiMock,  # noqa: F811
+) -> None:
+    """OR-N2: ``POST /ai/chat`` under a delegated token keeps the question out of the audit trail too."""
+    since = int(time.time() * 1_000_000) - 5_000_000
+    token = delegated_token(linked)
+    question, _ = tagged_question()
+    resp = requests.post(urljoin(client.base_url, f"api/{linked['org']}/ai/chat"), json=prompt(None, question),
+                         headers={"Authorization": f"Bearer {token}", "x-o2-slack-event": SLACK_EVENT}, timeout=60)
+    assert resp.status_code == 200, resp.text
+    where = f"org_id = '{linked['org']}' AND http_path LIKE '%ai/chat' AND user_email = '{linked['email']}'"
+    rec = wait_until(lambda: audit_rows(client, where, since), "the /ai/chat audit record", timeout=40)[0]
+    assert question not in rec["http_body"]
+    assert rec["protocol"] == "Slack"
+    body = json.loads(rec["http_body"])
+    assert body["messages"] == "[REDACTED: slack]"
+    assert body["slack_event"] == SLACK_EVENT
+    assert rec["delegated_link_id"] == linked["link"]["id"], rec
+    assert rec["delegated_jti"] == token_claims(token)["jti"], rec
+
+
+@pytest.mark.usefixtures("persistence_off")
 @pytest.mark.parametrize(
     ("script", "status", "code"),
     [
@@ -204,6 +251,7 @@ def test_o2ai_refusals_carry_error_code(
     assert resp.json()["error_code"] == code
 
 
+@pytest.mark.usefixtures("persistence_off")
 def test_an_upstream_429_and_an_unreachable_agent_still_name_error_code(
     client: OpenObserveClient, linked: dict[str, Any], o2ai: O2aiMock,  # noqa: F811
 ) -> None:
@@ -214,6 +262,7 @@ def test_an_upstream_429_and_an_unreachable_agent_still_name_error_code(
     assert "error_code" in resp.json()
 
 
+@pytest.mark.usefixtures("persistence_off")
 def test_an_in_band_restore_required_frame_passes_through(
     client: OpenObserveClient, linked: dict[str, Any], o2ai: O2aiMock,  # noqa: F811
 ) -> None:

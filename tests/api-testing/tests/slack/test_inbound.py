@@ -19,7 +19,7 @@ import requests
 
 from support.client import OpenObserveClient
 
-from .slack_helpers import MOCK_TEAM, SlackMock, self_hosted_install
+from .slack_helpers import MOCK_TEAM, SlackMock, mention, self_hosted_install, wait_until
 from .test_bridge import O2aiMock, o2ai  # noqa: F401
 from .test_bridge_slack import answers_in, ask, event, send, setup_team, turns_for
 
@@ -46,14 +46,17 @@ def slack_post(
     ts: int | None = None,
     content_type: str = "application/json",
     signature: str | None = None,
+    retry: int | None = None,
 ) -> requests.Response:
-    """POST as Slack does: no O2 credentials, only the signature headers."""
+    """POST as Slack does: no O2 credentials, only the signature headers (and Slack's retry headers)."""
     stamp = str(int(time.time()) if ts is None else ts)
     headers = {
         "Content-Type": content_type,
         "X-Slack-Request-Timestamp": stamp,
         "X-Slack-Signature": signature if signature is not None else sign(secret, stamp, body),
     }
+    if retry is not None:
+        headers |= {"X-Slack-Retry-Num": str(retry), "X-Slack-Retry-Reason": "http_timeout"}
     return requests.post(urljoin(client.base_url, f"api/slack/{kind}"), data=body, headers=headers, timeout=15)
 
 
@@ -92,44 +95,6 @@ def installed_http(client: OpenObserveClient, slack_org: str, ready: SlackMock) 
     remove(client, slack_org, inst["id"])
 
 
-def mention(app_id: str, event_id: str, *, thread_ts: str | None = None) -> bytes:
-    """An ``app_mention`` event_callback in the shape Slack sends (ids anonymized); the user is a mock member, as commit 10 reads ``users.info``."""
-    event: dict[str, Any] = {
-        "type": "app_mention", "user": "U0DANA", "text": "<@U0BOT> errors in checkout?",
-        "ts": f"{time.time():.6f}", "team": MOCK_TEAM, "user_team": MOCK_TEAM,
-        "channel": "C0OPS", "event_ts": f"{time.time():.6f}",
-    }
-    if thread_ts:
-        event["thread_ts"] = thread_ts
-    body = {
-        "token": "ignored", "team_id": MOCK_TEAM, "api_app_id": app_id, "event": event,
-        "type": "event_callback", "event_id": event_id, "event_time": int(time.time()),
-        "authorizations": [{"enterprise_id": None, "team_id": MOCK_TEAM, "user_id": "U0BOT",
-                            "is_bot": True, "is_enterprise_install": False}],
-        "is_ext_shared_channel": False,
-    }
-    return json.dumps(body).encode()
-
-
-def inbound_count(client: OpenObserveClient, event_type: str, result: str) -> float:
-    text = requests.get(urljoin(client.base_url, "metrics"), timeout=15).text
-    total = 0.0
-    for line in text.splitlines():
-        if line.startswith("zo_slack_inbound_events_total{") and f'type="{event_type}"' in line \
-                and f'result="{result}"' in line:
-            total += float(line.rsplit(" ", 1)[1])
-    return total
-
-
-def wait_for(predicate, what: str, timeout: float = 15.0) -> None:
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        if predicate():
-            return
-        time.sleep(0.25)
-    raise AssertionError(f"timed out waiting for {what}")
-
-
 def test_url_verification_with_a_pending_http_installations_secret(
     client: OpenObserveClient, pending_http: dict[str, Any]
 ) -> None:
@@ -149,7 +114,7 @@ def test_url_verification_with_an_unknown_secret_is_401(client: OpenObserveClien
 
 def test_a_bad_signature_is_401(client: OpenObserveClient, installed_http: dict[str, Any]) -> None:
     secret = f"signing-{installed_http['app_id']}"
-    body = mention(installed_http["app_id"], "Ev" + uuid.uuid4().hex[:10])
+    body = mention(installed_http, MOCK_TEAM, "U0DANA")
     ts = str(int(time.time()))
     tampered = body.replace(b"errors in checkout", b"drop every table")
     assert slack_post(client, "events", tampered, secret, ts=int(ts), signature=sign(secret, ts, body)).status_code == 401
@@ -159,7 +124,7 @@ def test_a_bad_signature_is_401(client: OpenObserveClient, installed_http: dict[
 
 @pytest.mark.parametrize("skew", [-360, 360])
 def test_a_timestamp_six_minutes_off_is_401(client: OpenObserveClient, installed_http: dict[str, Any], skew: int) -> None:
-    body = mention(installed_http["app_id"], "Ev" + uuid.uuid4().hex[:10])
+    body = mention(installed_http, MOCK_TEAM, "U0DANA")
     resp = slack_post(client, "events", body, f"signing-{installed_http['app_id']}", ts=int(time.time()) + skew)
     assert resp.status_code == 401, resp.text
 
@@ -171,25 +136,28 @@ def test_over_1_mib_is_413(client: OpenObserveClient, installed_http: dict[str, 
 
 
 def test_an_unknown_app_is_404(client: OpenObserveClient, installed_http: dict[str, Any]) -> None:
-    body = mention("A0NOSUCHAPP", "Ev" + uuid.uuid4().hex[:10])
+    body = mention({"app_id": "A0NOSUCHAPP"}, MOCK_TEAM, "U0DANA")
     resp = slack_post(client, "events", body, f"signing-{installed_http['app_id']}")
     assert resp.status_code == 404, resp.text
 
 
-def test_the_same_event_id_three_times_is_one_message(client: OpenObserveClient, installed_http: dict[str, Any]) -> None:
-    secret = f"signing-{installed_http['app_id']}"
-    body = mention(installed_http["app_id"], "Ev" + uuid.uuid4().hex[:10])
-    dispatched = inbound_count(client, "app_mention", "dispatched")
-    duplicates = inbound_count(client, "app_mention", "duplicate")
-    for attempt in range(3):
-        resp = slack_post(client, "events", body, secret)
-        assert resp.status_code == 200, f"attempt {attempt}: {resp.text}"
+def test_the_same_event_id_three_times_is_one_answer(
+    client: OpenObserveClient, slack_org: str, ready: SlackMock, o2ai: O2aiMock,  # noqa: F811
+) -> None:
+    """AC-8.2: Slack's delivery and two retries (``X-Slack-Retry-Num`` 1, 2) of one event id are one turn and one answer."""
+    team, inst, _ = setup_team(client, slack_org, ready, "U0DUP")
+    tag = uuid.uuid4().hex[:8]
+    body, ts, _ = event(inst, team, "U0DUP", f"<@U0BOT> errors in checkout? {tag}")
+    for retry in (None, 1, 2):
+        resp = slack_post(client, "events", body, f"signing-{inst['app_id']}", retry=retry)
+        assert resp.status_code == 200, f"retry {retry}: {resp.text}"
         assert resp.json() == {}
-    wait_for(lambda: inbound_count(client, "app_mention", "dispatched") == dispatched + 1, "one dispatch")
-    # NATS drops the copies at publish (duplicate window); the memory queue leaves them to the consumer.
-    time.sleep(1)
-    assert inbound_count(client, "app_mention", "dispatched") == dispatched + 1
-    assert inbound_count(client, "app_mention", "duplicate") - duplicates in (0, 2)
+    wait_until(lambda: answers_in(ready, ts), "the answer to the event")
+    # Copies of one thread are settled in order, so once a later question there is answered none is left.
+    ask(client, inst, team, ready, "U0DUP", f"and in payments? {tag}", thread_ts=ts, kind="message")
+    queries = [t["body"]["query"] for t in turns_for(o2ai, tag)]
+    assert queries == [f"errors in checkout? {tag}", f"and in payments? {tag}"], queries
+    assert len(answers_in(ready, ts)) == 2
 
 
 def test_a_command_and_a_click_are_acked_as_slack_expects(client: OpenObserveClient, installed_http: dict[str, Any]) -> None:
@@ -227,8 +195,8 @@ def test_parallel_threads(client: OpenObserveClient, slack_org: str, ready: Slac
     b1, _, _ = event(inst, team, "U0PAT", f"<@U0BOT> first in B {tag}", ts=thread_b)
     for body in (a1, a2, b1):
         send(client, inst, body)
-    wait_for(lambda: len(answers_in(ready, thread_a)) >= 2 and answers_in(ready, thread_b), "three answers",
-             timeout=40)
+    wait_until(lambda: len(answers_in(ready, thread_a)) >= 2 and answers_in(ready, thread_b), "three answers",
+               timeout=40)
     turns = turns_for(o2ai, tag)
     assert len(turns) == 3, "no turn was refused or retried"
     by_query = {t["body"]["query"]: t for t in turns}
@@ -236,6 +204,7 @@ def test_parallel_threads(client: OpenObserveClient, slack_org: str, ready: Slac
     session = "x-o2-assistant-session-id"
     assert first_a["headers"][session] == second_a["headers"][session]
     assert first_b["headers"][session] != first_a["headers"][session]
-    assert abs(second_a["at"] - first_a["at"]) >= 2.5, "one question of a thread waits for the other"
-    earliest_a = min(first_a["at"], second_a["at"])
-    assert abs(first_b["at"] - earliest_a) < 2.0, "another thread does not wait behind it"
+    earlier_a, later_a = sorted((first_a, second_a), key=lambda t: t["at"])
+    assert later_a["at"] >= earlier_a["last_frame_at"], "a thread's next question starts after its last one ended"
+    assert first_b["at"] < earlier_a["last_frame_at"], "thread B starts while thread A's first question is open"
+    assert earlier_a["at"] < first_b["last_frame_at"], "thread A's first question starts while thread B's is open"
