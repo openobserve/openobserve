@@ -92,6 +92,12 @@ const isTiny = (value: number) => value !== 0 && Math.abs(value) < 0.01;
 const formatTiny = (value: number) =>
   value.toLocaleString("en-US", { maximumSignificantDigits: 2 });
 
+/** An axis tick: up to 4 decimals, thousands grouped, so float noise like 0.0499999999999996 reads "0.05"; smaller ticks keep 2 significant digits. */
+export const formatAxis = (value: number): string =>
+  value !== 0 && Math.abs(value) < 0.0001
+    ? formatTiny(value)
+    : value.toLocaleString("en-US", { maximumFractionDigits: 4 });
+
 /** A number for labels and ranges: up to 2 decimals, thousands grouped ("1,000,000"), tiny values kept distinct ("0.00032"). */
 export const formatNumber = (value: number): string =>
   isTiny(value) ? formatTiny(value) : value.toLocaleString("en-US", { maximumFractionDigits: 2 });
