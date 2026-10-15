@@ -21,8 +21,10 @@ export default class DashboardNotices {
     this.xAliasWarning = page.locator('[data-test="panel-x-alias-inconsistency-warning"]');
     this.copyErrorBtn = page.locator('[data-test="panel-notice-action-copy-error"]');
 
-    // Query Inspector dialog.
-    this.inspectorDialog = page.locator('[data-test="query-inspector"]');
+    // Query Inspector dialog. The dashboard host (PanelContainer.vue) passes
+    // data-test="query-inspector-dialog" onto the QueryInspector root, which
+    // overrides the inner ODialog's own data-test="query-inspector".
+    this.inspectorDialog = page.locator('[data-test="query-inspector-dialog"]');
   }
 
   // ---------------------------------------------------------------------------
@@ -80,6 +82,53 @@ export default class DashboardNotices {
     await chip.hover();
     await this.noticeContent(id).waitFor({ state: "visible", timeout: 5000 });
     return this.noticeContent(id);
+  }
+
+  /**
+   * Hover a notice chip and click one of its tooltip action buttons.
+   *
+   * The tooltip fades + zooms in and reka's hoverable trigger can close it again
+   * while Playwright moves the pointer from the chip to the button, so a plain
+   * `click()` intermittently sees an unstable/detached target. We re-open, let
+   * the entrance animation settle, then click normally (and retry on a close
+   * race). A normal click keeps Playwright's actionability checks intact; the
+   * retry loop already moves the pointer away and re-hovers, which is the
+   * correct recovery from the reka-ui close race.
+   * @param {string} noticeId - notice id, e.g. "series-cap" / "function-error".
+   * @param {string} actionId - action button id, e.g. "use-top-n" / "edit-function".
+   */
+  async clickNoticeAction(noticeId, actionId) {
+    const action = this.noticeAction(actionId);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await this.openNoticeTooltip(noticeId);
+      await action.waitFor({ state: "visible", timeout: 5000 });
+      await this.page.waitForTimeout(500);
+      try {
+        await action.click({ timeout: 5000 });
+        return;
+      } catch (error) {
+        testLogger.warn(`Notice action "${actionId}" click attempt ${attempt + 1} failed, retrying`, {
+          error: error.message,
+        });
+        // Move the pointer away so the next hover re-triggers the tooltip open.
+        await this.page.mouse.move(0, 0).catch(() => {});
+      }
+    }
+    throw new Error(`Could not click notice action "${actionId}" after 3 attempts`);
+  }
+
+  /** Close the Query Inspector dialog opened from a panel's "Inspector" menu action. */
+  async closeInspector() {
+    await this.inspectorDialog
+      .locator('[data-test="o-dialog-close-btn"]')
+      .click();
+    await this.inspectorDialog
+      .waitFor({ state: "hidden", timeout: 5000 })
+      .catch((error) =>
+        testLogger.warn("Query Inspector dialog did not close cleanly", {
+          error: error.message,
+        }),
+      );
   }
 
   /**

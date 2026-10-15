@@ -60,7 +60,9 @@ test.describe("Dashboard Panel Notices testcases", () => {
       await expect(pm.dashboardNotices.lastRefreshed).toBeVisible({
         timeout: 15000,
       });
-      await expect(pm.dashboardNotices.lastRefreshed).toContainText("Last Refreshed");
+      // The header clock renders the 🕑 icon plus a relative age ("now"); the
+      // "Last Refreshed At" label lives in the hover tooltip title, not text.
+      await expect(pm.dashboardNotices.lastRefreshed).toContainText("🕑");
       await expect(pm.dashboardNotices.noticesContainer).toHaveCount(0);
       await expect(pm.dashboardNotices.errorIcon).toHaveCount(0);
 
@@ -98,7 +100,14 @@ test.describe("Dashboard Panel Notices testcases", () => {
       await pm.chartTypeSelector.searchAndAddField(SERIES_MEASURE_FIELD, "y");
       await pm.chartTypeSelector.searchAndAddField(SERIES_BREAKDOWN_FIELD, "b");
       await pm.dashboardPanelActions.applyDashboardBtn();
-      await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+      await pm.dashboardPanelActions
+        .waitForChartToRender()
+        .catch((error) =>
+          testLogger.warn(
+            "Chart render wait failed; notice assertions gate on the search response, not the render",
+            { error: error.message },
+          ),
+        );
       await pm.dashboardPanelActions.addPanelName("SeriesCapPanel");
       await pm.dashboardPanelActions.savePanel();
 
@@ -156,7 +165,14 @@ test.describe("Dashboard Panel Notices testcases", () => {
       await pm.chartTypeSelector.searchAndAddField(SERIES_MEASURE_FIELD, "y");
       await pm.chartTypeSelector.searchAndAddField(SERIES_BREAKDOWN_FIELD, "b");
       await pm.dashboardPanelActions.applyDashboardBtn();
-      await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+      await pm.dashboardPanelActions
+        .waitForChartToRender()
+        .catch((error) =>
+          testLogger.warn(
+            "Chart render wait failed; notice assertions gate on the search response, not the render",
+            { error: error.message },
+          ),
+        );
       await pm.dashboardPanelActions.addPanelName("SeriesCapPanel");
       await pm.dashboardPanelActions.savePanel();
 
@@ -178,6 +194,7 @@ test.describe("Dashboard Panel Notices testcases", () => {
 
       testLogger.info("Query Inspector shows the series-cap banner on query 0");
 
+      await pm.dashboardNotices.closeInspector();
       await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(pm.page, dashboardName);
     }
@@ -210,7 +227,14 @@ test.describe("Dashboard Panel Notices testcases", () => {
       // query carries a VRL function.
       await pm.dashboardNotices.addPanelVrlFunction(".foo = 1");
       await pm.dashboardPanelActions.applyDashboardBtn();
-      await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
+      await pm.dashboardPanelActions
+        .waitForChartToRender()
+        .catch((error) =>
+          testLogger.warn(
+            "Chart render wait failed; notice assertions gate on the search response, not the render",
+            { error: error.message },
+          ),
+        );
       await pm.dashboardPanelActions.addPanelName("FunctionErrorPanel");
       await pm.dashboardPanelActions.savePanel();
 
@@ -240,8 +264,9 @@ test.describe("Dashboard Panel Notices testcases", () => {
         })
         .toBe(functionErrorMessage);
 
-      // "Edit function" routes to the editor focused on the VRL function.
-      await pm.dashboardNotices.noticeAction("edit-function").click();
+      // "Copy error" closes the tooltip (PanelErrorButtons `closeTooltip`), so
+      // click "Edit function" via the helper that re-opens and stabilises it.
+      await pm.dashboardNotices.clickNoticeAction("function-error", "edit-function");
       await pm.page.waitForURL(/add_panel/, { timeout: 20000 });
       expect(new URL(pm.page.url()).searchParams.get("focus")).toBe("vrl");
 

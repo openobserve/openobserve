@@ -1,6 +1,0 @@
-{
-  "group": "Dashboards-Core",
-  "spec_filename": "panelNotices.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}
