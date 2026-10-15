@@ -1,0 +1,33 @@
+{
+  "feature_slug": "dashboard-time-range-apply",
+  "feature_title": "Dashboard Time Range Apply & Auto Run",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-time-range-apply.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-time-range-apply.spec.js",
+  "playwright_group": "Dashboards-Panel-Level-DateTime-Config",
+  "source_files": [
+    "web/src/composables/dashboard/useDashboardTimeGate.ts",
+    "web/src/composables/dashboard/usePanelRefreshAfterRestore.ts",
+    "web/src/composables/dashboard/dashboardFreshOnOpen.ts",
+    "web/src/utils/dashboard/panelTimeUtils.ts",
+    "web/src/components/DateTimePickerDashboard.vue",
+    "web/src/components/dashboards/viewPanel/ViewPanel.vue",
+    "web/src/components/dashboards/PanelContainer.vue",
+    "web/src/views/Dashboards/ViewDashboard.vue",
+    "web/src/views/Dashboards/RenderDashboardCharts.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Classified from the authoritative file list in changed_files.txt: every changed path lives under web/src/**, tests/ui-testing/**, or scripts/translations/ — none under enterprise/, o2_enterprise/, or src/enterprise/. No enterprise keywords (cipher/SSO/SAML/RBAC/SDR/logo-management) appear in any changed path or symbol, so this is an OSS change.",
+    "skip": "Not skipped. The change touches user-facing dashboard UI (time picker, refresh button states/tooltips, Auto Run menu copy), and there is no explicit opt-out: trigger_comment.txt and feature_hint.txt are both empty and no tests-added/skip label was passed in context.",
+    "e2e": "E2E is warranted. The diff removes the dashboard/panel time picker's Apply button, introduces a refresh-to-apply-time-range flow (yellow Refresh icon + tooltip) when Auto Run is off, applies ranges immediately when Auto Run is on, and updates the Auto Run description/scope copy — all user-exercisable UI behavior that needs verifying in a real browser.",
+    "area": "Area is Dashboards. The bulk of the UI changes live in web/src/views/Dashboards/ (ViewDashboard.vue, RenderDashboardCharts.vue), web/src/components/dashboards/ (PanelContainer.vue, viewPanel/ViewPanel.vue), and web/src/composables/dashboard/, and the sibling specs live under tests/ui-testing/playwright-tests/Dashboards/.",
+    "group": "playwright_group is Dashboards-Panel-Level-DateTime-Config — the closest existing matrix shard, whose run_files (dashboard-panel-time-apply-behavior, -variables-behavior, -url-priority, -config-behavior, -advanced-edge-cases) already cover panel-level date-time apply/URL/variable semantics, exactly the surface this change reworks.",
+    "existing_tests": "The diff modifies tests/ui-testing/playwright-tests/Dashboards/dashboard-variables-auto-run.spec.js — a genuine Playwright E2E spec — but only updates one Auto Run tooltip assertion; it does not cover the new no-Apply/refresh-to-apply-time-range flow. All other changed *.spec.ts files are Vitest unit tests (web/src/**) and the dashboardPages/*.js files are page objects, neither of which counts as E2E coverage. So existing_tests_in_diff is true, but the dev spec does not cover the new feature."
+  }
+}
