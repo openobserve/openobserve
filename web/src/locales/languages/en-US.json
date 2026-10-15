@@ -19954,6 +19954,8 @@
       "valuesLoadingRow": "Still loading values",
       "valuesLoadingHint": "Keep typing, or press Esc then Ctrl+Space",
       "valuesEmpty": "No values for {field} in the last {minutes} minutes",
+      "valuesEmptyInRange": "No values for {field} in the selected time range",
+      "closeValueQuote": "Close the value quote",
       "valuesFailed": "Couldn't load values for {field}",
       "chainedMenuAnnouncement": "{count} suggestion, Tab to accept | {count} suggestions, Tab to accept",
       "valuesCap": "{count} value shown · type to filter | {count} values shown · type to filter",

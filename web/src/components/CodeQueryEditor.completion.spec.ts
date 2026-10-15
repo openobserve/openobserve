@@ -54,7 +54,12 @@ const createdEditors: any[] = [];
 
 const makeEditorStub = (model: any) => ({
   onDidChangeModelContent: vi.fn(),
-  createContextKey: vi.fn(),
+  createContextKey: vi.fn(() => ({ set: vi.fn() })),
+  addAction: vi.fn(() => ({ dispose: vi.fn() })),
+  executeEdits: vi.fn(),
+  setPosition: vi.fn(),
+  pushUndoStop: vi.fn(),
+  getSelections: vi.fn(() => []),
   addCommand: vi.fn(),
   onKeyDown: vi.fn(),
   onDidFocusEditorWidget: vi.fn(),
@@ -147,6 +152,11 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     KeyZ: 56,
   },
   Range: class {
+    constructor(...args: number[]) {
+      Object.assign(this, { args });
+    }
+  },
+  Selection: class {
     constructor(...args: number[]) {
       Object.assign(this, { args });
     }
@@ -1998,6 +2008,253 @@ describe("P0-4 — PromQL label values come from the provider", () => {
       expect(noMenu.suggestions).toEqual([]);
     },
   );
+});
+
+// Runs after the PromQL block: each language's provider keeps the store of the first editor that registered it.
+describe("value quotes, late values, the empty-values copy and the typed prefix", () => {
+  let spy: ReturnType<typeof vi.spyOn>;
+  afterAll(() => spy?.mockRestore());
+
+  const FIELDS = [
+    { name: "level", label: "level", kind: "Field", insertText: "level", detail: "Utf8" },
+  ];
+
+  const mountWith = async (editorId: string, props: any = {}, zoConfig: any = {}) => {
+    const api: any = await import("monaco-editor/esm/vs/editor/editor.api");
+    const createFn = vi.mocked(api.editor.create);
+    const registerFn = vi.mocked(api.languages.registerCompletionItemProvider);
+    const before = createFn.mock.calls.length;
+    spy = vi
+      .spyOn(document, "getElementById")
+      .mockImplementation(() => document.createElement("div"));
+    mount(CodeQueryEditor, {
+      props: { editorId, language: "sql", query: "", keywords: FIELDS, ...props },
+      global: { plugins: [createStore({ state: { theme: "light", zoConfig } })] },
+    });
+    await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+      timeout: 15000,
+      interval: 25,
+    });
+    const editor = createdEditors.at(-1)!;
+    const language = props.language ?? "sql";
+    const registration = registerFn.mock.calls.filter((c: any) => c[0] === language).at(-1)![1];
+    return { api, editor, model: editor.getModel(), provide: registration.provideCompletionItems };
+  };
+
+  // Puts the caret at the end of `before`, with `after` following it on the same line.
+  const placeCaret = (editor: any, model: any, before: string, after = "") => {
+    model.getValueInRange.mockReturnValue(before);
+    model.getLineContent.mockReturnValue(before + after);
+    model.getWordUntilPosition.mockReturnValue({ word: "", startColumn: 1, endColumn: 1 });
+    editor.getPosition.mockReturnValue({ lineNumber: 1, column: before.length + 1 });
+  };
+
+  const TYPED_SPACE = { triggerKind: 1, triggerCharacter: " " };
+  const ask = (provide: any, editor: any, model: any, text: string) => {
+    placeCaret(editor, model, text);
+    return provide(model, { lineNumber: 1, column: text.length + 1 }, TYPED_SPACE, {});
+  };
+  const delayed = (ms: number, values: string[]) =>
+    vi.fn(
+      (_field: string, _options?: any) =>
+        new Promise<string[]>((r) => setTimeout(() => r(values), ms)),
+    );
+  const triggers = (editor: any) =>
+    editor.trigger.mock.calls.filter((c: any[]) => c[1] === "editor.action.triggerSuggest");
+
+  describe("Enter in an unclosed value quote", () => {
+    const enterAction = (editor: any) =>
+      editor.addAction.mock.calls
+        .map((c: any[]) => c[0])
+        .find((a: any) => a.id === "o2.suggest.closeValueQuote");
+    const quoteKey = (editor: any) => {
+      const index = editor.createContextKey.mock.calls.findIndex(
+        (c: any[]) => c[0] === "o2InValueQuote",
+      );
+      return editor.createContextKey.mock.results[index].value;
+    };
+    const moveCaret = (editor: any) => editor.onDidChangeCursorPosition.mock.calls.at(-1)![0]();
+
+    it("binds Enter only while no suggest row is focused", { timeout: 30000 }, async () => {
+      const { api, editor } = await mountWith("q-bind");
+      const action = enterAction(editor);
+      expect(action.keybindings).toEqual([api.KeyCode.Enter]);
+      expect(action.precondition).toContain("o2InValueQuote");
+      expect(action.precondition).toContain("!suggestWidgetHasFocusedSuggestion");
+    });
+
+    it(
+      "steps over an auto-closed quote instead of breaking the string",
+      { timeout: 30000 },
+      async () => {
+        const { editor, model } = await mountWith("q-closer");
+        const before = "SELECT * FROM logs WHERE level = 'zz";
+        placeCaret(editor, model, before, "'");
+        enterAction(editor).run();
+        expect(editor.setPosition).toHaveBeenCalledWith({
+          lineNumber: 1,
+          column: before.length + 2,
+        });
+        expect(editor.executeEdits).not.toHaveBeenCalled();
+        expect(editor.trigger).toHaveBeenCalledWith("o2", "hideSuggestWidget", {});
+      },
+    );
+
+    it("inserts the closing quote when none follows", { timeout: 30000 }, async () => {
+      const { editor, model } = await mountWith("q-insert");
+      const before = "SELECT * FROM logs WHERE level = 'zz";
+      placeCaret(editor, model, before, " AND x = 1");
+      enterAction(editor).run();
+      const [, edits, selection] = editor.executeEdits.mock.calls.at(-1)!;
+      expect(edits[0].text).toBe("'");
+      expect(edits[0].range.args).toEqual([1, before.length + 1, 1, before.length + 1]);
+      expect(selection[0].args).toEqual([1, before.length + 2, 1, before.length + 2]);
+    });
+
+    it("closes a PromQL label value with a double quote", { timeout: 30000 }, async () => {
+      const { editor, model } = await mountWith("q-promql", { language: "promql" });
+      const before = 'up{job="zz';
+      placeCaret(editor, model, before);
+      enterAction(editor).run();
+      expect(editor.executeEdits.mock.calls.at(-1)![1][0].text).toBe('"');
+    });
+
+    it("claims Enter only inside a value quote", { timeout: 30000 }, async () => {
+      const { editor, model } = await mountWith("q-key");
+      const key = quoteKey(editor);
+      placeCaret(editor, model, "SELECT * FROM logs WHERE level = 'zz", "'");
+      moveCaret(editor);
+      expect(key.set).toHaveBeenLastCalledWith(true);
+      placeCaret(editor, model, "SELECT * FROM logs WHERE level = 'zz' ");
+      moveCaret(editor);
+      expect(key.set).toHaveBeenLastCalledWith(false);
+      placeCaret(editor, model, "SELECT * FROM logs WHERE match_all('zz");
+      moveCaret(editor);
+      expect(key.set).toHaveBeenLastCalledWith(false);
+    });
+
+    it("leaves Enter alone in off mode", { timeout: 30000 }, async () => {
+      const { editor, model } = await mountWith("q-off", {}, { editor_suggest_mode: "off" });
+      placeCaret(editor, model, "SELECT * FROM logs WHERE level = 'zz", "'");
+      moveCaret(editor);
+      expect(quoteKey(editor).set).toHaveBeenLastCalledWith(false);
+    });
+  });
+
+  describe("a menu left on Still loading", () => {
+    it("asks Monaco again once the lookup lands", { timeout: 30000 }, async () => {
+      const resolver = delayed(1300, ["error"]);
+      const { editor, model, provide } = await mountWith("r-once", {
+        fieldValueResolver: resolver,
+      });
+      const result = await ask(provide, editor, model, "SELECT * FROM logs WHERE level = ");
+      expect(nameOf(rowsOf(result)[0])).toContain("valuesLoading");
+      expect(triggers(editor)).toHaveLength(0);
+      await vi.waitFor(() => expect(triggers(editor)).toHaveLength(1), { timeout: 3000 });
+      expect(triggers(editor)[0]).toEqual(["o2", "editor.action.triggerSuggest", { auto: true }]);
+      const ids = editor.trigger.mock.calls.map((c: any[]) => c[1]);
+      expect(ids.indexOf("hideSuggestWidget"), "closed first, or Monaco ignores the trigger").toBe(
+        ids.indexOf("editor.action.triggerSuggest") - 1,
+      );
+    });
+
+    it("never refills twice for the same lookup", { timeout: 30000 }, async () => {
+      const resolver = delayed(1100, ["error"]);
+      const { editor, model, provide } = await mountWith("r-twice", {
+        fieldValueResolver: resolver,
+      });
+      await ask(provide, editor, model, "SELECT * FROM logs WHERE level = ");
+      await vi.waitFor(() => expect(triggers(editor)).toHaveLength(1), { timeout: 3000 });
+      await ask(provide, editor, model, "SELECT * FROM logs WHERE level = ");
+      await new Promise((r) => setTimeout(r, 400));
+      expect(triggers(editor)).toHaveLength(1);
+    });
+
+    it("does not refill after Esc", { timeout: 30000 }, async () => {
+      const resolver = delayed(1300, ["error"]);
+      const { editor, model, provide } = await mountWith("r-esc", { fieldValueResolver: resolver });
+      await ask(provide, editor, model, "SELECT * FROM logs WHERE level = ");
+      editor.onKeyDown.mock.calls.at(-1)![0]({ keyCode: 9 });
+      await new Promise((r) => setTimeout(r, 600));
+      expect(triggers(editor)).toHaveLength(0);
+    });
+
+    it("does not refill after typed whitespace", { timeout: 30000 }, async () => {
+      const resolver = delayed(1300, ["error"]);
+      const { editor, model, provide } = await mountWith("r-space", {
+        fieldValueResolver: resolver,
+      });
+      const text = "SELECT * FROM logs WHERE level = ";
+      await ask(provide, editor, model, text);
+      editor.getPosition.mockReturnValue({ lineNumber: 1, column: text.length + 3 });
+      model.getValueInRange.mockImplementation((range: any) =>
+        range.startColumn === 1 ? text : "x ",
+      );
+      await new Promise((r) => setTimeout(r, 600));
+      expect(triggers(editor)).toHaveLength(0);
+    });
+  });
+
+  describe("the values copy follows the lookup's range", () => {
+    const emptyRow = async (editorId: string, props: any) => {
+      const { editor, model, provide } = await mountWith(editorId, {
+        fieldValueResolver: vi.fn(async () => []),
+        ...props,
+      });
+      const result = await ask(provide, editor, model, "SELECT * FROM logs WHERE level = ");
+      return nameOf(rowsOf(result)[0]);
+    };
+
+    it("names the default lookback when no range is set", { timeout: 30000 }, async () => {
+      expect(await emptyRow("e-default", {})).toContain("valuesEmpty");
+      expect(await emptyRow("e-default2", {})).not.toContain("valuesEmptyInRange");
+    });
+
+    const valuesHeader = async (editorId: string, props: any) => {
+      const { editor, model, provide } = await mountWith(editorId, {
+        fieldValueResolver: vi.fn(async () => ["error"]),
+        ...props,
+      });
+      const result = await ask(provide, editor, model, "SELECT * FROM logs WHERE level = ");
+      return nameOf(result.suggestions.find(isHeader));
+    };
+
+    it("heads values as recent when no range is set", { timeout: 30000 }, async () => {
+      expect(await valuesHeader("h-default", {})).toBe("sqlEditor.completion.groupValues");
+    });
+
+    it("heads values plainly when they come from a set range", { timeout: 30000 }, async () => {
+      const range = { startTime: 1_000_000, endTime: 2_000_000 };
+      expect(await valuesHeader("h-range", { valuesTimeRange: range })).toBe(
+        "sqlEditor.completion.groupValuesName",
+      );
+    });
+
+    it("speaks of the selected range when one is set", { timeout: 30000 }, async () => {
+      const range = { startTime: 1_000_000, endTime: 2_000_000 };
+      expect(await emptyRow("e-range", { valuesTimeRange: range })).toContain("valuesEmptyInRange");
+    });
+  });
+
+  describe("the typed prefix reaches the resolver", () => {
+    it("passes what is typed inside an open quote", { timeout: 30000 }, async () => {
+      const resolver = vi.fn(async (_field: string, _options?: any) => ["openobserve"]);
+      const { editor, model, provide } = await mountWith("p-quote", {
+        fieldValueResolver: resolver,
+      });
+      await ask(provide, editor, model, "SELECT * FROM logs WHERE level = 'openobs");
+      expect(resolver.mock.calls.at(-1)![1]).toMatchObject({ prefix: "openobs" });
+    });
+
+    it("passes an empty prefix outside a quote", { timeout: 30000 }, async () => {
+      const resolver = vi.fn(async (_field: string, _options?: any) => ["openobserve"]);
+      const { editor, model, provide } = await mountWith("p-bare", {
+        fieldValueResolver: resolver,
+      });
+      await ask(provide, editor, model, "SELECT * FROM logs WHERE level = ");
+      expect(resolver.mock.calls.at(-1)![1]).toMatchObject({ prefix: "" });
+    });
+  });
 });
 
 describe("P0-2 / P0-3 / W0-B — the chain, the operator lane and comments", () => {
