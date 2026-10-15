@@ -6588,7 +6588,14 @@
       "endTime": "Czas zakończenia",
       "variables": "Zmienne",
       "fixedVariables": "Stałe zmienne",
-      "dynamicVariables": "Dynamiczne zmienne"
+      "dynamicVariables": "Dynamiczne zmienne",
+      "statTook": "Zajęło {duration}",
+      "statScanned": "Przeskanowano {size}",
+      "statRowsScanned": "{count} przeskanany wiersz | {count} przeskanowanych wierszy",
+      "statRowsReturned": "{count} zwrócony wiersz | {count} zwróconych wierszy",
+      "statSeriesReturned": "{count} zwróconych serii",
+      "statFromCache": "{percent}% z pamięci podręcznej",
+      "statsLabel": "Statystyki zapytania"
     },
     "dashboards": {
       "failedToLoadFolder": "Nie udało się załadować pulpitów dla wybranego folderu.",
@@ -6888,7 +6895,30 @@
       "cachedDataDiffers": "Pokazane dane są z pamięci podręcznej i różnią się od wybranego zakresu czasu.",
       "partialData": "Pokazane dane są niekompletne, ponieważ ładowanie zostało przerwane. Odśwież, aby załadować pełne dane.",
       "lastRefreshed": "Ostatnio odświeżono: ",
-      "lastRefreshedAt": "Ostatnio odświeżono o: "
+      "lastRefreshedAt": "Ostatnio odświeżono o: ",
+      "seriesCapChip": "{shown}/{total} serii",
+      "seriesCapChipLowerBound": "{shown}/{total}+ serii",
+      "seriesCapChipFallback": "Serie ograniczone",
+      "seriesCapTitle": "Osiągnięto limit serii",
+      "seriesCapBody": "Wyświetlanych jest {shown} z {total} serii. Wykres rysuje maksymalnie {cap} serii.",
+      "seriesCapBodyCapped": "Wyświetlanych jest {shown} z co najmniej {total} serii. Wyniki zostały ograniczone do limitu wierszy.",
+      "seriesCapBodyPartial": "Wyświetlanych jest {shown} z co najmniej {total} serii. Serwer zwrócił częściowe wyniki.",
+      "partialChip": "Częściowe",
+      "partialTitle": "Częściowe wyniki",
+      "partialBody": "Serwer zwrócił częściowe wyniki, więc sumy mogą być niższe niż rzeczywiste.",
+      "interruptedChip": "Przerwano",
+      "interruptedTitle": "Ładowanie zostało przerwane",
+      "interruptedBody": "Ładowanie zatrzymało się, zanim dotarły wszystkie dane. Odśwież, aby załadować kompletne dane.",
+      "functionErrorChip": "Błąd funkcji",
+      "functionErrorTitle": "Funkcja VRL nie powiodła się",
+      "functionErrorBody": "Wiersze, na których funkcja zawiodła, są wyświetlane bez transformacji.",
+      "collapsedChip": "{count} problem | {count} problemów",
+      "collapsedTitle": "{count} problem na tym panelu | {count} problemów na tym panelu",
+      "useTopN": "Użyj Top N",
+      "editFunction": "Edytuj funkcję",
+      "copyError": "Kopiuj błąd",
+      "refresh": "Odśwież",
+      "openInspector": "Otwórz inspektor"
     },
     "dashboardSankeyChartBuilder": {
       "maxFieldAllowed": "Maksymalnie {count} pola w {axis} jest dozwolone.",
@@ -7111,7 +7141,8 @@
       "visualMapHigh": "Maksimum",
       "visualMapLow": "Minimum",
       "invalidVariableDependency": "Nieprawidłowa zależność: {child} nie może zależeć od {parent}",
-      "nestedArgPath": "{field} → Argument {index}"
+      "nestedArgPath": "{field} → Argument {index}",
+      "seriesLimitWarningCounts": "Wyświetlanych jest {shown} z {total} serii, aby wykres był szybki"
     },
     "variableNameAlreadyExists": "Zmienna o tej samej nazwie już istnieje",
     "pivotTotal": "Suma",

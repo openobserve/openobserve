@@ -346,6 +346,7 @@ import ExemplarCard from "@/components/dashboards/exemplars/ExemplarCard.vue";
 import ExemplarMarkerList from "@/components/dashboards/exemplars/ExemplarMarkerList.vue";
 import type { ExemplarMarker, InjectedExemplars, TraceVerdict } from "@/ts/interfaces/exemplars";
 import { detectChunkingDirection } from "@/utils/dashboard/chunkingDirection";
+import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -575,6 +576,8 @@ export default defineComponent({
     "updated:vrlFunctionFieldList",
     "loading-state-change",
     "limit-number-of-series-warning-message-update",
+    "series-limit-update",
+    "panel-diagnostics-update",
     "sparkline-warning-update",
     "is-partial-data-update",
     "series-data-update",
@@ -639,6 +642,7 @@ export default defineComponent({
     const annotationPopupRef: any = ref(null);
 
     const limitNumberOfSeriesWarningMessage: any = ref("");
+    const seriesLimit = ref<SeriesLimitInfo | null>(null);
 
     const chartPanelStyle = ref({
       height: "100%",
@@ -783,6 +787,7 @@ export default defineComponent({
       searchRequestTraceIds,
       loadingProgressPercentage,
       isPartialData,
+      panelDiagnostics,
       isFirstLoadSettled,
       reloadAnnotations,
     } = usePanelDataLoader(
@@ -1430,6 +1435,7 @@ export default defineComponent({
 
           limitNumberOfSeriesWarningMessage.value =
             panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
+          seriesLimit.value = panelData.value?.extras?.seriesLimit ?? null;
 
           errorDetail.value = {
             message: "",
@@ -1773,6 +1779,18 @@ export default defineComponent({
         );
       },
       { deep: true },
+    );
+
+    watch(seriesLimit, (value) => {
+      emit("series-limit-update", value);
+    });
+
+    watch(
+      () => panelDiagnostics?.value,
+      (value) => {
+        emit("panel-diagnostics-update", value ?? null);
+      },
+      { immediate: true },
     );
 
     watch(lastTriggeredAt, () => {

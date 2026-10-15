@@ -28,7 +28,7 @@ import type {
 } from "../types/panelEditor";
 
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
-import { processQueryMetadataErrors } from "@/utils/zincutils";
+import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useNotifications from "@/composables/useNotifications";
 import type { TranslateFn } from "@/types/i18n";
@@ -125,8 +125,16 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
 
   // ---- Warning Messages ----
 
-  /** Max query range warning message */
-  const maxQueryRangeWarning: Ref<string> = ref("");
+  /** Server notices for the header chips, and the range warning without what the chips already show */
+  const {
+    panelDiagnostics,
+    seriesLimit,
+    maxQueryRangeWarning,
+    noticeProps,
+    handleResultMetadataUpdate,
+    handlePanelDiagnosticsUpdate,
+    handleSeriesLimitUpdate,
+  } = usePanelNotices(() => store.state.timezone);
 
   /** Series limit warning message */
   const limitNumberOfSeriesWarningMessage: Ref<string> = ref("");
@@ -441,14 +449,6 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
    */
   const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (value: boolean): void => {
     isCachedDataDifferWithCurrentTimeRange.value = value;
-  };
-
-  /**
-   * Handle result metadata update (for QueryInspector)
-   * @param metadata - Query metadata
-   */
-  const handleResultMetadataUpdate = (metadata: any): void => {
-    maxQueryRangeWarning.value = processQueryMetadataErrors(metadata, store.state.timezone);
   };
 
   /**
@@ -827,6 +827,9 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     showAddToDashboardDialog,
     shouldRefreshWithoutCache,
     maxQueryRangeWarning,
+    panelDiagnostics,
+    seriesLimit,
+    noticeProps,
     limitNumberOfSeriesWarningMessage,
     sparklineWarning,
     errorMessage,
@@ -860,6 +863,8 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     handleLoadingStateChange,
     handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
     handleResultMetadataUpdate,
+    handlePanelDiagnosticsUpdate,
+    handleSeriesLimitUpdate,
     metaDataValue,
     seriesDataUpdate,
     collapseFieldList,

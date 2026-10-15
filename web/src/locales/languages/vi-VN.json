@@ -6588,7 +6588,14 @@
       "endTime": "Thời gian kết thúc",
       "variables": "Biến",
       "fixedVariables": "Biến cố định",
-      "dynamicVariables": "Biến động"
+      "dynamicVariables": "Biến động",
+      "statTook": "Mất {duration}",
+      "statScanned": "Đã quét {size}",
+      "statRowsScanned": "{count} hàng đã quét | {count} hàng đã quét",
+      "statRowsReturned": "{count} hàng được trả về | {count} hàng được trả về",
+      "statSeriesReturned": "{count} series được trả về",
+      "statFromCache": "{percent}% từ bộ nhớ đệm",
+      "statsLabel": "Thống kê truy vấn"
     },
     "dashboards": {
       "failedToLoadFolder": "Không thể tải dashboard cho thư mục đã chọn.",
@@ -6888,7 +6895,30 @@
       "cachedDataDiffers": "Dữ liệu hiển thị là dữ liệu được lưu trong bộ nhớ đệm và khác với khoảng thời gian đã chọn.",
       "partialData": "Dữ liệu hiển thị không đầy đủ vì quá trình tải bị gián đoạn. Làm mới để tải dữ liệu đầy đủ.",
       "lastRefreshed": "Làm mới lần cuối: ",
-      "lastRefreshedAt": "Làm mới lúc: "
+      "lastRefreshedAt": "Làm mới lúc: ",
+      "seriesCapChip": "{shown}/{total} series",
+      "seriesCapChipLowerBound": "{shown}/{total}+ series",
+      "seriesCapChipFallback": "Series bị giới hạn",
+      "seriesCapTitle": "Đã đạt giới hạn series",
+      "seriesCapBody": "Đang hiển thị {shown} trong {total} series. Biểu đồ chỉ vẽ tối đa {cap} series.",
+      "seriesCapBodyCapped": "Đang hiển thị {shown} trong ít nhất {total} series. Kết quả đã bị giới hạn ở mức giới hạn số hàng.",
+      "seriesCapBodyPartial": "Đang hiển thị {shown} trong ít nhất {total} series. Máy chủ đã trả về kết quả một phần.",
+      "partialChip": "Một phần",
+      "partialTitle": "Kết quả một phần",
+      "partialBody": "Máy chủ đã trả về kết quả một phần, nên tổng số có thể thấp hơn thực tế.",
+      "interruptedChip": "Bị gián đoạn",
+      "interruptedTitle": "Quá trình tải đã bị gián đoạn",
+      "interruptedBody": "Quá trình tải đã dừng trước khi nhận đủ dữ liệu. Làm mới để tải dữ liệu đầy đủ.",
+      "functionErrorChip": "Lỗi function",
+      "functionErrorTitle": "Function VRL thất bại",
+      "functionErrorBody": "Các hàng mà function xử lý thất bại được hiển thị ở dạng chưa biến đổi.",
+      "collapsedChip": "{count} vấn đề | {count} vấn đề",
+      "collapsedTitle": "{count} vấn đề trên bảng này | {count} vấn đề trên bảng này",
+      "useTopN": "Dùng Top N",
+      "editFunction": "Chỉnh sửa function",
+      "copyError": "Sao chép lỗi",
+      "refresh": "Làm mới",
+      "openInspector": "Mở trình kiểm tra"
     },
     "dashboardSankeyChartBuilder": {
       "maxFieldAllowed": "Tối đa {count} trường trong {axis} được cho phép.",
@@ -7111,7 +7141,8 @@
       "visualMapHigh": "Cao",
       "visualMapLow": "Thấp",
       "invalidVariableDependency": "Phụ thuộc không hợp lệ: {child} không thể phụ thuộc vào {parent}",
-      "nestedArgPath": "{field} → Đối số {index}"
+      "nestedArgPath": "{field} → Đối số {index}",
+      "seriesLimitWarningCounts": "Đang hiển thị {shown} trong {total} series để giữ biểu đồ nhanh"
     },
     "variableNameAlreadyExists": "Biến có cùng tên đã tồn tại",
     "pivotTotal": "Tổng",

@@ -6588,7 +6588,14 @@
       "endTime": "وقت الانتهاء",
       "variables": "المتغيرات",
       "fixedVariables": "المتغيرات الثابتة",
-      "dynamicVariables": "المتغيرات الديناميكية"
+      "dynamicVariables": "المتغيرات الديناميكية",
+      "statTook": "استغرق {duration}",
+      "statScanned": "تم فحص {size}",
+      "statRowsScanned": "{count} صف تم فحصه | {count} صفوف تم فحصها",
+      "statRowsReturned": "{count} صف تم إرجاعه | {count} صفوف تم إرجاعها",
+      "statSeriesReturned": "{count} سلسلة تم إرجاعها",
+      "statFromCache": "{percent}% من الذاكرة المؤقتة",
+      "statsLabel": "إحصاءات الاستعلام"
     },
     "dashboards": {
       "failedToLoadFolder": "فشل في تحميل لوحات المعلومات للمجلد المحدد.",
@@ -6888,7 +6895,30 @@
       "cachedDataDiffers": "البيانات المعروضة مخزنة مؤقتا وتختلف عن النطاق الزمني المحدد.",
       "partialData": "البيانات المعروضة غير مكتملة لأن التحميل تم مقاطعته. قم بتحديث لتحميل البيانات المكتملة.",
       "lastRefreshed": "آخر تحديث: ",
-      "lastRefreshedAt": "آخر تحديث في: "
+      "lastRefreshedAt": "آخر تحديث في: ",
+      "seriesCapChip": "{shown}/{total} سلسلة",
+      "seriesCapChipLowerBound": "{shown}/{total}+ سلسلة",
+      "seriesCapChipFallback": "السلاسل محدودة",
+      "seriesCapTitle": "تم الوصول إلى حد السلاسل",
+      "seriesCapBody": "يتم عرض {shown} من {total} سلسلة. يرسم المخطط {cap} سلسلة كحد أقصى.",
+      "seriesCapBodyCapped": "يتم عرض {shown} من {total} سلسلة على الأقل. تم تقييد النتائج عند حد الصفوف.",
+      "seriesCapBodyPartial": "يتم عرض {shown} من {total} سلسلة على الأقل. أعاد الخادم نتائج جزئية.",
+      "partialChip": "جزئي",
+      "partialTitle": "نتائج جزئية",
+      "partialBody": "أعاد الخادم نتائج جزئية، لذا قد تكون الإجماليات أقل من الفعلية.",
+      "interruptedChip": "مقاطَع",
+      "interruptedTitle": "تمت مقاطعة التحميل",
+      "interruptedBody": "توقف التحميل قبل وصول جميع البيانات. حدِّث لتحميل البيانات الكاملة.",
+      "functionErrorChip": "خطأ في الدالة",
+      "functionErrorTitle": "فشلت دالة VRL",
+      "functionErrorBody": "تُعرض الصفوف التي فشلت فيها الدالة دون تحويل.",
+      "collapsedChip": "{count} مشكلة | {count} مشكلات",
+      "collapsedTitle": "{count} مشكلة في هذه اللوحة | {count} مشكلات في هذه اللوحة",
+      "useTopN": "استخدام أهم N",
+      "editFunction": "تعديل الدالة",
+      "copyError": "نسخ الخطأ",
+      "refresh": "تحديث",
+      "openInspector": "فتح أداة الفحص"
     },
     "dashboardSankeyChartBuilder": {
       "maxFieldAllowed": "الحد الأقصى {count} حقل في {axis} مسموح به.",
@@ -7111,7 +7141,8 @@
       "visualMapHigh": "عالي",
       "visualMapLow": "منخفض",
       "invalidVariableDependency": "الاعتماد غير الصحيح: لا يمكن {child} الاعتماد على {parent}",
-      "nestedArgPath": "{field} → أر {index}"
+      "nestedArgPath": "{field} → أر {index}",
+      "seriesLimitWarningCounts": "يتم عرض {shown} من {total} سلسلة للحفاظ على سرعة المخطط"
     },
     "variableNameAlreadyExists": "متغير يحمل نفس الاسم موجود بالفعل",
     "pivotTotal": "المجموع",

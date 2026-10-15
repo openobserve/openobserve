@@ -6588,7 +6588,14 @@
       "endTime": "종료 시간",
       "variables": "변수",
       "fixedVariables": "고정 변수",
-      "dynamicVariables": "동적 변수"
+      "dynamicVariables": "동적 변수",
+      "statTook": "{duration} 소요",
+      "statScanned": "{size} 스캔됨",
+      "statRowsScanned": "{count}개 행 스캔됨 | {count}개 행 스캔됨",
+      "statRowsReturned": "{count}개 행 반환됨 | {count}개 행 반환됨",
+      "statSeriesReturned": "{count}개 시리즈 반환됨",
+      "statFromCache": "캐시에서 {percent}%",
+      "statsLabel": "쿼리 통계"
     },
     "dashboards": {
       "failedToLoadFolder": "선택한 폴더의 대시보드를 불러오지 못했습니다.",
@@ -6888,7 +6895,30 @@
       "cachedDataDiffers": "표시된 데이터는 캐시된 데이터이며 선택한 시간 범위와 다릅니다.",
       "partialData": "로딩이 중단되어 표시된 데이터가 불완전합니다. 새로고침하여 전체 데이터를 로드하세요.",
       "lastRefreshed": "마지막 새로고침: ",
-      "lastRefreshedAt": "마지막 새로고침 시간: "
+      "lastRefreshedAt": "마지막 새로고침 시간: ",
+      "seriesCapChip": "{shown}/{total} 시리즈",
+      "seriesCapChipLowerBound": "{shown}/{total}+ 시리즈",
+      "seriesCapChipFallback": "시리즈 제한됨",
+      "seriesCapTitle": "시리즈 한도에 도달함",
+      "seriesCapBody": "{total}개 시리즈 중 {shown}개를 표시합니다. 차트는 최대 {cap}개 시리즈를 그립니다.",
+      "seriesCapBodyCapped": "최소 {total}개 시리즈 중 {shown}개를 표시합니다. 결과가 행 한도에서 잘렸습니다.",
+      "seriesCapBodyPartial": "최소 {total}개 시리즈 중 {shown}개를 표시합니다. 서버가 부분 결과를 반환했습니다.",
+      "partialChip": "부분",
+      "partialTitle": "부분 결과",
+      "partialBody": "서버가 부분 결과를 반환했으므로 합계가 실제보다 낮을 수 있습니다.",
+      "interruptedChip": "중단됨",
+      "interruptedTitle": "로드가 중단되었습니다",
+      "interruptedBody": "모든 데이터가 도착하기 전에 로드가 중단되었습니다. 새로 고쳐 전체 데이터를 로드하세요.",
+      "functionErrorChip": "함수 오류",
+      "functionErrorTitle": "VRL 함수 실패",
+      "functionErrorBody": "함수가 실패한 행은 변환되지 않은 상태로 표시됩니다.",
+      "collapsedChip": "{count}개 문제 | {count}개 문제",
+      "collapsedTitle": "이 패널의 문제 {count}개 | 이 패널의 문제 {count}개",
+      "useTopN": "Top N 사용",
+      "editFunction": "함수 편집",
+      "copyError": "오류 복사",
+      "refresh": "새로 고침",
+      "openInspector": "검사기 열기"
     },
     "dashboardSankeyChartBuilder": {
       "maxFieldAllowed": "{axis}에서 최대 {count}개 필드가 허용됩니다.",
@@ -7111,7 +7141,8 @@
       "visualMapHigh": "최고",
       "visualMapLow": "최저",
       "invalidVariableDependency": "잘못된 종속성: {child}은(는) {parent}에 종속될 수 없습니다.",
-      "nestedArgPath": "{field} → 인자 {index}"
+      "nestedArgPath": "{field} → 인자 {index}",
+      "seriesLimitWarningCounts": "차트 속도를 유지하기 위해 {total}개 시리즈 중 {shown}개를 표시합니다"
     },
     "variableNameAlreadyExists": "같은 이름의 변수가 이미 존재합니다.",
     "pivotTotal": "총계",

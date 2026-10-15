@@ -6588,7 +6588,14 @@
       "endTime": "Bitiş Zamanı",
       "variables": "Değişkenler",
       "fixedVariables": "Sabit Değişkenler",
-      "dynamicVariables": "Dinamik Değişkenler"
+      "dynamicVariables": "Dinamik Değişkenler",
+      "statTook": "{duration} sürdü",
+      "statScanned": "{size} tarandı",
+      "statRowsScanned": "{count} satır tarandı | {count} satır tarandı",
+      "statRowsReturned": "{count} satır döndürüldü | {count} satır döndürüldü",
+      "statSeriesReturned": "{count} seri döndürüldü",
+      "statFromCache": "Önbellekten %{percent}",
+      "statsLabel": "Sorgu istatistikleri"
     },
     "dashboards": {
       "failedToLoadFolder": "Seçili klasör için panolar yüklenemedi.",
@@ -6888,7 +6895,30 @@
       "cachedDataDiffers": "Gösterilen veriler önbelleğe alınmıştır ve seçilen zaman aralığından farklıdır.",
       "partialData": "Gösterilen veriler eksiktir çünkü yükleme kesintiye uğradı. Tam verileri yüklemek için yenileyin.",
       "lastRefreshed": "Son Yenileme: ",
-      "lastRefreshedAt": "Son Yenileme Zamanı: "
+      "lastRefreshedAt": "Son Yenileme Zamanı: ",
+      "seriesCapChip": "{shown}/{total} seri",
+      "seriesCapChipLowerBound": "{shown}/{total}+ seri",
+      "seriesCapChipFallback": "Seri sınırlandı",
+      "seriesCapTitle": "Seri sınırına ulaşıldı",
+      "seriesCapBody": "{total} serinin {shown} tanesi gösteriliyor. Bir grafik en fazla {cap} seri çizer.",
+      "seriesCapBodyCapped": "En az {total} serinin {shown} tanesi gösteriliyor. Sonuçlar satır sınırında kesildi.",
+      "seriesCapBodyPartial": "En az {total} serinin {shown} tanesi gösteriliyor. Sunucu kısmi sonuçlar döndürdü.",
+      "partialChip": "Kısmi",
+      "partialTitle": "Kısmi sonuçlar",
+      "partialBody": "Sunucu kısmi sonuçlar döndürdüğü için toplamlar gerçek değerden düşük olabilir.",
+      "interruptedChip": "Kesildi",
+      "interruptedTitle": "Yükleme kesildi",
+      "interruptedBody": "Yükleme tüm veriler gelmeden durdu. Eksiksiz veriyi yüklemek için yenileyin.",
+      "functionErrorChip": "İşlev hatası",
+      "functionErrorTitle": "VRL işlevi başarısız oldu",
+      "functionErrorBody": "İşlevin başarısız olduğu satırlar dönüştürülmeden gösterilir.",
+      "collapsedChip": "{count} sorun | {count} sorun",
+      "collapsedTitle": "Bu panelde {count} sorun | Bu panelde {count} sorun",
+      "useTopN": "En Yüksek N'yi Kullan",
+      "editFunction": "İşlevi düzenle",
+      "copyError": "Hatayı kopyala",
+      "refresh": "Yenile",
+      "openInspector": "Denetleyiciyi aç"
     },
     "dashboardSankeyChartBuilder": {
       "maxFieldAllowed": "Maksimum {count} alan {axis} içinde izin verilir.",
@@ -7111,7 +7141,8 @@
       "visualMapHigh": "Yüksek",
       "visualMapLow": "Düşük",
       "invalidVariableDependency": "Geçersiz bağımlılık: {child}, {parent} öğesine bağımlı olamaz",
-      "nestedArgPath": "{field} → Arg {index}"
+      "nestedArgPath": "{field} → Arg {index}",
+      "seriesLimitWarningCounts": "Grafiği hızlı tutmak için {total} serinin {shown} tanesi gösteriliyor"
     },
     "variableNameAlreadyExists": "Aynı isimde değişken zaten mevcut",
     "pivotTotal": "Toplam",

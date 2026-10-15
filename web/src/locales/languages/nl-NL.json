@@ -6588,7 +6588,14 @@
       "endTime": "Eindtijd",
       "variables": "Variabelen",
       "fixedVariables": "Vaste variabelen",
-      "dynamicVariables": "Dynamische variabelen"
+      "dynamicVariables": "Dynamische variabelen",
+      "statTook": "Duurde {duration}",
+      "statScanned": "Gescand {size}",
+      "statRowsScanned": "{count} rij gescand | {count} rijen gescand",
+      "statRowsReturned": "{count} rij geretourneerd | {count} rijen geretourneerd",
+      "statSeriesReturned": "{count} reeksen geretourneerd",
+      "statFromCache": "{percent}% uit cache",
+      "statsLabel": "Query-statistieken"
     },
     "dashboards": {
       "failedToLoadFolder": "Dashboards laden voor geselecteerde map mislukt.",
@@ -6888,7 +6895,30 @@
       "cachedDataDiffers": "De weergegeven gegevens zijn in de cache en verschillen van het geselecteerde tijdsbereik.",
       "partialData": "De weergegeven gegevens zijn onvolledig omdat het laden is onderbroken. Vernieuw om volledige gegevens te laden.",
       "lastRefreshed": "Laatst ververst: ",
-      "lastRefreshedAt": "Laatst ververst om: "
+      "lastRefreshedAt": "Laatst ververst om: ",
+      "seriesCapChip": "{shown}/{total} reeksen",
+      "seriesCapChipLowerBound": "{shown}/{total}+ reeksen",
+      "seriesCapChipFallback": "Reeksen beperkt",
+      "seriesCapTitle": "Reekslimiet bereikt",
+      "seriesCapBody": "Toont {shown} van {total} reeksen. Een grafiek tekent maximaal {cap} reeksen.",
+      "seriesCapBodyCapped": "Toont {shown} van ten minste {total} reeksen. Resultaten zijn afgekapt op de rijlimiet.",
+      "seriesCapBodyPartial": "Toont {shown} van ten minste {total} reeksen. De server retourneerde gedeeltelijke resultaten.",
+      "partialChip": "Gedeeltelijk",
+      "partialTitle": "Gedeeltelijke resultaten",
+      "partialBody": "De server retourneerde gedeeltelijke resultaten, dus totalen kunnen lager zijn dan werkelijk.",
+      "interruptedChip": "Onderbroken",
+      "interruptedTitle": "Laden is onderbroken",
+      "interruptedBody": "Laden stopte voordat alle gegevens binnen waren. Vernieuw om de volledige gegevens te laden.",
+      "functionErrorChip": "Functiefout",
+      "functionErrorTitle": "VRL-functie mislukt",
+      "functionErrorBody": "Rijen waarvoor de functie is mislukt, worden ongetransformeerd getoond.",
+      "collapsedChip": "{count} probleem | {count} problemen",
+      "collapsedTitle": "{count} probleem op dit paneel | {count} problemen op dit paneel",
+      "useTopN": "Top N gebruiken",
+      "editFunction": "Functie bewerken",
+      "copyError": "Fout kopiëren",
+      "refresh": "Vernieuwen",
+      "openInspector": "Inspecteur openen"
     },
     "dashboardSankeyChartBuilder": {
       "maxFieldAllowed": "Maximaal {count} veld in {axis} is toegestaan.",
@@ -7111,7 +7141,8 @@
       "visualMapHigh": "Hoog",
       "visualMapLow": "Laag",
       "invalidVariableDependency": "Ongeldige afhankelijkheid: {child} kan niet afhankelijk zijn van {parent}",
-      "nestedArgPath": "{field} → Argument {index}"
+      "nestedArgPath": "{field} → Argument {index}",
+      "seriesLimitWarningCounts": "Toont {shown} van {total} reeksen om de grafiek snel te houden"
     },
     "variableNameAlreadyExists": "Er bestaat al een variabele met dezelfde naam",
     "pivotTotal": "Totaal",

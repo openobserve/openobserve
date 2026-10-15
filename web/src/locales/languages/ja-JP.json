@@ -6588,7 +6588,14 @@
       "endTime": "終了時間",
       "variables": "変数",
       "fixedVariables": "固定変数",
-      "dynamicVariables": "動的変数"
+      "dynamicVariables": "動的変数",
+      "statTook": "所要時間 {duration}",
+      "statScanned": "{size} をスキャン",
+      "statRowsScanned": "{count} 行をスキャン | {count} 行をスキャン",
+      "statRowsReturned": "{count} 行を返却 | {count} 行を返却",
+      "statSeriesReturned": "{count} シリーズを返却",
+      "statFromCache": "キャッシュから {percent}%",
+      "statsLabel": "クエリ統計"
     },
     "dashboards": {
       "failedToLoadFolder": "選択したフォルダのダッシュボードの読み込みに失敗しました。",
@@ -6888,7 +6895,30 @@
       "cachedDataDiffers": "表示されているデータはキャッシュされており、選択した時間範囲とは異なります。",
       "partialData": "読み込みが中断されたため、表示されているデータは不完全です。更新して完全なデータを読み込んでください。",
       "lastRefreshed": "最終更新: ",
-      "lastRefreshedAt": "最終更新日時: "
+      "lastRefreshedAt": "最終更新日時: ",
+      "seriesCapChip": "{shown}/{total} シリーズ",
+      "seriesCapChipLowerBound": "{shown}/{total}+ シリーズ",
+      "seriesCapChipFallback": "シリーズ数制限",
+      "seriesCapTitle": "シリーズ数の上限に達しました",
+      "seriesCapBody": "{total} シリーズ中 {shown} を表示しています。チャートは最大 {cap} シリーズまで描画します。",
+      "seriesCapBodyCapped": "少なくとも {total} シリーズ中 {shown} を表示しています。結果は行数の上限で打ち切られました。",
+      "seriesCapBodyPartial": "少なくとも {total} シリーズ中 {shown} を表示しています。サーバーが部分的な結果を返しました。",
+      "partialChip": "部分的",
+      "partialTitle": "部分的な結果",
+      "partialBody": "サーバーが部分的な結果を返したため、合計が実際より少ない可能性があります。",
+      "interruptedChip": "中断",
+      "interruptedTitle": "読み込みが中断されました",
+      "interruptedBody": "すべてのデータが到着する前に読み込みが停止しました。更新して完全なデータを読み込んでください。",
+      "functionErrorChip": "関数エラー",
+      "functionErrorTitle": "VRL 関数が失敗しました",
+      "functionErrorBody": "関数が失敗した行は変換されずに表示されます。",
+      "collapsedChip": "{count} 件の問題 | {count} 件の問題",
+      "collapsedTitle": "このパネルに {count} 件の問題 | このパネルに {count} 件の問題",
+      "useTopN": "Top N を使用",
+      "editFunction": "関数を編集",
+      "copyError": "エラーをコピー",
+      "refresh": "更新",
+      "openInspector": "インスペクターを開く"
     },
     "dashboardSankeyChartBuilder": {
       "maxFieldAllowed": "{axis}のフィールドは最大{count}まで許可されています。",
@@ -7111,7 +7141,8 @@
       "visualMapHigh": "高",
       "visualMapLow": "低",
       "invalidVariableDependency": "無効な依存関係: {child} は {parent} に依存できません。",
-      "nestedArgPath": "{field} → 引数 {index}"
+      "nestedArgPath": "{field} → 引数 {index}",
+      "seriesLimitWarningCounts": "チャートを高速に保つため、{total} シリーズ中 {shown} を表示しています"
     },
     "variableNameAlreadyExists": "同じ名前の変数が既に存在します。",
     "pivotTotal": "合計",

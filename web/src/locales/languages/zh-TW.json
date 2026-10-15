@@ -6583,7 +6583,14 @@
       "endTime": "結束時間",
       "variables": "變數",
       "fixedVariables": "固定變數",
-      "dynamicVariables": "動態變數"
+      "dynamicVariables": "動態變數",
+      "statTook": "耗時 {duration}",
+      "statScanned": "已掃描 {size}",
+      "statRowsScanned": "已掃描 {count} 列 | 已掃描 {count} 列",
+      "statRowsReturned": "已返回 {count} 列 | 已返回 {count} 列",
+      "statSeriesReturned": "已返回 {count} 個數列",
+      "statFromCache": "{percent}% 來自快取",
+      "statsLabel": "查詢統計"
     },
     "dashboards": {
       "failedToLoadFolder": "無法載入所選取資料夾的儀表板。",
@@ -6883,7 +6890,30 @@
       "cachedDataDiffers": "顯示的資料是快取的，與選取的時間範圍不同。",
       "partialData": "顯示的資料不完整，因為載入中斷。請重新整理以載入完整資料。",
       "lastRefreshed": "上次重新整理時間：",
-      "lastRefreshedAt": "上次重新整理時間："
+      "lastRefreshedAt": "上次重新整理時間：",
+      "seriesCapChip": "{shown}/{total} 個數列",
+      "seriesCapChipLowerBound": "{shown}/{total}+ 個數列",
+      "seriesCapChipFallback": "數列受限",
+      "seriesCapTitle": "已達數列上限",
+      "seriesCapBody": "顯示 {total} 個數列中的 {shown} 個。圖表最多繪製 {cap} 個數列。",
+      "seriesCapBodyCapped": "顯示至少 {total} 個數列中的 {shown} 個。結果已受限於列數上限。",
+      "seriesCapBodyPartial": "顯示至少 {total} 個數列中的 {shown} 個。伺服器返回部分結果。",
+      "partialChip": "部分",
+      "partialTitle": "部分結果",
+      "partialBody": "伺服器返回部分結果，因此總計可能低於實際值。",
+      "interruptedChip": "已中斷",
+      "interruptedTitle": "載入已中斷",
+      "interruptedBody": "載入在全部資料送達前即停止。請重新整理以載入完整資料。",
+      "functionErrorChip": "函式錯誤",
+      "functionErrorTitle": "VRL 函式失敗",
+      "functionErrorBody": "函式執行失败的列會以未轉換的形式顯示。",
+      "collapsedChip": "{count} 個問題 | {count} 個問題",
+      "collapsedTitle": "此面板有 {count} 個問題 | 此面板有 {count} 個問題",
+      "useTopN": "使用 Top N",
+      "editFunction": "編輯函式",
+      "copyError": "複製錯誤",
+      "refresh": "重新整理",
+      "openInspector": "開啟檢查器"
     },
     "dashboardSankeyChartBuilder": {
       "maxFieldAllowed": "最多允許 {count} 個欄位在 {axis} 中。",
@@ -7106,7 +7136,8 @@
       "visualMapHigh": "最高",
       "visualMapLow": "最低",
       "invalidVariableDependency": "無效的相依性：{child} 不能依賴於 {parent}",
-      "nestedArgPath": "{field} → 參數 {index}"
+      "nestedArgPath": "{field} → 參數 {index}",
+      "seriesLimitWarningCounts": "為保持圖表流暢，顯示 {total} 個數列中的 {shown} 個"
     },
     "variableNameAlreadyExists": "已存在相同名稱的變數",
     "pivotTotal": "總計",

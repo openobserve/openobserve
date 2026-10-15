@@ -6588,7 +6588,14 @@
       "endTime": "结束时间",
       "variables": "变量",
       "fixedVariables": "固定变量",
-      "dynamicVariables": "动态变量"
+      "dynamicVariables": "动态变量",
+      "statTook": "耗时 {duration}",
+      "statScanned": "已扫描 {size}",
+      "statRowsScanned": "已扫描 {count} 行 | 已扫描 {count} 行",
+      "statRowsReturned": "返回 {count} 行 | 返回 {count} 行",
+      "statSeriesReturned": "返回 {count} 个序列",
+      "statFromCache": "{percent}% 来自缓存",
+      "statsLabel": "查询统计"
     },
     "dashboards": {
       "failedToLoadFolder": "加载所选文件夹的仪表盘失败。",
@@ -6888,7 +6895,30 @@
       "cachedDataDiffers": "显示的数据是缓存数据，与所选时间范围不同。",
       "partialData": "显示的数据不完整，因为加载被中断。刷新以加载完整数据。",
       "lastRefreshed": "上次刷新时间： ",
-      "lastRefreshedAt": "上次刷新于： "
+      "lastRefreshedAt": "上次刷新于： ",
+      "seriesCapChip": "{shown}/{total} 个序列",
+      "seriesCapChipLowerBound": "{shown}/{total}+ 个序列",
+      "seriesCapChipFallback": "序列受限",
+      "seriesCapTitle": "已达序列上限",
+      "seriesCapBody": "正在显示 {total} 个序列中的 {shown} 个。图表最多绘制 {cap} 个序列。",
+      "seriesCapBodyCapped": "正在显示至少 {total} 个序列中的 {shown} 个。结果受行数上限限制。",
+      "seriesCapBodyPartial": "正在显示至少 {total} 个序列中的 {shown} 个。服务器返回了部分结果。",
+      "partialChip": "部分",
+      "partialTitle": "部分结果",
+      "partialBody": "服务器返回了部分结果，因此总计可能低于实际值。",
+      "interruptedChip": "已中断",
+      "interruptedTitle": "加载已中断",
+      "interruptedBody": "加载在全部数据到达前停止。请刷新以加载完整数据。",
+      "functionErrorChip": "函数错误",
+      "functionErrorTitle": "VRL 函数失败",
+      "functionErrorBody": "函数处理失败的行将以未转换的形式显示。",
+      "collapsedChip": "{count} 个问题 | {count} 个问题",
+      "collapsedTitle": "此面板上有 {count} 个问题 | 此面板上有 {count} 个问题",
+      "useTopN": "使用 Top N",
+      "editFunction": "编辑函数",
+      "copyError": "复制错误",
+      "refresh": "刷新",
+      "openInspector": "打开检查器"
     },
     "dashboardSankeyChartBuilder": {
       "maxFieldAllowed": "允许最多{count}个字段在{axis}中。",
@@ -7111,7 +7141,8 @@
       "visualMapHigh": "高",
       "visualMapLow": "低",
       "invalidVariableDependency": "无效的依赖关系：{child} 不能依赖 {parent}",
-      "nestedArgPath": "{field} → 参数 {index}"
+      "nestedArgPath": "{field} → 参数 {index}",
+      "seriesLimitWarningCounts": "为保持图表流畅，正在显示 {total} 个序列中的 {shown} 个"
     },
     "variableNameAlreadyExists": "已存在同名变量",
     "pivotTotal": "总计",

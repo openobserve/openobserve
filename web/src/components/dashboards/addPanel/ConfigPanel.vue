@@ -1850,6 +1850,12 @@ import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import SparklineConfig from "./SparklineConfig.vue";
 import ConfigPanelSearch from "./ConfigPanelSearch.vue";
+import {
+  isShown,
+  revealAndFocus,
+  usePanelEditorFocus,
+  waitForElement,
+} from "@/composables/dashboard/usePanelEditorFocus";
 import { useConfigPanel } from "../../../composables/dashboard/useConfigPanel";
 import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
 import NoSymbol from "@/components/icons/dashboards/NoSymbol.vue";
@@ -2642,6 +2648,25 @@ export default defineComponent({
       showTrellisConfig,
       showColorPalette,
       isPivotMode,
+    );
+
+    // "Use Top N" on a dashboard notice lands on the Top N input, opening its section first.
+    const { pendingFocus, takeFocus } = usePanelEditorFocus();
+    watch(
+      pendingFocus,
+      async () => {
+        if (!takeFocus("top-n")) return;
+        searchQuery.value = "";
+        expandedSections.value.data = true;
+        const el = await waitForElement(() => {
+          const found = document.querySelector<HTMLElement>(
+            '[data-test="dashboard-config-top_results"]',
+          );
+          return isShown(found) ? found : null;
+        });
+        if (el) revealAndFocus(el);
+      },
+      { immediate: true },
     );
 
     // Focus the search box when the config panel opens so users can start

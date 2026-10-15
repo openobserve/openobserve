@@ -6588,7 +6588,14 @@
       "endTime": "Время окончания",
       "variables": "Переменные",
       "fixedVariables": "Фиксированные переменные",
-      "dynamicVariables": "Динамические переменные"
+      "dynamicVariables": "Динамические переменные",
+      "statTook": "Заняло {duration}",
+      "statScanned": "Просканировано {size}",
+      "statRowsScanned": "{count} строка просканирована | {count} строк просканировано",
+      "statRowsReturned": "{count} строка возвращена | {count} строк возвращено",
+      "statSeriesReturned": "{count} серий возвращено",
+      "statFromCache": "{percent}% из кэша",
+      "statsLabel": "Статистика запроса"
     },
     "dashboards": {
       "failedToLoadFolder": "Не удалось загрузить дашборды для выбранной папки.",
@@ -6888,7 +6895,30 @@
       "cachedDataDiffers": "Показанные данные кешированы и отличаются от выбранного временного диапазона.",
       "partialData": "Показанные данные неполные, так как загрузка была прервана. Обновите, чтобы загрузить полные данные.",
       "lastRefreshed": "Последнее обновление: ",
-      "lastRefreshedAt": "Последнее обновление в: "
+      "lastRefreshedAt": "Последнее обновление в: ",
+      "seriesCapChip": "{shown}/{total} серий",
+      "seriesCapChipLowerBound": "{shown}/{total}+ серий",
+      "seriesCapChipFallback": "Серии ограничены",
+      "seriesCapTitle": "Достигнут лимит серий",
+      "seriesCapBody": "Показано {shown} из {total} серий. Диаграмма отображает не более {cap} серий.",
+      "seriesCapBodyCapped": "Показано {shown} из как минимум {total} серий. Результаты были ограничены лимитом строк.",
+      "seriesCapBodyPartial": "Показано {shown} из как минимум {total} серий. Сервер вернул частичные результаты.",
+      "partialChip": "Частично",
+      "partialTitle": "Частичные результаты",
+      "partialBody": "Сервер вернул частичные результаты, поэтому итоги могут быть ниже фактических.",
+      "interruptedChip": "Прервано",
+      "interruptedTitle": "Загрузка была прервана",
+      "interruptedBody": "Загрузка остановлена до поступления всех данных. Обновите, чтобы загрузить полные данные.",
+      "functionErrorChip": "Ошибка функции",
+      "functionErrorTitle": "Сбой функции VRL",
+      "functionErrorBody": "Строки, на которых функция завершилась ошибкой, показаны без преобразования.",
+      "collapsedChip": "{count} проблема | {count} проблем",
+      "collapsedTitle": "{count} проблема на этой панели | {count} проблем на этой панели",
+      "useTopN": "Использовать топ N",
+      "editFunction": "Редактировать функцию",
+      "copyError": "Копировать ошибку",
+      "refresh": "Обновить",
+      "openInspector": "Открыть инспектор"
     },
     "dashboardSankeyChartBuilder": {
       "maxFieldAllowed": "Максимум {count} поля в {axis} разрешено.",
@@ -7111,7 +7141,8 @@
       "visualMapHigh": "Максимум",
       "visualMapLow": "Минимум",
       "invalidVariableDependency": "Недопустимая зависимость: {child} не может зависеть от {parent}",
-      "nestedArgPath": "{field} → Аргумент {index}"
+      "nestedArgPath": "{field} → Аргумент {index}",
+      "seriesLimitWarningCounts": "Показано {shown} из {total} серий, чтобы диаграмма работала быстро"
     },
     "variableNameAlreadyExists": "Переменная с таким именем уже существует",
     "pivotTotal": "Итого",
