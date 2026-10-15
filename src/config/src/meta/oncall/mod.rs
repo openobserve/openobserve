@@ -28,11 +28,11 @@ pub mod target;
 pub mod team;
 
 pub use agent::{
-    AnalysisState, AnalysisStatus, AnalysisVerdict, Confidence, GatePlan, L0Error, L0Metric,
-    L0Mode, L0Modes, L0Policy, PageAction, PageRecommendation, ParsedReport, ProposedAction,
-    SeverityDecision, VerdictOutcome, analysis_status_for_start, apply_verdict, gate_plan,
-    metrics_for, parse_report, promotion_note, quieter_channels, ratchet, severity_pages,
-    update_channels, verdict_lines,
+    AnalysisState, AnalysisStatus, AnalysisVerdict, Confidence, ConfidenceRefusal, GatePlan,
+    L0Error, L0Metric, L0Mode, L0Modes, L0Policy, PageAction, PageRecommendation, ParsedReport,
+    ProposedAction, SeverityDecision, VerdictOutcome, analysis_status_for_start, apply_verdict,
+    confidence_refusal, gate_plan, metrics_for, parse_report, promotion_note, quieter_channels,
+    ratchet, severity_pages, update_channels, verdict_lines,
 };
 pub use contact::{
     CODE_MAX_ATTEMPTS, CODE_TTL_MICROS, CodeCheck, CodeRow, Contact, ContactError, DAY_MICROS,

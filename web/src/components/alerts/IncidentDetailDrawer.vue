@@ -1524,8 +1524,7 @@ import serviceStreamsApi, {
   buildChipDimensionsFromFilters,
   type CorrelationResponse,
 } from "@/services/service_streams";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
+import { extractRcaToc, renderRcaReport } from "@/utils/incidents/rcaReportMarkdown";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
@@ -1758,7 +1757,6 @@ export default defineComponent({
       children: TocItem[];
       expanded: boolean;
     }
-    const tableOfContents = ref<TocItem[]>([]);
     const expandedSections = ref<Record<string, boolean>>({});
 
     // Telemetry correlation state
@@ -2446,13 +2444,40 @@ export default defineComponent({
         : "";
     });
 
-    // Computed property for formatted RCA content
-    const formattedRcaContent = computed(() => {
-      const content = activeRcaMarkdown.value;
-      if (!content) return "";
+    const formattedRcaContent = computed(() =>
+      activeRcaMarkdown.value ? renderRcaReport(activeRcaMarkdown.value) : "",
+    );
 
-      return formatRcaContent(content);
+    // h2 sections are top-level TOC entries, h3 nest under the h2 above them.
+    const tableOfContents = computed<TocItem[]>(() => {
+      const toc: TocItem[] = [];
+      let parent: TocItem | null = null;
+      for (const { id, text, level } of extractRcaToc(activeRcaMarkdown.value)) {
+        const item: TocItem = { id, text, level: level - 1, children: [], expanded: true };
+        if (level === 3 && parent) {
+          parent.children.push(item);
+        } else {
+          toc.push(item);
+          if (level === 2) parent = item;
+        }
+      }
+      return toc;
     });
+
+    // Sections start expanded; a section the user collapsed stays collapsed.
+    watch(
+      tableOfContents,
+      (toc) => {
+        const ids = toc.flatMap((item) => [item.id, ...item.children.map((child) => child.id)]);
+        const unseen = ids.filter((id) => expandedSections.value[id] === undefined);
+        if (unseen.length === 0) return;
+        expandedSections.value = {
+          ...expandedSections.value,
+          ...Object.fromEntries(unseen.map((id) => [id, true])),
+        };
+      },
+      { immediate: true },
+    );
 
     // Alert Activity Chart Data - groups triggers by day and creates a bar chart
     const alertActivityChartData = computed(() => {
@@ -3211,86 +3236,6 @@ export default defineComponent({
       }
     };
 
-    // A fence only closes on the character it opened with, so ``` inside ~~~ stays code.
-    const createCodeFenceTracker = () => {
-      let openFence: string | null = null;
-      return (line: string): boolean => {
-        const marker = line.match(/^\s*(```|~~~)/)?.[1];
-        if (marker && (!openFence || openFence === marker)) {
-          openFence = openFence ? null : marker;
-          return true;
-        }
-        return openFence !== null;
-      };
-    };
-
-    // Extract headings from markdown content to build table of contents
-    const extractTableOfContents = (content: string): TocItem[] => {
-      // Handle both actual newlines and escaped \n in JSON strings
-      const normalizedContent = content.replace(/\\n/g, "\n");
-      const lines = normalizedContent.split("\n");
-      const toc: TocItem[] = [];
-      const stack: TocItem[] = [];
-      const isCode = createCodeFenceTracker();
-
-      lines.forEach((line) => {
-        if (isCode(line)) return;
-
-        const match = line.match(/^(#{1,3})\s+(.+)$/);
-        if (match) {
-          const level = match[1].length;
-          const text = match[2].trim();
-          const id =
-            "section-" +
-            text
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "-")
-              .replace(/(^-|-$)/g, "");
-
-          // Skip h1 headings (document title) - only show h2 and h3 in TOC
-          if (level === 1) {
-            return;
-          }
-
-          const tocItem: TocItem = {
-            id,
-            text,
-            level,
-            children: [],
-            expanded: true, // Changed from false to true to expand by default
-          };
-
-          // Set expanded state to true for all sections by default, but only if not already set
-          if (expandedSections.value[id] === undefined) {
-            expandedSections.value[id] = true;
-          }
-
-          // Adjust level for display (h2 becomes level 1, h3 becomes level 2)
-          const displayLevel = level - 1;
-
-          // Find the correct parent based on adjusted level
-          while (stack.length > 0 && stack[stack.length - 1].level >= displayLevel) {
-            stack.pop();
-          }
-
-          // Update the item with display level
-          tocItem.level = displayLevel;
-
-          if (stack.length === 0) {
-            // Top level item
-            toc.push(tocItem);
-          } else {
-            // Child item
-            stack[stack.length - 1].children.push(tocItem);
-          }
-
-          stack.push(tocItem);
-        }
-      });
-
-      return toc;
-    };
-
     // Scroll to a section in the RCA report
     const scrollToSection = (id: string) => {
       // Use setTimeout to ensure DOM is ready
@@ -3336,264 +3281,6 @@ export default defineComponent({
         ...expandedSections.value,
         [item.id]: !expandedSections.value[item.id],
       };
-    };
-
-    const convertKeyValueListsToTables = (content: string): string => {
-      // Pattern: Lists where items follow "**Key**: Value" or "- **Key**: Value" format
-      // Convert these to markdown tables for better readability
-      const lines = content.split("\n");
-      const result: string[] = [];
-      let i = 0;
-
-      while (i < lines.length) {
-        const line = lines[i];
-
-        // Check if this line starts a key-value list pattern
-        const isKeyValueItem = /^-\s+\*\*([^*]+)\*\*:\s*(.+)$/.test(line.trim());
-
-        if (isKeyValueItem) {
-          // Found a key-value list, collect all consecutive items
-          const tableRows: Array<{ key: string; value: string }> = [];
-          let j = i;
-
-          while (j < lines.length) {
-            const currentLine = lines[j].trim();
-            const match = currentLine.match(/^-\s+\*\*([^*]+)\*\*:\s*(.+)$/);
-
-            if (match) {
-              tableRows.push({ key: match[1] ?? "", value: match[2] ?? "" });
-              j++;
-            } else if (currentLine === "" && j < lines.length - 1) {
-              // Allow one blank line within the list
-              const nextLine = lines[j + 1]?.trim();
-              if (/^-\s+\*\*([^*]+)\*\*:\s*(.+)$/.test(nextLine)) {
-                j++; // Skip the blank line
-                continue;
-              } else {
-                break;
-              }
-            } else {
-              break;
-            }
-          }
-
-          // Convert to table if we have 3 or more items
-          if (tableRows.length >= 3) {
-            result.push(""); // Add blank line before table
-            result.push("| Field | Value |");
-            result.push("|-------|-------|");
-            tableRows.forEach((row) => {
-              result.push(`| ${row.key} | ${row.value} |`);
-            });
-            result.push(""); // Add blank line after table
-            i = j;
-          } else {
-            // Not enough items for a table, keep as list
-            result.push(line);
-            i++;
-          }
-        } else {
-          result.push(line);
-          i++;
-        }
-      }
-
-      return result.join("\n");
-    };
-
-    // Some agent reports mark sections with a standalone bold line instead of `##`.
-    const promoteBoldLinesToHeadings = (content: string): string => {
-      const isCode = createCodeFenceTracker();
-      const lines = content.split("\n").map((text) => ({ text, prose: !isCode(text) }));
-      // A report that already has sections uses its bold lines as sub-labels, not sections.
-      if (lines.some((l) => l.prose && /^#{2,3}\s/.test(l.text))) return content;
-      return lines
-        .map(({ text, prose }, i) => {
-          const prev = lines[i - 1]?.text.trim() ?? "";
-          // A bold line glued to the line above is part of that paragraph or list.
-          const startsBlock = prev === "" || /^([-*_])\1{2,}$/.test(prev);
-          const match =
-            prose && startsBlock
-              ? text.match(
-                  /^(?:\*\*([^*\s](?:[^*\n]*[^*\s])?)\*\*|__([^_\s](?:[^_\n]*[^_\s])?)__)\s*:?\s*$/,
-                )
-              : null;
-          if (!match) return text;
-          return `## ${(match[1] ?? match[2] ?? "").replace(/:$/, "").trim()}`;
-        })
-        .join("\n");
-    };
-
-    const formatRcaContent = (rawContent: string) => {
-      const content = promoteBoldLinesToHeadings(rawContent);
-
-      // First, extract table of contents - only update if content changed
-      const newToc = extractTableOfContents(content);
-      if (JSON.stringify(newToc) !== JSON.stringify(tableOfContents.value)) {
-        tableOfContents.value = newToc;
-      }
-
-      // Convert key-value lists to tables
-      const processedContent = convertKeyValueListsToTables(content);
-
-      // Configure marked with custom renderer using marked.use() extension API
-      marked.use({
-        renderer: {
-          heading({ tokens, depth }: any) {
-            // Parse inline tokens to get the heading text
-            const parsedText = this.parser.parseInline(tokens);
-
-            // Generate ID for heading - extract raw text from tokens first
-            let rawText = "";
-            if (tokens && Array.isArray(tokens)) {
-              rawText = tokens
-                .map((t: any) => {
-                  // Handle different token types
-                  if (t.type === "text" && t.text) return t.text;
-                  if (t.raw) return t.raw;
-                  if (t.text) return t.text;
-                  return "";
-                })
-                .join("")
-                .trim();
-            }
-
-            // Fallback: extract plain text from parsed HTML using DOM
-            if (!rawText) {
-              const tempDiv = document.createElement("div");
-              tempDiv.innerHTML = parsedText || "";
-              rawText = (tempDiv.textContent || tempDiv.innerText || "").trim();
-            }
-
-            const id =
-              "section-" +
-              rawText
-                .toLowerCase()
-                .replace(/[^a-z0-9]+/g, "-")
-                .replace(/(^-|-$)/g, "");
-
-            // Colours/backgrounds for these rca-* classes come from the
-            // `:deep(.rca-report-content)` rules in IncidentRCAAnalysis.vue (the
-            // component that v-htmls this string). Those rules are unlayered, so
-            // they beat any layered colour utility named here — only structural
-            // utilities (spacing, size, weight, border-width) are live.
-            const classes = [
-              "rca-h1 font-bold text-lg text-center mb-4 pb-2 border-b-2",
-              // TODO: Discuss with team - h2 section separators with background and left border
-              // Remove 'rca-section-bg px-4 py-3 rounded-default border-s-4' if not approved
-              "rca-h2 font-bold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-default border-s-4",
-              "rca-h3 font-semibold text-base mt-4 mb-2",
-              "rca-h4 font-semibold text-sm mt-3 mb-2",
-            ];
-            return `<div id="${id}" class="${classes[depth - 1] || ""}">${parsedText}</div>`;
-          },
-          code({ text }: any) {
-            return `<div class="rca-code-block border rounded-default p-3 my-3 overflow-x-auto"><pre class="text-sm font-mono whitespace-pre m-0"><code>${text}</code></pre></div>`;
-          },
-          codespan({ text }: any) {
-            return `<code class="rca-inline-code px-1.5 py-0.5 rounded-default text-sm font-mono">${text}</code>`;
-          },
-          list(token: any) {
-            const body = token.items.map((item: any) => this.listitem(item)).join("");
-            const tag = token.ordered ? "ol" : "ul";
-            const classes = token.ordered
-              ? "rca-ol ps-5 my-3 space-y-1.5 list-decimal"
-              : "rca-ul ps-5 my-3 space-y-1.5 list-disc";
-            return `<${tag} class="${classes}">${body}</${tag}>`;
-          },
-          listitem(item: any) {
-            const text = this.parser.parse(item.tokens);
-            return `<li class="rca-list-item">${text}</li>`;
-          },
-          table(token: any) {
-            let header = "<tr>";
-            for (let i = 0; i < token.header.length; i++) {
-              const cell = token.header[i];
-              const content = this.parser.parseInline(cell.tokens);
-              const cellClass = i === 0 ? "rca-first-cell" : "";
-              header += `<th class="px-3 py-2 text-left font-semibold text-sm text-table-header-text border-b border-table-header-border ${cellClass}">${content}</th>`;
-            }
-            header += "</tr>";
-
-            let body = "";
-            for (const row of token.rows) {
-              body += '<tr class="hover:bg-table-row-hover-bg">';
-              for (let i = 0; i < row.length; i++) {
-                const cell = row[i];
-                const content = this.parser.parseInline(cell.tokens);
-                const cellClass = i === 0 ? "rca-first-cell" : "";
-                body += `<td class="px-3 py-2 text-sm border-b border-table-row-divider ${cellClass}">${content}</td>`;
-              }
-              body += "</tr>";
-            }
-
-            return `<div class="rca-table-wrapper my-4 overflow-x-auto"><table class="rca-table w-full border border-table-header-border rounded-default"><thead class="bg-table-header-bg">${header}</thead><tbody>${body}</tbody></table></div>`;
-          },
-          blockquote({ tokens }: any) {
-            const text = this.parser.parse(tokens);
-            return `<blockquote class="rca-blockquote border-s-4 ps-4 py-2 my-3 italic">${text}</blockquote>`;
-          },
-          paragraph({ tokens }: any) {
-            const text = this.parser.parseInline(tokens);
-            return `<p class="mb-3">${text}</p>`;
-          },
-          strong({ tokens }: any) {
-            const text = this.parser.parseInline(tokens);
-            return `<strong class="font-semibold">${text}</strong>`;
-          },
-          em({ tokens }: any) {
-            const text = this.parser.parseInline(tokens);
-            return `<em class="italic">${text}</em>`;
-          },
-          hr() {
-            return `<hr class="my-4 border-t" />`;
-          },
-        },
-      });
-
-      // Configure marked options
-      marked.setOptions({
-        gfm: true,
-        breaks: false,
-      });
-
-      // Parse markdown
-      const html = marked.parse(processedContent) as string;
-
-      // Sanitize HTML to prevent XSS
-      const sanitized = DOMPurify.sanitize(html, {
-        ALLOWED_TAGS: [
-          "h1",
-          "h2",
-          "h3",
-          "h4",
-          "p",
-          "ul",
-          "ol",
-          "li",
-          "strong",
-          "em",
-          "code",
-          "pre",
-          "table",
-          "thead",
-          "tbody",
-          "tr",
-          "th",
-          "td",
-          "blockquote",
-          "hr",
-          "div",
-          "span",
-        ],
-        ALLOWED_ATTR: ["class", "value", "style", "id"],
-        ADD_ATTR: ["id"],
-        KEEP_CONTENT: true,
-        RETURN_TRUSTED_TYPE: false,
-      });
-
-      // Wrap in container
-      return `<div class="rca-report-content">${sanitized}</div>`;
     };
 
     // Aborts the client side of a manual run so closing the drawer or hitting Cancel
@@ -3843,7 +3530,6 @@ export default defineComponent({
       copyToClipboard,
       copiedField,
       calculateDuration,
-      formatRcaContent,
       checkAnalysisInFlight,
       updateSeverity: handleSeverityChange,
     };
