@@ -1,6 +1,0 @@
-{
-  "group": "Traces",
-  "spec_filename": "service-graph-side-panel.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}

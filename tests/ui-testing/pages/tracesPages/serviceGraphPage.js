@@ -373,13 +373,16 @@ export class ServiceGraphPage {
   }
 
   /**
-   * Assert the drawer overlay is present AND non-blocking. With `seamless` the
-   * overlay carries `pointer-events-none bg-transparent`, so it neither dims the
-   * page behind nor intercepts pointer events. Fails if the overlay is missing or
-   * blocks pointer events (i.e. the old modal behaviour).
+   * Assert the drawer has no blocking scrim. A non-modal drawer (`modal=false`)
+   * renders no overlay at all (reka-ui's DialogOverlay is a no-op comment node),
+   * while a `seamless` modal drawer renders a `pointer-events-none bg-transparent`
+   * scrim. Both satisfy the non-modal signal — the page behind is never dimmed or
+   * blocked. Fails only if an overlay is present AND blocks pointer events.
    */
   async expectOverlayNonBlocking() {
     const overlay = this.page.locator(this.overlay);
+    // Non-modal → reka-ui renders no overlay; its absence is the correct signal.
+    if ((await overlay.count()) === 0) return;
     await expect(overlay).toBeVisible({ timeout: 10000 });
     const cls = (await overlay.getAttribute('class').catch(() => '')) || '';
     const pointerEvents = await overlay
