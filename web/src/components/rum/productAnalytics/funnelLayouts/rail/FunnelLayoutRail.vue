@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <slot name="actions" />
               </div>
             </div>
-            <div class="flex flex-col gap-2 px-4 py-3">
+            <div class="flex flex-col gap-2">
               <slot name="notices" />
               <div v-if="!failed" class="flex min-w-0 flex-col" data-test="rum-analytics-funnel">
                 <FunnelStepsTable

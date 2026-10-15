@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col" data-test="rum-analytics-funnel-steps-table">
     <div
-      class="text-text-secondary bg-surface-subtle rounded-default grid items-center gap-x-3 px-2 py-2 text-xs max-md:hidden"
+      class="text-text-secondary bg-surface-subtle grid items-center gap-x-3 px-2 py-2 text-xs max-md:hidden"
       :class="gridClass"
       data-test="rum-analytics-funnel-steps-header"
     >
