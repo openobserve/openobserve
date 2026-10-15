@@ -44,10 +44,9 @@ pub fn hooks() -> SlackHooks {
     }
 }
 
-/// Registration comes first, so every task `boot` starts finds the hooks.
-pub async fn init() {
+/// Runs on every node role and before `slack::boot`, so every task `boot` starts finds the hooks.
+pub fn register() {
     slack::hooks::register(hooks());
-    slack::boot().await;
 }
 
 fn domain_mappings_for_org(org_id: String) -> BoxFut<anyhow::Result<Vec<String>>> {
