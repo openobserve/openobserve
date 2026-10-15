@@ -77,7 +77,6 @@ import AnalyticsFunnels from "./AnalyticsFunnels.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import i18n from "@/locales";
 import { assertJoinFree } from "@/utils/rum/productAnalyticsQueries";
 import { decodeDef, encodeDef } from "@/utils/rum/productAnalyticsModel";
@@ -1799,35 +1798,26 @@ describe("AnalyticsFunnels", () => {
       await mountFunnels();
       await setSteps([["p", "/a"]]);
       await openAddStep();
-      const picker = wrapper!
-        .findAllComponents(OSelect)
-        .find((s) => s.attributes("data-test") === "rum-analytics-funnel-add-step-select")!;
-      await picker.find("button").trigger("click");
-      picker.vm.$emit("open");
       await settle();
-      return picker;
     };
-    const optionEl = (label: string) =>
-      [...document.querySelectorAll('[role="option"]')].find((el) =>
-        el.textContent?.includes(label),
-      );
+    const rowText = (step: string) => {
+      const row = wrapper!.find(`[data-test="rum-analytics-funnel-add-step-${step}"]`);
+      return row.exists() ? row.text() : "";
+    };
 
-    it("P7-R15: the step picker groups Named events, Clicks and custom actions with a custom action tagged Event, and Errors", async () => {
-      const picker = await openPicker([
+    it("P7-R15: the step list groups Named events, Clicks and custom actions with a custom action tagged Event, and Errors", async () => {
+      await openPicker([
         ...PICKER_ROWS,
         { kind: "c", k: "signup_completed", sessions: 5, at: "custom" },
       ]);
-      const options = picker.props("options") as { label: string; header?: boolean }[];
-      const headers = options.filter((o) => o.header).map((o) => String(o.label));
-      expect(headers).toEqual(
-        expect.arrayContaining(["Named events", "Clicks and custom actions", "Errors"]),
-      );
-      const errorsAt = options.findIndex((o) => o.header && String(o.label) === "Errors");
-      expect(options.slice(errorsAt + 1).map((o) => String(o.label))).toContain(
-        "Failed to fetch billing info",
-      );
-      expect(optionEl("signup_completed")?.textContent).toContain("Event");
-      expect(optionEl("save-btn")?.textContent).not.toContain("Event");
+      const list = wrapper!.find('[data-test="rum-analytics-funnel-add-step-picker"]').text();
+      for (const header of ["Named events", "Clicks and custom actions", "Errors"])
+        expect(list).toContain(header);
+      expect(list.indexOf("Failed to fetch billing info")).toBeGreaterThan(list.indexOf("Errors"));
+      expect(rowText("c:signup_completed")).toContain("Event");
+      expect(rowText("c:signup_completed")).toContain("5");
+      expect(text("rum-analytics-funnel-suggestion-0")).toContain("save-btn");
+      expect(rowText("c:save-btn")).toBe("");
       expect(pageText()).not.toContain("No custom actions in range");
     });
 

@@ -39,6 +39,19 @@ export interface StepOptionsInput {
   modelValue?: () => StepRef | null;
 }
 
+export interface StepOptionRow {
+  step: StepRef;
+  label: string;
+  sessions: number | null;
+  custom?: true;
+}
+
+export interface StepOptionGroup {
+  kind: StepKind;
+  label: I18nText;
+  rows: StepOptionRow[];
+}
+
 export const encode = (s: { kind: StepKind; key: string }) => `${s.kind}:${s.key}`;
 
 export const decode = (v: string): StepRef => {
@@ -57,51 +70,59 @@ export function useStepOptions(opts: StepOptionsInput) {
   const failed = ref(false);
   const loadedKey = ref("");
 
-  const options = computed<SelectOption[]>(() => {
+  const headers = computed<Record<StepKind, I18nText>>(() => ({
+    e: t("rum.analytics.picker.events"),
+    p: t("rum.analytics.picker.pages"),
+    c: t("rum.analytics.picker.clicks"),
+    r: t("rum.analytics.picker.errors"),
+  }));
+
+  const byKind = computed(() => {
     const seen = new Set<string>();
-    const byKind: Record<StepKind, SelectOption[]> = { e: [], p: [], c: [], r: [] };
+    const out: Record<StepKind, StepOptionRow[]> = { e: [], p: [], c: [], r: [] };
     for (const e of opts.events()) {
-      byKind.e.push({
-        label: raw(e.name),
-        value: encode({ kind: "e", key: e.id }),
-        icon: KIND_ICON.e,
-      });
-      seen.add(encode({ kind: "e", key: e.id }));
+      const step: StepRef = { kind: "e", key: e.id };
+      out.e.push({ step, label: e.name, sessions: null });
+      seen.add(encode(step));
     }
     const found = searched.value.scope === pa.scopeKey.value ? searched.value.options : [];
     for (const r of [...rows.value, ...found]) {
       const v = encode(r);
       if (r.kind === "e" || seen.has(v)) continue;
       seen.add(v);
-      byKind[r.kind].push({
-        label: raw(r.key),
-        value: v,
-        icon: KIND_ICON[r.kind],
-        ...(r.custom ? { badge: t("rum.analytics.kind.event") } : {}),
+      out[r.kind].push({
+        step: { kind: r.kind, key: r.key },
+        label: r.key,
+        sessions: r.sessions,
+        ...(r.custom ? { custom: true as const } : {}),
       });
     }
     const current = opts.modelValue?.() ?? null;
     if (current && !seen.has(encode(current))) {
-      byKind[current.kind].unshift({
-        label: raw(current.key),
-        value: encode(current),
-        icon: KIND_ICON[current.kind],
-      });
+      out[current.kind].unshift({ step: current, label: current.key, sessions: null });
     }
-    const headers: Record<StepKind, I18nText> = {
-      e: t("rum.analytics.picker.events"),
-      p: t("rum.analytics.picker.pages"),
-      c: t("rum.analytics.picker.clicks"),
-      r: t("rum.analytics.picker.errors"),
-    };
-    return opts
-      .kinds()
-      .flatMap((k) =>
-        byKind[k].length
-          ? [{ label: headers[k], header: true, value: `header:${k}` }, ...byKind[k]]
-          : [],
-      );
+    return out;
   });
+
+  /** The same rows as `options`, kept per kind with their session counts. */
+  const groups = computed<StepOptionGroup[]>(() =>
+    opts
+      .kinds()
+      .filter((k) => byKind.value[k].length)
+      .map((k) => ({ kind: k, label: headers.value[k], rows: byKind.value[k] })),
+  );
+
+  const options = computed<SelectOption[]>(() =>
+    groups.value.flatMap((g) => [
+      { label: g.label, header: true, value: `header:${g.kind}` },
+      ...g.rows.map((r) => ({
+        label: raw(r.label),
+        value: encode(r.step),
+        icon: KIND_ICON[g.kind],
+        ...(r.custom ? { badge: t("rum.analytics.kind.event") } : {}),
+      })),
+    ]),
+  );
 
   const withErrors = computed(() => opts.kinds().includes("r"));
   const count = (kind: "r" | "rest") =>
@@ -159,7 +180,7 @@ export function useStepOptions(opts: StepOptionsInput) {
     }
   };
 
-  return { options, loading, failed, noCustom, load, onSearch };
+  return { options, groups, loading, failed, noCustom, load, onSearch };
 }
 
 export default useStepOptions;
