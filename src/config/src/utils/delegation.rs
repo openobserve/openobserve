@@ -32,6 +32,10 @@ pub const MAC_DOMAIN: &[u8] = b"o2dt.v1\0";
 /// `ZO_DELEGATION_SIGNING_KEY_PREVIOUS` value that keeps the master-key-derived key verifying.
 pub const PREVIOUS_DERIVED: &str = "derived";
 const MIN_OVERRIDE_KEY_LEN: usize = 32;
+/// Clock skew allowed between the minting node and this one, in seconds.
+const MAX_IAT_SKEW_SECS: i64 = 60;
+/// An hour plus that skew; a longer-lived token was not minted by O2.
+const MAX_LIFETIME_SECS: i64 = 3660;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Claims {
@@ -99,7 +103,7 @@ pub fn sign(keys: &Keys, claims: &Claims) -> String {
     format!("{TOKEN_PREFIX}{claims_b64}.{mac}")
 }
 
-/// `now` and `exp` are Unix seconds.
+/// `now`, `iat` and `exp` are Unix seconds.
 pub fn verify(keys: &Keys, token: &str, now: i64) -> Result<Claims, DelegationError> {
     let (claims_b64, mac_b64) = token
         .strip_prefix(TOKEN_PREFIX)
@@ -122,6 +126,16 @@ pub fn verify(keys: &Keys, token: &str, now: i64) -> Result<Claims, DelegationEr
     }
     if claims.exp <= now {
         return Err(DelegationError::Expired);
+    }
+    if claims.iat > now + MAX_IAT_SKEW_SECS {
+        return Err(DelegationError::Malformed(
+            "issued in the future".to_string(),
+        ));
+    }
+    if claims.exp - claims.iat > MAX_LIFETIME_SECS {
+        return Err(DelegationError::Malformed(
+            "lifetime over an hour".to_string(),
+        ));
     }
     Ok(claims)
 }
@@ -272,6 +286,45 @@ mod tests {
             Err(DelegationError::Expired)
         );
         assert!(verify(&keys, &token, claims().exp - 1).is_ok());
+    }
+
+    #[test]
+    fn issued_in_the_future_or_living_too_long_is_malformed() {
+        let keys = derived_keys();
+        let at = |iat: i64, exp: i64| {
+            verify(
+                &keys,
+                &sign(
+                    &keys,
+                    &Claims {
+                        iat,
+                        exp,
+                        ..claims()
+                    },
+                ),
+                NOW,
+            )
+        };
+        assert!(
+            at(NOW + 60, NOW + 3600).is_ok(),
+            "60 s of clock skew is allowed"
+        );
+        assert!(matches!(
+            at(NOW + 61, NOW + 3600),
+            Err(DelegationError::Malformed(_))
+        ));
+        assert!(
+            at(NOW - 60, NOW - 60 + 3660).is_ok(),
+            "an hour plus a minute is allowed"
+        );
+        assert!(matches!(
+            at(NOW - 60, NOW - 60 + 3661),
+            Err(DelegationError::Malformed(_))
+        ));
+        assert!(matches!(
+            at(NOW - 60, NOW + 86_400 * 365),
+            Err(DelegationError::Malformed(_))
+        ));
     }
 
     #[test]

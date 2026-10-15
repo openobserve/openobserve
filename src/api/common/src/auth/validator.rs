@@ -88,6 +88,8 @@ pub enum AuthError {
     Locked {
         retry_after_secs: i64,
     },
+    /// The credential could not be checked because a store it needs is down; the client may retry.
+    Unavailable(String),
 }
 
 impl std::fmt::Display for AuthError {
@@ -99,6 +101,7 @@ impl std::fmt::Display for AuthError {
             AuthError::Locked { retry_after_secs } => {
                 write!(f, "Locked: {}", lockout_message(*retry_after_secs))
             }
+            AuthError::Unavailable(msg) => write!(f, "Unavailable: {}", msg),
         }
     }
 }
@@ -140,6 +143,7 @@ impl IntoResponse for AuthError {
                 .header(header::RETRY_AFTER, retry_after_secs)
                 .body(Body::from(lockout_message(retry_after_secs)))
                 .unwrap(),
+            AuthError::Unavailable(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg).into_response(),
         }
     }
 }
@@ -2480,6 +2484,12 @@ mod tests {
             "42",
             "clients and proxies back off on the header, not on the sentence"
         );
+    }
+
+    #[test]
+    fn an_unavailable_store_answers_503() {
+        let response = AuthError::Unavailable("Service Unavailable".to_string()).into_response();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 
     #[test]
