@@ -432,11 +432,14 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
             .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
 }
 
-/// The segments after `api/{org}/slack/`, so a stream or folder named `slack` never matches.
+/// The segments after `{org}/slack/`: the audit layer runs below `/api` and the base URI.
 #[cfg(any(feature = "enterprise", test))]
 fn slack_path<'a>(segments: &'a [&'a str]) -> Option<&'a [&'a str]> {
-    let at = segments.iter().position(|s| *s == "api")?;
-    (segments.get(at + 2) == Some(&"slack")).then(|| &segments[at + 3..])
+    let segments = match segments {
+        ["api", rest @ ..] if rest.get(1) == Some(&"slack") => rest,
+        _ => segments,
+    };
+    (segments.get(1) == Some(&"slack")).then(|| &segments[2..])
 }
 
 /// Slack bodies that carry an OAuth code, a connect ticket or app credentials.
@@ -453,6 +456,31 @@ fn is_slack_secret_write(method: &Method, slack: &[&str]) -> bool {
                 | ["installations", _, "connection"]
         ) | (&Method::PUT, ["installations", _, "credentials"])
     )
+}
+
+/// The path as `audit_middleware` sees it, already below `/api` and the base URI.
+#[cfg(any(feature = "enterprise", test))]
+fn audited_path(uri: &Uri) -> String {
+    let path = uri.path();
+    path.strip_prefix('/').unwrap_or(path).to_string()
+}
+
+/// A delegated `/ai/chat` is audited like a Slack `chat_stream` turn: no question text.
+#[cfg(feature = "enterprise")]
+fn delegated_chat_audit_body(
+    method: &Method,
+    path: &str,
+    delegated: bool,
+    slack_event: Option<&str>,
+    body: &[u8],
+) -> Option<String> {
+    let is_chat = method == Method::POST && path.split('/').skip(1).eq(["ai", "chat"]);
+    (delegated && is_chat).then(|| {
+        openobserve_api_management::request::ai::chat::slack_audit_body(
+            serde_json::from_slice(body).unwrap_or_default(),
+            slack_event,
+        )
+    })
 }
 
 /// The request body as the audit trail may store it.
@@ -546,8 +574,7 @@ fn is_secret_field(name: &str) -> bool {
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let http_method = request.method().clone();
     let method = http_method.to_string();
-    let path = request.uri().path();
-    let path = path.strip_prefix("/").unwrap_or(path).to_string();
+    let path = audited_path(request.uri());
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
     let ingestion_path = if path.starts_with("api/") {
@@ -589,6 +616,11 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             .get(header::CONTENT_TYPE)
             .and_then(|v| v.to_str().ok())
             .map(str::to_string);
+        let slack_event = request
+            .headers()
+            .get(openobserve_api_management::request::ai::chat::SLACK_EVENT_HEADER)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
 
         let delegated =
             request
@@ -625,13 +657,27 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         response.headers_mut().remove(ERROR_HEADER);
 
         if response.status().is_success() || response.status().is_redirection() {
-            let body = audit_body(&http_method, &path, content_type.as_deref(), request_body);
+            let slack_chat = delegated_chat_audit_body(
+                &http_method,
+                &path,
+                delegated.is_some(),
+                slack_event.as_deref(),
+                &request_body,
+            );
+            let protocol = if slack_chat.is_some() {
+                Protocol::Slack
+            } else {
+                Protocol::Http
+            };
+            let body = slack_chat.unwrap_or_else(|| {
+                audit_body(&http_method, &path, content_type.as_deref(), request_body)
+            });
 
             audit(AuditMessage {
                 user_email,
                 org_id,
                 _timestamp: now_micros(),
-                protocol: Protocol::Http,
+                protocol,
                 response_meta: ResponseMeta {
                     http_method: method,
                     http_path: config::axum::middlewares::mask_share_tokens(&path),
@@ -2635,16 +2681,83 @@ mod tests {
         assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
+    /// Requests whose body or query axum's extractors refuse, one per extractor shape.
+    fn slack_requests_the_extractors_refuse() -> Vec<Request<Body>> {
+        let mut requests = Vec::new();
+        for (method, path) in [
+            (Method::POST, "/default/slack/install/start"),
+            (Method::POST, "/default/slack/installations"),
+            (Method::PUT, "/default/slack/installations/I1/credentials"),
+            (Method::PUT, "/default/slack/installations/I1/linking"),
+            (Method::POST, "/default/slack/link-requests/confirm"),
+        ] {
+            for (content_type, body) in [("application/json", "{not json"), ("text/plain", "{}")] {
+                requests.push(
+                    Request::builder()
+                        .method(method.clone())
+                        .uri(path)
+                        .header("user_id", "root@example.com")
+                        .header(header::CONTENT_TYPE, content_type)
+                        .body(Body::from(body))
+                        .unwrap(),
+                );
+            }
+        }
+        requests.push(
+            Request::builder()
+                .uri("/default/slack/manifest?channel_history=maybe")
+                .header("user_id", "root@example.com")
+                .body(Body::empty())
+                .unwrap(),
+        );
+        requests
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn a_bad_body_or_query_is_still_not_supported_in_the_oss_build() {
+        for req in slack_requests_the_extractors_refuse() {
+            let what = format!("{} {}", req.method(), req.uri());
+            let response = slack_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{what}");
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(json["message"], "Not Supported", "{what}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_bad_body_or_query_is_404_while_slack_is_off() {
+        for req in slack_requests_the_extractors_refuse() {
+            let what = format!("{} {}", req.method(), req.uri());
+            let response = slack_routes().oneshot(req).await.unwrap();
+            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{what}");
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(
+                json,
+                serde_json::json!({"code": 404, "message": "Slack is not enabled"}),
+                "{what}"
+            );
+        }
+    }
+
     #[test]
     fn slack_secret_writes_are_redacted() {
         for (method, path) in [
-            (Method::POST, "api/org/slack/install/exchange"),
+            (Method::POST, "org/slack/install/exchange"),
+            (Method::POST, "org/slack/installations"),
+            (Method::PUT, "org/slack/installations/I1/credentials"),
+            (Method::POST, "org/slack/connection/confirm"),
+            (Method::POST, "org/slack/installations/I1/connection"),
+            (Method::POST, "org/slack/link-requests/confirm"),
             (Method::POST, "api/org/slack/installations"),
-            (Method::PUT, "api/org/slack/installations/I1/credentials"),
-            (Method::POST, "api/org/slack/connection/confirm"),
-            (Method::POST, "api/org/slack/installations/I1/connection"),
-            (Method::POST, "api/org/slack/link-requests/confirm"),
-            (Method::POST, "base/api/org/slack/installations"),
+            (Method::POST, "api/slack/installations"),
         ] {
             assert!(is_secret_write(&method, path), "{method} {path}");
             assert_eq!(
@@ -2653,21 +2766,133 @@ mod tests {
             );
         }
         for (method, path) in [
-            (Method::GET, "api/org/slack/installations"),
-            (Method::POST, "api/org/slack/install/start"),
-            (
-                Method::POST,
-                "api/org/slack/installations/I1/connection/start",
-            ),
-            (Method::DELETE, "api/org/slack/installations/I1/connection"),
-            (Method::POST, "api/org/slack/installations/I1/link-all"),
-            (Method::PUT, "api/org/slack/installations/I1/linking"),
-            (Method::GET, "api/org/slack/installations/I1/credentials"),
-            (Method::POST, "api/org/slack/link-requests/R1/start"),
-            (Method::POST, "api/org/slack/link-requests/R1/resend"),
-            (Method::POST, "api/org/streams/slack/installations"),
+            (Method::GET, "org/slack/installations"),
+            (Method::POST, "org/slack/install/start"),
+            (Method::POST, "org/slack/installations/I1/connection/start"),
+            (Method::DELETE, "org/slack/installations/I1/connection"),
+            (Method::POST, "org/slack/installations/I1/link-all"),
+            (Method::PUT, "org/slack/installations/I1/linking"),
+            (Method::GET, "org/slack/installations/I1/credentials"),
+            (Method::POST, "org/slack/link-requests/R1/start"),
+            (Method::POST, "org/slack/link-requests/R1/resend"),
+            (Method::POST, "org/streams/slack/installations"),
+            (Method::POST, "slack/installations"),
         ] {
             assert!(!is_secret_write(&method, path), "{method} {path}");
+        }
+    }
+
+    /// What `audit_middleware` would store, seen from inside the `/api` and base-URI nesting.
+    async fn audited_through_the_router(
+        base: &str,
+        method: Method,
+        uri: &str,
+        body: &str,
+    ) -> String {
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let record = {
+            let seen = seen.clone();
+            move |request: Request<Body>, next: Next| {
+                let seen = seen.clone();
+                async move {
+                    let path = audited_path(request.uri());
+                    let method = request.method().clone();
+                    let (parts, body) = request.into_parts();
+                    let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
+                    seen.lock()
+                        .unwrap()
+                        .push(audit_body(&method, &path, None, bytes.to_vec()));
+                    next.run(Request::from_parts(parts, Body::from(bytes)))
+                        .await
+                }
+            }
+        };
+        let api = Router::new().nest("/api", slack_routes().layer(middleware::from_fn(record)));
+        let app = if base.is_empty() {
+            api
+        } else {
+            Router::new().nest(base, api)
+        };
+        let req = Request::builder()
+            .method(method)
+            .uri(uri)
+            .header("user_id", "root@example.com")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        app.oneshot(req).await.unwrap();
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 1, "{uri} reached the audit layer once");
+        seen[0].clone()
+    }
+
+    #[tokio::test]
+    async fn a_slack_secret_write_is_redacted_as_the_audit_layer_sees_it() {
+        let secret =
+            r#"{"code":"c-1","state":"s-1","client_secret":"cs-1","signing_secret":"ss-1"}"#;
+        for (base, method, uri) in [
+            ("", Method::POST, "/api/default/slack/install/exchange"),
+            ("", Method::POST, "/api/default/slack/installations"),
+            (
+                "",
+                Method::PUT,
+                "/api/default/slack/installations/I1/credentials",
+            ),
+            ("", Method::POST, "/api/default/slack/connection/confirm"),
+            (
+                "",
+                Method::POST,
+                "/api/default/slack/installations/I1/connection",
+            ),
+            ("", Method::POST, "/api/default/slack/link-requests/confirm"),
+            (
+                "/o2",
+                Method::POST,
+                "/o2/api/default/slack/install/exchange",
+            ),
+            (
+                "/o2",
+                Method::PUT,
+                "/o2/api/api/slack/installations/I1/credentials",
+            ),
+        ] {
+            let stored = audited_through_the_router(base, method.clone(), uri, secret).await;
+            assert_eq!(stored, "[REDACTED: secret write]", "{method} {uri}");
+        }
+        let start = audited_through_the_router(
+            "",
+            Method::POST,
+            "/api/default/slack/install/start",
+            r#"{"source":"settings"}"#,
+        )
+        .await;
+        assert_eq!(start, r#"{"source":"settings"}"#);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_delegated_chat_is_audited_without_the_question() {
+        let body = br#"{"messages":[{"role":"user","content":"why is checkout slow?"}],"context":{"currentPage":"slack"}}"#;
+        let stored =
+            delegated_chat_audit_body(&Method::POST, "org/ai/chat", true, Some("T0:C0:Ev1"), body)
+                .expect("a delegated /ai/chat gets the Slack record");
+        assert!(!stored.contains("checkout"), "{stored}");
+        let json: Value = serde_json::from_str(&stored).unwrap();
+        assert_eq!(json["messages"], "[REDACTED: slack]");
+        assert_eq!(json["slack_event"], "T0:C0:Ev1");
+        assert_eq!(json["context"]["currentPage"], "slack");
+        for (method, path, delegated) in [
+            (Method::POST, "org/ai/chat", false),
+            (Method::POST, "org/ai/chat_stream", true),
+            (Method::POST, "org/ai/chats", true),
+            (Method::GET, "org/ai/chat", true),
+            (Method::POST, "org/streams/ai/chat", true),
+        ] {
+            assert_eq!(
+                delegated_chat_audit_body(&method, path, delegated, None, body),
+                None,
+                "{method} {path} delegated={delegated}"
+            );
         }
     }
 
