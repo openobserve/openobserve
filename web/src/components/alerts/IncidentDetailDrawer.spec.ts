@@ -1539,6 +1539,22 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.analysisInFlight).toBe(true);
     });
 
+    it("drops a refused run's remedy banner when another incident opens in place", async () => {
+      wrapper.vm.incidentDetails = { ...wrapper.vm.incidentDetails, id: "1" };
+      wrapper.vm.rcaError = { reason: "out of credits", details: "", remedy: "plans" };
+      (incidentsService.get as any).mockResolvedValueOnce({
+        data: { ...wrapper.vm.incidentDetails, id: "2" },
+      });
+
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        params: { id: "2" },
+      } as any;
+      await flushPromises();
+
+      expect(wrapper.vm.rcaError).toBeNull();
+    });
+
     it("keeps a refused run's remedy banner, which the event log never records", async () => {
       const refused = { reason: "out of credits", details: "", remedy: "plans" };
       wrapper.vm.rcaError = refused;

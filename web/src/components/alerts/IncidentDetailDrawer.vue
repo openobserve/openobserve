@@ -2614,6 +2614,8 @@ export default defineComponent({
       // Reset correlation state when loading new incident
       correlationData.value = null;
       correlationError.value = null;
+      // A refused run's banner writes no event, so only this can stop it carrying over.
+      if (incidentDetails.value?.id !== incidentId) rcaError.value = null;
 
       try {
         const org = store.state.selectedOrganization.identifier;
