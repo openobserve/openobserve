@@ -7,12 +7,17 @@ import { withQueryClient } from "@/test/unit/helpers/queryClient";
 import type { QualityScore } from "@/services/online-evals.service";
 import QualityScorePane from "./QualityScorePane.vue";
 
-const { push, traceDetails } = vi.hoisted(() => ({
+const { push, traceDetails, timeRanges, sessionTurns } = vi.hoisted(() => ({
   push: vi.fn(() => Promise.resolve()),
   traceDetails: vi.fn(),
+  timeRanges: vi.fn(),
+  sessionTurns: vi.fn(),
 }));
 
-vi.mock("@/services/search", () => ({ default: { get_trace_details: traceDetails } }));
+vi.mock("@/services/search", () => ({
+  default: { get_trace_details: traceDetails, get_trace_time_ranges: timeRanges },
+}));
+vi.mock("@/services/sessions", () => ({ default: { details: sessionTurns } }));
 
 // The real box renders; only the heavy content renderer is replaced.
 vi.mock("@/plugins/traces/LLMContentRenderer.vue", () => ({
@@ -62,6 +67,21 @@ const WINDOW = {
   start_time: 1791199600000000 - 3_600_000_000,
   end_time: 1791199600000000 + 3_600_000_000,
 };
+const ranges = (
+  result: Record<string, unknown>,
+  partialCoverage = false,
+): Promise<{ data: Record<string, unknown> }> =>
+  Promise.resolve({ data: { results: [result], partial_coverage: partialCoverage } });
+// The real range the index finds: 10 seconds from the target time, padded by a minute each side when read.
+const FOUND = {
+  status: "found",
+  stream: "agents",
+  range: { start_time: 1791199600000000, end_time: 1791199610000000 },
+};
+const FOUND_WINDOW = {
+  start_time: 1791199600000000 - 60_000_000,
+  end_time: 1791199610000000 + 60_000_000,
+};
 const io = (wrapper: ReturnType<typeof mountPane>) =>
   wrapper.findAll('[data-test="quality-score-pane-io"] .llm').map((box) => box.text());
 const skeletons = (wrapper: ReturnType<typeof mountPane>) =>
@@ -90,6 +110,9 @@ describe("QualityScorePane", () => {
     vi.spyOn(window, "open").mockImplementation(() => null);
     push.mockClear();
     traceDetails.mockReset().mockImplementation(() => hits([]));
+    // The index cannot answer by default, so a trace is read from an hour either side of its time.
+    timeRanges.mockReset().mockImplementation(() => ranges({ status: "timeout" }));
+    sessionTurns.mockReset().mockImplementation(() => hits([]));
   });
 
   it("shows the health and the rule, but no target link, value or time", () => {
@@ -112,11 +135,13 @@ describe("QualityScorePane", () => {
     expect(header.text()).toContain("No healthy threshold set");
   });
 
-  it("shows Input and Output side by side, with the missing output said inside its box", () => {
-    // A session score never fetches, so its preview shows at once.
-    const io = mountPane({
+  it("shows Input and Output side by side, with the missing output said inside its box", async () => {
+    // A session the index cannot place keeps its preview.
+    const wrapper = mountPane({
       score: score({ targetScope: "session", sessionId: "sess-1", targetId: "sess-1" }),
-    }).find('[data-test="quality-score-pane-io"]');
+    });
+    await flushPromises();
+    const io = wrapper.find('[data-test="quality-score-pane-io"]');
     expect(io.classes()).toEqual(expect.arrayContaining(["flex-1", "md:flex-row"]));
     expect(io.find(".llm").text()).toBe("Write VRL to parse JSON from my nginx logs.");
     expect(io.find('[data-test="ai-review-content-empty-output"]').text()).toBe(
@@ -371,21 +396,125 @@ describe("QualityScorePane", () => {
     );
   });
 
-  it("does not fetch for a session score or a score without a source stream", async () => {
-    const session = mountPane({
-      score: score({ targetScope: "session", sessionId: "sess-1", targetId: "sess-1" }),
+  it("reads a trace from the real range and stream the time index finds", async () => {
+    timeRanges.mockImplementation(() => ranges(FOUND));
+    traceDetails.mockImplementation(() =>
+      hits([
+        { span_id: "root", gen_ai_input_messages: "Full question", gen_ai_output_messages: "A" },
+      ]),
+    );
+    const wrapper = mountPane({ score: score({ sourceStream: null }) });
+    await flushPromises();
+    expect(timeRanges).toHaveBeenCalledWith({
+      org_identifier: "default",
+      trace_ids: ["70d86ea9c0ffee"],
+      hint_ts: 1791199600000000,
     });
-    const noStream = mountPane({ score: score({ sourceStream: null }) });
+    expect(traceDetails).toHaveBeenCalledWith({
+      org_identifier: "default",
+      stream_name: "agents",
+      trace_id: "70d86ea9c0ffee",
+      ...FOUND_WINDOW,
+      hint_ts: FOUND_WINDOW.start_time + (FOUND_WINDOW.end_time - FOUND_WINDOW.start_time) / 2,
+    });
+    expect(io(wrapper)).toEqual(["Full question", "A"]);
+    expect(unavailable(wrapper).exists()).toBe(false);
+  });
+
+  it("does not read a trace the index surely does not have, and says so", async () => {
+    timeRanges.mockImplementation(() => ranges({ status: "not_found" }));
+    const wrapper = mountPane();
     await flushPromises();
     expect(traceDetails).not.toHaveBeenCalled();
-    for (const wrapper of [session, noStream]) {
-      expect(io(wrapper)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
-      expect(skeletons(wrapper)).toEqual([]);
-      expect(unavailable(wrapper).exists()).toBe(false);
-    }
-    expect(session.find('[data-test="quality-score-pane-open-target"]').text()).toBe(
+    expect(io(wrapper)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
+    expect(skeletons(wrapper)).toEqual([]);
+    expect(unavailable(wrapper).exists()).toBe(true);
+  });
+
+  it.each([
+    ["finds nothing with partial coverage", () => ranges({ status: "not_found" }, true)],
+    ["times out", () => ranges({ status: "timeout" })],
+    ["fails", () => Promise.reject(new Error("boom"))],
+  ])("falls back to an hour either side when the index %s", async (_, answer) => {
+    timeRanges.mockImplementation(answer);
+    mountPane();
+    await flushPromises();
+    expect(traceDetails).toHaveBeenCalledWith(expect.objectContaining(WINDOW));
+  });
+
+  it("says so without reading when the index cannot answer and the score has no stream", async () => {
+    const wrapper = mountPane({ score: score({ sourceStream: null }) });
+    await flushPromises();
+    expect(traceDetails).not.toHaveBeenCalled();
+    expect(io(wrapper)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
+    expect(unavailable(wrapper).exists()).toBe(true);
+  });
+
+  it("reads a session's question from its first turn and its answer from its last", async () => {
+    timeRanges.mockImplementation(() => ranges({ ...FOUND, session_id: "sess-1" }));
+    // Turns come back newest first; the first turn is the earliest.
+    sessionTurns.mockImplementation(() =>
+      hits([
+        { trace_id: "t-last", start_time: 3 },
+        { trace_id: "t-mid", start_time: 2 },
+        { trace_id: "t-first", start_time: 1 },
+      ]),
+    );
+    traceDetails.mockImplementation(({ trace_id }: { trace_id: string }) =>
+      hits([
+        {
+          span_id: trace_id,
+          gen_ai_input_messages: `Question of ${trace_id}`,
+          gen_ai_output_messages: `Answer of ${trace_id}`,
+        },
+      ]),
+    );
+    const wrapper = mountPane({
+      score: score({
+        targetScope: "session",
+        sessionId: "sess-1",
+        targetId: "sess-1",
+        traceId: null,
+      }),
+    });
+    await flushPromises();
+    expect(timeRanges).toHaveBeenCalledWith({
+      org_identifier: "default",
+      session_ids: ["sess-1"],
+      hint_ts: 1791199600000000,
+    });
+    expect(sessionTurns).toHaveBeenCalledWith({
+      orgId: "default",
+      streamName: "agents",
+      sessionId: "sess-1",
+      startTime: FOUND_WINDOW.start_time,
+      endTime: FOUND_WINDOW.end_time,
+    });
+    expect(traceDetails.mock.calls.map(([options]) => options.trace_id).sort()).toEqual([
+      "t-first",
+      "t-last",
+    ]);
+    expect(io(wrapper)).toEqual(["Question of t-first", "Answer of t-last"]);
+    expect(unavailable(wrapper).exists()).toBe(false);
+    expect(wrapper.find('[data-test="quality-score-pane-open-target"]').text()).toBe(
       "Open session",
     );
+  });
+
+  it("keeps a session's preview and says so when its range or turns cannot be read", async () => {
+    const session = score({ targetScope: "session", sessionId: "sess-1", targetId: "sess-1" });
+    const unknown = mountPane({ score: session });
+    await flushPromises();
+    expect(sessionTurns).not.toHaveBeenCalled();
+    expect(io(unknown)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
+    expect(unavailable(unknown).exists()).toBe(true);
+    unknown.unmount();
+
+    timeRanges.mockImplementation(() => ranges(FOUND));
+    const noTurns = mountPane({ score: { ...session, id: "s-other", sessionId: "sess-2" } });
+    await flushPromises();
+    expect(traceDetails).not.toHaveBeenCalled();
+    expect(unavailable(noTurns).exists()).toBe(true);
   });
 
   it("fetches a trace once for every score on it, coming back included", async () => {
@@ -430,13 +559,15 @@ describe("QualityScorePane", () => {
     expect(wrapper.find('[data-test="quality-score-pane-add-to-dataset"]').exists()).toBe(false);
     expect(traceDetails).not.toHaveBeenCalled();
 
-    // The page lands: the score shows and the skeletons go, the trace text then loads.
-    await wrapper.setProps({ score: score({ sourceStream: null }), loading: false });
+    // The page lands: the score shows and the header and reasoning skeletons go, the trace text then loads.
+    await wrapper.setProps({ score: score(), loading: false });
     expect(wrapper.find('[data-test="quality-score-pane-header-skeleton"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="quality-score-pane-reasoning-skeleton"]').exists()).toBe(
       false,
     );
     expect(wrapper.find('[data-test="quality-score-pane-reasoning-text"]').exists()).toBe(true);
+    expect(skeletons(wrapper)).toEqual(["input", "output"]);
+    await flushPromises();
     expect(skeletons(wrapper)).toEqual([]);
   });
 

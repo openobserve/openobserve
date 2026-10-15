@@ -675,6 +675,18 @@ describe("Search Service", () => {
       );
     });
 
+    it("looks up sessions by session_id instead of trace ids", async () => {
+      await search.get_trace_time_ranges({
+        org_identifier: "test-org",
+        session_ids: ["sess-1"],
+        hint_ts: 1500,
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        `/api/test-org/traces/time_range?session_id=sess-1&hint_ts=1500`,
+      );
+    });
+
     it("sends the bounds, hint and stream filter when given", async () => {
       await search.get_trace_time_ranges({
         org_identifier: "test-org",
