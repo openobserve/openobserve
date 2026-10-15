@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import config from "@/aws-exports";
-import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import { routeGuard } from "@/utils/zincutils";
 import store from "@/stores";
 import {
@@ -22,6 +21,9 @@ import {
   buildFeatureGateContext,
 } from "@/utils/enterpriseFeatures";
 import { oncallRouteGuard } from "./oncallRouteGuard";
+
+const ServiceAccountsList = () =>
+  import("@/components/iam/serviceAccounts/ServiceAccountsList.vue");
 
 // "rbac" needs the backend `rbac_enabled` flag, which only `store.state.zoConfig`
 // carries — every other key here is edition-only and could use the default.
@@ -98,7 +100,7 @@ const Organizations = () => import("@/components/iam/organizations/AppOrganizati
 
 const Invitations = () => import("@/views/Invitations.vue");
 
-import Users from "@/views/User.vue";
+const Users = () => import("@/views/User.vue");
 
 const IncidentList = () => import("@/components/alerts/IncidentList.vue");
 
