@@ -318,7 +318,7 @@ export const CHANGE_THRESHOLD = 0.5;
 const DOMINANT_SHARE = 0.2;
 const FULL_COVERAGE = 0.5;
 const DATA_TEST_SHARE = 0.2;
-const BREAKDOWN_TOP = 5;
+export const BREAKDOWN_TOP = 5;
 const BREAKDOWN_LIMIT = 1000;
 const PATH_BRANCHES = 5;
 const PATH_ROW_LIMIT = 5000;
@@ -1472,6 +1472,23 @@ export function foldBreakdown(
     Array(steps).fill(0),
   );
   return { rows, total };
+}
+
+/** One run's funnel numbers; a breakdown run sums its per-value rows, so both periods read the same way. */
+export function funnelResultOf(
+  rows: Record<string, unknown>[],
+  def: FunnelDef,
+): FunnelResult | null {
+  if (def.breakdown) {
+    const hit: Record<string, number> = {};
+    foldBreakdown(rows, def.steps.length).total.forEach((c, i) => {
+      hit[`c${i + 1}`] = c;
+      hit[`seen${i + 1}`] = 1;
+    });
+    return toFunnelResult(hit, def);
+  }
+  const row = rows[0] as Record<string, number> | undefined;
+  return row ? toFunnelResult(row, def) : null;
 }
 
 const UNITS = [
