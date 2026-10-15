@@ -241,6 +241,23 @@ pub(crate) async fn create_public_dashboards_schema_for_test(
         .await
 }
 
+/// The search queue as migrations 109 and earlier leave it.
+#[cfg(test)]
+pub(crate) async fn create_search_queue_schema_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    let manager = SchemaManager::new(db);
+    m20241204_143100_create_table_search_queue::Migration
+        .up(&manager)
+        .await?;
+    m20251219_000001_add_org_id_to_search_queue::Migration
+        .up(&manager)
+        .await?;
+    m20261015_000002_add_search_type_to_search_queue::Migration
+        .up(&manager)
+        .await
+}
+
 #[cfg(test)]
 pub(crate) async fn create_llm_prompt_schema_for_test(
     db: &sea_orm::DatabaseConnection,
