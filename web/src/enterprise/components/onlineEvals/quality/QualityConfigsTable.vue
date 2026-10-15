@@ -116,7 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="quality-failed-runs"
           >
             <span class="text-status-error-text" data-test="quality-tile-failed-runs">{{
-              t("onlineEvals.quality.tiles.failedRuns", { count: failedRuns }, failedRuns!)
+              t(
+                "onlineEvals.quality.tiles.failedRuns",
+                { count: formatCount(failedRuns!) },
+                failedRuns!,
+              )
             }}</span>
             <span class="text-text-secondary">·</span>
             <OButton

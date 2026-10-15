@@ -36,10 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="(event: MouseEvent) => emit('select', bucket, event.shiftKey)"
       >
         {{
-          t("onlineEvals.quality.detail.barButton", {
-            label: labels[index],
-            count: formatCount(bucket.count),
-          })
+          t(
+            "onlineEvals.quality.detail.barButton",
+            { label: labels[index], count: formatCount(bucket.count) },
+            bucket.count,
+          )
         }}
       </OButton>
     </div>
@@ -98,7 +99,10 @@ const options = computed(() => {
     position: "top",
     color: text,
     fontSize: 10,
-    formatter: (p: any) => props.buckets[p.dataIndex]?.count || "",
+    formatter: (p: any) => {
+      const count = props.buckets[p.dataIndex]?.count;
+      return count ? formatCount(count) : "";
+    },
   };
   const series = classified.value
     ? [
@@ -138,10 +142,10 @@ const options = computed(() => {
         if (!bucket) return "";
         const detail = classified.value
           ? t("onlineEvals.quality.detail.chartTooltip", {
-              count: bucket.count,
-              unhealthy: bucket.unhealthy ?? 0,
+              count: formatCount(bucket.count),
+              unhealthy: formatCount(bucket.unhealthy ?? 0),
             })
-          : t("onlineEvals.quality.detail.chartTooltipCount", { count: bucket.count });
+          : t("onlineEvals.quality.detail.chartTooltipCount", { count: formatCount(bucket.count) });
         return `${escapeHtml(labels.value[index])}<br/>${escapeHtml(detail)}`;
       },
     },

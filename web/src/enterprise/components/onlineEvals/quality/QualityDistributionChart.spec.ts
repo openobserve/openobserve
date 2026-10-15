@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import store from "@/test/unit/helpers/store";
 import type { QualityDistributionBucket } from "@/services/online-evals.service";
 
 vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
-  default: { name: "ChartRenderer", template: "<div data-test='chart-stub' />" },
+  // `__esModule` is load-bearing: the chart reaches this through defineAsyncComponent.
+  __esModule: true,
+  default: { name: "ChartRenderer", props: ["data"], template: "<div data-test='chart-stub' />" },
 }));
 
 import QualityDistributionChart from "./QualityDistributionChart.vue";
@@ -25,7 +27,7 @@ describe("QualityDistributionChart", () => {
   it("offers every bar as a keyboard button that filters like a click, shift widening the range", async () => {
     const wrapper = mountChart();
     const keys = wrapper.findAll('[data-test^="quality-distribution-key-"]');
-    expect(keys.map((key) => key.text())).toEqual(["< 0.5 · 3", "≥ 0.5 · 1,200"]);
+    expect(keys.map((key) => key.text())).toEqual(["< 0.5: 3 scores", "≥ 0.5: 1,200 scores"]);
     expect(wrapper.find('[data-test="quality-distribution-keys"]').attributes("role")).toBe(
       "group",
     );
@@ -38,5 +40,14 @@ describe("QualityDistributionChart", () => {
       '[data-test^="quality-distribution-key-"]',
     );
     expect(keys.map((key) => key.attributes("aria-pressed"))).toEqual(["false", "true"]);
+  });
+
+  it("groups the counts on the bars and in the tooltip", async () => {
+    const wrapper = mountChart();
+    await flushPromises();
+    const options = wrapper.findComponent({ name: "ChartRenderer" }).props("data").options;
+    const labelled = options.series.find((series: any) => series.label);
+    expect(labelled.label.formatter({ dataIndex: 1 })).toBe("1,200");
+    expect(options.tooltip.formatter([{ dataIndex: 1 }])).toContain("1,200 scores");
   });
 });
