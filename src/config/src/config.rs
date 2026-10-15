@@ -3199,7 +3199,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_COMPACT_TANTIVY_BUILDER_THREAD_NUM",
         default = 2,
-        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. less than or equal to 1 disables (single-threaded)"
+        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. 0 is treated as 1"
     )]
     pub tantivy_builder_thread_num: usize,
 }
