@@ -172,6 +172,22 @@ describe("a line's drawn stroke as a right-click target", () => {
     expect(lineAt(3)).not.toBe(1);
   });
 
+  it("names a step-after line on its riser, and none at the diagonal midpoint its path never crosses", () => {
+    const { chart, recorded, gesture } = render(step, "item", true);
+    const lineAt = (x: number, value: number) => {
+      recorded.length = 0;
+      gesture([
+        chart.convertToPixel({ xAxisIndex: 0 }, x) as number,
+        chart.convertToPixel({ yAxisIndex: 0 }, value) as number,
+      ]);
+      return recorded.find((event) => event.name === "contextmenu")?.seriesIndex;
+    };
+
+    expect(lineAt(1, 5.5)).toBe(0);
+    expect(lineAt(0.5, 2)).toBe(0);
+    expect(lineAt(0.5, 5.5)).toBeUndefined();
+  });
+
   it("stays silent on a stroke while the option is off", () => {
     const at = strokeAt(smooth, 0, 1.5) as number[];
     const { recorded, gesture } = render(smooth, "item", false);

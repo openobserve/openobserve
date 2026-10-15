@@ -29,6 +29,26 @@ vi.mock("@/utils/dom", () => ({
   downloadFile: vi.fn(),
 }));
 
+interface TestQuery {
+  query: string;
+  customQuery?: boolean;
+  fields: {
+    stream?: string;
+    stream_type?: string;
+    y?: { column: string; alias: string; aggregationFunction?: string }[];
+  };
+}
+
+/** The same query as one built in the panel editor, counting its y-axis column. */
+const builderQuery = (query: TestQuery): TestQuery => ({
+  ...query,
+  customQuery: false,
+  fields: {
+    ...query.fields,
+    y: (query.fields.y ?? []).map((y) => ({ ...y, aggregationFunction: "count" })),
+  },
+});
+
 describe("usePanelActions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -64,7 +84,7 @@ describe("usePanelActions", () => {
                 y: [{ column: "errors", alias: "errors" }],
               },
             },
-          ],
+          ] as TestQuery[],
         },
       };
 
@@ -177,7 +197,7 @@ describe("usePanelActions", () => {
         query: 'select count(*) as "warns" from logs',
         fields: { stream: "logs", stream_type: "logs", y: [{ column: "warns", alias: "warns" }] },
       });
-      const api = usePanelAlertCreation(args as any);
+      const api = usePanelAlertCreation(args);
       args.contextMenuData.value = { seriesName: "errors" };
 
       api.handleCreateAlert({ condition: "above", threshold: 10, panelQueryIndex: 0 });
@@ -209,10 +229,10 @@ describe("usePanelActions", () => {
       args.panelSchema.value.queries[0] = {
         query: 'select histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" from logs',
         fields: { stream: "logs", stream_type: "logs" },
-      } as any;
+      };
       args.metadata.value = { queries: [] };
       args.panelSchema.value.queries.push({ ...args.panelSchema.value.queries[0] });
-      const api = usePanelAlertCreation(args as any);
+      const api = usePanelAlertCreation(args);
 
       api.handleCreateAlert({ condition: "above", threshold: 4.42, panelQueryIndex: 0 });
 
@@ -230,9 +250,9 @@ describe("usePanelActions", () => {
       args.panelSchema.value.queries[0] = {
         query: 'select histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" from logs',
         fields: { stream: "logs", stream_type: "logs" },
-      } as any;
+      };
       args.metadata.value = { queries: [] };
-      const api = usePanelAlertCreation(args as any);
+      const api = usePanelAlertCreation(args);
 
       api.handleCreateAlert({ condition: "above", threshold: 4.42, panelQueryIndex: 0 });
 
@@ -248,13 +268,13 @@ describe("usePanelActions", () => {
       closeAlertCreationDialog();
       const args = makeBase();
       args.panelSchema.value.queries.push(
-        { query: 'select avg(latency) as "p50" from logs', fields: { stream: "logs" } } as any,
+        { query: 'select avg(latency) as "p50" from logs', fields: { stream: "logs" } },
         {
           query: 'select approx_percentile_cont(latency, 0.95) as "p95" from logs',
           fields: { stream: "logs" },
-        } as any,
+        },
       );
-      const api = usePanelAlertCreation(args as any);
+      const api = usePanelAlertCreation(args);
       args.contextMenuData.value = { seriesName: "errors" };
 
       // An empty-area click ties the value to no series, so it rides to whichever query is picked.
@@ -278,11 +298,9 @@ describe("usePanelActions", () => {
     it("keeps a builder query's right-clicked threshold in the SQL the form saves", () => {
       closeAlertCreationDialog();
       const args = makeBase();
-      const built = args.panelSchema.value.queries[0] as any;
-      built.customQuery = false;
-      built.fields.y[0].aggregationFunction = "count";
-      args.panelSchema.value.queries.push({ ...built });
-      const api = usePanelAlertCreation(args as any);
+      const built = builderQuery(args.panelSchema.value.queries[0]);
+      args.panelSchema.value.queries = [built, { ...built }];
+      const api = usePanelAlertCreation(args);
 
       api.handleCreateAlert({ condition: "above", threshold: 4.42 });
 
@@ -294,10 +312,8 @@ describe("usePanelActions", () => {
 
     it("writes a single builder query's right-clicked threshold into the SQL it saves", () => {
       const args = makeBase();
-      const built = args.panelSchema.value.queries[0] as any;
-      built.customQuery = false;
-      built.fields.y[0].aggregationFunction = "count";
-      const api = usePanelAlertCreation(args as any);
+      args.panelSchema.value.queries = [builderQuery(args.panelSchema.value.queries[0])];
+      const api = usePanelAlertCreation(args);
 
       api.handleCreateAlert({
         condition: "above",
@@ -331,8 +347,8 @@ describe("usePanelActions", () => {
                 { column: "took", alias: "y_axis_2", aggregationFunction: "avg" },
               ],
             },
-          } as any,
-          { query: 'select count(*) as "warns" from logs', fields: { stream: "logs" } } as any,
+          },
+          { query: 'select count(*) as "warns" from logs', fields: { stream: "logs" } },
         ];
         args.metadata.value = { queries: [] };
         return args;
@@ -342,7 +358,7 @@ describe("usePanelActions", () => {
       it("writes the threshold on the y field the clicked series drew", () => {
         const args = twoY();
         args.contextMenuData.value = { yField: 1 };
-        usePanelAlertCreation(args as any).handleCreateAlert({
+        usePanelAlertCreation(args).handleCreateAlert({
           condition: "above",
           threshold: 250,
           panelQueryIndex: 0,
@@ -357,7 +373,7 @@ describe("usePanelActions", () => {
 
       it("falls back to the first y field and says so when the click names none", () => {
         const args = twoY();
-        usePanelAlertCreation(args as any).handleCreateAlert({
+        usePanelAlertCreation(args).handleCreateAlert({
           condition: "above",
           threshold: 250,
           panelQueryIndex: 0,
@@ -381,7 +397,7 @@ describe("usePanelActions", () => {
         const args = twoY();
         args.panelSchema.value.queries.pop();
         args.contextMenuData.value = { yField: 1 };
-        const api = usePanelAlertCreation(args as any);
+        const api = usePanelAlertCreation(args);
 
         api.handleCreateAlert({ condition: "above", threshold: 250 });
         expect(alertCreationDialog.value).toBeNull();
@@ -413,8 +429,8 @@ describe("usePanelActions", () => {
 
       it("is no alert target, so the one real query goes straight to the form", () => {
         const args = makeBase();
-        args.panelSchema.value.queries.push({ query: "  ", fields: { stream: "logs" } } as any);
-        const api = usePanelAlertCreation(args as any);
+        args.panelSchema.value.queries.push({ query: "  ", fields: { stream: "logs" } });
+        const api = usePanelAlertCreation(args);
 
         api.handleCreateAlert({ condition: "above", threshold: 10 });
         expect(alertCreationDialog.value).toBeNull();
@@ -429,10 +445,10 @@ describe("usePanelActions", () => {
       it("is left out of the choices beside two real queries", () => {
         const args = makeBase();
         args.panelSchema.value.queries.push(
-          { query: "", fields: { stream: "logs" } } as any,
-          { query: 'select count(*) as "warns" from logs', fields: { stream: "logs" } } as any,
+          { query: "", fields: { stream: "logs" } },
+          { query: 'select count(*) as "warns" from logs', fields: { stream: "logs" } },
         );
-        usePanelAlertCreation(args as any).handleCreateAlert({ condition: "above", threshold: 10 });
+        usePanelAlertCreation(args).handleCreateAlert({ condition: "above", threshold: 10 });
 
         expect(alertCreationDialog.value?.prefill.queryChoices?.map((c) => c.index)).toEqual([
           0, 2,
@@ -516,7 +532,7 @@ describe("usePanelActions", () => {
 
     it("does not carry a clicked series' value to a query on another scale", () => {
       const args = makePromql();
-      const api = usePanelAlertCreation(args as any);
+      const api = usePanelAlertCreation(args);
 
       api.handleCreateAlert({ condition: "below", threshold: 3, panelQueryIndex: 1 });
       rebuildAlertPrefill({ queryIndex: 0 });
@@ -558,7 +574,7 @@ describe("usePanelActions", () => {
 
     it("keeps the source override through a query switch, so the explorer dialog stays minimal", () => {
       const args = { ...makePromql(), alertSource: { value: "explorer" } };
-      const api = usePanelAlertCreation(args as any);
+      const api = usePanelAlertCreation(args);
 
       api.handleCreateAlert({ condition: "above", threshold: 5, panelQueryIndex: 0 });
       expect(alertCreationDialog.value?.prefill.source).toBe("explorer");
@@ -569,7 +585,7 @@ describe("usePanelActions", () => {
 
     it("alerts on the visible query when a series names a hidden one", () => {
       const args = { ...makePromql(), visibleQueryIndexes: { value: [1] } };
-      const api = usePanelAlertCreation(args as any);
+      const api = usePanelAlertCreation(args);
 
       api.handleCreateAlert({ condition: "above", threshold: 5, panelQueryIndex: 0 });
 
@@ -579,7 +595,7 @@ describe("usePanelActions", () => {
 
     it("skips the dialog for a clicked series when only its query is visible", () => {
       const args = { ...makePromql(), visibleQueryIndexes: { value: [1] } };
-      const api = usePanelAlertCreation(args as any);
+      const api = usePanelAlertCreation(args);
 
       api.handleCreateAlert({ condition: "above", threshold: 5, panelQueryIndex: 1 });
 
@@ -815,7 +831,7 @@ describe("usePanelActions", () => {
         query: "max(node_disk_used_ratio)",
         fields: { stream: "node_disk_used_ratio", stream_type: "metrics" },
       });
-      const api = usePanelAlertCreation(args as any);
+      const api = usePanelAlertCreation(args);
 
       api.handleCreateAlert({
         condition: "forecast",

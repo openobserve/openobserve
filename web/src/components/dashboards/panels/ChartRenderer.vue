@@ -372,10 +372,7 @@ export default defineComponent({
       withChartFont(withLineStrokeEvents(options, props.findLineOnContextMenu));
 
     // The data point nearest the cursor along x, for a right-click on a line's stroke between points.
-    const nearestDataIndex = (seriesIndex: number, cursorX: number): number | undefined => {
-      const data = (chart?.getOption()?.series as LineSeriesOption[] | undefined)?.[seriesIndex]
-        ?.data;
-      if (!Array.isArray(data)) return undefined;
+    const nearestDataIndex = (seriesIndex: number, data: unknown[], cursorX: number) => {
       const xAt = (dataIndex: number) => {
         if (isGap(data[dataIndex])) return null;
         const pixel = chart?.convertToPixel(
@@ -389,10 +386,22 @@ export default defineComponent({
 
     // The stroke has no data point of its own, so the threshold is read at the cursor.
     const handleLineStrokeContextMenu = (params: LineStrokeEvent) => {
-      const offset = [params.event?.offsetX, params.event?.offsetY];
-      const point = chart?.convertFromPixel({ gridIndex: 0 }, offset);
-      const value = Array.isArray(point) ? Number(point[1]) : NaN;
       const event = params.event?.event;
+      const series = (chart?.getOption()?.series as LineSeriesOption[] | undefined)?.[
+        params.seriesIndex
+      ];
+      const data = Array.isArray(series?.data) ? series.data : [];
+      const cursorX = Number(params.event?.offsetX);
+      const dataIndex = nearestDataIndex(params.seriesIndex, data, cursorX);
+      const point = chart?.convertFromPixel({ gridIndex: 0 }, [cursorX, params.event?.offsetY]);
+      // A stacked line is drawn at the stack total, so its own value is read at the nearest point instead.
+      const value = series?.stack
+        ? dataIndex === undefined
+          ? NaN
+          : Number(datumValue(data[dataIndex], dataIndex)[1])
+        : Array.isArray(point)
+          ? Number(point[1])
+          : NaN;
       if (!event || !Number.isFinite(value)) return;
       event.preventDefault();
       event.stopPropagation();
@@ -401,7 +410,7 @@ export default defineComponent({
         y: event.clientY,
         value,
         seriesIndex: params.seriesIndex,
-        dataIndex: nearestDataIndex(params.seriesIndex, Number(offset[0])),
+        dataIndex,
       });
     };
 

@@ -970,9 +970,9 @@ describe("PanelContainer", () => {
         },
       });
       await wrapper.vm.metaDataValue({ queries: [] });
-      expect(wrapper.vm.buildPanelAlertPrefill().queryChoices.map((c: any) => c.index)).toEqual([
-        0, 2,
-      ]);
+      expect(
+        wrapper.vm.buildPanelAlertPrefill().queryChoices.map((c: { index: number }) => c.index),
+      ).toEqual([0, 2]);
     });
 
     describe("with a formula and hidden inputs", () => {

@@ -645,7 +645,7 @@ describe("ChartRenderer", () => {
         }
       });
 
-      it("names the right-clicked line of any shape, reading the threshold at the cursor", async () => {
+      it("names the right-clicked line, reading the threshold at the cursor, or a stacked line's own value", async () => {
         const mockChart = await chartMock();
         vi.mocked(mockChart.getOption).mockReturnValue({
           series: [
@@ -673,13 +673,22 @@ describe("ChartRenderer", () => {
           (_finder: unknown, value: number[]) => [value[0] * 100, value[1] * 10],
         );
 
-        handlerFor(mockChart, "contextmenu")(strokeEvent(1));
+        handlerFor(mockChart, "contextmenu")(strokeEvent(0));
         await flushPromises();
-
         expect(wrapper.emitted("domcontextmenu")?.at(-1)?.[0]).toEqual({
           x: 7,
           y: 8,
           value: 6,
+          seriesIndex: 0,
+          dataIndex: 1,
+        });
+
+        handlerFor(mockChart, "contextmenu")(strokeEvent(1));
+        await flushPromises();
+        expect(wrapper.emitted("domcontextmenu")?.at(-1)?.[0]).toEqual({
+          x: 7,
+          y: 8,
+          value: 9,
           seriesIndex: 1,
           dataIndex: 1,
         });

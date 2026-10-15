@@ -247,6 +247,22 @@ describe("PanelSchemaRenderer", () => {
     });
   };
 
+  /** The loader's state for the next mount: data and metadata as the executors store them. */
+  const mockLoadedData = (data: unknown[], metadataQueries: Record<string, unknown>[]) =>
+    vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+      data: ref(data),
+      loading: ref(false),
+      errorDetail: ref({ message: "", code: "" }),
+      metadata: ref({ queries: metadataQueries }),
+      resultMetaData: ref({}),
+      annotations: ref([]),
+      lastTriggeredAt: ref(null),
+      isCachedDataDifferWithCurrentTimeRange: ref(false),
+      searchRequestTraceIds: ref([]),
+      loadingProgressPercentage: ref(0),
+      isPartialData: ref(false),
+    } as unknown as ReturnType<typeof usePanelDataLoader>);
+
   describe("Component Initialization", () => {
     it("should render component with default props", () => {
       wrapper = createWrapper();
@@ -2257,21 +2273,10 @@ describe("PanelSchemaRenderer", () => {
     });
 
     it("maps a SQL series past a hidden query to its own panel query", () => {
-      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
-        data: ref([[], [], []]),
-        loading: ref(false),
-        errorDetail: ref({ message: "", code: "" }),
-        metadata: ref({
-          queries: [{ panelQueryIndex: 0 }, { panelQueryIndex: 1 }, { panelQueryIndex: 2 }],
-        }),
-        resultMetaData: ref({}),
-        annotations: ref([]),
-        lastTriggeredAt: ref(null),
-        isCachedDataDifferWithCurrentTimeRange: ref(false),
-        searchRequestTraceIds: ref([]),
-        loadingProgressPercentage: ref(0),
-        isPartialData: ref(false),
-      } as any);
+      mockLoadedData(
+        [[], [], []],
+        [{ panelQueryIndex: 0 }, { panelQueryIndex: 1 }, { panelQueryIndex: 2 }],
+      );
       const query = defaultProps.panelSchema.queries[0];
       wrapper = createWrapper({
         allowAlertCreation: true,
@@ -2299,20 +2304,6 @@ describe("PanelSchemaRenderer", () => {
     });
 
     describe("a multi-query SQL panel's series mapped back to their query", () => {
-      const loaded = (data: unknown[][], metadataQueries: Record<string, unknown>[]) =>
-        vi.mocked(usePanelDataLoader).mockReturnValueOnce({
-          data: ref(data),
-          loading: ref(false),
-          errorDetail: ref({ message: "", code: "" }),
-          metadata: ref({ queries: metadataQueries }),
-          resultMetaData: ref({}),
-          annotations: ref([]),
-          lastTriggeredAt: ref(null),
-          isCachedDataDifferWithCurrentTimeRange: ref(false),
-          searchRequestTraceIds: ref([]),
-          loadingProgressPercentage: ref(0),
-          isPartialData: ref(false),
-        } as unknown as ReturnType<typeof usePanelDataLoader>);
       const clickedQuery = (position: number) => {
         wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: position });
         return wrapper.vm.contextMenuData.panelQueryIndex;
@@ -2325,7 +2316,7 @@ describe("PanelSchemaRenderer", () => {
         }));
 
       it("sends a time-shifted series to its parent query", () => {
-        loaded(
+        mockLoadedData(
           [[], [], []],
           [
             { panelQueryIndex: 0, timeRangeGap: { seconds: 0 } },
@@ -2343,8 +2334,14 @@ describe("PanelSchemaRenderer", () => {
         expect(clickedQuery(2)).toBe(1);
       });
 
-      it("skips an empty query slot the executor never ran", () => {
-        loaded([[], []], [{ panelQueryIndex: 0 }, { panelQueryIndex: 2 }]);
+      it("maps past an empty query slot the executor never ran, which leaves a hole in its data", () => {
+        const holey = <T>(first: T, third: T): T[] => {
+          const entries: T[] = [];
+          entries[0] = first;
+          entries[2] = third;
+          return entries;
+        };
+        mockLoadedData(holey([], []), holey({ panelQueryIndex: 0 }, { panelQueryIndex: 2 }));
         wrapper = createWrapper({
           allowAlertCreation: true,
           panelSchema: {
@@ -2352,34 +2349,31 @@ describe("PanelSchemaRenderer", () => {
             queries: [query, { ...query, query: "" }, query],
           },
         });
-        wrapper.vm.panelData = { options: { series: series(2) } };
+        wrapper.vm.panelData = {
+          options: {
+            series: [
+              { name: "a", _queryIndex: 0, _panelQueryIndex: 0 },
+              { name: "c", _queryIndex: 2, _panelQueryIndex: 2, yAxisGroup: 0 },
+            ],
+          },
+        };
 
         expect(wrapper.vm.hasSeveralVisibleQueries).toBe(true);
         expect(clickedQuery(0)).toBe(0);
         expect(clickedQuery(1)).toBe(2);
+        expect(wrapper.vm.contextMenuData.yField).toBe(0);
       });
     });
 
     it("maps the one visible, time-shifted SQL query's series past a hidden one", () => {
-      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
-        data: ref([[], [], []]),
-        loading: ref(false),
-        errorDetail: ref({ message: "", code: "" }),
-        metadata: ref({
-          queries: [
-            { panelQueryIndex: 0, timeRangeGap: { seconds: 0 } },
-            { panelQueryIndex: 1, timeRangeGap: { seconds: 0 } },
-            { panelQueryIndex: 1, timeRangeGap: { seconds: 86400 } },
-          ],
-        }),
-        resultMetaData: ref({}),
-        annotations: ref([]),
-        lastTriggeredAt: ref(null),
-        isCachedDataDifferWithCurrentTimeRange: ref(false),
-        searchRequestTraceIds: ref([]),
-        loadingProgressPercentage: ref(0),
-        isPartialData: ref(false),
-      } as unknown as ReturnType<typeof usePanelDataLoader>);
+      mockLoadedData(
+        [[], [], []],
+        [
+          { panelQueryIndex: 0, timeRangeGap: { seconds: 0 } },
+          { panelQueryIndex: 1, timeRangeGap: { seconds: 0 } },
+          { panelQueryIndex: 1, timeRangeGap: { seconds: 86400 } },
+        ],
+      );
       const query = defaultProps.panelSchema.queries[0];
       wrapper = createWrapper({
         allowAlertCreation: true,

@@ -849,22 +849,18 @@ export default defineComponent({
           : index,
       );
 
+    // The data indexes filteredData keeps, or null when it passes data through, holes for empty slots included.
+    const keptDataIndexes = computed((): number[] | null => {
+      if (!data.value || !hiddenQueries.value?.length || !Array.isArray(data.value)) return null;
+      return data.value
+        .map((_: unknown, index: number) => index)
+        .filter((index: number) => !isHiddenAt(index));
+    });
+
     // Filter data based on hiddenQueries for PromQL panels
     const filteredData = computed(() => {
-      // If no data, return as is
-      if (!data.value) {
-        return data.value;
-      }
-
-      // If no hidden queries or empty array, return as is
-      if (!hiddenQueries.value || hiddenQueries.value.length === 0 || !Array.isArray(data.value)) {
-        return data.value;
-      }
-
-      // Filter out hidden queries by index (works for both SQL and PromQL)
-      const filtered = data.value.filter((_: any, index: number) => !isHiddenAt(index));
-
-      return filtered;
+      const kept = keptDataIndexes.value;
+      return kept === null ? data.value : kept.map((index: number) => data.value[index]);
     });
 
     // PromQL: metadata.queries and resultMetaData stay index-aligned with filteredData.
@@ -1193,10 +1189,8 @@ export default defineComponent({
     );
     // SQL drops hidden queries' data but not their metadata, so a series' position counts the kept entries only.
     const sqlPanelQueryIndex = (position: number): number | undefined => {
-      const kept = (Array.isArray(data.value) ? data.value : [])
-        .map((_: unknown, index: number) => index)
-        .filter((index: number) => !isHiddenAt(index));
-      const index = kept[position];
+      const kept = keptDataIndexes.value;
+      const index = kept === null ? position : kept[position];
       return index === undefined
         ? undefined
         : (metadata.value?.queries?.[index]?.panelQueryIndex ?? index);
