@@ -15,8 +15,59 @@
 
 import { queryOptions } from "@tanstack/vue-query";
 import search from "./search";
-import { traceDagKeys, traceDetailsKeys } from "./search.querykeys";
+import sessions, { type SessionDetailsApiHit } from "./sessions";
+import {
+  sessionTurnsKeys,
+  traceDagKeys,
+  traceDetailsKeys,
+  traceTimeRangeKeys,
+} from "./search.querykeys";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
+import type { TraceTimeRangeResult } from "@/ts/interfaces/traces/traceTimeRange.types";
+
+/**
+ * Where a trace or a session ran and its exact time range, from the trace time index.
+ * `partialCoverage` means a "not_found" is not proof of absence (no index, no permission).
+ */
+export const traceTimeRangeQuery = (
+  org: string,
+  kind: "trace" | "session",
+  id: string,
+  hintTs: number,
+) =>
+  queryOptions({
+    queryKey: traceTimeRangeKeys.detail(org, kind, id),
+    queryFn: async (): Promise<{
+      result: TraceTimeRangeResult | null;
+      partialCoverage: boolean;
+    }> => {
+      const data = (
+        await search.get_trace_time_ranges({
+          org_identifier: org,
+          ...(kind === "session" ? { session_ids: [id] } : { trace_ids: [id] }),
+          hint_ts: hintTs,
+        })
+      ).data;
+      return { result: data?.results?.[0] ?? null, partialCoverage: !!data?.partial_coverage };
+    },
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
+/** A session's turns (one per trace, with its start and end), read from a window that holds the session. */
+export const sessionTurnsQuery = (
+  org: string,
+  streamName: string,
+  sessionId: string,
+  startTime: number,
+  endTime: number,
+) =>
+  queryOptions({
+    queryKey: sessionTurnsKeys.detail(org, streamName, sessionId),
+    queryFn: async (): Promise<SessionDetailsApiHit[]> =>
+      (await sessions.details({ orgId: org, streamName, sessionId, startTime, endTime })).data
+        ?.hits ?? [],
+    staleTime: MEDIUM_STALE_TIME,
+  });
 
 export const traceDagQuery = (
   org: string,

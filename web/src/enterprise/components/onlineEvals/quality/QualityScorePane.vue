@@ -215,7 +215,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
-import { useQuery } from "@tanstack/vue-query";
 import { useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { toggleFullscreen } from "@/utils/dom";
@@ -229,15 +228,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ReviewContentBox from "@/enterprise/views/AIObservability/ReviewContentBox.vue";
 import AddToDatasetDrawer from "@/enterprise/components/AIObservability/AddToDatasetDrawer.vue";
 import type { QualityScore } from "@/services/online-evals.service";
-import { traceDetailsQuery } from "@/services/search.queries";
-import { extractLLMData } from "@/utils/llmUtils";
-import {
-  contentSpan,
-  evaluatorTraceLink,
-  targetLink,
-  targetTraceId,
-  targetWindow,
-} from "../utils/qualityFormat";
+import { evaluatorTraceLink, targetLink } from "../utils/qualityFormat";
+import { useScoreFullText } from "../composables/useScoreFullText";
 
 const props = defineProps<{
   score: QualityScore | null;
@@ -309,51 +301,16 @@ function updateDrawerOpen(open: boolean) {
   if (!open) drawerTarget.value = null;
 }
 
-// The preview shows at once; the scored span's full text replaces it once its trace loads. Sessions and scores without a stream keep the preview.
-const traceRef = computed(() => {
-  const score = props.score;
-  if (!score?.sourceStream) return null;
-  const traceId = targetTraceId(score);
-  return traceId ? { stream: score.sourceStream, traceId, ...targetWindow(score) } : null;
-});
-const traceQuery = useQuery(() => {
-  const target = traceRef.value;
-  return Object.assign(
-    traceDetailsQuery(
-      orgId.value,
-      target?.stream ?? "",
-      target?.traceId ?? "",
-      target?.startTime ?? 0,
-      target?.endTime ?? 0,
-    ),
-    { enabled: !!target },
-  );
-});
-
-function asText(value: unknown): string {
-  if (value == null) return "";
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
-
-const fullText = computed(() => {
-  const spans = traceQuery.data.value;
-  if (!traceRef.value || !props.score || !spans) return null;
-  const data = extractLLMData(contentSpan(props.score, spans));
-  const input = asText(data?.input);
-  const output = asText(data?.output);
-  return input || output ? { input, output } : null;
-});
-// Skeletons while the scores page or the selected score's trace loads; scores that never fetch show their preview at once.
-const contentLoading = computed(
-  () => props.loading || (!!traceRef.value && traceQuery.isPending.value),
-);
+// The preview shows at once; the full text replaces it once the trace or session loads.
+const {
+  fullText,
+  loading: fullTextLoading,
+  unavailable: fullTextUnavailable,
+} = useScoreFullText(() => props.score, orgId);
+// Skeletons while the scores page or the selected score's full text loads.
+const contentLoading = computed(() => props.loading || fullTextLoading.value);
 const inputText = computed(() => fullText.value?.input || props.score?.inputPreview || "");
 const outputText = computed(() => fullText.value?.output || props.score?.outputPreview || "");
-const fullTextUnavailable = computed(
-  () =>
-    !!traceRef.value &&
-    (traceQuery.isError.value || (traceQuery.isSuccess.value && !fullText.value)),
-);
 
 // Same tab: browser Back returns to this score through the page and score in the URL.
 function navigate(location: RouteLocationRaw) {
