@@ -256,6 +256,24 @@ pub struct RangeStatus {
     pub sources: Option<BTreeMap<String, Vec<(StreamType, String)>>>,
 }
 
+/// One link's status call: its ranges from the owning querier and its access counters.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LinkStatusReport {
+    pub link_id: String,
+    pub ranges: Vec<RangeStatus>,
+    pub access_count: i64,
+    pub last_accessed_at: Option<i64>,
+}
+
+/// The org's public dashboard settings as the settings API reads and writes them; a null
+/// `max_links` means the env default.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OrgPublicDashboardSettings {
+    pub enabled: bool,
+    #[serde(default)]
+    pub max_links: Option<i32>,
+}
+
 /// A window in UTC micros.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Window {

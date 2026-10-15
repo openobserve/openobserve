@@ -31,7 +31,7 @@ use crate::service::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use crate::service::auth::check_permissions;
 
-fn map_err(ctx: &str, e: anyhow::Error) -> Response {
+pub(super) fn map_err(ctx: &str, e: anyhow::Error) -> Response {
     if let Some(invalid) = e.downcast_ref::<Invalid>() {
         return MetaHttpResponse::bad_request(&invalid.0);
     }
@@ -53,7 +53,7 @@ fn map_err(ctx: &str, e: anyhow::Error) -> Response {
 
 /// 404 when the feature flag is off, so the admin surface mirrors the public
 /// plane's gating instead of leaking route existence.
-fn feature_gate() -> Option<Response> {
+pub(super) fn feature_gate() -> Option<Response> {
     if config::get_config().public_dashboards.enabled {
         None
     } else {
@@ -106,7 +106,7 @@ async fn edit_access_gate(
 }
 
 /// The link only when it belongs to this org and dashboard, else the response to return.
-async fn load_link(
+pub(super) async fn load_link(
     org_id: &str,
     dashboard_id: &str,
     link_id: &str,

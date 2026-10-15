@@ -33,6 +33,7 @@ use config::{
             KeyedRange, NotReadyResponse, PublicVariable, SanitizedDashboard, TimeRange,
         },
     },
+    router::is_public_dashboard_slug,
     utils::time::now_micros,
 };
 use infra::{
@@ -54,8 +55,6 @@ use serde::Deserialize;
 use crate::request::public_rate_limit::{Counters, client_ip, too_many_requests};
 
 const READ_WINDOW: Duration = Duration::from_secs(60);
-/// Slugs are 22 alphanumeric characters (`generate_random_string(22)`).
-const SLUG_LEN: usize = 22;
 
 /// Per-IP read counters for both public dashboard routes.
 static READS: LazyLock<Counters> = LazyLock::new(Counters::default);
@@ -79,7 +78,7 @@ enum Servable {
 /// revoked, draft or switched off gives a uniform 404 (no existence oracle); paused 503; expired
 /// 410.
 async fn resolve(slug: &str) -> Servable {
-    if !config::get_config().public_dashboards.enabled || !valid_slug(slug) {
+    if !config::get_config().public_dashboards.enabled || !is_public_dashboard_slug(slug) {
         return Servable::NotFound;
     }
     let db = get_orm_client_rw().await;
@@ -129,10 +128,6 @@ async fn evict_link(pd: &Model) {
     for range in core_pd::time_ranges(pd).ranges {
         store::evict(&store::key(&pd.org_id, &pd.id, &range.key())).await;
     }
-}
-
-fn valid_slug(slug: &str) -> bool {
-    slug.len() == SLUG_LEN && slug.bytes().all(|b| b.is_ascii_alphanumeric())
 }
 
 /// Whether a loaded link may be served; it is read fresh per request, so changes apply at once.
@@ -723,14 +718,6 @@ mod tests {
             servable(link(), rev, enabled, false, 1),
             Servable::NotFound
         ));
-    }
-
-    #[test]
-    fn a_slug_is_twenty_two_alphanumerics() {
-        assert!(valid_slug("k8Zt2mR7aB3cD4eF5gH6Qx"));
-        assert!(!valid_slug("k8Zt2mR7aB3cD4eF5gH6Q"));
-        assert!(!valid_slug("k8Zt2mR7aB3cD4eF5gH6Q/"));
-        assert!(!valid_slug("../../etc/passwd000000"));
     }
 
     #[test]
