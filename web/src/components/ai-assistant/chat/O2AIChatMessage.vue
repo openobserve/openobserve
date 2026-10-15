@@ -165,6 +165,15 @@ const isStopped = computed(() =>
             >
               {{ t("aiAssistant.errorMayBeTemporary") }}
             </div>
+            <OButton
+              v-if="block.navigationAction"
+              variant="primary"
+              size="xs"
+              class="stream-error-action text-compact ms-6 mt-2 self-start"
+              @click="emit('navigate', block.navigationAction)"
+            >
+              {{ block.navigationAction.label }}
+            </OButton>
           </div>
           <div
             v-else-if="block.type === 'status' && block.turnStatus === 'stopped'"

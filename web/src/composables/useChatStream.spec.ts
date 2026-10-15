@@ -149,6 +149,25 @@ describe("useChatStream", () => {
     expect(makeStream().stream.tryReattach(entry("s2"), 7)).toBe(false);
   });
 
+  it("adds no chat message after a navigation to billing", async () => {
+    vi.useFakeTimers();
+    const { stream, options, chatMessages } = makeStream();
+
+    await stream.handleNavigationAction({
+      resource_type: "billing",
+      action: "navigate_direct",
+      label: "Plans",
+      target: { path: "/billings/plans" },
+    } as any);
+    await vi.runAllTimersAsync();
+
+    expect(options.router.push).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "/billings/plans" }),
+    );
+    expect(chatMessages.value).toHaveLength(0);
+    expect(options.dbSaveToHistory).not.toHaveBeenCalled();
+  });
+
   it("sets isLoading and mints the session id before its first await", async () => {
     mockFetchAiChat.mockResolvedValue({ cancelled: true });
     const { stream } = makeStream();
