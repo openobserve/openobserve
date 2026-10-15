@@ -335,9 +335,25 @@ describe("AnalyticsFunnels", () => {
     expect(text("rum-analytics-funnel-step-2")).toContain("50.0%");
     expect(text("rum-analytics-funnel-dropoff-0")).toContain("120");
     expect(text("rum-analytics-funnel-overall")).toContain("20.0%");
-    expect(text("rum-analytics-funnel-order-label")).toBe(
-      "In order (other events allowed between)",
-    );
+    const header = wrapper!.find('[data-test="rum-analytics-funnel-steps-header"]');
+    expect(header.findAll("[data-test^=rum-analytics-funnel-col-]").map((c) => c.text())).toEqual([
+      "Step",
+      "Sessions",
+      "From previous",
+      "Time from step 1",
+      "Of step 1",
+    ]);
+    expect(header.text()).not.toContain("Reached, as share of step 1");
+    expect(
+      wrapper!
+        .find('[data-test="rum-analytics-funnel-col-step"] [aria-label]')
+        .attributes("aria-label"),
+    ).toBe("In order (other events allowed between)");
+    expect(
+      wrapper!
+        .find('[data-test="rum-analytics-funnel-col-unit"] [aria-label]')
+        .attributes("aria-label"),
+    ).toBe("Sessions that reached this step");
   });
 
   it("computes with one join-free search scoped to the app (AC-12, AC-14)", async () => {
@@ -362,7 +378,7 @@ describe("AnalyticsFunnels", () => {
     const before = funnelSqls().length;
     await dragSteps([0, 2, 1]);
     expect(useProductAnalytics().funnel.value.steps.map((s) => s.key)).toEqual(["/a", "/c", "b"]);
-    await wrapper!.find('[data-test="rum-analytics-funnel-rail-step-0-remove"]').trigger("click");
+    await wrapper!.find('[data-test="rum-analytics-funnel-step-0-remove"]').trigger("click");
     await settle();
     expect(useProductAnalytics().funnel.value.steps.map((s) => s.key)).toEqual(["/c", "b"]);
     expect(funnelSqls().length).toBe(before + 2);
@@ -905,7 +921,7 @@ describe("AnalyticsFunnels", () => {
       ["c", "b"],
     ]);
     expect(text("rum-analytics-funnel-step1-empty")).toContain("/nowhere");
-    await wrapper!.find('[data-test="rum-analytics-funnel-rail-step-0-remove"]').trigger("click");
+    await wrapper!.find('[data-test="rum-analytics-funnel-step-0-remove"]').trigger("click");
     await settle();
     expect(useProductAnalytics().funnel.value.steps.map((s) => s.key)).toEqual(["b"]);
   });
@@ -1711,7 +1727,7 @@ describe("AnalyticsFunnels", () => {
       await mountFunnels({ funnel: THREE("sessions", "session", [BETWEEN]) });
       await settle();
       toastSpy.mockClear();
-      await wrapper!.find('[data-test="rum-analytics-funnel-rail-step-2-remove"]').trigger("click");
+      await wrapper!.find('[data-test="rum-analytics-funnel-step-2-remove"]').trigger("click");
       await settle();
       const sent = decodeDef(router.currentRoute.value.query.funnel as string) as {
         s: unknown[];
