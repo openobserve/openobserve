@@ -901,6 +901,85 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(formatted).toContain("font-bold");
       expect(formatted).toContain("rca-ul");
     });
+
+    it("should build the TOC from standalone bold section lines", () => {
+      const content = [
+        "I've completed the investigation.",
+        "",
+        "---",
+        "",
+        "**Incident Details**",
+        "",
+        "| Attribute | Value |",
+        "|---|---|",
+        "| **Severity** | P2 |",
+        "",
+        "**Evidence:**",
+        "",
+        "**1. `stream_no_events_10m`** — false positive.",
+        "",
+        "- Restart the ingester",
+        "  **Note**",
+        "",
+        "The ingester restarted at 10:02.",
+        "**Inline label**",
+        "This was expected.",
+        "",
+        "** **",
+        "",
+        "**Evidence **",
+        "",
+        "__A__ and __B__",
+        "",
+        "```json",
+        "**not a heading**",
+        "```",
+        "",
+        "~~~",
+        "**tilde fence**",
+        "```",
+        "",
+        "**still code**",
+        "~~~",
+        "",
+        "__Executive Summary__",
+        "",
+        "Root cause: **three** miscalibrated alerts.",
+      ].join("\n");
+      const formatted = wrapper.vm.formatRcaContent(content);
+
+      expect(wrapper.vm.tableOfContents.map((item: any) => item.text)).toEqual([
+        "Incident Details",
+        "Evidence",
+        "Executive Summary",
+      ]);
+      // Rendered ids must match the TOC ids, or scroll-to-section finds nothing.
+      for (const item of wrapper.vm.tableOfContents) {
+        expect(formatted).toContain(`id="${item.id}"`);
+      }
+      expect(formatted).toContain("**not a heading**");
+      expect(formatted).toContain("**tilde fence**");
+      expect(formatted).toContain("**still code**");
+    });
+
+    it("should leave bold sub-labels alone when the report already has sections", () => {
+      const content = [
+        "## Root Cause",
+        "",
+        "**Timeline:**",
+        "",
+        "- 10:02 ingester restarted",
+        "",
+        "### Contributing factors",
+      ].join("\n");
+      const formatted = wrapper.vm.formatRcaContent(content);
+
+      expect(wrapper.vm.tableOfContents.map((item: any) => item.text)).toEqual(["Root Cause"]);
+      expect(wrapper.vm.tableOfContents[0].children.map((item: any) => item.text)).toEqual([
+        "Contributing factors",
+      ]);
+      expect(formatted).not.toContain('id="section-timeline"');
+    });
   });
 
   describe("Theme Support", () => {

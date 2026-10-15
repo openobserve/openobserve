@@ -3209,6 +3209,19 @@ export default defineComponent({
       }
     };
 
+    // A fence only closes on the character it opened with, so ``` inside ~~~ stays code.
+    const createCodeFenceTracker = () => {
+      let openFence: string | null = null;
+      return (line: string): boolean => {
+        const marker = line.match(/^\s*(```|~~~)/)?.[1];
+        if (marker && (!openFence || openFence === marker)) {
+          openFence = openFence ? null : marker;
+          return true;
+        }
+        return openFence !== null;
+      };
+    };
+
     // Extract headings from markdown content to build table of contents
     const extractTableOfContents = (content: string): TocItem[] => {
       // Handle both actual newlines and escaped \n in JSON strings
@@ -3216,19 +3229,10 @@ export default defineComponent({
       const lines = normalizedContent.split("\n");
       const toc: TocItem[] = [];
       const stack: TocItem[] = [];
-      let inCodeBlock = false;
+      const isCode = createCodeFenceTracker();
 
       lines.forEach((line) => {
-        // Check for code block delimiters (````)
-        if (line.trim().startsWith("```")) {
-          inCodeBlock = !inCodeBlock;
-          return;
-        }
-
-        // Skip lines inside code blocks
-        if (inCodeBlock) {
-          return;
-        }
+        if (isCode(line)) return;
 
         const match = line.match(/^(#{1,3})\s+(.+)$/);
         if (match) {
@@ -3395,7 +3399,32 @@ export default defineComponent({
       return result.join("\n");
     };
 
-    const formatRcaContent = (content: string) => {
+    // Some agent reports mark sections with a standalone bold line instead of `##`.
+    const promoteBoldLinesToHeadings = (content: string): string => {
+      const isCode = createCodeFenceTracker();
+      const lines = content.split("\n").map((text) => ({ text, prose: !isCode(text) }));
+      // A report that already has sections uses its bold lines as sub-labels, not sections.
+      if (lines.some((l) => l.prose && /^#{2,3}\s/.test(l.text))) return content;
+      return lines
+        .map(({ text, prose }, i) => {
+          const prev = lines[i - 1]?.text.trim() ?? "";
+          // A bold line glued to the line above is part of that paragraph or list.
+          const startsBlock = prev === "" || /^([-*_])\1{2,}$/.test(prev);
+          const match =
+            prose && startsBlock
+              ? text.match(
+                  /^(?:\*\*([^*\s](?:[^*\n]*[^*\s])?)\*\*|__([^_\s](?:[^_\n]*[^_\s])?)__)\s*:?\s*$/,
+                )
+              : null;
+          if (!match) return text;
+          return `## ${(match[1] ?? match[2] ?? "").replace(/:$/, "").trim()}`;
+        })
+        .join("\n");
+    };
+
+    const formatRcaContent = (rawContent: string) => {
+      const content = promoteBoldLinesToHeadings(rawContent);
+
       // First, extract table of contents - only update if content changed
       const newToc = extractTableOfContents(content);
       if (JSON.stringify(newToc) !== JSON.stringify(tableOfContents.value)) {
