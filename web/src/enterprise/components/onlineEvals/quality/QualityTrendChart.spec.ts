@@ -47,6 +47,24 @@ describe("QualityTrendChart", () => {
     );
   });
 
+  it("says 1 score, not 1 scores, for a bucket with one score", async () => {
+    const wrapper = mount(QualityTrendChart, {
+      props: {
+        timeline: [{ ...TIMELINE[0], count: 1 }],
+        kind: "score",
+        range: { min: 0, max: 1 },
+        threshold: null,
+      },
+      global: { plugins: [store] },
+    });
+    await flushPromises();
+    const options = wrapper.findComponent({ name: "ChartRenderer" }).props("data").options;
+    const html = options.tooltip.formatter([
+      { dataIndex: 0, marker: "", seriesName: "Avg", value: [1, 0.5] },
+    ]);
+    expect(html).toContain("1 score<br/>");
+  });
+
   it("labels the score axis with at most 4 decimals, so float noise never shows", async () => {
     const wrapper = mount(QualityTrendChart, {
       props: { timeline: TIMELINE, kind: "score", range: { min: 0, max: 0.05 }, threshold: null },

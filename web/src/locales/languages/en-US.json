@@ -16054,8 +16054,8 @@
         "legendHealthy": "Healthy",
         "legendUnhealthy": "Unhealthy",
         "legendScores": "Scores",
-        "chartTooltip": "{count} scores, {unhealthy} unhealthy",
-        "chartTooltipCount": "{count} scores",
+        "chartTooltip": "{count} score, {unhealthy} unhealthy | {count} scores, {unhealthy} unhealthy",
+        "chartTooltipCount": "{count} score | {count} scores",
         "trendTitle": {
           "score": "Trend",
           "healthyRate": "Healthy rate over time",

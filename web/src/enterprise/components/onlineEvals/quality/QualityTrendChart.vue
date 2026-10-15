@@ -193,9 +193,11 @@ const options = computed(() => {
           .join("&nbsp;&nbsp;&nbsp;");
         const when = escapeHtml(bucketTime(bucket));
         if (props.kind === "count") return `${when}<br/>${values}`;
-        const count = t("onlineEvals.quality.detail.chartTooltipCount", {
-          count: formatCount(bucket.count),
-        });
+        const count = t(
+          "onlineEvals.quality.detail.chartTooltipCount",
+          { count: formatCount(bucket.count) },
+          bucket.count,
+        );
         return `${when} · ${escapeHtml(count)}<br/>${values}`;
       },
     },
