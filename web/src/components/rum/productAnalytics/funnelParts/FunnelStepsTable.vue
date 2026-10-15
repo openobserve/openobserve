@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="col in headerCols"
         :key="col.id"
         class="flex items-center gap-1"
-        :class="col.id === 'step' ? '' : 'justify-end'"
+        :class="col.id === 'step' ? '' : 'justify-end text-end'"
         :data-test="`rum-analytics-funnel-col-${col.id}`"
         >{{ col.label }}
         <span class="flex items-center">

@@ -361,9 +361,9 @@ describe("AnalyticsFunnels", () => {
     expect(header.findAll("[data-test^=rum-analytics-funnel-col-]").map((c) => c.text())).toEqual([
       "Step",
       "Sessions",
-      "From previous",
+      "Conversion from previous step",
       "Time from step 1",
-      "Of step 1",
+      "Conversion from step 1",
     ]);
     expect(header.text()).not.toContain("Reached, as share of step 1");
     expect(
@@ -376,6 +376,11 @@ describe("AnalyticsFunnels", () => {
         .find('[data-test="rum-analytics-funnel-col-unit"] [aria-label]')
         .attributes("aria-label"),
     ).toBe("Sessions that reached this step");
+    expect(
+      wrapper!
+        .find('[data-test="rum-analytics-funnel-col-of-previous"] [aria-label]')
+        .attributes("aria-label"),
+    ).toBe("Share of the step above that reached this step");
   });
 
   it("computes with one join-free search scoped to the app (AC-12, AC-14)", async () => {
