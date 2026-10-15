@@ -569,9 +569,9 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should have exactly 24 children routes when enterprise is enabled", () => {
+    it("should have exactly 23 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(24); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 13 enterprise (incl. passwordPolicy, announcements + editor) + alert calibration
+      expect(routes[0].children).toHaveLength(23); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 13 enterprise (incl. passwordPolicy, announcements + editor)
     });
 
     it("should have the announcement banner list and editor routes when enterprise", () => {
@@ -642,9 +642,9 @@ describe("useManagementRoutes", () => {
       expect(orgMgmtRoute.component).toBeDefined();
     });
 
-    it("should have exactly 12 children routes when cloud is enabled", () => {
+    it("should have exactly 11 children routes when cloud is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(12); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + alert calibration + 1 cloud
+      expect(routes[0].children).toHaveLength(11); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 1 cloud
     });
   });
 
@@ -659,9 +659,9 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 25 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 24 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(25); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 13 enterprise (incl. passwordPolicy, announcements + editor) + alert calibration + 1 cloud
+      expect(routes[0].children).toHaveLength(24); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 13 enterprise (incl. passwordPolicy, announcements + editor) + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
