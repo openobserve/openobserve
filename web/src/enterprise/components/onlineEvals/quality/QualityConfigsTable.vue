@@ -192,9 +192,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :variant="unhealthyTone(unhealthyShare(row)) ?? 'default'"
             size="sm"
           />
-          <span class="flex items-baseline gap-1.5 text-xs whitespace-nowrap">
+          <!-- Wraps rather than clips the percent when the counts run to six digits. -->
+          <span class="flex flex-wrap items-baseline gap-x-1.5 text-xs">
             <span class="text-text-secondary">{{
-              t("onlineEvals.quality.outOf", { count: row.unhealthy ?? 0, total: row.total })
+              t("onlineEvals.quality.outOf", {
+                count: formatCount(row.unhealthy ?? 0),
+                total: formatCount(row.total),
+              })
             }}</span>
             <span class="text-text-heading font-semibold">{{
               formatPercent(row.unhealthy ?? 0, row.total)
@@ -206,7 +210,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #cell-scores="{ row }">
         <div class="flex min-w-0 flex-col gap-0.5">
-          <span class="text-text-heading font-semibold tabular-nums">{{ row.total }}</span>
+          <span class="text-text-heading font-semibold tabular-nums">{{
+            formatCount(row.total)
+          }}</span>
           <span class="text-text-secondary truncate text-xs">{{
             scopeMixText(row.scopeCounts, t)
           }}</span>
@@ -249,6 +255,7 @@ import OStatCard from "@/lib/data/StatStrip/OStatCard.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { QualityTileFilter, qualityTiles } from "../composables/useQualityList";
 import {
+  formatCount,
   formatPercent,
   healthSortValue,
   scopeMixText,

@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :subtitle="
             isNumeric && average != null
-              ? t('onlineEvals.quality.detail.averageValue', { value: average.toFixed(2) })
+              ? t('onlineEvals.quality.detail.averageValue', { value: formatFixed(average) })
               : undefined
           "
           data-test="quality-detail-distribution"
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OToggleGroupItem value="all" size="sm" data-test="quality-detail-only-all">
               {{ t("onlineEvals.quality.review.all") }}
-              <span class="font-semibold tabular-nums">{{ summary.total }}</span>
+              <span class="font-semibold tabular-nums">{{ formatCount(summary.total) }}</span>
             </OToggleGroupItem>
             <OToggleGroupItem
               value="unhealthy"
@@ -164,7 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="quality-detail-only-unhealthy"
             >
               {{ t("onlineEvals.quality.review.unhealthy") }}
-              <span class="font-semibold tabular-nums">{{ summary.unhealthy ?? 0 }}</span>
+              <span class="font-semibold tabular-nums">{{
+                formatCount(summary.unhealthy ?? 0)
+              }}</span>
             </OToggleGroupItem>
           </OToggleGroup>
           <OTag
@@ -285,6 +287,8 @@ import {
   QUALITY_SCOPES,
   chartFilterLabel,
   distributionDataType,
+  formatCount,
+  formatFixed,
   formatScoreValue,
   nextChartFilter,
   trendKind,
