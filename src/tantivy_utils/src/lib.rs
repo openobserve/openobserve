@@ -16,4 +16,3 @@
 pub mod index_builder;
 pub mod puffin;
 pub mod puffin_directory;
-pub mod scratch_directory;

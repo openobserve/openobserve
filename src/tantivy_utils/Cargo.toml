@@ -27,7 +27,6 @@ parquet.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tantivy.workspace = true
-tempfile.workspace = true
 tokio.workspace = true
 vortex = { workspace = true }
 zstd.workspace = true
