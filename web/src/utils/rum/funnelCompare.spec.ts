@@ -177,18 +177,17 @@ describe("funnelResultOf", () => {
 });
 
 describe("compareBreakdown", () => {
-  const cur = foldBreakdown(
-    [
-      { dim: "card", c1: 17, c2: 17 },
-      { dim: "upi", c1: 8, c2: 8 },
-      { dim: "cod", c1: 7, c2: 7 },
-    ],
-    2,
-  );
+  const curHits = [
+    { dim: "card", c1: 17, c2: 17 },
+    { dim: "upi", c1: 8, c2: 8 },
+    { dim: "cod", c1: 7, c2: 7 },
+  ];
+  const cur = foldBreakdown(curHits, 2);
 
   it("compares each value's overall conversion and the total", () => {
     const res = compareBreakdown(
       cur,
+      curHits,
       [
         { dim: "card", c1: 40, c2: 20 },
         { dim: "upi", c1: 10, c2: 10 },
@@ -204,14 +203,14 @@ describe("compareBreakdown", () => {
   });
 
   it("keeps a value seen only this period with no previous side", () => {
-    const res = compareBreakdown(cur, [{ dim: "card", c1: 10, c2: 5 }], 2);
+    const res = compareBreakdown(cur, curHits, [{ dim: "card", c1: 10, c2: 5 }], 2);
     const cod = res.rows.find((r) => r.value === "cod");
     expect(cod?.prev).toBeNull();
     expect(cod?.prevOnly).toBe(false);
   });
 
   it("gives a value seen only last period a row of its own", () => {
-    const res = compareBreakdown(cur, [{ dim: "paypal", c1: 4, c2: 2 }], 2);
+    const res = compareBreakdown(cur, curHits, [{ dim: "paypal", c1: 4, c2: 2 }], 2);
     const paypal = res.rows.find((r) => r.value === "paypal");
     expect(paypal?.prevOnly).toBe(true);
     expect(paypal?.counts).toEqual([0, 0]);
@@ -219,33 +218,66 @@ describe("compareBreakdown", () => {
     expect(paypal?.prev?.change).toBeNull();
   });
 
-  it("folds unmatched previous values into this period's Other row when it has one", () => {
-    const many = foldBreakdown(
-      ["a", "b", "c", "d", "e", "f"].map((dim, i) => ({ dim, c1: 20 - i, c2: 10 })),
-      2,
-    );
+  it("compares a value folded into this period's Other inside Other, and keeps a new one apart", () => {
+    const manyHits = ["a", "b", "c", "d", "e", "f"].map((dim, i) => ({ dim, c1: 20 - i, c2: 10 }));
     const res = compareBreakdown(
-      many,
+      foldBreakdown(manyHits, 2),
+      manyHits,
       [
         { dim: "f", c1: 5, c2: 1 },
         { dim: "z", c1: 5, c2: 4 },
       ],
       2,
     );
-    const other = res.rows.find((r) => r.other);
-    expect(other?.prev).toMatchObject({ first: 10, last: 5 });
-    expect(res.rows.some((r) => r.prevOnly)).toBe(false);
+    expect(res.rows.find((r) => r.other && !r.prevOnly)?.prev).toMatchObject({ first: 5, last: 1 });
+    expect(res.rows.find((r) => r.value === "z")).toMatchObject({ prevOnly: true });
+  });
+
+  it("never folds a named previous value into this period's (not set) row", () => {
+    const hits = [
+      { dim: "Chrome", c1: 50, c2: 25 },
+      { dim: null, c1: 10, c2: 5 },
+    ];
+    const res = compareBreakdown(
+      foldBreakdown(hits, 2),
+      hits,
+      [
+        { dim: "Chrome", c1: 40, c2: 20 },
+        { dim: "Edge", c1: 200, c2: 100 },
+        { dim: "", c1: 4, c2: 1 },
+      ],
+      2,
+    );
+    expect(res.rows.find((r) => r.notSet && !r.prevOnly)?.prev).toMatchObject({
+      first: 4,
+      last: 1,
+    });
+    expect(res.rows.find((r) => r.value === "Edge")).toMatchObject({
+      prevOnly: true,
+      prev: { first: 200, last: 100 },
+    });
+  });
+
+  it("caps previous-only rows and folds the overflow into a previous-only Other", () => {
+    const prev = ["p1", "p2", "p3", "p4", "p5", "p6", "p7"].map((dim, i) => ({
+      dim,
+      c1: 10 - i,
+      c2: 1,
+    }));
+    const res = compareBreakdown(cur, curHits, prev, 2);
+    expect(res.rows.filter((r) => r.prevOnly && r.value !== null)).toHaveLength(5);
+    expect(res.rows.find((r) => r.prevOnly && r.other)?.prev?.first).toBe(5 + 4);
   });
 
   it("an empty previous period gives no previous conversion or change, Total included", () => {
-    const res = compareBreakdown(cur, [], 2);
+    const res = compareBreakdown(cur, curHits, [], 2);
     expect(res.rows.every((r) => r.prev === null)).toBe(true);
     expect(res.total?.conversion).toBeNull();
     expect(res.total?.change).toBeNull();
   });
 
   it("applies the 30 rule to each value", () => {
-    const res = compareBreakdown(cur, [{ dim: "card", c1: 30, c2: 15 }], 2);
+    const res = compareBreakdown(cur, curHits, [{ dim: "card", c1: 30, c2: 15 }], 2);
     expect(res.rows.find((r) => r.value === "card")?.prev?.change?.lowVolume).toBe(true);
   });
 });

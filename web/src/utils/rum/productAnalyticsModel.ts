@@ -1427,15 +1427,24 @@ export function exclusionRemoved(
   });
 }
 
+/** A breakdown hit's per-step counts, c1..cN. */
+export function hitCounts(h: Record<string, unknown>, steps: number): number[] {
+  return Array.from({ length: steps }, (_, i) => num(h[`c${i + 1}`]));
+}
+
+/** Whether a breakdown hit carries a value; an empty dim is "(not set)". */
+export function isNamedDim(h: Record<string, unknown>): boolean {
+  return h.dim !== null && h.dim !== undefined && h.dim !== "";
+}
+
 export function foldBreakdown(
   hits: Record<string, unknown>[],
   steps: number,
   top: number = BREAKDOWN_TOP,
 ): { rows: BreakdownRow[]; total: number[] } {
-  const counts = (h: Record<string, unknown>) =>
-    Array.from({ length: steps }, (_, i) => num(h[`c${i + 1}`]));
+  const counts = (h: Record<string, unknown>) => hitCounts(h, steps);
   const sorted = [...hits].sort((a, b) => num(b.c1) - num(a.c1));
-  const named = sorted.filter((h) => h.dim !== null && h.dim !== undefined && h.dim !== "");
+  const named = sorted.filter(isNamedDim);
   const head = named.slice(0, top);
   const rest = sorted.filter((h) => !head.includes(h));
   const conversion = (c: number[]) => (c[0] > 0 ? c[c.length - 1] / c[0] : 0);
@@ -1456,7 +1465,7 @@ export function foldBreakdown(
       (acc, h) => acc.map((v, i) => v + counts(h)[i]),
       Array(steps).fill(0),
     );
-    const notSet = rest.every((h) => h.dim === null || h.dim === undefined || h.dim === "");
+    const notSet = rest.every((h) => !isNamedDim(h));
     rows.push({
       value: null,
       label: "",

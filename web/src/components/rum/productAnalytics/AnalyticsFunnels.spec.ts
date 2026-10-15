@@ -2318,6 +2318,27 @@ describe("AnalyticsFunnels", () => {
         "Bars: share of step-1 sessions.",
       );
       expect(wrapper!.find('[data-test="rum-analytics-funnel-bar-previous"]').exists()).toBe(true);
+      // The previous run is enqueued after the current one, so it is the last funnel search.
+      const funnelRuns = calls().filter((q) => isFunnel(q.sql));
+      expect(funnelRuns.at(-1)!.end_time).toBe(useProductAnalytics().range.value!.startUs);
+      expect(funnelRuns.at(-2)!.end_time).toBe(useProductAnalytics().range.value!.endUs);
+    });
+
+    it("a one-step funnel shows only the current range in the headline", async () => {
+      answerPrevious(prevHit([100]));
+      await mountFunnels({ fc: "prev" });
+      await setSteps([["p", "/a"]]);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-overall-range"]').exists()).toBe(true);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-overall-change"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("a funnel with no steps keeps the compare-off layout", async () => {
+      await mountFunnels({ fc: "prev" });
+      expect(useProductAnalytics().funnelCompare.value).toBe(true);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-compare-vs"]').exists()).toBe(false);
+      expect(prevCalls()).toHaveLength(0);
     });
 
     it("an empty previous period says so in words and shows dashes, not 0% or 100%", async () => {
@@ -2388,6 +2409,12 @@ describe("AnalyticsFunnels", () => {
       expect(text("rum-analytics-funnel-breakdown-row-0-prev")).toBe("50.0%");
       expect(text("rum-analytics-funnel-breakdown-row-1-prev")).toBe("—");
       expect(table.text()).toContain("Safari");
+      const safari = table
+        .findAll("[data-test^=rum-analytics-funnel-breakdown-row-]")
+        .find((c) => c.text() === "Safari")!
+        .element.closest("tr")!.textContent!;
+      // Steps and this period's conversion are dashes; only the previous period has a value.
+      expect(safari).toBe("Safari———50.0%—");
     });
   });
 });
