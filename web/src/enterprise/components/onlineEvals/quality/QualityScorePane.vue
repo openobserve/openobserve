@@ -133,8 +133,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               t("onlineEvals.quality.pane.reasoning")
             }}</span>
           </template>
+          <!-- Waits for the input and output too, so the reasoning never shows before what it judges. -->
           <div
-            v-if="loading"
+            v-if="contentLoading"
             class="flex flex-col gap-2 px-3 pb-2"
             data-test="quality-score-pane-reasoning-skeleton"
           >
