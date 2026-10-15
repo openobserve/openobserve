@@ -114,14 +114,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="mode === 'visualize'">
           <QueryHistoryDrawer @load="onHistoryLoad" />
           <OButton
-            variant="primary"
+            :variant="isVisualizePending ? 'pending' : 'primary'"
             size="sm-toolbar"
             icon-left="play-arrow"
             data-test="metrics-explorer-run"
+            :data-run-pending="isVisualizePending ? 'true' : undefined"
+            :aria-label="isVisualizePending ? t('search.runQueryPendingLabel') : undefined"
             @click="onVisualizeRun"
           >
             <span class="max-md:hidden">{{ t("metrics.runQuery") }}</span>
-            <OTooltip :content="t('metrics.runQuery')" shortcut-id="metricsRunQuery" />
+            <OTooltip
+              :content="isVisualizePending ? t('search.autoRunPendingDot') : t('metrics.runQuery')"
+              shortcut-id="metricsRunQuery"
+            />
           </OButton>
         </template>
         <OButton
@@ -1318,6 +1323,9 @@ export default defineComponent({
     // The mounted Visualize pane — the toolbar's refresh drives its runQuery in
     // visualize mode.
     const visualizeRef = ref<any>(null);
+    const isVisualizePending = computed(
+      () => mode.value === "visualize" && (visualizeRef.value?.isRunQueryPending ?? false),
+    );
 
     // The toolbar window as a CONSUMABLE absolute range (ms) for the Visualize
     // chart. The picker's v-model is a RELATIVE descriptor ({relativeTimePeriod:
@@ -2277,6 +2285,7 @@ export default defineComponent({
       onRouteQueryChange,
       visualizeSeed,
       visualizeRef,
+      isVisualizePending,
       visualizeDateTime,
       shareUrl,
       onDateChange,

@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import {
+  computed,
   defineComponent,
   ref,
   provide,
@@ -71,6 +72,7 @@ import type { SelectedDate } from "@/utils/dashboard/urlTimeParams";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import type { PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 import AddToDashboard from "../AddToDashboard.vue";
+import { panelPayloadSignature } from "@/composables/dashboard/usePanelLivePreview";
 
 export default defineComponent({
   name: "MetricsVisualize",
@@ -219,6 +221,16 @@ export default defineComponent({
       panelEditorRef.value?.runQuery?.();
     };
 
+    // The editor's chartData is the last-run snapshot; the payload check also covers edits its isOutDated config diff skips.
+    const isRunQueryPending = computed(() => {
+      const editor = panelEditorRef.value;
+      if (!editor || editor.isLoading) return false;
+      if (editor.isOutDated) return true;
+      const applied = editor.chartData;
+      if (!applied?.queries) return false;
+      return panelPayloadSignature(applied) !== panelPayloadSignature(dashboardPanelData.data);
+    });
+
     const { record } = useQueryHistoryRecorder();
 
     /** An explicit Run (button or shortcut): the only run that writes history. */
@@ -285,6 +297,7 @@ export default defineComponent({
       runQuery,
       onUserRun,
       applyPanelData,
+      isRunQueryPending,
     };
   },
 });
