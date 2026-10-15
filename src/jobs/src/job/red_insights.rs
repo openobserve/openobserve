@@ -95,15 +95,6 @@ async fn reconcile(org_id: &str, prefetched: Option<Vec<serde_json::Value>>) -> 
     let mut reads = read_streams(org_id).await;
     let volumes = service_volumes(org_id, &mut reads).await;
     let detectors: Vec<_> = configs.iter().filter_map(managed_detector).collect();
-    let widened: Vec<_> = detectors
-        .iter()
-        .filter_map(|d| {
-            Some((
-                d.id.clone(),
-                red_insights::widened_window(d.detection_window_seconds)?,
-            ))
-        })
-        .collect();
     retire_removed_streams(org_id, &detectors, &mut reads).await;
     let existing = red_insights::on_read_streams(detectors, &reads);
     // Uncapped here: a signal the template skips must not use up the per-cycle create budget.
@@ -117,11 +108,6 @@ async fn reconcile(org_id: &str, prefetched: Option<Vec<serde_json::Value>>) -> 
     );
     for id in &plan.delete {
         delete(org_id, id).await;
-    }
-    for (id, window) in widened {
-        if !plan.delete.contains(&id) {
-            widen_window(org_id, &id, window).await;
-        }
     }
 
     let templates: Vec<_> = plan
@@ -190,30 +176,12 @@ fn managed_detector(config: &serde_json::Value) -> Option<ManagedDetector> {
             .and_then(|v| v.as_bool())
             .unwrap_or(true),
         current,
-        detection_window_seconds: config
-            .get("detection_window_seconds")
-            .and_then(|v| v.as_i64())
-            .unwrap_or_default(),
     })
 }
 
 async fn delete(org_id: &str, anomaly_id: &str) {
     if let Err(e) = anomaly_detection::delete_config(org_id, anomaly_id).await {
         log::error!("[RED insights] org {org_id}: failed to delete {anomaly_id}: {e}");
-    }
-}
-
-async fn widen_window(org_id: &str, anomaly_id: &str, detection_window_seconds: i64) {
-    let req = anomaly_detection::UpdateAnomalyConfigRequest {
-        detection_window_seconds: Some(detection_window_seconds),
-        ..Default::default()
-    };
-    // Judged on the row being written, so a user edit made since the listing wins.
-    let widened = anomaly_detection::update_config_if(org_id, anomaly_id, req, |stored| {
-        red_insights::widened_window(stored.detection_window_seconds).is_some()
-    });
-    if let Err(e) = widened.await {
-        log::error!("[RED insights] org {org_id}: failed to widen the window of {anomaly_id}: {e}");
     }
 }
 

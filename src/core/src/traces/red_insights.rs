@@ -29,10 +29,7 @@ pub const MAX_CREATES: usize = 15;
 
 const HISTOGRAM_INTERVAL: &str = "5m";
 const SCHEDULE_INTERVAL: &str = "1h";
-/// The UI default; it exceeds 2*(schedule+bucket)+absence slack, so late runs skip nothing.
 const DETECTION_WINDOW_SECONDS: i64 = 10_800;
-/// Earlier releases stored this window on every detector; `widened_window` replaces it.
-const LEGACY_DETECTION_WINDOW_SECONDS: i64 = 3_900;
 const MIN_BUCKET_REQUESTS: u32 = 20;
 const NAME_SEPARATOR: &str = " · ";
 /// Alert names forbid `/`; U+2215 reads the same and the web strip maps it back.
@@ -112,7 +109,6 @@ pub struct ManagedDetector {
     pub enabled: bool,
     /// SQL equal to today's template; a non-current detector is deleted only by setting-off.
     pub current: bool,
-    pub detection_window_seconds: i64,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -352,11 +348,6 @@ pub fn template(
     })
 }
 
-/// Any window but the legacy one is user-set and kept.
-pub fn widened_window(stored_window_seconds: i64) -> Option<i64> {
-    (stored_window_seconds == LEGACY_DETECTION_WINDOW_SECONDS).then_some(DETECTION_WINDOW_SECONDS)
-}
-
 /// Recovers `(service, signal, current)` from the tag and the SQL, never the editable name.
 pub fn parse_managed(
     tags: &[String],
@@ -495,7 +486,6 @@ mod tests {
             signal,
             enabled,
             current: true,
-            detection_window_seconds: DETECTION_WINDOW_SECONDS,
         }
     }
 
@@ -560,7 +550,6 @@ mod tests {
                 signal: *signal,
                 enabled: true,
                 current: true,
-                detection_window_seconds: DETECTION_WINDOW_SECONDS,
             });
         }
     }
@@ -1265,17 +1254,5 @@ mod tests {
             let shown = displayable(plan.as_ref()).indent(true).to_string();
             assert!(shown.contains("AggregateTopkExec"), "{sql}\n{shown}");
         }
-    }
-
-    #[test]
-    fn widened_window_replaces_only_the_legacy_window() {
-        assert_eq!(
-            widened_window(LEGACY_DETECTION_WINDOW_SECONDS),
-            Some(DETECTION_WINDOW_SECONDS)
-        );
-        assert_eq!(widened_window(DETECTION_WINDOW_SECONDS), None);
-        assert_eq!(widened_window(7_200), None);
-        let created = template("default", "svc", RedSignal::Rate, &ALL_COLS).unwrap();
-        assert_eq!(created.detection_window_seconds, DETECTION_WINDOW_SECONDS);
     }
 }

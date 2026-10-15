@@ -841,28 +841,13 @@ pub async fn check_update_config(
 pub async fn update_config(
     org_id: &str,
     anomaly_id: &str,
-    req: UpdateAnomalyConfigRequest,
-) -> Result<serde_json::Value> {
-    update_config_if(org_id, anomaly_id, req, |_| true)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("Config not found"))
-}
-
-/// [`update_config`] gated on the stored row; `Ok(None)` when `precondition` rejects it.
-pub async fn update_config_if(
-    org_id: &str,
-    anomaly_id: &str,
     mut req: UpdateAnomalyConfigRequest,
-    precondition: impl FnOnce(&infra::table::entity::anomaly_detection_config::Model) -> bool,
-) -> Result<Option<serde_json::Value>> {
+) -> Result<serde_json::Value> {
     let db = get_orm_client_rw().await;
 
     // Fetch existing config — into_active_model() on a DB-fetched model sets the PK as
     // Unchanged, which is required for SeaORM to generate UPDATE … WHERE anomaly_id = ?
     let existing = config_to_update(db, org_id, anomaly_id).await?;
-    if !precondition(&existing) {
-        return Ok(None);
-    }
     checked_update_body(&mut req, &existing)?;
 
     let previous = existing.clone();
@@ -1130,7 +1115,7 @@ pub async fn update_config_if(
     if let Some(obj) = val.as_object_mut() {
         obj.insert("folder_id".to_string(), serde_json::Value::String(name));
     }
-    Ok(Some(val))
+    Ok(val)
 }
 
 /// Delete an anomaly detection configuration
