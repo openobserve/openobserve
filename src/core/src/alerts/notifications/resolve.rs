@@ -167,11 +167,12 @@ fn substitute_raw_row(
     row: &config::utils::json::Map<String, config::utils::json::Value>,
     unknown: &mut Vec<String>,
 ) -> String {
-    if input.trim() == "{...row}" {
+    let spread_enabled = !row.contains_key("...row");
+    if spread_enabled && input.trim() == "{...row}" {
         return serde_json::to_string(row).unwrap_or_default();
     }
 
-    if input.contains("{...row}") {
+    if spread_enabled && input.contains("{...row}") {
         let json = serde_json::to_string(row).unwrap_or_default();
         // Expand only source tokens, after resolving fields and unknown markers in each segment.
         return input
@@ -922,5 +923,33 @@ mod tests {
             "row={}"
         );
         assert!(unknown.is_empty());
+    }
+
+    #[test]
+    fn spread_row_preserves_literal_field_precedence() {
+        for value in [
+            serde_json::json!("literal value"),
+            serde_json::json!(""),
+            serde_json::json!(null),
+            serde_json::json!({"nested": true}),
+        ] {
+            let row = serde_json::from_value(serde_json::json!({
+                "...row": value,
+                "host": "web-1"
+            }))
+            .unwrap();
+            let field = super::super::custom::stringify_row_value(&value);
+            let short = field.chars().take(4).collect::<String>();
+            for (input, expected) in [
+                ("{...row}", field.clone()),
+                ("  {...row}  ", format!("  {field}  ")),
+                ("{...row:4}", short.clone()),
+                ("{...row} | {...row:4}", format!("{field} | {short}")),
+            ] {
+                let mut unknown = Vec::new();
+                assert_eq!(substitute_raw_row(input, &row, &mut unknown), expected);
+                assert!(unknown.is_empty());
+            }
+        }
     }
 }

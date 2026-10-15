@@ -3775,7 +3775,8 @@ fn process_row_templates_plain(
     let is_json_template = row_type == RowTemplateType::Json;
 
     for (row, tpl) in rows.iter().zip(templates) {
-        if tpl.template.trim() == "{...row}" {
+        let spread_enabled = !row.contains_key("...row");
+        if spread_enabled && tpl.template.trim() == "{...row}" {
             rows_tpl.push(if is_json_template {
                 Value::Object(row.clone())
             } else {
@@ -3785,7 +3786,7 @@ fn process_row_templates_plain(
         }
         let mut resp = tpl.template.clone();
         // Protect source tokens so row values cannot introduce or alter a spread expansion.
-        let spread_marker = resp.contains("{...row}").then(|| {
+        let spread_marker = (spread_enabled && resp.contains("{...row}")).then(|| {
             let marker = format!("\u{e000}{:032x}\u{e001}", rand::random::<u128>());
             resp = resp.replace("{...row}", &marker);
             marker
@@ -6079,6 +6080,40 @@ mod tests {
             };
             assert_eq!(result, vec![expected]);
         }
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_preserves_literal_field_precedence() {
+        let rows = vec![
+            serde_json::from_value(json!({
+                "...row": "literal value",
+                "host": "web-1"
+            }))
+            .unwrap(),
+        ];
+        for row_type in [RowTemplateType::String, RowTemplateType::Json] {
+            for (template, expected) in [
+                ("{...row}", "literal value"),
+                ("  {...row}  ", "  literal value  "),
+                ("{...row:4}", "lite"),
+                ("{...row} | {...row:4}", "literal value | lite"),
+            ] {
+                assert_eq!(
+                    process_row_template("test_org", template, &Alert::default(), row_type, &rows),
+                    vec![Value::String(expected.into())]
+                );
+            }
+        }
+        assert_eq!(
+            process_row_template(
+                "test_org",
+                r#"{"value":"{...row}","short":"{...row:4}"}"#,
+                &Alert::default(),
+                RowTemplateType::Json,
+                &rows,
+            ),
+            vec![json!({"value": "literal value", "short": "lite"})]
+        );
     }
 
     #[test]
