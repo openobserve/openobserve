@@ -610,3 +610,14 @@ describe("unhealthy share at the ends", () => {
     expect(barShare(null)).toBe(0);
   });
 });
+
+describe("categorical rule", () => {
+  const categorical = (healthyThreshold: unknown) =>
+    ({ name: "c", dataType: "categorical", categories: ["a", "b"], healthyThreshold }) as any;
+
+  it("says none for an empty healthy list, which the backend reads as every score unhealthy", () => {
+    expect(String(thresholdForConfig(categorical({ healthy_categories: [] })).label)).toBe("none");
+    expect(String(thresholdForConfig(categorical({ healthy_categories: ["a"] })).label)).toBe("a");
+    expect(String(thresholdForConfig(categorical({})).label)).toBe("");
+  });
+});

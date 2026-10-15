@@ -17056,6 +17056,7 @@
         }
       },
       "healthyIf": "Healthy if {rule}",
+      "noHealthyValue": "none",
       "setThreshold": "Set a healthy threshold",
       "noScoresInWindow": "No scores in this window",
       "outOf": "{count} out of {total}",
