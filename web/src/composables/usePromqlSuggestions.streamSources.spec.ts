@@ -48,6 +48,7 @@ vi.mock("@/services/stream", async (importOriginal) => {
 vi.mock("@/composables/fieldValueStore", () => ({
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue([]),
   requestFieldValues: vi.fn().mockResolvedValue([]),
+  pendingFieldValues: vi.fn(() => null),
   fieldValuesUnavailable: vi.fn(() => false),
 }));
 // A SINGLE mutable store, so a test can switch organisation the way the app

@@ -281,12 +281,12 @@ export const getFieldValuesForSuggestion = async (
 const inFlightRequests = new Map<string, Promise<string[]>>();
 const suppressedUntil = new Map<string, number>();
 const failedKeys = new Set<string>();
-const recentAnswers = new Map<string, { values: string[]; ts: number }>();
+const recentAnswers = new Map<string, { values: string[]; ts: number; truncated: boolean }>();
 const slowAnswers = new Map<string, Promise<string[]>>();
 
-const rememberAnswer = (key: string, values: string[]): void => {
+const rememberAnswer = (key: string, values: string[], truncated: boolean): void => {
   recentAnswers.delete(key);
-  recentAnswers.set(key, { values, ts: Date.now() });
+  recentAnswers.set(key, { values, ts: Date.now(), truncated });
   if (recentAnswers.size > READ_CACHE_MAX_ENTRIES) {
     recentAnswers.delete(recentAnswers.keys().next().value as string);
   }
@@ -348,13 +348,14 @@ const storeAnswer = (
   key: string,
   values: string[],
   transient: boolean,
+  truncated: boolean,
 ): void => {
   if (!values.length) {
     suppressedUntil.set(key, Date.now() + VALUES_RETRY_COOLDOWN_MS);
     return;
   }
   suppressedUntil.delete(key);
-  rememberAnswer(key, values);
+  rememberAnswer(key, values, truncated);
   if (transient) return;
   setCacheEntry(key, values);
   captureFromValuesApi(
@@ -400,6 +401,19 @@ export const pendingFieldValues = (
     ),
   ) ?? null;
 
+/** True when the server's last answer for this lookup filled a whole page, so more values may exist. */
+export const fieldValuesTruncated = (
+  ctx: StreamContext,
+  fieldName: string,
+  options: Pick<ValueLookupOptions, "timeRange" | "keyword"> = {},
+): boolean =>
+  recentAnswers.get(
+    withKeyword(
+      makeLookupKey(ctx, fieldName, options.timeRange),
+      options.keyword?.trim() || undefined,
+    ),
+  )?.truncated ?? false;
+
 export const requestFieldValues = async (
   ctx: StreamContext,
   fieldName: string,
@@ -441,12 +455,15 @@ export const requestFieldValues = async (
     })
     .then(
       (response: any) => {
-        const values: string[] = (response?.data?.hits?.[0]?.values ?? [])
+        const raw: any[] = response?.data?.hits?.[0]?.values ?? [];
+        const values: string[] = raw
           .map((entry: any) => String(entry?.zo_sql_key ?? ""))
           .filter((value: string) => value.length > 0);
         failedKeys.delete(key);
         options.onFetched?.(Date.now() - started);
-        storeAnswer(ctx, fieldName, key, values, !!(range || keyword));
+        // Counted before blanks are dropped: a full page is truncated even when one of its values was empty.
+        const truncated = raw.length >= VALUES_REQUEST_SIZE;
+        storeAnswer(ctx, fieldName, key, values, !!(range || keyword), truncated);
         return values;
       },
       () => {
@@ -488,7 +505,7 @@ const coveredByCompleteAnswer = (lookupKey: string, keyword: string): string[] |
     if (key !== lookupKey && !key.startsWith(lookupKey + KEYWORD_MARK)) continue;
     const shorter = key === lookupKey ? "" : key.slice(lookupKey.length + KEYWORD_MARK.length);
     const fresh = Date.now() - answer.ts < READ_CACHE_TTL_MS;
-    if (fresh && wanted.includes(shorter) && answer.values.length < VALUES_REQUEST_SIZE) {
+    if (fresh && wanted.includes(shorter) && !answer.truncated) {
       return answer.values.filter((value) => value.toLowerCase().includes(wanted));
     }
   }
