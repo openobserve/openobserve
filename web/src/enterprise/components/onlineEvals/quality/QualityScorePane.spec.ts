@@ -150,8 +150,10 @@ describe("QualityScorePane", () => {
     expect(io.find('[data-test="ai-review-content-empty-input"]').exists()).toBe(false);
   });
 
-  it("shows the reasoning in a bordered collapsible block, open by default", () => {
-    const block = mountPane().find('[data-test="quality-score-pane-reasoning"]');
+  it("shows the reasoning in a bordered collapsible block, open by default", async () => {
+    const wrapper = mountPane();
+    await flushPromises();
+    const block = wrapper.find('[data-test="quality-score-pane-reasoning"]');
     expect(block.classes()).toEqual(
       expect.arrayContaining(["border", "border-border-default", "rounded-default"]),
     );
@@ -169,6 +171,7 @@ describe("QualityScorePane", () => {
 
   it("folds and unfolds the reasoning, and keeps it folded across scores", async () => {
     const wrapper = mountPane();
+    await flushPromises();
     const toggle = () =>
       wrapper.find('[data-test="quality-score-pane-reasoning"] button').trigger("click");
     await toggle();
@@ -176,13 +179,15 @@ describe("QualityScorePane", () => {
     await wrapper.setProps({ score: score({ id: "s2", reasoning: "Second reasoning." }) });
     expect(wrapper.text()).not.toContain("Second reasoning.");
     await toggle();
+    await flushPromises();
     expect(wrapper.find('[data-test="quality-score-pane-reasoning-text"]').text()).toBe(
       "Second reasoning.",
     );
   });
 
-  it("says so inside the reasoning block when the judge gave none", () => {
+  it("says so inside the reasoning block when the judge gave none", async () => {
     const wrapper = mountPane({ score: score({ reasoning: null }) });
+    await flushPromises();
     expect(wrapper.find('[data-test="quality-score-pane-no-reasoning"]').text()).toBe(
       "No reasoning recorded",
     );
@@ -328,8 +333,10 @@ describe("QualityScorePane", () => {
       ...WINDOW,
       hint_ts: 1791199600000000,
     });
-    // While loading: a skeleton in each box, the frames kept, no preview and no note.
+    // While loading: a skeleton in each box and in the reasoning, the frames kept, no preview and no note.
     expect(skeletons(wrapper)).toEqual(["input", "output"]);
+    expect(wrapper.find('[data-test="quality-score-pane-reasoning-skeleton"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("The answer ignores the format");
     expect(io(wrapper)).toEqual([]);
     expect(wrapper.text()).not.toContain("Write VRL to parse JSON");
     expect(wrapper.find('[data-test="ai-review-content-copy-input"]').exists()).toBe(true);
@@ -354,6 +361,9 @@ describe("QualityScorePane", () => {
     ]);
     expect(unavailable(wrapper).exists()).toBe(false);
     expect(skeletons(wrapper)).toEqual([]);
+    expect(wrapper.find('[data-test="quality-score-pane-reasoning-text"]').text()).toBe(
+      "The answer ignores the format the user asked for.",
+    );
   });
 
   it("reads a trace score from the root chat span, as the scorer does", async () => {
@@ -559,16 +569,17 @@ describe("QualityScorePane", () => {
     expect(wrapper.find('[data-test="quality-score-pane-add-to-dataset"]').exists()).toBe(false);
     expect(traceDetails).not.toHaveBeenCalled();
 
-    // The page lands: the score shows and the header and reasoning skeletons go, the trace text then loads.
+    // The page lands: the header shows, and the boxes and the reasoning wait for the full text.
     await wrapper.setProps({ score: score(), loading: false });
     expect(wrapper.find('[data-test="quality-score-pane-header-skeleton"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="quality-score-pane-reasoning-skeleton"]').exists()).toBe(true);
+    expect(skeletons(wrapper)).toEqual(["input", "output"]);
+    await flushPromises();
+    expect(skeletons(wrapper)).toEqual([]);
     expect(wrapper.find('[data-test="quality-score-pane-reasoning-skeleton"]').exists()).toBe(
       false,
     );
     expect(wrapper.find('[data-test="quality-score-pane-reasoning-text"]').exists()).toBe(true);
-    expect(skeletons(wrapper)).toEqual(["input", "output"]);
-    await flushPromises();
-    expect(skeletons(wrapper)).toEqual([]);
   });
 
   it("emits previous and next, and disables what cannot move", async () => {
