@@ -6680,6 +6680,8 @@
       "refresh": "Làm mới",
       "refreshCacheReload": "Làm mới cache & tải lại",
       "moreRefreshOptions": "Thêm tùy chọn làm mới",
+      "autoRunDescription": "Chạy truy vấn khi mở và khi bộ lọc/thời gian thay đổi",
+      "autoRunScope": "Áp dụng cho tất cả bảng điều khiển, Nhật ký và Trace",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Không tìm thấy dashboard hoặc đã bị xóa. Đang chuyển hướng đến danh sách dashboard.",
       "failedToLoadDashboard": "Không thể tải dashboard. Đang chuyển hướng đến danh sách dashboard.",
@@ -6689,9 +6691,7 @@
       "panelMoveFailed": "Di chuyển panel thất bại",
       "failedToFetchReports": "Không thể tải báo cáo",
       "failedToUpdateJson": "Không thể cập nhật JSON dashboard: Phương thức lưu không khả dụng",
-      "failedToSaveChanges": "Không thể lưu thay đổi dashboard",
-      "autoRunDescription": "Chạy truy vấn khi mở và khi bộ lọc/thời gian thay đổi",
-      "autoRunScope": "Áp dụng cho tất cả bảng điều khiển, Nhật ký và Trace"
+      "failedToSaveChanges": "Không thể lưu thay đổi dashboard"
     },
     "dynamicFunctionPopUp": {
       "property": "Thuộc tính",
@@ -6964,6 +6964,8 @@
     "exitAnnotationsMode": "Thoát chế độ chú thích",
     "addAnnotations": "Thêm chú thích",
     "refreshToApplyVariables": "Làm mới để áp dụng các thay đổi biến mới nhất",
+    "refreshToApplyTimeRange": "Làm mới để áp dụng phạm vi thời gian",
+    "refreshToApplyTimeRangeAndVariables": "Làm mới để áp dụng phạm vi thời gian và các thay đổi biến",
     "moveToAnotherFolder": "Di chuyển {type} đến thư mục khác",
     "rawQueryBuilder": {
       "query": "Truy vấn",
@@ -7145,9 +7147,7 @@
       "markerAria": "Exemplar {value} lúc {time}"
     },
     "showExemplarsLabel": "Hiển thị exemplar",
-    "showExemplarsHelp": "Vẽ mẫu trace trên biểu đồ này cho tất cả những ai mở bảng điều khiển. Người xem vẫn có thể ẩn chúng từ tiêu đề panel.",
-    "refreshToApplyTimeRange": "Làm mới để áp dụng phạm vi thời gian",
-    "refreshToApplyTimeRangeAndVariables": "Làm mới để áp dụng phạm vi thời gian và các thay đổi biến"
+    "showExemplarsHelp": "Vẽ mẫu trace trên biểu đồ này cho tất cả những ai mở bảng điều khiển. Người xem vẫn có thể ẩn chúng từ tiêu đề panel."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8078,7 +8078,13 @@
       "emptyTitle": "Không có lần chạy nào trong {days} ngày qua",
       "emptyDescription": "Bảng điều khiển sẽ hiển thị dữ liệu sau khi hiệu chuẩn cảnh báo chạy."
     },
+    "lastRun": {
+      "succeeded": "Lần chạy cuối cùng đã thành công {time}.",
+      "failed": "Lần chạy cuối cùng đã thất bại {time}, nên bản tóm tắt mới nhất có thể đã lỗi thời: {error}",
+      "none": "Chưa có lần chạy nào được thực hiện."
+    },
     "settings": {
+      "title": "Cài đặt hiệu chỉnh cảnh báo",
       "schedule": "Lịch chạy",
       "enabled": "Chạy hiệu chuẩn cảnh báo cho tổ chức này",
       "enabledHelp": "Khi tắt, tổ chức không có lần chạy theo lịch nào. Bật lên sẽ khiến lần chạy đầu tiên đến hạn ngay lập tức.",
@@ -8102,6 +8108,7 @@
       "runNowHeading": "Chạy ngay",
       "findingsHeading": "Kết quả và quyền truy cập",
       "findingsDesc": "Mỗi lần chạy ghi kết quả của nó dưới dạng bản ghi nhật ký vào stream {stream} của tổ chức này, được lưu theo thời gian lưu trữ của stream đó.",
+      "accessNote": "Quyền Hiệu chỉnh cảnh báo trong một vai trò quyết định quyền truy cập: Get để đọc các phát hiện, Update để thay đổi các cài đặt này và Create để yêu cầu một lần chạy. Các phát hiện bao gồm mọi cảnh báo trong tổ chức, kể cả những cảnh báo mà người đọc không thể mở. Hiệu chỉnh cảnh báo không gửi thông báo nào.",
       "frequencyRange": "Chọn chu kỳ từ 1 phút đến 30 ngày.",
       "windowRange": "Chọn cửa sổ từ 1 phút đến 1 năm."
     }

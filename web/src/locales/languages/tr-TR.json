@@ -6680,6 +6680,8 @@
       "refresh": "Yenile",
       "refreshCacheReload": "Önbelleği yenile ve yeniden yükle",
       "moreRefreshOptions": "Daha fazla yenileme seçeneği",
+      "autoRunDescription": "Açıldığında ve filtre/zaman değişikliklerinde sorguları çalıştırır",
+      "autoRunScope": "Tüm gösterge panoları, Günlükler ve İzler için geçerlidir",
       "dashboard": "Pano",
       "dashboardNotFound": "Pano bulunamadı veya silinmiş. Pano listesine yönlendiriliyor.",
       "failedToLoadDashboard": "Pano yüklenemedi. Pano listesine yönlendiriliyor.",
@@ -6689,9 +6691,7 @@
       "panelMoveFailed": "Panel taşıma başarısız",
       "failedToFetchReports": "Raporlar alınamadı",
       "failedToUpdateJson": "Pano JSON güncellenemedi: Kaydetme yöntemi mevcut değil",
-      "failedToSaveChanges": "Pano değişiklikleri kaydedilemedi",
-      "autoRunDescription": "Açıldığında ve filtre/zaman değişikliklerinde sorguları çalıştırır",
-      "autoRunScope": "Tüm gösterge panoları, Günlükler ve İzler için geçerlidir"
+      "failedToSaveChanges": "Pano değişiklikleri kaydedilemedi"
     },
     "dynamicFunctionPopUp": {
       "property": "Özellik",
@@ -6964,6 +6964,8 @@
     "exitAnnotationsMode": "Açıklama Modundan Çık",
     "addAnnotations": "Açıklama Ekle",
     "refreshToApplyVariables": "En son değişken değişikliklerini uygulamak için yenileyin",
+    "refreshToApplyTimeRange": "Zaman aralığını uygulamak için yenileyin",
+    "refreshToApplyTimeRangeAndVariables": "Zaman aralığını ve değişken değişikliklerini uygulamak için yenileyin",
     "moveToAnotherFolder": "{type} Başka Bir Klasöre Taşı",
     "rawQueryBuilder": {
       "query": "Sorgu",
@@ -7145,9 +7147,7 @@
       "markerAria": "{time} zamanındaki örnek {value}"
     },
     "showExemplarsLabel": "Örnekleri göster",
-    "showExemplarsHelp": "Bu grafikte, gösterge panosunu açan herkes için iz örneklerini çizer. Görüntüleyenler bunları yine de panel başlığından gizleyebilir.",
-    "refreshToApplyTimeRange": "Zaman aralığını uygulamak için yenileyin",
-    "refreshToApplyTimeRangeAndVariables": "Zaman aralığını ve değişken değişikliklerini uygulamak için yenileyin"
+    "showExemplarsHelp": "Bu grafikte, gösterge panosunu açan herkes için iz örneklerini çizer. Görüntüleyenler bunları yine de panel başlığından gizleyebilir."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8078,7 +8078,13 @@
       "emptyTitle": "Son {days} günde çalışma yok",
       "emptyDescription": "Gösterge paneli, uyarı kalibrasyonu çalıştırıldıktan sonra dolar."
     },
+    "lastRun": {
+      "succeeded": "Son çalıştırma {time} tarihinde başarılı oldu.",
+      "failed": "Son çalıştırma {time} tarihinde başarısız oldu, bu nedenle en yeni özet güncel olmayabilir: {error}",
+      "none": "Henüz bir çalıştırma denenmedi."
+    },
     "settings": {
+      "title": "Uyarı Kalibrasyonu ayarları",
       "schedule": "Zamanlama",
       "enabled": "Bu organizasyon için uyarı kalibrasyonunu çalıştır",
       "enabledHelp": "Kapalıyken, organizasyonun zamanlanmış bir çalışması olmaz. Açıldığında, ilk çalışma hemen başlar.",
@@ -8102,6 +8108,7 @@
       "runNowHeading": "Şimdi çalıştır",
       "findingsHeading": "Bulgular ve erişim",
       "findingsDesc": "Her çalışma, bulgularını bu organizasyonun {stream} akışına günlük kaydı olarak yazar ve bu kayıtlar o akışın saklama süresi boyunca tutulur.",
+      "accessNote": "Bir roldeki Uyarı Kalibrasyonu izni erişimi belirler: Bulguları okumak için Get, bu ayarları değiştirmek için Update ve çalıştırma istemek için Create. Bulgular, okuyucunun açamadığı uyarılar dahil olmak üzere organizasyondaki her uyarıyı kapsar. Uyarı kalibrasyonu hiçbir bildirim göndermez.",
       "frequencyRange": "1 dakika ile 30 gün arasında bir sıklık seçin.",
       "windowRange": "1 dakika ile 1 yıl arasında bir pencere seçin."
     }

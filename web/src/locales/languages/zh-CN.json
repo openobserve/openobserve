@@ -6680,6 +6680,8 @@
       "refresh": "刷新",
       "refreshCacheReload": "刷新缓存并重新加载",
       "moreRefreshOptions": "更多刷新选项",
+      "autoRunDescription": "打开时以及过滤器/时间变更时运行查询",
+      "autoRunScope": "适用于所有仪表盘、日志和追踪",
       "dashboard": "仪表盘",
       "dashboardNotFound": "未找到仪表盘或已被删除。正在重定向到仪表盘列表。",
       "failedToLoadDashboard": "加载仪表盘失败。正在重定向到仪表盘列表。",
@@ -6689,9 +6691,7 @@
       "panelMoveFailed": "面板移动失败",
       "failedToFetchReports": "获取报告失败",
       "failedToUpdateJson": "更新仪表盘JSON失败：保存方法不可用",
-      "failedToSaveChanges": "保存仪表盘更改失败",
-      "autoRunDescription": "打开时以及过滤器/时间变更时运行查询",
-      "autoRunScope": "适用于所有仪表盘、日志和追踪"
+      "failedToSaveChanges": "保存仪表盘更改失败"
     },
     "dynamicFunctionPopUp": {
       "property": "属性",
@@ -6964,6 +6964,8 @@
     "exitAnnotationsMode": "退出标注模式",
     "addAnnotations": "添加标注",
     "refreshToApplyVariables": "刷新以应用最新的变量更改",
+    "refreshToApplyTimeRange": "刷新以应用时间范围",
+    "refreshToApplyTimeRangeAndVariables": "刷新以应用时间范围和变量变更",
     "moveToAnotherFolder": "将 {type} 移动到另一个文件夹",
     "rawQueryBuilder": {
       "query": "查询",
@@ -7145,9 +7147,7 @@
       "markerAria": "示例 {value}，时间 {time}"
     },
     "showExemplarsLabel": "显示示例",
-    "showExemplarsHelp": "在打开该仪表盘的所有人的图表上绘制追踪样本。查看者仍可从面板标题栏隐藏它们。",
-    "refreshToApplyTimeRange": "刷新以应用时间范围",
-    "refreshToApplyTimeRangeAndVariables": "刷新以应用时间范围和变量变更"
+    "showExemplarsHelp": "在打开该仪表盘的所有人的图表上绘制追踪样本。查看者仍可从面板标题栏隐藏它们。"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8078,7 +8078,13 @@
       "emptyTitle": "过去 {days} 天内没有运行记录",
       "emptyDescription": "告警校准运行后，仪表盘才会填充数据。"
     },
+    "lastRun": {
+      "succeeded": "上次运行已于 {time} 成功。",
+      "failed": "上次运行于 {time} 失败，因此最新摘要可能已过期：{error}",
+      "none": "尚未尝试任何运行。"
+    },
     "settings": {
+      "title": "告警校准设置",
       "schedule": "调度",
       "enabled": "为此组织运行告警校准",
       "enabledHelp": "关闭时，该组织没有计划运行。开启后会立即到期执行首次运行。",
@@ -8102,6 +8108,7 @@
       "runNowHeading": "立即运行",
       "findingsHeading": "发现与访问权限",
       "findingsDesc": "每次运行都会将发现作为日志记录写入此组织的 {stream} 数据流，并保留至该数据流的保留期。",
+      "accessNote": "角色中的告警校准权限决定访问范围：Get 可查看发现结果，Update 可更改这些设置，Create 可请求运行。发现结果涵盖组织中的所有告警，包括查看者无法打开的告警。告警校准不发送任何通知。",
       "frequencyRange": "请选择介于 1 分钟到 30 天之间的运行间隔。",
       "windowRange": "请选择介于 1 分钟到 1 年之间的窗口。"
     }

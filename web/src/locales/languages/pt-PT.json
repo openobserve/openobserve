@@ -6680,6 +6680,8 @@
       "refresh": "Atualizar",
       "refreshCacheReload": "Atualizar cache e recarregar",
       "moreRefreshOptions": "Mais opções de atualização",
+      "autoRunDescription": "Executa consultas ao abrir e em alterações de filtro/tempo",
+      "autoRunScope": "Aplica-se a todos os painéis, Registros e Rastros",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard não encontrado ou foi excluído. Redirecionando para a lista de dashboards.",
       "failedToLoadDashboard": "Falha ao carregar o dashboard. Redirecionando para a lista de dashboards.",
@@ -6689,9 +6691,7 @@
       "panelMoveFailed": "Falha ao mover o painel",
       "failedToFetchReports": "Falha ao buscar relatórios",
       "failedToUpdateJson": "Falha ao atualizar o JSON do dashboard: método de salvamento não disponível",
-      "failedToSaveChanges": "Falha ao salvar alterações no dashboard",
-      "autoRunDescription": "Executa consultas ao abrir e em alterações de filtro/tempo",
-      "autoRunScope": "Aplica-se a todos os painéis, Registros e Rastros"
+      "failedToSaveChanges": "Falha ao salvar alterações no dashboard"
     },
     "dynamicFunctionPopUp": {
       "property": "Propriedade",
@@ -6964,6 +6964,8 @@
     "exitAnnotationsMode": "Sair do modo de anotações",
     "addAnnotations": "Adicionar anotações",
     "refreshToApplyVariables": "Atualizar para aplicar as últimas alterações de variáveis",
+    "refreshToApplyTimeRange": "Atualize para aplicar o intervalo de tempo",
+    "refreshToApplyTimeRangeAndVariables": "Atualize para aplicar o intervalo de tempo e as alterações de variáveis",
     "moveToAnotherFolder": "Mover {type} para outra pasta",
     "rawQueryBuilder": {
       "query": "Consulta",
@@ -7145,9 +7147,7 @@
       "markerAria": "Exemplar {value} em {time}"
     },
     "showExemplarsLabel": "Mostrar exemplares",
-    "showExemplarsHelp": "Desenha amostras de rastros neste gráfico para todos que abrirem o painel. Os visualizadores ainda podem ocultá-las no cabeçalho do painel.",
-    "refreshToApplyTimeRange": "Atualize para aplicar o intervalo de tempo",
-    "refreshToApplyTimeRangeAndVariables": "Atualize para aplicar o intervalo de tempo e as alterações de variáveis"
+    "showExemplarsHelp": "Desenha amostras de rastros neste gráfico para todos que abrirem o painel. Os visualizadores ainda podem ocultá-las no cabeçalho do painel."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8078,7 +8078,13 @@
       "emptyTitle": "Nenhuma execução nos últimos {days} dias",
       "emptyDescription": "O painel é preenchido assim que a calibração de alertas for executada."
     },
+    "lastRun": {
+      "succeeded": "A última execução foi bem-sucedida {time}.",
+      "failed": "A última execução falhou {time}, portanto o resumo mais recente pode estar desatualizado: {error}",
+      "none": "Nenhuma execução foi tentada ainda."
+    },
     "settings": {
+      "title": "Configurações de calibração de alertas",
       "schedule": "Agendamento",
       "enabled": "Executar a calibração de alertas para esta organização",
       "enabledHelp": "Enquanto desativada, a organização não tem execução agendada. Ao ativá-la, a primeira execução vence imediatamente.",
@@ -8102,6 +8108,7 @@
       "runNowHeading": "Executar agora",
       "findingsHeading": "Achados e acesso",
       "findingsDesc": "Cada execução grava seus achados como registros de log no stream {stream} desta organização, mantidos conforme a retenção desse stream.",
+      "accessNote": "A permissão Calibração de alertas em um papel determina o acesso: Get para ler os resultados, Update para alterar estas configurações e Create para solicitar uma execução. Os resultados abrangem todos os alertas da organização, inclusive alertas que o leitor não pode abrir. A calibração de alertas não envia notificações.",
       "frequencyRange": "Escolha uma cadência entre 1 minuto e 30 dias.",
       "windowRange": "Escolha uma janela entre 1 minuto e 1 ano."
     }

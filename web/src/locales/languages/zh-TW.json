@@ -6675,6 +6675,8 @@
       "refresh": "重新整理",
       "refreshCacheReload": "重新整理快取並重新載入",
       "moreRefreshOptions": "更多重新整理選項",
+      "autoRunDescription": "開啟時以及篩選/時間變更時執行查詢",
+      "autoRunScope": "適用於所有儀表板、日誌與追蹤",
       "dashboard": "儀表板",
       "dashboardNotFound": "找不到儀表板或已被刪除。正在重新導向至儀表板清單。",
       "failedToLoadDashboard": "載入儀表板失敗。正在重新導向至儀表板清單。",
@@ -6684,9 +6686,7 @@
       "panelMoveFailed": "面板移動失敗",
       "failedToFetchReports": "取得報告失敗",
       "failedToUpdateJson": "更新儀表板 JSON 失敗：儲存方法不可用",
-      "failedToSaveChanges": "儲存儀表板變更失敗",
-      "autoRunDescription": "開啟時以及篩選/時間變更時執行查詢",
-      "autoRunScope": "適用於所有儀表板、日誌與追蹤"
+      "failedToSaveChanges": "儲存儀表板變更失敗"
     },
     "dynamicFunctionPopUp": {
       "property": "屬性",
@@ -6959,6 +6959,8 @@
     "exitAnnotationsMode": "退出註解模式",
     "addAnnotations": "新增註解",
     "refreshToApplyVariables": "重新整理以套用最新的變數變更",
+    "refreshToApplyTimeRange": "重新整理以套用時間範圍",
+    "refreshToApplyTimeRangeAndVariables": "重新整理以套用時間範圍與變數變更",
     "moveToAnotherFolder": "將 {type} 移至另一個資料夾",
     "rawQueryBuilder": {
       "query": "查詢",
@@ -7140,9 +7142,7 @@
       "markerAria": "{time} 的範例 {value}"
     },
     "showExemplarsLabel": "顯示範例",
-    "showExemplarsHelp": "為所有開啟儀表板的人在此圖表上繪製追蹤樣本。檢視者仍可從面板標題隱藏它們。",
-    "refreshToApplyTimeRange": "重新整理以套用時間範圍",
-    "refreshToApplyTimeRangeAndVariables": "重新整理以套用時間範圍與變數變更"
+    "showExemplarsHelp": "為所有開啟儀表板的人在此圖表上繪製追蹤樣本。檢視者仍可從面板標題隱藏它們。"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8073,7 +8073,13 @@
       "emptyTitle": "過去 {days} 天沒有執行",
       "emptyDescription": "警示校準執行後，儀表板就會填入資料。"
     },
+    "lastRun": {
+      "succeeded": "上次執行已於 {time} 成功。",
+      "failed": "上次執行於 {time} 失敗，因此最新的摘要可能已過期：{error}",
+      "none": "尚未嘗試任何執行。"
+    },
     "settings": {
+      "title": "警示校準管理",
       "schedule": "排程",
       "enabled": "為此組織執行警示校準",
       "enabledHelp": "關閉時，此組織沒有排程執行。開啟後，首次執行會立即到期。",
@@ -8097,6 +8103,7 @@
       "runNowHeading": "立即執行",
       "findingsHeading": "結果與存取權限",
       "findingsDesc": "每次執行會將其結果以日誌記錄形式寫入此組織的 {stream} 串流，並依該串流的保留期保存。",
+      "accessNote": "角色中的警示校準權限決定存取權：Get 可讀取發現項目，Update 可變更這些設定，Create 可要求執行。發現項目涵蓋組織中的所有警示，包括讀取者無法開啟的警示。警示校準不會傳送任何通知。",
       "frequencyRange": "請選擇介於 1 分鐘到 30 天之間的執行週期。",
       "windowRange": "請選擇介於 1 分鐘到 1 年之間的時間範圍。"
     }

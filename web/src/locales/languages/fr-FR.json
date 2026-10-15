@@ -6680,6 +6680,8 @@
       "refresh": "Actualiser",
       "refreshCacheReload": "Actualiser le cache et recharger",
       "moreRefreshOptions": "Plus d'options d'actualisation",
+      "autoRunDescription": "Exécute les requêtes à l'ouverture et lors des modifications de filtre ou de plage horaire",
+      "autoRunScope": "S'applique à tous les tableaux de bord, Logs et Traces",
       "dashboard": "Tableau de bord",
       "dashboardNotFound": "Tableau de bord introuvable ou supprimé. Redirection vers la liste des tableaux de bord.",
       "failedToLoadDashboard": "Échec du chargement du tableau de bord. Redirection vers la liste des tableaux de bord.",
@@ -6689,9 +6691,7 @@
       "panelMoveFailed": "Échec du déplacement du panneau",
       "failedToFetchReports": "Échec de la récupération des rapports",
       "failedToUpdateJson": "Échec de la mise à jour du JSON du tableau de bord : méthode de sauvegarde non disponible",
-      "failedToSaveChanges": "Échec de la sauvegarde des modifications du tableau de bord",
-      "autoRunDescription": "Exécute les requêtes à l'ouverture et lors des modifications de filtre ou de plage horaire",
-      "autoRunScope": "S'applique à tous les tableaux de bord, Logs et Traces"
+      "failedToSaveChanges": "Échec de la sauvegarde des modifications du tableau de bord"
     },
     "dynamicFunctionPopUp": {
       "property": "Propriété",
@@ -6964,6 +6964,8 @@
     "exitAnnotationsMode": "Quitter le mode annotations",
     "addAnnotations": "Ajouter des annotations",
     "refreshToApplyVariables": "Actualiser pour appliquer les dernières modifications de variables",
+    "refreshToApplyTimeRange": "Actualisez pour appliquer la plage horaire",
+    "refreshToApplyTimeRangeAndVariables": "Actualisez pour appliquer la plage horaire et les modifications de variables",
     "moveToAnotherFolder": "Déplacer {type} vers un autre dossier",
     "rawQueryBuilder": {
       "query": "Requête",
@@ -7145,9 +7147,7 @@
       "markerAria": "Exemplaire {value} à {time}"
     },
     "showExemplarsLabel": "Afficher les exemplaires",
-    "showExemplarsHelp": "Dessine les échantillons de traces sur ce graphique pour toute personne qui ouvre le tableau de bord. Les spectateurs peuvent toujours les masquer depuis l'en-tête du panneau.",
-    "refreshToApplyTimeRange": "Actualisez pour appliquer la plage horaire",
-    "refreshToApplyTimeRangeAndVariables": "Actualisez pour appliquer la plage horaire et les modifications de variables"
+    "showExemplarsHelp": "Dessine les échantillons de traces sur ce graphique pour toute personne qui ouvre le tableau de bord. Les spectateurs peuvent toujours les masquer depuis l'en-tête du panneau."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8078,7 +8078,13 @@
       "emptyTitle": "Aucune exécution au cours des {days} derniers jours",
       "emptyDescription": "Le tableau de bord se remplit dès que la calibration des alertes s'est exécutée."
     },
+    "lastRun": {
+      "succeeded": "La dernière exécution a réussi {time}.",
+      "failed": "La dernière exécution a échoué {time}, la dernière synthèse peut donc être obsolète : {error}",
+      "none": "Aucune exécution n'a encore été tentée."
+    },
     "settings": {
+      "title": "Réglages de calibration des alertes",
       "schedule": "Planification",
       "enabled": "Exécuter la calibration des alertes pour cette organisation",
       "enabledHelp": "Lorsqu'elle est désactivée, l'organisation n'a aucune exécution planifiée. L'activer rend la première exécution due immédiatement.",
@@ -8102,6 +8108,7 @@
       "runNowHeading": "Exécuter maintenant",
       "findingsHeading": "Constats et accès",
       "findingsDesc": "Chaque exécution écrit ses constats sous forme d'enregistrements de logs dans le flux {stream} de cette organisation, conservés selon la rétention de ce flux.",
+      "accessNote": "La permission Calibration des alertes d'un rôle détermine l'accès : Get pour consulter les constats, Update pour modifier ces réglages, et Create pour demander une exécution. Les constats couvrent toutes les alertes de l'organisation, y compris les alertes que le lecteur ne peut pas ouvrir. La calibration des alertes n'envoie aucune notification.",
       "frequencyRange": "Choisissez une cadence entre 1 minute et 30 jours.",
       "windowRange": "Choisissez une fenêtre entre 1 minute et 1 an."
     }
