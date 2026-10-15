@@ -13,10 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  LINK_REQUEST_TTL_MS,
   classifySlackLinkError,
   forgetLinkRequest,
+  isSafeReturnUrl,
+  isSlackUrl,
   parseLinkRequestParam,
   recallLinkRequest,
   rememberLinkRequest,
@@ -27,6 +30,7 @@ const refusal = (status: number, data: Record<string, unknown> = {}) =>
 
 afterEach(() => {
   localStorage.clear();
+  vi.useRealTimers();
 });
 
 describe("classifySlackLinkError (spec 7.3 error table)", () => {
@@ -101,4 +105,65 @@ describe("remembered link request", () => {
     localStorage.setItem("o2.slack.linkRequest", JSON.stringify({ r: "nodot" }));
     expect(recallLinkRequest()).toBeNull();
   });
+});
+
+describe("remembered link request expiry", () => {
+  it("is ignored and dropped once the 30 minute link lifetime has passed", () => {
+    vi.useFakeTimers({ now: new Date("2026-10-15T10:00:00Z") });
+    rememberLinkRequest("req-1.sig", null);
+    vi.setSystemTime(Date.now() + LINK_REQUEST_TTL_MS - 1);
+    expect(recallLinkRequest()?.r).toBe("req-1.sig");
+    vi.setSystemTime(Date.now() + 2);
+    expect(recallLinkRequest()).toBeNull();
+    expect(localStorage.getItem("o2.slack.linkRequest")).toBeNull();
+  });
+
+  it("drops an entry stored without an expiry", () => {
+    localStorage.setItem("o2.slack.linkRequest", JSON.stringify({ r: "req-1.sig" }));
+    expect(recallLinkRequest()).toBeNull();
+  });
+});
+
+describe("isSlackUrl", () => {
+  it.each([
+    "https://slack.com/oauth/v2/authorize?client_id=1&state=s",
+    "https://slack.com/openid/connect/authorize?state=s",
+    "https://acme.slack.com/archives/C0/p1",
+  ])("accepts %s", (url) => {
+    expect(isSlackUrl(url)).toBe(true);
+  });
+
+  it.each([
+    "javascript:alert(document.domain)",
+    "http://slack.com/oauth/v2/authorize",
+    "https://slack.com.evil.example/oauth",
+    "https://evilslack.com/oauth",
+    "https://user:pass@slack.com/oauth",
+    "https://slack.com:8443/oauth",
+    "data:text/html,hi",
+    "",
+    undefined,
+  ])("rejects %s", (url) => {
+    expect(isSlackUrl(url)).toBe(false);
+  });
+
+  it("pins an exact host when one is given", () => {
+    expect(isSlackUrl("https://api.slack.com/apps/A0/general", "api.slack.com")).toBe(true);
+    expect(isSlackUrl("https://slack.com/apps/A0", "api.slack.com")).toBe(false);
+    expect(isSlackUrl("https://evil.api.slack.com/apps", "api.slack.com")).toBe(false);
+  });
+});
+
+describe("isSafeReturnUrl", () => {
+  it("accepts a Slack permalink or a page of this OpenObserve", () => {
+    expect(isSafeReturnUrl("https://slack.com/app_redirect?team=T0&channel=C0")).toBe(true);
+    expect(isSafeReturnUrl(`${window.location.origin}/web/logs`)).toBe(true);
+  });
+
+  it.each(["javascript:alert(1)", "https://evil.example/phish", "http://slack.com/app_redirect"])(
+    "rejects %s",
+    (url) => {
+      expect(isSafeReturnUrl(url)).toBe(false);
+    },
+  );
 });

@@ -20,9 +20,12 @@ import i18n from "@/locales";
 import slack from "@/services/slack";
 import { makeSlackStore, ok } from "@/test/unit/helpers/slack";
 import { isSlackOAuthCallbackMessage } from "@/utils/slackOAuth";
+import { createStore } from "vuex";
+import organizations from "@/services/organizations";
 import SlackConnectCallback from "./SlackConnectCallback.vue";
 
 vi.mock("@/services/slack", () => ({ default: { confirmConnection: vi.fn() } }));
+vi.mock("@/services/organizations", () => ({ default: { list: vi.fn() } }));
 
 const refusal = (status: number, data: Record<string, unknown> = {}) =>
   Object.assign(new Error("refused"), {
@@ -35,6 +38,7 @@ let router: Router;
 
 const mountCallback = async (
   query: Record<string, string> = { code: "oidc-code", state: "signed-state" },
+  store = makeSlackStore(),
 ) => {
   router = createRouter({
     history: createMemoryHistory(),
@@ -46,7 +50,7 @@ const mountCallback = async (
   await router.push({ path: "/slack/connect/callback", query });
   await router.isReady();
   const wrapper = mount(SlackConnectCallback, {
-    global: { plugins: [i18n, router, makeSlackStore()] },
+    global: { plugins: [i18n, router, store] },
   });
   await flushPromises();
   return wrapper;
@@ -148,6 +152,27 @@ describe("SlackConnectCallback", () => {
     expect(state.text()).toContain(title);
     if (message) expect(state.text()).toContain(message);
     expect(w.find(testId("slack-connect-callback-settings")).exists()).toBe(true);
+  });
+
+  it.each([400, 403, 404, 410, 500])(
+    "NIT-8 without an opener, a %i strips the code from the URL",
+    async (status) => {
+      setOpener(null);
+      const replaceState = vi.spyOn(window.history, "replaceState");
+      vi.mocked(slack.confirmConnection).mockRejectedValue(refusal(status));
+      await mountCallback();
+      expect(replaceState).toHaveBeenCalledWith({}, document.title, window.location.pathname);
+    },
+  );
+
+  it("NIT-14 without an opener, a caller in no org gets the no-access state and no call", async () => {
+    setOpener(null);
+    vi.mocked(organizations.list).mockReturnValue(ok({ data: [] }) as any);
+    const w = await mountCallback(undefined, createStore({ state: { selectedOrganization: {} } }));
+    expect(slack.confirmConnection).not.toHaveBeenCalled();
+    expect(w.find(testId("slack-connect-callback-refused")).text()).toContain(
+      "You don't have access to OpenObserve yet",
+    );
   });
 
   it("without an opener or a code, shows the refusal without calling the server", async () => {

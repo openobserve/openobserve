@@ -16,6 +16,7 @@
 import { onBeforeUnmount, onMounted, readonly, ref, shallowRef } from "vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { isSlackUrl } from "@/utils/slackLink";
 import { isSlackOAuthCallbackMessage } from "@/utils/slackOAuth";
 
 export const SLACK_OAUTH_POPUP_NAME = "openobserve-slack-oauth";
@@ -37,7 +38,8 @@ export interface UseSlackOAuthPopupOptions<T> {
   /** Redeems the callback: install/exchange, or connection/confirm with `oidc_code`/`oidc_state`. */
   exchange: (callback: SlackOAuthCallback) => Promise<T>;
   onSuccess: (result: T) => void;
-  messages?: Partial<Record<SlackOAuthPopupToast, () => I18nText>>;
+  /** Overrides a toast; `error` is the failure behind a startFailed or exchangeFailed. */
+  messages?: Partial<Record<SlackOAuthPopupToast, (error?: unknown) => I18nText>>;
 }
 
 export function useSlackOAuthPopup<T>(options: UseSlackOAuthPopupOptions<T>) {
@@ -57,8 +59,8 @@ export function useSlackOAuthPopup<T>(options: UseSlackOAuthPopupOptions<T>) {
     popupClosed: () => t("alert_destinations.slackOAuth.popupClosed"),
   };
 
-  const message = (kind: SlackOAuthPopupToast): I18nText =>
-    (options.messages?.[kind] ?? defaultMessages[kind])();
+  const message = (kind: SlackOAuthPopupToast, error?: unknown): I18nText =>
+    (options.messages?.[kind] ?? defaultMessages[kind])(error);
 
   const stopPopupWatcher = (): void => {
     if (popupWatcher !== undefined) {
@@ -98,8 +100,8 @@ export function useSlackOAuthPopup<T>(options: UseSlackOAuthPopupOptions<T>) {
     try {
       const result = await options.exchange({ code: callback.code, state: callback.state });
       options.onSuccess(result);
-    } catch {
-      toast({ variant: "error", message: message("exchangeFailed") });
+    } catch (error) {
+      toast({ variant: "error", message: message("exchangeFailed", error) });
     } finally {
       connecting.value = false;
     }
@@ -136,11 +138,13 @@ export function useSlackOAuthPopup<T>(options: UseSlackOAuthPopupOptions<T>) {
     try {
       const url = await options.start();
       if (oauthWindow.value !== popup || popup.closed) return;
-      popup.location.href = String(url);
+      // The popup shares this origin until it leaves, so a javascript: URL would run as OpenObserve.
+      if (!isSlackUrl(url)) throw new Error("not a Slack URL");
+      popup.location.href = url;
       popup.focus();
-    } catch {
+    } catch (error) {
       release(true);
-      toast({ variant: "error", message: message("startFailed") });
+      toast({ variant: "error", message: message("startFailed", error) });
     }
   };
 

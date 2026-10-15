@@ -19,7 +19,7 @@ import i18n from "@/locales";
 import slack from "@/services/slack";
 import destinationService from "@/services/alert_destination";
 import SlackUninstallDialog from "./SlackUninstallDialog.vue";
-import { installationView, makeSlackStore, ok } from "@/test/unit/helpers/slack";
+import { axiosError, installationView, makeSlackStore, ok } from "@/test/unit/helpers/slack";
 
 vi.mock("@/services/slack", () => ({
   default: { disconnectInstallation: vi.fn(), uninstallInstallation: vi.fn() },
@@ -32,11 +32,13 @@ const primary = () =>
     .findAll("button")
     .find((b) => b.attributes("data-test") === "o-dialog-primary-btn");
 
+const errorHandler = vi.fn();
+
 const mountDialog = (mode: "disconnect" | "uninstall") =>
   mount(SlackUninstallDialog, {
     props: { open: true, mode, installation: installationView() },
     attachTo: document.body,
-    global: { plugins: [i18n, makeSlackStore()] },
+    global: { plugins: [i18n, makeSlackStore()], config: { errorHandler } },
   });
 
 beforeEach(() => {
@@ -108,6 +110,38 @@ describe("SlackUninstallDialog: Uninstall from workspace (row 19)", () => {
     expect(result.find('[data-test="slack-delete-app"]').attributes("href")).toBe(
       "https://api.slack.com/apps/A0SAMPLE01/general",
     );
+  });
+
+  it.each([
+    "javascript:alert(document.domain)",
+    "https://evil.example/apps/A0SAMPLE01/general",
+    "https://slack.com/apps/A0SAMPLE01/general",
+  ])("never links the Delete App button to %s", async (url) => {
+    vi.mocked(slack.uninstallInstallation).mockReturnValue(
+      ok({
+        revoked: true,
+        affected: { orgs: 1, destinations: [], links_revoked: 0 },
+        delete_app_url: url,
+      }) as any,
+    );
+    mountDialog("uninstall");
+    await flushPromises();
+    await primary()!.trigger("click");
+    await flushPromises();
+    expect(body().find('[data-test="slack-dialog-result"]').exists()).toBe(true);
+    expect(body().find('[data-test="slack-delete-app"]').exists()).toBe(false);
+  });
+
+  it("NIT-7 a refused uninstall keeps the confirm step without an unhandled error", async () => {
+    vi.mocked(slack.uninstallInstallation).mockReturnValue(
+      Promise.reject(axiosError(409, "2 alert destinations in other organizations")) as any,
+    );
+    mountDialog("uninstall");
+    await flushPromises();
+    await primary()!.trigger("click");
+    await flushPromises();
+    expect(body().find('[data-test="slack-dialog-confirm"]').exists()).toBe(true);
+    expect(errorHandler).not.toHaveBeenCalled();
   });
 
   it("AC-12.2 removes the selected affected destinations in bulk", async () => {

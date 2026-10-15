@@ -229,9 +229,18 @@ describe("router/index (factory)", () => {
 
     it("AC-9.6 sends a signed-out /slack/link to /login and keeps the URL to return to", async () => {
       window.sessionStorage.clear();
-      await router.push("/slack/link?r=req-1.sig").catch(() => {});
-      expect(router.currentRoute.value.path).toBe("/login");
-      expect(window.sessionStorage.getItem("redirectURI")).not.toBeNull();
+      const before = window.location.href;
+      // A Slack link opens a fresh tab, so the address bar already holds the link when the guard runs.
+      window.history.replaceState({}, "", "/web/slack/link?r=req-1.sig");
+      try {
+        await router.push("/slack/link?r=req-1.sig").catch(() => {});
+        expect(router.currentRoute.value.path).toBe("/login");
+        expect(window.sessionStorage.getItem("redirectURI")).toBe(
+          `${window.location.origin}/web/slack/link?r=req-1.sig`,
+        );
+      } finally {
+        window.history.replaceState({}, "", before);
+      }
     });
 
     it("lets the Slack OAuth popup callback through without a session", async () => {

@@ -29,6 +29,7 @@ import {
   uninstallInstallationMutation,
 } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { isSlackUrl } from "@/utils/slackLink";
 import type {
   InstallationView,
   SlackDestinationRef,
@@ -100,6 +101,11 @@ const otherOrgsAfter = computed(() =>
   result.value?.kind === "uninstall" ? Math.max(0, result.value.data.affected.orgs - 1) : 0,
 );
 
+const deleteAppUrl = computed(() => {
+  const url = result.value?.kind === "uninstall" ? result.value.data.delete_app_url : null;
+  return isSlackUrl(url, "api.slack.com") ? url : null;
+});
+
 const columns = computed<OTableColumnDef<SlackDestinationRef>[]>(() => [
   {
     id: "name",
@@ -115,13 +121,17 @@ const confirm = async (): Promise<void> => {
     return;
   }
   const id = props.installation.id;
-  if (props.mode === "disconnect") {
-    result.value = { kind: "disconnect", data: await disconnect.mutateAsync(id) };
-    return;
+  try {
+    if (props.mode === "disconnect") {
+      result.value = { kind: "disconnect", data: await disconnect.mutateAsync(id) };
+      return;
+    }
+    const data = await uninstall.mutateAsync(id);
+    affected.value = data.affected.destinations;
+    result.value = { kind: "uninstall", data };
+  } catch {
+    /* the mutation toasted the refusal; the dialog stays on its confirm step */
   }
-  const data = await uninstall.mutateAsync(id);
-  affected.value = data.affected.destinations;
-  result.value = { kind: "uninstall", data };
 };
 
 const removeSelected = async (): Promise<void> => {
@@ -251,9 +261,9 @@ const removeSelected = async (): Promise<void> => {
           {{ t("slackApp.uninstall.affectedEmpty", { team }) }}
         </p>
         <OButton
-          v-if="result.data.delete_app_url"
+          v-if="deleteAppUrl"
           as="a"
-          :href="result.data.delete_app_url"
+          :href="deleteAppUrl"
           target="_blank"
           rel="noopener noreferrer"
           variant="ghost-primary"

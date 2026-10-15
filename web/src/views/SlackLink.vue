@@ -24,9 +24,10 @@ import { useSlackLinkOrg } from "@/composables/slack/useSlackLinkOrg";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { resendLinkRequestMutation, startLinkRequestMutation } from "@/services/slack.queries";
 import { useI18nTyped } from "@/types/i18n";
-import { isSafeNavigableUrl } from "@/utils/safeUrl";
 import {
   classifySlackLinkError,
+  forgetLinkRequest,
+  isSlackUrl,
   leaveFor,
   parseLinkRequestParam,
   queryString,
@@ -53,19 +54,25 @@ const failed: Refusal = { kind: "failed", message: null, helpContact: null };
 const begin = async (): Promise<void> => {
   const target = request.value;
   refusal.value = null;
-  if (!target || !org.value) {
+  if (!target) {
     refusal.value = { kind: "unknown", message: null, helpContact: null };
+    return;
+  }
+  if (!org.value) {
+    refusal.value = { kind: "noAccess", message: null, helpContact: null };
     return;
   }
   try {
     const data = await start.mutateAsync(target);
-    if (!isSafeNavigableUrl(data.url)) {
+    if (!isSlackUrl(data.url)) {
+      forgetLinkRequest();
       refusal.value = failed;
       return;
     }
     rememberLinkRequest(rawRequest.value, data.help_contact);
     leaveFor(data.url);
   } catch (error) {
+    forgetLinkRequest();
     refusal.value = classifySlackLinkError(error, "noAccess");
   }
 };
