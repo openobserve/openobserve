@@ -23,7 +23,7 @@ vi.mock("@/utils/dashboard/checkConfigChangeApiCall", () => ({
   checkIfConfigChangeRequiredApiCallOrNot: vi.fn().mockReturnValue(false),
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+vi.mock("@/utils/queryUtils", () => ({
   processQueryMetadataErrors: vi.fn().mockReturnValue(""),
 }));
 
@@ -940,7 +940,7 @@ describe("usePanelEditor", () => {
   describe("handleResultMetadataUpdate", () => {
     it("should process metadata and update maxQueryRangeWarning", async () => {
       const { handleResultMetadataUpdate, maxQueryRangeWarning } = usePanelEditor(options);
-      const { processQueryMetadataErrors } = await import("@/utils/zincutils");
+      const { processQueryMetadataErrors } = await import("@/utils/queryUtils");
 
       (processQueryMetadataErrors as any).mockReturnValue("Max query range warning");
 

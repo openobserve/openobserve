@@ -299,6 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedDateForViewPanel="viewPanelSelectedDate"
             :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
             :searchType="searchType"
+            :viewOnly="!!viewOnly"
             @close-panel="() => (showViewPanel = false)"
             @update:initial-variable-values="updateInitialVariableValues"
           />
@@ -336,7 +337,7 @@ import {
   type Ref,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import DateTimePickerDashboard from "../../components/DateTimePickerDashboard.vue";
@@ -347,6 +348,7 @@ import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import { getVariableKey, useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import {
   useDashboardTimeGate,
@@ -683,11 +685,8 @@ export default defineComponent({
       }
     });
 
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
     const refreshDashboard = (onlyIfRequired = false) => {
       emit("refresh", onlyIfRequired);
     };
@@ -849,7 +848,8 @@ export default defineComponent({
     provide("hoveredSeriesState", hoveredSeriesState);
 
     // save the dashboard value
-    const saveDashboardData = useLoading(async () => {
+    // `change` names the edit in the conflict dialog when the caller is not a layout move.
+    const saveDashboardData = useLoading(async (change?: I18nText) => {
       try {
         await updateDashboard(
           store,
@@ -862,21 +862,22 @@ export default defineComponent({
         showPositiveNotification(t("dashboard.renderDashboardCharts.dashboardUpdatedSuccessfully"));
         return true;
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
-            t,
-          );
-        } else {
-          showErrorNotification(
-            error?.message ?? t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
-            {
-              timeout: 2000,
-            },
-          );
+        if (saveConflict.isConflict(error)) {
+          // No refresh, in any layout mode: the layout I just made stays on screen (and edit mode keeps its draft) while the dialog is open.
+          void saveConflict.openConflict({
+            dashboardId: props.dashboardData.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            mine: props.dashboardData,
+            change: change ?? t("dashboard.saveConflict.change.movedPanels"),
+          });
+          return false;
         }
+        showErrorNotification(
+          error?.message ?? t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
+          {
+            timeout: 2000,
+          },
+        );
 
         // A reload swaps the dashboard object and ends the edit session, so edit mode keeps the draft for a retry.
         if (props.layoutMode !== "edit") refreshDashboard();

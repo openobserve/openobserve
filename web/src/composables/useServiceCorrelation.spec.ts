@@ -273,12 +273,15 @@ describe("useServiceCorrelation", () => {
     it("returns null and sets error when extractSemanticDimensions returns empty", async () => {
       mockGetSemanticGroups.mockResolvedValue({ data: MOCK_GROUPS });
       mockExtractSemanticDimensions.mockReturnValue({});
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
       const { findRelatedTelemetry, error } = useServiceCorrelation();
 
       const result = await findRelatedTelemetry(mockContext as any, "logs", 5, "my-stream");
 
       expect(result).toBeNull();
       expect(error.value).toContain("No recognizable dimensions");
+      expect(consoleError).not.toHaveBeenCalled();
+      consoleError.mockRestore();
     });
 
     it("calls the correlate API and returns a result on success", async () => {

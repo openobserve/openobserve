@@ -392,6 +392,17 @@ export interface PanelEditorEmits {
    * Parent can use these to initialize variables from URL.
    */
   (e: "initialVariableValuesUpdated", values: Record<string, any>): void;
+
+  /**
+   * Emitted by the preview's Refresh notice action. A host that listens re-runs it the way its
+   * Apply does; without a listener the editor re-runs its own preview.
+   */
+  (e: "applyRequested"): void;
+
+  /**
+   * Emitted by a preview notice's "Open inspector". The action is offered only when the host listens.
+   */
+  (e: "openQueryInspector"): void;
 }
 
 // ============================================================================

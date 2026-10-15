@@ -24,6 +24,7 @@ import {
   markRaw,
   inject,
   hasInjectionContext,
+  computed,
 } from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
@@ -45,6 +46,7 @@ import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
 import { DASHBOARD_FRESH_PANEL_TIME } from "./dashboardFreshPanelTime";
 import { parseSearchError } from "@/utils/query/searchError";
 import { PANEL_KEY_IGNORED_PATHS, normalizeVariablesForCache } from "@/composables/query/panelKey";
+import { summarizePanelDiagnostics } from "@/utils/dashboard/panelDiagnostics";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -926,8 +928,25 @@ export const usePanelDataLoader = (
     return isRestoredFromCache;
   };
 
+  // Server-reported stats and notices per query; distinct from isPartialData, which only tracks a client-side cancel.
+  // Read the shown result, so the notices match the held result while a post-restore refresh runs.
+  const shown = refreshAfterRestore.shownResult;
+  const panelDiagnostics = computed(() =>
+    summarizePanelDiagnostics({
+      resultMetaData: shown.resultMetaData.value,
+      data: shown.data.value,
+      queryType: panelSchema.value?.queryType,
+      queryHasFunction: (queryIndex: number) => {
+        const panelQueryIndex =
+          shown.metadata.value?.queries?.[queryIndex]?.panelQueryIndex ?? queryIndex;
+        return !!panelSchema.value?.queries?.[panelQueryIndex]?.vrlFunctionQuery?.trim();
+      },
+    }),
+  );
+
   return {
     ...toRefs(state),
+    panelDiagnostics,
     ...refreshAfterRestore.shownResult,
     isFirstLoadSettled,
     loadData,
