@@ -2,7 +2,8 @@
 
 AC-10.9 (I): a thumbs-down reason reaches o2-ai's feedback ``comment``. AC-10.8 (I): Approve calls
 ``/confirm`` once and the message reads Approved. AC-10.2 (I): Re-ask in answers again in the thread
-in the picked org. AC-10.16 (I): ``/o2 ask`` in a channel answers by DM. AC-5.6 (I, OpenFGA off):
+in the picked org; in a channel it is offered by "Re-ask in another org", which lists the clicker's
+own orgs privately. AC-10.16 (I): ``/o2 ask`` in a channel answers by DM. AC-5.6 (I, OpenFGA off):
 approving an org CLI tool needs org Admin; a delete approval only the asker.
 
 Needs the flag-on self-hosted server with ``O2_AI_ENABLED=true`` and ``O2_AGENT_URL`` at
@@ -186,8 +187,14 @@ def test_reask_in_answers_again_in_the_thread_in_the_picked_org(
     body, ts, _ = event(inst, team, "U0ANN", f"<@U0BOT> how many queries per minute? {tag}")
     send(client, inst, body)
     answer = wait_until(lambda: answers_in(ready, ts), "the first answer", timeout=30)[-1]
-    select = element(json.loads(answer["blocks"]), "o2_reask_in")
+    assert other not in answer["blocks"], "a channel answer never lists the asker's orgs"
+    menu = element(json.loads(answer["blocks"]), "o2_reask_menu")
+    click(client, inst, team, "U0ANN", channel=CHANNEL, message_ts=answer["ts"], thread_ts=ts, action=menu)
+    listed = wait_until(lambda: [e for e in ephemerals(ready, "U0ANN") if "o2_reask_in" in e.get("blocks", "")],
+                        "the private list of the clicker's orgs")[-1]
+    select = element(json.loads(listed["blocks"]), "o2_reask_in")
     option = next(o for o in select["options"] if o["text"]["text"] == other)
+    assert len(option["value"]) <= 150, "Slack caps option values at 150 characters"
     action = {"type": "static_select", "action_id": "o2_reask_in", "block_id": "o2_answer",
               "selected_option": option, "placeholder": {"type": "plain_text", "text": "Re-ask in"}}
     click(client, inst, team, "U0ANN", channel=CHANNEL, message_ts=answer["ts"], thread_ts=ts, action=action)
