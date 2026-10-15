@@ -18,6 +18,8 @@ import * as walk from "acorn-walk";
 import { ref } from "vue";
 
 import { gt } from "@/types/i18n";
+import echartsUrl from "echarts/dist/echarts.min.js?url";
+import dompurifyUrl from "dompurify/dist/purify.min.js?url";
 
 export const panelIdToBeRefreshed = ref<string | null>(null);
 
@@ -42,13 +44,6 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     iframe.setAttribute("sandbox", "allow-scripts");
     document.body.appendChild(iframe);
 
-    let staticEchartsRef = "/web/src/assets/dashboard/echarts.min.js";
-    let staticPurifierRef = "/web/src/assets/dashboard/purify.min.js";
-
-    if (!window.location.pathname.includes("web")) {
-      staticEchartsRef = "/src/assets/dashboard/echarts.min.js";
-      staticPurifierRef = "/src/assets/dashboard/purify.min.js";
-    }
     let userCode = panelSchema.customChartContent;
 
     // **Validation before execution**
@@ -80,8 +75,8 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     connect-src 'none';
   ">
 
-  <script src="${staticEchartsRef}" nonce="${nonce}"></script>
-  <script src="${staticPurifierRef}" nonce="${nonce}"></script>
+  <script src="${echartsUrl}" nonce="${nonce}"></script>
+  <script src="${dompurifyUrl}" nonce="${nonce}"></script>
   <script nonce="${nonce}">
     const i18nMessages = ${sandboxMessages};
     let securityPolicyError = false;

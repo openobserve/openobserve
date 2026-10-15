@@ -179,8 +179,8 @@ describe("convertCustomChartData", () => {
       // Verify script content is set
       expect(mockIframe.srcdoc).toContain('<meta http-equiv="Content-Security-Policy"');
       expect(mockIframe.srcdoc).toContain("script-src 'self' 'nonce-");
-      expect(mockIframe.srcdoc).toContain("/src/assets/dashboard/echarts.min.js");
-      expect(mockIframe.srcdoc).toContain("/src/assets/dashboard/purify.min.js");
+      expect(mockIframe.srcdoc).toContain("echarts.min.js");
+      expect(mockIframe.srcdoc).toContain("purify.min.js");
 
       // Simulate iframe onload and message handling
       expect(mockIframe.onload).toBeDefined();
@@ -221,9 +221,9 @@ describe("convertCustomChartData", () => {
       expect(result).toEqual({ title: { text: "Test" } });
     });
 
-    it("should use /web/ prefix for assets when pathname contains 'web'", async () => {
-      // Set pathname to contain 'web'
-      window.location.pathname = "/web/dashboard";
+    it("should load echarts and dompurify from the npm packages", async () => {
+      const echartsUrl = (await import("echarts/dist/echarts.min.js?url")).default;
+      const dompurifyUrl = (await import("dompurify/dist/purify.min.js?url")).default;
 
       const acorn = await import("acorn");
       const walk = await import("acorn-walk");
@@ -248,9 +248,11 @@ describe("convertCustomChartData", () => {
 
       runJavaScriptCode(panelSchema, []);
 
-      // Verify the script uses /web/ prefix for assets
-      expect(mockIframe.srcdoc).toContain("/web/src/assets/dashboard/echarts.min.js");
-      expect(mockIframe.srcdoc).toContain("/web/src/assets/dashboard/purify.min.js");
+      expect(echartsUrl).toContain("echarts/dist/echarts.min.js");
+      expect(dompurifyUrl).toContain("dompurify/dist/purify.min.js");
+      expect(mockIframe.srcdoc).toContain(`<script src="${echartsUrl}"`);
+      expect(mockIframe.srcdoc).toContain(`<script src="${dompurifyUrl}"`);
+      expect(mockIframe.srcdoc).not.toContain("/src/assets/dashboard/");
     });
 
     it("should handle execution errors from iframe", async () => {
