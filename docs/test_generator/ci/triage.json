@@ -1,0 +1,26 @@
+{
+  "feature_slug": "logs-toolbar-pins",
+  "feature_title": "Logs Toolbar Pins",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logsToolbarPins.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/logsToolbarPins.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/plugins/logs/SearchBar.vue",
+    "web/src/composables/useToolbarPins.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path (tests/ui-testing/ci-matrix/ci_matrix.json, tests/ui-testing/pages/logsPages/logsToolbarPinsPage.js, tests/ui-testing/pages/page-manager.js, tests/ui-testing/playwright-tests/Logs/logsToolbarPins.spec.js) lives under tests/ui-testing/, the OSS-owned E2E test suite. None are in enterprise/ (or any enterprise-owned path), and there are no enterprise-only keywords (cipher/SSO/SAML/RBAC/SDR/sensitive-data) in the changed paths or symbols, so the change is OSS.",
+    "skip": "Not skipped. There is no explicit opt-out (no tests-added label and the trigger comment is empty), and the change is not docs/CI-only noise. The diff adds a dev-authored Playwright E2E spec under tests/ui-testing/playwright-tests/Logs/logsToolbarPins.spec.js plus its page object and matrix registration, so the dev-authored-tests rule routes this to enhance rather than an automatic skip.",
+    "e2e": "E2E is warranted. The dev-authored spec exercises a real user-facing UI flow (the Logs search-bar 'More' menu, pinning/unpinning toolbar controls, and the localStorage persistence behind useToolbarPins.ts), and the pipeline must review and potentially extend that coverage rather than drop it.",
+    "area": "Area is Logs. The new spec sits in tests/ui-testing/playwright-tests/Logs/, the new page object is under pages/logsPages/, and the feature is the Logs search toolbar, so sibling specs for this feature live in the Logs folder.",
+    "group": "Group is Logs-Core. The diff adds logsToolbarPins.spec.js to a Logs matrix run_files list in tests/ui-testing/ci-matrix/ci_matrix.json (adjacent to timezoneDisplay.spec.js, searchPatternsMultiStream.spec.js, logsActionReasons.spec.js, logsSearchCancelled.spec.js), and Logs-Core is the closest existing Logs shard for these search-bar features; the Engineer should confirm the exact shard name against the OSS ci_matrix.json.",
+    "existing_tests": "The diff adds a Playwright E2E spec, tests/ui-testing/playwright-tests/Logs/logsToolbarPins.spec.js, which covers the new Logs toolbar-pins feature end to end (default histogram pin, unpin persistence, unknown/corrupt storage handling, logs-vs-traces scope isolation, canonical ordering, and collapse-to-More-menu). The other changed files are a page-object helper and page-manager/matrix wiring, not specs; there are no Vitest/Rust unit tests in the diff."
+  }
+}

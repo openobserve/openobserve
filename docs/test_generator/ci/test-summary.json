@@ -1,0 +1,7 @@
+[
+  {
+    "title": "the syntax guide pin is tracked via the menu pin button title",
+    "action": "append",
+    "verifies": "the Syntax Guide pin toggles and persists in storage, asserted through the menu pin button's title attribute"
+  }
+]
