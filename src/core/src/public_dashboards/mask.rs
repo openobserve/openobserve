@@ -17,9 +17,11 @@
 
 use std::collections::BTreeMap;
 
-use config::meta::public_dashboards::{NotAvailableReason, PanelResult, PanelState, ResultBody};
+use config::meta::public_dashboards::{
+    NotAvailableReason, PanelResult, PanelState, PublicVariable, ResultBody,
+};
 
-use super::store::Header;
+use super::store::{Header, PanelSummary};
 
 /// The panels a reader may see now: withheld, changed and too-old panels masked, removed dropped.
 pub fn mask(
@@ -33,24 +35,105 @@ pub fn mask(
         .iter()
         .filter_map(|(id, panel)| {
             let current = intents.get(id)?;
-            let masked = |reason| {
-                let mut p = PanelResult::not_available(reason);
-                p.intent = current.clone();
-                p
+            let reason = masked(
+                id,
+                &panel.intent,
+                &panel.state,
+                panel.built_at,
+                header,
+                current,
+                now,
+                max_age_micros,
+            );
+            let out = match reason {
+                Some(reason) => {
+                    let mut p = PanelResult::not_available(reason);
+                    p.intent = current.clone();
+                    p
+                }
+                None => panel.clone(),
             };
-            if let Some(w) = header.withheld_panels.iter().find(|w| &w.panel_id == id) {
-                return Some((id.clone(), masked(w.reason)));
-            }
-            if &panel.intent != current {
-                return Some((id.clone(), masked(NotAvailableReason::Changed)));
-            }
-            let retained = matches!(panel.state, PanelState::Ok { retained: true, .. });
-            if retained && panel.built_at.is_none_or(|at| at < now - max_age_micros) {
-                return Some((id.clone(), masked(NotAvailableReason::TooOld)));
-            }
-            Some((id.clone(), panel.clone()))
+            Some((id.clone(), out))
         })
         .collect()
+}
+
+/// The visible state of each panel from the header alone, the same as [`mask`] gives.
+pub fn visible_states(
+    header: &Header,
+    intents: &BTreeMap<String, String>,
+    now: i64,
+    max_age_micros: i64,
+) -> Vec<(String, PanelState)> {
+    header
+        .panels
+        .iter()
+        .filter_map(
+            |PanelSummary {
+                 id,
+                 intent,
+                 state,
+                 built_at,
+             }| {
+                let current = intents.get(id)?;
+                let state = match masked(
+                    id,
+                    intent,
+                    state,
+                    *built_at,
+                    header,
+                    current,
+                    now,
+                    max_age_micros,
+                ) {
+                    Some(reason) => PanelState::NotAvailable { reason },
+                    None => state.clone(),
+                };
+                Some((id.clone(), state))
+            },
+        )
+        .collect()
+}
+
+/// The variables a reader may see: a value from a values query the publisher lost is nulled.
+pub fn variables(body: &ResultBody, header: &Header) -> Vec<PublicVariable> {
+    body.variables
+        .iter()
+        .enumerate()
+        .map(|(i, v)| {
+            let withheld = body
+                .variable_keys
+                .get(i)
+                .is_some_and(|key| header.withheld_variables.contains(key));
+            let mut v = v.clone();
+            if withheld {
+                v.value = serde_json::Value::Null;
+            }
+            v
+        })
+        .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn masked(
+    id: &str,
+    intent: &str,
+    state: &PanelState,
+    built_at: Option<i64>,
+    header: &Header,
+    current: &str,
+    now: i64,
+    max_age_micros: i64,
+) -> Option<NotAvailableReason> {
+    if let Some(w) = header.withheld_panels.iter().find(|w| w.panel_id == id) {
+        return Some(w.reason);
+    }
+    if intent != current {
+        return Some(NotAvailableReason::Changed);
+    }
+    let retained = matches!(state, PanelState::Ok { retained: true, .. });
+    (retained && built_at.is_none_or(|at| at < now - max_age_micros))
+        .then_some(NotAvailableReason::TooOld)
 }
 
 #[cfg(test)]
@@ -98,15 +181,25 @@ mod tests {
         panels.insert("young".to_string(), ok("i6", now - 23 * HOUR, true));
         // An absolute file's fresh panel never ages out; only retained data does.
         panels.insert("absolute".to_string(), ok("i7", now - 400 * HOUR, false));
+        let summaries = panels
+            .iter()
+            .map(|(id, p)| PanelSummary {
+                id: id.clone(),
+                intent: p.intent.clone(),
+                state: p.state.clone(),
+                built_at: p.built_at,
+            })
+            .collect();
         let body = ResultBody {
             panels,
-            variables: vec![],
+            ..Default::default()
         };
         let header = Header {
             withheld_panels: vec![WithheldPanel {
                 panel_id: "withheld".into(),
                 reason: NotAvailableReason::Unauthorized,
             }],
+            panels: summaries,
             ..Default::default()
         };
         let intents: BTreeMap<String, String> = [
@@ -134,5 +227,31 @@ mod tests {
         for id in ["withheld", "changed", "old"] {
             assert!(out[id].data.is_empty(), "{id} leaks data");
         }
+        // The header alone gives the same states, so a 304 needs no body.
+        let from_body: Vec<(String, PanelState)> =
+            out.into_iter().map(|(id, p)| (id, p.state)).collect();
+        assert_eq!(visible_states(&header, &intents, now, 24 * HOUR), from_body);
+    }
+
+    #[test]
+    fn gate02_a_variable_from_a_lost_values_stream_is_nulled() {
+        let var = |label: &str, value| PublicVariable {
+            label: label.into(),
+            value,
+            tab_id: None,
+            panel_id: None,
+        };
+        let body = ResultBody {
+            variables: vec![var("svc", json!("checkout")), var("env", json!("prod"))],
+            variable_keys: vec!["svc".into(), "env".into()],
+            ..Default::default()
+        };
+        let header = Header {
+            withheld_variables: vec!["svc".into()],
+            ..Default::default()
+        };
+        let out = variables(&body, &header);
+        assert_eq!(out[0].value, serde_json::Value::Null);
+        assert_eq!(out[1].value, json!("prod"));
     }
 }

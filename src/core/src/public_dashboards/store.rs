@@ -27,29 +27,30 @@ use anyhow::Context;
 use bytes::Bytes;
 use config::{
     meta::{
-        public_dashboards::{ResultBody, Window, WithheldPanel},
+        public_dashboards::{PanelState, ResultBody, Window, WithheldPanel},
         stream::StreamType,
     },
     metrics,
     utils::time::now_micros,
 };
-use infra::cache::file_data::{
-    disk::{
-        self, PUBLIC_DASHBOARDS_PREFIX, public_dashboards_evict, public_dashboards_memory_key,
-        public_dashboards_replace,
-    },
-    memory,
+use infra::cache::file_data::disk::{
+    self, PUBLIC_DASHBOARDS_PREFIX, public_dashboards_evict, public_dashboards_memory_get,
+    public_dashboards_memory_put, public_dashboards_replace,
 };
 use serde::{Deserialize, Serialize};
 
 const MAGIC: &[u8; 4] = b"O2PD";
-pub const FORMAT_VERSION: u16 = 1;
+pub const FORMAT_VERSION: u16 = 2;
 /// Magic, version and the header length.
 const PREFIX_LEN: usize = 4 + 2 + 4;
 
 /// Seeded from the clock, so an incarnation is never reused, not even across a restart.
 static INCARNATION: LazyLock<AtomicU64> =
     LazyLock::new(|| AtomicU64::new(u64::try_from(now_micros()).unwrap_or_default()));
+
+/// Keys whose next writes fail, to drive the write-failure paths in tests.
+#[cfg(test)]
+pub static FAIL_WRITES: LazyLock<dashmap::DashSet<String>> = LazyLock::new(Default::default);
 
 /// The public header: what may be served from the file and when it is due.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -61,6 +62,10 @@ pub struct Header {
     /// How long that build took, for the refresh poll hint.
     pub build_ms: u64,
     pub withheld_panels: Vec<WithheldPanel>,
+    /// Frozen-value keys of variables whose values query the publisher can no longer read.
+    pub withheld_variables: Vec<String>,
+    /// Each panel's state in the body, so rev and a 304 need no body read.
+    pub panels: Vec<PanelSummary>,
     pub auth_checked_at: i64,
     pub window_start: i64,
     pub window_end: i64,
@@ -90,6 +95,15 @@ impl Header {
     pub fn is_withheld(&self, panel_id: &str) -> bool {
         self.withheld_panels.iter().any(|w| w.panel_id == panel_id)
     }
+}
+
+/// One body panel as masking and rev see it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PanelSummary {
+    pub id: String,
+    pub intent: String,
+    pub state: PanelState,
+    pub built_at: Option<i64>,
 }
 
 /// How one panel's data in the body was produced.
@@ -138,7 +152,12 @@ pub struct ManifestPanel {
     pub outcome: PanelOutcome,
 }
 
-pub type Manifest = BTreeMap<String, ManifestPanel>;
+/// The private block: each panel's provenance and every values query a variable came from.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Manifest {
+    pub panels: BTreeMap<String, ManifestPanel>,
+    pub variables: Vec<ValuesDependency>,
+}
 
 /// A file as read from disk; the body stays compressed until a serve needs it.
 #[derive(Clone, Debug)]
@@ -256,8 +275,7 @@ pub async fn read(key: &str) -> Option<Stored> {
 
 /// The body of the written version `header` names: from memory, else decompressed from disk.
 pub async fn body(key: &str, header: &Header) -> Option<Arc<ResultBody>> {
-    let mem_key = public_dashboards_memory_key(key, header.incarnation);
-    if let Some(json) = memory::get(&mem_key, None).await {
+    if let Some(json) = public_dashboards_memory_get(key, header.incarnation).await {
         metrics::PUBLIC_DASHBOARD_MEM_CACHE_HITS_TOTAL.inc();
         return serde_json::from_slice(&json).ok().map(Arc::new);
     }
@@ -269,7 +287,7 @@ pub async fn body(key: &str, header: &Header) -> Option<Arc<ResultBody>> {
     }
     let json = decompress_body(&stored.body_zst).ok()?;
     let body = serde_json::from_slice(&json).ok().map(Arc::new);
-    _ = memory::set(&mem_key, json).await;
+    public_dashboards_memory_put(key, header.incarnation, json).await;
     body
 }
 
@@ -297,9 +315,18 @@ pub async fn write_raw(
 ) -> Result<u64, anyhow::Error> {
     header.incarnation = next_incarnation();
     header.last_read_at = now_micros();
+    #[cfg(test)]
+    anyhow::ensure!(!FAIL_WRITES.contains(key), "injected write failure");
     let bytes = encode(header, manifest, &body_zst)?;
     public_dashboards_replace(key, header.incarnation, bytes).await?;
     Ok(header.incarnation)
+}
+
+/// Evicts only a file the index holds, so a request for a made-up key takes no write lock.
+pub async fn evict_if_indexed(key: &str) {
+    if disk::public_dashboards_indexed(key).await {
+        evict(key).await;
+    }
 }
 
 pub async fn evict(key: &str) {
@@ -338,12 +365,13 @@ mod tests {
         ResultBody {
             panels,
             variables: vec![],
+            ..Default::default()
         }
     }
 
     fn manifest() -> Manifest {
-        let mut m = Manifest::new();
-        m.insert(
+        let mut m = Manifest::default();
+        m.panels.insert(
             "p1".into(),
             ManifestPanel {
                 intent: "abc".into(),
@@ -387,7 +415,7 @@ mod tests {
 
     #[test]
     fn gate16_an_unknown_format_version_or_broken_file_does_not_decode() {
-        let bytes = encode(&Header::default(), &Manifest::new(), &[]).unwrap();
+        let bytes = encode(&Header::default(), &Manifest::default(), &[]).unwrap();
         let mut newer = bytes.to_vec();
         newer[4..6].copy_from_slice(&(FORMAT_VERSION + 1).to_le_bytes());
         assert!(decode(&Bytes::from(newer)).is_err());

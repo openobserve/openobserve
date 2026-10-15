@@ -131,7 +131,7 @@ impl Engine for SearchEngine {
         family: &TraceFamily,
         flight: &Flight,
     ) -> Run {
-        run_panels(cap, range, range_key, now, family, flight).await
+        run_panels(self, cap, range, range_key, now, family, flight).await
     }
 
     async fn is_member(&self, org: &str, user: &str) -> Result<bool, anyhow::Error> {
@@ -165,6 +165,84 @@ impl Engine for SearchEngine {
         );
         #[cfg(not(feature = "cloud"))]
         true
+    }
+}
+
+/// The two searches a panel query runs; tests answer them in process.
+#[async_trait]
+trait PanelSearch: Send + Sync {
+    #[allow(clippy::too_many_arguments)]
+    async fn sql(
+        &self,
+        trace_id: &str,
+        org: &str,
+        stream_type: StreamType,
+        user: &str,
+        req: &search::Request,
+        range_error: String,
+        info: Option<DashboardInfo>,
+    ) -> Result<search::Response, String>;
+    /// The chart's `{resultType, result}` and whether the response carried warnings.
+    async fn promql(
+        &self,
+        trace_id: &str,
+        org: &str,
+        req: &promql_service::MetricsQueryRequest,
+        user: &str,
+        timeout: i64,
+    ) -> Result<(serde_json::Value, bool), String>;
+}
+
+#[async_trait]
+impl PanelSearch for SearchEngine {
+    async fn sql(
+        &self,
+        trace_id: &str,
+        org: &str,
+        stream_type: StreamType,
+        user: &str,
+        req: &search::Request,
+        range_error: String,
+        info: Option<DashboardInfo>,
+    ) -> Result<search::Response, String> {
+        search_service::cache::search(
+            trace_id,
+            org,
+            stream_type,
+            Some(user.to_string()),
+            req,
+            range_error,
+            false,
+            info,
+            false,
+        )
+        .await
+        .map_err(|e| e.to_string())
+    }
+
+    async fn promql(
+        &self,
+        trace_id: &str,
+        org: &str,
+        req: &promql_service::MetricsQueryRequest,
+        user: &str,
+        timeout: i64,
+    ) -> Result<(serde_json::Value, bool), String> {
+        #[cfg(not(feature = "enterprise"))]
+        let is_super_cluster = false;
+        #[cfg(feature = "enterprise")]
+        let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
+            .super_cluster
+            .enabled;
+        let resp =
+            promql_service::search::search(trace_id, org, req, user, timeout, is_super_cluster)
+                .await
+                .map_err(|e| e.to_string())?;
+        let data = serde_json::json!({
+            "resultType": resp.value.get_type().to_string(),
+            "result": resp.value,
+        });
+        Ok((data, !resp.warnings.is_empty()))
     }
 }
 
@@ -228,6 +306,7 @@ impl LinkValues {
 
 /// One build's fixed inputs for its searches.
 struct Ctx<'a> {
+    search: &'a dyn PanelSearch,
     link: &'a PublicDashboard,
     dash: &'a Dashboard,
     identity: String,
@@ -264,6 +343,20 @@ impl Ctx<'_> {
 
     fn timeout(&self) -> i64 {
         i64::from(get_config().public_dashboards.query_timeout_secs)
+    }
+
+    /// A denial withholds the panel; an authorizer that did not answer only fails this build.
+    fn refused(
+        &self,
+        panel: &Panel,
+        manifest: ManifestPanel,
+        reason: NotAvailableReason,
+    ) -> PanelRun {
+        if reason == NotAvailableReason::BuildError {
+            let error = "the authorizer did not answer".to_string();
+            return self.panel_failed(panel, manifest, error);
+        }
+        PanelRun::not_available(&panel.id, Class::Denied, reason, manifest, None)
     }
 
     fn panel_failed(&self, panel: &Panel, manifest: ManifestPanel, error: String) -> PanelRun {
@@ -594,18 +687,20 @@ pub async fn set_org_settings(
 ) -> Result<OrgPublicDashboardSettings, anyhow::Error> {
     validate_settings(&body).map_err(Invalid)?;
     let db = get_orm_client_rw().await;
+    // In Cloud an org admin writes only the switch; the plan sync owns the link limit.
     #[cfg(feature = "cloud")]
-    let body = if db::user::is_root_user(user_id) {
-        body
-    } else {
+    if !db::user::is_root_user(user_id) {
         let stored = pd_table::get_settings(db, org)
             .await?
             .and_then(|s| s.max_links);
-        OrgPublicDashboardSettings {
-            max_links: plan_owned_max_links(stored, body.max_links)?,
-            ..body
-        }
-    };
+        check_plan_owned_max_links(stored, body.max_links)?;
+        let row =
+            pd_table::set_settings_enabled(db, org, body.enabled, user_id, now_micros()).await?;
+        return Ok(OrgPublicDashboardSettings {
+            enabled: row.enabled,
+            max_links: row.max_links,
+        });
+    }
     let row =
         pd_table::upsert_settings(db, org, body.enabled, body.max_links, user_id, now_micros())
             .await?;
@@ -615,18 +710,17 @@ pub async fn set_org_settings(
     })
 }
 
-/// In Cloud the plan sync owns max_links, so an org admin keeps the stored value and may only
-/// use the switch.
+/// In Cloud the plan sync owns max_links: an org admin may echo or omit it, not change it.
 #[cfg(feature = "cloud")]
-fn plan_owned_max_links(
+fn check_plan_owned_max_links(
     stored: Option<i32>,
     requested: Option<i32>,
-) -> Result<Option<i32>, anyhow::Error> {
+) -> Result<(), anyhow::Error> {
     match requested {
         Some(n) if Some(n) != stored => Err(anyhow::anyhow!(
             "The link limit follows the organization's plan; changing it needs root permission"
         )),
-        _ => Ok(stored),
+        _ => Ok(()),
     }
 }
 
@@ -795,7 +889,8 @@ pub fn time_ranges(link: &PublicDashboard) -> TimeRangePolicy {
 }
 
 /// Runs every panel of the captured dashboard for one window (design 5.4 steps 3 to 6).
-pub(crate) async fn run_panels(
+async fn run_panels(
+    search: &dyn PanelSearch,
     cap: &Capture,
     range: &TimeRange,
     range_key: &str,
@@ -809,6 +904,7 @@ pub(crate) async fn run_panels(
     let link = &cap.link;
     let (start, end) = materialize::window(range, now);
     let ctx = Ctx {
+        search,
         link,
         dash,
         identity: public_dashboard_identity(&link.org_id),
@@ -824,11 +920,16 @@ pub(crate) async fn run_panels(
         .map(|s| f64::from(s.scrape_interval));
     let frozen = parse_frozen_vars(link.frozen_variables.as_deref());
     let values = fill_defaults(&ctx, frozen.clone()).await;
-    let variables = PublicVariable::list(dash, &values.values);
+    let (variable_keys, variables) = PublicVariable::list_keyed(dash, &values.values)
+        .into_iter()
+        .unzip();
+    let values_dependencies = values.deps.values().cloned().collect();
     let vars = QueryVars::new(dash, values.values.clone(), scrape);
     let Some(v8) = dash.v8.as_ref() else {
         return Run {
             variables,
+            variable_keys,
+            values_dependencies,
             panels: vec![],
         };
     };
@@ -864,11 +965,13 @@ pub(crate) async fn run_panels(
         .await;
     Run {
         variables,
+        variable_keys,
+        values_dependencies,
         panels: runs,
     }
 }
 
-/// Checks every stream the final query reads and returns them; OSS has no stream permissions.
+/// Checks every stream a query reads; an authorizer that does not answer gives `BuildError`.
 #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
 pub async fn authorize_query(
     org: &str,
@@ -879,40 +982,31 @@ pub async fn authorize_query(
 ) -> Result<Vec<(StreamType, String)>, NotAvailableReason> {
     #[cfg(feature = "enterprise")]
     {
-        use crate::authz::{
-            StreamPermissionResourceType, check_cipher_key_permissions, check_stream_permissions,
-        };
+        use crate::authz::check_cipher_key_permissions;
         // An unreadable query can't be proven safe, so it is withheld rather than run.
         let streams = query_streams(query_type, text, target.0)
             .map_err(|_| NotAvailableReason::Unauthorized)?;
-        for (stream, stream_type) in &streams {
-            let denied = check_stream_permissions(
-                stream,
-                org,
-                user_id,
-                stream_type,
-                StreamPermissionResourceType::Search,
-            )
-            .await
-            .is_some();
-            if denied {
-                return Err(NotAvailableReason::Unauthorized);
-            }
-        }
-        if query_type != "promql"
+        let typed: Vec<(StreamType, String)> = streams.into_iter().map(|(s, t)| (t, s)).collect();
+        let cipher_denied = query_type != "promql"
             && check_cipher_key_permissions(org, user_id, text)
                 .await
-                .is_some()
-        {
-            return Err(NotAvailableReason::Unauthorized);
+                .is_some();
+        if cipher_denied || !streams_allowed(org, user_id, typed.iter()).await {
+            return Err(match authorizer_answers(org, user_id).await {
+                Ok(()) => NotAvailableReason::Unauthorized,
+                Err(e) => {
+                    log::warn!("public dashboard authorizer did not answer: {e}");
+                    NotAvailableReason::BuildError
+                }
+            });
         }
-        Ok(streams.into_iter().map(|(s, t)| (t, s)).collect())
+        Ok(typed)
     }
     #[cfg(not(feature = "enterprise"))]
     Ok(typed_sources(query_type, text, target))
 }
 
-/// Re-authorizes the data one panel was built from, from its manifest, as `user`.
+/// Re-authorizes a panel's data from its manifest; an error means the authorizer did not answer.
 #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
 pub async fn authorize_manifest(
     org: &str,
@@ -921,36 +1015,18 @@ pub async fn authorize_manifest(
 ) -> Result<bool, anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
-        use crate::authz::{
-            StreamPermissionResourceType, check_stream_permissions, denied_cipher_keys,
-        };
         let streams = panel.sources.iter().chain(
             panel
                 .values_dependencies
                 .iter()
                 .flat_map(|d| d.sources.iter()),
         );
-        for (stream_type, stream) in streams {
-            let denied = check_stream_permissions(
-                stream,
-                org,
-                user_id,
-                stream_type,
-                StreamPermissionResourceType::Search,
-            )
-            .await
-            .is_some();
-            if denied {
-                return Ok(false);
-            }
-        }
-        let sqls: Vec<&str> = panel
-            .queries
-            .iter()
-            .filter(|q| q.query_type == "sql")
-            .map(|q| q.text.as_str())
-            .collect();
-        if !matches!(denied_cipher_keys(org, user_id, &sqls).await, Ok(d) if d.is_empty()) {
+        let denied = !streams_allowed(org, user_id, streams).await
+            || !crate::authz::denied_named_cipher_keys(org, user_id, &panel.cipher_keys)
+                .await
+                .is_empty();
+        if denied {
+            authorizer_answers(org, user_id).await?;
             return Ok(false);
         }
     }
@@ -1287,7 +1363,7 @@ async fn run_sql_panel(
         )
         .await
         {
-            return PanelRun::not_available(&panel.id, Class::Denied, reason, manifest, None);
+            return ctx.refused(panel, manifest, reason);
         }
         let shifts = time_shifts(q, ctx.end, false);
         for shift in std::iter::once(None).chain(shifts.iter().map(Some)) {
@@ -1316,21 +1392,21 @@ async fn run_sql_panel(
             );
             let trace_id = ctx.family.child();
             let clamped = !range_error.is_empty();
-            let resp = match search_service::cache::search(
-                &trace_id,
-                &ctx.link.org_id,
-                q.fields.stream_type,
-                Some(ctx.identity.clone()),
-                &req,
-                range_error,
-                false,
-                Some(ctx.dashboard_info(tab, panel)),
-                false,
-            )
-            .await
+            let resp = match ctx
+                .search
+                .sql(
+                    &trace_id,
+                    &ctx.link.org_id,
+                    q.fields.stream_type,
+                    &ctx.identity,
+                    &req,
+                    range_error,
+                    Some(ctx.dashboard_info(tab, panel)),
+                )
+                .await
             {
                 Ok(resp) => resp,
-                Err(e) => return ctx.panel_failed(panel, manifest, e.to_string()),
+                Err(e) => return ctx.panel_failed(panel, manifest, e),
             };
             let hits = resp.hits.len();
             // The wrapper also flags a clamped window as partial; only a real gap is retried.
@@ -1395,7 +1471,7 @@ async fn run_promql_panel(
         )
         .await
         {
-            return PanelRun::not_available(&panel.id, Class::Denied, reason, manifest, None);
+            return ctx.refused(panel, manifest, reason);
         }
     }
     let mut out = Collected {
@@ -1467,27 +1543,15 @@ async fn run_promql(
     end: i64,
 ) -> Result<(serde_json::Value, bool), String> {
     let req = promql_request(ctx, panel_id, expr, start, end);
-    #[cfg(not(feature = "enterprise"))]
-    let is_super_cluster = false;
-    #[cfg(feature = "enterprise")]
-    let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled;
-    let resp = promql_service::search::search(
-        trace_id,
-        &ctx.link.org_id,
-        &req,
-        &ctx.identity,
-        ctx.timeout(),
-        is_super_cluster,
-    )
-    .await
-    .map_err(|e| e.to_string())?;
-    let data = serde_json::json!({
-        "resultType": resp.value.get_type().to_string(),
-        "result": resp.value,
-    });
-    Ok((data, !resp.warnings.is_empty()))
+    ctx.search
+        .promql(
+            trace_id,
+            &ctx.link.org_id,
+            &req,
+            &ctx.identity,
+            ctx.timeout(),
+        )
+        .await
 }
 
 /// The search a PromQL panel query runs: its cache on, typed and timed for public dashboards.
@@ -1550,6 +1614,12 @@ async fn fill_defaults(ctx: &Ctx<'_>, frozen: BTreeMap<String, serde_json::Value
     let mut out = Values::default();
     while let Some(pending) = defaults.next_query() {
         let key = pending.key.clone();
+        // A cancelled build starts no child after the abort, so none escapes the drain.
+        if ctx.family.is_cancelled() {
+            out.failed.insert(key);
+            defaults.settle(pending, None);
+            continue;
+        }
         if pending.depends_on.iter().any(|k| out.denied.contains(k)) {
             out.denied.insert(key);
             defaults.settle(pending, None);
@@ -1574,6 +1644,10 @@ async fn fill_defaults(ctx: &Ctx<'_>, frozen: BTreeMap<String, serde_json::Value
         )
         .await
         {
+            Err(NotAvailableReason::BuildError) => {
+                out.failed.insert(key);
+                None
+            }
             Err(_) => {
                 out.denied.insert(key);
                 None
@@ -1609,19 +1683,18 @@ async fn run_values(ctx: &Ctx<'_>, q: &ValuesQuery) -> Result<Vec<String>, Strin
         search_event_context: Some(ctx.event_context(None)),
         ..Default::default()
     };
-    let resp = search_service::cache::search(
-        &ctx.family.child(),
-        &ctx.link.org_id,
-        q.stream_type,
-        Some(ctx.identity.clone()),
-        &req,
-        String::new(),
-        false,
-        None,
-        false,
-    )
-    .await
-    .map_err(|e| e.to_string())?;
+    let resp = ctx
+        .search
+        .sql(
+            &ctx.family.child(),
+            &ctx.link.org_id,
+            q.stream_type,
+            &ctx.identity,
+            &req,
+            String::new(),
+            None,
+        )
+        .await?;
     Ok(resp
         .hits
         .iter()
@@ -1646,6 +1719,9 @@ async fn publish_estimate(
             let Some(tmpl) = query_text(q) else {
                 continue;
             };
+            if ctx.family.is_cancelled() {
+                return;
+            }
             let req = search::SearchPartitionRequest {
                 sql: panel_vars.substitute(tmpl, "sql", ctx.start, ctx.end),
                 start_time: ctx.start,
@@ -1805,9 +1881,12 @@ fn record_sources(
     text: &str,
     target: (StreamType, &str),
 ) {
-    manifest
-        .sources
-        .extend(typed_sources(query_type, text, target));
+    // An unparseable query proves no stream, so the deadline never restores its panel.
+    if let Ok(streams) = query_streams(query_type, text, target.0) {
+        manifest
+            .sources
+            .extend(streams.into_iter().map(|(s, t)| (t, s)));
+    }
     manifest
         .sources
         .sort_by(|a, b| (a.0.as_str(), &a.1).cmp(&(b.0.as_str(), &b.1)));
@@ -1833,6 +1912,45 @@ fn public_meta(full: &serde_json::Value) -> serde_json::Value {
 fn parse_frozen_vars(json: Option<&str>) -> BTreeMap<String, serde_json::Value> {
     json.and_then(|s| serde_json::from_str(s).ok())
         .unwrap_or_default()
+}
+
+/// Whether `user` may search every one of `streams`.
+#[cfg(feature = "enterprise")]
+async fn streams_allowed<'a>(
+    org: &str,
+    user_id: &str,
+    streams: impl Iterator<Item = &'a (StreamType, String)>,
+) -> bool {
+    use crate::authz::{StreamPermissionResourceType, check_stream_permissions};
+    for (stream_type, stream) in streams {
+        let denied = check_stream_permissions(
+            stream,
+            org,
+            user_id,
+            stream_type,
+            StreamPermissionResourceType::Search,
+        )
+        .await
+        .is_some();
+        if denied {
+            return false;
+        }
+    }
+    true
+}
+
+/// Confirms a denial through calls that return errors, which the permission check folds into false.
+#[cfg(feature = "enterprise")]
+async fn authorizer_answers(org: &str, user_id: &str) -> Result<(), anyhow::Error> {
+    db::user::get(Some(org), user_id).await?;
+    if !o2_openfga::config::get_config().enabled || db::user::is_root_user(user_id) {
+        return Ok(());
+    }
+    // An empty role always reaches the service; the standard roles short-circuit in list_objects.
+    let object_type = o2_openfga::authorizer::authz::get_ofga_type("logs");
+    o2_openfga::authorizer::authz::list_objects(user_id, "GET", &object_type, org, "")
+        .await
+        .map(|_| ())
 }
 
 /// The typed streams a query reads; one that does not parse falls back to the panel's stream.
@@ -2285,6 +2403,19 @@ mod tests {
     }
 
     fn ctx_parts() -> (PublicDashboard, Dashboard, TraceFamily) {
+        // A root publisher passes every stream check, so Enterprise runs reach the fake search.
+        crate::common::infra::config::ORG_USERS.insert(
+            format!("{}/p@x", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord {
+                email: "p@x".into(),
+                org_id: config::DEFAULT_ORG.into(),
+                role: config::meta::user::UserRole::Root,
+                token: String::new(),
+                rum_token: None,
+                created_at: 0,
+                allow_static_token: false,
+            },
+        );
         let link = PublicDashboard {
             id: "l1".into(),
             org_id: "o1".into(),
@@ -2318,7 +2449,19 @@ mod tests {
     }
 
     fn ctx<'a>(link: &'a PublicDashboard, dash: &'a Dashboard, family: &'a TraceFamily) -> Ctx<'a> {
+        static NO_SEARCH: std::sync::LazyLock<FakeSearch> =
+            std::sync::LazyLock::new(Default::default);
+        ctx_with(&*NO_SEARCH, link, dash, family)
+    }
+
+    fn ctx_with<'a>(
+        search: &'a dyn PanelSearch,
+        link: &'a PublicDashboard,
+        dash: &'a Dashboard,
+        family: &'a TraceFamily,
+    ) -> Ctx<'a> {
         Ctx {
+            search,
             link,
             dash,
             identity: public_dashboard_identity(&link.org_id),
@@ -2790,14 +2933,341 @@ mod tests {
     #[cfg(feature = "cloud")]
     #[test]
     fn in_cloud_an_org_admin_cannot_change_the_plan_link_limit() {
-        // The switch alone, with the limit echoed or left out, keeps the plan's value.
-        assert_eq!(plan_owned_max_links(Some(3), Some(3)).unwrap(), Some(3));
-        assert_eq!(plan_owned_max_links(Some(3), None).unwrap(), Some(3));
-        assert_eq!(plan_owned_max_links(None, None).unwrap(), None);
+        // The switch alone, with the limit echoed or left out, is allowed.
+        assert!(check_plan_owned_max_links(Some(3), Some(3)).is_ok());
+        assert!(check_plan_owned_max_links(Some(3), None).is_ok());
+        assert!(check_plan_owned_max_links(None, None).is_ok());
         // Raising, lowering or setting a limit on a missing row is refused with 403.
         for (stored, requested) in [(Some(3), Some(50)), (Some(50), Some(10)), (None, Some(50))] {
-            let err = plan_owned_max_links(stored, requested).unwrap_err();
+            let err = check_plan_owned_max_links(stored, requested).unwrap_err();
             assert!(err.to_string().contains("permission"), "{err}");
         }
+    }
+
+    /// Answers every SQL query with `hits` rows and every PromQL query with `series` series.
+    #[derive(Default)]
+    struct FakeSearch {
+        hits: usize,
+        series: usize,
+        partial: bool,
+        calls: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl PanelSearch for FakeSearch {
+        async fn sql(
+            &self,
+            _trace_id: &str,
+            _org: &str,
+            _stream_type: StreamType,
+            _user: &str,
+            req: &search::Request,
+            _range_error: String,
+            _info: Option<DashboardInfo>,
+        ) -> Result<search::Response, String> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(search::Response {
+                hits: (0..self.hits)
+                    .map(|i| json!({ "_timestamp": req.query.start_time, "n": i, "zo_sql_key": format!("v{i}") }))
+                    .collect(),
+                total: self.hits,
+                histogram_interval: Some(60),
+                is_partial: self.partial,
+                function_error: vec!["a private error".into()],
+                ..Default::default()
+            })
+        }
+
+        async fn promql(
+            &self,
+            _trace_id: &str,
+            _org: &str,
+            req: &promql_service::MetricsQueryRequest,
+            _user: &str,
+            _timeout: i64,
+        ) -> Result<(serde_json::Value, bool), String> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            let result: Vec<_> = (0..self.series)
+                .map(|i| json!({ "metric": { "pod": format!("p{i}") }, "values": [[req.start / 1_000_000, "1"]] }))
+                .collect();
+            Ok((
+                json!({ "resultType": "matrix", "result": result }),
+                self.partial,
+            ))
+        }
+    }
+
+    fn typed_panel(
+        id: &str,
+        typ: &str,
+        query_type: &str,
+        query: &str,
+        shift: Option<&str>,
+    ) -> Panel {
+        let mut config = json!({ "promql_legend": "" });
+        if let Some(off) = shift {
+            config["time_shift"] = json!([{ "offSet": off }]);
+        }
+        serde_json::from_value(json!({
+            "id": id, "type": typ, "title": id, "description": "",
+            "config": { "show_legends": false, "legends_position": null },
+            "queryType": query_type,
+            "queries": [{
+                "query": query, "customQuery": true,
+                "fields": { "stream": "s", "stream_type": "logs", "x": [], "y": [],
+                            "filter": { "filterType": "group", "logicalOperator": "AND", "conditions": [] } },
+                "config": config
+            }]
+        }))
+        .unwrap()
+    }
+
+    async fn run_one(search: &FakeSearch, panel: Panel) -> PanelRun {
+        let (link, mut dash, family) = ctx_parts();
+        dash.v8.as_mut().unwrap().tabs[0].panels = vec![panel];
+        let ctx = ctx_with(search, &link, &dash, &family);
+        let tab = &dash.v8.as_ref().unwrap().tabs[0];
+        let vars = QueryVars::new(&dash, BTreeMap::new(), None);
+        run_panel(
+            &ctx,
+            &vars,
+            &BTreeMap::new(),
+            &Values::default(),
+            tab,
+            &tab.panels[0],
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn gate16_every_sql_panel_type_yields_the_shapes_the_viewer_renders() {
+        let search = FakeSearch {
+            hits: 3,
+            ..Default::default()
+        };
+        let hour_ms: i64 = 3_600_000;
+        for typ in [
+            "line",
+            "area",
+            "area-stacked",
+            "bar",
+            "h-bar",
+            "stacked",
+            "h-stacked",
+            "scatter",
+            "table",
+            "pie",
+            "donut",
+            "metric",
+            "gauge",
+            "heatmap",
+            "geomap",
+            "maps",
+            "sankey",
+        ] {
+            let panel = typed_panel("p", typ, "sql", "SELECT * FROM \"s\"", Some("1h"));
+            let run = run_one(&search, panel).await;
+            assert_eq!(run.class, Class::Fresh, "{typ}");
+            let r = &run.result;
+            assert_eq!(r.state, PanelState::ok(), "{typ}");
+            // One entry per run: the unshifted query, then its shift, index-aligned.
+            assert_eq!(r.data.len(), 2, "{typ}");
+            assert_eq!(r.result_meta_data.len(), 2, "{typ}");
+            assert_eq!(r.data[0].as_array().unwrap().len(), 3, "{typ}");
+            for meta in &r.result_meta_data {
+                let keys: Vec<&String> = meta.as_object().unwrap().keys().collect();
+                assert!(
+                    keys.iter()
+                        .all(|k| PUBLIC_META_FIELDS.contains(&k.as_str())),
+                    "{typ} {keys:?}"
+                );
+                assert_eq!(meta["histogram_interval"], 60);
+            }
+            let queries = r.metadata["queries"].as_array().unwrap();
+            assert_eq!(
+                queries[0]["timeRangeGap"],
+                json!({ "seconds": 0, "periodAsStr": "" })
+            );
+            assert_eq!(
+                queries[1]["timeRangeGap"],
+                json!({ "seconds": hour_ms, "periodAsStr": "1 Hour ago" })
+            );
+            assert_eq!(queries[1]["startTime"], json!(10 - hour_ms * 1000));
+            assert_eq!(queries[1]["panelQueryIndex"], 0);
+            assert_eq!(queries[0]["queryType"], "sql");
+            assert_eq!(r.window, Some(Window { start: 10, end: 20 }));
+            assert!(!serde_json::to_string(r).unwrap().contains("private error"));
+            assert_eq!(run.manifest.queries.len(), 2);
+        }
+    }
+
+    #[tokio::test]
+    async fn gate16_truncated_and_partial_results_are_flagged_and_still_served() {
+        let cap = get_config().limit.query_default_limit as usize;
+        let full = FakeSearch {
+            hits: cap,
+            ..Default::default()
+        };
+        let run = run_one(
+            &full,
+            typed_panel("p", "table", "sql", "SELECT * FROM \"s\"", None),
+        )
+        .await;
+        assert_eq!(run.class, Class::Truncated);
+        assert_eq!(run.result.data[0].as_array().unwrap().len(), cap);
+        // An explicit LIMIT returns what it asked for and is never truncated.
+        let sql = format!("SELECT * FROM \"s\" LIMIT {cap}");
+        let run = run_one(&full, typed_panel("p", "table", "sql", &sql, None)).await;
+        assert_eq!(run.class, Class::Fresh);
+        let partial = FakeSearch {
+            hits: 2,
+            partial: true,
+            ..Default::default()
+        };
+        let run = run_one(
+            &partial,
+            typed_panel("p", "line", "sql", "SELECT * FROM \"s\"", None),
+        )
+        .await;
+        assert_eq!(run.class, Class::Partial);
+        assert_eq!(run.result.data[0].as_array().unwrap().len(), 2);
+        let over = format!("SELECT * FROM \"s\" LIMIT {}", cap + 1);
+        let run = run_one(&full, typed_panel("p", "table", "sql", &over, None)).await;
+        assert_eq!(
+            run.result.state,
+            PanelState::NotAvailable {
+                reason: NotAvailableReason::TooLarge
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn gate16_promql_panels_cut_series_and_append_shifts_after_the_primaries() {
+        let max = get_config().limit.max_dashboard_series;
+        let search = FakeSearch {
+            series: max + 20,
+            ..Default::default()
+        };
+        for typ in ["line", "area", "bar", "metric", "gauge", "table"] {
+            let run = run_one(&search, typed_panel("p", typ, "promql", "up", Some("1d"))).await;
+            assert_eq!(run.class, Class::Fresh, "{typ}");
+            let r = &run.result;
+            assert_eq!(r.data.len(), 2, "{typ}");
+            assert_eq!(r.data[0]["resultType"], "matrix");
+            assert_eq!(r.data[0]["result"].as_array().unwrap().len(), max);
+            assert_eq!(r.data[1]["result"].as_array().unwrap().len(), max);
+            assert!(r.result_meta_data.iter().all(serde_json::Value::is_null));
+            let queries = r.metadata["queries"].as_array().unwrap();
+            assert_eq!(queries[1]["timeRangeGap"]["seconds"], 86_400_000);
+            assert_eq!(queries[1]["queryType"], "promql");
+        }
+        let partial = FakeSearch {
+            series: 1,
+            partial: true,
+            ..Default::default()
+        };
+        let run = run_one(&partial, typed_panel("p", "line", "promql", "up", None)).await;
+        assert_eq!(run.class, Class::Partial);
+        let custom = run_one(
+            &search,
+            typed_panel("p", "custom_chart", "promql", "up", None),
+        )
+        .await;
+        assert_eq!(
+            custom.result.state,
+            PanelState::NotAvailable {
+                reason: NotAvailableReason::Unsupported
+            }
+        );
+    }
+
+    fn flight() -> std::sync::Arc<Flight> {
+        let flights: &'static flight::Flights = Box::leak(Box::new(flight::Flights::new(1, 1)));
+        let flight::Start::Leader(f) =
+            flights.start("k", "o", flight::Kind::AuthCheck, |_| async {
+                Err(flight::Failure::Panic)
+            })
+        else {
+            panic!("the first reader leads");
+        };
+        f
+    }
+
+    #[tokio::test]
+    async fn gate15_panels_past_the_cap_across_tabs_are_withheld_and_a_higher_cap_admits_them() {
+        let (link, _, family) = ctx_parts();
+        let tabs = vec![
+            (0..7).map(|i| panel(&format!("a{i}"), None)).collect(),
+            (0..5).map(|i| panel(&format!("b{i}"), None)).collect(),
+        ];
+        let dash = dashboard(tabs);
+        let ctx = ctx(&link, &dash, &family);
+        let vars = QueryVars::new(&dash, BTreeMap::new(), None);
+        let (frozen, values, done, flight) = (
+            BTreeMap::new(),
+            Values::default(),
+            AtomicUsize::new(0),
+            flight(),
+        );
+        let panels: Vec<(&Tab, &Panel)> = dash
+            .v8
+            .as_ref()
+            .unwrap()
+            .tabs
+            .iter()
+            .flat_map(|t| t.panels.iter().map(move |p| (t, p)))
+            .collect();
+        for (max, too_many) in [(10, vec!["b3", "b4"]), (12, vec![])] {
+            let scope = PanelScope {
+                ctx: &ctx,
+                vars: &vars,
+                frozen: &frozen,
+                values: &values,
+                flight: &flight,
+                done: &done,
+                total: panels.len(),
+                max,
+            };
+            let mut capped = vec![];
+            for (i, (tab, panel)) in panels.iter().enumerate() {
+                let run = scope.run(i, tab, panel).await;
+                if run.result.state
+                    == (PanelState::NotAvailable {
+                        reason: NotAvailableReason::TooManyPanels,
+                    })
+                {
+                    capped.push(run.id);
+                }
+            }
+            assert_eq!(capped, too_many, "max {max}");
+        }
+    }
+
+    #[tokio::test]
+    async fn gate09_a_cancelled_build_starts_no_values_query() {
+        let (link, mut dash, family) = ctx_parts();
+        dash.v8.as_mut().unwrap().variables = Some(
+            serde_json::from_value(
+                json!({ "list": [{ "type": "query_values", "name": "svc", "label": "Svc",
+                "query_data": { "stream_type": "logs", "stream": "s", "field": "svc" } }] }),
+            )
+            .unwrap(),
+        );
+        let search = FakeSearch {
+            hits: 2,
+            ..Default::default()
+        };
+        let ctx = ctx_with(&search, &link, &dash, &family);
+        let values = fill_defaults(&ctx, BTreeMap::new()).await;
+        assert_eq!(search.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(values.values["svc"], json!("v0"));
+        family.cancel().await;
+        let values = fill_defaults(&ctx, BTreeMap::new()).await;
+        assert_eq!(
+            search.calls.load(Ordering::SeqCst),
+            1,
+            "no child after the cancel"
+        );
+        assert!(values.failed.contains("svc"));
     }
 }

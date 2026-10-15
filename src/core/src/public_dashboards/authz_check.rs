@@ -26,7 +26,7 @@ use infra::table::entity::public_dashboards::Model as PublicDashboard;
 use super::{
     flight::{Built, Failure, Flights, Kind, Outcome, Start, Wait},
     materialize::Engine,
-    store::{self, Header, PanelOutcome, Stored},
+    store::{self, Header, ManifestPanel, PanelOutcome, Stored},
 };
 
 pub const AUTH_DEADLINE_MICROS: i64 = 15 * 60 * 1_000_000;
@@ -145,7 +145,7 @@ pub async fn recheck(
     }
     let mut header = stored.header.clone();
     let mut restored = false;
-    for (id, panel) in &stored.manifest {
+    for (id, panel) in &stored.manifest.panels {
         let withheld = header.is_withheld(id);
         let served = matches!(
             panel.outcome,
@@ -174,12 +174,45 @@ pub async fn recheck(
             _ => {}
         }
     }
+    restored |= recheck_variables(engine, org, publisher, stored, &mut header).await?;
     if restored {
         header.incomplete_count = header.incomplete_count.max(1);
         header.next_retry_at = Some(now);
     }
     header.auth_checked_at = now;
     Ok(header)
+}
+
+/// Nulls a variable whose values query reads a stream the publisher lost; true when one returns.
+async fn recheck_variables(
+    engine: &'static dyn Engine,
+    org: &str,
+    publisher: &str,
+    stored: &Stored,
+    header: &mut Header,
+) -> Result<bool, Failure> {
+    let mut restored = false;
+    for dep in &stored.manifest.variables {
+        let probe = ManifestPanel {
+            values_dependencies: vec![dep.clone()],
+            ..Default::default()
+        };
+        let allowed = engine
+            .authorize(org, publisher, &probe)
+            .await
+            .map_err(|e| {
+                log::error!("public dashboard authorization failed: {e}");
+                Failure::Unavailable
+            })?;
+        let withheld = header.withheld_variables.contains(&dep.variable);
+        if !allowed && !withheld {
+            header.withheld_variables.push(dep.variable.clone());
+        } else if allowed && withheld {
+            header.withheld_variables.retain(|v| v != &dep.variable);
+            restored = true;
+        }
+    }
+    Ok(restored)
 }
 
 fn from_wait(wait: Wait) -> Checked {
