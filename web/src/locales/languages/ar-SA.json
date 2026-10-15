@@ -9450,6 +9450,9 @@
     "sloLongWindow": "نافذة طويلة",
     "sloShortWindow": "نافذة قصيرة",
     "sloCloneDisabled": "تنبيهات SLO تنشأ على صفحة SLO الخاصة بهم، لذا لا يمكن استنساخها من هنا.",
+    "builtinBadge": "النظام",
+    "builtinBadgeHint": "تنبيه مضمّن: يمكنك إيقافه أو تعديله، لكن لا يمكنك حذفه أو إعادة تسميته.",
+    "builtinDeleteDisabled": "تنبيه مضمّن، لا يمكن حذفه",
     "seconds": "ثوانٍ",
     "downtimes": {
       "newTitle": "فترة توقف جديدة",

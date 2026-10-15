@@ -121,7 +121,8 @@
       "ui-regression.spec.js",
       "landing-regression.spec.js",
       "internal-route-guards.spec.js",
-      "datetime-paste-invalid-values-14648.spec.js"
+      "datetime-paste-invalid-values-14648.spec.js",
+      "query-management-sql-tooltip.spec.js"
     ],
     "disabled": []
   },
