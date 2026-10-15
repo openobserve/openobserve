@@ -2,7 +2,7 @@
   "version": 8,
   "dashboardId": "",
   "title": "Oracle / Overview",
-  "description": "",
+  "description": "Sessions, executions, transactions, reads, CPU, memory and tablespaces for Oracle databases reporting through the OpenTelemetry oracledb receiver.",
   "role": "ready-made:oracle/overview:1",
   "owner": "",
   "created": "2026-10-15T00:00:00.000Z",
@@ -12,7 +12,7 @@
       "name": "Overview",
       "panels": [
         {
-          "id": "oracle_placeholder",
+          "id": "ora_note",
           "type": "markdown",
           "title": "",
           "description": "",
@@ -51,13 +51,1009 @@
             "i": 0
           },
           "htmlContent": "",
-          "markdownContent": "Placeholder"
+          "markdownContent": "Ready-made by OpenObserve. Charts fill in within a few minutes of new data. Edit or delete anything, including this note."
+        },
+        {
+          "id": "ora_sessions",
+          "type": "metric",
+          "title": "Sessions",
+          "description": "Open sessions on the selected instances, user and background together.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(oracledb_sessions_usage{oracledb_instance_name=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_sessions_usage",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 4,
+            "w": 64,
+            "h": 6,
+            "i": 1
+          }
+        },
+        {
+          "id": "ora_session_use",
+          "type": "metric",
+          "title": "Session use",
+          "description": "Open sessions as a share of the SESSIONS limit.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum(oracledb_sessions_usage{oracledb_instance_name=~\"$instance\"}) / sum(oracledb_sessions_limit{oracledb_instance_name=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_sessions_usage",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 4,
+            "w": 64,
+            "h": 6,
+            "i": 2
+          }
+        },
+        {
+          "id": "ora_process_use",
+          "type": "metric",
+          "title": "Process use",
+          "description": "Server processes as a share of the PROCESSES limit. New connections fail when it reaches 100%.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum(oracledb_processes_usage{oracledb_instance_name=~\"$instance\"}) / sum(oracledb_processes_limit{oracledb_instance_name=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_processes_usage",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 4,
+            "w": 64,
+            "h": 6,
+            "i": 3
+          }
+        },
+        {
+          "id": "ora_executions_rate",
+          "type": "metric",
+          "title": "Executions/s",
+          "description": "SQL statement executions per second, averaged over 5 minutes.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(oracledb_executions{oracledb_instance_name=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_executions",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 10,
+            "w": 64,
+            "h": 6,
+            "i": 4
+          }
+        },
+        {
+          "id": "ora_commits_rate",
+          "type": "metric",
+          "title": "Commits/s",
+          "description": "User commits per second, averaged over 5 minutes.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(oracledb_user_commits{oracledb_instance_name=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_user_commits",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 10,
+            "w": 64,
+            "h": 6,
+            "i": 5
+          }
+        },
+        {
+          "id": "ora_rollback_ratio",
+          "type": "metric",
+          "title": "Rollback ratio",
+          "description": "User rollbacks as a share of commits plus rollbacks, over 5 minutes. Near 0% is healthy.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum(rate(oracledb_user_rollbacks{oracledb_instance_name=~\"$instance\"}[5m])) / (sum(rate(oracledb_user_commits{oracledb_instance_name=~\"$instance\"}[5m])) + sum(rate(oracledb_user_rollbacks{oracledb_instance_name=~\"$instance\"}[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_user_rollbacks",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 10,
+            "w": 64,
+            "h": 6,
+            "i": 6
+          }
+        },
+        {
+          "id": "ora_rollbacks",
+          "type": "line",
+          "title": "Rollbacks/s",
+          "description": "User rollbacks per second, per instance. Flat at 0 is healthy: no transaction was rolled back.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 3,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (oracledb_instance_name)(rate(oracledb_user_rollbacks{oracledb_instance_name=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_user_rollbacks",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{oracledb_instance_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 16,
+            "w": 96,
+            "h": 14,
+            "i": 7
+          }
+        },
+        {
+          "id": "ora_deadlocks",
+          "type": "line",
+          "title": "Deadlocks (per 5 min)",
+          "description": "Enqueue and parallel-exchange deadlocks in the previous 5 minutes. Flat at 0 is healthy: no deadlocks.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(increase(oracledb_enqueue_deadlocks{oracledb_instance_name=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_enqueue_deadlocks",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "enqueue"
+              }
+            },
+            {
+              "query": "sum(increase(oracledb_exchange_deadlocks{oracledb_instance_name=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_exchange_deadlocks",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "exchange"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 16,
+            "w": 96,
+            "h": 14,
+            "i": 8
+          }
+        },
+        {
+          "id": "ora_exec_parse",
+          "type": "line",
+          "title": "Executions and parses/s",
+          "description": "Statement executions, parse calls and hard parses per second. Hard parses that climb with executions mean statements are not being reused.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(oracledb_executions{oracledb_instance_name=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_executions",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "executions"
+              }
+            },
+            {
+              "query": "sum(rate(oracledb_parse_calls{oracledb_instance_name=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_parse_calls",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "parse calls"
+              }
+            },
+            {
+              "query": "sum(rate(oracledb_hard_parses{oracledb_instance_name=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_hard_parses",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "hard parses"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 30,
+            "w": 96,
+            "h": 14,
+            "i": 9
+          }
+        },
+        {
+          "id": "ora_reads",
+          "type": "line",
+          "title": "Logical and physical reads/s",
+          "description": "Blocks read per second from the buffer cache (logical) and from disk (physical).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(oracledb_logical_reads{oracledb_instance_name=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_logical_reads",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "logical"
+              }
+            },
+            {
+              "query": "sum(rate(oracledb_physical_reads{oracledb_instance_name=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_physical_reads",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "physical"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 30,
+            "w": 96,
+            "h": 14,
+            "i": 10
+          }
+        },
+        {
+          "id": "ora_commits",
+          "type": "line",
+          "title": "Commits/s by instance",
+          "description": "User commits per second, per instance.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (oracledb_instance_name)(rate(oracledb_user_commits{oracledb_instance_name=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_user_commits",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{oracledb_instance_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 44,
+            "w": 96,
+            "h": 14,
+            "i": 11
+          }
+        },
+        {
+          "id": "ora_cpu",
+          "type": "line",
+          "title": "CPU",
+          "description": "CPU used by the database, per instance, as a percent of one core (200% = two full cores).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (oracledb_instance_name)(100 * rate(oracledb_cpu_time{oracledb_instance_name=~\"$instance\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_cpu_time",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{oracledb_instance_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 44,
+            "w": 96,
+            "h": 14,
+            "i": 12
+          }
+        },
+        {
+          "id": "ora_sessions_vs_limit",
+          "type": "line",
+          "title": "Sessions vs limit",
+          "description": "Open sessions by type against the SESSIONS limit.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (session_type)(oracledb_sessions_usage{oracledb_instance_name=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_sessions_usage",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{session_type}"
+              }
+            },
+            {
+              "query": "sum(oracledb_sessions_limit{oracledb_instance_name=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_sessions_limit",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "limit"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 58,
+            "w": 96,
+            "h": 16,
+            "i": 13
+          }
+        },
+        {
+          "id": "ora_processes_vs_limit",
+          "type": "line",
+          "title": "Processes vs limit",
+          "description": "Server processes against the PROCESSES limit.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(oracledb_processes_usage{oracledb_instance_name=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_processes_usage",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "processes"
+              }
+            },
+            {
+              "query": "sum(oracledb_processes_limit{oracledb_instance_name=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_processes_limit",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "limit"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 58,
+            "w": 96,
+            "h": 16,
+            "i": 14
+          }
+        },
+        {
+          "id": "ora_tablespace_used",
+          "type": "line",
+          "title": "Tablespace used",
+          "description": "Space used in each tablespace.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bytes",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (tablespace_name)(oracledb_tablespace_size_usage{oracledb_instance_name=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_tablespace_size_usage",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{tablespace_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 74,
+            "w": 96,
+            "h": 16,
+            "i": 15
+          }
+        },
+        {
+          "id": "ora_tablespace_use",
+          "type": "line",
+          "title": "Tablespace use",
+          "description": "Space used in each tablespace as a share of its maximum size, autoextend included.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum by (tablespace_name)(oracledb_tablespace_size_usage{oracledb_instance_name=~\"$instance\"}) / sum by (tablespace_name)(oracledb_tablespace_size_limit{oracledb_instance_name=~\"$instance\"} > 0)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_tablespace_size_usage",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{tablespace_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 74,
+            "w": 96,
+            "h": 16,
+            "i": 16
+          }
+        },
+        {
+          "id": "ora_pga",
+          "type": "line",
+          "title": "PGA memory",
+          "description": "Program Global Area memory held by sessions, per instance.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bytes",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (oracledb_instance_name)(oracledb_pga_memory{oracledb_instance_name=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_pga_memory",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{oracledb_instance_name}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 90,
+            "w": 96,
+            "h": 16,
+            "i": 17
+          }
+        },
+        {
+          "id": "ora_locks",
+          "type": "line",
+          "title": "Locks and transactions in use",
+          "description": "Enqueue locks, DML locks and transactions in use at each scrape. DML locks and transactions often read 0 between short transactions.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(oracledb_enqueue_locks_usage{oracledb_instance_name=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_enqueue_locks_usage",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "enqueue locks"
+              }
+            },
+            {
+              "query": "sum(oracledb_dml_locks_usage{oracledb_instance_name=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_dml_locks_usage",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "DML locks"
+              }
+            },
+            {
+              "query": "sum(oracledb_transactions_usage{oracledb_instance_name=~\"$instance\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "oracledb_transactions_usage",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "transactions"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 90,
+            "w": 96,
+            "h": 16,
+            "i": 18
+          }
         }
       ]
     }
   ],
   "variables": {
-    "list": [],
+    "list": [
+      {
+        "type": "query_values",
+        "name": "instance",
+        "label": "Instance",
+        "query_data": {
+          "stream_type": "metrics",
+          "stream": "oracledb_sessions_limit",
+          "field": "oracledb_instance_name",
+          "max_record_size": 100,
+          "filter": []
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": true,
+        "selectAllValueForMultiSelect": "all",
+        "scope": "global"
+      }
+    ],
     "showDynamicFilters": true
   },
   "defaultDatetimeDuration": {

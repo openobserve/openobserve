@@ -2,7 +2,7 @@
   "version": 8,
   "dashboardId": "",
   "title": "Nginx / Overview",
-  "description": "",
+  "description": "Requests, connections and dropped connections for Nginx servers reporting through the OpenTelemetry nginx receiver (stub_status). stub_status has no HTTP status codes.",
   "role": "ready-made:nginx/overview:1",
   "owner": "",
   "created": "2026-10-15T00:00:00.000Z",
@@ -12,7 +12,7 @@
       "name": "Overview",
       "panels": [
         {
-          "id": "nginx_placeholder",
+          "id": "nginx_note",
           "type": "markdown",
           "title": "",
           "description": "",
@@ -47,11 +47,392 @@
             "x": 0,
             "y": 0,
             "w": 192,
-            "h": 4,
+            "h": 6,
             "i": 0
           },
           "htmlContent": "",
-          "markdownContent": "Placeholder"
+          "markdownContent": "Ready-made by OpenObserve. Charts fill in within a few minutes of new data. Edit or delete anything, including this note. The data comes from the nginx receiver of the OpenTelemetry Collector Contrib."
+        },
+        {
+          "id": "nginx_requests_rate",
+          "type": "metric",
+          "title": "Requests/s",
+          "description": "Requests served per second (5-minute average), all status codes together. The receiver adds no server label, so several Nginx servers sent through one collector mix into one series.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(nginx_requests[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "nginx_requests",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 6,
+            "w": 64,
+            "h": 6,
+            "i": 1
+          }
+        },
+        {
+          "id": "nginx_active",
+          "type": "metric",
+          "title": "Active connections",
+          "description": "Open client connections, including idle keep-alive ones. The receiver adds no server label, so several Nginx servers sent through one collector mix into one series.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(nginx_connections_current{state=\"active\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "nginx_connections_current",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 6,
+            "w": 64,
+            "h": 6,
+            "i": 2
+          }
+        },
+        {
+          "id": "nginx_dropped_rate",
+          "type": "metric",
+          "title": "Dropped connections/s",
+          "description": "Connections accepted but not handled, usually because worker_connections is used up. 0 is healthy. The receiver adds no server label, so several Nginx servers sent through one collector mix into one series.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(nginx_connections_accepted[5m])) - sum(rate(nginx_connections_handled[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "nginx_connections_accepted",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 6,
+            "w": 64,
+            "h": 6,
+            "i": 3
+          }
+        },
+        {
+          "id": "nginx_dropped",
+          "type": "line",
+          "title": "Dropped connections/s",
+          "description": "Accepted minus handled connections per second. 0 is healthy; above it, raise worker_connections. HTTP status codes (4xx/5xx) are not available: stub_status does not report them, so send the access log to OpenObserve for error rates. The receiver adds no server label, so several Nginx servers sent through one collector mix into one series.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(nginx_connections_accepted[5m])) - sum(rate(nginx_connections_handled[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "nginx_connections_accepted",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "dropped"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 12,
+            "w": 192,
+            "h": 16,
+            "i": 4
+          }
+        },
+        {
+          "id": "nginx_requests",
+          "type": "line",
+          "title": "Requests/s",
+          "description": "Requests served per second (5-minute average), all status codes together. The receiver adds no server label, so several Nginx servers sent through one collector mix into one series.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(nginx_requests[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "nginx_requests",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "requests"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 28,
+            "w": 96,
+            "h": 16,
+            "i": 5
+          }
+        },
+        {
+          "id": "nginx_connections_rate",
+          "type": "line",
+          "title": "Connections accepted and handled/s",
+          "description": "New client connections per second; handled stays on accepted unless Nginx drops some. The receiver adds no server label, so several Nginx servers sent through one collector mix into one series.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(nginx_connections_accepted[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "nginx_connections_accepted",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "accepted"
+              }
+            },
+            {
+              "query": "sum(rate(nginx_connections_handled[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "nginx_connections_handled",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "handled"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 28,
+            "w": 96,
+            "h": 16,
+            "i": 6
+          }
+        },
+        {
+          "id": "nginx_connections_by_state",
+          "type": "line",
+          "title": "Connections by state",
+          "description": "Open connections: reading a request, writing a response, or waiting (idle keep-alive); active is all three. The receiver adds no server label, so several Nginx servers sent through one collector mix into one series.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (state)(nginx_connections_current)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "nginx_connections_current",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{state}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 44,
+            "w": 96,
+            "h": 16,
+            "i": 7
+          }
+        },
+        {
+          "id": "nginx_requests_per_connection",
+          "type": "line",
+          "title": "Requests per connection",
+          "description": "Average requests each connection carries; close to 1 means clients do not reuse connections (keep-alive off or one-shot clients). The receiver adds no server label, so several Nginx servers sent through one collector mix into one series.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(nginx_requests[5m])) / sum(rate(nginx_connections_handled[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "nginx_requests",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "requests per connection"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 44,
+            "w": 96,
+            "h": 16,
+            "i": 8
+          }
         }
       ]
     }

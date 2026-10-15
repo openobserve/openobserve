@@ -2,7 +2,7 @@
   "version": 8,
   "dashboardId": "",
   "title": "Kafka / Overview",
-  "description": "",
+  "description": "Brokers, topics, partitions, replication, message flow and consumer-group lag for Kafka clusters reporting through the OpenTelemetry kafkametrics receiver.",
   "role": "ready-made:kafka/overview:1",
   "owner": "",
   "created": "2026-10-15T00:00:00.000Z",
@@ -12,7 +12,7 @@
       "name": "Overview",
       "panels": [
         {
-          "id": "kafka_placeholder",
+          "id": "kafka_note",
           "type": "markdown",
           "title": "",
           "description": "",
@@ -47,17 +47,667 @@
             "x": 0,
             "y": 0,
             "w": 192,
-            "h": 4,
+            "h": 6,
             "i": 0
           },
           "htmlContent": "",
-          "markdownContent": "Placeholder"
+          "markdownContent": "Ready-made by OpenObserve. Charts fill in within a few minutes of new data. Edit or delete anything, including this note. The data comes from the kafkametrics receiver of the OpenTelemetry Collector Contrib."
+        },
+        {
+          "id": "kafka_brokers",
+          "type": "metric",
+          "title": "Brokers",
+          "description": "Brokers in the cluster, as the receiver sees it. The receiver adds no cluster label, so two clusters scraped by one collector show as one.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "max(kafka_brokers)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kafka_brokers",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 6,
+            "w": 64,
+            "h": 6,
+            "i": 1
+          }
+        },
+        {
+          "id": "kafka_topics",
+          "type": "metric",
+          "title": "Topics",
+          "description": "Topics the receiver reports; topics starting with an underscore (internal ones) are left out by its default topic filter.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "count(max by (topic)(kafka_topic_partitions{topic=~\"$topic\"}))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kafka_topic_partitions",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 6,
+            "w": 64,
+            "h": 6,
+            "i": 2
+          }
+        },
+        {
+          "id": "kafka_partitions",
+          "type": "metric",
+          "title": "Partitions",
+          "description": "Partitions across the selected topics.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(max by (topic)(kafka_topic_partitions{topic=~\"$topic\"}))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kafka_topic_partitions",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 6,
+            "w": 64,
+            "h": 6,
+            "i": 3
+          }
+        },
+        {
+          "id": "kafka_out_of_sync",
+          "type": "metric",
+          "title": "Out-of-sync replicas",
+          "description": "Partition replicas that have fallen out of the in-sync set. 0 is healthy; anything above means a broker is down or behind and those partitions have less redundancy.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(max by (topic, partition)(kafka_partition_replicas{topic=~\"$topic\"}) - max by (topic, partition)(kafka_partition_replicas_in_sync{topic=~\"$topic\"}))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kafka_partition_replicas",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 12,
+            "w": 64,
+            "h": 6,
+            "i": 4
+          }
+        },
+        {
+          "id": "kafka_messages_in",
+          "type": "metric",
+          "title": "Messages in/s",
+          "description": "Messages written per second, from the growth of the partitions' newest offsets. The receiver reads offsets once a minute, so this is a 5-minute average.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(kafka_partition_current_offset{topic=~\"$topic\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kafka_partition_current_offset",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 12,
+            "w": 64,
+            "h": 6,
+            "i": 5
+          }
+        },
+        {
+          "id": "kafka_lag",
+          "type": "metric",
+          "title": "Consumer lag",
+          "description": "Messages written but not yet consumed, summed over every consumer group. Empty until a consumer group commits offsets.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(max by (group, topic)(kafka_consumer_group_lag_sum{topic=~\"$topic\"}))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kafka_consumer_group_lag_sum",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 12,
+            "w": 64,
+            "h": 6,
+            "i": 6
+          }
+        },
+        {
+          "id": "kafka_out_of_sync_by_topic",
+          "type": "line",
+          "title": "Out-of-sync replicas by topic",
+          "description": "Replicas missing from the in-sync set, per topic. 0 is healthy; a rise means a broker is down or cannot keep up with the leader.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (topic)(max by (topic, partition)(kafka_partition_replicas{topic=~\"$topic\"}) - max by (topic, partition)(kafka_partition_replicas_in_sync{topic=~\"$topic\"}))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kafka_partition_replicas",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{topic}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 18,
+            "w": 96,
+            "h": 16,
+            "i": 7
+          }
+        },
+        {
+          "id": "kafka_lag_by_group",
+          "type": "line",
+          "title": "Consumer lag by group",
+          "description": "Unconsumed messages per consumer group and topic. A line that keeps rising means the group cannot keep up or has stopped. Empty until a consumer group commits offsets.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (group, topic)(kafka_consumer_group_lag_sum{topic=~\"$topic\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kafka_consumer_group_lag_sum",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{group} / {topic}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 18,
+            "w": 96,
+            "h": 16,
+            "i": 8
+          }
+        },
+        {
+          "id": "kafka_messages_in_by_topic",
+          "type": "line",
+          "title": "Messages in/s by topic",
+          "description": "Messages written per second to each topic, from the growth of the partitions' newest offsets (5-minute average).",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (topic)(rate(kafka_partition_current_offset{topic=~\"$topic\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kafka_partition_current_offset",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{topic}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 34,
+            "w": 96,
+            "h": 16,
+            "i": 9
+          }
+        },
+        {
+          "id": "kafka_messages_consumed",
+          "type": "line",
+          "title": "Messages consumed/s by group",
+          "description": "Messages each consumer group commits per second, from the growth of its committed offsets (5-minute average). Empty until a consumer group commits offsets.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (group, topic)(rate(kafka_consumer_group_offset_sum{topic=~\"$topic\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kafka_consumer_group_offset_sum",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{group} / {topic}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 34,
+            "w": 96,
+            "h": 16,
+            "i": 10
+          }
+        },
+        {
+          "id": "kafka_retained",
+          "type": "line",
+          "title": "Retained messages by topic",
+          "description": "Messages still kept per topic: newest minus oldest offset, summed over partitions. It drops when retention deletes old segments; for compacted topics it is the offset range, not the message count.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (topic)(max by (topic, partition)(kafka_partition_current_offset{topic=~\"$topic\"}) - max by (topic, partition)(kafka_partition_oldest_offset{topic=~\"$topic\"}))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kafka_partition_current_offset",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{topic}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 50,
+            "w": 96,
+            "h": 16,
+            "i": 11
+          }
+        },
+        {
+          "id": "kafka_group_members",
+          "type": "line",
+          "title": "Consumer group members",
+          "description": "Consumers in each group, over all topics. A group with lag and no members has nobody reading. Empty until a consumer group commits offsets.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (group)(kafka_consumer_group_members)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kafka_consumer_group_members",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{group}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 50,
+            "w": 96,
+            "h": 16,
+            "i": 12
+          }
+        },
+        {
+          "id": "kafka_lag_by_partition",
+          "type": "table",
+          "title": "Lag by partition (top 10)",
+          "description": "The 10 partitions with the most unconsumed messages, per consumer group; one hot partition points at a skewed message key. Empty until a consumer group commits offsets.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": [],
+            "promql_table_mode": "all"
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "topk(10, max by (group, topic, partition)(kafka_consumer_group_lag{topic=~\"$topic\"}))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kafka_consumer_group_lag",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 66,
+            "w": 96,
+            "h": 16,
+            "i": 13
+          }
+        },
+        {
+          "id": "kafka_partitions_by_topic",
+          "type": "table",
+          "title": "Partitions by topic",
+          "description": "Partition count of each selected topic.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": [],
+            "promql_table_mode": "all"
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "max by (topic)(kafka_topic_partitions{topic=~\"$topic\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kafka_topic_partitions",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 66,
+            "w": 96,
+            "h": 16,
+            "i": 14
+          }
         }
       ]
     }
   ],
   "variables": {
-    "list": [],
+    "list": [
+      {
+        "type": "query_values",
+        "name": "topic",
+        "label": "Topic",
+        "query_data": {
+          "stream_type": "metrics",
+          "stream": "kafka_topic_partitions",
+          "field": "topic",
+          "max_record_size": 100,
+          "filter": []
+        },
+        "value": "",
+        "options": [],
+        "multiSelect": true,
+        "selectAllValueForMultiSelect": "all",
+        "scope": "global"
+      }
+    ],
     "showDynamicFilters": true
   },
   "defaultDatetimeDuration": {
