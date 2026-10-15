@@ -17,7 +17,10 @@
 
 #![cfg(feature = "enterprise")]
 
-use std::sync::Mutex;
+use std::{
+    io::{Read, Write},
+    sync::Mutex,
+};
 
 use axum::{
     Router,
@@ -60,6 +63,25 @@ fn set_env(key: &str, value: &str) {
     unsafe { std::env::set_var(key, value) };
 }
 
+/// A JWKS endpoint with no keys, so a non-`o2dt` bearer fails validation instead of needing Dex.
+fn serve_empty_jwks() -> String {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    std::thread::spawn(move || {
+        for mut stream in listener.incoming().flatten() {
+            let mut request = [0u8; 4096];
+            let _ = stream.read(&mut request);
+            let body = r#"{"keys":[]}"#;
+            let _ = write!(
+                stream,
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            );
+        }
+    });
+    format!("http://127.0.0.1:{port}/dex")
+}
+
 async fn boot() {
     let data_dir = std::env::temp_dir().join(format!("o2-slack-delegated-{}", std::process::id()));
     std::fs::create_dir_all(data_dir.join("db")).unwrap();
@@ -72,6 +94,7 @@ async fn boot() {
     set_env("O2_MASTER_ENCRYPTION_KEY", &master_key());
     set_env("O2_AUDIT_ENABLED", "true");
     set_env("O2_AUDIT_BATCH_SIZE", "100000");
+    set_env("O2_DEX_BASE_URL", &serve_empty_jwks());
     infra::db::create_table().await.unwrap();
     infra::db_init().await.unwrap();
     infra::table::migrate().await.unwrap();
