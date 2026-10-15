@@ -92,7 +92,7 @@ const isTiny = (value: number) => value !== 0 && Math.abs(value) < 0.01;
 const formatTiny = (value: number) =>
   value.toLocaleString("en-US", { maximumSignificantDigits: 2 });
 
-/** A score value: 2 to 4 decimals, so 0.50 keeps its look and 0.019 never reads as a 0.02 rule; tiny values kept distinct. */
+/** A score or an average: 2 to 4 decimals, so 0.50 keeps its look and 0.019 never reads as a 0.02 rule; tiny values kept distinct. */
 export const formatScore = (value: number): string =>
   isTiny(value)
     ? formatTiny(value)
@@ -107,12 +107,6 @@ export const formatAxis = (value: number): string =>
 /** A number for labels and ranges: up to 2 decimals, thousands grouped ("1,000,000"), tiny values kept distinct ("0.00032"). */
 export const formatNumber = (value: number): string =>
   isTiny(value) ? formatTiny(value) : value.toLocaleString("en-US", { maximumFractionDigits: 2 });
-
-/** A score or an average: always 2 decimals ("0.70", "462,522,542.50"), tiny values kept distinct. */
-export const formatFixed = (value: number): string =>
-  isTiny(value)
-    ? formatTiny(value)
-    : value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** A configured value as entered: thousands grouped, never rounded, so a 0.333 threshold reads "0.333". */
 export const formatExact = (value: number): string =>
@@ -155,7 +149,7 @@ export function typicalScore(
   if (row.dataType === "numeric") {
     if (row.average == null) return null;
     return {
-      value: raw(formatFixed(row.average)),
+      value: raw(formatScore(row.average)),
       sub: t("onlineEvals.quality.table.averageRange", {
         min: formatNumber(row.range.min),
         max: formatNumber(row.range.max),
