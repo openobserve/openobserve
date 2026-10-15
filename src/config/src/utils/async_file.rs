@@ -90,6 +90,8 @@ pub async fn put_file_contents(
     // Write to temporary file first
     let mut file_handle = File::create(&temp_file).await?;
     file_handle.write_all(contents).await?;
+    // tokio writes on a blocking task; without flush, rename can publish a short file
+    file_handle.flush().await?;
 
     // Atomically rename the temp file to the target file
     // This ensures we either have the old file or the new file, never a partially written file
@@ -367,6 +369,21 @@ mod tests {
     use chrono::{TimeZone, Utc};
 
     use super::*;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_put_file_contents_is_complete_when_it_returns() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("large.bin");
+        // Past tokio's 2 MiB write buffer, so an unflushed tail is still in flight at the rename.
+        let content = vec![7u8; 4 << 20];
+        for _ in 0..20 {
+            put_file_contents(&path, &content).await.unwrap();
+            assert_eq!(
+                std::fs::metadata(&path).unwrap().len(),
+                content.len() as u64
+            );
+        }
+    }
 
     #[tokio::test]
     async fn test_get_file_contents_with_range() {
