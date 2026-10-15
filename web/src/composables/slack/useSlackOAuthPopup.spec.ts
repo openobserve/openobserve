@@ -98,6 +98,23 @@ describe("useSlackOAuthPopup", () => {
     expect(popup.focus).toHaveBeenCalled();
   });
 
+  it.each([
+    "javascript:alert(document.domain)",
+    "https://evil.example/oauth/v2/authorize",
+    "http://slack.com/oauth/v2/authorize",
+  ])("never navigates the popup to %s, closes it and reports a failed start", async (url) => {
+    vi.mocked(options.start).mockResolvedValue(url);
+    await openPopup();
+
+    expect(popup.location.href).toBe("about:blank");
+    expect(popup.close).toHaveBeenCalled();
+    expect(wrapper!.vm.connecting).toBe(false);
+    expect(lastToast()).toMatchObject({ variant: "error" });
+    expect(String(lastToast()?.message)).toBe(
+      String(i18n.global.t("alert_destinations.slackOAuth.startFailed")),
+    );
+  });
+
   it("does not start when the browser blocks the popup", async () => {
     vi.mocked(window.open).mockReturnValue(null);
     await openPopup();

@@ -88,6 +88,7 @@ const confirmHere = async (code: string, state: string): Promise<void> => {
   } catch (error) {
     // The 401 handler signs in again and reloads this URL, which must still carry the code.
     if (statusOf(error) === 401) return;
+    stripCallbackQuery();
     refused.value = refusalOf(error);
   }
 };
@@ -144,7 +145,17 @@ onMounted(() => {
     };
     return;
   }
-  whenResolved(() => void confirmHere(code, state));
+  whenResolved(() => {
+    if (org.value) {
+      void confirmHere(code, state);
+      return;
+    }
+    stripCallbackQuery();
+    refused.value = {
+      title: t("slackApp.link.noAccessTitle"),
+      detail: t("slackApp.link.helpContactDefault"),
+    };
+  });
 });
 </script>
 

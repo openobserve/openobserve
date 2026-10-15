@@ -20,11 +20,14 @@ import i18n from "@/locales";
 import slack from "@/services/slack";
 import { leaveFor, recallLinkRequest, rememberLinkRequest } from "@/utils/slackLink";
 import { makeSlackStore, ok } from "@/test/unit/helpers/slack";
+import { createStore } from "vuex";
+import organizations from "@/services/organizations";
 import SlackLinkCallback from "./SlackLinkCallback.vue";
 
 vi.mock("@/services/slack", () => ({
   default: { confirmLinkRequest: vi.fn(), resendLinkRequest: vi.fn() },
 }));
+vi.mock("@/services/organizations", () => ({ default: { list: vi.fn() } }));
 vi.mock("@/utils/slackLink", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/slackLink")>()),
   leaveFor: vi.fn(),
@@ -52,6 +55,7 @@ let router: Router;
 
 const mountCallback = async (
   query: Record<string, string> = { code: "oidc-code", state: "signed-state" },
+  store = makeSlackStore(),
 ) => {
   router = createRouter({
     history: createMemoryHistory(),
@@ -63,7 +67,7 @@ const mountCallback = async (
   await router.push({ path: "/slack/link/callback", query });
   await router.isReady();
   const wrapper = mount(SlackLinkCallback, {
-    global: { plugins: [i18n, router, makeSlackStore()] },
+    global: { plugins: [i18n, router, store] },
   });
   await flushPromises();
   return wrapper;
@@ -135,11 +139,66 @@ describe("SlackLinkCallback", () => {
     expect(w.find(testId("slack-link-linked")).text()).toContain("You can close this tab.");
   });
 
+  it.each([
+    ["an https page elsewhere", "https://evil.example/phish"],
+    ["a non-https Slack URL", "http://slack.com/app_redirect?team=T0"],
+  ])("NIT-9 never opens %s as the return_url", async (_label, url) => {
+    vi.useFakeTimers();
+    vi.mocked(slack.confirmLinkRequest).mockReturnValue(linked({ return_url: url }) as any);
+    const w = await mountCallback();
+    vi.advanceTimersByTime(5000);
+    expect(leaveFor).not.toHaveBeenCalled();
+    expect(w.find(testId("slack-link-back-to-slack")).exists()).toBe(false);
+  });
+
+  it("NIT-9 returns to a page of this OpenObserve", async () => {
+    const url = `${window.location.origin}/web/logs?org_identifier=prod`;
+    vi.mocked(slack.confirmLinkRequest).mockReturnValue(linked({ return_url: url }) as any);
+    const w = await mountCallback();
+    await w.find(testId("slack-link-back-to-slack")).trigger("click");
+    expect(leaveFor).toHaveBeenCalledWith(url);
+  });
+
+  it.each([400, 403, 404, 410, 429, 500])(
+    "NIT-8 W-S12 a %i strips the code from the URL and forgets the stored request",
+    async (status) => {
+      rememberLinkRequest("req-1.sig", null);
+      const replaceState = vi.spyOn(window.history, "replaceState");
+      vi.mocked(slack.confirmLinkRequest).mockRejectedValue(refusal(status));
+      await mountCallback();
+      expect(replaceState).toHaveBeenCalledWith({}, document.title, window.location.pathname);
+      expect(recallLinkRequest()).toBeNull();
+    },
+  );
+
+  it("W-S12 Slack's Cancel forgets the stored request but keeps Try again", async () => {
+    rememberLinkRequest("req-1.sig", null);
+    const w = await mountCallback({ error: "access_denied", state: "signed-state" });
+    expect(recallLinkRequest()).toBeNull();
+    await w.find(testId("slack-link-retry")).trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.query).toEqual({ r: "req-1.sig" });
+  });
+
+  it("NIT-14 a caller in no org gets the no-access state, never a call with an empty org", async () => {
+    vi.mocked(organizations.list).mockReturnValue(ok({ data: [] }) as any);
+    const w = await mountCallback(undefined, createStore({ state: { selectedOrganization: {} } }));
+    expect(slack.confirmLinkRequest).not.toHaveBeenCalled();
+    expect(w.find(testId("slack-link-state-noAccess")).exists()).toBe(true);
+  });
+
   it("keeps the code in the URL on a 401, so the login round trip can confirm it", async () => {
     const replaceState = vi.spyOn(window.history, "replaceState");
     vi.mocked(slack.confirmLinkRequest).mockRejectedValue(refusal(401));
     await mountCallback();
     expect(replaceState).not.toHaveBeenCalled();
+  });
+
+  it("W-S12 keeps the stored request on a 401, for the login round trip", async () => {
+    rememberLinkRequest("req-1.sig", null);
+    vi.mocked(slack.confirmLinkRequest).mockRejectedValue(refusal(401));
+    await mountCallback();
+    expect(recallLinkRequest()?.r).toBe("req-1.sig");
   });
 
   it.each([400, 410])(

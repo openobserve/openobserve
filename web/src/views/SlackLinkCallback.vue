@@ -26,10 +26,10 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { confirmLinkRequestMutation, resendLinkRequestMutation } from "@/services/slack.queries";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { SlackLinkRequestConfirmResponse } from "@/types/slack";
-import { isSafeNavigableUrl } from "@/utils/safeUrl";
 import {
   classifySlackLinkError,
   forgetLinkRequest,
+  isSafeReturnUrl,
   leaveFor,
   parseLinkRequestParam,
   queryString,
@@ -59,7 +59,7 @@ const confirm = useMutation(() => confirmLinkRequestMutation(org.value));
 const resend = useMutation(() => resendLinkRequestMutation(org.value));
 
 const returnUrl = computed(() =>
-  linked.value && isSafeNavigableUrl(linked.value.return_url) ? linked.value.return_url : null,
+  linked.value && isSafeReturnUrl(linked.value.return_url) ? linked.value.return_url : null,
 );
 
 const linkedDetail = computed<I18nText>(() => {
@@ -71,8 +71,10 @@ const linkedDetail = computed<I18nText>(() => {
     : t("slackApp.link.linkedOrg", { org });
 });
 
-const stripCallbackQuery = (): void => {
+// Every outcome but a 401 ends this request here: the code is spent and the kept copy of `r` is no longer needed.
+const settle = (): void => {
   window.history.replaceState({}, document.title, window.location.pathname);
+  forgetLinkRequest();
 };
 
 const backToSlack = (): void => {
@@ -82,12 +84,12 @@ const backToSlack = (): void => {
 const finish = async (code: string, state: string): Promise<void> => {
   try {
     linked.value = await confirm.mutateAsync({ oidc_code: code, oidc_state: state });
-    stripCallbackQuery();
-    forgetLinkRequest();
+    settle();
     if (returnUrl.value) returnTimer = setTimeout(backToSlack, RETURN_DELAY_MS);
   } catch (error) {
     // The 401 handler signs in again and reloads this URL, which must still carry the code.
     if (statusOf(error) === 401) return;
+    settle();
     const reading = classifySlackLinkError(error, "wrongAccount");
     refusal.value = {
       ...reading,
@@ -115,15 +117,27 @@ onMounted(() => {
   const code = queryString(route.query.code);
   const state = queryString(route.query.state);
   if (queryString(route.query.error)) {
-    stripCallbackQuery();
+    settle();
     cancelled.value = true;
     return;
   }
   if (!code || !state) {
+    settle();
     refusal.value = { kind: "failed", message: null, helpContact: null };
     return;
   }
-  whenResolved(() => void finish(code, state));
+  whenResolved(() => {
+    if (org.value) {
+      void finish(code, state);
+      return;
+    }
+    settle();
+    refusal.value = {
+      kind: "noAccess",
+      message: null,
+      helpContact: remembered?.helpContact ?? null,
+    };
+  });
 });
 
 onBeforeUnmount(() => clearTimeout(returnTimer));

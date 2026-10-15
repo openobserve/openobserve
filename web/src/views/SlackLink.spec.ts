@@ -124,6 +124,24 @@ describe("SlackLink (N7 pass-through)", () => {
     expect(w.find(testId("slack-link-state-failed")).exists()).toBe(true);
   });
 
+  it.each(["https://evil.example/openid/connect/authorize", "http://slack.com/openid"])(
+    "NIT-9 never leaves for %s, which is not Slack's own https sign-in",
+    async (url) => {
+      vi.mocked(slack.startLinkRequest).mockReturnValue(started({ url }) as any);
+      const w = await mountLink();
+      expect(leaveFor).not.toHaveBeenCalled();
+      expect(w.find(testId("slack-link-state-failed")).exists()).toBe(true);
+      expect(recallLinkRequest()).toBeNull();
+    },
+  );
+
+  it("NIT-14 a caller in no org gets the no-access state, never a call with an empty org", async () => {
+    vi.mocked(organizations.list).mockReturnValue(ok({ data: [] }) as any);
+    const w = await mountLink(undefined, createStore({ state: { selectedOrganization: {} } }));
+    expect(slack.startLinkRequest).not.toHaveBeenCalled();
+    expect(w.find(testId("slack-link-state-noAccess")).exists()).toBe(true);
+  });
+
   it("treats a malformed ?r as an unknown link without calling the server", async () => {
     const w = await mountLink({ r: "nodot" });
     expect(slack.startLinkRequest).not.toHaveBeenCalled();

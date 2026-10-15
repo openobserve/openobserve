@@ -26,6 +26,7 @@ import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/tr
 import store from "@/stores";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
+import { forgetLinkRequest } from "@/utils/slackLink";
 
 const Search = () => import("@/plugins/logs/Index.vue");
 const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
@@ -246,6 +247,7 @@ const useRoutes = () => {
           invalidateLoginData();
           useLocalCurrentUser("", true);
           useLocalUserInfo("", true);
+          forgetLinkRequest();
         } finally {
           window.location.href = `${getPath()}login`;
         }

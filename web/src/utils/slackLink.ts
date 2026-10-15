@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { isSafeNavigableUrl } from "@/utils/safeUrl";
+
 /** How a section 7.3 refusal reads on the link pages. */
 export type SlackLinkRefusalKind =
   "expired" | "unknown" | "noAccess" | "wrongAccount" | "rateLimited" | "failed";
@@ -41,6 +43,11 @@ export const SLACK_LINK_WRONG_ACCOUNT = "wrong_account";
 
 const STORAGE_KEY = "o2.slack.linkRequest";
 
+/** A link request lives 30 minutes on the server, so a kept copy is useless after that. */
+export const LINK_REQUEST_TTL_MS = 30 * 60 * 1000;
+
+const SLACK_DOMAIN = "slack.com";
+
 interface ErrorBody {
   message?: unknown;
   error_detail?: unknown;
@@ -54,6 +61,11 @@ const responseOf = (error: unknown): { status?: number; data?: ErrorBody } | und
   if (!error || typeof error !== "object") return undefined;
   return (error as { response?: { status?: number; data?: ErrorBody } }).response;
 };
+
+/** The server's own sentence from an O2 error body, if it sent one. */
+export function serverMessageOf(error: unknown): string | null {
+  return nonEmpty(responseOf(error)?.data?.message);
+}
 
 /** HTTP status of an axios error, or undefined for a network failure. */
 export function statusOf(error: unknown): number | undefined {
@@ -108,7 +120,8 @@ export function parseLinkRequestParam(value: unknown): SlackLinkRequestRef | nul
 /** Kept in localStorage because the 401 handler clears sessionStorage before the login round trip. */
 export function rememberLinkRequest(r: string, helpContact: string | null): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ r, helpContact }));
+    const expires_at = Date.now() + LINK_REQUEST_TTL_MS;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ r, helpContact, expires_at }));
   } catch {
     /* storage blocked: the callback page then offers no Try again */
   }
@@ -118,7 +131,11 @@ export function recallLinkRequest(): RememberedLinkRequest | null {
   try {
     const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
     if (!parsed || typeof parsed !== "object") return null;
-    const { r, helpContact } = parsed as Record<string, unknown>;
+    const { r, helpContact, expires_at } = parsed as Record<string, unknown>;
+    if (typeof expires_at !== "number" || expires_at <= Date.now()) {
+      forgetLinkRequest();
+      return null;
+    }
     if (!parseLinkRequestParam(r)) return null;
     return { r: r as string, helpContact: nonEmpty(helpContact) };
   } catch {
@@ -132,6 +149,30 @@ export function forgetLinkRequest(): void {
   } catch {
     /* storage blocked: nothing was kept */
   }
+}
+
+const parseUrl = (value: unknown): URL | null => {
+  if (!isSafeNavigableUrl(value)) return null;
+  try {
+    return new URL((value as string).trim());
+  } catch {
+    return null;
+  }
+};
+
+/** An https URL on slack.com or one of its subdomains, or exactly on `host` when given. */
+export function isSlackUrl(value: unknown, host?: string): boolean {
+  const url = parseUrl(value);
+  if (!url || url.protocol !== "https:" || url.port || url.username || url.password) return false;
+  const name = url.hostname.toLowerCase();
+  if (host) return name === host;
+  return name === SLACK_DOMAIN || name.endsWith(`.${SLACK_DOMAIN}`);
+}
+
+/** Where a finished link may send the browser: back to Slack, or to a page of this OpenObserve. */
+export function isSafeReturnUrl(value: unknown): boolean {
+  if (isSlackUrl(value)) return true;
+  return parseUrl(value)?.origin === window.location.origin;
 }
 
 /** Full-page hand-off to Slack; a module function so specs can stub the navigation. */
