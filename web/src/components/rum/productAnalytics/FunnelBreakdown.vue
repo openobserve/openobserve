@@ -49,7 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
       <template v-for="(_, i) in steps" :key="i" #[`cell-s${i}`]="{ row }">
-        <span class="flex flex-col items-end tabular-nums">
+        <span v-if="row.prevOnly" class="text-text-secondary flex justify-end">{{ dash }}</span>
+        <span v-else class="flex flex-col items-end tabular-nums">
           <span>{{ formatCount(row.counts[i], sampled) }}</span>
           <span v-if="i > 0" class="text-text-secondary text-xs">{{
             pct(row.counts[0] > 0 ? row.counts[i] / row.counts[0] : 0)

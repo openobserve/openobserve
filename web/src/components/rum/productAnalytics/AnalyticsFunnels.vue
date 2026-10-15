@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}</span
                 >
                 <span
-                  v-else-if="compareView.data && compareView.data.prevOverall !== null"
+                  v-else-if="compareView.data?.overall && compareView.data.prevOverall !== null"
                   class="flex items-baseline gap-1 text-xs"
                   data-test="rum-analytics-funnel-overall-change"
                 >
@@ -760,7 +760,8 @@ const compareData = computed(() => {
 
 const compareView = computed<FunnelCompareView | null>(() => {
   const cur = pa.range.value;
-  if (!compareActive.value || !cur) return null;
+  // A held or stepless funnel starts no run, so it keeps the compare-off layout.
+  if (!compareActive.value || !cur || funnelPanel.value.status === "idle") return null;
   const prev = previousWindow(cur);
   const p = prevPanel.value;
   const failed = p.key === prevKey.value && (p.status === "error" || p.status === "forbidden");
@@ -777,7 +778,12 @@ const compareView = computed<FunnelCompareView | null>(() => {
 
 const breakdownCompare = computed(() =>
   breakdown.value && prevRows.value
-    ? compareBreakdown(breakdown.value, prevRows.value, def.value.steps.length)
+    ? compareBreakdown(
+        breakdown.value,
+        funnelPanel.value.rows,
+        prevRows.value,
+        def.value.steps.length,
+      )
     : null,
 );
 
@@ -1082,8 +1088,7 @@ const compute = async (force = false) => {
   if (d.steps.length > 1) pushRecent(def.value);
   const cur = pa.resolveRange();
   const opts = { events: events.value, sample: pa.sampleRatio.value };
-  runPrevious(d, key, cur);
-  const res = await runner.run(
+  const current = runner.run(
     "funnel",
     {
       sql: funnelSql(pa.scope.value, identitySql.value, d, { ...opts, sample: 1 }),
@@ -1093,6 +1098,9 @@ const compute = async (force = false) => {
     },
     key,
   );
+  // Enqueued after the current run, so the table on screen never waits behind a compare-only scan.
+  runPrevious(d, key, cur);
+  const res = await current;
   if (res.status !== "ok" || key !== lastKey) return;
   runSuggestions(d, key, cur, opts);
 };
@@ -1316,7 +1324,8 @@ onActivated(() => {
   const cutShort = funnelPanel.value.status === "aborted" || nextPanel.value.status === "aborted";
   const prevCut = !cutShort && !refreshMissed && prevPanel.value.status === "aborted";
   void compute(cutShort || refreshMissed).then(() => {
-    if (prevCut) rerunPrevious();
+    // A full compute already restarted the previous run, which then no longer reads aborted.
+    if (prevCut && prevPanel.value.status === "aborted") rerunPrevious();
   });
   refreshMissed = false;
 });
