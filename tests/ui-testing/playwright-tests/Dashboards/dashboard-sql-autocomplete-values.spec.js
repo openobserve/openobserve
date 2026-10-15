@@ -65,7 +65,10 @@ test.describe('Dashboards custom SQL autocomplete', () => {
         await page.waitForLoadState('domcontentloaded');
 
         await openDashboardCustomSql(page, pm);
-        await page.keyboard.type(`SELECT * FROM "${STREAM}" WHERE status_text`, { delay: 30 });
+        await page.keyboard.type(`SELECT * FROM "${STREAM}" `, { delay: 30 });
+        // The panel loads the FROM stream's schema on its debounced update; without it status_text is an unknown name.
+        await page.waitForTimeout(1500);
+        await page.keyboard.type('WHERE status_text', { delay: 30 });
         await page.keyboard.type(' ');
         const menu = await waitForMenu(page, 10000);
         expect(menu.rows).toContain('=');
