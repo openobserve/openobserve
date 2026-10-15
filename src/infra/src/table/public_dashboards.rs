@@ -31,6 +31,8 @@ use super::entity::{
 };
 use crate::errors;
 
+/// A replicated apply that keeps losing its compare-and-set to local edits retries this often.
+const APPLY_ATTEMPTS: usize = 5;
 /// How long a soft-deleted link is kept, so a delayed replicated write cannot revive it.
 pub const DELETED_RETENTION_MICROS: i64 = 30 * 86_400 * 1_000_000;
 
@@ -40,6 +42,26 @@ pub enum CreateOutcome {
     Created,
     OrgFull,
     DashboardFull,
+}
+
+/// What applying a replicated link row did to the local one.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Applied {
+    /// The replicated row is now the local row.
+    Taken,
+    /// The local row stays: it is newer, the same write, or soft-deleted.
+    Kept,
+    /// The local write won a tie of equal revisions and was written again under a new revision,
+    /// which the caller sends to the other regions so they converge on it.
+    Reasserted(Box<links::Model>),
+}
+
+/// How the local row and a replicated one of the same link are ordered.
+#[derive(Debug, PartialEq)]
+enum Order {
+    Keep,
+    Take,
+    Reassert,
 }
 
 /// The next revision of a row: strictly increasing and never behind the clock.
@@ -222,6 +244,56 @@ pub async fn update_cas<C: ConnectionTrait>(
     Ok(res.rows_affected == 1)
 }
 
+/// Applies a link row replicated from region `origin`: a higher rev wins, equal revs are ordered by
+/// `(updated_at, origin region)`, a soft delete always wins and is never revived, and a delete
+/// that arrives before the first Put is kept as a deleted row. Access counters stay region-local.
+pub async fn apply_replicated<C: ConnectionTrait>(
+    db: &C,
+    incoming: &links::Model,
+    origin: &str,
+    local_origin: &str,
+    now: i64,
+) -> Result<Applied, errors::Error> {
+    for _ in 0..APPLY_ATTEMPTS {
+        let Some(local) = get(db, &incoming.id).await? else {
+            let row = links::Model {
+                last_accessed_at: None,
+                access_count: 0,
+                ..incoming.clone()
+            };
+            row.into_active_model().insert(db).await?;
+            return Ok(Applied::Taken);
+        };
+        let (next, applied) = match replicated_order(&local, incoming, origin, local_origin) {
+            Order::Keep => return Ok(Applied::Kept),
+            Order::Take => {
+                let rev = incoming.rev.max(local.rev);
+                (
+                    links::Model {
+                        rev,
+                        ..incoming.clone()
+                    },
+                    Applied::Taken,
+                )
+            }
+            Order::Reassert => {
+                let next = links::Model {
+                    rev: next_rev(local.rev, now),
+                    ..local.clone()
+                };
+                (next.clone(), Applied::Reasserted(Box::new(next)))
+            }
+        };
+        if update_cas(db, &next, local.rev).await? {
+            return Ok(applied);
+        }
+    }
+    Err(errors::Error::Message(format!(
+        "public link {} kept changing while applying a replicated write",
+        incoming.id
+    )))
+}
+
 /// Adds `count` data requests and moves `last_accessed_at` forward only; never touches rev.
 pub async fn flush_access<C: ConnectionTrait>(
     db: &C,
@@ -255,6 +327,20 @@ pub async fn purge_deleted<C: ConnectionTrait>(db: &C, before: i64) -> Result<u6
         .exec(db)
         .await?;
     Ok(res.rows_affected)
+}
+
+/// The org's live links published by `user`, for pausing them when the user leaves the org.
+pub async fn list_by_publisher<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    user: &str,
+) -> Result<Vec<links::Model>, errors::Error> {
+    Ok(links::Entity::find()
+        .filter(links::Column::OrgId.eq(org_id))
+        .filter(links::Column::PublishedBy.eq(user))
+        .filter(links::Column::DeletedAt.is_null())
+        .all(db)
+        .await?)
 }
 
 /// The org's settings row; `None` means enabled with the env default link limit.
@@ -383,6 +469,40 @@ pub async fn outbox_delete<C: ConnectionTrait>(
         .exec(db)
         .await?;
     Ok(())
+}
+
+/// Creates the three tables if absent, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn create_tables_for_tests(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
+    super::migration::create_public_dashboards_schema_for_test(db).await
+}
+
+fn replicated_order(
+    local: &links::Model,
+    incoming: &links::Model,
+    origin: &str,
+    local_origin: &str,
+) -> Order {
+    // Counters are region-local, so two copies of one write differ only there.
+    let same = links::Model {
+        last_accessed_at: local.last_accessed_at,
+        access_count: local.access_count,
+        ..incoming.clone()
+    } == *local;
+    if same || local.deleted_at.is_some() {
+        return Order::Keep;
+    }
+    if incoming.deleted_at.is_some() || incoming.rev > local.rev {
+        return Order::Take;
+    }
+    if incoming.rev < local.rev {
+        return Order::Keep;
+    }
+    if (incoming.updated_at, origin) > (local.updated_at, local_origin) {
+        Order::Take
+    } else {
+        Order::Reassert
+    }
 }
 
 #[cfg(test)]
@@ -595,5 +715,230 @@ mod tests {
                 ("o2".to_string(), "live", 1),
             ]
         );
+    }
+
+    fn replicated(id: &str, rev: i64, updated_at: i64) -> links::Model {
+        links::Model {
+            rev,
+            updated_at,
+            ..link(id, "o", "d")
+        }
+    }
+
+    #[tokio::test]
+    async fn gate07_a_put_inserts_and_a_newer_put_replaces_but_counters_stay_local() {
+        let db = db().await;
+        let mut first = replicated("l", 10, 10);
+        first.access_count = 99;
+        let applied = apply_replicated(&db, &first, "b", "a", 0).await.unwrap();
+        assert_eq!(applied, Applied::Taken);
+        let row = get(&db, "l").await.unwrap().unwrap();
+        assert_eq!((row.rev, row.access_count), (10, 0));
+        flush_access(&db, "l", 5, 3).await.unwrap();
+
+        let newer = links::Model {
+            name: "renamed".into(),
+            ..replicated("l", 20, 20)
+        };
+        assert_eq!(
+            apply_replicated(&db, &newer, "b", "a", 0).await.unwrap(),
+            Applied::Taken
+        );
+        let row = get(&db, "l").await.unwrap().unwrap();
+        assert_eq!(
+            (row.name.as_str(), row.rev, row.access_count),
+            ("renamed", 20, 3)
+        );
+
+        let older = links::Model {
+            name: "older".into(),
+            ..replicated("l", 15, 15)
+        };
+        assert_eq!(
+            apply_replicated(&db, &older, "b", "a", 0).await.unwrap(),
+            Applied::Kept
+        );
+        assert_eq!(get(&db, "l").await.unwrap().unwrap().name, "renamed");
+    }
+
+    #[tokio::test]
+    async fn gate07_a_delete_wins_and_no_later_put_resurrects_it() {
+        let db = db().await;
+        apply_replicated(&db, &replicated("l", 10, 10), "b", "a", 0)
+            .await
+            .unwrap();
+        let delete = links::Model {
+            deleted_at: Some(30),
+            ..replicated("l", 30, 30)
+        };
+        assert_eq!(
+            apply_replicated(&db, &delete, "b", "a", 0).await.unwrap(),
+            Applied::Taken
+        );
+        for put in [replicated("l", 20, 20), replicated("l", 40, 40)] {
+            assert_eq!(
+                apply_replicated(&db, &put, "b", "a", 0).await.unwrap(),
+                Applied::Kept
+            );
+        }
+        let row = get(&db, "l").await.unwrap().unwrap();
+        assert_eq!((row.deleted_at, row.rev), (Some(30), 30));
+        assert!(
+            get_on_dashboard(&db, "o", "d", "l")
+                .await
+                .unwrap()
+                .is_none()
+        );
+
+        // A revoke wins even over a later local edit the other region had not seen.
+        apply_replicated(&db, &replicated("m", 50, 50), "b", "a", 0)
+            .await
+            .unwrap();
+        let stale_delete = links::Model {
+            deleted_at: Some(45),
+            ..replicated("m", 45, 45)
+        };
+        apply_replicated(&db, &stale_delete, "b", "a", 0)
+            .await
+            .unwrap();
+        let row = get(&db, "m").await.unwrap().unwrap();
+        assert_eq!((row.deleted_at, row.rev), (Some(45), 50));
+    }
+
+    #[tokio::test]
+    async fn gate07_a_delete_before_the_first_put_stays_deleted() {
+        let db = db().await;
+        let delete = links::Model {
+            deleted_at: Some(30),
+            ..replicated("l", 30, 30)
+        };
+        assert_eq!(
+            apply_replicated(&db, &delete, "b", "a", 0).await.unwrap(),
+            Applied::Taken
+        );
+        for put in [replicated("l", 10, 10), replicated("l", 99, 99)] {
+            apply_replicated(&db, &put, "b", "a", 0).await.unwrap();
+        }
+        let row = get(&db, "l").await.unwrap().unwrap();
+        assert_eq!(row.deleted_at, Some(30));
+        assert!(get_by_slug(&db, "slug-l").await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn gate07_duplicate_messages_are_idempotent() {
+        let db = db().await;
+        let put = replicated("l", 10, 10);
+        apply_replicated(&db, &put, "b", "a", 0).await.unwrap();
+        flush_access(&db, "l", 5, 2).await.unwrap();
+        let before = get(&db, "l").await.unwrap().unwrap();
+        for _ in 0..3 {
+            assert_eq!(
+                apply_replicated(&db, &put, "b", "a", 0).await.unwrap(),
+                Applied::Kept
+            );
+        }
+        assert_eq!(get(&db, "l").await.unwrap().unwrap(), before);
+    }
+
+    /// Two regions write the same revision; each applies the other's Put and both end equal.
+    #[tokio::test]
+    async fn gate07_concurrent_cross_region_pause_and_edit_converge_by_the_stated_order() {
+        for (pause_at, edit_at) in [(200, 201), (201, 200), (200, 200)] {
+            let (a, b) = (db().await, db().await);
+            for region in [&a, &b] {
+                apply_replicated(region, &replicated("l", 100, 100), "x", "y", 0)
+                    .await
+                    .unwrap();
+            }
+            let paused = links::Model {
+                enabled: false,
+                ..replicated("l", 300, pause_at)
+            };
+            let edited = links::Model {
+                name: "edited".into(),
+                ..replicated("l", 300, edit_at)
+            };
+            assert!(update_cas(&a, &paused, 100).await.unwrap());
+            assert!(update_cas(&b, &edited, 100).await.unwrap());
+
+            let mut inbox = vec![
+                (&a, edited.clone(), "b", "a"),
+                (&b, paused.clone(), "a", "b"),
+            ];
+            while let Some((region, row, from, here)) = inbox.pop() {
+                if let Applied::Reasserted(again) =
+                    apply_replicated(region, &row, from, here, 1_000)
+                        .await
+                        .unwrap()
+                {
+                    let other = if std::ptr::eq(region, &a) { &b } else { &a };
+                    inbox.push((other, *again, here, from));
+                }
+            }
+            let (row_a, row_b) = (
+                get(&a, "l").await.unwrap().unwrap(),
+                get(&b, "l").await.unwrap().unwrap(),
+            );
+            assert_eq!(row_a, row_b, "pause at {pause_at}, edit at {edit_at}");
+            // The later write wins; on an exact tie the larger region id ("b", the edit) does.
+            let edit_wins = edit_at >= pause_at;
+            assert_eq!(row_a.enabled, edit_wins);
+            assert_eq!(row_a.name == "edited", edit_wins);
+        }
+
+        // Different revisions need no tie-break: the higher one stands in both regions.
+        let (a, b) = (db().await, db().await);
+        let paused = links::Model {
+            enabled: false,
+            ..replicated("l", 400, 400)
+        };
+        let edited = links::Model {
+            name: "edited".into(),
+            ..replicated("l", 300, 300)
+        };
+        for (region, local, remote, from) in
+            [(&a, &paused, &edited, "b"), (&b, &edited, &paused, "a")]
+        {
+            apply_replicated(region, local, "here", "here", 0)
+                .await
+                .unwrap();
+            apply_replicated(region, remote, from, "here", 0)
+                .await
+                .unwrap();
+        }
+        assert_eq!(get(&a, "l").await.unwrap(), get(&b, "l").await.unwrap());
+        assert!(!get(&a, "l").await.unwrap().unwrap().enabled);
+    }
+
+    #[tokio::test]
+    async fn gate07_local_concurrent_edits_serialize_on_the_compare_and_set() {
+        let db = std::sync::Arc::new(db().await);
+        insert_capped(&db, &link("l", "o", "d"), 10, 10)
+            .await
+            .unwrap();
+        let tasks: Vec<_> = (0..6)
+            .map(|i| {
+                let db = db.clone();
+                tokio::spawn(async move {
+                    loop {
+                        let mut row = get(&*db, "l").await.unwrap().unwrap();
+                        let seen = row.rev;
+                        row.name = format!("{}+{i}", row.name);
+                        row.rev = next_rev(seen, 0);
+                        if update_cas(&*db, &row, seen).await.unwrap() {
+                            return;
+                        }
+                    }
+                })
+            })
+            .collect();
+        for t in tasks {
+            t.await.unwrap();
+        }
+        let row = get(&*db, "l").await.unwrap().unwrap();
+        assert_eq!(row.rev, 7, "every edit moved the rev once");
+        for i in 0..6 {
+            assert!(row.name.contains(&format!("+{i}")), "{}", row.name);
+        }
     }
 }

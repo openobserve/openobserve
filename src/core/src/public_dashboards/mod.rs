@@ -23,6 +23,8 @@ pub mod flight;
 pub mod intent;
 mod mask;
 pub mod materialize;
+pub mod replication;
+pub mod status;
 pub mod store;
 mod variables;
 
@@ -41,9 +43,9 @@ use config::{
             v8::{Panel, Tab},
         },
         public_dashboards::{
-            MAX_REFRESH_SECS, MIN_REFRESH_SECS, NotAvailableReason, PanelResult, PanelState,
-            PublicDashboardConfig, PublicLinkState, PublicLinkStatus, PublicVariable, TimeRange,
-            TimeRangePolicy, Window, public_dashboard_identity,
+            MAX_REFRESH_SECS, MIN_REFRESH_SECS, NotAvailableReason, OrgPublicDashboardSettings,
+            PanelResult, PanelState, PublicDashboardConfig, PublicLinkState, PublicLinkStatus,
+            PublicVariable, TimeRange, TimeRangePolicy, Window, public_dashboard_identity,
         },
         search,
         sql::{TableReferenceExt, resolve_stream_names, resolve_stream_names_with_type},
@@ -69,6 +71,7 @@ use infra::{
     },
 };
 use materialize::{Capture, Class, Engine, PanelRun, Run};
+use sea_orm::ConnectionTrait;
 use store::{ExecutedQuery, ManifestPanel, ValuesDependency};
 use variables::{PanelVars, QueryVars};
 
@@ -82,6 +85,7 @@ const EDIT_ATTEMPTS: usize = 5;
 pub const OLDER_FORMAT_ERROR: &str =
     "This dashboard uses an older format. Open it and save it once, then publish.";
 pub const LINK_NOT_FOUND: &str = "public link not found";
+pub const ORG_SWITCHED_OFF: &str = "Public links are turned off for this organization.";
 
 /// Search-response fields the renderer reads; SQL, VRL errors and trace ids stay private.
 const PUBLIC_META_FIELDS: [&str; 6] = [
@@ -197,6 +201,29 @@ pub struct PublicLinkView {
     pub updated_at: i64,
     pub last_accessed_at: Option<i64>,
     pub access_count: i64,
+}
+
+/// A link's frozen values over one dashboard, resolved per panel by scope as the build resolves
+/// them before any values query; a value only a values query can pick stays a placeholder.
+pub struct LinkValues {
+    vars: QueryVars,
+}
+
+impl LinkValues {
+    pub fn new(dash: &Dashboard, frozen: Option<&str>) -> Self {
+        let values = Defaults::new(dash, parse_frozen_vars(frozen)).into_values();
+        Self {
+            vars: QueryVars::new(dash, values, None),
+        }
+    }
+
+    /// The panel's query text as its build substitutes it; the window only sizes `$__interval`.
+    pub fn substitute(&self, tab_id: &str, panel_id: &str, text: &str, query_type: &str) -> String {
+        let now = now_micros();
+        self.vars
+            .for_panel(tab_id, panel_id)
+            .substitute(text, query_type, now - 3_600_000_000, now)
+    }
 }
 
 /// One build's fixed inputs for its searches.
@@ -363,7 +390,7 @@ pub async fn create(
     validate_dashboard(&dash, &cfg.frozen_variables, now).map_err(Invalid)?;
 
     let db = get_orm_client_rw().await;
-    let org_max = org_link_limit(pd_table::get_settings(db, org).await?.as_ref());
+    let org_max = create_gate(pd_table::get_settings(db, org).await?.as_ref()).map_err(Invalid)?;
     let dashboard_max = get_config().public_dashboards.max_links_per_dashboard;
     let id = ider::uuid();
     let slug = gen_unique_slug().await?;
@@ -393,7 +420,10 @@ pub async fn create(
         access_count: 0,
     };
     match pd_table::insert_capped(db, &model, org_max, dashboard_max).await? {
-        CreateOutcome::Created => Ok(PublishResult { id, slug }),
+        CreateOutcome::Created => {
+            replication::replicate(&model).await;
+            Ok(PublishResult { id, slug })
+        }
         CreateOutcome::OrgFull => Err(Invalid(format!(
             "This organization has reached its limit of {org_max} public links. Revoke one to add another."
         ))
@@ -487,7 +517,8 @@ pub async fn update_link(
     let dash = current_dashboard(&link.org_id, &link.dashboard_id).await?;
     let now = now_micros();
     validate_dashboard(&dash, &cfg.frozen_variables, now).map_err(Invalid)?;
-    // The Enterprise editor stream check for changed frozen variables (design 6.3) belongs here.
+    #[cfg(feature = "enterprise")]
+    authorize_variable_edit(&link, &dash, &cfg.frozen_variables, user_id).await?;
     let ranges = serde_json::to_string(&cfg.time_range.ranges)?;
     let frozen = serde_json::to_string(&cfg.frozen_variables)?;
     edit(&link.org_id, &link.id, |l| {
@@ -535,6 +566,57 @@ pub async fn publisher_is_member(org: &str, user: &str) -> Result<bool, anyhow::
 pub async fn pause_for_departed_publisher(link: PublicDashboard) -> Result<(), anyhow::Error> {
     let updated_by = link.updated_by.clone();
     set_paused(&link, updated_by).await.map(|_| ())
+}
+
+/// Called after a membership delete commits: pauses every link the user published in the org.
+/// A failure is logged; the 15-minute deadline check pauses that link on its next read.
+pub async fn pause_departed_publisher_links(org: &str, user: &str) {
+    let paused = pause_departed_on(get_orm_client_rw().await, org, user, replication::send).await;
+    if paused > 0 {
+        log::info!("[public_dashboards] paused {paused} links of {user}, who left {org}");
+    }
+}
+
+/// The org's settings for the settings API; a missing row reads as enabled with the env default.
+pub async fn org_settings(org: &str) -> Result<OrgPublicDashboardSettings, anyhow::Error> {
+    let row = pd_table::get_settings(get_orm_client_rw().await, org).await?;
+    Ok(OrgPublicDashboardSettings {
+        enabled: row.as_ref().is_none_or(|s| s.enabled),
+        max_links: row.and_then(|s| s.max_links),
+    })
+}
+
+/// Writes the org's settings with a new revision, which makes every result file of the org due.
+pub async fn set_org_settings(
+    org: &str,
+    body: OrgPublicDashboardSettings,
+    user_id: &str,
+) -> Result<OrgPublicDashboardSettings, anyhow::Error> {
+    validate_settings(&body).map_err(Invalid)?;
+    let row = pd_table::upsert_settings(
+        get_orm_client_rw().await,
+        org,
+        body.enabled,
+        body.max_links,
+        user_id,
+        now_micros(),
+    )
+    .await?;
+    Ok(OrgPublicDashboardSettings {
+        enabled: row.enabled,
+        max_links: row.max_links,
+    })
+}
+
+/// A per-org link limit must lie within the env limit, which is the most any org may have.
+pub fn validate_settings(body: &OrgPublicDashboardSettings) -> Result<(), String> {
+    let env = get_config().public_dashboards.max_links_per_org;
+    match body.max_links {
+        Some(n) if n < 1 || u32::try_from(n).is_ok_and(|n| n > env) => Err(format!(
+            "max_links must be between 1 and {env}, the limit this server allows"
+        )),
+        _ => Ok(()),
+    }
 }
 
 /// Serve again at the same address; the next view builds.
@@ -853,13 +935,27 @@ pub async fn authorize_manifest(
     Ok(true)
 }
 
-/// Applies `change` to the live row and writes it with a compare-and-set on rev; a lost race
-/// re-reads the row and applies the change again.
-async fn edit<F>(org: &str, id: &str, mut change: F) -> Result<PublicDashboard, anyhow::Error>
+/// Applies `change` to the live row with a compare-and-set on rev, then replicates the result.
+async fn edit<F>(org: &str, id: &str, change: F) -> Result<PublicDashboard, anyhow::Error>
 where
     F: FnMut(&mut PublicDashboard) -> Result<(), anyhow::Error>,
 {
-    let db = get_orm_client_rw().await;
+    let row = edit_on(get_orm_client_rw().await, org, id, change).await?;
+    replication::replicate(&row).await;
+    Ok(row)
+}
+
+/// A lost race re-reads the row and applies the change again.
+async fn edit_on<C, F>(
+    db: &C,
+    org: &str,
+    id: &str,
+    mut change: F,
+) -> Result<PublicDashboard, anyhow::Error>
+where
+    C: ConnectionTrait,
+    F: FnMut(&mut PublicDashboard) -> Result<(), anyhow::Error>,
+{
     for _ in 0..EDIT_ATTEMPTS {
         let Some(mut row) = pd_table::get(db, id)
             .await?
@@ -899,6 +995,130 @@ fn org_link_limit(settings: Option<&OrgSettings>) -> u32 {
     settings
         .and_then(|s| s.max_links)
         .map_or(env, |max| u32::try_from(max).unwrap_or(0).min(env))
+}
+
+/// The org's link limit at create, or the refusal when the org switch is off.
+fn create_gate(settings: Option<&OrgSettings>) -> Result<u32, String> {
+    if settings.is_some_and(|s| !s.enabled) {
+        return Err(ORG_SWITCHED_OFF.to_string());
+    }
+    Ok(org_link_limit(settings))
+}
+
+/// Returns how many links were paused; each pause is its own compare-and-set and Put.
+async fn pause_departed_on<C, F, Fut>(db: &C, org: &str, user: &str, emit: F) -> usize
+where
+    C: ConnectionTrait,
+    F: Fn(PublicDashboard) -> Fut,
+    Fut: std::future::Future<Output = Result<(), anyhow::Error>>,
+{
+    if db::user::is_root_user(user) {
+        return 0;
+    }
+    let links = match pd_table::list_by_publisher(db, org, user).await {
+        Ok(links) => links,
+        Err(e) => {
+            log::error!("[public_dashboards] listing the links {user} published in {org}: {e}");
+            return 0;
+        }
+    };
+    let mut paused = 0;
+    for link in links.into_iter().filter(|l| l.enabled) {
+        let now = now_micros();
+        let pause = |l: &mut PublicDashboard| {
+            l.enabled = false;
+            l.updated_at = now;
+            Ok::<(), anyhow::Error>(())
+        };
+        match edit_on(db, org, &link.id, pause).await {
+            Ok(row) => {
+                replication::replicate_on(db, &row, &emit).await;
+                paused += 1;
+            }
+            Err(e) => log::error!(
+                "[public_dashboards] pausing link {} of departed publisher {user} failed; the \
+                 deadline check pauses it on its next read: {e}",
+                link.id
+            ),
+        }
+    }
+    paused
+}
+
+/// Enterprise: the editor must read every stream a changed frozen value makes a panel read.
+#[cfg(feature = "enterprise")]
+async fn authorize_variable_edit(
+    link: &PublicDashboard,
+    dash: &Dashboard,
+    frozen: &BTreeMap<String, serde_json::Value>,
+    user_id: &str,
+) -> Result<(), anyhow::Error> {
+    let sources = variable_edit_sources(link, dash, frozen);
+    if sources.is_empty() {
+        return Ok(());
+    }
+    crate::authz::authorize_query_sources(user_id, &sources)
+        .await
+        .map_err(|denied| {
+            anyhow::anyhow!(crate::authz::stream_access_message(&link.org_id, &denied))
+        })
+}
+
+/// The queries of every panel that reads a changed frozen value, substituted with the new values.
+#[cfg(feature = "enterprise")]
+fn variable_edit_sources(
+    link: &PublicDashboard,
+    dash: &Dashboard,
+    frozen: &BTreeMap<String, serde_json::Value>,
+) -> Vec<crate::authz::QuerySource> {
+    use crate::authz::QuerySource;
+
+    let old = parse_frozen_vars(link.frozen_variables.as_deref());
+    let changed: BTreeSet<&String> = frozen
+        .iter()
+        .filter(|(key, value)| old.get(*key) != Some(*value))
+        .map(|(key, _)| key)
+        .collect();
+    let Some(v8) = dash.v8.as_ref().filter(|_| !changed.is_empty()) else {
+        return vec![];
+    };
+    let new_json = serde_json::to_string(frozen).ok();
+    let values = LinkValues::new(dash, new_json.as_deref());
+    let mut sources = Vec::new();
+    for tab in &v8.tabs {
+        for panel in &tab.panels {
+            let texts: Vec<&str> = panel.queries.iter().filter_map(query_text).collect();
+            let reads_changed = values
+                .vars
+                .referenced(&tab.tab_id, &panel.id, &texts)
+                .iter()
+                .any(|(_, key)| changed.contains(key));
+            if !reads_changed {
+                continue;
+            }
+            let promql = panel.query_type == "promql";
+            for q in panel.queries.iter() {
+                let Some(text) = query_text(q) else {
+                    continue;
+                };
+                let lang = if promql { "promql" } else { "sql" };
+                let text = values.substitute(&tab.tab_id, &panel.id, text, lang);
+                sources.push(if promql {
+                    QuerySource::PromQl {
+                        org_id: link.org_id.clone(),
+                        query: text,
+                    }
+                } else {
+                    QuerySource::Sql {
+                        org_id: link.org_id.clone(),
+                        sql: text,
+                        default_type: q.fields.stream_type,
+                    }
+                });
+            }
+        }
+    }
+    sources
 }
 
 /// The outermost explicit LIMIT of a SQL query; None without one or when it does not parse.
@@ -2298,5 +2518,250 @@ mod tests {
         let manifest = panel_manifest(&ctx, &vars, &frozen, &values, tab, &tab.panels[0]);
         assert_eq!(manifest.intent, config_side["a"]);
         assert_eq!(manifest.resolved_variables["svc"], json!("api"));
+    }
+
+    fn org_settings_row(enabled: bool, max_links: Option<i32>) -> OrgSettings {
+        OrgSettings {
+            org_id: "o".into(),
+            rev: 1,
+            enabled,
+            max_links,
+            updated_at: 1,
+            updated_by: "admin".into(),
+        }
+    }
+
+    #[test]
+    fn gate12_a_missing_settings_row_gives_the_paid_default_and_an_off_switch_refuses_create() {
+        let env = get_config().public_dashboards.max_links_per_org;
+        assert_eq!(env, 50);
+        assert_eq!(create_gate(None), Ok(env));
+        assert_eq!(create_gate(Some(&org_settings_row(true, None))), Ok(env));
+        assert_eq!(create_gate(Some(&org_settings_row(true, Some(3)))), Ok(3));
+        assert_eq!(
+            create_gate(Some(&org_settings_row(true, Some(500)))),
+            Ok(env)
+        );
+        assert_eq!(
+            create_gate(Some(&org_settings_row(false, Some(3)))),
+            Err(ORG_SWITCHED_OFF.to_string())
+        );
+    }
+
+    #[test]
+    fn gate12_a_per_org_limit_must_lie_within_the_env_limit() {
+        let body = |max_links| OrgPublicDashboardSettings {
+            enabled: true,
+            max_links,
+        };
+        assert!(validate_settings(&body(None)).is_ok());
+        assert!(validate_settings(&body(Some(1))).is_ok());
+        assert!(validate_settings(&body(Some(50))).is_ok());
+        for bad in [0, -1, 51] {
+            assert_eq!(
+                validate_settings(&body(Some(bad))).unwrap_err(),
+                "max_links must be between 1 and 50, the limit this server allows"
+            );
+        }
+    }
+
+    /// Downgraded from 50 to 3 with 5 links: the 5 stay live and no sixth can be created.
+    #[tokio::test]
+    async fn gate12_a_downgrade_stops_new_links_and_keeps_existing_ones() {
+        let db = replication::tests::db().await;
+        let paid = create_gate(None).unwrap();
+        for i in 0..5 {
+            let link = replication::tests::link(&format!("l{i}"));
+            let made = pd_table::insert_capped(&db, &link, paid, 10).await.unwrap();
+            assert_eq!(made, CreateOutcome::Created);
+        }
+        let row = pd_table::upsert_settings(&db, "o", true, Some(3), "admin", 10)
+            .await
+            .unwrap();
+        let free = create_gate(Some(&row)).unwrap();
+        assert_eq!(free, 3);
+        let sixth = replication::tests::link("l5");
+        assert_eq!(
+            pd_table::insert_capped(&db, &sixth, free, 10)
+                .await
+                .unwrap(),
+            CreateOutcome::OrgFull
+        );
+        let live = pd_table::list(&db, "o").await.unwrap();
+        assert_eq!(live.len(), 5);
+        assert!(live.iter().all(|l| l.enabled && l.deleted_at.is_none()));
+    }
+
+    #[tokio::test]
+    async fn gate12_concurrent_creates_at_the_org_cap_admit_none_over_it() {
+        let db = std::sync::Arc::new(replication::tests::db().await);
+        let row = pd_table::upsert_settings(&*db, "o", true, Some(3), "admin", 10)
+            .await
+            .unwrap();
+        let cap = create_gate(Some(&row)).unwrap();
+        let tasks: Vec<_> = (0..8)
+            .map(|i| {
+                let db = db.clone();
+                tokio::spawn(async move {
+                    let mut link = replication::tests::link(&format!("l{i}"));
+                    link.dashboard_id = format!("d{i}");
+                    pd_table::insert_capped(&db, &link, cap, 10).await.unwrap()
+                })
+            })
+            .collect();
+        let mut created = 0;
+        for t in tasks {
+            if t.await.unwrap() == CreateOutcome::Created {
+                created += 1;
+            }
+        }
+        assert_eq!(created, 3);
+        assert_eq!(pd_table::list(&*db, "o").await.unwrap().len(), 3);
+    }
+
+    /// After the membership delete: each of the user's live links is paused with its own
+    /// compare-and-set and Put; a failed Put waits in the outbox until it is delivered.
+    #[tokio::test]
+    async fn gate14_the_departure_hook_pauses_the_links_and_recovers_from_a_failed_emit() {
+        use std::sync::atomic::Ordering;
+
+        let db = replication::tests::db().await;
+        let mut theirs = replication::tests::link("theirs");
+        theirs.published_by = "leaver@example.com".into();
+        let mut paused_already = replication::tests::link("paused");
+        paused_already.published_by = "leaver@example.com".into();
+        paused_already.enabled = false;
+        let mut revoked = replication::tests::link("revoked");
+        revoked.published_by = "leaver@example.com".into();
+        revoked.deleted_at = Some(1);
+        let other = replication::tests::link("other");
+        for link in [&theirs, &paused_already, &revoked, &other] {
+            pd_table::insert_capped(&db, link, 10, 10).await.unwrap();
+        }
+
+        let queue = replication::tests::Queue::default();
+        queue.down.store(true, Ordering::SeqCst);
+        let paused = pause_departed_on(&db, "o", "leaver@example.com", queue.emitter()).await;
+        assert_eq!(paused, 1);
+        let row = pd_table::get(&db, "theirs").await.unwrap().unwrap();
+        assert!(!row.enabled);
+        assert!(row.rev > theirs.rev, "the pause is a semantic write");
+        assert!(pd_table::get(&db, "other").await.unwrap().unwrap().enabled);
+        assert_eq!(
+            pd_table::get(&db, "paused").await.unwrap().unwrap().rev,
+            paused_already.rev
+        );
+        let queued = pd_table::outbox_list_due(&db, i64::MAX, 10).await.unwrap();
+        assert_eq!(queued.len(), 1);
+        assert_eq!(
+            (queued[0].link_id.as_str(), queued[0].rev),
+            ("theirs", row.rev)
+        );
+
+        queue.down.store(false, Ordering::SeqCst);
+        let sent = replication::retry_outbox_on(&db, queue.emitter(), now_micros()).await;
+        assert_eq!(sent, 1);
+        let delivered = queue.sent.lock().unwrap().clone();
+        assert_eq!(
+            (delivered[0].id.as_str(), delivered[0].enabled),
+            ("theirs", false)
+        );
+        assert!(
+            pd_table::outbox_list_due(&db, i64::MAX, 10)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn templated_dashboard() -> Dashboard {
+        Dashboard {
+            version: 8,
+            v8: Some(
+                serde_json::from_value(json!({
+                    "tabs": [
+                        { "tabId": "t1", "name": "", "panels": [
+                            panel("a", Some("SELECT * FROM $src")),
+                            panel("b", Some("SELECT * FROM fixed WHERE env = '$env'")),
+                        ]},
+                        { "tabId": "t2", "name": "", "panels": [
+                            panel("c", Some("SELECT * FROM $src"))
+                        ]}
+                    ],
+                    "variables": { "list": [
+                        { "type": "custom", "name": "src", "label": "S", "value": "safe",
+                          "scope": "panels", "panels": ["c"] },
+                        { "type": "custom", "name": "env", "label": "E", "value": "prod" }
+                    ]}
+                }))
+                .unwrap(),
+            ),
+            ..Default::default()
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn gate04_a_variable_edit_checks_only_the_panels_that_read_the_changed_value() {
+        let (mut link, ..) = ctx_parts();
+        link.frozen_variables = Some(json!({ "src.p.c": "safe", "env": "prod" }).to_string());
+        let dash = templated_dashboard();
+        let frozen = |v: serde_json::Value| -> BTreeMap<String, serde_json::Value> {
+            serde_json::from_value(v).unwrap()
+        };
+        let sql = |sources: Vec<crate::authz::QuerySource>| -> Vec<String> {
+            sources
+                .into_iter()
+                .map(|s| match s {
+                    crate::authz::QuerySource::Sql { sql, .. } => sql,
+                    other => panic!("{other:?}"),
+                })
+                .collect()
+        };
+        let same = frozen(json!({ "src.p.c": "safe", "env": "prod" }));
+        assert!(variable_edit_sources(&link, &dash, &same).is_empty());
+        let scoped = frozen(json!({ "src.p.c": "secret", "env": "prod" }));
+        assert_eq!(
+            sql(variable_edit_sources(&link, &dash, &scoped)),
+            ["SELECT * FROM secret"]
+        );
+        let global = frozen(json!({ "src.p.c": "safe", "env": "staging" }));
+        assert_eq!(
+            sql(variable_edit_sources(&link, &dash, &global)),
+            ["SELECT * FROM fixed WHERE env = 'staging'"]
+        );
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn gate04_a_link_variable_edit_selecting_an_unreadable_stream_is_refused() {
+        let editor = format!("{}@example.com", config::ider::uuid());
+        crate::authz::fake_checker().grant_read(
+            &editor,
+            &crate::authz::TypedStream {
+                org_id: "o1".to_string(),
+                stream_type: StreamType::Logs,
+                name: "safe".to_string(),
+            },
+        );
+        let (mut link, ..) = ctx_parts();
+        link.frozen_variables = Some(json!({ "src.p.c": "safe" }).to_string());
+        let dash = templated_dashboard();
+        let to = |value: &str| -> BTreeMap<String, serde_json::Value> {
+            BTreeMap::from([("src.p.c".to_string(), json!(value))])
+        };
+        let err = authorize_variable_edit(&link, &dash, &to("secret"), &editor)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Unauthorized Access: no read permission on logs/secret"
+        );
+        assert!(
+            authorize_variable_edit(&link, &dash, &to("safe"), &editor)
+                .await
+                .is_ok()
+        );
     }
 }
