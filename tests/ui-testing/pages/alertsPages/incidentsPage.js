@@ -77,8 +77,6 @@ export class IncidentsPage {
     expect(ok, 'the incident list must render either rows or its empty state').toBe(true);
   }
 
-  // ===== DOWNTIMES: muted incidents =====
-
   _incidentRow(text) {
     return this.page.locator(this.incidentTable).locator('[data-test^="o2-table-row-"]').filter({ hasText: text });
   }

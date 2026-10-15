@@ -4906,7 +4906,7 @@ export class AlertsPage {
 
     // ===== DOWNTIMES: row mute, Muted chip and last outcome =====
 
-    /** Open the Alerts list on one folder (and optionally one type tab), as a reload after a mute needs. */
+    /** A fresh load, which the Muted chip needs after a mute. */
     async gotoAlertListFolder(folderId, { tab = null } = {}) {
         const org = process.env.ORGNAME || 'default';
         const tabQuery = tab ? `&tab=${tab}` : '';
@@ -4952,10 +4952,11 @@ export class AlertsPage {
         await expect(this.page.locator(`[data-test="alert-list-${name}-last-outcome"]`)).toHaveText(text, { timeout: 20000 });
     }
 
-    /** True when the alert name text is clipped inside its cell. */
+    /** Throws when no element renders exactly the full name, since measuring the whole cell could report "not clipped" by accident. */
     async isAlertNameClipped(name) {
         return this.page.locator(`[data-test="alert-list-${name}-name-cell"]`).evaluate((cell, n) => {
-            const el = [...cell.querySelectorAll('*')].find((e) => e.textContent.trim() === n && [...e.children].every((c) => c.textContent.trim() !== n)) || cell;
+            const el = [...cell.querySelectorAll('*')].find((e) => e.textContent.trim() === n && [...e.children].every((c) => c.textContent.trim() !== n));
+            if (!el) throw new Error(`no element in the name cell of "${n}" renders its full name`);
             return el.scrollWidth > el.clientWidth;
         }, name);
     }

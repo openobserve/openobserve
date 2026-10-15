@@ -1,46 +1,15 @@
 // Copyright 2026 OpenObserve Inc.
 
-// Downtimes — the planned-maintenance create/edit page (plan Spec 1, DT-C-01..15).
-
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const dt = require('../utils/downtimes-api.js');
+const fx = require('../utils/downtimes-fixtures.js');
 
 const PREFIX = 'e2e_dt_create';
-const workerPrefix = (testInfo) => `${PREFIX}_w${testInfo.workerIndex}`;
 
-const gate = { available: false, reason: 'gate not probed', config: {} };
+const gate = { ready: false, config: {} };
 const shared = { stream: null, dest: null, run: null, svcA: null, svcB: null, h1: null, alertA: null, alertB: null, alertFolder: null };
-
-/** Next full local hour and its auto-name date, computed in the browser's own timezone and locale. */
-async function nextHour(page) {
-  return page.evaluate(() => {
-    const d = new Date();
-    d.setMinutes(0, 0, 0);
-    d.setHours(d.getHours() + 1);
-    const end = new Date(d.getTime() + 3600_000);
-    const pad = (n) => String(n).padStart(2, '0');
-    const parts = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' }).formatToParts(d);
-    const part = (t) => parts.find((p) => p.type === t)?.value ?? '';
-    const iso = new Date().getDay() || 7;
-    return {
-      startMs: d.getTime(),
-      start: `${pad(d.getHours())}:00`,
-      end: `${pad(end.getHours())}:00`,
-      autoDate: `${part('weekday')} ${part('day')} ${part('month')}`,
-      todayIso: iso,
-      todayLong: new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(new Date()),
-    };
-  });
-}
-
-/** A whole-minute local Date `minutes` from now. */
-function minutesFromNow(minutes) {
-  const d = new Date(Date.now() + minutes * 60_000);
-  d.setSeconds(0, 0);
-  return d;
-}
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -53,9 +22,9 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
     const context = await browser.newContext();
     const page = await context.newPage();
     try {
-      Object.assign(gate, await dt.isDowntimesAvailable(page));
-      if (!gate.available) return;
-      const wp = workerPrefix(testInfo);
+      gate.config = await dt.assertDowntimesEnabled(page);
+      gate.ready = true;
+      const wp = fx.workerPrefix(PREFIX, testInfo);
       await dt.cleanupDowntimes(page, { prefix: `${wp}_` });
 
       shared.run = dt.uniqueName('r').slice(-8);
@@ -89,10 +58,8 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
   });
 
   test.beforeEach(async ({ page }, testInfo) => {
-    reg = null;
     testLogger.testStart(testInfo.title, testInfo.file);
-    test.skip(!gate.available, `Downtimes are not testable here — ${gate.reason}`);
-    reg = { prefix: dt.uniqueName(workerPrefix(testInfo)), folders: [] };
+    reg = { prefix: dt.uniqueName(fx.workerPrefix(PREFIX, testInfo)), folders: [] };
     await navigateToBase(page);
     pm = new PageManager(page);
   });
@@ -102,40 +69,33 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
   });
 
   test.afterAll(async ({ browser }, testInfo) => {
-    if (!gate.available) return;
+    if (!gate.ready) return;
     const context = await browser.newContext();
     const page = await context.newPage();
-    const wp = workerPrefix(testInfo);
+    const wp = fx.workerPrefix(PREFIX, testInfo);
     await dt.cleanupDowntimes(page, { prefix: `${wp}_` });
     await dt.deleteAlertsAndFolders(page, [shared.alertA, shared.alertB], [shared.alertFolder]);
     await dt.deleteDestinationsByPrefix(page, `${wp}_`);
     await context.close();
   });
 
-  async function newFolder(page) {
-    const id = await dt.createDowntimeFolder(page, `${reg.prefix}_f`);
-    reg.folders.push(id);
-    return id;
-  }
-
-  const folderCount = async (page, folderId) => (await dt.listDowntimes(page, { folder_id: folderId })).total;
-
-  // ------------------------------------------------------------------ P1
-
   test('DT-C-01 creates a one-time downtime for a specific alert, and the first Save saves nothing', { tag: ['@P1', '@alerts'] }, async ({ page }) => {
-    const folderId = await newFolder(page);
+    test.setTimeout(4 * 60_000);
+    const folderId = await fx.newDowntimeFolder(page, reg);
     const name = `${reg.prefix}_once`;
-    const before = await folderCount(page, folderId);
-    const expected = await nextHour(page);
+    const before = await dt.downtimeCountInFolder(page, folderId);
+    // A save after the default start (the next full hour) would make the row active instead of scheduled.
+    await pm.downtimesPage.waitOutLocalHourBoundary(120_000);
+    const expected = await pm.downtimesPage.nextLocalHour();
 
     await pm.downtimesPage.gotoAdd(folderId);
     await pm.downtimesPage.setName(name);
-    await pm.downtimesPage.addSpecificItems('alerts', [shared.alertA.id]);
+    await pm.downtimesPage.addSpecificItems('alerts', [shared.alertA]);
     await pm.downtimesPage.save();
 
     await pm.downtimesPage.expectActiveTab('schedule');
     await pm.downtimesPage.expectCheckScheduleNudge();
-    expect(await folderCount(page, folderId), 'the first Save must not persist anything').toBe(before);
+    expect(await dt.downtimeCountInFolder(page, folderId), 'the first Save must not persist anything').toBe(before);
 
     await pm.downtimesPage.save();
     await pm.downtimesPage.expectToast('Downtime created');
@@ -150,41 +110,40 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
     expect(saved.targets[0]).toMatchObject({ module: 'alerts', folders: { kind: 'all' }, ids: [shared.alertA.id] });
     expect(saved.schedule.repeat).toBe('none');
     expect(saved.schedule.ends_at - saved.schedule.starts_at).toBe(3600 * dt.MICROS);
-    const later = await nextHour(page);
-    expect([expected.startMs, later.startMs], 'the default start is the next full local hour').toContain(saved.schedule.starts_at / 1000);
+    expect(saved.schedule.starts_at / 1000, 'the default start is the next full local hour').toBe(expected.startMs);
     expect(saved.status).toBe('scheduled');
   });
 
   test('DT-C-02 Enter in the name field never submits or saves', { tag: ['@P1'] }, async ({ page }) => {
-    const folderId = await newFolder(page);
+    const folderId = await fx.newDowntimeFolder(page, reg);
     const name = `${reg.prefix}_enter`;
-    const before = await folderCount(page, folderId);
+    const before = await dt.downtimeCountInFolder(page, folderId);
 
     await pm.downtimesPage.gotoAdd(folderId);
     await pm.downtimesPage.setName(name, { pressEnterTimes: 2 });
 
     const samples = await dt.sampleCountOver(page, async () => (await dt.listDowntimes(page, { search: name })).total, { holdMs: 3000, everyMs: 1000 });
     expect(samples.every((c) => c === 0), `no downtime named ${name} may exist after Enter: ${samples}`).toBe(true);
-    expect(await folderCount(page, folderId)).toBe(before);
+    expect(await dt.downtimeCountInFolder(page, folderId)).toBe(before);
     await pm.downtimesPage.expectOnAddPage();
     await pm.downtimesPage.expectNoToast('Downtime created');
     await pm.downtimesPage.expectTitle(name);
   });
 
   test('DT-C-03 "Mute whole modules?": Cancel saves nothing and Mute all saves', { tag: ['@P1'] }, async ({ page }) => {
-    const folderId = await newFolder(page);
+    const folderId = await fx.newDowntimeFolder(page, reg);
     const name = `${reg.prefix}_muteall`;
-    const before = await folderCount(page, folderId);
+    const before = await dt.downtimeCountInFolder(page, folderId);
 
     await pm.downtimesPage.gotoAdd(folderId);
     await pm.downtimesPage.setName(name);
     await pm.downtimesPage.openTab('schedule');
-    await pm.downtimesPage.setOnceWindow(minutesFromNow(120), minutesFromNow(180));
+    await pm.downtimesPage.setOnceWindow(fx.minutesFromNow(120), fx.minutesFromNow(180));
     await pm.downtimesPage.save();
 
     await pm.downtimesPage.expectMuteAllDialog({ present: ['alerts'] });
     await pm.downtimesPage.muteAllCancel();
-    expect(await folderCount(page, folderId), 'Cancel in the safety dialog must save nothing').toBe(before);
+    expect(await dt.downtimeCountInFolder(page, folderId), 'Cancel in the safety dialog must save nothing').toBe(before);
 
     await pm.downtimesPage.save();
     await pm.downtimesPage.expectMuteAllDialog({ present: ['alerts'] });
@@ -202,9 +161,10 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-C-04 the safety dialog lists only the unnarrowed modules', { tag: ['@P1', '@synthetics'] }, async ({ page }) => {
+    // The ENT gate runs without ZO_SYNTHETICS_ENABLED, so the module is legitimately absent there.
     test.skip(gate.config.synthetics_enabled !== true, 'the synthetics module is not enabled here (config.synthetics_enabled)');
-    const folderId = await newFolder(page);
-    const before = await folderCount(page, folderId);
+    const folderId = await fx.newDowntimeFolder(page, reg);
+    const before = await dt.downtimeCountInFolder(page, folderId);
 
     await pm.downtimesPage.gotoAdd(folderId);
     await pm.downtimesPage.setName(`${reg.prefix}_partial`);
@@ -212,7 +172,7 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
     await pm.downtimesPage.expectModulePressed('synthetics', true);
     await pm.downtimesPage.setTargetFolders('alerts', [shared.alertFolder]);
     await pm.downtimesPage.openTab('schedule');
-    await pm.downtimesPage.setOnceWindow(minutesFromNow(120), minutesFromNow(180));
+    await pm.downtimesPage.setOnceWindow(fx.minutesFromNow(120), fx.minutesFromNow(180));
     await pm.downtimesPage.save();
 
     await pm.downtimesPage.expectMuteAllDialog({
@@ -221,13 +181,15 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
       absent: ['alerts'],
     });
     await pm.downtimesPage.muteAllCancel();
-    expect(await folderCount(page, folderId)).toBe(before);
+    expect(await dt.downtimeCountInFolder(page, folderId)).toBe(before);
   });
 
   test('DT-C-05 schedule defaults to the next full hour, and weekly preselects today', { tag: ['@P1'] }, async ({ page }) => {
-    const folderId = await newFolder(page);
+    const folderId = await fx.newDowntimeFolder(page, reg);
+    // The form computes its defaults when it opens; an hour or midnight passing before the read below would split them.
+    await pm.downtimesPage.waitOutLocalHourBoundary();
     await pm.downtimesPage.gotoAdd(folderId);
-    const expected = await nextHour(page);
+    const expected = await pm.downtimesPage.nextLocalHour();
     await pm.downtimesPage.openTab('schedule');
     await pm.downtimesPage.expectScheduleTimes(expected.start, expected.end);
 
@@ -239,9 +201,11 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-C-06 the title is generated, and Refine by resource defaults to host', { tag: ['@P1'] }, async ({ page }) => {
-    const folderId = await newFolder(page);
+    const folderId = await fx.newDowntimeFolder(page, reg);
+    // The generated title carries the date of the default start, which an hour or midnight passing would shift.
+    await pm.downtimesPage.waitOutLocalHourBoundary();
     await pm.downtimesPage.gotoAdd(folderId);
-    const expected = await nextHour(page);
+    const expected = await pm.downtimesPage.nextLocalHour();
     await pm.downtimesPage.expectTitle(`All alerts · once ${expected.autoDate}`);
 
     await pm.downtimesPage.openCondition();
@@ -254,7 +218,7 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-C-07 the condition preview shows the incomplete state, then only the real matches', { tag: ['@P1'] }, async ({ page }) => {
-    const folderId = await newFolder(page);
+    const folderId = await fx.newDowntimeFolder(page, reg);
     await pm.downtimesPage.gotoAdd(folderId);
     await pm.downtimesPage.openCondition();
     await pm.downtimesPage.expectPreviewIncomplete('Finish the condition to see a preview.');
@@ -267,8 +231,8 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-C-08 condition validation messages block the save', { tag: ['@P1'] }, async ({ page }) => {
-    const folderId = await newFolder(page);
-    const before = await folderCount(page, folderId);
+    const folderId = await fx.newDowntimeFolder(page, reg);
+    const before = await dt.downtimeCountInFolder(page, folderId);
     await pm.downtimesPage.gotoAdd(folderId);
     await pm.downtimesPage.setName(`${reg.prefix}_cond`);
     await pm.downtimesPage.openCondition();
@@ -288,38 +252,40 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
     await pm.downtimesPage.save();
     await pm.downtimesPage.expectErrorText('Add at least one = condition. A condition made only of != rows would silence everything else.');
 
-    expect(await folderCount(page, folderId), 'an invalid condition must save nothing').toBe(before);
+    expect(await dt.downtimeCountInFolder(page, folderId), 'an invalid condition must save nothing').toBe(before);
   });
 
   test('DT-C-09 one-time schedule validation moves a failed save to the Schedule tab', { tag: ['@P1'] }, async ({ page }) => {
-    const folderId = await newFolder(page);
-    const before = await folderCount(page, folderId);
+    const folderId = await fx.newDowntimeFolder(page, reg);
+    const before = await dt.downtimeCountInFolder(page, folderId);
     await pm.downtimesPage.gotoAdd(folderId);
     await pm.downtimesPage.setName(`${reg.prefix}_sched`);
-    await pm.downtimesPage.addSpecificItems('alerts', [shared.alertA.id]);
+    await pm.downtimesPage.addSpecificItems('alerts', [shared.alertA]);
 
     await pm.downtimesPage.openTab('schedule');
-    await pm.downtimesPage.setOnceWindow(minutesFromNow(180), minutesFromNow(120));
+    await pm.downtimesPage.setOnceWindow(fx.minutesFromNow(180), fx.minutesFromNow(120));
     await pm.downtimesPage.openTab('targets');
     await pm.downtimesPage.save();
     await pm.downtimesPage.expectActiveTab('schedule');
     await pm.downtimesPage.expectErrorText('The end must be after the start.');
 
-    const start = minutesFromNow(120);
+    const start = fx.minutesFromNow(120);
     await pm.downtimesPage.setOnceWindow(start, new Date(start.getTime() + 8 * 24 * 3600_000));
     await pm.downtimesPage.save();
     await pm.downtimesPage.expectErrorText('A window can last at most 7 days.');
 
-    expect(await folderCount(page, folderId)).toBe(before);
+    expect(await dt.downtimeCountInFolder(page, folderId)).toBe(before);
   });
 
   test('DT-C-10 recurring schedule validation', { tag: ['@P1'] }, async ({ page }) => {
-    const folderId = await newFolder(page);
-    const before = await folderCount(page, folderId);
+    const folderId = await fx.newDowntimeFolder(page, reg);
+    const before = await dt.downtimeCountInFolder(page, folderId);
+    // Weekly preselects today, so midnight passing between the form opening and the read below would untick the wrong day.
+    await pm.downtimesPage.waitOutLocalHourBoundary();
     await pm.downtimesPage.gotoAdd(folderId);
-    const { todayIso } = await nextHour(page);
+    const { todayIso } = await pm.downtimesPage.nextLocalHour();
     await pm.downtimesPage.setName(`${reg.prefix}_recur`);
-    await pm.downtimesPage.addSpecificItems('alerts', [shared.alertA.id]);
+    await pm.downtimesPage.addSpecificItems('alerts', [shared.alertA]);
     await pm.downtimesPage.openTab('schedule');
 
     await pm.downtimesPage.setRepeat('weekly');
@@ -333,12 +299,12 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
     await pm.downtimesPage.save();
     await pm.downtimesPage.expectErrorText('Enter a duration such as 90m or 1h 30m.');
 
-    expect(await folderCount(page, folderId)).toBe(before);
+    expect(await dt.downtimeCountInFolder(page, folderId)).toBe(before);
   });
 
   test('DT-C-11 name, module and folder validation, each on its owning tab', { tag: ['@P1'] }, async ({ page }) => {
-    const folderId = await newFolder(page);
-    const before = await folderCount(page, folderId);
+    const folderId = await fx.newDowntimeFolder(page, reg);
+    const before = await dt.downtimeCountInFolder(page, folderId);
     await pm.downtimesPage.gotoAdd(folderId);
 
     await pm.downtimesPage.setName('n'.repeat(257));
@@ -359,11 +325,11 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
     await pm.downtimesPage.expectActiveTab('targets');
     await pm.downtimesPage.expectErrorText('Choose All folders or at least one folder.');
 
-    expect(await folderCount(page, folderId)).toBe(before);
+    expect(await dt.downtimeCountInFolder(page, folderId)).toBe(before);
   });
 
   test('DT-C-12 editing an active downtime shows the active banner, reloads the condition and bumps the version', { tag: ['@P1'] }, async ({ page }) => {
-    const folderId = await newFolder(page);
+    const folderId = await fx.newDowntimeFolder(page, reg);
     const created = await dt.createDowntime(page, folderId, {
       name: `${reg.prefix}_active`,
       // The edit form always saves a top-level group, so seed that shape and expect it back unchanged.
@@ -389,7 +355,7 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-C-13 a stale edit shows the 409 banner and Reload recovers the newer row', { tag: ['@P1'] }, async ({ page }) => {
-    const folderId = await newFolder(page);
+    const folderId = await fx.newDowntimeFolder(page, reg);
     const created = await dt.createDowntime(page, folderId, {
       name: `${reg.prefix}_stale`,
       targets: [dt.alertIdsTarget([shared.alertA.id])],
@@ -409,14 +375,12 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
     await pm.downtimesPage.expectTitle(apiName);
   });
 
-  // ------------------------------------------------------------------ P2
-
   test('DT-C-14 picking a notify destination ticks "ending soon" and "ended" with a 10m lead', { tag: ['@P2'] }, async ({ page }) => {
-    const folderId = await newFolder(page);
+    const folderId = await fx.newDowntimeFolder(page, reg);
     const name = `${reg.prefix}_notify`;
     await pm.downtimesPage.gotoAdd(folderId);
     await pm.downtimesPage.setName(name);
-    await pm.downtimesPage.addSpecificItems('alerts', [shared.alertA.id]);
+    await pm.downtimesPage.addSpecificItems('alerts', [shared.alertA]);
     await pm.downtimesPage.openTab('schedule');
     await pm.downtimesPage.pickNotifyDestination(shared.dest);
     await pm.downtimesPage.expectNotifyEventChecked('ending_soon', true);
@@ -434,11 +398,11 @@ test.describe('Downtimes create and edit', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-C-15 incident mode "Not created" persists', { tag: ['@P2', '@incidents'] }, async ({ page }) => {
-    const folderId = await newFolder(page);
+    const folderId = await fx.newDowntimeFolder(page, reg);
     const name = `${reg.prefix}_incmode`;
     await pm.downtimesPage.gotoAdd(folderId);
     await pm.downtimesPage.setName(name);
-    await pm.downtimesPage.addSpecificItems('alerts', [shared.alertA.id]);
+    await pm.downtimesPage.addSpecificItems('alerts', [shared.alertA]);
     await pm.downtimesPage.chooseIncidentModeNone();
     await pm.downtimesPage.openTab('schedule');
     await pm.downtimesPage.save();

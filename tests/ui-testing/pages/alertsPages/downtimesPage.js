@@ -1,7 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
 
-// Page object for Alerts → Downtimes: list, create/edit, detail, quick-mute dialog, org banner and the synthetics row mute.
-
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
@@ -11,7 +9,6 @@ export class DowntimesPage {
   constructor(page) {
     this.page = page;
 
-    // List
     this.listPage = '[data-test="downtime-list-page"]';
     this.listSearchField = '[data-test="downtime-list-search-field"]';
     this.listScopeThis = '[data-test="downtime-list-scope-this"]';
@@ -30,7 +27,6 @@ export class DowntimesPage {
     this.toastMessage = '[data-test="o-toast-message"]';
     this.toastAction = '[data-test="o-toast-action-btn"]';
 
-    // Create / edit
     this.addRoot = '[data-test="add-downtime"]';
     this.nameTrigger = '[data-test="add-downtime-name-trigger"]';
     this.nameInput = '[data-test="add-downtime-name-input"]';
@@ -62,7 +58,6 @@ export class DowntimesPage {
     this.incidentModeNone = '[data-test="downtime-target-alerts-incident-mode-none"]';
     this.folderInlineSelect = 'inline-select-folder-dropdown';
 
-    // Detail
     this.detailStatus = '[data-test="downtime-detail-status"]';
     this.detailTitle = '[data-test="downtime-detail-title"]';
     this.detailOccurrences = '[data-test="downtime-detail-occurrences"]';
@@ -80,7 +75,6 @@ export class DowntimesPage {
     this.detailExtendUntil = '[data-test="downtime-detail-extend-until"]';
     this.detailExtendDialog = '[data-test="downtime-detail-extend-dialog"]';
 
-    // Quick mute dialog
     this.quickMuteDialog = '[data-test="quick-mute-dialog"]';
     this.quickMuteCustomPreset = '[data-test="quick-mute-preset-custom"]';
     this.quickMuteReason = '[data-test="quick-mute-reason-field"]';
@@ -91,11 +85,9 @@ export class DowntimesPage {
     this.bannerCta = '[data-test^="announcement-banner-cta-downtime:"]';
     this.bannerDismiss = '[data-test^="announcement-banner-dismiss-downtime:"]';
 
-    // Synthetics list
     this.syntheticsTable = 'synthetic-monitoring-monitors-table';
+    this.syntheticsSearch = '[data-test="synthetic-monitoring-search-input-field"]';
   }
-
-  // ------------------------------------------------------------------ shared helpers
 
   async _openSelect(dataTest, scope = this.page) {
     const trigger = scope.locator(`[data-test="${dataTest}-trigger"]`).first();
@@ -109,13 +101,15 @@ export class DowntimesPage {
     return trigger;
   }
 
-  /** Pick `value` in an OSelect and verify the trigger committed it (virtualized options can drop a click). */
+  /** Verifies the trigger committed the pick, because a virtualized option can drop a click. */
   async _pickOption(dataTest, value, { scope = this.page, label = null, multiple = false } = {}) {
     const trigger = await this._openSelect(dataTest, scope);
     const option = this.page.locator(`[data-test="${dataTest}-option"][data-test-value="${value}"]`).first();
-    if (!(await option.isVisible())) {
-      const search = this.page.locator(`[data-test="${dataTest}-search"]`).first();
-      if (await search.isVisible()) await search.fill(label ?? String(value));
+    const rendered = await option.waitFor({ state: 'visible', timeout: 3000 }).then(() => true, () => false);
+    if (!rendered) {
+      // Lists over 50 options are virtualized and the OSelect search matches labels only, never ids.
+      if (!label) throw new Error(`${dataTest}: option ${value} is not rendered and no label was given to search for it`);
+      await this.page.locator(`[data-test="${dataTest}-search"]`).first().fill(label);
     }
     await expect(option).toBeVisible({ timeout: 15000 });
     await option.click();
@@ -162,8 +156,6 @@ export class DowntimesPage {
     const toast = this.page.locator('[data-test^="o-toast-"][data-test-message]').filter({ hasText: text }).first();
     await toast.locator(this.toastAction).click();
   }
-
-  // ------------------------------------------------------------------ list
 
   async gotoList(folderId, query = {}) {
     const q = new URLSearchParams({ org_identifier: ORG(), folder: folderId, ...query });
@@ -287,12 +279,12 @@ export class DowntimesPage {
     await expect(this.page.locator(this.addRoot)).toBeVisible({ timeout: 30000 });
   }
 
-  async moveRow(id, folderId) {
+  async moveRow(id, folderId, folderName) {
     await this.openMore(id);
     await this.page.locator(`[data-test="downtime-list-${id}-move"]`).click();
     const dialog = this.page.locator(this.moveDialog);
     await expect(dialog).toBeVisible();
-    await this._pickOption(this.moveFolderSelect, folderId);
+    await this._pickOption(this.moveFolderSelect, folderId, { label: folderName });
     await dialog.locator(this.dialogPrimary).click();
     await expect(dialog).toBeHidden({ timeout: 15000 });
   }
@@ -336,7 +328,6 @@ export class DowntimesPage {
     return this.page.locator(`[data-test="downtime-list-${id}-actions"]`).boundingBox();
   }
 
-  /** Visible Duplicate controls for a row: the desktop icon button plus any open-menu item. */
   async visibleDuplicateControlCount(id) {
     // Wait for the open menu so a menu-only Duplicate cannot be missed.
     await expect(this.page.locator(`[data-test="downtime-list-${id}-move"]`)).toBeVisible();
@@ -344,11 +335,37 @@ export class DowntimesPage {
       .filter({ visible: true }).count();
   }
 
-  async visibleMenuItemCount(text) {
-    return this.page.locator('[role="menuitem"]').filter({ hasText: text, visible: true }).count();
+  /** Read in the browser, because the form defaults to the next full hour in the browser's zone and locale. */
+  async nextLocalHour() {
+    return this.page.evaluate(() => {
+      const d = new Date();
+      d.setMinutes(0, 0, 0);
+      d.setHours(d.getHours() + 1);
+      const end = new Date(d.getTime() + 3600_000);
+      const pad = (n) => String(n).padStart(2, '0');
+      const parts = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' }).formatToParts(d);
+      const part = (t) => parts.find((p) => p.type === t)?.value ?? '';
+      const now = new Date();
+      return {
+        startMs: d.getTime(),
+        msToBoundary: d.getTime() - now.getTime(),
+        start: `${pad(d.getHours())}:00`,
+        end: `${pad(end.getHours())}:00`,
+        autoDate: `${part('weekday')} ${part('day')} ${part('month')}`,
+        todayIso: now.getDay() || 7,
+        todayLong: new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(now),
+      };
+    });
   }
 
-  // ------------------------------------------------------------------ create / edit
+  /** Waits past the next local hour (midnight included) when it is closer than `marginMs`, so the form's defaults and the test's expectations agree. */
+  async waitOutLocalHourBoundary(marginMs = 90_000) {
+    const { msToBoundary } = await this.nextLocalHour();
+    if (msToBoundary < marginMs) {
+      testLogger.info('Waiting out the local hour boundary', { msToBoundary });
+      await this.page.waitForTimeout(msToBoundary + 2000);
+    }
+  }
 
   async gotoAdd(folderId, query = {}) {
     const q = new URLSearchParams({ org_identifier: ORG(), folder_id: folderId, ...query });
@@ -411,9 +428,10 @@ export class DowntimesPage {
     await expect(this.page.locator(`[data-test="add-downtime-tab-${tab}"]`)).toHaveAttribute('data-state', 'on');
   }
 
-  async addSpecificItems(module, ids) {
+  /** Each item is `{ id, name }`; the name is what the search matches when the list is virtualized. */
+  async addSpecificItems(module, items) {
     await this.page.locator(`[data-test="downtime-target-${module}-add-items"]`).click();
-    for (const id of ids) await this._pickOption(`downtime-target-${module}-ids`, id, { multiple: true });
+    for (const { id, name } of items) await this._pickOption(`downtime-target-${module}-ids`, id, { multiple: true, label: name });
   }
 
   async expectSpecificItemSelected(module, id) {
@@ -421,7 +439,7 @@ export class DowntimesPage {
       .toHaveAttribute('data-test-selected-value', new RegExp(`(^|,)${id}(,|$)`), { timeout: 20000 });
   }
 
-  /** Narrow a module to exactly these folders, dropping the default "All folders" (`__all__`). */
+  /** Narrows to exactly these folders, so the default "All folders" (`__all__`) is deselected. */
   async setTargetFolders(module, folderIds) {
     const dt = `downtime-target-${module}-folders`;
     const trigger = await this._openSelect(dt);
@@ -435,7 +453,6 @@ export class DowntimesPage {
     await expect(trigger).toHaveAttribute('data-test-selected-value', folderIds.join(','));
   }
 
-  /** Deselect every folder, leaving the module with no folder at all. */
   async clearTargetFolders(module) {
     const dt = `downtime-target-${module}-folders`;
     const trigger = await this._openSelect(dt);
@@ -452,7 +469,7 @@ export class DowntimesPage {
     await expect(this.page.locator(this.conditionSection).locator(`[data-test="${this.conditionColumn}-trigger"]`).first()).toBeVisible();
   }
 
-  /** Fill condition row `index` (0-based); a falsy key leaves the dimension unset. */
+  /** A falsy key leaves the dimension of row `index` (0-based) unset. */
   async fillConditionRow(index, { key, operator = '=', value }) {
     const section = this.page.locator(this.conditionSection);
     if (key) {
@@ -540,7 +557,7 @@ export class DowntimesPage {
     await expect(this.page.locator('[data-test="downtime-schedule-end-time"] input').first()).toHaveValue(end);
   }
 
-  /** A one-time window from two local `Date`s. */
+  /** Takes local Dates, because the form shows local time. */
   async setOnceWindow(start, end) {
     const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     await this._setDate('downtime-schedule-start-date', start);
@@ -628,8 +645,6 @@ export class DowntimesPage {
     await this.page.locator(this.reloadBtn).click();
   }
 
-  // ------------------------------------------------------------------ detail
-
   async gotoDetail(id, folderId) {
     const folder = folderId ? `&folder=${folderId}` : '';
     await this.page.goto(`/web/downtimes/${id}?org_identifier=${ORG()}${folder}`);
@@ -707,8 +722,6 @@ export class DowntimesPage {
     await expect(dialog).toBeHidden({ timeout: 15000 });
   }
 
-  // ------------------------------------------------------------------ quick mute dialog
-
   async expectQuickMuteDialog(visible = true) {
     if (visible) await expect(this.page.locator(this.quickMuteDialog)).toBeVisible();
     else await expect(this.page.locator(this.quickMuteDialog)).toHaveCount(0);
@@ -719,21 +732,18 @@ export class DowntimesPage {
     await expect(this.page.locator(this.quickMuteDialog)).toBeHidden();
   }
 
-  /** Custom end, reason and filing folder, then the primary "Mute until …" button. */
-  async quickMuteCustom({ end, reason, folderId }) {
+  async quickMuteCustom({ end, reason, folderId, folderName }) {
     const dialog = this.page.locator(this.quickMuteDialog);
     await dialog.locator(this.quickMuteCustomPreset).click();
     await this._setDate('quick-mute-end-date', end);
     await this._setTime('quick-mute-end-time', `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`);
     await dialog.locator(this.quickMuteReason).fill(reason);
-    await this._pickOption(this.folderInlineSelect, folderId, { scope: dialog });
+    await this._pickOption(this.folderInlineSelect, folderId, { scope: dialog, label: folderName });
     const primary = dialog.locator(this.dialogPrimary);
     await expect(primary).toHaveText(/^Mute until /);
     await primary.click();
     await expect(dialog).toBeHidden({ timeout: 15000 });
   }
-
-  // ------------------------------------------------------------------ org banner
 
   /** The banner body whose id names this downtime; a combined banner lists every active id, so this works on a shared org too. */
   bannerById(downtimeId) {
@@ -743,6 +753,25 @@ export class DowntimesPage {
   async expectBannerById(downtimeId, visible = true, { timeout = 20000 } = {}) {
     if (visible) await expect(this.bannerById(downtimeId).first()).toBeVisible({ timeout });
     else await expect(this.bannerById(downtimeId)).toHaveCount(0, { timeout });
+  }
+
+  async reload() {
+    await this.page.reload();
+  }
+
+  // Absence after a reload proves nothing until the banners have been fetched again.
+  async reloadAndWaitForBanners() {
+    await Promise.all([
+      this.page.waitForResponse((r) => /\/api\/[^/]+\/announcements(\?|$)/.test(r.url()) && r.request().method() === 'GET', { timeout: 30000 }),
+      this.page.reload(),
+    ]);
+  }
+
+  /** This browser's storage state minus its banner dismissals, to stand in for a second browser. */
+  async storageStateWithoutDismissals() {
+    const state = await this.page.context().storageState();
+    state.origins = state.origins.map((o) => ({ ...o, localStorage: o.localStorage.filter((e) => e.name !== 'o2_dismissed_announcements') }));
+    return state;
   }
 
   async clearDismissedBanners() {
@@ -770,11 +799,11 @@ export class DowntimesPage {
     await expect(this.bannerById(downtimeId)).toHaveCount(0, { timeout: 10000 });
   }
 
-  // ------------------------------------------------------------------ synthetics list
-
-  async gotoSynthetics() {
-    await this.page.goto(`/web/synthetic-monitoring?org_identifier=${ORG()}`);
+  // The list shows 20 rows a page sorted by name, so it is narrowed to the test's checks before any row is read.
+  async gotoSynthetics(search) {
+    await this.page.goto(`/web/synthetics?org_identifier=${ORG()}`);
     await expect(this.page.locator(`[data-test="${this.syntheticsTable}"]`)).toBeVisible({ timeout: 30000 });
+    await this.page.locator(this.syntheticsSearch).fill(search);
   }
 
   /** The synthetics row ⋯ is not unique per row, so scope it to the row holding the check name. */
@@ -782,10 +811,14 @@ export class DowntimesPage {
     return this.page.locator(`[data-test="${this.syntheticsTable}"]`).locator(this.tableRow).filter({ hasText: name });
   }
 
-  async expectSyntheticMuted(checkId, muted = true) {
-    const chip = this.page.locator(`[data-test="${this.syntheticsTable}-${checkId}-muted"]`);
+  async expectSyntheticMuted(check, muted = true) {
+    const chip = this.page.locator(`[data-test="${this.syntheticsTable}-${check.id}-muted"]`);
     if (muted) await expect(chip).toBeVisible({ timeout: 20000 });
-    else await expect(chip).toHaveCount(0);
+    else {
+      // Absence only means something once the row itself has rendered.
+      await expect(this.syntheticsRow(check.name)).toBeVisible({ timeout: 20000 });
+      await expect(chip).toHaveCount(0);
+    }
   }
 
   async muteSyntheticRow(name, preset) {

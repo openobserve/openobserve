@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-// Downtimes REST + oracle helpers for tests/ui-testing/playwright-tests/Downtimes/. No expect() here: assertions belong in specs.
+// These helpers return values and never assert, so every expect() of the Downtimes specs stays in a spec.
 
 const testLogger = require('./test-logger.js');
 const { getAuthHeaders } = require('./cloud-auth.js');
@@ -38,7 +38,7 @@ async function jsonOrNull(res) {
   return res.json().catch(() => null);
 }
 
-/** Poll `fn` until `done(value)` or the timeout; returns the last value (the caller asserts). */
+/** Returns the last value on timeout instead of throwing, so the caller's expect() reports it. */
 async function pollUntil(page, fn, done, { timeoutMs = 120_000, intervalMs = 5000 } = {}) {
   const deadline = Date.now() + timeoutMs;
   let value = await fn();
@@ -49,32 +49,26 @@ async function pollUntil(page, fn, done, { timeoutMs = 120_000, intervalMs = 500
   return value;
 }
 
-// ------------------------------------------------------------------ gate
+const escapeRegExp = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Is the downtimes feature reachable here? Throws on 401/5xx so a broken deployment fails instead of skipping. */
-async function isDowntimesAvailable(page) {
+/** Throws rather than skips: these specs only run on enterprise shards, so a missing feature is a broken deployment. */
+async function assertDowntimesEnabled(page) {
   const cfgRes = await page.request.get(`${v1()}/config`, { headers: getAuthHeaders() });
-  if (cfgRes.status() === 401 || cfgRes.status() >= 500) {
-    throw new Error(`downtimes probe: GET /api/{org}/config answered HTTP ${cfgRes.status()}`);
-  }
-  const config = (await jsonOrNull(cfgRes)) || {};
+  if (!cfgRes.ok()) throw new Error(`GET /api/${orgId()}/config answered HTTP ${cfgRes.status()}`);
+  const config = await cfgRes.json();
   if (config.downtimes_enabled !== true) {
-    return {
-      available: false,
-      reason: `downtimes_enabled is ${JSON.stringify(config.downtimes_enabled)} on /api/{org}/config (build_type=${config.build_type})`,
-      config,
-    };
+    throw new Error(
+      `Downtimes specs need an enterprise build with O2_DOWNTIMES_ENABLED: downtimes_enabled is ` +
+      `${JSON.stringify(config.downtimes_enabled)} (build_type=${config.build_type})`,
+    );
   }
   const res = await page.request.get(`${v2()}/downtimes?page_size=1`, { headers: getAuthHeaders() });
-  if (res.ok()) return { available: true, reason: '', config };
-  const body = await res.text().catch(() => '');
-  if (res.status() === 404 || (res.status() === 403 && /not supported|not enabled/i.test(body))) {
-    return { available: false, reason: `downtimes route answered HTTP ${res.status()}: ${body.slice(0, 120)}`, config };
+  if (!res.ok()) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`GET /downtimes answered HTTP ${res.status()} although downtimes_enabled is true: ${body.slice(0, 200)}`);
   }
-  throw new Error(`downtimes probe failed: HTTP ${res.status()} on /downtimes — ${body.slice(0, 200)}`);
+  return config;
 }
-
-// ------------------------------------------------------------------ folders
 
 async function listDowntimeFolders(page) {
   const body = await jsonOrNull(await api(page, 'get', `${v2()}/folders/downtimes`));
@@ -94,7 +88,7 @@ async function deleteDowntimeFolder(page, folderId) {
   return api(page, 'delete', `${v2()}/folders/downtimes/${enc(folderId)}`);
 }
 
-/** The long-lived folder SLO-target downtimes are parked in: they can never be deleted. */
+// SLO-correcting downtimes can never be deleted, so they all park in one long-lived folder.
 async function ensureParkingFolder(page) {
   const existing = (await listDowntimeFolders(page)).find((f) => f.name === PARKING_FOLDER_NAME);
   if (existing) return existing.folderId ?? existing.folder_id ?? existing.id;
@@ -107,8 +101,6 @@ async function ensureParkingFolder(page) {
     throw e;
   }
 }
-
-// ------------------------------------------------------------------ schedules / targets
 
 function windowFromMs(startMs, endMs, timezone = 'UTC') {
   const startsAt = Math.floor(startMs) * 1000;
@@ -123,19 +115,17 @@ function windowFromMs(startMs, endMs, timezone = 'UTC') {
   };
 }
 
-/** A one-time window that is already open. */
 function activeWindow({ startOffsetSec = -60, durationSec = 3600 } = {}) {
   const start = Date.now() + startOffsetSec * 1000;
   return windowFromMs(start, start + durationSec * 1000);
 }
 
-/** A one-time window that opens later, so the downtime is `scheduled`. */
 function futureWindow({ startInSec = 1800, durationSec = 3600 } = {}) {
   const start = Date.now() + startInSec * 1000;
   return windowFromMs(start, start + durationSec * 1000);
 }
 
-/** A daily recurring window at `HH:MM` UTC. */
+/** startTimeLocal is read in UTC, not in the browser's zone. */
 function dailyWindow({ startTimeLocal = '03:00', durationSec = 3600 } = {}) {
   return {
     repeat: 'daily',
@@ -152,17 +142,15 @@ const idsTarget = (module, ids, extra = {}) => ({ module, folders: { kind: 'all'
 const alertIdsTarget = (ids, extra = {}) => idsTarget('alerts', ids, extra);
 const folderTarget = (module, folderIds, extra = {}) => ({ module, folders: { kind: 'some', folder_ids: folderIds }, ...extra });
 const allFoldersTarget = (module, extra = {}) => ({ module, folders: { kind: 'all' }, ...extra });
+const sloTarget = (sloId, mode) => [idsTarget('slos', [sloId], { slo_mode: mode })];
 const pair = (key, value, operator = '=') => ({ type: 'pair', key, operator, value });
 
-// ------------------------------------------------------------------ downtime CRUD
-
-/** POST a downtime and return the raw response, for specs that assert a refusal. */
+/** Returns the raw response, for specs that assert a refusal. */
 async function createDowntimeRaw(page, folderId, body) {
   const payload = { show_banner: false, ...body, folder_id: folderId };
   return api(page, 'post', `${v2()}/downtimes?folder=${enc(folderId)}`, payload);
 }
 
-/** @returns {Promise<{id: string, name: string, folderId: string}>} */
 async function createDowntime(page, folderId, body) {
   const payload = { show_banner: false, ...body, folder_id: folderId };
   const res = await api(page, 'post', `${v2()}/downtimes?folder=${enc(folderId)}`, payload);
@@ -177,12 +165,12 @@ async function getDowntimeResponse(page, id, folderId) {
   return page.request.get(`${v2()}/downtimes/${enc(id)}${q}`, { headers: getAuthHeaders() });
 }
 
-/** The stored downtime, or null when it does not exist. */
+/** Null when the row does not exist, so a spec can assert a delete. */
 async function getDowntime(page, id, folderId) {
   return jsonOrNull(await getDowntimeResponse(page, id, folderId));
 }
 
-/** Re-PUT the stored row with `changes` merged and the loaded version, as the edit page does. */
+/** Re-PUTs the stored row with `changes` merged and the loaded version, as the edit page does. */
 async function updateDowntime(page, id, folderId, changes) {
   const current = await getDowntime(page, id, folderId);
   if (!current) throw new Error(`updateDowntime: ${id} not found`);
@@ -224,7 +212,6 @@ async function deleteDowntime(page, id, folderId) {
   return api(page, 'delete', `${v2()}/downtimes/${enc(id)}?folder=${enc(folderId)}`);
 }
 
-/** @returns {Promise<{items: object[], total: number, counts: object}>} */
 async function listDowntimes(page, params = {}) {
   const q = new URLSearchParams({ page_size: '500', ...Object.fromEntries(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== null).map(([k, v]) => [k, String(v)]),
@@ -234,7 +221,11 @@ async function listDowntimes(page, params = {}) {
   return { items: body.items ?? [], total: body.total ?? 0, counts: body.counts ?? {} };
 }
 
-/** Downtimes muting this alert id (quick mutes have server-generated names, so find them by target). */
+async function downtimeCountInFolder(page, folderId) {
+  return (await listDowntimes(page, { folder_id: folderId })).total;
+}
+
+/** Rows of any status covering this alert, found by target too because quick mutes get server-generated names. */
 async function downtimesForAlert(page, alertId) {
   // alert_id resolves the alert through an inventory cached for 60 s, so a fresh alert also needs the explicit-id rows.
   const rows = new Map((await listDowntimes(page, { alert_id: alertId })).items.map((r) => [r.id, r]));
@@ -244,9 +235,29 @@ async function downtimesForAlert(page, alertId) {
   return [...rows.values()];
 }
 
-// ------------------------------------------------------------------ cleanup
+/** Only active rows mute: another spec's scheduled unnarrowed "Mute all" row covers every alert but mutes nothing. */
+async function activeDowntimesForAlert(page, alertId) {
+  return (await downtimesForAlert(page, alertId)).filter((r) => r.status === 'active');
+}
 
-/** Cancel then delete every downtime whose name starts with `prefix`, that targets one of `alertIds`, or that sits in one of `folderIds`; then drop those folders. Best effort: cleanup must never mask a test result. SLO-corrected rows answer 409 and are left parked. */
+async function waitForActiveMutes(page, alertId, { timeoutMs = 20_000 } = {}) {
+  return pollUntil(page, () => activeDowntimesForAlert(page, alertId), (rows) => rows.length >= 1, { timeoutMs, intervalMs: 2000 });
+}
+
+/** The row whose target names this id in `module`, or undefined after the timeout. */
+async function waitForDowntimeTargeting(page, module, id, { timeoutMs = 20_000 } = {}) {
+  return pollUntil(page, async () => (await listDowntimes(page)).items
+    .find((r) => r.targets?.some((t) => t.module === module && (t.ids ?? []).includes(id))),
+  (row) => !!row, { timeoutMs, intervalMs: 2000 });
+}
+
+async function countDowntimesNamingId(page, id) {
+  return (await listDowntimes(page)).items.filter((r) => r.targets?.some((t) => (t.ids ?? []).includes(id))).length;
+}
+
+const secsLeft = (row) => (row.schedule.ends_at / MICROS) - Date.now() / 1000;
+
+/** Best effort: a cleanup error is logged, never thrown, so it cannot mask a test result. */
 async function cleanupDowntimes(page, { prefix = null, alertIds = [], targetIds = [], folderIds = [] } = {}) {
   try {
     const rows = new Map();
@@ -268,6 +279,7 @@ async function cleanupDowntimes(page, { prefix = null, alertIds = [], targetIds 
       if (r.status === 'active' || r.status === 'scheduled') {
         await api(page, 'post', `${v2()}/downtimes/${enc(r.id)}/cancel?folder=${enc(r.folder_id)}`).catch(() => {});
       }
+      // SLO-corrected rows answer 409 here and stay parked by design.
       await api(page, 'delete', `${v2()}/downtimes/${enc(r.id)}?folder=${enc(r.folder_id)}`).catch(() => {});
     }
     for (const f of folderIds.filter(Boolean)) {
@@ -285,9 +297,7 @@ async function cleanupDowntimes(page, { prefix = null, alertIds = [], targetIds 
   }
 }
 
-// ------------------------------------------------------------------ streams / destinations
-
-/** Rows each minute for `minutes`, newest now; lowercase identity values and no `job` field (it competes for `service`). */
+/** Omits a `job` field, which would compete with service_name for the service dimension. */
 function minuteRows({ minutes = 15, services, hosts = ['h1'], extra = {}, endMs = Date.now() }) {
   const rows = [];
   for (let i = 0; i < minutes; i++) {
@@ -308,6 +318,24 @@ function minuteRows({ minutes = 15, services, hosts = ['h1'], extra = {}, endMs 
   return rows;
 }
 
+/** Carries the k8s dimensions incidents correlate on. */
+function incidentRows(services, minutes = 1) {
+  const rows = [];
+  const now = Date.now();
+  for (let i = 0; i < minutes; i++) {
+    for (const service of services) {
+      rows.push({
+        _timestamp: (now - i * 60_000) * 1000,
+        k8s_cluster: 'e2e-dt-cluster',
+        k8s_deployment_name: `${service}-v1`,
+        service_name: service,
+        level: 'error',
+      });
+    }
+  }
+  return rows;
+}
+
 async function ingestRows(page, stream, rows) {
   const res = await api(page, 'post', `${ingestUrl()}/api/${orgId()}/${stream}/_json`, rows);
   return must(res, `Ingest ${rows.length} rows into ${stream}`);
@@ -320,7 +348,7 @@ async function seedStream(page, stream, opts) {
   return rows.length;
 }
 
-/** Keep fresh rows flowing so every 1-minute alert always has data in its window. */
+/** Keeps fresh rows flowing so every 1-minute alert always has data in its window. */
 function startBackgroundIngest(page, stream, { services, hosts = ['h1'], extra = {}, everyMs = 30_000, rowsFn = null }) {
   let stopped = false;
   const tick = async () => {
@@ -335,7 +363,7 @@ function startBackgroundIngest(page, stream, { services, hosts = ['h1'], extra =
   return { stop: () => { stopped = true; clearInterval(timer); } };
 }
 
-/** Self-ingest destination like `seedNotificationDestination`, but the template also renders `{rows}` so the sink can be filtered per group. */
+/** Self-ingest destination like seedNotificationDestination, but the template also renders {rows} so the sink can be filtered per group. */
 async function seedSinkDestination(page, baseName) {
   const template = `${baseName}_tmpl`;
   const destination = `${baseName}_dest`;
@@ -360,7 +388,7 @@ async function seedSinkDestination(page, baseName) {
   return { destination, sink, template };
 }
 
-/** Delete destinations, then templates, whose name starts with `prefix` (a template in use cannot go first). */
+// Destinations go before templates because a template still in use cannot be deleted.
 async function deleteDestinationsByPrefix(page, prefix) {
   for (const kind of ['destinations', 'templates']) {
     try {
@@ -374,9 +402,7 @@ async function deleteDestinationsByPrefix(page, prefix) {
   }
 }
 
-// ------------------------------------------------------------------ search / sink oracle
-
-/** SQL hits over the last `sinceSec`, through page.request so no page needs to be loaded. */
+/** Searches through page.request, so no page needs to be loaded. */
 async function searchHits(page, sql, sinceSec = 3600) {
   const end = nowUs();
   const res = await page.request.post(`${v1()}/_search?type=logs`, {
@@ -399,14 +425,14 @@ async function searchCount(page, sql, sinceSec = 3600) {
 
 const sqlStr = (s) => String(s).replace(/'/g, "''");
 
-/** Sink rows delivered for `alertName` since `sinceUs` (alert notifications render the name into `text`). */
+/** Matches on `text` because the alert template renders the alert name there. */
 async function alertSinkCount(page, sink, alertName, sinceUs, extraWhere = '') {
   const extra = extraWhere ? ` AND ${extraWhere}` : '';
   const sql = `SELECT COUNT(*) AS c FROM "${sink}" WHERE str_match(text, '${sqlStr(alertName)}') AND _timestamp > ${Math.floor(sinceUs)}${extra}`;
   return searchCount(page, sql, Math.ceil((nowUs() - sinceUs) / MICROS) + 120);
 }
 
-/** Anomaly notifications post their own JSON (anomaly_id, alert_type, …); recoveries are excluded. */
+/** Anomaly notifications post their own JSON (anomaly_id, alert_type, …), and recoveries are excluded. */
 async function anomalySinkCount(page, sink, anomalyId, sinceUs) {
   const sql = `SELECT COUNT(*) AS c FROM "${sink}" WHERE anomaly_id = '${sqlStr(anomalyId)}' AND alert_type = 'anomaly_detection' AND _timestamp > ${Math.floor(sinceUs)}`;
   return searchCount(page, sql, Math.ceil((nowUs() - sinceUs) / MICROS) + 120);
@@ -419,19 +445,18 @@ async function downtimeEventCount(page, sink, downtimeName, event, sinceUs) {
   return searchCount(page, sql, Math.ceil((nowUs() - sinceUs) / MICROS) + 120);
 }
 
-/** Incident notifications post `{"incident": {id, event, …}}`, which flattens to incident_id / incident_event; no event counts them all. */
+/** Incident notifications post {"incident": {id, event, …}}, which flattens to incident_id / incident_event; no event counts them all. */
 async function incidentEventCount(page, sink, incidentId, event = null) {
   const byEvent = event ? ` AND incident_event = '${sqlStr(event)}'` : '';
   const sql = `SELECT COUNT(*) AS c FROM "${sink}" WHERE incident_id = '${sqlStr(incidentId)}'${byEvent}`;
   return searchCount(page, sql, 6 * 3600);
 }
 
-/** Wait until `countFn()` satisfies `done`; returns the last count. */
 async function waitForCount(page, countFn, done, { timeoutMs = 120_000, intervalMs = 5000 } = {}) {
   return pollUntil(page, countFn, done, { timeoutMs, intervalMs });
 }
 
-/** Sample a count now and repeatedly over `holdMs` (one notifier tick by default). The spec asserts every sample, which is the "zero" / "exactly once" oracle without the expect.poll false-wait trap. */
+/** Samples over a whole notifier tick, so a spec asserts every sample instead of using a false-wait expect.poll. */
 async function sampleCountOver(page, countFn, { holdMs = DEFAULT_HOLD_MS, everyMs = 10_000 } = {}) {
   const samples = [await countFn()];
   const deadline = Date.now() + holdMs;
@@ -442,7 +467,41 @@ async function sampleCountOver(page, countFn, { holdMs = DEFAULT_HOLD_MS, everyM
   return samples;
 }
 
-// ------------------------------------------------------------------ alert history oracle
+async function waitForAlertDelivered(page, sink, alertName, sinceUs, { timeoutMs = 150_000, extraWhere = '' } = {}) {
+  return waitForCount(page, () => alertSinkCount(page, sink, alertName, sinceUs, extraWhere), (c) => c >= 1, { timeoutMs });
+}
+
+async function sampleAlertSink(page, sink, alertName, sinceUs, { extraWhere = '', holdMs } = {}) {
+  return sampleCountOver(page, () => alertSinkCount(page, sink, alertName, sinceUs, extraWhere), { holdMs });
+}
+
+async function waitForAnomalyNotified(page, sink, anomalyId, sinceUs) {
+  return waitForCount(page, () => anomalySinkCount(page, sink, anomalyId, sinceUs), (c) => c >= 1, { timeoutMs: 150_000 });
+}
+
+async function sampleAnomalySink(page, sink, anomalyId, sinceUs) {
+  return sampleCountOver(page, () => anomalySinkCount(page, sink, anomalyId, sinceUs));
+}
+
+async function waitForDowntimeEvent(page, sink, downtimeName, event, sinceUs, { timeoutMs = 60_000 } = {}) {
+  return waitForCount(page, () => downtimeEventCount(page, sink, downtimeName, event, sinceUs), (c) => c >= 1, { timeoutMs, intervalMs: 3000 });
+}
+
+/** Every event's count read together at each sample, as `{ event: count }`. */
+async function sampleDowntimeEventCounts(page, sink, downtimeName, sinceUs, events) {
+  const samples = await sampleCountOver(page, async () => JSON.stringify(
+    Object.fromEntries(await Promise.all(events.map(async (e) => [e, await downtimeEventCount(page, sink, downtimeName, e, sinceUs)]))),
+  ));
+  return samples.map((s) => JSON.parse(s));
+}
+
+async function waitForIncidentEvent(page, sink, incidentId, event, { timeoutMs = 180_000 } = {}) {
+  return waitForCount(page, () => incidentEventCount(page, sink, incidentId, event), (c) => c >= 1, { timeoutMs });
+}
+
+async function sampleIncidentEvents(page, sink, incidentId, event, { holdMs } = {}) {
+  return sampleCountOver(page, () => incidentEventCount(page, sink, incidentId, event), { holdMs });
+}
 
 async function alertHistory(page, params) {
   const q = new URLSearchParams(Object.fromEntries(
@@ -452,7 +511,7 @@ async function alertHistory(page, params) {
   return body?.hits ?? [];
 }
 
-/** Suppressed history rows carrying this downtime id (alerts, anomalies and synthetics all land here). */
+/** Alerts, anomalies and synthetics all record their suppressed runs here with the downtime id. */
 async function suppressedRows(page, { downtimeId, alertId, sinceUs, status = 'suppressed' }) {
   const hits = await alertHistory(page, {
     alert_id: alertId,
@@ -464,13 +523,16 @@ async function suppressedRows(page, { downtimeId, alertId, sinceUs, status = 'su
   return hits.filter((h) => h.downtime_id === downtimeId);
 }
 
-/** Poll until at least `minRows` suppressed rows exist; returns the rows seen (the spec asserts). */
 async function waitForSuppressed(page, { downtimeId, alertId, sinceUs, status = 'suppressed', minRows = 1, timeoutMs = 150_000 }) {
   return pollUntil(page, () => suppressedRows(page, { downtimeId, alertId, sinceUs, status }),
     (rows) => rows.length >= minRows, { timeoutMs, intervalMs: 5000 });
 }
 
-/** History rows for `alertId` after `sinceUs` whose status is not suppressed. */
+async function waitForSuppressedRowNamed(page, { downtimeId, name, sinceUs, timeoutMs = 150_000 }) {
+  return pollUntil(page, () => suppressedRows(page, { downtimeId, sinceUs }),
+    (rows) => rows.some((h) => h.alert_name === name), { timeoutMs, intervalMs: 5000 });
+}
+
 async function unsuppressedRows(page, { alertId, sinceUs }) {
   const hits = await alertHistory(page, {
     alert_id: alertId,
@@ -485,16 +547,13 @@ async function waitForFiringAfter(page, { alertId, sinceUs, timeoutMs = 150_000 
     (rows) => rows.length >= 1, { timeoutMs, intervalMs: 5000 });
 }
 
-// ------------------------------------------------------------------ alerts
-
-/** Alert folder for the given name; returns its id. */
 async function createAlertFolder(page, name) {
   const payload = { name, description: '' };
   const body = await must(await api(page, 'post', `${v2()}/folders/alerts`, payload), `Create alert folder ${name}`, payload);
   return body.folderId ?? body.folder_id ?? body.id;
 }
 
-/** A 1-minute SQL alert. Identity comes from the WHERE equalities and the GROUP BY values, which is what a downtime condition matches. */
+/** A downtime condition matches the alert identity built from its WHERE equalities and GROUP BY values. */
 async function createSqlAlert(page, {
   name,
   stream,
@@ -553,7 +612,7 @@ async function createSqlAlert(page, {
   return { id, name, folder };
 }
 
-/** A per-group (multi-alert) custom alert: one identity and one notification per `groupBy` value. */
+/** A multi-alert has one identity, and sends one notification, per `groupBy` value. */
 async function createGroupedAlert(page, { name, stream, groupBy, destinations = [], folder = 'default', rowTemplate = '' }) {
   const payload = {
     name,
@@ -586,7 +645,7 @@ async function enableAlert(page, alertId, folder = 'default') {
   return must(res, `Enable alert ${alertId}`);
 }
 
-/** A real-time alert filtering on service_name, suppressed at ingest. */
+/** Real-time alerts are suppressed at ingest, not by the scheduler. */
 async function createRealtimeAlert(page, { name, stream, service, destinations = [], folder = 'default' }) {
   const payload = {
     name,
@@ -620,7 +679,7 @@ async function createRealtimeAlert(page, { name, stream, service, destinations =
   return { id: body?.id ?? body?.alert_id, name, folder };
 }
 
-/** The trigger route's message: "Alert suppressed by downtime <name>" when covered, "Alert triggered" otherwise. */
+/** The trigger route answers "Alert suppressed by downtime <name>" when covered and "Alert triggered" otherwise. */
 async function triggerMessage(page, alertId, folder = 'default') {
   const res = await api(page, 'patch', `${v2()}/alerts/${enc(alertId)}/trigger?folder=${enc(folder)}`);
   const text = await res.text().catch(() => '');
@@ -633,7 +692,7 @@ async function triggerMessage(page, alertId, folder = 'default') {
   }
 }
 
-/** Delete alerts (any folder), then their folders. Best effort. */
+/** Best effort, and alerts go first so each folder is empty when it is deleted. */
 async function deleteAlertsAndFolders(page, alerts = [], folderIds = []) {
   for (const a of alerts.filter(Boolean)) {
     await api(page, 'delete', `${v2()}/alerts/${enc(a.id)}?folder=${enc(a.folder || 'default')}`).catch(() => {});
@@ -643,8 +702,6 @@ async function deleteAlertsAndFolders(page, alerts = [], folderIds = []) {
   }
 }
 
-// ------------------------------------------------------------------ incidents
-
 async function listIncidents(page, { status = null, keyword = null, limit = 200 } = {}) {
   const q = new URLSearchParams({ limit: String(limit), offset: '0' });
   if (status) q.set('status', status);
@@ -653,7 +710,7 @@ async function listIncidents(page, { status = null, keyword = null, limit = 200 
   return body?.incidents ?? [];
 }
 
-/** The open incident whose group values carry this (per-test unique) service name. */
+/** Matches on the group values, which carry the per-test unique service name. */
 async function findIncidentByService(page, service) {
   const rows = await listIncidents(page, { keyword: service });
   return rows.find((i) => i.group_values?.service_name === service || i.group_values?.service === service)
@@ -670,6 +727,10 @@ async function getIncident(page, incidentId) {
   return body?.incident ?? body;
 }
 
+async function waitForIncidentUnmuted(page, incidentId, { timeoutMs = 180_000 } = {}) {
+  return pollUntil(page, () => getIncident(page, incidentId), (i) => i && !i.muted_by_downtime_id, { timeoutMs });
+}
+
 async function setIncidentSeverity(page, incidentId, severity) {
   const res = await api(page, 'patch', `${v2()}/alerts/incidents/${enc(incidentId)}/update`, { severity });
   return must(res, `Set incident ${incidentId} severity ${severity}`);
@@ -679,9 +740,7 @@ async function resolveIncident(page, incidentId) {
   await api(page, 'patch', `${v2()}/alerts/incidents/${enc(incidentId)}/update`, { status: 'resolved' }).catch(() => {});
 }
 
-// ------------------------------------------------------------------ anomaly detection
-
-/** Backdated steady rows per service, oldest first, inside ZO_INGEST_ALLOWED_UPTO (5 h in CI). */
+/** Backdated steady rows per service, oldest first, kept inside ZO_INGEST_ALLOWED_UPTO (5 h in CI). */
 async function backfillAnomalyStream(page, stream, services, { hours = 4.6, perMinute = 100 } = {}) {
   const minutes = Math.floor(hours * 60);
   const now = Date.now();
@@ -698,7 +757,6 @@ async function backfillAnomalyStream(page, stream, services, { hours = 4.6, perM
   }
 }
 
-/** `count` events for `service` stamped inside the current minute. */
 async function spike(page, stream, service, count = 800) {
   const base = Date.now() * 1000;
   const rows = Array.from({ length: count }, (_, i) => ({ _timestamp: base - i * 10, service_name: service, svc_key: service, level: 'error' }));
@@ -712,7 +770,7 @@ async function spike(page, stream, service, count = 800) {
   return res;
 }
 
-/** Detector tuned to fire on a one-minute spike (QA recipe): 1m buckets and schedule, 120 s window, 1-day training. `filterField: 'svc_key'` filters on a non-semantic field, so the detector's identity comes from its tags alone. */
+/** QA recipe tuned to fire on a one-minute spike; filterField 'svc_key' leaves the tags as the detector's only identity. */
 async function createAnomalyDetector(page, { name, stream, service, destinations, folder = 'default', tags = [], filterField = 'service_name' }) {
   const payload = {
     alert_type: 'anomaly_detection',
@@ -749,9 +807,12 @@ async function trainDetector(page, id) {
   await api(page, 'post', `${v1()}/anomaly_detection/${enc(id)}/train`, {});
 }
 
+const isDetectorReady = (d) => d?.is_trained === true || d?.status === 'ready';
+
+/** Returns the last detector state, trained or not, so the spec asserts readiness on it. */
 async function waitForDetectorReady(page, id, { timeoutMs = 240_000 } = {}) {
   return pollUntil(page, async () => jsonOrNull(await api(page, 'get', `${v1()}/anomaly_detection/${enc(id)}`)),
-    (d) => !!(d && (d.is_trained || d.status === 'ready')), { timeoutMs, intervalMs: 5000 });
+    isDetectorReady, { timeoutMs, intervalMs: 5000 });
 }
 
 async function detectNow(page, id) {
@@ -762,9 +823,7 @@ async function deleteDetector(page, id) {
   await api(page, 'delete', `${v1()}/anomaly_detection/${enc(id)}`).catch(() => {});
 }
 
-// ------------------------------------------------------------------ SLO
-
-/** An SLO alert (burn rate by default, or `kind: 'error_budget'`), the payload `buildSloAlertPayload` sends. */
+/** The payload buildSloAlertPayload sends: burn rate by default, or kind 'error_budget'. */
 async function createSloBurnAlert(page, { name, sloId, destinations, critical = 1, kind = 'burn_rate' }) {
   const windows = kind === 'burn_rate' ? { long_window_secs: 3600, short_window_secs: 300 } : {};
   const payload = {
@@ -816,13 +875,12 @@ function sloRows(service, { minutes = 180, errorMinutes = 40 } = {}) {
   return rows;
 }
 
-/** Poll until the SLO's first live pass set `watermark_end`; returns the last status (the spec asserts). */
 async function waitForSloLive(page, sloId, { timeoutMs = 240_000 } = {}) {
   return pollUntil(page, async () => (await jsonOrNull(await api(page, 'get', `${v1()}/slos/${enc(sloId)}`)))?.status ?? null,
     (status) => status?.watermark_end != null, { timeoutMs, intervalMs: 5000 });
 }
 
-/** `slo_slices` rows of an SLO; `slice_start` is in epoch SECONDS. */
+/** slice_start is in epoch SECONDS. */
 async function sliceRows(page, sloId, downtimeId = null) {
   const where = downtimeId
     ? `slo_id = '${sqlStr(sloId)}' AND corrected_by = '${sqlStr(downtimeId)}'`
@@ -830,11 +888,8 @@ async function sliceRows(page, sloId, downtimeId = null) {
   return searchHits(page, `SELECT slice_start, good, total, corrected_by FROM "slo_slices" WHERE ${where}`, 3600);
 }
 
-// ------------------------------------------------------------------ synthetics
-
-async function listSyntheticLocations(page) {
-  const body = await jsonOrNull(await api(page, 'get', `${v1()}/synthetics/locations`));
-  return Array.isArray(body) ? body : (body?.list ?? body?.locations ?? []);
+async function waitForCorrectedSlices(page, sloId, downtimeId) {
+  return pollUntil(page, () => sliceRows(page, sloId, downtimeId), (rows) => rows.length > 0, { timeoutMs: 120_000, intervalMs: 5000 });
 }
 
 async function createSyntheticCheck(page, { name, tags = [], location, destinations = [], folder = 'default' }) {
@@ -876,11 +931,20 @@ async function deleteSyntheticsFolder(page, folderId) {
   await api(page, 'delete', `${v2()}/folders/synthetics/${enc(folderId)}`).catch(() => {});
 }
 
-// ------------------------------------------------------------------ banners
-
-async function downtimeBanners(page) {
+/** The server folds every active show_banner downtime into one banner, so there is at most one. */
+async function downtimeBanner(page) {
   const body = await jsonOrNull(await api(page, 'get', `${v1()}/announcements`));
-  return (body?.banners ?? []).filter((b) => String(b.id ?? '').startsWith('downtime:'));
+  return (body?.banners ?? []).find((b) => String(b.id ?? '').startsWith('downtime:')) ?? null;
+}
+
+/** The banner id lists `<downtime id>:<window start>` for every active row it covers. */
+const bannerEntries = (banner) => String(banner?.id ?? '').replace(/^downtime:/, '').split(',').filter(Boolean);
+
+/** Banner counts read an inventory cached for up to 60 s, so a fresh alert is counted only after a later read. */
+async function waitForBannerNaming(page, downtimeId, { timeoutMs = 90_000 } = {}) {
+  return pollUntil(page, () => downtimeBanner(page),
+    (b) => !!b && String(b.id).includes(downtimeId) && (bannerEntries(b).length > 1 || / muted\.$/.test(b.message)),
+    { timeoutMs, intervalMs: 5000 });
 }
 
 module.exports = {
@@ -890,7 +954,8 @@ module.exports = {
   nowUs,
   uniqueName,
   pollUntil,
-  isDowntimesAvailable,
+  escapeRegExp,
+  assertDowntimesEnabled,
   listDowntimeFolders,
   createDowntimeFolder,
   deleteDowntimeFolder,
@@ -903,6 +968,7 @@ module.exports = {
   alertIdsTarget,
   folderTarget,
   allFoldersTarget,
+  sloTarget,
   pair,
   createDowntimeRaw,
   createDowntime,
@@ -914,9 +980,16 @@ module.exports = {
   moveDowntimes,
   deleteDowntime,
   listDowntimes,
+  downtimeCountInFolder,
   downtimesForAlert,
+  activeDowntimesForAlert,
+  waitForActiveMutes,
+  waitForDowntimeTargeting,
+  countDowntimesNamingId,
+  secsLeft,
   cleanupDowntimes,
   minuteRows,
+  incidentRows,
   ingestRows,
   seedStream,
   startBackgroundIngest,
@@ -930,9 +1003,18 @@ module.exports = {
   incidentEventCount,
   waitForCount,
   sampleCountOver,
+  waitForAlertDelivered,
+  sampleAlertSink,
+  waitForAnomalyNotified,
+  sampleAnomalySink,
+  waitForDowntimeEvent,
+  sampleDowntimeEventCounts,
+  waitForIncidentEvent,
+  sampleIncidentEvents,
   alertHistory,
   suppressedRows,
   waitForSuppressed,
+  waitForSuppressedRowNamed,
   unsuppressedRows,
   waitForFiringAfter,
   createAlertFolder,
@@ -946,23 +1028,27 @@ module.exports = {
   findIncidentByService,
   waitForIncidentByService,
   getIncident,
+  waitForIncidentUnmuted,
   setIncidentSeverity,
   resolveIncident,
   backfillAnomalyStream,
   spike,
   createAnomalyDetector,
   trainDetector,
+  isDetectorReady,
   waitForDetectorReady,
   detectNow,
   deleteDetector,
   createSloBurnAlert,
   sloRows,
   sliceRows,
+  waitForCorrectedSlices,
   waitForSloLive,
-  listSyntheticLocations,
   createSyntheticCheck,
   deleteSyntheticCheck,
   createSyntheticsFolder,
   deleteSyntheticsFolder,
-  downtimeBanners,
+  downtimeBanner,
+  bannerEntries,
+  waitForBannerNaming,
 };

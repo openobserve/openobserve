@@ -241,8 +241,6 @@ export class SloDetailPage {
     ).toBeVisible({ timeout });
   }
 
-  // ===== DOWNTIMES: corrections =====
-
   async expectCorrectedTag() {
     await expect(this.page.locator('[data-test="slos-slodetail-corrected"]')).toBeVisible({ timeout: 20000 });
   }

@@ -212,8 +212,6 @@ export class SloListPage {
     }
   }
 
-  // ===== DOWNTIMES: correction chip and "Exclude a window…" =====
-
   async expectCorrectedChip(name, visible = true) {
     const chip = this.page.locator(`[data-test="slos-slolist-corrected-${name}"]`);
     if (visible) await expect(chip).toBeVisible({ timeout: 20000 });

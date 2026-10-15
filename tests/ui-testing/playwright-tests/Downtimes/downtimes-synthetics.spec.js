@@ -1,19 +1,18 @@
 // Copyright 2026 OpenObserve Inc.
 
-// Downtimes — synthetics checks (plan Spec 4, DT-SY-01..04).
-
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const dt = require('../utils/downtimes-api.js');
+const fx = require('../utils/downtimes-fixtures.js');
+const { ensureSyntheticsLocation } = require('../utils/synthetics-helpers.js');
 
 const PREFIX = 'e2e_dt_synth';
-const NO_LOCATION = 'no synthetics probe location in this env: a check cannot be saved/run';
-const NO_RUNTIME = 'needs a probe (Lambda/agent) to execute checks; CI has none';
-const workerPrefix = (testInfo) => `${PREFIX}_w${testInfo.workerIndex}`;
+// Synthetics alerting runs only when a probe acks a job (job_api.rs ack → resolve_alert); seeded result rows never reach it.
+const NO_RUNTIME = 'needs a probe runner that executes checks and acks their results; CI has none';
 
-const gate = { available: false, reason: 'gate not probed', config: {}, location: null };
-const shared = { dest: null, sink: null };
+const gate = { ready: false, available: false, reason: '', config: {} };
+const shared = { location: null, dest: null, sink: null };
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -25,17 +24,16 @@ test.describe('Downtimes on synthetics checks', { tag: ['@downtimes', '@enterpri
     const context = await browser.newContext();
     const page = await context.newPage();
     try {
-      Object.assign(gate, await dt.isDowntimesAvailable(page));
-      if (!gate.available) return;
+      gate.config = await dt.assertDowntimesEnabled(page);
+      gate.ready = true;
       if (gate.config.synthetics_enabled !== true) {
-        Object.assign(gate, { available: false, reason: 'synthetics are not enabled here (config.synthetics_enabled)' });
+        // The ENT gate runs without ZO_SYNTHETICS_ENABLED, so the module is legitimately absent there.
+        gate.reason = 'synthetics are not enabled here (config.synthetics_enabled)';
         return;
       }
-      const locations = await dt.listSyntheticLocations(page);
-      const first = locations.find((l) => l.enabled !== false) ?? locations[0];
-      gate.location = first ? (first.id ?? first.name ?? first.location_id) : null;
-      if (!gate.location) return;
-      const wp = workerPrefix(testInfo);
+      gate.available = true;
+      shared.location = await ensureSyntheticsLocation(page);
+      const wp = fx.workerPrefix(PREFIX, testInfo);
       await dt.cleanupDowntimes(page, { prefix: `${wp}_` });
       const sink = await dt.seedSinkDestination(page, `${wp}_${dt.uniqueName('r').slice(-8)}`);
       shared.dest = sink.destination;
@@ -49,72 +47,60 @@ test.describe('Downtimes on synthetics checks', { tag: ['@downtimes', '@enterpri
     reg = null;
     testLogger.testStart(testInfo.title, testInfo.file);
     test.skip(!gate.available, `Downtimes on synthetics are not testable here — ${gate.reason}`);
-    test.skip(!gate.location, NO_LOCATION);
-    reg = { prefix: dt.uniqueName(workerPrefix(testInfo)), checks: [], synthFolders: [], folders: [] };
+    reg = { prefix: dt.uniqueName(fx.workerPrefix(PREFIX, testInfo)), checks: [], synthFolders: [], folders: [] };
     await navigateToBase(page);
     pm = new PageManager(page);
   });
 
   test.afterEach(async ({ page }) => {
     if (!reg) return;
-    await dt.cleanupDowntimes(page, { prefix: reg.prefix, folderIds: reg.folders });
+    // Row mutes get server-generated names, so they are found by the checks they target.
+    await dt.cleanupDowntimes(page, { prefix: reg.prefix, folderIds: reg.folders, targetIds: reg.checks.map((c) => c.id) });
     for (const c of reg.checks) await dt.deleteSyntheticCheck(page, c.id, c.folder);
     for (const f of reg.synthFolders) await dt.deleteSyntheticsFolder(page, f);
   });
 
   test.afterAll(async ({ browser }, testInfo) => {
-    if (!gate.available || !gate.location) return;
+    if (!gate.available) return;
     const context = await browser.newContext();
     const page = await context.newPage();
-    await dt.cleanupDowntimes(page, { prefix: `${workerPrefix(testInfo)}_` });
-    await dt.deleteDestinationsByPrefix(page, `${workerPrefix(testInfo)}_`);
+    await dt.cleanupDowntimes(page, { prefix: `${fx.workerPrefix(PREFIX, testInfo)}_` });
+    await dt.deleteDestinationsByPrefix(page, `${fx.workerPrefix(PREFIX, testInfo)}_`);
     await context.close();
   });
 
-  async function check(page, suffix, { tags = [], folder = 'default' } = {}) {
-    const c = await dt.createSyntheticCheck(page, { name: `${reg.prefix}_${suffix}`, tags, location: gate.location, destinations: [shared.dest], folder });
-    reg.checks.push(c);
-    return c;
-  }
-
-  async function newFolder(page) {
-    const id = await dt.createDowntimeFolder(page, `${reg.prefix}_f`);
-    reg.folders.push(id);
-    return id;
-  }
-
   test('DT-SY-01 a saved check shows the Muted chip and the control does not', { tag: ['@P1'] }, async ({ page }) => {
-    const x = await check(page, 'x');
-    const y = await check(page, 'y');
-    const f = await newFolder(page);
+    const x = await fx.syntheticCheck(page, reg, shared, 'x');
+    const y = await fx.syntheticCheck(page, reg, shared, 'y');
+    const f = await fx.newDowntimeFolder(page, reg);
     await dt.createDowntime(page, f, { name: `${reg.prefix}_dt`, targets: [dt.idsTarget('synthetics', [x.id])], schedule: dt.activeWindow() });
 
-    await pm.downtimesPage.gotoSynthetics();
-    await pm.downtimesPage.expectSyntheticMuted(x.id, true);
-    await pm.downtimesPage.expectSyntheticMuted(y.id, false);
+    await pm.downtimesPage.gotoSynthetics(reg.prefix);
+    await pm.downtimesPage.expectSyntheticMuted(x, true);
+    await pm.downtimesPage.expectSyntheticMuted(y, false);
   });
 
   test('DT-SY-02 row ⋯ → Mute 1h mutes exactly that check', { tag: ['@P1'] }, async ({ page }) => {
-    const x = await check(page, 'x');
-    await check(page, 'y');
+    const x = await fx.syntheticCheck(page, reg, shared, 'x');
+    const y = await fx.syntheticCheck(page, reg, shared, 'y');
 
-    await pm.downtimesPage.gotoSynthetics();
+    await pm.downtimesPage.gotoSynthetics(reg.prefix);
     await pm.downtimesPage.muteSyntheticRow(x.name, '1h');
 
-    const mute = await dt.pollUntil(page, async () => (await dt.listDowntimes(page, { search: x.name })).items
-      .find((r) => r.targets?.some((t) => t.module === 'synthetics' && (t.ids ?? []).includes(x.id))),
-    (row) => !!row, { timeoutMs: 20_000, intervalMs: 2000 });
+    const mute = await dt.waitForDowntimeTargeting(page, 'synthetics', x.id);
     expect(mute, 'a downtime targeting the check must exist').toBeTruthy();
+    expect(mute.targets).toHaveLength(1);
     expect(mute.targets[0]).toMatchObject({ module: 'synthetics', ids: [x.id] });
+    expect(await dt.countDowntimesNamingId(page, y.id), 'the other check must not be muted').toBe(0);
   });
 
   test('DT-SY-03 suppression by tags: only a check carrying every tag is suppressed', { tag: ['@P0'] }, async ({ page }) => {
-    test.skip(!process.env.DOWNTIMES_SYNTHETICS_RUNTIME, NO_RUNTIME);
+    test.fixme(true, NO_RUNTIME);
     test.setTimeout(8 * 60_000);
     const run = reg.prefix.slice(-8);
-    const x = await check(page, 'x', { tags: [`team:${run}`, 'env:prod'] });
-    const y = await check(page, 'y', { tags: [`team:${run}`] });
-    const f = await newFolder(page);
+    const x = await fx.syntheticCheck(page, reg, shared, 'x', { tags: [`team:${run}`, 'env:prod'] });
+    const y = await fx.syntheticCheck(page, reg, shared, 'y', { tags: [`team:${run}`] });
+    const f = await fx.newDowntimeFolder(page, reg);
     const t0 = dt.nowUs();
     const down = await dt.createDowntime(page, f, {
       name: `${reg.prefix}_tags`,
@@ -125,21 +111,19 @@ test.describe('Downtimes on synthetics checks', { tag: ['@downtimes', '@enterpri
     const suppressed = await dt.waitForSuppressed(page, { downtimeId: down.id, sinceUs: t0 - 60 * dt.MICROS, timeoutMs: 240_000 });
     expect(suppressed.some((h) => h.alert_name === x.name), 'the fully tagged check must be suppressed').toBe(true);
     expect(suppressed.some((h) => h.alert_name === y.name), 'a partially tagged check must not be suppressed').toBe(false);
-    const yDelivered = await dt.waitForCount(page, () => dt.alertSinkCount(page, shared.sink, y.name, t0), (c) => c >= 1, { timeoutMs: 180_000 });
-    expect(yDelivered, 'the partially tagged control keeps notifying').toBeGreaterThanOrEqual(1);
-    const xSamples = await dt.sampleCountOver(page, () => dt.alertSinkCount(page, shared.sink, x.name, t0 + 5 * dt.MICROS));
-    expect(xSamples.every((c) => c === 0), `the suppressed check must not notify: ${xSamples}`).toBe(true);
+    expect(await dt.waitForAlertDelivered(page, shared.sink, y.name, t0, { timeoutMs: 180_000 }), 'the partially tagged control keeps notifying').toBeGreaterThanOrEqual(1);
+    const silent = await dt.sampleAlertSink(page, shared.sink, x.name, t0 + 5 * dt.MICROS);
+    expect(silent.every((c) => c === 0), `the suppressed check must not notify: ${silent}`).toBe(true);
   });
 
   test('DT-SY-04 suppression by synthetics folder: only the check in the covered folder is suppressed', { tag: ['@P0'] }, async ({ page }) => {
-    test.skip(!process.env.DOWNTIMES_SYNTHETICS_RUNTIME, NO_RUNTIME);
+    test.fixme(true, NO_RUNTIME);
     test.setTimeout(8 * 60_000);
-    const s1 = await dt.createSyntheticsFolder(page, `${reg.prefix}_s1`);
-    const s2 = await dt.createSyntheticsFolder(page, `${reg.prefix}_s2`);
-    reg.synthFolders.push(s1, s2);
-    const x = await check(page, 'x', { folder: s1 });
-    const y = await check(page, 'y', { folder: s2 });
-    const f = await newFolder(page);
+    const s1 = await fx.newSyntheticsFolder(page, reg, 's1');
+    const s2 = await fx.newSyntheticsFolder(page, reg, 's2');
+    const x = await fx.syntheticCheck(page, reg, shared, 'x', { folder: s1 });
+    const y = await fx.syntheticCheck(page, reg, shared, 'y', { folder: s2 });
+    const f = await fx.newDowntimeFolder(page, reg);
     const t0 = dt.nowUs();
     const down = await dt.createDowntime(page, f, {
       name: `${reg.prefix}_sfolder`,
@@ -148,11 +132,10 @@ test.describe('Downtimes on synthetics checks', { tag: ['@downtimes', '@enterpri
     });
 
     const suppressed = await dt.waitForSuppressed(page, { downtimeId: down.id, sinceUs: t0 - 60 * dt.MICROS, timeoutMs: 240_000 });
-    expect(suppressed.some((h) => h.alert_name === x.name)).toBe(true);
-    expect(suppressed.some((h) => h.alert_name === y.name)).toBe(false);
-    const yDelivered = await dt.waitForCount(page, () => dt.alertSinkCount(page, shared.sink, y.name, t0), (c) => c >= 1, { timeoutMs: 180_000 });
-    expect(yDelivered, 'the control check keeps notifying').toBeGreaterThanOrEqual(1);
-    const xSamples = await dt.sampleCountOver(page, () => dt.alertSinkCount(page, shared.sink, x.name, t0 + 5 * dt.MICROS));
-    expect(xSamples.every((c) => c === 0), `the suppressed check must not notify: ${xSamples}`).toBe(true);
+    expect(suppressed.some((h) => h.alert_name === x.name), 'the check in the covered folder must be suppressed').toBe(true);
+    expect(suppressed.some((h) => h.alert_name === y.name), 'the check in the other folder must not be suppressed').toBe(false);
+    expect(await dt.waitForAlertDelivered(page, shared.sink, y.name, t0, { timeoutMs: 180_000 }), 'the control check keeps notifying').toBeGreaterThanOrEqual(1);
+    const silent = await dt.sampleAlertSink(page, shared.sink, x.name, t0 + 5 * dt.MICROS);
+    expect(silent.every((c) => c === 0), `the suppressed check must not notify: ${silent}`).toBe(true);
   });
 });

@@ -1,24 +1,16 @@
 // Copyright 2026 OpenObserve Inc.
 
-// Downtimes — list lifecycle actions and the detail page (plan Spec 2, DT-L-01..15 and DT-D-01..04).
-
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const dt = require('../utils/downtimes-api.js');
+const fx = require('../utils/downtimes-fixtures.js');
 
 const PREFIX = 'e2e_dt_list';
 const ENT_2848 = 'https://github.com/openobserve/o2-enterprise/issues/2848';
-const workerPrefix = (testInfo) => `${PREFIX}_w${testInfo.workerIndex}`;
 
-const gate = { available: false, reason: 'gate not probed', config: {} };
+const gate = { ready: false, config: {} };
 const shared = { stream: null, dest: null, alertX: null };
-
-function minutesFromNow(minutes) {
-  const d = new Date(Date.now() + minutes * 60_000);
-  d.setSeconds(0, 0);
-  return d;
-}
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -31,9 +23,9 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
     const context = await browser.newContext();
     const page = await context.newPage();
     try {
-      Object.assign(gate, await dt.isDowntimesAvailable(page));
-      if (!gate.available) return;
-      const wp = workerPrefix(testInfo);
+      gate.config = await dt.assertDowntimesEnabled(page);
+      gate.ready = true;
+      const wp = fx.workerPrefix(PREFIX, testInfo);
       await dt.cleanupDowntimes(page, { prefix: `${wp}_` });
       const run = dt.uniqueName('r').slice(-8);
       shared.stream = `${wp}_${run}_stream`;
@@ -54,10 +46,8 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test.beforeEach(async ({ page }, testInfo) => {
-    reg = null;
     testLogger.testStart(testInfo.title, testInfo.file);
-    test.skip(!gate.available, `Downtimes are not testable here — ${gate.reason}`);
-    reg = { prefix: dt.uniqueName(workerPrefix(testInfo)), folders: [] };
+    reg = { prefix: dt.uniqueName(fx.workerPrefix(PREFIX, testInfo)), folders: [] };
     await navigateToBase(page);
     pm = new PageManager(page);
   });
@@ -67,52 +57,27 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test.afterAll(async ({ browser }, testInfo) => {
-    if (!gate.available) return;
+    if (!gate.ready) return;
     const context = await browser.newContext();
     const page = await context.newPage();
-    const wp = workerPrefix(testInfo);
+    const wp = fx.workerPrefix(PREFIX, testInfo);
     await dt.cleanupDowntimes(page, { prefix: `${wp}_` });
     await dt.deleteAlertsAndFolders(page, [shared.alertX]);
     await dt.deleteDestinationsByPrefix(page, `${wp}_`);
     await context.close();
   });
 
-  async function newFolder(page, suffix = 'f') {
-    const id = await dt.createDowntimeFolder(page, `${reg.prefix}_${suffix}`);
-    reg.folders.push(id);
-    return id;
-  }
-
-  const target = () => [dt.alertIdsTarget([shared.alertX.id])];
-
-  async function active(page, folderId, suffix = 'active', schedule = dt.activeWindow()) {
-    return dt.createDowntime(page, folderId, { name: `${reg.prefix}_${suffix}`, targets: target(), schedule });
-  }
-
-  async function scheduled(page, folderId, suffix = 'scheduled', schedule = dt.futureWindow({ startInSec: 7200 })) {
-    return dt.createDowntime(page, folderId, { name: `${reg.prefix}_${suffix}`, targets: target(), schedule });
-  }
-
-  async function cancelled(page, folderId, suffix = 'cancelled') {
-    const row = await scheduled(page, folderId, suffix);
-    await dt.cancelDowntime(page, row.id, folderId);
-    return row;
-  }
-
-  // ------------------------------------------------------------------ P1
-
   test('DT-L-01 stat tiles count the folder and filter the list by status', { tag: ['@P1'] }, async ({ page }) => {
-    const f = await newFolder(page);
-    const a = await active(page, f);
-    const s = await scheduled(page, f);
-    const c = await cancelled(page, f);
+    const f = await fx.newDowntimeFolder(page, reg);
+    const a = await fx.activeDowntime(page, reg, f, shared.alertX.id);
+    const s = await fx.scheduledDowntime(page, reg, f, shared.alertX.id);
+    const c = await fx.cancelledDowntime(page, reg, f, shared.alertX.id);
     const items = (await dt.listDowntimes(page, { folder_id: f })).items;
-    const countOf = (status) => items.filter((r) => r.status === status).length;
 
     await pm.downtimesPage.gotoList(f);
-    await pm.downtimesPage.expectStatTileCount('active', countOf('active'));
-    await pm.downtimesPage.expectStatTileCount('scheduled', countOf('scheduled'));
-    await pm.downtimesPage.expectStatTileCount('cancelled', countOf('cancelled'));
+    for (const status of ['active', 'scheduled', 'cancelled']) {
+      await pm.downtimesPage.expectStatTileCount(status, items.filter((r) => r.status === status).length);
+    }
     await pm.downtimesPage.expectStatTileCount('total', items.length);
 
     await pm.downtimesPage.clickStatTile('active');
@@ -131,11 +96,11 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-L-02 type toggle, search, and the All-folders scope', { tag: ['@P1'] }, async ({ page }) => {
-    const f = await newFolder(page, 'f');
-    const g = await newFolder(page, 'g');
-    const once = await scheduled(page, f, 'oncerow');
-    const daily = await dt.createDowntime(page, f, { name: `${reg.prefix}_dailyrow`, targets: target(), schedule: dt.dailyWindow() });
-    const other = await scheduled(page, g, 'other');
+    const f = await fx.newDowntimeFolder(page, reg, 'f');
+    const g = await fx.newDowntimeFolder(page, reg, 'g');
+    const once = await fx.scheduledDowntime(page, reg, f, shared.alertX.id, 'oncerow');
+    const daily = await dt.createDowntime(page, f, { name: `${reg.prefix}_dailyrow`, targets: [dt.alertIdsTarget([shared.alertX.id])], schedule: dt.dailyWindow() });
+    const other = await fx.scheduledDowntime(page, reg, g, shared.alertX.id, 'other');
 
     await pm.downtimesPage.gotoList(f);
     await pm.downtimesPage.setType('recurring');
@@ -158,10 +123,10 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-L-03 the Status and "Ends / next" columns read per state', { tag: ['@P1'] }, async ({ page }) => {
-    const f = await newFolder(page);
-    const a = await active(page, f);
-    const s = await scheduled(page, f);
-    const c = await cancelled(page, f);
+    const f = await fx.newDowntimeFolder(page, reg);
+    const a = await fx.activeDowntime(page, reg, f, shared.alertX.id);
+    const s = await fx.scheduledDowntime(page, reg, f, shared.alertX.id);
+    const c = await fx.cancelledDowntime(page, reg, f, shared.alertX.id);
 
     await pm.downtimesPage.gotoList(f);
     await pm.downtimesPage.expectRowStatus(a.id, 'Active');
@@ -174,9 +139,9 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
 
   test('DT-L-04 a row flips from Scheduled to Active without a reload', { tag: ['@P1'] }, async ({ page }) => {
     test.setTimeout(4 * 60_000);
-    const f = await newFolder(page);
+    const f = await fx.newDowntimeFolder(page, reg);
     const start = Date.now() + 75_000;
-    const s = await scheduled(page, f, 'flip', dt.windowFromMs(start, start + 3600_000));
+    const s = await fx.scheduledDowntime(page, reg, f, shared.alertX.id, 'flip', dt.windowFromMs(start, start + 3600_000));
 
     await pm.downtimesPage.gotoList(f);
     await pm.downtimesPage.expectRowStatus(s.id, 'Scheduled');
@@ -186,9 +151,9 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-L-05 extends a running downtime by 1 h from the list; a scheduled one cannot be extended', { tag: ['@P1'] }, async ({ page }) => {
-    const f = await newFolder(page);
-    const a = await active(page, f);
-    const s = await scheduled(page, f);
+    const f = await fx.newDowntimeFolder(page, reg);
+    const a = await fx.activeDowntime(page, reg, f, shared.alertX.id);
+    const s = await fx.scheduledDowntime(page, reg, f, shared.alertX.id);
     const before = await dt.getDowntime(page, a.id, f);
 
     await pm.downtimesPage.gotoList(f);
@@ -201,8 +166,8 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-L-06 End now: Keep running leaves it active, End now ends it early', { tag: ['@P1'] }, async ({ page }) => {
-    const f = await newFolder(page);
-    const a = await active(page, f);
+    const f = await fx.newDowntimeFolder(page, reg);
+    const a = await fx.activeDowntime(page, reg, f, shared.alertX.id);
 
     await pm.downtimesPage.gotoList(f);
     await pm.downtimesPage.clickEndNow(a.id);
@@ -219,8 +184,8 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-L-07 cancels a scheduled downtime after Keep downtime is offered', { tag: ['@P1'] }, async ({ page }) => {
-    const f = await newFolder(page);
-    const s = await scheduled(page, f);
+    const f = await fx.newDowntimeFolder(page, reg);
+    const s = await fx.scheduledDowntime(page, reg, f, shared.alertX.id);
 
     await pm.downtimesPage.gotoList(f);
     await pm.downtimesPage.clickCancel(s.id);
@@ -236,9 +201,9 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-L-08 Delete is offered only for finished downtimes', { tag: ['@P1'] }, async ({ page }) => {
-    const f = await newFolder(page);
-    const a = await active(page, f);
-    const c = await cancelled(page, f);
+    const f = await fx.newDowntimeFolder(page, reg);
+    const a = await fx.activeDowntime(page, reg, f, shared.alertX.id);
+    const c = await fx.cancelledDowntime(page, reg, f, shared.alertX.id);
 
     await pm.downtimesPage.gotoList(f);
     await pm.downtimesPage.openMore(a.id);
@@ -252,8 +217,8 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-L-09 Duplicate opens the create page as "Copy of" with the same target, and Cancel creates nothing', { tag: ['@P1'] }, async ({ page }) => {
-    const f = await newFolder(page);
-    const s = await scheduled(page, f, 'dup');
+    const f = await fx.newDowntimeFolder(page, reg);
+    const s = await fx.scheduledDowntime(page, reg, f, shared.alertX.id, 'dup');
     const before = (await dt.listDowntimes(page, { folder_id: f })).total;
 
     await pm.downtimesPage.gotoList(f);
@@ -266,12 +231,12 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-L-10 moves a downtime to another folder', { tag: ['@P1'] }, async ({ page }) => {
-    const f = await newFolder(page, 'f');
-    const g = await newFolder(page, 'g');
-    const s = await scheduled(page, f, 'move');
+    const f = await fx.newDowntimeFolder(page, reg, 'f');
+    const g = await fx.newDowntimeFolder(page, reg, 'g');
+    const s = await fx.scheduledDowntime(page, reg, f, shared.alertX.id, 'move');
 
     await pm.downtimesPage.gotoList(f);
-    await pm.downtimesPage.moveRow(s.id, g);
+    await pm.downtimesPage.moveRow(s.id, g, `${reg.prefix}_g`);
     await pm.downtimesPage.expectRowHidden(s.id);
     expect((await dt.getDowntime(page, s.id, g)).folder_id).toBe(g);
 
@@ -280,8 +245,8 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-L-11 a folder that still holds downtimes cannot be deleted, an empty one can', { tag: ['@P1'] }, async ({ page }) => {
-    const f = await newFolder(page);
-    const c = await cancelled(page, f);
+    const f = await fx.newDowntimeFolder(page, reg);
+    const c = await fx.cancelledDowntime(page, reg, f, shared.alertX.id);
 
     await pm.downtimesPage.gotoList(f);
     await pm.downtimesPage.deleteFolderFromSidebar(f);
@@ -295,8 +260,8 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-D-01 detail shows Overview, the Affected count and empty Notifications and Suppressed tabs', { tag: ['@P1'] }, async ({ page }) => {
-    const f = await newFolder(page);
-    const a = await active(page, f);
+    const f = await fx.newDowntimeFolder(page, reg);
+    const a = await fx.activeDowntime(page, reg, f, shared.alertX.id);
     // The detail's affected list reads an inventory cached for up to 60 s (downtimes/inventory.rs INVENTORY_TTL).
     await expect.poll(async () => (await dt.getDowntime(page, a.id, f)).affected?.alerts?.length ?? 0, {
       message: 'the API must report the targeted alert as affected', timeout: 90_000, intervals: [3000],
@@ -317,9 +282,9 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-D-02 extends a downtime "Until…" from the detail page', { tag: ['@P1'] }, async ({ page }) => {
-    const f = await newFolder(page);
-    const a = await active(page, f);
-    const end = minutesFromNow(150);
+    const f = await fx.newDowntimeFolder(page, reg);
+    const a = await fx.activeDowntime(page, reg, f, shared.alertX.id);
+    const end = fx.minutesFromNow(150);
 
     await pm.downtimesPage.gotoDetail(a.id, f);
     await pm.downtimesPage.extendUntilFromDetail(end);
@@ -329,11 +294,9 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
     expect(Math.abs(after.schedule.ends_at / 1000 - end.getTime())).toBeLessThanOrEqual(60_000);
   });
 
-  // ------------------------------------------------------------------ P2
-
   test('DT-L-12 rows share one height and their action slots line up', { tag: ['@P2'] }, async ({ page }) => {
-    const f = await newFolder(page);
-    const rows = [await active(page, f), await scheduled(page, f), await cancelled(page, f)];
+    const f = await fx.newDowntimeFolder(page, reg);
+    const rows = [await fx.activeDowntime(page, reg, f, shared.alertX.id), await fx.scheduledDowntime(page, reg, f, shared.alertX.id), await fx.cancelledDowntime(page, reg, f, shared.alertX.id)];
 
     await pm.downtimesPage.gotoList(f);
     for (const r of rows) await pm.downtimesPage.expectRowVisible(r.id);
@@ -344,14 +307,14 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-D-03 a missing id shows Downtime not found', { tag: ['@P2'] }, async ({ page }) => {
-    const f = await newFolder(page);
+    const f = await fx.newDowntimeFolder(page, reg);
     await pm.downtimesPage.gotoDetail(`${reg.prefix.replace(/_/g, '')}missing`, f);
     await pm.downtimesPage.expectNotFound('Downtime not found');
   });
 
   test('DT-D-04 "Mute now for 1 h" on the detail page creates a child downtime', { tag: ['@P2'] }, async ({ page }) => {
-    const f = await newFolder(page);
-    const a = await active(page, f, 'parent');
+    const f = await fx.newDowntimeFolder(page, reg);
+    const a = await fx.activeDowntime(page, reg, f, shared.alertX.id, 'parent');
 
     await pm.downtimesPage.gotoDetail(a.id, f);
     await pm.downtimesPage.muteForHourFromDetail();
@@ -365,8 +328,8 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
 
   test('DT-L-13 the Matched column is not hidden behind the row actions', { tag: ['@P2'] }, async ({ page }) => {
     test.fixme(true, `Matched column hidden behind the actions — ${ENT_2848}`);
-    const f = await newFolder(page);
-    const a = await active(page, f);
+    const f = await fx.newDowntimeFolder(page, reg);
+    const a = await fx.activeDowntime(page, reg, f, shared.alertX.id);
     await pm.downtimesPage.gotoList(f);
     const matched = await pm.downtimesPage.cellBox(a.id, 'matched');
     const actions = await pm.downtimesPage.actionsBox(a.id);
@@ -375,8 +338,8 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-L-14 a row offers Duplicate exactly once at desktop width (icon plus ⋮ menu), and it opens a copy', { tag: ['@P2'] }, async ({ page }) => {
-    const f = await newFolder(page);
-    const a = await active(page, f);
+    const f = await fx.newDowntimeFolder(page, reg);
+    const a = await fx.activeDowntime(page, reg, f, shared.alertX.id);
     await pm.downtimesPage.gotoList(f);
     await pm.downtimesPage.openMore(a.id);
     expect(await pm.downtimesPage.visibleDuplicateControlCount(a.id), 'Duplicate must appear once across the icon and the open menu').toBe(1);
@@ -388,9 +351,9 @@ test.describe('Downtimes list and detail', { tag: ['@downtimes', '@enterprise', 
   });
 
   test('DT-L-15 bulk-cancels two active downtimes', { tag: ['@P2'] }, async ({ page }) => {
-    const f = await newFolder(page);
-    const a1 = await active(page, f, 'bulk1');
-    const a2 = await active(page, f, 'bulk2');
+    const f = await fx.newDowntimeFolder(page, reg);
+    const a1 = await fx.activeDowntime(page, reg, f, shared.alertX.id, 'bulk1');
+    const a2 = await fx.activeDowntime(page, reg, f, shared.alertX.id, 'bulk2');
 
     await pm.downtimesPage.gotoList(f);
     await pm.downtimesPage.selectRows([a1.id, a2.id]);

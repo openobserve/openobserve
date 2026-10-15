@@ -1,20 +1,19 @@
 // Copyright 2026 OpenObserve Inc.
 
-// Downtimes — the org-wide banner (plan Spec 8, DT-B-01..04); expected text comes from GET /api/{org}/announcements.
+// Expected banner text is read from GET /api/{org}/announcements, so the assertions follow the server's wording and counts.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const dt = require('../utils/downtimes-api.js');
+const fx = require('../utils/downtimes-fixtures.js');
 
 const PREFIX = 'e2e_dt_banner';
-const workerPrefix = (testInfo) => `${PREFIX}_w${testInfo.workerIndex}`;
-const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const gate = { available: false, reason: 'gate not probed', config: {} };
+const gate = { ready: false, config: {} };
 const shared = { stream: null, dest: null };
 
-// Serial by the approved plan: banners are org-wide, so parallel banner tests would rewrite each other's combined message.
+// Serial: the banner is one org-wide combination of every active downtime, so parallel banner tests would rewrite each other's message.
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Downtime org banner', { tag: ['@downtimes', '@enterprise', '@all'] }, () => {
@@ -25,9 +24,9 @@ test.describe('Downtime org banner', { tag: ['@downtimes', '@enterprise', '@all'
     const context = await browser.newContext();
     const page = await context.newPage();
     try {
-      Object.assign(gate, await dt.isDowntimesAvailable(page));
-      if (!gate.available) return;
-      const wp = workerPrefix(testInfo);
+      gate.config = await dt.assertDowntimesEnabled(page);
+      gate.ready = true;
+      const wp = fx.workerPrefix(PREFIX, testInfo);
       await dt.cleanupDowntimes(page, { prefix: `${wp}_` });
       const run = dt.uniqueName('r').slice(-8);
       shared.stream = `${wp}_${run}_stream`;
@@ -39,10 +38,8 @@ test.describe('Downtime org banner', { tag: ['@downtimes', '@enterprise', '@all'
   });
 
   test.beforeEach(async ({ page }, testInfo) => {
-    reg = null;
     testLogger.testStart(testInfo.title, testInfo.file);
-    test.skip(!gate.available, `Downtimes are not testable here — ${gate.reason}`);
-    reg = { prefix: dt.uniqueName(workerPrefix(testInfo)), alerts: [], folders: [] };
+    reg = { prefix: dt.uniqueName(fx.workerPrefix(PREFIX, testInfo)), alerts: [], folders: [] };
     await navigateToBase(page);
     pm = new PageManager(page);
     await pm.downtimesPage.clearDismissedBanners();
@@ -55,64 +52,30 @@ test.describe('Downtime org banner', { tag: ['@downtimes', '@enterprise', '@all'
   });
 
   test.afterAll(async ({ browser }, testInfo) => {
-    if (!gate.available) return;
+    if (!gate.ready) return;
     const context = await browser.newContext();
     const page = await context.newPage();
-    const wp = workerPrefix(testInfo);
+    const wp = fx.workerPrefix(PREFIX, testInfo);
     await dt.cleanupDowntimes(page, { prefix: `${wp}_` });
     await dt.deleteDestinationsByPrefix(page, `${wp}_`);
     await context.close();
   });
 
-  async function folderAndAlert(page) {
-    const f = await dt.createDowntimeFolder(page, `${reg.prefix}_f`);
-    reg.folders.push(f);
-    const alert = await dt.createSqlAlert(page, {
-      name: `${reg.prefix}_alert`,
-      stream: shared.stream,
-      sql: `SELECT count(*) AS c FROM "${shared.stream}"`,
-      destinations: [shared.dest],
-      frequencyMinutes: 60,
-      periodMinutes: 60,
-      enabled: false,
-    });
-    reg.alerts.push(alert);
-    return { f, alert };
-  }
-
-  const banner = (page, name, f, alert, { showBanner = true, schedule = dt.activeWindow() } = {}) => dt.createDowntime(page, f, {
-    name: `${reg.prefix}_${name}`,
-    targets: [dt.alertIdsTarget([alert.id])],
-    schedule,
-    show_banner: showBanner,
-  });
-
-  /** The one generated downtime banner, read from the API the page renders. */
-  async function apiBanner(page) {
-    const [b] = await dt.downtimeBanners(page);
-    return b ?? null;
-  }
-
-  const entries = (b) => String(b.id).replace(/^downtime:/, '').split(',').filter(Boolean);
-
-  // ------------------------------------------------------------------ P1
-
   test('DT-B-01 one active downtime: message, countdown and the "View downtime" CTA; show_banner:false shows nothing', { tag: ['@P1'] }, async ({ page }) => {
-    const { f, alert } = await folderAndAlert(page);
-    const quiet = await banner(page, 'quiet', f, alert, { showBanner: false });
-    await page.reload();
+    const { f, alert } = await fx.disabledAlertWithFolder(page, reg, shared);
+    const quiet = await fx.bannerDowntime(page, reg, { suffix: 'quiet', folderId: f, alertId: alert.id, showBanner: false });
+    await pm.downtimesPage.reload();
     await pm.downtimesPage.expectBannerById(quiet.id, false);
 
-    const loud = await banner(page, 'loud', f, alert);
-    // Banner counts read an inventory cached for up to 60 s, so a fresh alert is counted only after the next reload of it.
-    const b = await dt.pollUntil(page, () => apiBanner(page),
-      (x) => !!x && (entries(x).length > 1 || / muted\.$/.test(x.message)), { timeoutMs: 90_000, intervalMs: 5000 });
-    await page.reload();
+    const loud = await fx.bannerDowntime(page, reg, { suffix: 'loud', folderId: f, alertId: alert.id });
+    const b = await dt.waitForBannerNaming(page, loud.id);
+    await pm.downtimesPage.reload();
     expect(b, 'the announcements API must carry a downtime banner').toBeTruthy();
     expect(b.id, 'the banner names our downtime').toContain(loud.id);
     expect(b.id, 'a show_banner:false downtime is never part of it').not.toContain(quiet.id);
-    const single = entries(b).length === 1;
-    expect(b.message).toMatch(single ? new RegExp(`^${escapeRe(`${loud.name} is active. 1 alert is muted.`)}$`) : /\d+ downtimes are active\./);
+    // Another spec's active show_banner downtime folds into the same banner, so the single-row wording holds only when ours is alone.
+    const single = dt.bannerEntries(b).length === 1;
+    expect(b.message).toMatch(single ? new RegExp(`^${dt.escapeRegExp(`${loud.name} is active. 1 alert is muted.`)}$`) : /\d+ downtimes are active\./);
 
     await pm.downtimesPage.expectBannerById(loud.id, true);
     await pm.downtimesPage.expectBannerText(b.message);
@@ -125,21 +88,24 @@ test.describe('Downtime org banner', { tag: ['@downtimes', '@enterprise', '@all'
   });
 
   test('DT-B-02 several active downtimes: combined message, "first ends in", and the "View downtimes" CTA', { tag: ['@P1'] }, async ({ page }) => {
-    const { f, alert } = await folderAndAlert(page);
-    const d20 = await banner(page, 'twenty', f, alert, { schedule: dt.activeWindow({ startOffsetSec: -60, durationSec: 21 * 60 }) });
-    const d40 = await banner(page, 'forty', f, alert, { schedule: dt.activeWindow({ startOffsetSec: -60, durationSec: 41 * 60 }) });
-    await page.reload();
+    const { f, alert } = await fx.disabledAlertWithFolder(page, reg, shared);
+    const w20 = dt.activeWindow({ startOffsetSec: -60, durationSec: 21 * 60 });
+    const d20 = await fx.bannerDowntime(page, reg, { suffix: 'twenty', folderId: f, alertId: alert.id, schedule: w20 });
+    const d40 = await fx.bannerDowntime(page, reg, { suffix: 'forty', folderId: f, alertId: alert.id, schedule: dt.activeWindow({ startOffsetSec: -60, durationSec: 41 * 60 }) });
+    await pm.downtimesPage.reload();
 
-    const b = await apiBanner(page);
+    const b = await dt.downtimeBanner(page);
+    expect(b, 'the announcements API must carry a downtime banner').toBeTruthy();
     expect(b.id).toContain(d20.id);
     expect(b.id).toContain(d40.id);
-    const n = entries(b).length;
+    const n = dt.bannerEntries(b).length;
     expect(b.message).toContain(`${n} downtimes are active.`);
     await pm.downtimesPage.expectBannerText(new RegExp(`${n} downtimes are active\\.`));
 
+    // The first end is the earliest of every active window, so another spec's row may end sooner but never later than ours.
+    expect(Number(b.ends_at), 'the banner counts down to the earliest end, which is at most our 20-minute row').toBeLessThanOrEqual(w20.ends_at);
     const minutes = Math.floor((Number(b.ends_at) / 1000 - Date.now()) / 60_000);
     await pm.downtimesPage.expectBannerCountdown(new RegExp(`first ends in (${minutes - 1}|${minutes}|${minutes + 1}) minutes`));
-    expect(minutes, 'on a fresh org the first end is ours, ~20 minutes away').toBeLessThanOrEqual(20);
 
     await pm.downtimesPage.clickBannerCta('View downtimes');
     await pm.downtimesPage.expectUrl(/status=active/);
@@ -150,11 +116,11 @@ test.describe('Downtime org banner', { tag: ['@downtimes', '@enterprise', '@all'
 
   test('DT-B-03 the banner clears at the window end without a reload', { tag: ['@P1'] }, async ({ page }) => {
     test.setTimeout(4 * 60_000);
-    const { f, alert } = await folderAndAlert(page);
+    const { f, alert } = await fx.disabledAlertWithFolder(page, reg, shared);
     const startMs = Date.now() - 30_000;
     const endMs = Date.now() + 75_000;
-    const short = await banner(page, 'short', f, alert, { schedule: dt.windowFromMs(startMs, endMs) });
-    await page.reload();
+    const short = await fx.bannerDowntime(page, reg, { suffix: 'short', folderId: f, alertId: alert.id, schedule: dt.windowFromMs(startMs, endMs) });
+    await pm.downtimesPage.reload();
     await pm.downtimesPage.expectBannerById(short.id, true);
 
     const loads = pm.downtimesPage.trackNavigations();
@@ -162,24 +128,16 @@ test.describe('Downtime org banner', { tag: ['@downtimes', '@enterprise', '@all'
     expect(loads.count, 'the banner must clear without a page reload').toBe(0);
   });
 
-  // ------------------------------------------------------------------ P2
-
   test('DT-B-04 a dismissal holds after reload but is per browser', { tag: ['@P2'] }, async ({ page, browser }) => {
-    const { f, alert } = await folderAndAlert(page);
-    const d = await banner(page, 'dismiss', f, alert);
-    await page.reload();
+    const { f, alert } = await fx.disabledAlertWithFolder(page, reg, shared);
+    const d = await fx.bannerDowntime(page, reg, { suffix: 'dismiss', folderId: f, alertId: alert.id });
+    await pm.downtimesPage.reload();
     await pm.downtimesPage.expectBannerById(d.id, true);
     await pm.downtimesPage.dismissBanner(d.id);
-    // Absence after a reload proves nothing until the banners have been fetched again.
-    await Promise.all([
-      page.waitForResponse((r) => /\/api\/[^/]+\/announcements(\?|$)/.test(r.url()) && r.request().method() === 'GET', { timeout: 30000 }),
-      page.reload(),
-    ]);
+    await pm.downtimesPage.reloadAndWaitForBanners();
     await pm.downtimesPage.expectBannerById(d.id, false);
 
-    const state = await page.context().storageState();
-    state.origins = state.origins.map((o) => ({ ...o, localStorage: o.localStorage.filter((e) => e.name !== 'o2_dismissed_announcements') }));
-    const other = await browser.newContext({ storageState: state });
+    const other = await browser.newContext({ storageState: await pm.downtimesPage.storageStateWithoutDismissals() });
     try {
       const page2 = await other.newPage();
       await navigateToBase(page2);
