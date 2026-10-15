@@ -104,8 +104,18 @@ export const formatFixed = (value: number): string =>
 /** A count with thousands grouped: "150,000". */
 export const formatCount = (value: number): string => value.toLocaleString("en-US");
 
-export const formatPercent = (part: number, whole: number): string =>
-  whole > 0 ? `${((part / whole) * 100).toFixed(1)}%` : "—";
+/** One decimal, but never "0.0%" for some or "100.0%" for not all: 1 in 5,000 reads "<0.1%". */
+export function formatPercent(part: number, whole: number): string {
+  if (whole <= 0) return "—";
+  const percent = (part / whole) * 100;
+  if (part > 0 && percent < 0.05) return "<0.1%";
+  if (part < whole && percent >= 99.95) return ">99.9%";
+  return `${percent.toFixed(1)}%`;
+}
+
+/** Bar fill for a share: any non-zero share keeps a visible sliver, so it never looks like a healthy config. */
+export const barShare = (share: number | null): number =>
+  share == null || share <= 0 ? 0 : Math.max(share, 0.02);
 
 export function formatScoreValue(value: QualityScore["value"], dataType: ScoreDataType): string {
   if (value == null) return "—";
