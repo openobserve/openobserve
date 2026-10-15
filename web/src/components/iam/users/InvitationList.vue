@@ -191,6 +191,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -294,7 +295,7 @@ export default defineComponent({
       },
     ];
     const loading = ref(false);
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
 
     onMounted(() => {
       fetchPendingInvitations();
@@ -320,7 +321,7 @@ export default defineComponent({
       } catch (error) {
         const e = error as { response?: { status?: number; data?: { message?: string } } };
         dismiss();
-        forbidden.value = e.response?.status === 403;
+        forbidden.value = forbiddenState(e);
         // The grouped access toast already reports a 403; a second red toast adds nothing.
         if (!forbidden.value) {
           toast({

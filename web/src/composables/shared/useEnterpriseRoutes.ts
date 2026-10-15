@@ -16,7 +16,15 @@
 import config from "@/aws-exports";
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import { routeGuard } from "@/utils/zincutils";
+import { featureLockedPath, featureState } from "@/utils/featureGate";
 import store from "@/stores";
+
+// Checked before the flag guards: a locked feature also reports its legacy flag false.
+const redirectIfLocked = (feature: string, to: any, next: any): boolean => {
+  if (featureState(store.state.zoConfig?.features, feature) !== "locked") return false;
+  next({ path: featureLockedPath(feature), query: { org_identifier: to.query.org_identifier } });
+  return true;
+};
 
 // Synthetics routes are gated on the backend /config flag `synthetics_enabled`
 // (`ZO_SYNTHETICS_ENABLED`), not on the build: synthetics ships in OSS. Direct URL
@@ -53,6 +61,7 @@ const privateLocationRouteGuard = (to: any, from: any, next: any) => {
 // never flashes in) — the two are not meant to match. Same split as
 // syntheticsRouteGuard above.
 const workflowsRouteGuard = (to: any, from: any, next: any) => {
+  if (redirectIfLocked("workflows", to, next)) return;
   if (store.state.zoConfig?.workflows_enabled === false) {
     next("/");
     return;
@@ -65,10 +74,16 @@ const workflowsRouteGuard = (to: any, from: any, next: any) => {
 // the flag is briefly undefined on a cold load, and bouncing a bookmarked page
 // home on "not yet known" is worse than a moment of empty state.
 const oncallRouteGuard = (to: any, from: any, next: any) => {
+  if (redirectIfLocked("oncall", to, next)) return;
   if (store.state.zoConfig?.oncall_enabled === false) {
     next("/");
     return;
   }
+  routeGuard(to, from, next);
+};
+
+const incidentsRouteGuard = (to: any, from: any, next: any) => {
+  if (redirectIfLocked("incidents", to, next)) return;
   routeGuard(to, from, next);
 };
 
@@ -377,7 +392,7 @@ const useEnterpriseRoutes = () => {
           titleKey: "menu.incidents",
         },
         beforeEnter(to: any, from: any, next: any) {
-          routeGuard(to, from, next);
+          incidentsRouteGuard(to, from, next);
         },
       },
       {
@@ -388,7 +403,7 @@ const useEnterpriseRoutes = () => {
           titleKey: "routeTitles.incidentDetail",
         },
         beforeEnter(to: any, from: any, next: any) {
-          routeGuard(to, from, next);
+          incidentsRouteGuard(to, from, next);
         },
       },
     );

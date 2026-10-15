@@ -477,8 +477,14 @@ pub async fn zo_config(
     let custom_hide_menus = enterprise_value!("", &o2cfg.common.custom_hide_menus);
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
     // AI needs o2-ai to answer; with no agent target its buttons could only fail, so report it off.
-    let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled && o2cfg.ai.has_agent_target());
-    let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
+    let ai_enabled = enterprise_value!(
+        false,
+        o2cfg.ai.enabled && o2cfg.ai.has_agent_target() && check_features(&[Feature::AiAssistant])
+    );
+    let incidents_enabled = enterprise_value!(
+        false,
+        o2cfg.incidents.enabled && check_features(&[Feature::Incidents])
+    );
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Anomaly detection is on when the enterprise feature is compiled in, unless turned off at
     // runtime via O2_ANOMALY_DETECTION_DISABLED. When disabled the UI hides the anomaly tab.
@@ -500,7 +506,10 @@ pub async fn zo_config(
     let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
     let synthetics_browser_max_steps = cfg.synthetics.browser_max_steps;
-    let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
+    let oncall_enabled = enterprise_value!(
+        false,
+        o2cfg.oncall.enabled && check_features(&[Feature::Oncall])
+    );
 
     #[cfg(feature = "cloud")]
     let build_type = "cloud";
@@ -533,12 +542,12 @@ pub async fn zo_config(
     let billing_group_allowed_orgs = o2cfg.cloud.billing_group_allowed_orgs.clone();
 
     #[cfg(feature = "enterprise")]
-    let workflows_enabled = o2cfg.common.workflows_enabled;
+    let workflows_enabled = o2cfg.common.workflows_enabled && check_features(&[Feature::Workflows]);
 
     #[cfg(feature = "enterprise")]
     let featuremap: HashMap<Feature, FeatureState> = Feature::all()
         .map(|variant| {
-            // these flags are license-masked, so off-but-entitled means the operator turned it off
+            // operator-off hides whatever the license says; operator-on but unlicensed locks
             let switched_on = match variant {
                 Feature::AiAssistant => o2cfg.ai.enabled,
                 Feature::Incidents => o2cfg.incidents.enabled,
@@ -553,7 +562,7 @@ pub async fn zo_config(
                 .custom_hide_menus
                 .split(',')
                 .any(|m| m.trim() == key);
-            let state = if listed || (entitled && !switched_on) {
+            let state = if listed || !switched_on {
                 FeatureState::Hidden
             } else if entitled {
                 FeatureState::Enabled

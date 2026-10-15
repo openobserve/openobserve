@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { readonly, ref } from "vue";
 import { toast, toastRecords, updateToast } from "@/lib/feedback/Toast/useToast";
 import type { ToastDetail } from "@/lib/feedback/Toast/OToast.types";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -190,6 +191,23 @@ export function addUnauthorizedError(responseUrl: string): void {
     debounceTimer = null;
     flushGroupedToast();
   }, 300);
+}
+
+// null while closed; denials arriving while open join the same dialog.
+const licenseDenied = ref<string[] | null>(null);
+
+/** Open the license-denial dialog (403 + 40001), kept apart from the RBAC access toast. */
+export function addLicenseDeniedError(features: string[]): void {
+  licenseDenied.value = [...new Set([...(licenseDenied.value ?? []), ...features])];
+}
+
+export function useLicenseDeniedDialog() {
+  return {
+    features: readonly(licenseDenied),
+    close: () => {
+      licenseDenied.value = null;
+    },
+  };
 }
 
 /**

@@ -22,6 +22,8 @@ import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
 import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
 import OnlineEvals from "@/enterprise/components/OnlineEvals.vue";
 import { routeGuard } from "@/utils/zincutils";
+import { featureLockedPath, featureState } from "@/utils/featureGate";
+import store from "@/stores";
 import { promptRoutes } from "@/views/AIObservability/promptRoutes";
 
 const AIObservabilityShell = () => import("@/enterprise/views/AIObservability/Index.vue");
@@ -90,6 +92,13 @@ const useEnvRoutes = () => {
       path: "ai",
       component: AIObservabilityShell,
       beforeEnter(to: any, from: any, next: any) {
+        if (featureState(store.state.zoConfig?.features, "ai_observability") === "locked") {
+          next({
+            path: featureLockedPath("ai_observability"),
+            query: { org_identifier: to.query.org_identifier },
+          });
+          return;
+        }
         routeGuard(to, from, next);
       },
       meta: {

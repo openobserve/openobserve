@@ -151,6 +151,25 @@ describe("MainLayout — Product Analytics menu entry", () => {
     expect(tileNames(entries)).not.toContain("productAnalytics");
   });
 
+  describe("license-gated entries", () => {
+    afterEach(() => {
+      delete store.state.zoConfig.features;
+    });
+
+    it("keeps a locked feature on the rail with a lock, pointing at the upsell page", async () => {
+      store.state.zoConfig.features = { incidents: "locked" };
+      const incidents = (await railItems()).find((l) => l.name === "incidentList");
+      expect(incidents).toMatchObject({ link: "/feature-locked/incidents", locked: true });
+    });
+
+    it("leaves a hidden or unsent feature off the rail", async () => {
+      store.state.zoConfig.features = { workflows: "hidden" };
+      const names = (await railItems()).map((l) => l.name);
+      expect(names).not.toContain("workflows");
+      expect(names).not.toContain("incidentList");
+    });
+  });
+
   it("uses only registered icons on the Experience tile and its children", async () => {
     const experience = NAV_GROUPS.find((g) => g.key === "experience")!;
     for (const icon of [experience.icon, ...experience.children.map((c) => c.icon)]) {

@@ -1095,4 +1095,57 @@ describe("ONavGroup", () => {
       expect(panel.find('[data-test="nav-group-item-pipelines"]').exists()).toBe(true);
     });
   });
+
+  // OSS builds never register the Workflows route, so a locked child must not depend on hasRoute.
+  describe("license feature state of a child", () => {
+    const workflowsChild: SubnavChild = {
+      titleKey: "menu.workflows",
+      icon: "schema",
+      name: "workflows",
+      feature: "workflows",
+    };
+
+    async function mountWithFeature(state?: "enabled" | "locked" | "hidden") {
+      const featureStore = createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: { features: state ? { workflows: state } : {} },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+      wrapper = mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children: [...children, workflowsChild],
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        global: {
+          plugins: [makeRouter(), featureStore, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      await hoverOpen();
+    }
+
+    it("shows a locked child with a lock, linking to the upsell page", async () => {
+      await mountWithFeature("locked");
+      const item = flyout().get('[data-test="nav-group-item-workflows"]');
+      expect(item.attributes("href")).toBe("/feature-locked/workflows?org_identifier=default");
+      expect(item.find('[data-test="nav-group-item-locked"]').exists()).toBe(true);
+    });
+
+    it("drops a hidden child", async () => {
+      await mountWithFeature("hidden");
+      expect(flyout().find('[data-test="nav-group-item-workflows"]').exists()).toBe(false);
+    });
+
+    it("keeps the route check for an enabled or unsent feature", async () => {
+      await mountWithFeature();
+      expect(flyout().find('[data-test="nav-group-item-workflows"]').exists()).toBe(false);
+      expect(flyout().find('[data-test="nav-group-item-locked"]').exists()).toBe(false);
+    });
+  });
 });

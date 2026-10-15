@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import { ref, defineComponent, computed } from "vue";
+import { ref, defineComponent, computed, type PropType } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useStore } from "vuex";
@@ -184,6 +184,7 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
+import type { ForbiddenState } from "@/utils/featureGate";
 
 export default defineComponent({
   name: "RunningQueriesList",
@@ -215,7 +216,7 @@ export default defineComponent({
       default: false,
     },
     forbidden: {
-      type: Boolean,
+      type: [Boolean, Array] as PropType<ForbiddenState>,
       default: false,
     },
     lastRefreshed: {

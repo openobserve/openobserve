@@ -1029,9 +1029,7 @@ async fn handle_composite_alert_trigger(
 
             #[cfg(feature = "enterprise")]
             let incident_handled = if notification_alert.creates_incident
-                && o2_enterprise::enterprise::common::config::get_config()
-                    .incidents
-                    .enabled
+                && crate::alerts::incidents::incidents_enabled()
             {
                 crate::alerts::incidents::correlate_alert_to_incident(
                     &notification_alert,
@@ -1864,7 +1862,13 @@ async fn trigger_rca_for_alert_firing(
 
     let cfg = get_o2_config();
     // Must agree with the condition `analysis_at_start` used to mark these records `Pending`.
-    if !cfg.incidents.rca_enabled || !cfg.ai.enabled || !cfg.ai.has_agent_target() {
+    if !cfg.incidents.rca_enabled
+        || !cfg.ai.enabled
+        || !cfg.ai.has_agent_target()
+        || !o2_enterprise::enterprise::license::check_features(&[
+            config::meta::feature::Feature::AiAssistant,
+        ])
+    {
         release_alert_firing_hold(&alert.org_id, &opened).await;
         return;
     }
@@ -3146,9 +3150,7 @@ async fn handle_alert_triggers(
 
         #[cfg(feature = "enterprise")]
         let incident_handled_notification = if alert.creates_incident
-            && o2_enterprise::enterprise::common::config::get_config()
-                .incidents
-                .enabled
+            && crate::alerts::incidents::incidents_enabled()
             && let Some(first_row) = data.first()
         {
             match crate::alerts::incidents::correlate_alert_to_incident(

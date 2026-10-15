@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel.
            Leads the utility-icon cluster, set off by a separator from the
            org selector so it reads as the primary action in this group. -->
-          <template v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled">
+          <template v-if="aiAssistantState === 'enabled'">
             <OButton
               variant="ghost"
               size="icon-toolbar"
@@ -247,6 +247,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OButton>
           </template>
+          <OButton
+            v-else-if="aiAssistantState === 'locked'"
+            variant="ghost"
+            size="icon-toolbar"
+            icon-left="lock"
+            data-test="menu-link-ai-locked"
+            @click="openLockedAiAssistant"
+          >
+            <OTooltip
+              side="bottom"
+              align="center"
+              :content="t('featureLock.title', { feature: t('menu.aiAssistant') })"
+            />
+          </OButton>
 
           <!-- THEME SWITCHER: Toggle between light and dark mode -->
           <ThemeSwitcher class="max-md:hidden"></ThemeSwitcher>
@@ -463,6 +477,7 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 
 import { getImageURL } from "@/utils/zincutils";
+import { featureLockedPath, menuState } from "@/utils/featureGate";
 import { chartColor } from "@/utils/chartTheme";
 
 export default defineComponent({
@@ -626,6 +641,21 @@ export default defineComponent({
       emit("toggleAIChat");
     };
 
+    const aiAssistantState = computed(() =>
+      menuState(
+        props.store.state.zoConfig?.features,
+        "ai_assistant",
+        props.config.isEnterprise == "true" && !!props.store.state.zoConfig.ai_enabled,
+      ),
+    );
+
+    const openLockedAiAssistant = () => {
+      router.push({
+        path: featureLockedPath("ai_assistant"),
+        query: { org_identifier: props.store.state.selectedOrganization?.identifier },
+      });
+    };
+
     const openSlack = () => {
       emit("openSlack");
     };
@@ -689,6 +719,8 @@ export default defineComponent({
       homeUrl,
       goToAbout,
       toggleAIChat,
+      aiAssistantState,
+      openLockedAiAssistant,
       openSlack,
       navigateToOpenAPI,
       navigateToDocs,

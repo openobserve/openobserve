@@ -996,6 +996,7 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -1104,7 +1105,7 @@ export default defineComponent({
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = ref(false);
     const lastUpdatedAt = ref<number | null>(null);
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     const oTableRef: any = ref(null);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
@@ -2114,7 +2115,7 @@ export default defineComponent({
       } catch (error: any) {
         console.error(error);
         dismiss();
-        forbidden.value = error?.response?.status === 403;
+        forbidden.value = forbiddenState(error);
         // The grouped access toast already reports a 403; a second red toast adds nothing.
         if (!forbidden.value) {
           toast({

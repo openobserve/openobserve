@@ -560,6 +560,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { resolveBadge, resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import type { ForbiddenState } from "@/utils/featureGate";
 
 type Mode = "all" | "browser";
 
@@ -597,7 +598,7 @@ const props = withDefaults(
     mode: Mode;
     data: any[];
     loading?: boolean;
-    forbidden?: boolean;
+    forbidden?: ForbiddenState;
     /** IANA zone for the Last Check tooltip. Passed in: this table is a leaf
      *  component and must not reach into the store for it. */
     timezone?: string;

@@ -13,7 +13,7 @@ import {
   watch,
   watchEffect,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender, type Row } from "@tanstack/vue-table";
@@ -1667,7 +1667,19 @@ defineExpose({
 
         <!-- ── Access Denied State ───────────────────────────── -->
         <OTableEmpty v-if="showForbidden" :floor="!props.fillHeight" data-test="o2-table-forbidden">
-          <OEmptyState size="hero" preset="no-access" />
+          <OEmptyState
+            v-if="Array.isArray(props.forbidden)"
+            size="hero"
+            preset="no-access"
+            :title="t('featureLock.toastTitle')"
+            :description="
+              props.forbidden.length
+                ? t('featureLock.toastMessage', { features: raw(props.forbidden.join(', ')) })
+                : t('featureLock.toastMessageGeneric')
+            "
+            data-test="o2-table-license-denied"
+          />
+          <OEmptyState v-else size="hero" preset="no-access" />
         </OTableEmpty>
 
         <!-- ── Empty State ───────────────────────────────────── -->

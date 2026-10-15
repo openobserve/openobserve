@@ -46,10 +46,19 @@ vi.mock("@/utils/zincutils", () => ({
 
 vi.mock("axios");
 
+vi.mock("@/composables/useUnauthorizedErrorGrouper", () => ({
+  addUnauthorizedError: vi.fn(),
+  addLicenseDeniedError: vi.fn(),
+}));
+
 import config from "../aws-exports";
 import store from "../stores";
 import axios from "axios";
-import { attemptTokenRefresh } from "./http";
+import http, { attemptTokenRefresh } from "./http";
+import {
+  addLicenseDeniedError,
+  addUnauthorizedError,
+} from "@/composables/useUnauthorizedErrorGrouper";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -174,5 +183,46 @@ describe("attemptTokenRefresh", () => {
 
     expect(vi.mocked(store.dispatch)).toHaveBeenCalledWith("logout");
     expect(reloadMock).toHaveBeenCalled();
+  });
+});
+
+describe("response interceptor — 403 handling", () => {
+  // Builds a real instance and returns the rejection handler it registered.
+  function errorHandler() {
+    const use = vi.fn();
+    vi.mocked(axios.create).mockReturnValue({ interceptors: { response: { use } } } as any);
+    http();
+    return use.mock.calls[0][1] as (error: unknown) => Promise<unknown>;
+  }
+
+  const forbidden = (data: Record<string, unknown>) => ({
+    response: { status: 403, data },
+    request: { responseURL: "http://localhost:5080/api/org/workflows" },
+  });
+
+  beforeEach(() => {
+    (config as any).isEnterprise = "true";
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("shows the license toast with the missing features for code 40001", async () => {
+    const error = forbidden({ code: 40001, error_detail: "oncall, workflows" });
+
+    await expect(errorHandler()(error)).rejects.toBe(error);
+
+    expect(addLicenseDeniedError).toHaveBeenCalledWith(["oncall", "workflows"]);
+    expect(addUnauthorizedError).not.toHaveBeenCalled();
+  });
+
+  it("keeps a plain 403 on the RBAC access toast", async () => {
+    const error = forbidden({ code: 403, message: "Unauthorized Access" });
+
+    await expect(errorHandler()(error)).rejects.toBe(error);
+
+    expect(addUnauthorizedError).toHaveBeenCalledWith("http://localhost:5080/api/org/workflows");
+    expect(addLicenseDeniedError).not.toHaveBeenCalled();
   });
 });

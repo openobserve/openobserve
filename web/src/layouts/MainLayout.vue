@@ -226,6 +226,7 @@ import { configFullQuery } from "@/services/config.queries";
 import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
+import { featureLockedPath, menuState, type FeatureState } from "@/utils/featureGate";
 import AppHeader from "../components/Header.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
@@ -429,23 +430,25 @@ export default defineComponent({
       : undefined;
     const selectedOrg = ref(store.state.selectedOrganization);
     const userClickedOrg = ref(store.state.selectedOrganization);
-    const isIncidentsEnabled = computed(() => {
-      return (
-        (config.isEnterprise == "true" || config.isCloud == "true") &&
-        store.state.zoConfig.incidents_enabled
-      );
-    });
+    const isEnterpriseOrCloud = config.isEnterprise == "true" || config.isCloud == "true";
+    // Locked and hidden come from the license `features` map; the enabled path keeps the legacy flag for older backends.
+    const features = computed(() => store.state.zoConfig?.features);
+    const incidentsMenuState = computed(() =>
+      menuState(
+        features.value,
+        "incidents",
+        isEnterpriseOrCloud && !!store.state.zoConfig.incidents_enabled,
+      ),
+    );
 
-    // Workflows — enterprise/cloud only (FD3). Build-time gate, no runtime flag.
-    // Enterprise/cloud build AND the backend `/config` flag `workflows_enabled`
-    // (enterprise `O2_WORKFLOWS_ENABLED`). Reactive so the menu picks it up
-    // regardless of whether the config response arrived before or after mount.
     // `=== true`, not truthy: /config is fetched without await, so the flag is
     // briefly undefined and the entry must stay hidden rather than flash in.
-    const isWorkflowsEnabled = computed(
-      () =>
-        (config.isEnterprise == "true" || config.isCloud == "true") &&
-        store.state.zoConfig?.workflows_enabled === true,
+    const workflowsMenuState = computed(() =>
+      menuState(
+        features.value,
+        "workflows",
+        isEnterpriseOrCloud && store.state.zoConfig?.workflows_enabled === true,
+      ),
     );
 
     // Backend `/config` flag `online_evals_enabled` — controlled by
@@ -464,8 +467,12 @@ export default defineComponent({
     // of the module. AIObservabilityShell (Index.vue) shows only the Monitor
     // group there; Evaluate/Experiment/Annotate/Agent Graph/Agent Behavior stay
     // behind `isOnlineEvalsEnabled` as before.
-    const isOssBuild = !(config.isEnterprise == "true" || config.isCloud == "true");
-    const isAiObservabilityMenuVisible = computed(() => isOnlineEvalsEnabled.value || isOssBuild);
+    // OSS ignores the map's `locked` here: its Monitor half works without a license.
+    const aiObservabilityMenuState = computed<FeatureState>(() =>
+      isEnterpriseOrCloud
+        ? menuState(features.value, "ai_observability", isOnlineEvalsEnabled.value)
+        : "enabled",
+    );
 
     // Backend `/config` flag `synthetics_enabled` — `ZO_SYNTHETICS_ENABLED`, and
     // no longer an enterprise build check: synthetics ships in OSS, and only the
@@ -766,50 +773,58 @@ export default defineComponent({
       }
     });
 
+    // One idempotent add/update/remove for a license-gated entry; `insertAt` returns -1 to skip.
+    const syncFeatureLink = (
+      item: NavItem,
+      feature: string,
+      state: FeatureState,
+      insertAt: () => number,
+    ) => {
+      const existingIndex = linksList.value.findIndex((link) => link.name === item.name);
+      // Removed, not just skipped: the menu is rebuilt on org switch and the state can change.
+      if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+      if (state === "hidden") return;
+      const at = insertAt();
+      if (at === -1) return;
+      linksList.value.splice(
+        at,
+        0,
+        state === "locked" ? { ...item, link: featureLockedPath(feature), locked: true } : item,
+      );
+    };
+
+    const afterAlerts = () => {
+      const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
+      return alertIndex === -1 ? -1 : alertIndex + 1;
+    };
+
     const updateIncidentsMenu = () => {
-      if (isIncidentsEnabled.value) {
-        const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
-
-        const incidentExists = linksList.value.some((link) => link.name === "incidentList");
-
-        if (alertIndex !== -1 && !incidentExists) {
-          linksList.value.splice(alertIndex + 1, 0, {
-            title: t("menu.incidents"),
-            icon: "notifications-active",
-            link: "/incidents",
-            name: "incidentList",
-          });
-        }
-      }
+      syncFeatureLink(
+        {
+          title: t("menu.incidents"),
+          icon: "notifications-active",
+          link: "/incidents",
+          name: "incidentList",
+        },
+        "incidents",
+        incidentsMenuState.value,
+        afterAlerts,
+      );
     };
 
-    // Insert the Workflows entry after Alerts. Idempotent.
     const updateWorkflowsMenu = () => {
-      const existingIndex = linksList.value.findIndex((link) => link.name === "workflows");
-
-      if (isWorkflowsEnabled.value) {
-        if (existingIndex !== -1) return;
-
-        const anchor = linksList.value.findIndex((link) => link.name === "alertList");
-        if (anchor === -1) return;
-
-        linksList.value.splice(anchor + 1, 0, {
-          title: t("menu.workflows"),
-          icon: "schema",
-          link: "/workflows",
-          name: "workflows",
-        });
-      } else if (existingIndex !== -1) {
-        // The entry must be REMOVED, not just skipped: the menu is rebuilt on
-        // org switch and `workflows_enabled` can differ per deployment, so an
-        // add-only guard would leave a stale entry behind.
-        linksList.value.splice(existingIndex, 1);
-      }
+      syncFeatureLink(
+        { title: t("menu.workflows"), icon: "schema", link: "/workflows", name: "workflows" },
+        "workflows",
+        workflowsMenuState.value,
+        afterAlerts,
+      );
     };
 
-    // If `/config` resolves after this component mounted (or the flag flips),
+    // If `/config` resolves after this component mounted (or the state flips),
     // keep the menu in sync — same contract as the other flag-driven entries.
-    watch(isWorkflowsEnabled, () => updateWorkflowsMenu(), { immediate: false });
+    watch(incidentsMenuState, () => updateIncidentsMenu(), { immediate: false });
+    watch(workflowsMenuState, () => updateWorkflowsMenu(), { immediate: false });
     const splitterModel = ref(100);
     const selectedLanguage: any = langList.find((l) => l.code == getLocale()) || langList[0];
 
@@ -817,30 +832,27 @@ export default defineComponent({
     // flag. Position: directly after Traces. Idempotent — safe to call from
     // multiple lifecycle hooks.
     const updateAIObservabilityMenu = () => {
-      const existingIndex = linksList.value.findIndex(
-        (link: any) => link.name === "aiObservability",
-      );
-
-      if (isAiObservabilityMenuVisible.value) {
-        if (existingIndex !== -1) return;
-        const anchorIndex = linksList.value.findIndex(
-          (link: any) => link.name === "profiles" || link.name === "traces",
-        );
-        const insertAt = anchorIndex === -1 ? linksList.value.length : anchorIndex + 1;
-        linksList.value.splice(insertAt, 0, {
+      syncFeatureLink(
+        {
           title: t("menu.aiObservability"),
           icon: "auto-awesome",
           link: "/ai",
           name: "aiObservability",
-        });
-      } else if (existingIndex !== -1) {
-        linksList.value.splice(existingIndex, 1);
-      }
+        },
+        "ai_observability",
+        aiObservabilityMenuState.value,
+        () => {
+          const anchorIndex = linksList.value.findIndex(
+            (link) => link.name === "profiles" || link.name === "traces",
+          );
+          return anchorIndex === -1 ? linksList.value.length : anchorIndex + 1;
+        },
+      );
     };
 
-    // If `/config` resolves after this component mounted (or if the flag
+    // If `/config` resolves after this component mounted (or if the state
     // ever flips at runtime), keep the menu in sync.
-    watch(isAiObservabilityMenuVisible, () => updateAIObservabilityMenu(), { immediate: false });
+    watch(aiObservabilityMenuState, () => updateAIObservabilityMenu(), { immediate: false });
 
     const updateSyntheticMenu = () => {
       const existingIndex = linksList.value.findIndex((l: any) => l.name === "synthetics");

@@ -37,6 +37,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ badge > 99 ? "99+" : badge }}
         </div>
+        <OIcon
+          v-else-if="locked"
+          name="lock"
+          size="xs"
+          class="bg-surface-base text-text-secondary absolute -top-1 -right-2 rounded-full"
+          :label="t('featureLock.locked')"
+          data-test="menu-link-locked"
+        />
       </div>
       <div
         class="nav-menu-item-label line-clamp-2 w-full text-center text-xs leading-tight tracking-[0.01em] break-normal wrap-normal [hyphens:none] transition-colors duration-250 max-md:text-left max-md:text-sm"
@@ -125,6 +133,11 @@ export default defineComponent({
     badge: {
       type: Number,
       default: 0,
+    },
+
+    locked: {
+      type: Boolean,
+      default: false,
     },
 
     // Trigger mode — render as a non-navigating <button> that opens a submenu

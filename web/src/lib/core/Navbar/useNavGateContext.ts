@@ -52,6 +52,7 @@ const ALL_GATES_OPEN: NavGateContext = {
   oncallEnabled: true,
   databaseMonitoring: true,
   hiddenMenus: new Set<string>(),
+  features: {},
 };
 
 export function useNavGateContext(): ComputedRef<NavGateContext> {
@@ -76,6 +77,7 @@ export function useNavGateContext(): ComputedRef<NavGateContext> {
       databaseMonitoring: !!z.database_monitoring_enabled,
       // Raw split (no trim) to match how pages test custom_hide_menus.
       hiddenMenus: new Set((z.custom_hide_menus ?? "").split(",")),
+      features: z.features ?? {},
     };
   });
 }

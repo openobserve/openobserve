@@ -532,6 +532,17 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
     .await;
 }
 
+/// Whether the operator switched incident correlation on and the license grants it.
+#[cfg(feature = "enterprise")]
+pub fn incidents_enabled() -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .incidents
+        .enabled
+        && o2_enterprise::enterprise::license::check_features(&[
+            config::meta::feature::Feature::Incidents,
+        ])
+}
+
 /// Correlate an alert to an incident, and send a notification if appropriate.
 ///
 /// This is the main entry point for incident correlation in the alert execution flow.
@@ -2379,7 +2390,7 @@ pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
     use o2_enterprise::enterprise::{alerts::rca_service, common::config::get_config};
 
     let cfg = get_config();
-    let will_run = cfg.incidents.enabled
+    let will_run = incidents_enabled()
         && cfg.incidents.rca_enabled
         && cfg.ai.has_agent_target()
         && !rca_service::l0_off_for_incident(org_id, incident_id).await;
@@ -2419,7 +2430,7 @@ pub async fn trigger_rca_for_incident(
     let config = get_o2_config();
 
     // Check if RCA is enabled and configured
-    if !config.incidents.enabled || !config.incidents.rca_enabled {
+    if !incidents_enabled() || !config.incidents.rca_enabled {
         log::debug!("[INCIDENTS::RCA] RCA not enabled, skipping immediate trigger");
         // §6: no verdict is coming, so nothing may go on holding a page for
         // one. Every guard below reaches this same state.

@@ -47,9 +47,14 @@ pub async fn run() -> Result<(), anyhow::Error> {
             "incidents_auto_resolve",
             config.incidents.cleanup_interval_secs,
             {
-                log::debug!("[INCIDENTS::JOB] Running incident auto-resolve");
-                if let Err(e) = auto_resolve_stale_incidents().await {
-                    log::error!("[INCIDENTS::JOB] Auto-resolve failed: {e}");
+                // license read per tick so a change applies; `continue` here would skip sleep_after
+                if o2_enterprise::enterprise::license::check_features(&[
+                    config::meta::feature::Feature::Incidents,
+                ]) {
+                    log::debug!("[INCIDENTS::JOB] Running incident auto-resolve");
+                    if let Err(e) = auto_resolve_stale_incidents().await {
+                        log::error!("[INCIDENTS::JOB] Auto-resolve failed: {e}");
+                    }
                 }
             },
             sleep_after

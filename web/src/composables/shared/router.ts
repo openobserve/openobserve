@@ -603,6 +603,19 @@ const useRoutes = () => {
       },
     },
     {
+      // Every build: locked nav entries land here, including on OSS where the feature has no route.
+      path: "feature-locked/:feature",
+      name: "featureLocked",
+      component: () => import("@/components/common/FeatureLocked.vue"),
+      meta: {
+        titleKey: "featureLock.routeTitle",
+        allowOnEmptyData: true,
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "dashboards",
       name: "dashboards",
       component: Dashboards,

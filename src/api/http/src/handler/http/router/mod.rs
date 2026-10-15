@@ -57,7 +57,7 @@ use {
     o2_enterprise::enterprise::{
         common::{
             auditor::{AuditMessage, Protocol, ResponseMeta},
-            config::{get_config as get_o2_config, init_unmasked as o2_operator_config},
+            config::get_config as get_o2_config,
         },
         license::check_features,
     },
@@ -759,7 +759,7 @@ pub fn basic_routes() -> Router {
     // Static `/api/v2`: a param beside the router's `/api/{*path}` panics axum at startup.
     // Registered on the operator's flag, not the license's, so a new license needs no restart.
     #[cfg(feature = "enterprise")]
-    if o2_operator_config().oncall.enabled {
+    if get_o2_config().oncall.enabled {
         // Unauthenticated HMAC link; GET only renders, so a gateway prefetch cannot ack a page.
         router = router.route(
             "/api/v2/{org_id}/oncall/ack",
@@ -778,11 +778,15 @@ pub fn basic_routes() -> Router {
     router = router
         .route(
             "/api/v2/{org_id}/incidents/events",
-            post(alerts::external_events::ingest_events),
+            post(alerts::external_events::ingest_events).route_layer(middleware::from_fn(
+                |req, next| require_features(&[Feature::Incidents], req, next),
+            )),
         )
         .route(
             "/api/v2/{org_id}/incidents/events/{token}",
-            post(alerts::external_events::ingest_events_url_token),
+            post(alerts::external_events::ingest_events_url_token).route_layer(
+                middleware::from_fn(|req, next| require_features(&[Feature::Incidents], req, next)),
+            ),
         )
         .route_layer(DefaultBodyLimit::max(
             alerts::external_events::MAX_BODY_BYTES,
@@ -1545,7 +1549,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
 
-        if o2_operator_config().common.workflows_enabled {
+        if get_o2_config().common.workflows_enabled {
             // workflows
             router = router
                 .route(
@@ -1721,7 +1725,7 @@ pub fn service_routes() -> Router {
     }
 
     #[cfg(feature = "enterprise")]
-    if o2_operator_config().oncall.enabled {
+    if get_o2_config().oncall.enabled {
         router = router
             .route(
                 "/{org_id}/oncall/teams",

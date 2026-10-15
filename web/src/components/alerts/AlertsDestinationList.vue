@@ -375,6 +375,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -580,7 +581,7 @@ export default defineComponent({
     };
 
     const loading = ref(false);
-    const forbidden = ref(false);
+    const forbidden = ref<ForbiddenState>(false);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
       loading,
@@ -653,7 +654,7 @@ export default defineComponent({
           loadDepGraph(org, force ? ["alerts", "templates"] : []);
         })
         .catch((err: any) => {
-          forbidden.value = err?.response?.status === 403;
+          forbidden.value = forbiddenState(err);
           if (!forbidden.value) {
             toast({
               variant: "error",

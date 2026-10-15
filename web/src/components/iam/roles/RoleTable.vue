@@ -12,13 +12,14 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useI18nTyped } from "@/types/i18n";
+import type { ForbiddenState } from "@/utils/featureGate";
 
 const { t } = useI18nTyped();
 
 const props = defineProps<{
   data: any[];
   loading?: boolean;
-  forbidden?: boolean;
+  forbidden?: ForbiddenState;
   actionLoading?: boolean;
   selectedIds?: string[];
   globalFilter?: string;

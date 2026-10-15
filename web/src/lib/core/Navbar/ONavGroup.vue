@@ -55,6 +55,7 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 import { isGateOpen, useNavGateContext } from "./useNavGateContext";
 import type { SubnavChild } from "./ONavbar.types";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { featureLockedPath, featureState } from "@/utils/featureGate";
 import useBreakpoint from "@/composables/useBreakpoint";
 
 const props = defineProps<{
@@ -98,6 +99,10 @@ const flyoutStyle = ref<Record<string, string>>({});
 // group is worth collapsing into at all.
 const gateContext = useNavGateContext();
 
+const childState = (c: SubnavChild) =>
+  c.feature ? featureState(gateContext.value.features, c.feature) : "enabled";
+const isLocked = (c: SubnavChild) => childState(c) === "locked";
+
 // A child shows only when (a) its route is registered in this build, (b)
 // custom_hide_menus does not name it, AND (c) its visibility gate (if any)
 // passes — exactly as the target page would decide.
@@ -105,10 +110,14 @@ const gateContext = useNavGateContext();
 // The custom_hide_menus check is by route NAME so a child with no top-level
 // rail entry of its own is hideable at all: `requires` only tracks the parent,
 // and MainLayout's filter only ever sees top-level links.
+// A locked child skips (a) and (c): OSS builds never register the feature's routes.
 const visibleChildren = computed(() =>
   props.children.filter((c) => {
-    if (!router.hasRoute(c.name)) return false;
+    const state = childState(c);
+    if (state === "hidden") return false;
     if (gateContext.value.hiddenMenus.has(c.name)) return false;
+    if (state === "locked") return true;
+    if (!router.hasRoute(c.name)) return false;
     if (c.gate && !isGateOpen(gateContext.value, c.gate)) return false;
     return true;
   }),
@@ -252,6 +261,12 @@ const isGroupActive = computed(() => activeChild.value !== null);
 const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier);
 
 function childTo(child: SubnavChild) {
+  if (child.feature && isLocked(child)) {
+    return {
+      path: featureLockedPath(child.feature),
+      query: { org_identifier: orgIdentifier.value },
+    };
+  }
   const route = router.currentRoute.value;
   const query: LocationQueryRaw = route.name === child.name ? { ...route.query } : {};
   if (orgIdentifier.value) query.org_identifier = orgIdentifier.value;
@@ -544,6 +559,14 @@ function onChildMouseenter(event: MouseEvent) {
               child.title ? raw(child.title) : t(child.titleKey)
             }}</span>
             <BetaBadge v-if="child.beta" size="xs" />
+            <OIcon
+              v-if="isLocked(child)"
+              name="lock"
+              size="xs"
+              class="text-text-secondary ms-auto shrink-0"
+              :label="t('featureLock.locked')"
+              data-test="nav-group-item-locked"
+            />
           </router-link>
         </div>
 
@@ -566,6 +589,14 @@ function onChildMouseenter(event: MouseEvent) {
             block.child.title ? raw(block.child.title) : t(block.child.titleKey)
           }}</span>
           <BetaBadge v-if="block.child.beta" size="xs" />
+          <OIcon
+            v-if="isLocked(block.child)"
+            name="lock"
+            size="xs"
+            class="text-text-secondary ms-auto shrink-0"
+            :label="t('featureLock.locked')"
+            data-test="nav-group-item-locked"
+          />
         </router-link>
       </template>
     </div>
@@ -642,6 +673,14 @@ function onChildMouseenter(event: MouseEvent) {
                 child.title ? raw(child.title) : t(child.titleKey)
               }}</span>
               <BetaBadge v-if="child.beta" size="xs" />
+              <OIcon
+                v-if="isLocked(child)"
+                name="lock"
+                size="xs"
+                class="text-text-secondary ms-auto shrink-0"
+                :label="t('featureLock.locked')"
+                data-test="nav-group-item-locked"
+              />
             </router-link>
           </div>
 
@@ -669,6 +708,14 @@ function onChildMouseenter(event: MouseEvent) {
               block.child.title ? raw(block.child.title) : t(block.child.titleKey)
             }}</span>
             <BetaBadge v-if="block.child.beta" size="xs" />
+            <OIcon
+              v-if="isLocked(block.child)"
+              name="lock"
+              size="xs"
+              class="text-text-secondary ms-auto shrink-0"
+              :label="t('featureLock.locked')"
+              data-test="nav-group-item-locked"
+            />
           </router-link>
         </template>
       </div>
