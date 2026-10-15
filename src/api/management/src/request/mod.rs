@@ -15,6 +15,8 @@
 
 #[cfg(feature = "enterprise")]
 pub mod ai;
+#[cfg(feature = "enterprise")]
+pub mod alert_calibration;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod annotation_queues;

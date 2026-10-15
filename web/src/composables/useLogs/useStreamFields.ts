@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { nextTick, ref } from "vue";
+import { effectScope, getCurrentScope, nextTick, onScopeDispose, ref, type EffectScope } from "vue";
 import { byString } from "@/utils/json";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -49,10 +49,15 @@ import {
 import { buildStreamNameColumn, shouldShowStreamNameColumn } from "@/utils/logs/streamNameColumn";
 import type { KeyFieldsConfig, FieldGroupingConfig } from "@/composables/useServiceCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
+import type { FieldAlias } from "@/services/service_streams";
 import { isGuardActive } from "@/composables/useLogs/useAutoRun";
 import { pickLatestStream, type StreamStatsEntry } from "@/utils/logs/estimateScanMb";
 import { restoreLogsSelectedStreams } from "@/utils/streamPersist";
 import { sqlSources } from "@/utils/logs/sqlSources";
+
+let correlationWatcherUsers = 0;
+let correlationWatcherScope: EffectScope | null = null;
 
 export interface InitialStreamInput {
   list: StreamStatsEntry[];
@@ -71,6 +76,12 @@ export interface InitialStreamPick {
 export interface StreamListOptions {
   fromUrl?: boolean;
   isCurrent?: () => boolean;
+}
+
+export interface ExtractFieldsOptions {
+  reuseLoadedSchema?: boolean;
+  /** Rebuilds the field list from already-loaded schemas with groups that changed after the first build; search errors and the loading flag are left alone. */
+  regroupWith?: FieldAlias[];
 }
 
 export function pickInitialLogsStreams(input: InitialStreamInput): InitialStreamPick {
@@ -126,7 +137,7 @@ export const useStreamFields = () => {
     },
     querySource: () => searchObj.data.query,
   });
-  correlationFilters.watchQuery();
+  retainCorrelationQueryWatcher(correlationFilters.watchQuery);
 
   const updateFieldValues = () => {
     try {
@@ -178,17 +189,22 @@ export const useStreamFields = () => {
     }
   };
 
-  const extractFields = async (options: { reuseLoadedSchema?: boolean } = {}) => {
+  const extractFields = async (options: ExtractFieldsOptions = {}) => {
     schemaRequestToken.value++;
     const capturedToken = schemaRequestToken.value;
-    searchObj.loadingStream = true;
+    const regroupPass = options.regroupWith !== undefined;
+    const orgId = store.state.selectedOrganization.identifier;
+    let lateSemanticGroups: { load: Promise<FieldAlias[]>; used: FieldAlias[] } | null = null;
+    if (!regroupPass) searchObj.loadingStream = true;
     await nextTick();
     try {
       searchObjDebug["extractFieldsStartTime"] = performance.now();
       searchObjDebug["extractFieldsWithAPI"] = "";
-      searchObj.data.errorMsg = "";
-      searchObj.data.errorDetail = "";
-      searchObj.data.countErrorMsg = "";
+      if (!regroupPass) {
+        searchObj.data.errorMsg = "";
+        searchObj.data.errorDetail = "";
+        searchObj.data.countErrorMsg = "";
+      }
       // Do NOT clear selectedStreamFields here — clearing it before the async
       // work completes causes the field list to briefly render empty, which
       // resets the scroll container's scrollTop to 0 and loses the user's
@@ -253,10 +269,14 @@ export const useStreamFields = () => {
 
         const streamType = searchObj.data.stream.streamType || "logs";
 
-        // Load org semantic groups + key fields config + field grouping in parallel (all cached after first call)
         const isEnterprise = config.isEnterprise === "true" || config.isCloud === "true";
-        const [semanticAliases, keyFieldsConfig, fieldGrouping] = await Promise.all([
-          isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
+        let semanticAliases: FieldAlias[] = options.regroupWith ?? [];
+        if (isEnterprise && !regroupPass) {
+          // The search waits on this function, so a slow groups request must not hold it; changed groups regroup when they land.
+          semanticAliases = getCachedSemanticGroups(orgId) ?? [];
+          lateSemanticGroups = { load: loadSemanticGroups(), used: semanticAliases };
+        }
+        const [keyFieldsConfig, fieldGrouping] = await Promise.all([
           loadKeyFields(),
           loadFieldGrouping(),
         ]);
@@ -902,13 +922,40 @@ export const useStreamFields = () => {
       correlationFilters.restore();
 
       searchObjDebug["extractFieldsEndTime"] = performance.now();
-      searchObj.loadingStream = false;
+      if (!regroupPass) searchObj.loadingStream = false;
+      if (lateSemanticGroups) {
+        regroupWhenSemanticGroupsArrive(lateSemanticGroups, capturedToken, orgId);
+      }
     } catch (e: any) {
-      searchObj.loadingStream = false;
+      if (!regroupPass) searchObj.loadingStream = false;
       console.log("Error while extracting fields.", e);
       notificationMsg.value = t("search.errorWhileExtractingStreamFields");
     }
   };
+
+  const regroupWhenSemanticGroupsArrive = (
+    late: { load: Promise<FieldAlias[]>; used: FieldAlias[] },
+    token: number,
+    orgId: string,
+  ) => {
+    void late.load.then(() => {
+      // fetchQuery returns the raw response; the cached copy keeps its reference when nothing changed, and survives a failed refresh.
+      const aliases = getCachedSemanticGroups(orgId);
+      if (!aliases?.length || aliases === late.used) return;
+      if (token !== schemaRequestToken.value) return;
+      // A stream or org change in flight runs its own extract, which reads these groups from the cache.
+      if (searchObj.loadingStream || orgId !== store.state.selectedOrganization.identifier) return;
+      if (!selectedSchemasLoaded()) return;
+      void extractFields({ reuseLoadedSchema: true, regroupWith: aliases });
+    });
+  };
+
+  const selectedSchemasLoaded = () =>
+    searchObj.data.stream.selectedStream.every((name: string) =>
+      searchObj.data.streamResults.list.some(
+        (stream: any) => stream.name === name && Array.isArray(stream.schema),
+      ),
+    );
 
   const loadStreamFields = async (streamName: string) => {
     try {
@@ -1352,5 +1399,19 @@ export const useStreamFields = () => {
     filterHitsColumns,
   };
 };
+
+// Every consumer syncs the same shared query, so one watcher serves all of them for as long as any is mounted.
+function retainCorrelationQueryWatcher(watchQuery: () => void): void {
+  if (correlationWatcherUsers++ === 0) {
+    correlationWatcherScope = effectScope(true);
+    correlationWatcherScope.run(watchQuery);
+  }
+  if (!getCurrentScope()) return;
+  onScopeDispose(() => {
+    if (--correlationWatcherUsers > 0) return;
+    correlationWatcherScope?.stop();
+    correlationWatcherScope = null;
+  });
+}
 
 export default useStreamFields;

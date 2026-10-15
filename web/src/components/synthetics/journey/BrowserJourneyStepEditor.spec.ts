@@ -641,36 +641,13 @@ describe("BrowserJourneyStepEditor subtest action", () => {
     expect((w2.emitted("update:step")!.at(-1)![0] as BrowserStep).subtest).toBeUndefined();
   });
 
-  // Both halves: without the ON case, the OFF assertion would pass against pre-gate code too.
-  it.each([
-    [true, true],
-    [false, false],
-  ])(
-    "offers the subtest action only when composition is enabled (flag=%s)",
-    async (flag, expected) => {
-      store.state.zoConfig.synthetics_subtests_enabled = flag;
-      const w = render({ action: "click" });
-      const values = w
-        .findComponent(OSelect)
-        .props("options")
-        .map((o: { value: string }) => o.value);
-      expect(values.includes("subtest")).toBe(expected);
-      store.state.zoConfig.synthetics_subtests_enabled = true;
-    },
-  );
-
-  it("keeps the subtest action for a row that already holds a reference while composition is off", () => {
-    store.state.zoConfig.synthetics_subtests_enabled = false;
-    try {
-      const w = render({ action: "subtest", subtest: { id: "login-test" } });
-      const values = w
-        .findComponent(OSelect)
-        .props("options")
-        .map((o: { value: string }) => o.value);
-      expect(values).toContain("subtest");
-    } finally {
-      store.state.zoConfig.synthetics_subtests_enabled = true;
-    }
+  it("always offers the subtest action", () => {
+    const w = render({ action: "click" });
+    const values = w
+      .findComponent(OSelect)
+      .props("options")
+      .map((o: { value: string }) => o.value);
+    expect(values).toContain("subtest");
   });
 
   const pick = async (w: ReturnType<typeof render>, picked: { id: string; name: string }) => {
