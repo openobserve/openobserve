@@ -65,6 +65,12 @@ export const forecastPointOf = (series: any, dataIndex: number | undefined) => {
   };
 };
 
+/** The alias of the first aggregate in a SQL query: count(...) as alias, avg(...) as alias, etc. */
+const aggregateAliasOf = (sqlQuery: string): string | null =>
+  sqlQuery.match(
+    /(?:count|sum|avg|min|max|median)\s*\([^)]+\)\s+as\s+["']?([^"',\s)]+)["']?/i,
+  )?.[1] || null;
+
 /** The SQL column a right-clicked threshold applies to, read off the query's y-axis or its SQL. */
 const sqlYAxisColumnOf = (
   query: any,
@@ -107,19 +113,17 @@ const sqlYAxisColumnOf = (
       yAxisColumn = match[1];
     } else {
       // Last resort: extract any aggregation column from SQL (first one found)
-      // Pattern: count(...) as alias, avg(...) as alias, etc.
-      const aggRegex =
-        /(?:count|sum|avg|min|max|median)\s*\([^)]+\)\s+as\s+["']?([^"',\s)]+)["']?/i;
-      const aggMatch = sqlQuery.match(aggRegex);
-      if (aggMatch && aggMatch[1]) {
-        yAxisColumn = aggMatch[1];
-      } else {
-        yAxisColumn = clickedSeriesName;
-      }
+      yAxisColumn = aggregateAliasOf(sqlQuery) ?? clickedSeriesName;
     }
   }
   return yAxisColumn;
 };
+
+/** A query's own y-axis column, for a query the user picked rather than clicked. */
+const ownYAxisColumnOf = (query: any, executedQuery: string | undefined): string | null =>
+  query?.fields?.y?.length
+    ? sqlYAxisColumnOf(query, executedQuery, undefined)
+    : aggregateAliasOf(executedQuery || query?.query || "");
 
 export function usePanelAlertCreation({
   panelSchema,
@@ -234,14 +238,17 @@ export function usePanelAlertCreation({
     const executedQueryOf = (index: number) =>
       executedPanelQuery(metadata.value?.queries, index) || queries[index]?.query;
     // Only a SQL threshold needs the y-axis column; PromQL compares the series value.
-    const yAxisColumnOf = (index: number) =>
-      queryType === "sql"
+    const yAxisColumnOf = (index: number) => {
+      if (queryType !== "sql") return null;
+      // The clicked series names a column of its own query only; any other pick resolves its own.
+      return !offerChoice || index === clicked
         ? sqlYAxisColumnOf(
             queries[index],
             executedQueryOf(index),
             contextMenuData.value?.seriesName,
           )
-        : null;
+        : ownYAxisColumnOf(queries[index], executedQueryOf(index));
+    };
 
     // The menu already chose the threshold, so the dialog is only for which query, which stream, or why not.
     const queryChoices = offerChoice

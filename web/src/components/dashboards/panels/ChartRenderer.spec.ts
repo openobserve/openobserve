@@ -596,13 +596,14 @@ describe("ChartRenderer", () => {
     });
 
     describe("a right-click on a line between its symbols", () => {
-      const twoLines = async () => {
+      const twoLines = async (extra: Record<string, unknown> = {}, second = {}) => {
         const echarts = await import("echarts/core");
         const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
         vi.mocked(mockChart.getOption).mockReturnValue({
           series: [
             {
               type: "line",
+              name: "a",
               data: [
                 [0, 1],
                 [1, 1],
@@ -610,12 +611,15 @@ describe("ChartRenderer", () => {
             },
             {
               type: "line",
+              name: "b",
               data: [
                 [0, 5],
                 [1, 9],
               ],
+              ...second,
             },
           ],
+          ...extra,
         });
         vi.mocked(mockChart.convertFromPixel).mockReturnValue([0, 6]);
         // Pixel x is 100 per step and pixel y is 10 per unit, so series 1 runs from (0, 50) to (100, 90).
@@ -645,6 +649,36 @@ describe("ChartRenderer", () => {
           dataIndex: 1,
         });
         expect(await rightClick(50, 300)).not.toHaveProperty("seriesIndex");
+      });
+
+      it("names no line on a stacked chart, where a line is drawn above its own values", async () => {
+        await twoLines({}, { stack: "q1-stack" });
+        await wrapper.setProps({ findLineOnContextMenu: true });
+
+        expect(await rightClick(75, 81)).toEqual({ x: 75, y: 81, value: 6 });
+      });
+
+      it("skips a line switched off in the legend", async () => {
+        await twoLines({ legend: [{ selected: { a: true, b: false } }] });
+        await wrapper.setProps({ findLineOnContextMenu: true });
+
+        expect(await rightClick(75, 81)).toEqual({ x: 75, y: 81, value: 6 });
+      });
+
+      it("places only the points near the cursor, however long the line", async () => {
+        const echarts = await import("echarts/core");
+        const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
+        const data = Array.from({ length: 10_000 }, (_, index) => [index, 1]);
+        vi.mocked(mockChart.getOption).mockReturnValue({ series: [{ type: "line", data }] });
+        vi.mocked(mockChart.convertFromPixel).mockReturnValue([5000, 1]);
+        vi.mocked(mockChart.convertToPixel).mockReset();
+        vi.mocked(mockChart.convertToPixel).mockImplementation(
+          (_finder: unknown, value: number[]) => [value[0] / 10, value[1] * 10],
+        );
+        await wrapper.setProps({ findLineOnContextMenu: true });
+
+        expect(await rightClick(500, 10)).toMatchObject({ seriesIndex: 0, dataIndex: 5000 });
+        expect(vi.mocked(mockChart.convertToPixel).mock.calls.length).toBeLessThan(250);
       });
 
       it("emits only the cursor reading by default, and never looks for the line", async () => {

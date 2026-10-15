@@ -17,7 +17,9 @@ export type PixelPoint = [number, number];
 
 export interface LineSeriesPixels {
   seriesIndex: number;
-  /** One entry per data index; null where the series draws nothing. */
+  /** Data index of `points[0]`. */
+  offset?: number;
+  /** One entry per data index from `offset`; null where the series draws nothing. */
   points: (PixelPoint | null)[];
 }
 
@@ -38,6 +40,42 @@ const distanceToSegment = (p: PixelPoint, a: PixelPoint, b: PixelPoint): number 
       ? 0
       : Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lengthSquared));
   return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
+};
+
+/** Last index whose x is at or left of `x`, -1 when none; null when an x cannot be placed. */
+const lastIndexAtOrBefore = (
+  count: number,
+  x: number,
+  xAt: (index: number) => number,
+): number | null => {
+  let low = 0;
+  let high = count - 1;
+  let last = -1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    const midX = xAt(mid);
+    if (!Number.isFinite(midX)) return null;
+    if (midX <= x) {
+      last = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return last;
+};
+
+/** The data indexes whose segments can pass within `tolerance` of `cursorX`, for points sorted by x. */
+export const indexesNearX = (
+  count: number,
+  cursorX: number,
+  xAt: (index: number) => number,
+  tolerance: number = LINE_HIT_TOLERANCE,
+): [number, number] | null => {
+  const from = lastIndexAtOrBefore(count, cursorX - tolerance, xAt);
+  const to = lastIndexAtOrBefore(count, cursorX + tolerance, xAt);
+  if (from === null || to === null || count === 0) return null;
+  return [Math.max(0, from), Math.min(count - 1, to + 1)];
 };
 
 const gap = (a: PixelPoint, b: PixelPoint): number => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -66,10 +104,10 @@ export const lineSeriesAtPoint = (
   tolerance: number = LINE_HIT_TOLERANCE,
 ): LineSeriesHit | null => {
   let best: (LineSeriesHit & { distance: number }) | null = null;
-  for (const { seriesIndex, points } of series) {
+  for (const { seriesIndex, offset = 0, points } of series) {
     const hit = nearestOnSeries(cursor, points);
     if (hit && hit.distance <= tolerance && (!best || hit.distance < best.distance)) {
-      best = { seriesIndex, ...hit };
+      best = { seriesIndex, distance: hit.distance, dataIndex: offset + hit.dataIndex };
     }
   }
   return best && { seriesIndex: best.seriesIndex, dataIndex: best.dataIndex };

@@ -116,6 +116,7 @@ import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import { withChartFont } from "@/utils/fonts";
 import {
+  indexesNearX,
   lineSeriesAtPoint,
   type LineSeriesPixels,
   type PixelPoint,
@@ -152,6 +153,13 @@ echarts.use([
 
 // Right-click reads a y-axis value, so only cartesian series types can answer it
 const CONTEXT_MENU_SERIES_TYPES = ["bar", "line", "scatter"];
+
+interface LineSeriesOption {
+  type?: string;
+  name?: string;
+  stack?: string;
+  data?: unknown;
+}
 
 // A line datum is `[x, y]`, `{ value: [x, y] }`, or a bare y on a category axis.
 const datumValue = (datum: unknown, dataIndex: number): (string | number)[] => {
@@ -405,28 +413,43 @@ export default defineComponent({
       }
     };
 
-    const linePixels = (): LineSeriesPixels[] =>
-      ((chart?.getOption()?.series ?? []) as { type?: string; data?: unknown }[]).map(
-        (series, seriesIndex) => ({
-          seriesIndex,
-          points:
-            series?.type !== "line" || !Array.isArray(series.data)
-              ? []
-              : series.data.map((datum: unknown, dataIndex: number) => {
-                  const value = datumValue(datum, dataIndex);
-                  if (value[1] === null || value[1] === undefined || value[1] === "") return null;
-                  const pixel = chart?.convertToPixel({ seriesIndex }, value);
-                  return Array.isArray(pixel) && pixel.every(Number.isFinite)
-                    ? (pixel as PixelPoint)
-                    : null;
-                }),
-        }),
-      );
+    const linePixels = (cursor: PixelPoint): LineSeriesPixels[] => {
+      const option = chart?.getOption() ?? {};
+      const series = (option.series ?? []) as LineSeriesOption[];
+      // A stacked line is drawn above its own values, so its raw position would name the wrong series.
+      if (series.some((entry) => entry?.type === "line" && entry.stack)) return [];
+      const legends = (option.legend ?? []) as { selected?: Record<string, boolean> }[];
+      const legendOff = (name: string | undefined) =>
+        name !== undefined && legends.some((legend) => legend?.selected?.[name] === false);
+      return series.flatMap((entry, seriesIndex) => {
+        const data = entry?.data;
+        if (entry?.type !== "line" || !Array.isArray(data) || legendOff(entry.name)) return [];
+        const pixelOf = (value: (string | number)[]) => {
+          const pixel = chart?.convertToPixel({ seriesIndex }, value);
+          return Array.isArray(pixel) && pixel.every(Number.isFinite)
+            ? (pixel as PixelPoint)
+            : null;
+        };
+        const nearby = indexesNearX(
+          data.length,
+          cursor[0],
+          (dataIndex) => pixelOf([datumValue(data[dataIndex], dataIndex)[0], 0])?.[0] ?? NaN,
+        );
+        if (!nearby) return [];
+        const points: (PixelPoint | null)[] = [];
+        for (let dataIndex = nearby[0]; dataIndex <= nearby[1]; dataIndex++) {
+          const value = datumValue(data[dataIndex], dataIndex);
+          const empty = value[1] === null || value[1] === undefined || value[1] === "";
+          points.push(empty ? null : pixelOf(value));
+        }
+        return [{ seriesIndex, offset: nearby[0], points }];
+      });
+    };
 
     // The series lookup only refines the menu; a failure must not cost the user the menu itself.
     const lineSeriesHit = (pixelPoint: PixelPoint) => {
       try {
-        return lineSeriesAtPoint(pixelPoint, linePixels());
+        return lineSeriesAtPoint(pixelPoint, linePixels(pixelPoint));
       } catch {
         return null;
       }

@@ -198,6 +198,36 @@ describe("usePanelActions", () => {
       closeAlertCreationDialog();
     });
 
+    it("puts the threshold on a picked raw-SQL query's own column, not the clicked series'", () => {
+      closeAlertCreationDialog();
+      const args = makeBase();
+      args.panelSchema.value.queries.push(
+        { query: 'select avg(latency) as "p50" from logs', fields: { stream: "logs" } } as any,
+        {
+          query: 'select approx_percentile_cont(latency, 0.95) as "p95" from logs',
+          fields: { stream: "logs" },
+        } as any,
+      );
+      const api = usePanelAlertCreation(args as any);
+      args.contextMenuData.value = { seriesName: "errors" };
+
+      api.handleCreateAlert({ condition: "above", threshold: 10, panelQueryIndex: 0 });
+      rebuildAlertPrefill({ queryIndex: 1 });
+      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toEqual({
+        column: "p50",
+        operator: ">=",
+        value: 10,
+      });
+
+      // No column of its own to find: better no HAVING than one on the clicked query's column.
+      rebuildAlertPrefill({ queryIndex: 2 });
+      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toBeUndefined();
+
+      rebuildAlertPrefill({ queryIndex: 0 });
+      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving?.column).toBe("errors");
+      closeAlertCreationDialog();
+    });
+
     it("keeps a builder query's right-clicked threshold in the SQL the form saves", () => {
       closeAlertCreationDialog();
       const args = makeBase();

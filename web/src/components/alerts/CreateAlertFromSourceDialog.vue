@@ -63,7 +63,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <!-- The whole picked query, laid out like the panel's Query Inspector. -->
       <div v-if="pickQueryOnly && pickedQuery" data-test="create-alert-picked-query">
         <div class="flex items-center justify-between">
           <span class="text-xs font-bold tracking-wider">
@@ -80,16 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <div
-          v-if="pickedQueryHtml"
           class="rounded-default bg-theme-body-bg-primary border-card-glass-border mt-1 max-h-40 [scrollbar-width:thin] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap"
           data-test="create-alert-picked-query-text"
           v-html="pickedQueryHtml"
-        ></div>
-        <div
-          v-else
-          class="rounded-default bg-theme-body-bg-primary border-card-glass-border mt-1 max-h-40 [scrollbar-width:thin] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap"
-          data-test="create-alert-picked-query-text"
-          v-text="pickedQuery"
         ></div>
       </div>
 
@@ -243,7 +235,6 @@ import { isPrefillBlocked } from "@/utils/alerts/alertPrefill";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { formatSqlForDisplay } from "@/utils/query/formatSql";
 
-// Pinned to the field's width so each option cuts to one line and shows its whole query on hover.
 const QUERY_PICKER_DROPDOWN = { width: "var(--reka-select-trigger-width)" };
 
 const props = defineProps<{
@@ -317,17 +308,26 @@ const pickedQuery = computed(
 );
 
 const pickedQueryHtml = ref("");
+let colorizeRun = 0;
+
+const escapedText = (text: string) =>
+  Object.assign(document.createElement("div"), { textContent: text }).innerHTML;
 
 watch(
   () => [pickQueryOnly.value, pickedQuery.value, props.prefill?.queryType] as const,
   async ([active, query, queryType]) => {
-    pickedQueryHtml.value = "";
+    const run = ++colorizeRun;
+    pickedQueryHtml.value = escapedText(query);
     if (!active || !query) return;
-    // Loaded on demand: the colorizer pulls in Monaco, and this dialog sits in the app shell.
-    const { colorizeQuery } = await import("@/utils/query/colorizeQuery");
-    const html = await colorizeQuery(query, queryType === "promql" ? "promql" : "sql");
-    // A newer pick may have landed while this one was colorizing.
-    if (pickedQuery.value === query) pickedQueryHtml.value = DOMPurify.sanitize(html);
+    try {
+      // Loaded on demand: the colorizer pulls in Monaco, and this dialog sits in the app shell.
+      const { colorizeQuery } = await import("@/utils/query/colorizeQuery");
+      const html = await colorizeQuery(query, queryType === "promql" ? "promql" : "sql");
+      // A later pick or prefill started its own run while this one awaited.
+      if (run === colorizeRun) pickedQueryHtml.value = DOMPurify.sanitize(html);
+    } catch {
+      // The plain text already shown is the fallback when the colorizer cannot load.
+    }
   },
   { immediate: true },
 );

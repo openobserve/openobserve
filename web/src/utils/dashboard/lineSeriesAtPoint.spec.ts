@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { lineSeriesAtPoint, type LineSeriesPixels } from "./lineSeriesAtPoint";
+import { indexesNearX, lineSeriesAtPoint, type LineSeriesPixels } from "./lineSeriesAtPoint";
 
 const flat: LineSeriesPixels = {
   seriesIndex: 0,
@@ -52,5 +52,30 @@ describe("lineSeriesAtPoint", () => {
   it("takes the first of two lines drawn on top of each other", () => {
     const twin = { ...flat, seriesIndex: 3 };
     expect(lineSeriesAtPoint([50, 100], [flat, twin])?.seriesIndex).toBe(0);
+  });
+
+  it("reports the data index of a window that starts past the series' first point", () => {
+    expect(lineSeriesAtPoint([75, 40], [{ ...spike, offset: 500 }])).toEqual({
+      seriesIndex: 2,
+      dataIndex: 501,
+    });
+  });
+});
+
+describe("indexesNearX", () => {
+  const every10 = (index: number) => index * 10;
+
+  it("takes the points within reach of the cursor plus one either side", () => {
+    expect(indexesNearX(100, 505, every10, 6)).toEqual([49, 52]);
+  });
+
+  it("clamps to the series' ends", () => {
+    expect(indexesNearX(3, -50, every10, 6)).toEqual([0, 0]);
+    expect(indexesNearX(3, 500, every10, 6)).toEqual([2, 2]);
+  });
+
+  it("gives up on a series whose x cannot be placed, or that has no points", () => {
+    expect(indexesNearX(10, 50, () => NaN)).toBeNull();
+    expect(indexesNearX(0, 50, every10)).toBeNull();
   });
 });

@@ -184,6 +184,8 @@ describe("buildPrefillFromPanel", () => {
         makeId,
       );
       expect(p.meta?.sqlHaving).toEqual({ column: "y_axis_1", operator: ">=", value: 4.42 });
+      // Only in the SQL: the aggregation keeps its neutral default so the condition is not applied twice.
+      expect(p.aggregation?.having).toEqual({ column: "y_axis_1", operator: ">=", value: 1 });
     });
 
     it("stays in the aggregation alone on a single-query panel, as before", () => {

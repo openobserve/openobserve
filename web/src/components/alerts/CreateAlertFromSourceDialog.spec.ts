@@ -25,10 +25,11 @@ import { normalizePrefill } from "@/utils/alerts/alertPrefill";
 const { copyToClipboard } = vi.hoisted(() => ({ copyToClipboard: vi.fn() }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard }));
 // Monaco's tokenizer does not run in jsdom; the markup it yields is all this dialog renders.
-vi.mock("@/utils/query/colorizeQuery", () => ({
-  colorizeQuery: async (query: string, lang: string) =>
-    `<span class="text-query-syntax-keyword" data-lang="${lang}">${query}</span><script>x</script>`,
-}));
+const colorized = async (query: string, lang: string) =>
+  `<span class="text-query-syntax-keyword" data-lang="${lang}">${query}</span><script>x</script>`;
+const { colorizeQuery } = vi.hoisted(() => ({ colorizeQuery: vi.fn() }));
+vi.mock("@/utils/query/colorizeQuery", () => ({ colorizeQuery }));
+colorizeQuery.mockImplementation(colorized);
 
 // ODialog and OCodeBlock are portal/highlighter heavy — stub them down to what
 // this component's own logic needs.
@@ -397,6 +398,35 @@ describe("CreateAlertFromSourceDialog", () => {
       expect(wrapper.find('[data-test="create-alert-picked-query-text"]').text()).toBe(
         "avg(disk_used)",
       );
+    });
+
+    it("keeps the plain query when the colorizer fails to load", async () => {
+      colorizeQuery.mockRejectedValueOnce(new Error("chunk failed"));
+      wrapper = mountDialog(
+        panelPick({ queryChoices: [choices[0], { ...choices[1], query: "a < b" }] }),
+      );
+      await flushPromises();
+
+      const text = wrapper.find('[data-test="create-alert-picked-query-text"]');
+      expect(text.text()).toBe("a < b");
+      expect(text.find(".text-query-syntax-keyword").exists()).toBe(false);
+    });
+
+    it("keeps the latest coloring when an earlier run for the same text finishes last", async () => {
+      let finishFirst: (html: string) => void = () => {};
+      colorizeQuery.mockImplementationOnce(
+        () => new Promise<string>((resolve) => (finishFirst = resolve)),
+      );
+      wrapper = mountDialog(panelPick());
+      await flushPromises();
+      await wrapper.setProps({ prefill: panelPick({ queryType: "sql" }) });
+      await flushPromises();
+
+      finishFirst('<span class="stale">sum(rate(io_ops[1m]))</span>');
+      await flushPromises();
+      const text = wrapper.find('[data-test="create-alert-picked-query-text"]');
+      expect(text.find(".stale").exists()).toBe(false);
+      expect(text.find(".text-query-syntax-keyword").attributes("data-lang")).toBe("sql");
     });
 
     it("hands the hidden non-blocking warnings on to the form", async () => {

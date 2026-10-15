@@ -291,8 +291,11 @@ export const buildPrefillFromPanel = (
 
   const hasThreshold = input.threshold !== undefined && !!input.condition;
   const operator = input.condition === "above" ? ">=" : "<=";
+  // A picked built query's threshold goes into its SQL alone: the form saves the SQL, and a second copy in the aggregation would apply it twice.
+  const thresholdInSql =
+    hasThreshold && !isPromql && !!input.yAxisColumn && (!aggregation || isQueryPick);
 
-  if (hasThreshold && aggregation) {
+  if (hasThreshold && aggregation && !thresholdInSql) {
     aggregation.having.value = input.threshold as number;
     aggregation.having.operator = operator;
   }
@@ -332,8 +335,7 @@ export const buildPrefillFromPanel = (
     prefill.sql = sourceQuery;
     // Raw-SQL panels get their threshold as a HAVING clause injected into the
     // query text, which needs the SQL parser — the consumer applies this.
-    // A picked built query needs it too: the form saves the SQL, not the aggregation.
-    if (hasThreshold && (!aggregation || isQueryPick) && input.yAxisColumn) {
+    if (thresholdInSql) {
       prefill.meta = {
         ...prefill.meta,
         sqlHaving: {
