@@ -1,0 +1,10 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/service-graph-side-panel.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/service-catalog.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/service-graph.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "The non-modal side panel (ServiceGraphNodeSidePanel + ODrawer) is its own feature area, distinct from the catalog table behavior. service-catalog.spec.js covers pagination/sort/filter/pills and has exactly ONE side-panel smoke test ('Row click opens side panel') that only asserts visibility — none of the non-modal mechanics (overlay pointer-events-none, outside-click ignored, behind-page interactivity, close/reopen, Escape, RED/ops/tabs/metrics) are covered there. service-graph.spec.js is @enterprise-gated (topology endpoint is #[cfg(feature=\"enterprise\")]) and does not run in the OSS CI. The run-context spec_path designates a dedicated new spec; the OSS-reachable entry is Services Catalog, so the new spec drives the shared panel through that path. Register the new file in ci_matrix.json under the Traces group run_files."
+}
