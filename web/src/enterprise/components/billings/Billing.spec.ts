@@ -891,7 +891,7 @@ describe("Billing Component", () => {
       testWrapper.unmount();
     });
 
-    it("still logs non-401 billing errors", async () => {
+    it("still logs billing errors other than 401 and 403", async () => {
       const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       (BillingService.list_subscription as any).mockRejectedValue(new Error("Network error"));
 

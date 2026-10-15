@@ -231,7 +231,7 @@ describe("TrialPeriod.vue", () => {
       expect(strip().exists()).toBe(true);
     });
 
-    it("keeps the strip and logs a failed lookup that is not a 401", async () => {
+    it("keeps the strip and logs a failed lookup that is not a 401 or 403", async () => {
       const error = vi.spyOn(console, "error").mockImplementation(() => {});
       vi.mocked(BillingService.list_subscription).mockRejectedValue({
         response: { status: 500 },
