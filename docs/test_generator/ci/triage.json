@@ -1,0 +1,28 @@
+{
+  "feature_slug": "billing-group-remove-leave",
+  "feature_title": "Billing Group Remove Member & Leave Group",
+  "area": "Management",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "billingGroupRemoveLeave.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Management/billingGroupRemoveLeave.spec.js",
+  "playwright_group": "Management",
+  "source_files": [
+    "web/src/enterprise/components/billings/BillingGroup.vue",
+    "web/src/enterprise/components/billings/Billing.vue",
+    "web/src/services/billings.ts",
+    "src/api/management/src/request/organization/billing_group.rs"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Changed paths span both repos. OSS files: src/api/http/src/handler/http/router/mod.rs, src/api/management/src/request/organization/billing_group.rs, web/src/services/billings.ts, and web/src/locales/** (plus the translation-state file). Enterprise files: web/src/enterprise/components/billings/Billing.vue and BillingGroup.vue, and o2_enterprise/src/enterprise/cloud/billing_group.rs + table/customer_billings.rs + metering/common.rs. The diff is explicitly the linked OSS+ENT sister pair (o2-enterprise #2862), the router gates the billing_group module behind #[cfg(feature = \"cloud\")], and keywords 'billing group', 'SuperOrg', and 'Stripe' corroborate the enterprise nature — hence 'both'.",
+    "skip": "No explicit opt-out (trigger_comment.txt and feature_hint.txt are empty, no tests-added label passed). The change is not docs/CI-only: it adds user-facing controls and dialogs in web/src/enterprise/components/billings/BillingGroup.vue, so no skip condition applies.",
+    "e2e": "The diff adds new user-facing UI flow: a per-row 'Remove' button plus a mobile dropdown in the member table, a 'Leave billing group' button on the member view, and two confirmation dialogs backed by new DELETE endpoints, with success/error toasts and loading state. These are new controls, new interactions, and new component state that warrant UI verification.",
+    "area": "The bulk of the UI changes live in web/src/enterprise/components/billings/, which is the org/billing management surface. The existing 'Management' area already hosts enterprise settings and billing-adjacent specs (model-pricing.spec.js, cipherKeys.spec.js, logoManagement.spec.js), so it is the closest existing folder for a billing-group spec.",
+    "group": "The enterprise overlay tests/ui-testing/ci-matrix/ci_matrix.ent.json appends enterprise specs to the shared 'Management' shard, and ci_matrix_cloud.json also carries a 'Management' group. A billing-group management spec belongs there. Note: the OSS ci_matrix.json is not present in this repo (this is o2-enterprise), so the Engineer should append the spec to the 'Management' group in the OSS ci_matrix.json / enterprise overlay when authoring.",
+    "existing_tests": "No Playwright E2E specs under tests/ui-testing/playwright-tests/ are changed in the diff — no E2E specs in the diff. The only test files present are Vitest unit specs (web/src/enterprise/components/billings/BillingGroup.spec.ts, web/src/services/billings.spec.ts) and Rust #[cfg(test)] modules, which are unit tests, not E2E coverage."
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "feature_slug": "billing-group-remove-leave",
+  "feature_title": "Billing Group Remove Member & Leave Group",
+  "area": "Management",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "billingGroupRemoveLeave.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Management/billingGroupRemoveLeave.spec.js",
+  "playwright_group": "Management",
+  "source_files": [
+    "web/src/enterprise/components/billings/BillingGroup.vue",
+    "web/src/enterprise/components/billings/Billing.vue",
+    "web/src/services/billings.ts",
+    "src/api/management/src/request/organization/billing_group.rs"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
