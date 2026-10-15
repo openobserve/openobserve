@@ -3199,7 +3199,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_COMPACT_TANTIVY_BUILDER_THREAD_NUM",
         default = 2,
-        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. 0 is treated as 1"
+        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. Minimum 2"
     )]
     pub tantivy_builder_thread_num: usize,
 }
@@ -4776,6 +4776,9 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
+    }
+    if cfg.compact.tantivy_builder_thread_num < 2 {
+        cfg.compact.tantivy_builder_thread_num = 2;
     }
     if !cfg.compact.fast_mode && cfg.common.local_mode {
         cfg.compact.fast_mode = true;

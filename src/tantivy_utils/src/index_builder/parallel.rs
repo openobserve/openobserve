@@ -503,7 +503,7 @@ mod tests {
                 &["continent".to_string(), "name".to_string()],
                 &stream_schema,
             ),
-            1,
+            2,
         )
         .await
         .unwrap()
