@@ -32,8 +32,8 @@ use config::{
         },
     },
     router::{
-        extract_path_without_query, is_fixed_querier_route, is_querier_route,
-        is_querier_route_by_body,
+        extract_path_without_query, is_fixed_querier_route, is_public_dashboard_slug,
+        is_querier_route, is_querier_route_by_body, public_dashboard_slug,
     },
     utils::{json, rand::get_rand_element},
 };
@@ -108,6 +108,14 @@ pub async fn dispatch(req: Request) -> Response {
         .unwrap_or("")
         .to_string();
 
+    let public_slug = public_dashboard_slug(&path).map(str::to_string);
+    if public_slug
+        .as_deref()
+        .is_some_and(|slug| !is_public_dashboard_slug(slug))
+    {
+        return (StatusCode::NOT_FOUND, "not found").into_response();
+    }
+
     // Resolve the candidate nodes (preferred node first, the rest are fail-over
     // targets used when the preferred node can't be reached).
     let (full_path, nodes) = match resolve_candidates(&path, &cfg.common.base_uri).await {
@@ -124,7 +132,12 @@ pub async fn dispatch(req: Request) -> Response {
     };
 
     // Route based on request type
-    if cfg.common.result_cache_enabled && is_querier_route_by_body(&path) {
+    if let Some(slug) = public_slug.filter(|_| req.method() == Method::GET) {
+        let headers = req.headers().clone();
+        let group = Some(RoleGroup::Interactive);
+        let payload = QuerierPayload::Empty;
+        proxy_by_key(full_path, nodes, &slug, group, &headers, &payload, start).await
+    } else if cfg.common.result_cache_enabled && is_querier_route_by_body(&path) {
         proxy_with_body_routing(req, full_path, nodes, start).await
     } else {
         proxy_request(req, full_path, nodes, start).await
@@ -365,10 +378,32 @@ async fn proxy_with_body_routing(
         }
         Err(e) => return e,
     };
+    proxy_by_key(
+        path,
+        nodes,
+        &routing_key,
+        None,
+        &headers,
+        &querier_payload,
+        start,
+    )
+    .await
+}
 
-    // Use routing_key for consistent hash node selection
+/// Proxies to the querier the routing key hashes to (for its caches), failing over to the other
+/// online queriers, which only costs a cache miss.
+async fn proxy_by_key(
+    path: String,
+    nodes: Vec<Node>,
+    routing_key: &str,
+    group: Option<RoleGroup>,
+    headers: &HeaderMap,
+    querier_payload: &QuerierPayload,
+    start: std::time::Instant,
+) -> Response {
+    let query_path = extract_path_without_query(&path);
     let Some(node_name) =
-        cluster::get_node_from_consistent_hash(&routing_key, &Role::Querier, None).await
+        cluster::get_node_from_consistent_hash(routing_key, &Role::Querier, group).await
     else {
         log::error!(
             "dispatch: {} consistent hash error: {:?}, took: {} ms",
@@ -397,7 +432,7 @@ async fn proxy_with_body_routing(
     candidates.extend(nodes.into_iter().filter(|n| n.uuid != primary.uuid));
 
     let is_streaming = is_streaming_endpoint(query_path);
-    let req_headers = build_request_headers(&headers, is_streaming);
+    let req_headers = build_request_headers(headers, is_streaming);
     let client = get_http_client();
     let attempts = max_attempts(candidates.len());
     let mut last_error: Option<(String, reqwest::Error)> = None;
@@ -408,7 +443,7 @@ async fn proxy_with_body_routing(
             client,
             &target.full_url,
             req_headers.clone(),
-            &querier_payload,
+            querier_payload,
         );
 
         match upstream_req.send().await {
@@ -985,6 +1020,38 @@ mod tests {
         assert_eq!(max_attempts(100), 1 + max_retries);
         // capped by the number of available nodes
         assert!(max_attempts(2) <= 2);
+    }
+
+    #[tokio::test]
+    async fn a_malformed_public_dashboard_slug_is_404_without_proxying() {
+        for path in [
+            "/api/public_dashboards/short",
+            "/api/public_dashboards/k8Zt2mR7aB3cD4eF5gH6Q-/data?range=r3600",
+            "/api/public_dashboards/..%2F..%2Fetc%2Fpasswd/data",
+        ] {
+            let req = Request::builder().uri(path).body(Body::empty()).unwrap();
+            assert_eq!(
+                dispatch(req).await.status(),
+                StatusCode::NOT_FOUND,
+                "{path}"
+            );
+        }
+    }
+
+    // No querier is online in a unit test, so a well-formed slug reaching the proxy answers 503.
+    #[tokio::test]
+    async fn a_well_formed_public_dashboard_slug_is_proxied_to_a_querier() {
+        for path in [
+            "/api/public_dashboards/k8Zt2mR7aB3cD4eF5gH6Qx",
+            "/api/public_dashboards/k8Zt2mR7aB3cD4eF5gH6Qx/data?range=r3600",
+        ] {
+            let req = Request::builder().uri(path).body(Body::empty()).unwrap();
+            assert_eq!(
+                dispatch(req).await.status(),
+                StatusCode::SERVICE_UNAVAILABLE,
+                "{path}"
+            );
+        }
     }
 
     #[tokio::test]
