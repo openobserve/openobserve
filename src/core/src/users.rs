@@ -1202,6 +1202,9 @@ pub async fn remove_user_from_org(
                             ),
                         }
                     }
+                    // After the membership is gone: their links ran with their stream access.
+                    crate::public_dashboards::pause_departed_publisher_links(org_id, email_id)
+                        .await;
                     if let Err(e) =
                         infra::table::query_history::delete_by_user(org_id, email_id).await
                     {
@@ -1898,6 +1901,59 @@ mod tests {
         assert_eq!(resp.status(), http::StatusCode::OK);
         assert_eq!(history_count("dummy", email).await, 0);
         assert_eq!(history_count("other", email).await, 1);
+    }
+
+    #[tokio::test]
+    async fn gate14_removing_a_publisher_pauses_their_public_links_after_the_membership_delete() {
+        use infra::table::{entity::public_dashboards::Model as Link, public_dashboards as links};
+
+        let _guard = set_up().await;
+        links::create_tables_for_tests(get_orm_client_rw().await)
+            .await
+            .unwrap();
+        let email = "public-link-publisher@example.com";
+        create_user_with_history(email).await;
+        let id = config::ider::uuid();
+        let link = Link {
+            id: id.clone(),
+            org_id: "dummy".to_string(),
+            folder_id: "default".to_string(),
+            dashboard_id: "d1".to_string(),
+            slug: config::utils::rand::generate_random_string(22),
+            name: "Exec view".to_string(),
+            visibility: 1,
+            time_ranges: None,
+            default_range_key: None,
+            frozen_variables: None,
+            refresh_secs: 300,
+            dashboard_version: 8,
+            published_by: email.to_string(),
+            enabled: true,
+            expires_at: None,
+            created_by: email.to_string(),
+            updated_by: None,
+            created_at: 1,
+            updated_at: 1,
+            rev: 1,
+            deleted_at: None,
+            last_accessed_at: None,
+            access_count: 0,
+        };
+        links::insert_capped(get_orm_client_rw().await, &link, 50, 10)
+            .await
+            .unwrap();
+
+        let resp = remove_user_from_org("dummy", email, "admin@zo.dev")
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        assert!(infra_table::org_users::get("dummy", email).await.is_err());
+        let row = links::get(get_orm_client_rw().await, &id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!row.enabled, "the departed publisher's link is paused");
+        assert!(row.rev > link.rev, "the pause bumped the revision");
     }
 
     #[tokio::test]
