@@ -23,6 +23,8 @@ import {
   alignPrevious,
   foldTrend,
   pairParam,
+  parseInterval,
+  parsePair,
   previousTrendPeriods,
   resolveInterval,
   resolvePair,
@@ -207,13 +209,12 @@ export default function useFunnelTrend(deps: TrendDeps) {
   });
 
   const setPair = (v: unknown) => {
-    const [a, b] = String(v).split("-").map(Number);
-    const n = def.value.steps.length;
-    pa.funnelPair.value = a === 1 && b === n ? null : { a, b };
+    const p = parsePair(v);
+    pa.funnelPair.value = p && !(p.a === 1 && p.b === def.value.steps.length) ? p : null;
   };
 
   const setInterval = (v: unknown) => {
-    pa.funnelInterval.value = v === "day" || v === "week" || v === "month" ? v : "auto";
+    pa.funnelInterval.value = parseInterval(v);
   };
 
   const hold = () => {
@@ -246,7 +247,10 @@ export default function useFunnelTrend(deps: TrendDeps) {
   /** Runs the trend for the funnel on screen; an answered or running key is left alone unless forced. */
   const run = async (d: FunnelDef, force = false) => {
     if (!shown.value) return hold();
+    const before = key.value;
     await pa.loadDataStart();
+    // A newer funnel or first-data day changed the key meanwhile, and the key watcher runs that one.
+    if (key.value !== before) return;
     const k = key.value;
     const p = periods.value;
     const cur = pa.range.value;

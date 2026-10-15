@@ -53,9 +53,11 @@ const stillConvertingData = (
   });
 
 // Buckets sit on whole numbers of a value axis, so a band can span a bucket's full width.
-const bands = (input: TrendChartInput, buckets: TrendBucket[]) =>
-  buckets.flatMap((b, i) => {
-    const label = input.bandLabel(b);
+// A bucket is a gap only when no series has entrants there; before-data is the same for every series.
+const bands = (input: TrendChartInput) =>
+  (input.series[0]?.data.buckets ?? []).flatMap((b, i) => {
+    const gap = b.beforeData || input.series.every((s) => s.data.buckets[i]?.empty);
+    const label = gap ? input.bandLabel(b) : null;
     return label ? [[{ name: label, xAxis: i - 0.5 }, { xAxis: i + 0.5 }]] : [];
   });
 
@@ -120,7 +122,7 @@ export function trendChartOptions(input: TrendChartInput, t: TranslateFn): Recor
               silent: true,
               itemStyle: { color: band },
               label: { color: grey, position: "insideTop" },
-              data: bands(input, s.data.buckets),
+              data: bands(input),
             },
           }
         : {}),

@@ -237,7 +237,6 @@ const TABLE_MIN_REM = 56.5;
 const TABLE_MIN_NO_TIME_REM = 47.5;
 // The previous-period and change columns; past the rail's minimum the table scrolls inside the card.
 const TABLE_COMPARE_EXTRA_REM = 13;
-// The trend table's four columns plus room for the chart's axis labels.
 const TREND_MIN_REM = 40;
 const SEPARATOR_REM = 2;
 

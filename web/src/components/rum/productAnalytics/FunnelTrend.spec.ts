@@ -185,6 +185,46 @@ describe("FunnelTrend (P0-9)", () => {
     expect(options.series[0].name).toBe("8–15 Oct");
   });
 
+  it("a breakdown gap band needs every value empty; one empty value is not a chart-wide gap", async () => {
+    const periods = periodsOf(8);
+    const hits = [
+      { dim: "Chrome", un: 0, tot: 90, bk: 1, ca: 10, cb: 5 },
+      { dim: "Safari", un: 0, tot: 40, bk: 1, ca: 4, cb: 2 },
+      { dim: "Safari", un: 0, tot: 40, bk: 2, ca: 40, cb: 8 },
+    ];
+    const w = await mountTrend({
+      breakdown: true,
+      dimLabel: raw("Browser"),
+      periods,
+      series: foldTrend(hits, periods, ctx, true),
+    });
+    const options = (w.findComponent({ name: "ChartRenderer" }) as unknown as ChartStub).props(
+      "data",
+    ).options;
+    const banded = options.series[0].markArea.data.map(
+      (a: { xAxis: number }[]) => a[0].xAxis + 0.5,
+    );
+    expect(banded).not.toContain(1);
+    expect(banded).not.toContain(2);
+    expect(banded).toContain(0);
+  });
+
+  it("the pivot marks every still-converting day, as Users mode's window leaves several open", async () => {
+    const periods = periodsOf(8);
+    const hits = [{ dim: "Chrome", un: 0, tot: 9, bk: 1, ca: 10, cb: 5 }];
+    const w = await mountTrend({
+      breakdown: true,
+      dimLabel: raw("Browser"),
+      periods,
+      series: foldTrend(hits, periods, { ...ctx, windowUs: DAY }, true),
+      today: false,
+    });
+    const head = w.find('[data-test="rum-analytics-funnel-trend-table"] thead').text();
+    expect(head).toContain("14 Oct · Still converting");
+    expect(head).toContain("15 Oct · Still converting");
+    expect(head).not.toContain("13 Oct · Still converting");
+  });
+
   it("a breakdown pivots value × day up to 8 days, and past that shows averages without today", async () => {
     const hits = [
       { dim: "Chrome", un: 0, bk: 1, ca: 10, cb: 5 },

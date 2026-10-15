@@ -385,12 +385,12 @@ const columns = computed<OTableColumnDef<Row>[]>(() => {
     meta: { fillRemaining: true },
   };
   if (pivot.value) {
-    const running = props.periods?.runningIndex ?? null;
+    const still = (i: number) => props.series.some((s) => s.buckets[i]?.stillConverting);
     return [
       first,
       ...labels.value.map((l, i) => ({
         id: `b${i}`,
-        header: i === running ? raw(`${l} · ${stillLabel.value}`) : raw(l),
+        header: still(i) ? raw(`${l} · ${stillLabel.value}`) : raw(l),
         accessorFn: (r: Row) => r.pivot?.[i] ?? null,
         size: 100,
         meta: { align: "right" as const },

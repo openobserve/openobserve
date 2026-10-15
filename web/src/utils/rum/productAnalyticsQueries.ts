@@ -1536,8 +1536,18 @@ const funnelCtes = (
   const exs = p.between.map((x) => `${exAgg(x.j)} AS ex${x.j}`);
   const seen = p.n1.map((i) => `SUM(m${i}) AS seen${i}`);
   const firstDim = "first_value(dim ORDER BY CASE WHEN m1 = 1 THEN 0 ELSE 1 END, t) AS dim";
+  // A later step counts from the unit's first step 1 on, so a stray earlier event cannot move its bucket.
+  if (entry !== null && entry > 1) {
+    ctes.push(
+      `xe AS (SELECT *, MIN(CASE WHEN m1 = 1 THEN t END) OVER (PARTITION BY ${partition}) AS t1w FROM ${source})`,
+    );
+    source = "xe";
+  }
   // Server time in µs, so buckets compare with range bounds; t is the device clock in ms.
-  const entryCols = entry !== null ? [`MIN(CASE WHEN m${entry} = 1 THEN ts END) AS entry_ts`] : [];
+  const entryCols =
+    entry === null
+      ? []
+      : [`MIN(CASE WHEN m${entry} = 1${entry > 1 ? " AND t >= t1w" : ""} THEN ts END) AS entry_ts`];
   const entryCarry = entry !== null ? ["entry_ts"] : [];
   if (users && windowMs) {
     // A windowed sequence spans the user's sessions, so it aggregates the user's rows directly.
@@ -1667,9 +1677,9 @@ export function funnelTrendSql(
       `tb AS (SELECT dim, CASE WHEN r${a} = 1 THEN ${bk} END AS bk, SUM(r1) AS c1, SUM(r${a}) AS ca, SUM(r${b}) AS cb FROM ${from} GROUP BY dim, CASE WHEN r${a} = 1 THEN ${bk} END)`,
       "tk AS (SELECT *, SUM(c1) OVER (PARTITION BY dim) AS tot, CASE WHEN dim IS NULL OR dim = '' THEN 1 ELSE 0 END AS un FROM tb)",
       "tr AS (SELECT *, DENSE_RANK() OVER (ORDER BY un, tot DESC, dim) AS rk FROM tk)",
-      `tg AS (SELECT CASE WHEN ${top} THEN dim END AS gd, un, bk, ca, cb FROM tr WHERE bk IS NOT NULL)`,
+      `tg AS (SELECT CASE WHEN ${top} THEN dim END AS gd, un, tot, bk, ca, cb FROM tr WHERE bk IS NOT NULL)`,
     ],
-    `SELECT gd AS dim, MIN(un) AS un, bk, SUM(ca) AS ca, SUM(cb) AS cb FROM tg GROUP BY gd, bk ORDER BY bk, gd LIMIT ${m * (BREAKDOWN_TOP + 1)}`,
+    `SELECT gd AS dim, MIN(un) AS un, MAX(tot) AS tot, bk, SUM(ca) AS ca, SUM(cb) AS cb FROM tg GROUP BY gd, bk ORDER BY bk, gd LIMIT ${m * (BREAKDOWN_TOP + 1)}`,
   );
 }
 

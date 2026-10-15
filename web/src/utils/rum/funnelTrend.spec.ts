@@ -229,6 +229,15 @@ describe("foldTrend", () => {
     expect(unnamed.map((s) => s.kind)).toEqual(["notSet"]);
   });
 
+  it("orders breakdown values by the SQL's step-1 rank total, not by step-a entrants", () => {
+    const hits = [
+      { dim: "Safari", un: 0, tot: 20, bk: 1, ca: 30, cb: 5 },
+      { dim: "Chrome", un: 0, tot: 90, bk: 1, ca: 4, cb: 1 },
+      { dim: null, un: 0, tot: 500, bk: 1, ca: 50, cb: 1 },
+    ];
+    expect(foldTrend(hits, p, ctx(), true).map((s) => s.value)).toEqual(["Chrome", "Safari", null]);
+  });
+
   it("a breakdown value's average pools closed buckets and leaves the still-converting one out", () => {
     const hits = [
       { dim: "Chrome", un: 0, bk: 1, ca: 10, cb: 5 },

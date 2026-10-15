@@ -175,7 +175,8 @@ export function foldTrend(
     const id = named(r.dim) ? String(r.dim) : REST_ID;
     groups.set(id, [...(groups.get(id) ?? []), r]);
   }
-  const total = (id: string) => (groups.get(id) ?? []).reduce((s, r) => s + num(r.ca), 0);
+  // The SQL ranked values by step-1 units, so the order and colours match the Steps breakdown.
+  const total = (id: string) => Math.max(0, ...(groups.get(id) ?? []).map((r) => num(r.tot)));
   const ids = [...groups.keys()]
     .filter((id) => id !== REST_ID)
     .sort((x, y) => total(y) - total(x) || x.localeCompare(y));
