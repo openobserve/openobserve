@@ -325,6 +325,7 @@ import {
   usePanelDownload,
 } from "@/composables/dashboard/usePanelActions";
 import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
+import { isAlertableQuery } from "@/utils/alerts/prefill/fromPanel";
 import { overlayNewDataOnOldOptions, isOverlayEligible } from "@/utils/dashboard/streaming";
 import { usePanelExemplars } from "@/composables/dashboard/usePanelExemplars";
 import { usePanelExemplarInteraction } from "@/composables/dashboard/usePanelExemplarInteraction";
@@ -1179,7 +1180,12 @@ export default defineComponent({
       alertSource,
     });
     // Only a multi-query panel asks which query, so only it needs the clicked series' query resolved.
-    const hasSeveralVisibleQueries = computed(() => visibleQueryIndexes.value.length > 1);
+    const hasSeveralVisibleQueries = computed(
+      () =>
+        visibleQueryIndexes.value.filter((index: number) =>
+          isAlertableQuery(panelSchema.value?.queries?.[index]),
+        ).length > 1,
+    );
     // SQL drops hidden queries' data but not their metadata, so a series' position counts the kept entries only.
     const sqlPanelQueryIndex = (position: number): number | undefined => {
       const kept = (Array.isArray(data.value) ? data.value : [])
@@ -1204,6 +1210,10 @@ export default defineComponent({
           : series?._panelQueryIndex;
       openAlertContextMenu({
         ...event,
+        // A query plotting several y fields needs to know which one the clicked series drew.
+        ...(hasSeveralVisibleQueries.value && typeof series?.yAxisGroup === "number"
+          ? { yField: series.yAxisGroup }
+          : {}),
         panelQueryIndex,
         seriesRole: series?._seriesRole,
         ...(series?._seriesRole === "forecast"

@@ -305,6 +305,91 @@ describe("usePanelActions", () => {
       });
     });
 
+    describe("a builder query plotting two y fields", () => {
+      const twoY = () => {
+        const args = makeBase();
+        args.panelSchema.value.queries = [
+          {
+            query: 'select count(*) as "y_axis_1", avg(took) as "y_axis_2" from logs',
+            customQuery: false,
+            fields: {
+              stream: "logs",
+              stream_type: "logs",
+              y: [
+                { column: "_timestamp", alias: "y_axis_1", aggregationFunction: "count" },
+                { column: "took", alias: "y_axis_2", aggregationFunction: "avg" },
+              ],
+            },
+          } as any,
+          { query: 'select count(*) as "warns" from logs', fields: { stream: "logs" } } as any,
+        ];
+        args.metadata.value = { queries: [] };
+        return args;
+      };
+      beforeEach(() => closeAlertCreationDialog());
+
+      it("writes the threshold on the y field the clicked series drew", () => {
+        const args = twoY();
+        args.contextMenuData.value = { yField: 1 };
+        usePanelAlertCreation(args as any).handleCreateAlert({
+          condition: "above",
+          threshold: 250,
+          panelQueryIndex: 0,
+        });
+
+        expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toEqual({
+          column: "y_axis_2",
+          operator: ">=",
+          value: 250,
+        });
+      });
+
+      it("leaves the threshold to the form when the click names no y field", () => {
+        const args = twoY();
+        usePanelAlertCreation(args as any).handleCreateAlert({
+          condition: "above",
+          threshold: 250,
+          panelQueryIndex: 0,
+        });
+
+        const prefill = alertCreationDialog.value?.prefill;
+        expect(prefill?.meta?.sqlHaving).toBeUndefined();
+        expect(prefill?.aggregation?.having).toMatchObject({ operator: ">=", value: 1 });
+      });
+    });
+
+    describe("an empty query slot", () => {
+      beforeEach(() => closeAlertCreationDialog());
+
+      it("is no alert target, so the one real query goes straight to the form", () => {
+        const args = makeBase();
+        args.panelSchema.value.queries.push({ query: "  ", fields: { stream: "logs" } } as any);
+        const api = usePanelAlertCreation(args as any);
+
+        api.handleCreateAlert({ condition: "above", threshold: 10 });
+        expect(alertCreationDialog.value).toBeNull();
+        expect(args.router.push).toHaveBeenCalledTimes(1);
+        expect(readAlertPrefill()?.sql).toContain("where level");
+
+        api.handleCreateAlert({ condition: "above", threshold: 10, panelQueryIndex: 0 });
+        expect(alertCreationDialog.value).toBeNull();
+        expect(args.router.push).toHaveBeenCalledTimes(2);
+      });
+
+      it("is left out of the choices beside two real queries", () => {
+        const args = makeBase();
+        args.panelSchema.value.queries.push(
+          { query: "", fields: { stream: "logs" } } as any,
+          { query: 'select count(*) as "warns" from logs', fields: { stream: "logs" } } as any,
+        );
+        usePanelAlertCreation(args as any).handleCreateAlert({ condition: "above", threshold: 10 });
+
+        expect(alertCreationDialog.value?.prefill.queryChoices?.map((c) => c.index)).toEqual([
+          0, 2,
+        ]);
+      });
+    });
+
     it("does nothing when query is missing", () => {
       const args = makeBase();
       args.panelSchema.value.queries = [];

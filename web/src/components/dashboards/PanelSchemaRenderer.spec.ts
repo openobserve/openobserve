@@ -2285,13 +2285,14 @@ describe("PanelSchemaRenderer", () => {
         options: {
           series: [
             { name: "a", _queryIndex: 0, _panelQueryIndex: 0 },
-            { name: "c", _queryIndex: 1, _panelQueryIndex: 1 },
+            { name: "c", _queryIndex: 1, _panelQueryIndex: 1, yAxisGroup: 1 },
           ],
         },
       };
 
       wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 1 });
       expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(2);
+      expect(wrapper.vm.contextMenuData.yField).toBe(1);
 
       wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0 });
       expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(0);
@@ -2320,13 +2321,14 @@ describe("PanelSchemaRenderer", () => {
         },
       });
       wrapper.vm.panelData = {
-        options: { series: [{ name: "b", _queryIndex: 0, _panelQueryIndex: 0 }] },
+        options: { series: [{ name: "b", _queryIndex: 0, _panelQueryIndex: 0, yAxisGroup: 1 }] },
       };
 
       wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0 });
 
       expect(wrapper.vm.hasSeveralVisibleQueries).toBe(false);
       expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(0);
+      expect(wrapper.vm.contextMenuData).not.toHaveProperty("yField");
     });
 
     it("reads a forecast line's start and the clicked point's time, for the forecast alert", () => {

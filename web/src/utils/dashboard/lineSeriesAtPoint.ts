@@ -42,34 +42,53 @@ const distanceToSegment = (p: PixelPoint, a: PixelPoint, b: PixelPoint): number 
   return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
 };
 
-/** Last index whose x is at or left of `x`, -1 when none; null when an x cannot be placed. */
+/** The placed index nearest `mid` within [low, high], skipping gaps; null when all are gaps. */
+const placedNear = (
+  mid: number,
+  low: number,
+  high: number,
+  xAt: (index: number) => number | null,
+): { index: number; x: number } | null => {
+  for (let step = 0; mid - step >= low || mid + step <= high; step++) {
+    for (const index of step === 0 ? [mid] : [mid - step, mid + step]) {
+      if (index < low || index > high) continue;
+      const x = xAt(index);
+      if (x !== null) return { index, x };
+    }
+  }
+  return null;
+};
+
+/** Last placed index whose x is at or left of `x`, -1 when none; null when an x cannot be placed. */
 const lastIndexAtOrBefore = (
   count: number,
   x: number,
-  xAt: (index: number) => number,
+  xAt: (index: number) => number | null,
 ): number | null => {
   let low = 0;
   let high = count - 1;
   let last = -1;
   while (low <= high) {
     const mid = (low + high) >> 1;
-    const midX = xAt(mid);
-    if (!Number.isFinite(midX)) return null;
-    if (midX <= x) {
-      last = mid;
-      low = mid + 1;
+    const placed = placedNear(mid, low, high, xAt);
+    if (!placed) break;
+    if (!Number.isFinite(placed.x)) return null;
+    // Indexes between `mid` and the placed one are gaps, so the search may skip past both.
+    if (placed.x <= x) {
+      last = placed.index;
+      low = Math.max(placed.index, mid) + 1;
     } else {
-      high = mid - 1;
+      high = Math.min(placed.index, mid) - 1;
     }
   }
   return last;
 };
 
-/** The data indexes whose segments can pass within `tolerance` of `cursorX`, for points sorted by x. */
+/** The data indexes whose segments can pass within `tolerance` of `cursorX`; `xAt` is null for a gap. */
 export const indexesNearX = (
   count: number,
   cursorX: number,
-  xAt: (index: number) => number,
+  xAt: (index: number) => number | null,
   tolerance: number = LINE_HIT_TOLERANCE,
 ): [number, number] | null => {
   const from = lastIndexAtOrBefore(count, cursorX - tolerance, xAt);

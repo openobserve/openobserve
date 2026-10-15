@@ -158,7 +158,13 @@ interface LineSeriesOption {
   type?: string;
   name?: string;
   stack?: string;
+  step?: string | boolean;
   data?: unknown;
+}
+
+interface ChartOptionLike {
+  series?: unknown;
+  legend?: unknown;
 }
 
 // A line datum is `[x, y]`, `{ value: [x, y] }`, or a bare y on a category axis.
@@ -419,12 +425,13 @@ export default defineComponent({
       }
     };
 
-    const linePixels = (cursor: PixelPoint): LineSeriesPixels[] => {
-      const option = chart?.getOption() ?? {};
-      const series = (option.series ?? []) as LineSeriesOption[];
-      // A stacked line is drawn above its own values, so its raw position would name the wrong series.
-      if (series.some((entry) => entry?.type === "line" && entry.stack)) return [];
-      const legends = (option.legend ?? []) as { selected?: Record<string, boolean> }[];
+    const linePixels = (cursor: PixelPoint, option: ChartOptionLike): LineSeriesPixels[] => {
+      const series = (Array.isArray(option.series) ? option.series : []) as LineSeriesOption[];
+      // Stacked and step lines are not drawn through their raw points, so those would name the wrong series.
+      if (series.some((entry) => entry?.type === "line" && (entry.stack || entry.step))) return [];
+      const legends = (Array.isArray(option.legend) ? option.legend : []) as {
+        selected?: Record<string, boolean>;
+      }[];
       const legendOff = (name: string | undefined) =>
         name !== undefined && legends.some((legend) => legend?.selected?.[name] === false);
       return series.flatMap((entry, seriesIndex) => {
@@ -436,30 +443,26 @@ export default defineComponent({
             ? (pixel as PixelPoint)
             : null;
         };
-        // A merged x-axis leaves bare nulls whose x is unknown, so only drawn points are searched.
-        const drawn = data.flatMap((datum: unknown, dataIndex: number) =>
-          isGap(datum) ? [] : [dataIndex],
-        );
-        const nearby = indexesNearX(
-          drawn.length,
-          cursor[0],
-          (position) => pixelOf(datumValue(data[drawn[position]], drawn[position]))?.[0] ?? NaN,
-        );
+        // A merged x-axis leaves bare nulls whose x is unknown, so the search steps over them.
+        const xAt = (dataIndex: number) =>
+          isGap(data[dataIndex])
+            ? null
+            : (pixelOf(datumValue(data[dataIndex], dataIndex))?.[0] ?? NaN);
+        const nearby = indexesNearX(data.length, cursor[0], xAt);
         if (!nearby) return [];
-        const first = drawn[nearby[0]];
         const points: (PixelPoint | null)[] = [];
-        for (let dataIndex = first; dataIndex <= drawn[nearby[1]]; dataIndex++) {
+        for (let dataIndex = nearby[0]; dataIndex <= nearby[1]; dataIndex++) {
           const datum = data[dataIndex];
           points.push(isGap(datum) ? null : pixelOf(datumValue(datum, dataIndex)));
         }
-        return [{ seriesIndex, offset: first, points }];
+        return [{ seriesIndex, offset: nearby[0], points }];
       });
     };
 
     // The series lookup only refines the menu; a failure must not cost the user the menu itself.
-    const lineSeriesHit = (pixelPoint: PixelPoint) => {
+    const lineSeriesHit = (pixelPoint: PixelPoint, option: ChartOptionLike) => {
       try {
-        return lineSeriesAtPoint(pixelPoint, linePixels(pixelPoint));
+        return lineSeriesAtPoint(pixelPoint, linePixels(pixelPoint, option));
       } catch {
         return null;
       }
@@ -470,7 +473,8 @@ export default defineComponent({
     const handleNativeContextMenu = async (event: MouseEvent) => {
       // Get chart type from the first series
       await nextTick();
-      const chartType = chart?.getOption()?.series?.[0]?.type;
+      const option = chart?.getOption();
+      const chartType = option?.series?.[0]?.type;
 
       if (!chartType || !CONTEXT_MENU_SERIES_TYPES.includes(chartType)) {
         return;
@@ -500,7 +504,7 @@ export default defineComponent({
           if (yAxisValue !== null && yAxisValue !== undefined && !isNaN(Number(yAxisValue))) {
             // A line hides its symbols until hovered, so a click on the line itself hits no series.
             const hit = props.findLineOnContextMenu
-              ? lineSeriesHit(pixelPoint as PixelPoint)
+              ? lineSeriesHit(pixelPoint as PixelPoint, option ?? {})
               : null;
             emit("domcontextmenu", {
               x: event.clientX,

@@ -951,6 +951,30 @@ describe("PanelContainer", () => {
       expect(second.queryIndex).toBe(1);
     });
 
+    it("offers no empty query slot as an alert target", async () => {
+      const query = (text: string) => ({
+        query: text,
+        fields: { stream: "io_ops", stream_type: "metrics" },
+      });
+      wrapper = createWrapper({
+        data: { ...mockPanelData, queryType: "promql", queries: [query("up"), query(" ")] },
+      });
+      await wrapper.vm.metaDataValue({ queries: [{ query: "up", panelQueryIndex: 0 }] });
+      expect(wrapper.vm.buildPanelAlertPrefill().queryChoices).toBeUndefined();
+
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          queryType: "promql",
+          queries: [query("up"), query(""), query("rate(io_ops[1m])")],
+        },
+      });
+      await wrapper.vm.metaDataValue({ queries: [] });
+      expect(wrapper.vm.buildPanelAlertPrefill().queryChoices.map((c: any) => c.index)).toEqual([
+        0, 2,
+      ]);
+    });
+
     describe("with a formula and hidden inputs", () => {
       const combined = "(sum(rate(errors[1m]))) / (sum(rate(requests[1m]))) * 100";
       const formulaPanel = (hideA: boolean) => ({

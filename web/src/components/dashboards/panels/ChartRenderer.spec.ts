@@ -658,6 +658,13 @@ describe("ChartRenderer", () => {
         expect(await rightClick(75, 81)).toEqual({ x: 75, y: 81, value: 6 });
       });
 
+      it("names no line on a step chart, which is not drawn through straight segments", async () => {
+        await twoLines({}, { step: "end" });
+        await wrapper.setProps({ findLineOnContextMenu: true });
+
+        expect(await rightClick(75, 81)).toEqual({ x: 75, y: 81, value: 6 });
+      });
+
       it("skips a line switched off in the legend", async () => {
         await twoLines({ legend: [{ selected: { a: true, b: false } }] });
         await wrapper.setProps({ findLineOnContextMenu: true });
@@ -677,7 +684,9 @@ describe("ChartRenderer", () => {
         );
         await wrapper.setProps({ findLineOnContextMenu: true });
 
+        vi.mocked(mockChart.getOption).mockClear();
         expect(await rightClick(500, 10)).toMatchObject({ seriesIndex: 0, dataIndex: 5000 });
+        expect(mockChart.getOption).toHaveBeenCalledTimes(1);
         expect(vi.mocked(mockChart.convertToPixel).mock.calls.length).toBeLessThan(250);
       });
 

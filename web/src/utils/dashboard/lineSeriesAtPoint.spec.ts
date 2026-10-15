@@ -74,6 +74,13 @@ describe("indexesNearX", () => {
     expect(indexesNearX(3, 500, every10, 6)).toEqual([2, 2]);
   });
 
+  it("steps over gaps whose x is unknown", () => {
+    const gaps = new Set([2, 3, 4, 5, 6, 7]);
+    const xAt = (index: number) => (gaps.has(index) ? null : index * 10);
+    expect(indexesNearX(9, 15, xAt, 6)).toEqual([0, 2]);
+    expect(indexesNearX(9, 85, xAt, 6)).toEqual([1, 8]);
+  });
+
   it("gives up on a series whose x cannot be placed, or that has no points", () => {
     expect(indexesNearX(10, 50, () => NaN)).toBeNull();
     expect(indexesNearX(0, 50, every10)).toBeNull();

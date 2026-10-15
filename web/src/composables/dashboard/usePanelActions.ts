@@ -17,7 +17,9 @@ import {
   buildPrefillFromPanel,
   dateToMicros,
   executedPanelQuery,
+  isAlertableQuery,
   panelQueryChoices,
+  type PanelQueryShape,
 } from "@/utils/alerts/prefill/fromPanel";
 import { requestAlertCreation, useAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
@@ -76,6 +78,7 @@ const sqlYAxisColumnOf = (
   query: any,
   executedQuery: string | undefined,
   clickedSeriesName: string | undefined,
+  yFieldIndex = 0,
 ): string | null => {
   let yAxisColumn = null;
   const sqlQuery = executedQuery || query.query;
@@ -83,7 +86,7 @@ const sqlYAxisColumnOf = (
   // First, try to get from query.fields.y if available (most reliable for query builder)
   if (query.fields?.y && query.fields.y.length > 0) {
     // For query builder queries, use the Y-axis field
-    const yField = query.fields.y[0];
+    const yField = query.fields.y[yFieldIndex];
     const aliasOrColumn = yField.alias || yField.column;
 
     // Extract from SQL to get the exact case (without quotes)
@@ -120,7 +123,10 @@ const sqlYAxisColumnOf = (
 };
 
 /** A query's own y-axis column, for a query the user picked rather than clicked. */
-const ownYAxisColumnOf = (query: any, executedQuery: string | undefined): string | null =>
+const ownYAxisColumnOf = (
+  query: PanelQueryShape | undefined,
+  executedQuery: string | undefined,
+): string | null =>
   query?.fields?.y?.length
     ? sqlYAxisColumnOf(query, executedQuery, undefined)
     : aggregateAliasOf(executedQuery || query?.query || "");
@@ -215,7 +221,10 @@ export function usePanelAlertCreation({
     hideContextMenu();
 
     const queries: any[] = panelSchema.value.queries ?? [];
-    const visible = visibleQueryIndexes?.value ?? queries.map((_, index) => index);
+    const shown = visibleQueryIndexes?.value ?? queries.map((_, index) => index);
+    // An empty query slot runs nothing, so it is no alert target; a lone shown query keeps its established path.
+    const visible =
+      shown.length > 1 ? shown.filter((index) => isAlertableQuery(queries[index])) : shown;
     const point = contextMenuData.value?.forecastPoint;
     const isForecast = selection.condition === "forecast" && !!point;
     // A forecast is fitted to the clicked series, so it cannot move to another query.
@@ -239,6 +248,15 @@ export function usePanelAlertCreation({
       executedPanelQuery(metadata.value?.queries, index) || queries[index]?.query;
     // A series clicked on a multi-query panel ties its value to that series' own query.
     const pickedSeriesQuery = offerChoice && clicked !== undefined && visible.includes(clicked);
+    const clickedYField = contextMenuData.value?.yField;
+    // A query plotting several y fields takes a threshold only for the one the clicked series drew.
+    const yFieldOf = (index: number): number | undefined => {
+      const count = queries[index]?.fields?.y?.length ?? 0;
+      if (count <= 1) return 0;
+      return index === clicked && typeof clickedYField === "number" && clickedYField < count
+        ? clickedYField
+        : undefined;
+    };
     // Only a SQL threshold needs the y-axis column; PromQL compares the series value.
     const yAxisColumnOf = (index: number) => {
       if (queryType !== "sql") return null;
@@ -256,13 +274,15 @@ export function usePanelAlertCreation({
               queries[index],
               executedQueryOf(index),
               contextMenuData.value?.seriesName,
+              yFieldOf(index) ?? 0,
             )
           : null) ?? ownYAxisColumnOf(queries[index], executedQueryOf(index))
       );
     };
     // The clicked value is on that series' scale, so another query gets the form's own default.
     const thresholdFor = (index: number) =>
-      pickedSeriesQuery && index !== clicked
+      (pickedSeriesQuery && index !== clicked) ||
+      (offerChoice && queryType === "sql" && yFieldOf(index) === undefined)
         ? {}
         : { threshold: selection.threshold, condition: selection.condition as "above" | "below" };
 

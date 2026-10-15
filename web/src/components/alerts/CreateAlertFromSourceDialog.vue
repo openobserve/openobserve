@@ -41,7 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onConfirm"
   >
     <div v-if="prefill" class="flex flex-col gap-5">
-      <!-- Query picker — only when the surface had several queries and could not tell which. -->
       <div v-if="queryOptions.length > 1" class="flex flex-col gap-2">
         <label
           v-if="pickQueryOnly"

@@ -37,6 +37,14 @@ import { selectorMetricNames } from "@/utils/dashboard/exemplars/exemplarPlaceme
 /** Panel types whose shape has no meaningful row count to alert on. */
 const UNSUPPORTED_PANEL_TYPES = ["markdown", "html", "geomap", "sankey"];
 
+/** The parts of a dashboard panel query the alert adapters read. */
+export interface PanelQueryShape {
+  query?: string;
+  customQuery?: boolean;
+  fields?: { stream?: string; y?: { alias?: string; column?: string }[] };
+  config?: { formula?: string; hide?: boolean };
+}
+
 export interface PanelPrefillInput {
   panelTitle?: string;
   panelId?: string;
@@ -213,12 +221,20 @@ const formulaInputStreams = (
 };
 
 /** The metrics a code-mode query's text selects, when its inherited `fields.stream` is not one of them. */
-const codeModeStreams = (query: any, text: string): AlertPrefillStreamCandidate[] => {
+const codeModeStreams = (
+  query: PanelQueryShape | undefined,
+  text: string,
+): AlertPrefillStreamCandidate[] => {
   if (query?.customQuery !== true) return [];
   const names = selectorMetricNames(withoutComments(text));
-  if (names.includes(query?.fields?.stream)) return [];
+  const stream = query.fields?.stream;
+  if (stream && names.includes(stream)) return [];
   return names.map((name) => ({ name, type: "metrics" }));
 };
+
+/** A query with something to alert on: its own text, or a formula over other queries. */
+export const isAlertableQuery = (query: PanelQueryShape | undefined): boolean =>
+  isFormulaQuery(query) || !!query?.query?.trim();
 
 /** The executed text of a panel query's current-period window; shifted windows follow the primaries. */
 export const executedPanelQuery = (
