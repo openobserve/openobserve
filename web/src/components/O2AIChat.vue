@@ -1103,17 +1103,6 @@ export default defineComponent({
       if ((!hasText && !hasImages) || isLoading.value) return;
       turnLimitError.value = false;
 
-      // A credits-refused turn (prompt plus a reply of only ephemeral notices) is replaced, not repeated.
-      const [prev, last] = chatMessages.value.slice(-2);
-      if (
-        prev?.role === "user" &&
-        last?.role === "assistant" &&
-        last.contentBlocks?.length &&
-        last.contentBlocks.every((block) => block.ephemeral)
-      ) {
-        chatMessages.value.splice(-2, 2);
-      }
-
       let backendMessage = inputMessage.value;
       if (chatInput.value && typeof chatInput.value.getMessageForBackend === "function") {
         backendMessage = chatInput.value.getMessageForBackend();
@@ -1151,7 +1140,7 @@ export default defineComponent({
       if (outcome === "creditsExhausted" && !inputMessage.value) {
         inputMessage.value = userMessage;
         chatInput.value?.setContent?.(userMessage);
-        // A resend replaces the refused turn, so the images it held go back to the composer too.
+        // The draft goes back with its images, so a resend carries them too.
         if (!pendingImages.value.length) pendingImages.value = messagesToSend;
       }
     };

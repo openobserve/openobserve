@@ -918,6 +918,8 @@ describe("O2AIChat", () => {
     describe("AI credits exhausted (402)", () => {
       const sendAndGetLast = async (remedy?: string) => {
         wrapper = mountO2AIChat({ isOpen: true });
+        // The new-chat reset runs on the next tick; sending before it would wipe the prompt.
+        await flushPromises();
         const vm = wrapper.vm as any;
         mockFetchAiChat.mockResolvedValueOnce({
           ok: false,
@@ -996,7 +998,7 @@ describe("O2AIChat", () => {
         expect(vm.pendingImages).toEqual([image]);
       });
 
-      it("resending replaces the refused prompt instead of repeating it", async () => {
+      it("keeps the refused prompt in the chat when the draft is resent", async () => {
         await sendAndGetLast("subscribe");
         const vm = wrapper.vm as any;
         mockFetchAiChat.mockResolvedValueOnce({
@@ -1010,10 +1012,12 @@ describe("O2AIChat", () => {
         await vm.sendMessage();
         await flushPromises();
 
-        const sent = mockFetchAiChat.mock.calls.at(-1)![0] as Array<{ role: string }>;
-        expect(sent.filter((m) => m.role === "user")).toHaveLength(1);
-        expect(vm.chatMessages.filter((m: any) => m.role === "user")).toHaveLength(1);
-        expect(vm.chatMessages).toHaveLength(2);
+        expect(vm.chatMessages.map((m: any) => m.role)).toEqual([
+          "user",
+          "assistant",
+          "user",
+          "assistant",
+        ]);
       });
     });
 
