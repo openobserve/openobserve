@@ -51,12 +51,11 @@ export const toDetectionFunctionSql = (rawFn: string, field: string): string => 
 };
 
 /**
- * Builds the SQL query for an anomaly detection config, including seasonality
- * columns (hour, dow) that match the SQL Preview shown during config setup.
+ * Builds the SQL query for an anomaly detection config, matching the SQL Preview
+ * shown during config setup.
  *
  * For custom_sql mode, returns the user-provided SQL.
- * For filters mode, generates the full SQL from stream, function, filters, and
- * training window.
+ * For filters mode, generates the full SQL from stream, function and filters.
  */
 export const buildAnomalyPreviewSql = (config: any): string => {
   if (!config) return "";
@@ -86,21 +85,12 @@ export const buildAnomalyPreviewSql = (config: any): string => {
       ].join("\n")
     : "";
 
-  // Seasonality columns based on training window (matches AddAlert SQL preview)
-  const trainingDays = config.training_window_days ?? 14;
-  const autoSeasonality = trainingDays >= 7 ? "week" : "day";
-  const seasonalSelect =
-    autoSeasonality === "week"
-      ? ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour,\n       date_part('dow', to_timestamp(_timestamp / 1000000)) AS dow"
-      : ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour";
-  const seasonalGroup = autoSeasonality === "week" ? ", hour, dow" : ", hour";
-
   return [
     `SELECT histogram(_timestamp, '${interval}') AS time_bucket,`,
-    `       ${fn} AS value${seasonalSelect}`,
+    `       ${fn} AS value`,
     `FROM ${streamName}`,
     where,
-    `GROUP BY time_bucket${seasonalGroup}`,
+    `GROUP BY time_bucket`,
     `ORDER BY time_bucket`,
   ]
     .filter(Boolean)

@@ -13,11 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import CorrelatedLogsTable from "./CorrelatedLogsTable.vue";
 import store from "@/test/unit/helpers/store";
+import rootStore from "@/stores";
 import { nextTick } from "vue";
 
 // Mock the useCorrelatedLogs composable
@@ -1080,6 +1081,34 @@ describe("CorrelatedLogsTable.vue", () => {
       // lastResizableCol.size (150) <= 233. ✓
       const maxAllowedAfterClearance = Math.max(150, wrapper.vm.columnMaxCap - 12);
       expect(lastResizableCol.size).toBeLessThanOrEqual(maxAllowedAfterClearance);
+    });
+  });
+  describe("severity spine and the inference kill switch (F3)", () => {
+    afterEach(() => {
+      rootStore.commit("setConfig", {});
+    });
+
+    const statusColorFn = (w: any) => {
+      const table = w.findComponent({ name: "OTable" });
+      return (table.vm.$attrs["get-row-status-color"] ?? table.vm.$attrs.getRowStatusColor) as (
+        row: any,
+      ) => string;
+    };
+
+    it("paints no inferred spine when /config disables inference before any Logs mount", () => {
+      rootStore.commit("setConfig", { ui_logs_severity_inference: false });
+      wrapper = createWrapper();
+      const colour = statusColorFn(wrapper);
+      expect(colour({ message: "[ERROR] x" })).toBe("transparent");
+      expect(colour({ level: "error" })).toBe("var(--color-log-severity-error-indicator)");
+    });
+
+    it("infers a solid spine when the flag is absent", () => {
+      rootStore.commit("setConfig", {});
+      wrapper = createWrapper();
+      expect(statusColorFn(wrapper)({ message: "[WARN] y" })).toBe(
+        "var(--color-log-severity-warning-indicator)",
+      );
     });
   });
 });

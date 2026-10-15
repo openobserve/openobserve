@@ -145,7 +145,8 @@ describe("PanelLayoutSettings.vue", () => {
       const dialog = wrapper.findComponent(ODialogStub);
       expect(dialog.props("open")).toBe(true);
       expect(dialog.props("title")).toBe("Layout");
-      expect(dialog.props("primaryButtonLabel")).toBe("Save");
+      // The dialog only adds a draft step, so it must not read as a second Save beside the header's.
+      expect(dialog.props("primaryButtonLabel")).toBe("Apply");
       expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
       expect(dialog.props("size")).toBe("sm");
     });

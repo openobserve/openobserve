@@ -202,6 +202,34 @@ describe("ModuleRail - selection", () => {
 
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["logs"]);
   });
+
+  // Role Overview is selected by the empty key, and it is a separate row from the
+  // `summary` permission module. Conflating the two sends the editor into that
+  // module's pane instead of back to the landing summary.
+  it("emits the empty key when Role Overview is chosen", async () => {
+    const wrapper = await mountRail([makeModule("summary", { groupId: "platform" })], "summary");
+
+    await wrapper.find('[data-test="edit-role-module-rail-overview"]').trigger("mousedown");
+
+    expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([""]);
+  });
+
+  it("pins All Modules under Role Overview and emits its key when chosen", async () => {
+    const wrapper = await mountRail([makeModule("logs")]);
+    const allModules = wrapper.find('[data-test="edit-role-module-rail-all-modules"]');
+
+    await allModules.trigger("mousedown");
+
+    expect(allModules.text()).toContain(String(i18n.global.t("iam.editRole.allModulesTitle")));
+    const html = wrapper.html();
+    expect(html.indexOf("edit-role-module-rail-overview")).toBeLessThan(
+      html.indexOf("edit-role-module-rail-all-modules"),
+    );
+    expect(html.indexOf("edit-role-module-rail-all-modules")).toBeLessThan(
+      html.indexOf("edit-role-module-rail-item-logs"),
+    );
+    expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["__all__"]);
+  });
 });
 
 describe("ModuleRail - collapsible groups", () => {

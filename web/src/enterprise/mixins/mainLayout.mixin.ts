@@ -13,6 +13,7 @@ import {
 } from "@/utils/zincutils";
 import organizationService from "@/services/organizations";
 import userService from "@/services/users";
+import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 
 const MainLayoutCloudMixin = {
   setup() {
@@ -65,8 +66,17 @@ const MainLayoutCloudMixin = {
         .then((res: any) => {
           store.dispatch("setOrganizations", res.data.data);
           const localOrg: any = useLocalOrganization();
-          orgOptions.value = res.data.data.map(
-            (data: { id: any; name: any; type: any; identifier: any; UserObj: any }) => {
+          const labeledOrgs = withDisambiguatedOrgLabels(res.data.data);
+          orgOptions.value = labeledOrgs.map(
+            (data: {
+              id: any;
+              name: any;
+              type: any;
+              identifier: any;
+              UserObj: any;
+              label: string;
+            }) => {
+              // `label` is the real name here; the disambiguated string is applied only to the dropdown copy returned below.
               const optiondata: any = {
                 label: data.name,
                 id: data.id,
@@ -87,7 +97,7 @@ const MainLayoutCloudMixin = {
                 useLocalOrganization(selectedOrg.value);
                 store.dispatch("setSelectedOrganization", selectedOrg.value);
               }
-              return optiondata;
+              return { ...optiondata, label: data.label };
             },
           );
         })

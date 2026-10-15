@@ -74,7 +74,7 @@ pub(crate) async fn create_context(
     }
 
     // get wal record batches
-    let (stats, batches, schema) = get_wal_batches(
+    let (stats, batches, schema, partial_err) = get_wal_batches(
         trace_id,
         org_id,
         stream_name,
@@ -84,14 +84,23 @@ pub(crate) async fn create_context(
         label_selector,
     )
     .await?;
+    let warnings = if partial_err.is_empty() {
+        vec![]
+    } else {
+        log::warn!("[trace_id {trace_id}] promql->wal->search: partial result: {partial_err}");
+        vec![partial_err]
+    };
 
     if batches.is_empty() {
-        return Ok(vec![ScanContext::table(
-            SessionContext::new(),
-            Arc::new(Schema::empty()),
-            ScanStats::default(),
-            true,
-        )]);
+        return Ok(vec![
+            ScanContext::table(
+                SessionContext::new(),
+                Arc::new(Schema::empty()),
+                ScanStats::default(),
+                true,
+            )
+            .with_warnings(warnings),
+        ]);
     }
 
     log::info!(
@@ -102,13 +111,12 @@ pub(crate) async fn create_context(
 
     let ctx = DataFusionContextBuilder::new()
         .trace_id(trace_id)
-        .stream_type(StreamType::Metrics)
         .build(0)
         .await?;
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
     log::info!("[trace_id {trace_id}] promql->wal->search: register mem table done");
     ctx.register_table(stream_name, mem_table)?;
-    resp.push(ScanContext::table(ctx, schema, stats, true));
+    resp.push(ScanContext::table(ctx, schema, stats, true).with_warnings(warnings));
 
     Ok(resp)
 }
@@ -145,17 +153,22 @@ async fn get_wal_batches(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: HashSet<String>,
-) -> Result<(ScanStats, Vec<RecordBatch>, Arc<Schema>)> {
+) -> Result<(ScanStats, Vec<RecordBatch>, Arc<Schema>, String)> {
     let cfg = get_config();
-    let nodes = get_cached_online_ingester_nodes().await;
-    if nodes.is_none() && nodes.as_deref().unwrap().is_empty() {
-        return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
-    }
-    let nodes = nodes.unwrap();
+    let Some(nodes) = get_cached_online_ingester_nodes()
+        .await
+        .filter(|nodes| !nodes.is_empty())
+    else {
+        return Ok((
+            ScanStats::new(),
+            vec![],
+            Arc::new(Schema::empty()),
+            String::new(),
+        ));
+    };
 
     let ctx = DataFusionContextBuilder::new()
         .trace_id(trace_id)
-        .stream_type(StreamType::Metrics)
         .build(cfg.limit.cpu_num)
         .await?;
     let table_ref = register_remote_metric_table(&ctx, stream_name, Arc::clone(&schema))?;
@@ -169,7 +182,12 @@ async fn get_wal_batches(
                 .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
         )?,
         Err(_) => {
-            return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
+            return Ok((
+                ScanStats::new(),
+                vec![],
+                Arc::new(Schema::empty()),
+                String::new(),
+            ));
         }
     };
 
@@ -177,7 +195,14 @@ async fn get_wal_batches(
 
     match apply_label_selector(df, &schema, &label_selector) {
         Some(dataframe) => df = dataframe,
-        None => return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty()))),
+        None => {
+            return Ok((
+                ScanStats::new(),
+                vec![],
+                Arc::new(Schema::empty()),
+                String::new(),
+            ));
+        }
     }
 
     let plan = df.logical_plan();
@@ -216,7 +241,7 @@ async fn get_wal_batches(
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
-    let (batches, stats, ..) = if let Err(e) = ret {
+    let (batches, stats, partial_err) = if let Err(e) = ret {
         log::error!("[trace_id {trace_id}] promql->wal->search: datafusion collect error: {e}");
         Err(e)
     } else {
@@ -225,7 +250,12 @@ async fn get_wal_batches(
     }?;
 
     if batches.is_empty() {
-        return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
+        return Ok((
+            ScanStats::new(),
+            vec![],
+            Arc::new(Schema::empty()),
+            partial_err,
+        ));
     }
 
     // remove the metadata
@@ -243,7 +273,7 @@ async fn get_wal_batches(
             batch.columns().to_vec(),
         )?);
     }
-    Ok((stats, new_batches, schema))
+    Ok((stats, new_batches, schema, partial_err))
 }
 
 #[cfg(test)]

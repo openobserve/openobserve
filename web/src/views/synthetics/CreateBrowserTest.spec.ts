@@ -459,16 +459,12 @@ const baseStubs = {
   Teleport: {
     template: "<div><slot /></div>",
   },
-  BetaBadge: {
-    template: '<span data-test="beta-badge">BETA</span>',
-  },
 };
 
 // ── Missing component stubs required by OPageLayout ──────────────────────
 const pageLayoutStubs = {
   OPageLayout: {
-    template:
-      '<div><slot name="title" /><div data-test="page-actions"><slot name="actions" /></div><slot /></div>',
+    template: '<div><div data-test="page-actions"><slot name="actions" /></div><slot /></div>',
     props: ["title", "subtitle", "back", "class", "bleed"],
   },
 };
@@ -674,13 +670,6 @@ describe("CreateBrowserTest", () => {
       const buildBtn = wrapper.find('[data-test="synthetics-create-build-btn"]');
       expect(recordBtn.attributes("disabled")).toBeDefined();
       expect(buildBtn.attributes("disabled")).toBeDefined();
-    });
-
-    it("should render the Beta badge in the page title", async () => {
-      wrapper = mountPage();
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
 
     it("should show a placeholder example under the Starting URL", async () => {
@@ -1331,22 +1320,6 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
       expect(dialogStub(w).props("open")).toBe(true);
     }
-
-    it("hides the button when composition is disabled", async () => {
-      store.state.zoConfig.synthetics_subtests_enabled = false;
-      try {
-        wrapper = await mountEdit();
-        await selectRange(wrapper, ["s2", "s3"]);
-
-        expect(wrapper.find('[data-test="synthetics-journey-delete-selected-btn"]').exists()).toBe(
-          true,
-        );
-        expect(wrapper.find(OPEN_BTN).exists()).toBe(false);
-        expect(wrapper.find(REASON).exists()).toBe(false);
-      } finally {
-        store.state.zoConfig.synthetics_subtests_enabled = true;
-      }
-    });
 
     it("marks the button aria-disabled and says why for an ineligible selection", async () => {
       wrapper = await mountEdit();

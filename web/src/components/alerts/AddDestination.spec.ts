@@ -29,8 +29,11 @@ const hoisted = vi.hoisted(() => ({
   mockUpdatePrebuilt: vi.fn(),
   mockTestPrebuilt: vi.fn(),
   mockGeneratePreview: vi.fn(),
+  mockTestCustom: vi.fn(),
+  mockRenderTemplateBody: vi.fn(),
   mockClearTestResult: vi.fn(),
   mockTrack: vi.fn(),
+  mockTestInProgress: false,
   mockLastTestResult: null as null | {
     success: boolean;
     statusCode: number;
@@ -42,6 +45,12 @@ vi.mock("vue-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
   useRoute: () => ({ params: {}, query: {} }),
 }));
+
+// Passthrough spy: real toasts still render, and specs can read what was raised.
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return { ...actual, toast: vi.fn((...args: unknown[]) => actual.toast(...args)) };
+});
 
 vi.mock("@/services/alert_destination", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -66,7 +75,7 @@ vi.mock("@/services/reodotdev_analytics", () => ({
 }));
 
 vi.mock("@/composables/usePrebuiltDestinations", async () => {
-  const { ref, computed } = await import("vue");
+  const { computed } = await import("vue");
   return {
     usePrebuiltDestinations: () => ({
       availableTypes: computed(() => [{ id: "slack", name: "Slack" }]),
@@ -76,8 +85,10 @@ vi.mock("@/composables/usePrebuiltDestinations", async () => {
       createDestination: hoisted.mockCreatePrebuilt,
       updateDestination: hoisted.mockUpdatePrebuilt,
       generatePreview: hoisted.mockGeneratePreview,
+      testCustomDestination: hoisted.mockTestCustom,
+      renderTemplateBody: hoisted.mockRenderTemplateBody,
       clearTestResult: hoisted.mockClearTestResult,
-      isTestInProgress: ref(false),
+      isTestInProgress: computed(() => hoisted.mockTestInProgress),
       lastTestResult: computed(() => hoisted.mockLastTestResult),
       detectPrebuiltType: vi.fn(),
       getPrebuiltConfig: vi.fn(),
@@ -94,6 +105,7 @@ import usersService from "@/services/users";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import config from "@/aws-exports";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 let wrapper: any = null;
 
@@ -102,6 +114,7 @@ afterEach(() => {
   wrapper = null;
   config.isCloud = "false";
   config.isEnterprise = "false";
+  hoisted.mockTestInProgress = false;
   vi.restoreAllMocks();
 });
 
@@ -130,7 +143,7 @@ function mountComp(props: Record<string, any> = {}) {
         DestinationPreview: {
           name: "DestinationPreview",
           template: '<div data-test="destination-preview-stub"></div>',
-          props: ["type", "templateContent"],
+          props: ["modelValue", "type", "templateContent"],
         },
         AppTabs: {
           template: '<div data-test="app-tabs-stub"></div>',
@@ -319,6 +332,32 @@ describe("AddDestination - pipeline (!isAlerts) branch", () => {
     expect(payload.name).toBe("pipe-dest");
     expect(payload.url).toBe("https://pipe.example.com");
   });
+
+  it("edit keeps a saved Authorization header in the rows and in the saved payload", async () => {
+    const headers = { Authorization: "Bearer x", "X-A": "1" };
+    wrapper = mountComp({
+      isAlerts: false,
+      destination: {
+        name: "pipe-dest",
+        url: "https://pipe.example.com",
+        method: "post",
+        type: "http",
+        output_format: "json",
+        headers,
+      },
+    });
+    await flushPromises();
+    const form = getForm(wrapper);
+
+    expect(form.state.values.apiHeaders).toEqual([
+      { key: "Authorization", value: "Bearer x" },
+      { key: "X-A", value: "1" },
+    ]);
+
+    await form.handleSubmit();
+    await flushPromises();
+    expect((destinationService.update as any).mock.calls[0][0].data.headers).toEqual(headers);
+  });
 });
 
 describe("AddDestination - apiHeaders field array (Rule ①)", () => {
@@ -363,6 +402,189 @@ describe("AddDestination - apiHeaders field array (Rule ①)", () => {
 
     const rows = form.getFieldValue("apiHeaders");
     expect(rows).toEqual([{ key: "", value: "" }]);
+  });
+});
+
+describe("AddDestination - custom Web Hook preview and test", () => {
+  const TEMPLATE = { name: "tmpl1", type: "http" as const, body: '{"alert": "{alert_name}"}' };
+  const PREVIEW_BTN = '[data-test="destination-preview-button"]';
+  const TEST_BTN = '[data-test="destination-test-button"]';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.mockLastTestResult = null;
+    hoisted.mockTestCustom.mockResolvedValue({ success: true, statusCode: 200 });
+    hoisted.mockRenderTemplateBody.mockResolvedValue('{"alert": "Test Alert"}');
+  });
+
+  it("shows Preview and Test on the Web Hook tab", async () => {
+    wrapper = mountComp({ templates: [TEMPLATE] });
+    await toCustomHttp(wrapper);
+
+    expect(wrapper.find(PREVIEW_BTN).exists()).toBe(true);
+    expect(wrapper.find(TEST_BTN).exists()).toBe(true);
+  });
+
+  it("hides Preview and Test on the custom Email tab", async () => {
+    wrapper = mountComp({ templates: [TEMPLATE] });
+    const form = getForm(wrapper);
+    form.setFieldValue("destination_type", "custom");
+    form.setFieldValue("type", "email");
+    await nextTick();
+
+    expect(wrapper.find(PREVIEW_BTN).exists()).toBe(false);
+    expect(wrapper.find(TEST_BTN).exists()).toBe(false);
+  });
+
+  it("hides Preview and Test for pipeline destinations", async () => {
+    wrapper = mountComp({ isAlerts: false, templates: [TEMPLATE] });
+    // Same discriminators as the alerts Web Hook tab: only isAlerts differs.
+    await toCustomHttp(wrapper);
+
+    expect(wrapper.find(PREVIEW_BTN).exists()).toBe(false);
+    expect(wrapper.find(TEST_BTN).exists()).toBe(false);
+  });
+
+  it("Test sends the form url, method, headers, TLS flag and the selected template", async () => {
+    wrapper = mountComp({ templates: [TEMPLATE] });
+    const form = await toCustomHttp(wrapper);
+    form.setFieldValue("url", "https://hooks.example.com/in");
+    form.setFieldValue("method", "put");
+    form.setFieldValue("template", "tmpl1");
+    form.setFieldValue("skip_tls_verify", true);
+    form.setFieldValue("apiHeaders", [
+      { key: "X-Token", value: "abc" },
+      { key: "X-Empty", value: "" },
+    ]);
+    await nextTick();
+
+    await wrapper.find(TEST_BTN).trigger("click");
+    await flushPromises();
+
+    expect(hoisted.mockTestCustom).toHaveBeenCalledWith({
+      url: "https://hooks.example.com/in",
+      method: "put",
+      headers: { "X-Token": "abc" },
+      skipTlsVerify: true,
+      template: "tmpl1",
+    });
+    expect(hoisted.mockTestPrebuilt).not.toHaveBeenCalled();
+  });
+
+  it("Preview without a template asks for one and does not open the preview", async () => {
+    wrapper = mountComp({ templates: [TEMPLATE] });
+    await toCustomHttp(wrapper);
+
+    await wrapper.find(PREVIEW_BTN).trigger("click");
+    await flushPromises();
+
+    expect(toast).toHaveBeenCalledWith({ variant: "error", message: "Template is required!" });
+    expect(hoisted.mockRenderTemplateBody).not.toHaveBeenCalled();
+    expect(wrapper.findComponent({ name: "DestinationPreview" }).props("modelValue")).toBe(false);
+  });
+
+  it("Preview renders the selected template into the preview modal", async () => {
+    wrapper = mountComp({ templates: [TEMPLATE] });
+    const form = await toCustomHttp(wrapper);
+    form.setFieldValue("template", "tmpl1");
+    await nextTick();
+
+    await wrapper.find(PREVIEW_BTN).trigger("click");
+    await flushPromises();
+
+    expect(hoisted.mockRenderTemplateBody).toHaveBeenCalledWith("tmpl1");
+    expect(hoisted.mockGeneratePreview).not.toHaveBeenCalled();
+    const preview = wrapper.findComponent({ name: "DestinationPreview" });
+    expect(preview.props("modelValue")).toBe(true);
+    expect(preview.props("templateContent")).toBe('{"alert": "Test Alert"}');
+  });
+
+  it("shows the test result under the Web Hook settings", async () => {
+    hoisted.mockLastTestResult = { success: true, statusCode: 200, responseBody: "ok" };
+    wrapper = mountComp({ templates: [TEMPLATE] });
+    await toCustomHttp(wrapper);
+
+    const result = wrapper.findComponent({ name: "DestinationTestResult" });
+    expect(result.attributes("data-test")).toBe("custom-test-result");
+  });
+
+  it("clears a stale test result when the url, template or headers change", async () => {
+    hoisted.mockLastTestResult = { success: true, statusCode: 200 };
+    wrapper = mountComp({ templates: [TEMPLATE] });
+    const form = await toCustomHttp(wrapper);
+
+    hoisted.mockClearTestResult.mockClear();
+    form.setFieldValue("url", "https://hooks.example.com/other");
+    await nextTick();
+    form.setFieldValue("template", "tmpl1");
+    await nextTick();
+    form.setFieldValue("apiHeaders", [{ key: "X-Token", value: "abc" }]);
+    await nextTick();
+
+    expect(hoisted.mockClearTestResult).toHaveBeenCalledTimes(3);
+  });
+
+  it("discards an in-flight test when a field changes", async () => {
+    hoisted.mockTestInProgress = true;
+    wrapper = mountComp({ templates: [TEMPLATE] });
+    const form = await toCustomHttp(wrapper);
+
+    hoisted.mockClearTestResult.mockClear();
+    form.setFieldValue("url", "https://hooks.example.com/other");
+    await nextTick();
+
+    expect(hoisted.mockClearTestResult).toHaveBeenCalledTimes(1);
+  });
+
+  it("Preview of a template that cannot be fetched shows the preview error", async () => {
+    hoisted.mockRenderTemplateBody.mockRejectedValue(
+      new Error("Request failed with status code 404"),
+    );
+    wrapper = mountComp({ templates: [] });
+    const form = await toCustomHttp(wrapper);
+    form.setFieldValue("template", "tmpl-deleted");
+    await nextTick();
+
+    await wrapper.find(PREVIEW_BTN).trigger("click");
+    await flushPromises();
+
+    expect(hoisted.mockRenderTemplateBody).toHaveBeenCalledWith("tmpl-deleted");
+    expect(toast).toHaveBeenCalledWith({
+      variant: "error",
+      message: "Failed to generate preview",
+    });
+    expect(wrapper.findComponent({ name: "DestinationPreview" }).props("modelValue")).toBe(false);
+  });
+
+  it("edit keeps a saved Authorization header and sends it on Test and Save", async () => {
+    const headers = { Authorization: "Bearer x", "X-A": "1" };
+    wrapper = mountComp({
+      templates: [TEMPLATE],
+      destination: {
+        name: "hook",
+        url: "https://hooks.example.com/in",
+        method: "post",
+        type: "http",
+        template: "tmpl1",
+        skip_tls_verify: false,
+        headers,
+      },
+    });
+    await flushPromises();
+    const form = getForm(wrapper);
+
+    expect(form.state.values.apiHeaders).toEqual([
+      { key: "Authorization", value: "Bearer x" },
+      { key: "X-A", value: "1" },
+    ]);
+
+    await wrapper.find(TEST_BTN).trigger("click");
+    await flushPromises();
+    expect(hoisted.mockTestCustom).toHaveBeenCalledWith(expect.objectContaining({ headers }));
+
+    await form.handleSubmit();
+    await flushPromises();
+    expect((destinationService.update as any).mock.calls[0][0].data.headers).toEqual(headers);
   });
 });
 

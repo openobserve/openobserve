@@ -36,15 +36,10 @@ export default defineComponent({
     };
 
     const handleOriginalUrl = (url: string) => {
-      const urlArray = url.split("/");
-
-      // if the url contains web, then route to the original url
-
-      if (urlArray.includes("web")) {
-        routeToOriginalUrl(urlArray.slice(4).join("/"));
-      } else {
-        routeToOriginalUrl(urlArray.slice(3).join("/"));
-      }
+      const { pathname, search, hash } = new URL(url, window.location.origin);
+      // Everything up to the first /web/ is the deployment's base path (ZO_BASE_URI), as in getPath().
+      const webPos = `${pathname}/`.indexOf("/web/");
+      routeToOriginalUrl((webPos > -1 ? pathname.slice(webPos + 4) : pathname) + search + hash);
     };
 
     const routeToOriginalUrl = (url: string) => {

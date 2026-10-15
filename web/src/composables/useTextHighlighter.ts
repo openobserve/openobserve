@@ -21,7 +21,7 @@
  * Provides unified text processing for both visual styling and search highlighting.
  *
  * Features:
- * - Extracts keywords from SQL query patterns (match_all, fuzzy_match_all)
+ * - Extracts keywords from match_all/fuzzy_match_all and compiles str_match/re_match filters to RegExps
  * - Applies semantic colors to different text types (IPs, URLs, timestamps, etc.)
  * - Highlights matching keywords with background color
  * - Handles HTML escaping and safe rendering
@@ -48,6 +48,398 @@ export interface TextSegment {
   isWhitespace: boolean;
 }
 
+/** Groups: 1 function, 2 field (quoted or bare), 3 single-quoted literal, 4 double-quoted literal. */
+const FIELD_FILTER_REGEX =
+  /\b(str_match_ignore_case|match_field_ignore_case|str_match|match_field|re_match|fuzzy_match)\s*\(\s*("(?:[^"]|"")*"|`(?:[^`]|``)*`|[^,()"`\s]+)\s*,\s*(?:'((?:[^']|'')*)'|"([^"]*)")(?:\s*,\s*\d+)?\s*\)/gi;
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// JS regexes backtrack (Rust's do not), so these bound re_match highlighting to keep the UI responsive.
+const MAX_REGEX_PATTERN_LENGTH = 256;
+const MAX_REGEX_TEXT_LENGTH = 512;
+const MAX_REGEX_MATCHES = 100;
+// Caps alternation combinations; beside an unbounded quantifier each is retried at every split point.
+const MAX_VARIANTS = 81;
+const MAX_VARIANTS_WITH_UNBOUNDED = 2;
+
+// Escaped literals cannot backtrack, so they are exempt from MAX_REGEX_TEXT_LENGTH.
+const literalPatterns = new WeakSet<RegExp>();
+
+/** UTF-16 code unit ranges an atom can match; `any` means not bounded by this analysis. */
+interface CharSet {
+  ranges: Array<[number, number]>;
+  negated: boolean;
+  any: boolean;
+}
+
+/** One regex element (atom or unquantified group) with its width bounds. */
+interface RegexItem {
+  chars: CharSet;
+  min: number;
+  max: number;
+}
+
+const ANY_CHAR: CharSet = { ranges: [], negated: false, any: true };
+// JS (non-unicode) \d, \w and \s
+const CLASS_ESCAPE_RANGES: Record<string, Array<[number, number]>> = {
+  d: [[0x30, 0x39]],
+  w: [
+    [0x30, 0x39],
+    [0x41, 0x5a],
+    [0x5f, 0x5f],
+    [0x61, 0x7a],
+  ],
+  s: [
+    [0x09, 0x0d],
+    [0x20, 0x20],
+    [0xa0, 0xa0],
+    [0x1680, 0x1680],
+    [0x2000, 0x200a],
+    [0x2028, 0x2029],
+    [0x202f, 0x202f],
+    [0x205f, 0x205f],
+    [0x3000, 0x3000],
+    [0xfeff, 0xfeff],
+  ],
+};
+const CONTROL_ESCAPES: Record<string, number> = { n: 10, t: 9, r: 13, f: 12, v: 11 };
+
+const literalSet = (code: number): CharSet => ({
+  ranges: [[code, code]],
+  negated: false,
+  any: false,
+});
+
+/** Code unit of a literal, or null for a surrogate half (astral characters are not modelled). */
+const literalCode = (char: string): number | null => {
+  const code = char.charCodeAt(0);
+  return code >= 0xd800 && code <= 0xdfff ? null : code;
+};
+
+/** Parses the escape at source[i] ("\"), returning its set and length, or null. */
+function parseEscape(source: string, i: number): { chars: CharSet; length: number } | null {
+  const next = source[i + 1];
+  if (next === undefined) return null;
+  const lower = next.toLowerCase();
+  if (CLASS_ESCAPE_RANGES[lower]) {
+    return {
+      chars: { ranges: CLASS_ESCAPE_RANGES[lower], negated: next !== lower, any: false },
+      length: 2,
+    };
+  }
+  if (CONTROL_ESCAPES[next] !== undefined) {
+    return { chars: literalSet(CONTROL_ESCAPES[next]), length: 2 };
+  }
+  if (/[a-zA-Z0-9]/.test(next)) return null; // \p{..}, \x.., \u...., backreferences, \A ...
+  const code = literalCode(next);
+  return code === null ? null : { chars: literalSet(code), length: 2 };
+}
+
+/** Parses the class starting at source[i] ("["), returning its set and end index, or null. */
+function parseClass(source: string, i: number): { chars: CharSet; end: number } | null {
+  let j = i + 1;
+  const negated = source[j] === "^";
+  if (negated) j++;
+  if (source[j] === "]") return null; // [] and [^] differ between Rust and JS
+  const ranges: Array<[number, number]> = [];
+  let unbounded = false;
+
+  // One class member: a literal code unit, or a class escape such as \d
+  const member = (): { code?: number; chars?: CharSet; length: number } | null => {
+    if (source[j] === "\\") {
+      const escape = parseEscape(source, j);
+      if (!escape) return null;
+      const single = !escape.chars.negated && escape.chars.ranges.length === 1;
+      const [lo, hi] = escape.chars.ranges[0];
+      return single && lo === hi ? { code: lo, length: 2 } : { chars: escape.chars, length: 2 };
+    }
+    if (source[j] === "[" || source.startsWith("&&", j) || source.startsWith("--", j)) return null;
+    const code = literalCode(source[j]);
+    return code === null ? null : { code, length: 1 };
+  };
+
+  while (j < source.length && source[j] !== "]") {
+    const first = member();
+    if (!first) return null;
+    j += first.length;
+    if (first.chars) {
+      if (first.chars.negated) unbounded = true;
+      else ranges.push(...first.chars.ranges);
+      continue;
+    }
+    if (source[j] === "-" && source[j + 1] !== undefined && source[j + 1] !== "]") {
+      j++;
+      const last = member();
+      if (!last || last.code === undefined || last.code < first.code!) return null;
+      j += last.length;
+      ranges.push([first.code!, last.code]);
+    } else {
+      ranges.push([first.code!, first.code!]);
+    }
+  }
+  if (j >= source.length) return null;
+  return { chars: unbounded ? ANY_CHAR : { ranges, negated, any: false }, end: j };
+}
+
+/** Adds other-case forms for the i flag; negated or wide non-ASCII sets become ANY_CHAR. */
+function foldCase(chars: CharSet): CharSet {
+  if (chars.any) return chars;
+  if (chars.negated) return ANY_CHAR;
+  const ranges = [...chars.ranges];
+  for (const [lo, hi] of chars.ranges) {
+    if (hi >= 0x80 && hi - Math.max(lo, 0x80) > 512) return ANY_CHAR;
+    for (let code = lo; code <= hi; code++) {
+      const char = String.fromCharCode(code);
+      for (const variant of [char.toLowerCase(), char.toUpperCase()]) {
+        if (variant.length === 1) ranges.push([variant.charCodeAt(0), variant.charCodeAt(0)]);
+      }
+    }
+  }
+  return { ranges, negated: false, any: false };
+}
+
+/** Whether every code unit in [lo, hi] lies inside the given ranges. */
+function isCovered(lo: number, hi: number, ranges: Array<[number, number]>): boolean {
+  let next = lo;
+  for (const [from, to] of [...ranges].sort((a, b) => a[0] - b[0])) {
+    if (from > next) break;
+    next = Math.max(next, to + 1);
+    if (next > hi) return true;
+  }
+  return next > hi;
+}
+
+/** Whether two sets may share a character; overlap is assumed unless provably disjoint. */
+function charSetsOverlap(a: CharSet, b: CharSet): boolean {
+  if (a.any || b.any || (a.negated && b.negated)) return true;
+  if (a.negated || b.negated) {
+    const [excluded, included] = a.negated ? [a, b] : [b, a];
+    return !included.ranges.every(([lo, hi]) => isCovered(lo, hi, excluded.ranges));
+  }
+  return a.ranges.some(([aLo, aHi]) => b.ranges.some(([bLo, bHi]) => aLo <= bHi && bLo <= aHi));
+}
+
+/** Splits source at "|" that is outside groups, classes and escapes; null if unbalanced. */
+function splitAlternation(source: string): string[] | null {
+  const branches: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i];
+    if (char === "\\") {
+      i++;
+    } else if (char === "[") {
+      const parsed = parseClass(source, i);
+      if (!parsed) return null;
+      i = parsed.end;
+    } else if (char === "(") {
+      depth++;
+    } else if (char === ")") {
+      if (--depth < 0) return null;
+    } else if (char === "|" && depth === 0) {
+      branches.push(source.slice(start, i));
+      start = i + 1;
+    }
+  }
+  if (depth !== 0) return null;
+  branches.push(source.slice(start));
+  return branches;
+}
+
+/** Parses an alternation-free sequence into items, or null for constructs not modelled. */
+function parseSequence(
+  source: string,
+  flags: string,
+): { items: RegexItem[]; choices: number } | null {
+  const items: RegexItem[] = [];
+  let choices = 1;
+  let i = 0;
+
+  while (i < source.length) {
+    const char = source[i];
+    let chars: CharSet | null = null;
+
+    if (char === "\\") {
+      if (source[i + 1] === "b" || source[i + 1] === "B") {
+        i += 2;
+        continue;
+      }
+      const escape = parseEscape(source, i);
+      if (!escape) return null;
+      chars = escape.chars;
+      i += escape.length;
+    } else if (char === "[") {
+      const parsed = parseClass(source, i);
+      if (!parsed) return null;
+      chars = parsed.chars;
+      i = parsed.end + 1;
+    } else if (char === ".") {
+      chars = ANY_CHAR;
+      i++;
+    } else if (char === "^" || char === "$") {
+      i++;
+      continue;
+    } else if (char === "(") {
+      // Find the matching ")"; its content is checked by splitAlternation
+      let depth = 0;
+      let end = i;
+      for (; end < source.length; end++) {
+        if (source[end] === "\\") end++;
+        else if (source[end] === "[") end = parseClass(source, end)?.end ?? source.length;
+        else if (source[end] === "(") depth++;
+        else if (source[end] === ")" && --depth === 0) break;
+      }
+      if (end >= source.length || /^[*+?{]/.test(source.slice(end + 1))) return null;
+      const opening = source.startsWith("(?:", i) ? 3 : 1;
+      if (opening === 1 && source[i + 1] === "?") return null;
+      const branches = splitAlternation(source.slice(i + opening, end));
+      if (!branches) return null;
+
+      const parsed = branches.map((branch) => parseSequence(branch, flags));
+      if (parsed.some((branch) => !branch)) return null;
+      if (branches.length === 1) {
+        items.push(...parsed[0]!.items);
+        choices *= parsed[0]!.choices;
+      } else {
+        // Alternation: only fixed-width branches, merged into one item
+        if (parsed.some((branch) => branch!.items.some((item) => item.min !== item.max))) {
+          return null;
+        }
+        const widths = parsed.map((branch) =>
+          branch!.items.reduce((total, item) => total + item.min, 0),
+        );
+        const sets = parsed.flatMap((branch) => branch!.items.map((item) => item.chars));
+        const union: CharSet = sets.some((set) => set.any || set.negated)
+          ? ANY_CHAR
+          : { ranges: sets.flatMap((set) => set.ranges), negated: false, any: false };
+        // Literal choices backtrack once per branch (bounded by MAX_VARIANTS), so count as fixed width.
+        const width = Math.min(...widths);
+        items.push({ chars: union, min: width, max: width });
+        choices *= branches.length * parsed.reduce((total, branch) => total * branch!.choices, 1);
+      }
+      i = end + 1;
+      continue;
+    } else if ("*+?)|".includes(char)) {
+      return null;
+    } else {
+      const code = literalCode(char);
+      if (code === null) return null;
+      chars = literalSet(code);
+      i++;
+    }
+
+    const item: RegexItem = {
+      chars: flags.includes("i") ? foldCase(chars) : chars,
+      min: 1,
+      max: 1,
+    };
+    // Quantifier, with an optional lazy ? after it
+    const quantifier = /^(?:([*+?])|\{(\d+)(?:(,)(\d*))?\})\??/.exec(source.slice(i));
+    if (quantifier) {
+      if (quantifier[1]) {
+        item.min = quantifier[1] === "+" ? 1 : 0;
+        item.max = quantifier[1] === "?" ? 1 : Infinity;
+      } else {
+        item.min = Number(quantifier[2]);
+        item.max = !quantifier[3] ? item.min : quantifier[4] ? Number(quantifier[4]) : Infinity;
+      }
+      i += quantifier[0].length;
+    }
+    items.push(item);
+  }
+
+  return { items, choices };
+}
+
+/** Whether a regex risks catastrophic backtracking in JS; anything not modelled counts as a risk. */
+function isBacktrackingRisk(source: string, flags: string): boolean {
+  const alternatives = splitAlternation(source);
+  if (!alternatives) return true;
+
+  for (const alternative of alternatives) {
+    const parsed = parseSequence(alternative, flags);
+    if (!parsed) return true;
+    const { items, choices } = parsed;
+    const unbounded = items.some((item) => item.max === Infinity);
+    if (choices > (unbounded ? MAX_VARIANTS_WITH_UNBOUNDED : MAX_VARIANTS)) return true;
+    const overlaps = (a: number, b: number) => charSetsOverlap(items[a].chars, items[b].chars);
+
+    for (let first = 0; first < items.length; first++) {
+      if (items[first].min === items[first].max) continue;
+      for (let second = first + 1; second < items.length; second++) {
+        if (items[second].min === items[second].max) continue;
+        if (!overlaps(first, second)) continue;
+
+        let separated = false;
+        for (let between = first + 1; between < second && !separated; between++) {
+          separated =
+            items[between].min > 0 && (!overlaps(between, first) || !overlaps(between, second));
+        }
+        if (!separated) return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/** Compiles a Rust re_match pattern into a global JS RegExp; null when uncompilable or unsafe. */
+function compileHighlightRegex(pattern: string): RegExp | null {
+  if (!pattern || pattern.length > MAX_REGEX_PATTERN_LENGTH) return null;
+
+  let source = pattern;
+  let flags = "g";
+  const inlineFlags = /^\(\?([a-zA-Z]+)\)/.exec(source);
+  if (inlineFlags) {
+    for (const flag of inlineFlags[1]) {
+      if (flag !== "i" && flag !== "m" && flag !== "s") return null;
+      if (!flags.includes(flag)) flags += flag;
+    }
+    source = source.slice(inlineFlags[0].length);
+  }
+
+  if (isBacktrackingRisk(source, flags)) return null;
+
+  try {
+    return new RegExp(source, flags);
+  } catch {
+    return null;
+  }
+}
+
+/** Compiled patterns per (field-scoped) query string, least recently used evicted past 64. */
+const patternCache = new Map<string, RegExp[]>();
+
+/** Field-scoped queries for the most recent query string; rendering asks once per key per hit. */
+let scopedQueries = { query: "", byField: new Map<string, string>() };
+
+// Quoted identifiers keep their case and unquoted ones are lowercased, as DataFusion resolves them.
+const resolveFilterField = (field: string) => {
+  const quote = field[0];
+  if ((quote === '"' || quote === "`") && field.length > 1 && field.endsWith(quote)) {
+    return field.slice(1, -1).replaceAll(quote + quote, quote);
+  }
+  return field.toLowerCase();
+};
+
+/** Drops field filters naming another field, so each filter highlights only its own field. */
+export function scopeHighlightQuery(queryString: string, field: string): string {
+  if (!queryString) return queryString;
+  if (scopedQueries.query !== queryString) {
+    scopedQueries = { query: queryString, byField: new Map() };
+  }
+  let scoped = scopedQueries.byField.get(field);
+  if (scoped === undefined) {
+    scoped = queryString.replace(
+      FIELD_FILTER_REGEX,
+      (filter: string, _name: string, filterField: string) =>
+        resolveFilterField(filterField) === field ? filter : "",
+    );
+    scopedQueries.byField.set(field, scoped);
+  }
+  return scoped;
+}
+
 /**
  * Composable for text highlighting and semantic colorization
  */
@@ -58,7 +450,6 @@ export function useTextHighlighter() {
    * Extracts keywords from SQL query strings
    * Matches patterns like:
    * - match_all('keyword')
-   * - fuzzy_match('keyword', 2)
    * - fuzzy_match_all('keyword', 2)
    *
    * @param queryString - The SQL query string to parse
@@ -67,9 +458,8 @@ export function useTextHighlighter() {
   function extractKeywords(queryString: string): string[] {
     if (!queryString?.trim()) return [];
 
-    // Regex to support match_all, fuzzy_match, and fuzzy_match_all SQL functions
-    const regex =
-      /\b(?:match_all|fuzzy_match_all|fuzzy_match)\(\s*(['"])([^'"]+)\1(?:\s*,\s*\d+)?\s*\)/g;
+    // Regex to support match_all and fuzzy_match_all SQL functions
+    const regex = /\b(?:match_all|fuzzy_match_all)\(\s*(['"])([^'"]+)\1(?:\s*,\s*\d+)?\s*\)/gi;
     const result: string[] = [];
     let match: RegExpExecArray | null;
 
@@ -86,25 +476,129 @@ export function useTextHighlighter() {
     return Array.from(new Set(result));
   }
 
+  /** The u flag makes ignore-case folding Unicode-aware, like the server's lowercase match. */
+  function literalPattern(value: string, ignoreCase: boolean): RegExp {
+    const regex = new RegExp(escapeRegExp(value), ignoreCase ? "giu" : "g");
+    literalPatterns.add(regex);
+    return regex;
+  }
+
+  /** Extracts field-filter patterns, skipping re_not_match and regexes JS cannot run safely. */
+  function extractHighlightPatterns(queryString: string): RegExp[] {
+    if (!queryString?.trim()) return [];
+    const cached = patternCache.get(queryString);
+    if (cached) {
+      patternCache.delete(queryString);
+      patternCache.set(queryString, cached);
+      return cached;
+    }
+
+    const patterns: RegExp[] = [];
+    const seen = new Set<string>();
+
+    for (const filter of queryString.matchAll(FIELD_FILTER_REGEX)) {
+      const name = filter[1].toLowerCase();
+      const value = filter[3]?.replace(/''/g, "'") ?? filter[4] ?? "";
+      const regex =
+        name === "re_match"
+          ? compileHighlightRegex(value)
+          : value
+            ? literalPattern(value, name.endsWith("_ignore_case") || name === "fuzzy_match")
+            : null;
+
+      if (regex && !seen.has(`${regex.source}/${regex.flags}`)) {
+        seen.add(`${regex.source}/${regex.flags}`);
+        patterns.push(regex);
+      }
+    }
+
+    if (patternCache.size >= 64) patternCache.delete(patternCache.keys().next().value!);
+    patternCache.set(queryString, patterns);
+    return patterns;
+  }
+
+  /** Collects [start, end) match ranges, skipping zero-length ones, up to MAX_REGEX_MATCHES. */
+  function collectMatchRanges(text: string, regex: RegExp, ranges: Array<[number, number]>) {
+    regex.lastIndex = 0;
+    let count = 0;
+    let match: RegExpExecArray | null;
+
+    while (count < MAX_REGEX_MATCHES && (match = regex.exec(text)) !== null) {
+      if (match[0].length === 0) {
+        regex.lastIndex++;
+        continue;
+      }
+      ranges.push([match.index, match.index + match[0].length]);
+      count++;
+    }
+    regex.lastIndex = 0;
+  }
+
+  /** Collects pattern ranges; compiled re_match regexes skip texts over MAX_REGEX_TEXT_LENGTH. */
+  function collectPatternRanges(text: string, patterns: RegExp[]): Array<[number, number]> {
+    const ranges: Array<[number, number]> = [];
+    if (!text) return ranges;
+    for (const pattern of patterns) {
+      if (text.length <= MAX_REGEX_TEXT_LENGTH || literalPatterns.has(pattern)) {
+        collectMatchRanges(text, pattern, ranges);
+      }
+    }
+    return ranges;
+  }
+
   /**
    * Splits text by highlight keywords and marks matched parts
    *
    * @param text - Text to process
    * @param keywords - Array of keywords to highlight
+   * @param patterns - Global RegExps to highlight, from extractHighlightPatterns
    * @returns Array of text parts with highlight flags
    */
   function splitTextByKeywords(
     text: string,
     keywords: string[],
+    patterns: RegExp[] = [],
   ): Array<{ text: string; isHighlighted: boolean }> {
-    if (!keywords.length || !text) {
+    return splitTextByRanges(text, keywords, collectPatternRanges(text, patterns));
+  }
+
+  function splitTextByRanges(
+    text: string,
+    keywords: string[],
+    extraRanges: Array<[number, number]>,
+  ): Array<{ text: string; isHighlighted: boolean }> {
+    if ((!keywords.length && !extraRanges.length) || !text) {
       return [{ text, isHighlighted: false }];
+    }
+
+    if (extraRanges.length) {
+      const ranges = [...extraRanges];
+      if (keywords.length) {
+        collectMatchRanges(text, new RegExp(keywords.map(escapeRegExp).join("|"), "giu"), ranges);
+      }
+      ranges.sort((a, b) => a[0] - b[0]);
+
+      const result: Array<{ text: string; isHighlighted: boolean }> = [];
+      let cursor = 0;
+      for (const [start, end] of ranges) {
+        if (end <= cursor) continue;
+        const from = Math.max(start, cursor);
+        if (from > cursor) result.push({ text: text.slice(cursor, from), isHighlighted: false });
+        if (result.length && result[result.length - 1].isHighlighted) {
+          result[result.length - 1].text += text.slice(from, end);
+        } else {
+          result.push({ text: text.slice(from, end), isHighlighted: true });
+        }
+        cursor = end;
+      }
+      if (cursor < text.length) result.push({ text: text.slice(cursor), isHighlighted: false });
+      return result;
     }
 
     // Create regex pattern from keywords (escape special characters)
     const escapedKeywords = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 
-    const pattern = new RegExp(`(${escapedKeywords.join("|")})`, "gi");
+    const pattern = new RegExp(`(${escapedKeywords.join("|")})`, "giu");
 
     // Split by pattern but keep the delimiters
     const parts = text.split(pattern);
@@ -352,6 +846,7 @@ export function useTextHighlighter() {
    * @param keywords - Keywords to highlight
    * @param colors - Color theme object
    * @param showQuotes - Whether to add quotes around values
+   * @param patternRanges - Pattern match ranges over the whole text the segments make up
    * @returns HTML string with applied styling
    */
   function processTextSegments(
@@ -359,6 +854,7 @@ export function useTextHighlighter() {
     keywords: string[],
     colors: any,
     showQuotes: boolean = false,
+    patternRanges: Array<[number, number]> = [],
   ): string {
     let result = "";
 
@@ -368,15 +864,32 @@ export function useTextHighlighter() {
     }
 
     // Process each segment individually
+    let offset = 0;
     result += segments
       .map((segment) => {
-        // For whitespace, just return as-is with no special styling
+        // Pattern ranges that fall in this segment, relative to its start
+        const start = offset;
+        const end = offset + segment.content.length;
+        offset = end;
+        const segmentRanges: Array<[number, number]> = [];
+        for (const [from, to] of patternRanges) {
+          if (from < end && to > start) {
+            segmentRanges.push([Math.max(from, start) - start, Math.min(to, end) - start]);
+          }
+        }
+
+        // For whitespace, return as-is unless a pattern match spans it
         if (segment.type === "whitespace") {
-          return segment.content;
+          if (!segmentRanges.length) return segment.content;
+          return splitTextByRanges(segment.content, [], segmentRanges)
+            .map((part) =>
+              part.isHighlighted ? `<span class="log-highlighted">${part.text}</span>` : part.text,
+            )
+            .join("");
         }
 
         // For regular tokens, split by keywords and apply semantic colors
-        const parts = splitTextByKeywords(segment.content, keywords);
+        const parts = splitTextByRanges(segment.content, keywords, segmentRanges);
         return parts
           .map((part) => {
             const content = escapeHtml(part.text);
@@ -424,14 +937,16 @@ export function useTextHighlighter() {
 
     const textStr = String(text);
     const keywords = extractKeywords(queryString);
+    const patternRanges = collectPatternRanges(textStr, extractHighlightPatterns(queryString));
     const segments = smartTokenize(textStr);
 
-    return processTextSegments(segments, keywords, colors, showQuotes);
+    return processTextSegments(segments, keywords, colors, showQuotes, patternRanges);
   }
 
   return {
     processTextWithHighlights,
     extractKeywords,
+    extractHighlightPatterns,
     splitTextByKeywords,
     getSingleSemanticColor,
     getSemanticCSSClass,

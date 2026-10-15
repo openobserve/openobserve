@@ -31,6 +31,7 @@ Access key: Basic {token}`;
 export default function dynamodbCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
+      id: "dynamoDB",
       name: raw("DynamoDB"),
       tagline: t("ingestion.setupCard.dynamodbTagline"),
       logo: getImageURL("images/ingestion/dynamodb.png"),

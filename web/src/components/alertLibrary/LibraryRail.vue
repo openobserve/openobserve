@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="toggleCategory(item.id)"
         >
           <template #label>
-            <span class="truncate text-xs" :title="item.label">{{ item.label }}</span>
+            <OTruncatedText class="block text-xs">{{ item.label }}</OTruncatedText>
           </template>
         </OCheckbox>
 
@@ -160,6 +160,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 import type { LibraryFacet } from "./libraryFacets";

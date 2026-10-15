@@ -120,8 +120,16 @@ export const useRoleJsonView = (deps: JsonViewDeps) => {
           resourceDetails = resourceMapper.value["synthetic_folder"].entities.find((f: Entity) =>
             (f.entities ?? []).some((e: Entity) => e.name === entity),
           ) as Entity;
+        } else if (resource === "downtime") {
+          resourceDetails = resourceMapper.value["downtime_folder"].entities.find((f: Entity) =>
+            (f.entities ?? []).some((e: Entity) => e.name === entity),
+          ) as Entity;
         } else if (resource === "workflows") {
           resourceDetails = resourceMapper.value["workflow_folder"].entities.find((f: Entity) =>
+            (f.entities ?? []).some((e: Entity) => e.name === entity),
+          ) as Entity;
+        } else if (resource === "prompt") {
+          resourceDetails = resourceMapper.value["pfolder"].entities.find((f: Entity) =>
             (f.entities ?? []).some((e: Entity) => e.name === entity),
           ) as Entity;
         } else if (entity === "_all_" + getOrgId()) {
@@ -176,8 +184,16 @@ export const useRoleJsonView = (deps: JsonViewDeps) => {
           resourceDetails = resourceMapper.value["synthetic_folder"].entities.find((f: Entity) =>
             (f.entities ?? []).some((e: Entity) => e.name === entity),
           ) as Entity;
+        } else if (resource === "downtime") {
+          resourceDetails = resourceMapper.value["downtime_folder"].entities.find((f: Entity) =>
+            (f.entities ?? []).some((e: Entity) => e.name === entity),
+          ) as Entity;
         } else if (resource === "workflows") {
           resourceDetails = resourceMapper.value["workflow_folder"].entities.find((f: Entity) =>
+            (f.entities ?? []).some((e: Entity) => e.name === entity),
+          ) as Entity;
+        } else if (resource === "prompt") {
+          resourceDetails = resourceMapper.value["pfolder"].entities.find((f: Entity) =>
             (f.entities ?? []).some((e: Entity) => e.name === entity),
           ) as Entity;
         } else if (resource === "report") {

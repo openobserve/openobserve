@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { createStore } from "vuex";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import DbmEmptyState from "./DbmEmptyState.vue";
@@ -47,6 +48,24 @@ describe("DbmEmptyState", () => {
 
     it("marks the feature flag as failing when it is off", () => {
       expect(verdictOf(mountWith({ enabled: false }), "enabled")).toBe("fail");
+    });
+
+    it("names the org by its label, not its opaque identifier", () => {
+      const store = createStore({
+        state: {
+          selectedOrganization: {
+            identifier: "3IV3cRABFAqR5I3bdTtHdn041uU",
+            label: "dbmonitoring",
+          },
+        },
+      });
+      const wrapper = mount(DbmEmptyState, {
+        props: { ...HEALTHY, org: "3IV3cRABFAqR5I3bdTtHdn041uU" },
+        global: { plugins: [i18n, store] },
+      });
+      const row = wrapper.find("[data-test='dbm-empty-check-permission']");
+      expect(row.text()).toContain("dbmonitoring");
+      expect(row.text()).not.toContain("3IV3cRABFAqR5I3bdTtHdn041uU");
     });
 
     it("marks access as failing on a permission error", () => {

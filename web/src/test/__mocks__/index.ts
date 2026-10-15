@@ -15,5 +15,4 @@
 
 import "./canvas";
 import "./global";
-import "./rudder-sdk";
 import "./http";

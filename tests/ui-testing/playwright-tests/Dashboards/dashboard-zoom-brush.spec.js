@@ -121,23 +121,28 @@ test.describe("Dashboard Chart Zoom Brush & Panel Drag testcases", () => {
     const before = await pm.dashboardZoomDrag.readPanelLayout(panelBId);
     testLogger.info("Pre-drag panel B layout", before);
 
-    // Register the layout-save listener before dragging, so we can assert the
-    // GridStack change handler persisted the new layout to the backend.
-    const putResponsePromise = page
-      .waitForResponse(
-        (r) => r.request().method() === "PUT" && r.url().includes("/dashboards/"),
-        { timeout: 30000 }
-      )
-      .catch(() => null);
+    const isDashboardPut = (r) => r.method() === "PUT" && r.url().includes("/dashboards/");
+    let putsBeforeSave = 0;
+    const countPut = (r) => {
+      if (isDashboardPut(r)) putsBeforeSave += 1;
+    };
 
+    // The layout opens locked, and a drag in edit mode only drafts until Save sends the PUT.
+    await pm.dashboardPanelActions.enterLayoutEdit();
+    page.on("request", countPut);
     await pm.dashboardZoomDrag.dragPanelHeader(panelBId, { deltaX: -400, deltaY: 200 });
 
-    const putResponse = await putResponsePromise;
-    expect(putResponse).not.toBeNull();
-
     const after = await pm.dashboardZoomDrag.readPanelLayout(panelBId);
+    page.off("request", countPut);
     testLogger.info("Post-drag panel B layout", after);
     expect(after.x !== before.x || after.y !== before.y).toBe(true);
+    expect(putsBeforeSave).toBe(0);
+
+    const putResponsePromise = page
+      .waitForResponse((r) => isDashboardPut(r.request()), { timeout: 30000 })
+      .catch(() => null);
+    await pm.dashboardPanelActions.saveLayoutEdit();
+    expect(await putResponsePromise).not.toBeNull();
 
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -274,6 +279,9 @@ test.describe("Dashboard Chart Zoom Brush & Panel Drag testcases", () => {
     const panelBId = panelIds[1];
     await pm.dashboardZoomDrag.waitForPanelTile(panelBId);
 
+    // A locked layout starts no drag anywhere, so only edit mode tells the body from the header.
+    await pm.dashboardPanelActions.enterLayoutEdit();
+
     // Vertical only: a horizontal press on the body would also brush the chart,
     // and what is under test here is the grid, not the zoom.
     const gesture = { deltaX: 0, deltaY: -200 };
@@ -296,6 +304,8 @@ test.describe("Dashboard Chart Zoom Brush & Panel Drag testcases", () => {
     testLogger.info("Grid drag from panel header", { headerStartedDrag });
     expect(headerStartedDrag).toBe(true);
 
+    // The header drag may leave a draft, whose leave prompt would block the cleanup's navigation.
+    await pm.dashboardPanelActions.discardLayoutEdit();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
 });

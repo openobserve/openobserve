@@ -91,10 +91,9 @@ vi.mock("@/services/stream", async (importOriginal) => {
   });
 });
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
-    identify: vi.fn(),
     page: vi.fn(),
   },
 }));
@@ -1797,12 +1796,6 @@ describe("SearchBar.vue Actual Component Methods", () => {
         }
       }),
 
-      filterSavedViewFn: vi.fn((rows, terms) => {
-        if (terms === "") return [];
-        terms = terms.toLowerCase();
-        return rows.filter((row) => row.view_name.toLowerCase().includes(terms));
-      }),
-
       regionFilterMethod: vi.fn((node, filter) => {
         const filt = filter.toLowerCase();
         return (node && node.label && node.label.toLowerCase().indexOf(filt) > -1) || false;
@@ -2184,21 +2177,6 @@ describe("SearchBar.vue Actual Component Methods", () => {
       position: "bottom",
       timeout: 2000,
     });
-  });
-
-  // Test 100: filterSavedViewFn method
-  it("should filter saved views by search terms", () => {
-    const rows = [
-      { view_name: "My Test View" },
-      { view_name: "Production Logs" },
-      { view_name: "Test Results" },
-    ];
-
-    const filtered = componentInstance.filterSavedViewFn(rows, "test");
-
-    expect(filtered).toHaveLength(2);
-    expect(filtered[0].view_name).toBe("My Test View");
-    expect(filtered[1].view_name).toBe("Test Results");
   });
 
   // Test 101: regionFilterMethod
@@ -2677,24 +2655,6 @@ describe("SearchBar.vue Actual Component Methods", () => {
       position: "bottom",
       timeout: 2000,
     });
-  });
-
-  // Test 142: filterSavedViewFn with empty search terms
-  it("should return empty array for empty search terms", () => {
-    const rows = [{ view_name: "Test View" }];
-
-    const result = componentInstance.filterSavedViewFn(rows, "");
-
-    expect(result).toEqual([]);
-  });
-
-  // Test 143: filterSavedViewFn with no matches
-  it("should return empty array when no views match", () => {
-    const rows = [{ view_name: "Production Logs" }, { view_name: "Error Tracking" }];
-
-    const result = componentInstance.filterSavedViewFn(rows, "development");
-
-    expect(result).toEqual([]);
   });
 
   // Test 144: resetRegionFilter method
@@ -3418,20 +3378,6 @@ describe("SearchBar.vue Actual Component Methods", () => {
 
     // parseInt("invalid") returns NaN, which should be handled
     expect(componentInstance.searchObj.data.customDownloadQueryObj.query.size).toBe(100);
-  });
-
-  // Test 208: filterSavedViewFn with special characters
-  it("should filter views with special characters", () => {
-    const rows = [
-      { view_name: "Test-View_123" },
-      { view_name: "Production@Logs" },
-      { view_name: "Dev Environment" },
-    ];
-
-    const result = componentInstance.filterSavedViewFn(rows, "-");
-
-    expect(result).toHaveLength(1);
-    expect(result[0].view_name).toBe("Test-View_123");
   });
 
   // Test 209: regionFilterMethod with empty filter

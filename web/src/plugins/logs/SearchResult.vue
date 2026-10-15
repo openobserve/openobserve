@@ -166,14 +166,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left><OIcon name="troubleshoot" size="sm" /></template>
               {{ t("volumeInsights.searchInspectionsLabel") }}
             </ODropdownItem>
-            <ODropdownItem
-              v-if="showAnalyzeBtn"
-              data-test="logs-analyze-dimensions-button"
-              @select="openVolumeAnalysisDashboard"
-            >
-              <template #icon-left><OIcon name="timeline" size="sm" /></template>
-              {{ t("volumeInsights.analyzeTooltipLogs") }}
-            </ODropdownItem>
           </ODropdown>
 
           <!-- INLINE BUTTONS (wider container) -->
@@ -190,10 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <!-- Action buttons -->
-            <div
-              v-if="showInspectBtn || showAnalyzeBtn || showWrapBtn"
-              class="inline-flex items-center gap-0.5"
-            >
+            <div v-if="showInspectBtn || showWrapBtn" class="inline-flex items-center gap-0.5">
               <OButton
                 v-if="showInspectBtn"
                 variant="outline"
@@ -211,22 +200,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OButton>
               <OButton
-                v-if="showAnalyzeBtn"
-                variant="outline"
-                :size="showActionLabels ? 'chip' : 'icon-chip'"
-                @click="openVolumeAnalysisDashboard"
-                data-test="logs-analyze-dimensions-button"
-              >
-                <OIcon name="timeline" size="sm" />
-                <span v-if="showActionLabels" class="whitespace-nowrap">{{
-                  t("volumeInsights.analyzeBtnLabel")
-                }}</span>
-                <OTooltip
-                  v-if="!showActionLabels"
-                  :content="t('volumeInsights.analyzeTooltipLogs')"
-                />
-              </OButton>
-              <OButton
                 v-if="showWrapBtn"
                 variant="outline"
                 size="icon-chip"
@@ -240,40 +213,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <OSelect
+          <span
             v-if="
               searchObj.meta.resultGrid.showPagination &&
               searchObj.meta.logsVisualizeToggle === 'logs'
             "
-            data-test="logs-search-result-records-per-page"
-            v-model="searchObj.meta.resultGrid.rowsPerPage"
-            :options="rowsPerPageOptions"
-            class="select-pagination min-w-[4.5rem]"
-            size="sm"
-            :searchable="false"
-            :disable="searchObj.loading"
-            @update:model-value="getPageData('recordsPerPage')"
+            :tabindex="gridLockReason ? 0 : undefined"
+            :aria-disabled="gridLockReason ? true : undefined"
+            :aria-describedby="gridLockReason ? 'logs-page-size-reason' : undefined"
+          >
+            <OSelect
+              v-if="
+                searchObj.meta.resultGrid.showPagination &&
+                searchObj.meta.logsVisualizeToggle === 'logs'
+              "
+              data-test="logs-search-result-records-per-page"
+              v-model="searchObj.meta.resultGrid.rowsPerPage"
+              :options="rowsPerPageOptions"
+              class="select-pagination min-w-[4.5rem]"
+              size="sm"
+              :searchable="false"
+              :disabled="searchObj.loading || !!gridLockReason"
+              @update:model-value="getPageData('recordsPerPage')"
+            />
+            <span v-if="gridLockReason" id="logs-page-size-reason" class="sr-only">{{
+              gridLockReason
+            }}</span>
+          </span>
+          <OTooltip
+            v-if="gridLockReason && searchObj.meta.resultGrid.showPagination"
+            :content="gridLockReason"
           />
-          <OPagination
+          <span
             v-if="
               searchObj.meta.resultGrid.showPagination &&
               searchObj.meta.logsVisualizeToggle === 'logs'
             "
-            :disable="searchObj.loading"
-            v-model="pageNumberInput"
-            :key="searchObj.data.queryResults.total + '-' + searchObj.data.resultGrid.currentPage"
-            :max="
-              Math.max(
-                1,
-                (searchObj.communicationMethod === 'streaming' || searchObj.meta.jobId != ''
-                  ? searchObj.data.queryResults?.pagination?.length
-                  : searchObj.data.queryResults?.partitionDetail?.paginations?.length) || 0,
-              )
-            "
-            :max-pages="paginationMaxPages"
-            class="paginator-section"
-            @update:model-value="getPageData('pageChange')"
-            data-test="logs-search-result-pagination"
+            :tabindex="gridLockReason ? 0 : undefined"
+            :aria-disabled="gridLockReason ? true : undefined"
+            :aria-describedby="gridLockReason ? 'logs-pagination-reason' : undefined"
+          >
+            <OPagination
+              v-if="
+                searchObj.meta.resultGrid.showPagination &&
+                searchObj.meta.logsVisualizeToggle === 'logs'
+              "
+              :disable="searchObj.loading || !!gridLockReason"
+              :data-locked="gridLockReason ? 'true' : undefined"
+              v-model="pageNumberInput"
+              :key="searchObj.data.queryResults.total + '-' + searchObj.data.resultGrid.currentPage"
+              :max="pageCount"
+              :max-pages="paginationMaxPages"
+              class="paginator-section"
+              @update:model-value="getPageData('pageChange')"
+              data-test="logs-search-result-pagination"
+            />
+            <span v-if="gridLockReason" id="logs-pagination-reason" class="sr-only">{{
+              gridLockReason
+            }}</span>
+          </span>
+          <OTooltip
+            v-if="gridLockReason && searchObj.meta.resultGrid.showPagination"
+            :content="gridLockReason"
           />
         </div>
       </div>
@@ -290,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Combined scroll: histogram + logs/patterns scroll together vertically.
         The histogram is pinned along the X axis only (see histogramPinStyle), so
         scrolling the wide results table sideways can't drag the chart with it. -->
-      <div class="min-h-0 flex-1 overflow-auto" ref="scrollContainerRef">
+      <div class="min-h-0 flex-1 overflow-auto" ref="scrollContainerRef" tabindex="-1">
         <div
           ref="histogramRef"
           :style="histogramPinStyle"
@@ -471,13 +472,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Logs View -->
         <template v-if="searchObj.meta.logsVisualizeToggle === 'logs'">
           <!-- Missing-stream warning banner -->
-          <div
+          <LogsMissingStreamBanner
             v-if="!searchObj.loading && searchObj.data.missingStreamMessage"
-            class="px-page-edge text-status-warning-text bg-status-warning-bg flex items-center gap-2 py-2 text-xs"
-          >
-            <OIcon name="warning" size="sm" />
-            <span>{{ searchObj.data.missingStreamMessage }}</span>
-          </div>
+            :message="searchObj.data.missingStreamMessage"
+            :no-fts-streams="searchObj.data.freeTextExcluded ?? []"
+            :term="noFtsRecoveryTerm"
+            :recovery-streams="noFtsRecoverySchemas"
+            :selected-streams="searchObj.data.stream.selectedStream"
+            @clear-run="$emit('no-fts-clear-run')"
+            @field-search="(values) => $emit('no-fts-field-search', values)"
+          />
           <!-- VRL function-error banner (collapsible) -->
           <div
             v-if="!searchObj.loading && searchObj?.data?.functionError"
@@ -511,6 +515,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :columns="getColumns || []"
                   :data="searchObj.data.queryResults?.hits || []"
                   :wrap="searchObj.meta.toggleSourceWrap"
+                  :cell-overflow-tooltip="false"
                   :loading="isResultsSkeleton"
                   :streaming="isResultsStreaming"
                   :row-key="logsRowKey"
@@ -530,6 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :enable-column-resize="true"
                   :get-row-status-color="getLogRowStatusColor"
                   :row-class="getLogRowClass"
+                  :active-row-index="activeRowIndex"
                   expansion="multiple"
                   :expanded-ids="expandedLogIds"
                   data-test="logs-search-result-logs-table"
@@ -559,9 +565,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       v-if="logsCellHtml(col.id, row)"
                       class="log-cell-html"
+                      :data-test="
+                        col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
+                      "
                       v-html="logsCellHtml(col.id, row)"
                     />
-                    <span v-else>{{ value }}</span>
+                    <span
+                      v-else
+                      :data-test="
+                        col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
+                      "
+                      >{{ value }}</span
+                    >
+                    <span
+                      v-if="col.id === logsTimestampCol"
+                      class="sr-only select-none"
+                      data-test="log-row-severity-sr"
+                      >{{ logRowSeveritySrText(row) }}</span
+                    >
                   </template>
 
                   <!-- Per-cell hover actions: AI button on the timestamp cell; copy /
@@ -623,6 +644,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @select="copyLogToClipboard(contextCell.value)"
               >
                 {{ t("logs.cellActions.copy") }}
+              </OContextMenuItem>
+
+              <OContextMenuItem
+                v-if="contextLineLink.kind !== 'hidden'"
+                icon-left="link"
+                :disabled="contextLineLink.kind === 'disabled'"
+                focusable-unavailable
+                :description="
+                  contextLineLink.kind === 'disabled' ? contextLineLink.reason : undefined
+                "
+                data-test="log-context-menu-copy-line-link"
+                @select="copyLineLink(contextCell.row, 'menu')"
+              >
+                <span class="min-w-0 flex-1">
+                  <OTooltip
+                    v-if="contextLineLink.kind === 'disabled'"
+                    :content="contextLineLink.reason"
+                    side="right"
+                  />
+                  {{ t("search.linePermalink.copyLinkMenu") }}
+                </span>
               </OContextMenuItem>
 
               <template v-if="contextCellIsStreamField">
@@ -723,42 +765,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:open="searchObj.meta.showDetailTab"
         :width="85"
         :title="t('search.rowDetail')"
-        @update:open="(v) => !v && reDrawChart()"
+        :sub-title="drawerSubTitle"
+        :return-focus-to="detailReturnFocus"
+        @update:open="(v) => !v && (reDrawChart(), endSharedDetail())"
+        @after-close="onDetailDrawerAfterClose"
       >
         <DetailTable
-          v-if="searchObj.data.queryResults?.hits?.length"
-          :key="'dialog_' + searchObj.meta.resultGrid.navigation.currentRowIndex"
-          v-model="
-            searchObj.data.queryResults.hits[searchObj.meta.resultGrid.navigation.currentRowIndex]
-          "
+          v-if="detailRow"
+          :key="'dialog_' + detailOpenSeq"
+          :model-value="detailRow"
           :stream-type="searchObj.data.stream.streamType"
           :correlation-props="correlationDashboardProps"
           :correlation-loading="correlationLoading"
           :correlation-error="correlationError ?? undefined"
           :initial-tab="detailTableInitialTab"
           class="rounded-default"
-          :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
-          :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
+          :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex ?? -1"
+          :totalLength="searchObj.data.queryResults?.hits?.length || 0"
+          :has-prev-page="hasPrevPage"
+          :has-next-page="hasNextPage"
+          :page-loading="!!searchObj.meta.resultGrid.navigation.pendingPageSelection"
+          :page-loading-direction="pageLoadingDirection"
+          :page-loading-page="searchObj.meta.resultGrid.navigation.pendingPageSelection?.page ?? 0"
+          :nav-disabled-reason="navDisabledReason"
+          :page-edge-reason="pageEdgeReason"
           :highlight-query="searchObj.data.highlightQuery"
-          @showNextDetail="navigateRowDetail"
-          @showPrevDetail="navigateRowDetail"
+          @showNextDetail="stepLogRow(1, false)"
+          @showPrevDetail="stepLogRow(-1, false)"
+          @update:tab="onDetailTabChange"
           @add:searchterm="addSearchTerm"
           @remove:searchterm="removeSearchTerm"
           @search:timeboxed="onTimeBoxed"
           @add:table="addFieldToTable"
-          @close="searchObj.meta.showDetailTab = false"
-          @view-trace="
-            redirectToTraces(
-              searchObj.data.queryResults.hits[
-                searchObj.meta.resultGrid.navigation.currentRowIndex
-              ],
-            )
-          "
+          @close="onDetailUserClose"
+          @view-trace="redirectToTraces(detailRow)"
           @sendToAiChat="sendToAiChat"
           @closeTable="closeTable"
           @load-correlation="openCorrelationFromLog"
         />
+        <div class="sr-only" aria-live="polite" aria-atomic="true" data-test="logs-detail-nav-live">
+          {{ detailNavAnnouncement }}
+        </div>
       </ODrawer>
+
+      <!-- eslint-disable local/no-hardcoded-px -- Context-menu coordinates come from MouseEvent client pixels. -->
+      <div
+        v-if="menuLinkAnchor"
+        class="pointer-events-none fixed size-0"
+        :style="{ insetInlineStart: `${menuLinkAnchor.x}px`, top: `${menuLinkAnchor.y}px` }"
+      >
+        <LogLineLinkPopover source="menu" />
+      </div>
 
       <!-- Pattern Details Drawer -->
       <PatternDetailsDialog
@@ -770,25 +827,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @add-to-search="addPatternToSearch"
         @create-alert="createAlertFromPattern"
       />
-
-      <!-- Volume Analysis Dashboard -->
-      <TracesAnalysisDashboard
-        v-if="showVolumeAnalysisDashboard"
-        :streamName="searchObj.data.stream.selectedStream[0]"
-        streamType="logs"
-        :timeRange="originalTimeRangeBeforeSelection || volumeAnalysisTimeRange"
-        :rateFilter="hasHistogramSelection ? histogramSelectionRange : undefined"
-        :baseFilter="searchObj.data.editorValue"
-        :streamFields="
-          searchObj.data.stream.userDefinedSchema?.length > 0
-            ? searchObj.data.stream.userDefinedSchema
-            : searchObj.data.stream.selectedStreamFields
-        "
-        :logSamples="searchObj.data.queryResults.hits"
-        analysisType="volume"
-        :availableAnalysisTypes="['volume']"
-        @close="closeVolumeAnalysisDashboard"
-      />
+      <!-- eslint-enable local/no-hardcoded-px -->
     </div>
 
     <!-- Correlation Dashboard (for inline expanded logs, opens as separate dialog) -->
@@ -815,6 +854,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { logsPageCount } from "@/utils/logs/pageCount";
+import { announceInto } from "@/utils/announceInto";
 import {
   computed,
   defineComponent,
@@ -839,6 +880,9 @@ import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
 import { formatLargeNumber } from "@/utils/formatters";
 import { CUSTOM_THEME_NAME, THEME_STORAGE_KEYS } from "@/constants/themes";
 import useLogs from "../../composables/useLogs";
+import { BREAKDOWN_EMPTY_LABEL, BREAKDOWN_EMPTY_VALUE } from "@/utils/logs/constants";
+import { getEmptyBreakdownFilter } from "@/utils/logs/breakdownFilter";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
@@ -857,6 +901,30 @@ import { usePagination } from "@/composables/useLogs/usePagination";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { searchState } from "@/composables/useLogs/searchState";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import {
+  failPendingPageNavigation,
+  logsRowNavAnnouncement,
+  onHitsComplete,
+  resetRowSelection,
+  setPageNavFailureHandler,
+} from "@/composables/useLogs/logsRowNav";
+import { nextRowTarget } from "@/utils/rowNavigation";
+import {
+  activePermalink,
+  clearColumnsFromUrl,
+  clearPermalink,
+  columnsFromUrl,
+  permalinkHighlightTs,
+  permalinkRowIndex,
+  searchResultMounts,
+  sharedLineRecord,
+} from "@/composables/useLogs/useLogPermalink";
+import { useLogLineLink, type LineLinkState } from "@/composables/useLogs/useLogLineLink";
+import LogLineLinkPopover from "@/plugins/logs/LogLineLinkPopover.vue";
+import { traceDetailsLocation } from "@/composables/useLogs/useViewTraceAction";
+import { matchDetailRow, trustworthyFields } from "@/utils/logs/detailRowMatch";
+import { acceptsPageLoad, type PageLoad, type PendingPageSelection } from "@/utils/pageCrossing";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
@@ -885,9 +953,15 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
+import {
+  noFtsRecoveryStreams,
+  noFtsRecoveryTerm as recoveryTerm,
+} from "@/composables/useLogs/freeTextSearch";
+import LogsMissingStreamBanner from "@/plugins/logs/LogsMissingStreamBanner.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
-import { extractStatusFromLog } from "@/utils/logs/statusParser";
+import { severityIndicatorColor, severityRowClass } from "@/utils/logs/statusParser";
+import useLogSeverity from "@/composables/useLogs/useLogSeverity";
 import { isFilterableLogField } from "@/utils/logs/streamNameColumn";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
@@ -901,6 +975,7 @@ import {
 export default defineComponent({
   name: "SearchResult",
   components: {
+    LogLineLinkPopover,
     ORefreshButton,
     OButton,
     ODrawer,
@@ -917,14 +992,12 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     OTable: defineAsyncComponent(() => import("@/lib/core/Table/OTable.vue")),
     CellActions,
+    LogsMissingStreamBanner,
     O2AIContextAddBtn,
     JsonPreview: defineAsyncComponent(() => import("./JsonPreview.vue")),
     TelemetryCorrelationDashboard,
     PatternList: defineAsyncComponent(() => import("./patterns/PatternList.vue")),
     PatternDetailsDialog: defineAsyncComponent(() => import("./patterns/PatternDetailsDialog.vue")),
-    TracesAnalysisDashboard: defineAsyncComponent(
-      () => import("../traces/metrics/TracesAnalysisDashboard.vue"),
-    ),
     OIcon,
     ODropdown,
     ODropdownItem,
@@ -948,6 +1021,8 @@ export default defineComponent({
     "run-query",
     "jump-to-stream-data",
     "open-mobile-fields",
+    "no-fts-clear-run",
+    "no-fts-field-search",
   ],
   props: {
     expandedLogs: {
@@ -1002,6 +1077,7 @@ export default defineComponent({
         ] = [...newColOrder];
 
         if (newColOrder.length > 0) {
+          clearColumnsFromUrl();
           this.searchObj.organizationIdentifier = this.store.state.selectedOrganization.identifier;
           let selectedFields = this.reorderSelectedFields();
 
@@ -1014,6 +1090,7 @@ export default defineComponent({
     },
 
     getPageData(actionType: string) {
+      if (this.gridLockReason) return false;
       if (actionType == "prev") {
         if (this.searchObj.data.resultGrid.currentPage > 1) {
           this.searchObj.data.resultGrid.currentPage =
@@ -1036,6 +1113,7 @@ export default defineComponent({
           this.scrollTableToTop(0);
         }
       } else if (actionType == "recordsPerPage") {
+        resetRowSelection(this.searchObj);
         this.searchObj.data.resultGrid.currentPage = 1;
         this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
         if (this.searchObj.communicationMethod === "streaming") {
@@ -1054,36 +1132,14 @@ export default defineComponent({
         this.$emit("update:recordsPerPage");
         this.scrollTableToTop(0);
       } else if (actionType == "pageChange") {
-        //here at first the queryResults is undefined so we are checking if it is undefined then we are setting it to empty array
-        if (
-          this.searchObj.meta.jobId != "" &&
-          this.searchObj.data.queryResults.paginations == undefined
-        ) {
-          this.searchObj.data.queryResults.pagination = [];
-        }
-        const maxPages =
-          this.searchObj.communicationMethod === "streaming" || this.searchObj.meta.jobId != ""
-            ? this.searchObj.data.queryResults.pagination.length
-            : this.searchObj.data.queryResults?.partitionDetail?.paginations.length;
-        if (this.pageNumberInput > Math.ceil(maxPages) && this.searchObj.meta.jobId == "") {
-          toast({
-            variant: "error",
-            message: this.t("logs.searchResult.pageOutOfRange"),
-            timeout: 1000,
-          });
-          this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
-          return false;
-        }
-
-        this.searchObj.data.resultGrid.currentPage = this.pageNumberInput;
-        this.$emit("update:scroll");
-        this.scrollTableToTop(0);
+        if (!this.changePage(Number(this.pageNumberInput), { fromCrossing: false })) return false;
       }
       return undefined;
     },
     closeColumn(col: any) {
       // Explicit user action — clear the system-pick marker so the result persists.
       this.searchObj.meta.isFtsDefaultColumn = false;
+      clearColumnsFromUrl();
       let selectedFields = this.reorderSelectedFields();
 
       // `col` is the OTable columnDef, which carries `id` but not the original
@@ -1140,7 +1196,9 @@ export default defineComponent({
       }
     },
     onTimeBoxed(obj: any) {
+      clearPermalink();
       this.searchObj.meta.showDetailTab = false;
+      resetRowSelection(this.searchObj);
       this.searchObj.data.searchAround.indexTimestamp = obj.key;
       // this.$emit("search:timeboxed", obj);
       this.searchAroundData(obj);
@@ -1251,6 +1309,17 @@ export default defineComponent({
       useLogs(t);
 
     const { searchObj } = searchState();
+    const autoRun = useLogsAutoRun();
+    const noFtsRecoverySchemas = computed(() =>
+      noFtsRecoveryStreams(searchObj, searchObj.data.freeTextExcluded ?? [], store.state.zoConfig),
+    );
+    const noFtsRecoveryTerm = computed(() => recoveryTerm(searchObj, store.state.zoConfig));
+
+    const gridLockReason = computed(() => {
+      if (autoRun.engine.isResultsStale()) return t("search.autoRunStaleTooltip");
+      if (autoRun.searchAroundActive()) return t("search.autoRunSearchAroundActive");
+      return null;
+    });
 
     // Use separate patterns state (completely isolated from logs)
     const { patternsState } = usePatterns(t);
@@ -1335,8 +1404,7 @@ export default defineComponent({
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
 
-    // Volume Analysis state
-    const showVolumeAnalysisDashboard = ref(false);
+    // Histogram brush selection, read by the Drill down page (Index.vue)
     const hasHistogramSelection = ref(false);
     const histogramSelectionRange = ref<{
       start: number;
@@ -1545,22 +1613,18 @@ export default defineComponent({
       const timestamp = formatDate(new Date(xData[dataIndex]));
 
       const rows = [...breakdownSeries.entries()].map(([category, counts]) => {
-        // Explicit check so numeric 0 is not treated as empty (0 is falsy in JS).
-        // Case is preserved — we never re-capitalize or lowercase user data;
-        // the tooltip label and the filter term must match the source exactly.
+        // Explicit check so a numeric 0 stays a real category; the label must match the source exactly.
         const label =
-          category === null || category === undefined || category === ""
-            ? "(empty)"
+          category === null || category === undefined || category === BREAKDOWN_EMPTY_VALUE
+            ? BREAKDOWN_EMPTY_LABEL
             : String(category);
-        const rawValue = label === "(empty)" ? "" : label;
+        const rawValue = label === BREAKDOWN_EMPTY_LABEL ? BREAKDOWN_EMPTY_VALUE : label;
         const matchedSeries = (plotChart.value?.options?.series ?? []).find(
           (s: any) => s.name === label,
         );
         return {
-          // `label` stays the English sentinel: it is compared above to derive
-          // rawValue and matched against the ECharts series name. Only the
-          // rendered field is translated.
-          displayLabel: label === "(empty)" ? t("logs.searchResult.emptyValue") : label,
+          // label stays the sentinel because it is matched against the ECharts series name
+          displayLabel: label === BREAKDOWN_EMPTY_LABEL ? t("logs.searchResult.emptyValue") : label,
           rawValue,
           count: (counts as number[])[dataIndex] ?? 0,
           color: matchedSeries?.itemStyle?.color ?? "#888",
@@ -1594,6 +1658,21 @@ export default defineComponent({
     const applyPinnedFilter = (rawValue: string, action: "include" | "exclude") => {
       const field = pinnedTooltip.value.field;
       if (!field) return;
+      if (rawValue === BREAKDOWN_EMPTY_VALUE) {
+        const quote = (f: string) =>
+          searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(f) : f;
+        const fieldType = searchObj.data.stream.selectedStreamFields.find(
+          (f: { name: string; dataType?: string }) => f.name === field,
+        )?.dataType;
+        searchObj.data.stream.addToFilterMode = "append";
+        searchObj.data.stream.addToFilter = getEmptyBreakdownFilter(
+          field,
+          action,
+          quote,
+          fieldType,
+        );
+        return;
+      }
       addSearchTerm(field, rawValue, action);
     };
 
@@ -1669,13 +1748,13 @@ export default defineComponent({
       // searchObj.meta.resultGrid.pagination.rowsPerPage = val;
     };
 
-    const openLogDetails = (props: any, index: number) => {
-      searchObj.meta.showDetailTab = true;
-      searchObj.meta.resultGrid.navigation.currentRowIndex = index;
-      detailTableInitialTab.value = "json"; // Reset to default tab
+    const openLogDetails = (_row: any, index: number) => {
+      if (!openDetail({ index }, { tab: "json" })) return;
+      searchObj.meta.resultGrid.navigation.selectionActive = true;
+      scrollRowIntoView(index);
 
       // Prepare correlation context (but don't open panel automatically)
-      const logData = searchObj.data.queryResults?.hits?.[index];
+      const logData = detailRow.value;
       if (logData) {
         correlationContext.value = {
           timestamp: logData._timestamp || Date.now() * 1000,
@@ -1693,26 +1772,16 @@ export default defineComponent({
         return;
       }
 
-      // Find the index of this row in the hits array by comparing timestamp
-      const timestampColumn = store.state.zoConfig?.timestamp_column || "_timestamp";
-      const index = searchObj.data.queryResults?.hits?.findIndex(
-        (hit: any) => hit[timestampColumn] === row[timestampColumn],
-      );
-
-      if (index === -1 || index === undefined) {
+      const index = logsRowIndex(row);
+      if (index < 0) {
         console.error("[SearchResult] Could not find flex index for correlation", {
-          rowTimestamp: row[timestampColumn],
           hitsCount: searchObj.data.queryResults?.hits?.length,
         });
         return;
       }
 
-      // Set the initial tab to correlated-logs before opening the sidebar
-      detailTableInitialTab.value = "correlated-logs";
-
-      // Open the log details sidebar
-      searchObj.meta.showDetailTab = true;
-      searchObj.meta.resultGrid.navigation.currentRowIndex = index;
+      openDetail({ index }, { tab: "correlated-logs" });
+      searchObj.meta.resultGrid.navigation.selectionActive = true;
 
       // Load correlation data
       openCorrelationFromLog(row);
@@ -1868,28 +1937,431 @@ export default defineComponent({
       }
     };
 
-    const getRowIndex = (next: boolean, prev: boolean, oldIndex: number) => {
-      if (next) {
-        return oldIndex + 1;
-      } else {
-        return oldIndex - 1;
-      }
-    };
-
-    const navigateRowDetail = (isNext: boolean, isPrev: boolean) => {
-      const newIndex = getRowIndex(
-        isNext,
-        isPrev,
-        Number(searchObj.meta.resultGrid.navigation.currentRowIndex),
-      );
-      searchObj.meta.resultGrid.navigation.currentRowIndex = newIndex;
-
-      // Clear correlation data when navigating to a different log
-      // User will need to click a correlation tab again for the new log
+    const clearCorrelationState = () => {
       correlationDashboardProps.value = null;
       correlationLoading.value = false;
       correlationError.value = null;
     };
+
+    const navigation = () => searchObj.meta.resultGrid.navigation;
+    const hitsList = (): any[] => searchObj.data.queryResults?.hits ?? [];
+    const detailRow = ref<Record<string, any> | null>(null);
+    const detailOpenSeq = ref(0);
+    const detailActiveTab = ref("json");
+    const rowNavAnnouncement = logsRowNavAnnouncement;
+    const detailNavAnnouncement = ref("");
+    let afterCloseAnnouncement: string | null = null;
+    let crossingFromClosedDrawer = false;
+
+    const currentPage = computed(() => Number(searchObj.data.resultGrid.currentPage) || 1);
+    const pageCount = computed(() =>
+      Math.max(
+        1,
+        logsPageCount(
+          searchObj.communicationMethod,
+          searchObj.meta.jobId,
+          searchObj.data.queryResults,
+        ) || 0,
+      ),
+    );
+    const searchAroundShown = () => searchObj.data.searchAround?.indexTimestamp > 0;
+    const autoRefreshOn = () => Number(searchObj.meta.refreshInterval ?? 0) > 0;
+    const canChangePage = computed(
+      () =>
+        !!searchObj.meta.resultGrid.showPagination &&
+        !autoRefreshOn() &&
+        !searchAroundShown() &&
+        !gridLockReason.value,
+    );
+    const hasNextPage = computed(() => canChangePage.value && currentPage.value < pageCount.value);
+    const hasPrevPage = computed(() => canChangePage.value && currentPage.value > 1);
+    const hitsSettled = () => searchObj.data.resultGrid.hitsSettled !== false && !searchObj.loading;
+
+    const activeRowIndex = computed(() =>
+      navigation().selectionActive ? (navigation().currentRowIndex ?? null) : null,
+    );
+
+    const pageEdgeReason = computed(() => {
+      if (searchAroundShown()) return t("search.autoRunSearchAroundActive");
+      if (!searchObj.meta.resultGrid.showPagination) return null;
+      if (autoRefreshOn()) return t("logs.rowNav.autoRefreshEdge");
+      if (autoRun.engine.isResultsStale()) return t("search.autoRunStaleTooltip");
+      return null;
+    });
+
+    const detailIsShared = ref(false);
+
+    const navDisabledReason = computed<"resultsChanged" | "notInPage" | "loading" | null>(() => {
+      if (navigation().pendingPageSelection) return null;
+      if (!hitsSettled()) return "loading";
+      if (navigation().currentRowIndex === null || navigation().currentRowIndex === undefined) {
+        return detailIsShared.value ? "notInPage" : "resultsChanged";
+      }
+      return null;
+    });
+
+    const pageLoadingDirection = computed<"next" | "prev" | null>(() => {
+      const pending = navigation().pendingPageSelection;
+      if (!pending) return null;
+      return pending.position === "first" ? "next" : "prev";
+    });
+
+    const drawerSubTitle = computed(() => {
+      const pending = navigation().pendingPageSelection;
+      if (pending) return t("logs.rowNav.loadingPage", { page: pending.page });
+      const index = navigation().currentRowIndex;
+      if (index === null || index === undefined || !hitsList().length) return undefined;
+      return t("logs.rowNav.positionLabel", {
+        row: index + 1,
+        count: hitsList().length,
+        page: currentPage.value,
+      });
+    });
+
+    const resultsRowElement = (index: number): HTMLElement | null =>
+      searchListContainer.value?.querySelector<HTMLElement>(
+        `[data-test="logs-search-result-logs-table"] [data-test="o2-table-row-${index}"]`,
+      ) ?? null;
+
+    const detailReturnFocus = (): HTMLElement | null => {
+      const index = navigation().currentRowIndex;
+      return index === null || index === undefined ? null : resultsRowElement(index);
+    };
+
+    const announce = (message: string) =>
+      announceInto(
+        searchObj.meta.showDetailTab ? detailNavAnnouncement : rowNavAnnouncement,
+        message,
+      );
+
+    const announcePosition = (index: number) =>
+      announce(
+        t("logs.rowNav.position", {
+          row: index + 1,
+          count: hitsList().length,
+          page: currentPage.value,
+        }),
+      );
+
+    const scrollRowIntoView = (index: number) => {
+      nextTick(() => {
+        const row = resultsRowElement(index);
+        const scroller = scrollContainerRef.value;
+        if (!row || !scroller) return;
+        const header = searchListContainer.value?.querySelector<HTMLElement>(
+          '[data-test="logs-search-result-logs-table"] [data-test="o2-table-header"]',
+        );
+        const viewTop = scroller.getBoundingClientRect().top + scroller.clientTop;
+        const top = Math.max(viewTop, header?.getBoundingClientRect().bottom ?? viewTop);
+        const bottom = viewTop + scroller.clientHeight;
+        const rect = row.getBoundingClientRect();
+        if (rect.top < top) scroller.scrollTop -= top - rect.top;
+        else if (rect.bottom > bottom) scroller.scrollTop += rect.bottom - bottom;
+      });
+    };
+
+    const clearRowSelection = () => {
+      navigation().selectionActive = false;
+      navigation().currentRowIndex = null;
+    };
+
+    const openDetail = (
+      target: { index: number } | { record: Record<string, any> },
+      options: { origin?: "user" | "permalink" | "crossing"; tab?: string } = {},
+    ): boolean => {
+      let record: Record<string, any> | undefined;
+      let index: number | null = null;
+      if ("index" in target) {
+        record = hitsList()[target.index];
+        index = target.index;
+      } else {
+        record = target.record;
+      }
+      if (!record) return false;
+      const origin = options.origin ?? "user";
+      if (origin !== "permalink" && activePermalink.value) clearPermalink();
+      detailIsShared.value = origin === "permalink";
+      if (origin !== "crossing") navigation().pendingPageSelection = null;
+      const tab =
+        options.tab ?? (searchObj.meta.showDetailTab ? detailTableInitialTab.value : "json");
+      detailRow.value = { ...record };
+      navigation().currentRowIndex = index;
+      detailOpenSeq.value += 1;
+      detailTableInitialTab.value = tab;
+      detailActiveTab.value = tab;
+      searchObj.meta.showDetailTab = true;
+      return true;
+    };
+
+    const onDetailTabChange = (tab: string) => {
+      detailActiveTab.value = tab;
+      if (tab === "json" || tab === "table") detailTableInitialTab.value = tab;
+    };
+
+    const isOtherDialogOpen = () =>
+      Array.from(document.querySelectorAll('[role="dialog"][data-state="open"]')).some(
+        (el) => !el.matches('[data-test="logs-search-result-detail-dialog"]'),
+      );
+
+    const focusedResultsRow = (): number | null => {
+      const active = document.activeElement as HTMLElement | null;
+      const table = searchListContainer.value?.querySelector(
+        '[data-test="logs-search-result-logs-table"]',
+      );
+      const row = active?.closest?.<HTMLElement>('[data-test^="o2-table-row-"]');
+      if (!table || !row || !table.contains(row)) return null;
+      const match = /^o2-table-row-(\d+)$/.exec(row.dataset.test ?? "");
+      return match ? Number(match[1]) : null;
+    };
+
+    const resolveAnchor = (): number | null => {
+      if (searchObj.meta.showDetailTab) return navigation().currentRowIndex ?? null;
+      const focused = focusedResultsRow();
+      if (focused !== null) return focused;
+      if (navigation().selectionActive) return navigation().currentRowIndex ?? null;
+      if (searchAroundShown()) {
+        const ts = searchObj.data.searchAround.indexTimestamp;
+        const index = hitsList().findIndex((hit) => hit[logsTimestampCol.value] === ts);
+        return index >= 0 ? index : null;
+      }
+      return null;
+    };
+
+    const edgeMessage = (edge: "first" | "last", direction: 1 | -1): string => {
+      const morePages =
+        searchObj.meta.resultGrid.showPagination &&
+        !searchAroundShown() &&
+        (direction === 1 ? currentPage.value < pageCount.value : currentPage.value > 1);
+      if (morePages && pageEdgeReason.value) return pageEdgeReason.value;
+      return edge === "last" ? t("traces.rowNav.lastResult") : t("traces.rowNav.firstResult");
+    };
+
+    const changePage = (page: number, options: { fromCrossing?: boolean } = {}): boolean => {
+      if (gridLockReason.value) return false;
+      const results = searchObj.data.queryResults;
+      if (
+        searchObj.meta.jobId !== "" &&
+        (results.paginations === null || results.paginations === undefined)
+      )
+        results.pagination = [];
+      const maxPages = logsPageCount(searchObj.communicationMethod, searchObj.meta.jobId, results);
+      if (page > Math.ceil(maxPages ?? Number.NaN) && searchObj.meta.jobId === "") {
+        toast({ variant: "error", message: t("logs.searchResult.pageOutOfRange"), timeout: 1000 });
+        pageNumberInput.value = searchObj.data.resultGrid.currentPage;
+        return false;
+      }
+      if (!options.fromCrossing) resetRowSelection(searchObj);
+      searchObj.data.resultGrid.currentPage = page;
+      pageNumberInput.value = page;
+      emit("update:scroll");
+      scrollTableToTop(0);
+      return true;
+    };
+
+    const startCrossing = (page: number, position: "first" | "last") => {
+      crossingFromClosedDrawer = !searchObj.meta.showDetailTab;
+      navigation().pendingPageSelection = { page, position, requestId: null };
+      announce(t("logs.rowNav.loadingPageAnnouncement", { page }));
+      const sent = changePage(page, { fromCrossing: true });
+      if (navigation().pendingPageSelection?.requestId === null) {
+        failPendingPageNavigation(searchObj, { quiet: !sent });
+      }
+    };
+
+    const stepLogRow = (direction: 1 | -1, isRepeat = false) => {
+      if (searchObj.meta.logsVisualizeToggle !== "logs") return;
+      if (!hitsSettled() || navigation().pendingPageSelection) return;
+      if (isOtherDialogOpen()) return;
+      const hits = hitsList();
+      if (!hits.length) return;
+      if (searchObj.meta.showDetailTab && detailActiveTab.value.startsWith("correlated-")) return;
+      const target = nextRowTarget({
+        anchor: resolveAnchor(),
+        count: hits.length,
+        direction,
+        page: currentPage.value,
+        pageCount: pageCount.value,
+        canChangePage: canChangePage.value,
+        isRepeat,
+      });
+      if (target.kind === "select") {
+        if (!openDetail({ index: target.index })) return;
+        navigation().selectionActive = true;
+        clearCorrelationState();
+        scrollRowIntoView(target.index);
+        announcePosition(target.index);
+      } else if (target.kind === "page") {
+        startCrossing(target.page, target.position);
+      } else if (target.kind === "edge") {
+        announce(edgeMessage(target.edge, direction));
+      }
+    };
+
+    const closeDrawerAnnouncing = (message: string) => {
+      if (searchObj.meta.showDetailTab) {
+        afterCloseAnnouncement = message;
+        searchObj.meta.showDetailTab = false;
+      } else {
+        announceInto(rowNavAnnouncement, message);
+      }
+    };
+
+    const failCrossing = (page: number, options: { quiet: boolean; cancelled?: boolean }) => {
+      navigation().pendingPageSelection = null;
+      clearRowSelection();
+      if (options.cancelled) {
+        closeDrawerAnnouncing("");
+        return;
+      }
+      const message = t("traces.rowNav.pageFailed", { page });
+      if (!options.quiet) toast({ variant: "error", message });
+      closeDrawerAnnouncing(message);
+    };
+
+    const crossingTargetStillWanted = () => {
+      if (searchObj.meta.logsVisualizeToggle !== "logs" || isOtherDialogOpen()) return false;
+      if (!crossingFromClosedDrawer) return true;
+      const active = document.activeElement;
+      if (!active || active === document.body) return true;
+      const table = searchListContainer.value?.querySelector(
+        '[data-test="logs-search-result-logs-table"]',
+      );
+      return !!table?.contains(active) || active === scrollContainerRef.value;
+    };
+
+    const resolveCrossing = (pending: PendingPageSelection, load: PageLoad) => {
+      if (!load.ok) {
+        failCrossing(pending.page, { quiet: false, cancelled: load.reason === "cancelled" });
+        return;
+      }
+      const hits = hitsList();
+      if (!hits.length) {
+        navigation().pendingPageSelection = null;
+        clearRowSelection();
+        closeDrawerAnnouncing(t("traces.rowNav.pageEmpty", { page: pending.page }));
+        return;
+      }
+      const index = pending.position === "first" ? 0 : hits.length - 1;
+      navigation().pendingPageSelection = null;
+      if (crossingTargetStillWanted()) {
+        openDetail({ index }, { origin: "crossing" });
+        clearCorrelationState();
+      } else {
+        navigation().currentRowIndex = index;
+      }
+      navigation().selectionActive = true;
+      scrollRowIntoView(index);
+      nextTick(() => announcePosition(index));
+    };
+
+    watch(
+      () => searchObj.data.resultGrid.pageLoad,
+      (load) => {
+        const pending = navigation().pendingPageSelection ?? null;
+        if (pending && acceptsPageLoad(pending, load ?? null)) resolveCrossing(pending, load!);
+      },
+      { flush: "sync" },
+    );
+
+    watch(
+      () => searchObj.meta.logsVisualizeToggle,
+      (mode) => {
+        if (mode !== "logs" && navigation().pendingPageSelection) resetRowSelection(searchObj);
+      },
+    );
+
+    const onDetailDrawerAfterClose = () => {
+      const message = afterCloseAnnouncement;
+      afterCloseAnnouncement = null;
+      if (navigation().currentRowIndex === null || navigation().currentRowIndex === undefined)
+        scrollContainerRef.value?.focus({ preventScroll: true });
+      if (message) nextTick(() => announceInto(rowNavAnnouncement, message));
+    };
+
+    const executedTrustworthy = () => {
+      const executed = searchObj.meta.executed as
+        { signature?: { sqlMode?: boolean }; req?: any } | null | undefined;
+      const options = { timestampColumn: logsTimestampCol.value };
+      return executed?.req
+        ? trustworthyFields(
+            {
+              sqlMode: !!executed.signature?.sqlMode,
+              encoding: executed.req.encoding,
+              query: executed.req.query ?? {},
+            },
+            options,
+          )
+        : "all";
+    };
+
+    const rematchDetailRow = () => {
+      const snapshot = detailRow.value;
+      if (!snapshot) return;
+      const options = { timestampColumn: logsTimestampCol.value };
+      navigation().currentRowIndex = matchDetailRow(
+        hitsList(),
+        snapshot,
+        executedTrustworthy(),
+        options,
+      );
+    };
+
+    const mapSharedLine = () => {
+      const record = detailRow.value;
+      if (!record) return;
+      const hits = hitsList();
+      const snapshot: Record<string, any> = { ...record };
+      if (!hits.some((hit) => hit?._o2_id !== undefined)) delete snapshot._o2_id;
+      const options = { timestampColumn: logsTimestampCol.value };
+      const index = matchDetailRow(hits, snapshot, executedTrustworthy(), options);
+      navigation().currentRowIndex = index;
+      permalinkRowIndex.value = index;
+      if (index === null) return;
+      navigation().selectionActive = true;
+      scrollRowIntoView(index);
+    };
+
+    const stopHitsComplete = onHitsComplete((payload) => {
+      if (payload.type !== "search" || navigation().pendingPageSelection) return;
+      if (!searchObj.meta.showDetailTab || !detailRow.value) return;
+      if (detailIsShared.value && sharedLineRecord.value) mapSharedLine();
+      else rematchDetailRow();
+    });
+
+    watch(
+      sharedLineRecord,
+      (record) => {
+        if (!record) return;
+        openDetail({ record }, { origin: "permalink", tab: "json" });
+        const executed = searchObj.meta.executed as { complete?: boolean } | null | undefined;
+        if (executed?.complete && hitsSettled() && hitsList().length) mapSharedLine();
+      },
+      { immediate: true },
+    );
+
+    const endSharedDetail = () => {
+      if (detailIsShared.value) clearPermalink();
+    };
+
+    const onDetailUserClose = () => {
+      searchObj.meta.showDetailTab = false;
+      endSharedDetail();
+    };
+
+    searchResultMounts.value += 1;
+
+    const stopPageNavFailure = setPageNavFailureHandler(({ quiet }) => {
+      const pending = navigation().pendingPageSelection;
+      if (pending) failCrossing(pending.page, { quiet });
+    });
+
+    onBeforeUnmount(() => {
+      searchResultMounts.value = Math.max(0, searchResultMounts.value - 1);
+      stopHitsComplete();
+      stopPageNavFailure();
+      if (afterCloseAnnouncement) announceInto(rowNavAnnouncement, afterCloseAnnouncement);
+      afterCloseAnnouncement = null;
+    });
 
     const addSearchTerm = (
       field: string | number,
@@ -1921,6 +2393,7 @@ export default defineComponent({
       // Explicit user action — this selection is now user-owned, so allow it to
       // persist (clears any prior system-pick FTS-default marker).
       searchObj.meta.isFtsDefaultColumn = false;
+      clearColumnsFromUrl();
       if (searchObj.data.stream.selectedFields.includes(fieldName)) {
         searchObj.data.stream.selectedFields = searchObj.data.stream.selectedFields.filter(
           (v: any) => v !== fieldName,
@@ -1953,27 +2426,7 @@ export default defineComponent({
         return;
       }
 
-      // 15 mins +- from the log timestamp
-      const from = log[store.state.zoConfig.timestamp_column] - 900000000;
-      const to = log[store.state.zoConfig.timestamp_column] + 900000000;
-      const refresh = 0;
-
-      const query: any = {
-        name: "traceDetails",
-        query: {
-          stream: searchObj.meta.selectedTraceStream,
-          from,
-          to,
-          refresh,
-          org_identifier: store.state.selectedOrganization.identifier,
-          trace_id: log[store.state.organizationData.organizationSettings.trace_id_field_name],
-          reload: "true",
-        },
-      };
-
-      query["span_id"] = log[store.state.organizationData.organizationSettings.span_id_field_name];
-
-      router.push(query);
+      router.push(traceDetailsLocation(log, store.state, searchObj.meta.selectedTraceStream));
     };
 
     const getTableWidth = computed(() => {
@@ -2033,19 +2486,11 @@ export default defineComponent({
 
     const closeTable = () => {
       searchObj.meta.showDetailTab = false;
+      endSharedDetail();
       // Clear correlation data when closing sidebar so it doesn't persist to next "row"
       correlationDashboardProps.value = null;
       correlationLoading.value = false;
       correlationError.value = null;
-    };
-
-    // Volume Analysis functions
-    const openVolumeAnalysisDashboard = () => {
-      showVolumeAnalysisDashboard.value = true;
-    };
-
-    const closeVolumeAnalysisDashboard = () => {
-      showVolumeAnalysisDashboard.value = false;
     };
 
     // Search Job Inspector functions
@@ -2087,6 +2532,7 @@ export default defineComponent({
           if (searchObj.meta.sqlMode) {
             return;
           }
+          if (columnsFromUrl.value) return;
           // Only the system may overwrite a column the system itself picked.
           // isFtsDefaultColumn is the authoritative "current columns are a system
           // pick" signal: it is true only when this watcher set the columns, and
@@ -2156,6 +2602,7 @@ export default defineComponent({
           correlationDashboardProps.value = null;
           correlationLoading.value = false;
           correlationError.value = null;
+          if (navigation().pendingPageSelection) resetRowSelection(searchObj);
         }
       },
     );
@@ -2234,6 +2681,11 @@ export default defineComponent({
     }
 
     const contextCell = ref<ContextCell | null>(null);
+    const menuLinkAnchor = ref<{ x: number; y: number } | null>(null);
+    const { lineLinkState, copyLineLink } = useLogLineLink();
+    const contextLineLink = computed<LineLinkState>(() =>
+      contextCell.value ? lineLinkState(contextCell.value.row) : { kind: "hidden" },
+    );
 
     const contextCellIsStreamField = computed(() => {
       const columnId = contextCell.value?.columnId;
@@ -2264,6 +2716,7 @@ export default defineComponent({
 
     const handleTableContextMenu = (event: MouseEvent) => {
       contextCell.value = null;
+      menuLinkAnchor.value = { x: event.clientX, y: event.clientY };
       const target = event.target;
       if (!(target instanceof Element) || !target.closest?.(DATA_CELL_SELECTOR)) {
         event.preventDefault();
@@ -2329,7 +2782,15 @@ export default defineComponent({
       () => reprocessLogsHighlight(false),
     );
 
-    const getLogRowStatusColor = (row: any): string | undefined => extractStatusFromLog(row)?.color;
+    const { rowSeverity } = useLogSeverity();
+    const getLogRowStatusColor = (row: any): string => severityIndicatorColor(rowSeverity(row));
+    const logRowSeveritySrText = (row: any) => {
+      const severity = rowSeverity(row);
+      const level = t(`logs.severity.levels.${severity.level}`);
+      return severity.source === "message"
+        ? t("logs.severity.srTextInferred", { level })
+        : t("logs.severity.srText", { level });
+    };
 
     // "Search around" highlight, applied as a class (not an inline style) so the
     // row-hover utility still wins on hover.
@@ -2339,10 +2800,25 @@ export default defineComponent({
       if (ts != null && ts !== -1 && row[logsTimestampCol.value] === ts) {
         classes.push("bg-table-row-selected-bg");
       }
+      const sharedTs = permalinkHighlightTs.value;
+      const sharedStream = activePermalink.value?.link.stream;
+      if (
+        sharedTs !== null &&
+        Number(row[logsTimestampCol.value]) === sharedTs &&
+        (row._stream_name === undefined || row._stream_name === sharedStream)
+      ) {
+        classes.push("bg-table-row-selected-bg o2-log-permalink-match");
+      }
+      if (
+        activePermalink.value &&
+        permalinkRowIndex.value !== null &&
+        logsRowIndex(row) === permalinkRowIndex.value
+      ) {
+        classes.push("o2-log-permalink-row");
+      }
       // Carries the detected severity for the status spine, which is otherwise
       // only readable as a colour.
-      const level = extractStatusFromLog(row)?.level;
-      if (level) classes.push(`o2-log-level-${level}`);
+      classes.push(severityRowClass(rowSeverity(row)));
       return classes.join(" ");
     };
 
@@ -2378,6 +2854,35 @@ export default defineComponent({
     const openLogDetailsByRow = (row: any) => openLogDetails(row, logsRowIndex(row));
 
     return {
+      noFtsRecoverySchemas,
+      noFtsRecoveryTerm,
+      gridLockReason,
+      activeRowIndex,
+      pageCount,
+      canChangePage,
+      hasPrevPage,
+      hasNextPage,
+      pageLoadingDirection,
+      navDisabledReason,
+      pageEdgeReason,
+      drawerSubTitle,
+      detailReturnFocus,
+      onDetailDrawerAfterClose,
+      detailRow,
+      detailIsShared,
+      endSharedDetail,
+      onDetailUserClose,
+      contextLineLink,
+      copyLineLink,
+      menuLinkAnchor,
+      detailOpenSeq,
+      detailActiveTab,
+      onDetailTabChange,
+      openDetail,
+      stepLogRow,
+      changePage,
+      rowNavAnnouncement,
+      detailNavAnnouncement,
       raw,
       isDark,
       isMobile,
@@ -2405,6 +2910,7 @@ export default defineComponent({
       logsRowKey,
       getLogRowStatusColor,
       getLogRowClass,
+      logRowSeveritySrText,
       expandedLogIds,
       onExpandedLogIdsChange,
       openLogDetailsByRow,
@@ -2426,7 +2932,6 @@ export default defineComponent({
       formatCount,
       openLogDetails,
       changeMaxRecordToReturn,
-      navigateRowDetail,
       totalHeight,
       reDrawChart,
       toggleFieldList,
@@ -2461,7 +2966,6 @@ export default defineComponent({
       skeletonBarHeights,
       sendToAiChat,
       closeTable,
-      getRowIndex,
       getPartitionPaginations,
       getSocketPaginations,
       resetPlotChart,
@@ -2473,7 +2977,6 @@ export default defineComponent({
       hasHistogramSelection,
       histogramSelectionRange,
       originalTimeRangeBeforeSelection,
-      showVolumeAnalysisDashboard,
       openPatternDetails,
       navigatePatternDetail,
       patternNavTotal,
@@ -2483,8 +2986,6 @@ export default defineComponent({
       addWildcardValueToSearch,
       createAlertFromPattern,
       extractConstantsFromPattern,
-      openVolumeAnalysisDashboard,
-      closeVolumeAnalysisDashboard,
       openSearchJobInspector,
       showCorrelation,
       correlationContext,
@@ -2537,9 +3038,6 @@ export default defineComponent({
         this.config.isCloud == "false" &&
         this.store.state.zoConfig.search_inspector_enabled
       );
-    },
-    showAnalyzeBtn() {
-      return this.searchObj.data?.queryResults?.hits?.length > 0 && !this.searchObj.meta.sqlMode;
     },
     showWrapBtn() {
       return (

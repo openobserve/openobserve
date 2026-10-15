@@ -199,7 +199,7 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
     <span
       v-if="$slots.label || label"
       :class="[
-        'o-input-label text-compact leading-tight select-none',
+        'o-input-label text-compact min-w-0 leading-tight select-none',
         isDisabled
           ? 'text-input-label-text-disabled font-normal'
           : 'text-input-label-text font-medium',

@@ -95,3 +95,28 @@ export const BADGE_LABEL_KEYS: Record<string, I18nKey> = {
   summary: "metrics.badge.summary",
   other: "metrics.badge.other",
 };
+
+/** Human-facing unit text. */
+export const UNIT_LABELS: Record<string, string> = {
+  seconds: "s",
+  milliseconds: "ms",
+  microseconds: "µs",
+  nanoseconds: "ns",
+  bytes: "bytes",
+  "bytes-per-sec": "bytes/s",
+  "count-per-sec": "c/s",
+  "ms-per-sec": "ms/s",
+  "us-per-sec": "µs/s",
+  "ns-per-sec": "ns/s",
+  bits: "bits",
+  "bits-per-sec": "bits/s",
+  percent: "%",
+  "percent-1": "%",
+  celsius: "°C",
+  volts: "V",
+  amperes: "A",
+  joules: "J",
+  watts: "W",
+  short: "",
+  none: "",
+};

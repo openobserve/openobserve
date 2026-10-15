@@ -242,6 +242,14 @@ const builtInVars: { name: string; desc: I18nText }[] = [
     desc: t("alerts.alertSettings.builtInVars.alertStartTime"),
   },
   { name: "alert_end_time", desc: t("alerts.alertSettings.builtInVars.alertEndTime") },
+  {
+    name: "alert_start_time_millis",
+    desc: t("alerts.alertSettings.builtInVars.alertStartTimeMillis"),
+  },
+  {
+    name: "alert_end_time_millis",
+    desc: t("alerts.alertSettings.builtInVars.alertEndTimeMillis"),
+  },
   { name: "alert_url", desc: t("alerts.alertSettings.builtInVars.alertUrl") },
   {
     name: "alert_trigger_time",

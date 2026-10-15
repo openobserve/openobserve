@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
+          ref="oTableRef"
           :frame="false"
           :data="visibleRows"
           :columns="columns"
@@ -40,9 +41,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-ids="selectedKeyIds"
           selection="multiple"
           pagination="client"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[20, 50, 100, 250, 500]"
-          :footer-title="t('cipherKey.header')"
+          :current-page="currentPage"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:page-size="pageSize = $event"
+          @update:current-page="currentPage = $event"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           sorting="client"
           filter-mode="client"
           :default-columns="false"
@@ -130,10 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
             </ODropdown>
           </template>
-          <template v-if="selectedKeys.length > 0" #bottom>
-            <span class="text-text-body text-xs font-medium">
-              {{ t("settings.cipherKeysPage.selected", { count: selectedKeys.length }) }}
-            </span>
+          <template #selection-actions>
             <OButton
               data-test="cipher-keys-list-delete-keys-btn"
               variant="outline-destructive"
@@ -196,6 +200,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { useListViewState } from "@/composables/useListViewState";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -233,7 +238,38 @@ export default defineComponent({
       const e: any = cipherKeysList.error.value;
       return e?.status === 403 || e?.response?.status === 403;
     });
-    const filterQuery = ref("");
+    const viewState = useListViewState("cipher-keys", {
+      filterQuery: "",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
+    const pageSize = ref(viewState.pageSize);
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref(viewState.sortOrder);
+    const oTableRef = ref<any>(null);
+
+    watch([filterQuery, pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
+    // setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
+    watch(
+      loading,
+      (v) => {
+        if (v) return;
+        setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+      },
+      { once: true, immediate: true },
+    );
     const columns: OTableColumnDef[] = [
       {
         id: "name",
@@ -275,7 +311,6 @@ export default defineComponent({
         meta: { align: "center", actionCount: 2 },
       },
     ];
-    const resultTotal = ref<number>(0);
 
     const confirmDelete: Ref<{
       visible: boolean;
@@ -356,7 +391,6 @@ export default defineComponent({
       }
 
       tabledata.value = data;
-      resultTotal.value = responseData.length;
     };
 
     // The table is the query now: anything that invalidates the cipher-keys
@@ -491,15 +525,6 @@ export default defineComponent({
       return filterData(tabledata.value || [], filterQuery.value);
     });
 
-    // Watch visibleRows to sync resultTotal with search filter
-    watch(
-      visibleRows,
-      (newVisibleRows) => {
-        resultTotal.value = newVisibleRows.length;
-      },
-      { immediate: true },
-    );
-
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
@@ -577,8 +602,12 @@ export default defineComponent({
       showAddDialog,
       addCipherKey,
       getData,
-      resultTotal,
       filterQuery,
+      pageSize,
+      currentPage,
+      sortBy,
+      sortOrder,
+      oTableRef,
       hideAddDialog,
       cancelDeleteCipherKey,
       confirmDeleteCipherKey,

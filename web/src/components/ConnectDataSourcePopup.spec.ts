@@ -31,10 +31,10 @@ vi.mock("@/aws-exports", () => ({
   default: mockConfig,
 }));
 
-vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 import ConnectDataSourcePopup from "./ConnectDataSourcePopup.vue";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const USER_EMAIL = "example@gmail.com"; // matches store.ts userInfo.email
@@ -179,7 +179,7 @@ describe("ConnectDataSourcePopup", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
-      expect(segment.track).toHaveBeenCalledWith(
+      expect(analytics.track).toHaveBeenCalledWith(
         "onboarding_prompt_shown",
         expect.objectContaining({ org_id: "default", user_id: USER_EMAIL }),
       );
@@ -195,7 +195,10 @@ describe("ConnectDataSourcePopup", () => {
 
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
       expect(store.state.organizationData.isDataIngested).toBe(true);
-      expect(segment.track).not.toHaveBeenCalledWith("onboarding_prompt_shown", expect.anything());
+      expect(analytics.track).not.toHaveBeenCalledWith(
+        "onboarding_prompt_shown",
+        expect.anything(),
+      );
     });
   });
 
@@ -322,7 +325,7 @@ describe("ConnectDataSourcePopup", () => {
 
       await connectBtn.trigger("click");
 
-      expect(segment.track).toHaveBeenCalledWith(
+      expect(analytics.track).toHaveBeenCalledWith(
         "onboarding_prompt_connect_clicked",
         expect.objectContaining({ org_id: "default", user_id: USER_EMAIL }),
       );
@@ -338,7 +341,7 @@ describe("ConnectDataSourcePopup", () => {
 
       await closeBtn.trigger("click");
 
-      expect(segment.track).toHaveBeenCalledWith(
+      expect(analytics.track).toHaveBeenCalledWith(
         "onboarding_prompt_dismissed",
         expect.objectContaining({ org_id: "default", user_id: USER_EMAIL }),
       );
@@ -350,7 +353,7 @@ describe("ConnectDataSourcePopup", () => {
 
       await dialogStub.vm.$emit("update:open", false);
 
-      const dismissedCalls = (segment.track as ReturnType<typeof vi.fn>).mock.calls.filter(
+      const dismissedCalls = (analytics.track as ReturnType<typeof vi.fn>).mock.calls.filter(
         ([event]) => event === "onboarding_prompt_dismissed",
       );
       expect(dismissedCalls).toHaveLength(1);
@@ -399,7 +402,7 @@ describe("ConnectDataSourcePopup", () => {
       );
       const record = JSON.parse(localStorage.getItem(SLACK_STATE_KEY) ?? "{}");
       expect(record.status).toBe("pending_day2");
-      expect(segment.track).toHaveBeenCalledWith(
+      expect(analytics.track).toHaveBeenCalledWith(
         "community_slack_prompt_shown",
         expect.objectContaining({ source: "connect_data_popup" }),
       );
@@ -423,7 +426,7 @@ describe("ConnectDataSourcePopup", () => {
 
       const record = JSON.parse(localStorage.getItem(SLACK_STATE_KEY) ?? "{}");
       expect(record.status).toBe("pending_day2");
-      expect(segment.track).not.toHaveBeenCalledWith(
+      expect(analytics.track).not.toHaveBeenCalledWith(
         "community_slack_prompt_shown",
         expect.anything(),
       );

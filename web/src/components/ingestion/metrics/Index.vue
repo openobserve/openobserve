@@ -18,6 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <DataSourceSidebarLayout v-model="ingestiontabs" :splitter-width="250">
     <template #tabs>
+      <FirstSourcePickGroup
+        v-if="pickRoute === otelCollectorTab.name"
+        rail="metrics"
+        :tab="otelCollectorTab"
+        :rest-label="t('ingestion.metricsLabel')"
+      />
       <ORouteTab
         name="prometheus"
         data-test="ingestion-metrics-tab-prometheus"
@@ -66,17 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/categraf.png')"
         :label="t('ingestion.metrics.categraf')"
       />
-      <ORouteTab
-        name="otelCollector"
-        :to="{
-          name: 'otelCollector',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-        :label="t('ingestion.metrics.otelCollector')"
-      />
+      <ORouteTab v-if="pickRoute !== otelCollectorTab.name" v-bind="otelCollectorTab" />
       <ORouteTab
         name="telegraf"
         :to="{
@@ -104,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full overflow-y-auto pt-0.5">
         <router-view
-          :title="ingestiontabs"
           :currOrgIdentifier="currOrgIdentifier"
           :currUserEmail="currentUserEmail"
           @copy-to-clipboard-fn="copyToClipboardFn"
@@ -118,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
+import FirstSourcePickGroup from "@/components/ingestion/FirstSourcePickGroup.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { useI18nTyped } from "@/types/i18n";
@@ -126,15 +122,17 @@ import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 // import { config } from "../constants/config";
 import config from "../../../aws-exports";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
+import { firstSourcePickRoute } from "@/components/login/firstSourceOptions";
 
 export default defineComponent({
   name: "IngestMetrics",
   components: {
     ORouteTab,
     DataSourceSidebarLayout,
+    FirstSourcePickGroup,
   },
   data() {
     return {};
@@ -204,7 +202,7 @@ export default defineComponent({
         timeout: 5000,
       }).then((success: boolean) => {
         if (success) {
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Copy to Clipboard",
             ingestion: router.currentRoute.value.name,
             user_org: store.state.selectedOrganization.identifier,
@@ -219,6 +217,17 @@ export default defineComponent({
       confirmUpdate.value = true;
     };
 
+    const otelCollectorTab = {
+      name: "otelCollector",
+      to: {
+        name: "otelCollector",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      },
+      icon: "img:" + getImageURL("images/ingestion/otlp.svg"),
+      label: t("ingestion.metrics.otelCollector"),
+    };
+    const pickRoute = firstSourcePickRoute(store.state.selectedOrganization.identifier);
+
     return {
       t,
       store,
@@ -232,6 +241,8 @@ export default defineComponent({
       ingestiontabs,
       getImageURL,
       verifyOrganizationStatus,
+      otelCollectorTab,
+      pickRoute,
     };
   },
 });

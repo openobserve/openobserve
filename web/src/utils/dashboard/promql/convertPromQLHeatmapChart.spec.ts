@@ -1251,6 +1251,18 @@ describe("HeatmapConverter", () => {
       expect(result.visualMap.inRange.color[16]).not.toBe(result.visualMap.inRange.color[15]);
     });
 
+    it("takes a given colour range over its own, so several heatmaps share one scale", () => {
+      const result: any = converter.convert(
+        histogramData(),
+        histogramSchema({ visual_map_range: { min: 0, max: 40 } }),
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.visualMap.min).toBe(0);
+      expect(result.visualMap.max).toBe(40);
+    });
+
     it("keeps config.unit as the cell-intensity unit in the tooltip", () => {
       const result: any = converter.convert(
         histogramData(),

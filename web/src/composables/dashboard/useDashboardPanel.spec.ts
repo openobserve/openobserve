@@ -184,6 +184,19 @@ describe("useDashboardPanel", () => {
     expect(panel.dashboardPanelData.layout.vrlFunctionToggle).toBe(false);
   });
 
+  it("drops formulas when the panel leaves PromQL", async () => {
+    const panel = useDashboardPanelData("dashboard-panel-test-formula");
+    panel.dashboardPanelData.data.queryType = "promql";
+    panel.addQuery();
+    panel.dashboardPanelData.data.queries[1].config.formula = "A * 2";
+    await nextTick();
+
+    panel.dashboardPanelData.data.queryType = "sql";
+    await nextTick();
+
+    expect(panel.dashboardPanelData.data.queries[1].config).not.toHaveProperty("formula");
+  });
+
   it("uses user defined schema when enabled", () => {
     const panel = useDashboardPanelData("dashboard-panel-test-4");
 

@@ -67,7 +67,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-labels="{ row }">
-        <div v-if="row.labels && Object.keys(row.labels).length" class="flex flex-wrap gap-1">
+        <OTruncatedText
+          v-if="row.labels && Object.keys(row.labels).length"
+          as="div"
+          class="flex flex-wrap gap-1"
+          :tooltip="labelsText(row.labels)"
+        >
           <OTag
             v-for="(value, key) in row.labels"
             :key="key"
@@ -76,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ key }}={{ value }}
           </OTag>
-        </div>
+        </OTruncatedText>
         <span v-else class="text-text-secondary text-xs">—</span>
       </template>
 
@@ -144,6 +149,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import incidentsService, { type ExternalAlertPayload } from "@/services/incidents";
@@ -169,6 +175,7 @@ export default defineComponent({
     OTable,
     OButton,
     ODialog,
+    OTruncatedText,
   },
   props: {
     triggers: {
@@ -270,6 +277,14 @@ export default defineComponent({
       emit("row-click", row.alert_name);
     };
 
+    // The chips hold no separators in their text, so the cut-cell tooltip spells them out.
+    const labelsText = (labels: Record<string, string>) =>
+      raw(
+        Object.entries(labels)
+          .map(([key, value]) => `${key}=${value}`)
+          .join(", "),
+      );
+
     const payloadDialogOpen = ref(false);
     const payloadLoading = ref(false);
     const payloadError = ref("");
@@ -307,6 +322,7 @@ export default defineComponent({
       formatTimestamp,
       getReasonTooltip,
       onRowClick,
+      labelsText,
       payloadDialogOpen,
       payloadLoading,
       payloadError,

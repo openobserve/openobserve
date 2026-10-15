@@ -28,6 +28,9 @@ vi.mock("./http", () => ({
 }));
 
 import http from "./http";
+import analytics from "./product_analytics";
+
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 describe("Dashboards Service", () => {
   let mockHttp: any;
@@ -699,6 +702,44 @@ describe("Dashboards Service", () => {
           { headers: { "Content-Type": "application/json; charset=UTF-8" } },
         );
       }
+    });
+  });
+
+  describe("product analytics", () => {
+    it.each([
+      ["delete", "delete", () => dashboards.delete("test-org", "d1")],
+      ["bulkDelete", "delete", () => dashboards.bulkDelete("test-org", { ids: ["d1"] })],
+      ["new_Folder", "post", () => dashboards.new_Folder("test-org", {})],
+      ["create", "post", () => dashboards.create("test-org", {})],
+    ] as Array<[string, string, () => Promise<unknown>]>)(
+      "%s does not track, since replace and auto-setup flows call it too",
+      async (_label, verb, call) => {
+        mockHttp[verb].mockResolvedValue({ data: { successful: ["d1"], unsuccessful: [] } });
+
+        await call();
+
+        expect(analytics.track).not.toHaveBeenCalled();
+      },
+    );
+
+    it("tracks dashboard_moved with the number of moved dashboards", async () => {
+      const response = { data: {} };
+      mockHttp.patch.mockResolvedValue(response);
+
+      await expect(dashboards.move_Dashboard("test-org", ["d1", "d2"], "a", "b")).resolves.toBe(
+        response,
+      );
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_moved", { count: 2 });
+    });
+
+    it("does not track dashboard_moved when the move rejects", async () => {
+      mockHttp.patch.mockRejectedValue(new Error("boom"));
+
+      await expect(dashboards.move_Dashboard("test-org", ["d1"], "a", "b")).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

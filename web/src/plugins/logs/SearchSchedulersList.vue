@@ -33,6 +33,7 @@
       </template>
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
+          ref="oTableRef"
           :forbidden="forbidden"
           :frame="false"
           class="search-scheduler-otable"
@@ -43,6 +44,15 @@
           row-key="trace_id"
           :loading="isLoading"
           pagination="client"
+          :page-size="pageSize"
+          :page-size-options="pageSizeOptions"
+          :current-page="currentPage"
+          @update:current-page="currentPage = $event"
+          @update:page-size="pageSize = $event"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           expansion="single"
           :expand-on-row-click="true"
           v-model:expanded-ids="expandedIds"
@@ -280,16 +290,11 @@
               </div>
             </div>
           </template>
-          <template #bottom>
-            <div class="flex h-12 w-full items-center justify-between">
-              <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
-                {{ resultTotal }} {{ t("search_scheduler_job.results") }}
-              </div>
-              <div class="ms-auto me-2 max-md:hidden">
-                {{ t("search_scheduler_job.max_limit") }} :
-                <b>1000</b>
-              </div>
-            </div>
+          <template v-if="dataToBeLoaded.length > 0" #footer-note>
+            <span class="max-md:hidden">
+              {{ t("search_scheduler_job.max_limit") }} :
+              <b>1000</b>
+            </span>
           </template>
           <template #empty>
             <div v-if="!isLoading" class="flex w-full">
@@ -320,14 +325,15 @@
 <script lang="ts">
 //@ts-nocheck
 import {
-  ref,
   onMounted,
-  onUnmounted,
+  ref,
   computed,
   defineAsyncComponent,
   defineComponent,
   reactive,
+  watch,
 } from "vue";
+import { useListViewState } from "@/composables/useListViewState";
 import { b64EncodeUnicode, b64DecodeUnicode } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -358,7 +364,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
@@ -415,7 +421,26 @@ export default defineComponent({
     const activeTab = ref("query");
     const query = ref("");
 
-    const pageSize = ref(100);
+    const viewState = useListViewState("searchSchedulers", {
+      pageSize: 100,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const oTableRef: any = ref(null);
+    const pageSize = ref(viewState.pageSize);
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+    let pendingPageRestore = true;
+    watch([pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
     const pageSizeOptions = [5, 10, 20, 50, 100];
     const tabs = reactive([
       {
@@ -433,8 +458,6 @@ export default defineComponent({
     // onMounted(async ()=>{
     //   await fetchSearchHistory();
     // })
-
-    const resultTotal = ref<number>(0);
 
     // Columns are a fixed schema (not derived from the response), so they can be
     // built up front — the table needs them present during loading to render the
@@ -533,7 +556,6 @@ export default defineComponent({
           })
           .then((res) => {
             responseToBeFetched = res.data;
-            resultTotal.value = res.data.length;
 
             columnsToBeRendered.value = generateColumns();
 
@@ -561,6 +583,11 @@ export default defineComponent({
 
             dataToBeLoaded.value = responseToBeFetched;
             isLoading.value = false;
+            if (pendingPageRestore) {
+              pendingPageRestore = false;
+              // Macrotask so the restored page wins over the table's own reset on data change.
+              setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+            }
           })
           .catch((e) => {
             forbidden.value = e?.response?.status === 403;
@@ -878,15 +905,10 @@ export default defineComponent({
         },
       },
     ]);
-    // Own page: claim the keyboard scope and load jobs on mount, then hand the
-    // scope back to the logs page on leave.
     onMounted(() => {
-      getManager()?.setScope("search-schedulers");
       fetchSearchHistory();
     });
-    onUnmounted(() => {
-      getManager()?.setScope("logs");
-    });
+
     return {
       searchObj,
       store,
@@ -903,6 +925,10 @@ export default defineComponent({
       forbidden,
       pageSize,
       pageSizeOptions,
+      currentPage,
+      sortBy,
+      sortOrder,
+      oTableRef,
       expandedIds,
       goToLogs,
       onExpandedIdsChange,
@@ -911,7 +937,6 @@ export default defineComponent({
       copyToClipboard,
       formatTime,
       delayMessage,
-      resultTotal,
       getStatusText,
       getStatusIcon,
       getStatusColor,

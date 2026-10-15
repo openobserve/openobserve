@@ -111,7 +111,7 @@ function makeWrapper() {
         OPageHeader: {
           template: `
             <div data-test="app-page-header">
-              <slot name="title" />
+              <span data-test="app-page-header-title">{{ title }}</span>
               <span data-test="app-page-header-subtitle">{{ subtitle }}</span>
               <slot name="actions" />
             </div>
@@ -185,9 +185,6 @@ function makeWrapper() {
             "overrideError",
           ],
         },
-        BetaBadge: {
-          template: '<span data-test="beta-badge">BETA</span>',
-        },
       },
     },
   });
@@ -228,9 +225,8 @@ describe("MonitorResults", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      const header = wrapper.find('[data-test="app-page-header"]');
-      expect(header.text()).toContain("Test Monitor");
-      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
+      const title = wrapper.find('[data-test="app-page-header-title"]');
+      expect(title.text()).toBe("Test Monitor");
     });
 
     it("should title the page from the fetched check, not the deep link", async () => {

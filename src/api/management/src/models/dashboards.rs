@@ -357,6 +357,61 @@ mod tests {
     }
 
     #[test]
+    fn test_v8_query_config_formula_fields_survive_save_and_reload() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let mut value: Value = serde_json::from_str(json).unwrap();
+        let fields = serde_json::json!({
+            "formula": "A / B * 100",
+            "ref": "C",
+            "hide": true,
+            "query_type": "instant",
+            "promql_legend_fallback": "errors"
+        });
+        let config = value["tabs"][0]["panels"][0]["queries"][0]["config"]
+            .as_object_mut()
+            .unwrap();
+        config.extend(fields.as_object().unwrap().clone());
+
+        let saved: MetaDashboard = serde_json::from_value::<DashboardRequestBody>(value)
+            .unwrap()
+            .into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+        let reloaded: v8::Dashboard = serde_json::from_value(stored).unwrap();
+        let reloaded = serde_json::to_value(reloaded).unwrap();
+
+        let config = &reloaded["tabs"][0]["panels"][0]["queries"][0]["config"];
+        for (key, expected) in fields.as_object().unwrap() {
+            assert_eq!(&config[key], expected, "{key} was dropped");
+        }
+    }
+
+    #[test]
+    fn test_v8_query_config_omits_unset_formula_fields() {
+        let json = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../web/src/assets/dashboards/host_metrics.dashboard.json"
+        ));
+        let body: DashboardRequestBody = serde_json::from_str(json).unwrap();
+        let saved: MetaDashboard = body.into();
+        let stored = serde_json::to_value(saved.v8.unwrap()).unwrap();
+        let config = stored["tabs"][0]["panels"][0]["queries"][0]["config"]
+            .as_object()
+            .unwrap();
+        for key in [
+            "formula",
+            "ref",
+            "hide",
+            "query_type",
+            "promql_legend_fallback",
+        ] {
+            assert!(!config.contains_key(key), "{key} serialised while unset");
+        }
+    }
+
+    #[test]
     fn test_from_request_body_v2_sets_version() {
         let json = serde_json::json!({
             "version": 2,

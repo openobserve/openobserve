@@ -183,6 +183,7 @@ export default function rumAndroidCard(subs: RumAndroidCardSubs): RichCardConten
 
   return {
     provider: {
+      id: "rumAndroid",
       // Same title as the other platform cards by design — the platform switch
       // next to it already says which guide you are on, so the heading stays
       // stable across platforms instead of rewriting itself on every click.

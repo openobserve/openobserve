@@ -15,6 +15,7 @@
 
 import { calculateOptimalFontSize } from "../../chartDimensionUtils";
 import { getContrastColor } from "../../chartColorUtils";
+import { getFieldLabel } from "../../fieldLabel";
 import { resolveMetricValueStyle } from "../../tableConfigUtils";
 import { type SQLContext } from "../shared/types";
 import { chartColor, chartNumber } from "../../../chartTheme";
@@ -323,7 +324,12 @@ export function applyMetricChart(ctx: SQLContext): void {
       chartColor("--color-chart-metric-text"),
       chartNumber("--chart-metric-contrast-threshold", 0.5),
     );
-  const metricFieldLabel = panelSchema?.queries?.[0]?.fields?.y?.[0]?.label || key1;
+  const metricFieldLabel =
+    getFieldLabel(
+      panelSchema?.queries?.[0]?.fields?.y?.[0],
+      panelSchema?.config,
+      panelSchema?.queries?.[0]?.customQuery,
+    ) || key1;
 
   const textSeries: any = {
     ...defaultSeriesProps,

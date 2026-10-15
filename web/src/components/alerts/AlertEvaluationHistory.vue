@@ -136,9 +136,7 @@
     </template>
 
     <template #cell-error="{ row }">
-      <OTooltip v-if="row.error" :content="row.error">
-        <span class="text-compact">{{ row.error }}</span>
-      </OTooltip>
+      <span v-if="row.error" class="text-compact">{{ row.error }}</span>
       <span v-else class="text-compact">—</span>
     </template>
 

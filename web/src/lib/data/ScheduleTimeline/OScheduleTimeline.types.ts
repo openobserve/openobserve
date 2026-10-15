@@ -142,6 +142,8 @@ export interface ScheduleTimelineEmits {
 
 export interface ScheduleBandProps {
   band: ScheduleBand;
+  /** Hover text when the label is cut (defaults to the label); `false` when the caller wraps the band in its own tooltip. */
+  tooltip?: I18nText | false;
 }
 
 export interface ScheduleTimelineSlots {

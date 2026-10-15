@@ -24,6 +24,8 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
+#[cfg(feature = "enterprise")]
+use openobserve_core::background_access::StreamReadCheck;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -59,11 +61,26 @@ use crate::{
         ("x-o2-mcp" = json!({"description": "Create a VRL (Vector Remap Language) function", "category": "functions"}))
     )
 )]
-pub async fn save_function(Path(org_id): Path<String>, Json(func): Json<Transform>) -> Response {
+pub async fn save_function(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(func): Json<Transform>,
+) -> Response {
     let mut transform = func;
     transform.name = transform.name.trim().to_string();
     transform.function = transform.function.trim().to_string();
-    match openobserve_core::functions::save_function(org_id, transform).await {
+    #[cfg(feature = "enterprise")]
+    let saved = {
+        let org = org_id.clone();
+        let check = StreamReadCheck {
+            org_id: &org,
+            user_id: &user_email.user_id,
+        };
+        openobserve_core::functions::save_function_checked(org_id, transform, Some(&check)).await
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let saved = openobserve_core::functions::save_function(org_id, transform).await;
+    match saved {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
@@ -305,13 +322,29 @@ pub async fn delete_function_bulk(
 )]
 pub async fn update_function(
     Path((org_id, name)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(func): Json<Transform>,
 ) -> Response {
     let name = name.trim();
     let mut transform = func;
     transform.name = transform.name.trim().to_string();
     transform.function = transform.function.trim().to_string();
-    match openobserve_core::functions::update_function(&org_id, name, transform).await {
+    #[cfg(feature = "enterprise")]
+    let check = StreamReadCheck {
+        org_id: &org_id,
+        user_id: &user_email.user_id,
+    };
+    #[cfg(feature = "enterprise")]
+    let updated = openobserve_core::functions::update_function_checked(
+        &org_id,
+        name,
+        transform,
+        Some(&check),
+    )
+    .await;
+    #[cfg(not(feature = "enterprise"))]
+    let updated = openobserve_core::functions::update_function(&org_id, name, transform).await;
+    match updated {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
@@ -399,5 +432,170 @@ pub async fn test_function(
     {
         Ok(result) => result,
         Err(err) => (StatusCode::BAD_REQUEST, err.to_string()).into_response(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "enterprise")]
+    mod stream_access {
+        use std::sync::Arc;
+
+        use axum::{Json, body::to_bytes, extract::Path, http::StatusCode};
+        use config::meta::{function::Transform, stream::StreamType};
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::{
+            auth::UserEmail,
+            authz::{TypedStream, WriteCheck, fake_checker},
+        };
+        use transform::enrichment::{ENRICHMENT_TABLES, StreamTable};
+
+        use super::super::*;
+
+        async fn guard_function(
+            org_id: &str,
+            user_id: &str,
+            transform: &Transform,
+        ) -> Result<(), Response> {
+            StreamReadCheck { org_id, user_id }.check(transform).await
+        }
+
+        #[tokio::test]
+        async fn an_empty_body_from_a_denied_user_gets_the_save_400() {
+            fake_checker();
+            let mut empty = vrl("sf_own_table");
+            empty.function = String::new();
+            let resp = save_function(
+                Path("sf_org1".to_string()),
+                Headers(UserEmail { user_id: user() }),
+                Json(empty.clone()),
+            )
+            .await;
+            assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+            let resp = update_function(
+                Path(("sf_org1".to_string(), "fn1".to_string())),
+                Headers(UserEmail { user_id: user() }),
+                Json(empty),
+            )
+            .await;
+            assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        }
+
+        fn user() -> String {
+            format!("{}@example.com", config::ider::uuid())
+        }
+
+        fn add_table(org: &str, name: &str) -> String {
+            let key = format!("{org}/enrichment_tables/{name}");
+            ENRICHMENT_TABLES.insert(
+                key.clone(),
+                StreamTable {
+                    org_id: org.to_string(),
+                    stream_name: name.to_string(),
+                    data: Arc::new(vec![]),
+                },
+            );
+            key
+        }
+
+        fn vrl(table: &str) -> Transform {
+            Transform {
+                name: "fn1".to_string(),
+                function: format!("row = get_enrichment_table_record!(\"{table}\", {{\"k\": .k}})"),
+                params: "row".to_string(),
+                num_args: 1,
+                trans_type: Some(0),
+                streams: None,
+            }
+        }
+
+        fn table(org: &str, name: &str) -> TypedStream {
+            TypedStream {
+                org_id: org.to_string(),
+                stream_type: StreamType::EnrichmentTables,
+                name: name.to_string(),
+            }
+        }
+
+        async fn message(resp: axum::response::Response) -> String {
+            let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+            let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            body["message"].as_str().unwrap_or_default().to_string()
+        }
+
+        #[tokio::test]
+        async fn function_denied_enrichment_table_is_refused() {
+            fake_checker();
+            let key = add_table("sf_org1", "sf_own_table");
+            let caller = user();
+            let resp = save_function(
+                Path("sf_org1".to_string()),
+                Headers(UserEmail {
+                    user_id: caller.clone(),
+                }),
+                Json(vrl("sf_own_table")),
+            )
+            .await;
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+            assert_eq!(
+                message(resp).await,
+                "Unauthorized Access: no read permission on enrichment_tables/sf_own_table"
+            );
+
+            fake_checker().grant_read(&caller, &table("sf_org1", "sf_own_table"));
+            assert!(
+                guard_function("sf_org1", &caller, &vrl("sf_own_table"))
+                    .await
+                    .is_ok()
+            );
+            ENRICHMENT_TABLES.remove(&key);
+        }
+
+        #[tokio::test]
+        async fn default_org_table_refused_for_other_org_admin() {
+            let key = add_table("default", "sf_shared_table");
+            let admin = user();
+            fake_checker().grant_admin("sf_org2", &admin);
+            let resp = guard_function("sf_org2", &admin, &vrl("sf_shared_table"))
+                .await
+                .unwrap_err();
+            assert_eq!(
+                message(resp).await,
+                "Unauthorized Access: no read permission on default/enrichment_tables/sf_shared_table"
+            );
+
+            fake_checker().grant_read(&admin, &table("default", "sf_shared_table"));
+            assert!(
+                guard_function("sf_org2", &admin, &vrl("sf_shared_table"))
+                    .await
+                    .is_ok()
+            );
+            ENRICHMENT_TABLES.remove(&key);
+        }
+
+        #[tokio::test]
+        async fn same_name_own_org_table_is_the_one_checked() {
+            let shared = add_table("default", "sf_both_table");
+            let own = add_table("sf_org3", "sf_both_table");
+            let caller = user();
+            fake_checker().grant_read(&caller, &table("sf_org3", "sf_both_table"));
+            assert!(
+                guard_function("sf_org3", &caller, &vrl("sf_both_table"))
+                    .await
+                    .is_ok()
+            );
+            ENRICHMENT_TABLES.remove(&shared);
+            ENRICHMENT_TABLES.remove(&own);
+        }
+
+        #[tokio::test]
+        async fn unknown_table_is_left_to_the_compile_error() {
+            let caller = user();
+            assert!(
+                guard_function("sf_org1", &caller, &vrl("sf_missing_table"))
+                    .await
+                    .is_ok()
+            );
+        }
     }
 }

@@ -17,6 +17,7 @@ import DOMPurify from "dompurify";
 import hljs from "highlight.js";
 import { marked } from "marked";
 
+import type { ChatMessage } from "@/ts/interfaces/chat";
 import type { TranslateFn } from "@/types/i18n";
 import { UNAUTHORIZED_MESSAGE_KEY } from "@/utils/authErrors";
 
@@ -110,8 +111,9 @@ export function processTextBlock(text: string): RenderedBlock[] {
 
 export const processMessageContent = processTextBlock;
 
-// Helper to format JSON with syntax highlighting
-export function formatLogEntryContent(content: string): string {
+/** A log entry as highlighted JSON or escaped text; `strict` for read-only views of other people's chats. */
+export function formatLogEntryContent(content: string, strict = false): string {
+  const sanitize = (html: string) => (strict ? sanitizeStrict(html) : DOMPurify.sanitize(html));
   try {
     const parsed = JSON.parse(content);
     const formatted = JSON.stringify(parsed, null, 2);
@@ -133,10 +135,10 @@ export function formatLogEntryContent(content: string): string {
         return `<span class="${cls}">${match}</span>`;
       },
     );
-    return DOMPurify.sanitize(highlighted);
+    return sanitize(highlighted);
   } catch {
     // Not JSON, return plain text with HTML escaping
-    return DOMPurify.sanitize(
+    return sanitize(
       content
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
@@ -245,10 +247,90 @@ export function chatErrorMessage(error: any, t: TranslateFn): string {
   }
 }
 
-export function processHtmlBlock(content: string): string {
+// Read-only views render other people's chats: only the markup markdown produces, nothing interactive or remote.
+const STRICT_PURIFY = {
+  ALLOWED_TAGS: [
+    "a",
+    "b",
+    "blockquote",
+    "br",
+    "code",
+    "del",
+    "div",
+    "em",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hr",
+    "i",
+    "img",
+    "li",
+    "ol",
+    "p",
+    "pre",
+    "s",
+    "span",
+    "strong",
+    "sub",
+    "sup",
+    "table",
+    "tbody",
+    "td",
+    "tfoot",
+    "th",
+    "thead",
+    "tr",
+    "ul",
+  ],
+  ALLOWED_ATTR: ["href", "title", "alt", "src", "class", "colspan", "rowspan", "align", "start"],
+  ALLOW_DATA_ATTR: false,
+  ALLOW_ARIA_ATTR: false,
+};
+
+const SHARED_LINK_REL = "noopener noreferrer nofollow";
+
+/** Sanitize with the read-only profile: inline (data:) images only, no styles, links that leak nothing. */
+export function sanitizeStrict(content: string): string {
+  const fragment = DOMPurify.sanitize(content, { ...STRICT_PURIFY, RETURN_DOM_FRAGMENT: true });
+  fragment.querySelectorAll("img").forEach((img) => {
+    if (!/^data:image\//i.test(img.getAttribute("src") ?? "")) img.remove();
+  });
+  fragment.querySelectorAll("a").forEach((link) => {
+    link.setAttribute("rel", SHARED_LINK_REL);
+    link.setAttribute("target", "_blank");
+  });
+  const container = document.createElement("div");
+  container.appendChild(fragment);
+  return container.innerHTML;
+}
+
+export function processHtmlBlock(content: string, strict = false): string {
   // Sanitize HTML to prevent XSS attacks
-  const sanitized = DOMPurify.sanitize(content);
+  const sanitized = strict ? sanitizeStrict(content) : DOMPurify.sanitize(content);
   return sanitized
     .replace(/<pre([^>]*)>/g, '<span class="generated-code-block"$1>')
     .replace(/<\/pre>/g, "</span>");
+}
+
+/** A chat message prepared for `O2AIChatMessage`: markdown blocks plus inline log entries. */
+export function processChatMessage(message: ChatMessage) {
+  if (message.role === "user") {
+    const orderedBlocks = parseLogEntries(message.content);
+    return {
+      ...message,
+      blocks: orderedBlocks.length > 0 ? [] : processMessageContent(message.content),
+      contentBlocks:
+        orderedBlocks.length > 0
+          ? [...orderedBlocks, ...(message.contentBlocks || [])]
+          : message.contentBlocks || [],
+    };
+  }
+  return {
+    ...message,
+    blocks: processMessageContent(message.content),
+    contentBlocks: message.contentBlocks || [],
+  };
 }

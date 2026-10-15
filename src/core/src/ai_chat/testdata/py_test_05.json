@@ -1,0 +1,78 @@
+{
+ "events": [
+  {
+   "id": "evt_0",
+   "aggregateID": "ses_T",
+   "seq": 0,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_u",
+     "sessionID": "ses_T",
+     "role": "user",
+     "time": {
+      "created": 1
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_1",
+   "aggregateID": "ses_T",
+   "seq": 1,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_i",
+     "sessionID": "ses_T",
+     "messageID": "msg_u",
+     "type": "text",
+     "text": "[Context]\norg_id: x",
+     "metadata": {
+      "o2_injected": true
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_2",
+   "aggregateID": "ses_T",
+   "seq": 2,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_u",
+     "sessionID": "ses_T",
+     "messageID": "msg_u",
+     "type": "text",
+     "text": "[Restored conversation]\nmine\n---\n\n[Context]\nalso mine\n\nand now?"
+    }
+   }
+  }
+ ],
+ "expected": {
+  "turns": [
+   {
+    "user_message_id": "msg_u",
+    "created": 1,
+    "user": {
+     "text": "[Restored conversation]\nmine\n---\n\n[Context]\nalso mine\n\nand now?",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "first_seq": 0,
+    "last_seq": 2
+   }
+  ],
+  "title": null,
+  "last_seq": 2
+ }
+}

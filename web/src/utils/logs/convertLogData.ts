@@ -5,6 +5,8 @@ import {
 } from "@/utils/dashboard/colorPalette";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { dataZoomBrushStyle } from "@/utils/chartTheme";
+import { resolveSeverityFieldValue } from "@/utils/logs/statusParser";
+import { BREAKDOWN_EMPTY_LABEL, BREAKDOWN_EMPTY_VALUE } from "@/utils/logs/constants";
 
 export const convertLogData = (
   x: any,
@@ -170,7 +172,7 @@ const SEMANTIC_COLORS_LIGHT: Record<string, string> = {
   success: "#43A047",
   ok: "#43A047",
   // untagged
-  "(empty)": "#BDBDBD",
+  [BREAKDOWN_EMPTY_LABEL]: "#BDBDBD",
 };
 
 const SEMANTIC_COLORS_DARK: Record<string, string> = {
@@ -191,7 +193,7 @@ const SEMANTIC_COLORS_DARK: Record<string, string> = {
   pending: "#D4A83A",
   success: "#4DAD55",
   ok: "#4DAD55",
-  "(empty)": "#707070",
+  [BREAKDOWN_EMPTY_LABEL]: "#707070",
 };
 
 export const formatCount = (value: number): string => {
@@ -200,38 +202,21 @@ export const formatCount = (value: number): string => {
   return String(value);
 };
 
-// Maps numeric severity levels (0-7) to their semantic names, matching
-// statusParser.ts mapNumericStatus. Needed because the backend histogram
-// query selects the raw field value as zo_sql_breakdown, which for OTEL
-// severity data are numbers. useHistogram.ts coerces these to strings.
-// Only maps 0-7; other numeric strings (200, 500, etc.) pass through.
-const NUMERIC_SEVERITY_TO_SEMANTIC: Record<string, string> = {
-  "0": "info", // OTEL UNSPECIFIED
-  "1": "alert",
-  "2": "critical",
-  "3": "error",
-  "4": "warning",
-  "5": "notice",
-  "6": "info",
-  "7": "debug",
-};
-
 const getSemanticColor = (
   label: unknown,
   isDarkTheme: boolean,
   fallbackPalette: string[],
+  breakdownField?: string | null,
 ): string => {
   const map = isDarkTheme ? SEMANTIC_COLORS_DARK : SEMANTIC_COLORS_LIGHT;
   const lowerLabel = String(label ?? "")
     .trim()
     .toLowerCase();
 
-  const directMatch = map[lowerLabel];
-  if (directMatch) return directMatch;
+  if (Object.hasOwn(map, lowerLabel)) return map[lowerLabel];
 
-  const semanticName = NUMERIC_SEVERITY_TO_SEMANTIC[lowerLabel];
-  if (semanticName)
-    return map[semanticName] ?? fallbackPalette[getSeriesHash(String(label), fallbackPalette)];
+  const resolved = breakdownField ? resolveSeverityFieldValue(breakdownField, label) : null;
+  if (resolved && map[resolved.level]) return map[resolved.level];
 
   return fallbackPalette[getSeriesHash(String(label), fallbackPalette)];
 };
@@ -245,12 +230,11 @@ export const convertStackedLogData = (
   const palette = isDarkTheme ? classicColorPaletteDarkTheme : classicColorPaletteLightTheme;
 
   const series = [...breakdownSeries.entries()].map(([category, values]) => {
-    // Use explicit check so numeric 0 is treated as a real value, not empty.
-    // `category || "(empty)"` would incorrectly map 0 → "(empty)" because 0 is falsy.
-    // Case is preserved from the source data — "INFO", "Info", "info" render as
-    // three distinct series instead of being collapsed to one normalized label.
+    // Explicit check so a numeric 0 stays a real category; case is kept as the source sent it.
     const label =
-      category === null || category === undefined || category === "" ? "(empty)" : String(category);
+      category === null || category === undefined || category === BREAKDOWN_EMPTY_VALUE
+        ? BREAKDOWN_EMPTY_LABEL
+        : String(category);
     return {
       name: label,
       type: "bar",
@@ -261,7 +245,7 @@ export const convertStackedLogData = (
         values[i] ?? 0,
       ]),
       itemStyle: {
-        color: getSemanticColor(label, isDarkTheme, palette),
+        color: getSemanticColor(label, isDarkTheme, palette, params.breakdownField),
       },
     };
   });

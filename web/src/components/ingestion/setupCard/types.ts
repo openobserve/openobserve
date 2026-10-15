@@ -224,7 +224,7 @@ export interface RichCardExtras {
    * through the same live substitution as the steps ({stream} and step inputs).
    */
   advanced?: {
-    /** Accordion label, e.g. "Advanced Installation (Manual Steps)".
+    /** Accordion label, e.g. "Advanced installation (manual steps)".
      *  Omit when `labelKey` is set. */
     label?: I18nText;
     /** i18n KEY for the accordion label, translated by the renderer. */
@@ -256,6 +256,8 @@ export interface RichCardExtras {
 }
 
 export interface RichCardProvider {
+  /** Stable, non-localized key (the card's slug), safe to send to analytics. */
+  id: string;
   name: string;
   tagline: I18nText;
   /** Resolved logo asset URL for light mode (rendered on a neutral tile). */
