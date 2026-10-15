@@ -44,7 +44,9 @@ export interface PanelDiagnostics {
 }
 
 // Server-authored texts (src/search_service) that ride in `function_error` but are not function failures.
-const RANGE_CLAMP_PREFIX = "Query duration is modified due to query range restriction";
+// Range clamps: non-streaming/multi-stream wording, and the streaming wording, which arrives
+// appended to the partial-data notice ("…based on partial data \n reached max query range limit").
+const RANGE_CLAMP_MARKERS = ["due to query range restriction", "reached max query range limit"];
 const PARTIAL_DATA_MESSAGE = "Please be aware that the response is based on partial data";
 const CAPPED_RESULTS_PREFIX = "Warn: results are capped";
 
@@ -60,7 +62,8 @@ const toMessages = (value: unknown): string[] => {
   return typeof value === "string" && value.trim() !== "" ? [value] : [];
 };
 
-const isRangeClamp = (message: string) => message.startsWith(RANGE_CLAMP_PREFIX);
+const isRangeClamp = (message: string) =>
+  RANGE_CLAMP_MARKERS.some((marker) => message.includes(marker));
 
 type MessageKind = "range" | "function" | "partial";
 

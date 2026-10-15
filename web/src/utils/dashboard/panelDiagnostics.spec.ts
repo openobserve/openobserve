@@ -81,6 +81,18 @@ describe("summarizeQueryDiagnostics", () => {
     expect(result.functionErrors).toEqual([]);
   });
 
+  it("recognises the streaming range clamp, which rides on the partial-data notice", () => {
+    const streamingClamp =
+      "Please be aware that the response is based on partial data \n reached max query range limit";
+    const result = summarizeQueryDiagnostics(
+      [{ is_partial: true, function_error: [streamingClamp], new_start_time: 1, new_end_time: 2 }],
+      { queryHasFunction: true },
+    );
+    expect(result.serverPartial).toBe(false);
+    expect(result.partialReasons).toEqual([]);
+    expect(result.functionErrors).toEqual([]);
+  });
+
   it("treats messages on a query with a VRL function as function errors, deduped", () => {
     const result = summarizeQueryDiagnostics(
       [{ function_error: [VRL_ERROR] }, { function_error: [VRL_ERROR, RANGE_CLAMP] }],

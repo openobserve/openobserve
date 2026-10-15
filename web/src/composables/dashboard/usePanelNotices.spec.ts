@@ -37,6 +37,17 @@ describe("usePanelNotices", () => {
     expect(notices.maxQueryRangeWarning.value).toBe(RANGE_CLAMP);
   });
 
+  it("keeps the streaming range clamp on the range warning", () => {
+    const streamingClamp =
+      "Please be aware that the response is based on partial data \n reached max query range limit";
+    const notices = usePanelNotices(() => "UTC");
+    notices.handleResultMetadataUpdate([
+      [{ is_partial: true, function_error: [streamingClamp], new_start_time: 1, new_end_time: 2 }],
+    ]);
+    notices.handlePanelDiagnosticsUpdate(diagnostics([]));
+    expect(notices.maxQueryRangeWarning.value).toContain("reached max query range limit");
+  });
+
   it("clears the range warning once a fixed function leaves only VRL errors behind", () => {
     const notices = usePanelNotices(() => "UTC");
     notices.handlePanelDiagnosticsUpdate(diagnostics([VRL_ERROR]));
