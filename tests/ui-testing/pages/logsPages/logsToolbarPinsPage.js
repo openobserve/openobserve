@@ -55,7 +55,11 @@ export class LogsToolbarPinsPage {
       sqlMode: '[data-test="logs-search-bar-sql-mode-pinned-btn"]',
       quickMode: '[data-test="logs-search-bar-quick-mode-pinned-btn"]',
       savedViews: '[data-test="logs-search-bar-saved-views-pinned"]',
-      syntaxGuide: '[data-test="logs-search-bar-syntax-guide-pinned-btn"]',
+      // No syntaxGuide entry on purpose — see assertablePinOrder below. Its
+      // data-test is handed to a component that never renders it, so a selector
+      // here would match nothing and quietly pass any assertion made against it.
+      // Add it back only once SyntaxGuide.vue binds the attribute to its button.
+      //
       // Lives on the right toolbar, so it is outside the left-section width
       // budget and is the one pin that renders at any viewport width.
       functionEditor: '[data-test="logs-search-bar-function-editor-pinned-btn"]',
@@ -71,7 +75,11 @@ export class LogsToolbarPinsPage {
     // neither attribute ever reaches the DOM — every variant renders only
     // data-cy="syntax-guide-button". Assertions use the controls that do carry a
     // hook; savedViews is then the last of them in priority order.
-    this.assertablePinOrder = this.leftSectionOrder.filter((key) => key !== 'syntaxGuide');
+    //
+    // Derived from pinnedControl rather than hand-filtered, so a control can only
+    // become assertable by gaining a selector that actually renders — a dead
+    // entry cannot reintroduce a silently-matching-nothing assertion.
+    this.assertablePinOrder = this.leftSectionOrder.filter((key) => key in this.pinnedControl);
   }
 
   // ===== SETUP =====
