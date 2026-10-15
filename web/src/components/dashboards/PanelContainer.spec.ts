@@ -741,6 +741,51 @@ describe("PanelContainer", () => {
 
       expect(wrapper.vm.variablesDataUpdated).toBe(true);
     });
+
+    describe("a time range waiting in the panel's own picker", () => {
+      const refreshButton = () => wrapper.find('[data-test="dashboard-panel-refresh-panel-btn"]');
+      const refreshTooltip = () =>
+        refreshButton().findComponent({ name: "OTooltip" }).props("content");
+
+      it("marks the refresh icon with the variables warning look and says why", () => {
+        wrapper = createWrapper({ isTimeRangeWaiting: true });
+
+        expect(refreshButton().attributes("data-o2-variant")).toBe("ghost-warning");
+        expect(refreshTooltip()).toBe("Refresh to apply the time range");
+      });
+
+      it("names both when variables are waiting too", async () => {
+        wrapper = createWrapper({
+          isTimeRangeWaiting: true,
+          data: {
+            ...mockPanelData,
+            queries: [{ query: "SELECT * FROM test WHERE field = ${testVar}" }],
+          },
+          variablesData: { values: [{ name: "testVar", value: "a" }], isLoading: false },
+          currentVariablesData: { values: [{ name: "testVar", value: "b" }], isLoading: false },
+        });
+        await wrapper.vm.$nextTick();
+
+        expect(refreshButton().attributes("data-o2-variant")).toBe("ghost-warning");
+        expect(refreshTooltip()).toBe("Refresh to apply the time range and variable changes");
+      });
+
+      it("keeps the marker outside layout edit mode, where the refresh icon is hidden", () => {
+        wrapper = createWrapper({ isTimeRangeWaiting: true, layoutMode: "view" });
+        expect(refreshButton().attributes("data-o2-variant")).toBe("ghost-warning");
+        wrapper.unmount();
+
+        wrapper = createWrapper({ isTimeRangeWaiting: true, layoutMode: "edit" });
+        expect(refreshButton().exists()).toBe(false);
+      });
+
+      it("keeps the plain refresh icon when nothing waits", () => {
+        wrapper = createWrapper({ isTimeRangeWaiting: false });
+
+        expect(refreshButton().attributes("data-o2-variant")).toBe("ghost");
+        expect(refreshTooltip()).toBe("Refresh");
+      });
+    });
   });
 
   describe("Delete Panel", () => {
@@ -1435,6 +1480,28 @@ describe("PanelContainer", () => {
       await panelRenderer.vm.$emit("loading-state-change", true);
 
       expect(wrapper.vm.isPanelLoading).toBe(true);
+    });
+
+    it("keeps the previous last-refreshed age in the header while a restored panel refreshes", async () => {
+      wrapper = createWrapper({}, { PanelErrorButtons });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      const shownAge = () => {
+        expect(wrapper.find('[data-test="panel-last-refreshed-at"]').exists()).toBe(true);
+        return wrapper.findComponent(PanelErrorButtons).props("lastTriggeredAt");
+      };
+      const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+
+      await renderer.vm.$emit("last-triggered-at-update", tenMinutesAgo);
+      await renderer.vm.$emit("loading-state-change", true);
+      await flushPromises();
+      expect(wrapper.vm.isPanelLoading).toBe(true);
+      expect(shownAge()).toBe(tenMinutesAgo);
+
+      const freshAt = Date.now();
+      await renderer.vm.$emit("last-triggered-at-update", freshAt);
+      await renderer.vm.$emit("loading-state-change", false);
+      await flushPromises();
+      expect(shownAge()).toBe(freshAt);
     });
   });
 

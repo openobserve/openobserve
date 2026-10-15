@@ -6696,7 +6696,9 @@
       "panelMoveFailed": "パネルの移動に失敗しました",
       "failedToFetchReports": "レポートの取得に失敗しました",
       "failedToUpdateJson": "ダッシュボードJSONの更新に失敗しました：保存メソッドが利用できません",
-      "failedToSaveChanges": "ダッシュボードの変更の保存に失敗しました"
+      "failedToSaveChanges": "ダッシュボードの変更の保存に失敗しました",
+      "autoRunDescription": "開いたときとフィルター/時間変更時にクエリを実行します",
+      "autoRunScope": "すべてのダッシュボード、ログ、トレースに適用されます"
     },
     "dynamicFunctionPopUp": {
       "property": "プロパティ",
@@ -7174,7 +7176,9 @@
       "markerAria": "{time} のエグザンプラー {value}"
     },
     "showExemplarsLabel": "エグザンプラーを表示",
-    "showExemplarsHelp": "このダッシュボードを開くすべてのユーザーに対して、このグラフにトレースサンプルを描画します。閲覧者はパネルヘッダーから非表示にできます。"
+    "showExemplarsHelp": "このダッシュボードを開くすべてのユーザーに対して、このグラフにトレースサンプルを描画します。閲覧者はパネルヘッダーから非表示にできます。",
+    "refreshToApplyTimeRange": "時間範囲を適用するには更新してください",
+    "refreshToApplyTimeRangeAndVariables": "時間範囲と変数の変更を適用するには更新してください"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7801,7 +7805,7 @@
       "inviteSent": "招待状は正常に送信されました",
       "inviteSameOrg": "組織は自らを招待できない",
       "childHeadline": "請求管理者",
-      "childHeroSub": "使用量はこの組織に請求されます。プランの変更と請求書は親組織によって処理されるため、ここで管理することは何もありません。",
+      "childHeroSub": "ご利用分はこの組織に請求されます。プランの変更と請求書は親組織によって処理されます。",
       "invitesPanelHint": "これらの組織は、あなたをその請求グループに参加するよう招待しています。同意すると、この組織の使用量が組織に請求されます。",
       "inviteTabPrompt": "請求グループに別の組織を招待してください。その使用量はこの組織に請求されます。",
       "emptyTitle": "請求グループを開始",
@@ -7821,7 +7825,15 @@
       "currentOrgTitle": "現在の組織",
       "memberOrgsTitle": "メンバー組織",
       "searchMemberOrg": "組織を検索",
-      "noMemberMatch": "一致する組織がありません"
+      "noMemberMatch": "一致する組織がありません",
+      "remove": "削除",
+      "removeTitle": "{name} を請求グループから削除しますか？",
+      "removeBody": "この組織は無料組織になり、自身の利用分を支払います。無料プランの制限が適用されます。ユーザー、データ、および過去の利用分には影響しません。",
+      "removed": "組織を請求グループから削除しました",
+      "leave": "請求グループを脱退",
+      "leaveTitle": "{name} の請求グループから脱退しますか？",
+      "leaveBody": "この組織は無料組織になり、自身の利用分を支払います。無料プランの制限が適用されます。お客様のユーザー、データ、および過去の利用分には影響しません。",
+      "left": "請求グループから脱退しました"
     },
     "azureMarketplace": {
       "noTokenFound": "マーケットプレイストークンが見つかりません",

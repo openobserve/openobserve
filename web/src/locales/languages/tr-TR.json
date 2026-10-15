@@ -6696,7 +6696,9 @@
       "panelMoveFailed": "Panel taşıma başarısız",
       "failedToFetchReports": "Raporlar alınamadı",
       "failedToUpdateJson": "Pano JSON güncellenemedi: Kaydetme yöntemi mevcut değil",
-      "failedToSaveChanges": "Pano değişiklikleri kaydedilemedi"
+      "failedToSaveChanges": "Pano değişiklikleri kaydedilemedi",
+      "autoRunDescription": "Açıldığında ve filtre/zaman değişikliklerinde sorguları çalıştırır",
+      "autoRunScope": "Tüm gösterge panoları, Günlükler ve İzler için geçerlidir"
     },
     "dynamicFunctionPopUp": {
       "property": "Özellik",
@@ -7174,7 +7176,9 @@
       "markerAria": "{time} zamanındaki örnek {value}"
     },
     "showExemplarsLabel": "Örnekleri göster",
-    "showExemplarsHelp": "Bu grafikte, gösterge panosunu açan herkes için iz örneklerini çizer. Görüntüleyenler bunları yine de panel başlığından gizleyebilir."
+    "showExemplarsHelp": "Bu grafikte, gösterge panosunu açan herkes için iz örneklerini çizer. Görüntüleyenler bunları yine de panel başlığından gizleyebilir.",
+    "refreshToApplyTimeRange": "Zaman aralığını uygulamak için yenileyin",
+    "refreshToApplyTimeRangeAndVariables": "Zaman aralığını ve değişken değişikliklerini uygulamak için yenileyin"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7801,7 +7805,7 @@
       "inviteSent": "Davet Başarıyla Gönderildi",
       "inviteSameOrg": "Bir kuruluş kendini davet edemez",
       "childHeadline": "Tarafından yönetilen faturalandırma",
-      "childHeroSub": "Kullanımınız bu kuruluşa faturalandırılır. Plan değişiklikleri ve faturalar ana kuruluş tarafından ele alınır - burada yönetilecek bir şey yoktur.",
+      "childHeroSub": "Kullanımınız bu organizasyona faturalandırılır. Plan değişiklikleri ve faturalar üst organizasyon tarafından yönetilir.",
       "invitesPanelHint": "Bu kuruluşlar sizi faturalandırma gruplarına katılmaya davet etti. Kabul ederseniz, bu kuruluşun kullanımı onlara faturalandırılır.",
       "inviteTabPrompt": "Başka bir kuruluşu faturalandırma grubunuza katılmaya davet edin. Kullanımları bu kuruluşa faturalandırılacaktır.",
       "emptyTitle": "Faturalandırma Grubunu Başlat",
@@ -7821,7 +7825,15 @@
       "currentOrgTitle": "Mevcut Kuruluş",
       "memberOrgsTitle": "Üye Organizasyonlar",
       "searchMemberOrg": "Organizasyon Ara",
-      "noMemberMatch": "Eşleşen Organizasyon Yok"
+      "noMemberMatch": "Eşleşen Organizasyon Yok",
+      "remove": "Kaldır",
+      "removeTitle": "{name} faturalandırma grubunuzdan kaldırılsın mı?",
+      "removeBody": "Bu organizasyon ücretsiz bir organizasyon haline gelir ve kendi kullanımı için ödeme yapar. Ücretsiz plan sınırları geçerlidir. Kullanıcıları, verileri ve geçmiş kullanımı etkilenmez.",
+      "removed": "Organizasyon faturalandırma grubundan kaldırıldı",
+      "leave": "Faturalandırma grubundan ayrıl",
+      "leaveTitle": "{name} faturalandırma grubundan ayrılınsın mı?",
+      "leaveBody": "Bu organizasyon ücretsiz bir organizasyon haline gelir ve kendi kullanımı için ödeme yapar. Ücretsiz plan sınırları geçerlidir. Kullanıcılarınız, verileriniz ve geçmiş kullanımınız etkilenmez.",
+      "left": "Faturalandırma grubundan ayrıldınız"
     },
     "azureMarketplace": {
       "noTokenFound": "Marketplace Belirteci Bulunamadı",

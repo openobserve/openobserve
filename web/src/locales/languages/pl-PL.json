@@ -6696,7 +6696,9 @@
       "panelMoveFailed": "Przeniesienie panelu nie powiodło się",
       "failedToFetchReports": "Nie udało się pobrać raportów",
       "failedToUpdateJson": "Nie udało się zaktualizować JSON pulpitu nawigacyjnego: metoda zapisu niedostępna",
-      "failedToSaveChanges": "Nie udało się zapisać zmian na pulpicie nawigacyjnym"
+      "failedToSaveChanges": "Nie udało się zapisać zmian na pulpicie nawigacyjnym",
+      "autoRunDescription": "Uruchamia zapytania przy otwarciu oraz przy zmianach filtra/czasu",
+      "autoRunScope": "Dotyczy wszystkich pulpitów, Logów i Trace"
     },
     "dynamicFunctionPopUp": {
       "property": "Właściwość",
@@ -7174,7 +7176,9 @@
       "markerAria": "Exemplar {value} o {time}"
     },
     "showExemplarsLabel": "Pokaż exemplary",
-    "showExemplarsHelp": "Rysuje próbki trace na tym wykresie dla wszystkich, którzy otworzą pulpit. Przeglądający nadal mogą je ukryć w nagłówku panelu."
+    "showExemplarsHelp": "Rysuje próbki trace na tym wykresie dla wszystkich, którzy otworzą pulpit. Przeglądający nadal mogą je ukryć w nagłówku panelu.",
+    "refreshToApplyTimeRange": "Odśwież, aby zastosować zakres czasu",
+    "refreshToApplyTimeRangeAndVariables": "Odśwież, aby zastosować zakres czasu i zmiany zmiennych"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7801,7 +7805,7 @@
       "inviteSent": "Zaproszenie wysłane pomyślnie",
       "inviteSameOrg": "Organizacja nie może zaprosić samej siebie",
       "childHeadline": "Rozliczenia zarządzane przez",
-      "childHeroSub": "Twoje użycie jest fakturowane na tę organizację. Zmiany planu i faktury są obsługiwane przez organizację nadrzędną — tutaj nie ma nic do zarządzania.",
+      "childHeroSub": "Twoje zużycie jest rozliczane na tę organizację. Zmiany planu i faktury obsługuje organizacja nadrzędna.",
       "invitesPanelHint": "Te organizacje zaprosiły Cię do dołączenia do ich grupy rozliczeniowej. Jeśli zaakceptujesz, użycie tej organizacji będzie im fakturowane.",
       "inviteTabPrompt": "Zaproś inną organizację do dołączenia do Twojej grupy rozliczeniowej. Jej użycie będzie fakturowane na tę organizację.",
       "emptyTitle": "Rozpocznij grupę rozliczeniową",
@@ -7821,7 +7825,15 @@
       "currentOrgTitle": "Bieżąca organizacja",
       "memberOrgsTitle": "Organizacje członkowskie",
       "searchMemberOrg": "Szukaj organizacji",
-      "noMemberMatch": "Brak pasujących organizacji"
+      "noMemberMatch": "Brak pasujących organizacji",
+      "remove": "Usuń",
+      "removeTitle": "Usunąć {name} z grupy rozliczeniowej?",
+      "removeBody": "Ta organizacja staje się organizacją darmową i sama płaci za swoje zużycie. Obowiązują limity planu darmowego. Jej użytkownicy, dane i wcześniejsze zużycie nie zostaną zmienione.",
+      "removed": "Organizacja usunięta z grupy rozliczeniowej",
+      "leave": "Opuść grupę rozliczeniową",
+      "leaveTitle": "Opuścić grupę rozliczeniową {name}?",
+      "leaveBody": "Ta organizacja staje się organizacją darmową i sama płaci za swoje zużycie. Obowiązują limity planu darmowego. Twoi użytkownicy, dane i wcześniejsze zużycie nie zostaną zmienione.",
+      "left": "Opuszczono grupę rozliczeniową"
     },
     "azureMarketplace": {
       "noTokenFound": "Nie znaleziono tokenu Marketplace",

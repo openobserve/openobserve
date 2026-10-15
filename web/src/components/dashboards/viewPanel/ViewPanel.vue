@@ -43,12 +43,16 @@
         />
 
         <DateTimePickerDashboard
-          v-model="selectedDate"
+          :model-value="pickedDate ?? selectedDate"
+          :auto-apply-dashboard="true"
           ref="dateTimePickerRef"
           class="hover:bg-interactive-hover-bg h-8 min-h-8 transition-all duration-200"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
-          @hide="setTimeForVariables()"
+          @update:model-value="timeGate.onPick"
+          @show="timeGate.onShow"
+          @hide="onTimePickerHide"
+          @timezone-change="timeGate.flush"
         />
         <AutoRefreshInterval
           v-model="refreshInterval"
@@ -78,15 +82,7 @@
             data-test="dashboard-viewpanel-refresh-data-btn"
             :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
           >
-            <OTooltip
-              :content="
-                isAutoRunOn
-                  ? t('search.autoRunEnabled')
-                  : showApplyHint
-                    ? t('dashboard.refreshToApplyVariables')
-                    : t('common.refresh')
-              "
-            />
+            <OTooltip :content="refreshTooltip" />
           </OButton>
           <ODropdown v-if="isAutoRunAvailable" align="end" side="bottom">
             <template #trigger>
@@ -125,7 +121,13 @@
                   {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
                 </div>
                 <div class="text-text-secondary text-xs">
-                  {{ t("search.liveModeTooltip") }}
+                  {{ t("dashboard.viewDashboard.autoRunDescription") }}
+                </div>
+                <div
+                  class="text-text-secondary text-xs"
+                  data-test="dashboard-viewpanel-auto-run-scope"
+                >
+                  {{ t("dashboard.viewDashboard.autoRunScope") }}
                 </div>
               </span>
             </ODropdownItem>
@@ -274,11 +276,13 @@ import {
 import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
+import { useDashboardTimeGate } from "@/composables/dashboard/useDashboardTimeGate";
 import {
   DASHBOARD_FRESH_PANEL_TIME,
   freshTimeFromAppliedRange,
 } from "@/composables/dashboard/dashboardFreshPanelTime";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import { pickerValueToTimeObj, toPickerSavedDate } from "@/utils/dashboard/panelTimeUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -380,7 +384,7 @@ export default defineComponent({
       dashboardPanelDataPageKey,
       t,
     );
-    // default selected date will be absolute time
+    // The applied range the chart loads with; the picker's own value is `timeGate.picked`.
     const selectedDate: any = ref(props.selectedDateForViewPanel);
     const dateTimePickerRef: any = ref(null);
     const errorData: any = reactive({
@@ -642,14 +646,36 @@ export default defineComponent({
         });
 
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-        dateTimePickerRef.value.refresh();
+        timeGate.refresh();
         Object.assign(currentVariablesDataRef, JSON.parse(JSON.stringify(variablesData)));
         isVariablesChanged.value = false;
       }
     };
 
     const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
-    const showApplyHint = computed(() => isVariablesChanged.value && !isAutoRunOn.value);
+
+    const timeGate = useDashboardTimeGate({
+      applied: selectedDate,
+      isAutoRunOn: () => isAutoRunOn.value,
+      showInPicker: (value) =>
+        dateTimePickerRef.value?.setSavedDate(toPickerSavedDate(value, store.state.timezone)),
+    });
+
+    const showApplyHint = computed(
+      () => (isVariablesChanged.value && !isAutoRunOn.value) || timeGate.needsRefresh.value,
+    );
+
+    const refreshTooltip = computed(() => {
+      if (isAutoRunOn.value) return t("dashboard.viewDashboard.autoRunDescription");
+      if (timeGate.needsRefresh.value) {
+        return isVariablesChanged.value
+          ? t("dashboard.refreshToApplyTimeRangeAndVariables")
+          : t("dashboard.refreshToApplyTimeRange");
+      }
+      return isVariablesChanged.value
+        ? t("dashboard.refreshToApplyVariables")
+        : t("common.refresh");
+    });
 
     watch(isAutoRunOn, (on) => variablesManager.setLiveMode(on), { immediate: true });
 
@@ -755,9 +781,9 @@ export default defineComponent({
     watch(selectedDate, () => {
       updateDateTime();
 
-      // CRITICAL: When date time changes (user clicked Apply), also commit any pending variable changes
+      // CRITICAL: When the applied date time changes, also commit any pending variable changes
       // This ensures that if user changed both variables and date time,
-      // both changes are applied to the chart when Apply is clicked
+      // both changes are applied to the chart together
       Object.assign(currentVariablesDataRef, JSON.parse(JSON.stringify(variablesData)));
 
       isVariablesChanged.value = false;
@@ -768,33 +794,30 @@ export default defineComponent({
       end_time: Date;
     } | null>(null);
 
+    // Variables load with the applied range; a range still waiting must not reach them.
     const setTimeForVariables = () => {
-      const date = dateTimePickerRef.value?.getConsumableDateTime();
-      const startTime = new Date(date.startTime);
-      const endTime = new Date(date.endTime);
+      const appliedTime = pickerValueToTimeObj(selectedDate.value);
+      if (appliedTime) dateTimeForVariables.value = appliedTime;
+    };
 
-      // Update the variables time object for query_values variables
-      // This allows variables to load with the new time range
-      // NOTE: This does NOT commit variables to the chart - only refreshData() does that
-      dateTimeForVariables.value = {
-        start_time: startTime,
-        end_time: endTime,
-      };
+    const onTimePickerHide = () => {
+      timeGate.onHide();
+      setTimeForVariables();
     };
 
     const updateDateTime = () => {
+      const appliedTime = pickerValueToTimeObj(selectedDate.value);
+      if (!appliedTime) return;
+
       // CRITICAL: Clear panelIdToBeRefreshed to ensure panel refreshes
       // In view panel mode, when time changes, this panel should always refresh
       panelIdToBeRefreshed.value = null;
 
-      dashboardPanelData.meta.dateTime = {
-        start_time: new Date(selectedDate.value.startTime),
-        end_time: new Date(selectedDate.value.endTime),
-      };
+      dashboardPanelData.meta.dateTime = appliedTime;
 
       dateTimeForVariables.value = {
-        start_time: new Date(selectedDate.value.startTime),
-        end_time: new Date(selectedDate.value.endTime),
+        start_time: new Date(appliedTime.start_time),
+        end_time: new Date(appliedTime.end_time),
       };
     };
     const goBack = () => {
@@ -987,6 +1010,10 @@ export default defineComponent({
       currentVariablesDataRef,
       isVariablesChanged,
       showApplyHint,
+      refreshTooltip,
+      timeGate,
+      pickedDate: timeGate.picked,
+      onTimePickerHide,
       isAutoRunAvailable,
       isAutoRunOn,
       toggleAutoRun,
