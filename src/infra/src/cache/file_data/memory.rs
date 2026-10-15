@@ -356,23 +356,22 @@ pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
     files.remove(file).await
 }
 
-/// Removes every entry whose key starts with `prefix`; it scans the whole cache, so keep it rare.
-pub async fn remove_prefix(prefix: &str) -> Result<(), anyhow::Error> {
-    let keys: Vec<String> = DATA
-        .iter()
-        .flat_map(|bucket| {
-            bucket
-                .iter()
-                .filter(|e| e.key().starts_with(prefix))
-                .map(|e| e.key().clone())
-                .collect::<Vec<_>>()
-        })
-        .collect();
-    for key in keys {
-        let idx = get_bucket_idx(&key);
-        FILES[idx].write().await.remove(&key).await?;
-    }
-    Ok(())
+/// Removes one entry even while the cache is switched off; a point removal for the disk cache.
+pub async fn forget(file: &str) -> Result<(), anyhow::Error> {
+    let idx = get_bucket_idx(file);
+    FILES[idx].write().await.remove(file).await
+}
+
+/// Stores an entry even while the cache is switched off.
+#[cfg(test)]
+pub(crate) async fn set_for_test(file: &str, data: Bytes) {
+    let idx = get_bucket_idx(file);
+    FILES[idx].write().await.set(file, data).await.unwrap();
+}
+
+#[cfg(test)]
+pub(crate) fn holds(file: &str) -> bool {
+    DATA[get_bucket_idx(file)].contains_key(file)
 }
 
 async fn gc() -> Result<(), anyhow::Error> {
@@ -703,24 +702,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn remove_prefix_drops_every_version_of_one_public_dashboard_key() {
-        let key = format!("public_dashboards/o/{}/r3600", config::ider::uuid());
-        let other = format!("{key}0");
-        for k in [format!("{key}#1"), format!("{key}#2"), format!("{other}#1")] {
-            let idx = get_bucket_idx(&k);
-            FILES[idx]
-                .write()
-                .await
-                .set(&k, Bytes::from_static(b"body"))
-                .await
-                .unwrap();
-        }
-        remove_prefix(&format!("{key}#")).await.unwrap();
-        let left = |k: String| DATA[get_bucket_idx(&k)].contains_key(&k);
-        assert!(!left(format!("{key}#1")));
-        assert!(!left(format!("{key}#2")));
-        assert!(left(format!("{other}#1")));
-        let idx = get_bucket_idx(&format!("{key}#1"));
-        assert!(!FILES[idx].read().await.exist(&format!("{key}#1")).await);
+    async fn forget_removes_one_entry_and_its_accounting() {
+        let key = format!("public_dashboards/o/{}/r3600#1", config::ider::uuid());
+        set_for_test(&key, Bytes::from_static(b"body")).await;
+        assert!(holds(&key));
+        forget(&key).await.unwrap();
+        assert!(!holds(&key));
+        let idx = get_bucket_idx(&key);
+        assert!(!FILES[idx].read().await.exist(&key).await);
     }
 }

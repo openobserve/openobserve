@@ -28,7 +28,7 @@ use std::{
 use async_recursion::async_recursion;
 use bytes::Bytes;
 use config::{
-    RwAHashMap, get_config, metrics, spawn_pausable_job,
+    RwAHashMap, RwHashMap, get_config, metrics, spawn_pausable_job,
     utils::{
         file::*,
         hash::{Sum64, gxhash},
@@ -113,6 +113,9 @@ const RESULT_CACHE_MAX_ENTRIES_PER_KEY: usize = 10;
 
 /// Public dashboard result files: one per key, in the result buckets and under their budget.
 pub const PUBLIC_DASHBOARDS_PREFIX: &str = "public_dashboards/";
+
+/// Incarnations of each public dashboard key with a memory copy, so a drop is a point removal.
+static PUBLIC_DASHBOARD_BODIES: Lazy<RwHashMap<String, Vec<u64>>> = Lazy::new(Default::default);
 
 static METRICS_RESULT_CACHE_EVICT_HOOK: OnceLock<fn(Vec<String>)> = OnceLock::new();
 
@@ -625,8 +628,25 @@ pub async fn init() -> Result<(), anyhow::Error> {
 }
 
 async fn drop_public_dashboard_bodies(key: &str) {
-    if let Err(e) = super::memory::remove_prefix(&format!("{key}#")).await {
-        log::error!("public dashboard memory copies of {key} remove error: {e}");
+    let Some((_, incarnations)) = PUBLIC_DASHBOARD_BODIES.remove(key) else {
+        return;
+    };
+    for incarnation in incarnations {
+        let mem_key = public_dashboards_memory_key(key, incarnation);
+        if let Err(e) = super::memory::forget(&mem_key).await {
+            log::error!("public dashboard memory copy {mem_key} remove error: {e}");
+        }
+    }
+}
+
+fn public_dashboards_memory_key(key: &str, incarnation: u64) -> String {
+    format!("{key}#{incarnation}")
+}
+
+fn track_public_dashboard_body(key: &str, incarnation: u64) {
+    let mut incarnations = PUBLIC_DASHBOARD_BODIES.entry(key.to_string()).or_default();
+    if !incarnations.contains(&incarnation) {
+        incarnations.push(incarnation);
     }
 }
 
@@ -1073,9 +1093,28 @@ pub async fn public_dashboards_evict(key: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// The memory cache key of one written version of a public dashboard result.
-pub fn public_dashboards_memory_key(key: &str, incarnation: u64) -> String {
-    format!("{key}#{incarnation}")
+/// Whether the index holds this public dashboard file; a read lock, no file system access.
+pub async fn public_dashboards_indexed(key: &str) -> bool {
+    get_config().disk_cache.enabled
+        && RESULT_FILES[get_bucket_idx(key)]
+            .read()
+            .await
+            .exist(key)
+            .await
+}
+
+/// The memory copy of one written version of a public dashboard body.
+pub async fn public_dashboards_memory_get(key: &str, incarnation: u64) -> Option<Bytes> {
+    super::memory::get(&public_dashboards_memory_key(key, incarnation), None).await
+}
+
+/// Keeps a memory copy of one written version; every write or eviction of the key drops it.
+pub async fn public_dashboards_memory_put(key: &str, incarnation: u64, data: Bytes) {
+    if !get_config().memory_cache.enabled {
+        return;
+    }
+    track_public_dashboard_body(key, incarnation);
+    _ = super::memory::set(&public_dashboards_memory_key(key, incarnation), data).await;
 }
 
 /// The hook runs on a detached task and may run concurrently with held disk cache locks.
@@ -2758,5 +2797,45 @@ mod tests {
                 .await
                 .is_err()
         );
+    }
+
+    #[tokio::test]
+    async fn gate06_a_write_or_eviction_drops_the_memory_copies_of_its_key() {
+        let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
+        let (_, key) = public_key("r3600");
+        let other = format!("{key}0");
+        for (k, inc) in [(&key, 1), (&key, 2), (&other, 1)] {
+            track_public_dashboard_body(k, inc);
+            super::super::memory::set_for_test(
+                &public_dashboards_memory_key(k, inc),
+                Bytes::from_static(b"body"),
+            )
+            .await;
+        }
+        public_dashboards_replace(&key, 3, Bytes::from_static(b"new"))
+            .await
+            .unwrap();
+        assert!(!super::super::memory::holds(&public_dashboards_memory_key(
+            &key, 1
+        )));
+        assert!(!super::super::memory::holds(&public_dashboards_memory_key(
+            &key, 2
+        )));
+        assert!(super::super::memory::holds(&public_dashboards_memory_key(
+            &other, 1
+        )));
+        assert!(public_dashboards_indexed(&key).await);
+        track_public_dashboard_body(&key, 3);
+        super::super::memory::set_for_test(
+            &public_dashboards_memory_key(&key, 3),
+            Bytes::from_static(b"new"),
+        )
+        .await;
+        public_dashboards_evict(&key).await.unwrap();
+        assert!(!super::super::memory::holds(&public_dashboards_memory_key(
+            &key, 3
+        )));
+        assert!(!public_dashboards_indexed(&key).await);
+        drop_public_dashboard_bodies(&other).await;
     }
 }
