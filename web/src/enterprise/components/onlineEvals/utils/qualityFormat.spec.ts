@@ -23,6 +23,8 @@ import {
   evaluatorAgentWhere,
   evaluatorTraceLink,
   formatCount,
+  formatEdge,
+  formatExact,
   formatFixed,
   formatNumber,
   formatPercent,
@@ -619,5 +621,32 @@ describe("categorical rule", () => {
     expect(String(thresholdForConfig(categorical({ healthy_categories: [] })).label)).toBe("none");
     expect(String(thresholdForConfig(categorical({ healthy_categories: ["a"] })).label)).toBe("a");
     expect(String(thresholdForConfig(categorical({})).label)).toBe("");
+  });
+});
+
+describe("precision that matches the data", () => {
+  it("shows a configured threshold exactly, so it never contradicts a score", () => {
+    const config = {
+      name: "c",
+      dataType: "numeric",
+      healthyThreshold: { direction: "gte", value: 0.333 },
+    } as any;
+    expect(String(thresholdForConfig(config).label)).toBe("≥ 0.333");
+    expect(formatExact(1_250_000.125)).toBe("1,250,000.125");
+  });
+
+  it("labels narrow buckets with enough decimals to tell them apart", () => {
+    expect(bucketLabel({ key: 4, lower: 0.02, upper: 0.025, count: 1, unhealthy: 0 })).toBe(
+      "0.02–0.025",
+    );
+    expect(
+      bucketLabel({ key: 9, lower: 0.045, upper: 0.05, count: 1, unhealthy: 0 }, { last: true }),
+    ).toBe("≥ 0.045");
+    expect(formatEdge(100_000_000, 100_000_000)).toBe("100,000,000");
+  });
+
+  it("never prints exponent notation for tiny values", () => {
+    expect(formatNumber(1e-9)).not.toContain("e");
+    expect(formatFixed(2.5e-7)).not.toContain("e");
   });
 });

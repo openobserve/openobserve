@@ -89,17 +89,29 @@ export function typicalSortValue(row: QualityConfigSummary): number {
 // Below 0.01 two decimals collapse distinct values to 0, so tiny values keep 2 significant digits.
 const isTiny = (value: number) => value !== 0 && Math.abs(value) < 0.01;
 
+// Significant digits through toLocaleString, so 1e-9 reads "0.000000001", not "1e-9".
+const formatTiny = (value: number) =>
+  value.toLocaleString("en-US", { maximumSignificantDigits: 2 });
+
 /** A number for labels and ranges: up to 2 decimals, thousands grouped ("1,000,000"), tiny values kept distinct ("0.00032"). */
 export const formatNumber = (value: number): string =>
-  isTiny(value)
-    ? String(Number(value.toPrecision(2)))
-    : value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  isTiny(value) ? formatTiny(value) : value.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
 /** A score or an average: always 2 decimals ("0.70", "462,522,542.50"), tiny values kept distinct. */
 export const formatFixed = (value: number): string =>
   isTiny(value)
-    ? String(Number(value.toPrecision(2)))
+    ? formatTiny(value)
     : value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** A configured value as entered: thousands grouped, never rounded, so a 0.333 threshold reads "0.333". */
+export const formatExact = (value: number): string =>
+  value.toLocaleString("en-US", { maximumFractionDigits: 20 });
+
+/** A bucket edge with one more decimal than the bucket width needs, so neighbours never share a label: "0.045" for 0.005-wide buckets. */
+export function formatEdge(value: number, width: number): string {
+  const decimals = width > 0 ? Math.min(20, Math.max(0, Math.ceil(-Math.log10(width)) + 1)) : 2;
+  return value.toLocaleString("en-US", { maximumFractionDigits: decimals });
+}
 
 /** A count with thousands grouped: "150,000". */
 export const formatCount = (value: number): string => value.toLocaleString("en-US");
@@ -185,9 +197,12 @@ export function bucketLabel(
   edge: { first?: boolean; last?: boolean } = {},
 ): string {
   if (bucket.lower != null && bucket.upper != null) {
-    if (edge.first && !edge.last) return `< ${formatNumber(bucket.upper)}`;
-    if (edge.last && !edge.first) return `≥ ${formatNumber(bucket.lower)}`;
-    return `${formatNumber(bucket.lower)}–${formatNumber(bucket.upper)}`;
+    const width = bucket.upper - bucket.lower;
+    const lower = formatEdge(bucket.lower, width);
+    const upper = formatEdge(bucket.upper, width);
+    if (edge.first && !edge.last) return `< ${upper}`;
+    if (edge.last && !edge.first) return `≥ ${lower}`;
+    return `${lower}–${upper}`;
   }
   return String(bucket.key);
 }
@@ -283,8 +298,10 @@ export function chartFilterLabel(
   if (filter.kind === "value") return raw(filter.value);
   const first = distribution.find((b) => b.key === filter.from);
   const last = distribution.find((b) => b.key === filter.to);
-  const from = formatNumber(first?.lower ?? filter.from);
-  const to = formatNumber(last?.upper ?? filter.to + 1);
+  // The same precision as the bar labels, so the chip and the bars read alike.
+  const width = first?.lower != null && first.upper != null ? first.upper - first.lower : 1;
+  const from = formatEdge(first?.lower ?? filter.from, width);
+  const to = formatEdge(last?.upper ?? filter.to + 1, width);
   // The edge bars also hold the values outside the range, as their labels say.
   const openLow = filter.from === distribution[0]?.key;
   const openHigh = filter.to === distribution[distribution.length - 1]?.key;
