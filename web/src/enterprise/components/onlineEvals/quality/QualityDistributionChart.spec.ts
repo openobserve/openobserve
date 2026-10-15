@@ -50,4 +50,20 @@ describe("QualityDistributionChart", () => {
     expect(labelled.label.formatter({ dataIndex: 1 })).toBe("1,200");
     expect(options.tooltip.formatter([{ dataIndex: 1 }])).toContain("1,200 scores");
   });
+
+  it("says 1 score, not 1 scores, in the tooltip", async () => {
+    const tooltipOf = async (unhealthy: number | null) => {
+      const wrapper = mount(QualityDistributionChart, {
+        props: { buckets: [{ key: 0, lower: 0, upper: 0.5, count: 1, unhealthy }], filter: null },
+        global: { plugins: [store] },
+      });
+      await flushPromises();
+      return wrapper
+        .findComponent({ name: "ChartRenderer" })
+        .props("data")
+        .options.tooltip.formatter([{ dataIndex: 0 }]);
+    };
+    expect(await tooltipOf(0)).toContain("1 score, 0 unhealthy");
+    expect(await tooltipOf(null)).toMatch(/1 score$/);
+  });
 });
