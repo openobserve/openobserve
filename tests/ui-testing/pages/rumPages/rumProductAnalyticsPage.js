@@ -103,7 +103,7 @@ export class RumProductAnalyticsPage {
         this.invalidLink = page.locator('[data-test="rum-analytics-invalid-link"]');
         this.invalidLinkDismiss = page.locator('[data-test="rum-analytics-invalid-link-dismiss"]');
         this.deletedEventLink = page.locator('[data-test="rum-analytics-deleted-event-link"]');
-        this.syntheticExcluded = page.locator('[data-test="rum-analytics-synthetic-excluded"]');
+        this.syntheticExcluded = page.locator('[data-test="rum-analytics-app-filters-synthetic"]');
         this.kpiSessions = page.locator('[data-test="rum-analytics-kpi-sessions"]');
 
         this.trendsClearBtn = page.locator('[data-test="rum-analytics-trends-clear-btn"]');

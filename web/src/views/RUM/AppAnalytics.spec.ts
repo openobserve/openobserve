@@ -415,17 +415,19 @@ describe("AppAnalytics shell", () => {
     expect(router.currentRoute.value.query.period).toBe("7d");
   });
 
-  it("states data through, the SDK sampling caveat and excluded synthetic sessions (AC-54)", async () => {
+  it("states data through on the refresh tooltip and the SDK sampling caveat beside the title (AC-54)", async () => {
     await mountAt("/product-analytics/overview?app=web&period=7d");
-    expect(wrapper!.find('[data-test="rum-analytics-data-through"]').text()).toContain("2026");
-    expect(wrapper!.find('[data-test="rum-analytics-sdk-sampling"]').exists()).toBe(true);
-    expect(wrapper!.find('[data-test="rum-analytics-synthetic-excluded"]').text()).toContain("7");
-  });
-
-  it("drops the synthetic caption on the funnel builder, where the funnel card carries it", async () => {
-    await mountAt("/product-analytics/funnels/build?app=web&period=7d");
-    expect(wrapper!.find('[data-test="rum-analytics-sdk-sampling"]').exists()).toBe(true);
-    expect(wrapper!.find('[data-test="rum-analytics-synthetic-excluded"]').exists()).toBe(false);
+    expect(wrapper!.find('[data-test="rum-analytics-trust-caption"]').exists()).toBe(false);
+    const tips = wrapper!.findAllComponents(OTooltip).map((c) => String(c.props("content") ?? ""));
+    expect(tips.some((c) => /^Refresh · data through 2026/.test(c))).toBe(true);
+    const sampling = wrapper!.find('[data-test="rum-analytics-sdk-sampling"]');
+    expect(sampling.attributes("aria-label")).toBe("Counts reflect sampled SDK sessions");
+    expect(
+      wrapper!
+        .find('[data-test="rum-analytics-title"]')
+        .find('[data-test="rum-analytics-sdk-sampling"]')
+        .exists(),
+    ).toBe(false);
   });
 
   it("names the excluded identity share, never the value, and Include it sets idall (AC-50)", async () => {
