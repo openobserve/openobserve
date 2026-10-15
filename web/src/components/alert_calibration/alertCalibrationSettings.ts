@@ -15,8 +15,8 @@
 
 import type { I18nText, TranslateFn } from "@/types/i18n";
 import type { UpdateAlertCalibrationConfig } from "@/services/alert_calibration";
-import { formatMinutes } from "@/components/alert_calibration/format";
-import { RULE_META, rulesStarvedBy } from "@/components/alert_calibration/rules";
+import { formatMinutes } from "./format";
+import { RULE_META, rulesStarvedBy } from "./rules";
 import type { AlertCalibrationSettingsForm } from "./AlertCalibrationSettings.schema";
 
 const FIELDS = ["enabled", "frequency_minutes", "window_minutes"] as const;

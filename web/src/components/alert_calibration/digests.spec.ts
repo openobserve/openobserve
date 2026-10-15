@@ -19,11 +19,9 @@ import {
   coverageNotes,
   coverageVerdict,
   isClean,
-  isNotYetWritten,
   latestEmission,
   latestPerWindow,
   latestRun,
-  runsWithAlertSql,
   type DigestRecord,
   type RuleId,
   type RunRow,
@@ -145,20 +143,6 @@ describe("a run's verdict", () => {
     const later = run({ window_end: 900, emitted_at: 1 });
     expect(latestRun([run({ emitted_at: 2 }), later])).toBe(later);
     expect(latestRun([])).toBeNull();
-  });
-});
-
-describe("the digest searches", () => {
-  it("quote an alert name so it cannot widen the query", () => {
-    expect(runsWithAlertSql("it's")).toContain("str_match_ignore_case(alert_name, 'it''s')");
-  });
-
-  it("read a stream or column no run has written yet as empty, and nothing else", () => {
-    const failure = (code: number) => ({ response: { status: 400, data: { code, message: "x" } } });
-    expect(isNotYetWritten(failure(20002))).toBe(true);
-    expect(isNotYetWritten(failure(20004))).toBe(true);
-    expect(isNotYetWritten(failure(20001))).toBe(false);
-    expect(isNotYetWritten(new Error("Network Error"))).toBe(false);
   });
 });
 

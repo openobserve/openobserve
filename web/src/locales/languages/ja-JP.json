@@ -8103,7 +8103,6 @@
       "findingsHeading": "検出事項とアクセス",
       "findingsDesc": "各実行は検出事項をこの組織の {stream} ストリームにログレコードとして書き込み、そのストリームの保持期間に従って保持されます。",
       "accessNote": "検出事項はアラートごとのアクセス制御がされていません。{stream} ストリームを検索できるユーザーは、開く権限のないアラートを含め、組織内のすべてのアラートに関する検出事項を閲覧できます。アラートキャリブレーションは通知を送信しません。",
-      "openPage": "アラートキャリブレーションを開く",
       "frequencyRange": "1 分から 30 日の間で実行間隔を選択してください。",
       "windowRange": "1 分から 1 年の間でウィンドウを選択してください。"
     }
@@ -9672,9 +9671,6 @@
     "sloLongWindow": "長期ウィンドウ",
     "sloShortWindow": "短期ウィンドウ",
     "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。",
-    "builtinBadge": "システム",
-    "builtinBadgeHint": "組み込みアラート: 無効化や編集はできますが、削除や名前の変更はできません。",
-    "builtinDeleteDisabled": "組み込みアラートのため削除できません",
     "seconds": "秒",
     "downtimes": {
       "newTitle": "新規ダウンタイム",
@@ -11237,8 +11233,6 @@
     }
   },
   "settings": {
-    "alertCalibration": "アラートキャリブレーション",
-    "alertCalibrationDesc": "アラートの動作を確認するジョブをスケジュールします",
     "header": "設定",
     "correlationSettings": "相関設定",
     "generalLabel": "一般設定",

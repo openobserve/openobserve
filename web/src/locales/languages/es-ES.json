@@ -8103,7 +8103,6 @@
       "findingsHeading": "Hallazgos y acceso",
       "findingsDesc": "Cada ejecución escribe sus hallazgos como registros de log en el stream {stream} de esta organización, conservados según la retención de ese stream.",
       "accessNote": "Los hallazgos no tienen control de acceso por alerta. Cualquiera que pueda buscar en el stream {stream} ve los hallazgos de todas las alertas de la organización, incluidas las alertas que no puede abrir. La calibración de alertas no envía notificaciones.",
-      "openPage": "Abrir Calibración de alertas",
       "frequencyRange": "Elige una cadencia entre 1 minuto y 30 días.",
       "windowRange": "Elige una ventana entre 1 minuto y 1 año."
     }
@@ -9672,9 +9671,6 @@
     "sloLongWindow": "Ventana larga",
     "sloShortWindow": "Ventana corta",
     "sloCloneDisabled": "Las alertas SLO se crean en su página SLO, por lo que no se pueden clonar desde aquí.",
-    "builtinBadge": "Sistema",
-    "builtinBadgeHint": "Una alerta integrada: puedes desactivarla o editarla, pero no eliminarla ni cambiarle el nombre.",
-    "builtinDeleteDisabled": "Alerta integrada, no se puede eliminar",
     "seconds": "Segundos",
     "downtimes": {
       "newTitle": "Nueva inactividad",
@@ -11237,8 +11233,6 @@
     }
   },
   "settings": {
-    "alertCalibration": "Calibración de alertas",
-    "alertCalibrationDesc": "Programa el trabajo que comprueba cómo se comportan tus alertas",
     "header": "Ajustes",
     "correlationSettings": "Configuración de correlación",
     "generalLabel": "General",

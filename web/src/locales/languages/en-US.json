@@ -8078,7 +8078,13 @@
       "emptyTitle": "No runs in the last {days} days",
       "emptyDescription": "The dashboard fills in once alert calibration has run."
     },
+    "lastRun": {
+      "succeeded": "The last run succeeded {time}.",
+      "failed": "The last run failed {time}, so the newest digest may be out of date: {error}",
+      "none": "No run has been attempted yet."
+    },
     "settings": {
+      "title": "Alert calibration settings",
       "schedule": "Schedule",
       "enabled": "Run alert calibration for this organization",
       "enabledHelp": "While off, the organization has no scheduled run. Turning it on makes the first run due immediately.",
@@ -8102,8 +8108,7 @@
       "runNowHeading": "Run now",
       "findingsHeading": "Findings and access",
       "findingsDesc": "Each run writes its findings as log records to the {stream} stream of this organization, kept for that stream's retention.",
-      "accessNote": "Findings are not access-controlled per alert. Anyone who can search the {stream} stream sees findings about every alert in the organization, including alerts they cannot open. Alert calibration sends no notifications.",
-      "openPage": "Open Alert Calibration",
+      "accessNote": "The Alert Calibration permission in a role decides access: Get to read findings, Update to change these settings, and Create to request a run. Findings cover every alert in the organization, including alerts the reader cannot open. Alert calibration sends no notifications.",
       "frequencyRange": "Choose a cadence between 1 minute and 30 days.",
       "windowRange": "Choose a window between 1 minute and 1 year."
     }
@@ -9672,9 +9677,6 @@
     "sloLongWindow": "Long window",
     "sloShortWindow": "Short window",
     "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here.",
-    "builtinBadge": "System",
-    "builtinBadgeHint": "A built-in alert: you can switch it off or edit it, but not delete or rename it.",
-    "builtinDeleteDisabled": "Built-in alert, cannot be deleted",
     "seconds": "Seconds",
     "downtimes": {
       "newTitle": "New downtime",
@@ -11237,8 +11239,6 @@
     }
   },
   "settings": {
-    "alertCalibration": "Alert Calibration",
-    "alertCalibrationDesc": "Schedule the job that checks how your alerts behave",
     "header": "Settings",
     "correlationSettings": "Correlation Settings",
     "generalLabel": "General Settings",

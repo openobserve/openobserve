@@ -8103,7 +8103,6 @@
       "findingsHeading": "Bulgular ve erişim",
       "findingsDesc": "Her çalışma, bulgularını bu organizasyonun {stream} akışına günlük kaydı olarak yazar ve bu kayıtlar o akışın saklama süresi boyunca tutulur.",
       "accessNote": "Bulgular uyarı başına erişim denetimine tabi değildir. {stream} akışını arayabilen herkes, organizasyondaki her uyarıyla ilgili bulguları görür; açamadıkları uyarılar dahil. Uyarı kalibrasyonu hiçbir bildirim göndermez.",
-      "openPage": "Uyarı Kalibrasyonunu Aç",
       "frequencyRange": "1 dakika ile 30 gün arasında bir sıklık seçin.",
       "windowRange": "1 dakika ile 1 yıl arasında bir pencere seçin."
     }
@@ -9672,9 +9671,6 @@
     "sloLongWindow": "Uzun pencere",
     "sloShortWindow": "Kısa pencere",
     "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz.",
-    "builtinBadge": "Sistem",
-    "builtinBadgeHint": "Yerleşik bir uyarı: kapatabilir veya düzenleyebilirsiniz, ancak silemez veya yeniden adlandıramazsınız.",
-    "builtinDeleteDisabled": "Yerleşik uyarı, silinemez",
     "seconds": "Saniye",
     "downtimes": {
       "newTitle": "Yeni kesinti",
@@ -11237,8 +11233,6 @@
     }
   },
   "settings": {
-    "alertCalibration": "Uyarı Kalibrasyonu",
-    "alertCalibrationDesc": "Uyarılarınızın nasıl davrandığını kontrol eden görevi zamanlayın",
     "header": "Ayarlar",
     "correlationSettings": "Korelasyon Ayarları",
     "generalLabel": "General",

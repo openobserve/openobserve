@@ -112,7 +112,7 @@ import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { errorMessage, type AlertCalibrationConfig } from "@/services/alert_calibration";
 import { updateAlertCalibrationConfigMutation } from "@/services/alert_calibration.queries";
-import { formatMinutes } from "@/components/alert_calibration/format";
+import { formatMinutes } from "./format";
 import {
   CONFIG_DEFAULTS,
   makeAlertCalibrationSettingsSchema,

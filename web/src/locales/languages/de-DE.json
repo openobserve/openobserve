@@ -8103,7 +8103,6 @@
       "findingsHeading": "Befunde und Zugriff",
       "findingsDesc": "Jeder Lauf schreibt seine Befunde als Log-Datensätze in den Stream {stream} dieser Organisation, die gemäß der Aufbewahrung dieses Streams aufbewahrt werden.",
       "accessNote": "Befunde sind nicht pro Alarm zugriffsgesteuert. Jeder, der den Stream {stream} durchsuchen kann, sieht Befunde zu jedem Alarm der Organisation, auch zu Alarmen, die er nicht öffnen kann. Die Alarmkalibrierung versendet keine Benachrichtigungen.",
-      "openPage": "Alarmkalibrierung öffnen",
       "frequencyRange": "Wählen Sie ein Intervall zwischen 1 Minute und 30 Tagen.",
       "windowRange": "Wählen Sie ein Fenster zwischen 1 Minute und 1 Jahr."
     }
@@ -9672,9 +9671,6 @@
     "sloLongWindow": "Langes Zeitfenster",
     "sloShortWindow": "Kurzes Zeitfenster",
     "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden.",
-    "builtinBadge": "System",
-    "builtinBadgeHint": "Ein integrierter Alarm: Sie können ihn deaktivieren oder bearbeiten, aber nicht löschen oder umbenennen.",
-    "builtinDeleteDisabled": "Integrierter Alarm, kann nicht gelöscht werden",
     "seconds": "Sekunden",
     "downtimes": {
       "newTitle": "Neues Wartungsfenster",
@@ -11237,8 +11233,6 @@
     }
   },
   "settings": {
-    "alertCalibration": "Alarmkalibrierung",
-    "alertCalibrationDesc": "Planen Sie den Job, der prüft, wie sich Ihre Alarme verhalten",
     "header": "Einstellungen",
     "correlationSettings": "Korrelationseinstellungen",
     "generalLabel": "Allgemeines",

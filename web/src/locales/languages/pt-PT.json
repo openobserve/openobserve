@@ -8103,7 +8103,6 @@
       "findingsHeading": "Achados e acesso",
       "findingsDesc": "Cada execução grava seus achados como registros de log no stream {stream} desta organização, mantidos conforme a retenção desse stream.",
       "accessNote": "Os achados não têm controle de acesso por alerta. Qualquer pessoa que possa pesquisar o stream {stream} vê achados sobre todos os alertas da organização, incluindo alertas que não pode abrir. A calibração de alertas não envia notificações.",
-      "openPage": "Abrir Calibração de alertas",
       "frequencyRange": "Escolha uma cadência entre 1 minuto e 30 dias.",
       "windowRange": "Escolha uma janela entre 1 minuto e 1 ano."
     }
@@ -9672,9 +9671,6 @@
     "sloLongWindow": "Janela longa",
     "sloShortWindow": "Janela curta",
     "sloCloneDisabled": "Os alertas de SLO são criados em sua página de SLO, portanto não podem ser clonados daqui.",
-    "builtinBadge": "Sistema",
-    "builtinBadgeHint": "Um alerta integrado: você pode desativá-lo ou editá-lo, mas não excluí-lo nem renomeá-lo.",
-    "builtinDeleteDisabled": "Alerta integrado, não pode ser excluído",
     "seconds": "Segundos",
     "downtimes": {
       "newTitle": "Nova janela de manutenção",
@@ -11237,8 +11233,6 @@
     }
   },
   "settings": {
-    "alertCalibration": "Calibração de alertas",
-    "alertCalibrationDesc": "Agende o job que verifica como seus alertas se comportam",
     "header": "Configurações",
     "correlationSettings": "Configurações de correlação",
     "generalLabel": "Geral",

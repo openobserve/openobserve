@@ -8103,7 +8103,6 @@
       "findingsHeading": "Ustalenia i dostęp",
       "findingsDesc": "Każde uruchomienie zapisuje swoje ustalenia jako rekordy logów w strumieniu {stream} tej organizacji, przechowywane zgodnie z okresem retencji tego strumienia.",
       "accessNote": "Ustalenia nie mają kontroli dostępu na poziomie poszczególnych alertów. Każdy, kto może przeszukiwać strumień {stream}, widzi ustalenia dotyczące wszystkich alertów w organizacji, w tym alertów, których nie może otworzyć. Kalibracja alertów nie wysyła powiadomień.",
-      "openPage": "Otwórz Kalibrację alertów",
       "frequencyRange": "Wybierz częstotliwość od 1 minuty do 30 dni.",
       "windowRange": "Wybierz okno od 1 minuty do 1 roku."
     }
@@ -9672,9 +9671,6 @@
     "sloLongWindow": "Długie okno",
     "sloShortWindow": "Krótkie okno",
     "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować.",
-    "builtinBadge": "System",
-    "builtinBadgeHint": "Wbudowany alert: możesz go wyłączyć lub edytować, ale nie możesz go usunąć ani zmienić jego nazwy.",
-    "builtinDeleteDisabled": "Wbudowany alert, nie można go usunąć",
     "seconds": "Sekundy",
     "downtimes": {
       "newTitle": "Nowa przerwa",
@@ -11237,8 +11233,6 @@
     }
   },
   "settings": {
-    "alertCalibration": "Kalibracja alertów",
-    "alertCalibrationDesc": "Zaplanuj zadanie sprawdzające zachowanie alertów",
     "header": "Ustawienia",
     "correlationSettings": "Ustawienia korelacji",
     "generalLabel": "Ustawienia ogólne",

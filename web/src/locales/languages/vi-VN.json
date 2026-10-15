@@ -8103,7 +8103,6 @@
       "findingsHeading": "Kết quả và quyền truy cập",
       "findingsDesc": "Mỗi lần chạy ghi kết quả của nó dưới dạng bản ghi nhật ký vào stream {stream} của tổ chức này, được lưu theo thời gian lưu trữ của stream đó.",
       "accessNote": "Kết quả không được kiểm soát quyền truy cập theo từng cảnh báo. Bất kỳ ai có thể tìm kiếm stream {stream} đều thấy kết quả về mọi cảnh báo trong tổ chức, kể cả những cảnh báo họ không thể mở. Hiệu chuẩn cảnh báo không gửi thông báo nào.",
-      "openPage": "Mở Hiệu chuẩn cảnh báo",
       "frequencyRange": "Chọn chu kỳ từ 1 phút đến 30 ngày.",
       "windowRange": "Chọn cửa sổ từ 1 phút đến 1 năm."
     }
@@ -9672,9 +9671,6 @@
     "sloLongWindow": "Cửa sổ dài",
     "sloShortWindow": "Cửa sổ ngắn",
     "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây.",
-    "builtinBadge": "Hệ thống",
-    "builtinBadgeHint": "Cảnh báo tích hợp sẵn: bạn có thể tắt hoặc chỉnh sửa, nhưng không thể xóa hay đổi tên.",
-    "builtinDeleteDisabled": "Cảnh báo tích hợp sẵn, không thể xóa",
     "seconds": "Giây",
     "downtimes": {
       "newTitle": "Thời gian tạm dừng mới",
@@ -11237,8 +11233,6 @@
     }
   },
   "settings": {
-    "alertCalibration": "Hiệu chuẩn cảnh báo",
-    "alertCalibrationDesc": "Lên lịch cho tác vụ kiểm tra cách các cảnh báo của bạn hoạt động",
     "header": "Cài đặt",
     "correlationSettings": "Cài đặt tương quan",
     "generalLabel": "Cài đặt chung",

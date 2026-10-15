@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
-import { errorCode } from "@/services/alert_calibration";
 
 export const DIGEST_STREAM = "_o2_alert_calibration_digests";
 /** Every digest search asks for this many rows, and a full page means more may exist. */
@@ -22,8 +21,6 @@ export const SEARCH_SIZE = 100;
 export const RUNS_LOOKBACK_DAYS = 14;
 
 const MICROS_PER_DAY = 86_400_000_000;
-/** A search for a stream or a column no record has written yet fails with one of these. */
-const NOT_YET_WRITTEN_CODES = [20002, 20004];
 
 export type RuleId = "failure" | "no_destination" | "noise" | "notify_failed" | "silent";
 export type Severity = "Info" | "Low" | "Medium" | "High";
@@ -97,14 +94,9 @@ const RUN_COLUMNS = [
   ...COVERAGE_COLUMNS,
 ];
 
-const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
-
 /** One row per emission: a run pulled again writes a second emission with its own `_timestamp`. */
 export const runsSql = () =>
   `SELECT DISTINCT ${RUN_COLUMNS.join(", ")}, _timestamp AS emitted_at\nFROM "${DIGEST_STREAM}"\nORDER BY emitted_at DESC`;
-
-export const runsWithAlertSql = (name: string) =>
-  `SELECT DISTINCT window_start, window_end\nFROM "${DIGEST_STREAM}"\nWHERE rule_id IS NOT NULL\n  AND str_match_ignore_case(alert_name, ${quote(name)})`;
 
 export const runRecordsSql = (windowStart: number, windowEnd: number) =>
   `SELECT *\nFROM "${DIGEST_STREAM}"\nWHERE window_start = ${Math.trunc(windowStart)} AND window_end = ${Math.trunc(windowEnd)}\nORDER BY _timestamp DESC`;
@@ -112,16 +104,10 @@ export const runRecordsSql = (windowStart: number, windowEnd: number) =>
 export const flaggedByRuleSql = () =>
   `SELECT rule_id, COUNT(DISTINCT alert_id) AS alerts_flagged, COUNT(DISTINCT window_end) AS runs_flagging\nFROM "${DIGEST_STREAM}"\nWHERE rule_id IS NOT NULL\nGROUP BY rule_id`;
 
-/** The range the timeline and the dashboard search; a run emitted before it is not listed. */
+/** The range the timeline and the dashboard read; a run emitted before it is not listed. */
 export const lookbackRange = (nowMicros: number) => ({
-  startTime: nowMicros - RUNS_LOOKBACK_DAYS * MICROS_PER_DAY,
-  endTime: nowMicros,
-});
-
-/** A record is stamped when its run finishes, at or after `window_end`, so this range holds the whole run. */
-export const runRange = (windowEnd: number, nowMicros: number) => ({
-  startTime: windowEnd,
-  endTime: nowMicros,
+  start_time: nowMicros - RUNS_LOOKBACK_DAYS * MICROS_PER_DAY,
+  end_time: nowMicros,
 });
 
 export const runKey = (row: Pick<RunRow, "window_start" | "window_end">) =>
@@ -215,10 +201,4 @@ export function coverageNotes(t: TranslateFn, row: RunRow): I18nText[] {
     if (row[column]) notes.push(t(key));
   }
   return notes;
-}
-
-/** A digest stream with no record yet, or no finding yet, reads as empty rather than as a failure. */
-export function isNotYetWritten(error: unknown): boolean {
-  const code = errorCode(error);
-  return code !== undefined && NOT_YET_WRITTEN_CODES.includes(code);
 }

@@ -2491,7 +2491,6 @@
       "lastSaved": "b23ddd9bf648f2a8",
       "loadFailed": "ee0abd5ca4637d00",
       "noConfig": "80dd684679ba56dc",
-      "openPage": "6a07d892a9405d29",
       "ruleNeeds": "e45b43819260b1c6",
       "runNowHeading": "0991397702fabb40",
       "save": "1509f561f2416598",
@@ -3382,9 +3381,6 @@
     "applyVRL": "e423ed9722cca557",
     "applyVRLForOutput": "62c19ae8cf583e06",
     "asOf": "60097e7b87261bf9",
-    "builtinBadge": "6725e7bbcd28f3a8",
-    "builtinBadgeHint": "91ea113c01f86589",
-    "builtinDeleteDisabled": "1d0281c6784d42ed",
     "cancel": "19766ed6ccb2f4a3",
     "clearMultiWindowsTitle": "16daf7202d6f8e54",
     "clone": "c820597b0d020f98",
@@ -19342,8 +19338,6 @@
     "aiToolsetsPage": {
       "subtitle": "be1ec7e0985babaf"
     },
-    "alertCalibration": "7eaddf684d3764dc",
-    "alertCalibrationDesc": "45d26a04cf3d689e",
     "allUsersAllowedMessage": "9d29adadbb726a7f",
     "allUsersBlockedMessage": "8eed6e8fc3423ab1",
     "allowAllUsersFromDomain": "fe38f6a44fe6da62",

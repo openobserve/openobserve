@@ -22,7 +22,7 @@ use serde_json::Value;
 use crate::traces::service_graph::v4::writer::{ReplyClass, chunk, classify, max_request_bytes};
 
 /// The `_o2_` prefix is load-bearing: `is_internal_rollup_stream` guards user ingest by it.
-const DIGEST_STREAM: &str = "_o2_alert_calibration_digests";
+pub const DIGEST_STREAM: &str = "_o2_alert_calibration_digests";
 
 /// The stream is a pass's only record, so a lost chunk fails the pass rather than shortening it.
 pub(crate) async fn write_digest_records(
