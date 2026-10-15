@@ -20,7 +20,7 @@ vi.mock("@/composables/fieldValueStore", async (importOriginal) => ({
   requestFieldValuesMatching: vi.fn().mockResolvedValue([]),
   pendingFieldValues: vi.fn(() => null),
   fieldValuesUnavailable: vi.fn(() => false),
-  FIELD_VALUES_REQUEST_SIZE: 10,
+  fieldValuesTruncated: vi.fn(() => false),
 }));
 
 // getSuggestions now lazily loads the server function catalog. Stub it to an
@@ -34,6 +34,7 @@ vi.mock("@/services/query_functions", async (importOriginal) => {
 });
 
 import {
+  fieldValuesTruncated,
   fieldValuesUnavailable,
   getFieldValuesForSuggestion,
   requestFieldValues,
@@ -755,6 +756,7 @@ describe("resolveFieldValues — a typed prefix asks the server for matches", ()
     vi.mocked(requestFieldValues).mockResolvedValue(topTen);
     vi.mocked(requestFieldValuesMatching).mockResolvedValue(["openobserve"]);
     vi.mocked(fieldValuesUnavailable).mockReturnValue(false);
+    vi.mocked(fieldValuesTruncated).mockReturnValue(true);
   });
 
   it("adds the server's matches when the top ten was truncated and has none", async () => {
@@ -771,9 +773,22 @@ describe("resolveFieldValues — a typed prefix asks the server for matches", ()
 
   it("does not ask when the unfiltered answer was complete", async () => {
     vi.mocked(requestFieldValues).mockResolvedValue(topTen.slice(0, 9));
+    vi.mocked(fieldValuesTruncated).mockReturnValue(false);
     const c = makeComposable();
     await c.resolveFieldValues("service_name", { prefix: "openobs" });
     expect(requestFieldValuesMatching).not.toHaveBeenCalled();
+  });
+
+  it("asks when the store calls nine values truncated, as when a blank filled the tenth slot", async () => {
+    vi.mocked(requestFieldValues).mockResolvedValue(topTen.slice(0, 9));
+    const c = makeComposable();
+    const values = await c.resolveFieldValues("service_name", { prefix: "openobs" });
+    expect(values).toContain("openobserve");
+    expect(fieldValuesTruncated).toHaveBeenCalledWith(
+      expect.objectContaining({ streamName: "http_logs" }),
+      "service_name",
+      expect.anything(),
+    );
   });
 
   it("does not ask when three values already start with the prefix", async () => {

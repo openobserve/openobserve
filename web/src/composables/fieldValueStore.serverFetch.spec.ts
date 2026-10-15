@@ -706,3 +706,48 @@ describe("pendingFieldValues — a lookup still running after its timeout", () =
     }
   });
 });
+
+describe("resolvePromqlLabelValues — a label lookup still answering", () => {
+  it("waits for the running request instead of reporting no values", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(streamService.fieldValues).mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(apiResponse(["development"]) as any), 12_000),
+          ) as any,
+      );
+      await freshStore();
+      const { resolvePromqlLabelValues } = await import("./usePromqlSuggestions");
+      const answer = resolvePromqlLabelValues("myorg", "cache_hit_ratio", "environment");
+      await vi.advanceTimersByTimeAsync(12_000);
+      await expect(answer).resolves.toEqual(["development"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("truncation — a blank value still counts toward a full answer", () => {
+  const blankThenNine = ["", ...Array.from({ length: 9 }, (_, i) => `a${i}`)];
+
+  it("asks the server for a longer keyword when the shorter one's answer was full", async () => {
+    const store = await freshStore();
+    vi.mocked(streamService.fieldValues).mockResolvedValueOnce(apiResponse(blankThenNine) as any);
+    await store.requestFieldValuesMatching(ctx, "service", "a");
+    vi.mocked(streamService.fieldValues).mockResolvedValueOnce(apiResponse(["azebra"]) as any);
+    await expect(store.requestFieldValuesMatching(ctx, "service", "aze")).resolves.toEqual([
+      "azebra",
+    ]);
+    expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(2);
+  });
+
+  it("reports the top values as truncated though one of the ten was blank", async () => {
+    vi.mocked(streamService.fieldValues).mockReset();
+    vi.mocked(streamService.fieldValues).mockResolvedValue(apiResponse(blankThenNine) as any);
+    const store = await freshStore();
+    const values = await store.requestFieldValues(ctx, "service");
+    expect(values).toHaveLength(9);
+    expect(store.fieldValuesTruncated(ctx, "service")).toBe(true);
+  });
+});

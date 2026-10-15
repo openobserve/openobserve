@@ -3,7 +3,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed } from "vue";
 import { useStore } from "vuex";
 import {
-  FIELD_VALUES_REQUEST_SIZE,
+  fieldValuesTruncated,
   fieldValuesUnavailable,
   getFieldValuesForSuggestion,
   noValueLookup,
@@ -189,8 +189,8 @@ const useSqlSuggestions = () => {
   };
 
   // Only a truncated top list can be hiding matches, and a few matches already make a useful menu.
-  const needsPrefixLookup = (prefix: string, fetched: string[] | null, merged: string[]) => {
-    if (!fetched || fetched.length < FIELD_VALUES_REQUEST_SIZE) return false;
+  const needsPrefixLookup = (prefix: string, truncated: boolean, merged: string[]) => {
+    if (!truncated) return false;
     const lower = prefix.toLowerCase();
     const matches = merged.filter((v) => v.toLowerCase().startsWith(lower)).length;
     return matches < PREFIX_ENOUGH_MATCHES;
@@ -247,7 +247,14 @@ const useSqlSuggestions = () => {
     let merged = [...new Set([...local, ...(fetched ?? [])])];
 
     const prefix = typed.trim();
-    if (prefix && needsPrefixLookup(prefix, fetched, merged)) {
+    if (
+      prefix &&
+      needsPrefixLookup(
+        prefix,
+        !!fetched && fieldValuesTruncated(ctx, fieldName, serverOptions),
+        merged,
+      )
+    ) {
       const matching = requestFieldValuesMatching(ctx, fieldName, prefix, serverOptions);
       const matched = await awaitServer(matching);
       if (!lookupUnchanged(ctx, range)) return resolveFieldValues(fieldName, options);

@@ -3,6 +3,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import {
   fieldValuesUnavailable,
   getFieldValuesForSuggestion,
+  pendingFieldValues,
   requestFieldValues,
   type ValueLookupOptions,
 } from "@/composables/fieldValueStore";
@@ -52,10 +53,13 @@ export const resolvePromqlLabelValues = async (
   const cached = await getFieldValuesForSuggestion(ctx, label).catch(() => [] as string[]);
   if (cached.length) return cached;
   const fetched = await requestFieldValues(ctx, label, options);
-  if (!fetched.length && fieldValuesUnavailable(ctx, label)) {
+  // A request still answering after its timeout has not shown the label to be empty.
+  const slow = !fetched.length && pendingFieldValues(ctx, label);
+  const answer = slow ? await slow : fetched;
+  if (!answer.length && fieldValuesUnavailable(ctx, label)) {
     throw new Error("label values unavailable");
   }
-  return fetched;
+  return answer;
 };
 
 /** An auto-closed quote ahead is swallowed so the caret ends outside the string. */
