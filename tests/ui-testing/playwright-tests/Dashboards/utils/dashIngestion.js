@@ -106,6 +106,54 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
   }
 };
 
+// Ingests a dedicated stream whose breakdown field has more distinct values than
+// the dashboard's series cap (max_dashboard_series, default 100). No existing
+// fixture has a field with >100 distinct values, so this generates `count` records
+// each with a distinct breakdown value plus a numeric measure — the only
+// deterministic route to the series-cap notice. Mirrors the `ingestion()` POST
+// (INGESTION_URL + getAuthHeaders + getOrgIdentifier) above.
+export const ingestionHighCardinality = async (
+  streamName,
+  { breakdownField = "breakdown", measureField = "metric_value", count = 150 } = {},
+) => {
+  if (!process.env["INGESTION_URL"]) {
+    throw new Error("Required environment variables are not set");
+  }
+
+  const nowUs = Date.now() * 1000;
+  const records = [];
+  for (let i = 0; i < count; i++) {
+    records.push({
+      [breakdownField]: `series-${i}`,
+      [measureField]: i + 1,
+      _timestamp: nowUs,
+    });
+  }
+
+  const fetchResponse = await fetch(
+    `${process.env.INGESTION_URL}/api/${getOrgIdentifier()}/${streamName}/_json`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(records),
+    }
+  );
+
+  if (!fetchResponse.ok) {
+    const body = await fetchResponse.text().catch(() => "");
+    throw new Error(
+      `HTTP error! status: ${fetchResponse.status}, response: ${body.slice(0, 200)}`
+    );
+  }
+
+  testLogger.info("High-cardinality stream ingested", {
+    streamName,
+    count,
+    breakdownField,
+  });
+  return await fetchResponse.json();
+};
+
 // Dashboard maps ingestion
 
 // Ingestion function for Geomap and Maps chart

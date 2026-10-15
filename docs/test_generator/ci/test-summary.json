@@ -1,0 +1,9 @@
+[
+  { "title": "should show the last-refreshed clock with no notices and no error icon on a healthy panel", "action": "new", "verifies": "a healthy panel mounts PanelErrorButtons with the last-refreshed clock and no notice chips or error icon" },
+  { "title": "should render the series-cap notice with correct counts and route \"Use Top N\" to the editor", "action": "new", "verifies": "a breakdown with >100 distinct values surfaces the series-cap chip with N/M series and \"Use Top N\" routes to the editor with focus=top-n" },
+  { "title": "should show the series-cap banner on query 0 in the Query Inspector", "action": "new", "verifies": "the Query Inspector shows the series-cap banner on query 0 with the \"A chart draws at most\" body plus original/executed query text" },
+  { "title": "should render the function-error notice with verbatim detail, \"Copy error\" and \"Edit function\"", "action": "new", "verifies": "a VRL function failure surfaces the function-error chip with verbatim detail, copy-to-clipboard, and edit-function routing to focus=vrl" },
+  { "title": "should render the partial notice and re-run the panel on \"Refresh\"", "action": "new", "verifies": "a server-partial result surfaces the partial chip whose Refresh action re-runs the panel search" },
+  { "title": "should show the query-error icon on an erroring panel", "action": "new", "verifies": "a panel whose query errors surfaces the legacy panel-error-data warning icon" },
+  { "title": "x-alias inconsistency warning on dashboard view — not wired: PanelContainer.vue/ViewPanel.vue do not pass xAliasInconsistencyWarning (only PanelEditor.vue:267/588 wires hasInconsistentXAlias)", "action": "new", "verifies": "the x-alias inconsistency warning icon renders on the dashboard view (feature-incomplete, parked as fixme)" }
+]

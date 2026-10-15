@@ -1,0 +1,23 @@
+{
+  "feature_slug": "panel-notices",
+  "feature_title": "Dashboard Panel Notices",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "panelNotices.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/panelNotices.spec.js",
+  "playwright_group": "Dashboards",
+  "source_files": [
+    "web/src/components/dashboards/PanelErrorButtons.vue",
+    "web/src/components/dashboards/PanelNoticeContent.vue",
+    "web/src/components/dashboards/QueryInspector.vue",
+    "web/src/components/dashboards/PanelContainer.vue",
+    "web/src/composables/dashboard/usePanelNotices.ts",
+    "web/src/utils/dashboard/panelNotices.ts",
+    "web/src/utils/dashboard/panelDiagnostics.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
