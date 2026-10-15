@@ -165,7 +165,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="flex flex-col gap-2">
               <slot name="notices" />
-              <div v-if="!failed" class="flex min-w-0 flex-col" data-test="rum-analytics-funnel">
+              <div
+                v-if="!failed"
+                class="flex min-w-0 flex-col overflow-x-auto"
+                data-test="rum-analytics-funnel"
+              >
                 <FunnelStepsTable
                   :def="def"
                   :result="result"
@@ -178,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :unit-label="unitLabel"
                   :unit-noun="unitNoun"
                   :hide-time="hideTime"
+                  :compare="compare"
                   @update:def="(d) => emit('update:def', d)"
                   @dropoff="(k) => emit('dropoff', k)"
                 />
@@ -227,8 +232,10 @@ const RAIL_MIN_REM = 17;
 const RAIL_DEFAULT_REM = 22;
 const RAIL_MAX_REM = 30;
 // The table's fixed columns plus a Step column that keeps a typical step name on one or two lines.
-const TABLE_MIN_REM = 55;
-const TABLE_MIN_NO_TIME_REM = 46;
+const TABLE_MIN_REM = 56.5;
+const TABLE_MIN_NO_TIME_REM = 47.5;
+// The previous-period and change columns; past the rail's minimum the table scrolls inside the card.
+const TABLE_COMPARE_EXTRA_REM = 13;
 const SEPARATOR_REM = 2;
 
 const adding = ref(false);
@@ -267,7 +274,10 @@ try {
 const limits = computed<[number, number]>(() => {
   const r = rem();
   const min = RAIL_MIN_REM * r;
-  const table = (props.hideTime ? TABLE_MIN_NO_TIME_REM : TABLE_MIN_REM) * r;
+  const table =
+    ((props.hideTime ? TABLE_MIN_NO_TIME_REM : TABLE_MIN_REM) +
+      (props.compare ? TABLE_COMPARE_EXTRA_REM : 0)) *
+    r;
   const room = frameWidth.value ? frameWidth.value - SEPARATOR_REM * r - table : RAIL_MAX_REM * r;
   return [min, Math.max(min, Math.min(RAIL_MAX_REM * r, room))];
 });
