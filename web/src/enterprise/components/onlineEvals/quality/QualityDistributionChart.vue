@@ -15,9 +15,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="h-full min-h-0 w-full" data-test="quality-distribution-chart">
+  <div class="relative h-full min-h-0 w-full" data-test="quality-distribution-chart">
     <!-- ChartRenderer, not PanelSchemaRenderer: only it forwards the bar click that filters the scores. -->
     <ChartRenderer :data="{ options }" @click="onBarClick" />
+    <!-- The bars as buttons for keyboard users: hidden until one takes focus, then a row over the chart's foot. -->
+    <div
+      role="group"
+      :aria-label="t('onlineEvals.quality.detail.filterByBar')"
+      class="focus-within:bg-surface-base sr-only focus-within:not-sr-only focus-within:absolute focus-within:inset-x-0 focus-within:bottom-0 focus-within:flex focus-within:flex-wrap focus-within:gap-1 focus-within:p-1"
+      data-test="quality-distribution-keys"
+    >
+      <OButton
+        v-for="(bucket, index) in buckets"
+        :key="String(bucket.key)"
+        variant="outline"
+        size="chip"
+        :active="!!filter && bucketSelected(filter, bucket)"
+        :aria-pressed="String(!!filter && bucketSelected(filter, bucket))"
+        :data-test="`quality-distribution-key-${index}`"
+        @click="(event: MouseEvent) => emit('select', bucket, event.shiftKey)"
+      >
+        {{
+          t("onlineEvals.quality.detail.barButton", {
+            label: labels[index],
+            count: formatCount(bucket.count),
+          })
+        }}
+      </OButton>
+    </div>
   </div>
 </template>
 
@@ -28,7 +53,13 @@ import { useI18nTyped } from "@/types/i18n";
 import { chartColor } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 import type { QualityDistributionBucket } from "@/services/online-evals.service";
-import { bucketLabel, bucketSelected, type QualityChartFilter } from "../utils/qualityFormat";
+import OButton from "@/lib/core/Button/OButton.vue";
+import {
+  bucketLabel,
+  bucketSelected,
+  formatCount,
+  type QualityChartFilter,
+} from "../utils/qualityFormat";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),

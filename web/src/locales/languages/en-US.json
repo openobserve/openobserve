@@ -14990,6 +14990,8 @@
         "filterBelow": "Below {to}",
         "filterAtLeast": "{from} or more",
         "filterAny": "Any value",
+        "filterByBar": "Filter scores by value",
+        "barButton": "{label} · {count}",
         "clearFilter": "Clear filter"
       },
       "review": {
