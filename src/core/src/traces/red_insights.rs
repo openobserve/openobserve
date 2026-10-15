@@ -31,7 +31,7 @@ const HISTOGRAM_INTERVAL: &str = "5m";
 const SCHEDULE_INTERVAL: &str = "1h";
 /// The UI default; it exceeds 2*(schedule+bucket)+absence slack, so late runs skip nothing.
 const DETECTION_WINDOW_SECONDS: i64 = 10_800;
-/// Earlier releases stored this window on every detector; `repair` widens it in place.
+/// Earlier releases stored this window on every detector; `widened_window` replaces it.
 const LEGACY_DETECTION_WINDOW_SECONDS: i64 = 3_900;
 const MIN_BUCKET_REQUESTS: u32 = 20;
 const NAME_SEPARATOR: &str = " · ";
@@ -44,8 +44,6 @@ const ERROR_VOCABULARY: [&str; 6] = ["error", "errors", "fatal", "critical", "5x
 const KIND_PREDICATE: &str = "CAST(span_kind AS VARCHAR) IN ('2','5')";
 /// Any root span is a request, whatever its kind: a trace starting at a client span entered there.
 const ROOT_ARM: &str = "OR (reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
-/// Leads G5's refusal in enterprise servability.rs; the gated validator test pins it.
-const UNSERVABLE_PREFIX: &str = "this series has a near-zero baseline";
 
 /// Tolerates reformatting, not rewrites: a condition before `service_name` stays unrecognised.
 static IDENTITY: LazyLock<Regex> = LazyLock::new(|| {
@@ -115,27 +113,6 @@ pub struct ManagedDetector {
     /// SQL equal to today's template; a non-current detector is deleted only by setting-off.
     pub current: bool,
     pub detection_window_seconds: i64,
-    /// Its last training was refused by G5 as a near-zero series.
-    pub unservable: bool,
-}
-
-/// In-place fixes for a kept detector, engine-free like `DetectorTemplate`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Repair {
-    pub detection_window_seconds: Option<i64>,
-    /// A disabled detector still occupies its triple, so the planner never recreates it.
-    pub disable: bool,
-}
-
-#[cfg(feature = "enterprise")]
-impl Repair {
-    pub fn into_request(self) -> crate::anomaly_detection::UpdateAnomalyConfigRequest {
-        crate::anomaly_detection::UpdateAnomalyConfigRequest {
-            detection_window_seconds: self.detection_window_seconds,
-            enabled: self.disable.then_some(false),
-            ..Default::default()
-        }
-    }
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -375,18 +352,10 @@ pub fn template(
     })
 }
 
-/// `None` when the detector needs nothing; user-edited SQL is never disabled.
-pub fn repair(d: &ManagedDetector) -> Option<Repair> {
-    let repair = Repair {
-        detection_window_seconds: (d.detection_window_seconds == LEGACY_DETECTION_WINDOW_SECONDS)
-            .then_some(DETECTION_WINDOW_SECONDS),
-        disable: d.current && d.enabled && d.unservable,
-    };
-    (repair.detection_window_seconds.is_some() || repair.disable).then_some(repair)
-}
-
-pub fn is_unservable(last_error: &str) -> bool {
-    last_error.starts_with(UNSERVABLE_PREFIX)
+/// Any window but the legacy one is user-set and kept.
+pub fn widened_window(d: &ManagedDetector) -> Option<i64> {
+    (d.detection_window_seconds == LEGACY_DETECTION_WINDOW_SECONDS)
+        .then_some(DETECTION_WINDOW_SECONDS)
 }
 
 /// Recovers `(service, signal, current)` from the tag and the SQL, never the editable name.
@@ -528,7 +497,6 @@ mod tests {
             enabled,
             current: true,
             detection_window_seconds: DETECTION_WINDOW_SECONDS,
-            unservable: false,
         }
     }
 
@@ -594,7 +562,6 @@ mod tests {
                 enabled: true,
                 current: true,
                 detection_window_seconds: DETECTION_WINDOW_SECONDS,
-                unservable: false,
             });
         }
     }
@@ -1302,84 +1269,22 @@ mod tests {
     }
 
     #[test]
-    fn repair_widens_only_the_legacy_window() {
+    fn widened_window_replaces_only_the_legacy_window() {
         let legacy = ManagedDetector {
             detection_window_seconds: LEGACY_DETECTION_WINDOW_SECONDS,
             ..det("a", "svc", RedSignal::Rate, true)
         };
+        assert_eq!(widened_window(&legacy), Some(DETECTION_WINDOW_SECONDS));
         assert_eq!(
-            repair(&legacy),
-            Some(Repair {
-                detection_window_seconds: Some(DETECTION_WINDOW_SECONDS),
-                disable: false,
-            })
+            widened_window(&det("b", "svc", RedSignal::Rate, true)),
+            None
         );
-        assert_eq!(repair(&det("b", "svc", RedSignal::Rate, true)), None);
         let user_set = ManagedDetector {
             detection_window_seconds: 1_800,
             ..det("c", "svc", RedSignal::Rate, true)
         };
-        assert_eq!(repair(&user_set), None);
+        assert_eq!(widened_window(&user_set), None);
         let created = template("default", "svc", RedSignal::Rate, &ALL_COLS).unwrap();
         assert_eq!(created.detection_window_seconds, DETECTION_WINDOW_SECONDS);
-    }
-
-    #[test]
-    fn repair_disables_only_enabled_current_unservable_detectors() {
-        let refused = ManagedDetector {
-            unservable: true,
-            ..det("a", "svc", RedSignal::ErrorRatio, true)
-        };
-        assert_eq!(
-            repair(&refused),
-            Some(Repair {
-                detection_window_seconds: None,
-                disable: true,
-            })
-        );
-        let both = ManagedDetector {
-            detection_window_seconds: LEGACY_DETECTION_WINDOW_SECONDS,
-            ..refused.clone()
-        };
-        assert_eq!(
-            repair(&both),
-            Some(Repair {
-                detection_window_seconds: Some(DETECTION_WINDOW_SECONDS),
-                disable: true,
-            })
-        );
-        let paused = ManagedDetector {
-            enabled: false,
-            ..refused.clone()
-        };
-        assert_eq!(repair(&paused), None);
-        let user_sql = ManagedDetector {
-            current: false,
-            ..refused
-        };
-        assert_eq!(repair(&user_sql), None);
-    }
-
-    #[test]
-    fn a_disabled_unservable_detector_is_neither_recreated_nor_deleted() {
-        let mut existing = all_signals("d", "svc", true);
-        existing[1] = ManagedDetector {
-            enabled: false,
-            unservable: true,
-            ..existing[1].clone()
-        };
-        let p = plan_default(&[vol("default", "svc", 50_000)], &existing);
-        assert_eq!(p, Plan::default());
-    }
-
-    #[test]
-    fn is_unservable_matches_only_the_g5_refusal() {
-        assert!(is_unservable(
-            "this series has a near-zero baseline in 168 of its 168 observed hour-of-week slots"
-        ));
-        assert!(!is_unservable(
-            "Insufficient data points: 10 closed buckets < 100"
-        ));
-        assert!(!is_unservable(""));
     }
 }

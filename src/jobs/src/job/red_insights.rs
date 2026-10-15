@@ -25,7 +25,7 @@ use openobserve_core::{
     anomaly_detection,
     traces::red_insights::{
         self, FOLDER_NAME, MANAGED_TAG, MAX_CREATES, MAX_SERVICES, MIN_REQUESTS_24H,
-        ManagedDetector, Repair, ServiceVolume, StreamRead,
+        ManagedDetector, ServiceVolume, StreamRead,
     },
 };
 
@@ -95,9 +95,9 @@ async fn reconcile(org_id: &str, prefetched: Option<Vec<serde_json::Value>>) -> 
     let mut reads = read_streams(org_id).await;
     let volumes = service_volumes(org_id, &mut reads).await;
     let detectors: Vec<_> = configs.iter().filter_map(managed_detector).collect();
-    let repairs: Vec<_> = detectors
+    let widened: Vec<_> = detectors
         .iter()
-        .filter_map(|d| Some((d.id.clone(), red_insights::repair(d)?)))
+        .filter_map(|d| Some((d.id.clone(), red_insights::widened_window(d)?)))
         .collect();
     retire_removed_streams(org_id, &detectors, &mut reads).await;
     let existing = red_insights::on_read_streams(detectors, &reads);
@@ -113,9 +113,9 @@ async fn reconcile(org_id: &str, prefetched: Option<Vec<serde_json::Value>>) -> 
     for id in &plan.delete {
         delete(org_id, id).await;
     }
-    for (id, repair) in repairs {
+    for (id, window) in widened {
         if !plan.delete.contains(&id) {
-            update(org_id, &id, repair).await;
+            widen_window(org_id, &id, window).await;
         }
     }
 
@@ -189,7 +189,6 @@ fn managed_detector(config: &serde_json::Value) -> Option<ManagedDetector> {
             .get("detection_window_seconds")
             .and_then(|v| v.as_i64())
             .unwrap_or_default(),
-        unservable: red_insights::is_unservable(config_str(config, "last_error")),
     })
 }
 
@@ -199,13 +198,13 @@ async fn delete(org_id: &str, anomaly_id: &str) {
     }
 }
 
-async fn update(org_id: &str, anomaly_id: &str, repair: Repair) {
-    match anomaly_detection::update_config(org_id, anomaly_id, repair.into_request()).await {
-        Ok(_) if repair.disable => {
-            log::info!("[RED insights] org {org_id}: disabled unservable detector {anomaly_id}")
-        }
-        Ok(_) => {}
-        Err(e) => log::error!("[RED insights] org {org_id}: failed to update {anomaly_id}: {e}"),
+async fn widen_window(org_id: &str, anomaly_id: &str, detection_window_seconds: i64) {
+    let req = anomaly_detection::UpdateAnomalyConfigRequest {
+        detection_window_seconds: Some(detection_window_seconds),
+        ..Default::default()
+    };
+    if let Err(e) = anomaly_detection::update_config(org_id, anomaly_id, req).await {
+        log::error!("[RED insights] org {org_id}: failed to widen the window of {anomaly_id}: {e}");
     }
 }
 
