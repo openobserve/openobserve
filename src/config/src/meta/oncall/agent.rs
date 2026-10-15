@@ -321,9 +321,12 @@ pub struct L0Policy {
     /// How far one verdict may raise a severity, so a P4 cannot become a P1 in
     /// a single hop.
     pub max_promotion_steps: u8,
+    /// A `Downgrade` at `medium` or `high` confidence rides quieter channels.
+    /// At `low` the page goes on its normal channels.
     pub allow_downgrade: bool,
     /// **Opt-in.** Until a team enables it, a Suppress verdict is recorded as a
-    /// recommendation and the page still goes out.
+    /// recommendation and the page still goes out. Enabled, only a `high`
+    /// confidence Suppress silences the page.
     pub allow_suppress: bool,
 }
 
@@ -619,11 +622,13 @@ pub enum VerdictOutcome {
     Page {
         severity: AlertPriority,
         promoted_from: Option<AlertPriority>,
-        /// A `Downgrade` the team allows: this firing rides a quieter channel
-        /// set. The recorded severity is `severity`, unchanged.
+        /// A `Downgrade` the team allows, at `medium` or `high` confidence:
+        /// this firing rides a quieter channel set. The recorded severity is
+        /// `severity`, unchanged.
         quieter_channels: bool,
     },
-    /// No page at all. The record is still written, the verdict still lands on
+    /// No page at all. Only a `high`-confidence `Suppress` the team opted into
+    /// reaches here. The record is still written, the verdict still lands on
     /// the timeline, and the firing still appears in the team's digest.
     Suppress,
     /// The page has already gone out. The verdict rides as one ledger-deduped
@@ -663,15 +668,59 @@ fn hold_deadline(l0: &L0Policy, analysis: &AnalysisState, now: i64) -> i64 {
     analysis.requested_at.unwrap_or(now) + l0.triage_budget_micros()
 }
 
+/// A recommendation the confidence gate turned down (§5.4): the team allows
+/// the action, but the band is too weak for it. The page goes out on its
+/// normal channels, and the timeline says why.
+///
+/// A `Suppress` the team has not opted into, or a `Downgrade` the team does
+/// not allow, is not one of these: policy, not confidence, sent that page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConfidenceRefusal {
+    pub action: PageAction,
+    pub confidence: Confidence,
+}
+
+impl std::fmt::Display for ConfidenceRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} refused: confidence {}", self.action, self.confidence)
+    }
+}
+
 /// The verdict-application decision — pure over `(policy.l0, analysis,
 /// severity, now)`. `severity` is the firing's recorded severity, not the
 /// suggestion.
+///
+/// §5.4: a `Suppress` needs `high` confidence and a `Downgrade` needs `medium`
+/// or `high`. Below that the page goes out on its normal channels.
 pub fn apply_verdict(
     l0: &L0Policy,
     analysis: &AnalysisState,
     severity: AlertPriority,
     now: i64,
 ) -> VerdictOutcome {
+    decide_verdict(l0, analysis, severity, now).0
+}
+
+/// The recommendation [`apply_verdict`] turned down for weak confidence, over
+/// the same inputs. `None` whenever the gate never weighed the action: no
+/// verdict, a promotion, a verdict past the hold, any mode but `Gate`.
+pub fn confidence_refusal(
+    l0: &L0Policy,
+    analysis: &AnalysisState,
+    severity: AlertPriority,
+    now: i64,
+) -> Option<ConfidenceRefusal> {
+    decide_verdict(l0, analysis, severity, now).1
+}
+
+/// One source for [`apply_verdict`] and [`confidence_refusal`], so the
+/// timeline can never explain a refusal the engine did not make.
+fn decide_verdict(
+    l0: &L0Policy,
+    analysis: &AnalysisState,
+    severity: AlertPriority,
+    now: i64,
+) -> (VerdictOutcome, Option<ConfidenceRefusal>) {
     let verdict = analysis.verdict.as_ref();
     let decision = ratchet(
         severity,
@@ -684,7 +733,7 @@ pub fn apply_verdict(
         _ => None,
     };
 
-    match l0.mode_for(severity) {
+    let outcome = match l0.mode_for(severity) {
         // No agent ran, so no verdict — and therefore no promotion — can ever reach this arm in
         // practice; kept exhaustive and inert rather than reachable by construction.
         L0Mode::Off => VerdictOutcome::FollowUp { severity },
@@ -711,40 +760,67 @@ pub fn apply_verdict(
             let Some(verdict) = verdict else {
                 // No verdict is on its way, so `Failed` and `Skipped` do not wait out a budget.
                 if analysis.status.may_still_answer() && now < deadline {
-                    return VerdictOutcome::Hold { until: deadline };
+                    return (VerdictOutcome::Hold { until: deadline }, None);
                 }
-                return VerdictOutcome::FailOpen { severity };
+                return (VerdictOutcome::FailOpen { severity }, None);
             };
             // A promotion IS a page, so it re-enters the ladder whenever it lands, hold included.
             if let Some((from, to)) = promotion {
-                return VerdictOutcome::Page {
-                    severity: to,
-                    promoted_from: Some(from),
-                    quieter_channels: false,
-                };
+                return (
+                    VerdictOutcome::Page {
+                        severity: to,
+                        promoted_from: Some(from),
+                        quieter_channels: false,
+                    },
+                    None,
+                );
             }
             // A verdict landing on the deadline races a page already decided, and the page wins.
             let arrived = analysis.completed_at.unwrap_or(now);
             if arrived >= deadline {
-                return VerdictOutcome::FollowUp { severity };
+                return (VerdictOutcome::FollowUp { severity }, None);
             }
-            match verdict.page_recommendation.action {
-                PageAction::Suppress if l0.allow_suppress => VerdictOutcome::Suppress,
-                PageAction::Downgrade => VerdictOutcome::Page {
-                    severity,
-                    promoted_from: None,
-                    // A choice about one notification; the recorded severity is untouched.
-                    quieter_channels: l0.allow_downgrade,
-                },
-                // A Suppress the team has not opted into is advice: the page still goes out.
-                PageAction::Page | PageAction::Suppress => VerdictOutcome::Page {
-                    severity,
-                    promoted_from: None,
-                    quieter_channels: false,
-                },
-            }
+            let action = verdict.page_recommendation.action;
+            let confidence = verdict.confidence;
+            // `==` and `matches!`, never `>=`: the enum declares `High` first, so a derived order
+            // would rank `Low` above it.
+            let refused = match action {
+                PageAction::Suppress => l0.allow_suppress && confidence != Confidence::High,
+                // Refused only where the team allows downgrades: otherwise policy sent the page.
+                PageAction::Downgrade => l0.allow_downgrade && confidence == Confidence::Low,
+                PageAction::Page => false,
+            };
+            let outcome = match action {
+                PageAction::Suppress if l0.allow_suppress && confidence == Confidence::High => {
+                    VerdictOutcome::Suppress
+                }
+                PageAction::Downgrade
+                    if matches!(confidence, Confidence::High | Confidence::Medium) =>
+                {
+                    VerdictOutcome::Page {
+                        severity,
+                        promoted_from: None,
+                        // A choice about one notification; the recorded severity is untouched.
+                        quieter_channels: l0.allow_downgrade,
+                    }
+                }
+                // A Suppress the team has not opted into, or one below `high`, and a Downgrade at
+                // `low`, are advice: the page still goes out on its normal channels.
+                PageAction::Page | PageAction::Downgrade | PageAction::Suppress => {
+                    VerdictOutcome::Page {
+                        severity,
+                        promoted_from: None,
+                        quieter_channels: false,
+                    }
+                }
+            };
+            return (
+                outcome,
+                refused.then_some(ConfidenceRefusal { action, confidence }),
+            );
         }
-    }
+    };
+    (outcome, None)
 }
 
 /// Whether a severity pages a human at all under §1's table. L0's own table,
@@ -2294,6 +2370,125 @@ mod tests {
                 apply_verdict(&p, &state, P3, at),
                 want,
                 "downgrade={downgrade} suppress={suppress} action={action}"
+            );
+        }
+    }
+
+    /// Confidence §5.4: suppress needs `high`, downgrade needs `medium` or
+    /// `high`; below that the page goes out normally and the refusal is named.
+    #[test]
+    fn test_suppress_and_downgrade_are_gated_on_the_confidence_band() {
+        let at = FIRED_AT + 4 * SECOND;
+        let page = |quieter: bool| VerdictOutcome::Page {
+            severity: P3,
+            promoted_from: None,
+            quieter_channels: quieter,
+        };
+        // (allow_suppress, action, confidence, expected outcome, expected refusal text)
+        let cases: [(bool, PageAction, Confidence, VerdictOutcome, Option<&str>); 8] = [
+            (
+                true,
+                PageAction::Suppress,
+                Confidence::High,
+                VerdictOutcome::Suppress,
+                None,
+            ),
+            (
+                true,
+                PageAction::Suppress,
+                Confidence::Medium,
+                page(false),
+                Some("suppress refused: confidence medium"),
+            ),
+            (
+                true,
+                PageAction::Suppress,
+                Confidence::Low,
+                page(false),
+                Some("suppress refused: confidence low"),
+            ),
+            (
+                false,
+                PageAction::Suppress,
+                Confidence::High,
+                page(false),
+                None,
+            ),
+            (
+                false,
+                PageAction::Suppress,
+                Confidence::Low,
+                page(false),
+                None,
+            ),
+            (
+                true,
+                PageAction::Downgrade,
+                Confidence::High,
+                page(true),
+                None,
+            ),
+            (
+                true,
+                PageAction::Downgrade,
+                Confidence::Medium,
+                page(true),
+                None,
+            ),
+            (
+                true,
+                PageAction::Downgrade,
+                Confidence::Low,
+                page(false),
+                Some("downgrade refused: confidence low"),
+            ),
+        ];
+        for (suppress, action, confidence, want, refusal) in cases {
+            let p = raw(
+                L0Mode::Parallel,
+                L0Mode::Gate,
+                L0Mode::Gate,
+                L0Mode::Only,
+                90,
+                true,
+                2,
+                true,
+                suppress,
+            );
+            let mut v = verdict(action, None);
+            v.confidence = confidence;
+            let state = complete(FIRED_AT, at, v);
+            let label = format!("suppress={suppress} action={action} confidence={confidence}");
+            assert_eq!(apply_verdict(&p, &state, P3, at), want, "{label}");
+            assert_eq!(
+                confidence_refusal(&p, &state, P3, at).map(|r| r.to_string()),
+                refusal.map(str::to_string),
+                "{label}"
+            );
+        }
+    }
+
+    /// No refusal without a verdict, for a verdict past the hold, or outside `gate`.
+    #[test]
+    fn test_no_confidence_refusal_without_a_timely_gated_verdict() {
+        let p = everything_enabled();
+        let at = FIRED_AT + 4 * SECOND;
+        let late = FIRED_AT + 200 * SECOND;
+        let mut low = verdict(PageAction::Suppress, None);
+        low.confidence = Confidence::Low;
+        assert_eq!(confidence_refusal(&p, &pending(FIRED_AT), P3, at), None);
+        assert_eq!(confidence_refusal(&p, &pending(FIRED_AT), P3, late), None);
+        assert_eq!(
+            confidence_refusal(&p, &complete(FIRED_AT, late, low.clone()), P3, late),
+            None,
+            "a verdict after the deadline refuses nothing"
+        );
+        for mode in [L0Mode::Off, L0Mode::Parallel, L0Mode::Only] {
+            let p = raw(mode, mode, mode, mode, 90, true, 2, true, true);
+            assert_eq!(
+                confidence_refusal(&p, &complete(FIRED_AT, at, low.clone()), P3, at),
+                None,
+                "{mode:?}"
             );
         }
     }
