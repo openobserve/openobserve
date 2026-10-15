@@ -58,6 +58,11 @@ vi.mock("@/services/reports", async (importOriginal) => {
   });
 });
 
+vi.mock("@/services/health", () => ({
+  pingBackend: vi.fn().mockResolvedValue(true),
+  default: { pingBackend: vi.fn().mockResolvedValue(true) },
+}));
+
 vi.mock("@/services/short_url", () => ({
   default: {
     create: vi.fn().mockResolvedValue({ data: { short_url: "http://short.url" } }),
@@ -113,6 +118,8 @@ const routeUpdateGuards: Array<(to: RouteLike, from: RouteLike) => unknown> = []
 // Mutable so a test can say what the previous history entry was; the back
 // button prefers real history over rebuilding the folder-scoped list route.
 const mockHistoryState: { back: string | null } = { back: null };
+// Extra query params a test wants on the route it mounts with (cleared before every test).
+const mockExtraRouteQuery: Record<string, string> = {};
 
 // Comprehensive Vue composable mocks
 vi.mock("vue-router", () => ({
@@ -143,7 +150,12 @@ vi.mock("vue-router", () => ({
   },
   useRoute: () => ({
     params: { dashboardId: "test-dashboard-1", folderId: "default" },
-    query: { dashboard: "test-dashboard-1", folder: "default", tab: "tab-1" },
+    query: {
+      dashboard: "test-dashboard-1",
+      folder: "default",
+      tab: "tab-1",
+      ...mockExtraRouteQuery,
+    },
     path: "/dashboard/test-dashboard-1",
   }),
 }));
@@ -288,6 +300,7 @@ describe("ViewDashboard", () => {
     global.mockRouterReplace.mockClear();
     global.mockRouterBack.mockClear();
     global.mockHistoryState.back = null;
+    Object.keys(mockExtraRouteQuery).forEach((key) => delete mockExtraRouteQuery[key]);
     global.mockStoreCommit.mockClear();
     global.mockStoreDispatch.mockClear();
     global.mockShowPositiveNotification.mockClear();
@@ -2015,6 +2028,165 @@ describe("ViewDashboard", () => {
       } finally {
         manager.unregisterById(chatId);
       }
+    });
+  });
+
+  describe("time range carried by a link", () => {
+    // A link with ?refresh= rewrites the URL on mount, before the dashboard (and its picker value) has loaded.
+    it.each(["1w", "15m", "2h", "7d", "1M"])(
+      "keeps period=%s when the link also sets a refresh interval",
+      async (period) => {
+        Object.assign(mockExtraRouteQuery, { period, refresh: "1m" });
+        let resolveDashboard: (value: unknown) => void = () => {};
+        vi.mocked(getDashboard).mockImplementationOnce(
+          () => new Promise((resolve) => (resolveDashboard = resolve)),
+        );
+        wrapper = createWrapper();
+        await flushPromises();
+
+        const rewrites = global.mockRouterReplace.mock.calls.map((call) => call[0]?.query);
+        expect(rewrites.length).toBeGreaterThan(0);
+        rewrites.forEach((query) => expect(query?.period).toBe(period));
+
+        resolveDashboard({
+          dashboardId: "test-dashboard-1",
+          title: "Test Dashboard",
+          variables: { list: [] },
+          defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "15m" },
+          tabs: [{ tabId: "tab-1", name: "Tab 1", panels: [] }],
+        });
+        await flushPromises();
+        expect(wrapper.vm.selectedDate).toMatchObject({
+          valueType: "relative",
+          relativeTimePeriod: period,
+        });
+      },
+    );
+
+    it("keeps an absolute from/to when the link also sets a refresh interval", async () => {
+      Object.assign(mockExtraRouteQuery, {
+        from: "1700000000000",
+        to: "1700003600000",
+        refresh: "1m",
+      });
+      vi.mocked(getDashboard).mockImplementationOnce(() => new Promise(() => {}));
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const rewrites = global.mockRouterReplace.mock.calls.map((call) => call[0]?.query);
+      expect(rewrites.length).toBeGreaterThan(0);
+      rewrites.forEach((query) => {
+        expect(query?.from).toBe("1700000000000");
+        expect(query?.to).toBe("1700003600000");
+      });
+    });
+  });
+
+  describe("Kiosk / TV mode", () => {
+    const mountKiosk = async () => {
+      wrapper = createWrapper({
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            OPageLayout: {
+              name: "OPageLayout",
+              props: ["headerClass"],
+              template:
+                '<div><slot name="title" /><slot name="actions" /><slot name="actions-overflow" /><slot /></div>',
+            },
+            RenderDashboardCharts: {
+              name: "RenderDashboardCharts",
+              props: ["viewOnly", "kiosk", "fitToScreen"],
+              template: "<div />",
+            },
+          },
+        },
+      });
+      await flushPromises();
+    };
+
+    afterEach(() => {
+      global.mockStoreState.kioskMode = false;
+    });
+
+    it("keeps the normal view unchanged: no strip, header shown, panels editable", async () => {
+      await mountKiosk();
+
+      expect(wrapper.vm.kioskMode).toBe(false);
+      expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(false);
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      expect(charts.props("viewOnly")).toBe(false);
+      expect(charts.props("kiosk")).toBe(false);
+      expect(wrapper.findComponent({ name: "OPageLayout" }).props("headerClass")).toBe("shrink-0");
+    });
+
+    it("opens TV mode with a link that keeps the relative range and adds the chosen options", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockRouterPush.mockClear();
+
+      await wrapper.vm.enterKiosk({ refreshSeconds: 300, theme: "dark", fit: true });
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", true);
+      expect(global.mockStoreCommit).toHaveBeenCalledWith("setThemeOverride", "dark");
+      expect(wrapper.vm.refreshInterval).toBe(300);
+      const { query } = global.mockRouterPush.mock.calls.at(-1)[0];
+      expect(query).toMatchObject({
+        dashboard: "test-dashboard-1",
+        tab: "tab-1",
+        kiosk: "true",
+        theme: "dark",
+        fit: "true",
+        refresh: "5m",
+      });
+      expect(query.print).toBeUndefined();
+      expect(query.from).toBeUndefined();
+    });
+
+    it("renders the read-only strip and view-only panels without the toolbar", async () => {
+      global.mockStoreState.kioskMode = true;
+      await mountKiosk();
+
+      expect(wrapper.findComponent({ name: "KioskStrip" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OPageLayout" }).props("headerClass")).toBe("hidden");
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      expect(charts.props("viewOnly")).toBe(true);
+      expect(charts.props("kiosk")).toBe(true);
+    });
+
+    it("exits on Esc back to the normal view with kiosk params removed", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockRouterReplace.mockClear();
+
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      await flushPromises();
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
+      const { query } = global.mockRouterReplace.mock.calls.at(-1)[0];
+      expect(query.kiosk).toBeUndefined();
+      expect(query.theme).toBeUndefined();
+    });
+
+    it("never shows an invalid range in the strip before the picker resolves", async () => {
+      await mountKiosk();
+      wrapper.vm.selectedDate = { valueType: "absolute", startTime: null, endTime: null };
+      wrapper.vm.currentTimeObj = {};
+      wrapper.vm.timeString = " Invalid date - Invalid date ";
+      await flushPromises();
+      expect(wrapper.vm.kioskTimeRange).toBe("");
+    });
+
+    it("leaves kiosk when the page is left", async () => {
+      global.mockStoreState.kioskMode = true;
+      wrapper = createWrapper();
+      await flushPromises();
+      global.mockStoreDispatch.mockClear();
+
+      routeLeaveGuards.at(-1)?.();
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setKioskMode", false);
     });
   });
 });

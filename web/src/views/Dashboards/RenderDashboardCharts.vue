@@ -18,10 +18,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
+    ref="dashboardScrollRef"
     :class="[
       'bg-surface-base',
       frame ? 'border-border-default rounded-default border' : '',
-      store.state.printMode ? '' : 'h-full overflow-y-auto',
+      store.state.printMode
+        ? ''
+        : fitToScreen
+          ? 'h-full overflow-hidden'
+          : 'h-full overflow-y-auto',
     ]"
   >
     <div class="px-page-edge render-dashboard-charts-container pt-2">
@@ -43,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selectedTimeDate="currentTimeObj['__global']"
         :initialVariableValues="initialVariableValues"
         class="global-variables-selector"
+        :class="kiosk ? 'hidden' : undefined"
         data-test="global-variables-selector"
       />
 
@@ -50,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <TabList
         v-if="showTabs && selectedTabId !== null"
         class="mt-2"
+        :class="kiosk ? 'hidden' : undefined"
         :dashboardData="dashboardData"
         :viewOnly="viewOnly"
         :layoutMode="layoutMode"
@@ -66,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :variablesManager="variablesManager"
         :selectedTimeDate="currentTimeObj['__global']"
         :initialVariableValues="initialVariableValues"
+        :class="kiosk ? 'hidden' : undefined"
         data-test="tab-variables-selector"
       />
 
@@ -93,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @onDeletePanel="onDeletePanel"
             @onViewPanel="onViewPanel"
             :viewOnly="viewOnly"
+            :kiosk="kiosk"
             :layoutMode="layoutMode"
             :data="panels[0] || {}"
             :dashboardId="dashboardData.dashboardId"
@@ -192,6 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @onDeletePanel="onDeletePanel"
                   @onViewPanel="onViewPanel"
                   :viewOnly="viewOnly"
+                  :kiosk="kiosk"
                   :layoutMode="layoutMode"
                   :data="item"
                   :dashboardId="dashboardData.dashboardId"
@@ -268,6 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         :initialVariableValues="initialVariableValues"
                         class="panel-variables-margin mb-2"
+                        :class="kiosk ? 'hidden' : undefined"
                         data-test="panel-variables-selector"
                       />
                     </div>
@@ -349,6 +360,7 @@ import useNotifications from "@/composables/useNotifications";
 import { getVariableKey, useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
+import { computeFitCellHeight } from "@/utils/dashboard/kiosk";
 import {
   convertTimeObjToPickerFormat,
   resolvePanelTimeValue,
@@ -359,6 +371,10 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 import type { LayoutMode } from "@/components/dashboards/layoutMode";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+
+// Must match the cellHeight GridStack is initialised with below.
+const DEFAULT_CELL_HEIGHT_PX = 17;
+const FIT_BOTTOM_GAP_PX = 8;
 
 export default defineComponent({
   name: "RenderDashboardCharts",
@@ -442,6 +458,16 @@ export default defineComponent({
       type: String as PropType<LayoutMode>,
       default: "live",
     },
+    /** Wall-screen display: hides tabs and variable pickers and shows failed panels loudly. */
+    kiosk: {
+      type: Boolean,
+      default: false,
+    },
+    /** Scales the grid's cell height so every row fits the visible height without scrolling. */
+    fitToScreen: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   components: {
@@ -460,6 +486,7 @@ export default defineComponent({
     const router = useRouter();
     const store = useStore();
     const gridStackContainer = ref(null);
+    const dashboardScrollRef = ref<HTMLElement | null>(null);
     // True while a panel is being dragged or resized — drives the grid backdrop.
     const isGridInteracting = ref(false);
     const isLayoutEditing = computed(() => props.layoutMode === "edit");
@@ -1087,11 +1114,46 @@ export default defineComponent({
       grid.batchUpdate(false);
 
       gridStackUpdateInProgress = false;
+      applyFitToScreen();
       window.dispatchEvent(new Event("resize"));
 
       // Re-setup panel observers for the new panels
       await setupPanelObservers();
     };
+
+    // Only ever touches the grid once fit has been asked for, so a normal dashboard keeps GridStack's own sizing.
+    let fitApplied = false;
+    const applyFitToScreen = () => {
+      if (!props.fitToScreen && !fitApplied) return;
+      const grid = gridStackInstance;
+      const root = dashboardScrollRef.value;
+      const host = gridStackContainer.value;
+      if (!grid || !root || !(host instanceof HTMLElement)) return;
+      fitApplied = props.fitToScreen;
+      const target = props.fitToScreen
+        ? computeFitCellHeight(
+            root.clientHeight -
+              (host.getBoundingClientRect().top - root.getBoundingClientRect().top) -
+              FIT_BOTTOM_GAP_PX,
+            grid.getRow(),
+          )
+        : DEFAULT_CELL_HEIGHT_PX;
+      if (!target || grid.getCellHeight() === target) return;
+      grid.cellHeight(target);
+      window.dispatchEvent(new Event("resize"));
+    };
+
+    let fitResizeObserver: ResizeObserver | null = null;
+    const observeFit = () => {
+      fitResizeObserver?.disconnect();
+      fitResizeObserver = null;
+      if (props.fitToScreen && dashboardScrollRef.value && typeof ResizeObserver !== "undefined") {
+        fitResizeObserver = new ResizeObserver(() => applyFitToScreen());
+        fitResizeObserver.observe(dashboardScrollRef.value);
+      }
+      applyFitToScreen();
+    };
+    watch(() => props.fitToScreen, observeFit, { flush: "post" });
 
     // Add a method to reset grid layout
     const resetGridLayout = async () => {
@@ -1280,6 +1342,7 @@ export default defineComponent({
       await nextTick(); // Wait for DOM to be ready
       initGridStack(); // Initialize the grid system
       await nextTick(); // Wait for grid initialization to complete
+      if (props.fitToScreen) observeFit();
 
       // Set up IntersectionObserver for panel visibility (for lazy loading panel-scoped variables)
       await setupPanelObservers();
@@ -1464,6 +1527,8 @@ export default defineComponent({
 
     // Final cleanup when component is fully unmounted
     onUnmounted(() => {
+      fitResizeObserver?.disconnect();
+      fitResizeObserver = null;
       if (gridStackInstance) {
         gridStackInstance.destroy(false);
         gridStackInstance = null;
@@ -1869,6 +1934,7 @@ export default defineComponent({
 
     return {
       store,
+      dashboardScrollRef,
       addPanelData,
       t,
       getPanelLayout,

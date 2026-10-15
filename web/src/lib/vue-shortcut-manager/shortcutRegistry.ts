@@ -343,6 +343,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         descriptionKey: "shortcuts.actions.dashboardLayoutExit",
       },
       {
+        id: "dashboardKioskExit",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.dashboardKioskExit",
+      },
+      {
         id: "dashboardFullscreen",
         key: "f",
         descriptionKey: "shortcuts.actions.dashboardFullscreen",
