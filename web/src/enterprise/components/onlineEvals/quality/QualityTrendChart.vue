@@ -34,6 +34,7 @@ import {
 } from "@/utils/dashboard/colorPalette";
 import type { QualityTimelineBucket } from "@/services/online-evals.service";
 import {
+  formatAxis,
   formatCount,
   formatExact,
   formatFixed,
@@ -211,7 +212,7 @@ const options = computed(() => {
         : rate
           ? { min: 0, max: 100 }
           : { min: 0, minInterval: 1 }),
-      axisLabel: { color: text, fontSize: 10, formatter: rate ? "{value}%" : undefined },
+      axisLabel: { color: text, fontSize: 10, formatter: rate ? "{value}%" : formatAxis },
       splitLine: { lineStyle: { color: grid } },
     },
     series,
