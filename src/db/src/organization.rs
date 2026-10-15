@@ -318,6 +318,9 @@ pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "enterprise")]
     super_cluster::organization_add(&key, entry).await?;
+    #[cfg(feature = "cloud")]
+    o2_enterprise::enterprise::cloud::billings::sync_public_dashboard_links(&entry.identifier)
+        .await;
     Ok(())
 }
 

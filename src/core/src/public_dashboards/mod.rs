@@ -593,19 +593,41 @@ pub async fn set_org_settings(
     user_id: &str,
 ) -> Result<OrgPublicDashboardSettings, anyhow::Error> {
     validate_settings(&body).map_err(Invalid)?;
-    let row = pd_table::upsert_settings(
-        get_orm_client_rw().await,
-        org,
-        body.enabled,
-        body.max_links,
-        user_id,
-        now_micros(),
-    )
-    .await?;
+    let db = get_orm_client_rw().await;
+    #[cfg(feature = "cloud")]
+    let body = if db::user::is_root_user(user_id) {
+        body
+    } else {
+        let stored = pd_table::get_settings(db, org)
+            .await?
+            .and_then(|s| s.max_links);
+        OrgPublicDashboardSettings {
+            max_links: plan_owned_max_links(stored, body.max_links)?,
+            ..body
+        }
+    };
+    let row =
+        pd_table::upsert_settings(db, org, body.enabled, body.max_links, user_id, now_micros())
+            .await?;
     Ok(OrgPublicDashboardSettings {
         enabled: row.enabled,
         max_links: row.max_links,
     })
+}
+
+/// In Cloud the plan sync owns max_links, so an org admin keeps the stored value and may only
+/// use the switch.
+#[cfg(feature = "cloud")]
+fn plan_owned_max_links(
+    stored: Option<i32>,
+    requested: Option<i32>,
+) -> Result<Option<i32>, anyhow::Error> {
+    match requested {
+        Some(n) if Some(n) != stored => Err(anyhow::anyhow!(
+            "The link limit follows the organization's plan; changing it needs root permission"
+        )),
+        _ => Ok(stored),
+    }
 }
 
 /// A per-org link limit must lie within the env limit, which is the most any org may have.
@@ -2763,5 +2785,19 @@ mod tests {
                 .await
                 .is_ok()
         );
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn in_cloud_an_org_admin_cannot_change_the_plan_link_limit() {
+        // The switch alone, with the limit echoed or left out, keeps the plan's value.
+        assert_eq!(plan_owned_max_links(Some(3), Some(3)).unwrap(), Some(3));
+        assert_eq!(plan_owned_max_links(Some(3), None).unwrap(), Some(3));
+        assert_eq!(plan_owned_max_links(None, None).unwrap(), None);
+        // Raising, lowering or setting a limit on a missing row is refused with 403.
+        for (stored, requested) in [(Some(3), Some(50)), (Some(50), Some(10)), (None, Some(50))] {
+            let err = plan_owned_max_links(stored, requested).unwrap_err();
+            assert!(err.to_string().contains("permission"), "{err}");
+        }
     }
 }
