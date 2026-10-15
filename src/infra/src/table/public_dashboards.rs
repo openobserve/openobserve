@@ -390,8 +390,7 @@ pub async fn upsert_settings<C: ConnectionTrait>(
     upsert_settings_columns(db, org_id, enabled, max_links, &columns, updated_by, now).await
 }
 
-/// Writes only the org's switch; a concurrent write of its link limit is kept. A new row has no
-/// limit of its own.
+/// Writes only the org's switch, keeping its link limit; a new row has no limit.
 pub async fn set_settings_enabled<C: ConnectionTrait>(
     db: &C,
     org_id: &str,
@@ -403,7 +402,7 @@ pub async fn set_settings_enabled<C: ConnectionTrait>(
     upsert_settings_columns(db, org_id, enabled, None, &columns, updated_by, now).await
 }
 
-/// Writes only the org's link limit; a concurrent write of its switch is kept. A new row is on.
+/// Writes only the org's link limit, keeping its switch; a new row is on.
 pub async fn set_settings_max_links<C: ConnectionTrait>(
     db: &C,
     org_id: &str,

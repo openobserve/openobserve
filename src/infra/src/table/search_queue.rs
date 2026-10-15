@@ -104,8 +104,7 @@ pub struct QueueCounts {
     pub type_org: usize,
 }
 
-/// Counts the work group's admitted searches globally, for the org, for the user, and for the
-/// search type globally and in the org, in one query. A `None` level counts zero.
+/// Counts admitted searches per level and per search type in one query; `None` counts zero.
 pub async fn count_all_levels(
     work_group: &str,
     org_id: Option<&str>,
