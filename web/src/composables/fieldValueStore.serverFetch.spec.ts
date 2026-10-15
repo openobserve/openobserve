@@ -402,3 +402,307 @@ describe("noValueLookup — a lookup that never ran", () => {
     expect(store.isNoValueLookup(new Error("500"))).toBe(false);
   });
 });
+
+describe("requestFieldValues — a recent answer is reused", () => {
+  // The resolver now asks on every value lookup, even with local values, so each keystroke must not cost a request.
+  it("answers a repeat question from the last answer, without a request", async () => {
+    const store = await freshStore();
+    await store.requestFieldValues(ctx, "environment");
+    await expect(store.requestFieldValues(ctx, "environment")).resolves.toEqual([
+      "development",
+      "staging",
+    ]);
+    expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(1);
+  });
+
+  it("asks again once the answer is a minute old", async () => {
+    const store = await freshStore();
+    await store.requestFieldValues(ctx, "environment");
+    const realNow = Date.now;
+    try {
+      const advanced = realNow() + 61_000;
+      Date.now = () => advanced;
+      await store.requestFieldValues(ctx, "environment");
+    } finally {
+      Date.now = realNow;
+    }
+    expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(2);
+  });
+
+  it("forgets the answer when the read cache is cleared on org switch or logout", async () => {
+    const store = await freshStore();
+    await store.requestFieldValues(ctx, "environment");
+    store.clearReadCache();
+    await store.requestFieldValues(ctx, "environment");
+    expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(2);
+  });
+});
+
+describe("requestFieldValues — an explicit time range", () => {
+  const timeRange = { startTime: 1_700_000_000_000_000, endTime: 1_700_086_400_000_000 };
+
+  it("asks for exactly that range instead of the last fifteen minutes", async () => {
+    await (await freshStore()).requestFieldValues(ctx, "environment", { timeRange });
+    const [args] = vi.mocked(streamService.fieldValues).mock.calls[0] as any[];
+    expect(args.start_time).toBe(timeRange.startTime);
+    expect(args.end_time).toBe(timeRange.endTime);
+  });
+
+  it("treats a different range as a different question", async () => {
+    const store = await freshStore();
+    await store.requestFieldValues(ctx, "environment", { timeRange });
+    await store.requestFieldValues(ctx, "environment", {
+      timeRange: { ...timeRange, startTime: timeRange.startTime - 1 },
+    });
+    await store.requestFieldValues(ctx, "environment");
+    expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(3);
+  });
+
+  it("reuses the answer for the same range", async () => {
+    const store = await freshStore();
+    await store.requestFieldValues(ctx, "environment", { timeRange });
+    await expect(
+      store.requestFieldValues(ctx, "environment", { timeRange: { ...timeRange } }),
+    ).resolves.toEqual(["development", "staging"]);
+    expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(1);
+  });
+
+  it("never lets a range's values reach the default lookup's cache", async () => {
+    const store = await freshStore();
+    await store.requestFieldValues(ctx, "tier", { timeRange });
+    await settle();
+    await expect(store.getFieldValuesForSuggestion(ctx, "tier")).resolves.toEqual([]);
+    vi.mocked(streamService.fieldValues).mockResolvedValue(apiResponse(["recent"]) as any);
+    await expect(store.requestFieldValues(ctx, "tier")).resolves.toEqual(["recent"]);
+  });
+
+  it("keeps an empty or failed answer to its own range", async () => {
+    const store = await freshStore();
+    vi.mocked(streamService.fieldValues).mockRejectedValueOnce(new Error("500"));
+    await store.requestFieldValues(ctx, "environment", { timeRange });
+    expect(store.fieldValuesUnavailable(ctx, "environment", timeRange)).toBe(true);
+    expect(store.fieldValuesUnavailable(ctx, "environment")).toBe(false);
+    await expect(store.requestFieldValues(ctx, "environment")).resolves.toEqual([
+      "development",
+      "staging",
+    ]);
+  });
+});
+
+describe("requestFieldValues — a typed keyword", () => {
+  it("sends the keyword and keeps its answer apart from the unfiltered one", async () => {
+    const store = await freshStore();
+    await store.requestFieldValues(ctx, "service", { keyword: "open" });
+    const [args] = vi.mocked(streamService.fieldValues).mock.calls[0] as any[];
+    expect(args.keyword).toBe("open");
+    await settle();
+    await expect(store.getFieldValuesForSuggestion(ctx, "service")).resolves.toEqual([]);
+    await store.requestFieldValues(ctx, "service");
+    await store.requestFieldValues(ctx, "service", { keyword: "open" });
+    expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(2);
+  });
+
+  it("names the request size, so a caller can tell a full answer from a truncated one", async () => {
+    expect((await freshStore()).FIELD_VALUES_REQUEST_SIZE).toBe(10);
+  });
+});
+
+describe("requestFieldValuesMatching — one keyword request at a time", () => {
+  it("asks for the newest prefix once the request in flight returns, and drops the ones between", async () => {
+    let finishFirst!: (v: any) => void;
+    vi.mocked(streamService.fieldValues)
+      .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)) as any)
+      .mockResolvedValue(apiResponse(["openobserve"]) as any);
+    const store = await freshStore();
+    const first = store.requestFieldValuesMatching(ctx, "service", "o");
+    const middle = store.requestFieldValuesMatching(ctx, "service", "op");
+    const newest = store.requestFieldValuesMatching(ctx, "service", "ope");
+    const truncated = Array.from({ length: 10 }, (_, i) => `o-${i}`);
+    finishFirst(apiResponse(truncated));
+    await expect(first).resolves.toEqual(truncated);
+    await expect(middle).resolves.toEqual([]);
+    await expect(newest).resolves.toEqual(["openobserve"]);
+    const keywords = vi.mocked(streamService.fieldValues).mock.calls.map((c: any) => c[0].keyword);
+    expect(keywords).toEqual(["o", "ope"]);
+  });
+
+  it("filters a complete answer for a shorter prefix instead of asking again", async () => {
+    vi.mocked(streamService.fieldValues).mockResolvedValue(
+      apiResponse(["openobserve", "OpenTelemetry"]) as any,
+    );
+    const store = await freshStore();
+    await store.requestFieldValuesMatching(ctx, "service", "open");
+    await expect(store.requestFieldValuesMatching(ctx, "service", "OpenO")).resolves.toEqual([
+      "openobserve",
+    ]);
+    expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(1);
+  });
+
+  it("asks again when the shorter prefix's answer was truncated", async () => {
+    const full = Array.from({ length: 10 }, (_, i) => `open-${i}`);
+    vi.mocked(streamService.fieldValues).mockResolvedValue(apiResponse(full) as any);
+    const store = await freshStore();
+    await store.requestFieldValuesMatching(ctx, "service", "open");
+    await store.requestFieldValuesMatching(ctx, "service", "openo");
+    expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(2);
+  });
+
+  it("asks within the caller's time range", async () => {
+    const timeRange = { startTime: 1_000_000, endTime: 2_000_000 };
+    const store = await freshStore();
+    await store.requestFieldValuesMatching(ctx, "service", "open", { timeRange });
+    const [args] = vi.mocked(streamService.fieldValues).mock.calls[0] as any[];
+    expect(args).toMatchObject({ start_time: 1_000_000, end_time: 2_000_000, keyword: "open" });
+    await store.requestFieldValuesMatching(ctx, "service", "open");
+    expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(2);
+  });
+});
+
+describe("requestFieldValues — slow lookups over a long range", () => {
+  const DAY_US = 86_400_000_000;
+  const days = (n: number) => ({
+    startTime: 1_000_000_000_000_000,
+    endTime: 1_000_000_000_000_000 + n * DAY_US,
+  });
+  const answerAfter = (ms: number, values: string[]) =>
+    vi
+      .mocked(streamService.fieldValues)
+      .mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(apiResponse(values) as any), ms),
+          ) as any,
+      );
+
+  it("waits out a seven-day lookup that takes fifteen seconds", async () => {
+    vi.useFakeTimers();
+    try {
+      answerAfter(15_000, ["openobserve"]);
+      const store = await freshStore();
+      const pending = store.requestFieldValues(ctx, "service", { timeRange: days(7) });
+      await vi.advanceTimersByTimeAsync(15_000);
+      await expect(pending).resolves.toEqual(["openobserve"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("waits at most thirty seconds however long the range", async () => {
+    vi.useFakeTimers();
+    try {
+      answerAfter(29_000, ["openobserve"]);
+      const store = await freshStore();
+      const within = store.requestFieldValues(ctx, "service", { timeRange: days(90) });
+      await vi.advanceTimersByTimeAsync(29_000);
+      await expect(within).resolves.toEqual(["openobserve"]);
+
+      answerAfter(31_000, ["late"]);
+      let answer: string[] | undefined;
+      void store
+        .requestFieldValues(ctx, "region", { timeRange: days(90) })
+        .then((v) => (answer = v));
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(answer).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still gives up at ten seconds on the default fifteen-minute lookup", async () => {
+    vi.useFakeTimers();
+    try {
+      answerAfter(12_000, ["development"]);
+      const store = await freshStore();
+      let answer: string[] | undefined;
+      void store.requestFieldValues(ctx, "environment").then((v) => (answer = v));
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(answer).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not call a timed-out lookup a failure, and keeps its late answer", async () => {
+    vi.useFakeTimers();
+    try {
+      answerAfter(12_000, ["development"]);
+      const store = await freshStore();
+      await Promise.all([
+        store.requestFieldValues(ctx, "environment"),
+        vi.advanceTimersByTimeAsync(10_000),
+      ]);
+      expect(store.fieldValuesUnavailable(ctx, "environment")).toBe(false);
+      await vi.advanceTimersByTimeAsync(2_000);
+      await expect(store.requestFieldValues(ctx, "environment")).resolves.toEqual(["development"]);
+      expect(vi.mocked(streamService.fieldValues).mock.calls.length).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("pendingFieldValues — a lookup still running after its timeout", () => {
+  it("hands back the running request, which settles with the late answer", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(streamService.fieldValues).mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(apiResponse(["development"]) as any), 12_000),
+          ) as any,
+      );
+      const store = await freshStore();
+      expect(store.pendingFieldValues(ctx, "environment")).toBeNull();
+      await Promise.all([
+        store.requestFieldValues(ctx, "environment"),
+        vi.advanceTimersByTimeAsync(10_000),
+      ]);
+      const pending = store.pendingFieldValues(ctx, "environment");
+      expect(pending).not.toBeNull();
+      await vi.advanceTimersByTimeAsync(2_000);
+      await expect(pending).resolves.toEqual(["development"]);
+      expect(store.pendingFieldValues(ctx, "environment")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("gives up on a request that never answers, and calls it failed", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(streamService.fieldValues).mockReturnValue(new Promise(() => {}) as any);
+      const store = await freshStore();
+      await Promise.all([
+        store.requestFieldValues(ctx, "environment"),
+        vi.advanceTimersByTimeAsync(10_000),
+      ]);
+      const pending = store.pendingFieldValues(ctx, "environment");
+      await vi.advanceTimersByTimeAsync(60_000);
+      await expect(pending).resolves.toEqual([]);
+      expect(store.fieldValuesUnavailable(ctx, "environment")).toBe(true);
+      expect(store.pendingFieldValues(ctx, "environment")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a keyword's and a range's running request to their own key", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(streamService.fieldValues).mockReturnValue(new Promise(() => {}) as any);
+      const store = await freshStore();
+      const timeRange = { startTime: 1_000_000, endTime: 2_000_000 };
+      await Promise.all([
+        store.requestFieldValues(ctx, "service", { timeRange, keyword: "open" }),
+        vi.advanceTimersByTimeAsync(11_000),
+      ]);
+      expect(
+        store.pendingFieldValues(ctx, "service", { timeRange, keyword: "open" }),
+      ).not.toBeNull();
+      expect(store.pendingFieldValues(ctx, "service", { timeRange })).toBeNull();
+      expect(store.pendingFieldValues(ctx, "service")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

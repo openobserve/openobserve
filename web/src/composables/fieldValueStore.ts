@@ -58,10 +58,14 @@ const VALUES_LOOKBACK_MS = FIELD_VALUES_LOOKBACK_MINUTES * 60 * 1000;
 // How many values one request asks for. A dropdown shows a handful; the
 // endpoint charges for the rest.
 const VALUES_REQUEST_SIZE = 10;
+// An answer this long may have been cut short by the server.
+export const FIELD_VALUES_REQUEST_SIZE = VALUES_REQUEST_SIZE;
 
 // How long to wait for the endpoint before giving up. services/http.ts has its
 // axios timeout commented out, so nothing upstream ends a stalled request.
 const VALUES_REQUEST_TIMEOUT_MS = 10_000;
+const MAX_RANGE_REQUEST_TIMEOUT_MS = 30_000;
+const MICROS_PER_DAY = 86_400_000_000;
 
 // How long to wait before asking again about a field that answered with nothing
 // — or whose request failed. NOT permanent: a transient 500, or one quiet
@@ -88,6 +92,8 @@ const READ_CACHE_MAX_ENTRIES = 500;
  */
 export const clearReadCache = (): void => {
   readCache.clear();
+  recentAnswers.clear();
+  slowAnswers.clear();
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -110,6 +116,18 @@ export interface StreamContext {
 // The "|" separator is safe because org/stream names in OO cannot contain "|".
 const makeKey = (ctx: StreamContext, fieldName: string): string =>
   `${ctx.org}|${ctx.streamType}|${ctx.streamName}|${fieldName}`;
+
+// Server answers are cached per window, so values from different time ranges never mix.
+const makeLookupKey = (ctx: StreamContext, fieldName: string, range?: FieldValuesTimeRange) =>
+  range
+    ? `${makeKey(ctx, fieldName)}|${range.startTime}-${range.endTime}`
+    : makeKey(ctx, fieldName);
+
+const KEYWORD_MARK = "|k:";
+
+// The server matches a keyword case-insensitively, so the cache does too.
+const withKeyword = (lookupKey: string, keyword?: string) =>
+  keyword ? `${lookupKey}${KEYWORD_MARK}${keyword.toLowerCase()}` : lookupKey;
 
 /**
  * Schedule a background write using requestIdleCallback.
@@ -263,6 +281,16 @@ export const getFieldValuesForSuggestion = async (
 const inFlightRequests = new Map<string, Promise<string[]>>();
 const suppressedUntil = new Map<string, number>();
 const failedKeys = new Set<string>();
+const recentAnswers = new Map<string, { values: string[]; ts: number }>();
+const slowAnswers = new Map<string, Promise<string[]>>();
+
+const rememberAnswer = (key: string, values: string[]): void => {
+  recentAnswers.delete(key);
+  recentAnswers.set(key, { values, ts: Date.now() });
+  if (recentAnswers.size > READ_CACHE_MAX_ENTRIES) {
+    recentAnswers.delete(recentAnswers.keys().next().value as string);
+  }
+};
 
 const NO_VALUE_LOOKUP = "NoValueLookup";
 
@@ -274,8 +302,11 @@ export const isNoValueLookup = (error: unknown): boolean =>
   (error as Error | undefined)?.name === NO_VALUE_LOOKUP;
 
 /** True while the last server lookup for this field failed, so "no values" would be a lie. */
-export const fieldValuesUnavailable = (ctx: StreamContext, fieldName: string): boolean =>
-  failedKeys.has(makeKey(ctx, fieldName));
+export const fieldValuesUnavailable = (
+  ctx: StreamContext,
+  fieldName: string,
+  timeRange?: FieldValuesTimeRange | null,
+): boolean => failedKeys.has(makeLookupKey(ctx, fieldName, timeRange ?? undefined));
 
 /**
  * Ask the server for a field's recent values, and leave them in the cache.
@@ -292,10 +323,82 @@ export const fieldValuesUnavailable = (ctx: StreamContext, fieldName: string): b
  *
  * Never throws; the editor races it against a wait budget and a late answer still fills the cache.
  */
+export interface FieldValuesTimeRange {
+  /** Microseconds. */
+  startTime: number;
+  /** Microseconds. */
+  endTime: number;
+}
+
 export interface ValueLookupOptions {
   /** Called only when this call went to the server, so cache hits never skew the fetch-time median. */
   onFetched?: (ms: number) => void;
+  /** Replaces the fifteen-minute lookback; its answers stay out of the persisted store. */
+  timeRange?: FieldValuesTimeRange;
+  /** Case-insensitive substring the server filters by; its answers stay out of the persisted store. */
+  keyword?: string;
+  /** What the user typed inside the value's quote, so the resolver can ask past the top values. */
+  prefix?: string;
 }
+
+// The read cache is filled synchronously so the next keystroke is local; IndexedDB persistence can wait.
+const storeAnswer = (
+  ctx: StreamContext,
+  fieldName: string,
+  key: string,
+  values: string[],
+  transient: boolean,
+): void => {
+  if (!values.length) {
+    suppressedUntil.set(key, Date.now() + VALUES_RETRY_COOLDOWN_MS);
+    return;
+  }
+  suppressedUntil.delete(key);
+  rememberAnswer(key, values);
+  if (transient) return;
+  setCacheEntry(key, values);
+  captureFromValuesApi(
+    ctx,
+    fieldName,
+    values.map((value) => ({ key: value })),
+  );
+};
+
+// Lets a caller keep waiting on a request that outlived its timeout, until a ceiling calls it failed.
+const trackSlowAnswer = (key: string, answer: Promise<string[]>): void => {
+  let ceiling: ReturnType<typeof setTimeout> | undefined;
+  const stalled = new Promise<string[]>((resolve) => {
+    ceiling = setTimeout(() => {
+      failedKeys.add(key);
+      resolve([]);
+    }, VALUES_RETRY_COOLDOWN_MS);
+  });
+  const slow: Promise<string[]> = Promise.race([answer, stalled]).finally(() => {
+    clearTimeout(ceiling);
+    if (slowAnswers.get(key) === slow) slowAnswers.delete(key);
+  });
+  slowAnswers.set(key, slow);
+};
+
+// A seven-day lookup measured 10.3-14.3 s on a busy stream; one more second per day of range covers it with margin, capped so nothing waits forever.
+const valuesRequestTimeoutMs = (range?: FieldValuesTimeRange): number => {
+  if (!range) return VALUES_REQUEST_TIMEOUT_MS;
+  const days = (range.endTime - range.startTime) / MICROS_PER_DAY;
+  return Math.min(MAX_RANGE_REQUEST_TIMEOUT_MS, VALUES_REQUEST_TIMEOUT_MS + days * 1000);
+};
+
+/** The request still running after its caller's timeout, so an empty answer is not mistaken for "no values". */
+export const pendingFieldValues = (
+  ctx: StreamContext,
+  fieldName: string,
+  options: Pick<ValueLookupOptions, "timeRange" | "keyword"> = {},
+): Promise<string[]> | null =>
+  slowAnswers.get(
+    withKeyword(
+      makeLookupKey(ctx, fieldName, options.timeRange),
+      options.keyword?.trim() || undefined,
+    ),
+  ) ?? null;
 
 export const requestFieldValues = async (
   ctx: StreamContext,
@@ -304,7 +407,12 @@ export const requestFieldValues = async (
 ): Promise<string[]> => {
   if (!fieldName || !ctx.org || !ctx.streamType || !ctx.streamName) return [];
 
-  const key = makeKey(ctx, fieldName);
+  const range = options.timeRange;
+  const keyword = options.keyword?.trim() || undefined;
+  const key = withKeyword(makeLookupKey(ctx, fieldName, range), keyword);
+
+  const recent = recentAnswers.get(key);
+  if (recent && Date.now() - recent.ts < READ_CACHE_TTL_MS) return recent.values;
 
   const until = suppressedUntil.get(key);
   if (until !== undefined && Date.now() < until) return [];
@@ -312,68 +420,106 @@ export const requestFieldValues = async (
   const existing = inFlightRequests.get(key);
   if (existing) return existing;
 
-  const endMicros = Date.now() * 1000;
+  const endMicros = range?.endTime ?? Date.now() * 1000;
+  const startMicros = range?.startTime ?? endMicros - VALUES_LOOKBACK_MS * 1000;
   const started = Date.now();
 
-  // The timeout races the request, and the cleanup hangs off the RACE rather
-  // than off the request: a promise that never settles would never run its own
-  // finally, which is precisely the state being guarded against.
+  // Settles on its own even after the caller stopped waiting, so a slow answer still reaches the cache.
+  const answer = streamService
+    .fieldValues({
+      org_identifier: ctx.org,
+      stream_name: ctx.streamName,
+      fields: [fieldName],
+      size: VALUES_REQUEST_SIZE,
+      start_time: startMicros,
+      end_time: endMicros,
+      // Without this a metrics or traces stream is read as logs, and
+      // answers with nothing.
+      type: ctx.streamType,
+      no_count: true,
+      keyword,
+    })
+    .then(
+      (response: any) => {
+        const values: string[] = (response?.data?.hits?.[0]?.values ?? [])
+          .map((entry: any) => String(entry?.zo_sql_key ?? ""))
+          .filter((value: string) => value.length > 0);
+        failedKeys.delete(key);
+        options.onFetched?.(Date.now() - started);
+        storeAnswer(ctx, fieldName, key, values, !!(range || keyword));
+        return values;
+      },
+      () => {
+        failedKeys.add(key);
+        suppressedUntil.set(key, Date.now() + VALUES_RETRY_COOLDOWN_MS);
+        return [] as string[];
+      },
+    );
+
+  // The cleanup hangs off the RACE, because a request that never settles would never run its own.
   const request = (async (): Promise<string[]> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const giveUp = new Promise<string[]>((resolve) => {
+      timer = setTimeout(() => {
+        // Slow is not failed: no failure mark, and the cooldown only stops a second request piling on.
+        suppressedUntil.set(key, Date.now() + VALUES_RETRY_COOLDOWN_MS);
+        trackSlowAnswer(key, answer);
+        resolve([]);
+      }, valuesRequestTimeoutMs(range));
+    });
     try {
-      const response: any = await Promise.race([
-        streamService.fieldValues({
-          org_identifier: ctx.org,
-          stream_name: ctx.streamName,
-          fields: [fieldName],
-          size: VALUES_REQUEST_SIZE,
-          start_time: endMicros - VALUES_LOOKBACK_MS * 1000,
-          end_time: endMicros,
-          // Without this a metrics or traces stream is read as logs, and
-          // answers with nothing.
-          type: ctx.streamType,
-          no_count: true,
-        }),
-        new Promise((_, reject) => {
-          timer = setTimeout(
-            () => reject(new Error("field values request timed out")),
-            VALUES_REQUEST_TIMEOUT_MS,
-          );
-        }),
-      ]);
-
-      const values: string[] = (response?.data?.hits?.[0]?.values ?? [])
-        .map((entry: any) => String(entry?.zo_sql_key ?? ""))
-        .filter((value: string) => value.length > 0);
-
-      failedKeys.delete(key);
-      options.onFetched?.(Date.now() - started);
-      if (values.length) {
-        // The read cache is filled HERE, synchronously, so the next keystroke
-        // is local. captureFromValuesApi persists to IndexedDB on
-        // requestIdleCallback — up to two seconds away, and observed in the app
-        // as a list still showing field names long after the values had
-        // arrived. Persistence can wait; the next lookup cannot.
-        setCacheEntry(key, values);
-        captureFromValuesApi(
-          ctx,
-          fieldName,
-          values.map((value) => ({ key: value })),
-        );
-      } else suppressedUntil.set(key, Date.now() + VALUES_RETRY_COOLDOWN_MS);
-
-      return values;
-    } catch {
-      // Failed, or took too long to matter. Either way, wait before asking again.
-      failedKeys.add(key);
-      suppressedUntil.set(key, Date.now() + VALUES_RETRY_COOLDOWN_MS);
-      return [];
+      return await Promise.race([answer, giveUp]);
     } finally {
-      if (timer !== undefined) clearTimeout(timer);
+      clearTimeout(timer);
       inFlightRequests.delete(key);
     }
   })();
 
   inFlightRequests.set(key, request);
+  return request;
+};
+
+const keywordLanes = new Map<string, { busy: Promise<void> | null; newest: string }>();
+
+// A complete answer for a shorter keyword already holds every value matching a longer one.
+const coveredByCompleteAnswer = (lookupKey: string, keyword: string): string[] | null => {
+  const wanted = keyword.toLowerCase();
+  for (const [key, answer] of recentAnswers) {
+    if (key !== lookupKey && !key.startsWith(lookupKey + KEYWORD_MARK)) continue;
+    const shorter = key === lookupKey ? "" : key.slice(lookupKey.length + KEYWORD_MARK.length);
+    const fresh = Date.now() - answer.ts < READ_CACHE_TTL_MS;
+    if (fresh && wanted.includes(shorter) && answer.values.length < VALUES_REQUEST_SIZE) {
+      return answer.values.filter((value) => value.toLowerCase().includes(wanted));
+    }
+  }
+  return null;
+};
+
+/** Values matching a typed keyword, one request per field at a time; a newer keyword supersedes the waiting ones. */
+export const requestFieldValuesMatching = async (
+  ctx: StreamContext,
+  fieldName: string,
+  keyword: string,
+  options: ValueLookupOptions = {},
+): Promise<string[]> => {
+  const wanted = keyword.trim();
+  if (!wanted || !fieldName || !ctx.org || !ctx.streamType || !ctx.streamName) return [];
+
+  const lookupKey = makeLookupKey(ctx, fieldName, options.timeRange);
+  const lane = keywordLanes.get(lookupKey) ?? { busy: null, newest: "" };
+  keywordLanes.set(lookupKey, lane);
+  lane.newest = wanted;
+  while (lane.busy) {
+    await lane.busy;
+    if (lane.newest !== wanted) return [];
+  }
+
+  const covered = coveredByCompleteAnswer(lookupKey, wanted);
+  if (covered) return covered;
+
+  const request = requestFieldValues(ctx, fieldName, { ...options, keyword: wanted });
+  lane.busy = request.then(() => {
+    lane.busy = null;
+  });
   return request;
 };

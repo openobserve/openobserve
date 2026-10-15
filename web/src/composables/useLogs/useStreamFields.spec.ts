@@ -147,6 +147,39 @@ describe("useStreamFields Composable", () => {
     });
   });
 
+  describe("updateFieldValues — in-session values for autocomplete", () => {
+    const { searchObj, fieldValues } = searchState();
+
+    beforeEach(() => {
+      fieldValues.value = {};
+      searchObj.data.stream.selectedStreamFields = [];
+      searchObj.data.queryResults = {
+        hits: [
+          { _timestamp: 2, level: "error", service_name: "querier" },
+          { _timestamp: 1, msg: "x", level: "warn", service_name: "ingester" },
+        ],
+      } as any;
+    });
+
+    it("skips an excluded key and keeps reading the rest of the hits", () => {
+      wrapper.vm.updateFieldValues();
+
+      expect([...fieldValues.value.level]).toEqual(["error", "warn"]);
+      expect([...fieldValues.value.service_name]).toEqual(["querier", "ingester"]);
+      expect(fieldValues.value._timestamp).toBeUndefined();
+      expect(fieldValues.value.msg).toBeUndefined();
+    });
+
+    it("empties the list in place on a new search, so the editor's copy stays live", () => {
+      wrapper.vm.updateFieldValues();
+      const held = fieldValues.value;
+      wrapper.vm.resetFieldValues();
+      wrapper.vm.updateFieldValues();
+      expect(fieldValues.value).toBe(held);
+      expect([...held.level]).toEqual(["error", "warn"]);
+    });
+  });
+
   describe("updateGridColumns stream name column", () => {
     const { searchObj } = searchState();
 
