@@ -1410,6 +1410,48 @@ describe("ServicesCatalog", () => {
       expect(wrapper.vm.showSidePanel).toBe(false);
       expect(wrapper.vm.selectedServiceRow).toBeNull();
     });
+
+    it("should switch the open side panel to another row in place", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.slice(0, 2).map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
+
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
+
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      await wrapper.find('[data-test="services-catalog-row-name-api-gateway"]').trigger("click");
+      expect(wrapper.vm.showSidePanel).toBe(true);
+      expect(wrapper.vm.selectedServiceRow?.service_name).toBe("api-gateway");
+      const panelBefore = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
+      expect(panelBefore.exists()).toBe(true);
+
+      await wrapper.find('[data-test="services-catalog-row-name-auth-service"]').trigger("click");
+      expect(wrapper.vm.showSidePanel).toBe(true);
+      expect(wrapper.vm.selectedServiceRow?.service_name).toBe("auth-service");
+      const panelAfter = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
+      expect(panelAfter.vm).toBe(panelBefore.vm);
+      expect(panelAfter.props("selectedNode")?.name).toBe("auth-service");
+    });
   });
 
   // -----------------------------------------------------------------------

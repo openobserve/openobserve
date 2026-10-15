@@ -138,6 +138,14 @@ pub enum StreamType {
 }
 
 impl StreamType {
+    /// Types the compactor can merge across the hours of a closed day.
+    pub fn support_dynamic_merge(&self) -> bool {
+        matches!(
+            *self,
+            StreamType::Logs | StreamType::Metrics | StreamType::Traces
+        )
+    }
+
     pub fn support_index(&self) -> bool {
         matches!(
             *self,
@@ -814,6 +822,8 @@ pub struct UpdateStreamSettings {
     #[serde(default)]
     pub approx_partition: Option<bool>,
     #[serde(default)]
+    pub dynamic_merge: Option<bool>,
+    #[serde(default)]
     pub extended_retention_days: UpdateSettingsWrapper<TimeRange>,
     #[serde(default)]
     pub index_original_data: Option<bool>,
@@ -995,6 +1005,9 @@ pub struct StreamSettings {
     pub store_original_data: bool,
     #[serde(default)]
     pub approx_partition: bool,
+    /// Per-stream override of `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES`; unset follows the type.
+    #[serde(default)]
+    pub dynamic_merge: Option<bool>,
     #[serde(default)]
     pub index_original_data: bool,
     #[serde(default)]
@@ -1028,6 +1041,7 @@ impl Default for StreamSettings {
             max_query_range: 0,
             store_original_data: false,
             approx_partition: false,
+            dynamic_merge: None,
             distinct_value_fields: Vec::new(),
             index_updated_at: 0,
             index_fields_updated_at: Default::default(),
@@ -1084,6 +1098,10 @@ impl Serialize for StreamSettings {
         state.serialize_field("max_query_range", &self.max_query_range)?;
         state.serialize_field("store_original_data", &self.store_original_data)?;
         state.serialize_field("approx_partition", &self.approx_partition)?;
+        match self.dynamic_merge {
+            Some(dynamic_merge) => state.serialize_field("dynamic_merge", &dynamic_merge)?,
+            None => state.skip_field("dynamic_merge")?,
+        }
         state.serialize_field("index_updated_at", &self.index_updated_at)?;
         if !self.index_fields_updated_at.is_empty() {
             state.serialize_field("index_fields_updated_at", &self.index_fields_updated_at)?;
@@ -1216,6 +1234,8 @@ impl From<&str> for StreamSettings {
                     .use_stream_settings_for_partitions_enabled,
             );
 
+        let dynamic_merge = settings.get("dynamic_merge").and_then(Value::as_bool);
+
         let mut distinct_value_fields = Vec::new();
         let fields = settings.get("distinct_value_fields");
         if let Some(value) = fields {
@@ -1302,6 +1322,7 @@ impl From<&str> for StreamSettings {
             defined_schema_fields,
             store_original_data,
             approx_partition,
+            dynamic_merge,
             distinct_value_fields,
             index_updated_at,
             index_fields_updated_at,
@@ -2573,5 +2594,34 @@ mod tests {
                 .mindex_size,
             0.0
         );
+    }
+
+    #[test]
+    fn test_stream_settings_dynamic_merge_round_trip() {
+        // unset is not written, so old readers see no unknown key
+        let unset = json::to_string(&StreamSettings::default()).unwrap();
+        assert!(!unset.contains("dynamic_merge"));
+        assert_eq!(StreamSettings::from(unset.as_str()).dynamic_merge, None);
+        for value in [true, false] {
+            let settings = StreamSettings {
+                dynamic_merge: Some(value),
+                ..Default::default()
+            };
+            let text = json::to_string(&settings).unwrap();
+            assert_eq!(
+                StreamSettings::from(text.as_str()).dynamic_merge,
+                Some(value)
+            );
+        }
+    }
+
+    #[test]
+    fn test_update_stream_settings_dynamic_merge_null_is_unchanged() {
+        let missing: UpdateStreamSettings = json::from_str("{}").unwrap();
+        assert_eq!(missing.dynamic_merge, None);
+        let null: UpdateStreamSettings = json::from_str(r#"{"dynamic_merge": null}"#).unwrap();
+        assert_eq!(null.dynamic_merge, None);
+        let set: UpdateStreamSettings = json::from_str(r#"{"dynamic_merge": false}"#).unwrap();
+        assert_eq!(set.dynamic_merge, Some(false));
     }
 }
