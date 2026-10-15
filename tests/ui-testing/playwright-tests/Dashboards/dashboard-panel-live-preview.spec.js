@@ -38,32 +38,24 @@ const TYPED_SQL = `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp)
 
 test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@panelLivePreview', '@all'] }, () => {
   test.describe.configure({ mode: 'parallel' });
+  let pm;
+  let lp;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
+    pm = new PageManager(page);
+    lp = pm.dashboardLivePreview;
   });
 
   test.afterAll(async () => {
     await deleteCreatedDashboards();
   });
 
-  // Every new panel opens on STREAM, so run counts are attributable to the panel under test.
-  async function openNewPanel(page, { flag = true, autoRun = 'true' } = {}) {
-    const pm = new PageManager(page);
-    const lp = pm.dashboardLivePreview;
-    await lp.pinAutoQuery(flag);
-    await lp.setStoredAutoRun(autoRun);
-    await lp.rememberPanelStream(STREAM);
-    const dashboardId = await lp.createEmptyDashboard('live_preview');
-    await lp.openNewPanel(dashboardId);
-    await lp.expectSelectedStream(STREAM);
-    return { pm, lp, dashboardId };
-  }
 
   test('Auto Run on: a new panel opens on the remembered stream and renders without Apply', { tag: ['@smoke', '@P0'] }, async ({ page }) => {
-    const { lp } = await openNewPanel(page);
+    await lp.openNewPanelOn(STREAM);
 
     await lp.settledRunCount(STREAM, { atLeast: 1 });
     await lp.expectChartRendered();
@@ -72,7 +64,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
   });
 
   test('Auto Run on: a builder edit re-runs the chart once and Apply never turns amber', { tag: ['@P0'] }, async ({ page }) => {
-    const { pm, lp } = await openNewPanel(page);
+    await lp.openNewPanelOn(STREAM);
     const base = await lp.settledRunCount(STREAM, { atLeast: 1 });
     testLogger.info('Initial runs settled', { base });
 
@@ -86,7 +78,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
   });
 
   test('Auto Run off: the new panel and every builder edit wait for Apply', { tag: ['@P0'] }, async ({ page }) => {
-    const { pm, lp } = await openNewPanel(page, { autoRun: 'false' });
+    await lp.openNewPanelOn(STREAM, { autoRun: 'false' });
 
     await lp.expectNoNewRun(STREAM, 0);
     await lp.expectApplyVariant('warning');
@@ -109,7 +101,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
   });
 
   test('typed custom SQL never runs on its own and runs on Apply', { tag: ['@P1'] }, async ({ page }) => {
-    const { pm, lp } = await openNewPanel(page);
+    await lp.openNewPanelOn(STREAM);
     const base = await lp.settledRunCount(STREAM, { atLeast: 1 });
 
     await pm.chartTypeSelector.setCustomSQL(TYPED_SQL);
@@ -125,7 +117,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
   });
 
   test('a half-built filter holds the live run until it is removed', { tag: ['@P1'] }, async ({ page }) => {
-    const { pm, lp } = await openNewPanel(page);
+    await lp.openNewPanelOn(STREAM);
     const base = await lp.settledRunCount(STREAM, { atLeast: 1 });
 
     await pm.chartTypeSelector.searchAndAddField(NAMESPACE_FIELD, 'filter');
@@ -139,7 +131,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
   });
 
   test('the Apply menu toggles Auto Run, and turning it back on runs the pending edit', { tag: ['@P1'] }, async ({ page }) => {
-    const { pm, lp } = await openNewPanel(page);
+    await lp.openNewPanelOn(STREAM);
     const base = await lp.settledRunCount(STREAM, { atLeast: 1 });
 
     await lp.expectAutoRunToggleLabel('Turn off Auto Run');
@@ -160,7 +152,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
   });
 
   test('with ZO_AUTO_QUERY_ENABLED off there is no Auto Run toggle and edits wait for Apply', { tag: ['@P1'] }, async ({ page }) => {
-    const { pm, lp } = await openNewPanel(page, { flag: false, autoRun: 'true' });
+    await lp.openNewPanelOn(STREAM, { autoQueryEnabled: false });
 
     await lp.expectNoNewRun(STREAM, 0);
     await lp.expectApplyVariant('warning');
@@ -177,7 +169,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
 
   test('saving a panel remembers its stream for the next new panel', { tag: ['@P1'] }, async ({ page }) => {
     await ingestion(page, OTHER_STREAM);
-    const { pm, lp, dashboardId } = await openNewPanel(page);
+    const dashboardId = await lp.openNewPanelOn(STREAM);
     await lp.settledRunCount(STREAM, { atLeast: 1 });
 
     await pm.chartTypeSelector.selectStream(OTHER_STREAM);
@@ -196,7 +188,7 @@ test.describe('Dashboard panel editor live preview', { tag: ['@dashboards', '@pa
   });
 
   test('Auto Run off: the time picker has no Apply of its own and a new range waits for the panel Apply', { tag: ['@P2'] }, async ({ page }) => {
-    const { lp } = await openNewPanel(page, { autoRun: 'false' });
+    await lp.openNewPanelOn(STREAM, { autoRun: 'false' });
     await lp.clickApply();
     await lp.waitForRuns(STREAM, 1);
     await lp.expectApplyIdle();

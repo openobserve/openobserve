@@ -75,6 +75,17 @@ export default class DashboardLivePreview {
     await this.applyBtn.or(this.cancelBtn).first().waitFor({ state: "visible", timeout: 30000 });
   }
 
+  // Auto Run and the remembered stream are seeded before the editor mounts, so the new panel opens on `stream`.
+  async openNewPanelOn(stream, { autoQueryEnabled = true, autoRun = "true" } = {}) {
+    await this.pinAutoQuery(autoQueryEnabled);
+    await this.setStoredAutoRun(autoRun);
+    await this.rememberPanelStream(stream);
+    const dashboardId = await this.createEmptyDashboard("live_preview");
+    await this.openNewPanel(dashboardId);
+    await this.expectSelectedStream(stream);
+    return dashboardId;
+  }
+
   runsFrom(stream) {
     return this.panelRuns.from(stream);
   }
