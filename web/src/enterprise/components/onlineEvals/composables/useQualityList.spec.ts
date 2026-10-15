@@ -5,24 +5,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import store from "@/test/unit/helpers/store";
 import { withQueryClient } from "@/test/unit/helpers/queryClient";
 import type { QualityConfigSummary, ScoreConfig } from "@/services/online-evals.service";
-import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
-
-const agent = (id: string | null, name: string): GenAiAgentListItem => ({
-  id,
-  name,
-  source_stream: "default",
-  source_stream_type: "traces",
-  env: "prod",
-  version: "1",
-});
-
-const { list, failedRuns } = vi.hoisted(() => ({ list: vi.fn(), failedRuns: vi.fn() }));
+const { list } = vi.hoisted(() => ({ list: vi.fn() }));
 
 vi.mock("@/services/online-evals.service", async (importOriginal) => {
   const actual: any = await importOriginal();
   return {
     ...actual,
-    default: { ...actual.default, quality: { list, scores: vi.fn(), failedRuns } },
+    default: { ...actual.default, quality: { list, scores: vi.fn() } },
   };
 });
 
@@ -129,10 +118,9 @@ describe("qualityTiles", () => {
 describe("useQualityList", () => {
   beforeEach(() => {
     list.mockReset().mockResolvedValue(LIST);
-    failedRuns.mockReset().mockResolvedValue(3);
   });
 
-  function mountList(agentParams = {}, evaluatorAgents: GenAiAgentListItem[] | null = null) {
+  function mountList(agentParams = {}) {
     let api!: ReturnType<typeof useQualityList>;
     const Host = defineComponent({
       setup() {
@@ -140,7 +128,6 @@ describe("useQualityList", () => {
           scoreConfigs: ref(CONFIGS),
           dateWindow: ref({ startUs: 1_000_000_000, endUs: 2_000_000_000 }),
           agentParams: ref(agentParams),
-          evaluatorAgents: ref(evaluatorAgents),
           enabled: ref(true),
         });
         return () => null;
@@ -150,8 +137,8 @@ describe("useQualityList", () => {
     return () => api;
   }
 
-  it("reads the list and the failed-run count with the window and the agent filter", async () => {
-    const api = mountList({ agent_id: "a1", agent_env: "prod" }, [agent("a1", "alpha")]);
+  it("reads the list with the window and the agent filter", async () => {
+    const api = mountList({ agent_id: "a1", agent_env: "prod" });
     await flushPromises();
     expect(list).toHaveBeenCalledWith("default", {
       start_time: 1_000_000_000,
@@ -159,40 +146,12 @@ describe("useQualityList", () => {
       agent_id: "a1",
       agent_env: "prod",
     });
-    expect(failedRuns).toHaveBeenCalledWith(
-      "default",
-      expect.objectContaining({ agentWhere: "(attributes_target_agent_id = 'a1')" }),
-    );
     expect(api().rows.value.map((row) => row.configId)).toEqual(["hal", "tox", "con", "gro"]);
-    expect(api().failedRuns.value).toBe(3);
-  });
-
-  it("counts failed runs for every agent an Env or Version selects", async () => {
-    mountList({ agent_env: "prod" }, [agent("a1", "alpha"), agent(null, "beta")]);
-    await flushPromises();
-    expect(failedRuns).toHaveBeenCalledWith(
-      "default",
-      expect.objectContaining({
-        agentWhere:
-          "(attributes_target_agent_id = 'a1') OR (attributes_target_agent_name = 'beta')",
-      }),
-    );
-  });
-
-  it("shows no failed-run count when no agent matches the selection", async () => {
-    const api = mountList({ agent_env: "nowhere" }, []);
-    await flushPromises();
-    expect(failedRuns).not.toHaveBeenCalled();
-    expect(api().failedRuns.value).toBeNull();
   });
 
   it("filters by one tile at a time: needing attention, or without a result", async () => {
     const api = mountList();
     await flushPromises();
-    expect(failedRuns).toHaveBeenCalledWith(
-      "default",
-      expect.objectContaining({ agentWhere: null }),
-    );
     const visible = () => api().visibleRows.value.map((row) => row.configId);
     api().tileFilter.value = "attention";
     expect(visible()).toEqual(["hal", "tox"]);

@@ -34,6 +34,4 @@ export const onlineEvalKeys = {
     orgKey(org, "onlineEvals", "quality", "list", params),
   qualityScores: (org: string, entityId: string, params: Record<string, unknown>) =>
     orgKey(org, "onlineEvals", "quality", "scores", entityId, params),
-  qualityFailedRuns: (org: string, start: number, end: number, agentWhere: string | null) =>
-    orgKey(org, "onlineEvals", "quality", "failedRuns", start, end, agentWhere),
 };

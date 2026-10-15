@@ -13,7 +13,7 @@ vi.mock("@/services/online-evals.service", async (importOriginal) => {
   const actual: any = await importOriginal();
   return {
     ...actual,
-    default: { ...actual.default, quality: { list: vi.fn(), scores, failedRuns: vi.fn() } },
+    default: { ...actual.default, quality: { list: vi.fn(), scores } },
   };
 });
 

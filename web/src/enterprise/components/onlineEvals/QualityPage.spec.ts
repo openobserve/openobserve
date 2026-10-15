@@ -7,11 +7,10 @@ import { queryClient } from "@/composables/query/queryClient";
 import { onlineEvalKeys } from "@/services/online-evals.service.querykeys";
 import type { QualityConfigSummary } from "@/services/online-evals.service";
 
-const { list, failedRuns, route, push, replace, back } = await vi.hoisted(async () => {
+const { list, route, push, replace, back } = await vi.hoisted(async () => {
   const { reactive } = await import("vue");
   return {
     list: vi.fn(),
-    failedRuns: vi.fn(),
     route: reactive({ name: "aiEvaluations", query: {} as Record<string, string> }),
     push: vi.fn(() => Promise.resolve()),
     replace: vi.fn(() => Promise.resolve()),
@@ -23,7 +22,7 @@ vi.mock("@/services/online-evals.service", async (importOriginal) => {
   const actual: any = await importOriginal();
   return {
     ...actual,
-    default: { ...actual.default, quality: { list, scores: vi.fn(), failedRuns } },
+    default: { ...actual.default, quality: { list, scores: vi.fn() } },
   };
 });
 
@@ -45,7 +44,7 @@ import QualityPage from "./QualityPage.vue";
 
 const TableStub = defineComponent({
   name: "QualityConfigsTable",
-  props: ["rows", "tiles", "failedRuns", "search"],
+  props: ["rows", "tiles", "search"],
   emits: ["open", "update:search"],
   template: `<div data-test="table-stub">{{ rows.length }} rows</div>`,
 });
@@ -103,7 +102,6 @@ function mountPage(
       configsLoading: false,
       dateWindow,
       agentParams: {},
-      evaluatorAgents: null,
       enabled: true,
     },
     global: {
@@ -121,7 +119,6 @@ describe("QualityPage", () => {
   beforeEach(() => {
     route.query = {};
     list.mockReset().mockResolvedValue(LIST);
-    failedRuns.mockReset().mockResolvedValue(0);
     push.mockClear();
     replace.mockClear();
     back.mockClear();
@@ -317,7 +314,6 @@ describe("QualityPage", () => {
     mountPage();
     await flushPromises();
     expect(list).toHaveBeenCalledTimes(1);
-    expect(failedRuns).toHaveBeenCalledTimes(1);
 
     // The Refresh in OnlineEvals forces every active read under this scope.
     await queryClient.refetchQueries(
@@ -325,7 +321,6 @@ describe("QualityPage", () => {
       { cancelRefetch: false },
     );
     expect(list).toHaveBeenCalledTimes(2);
-    expect(failedRuns).toHaveBeenCalledTimes(2);
   });
 
   it("reads a moved window with its own times", async () => {

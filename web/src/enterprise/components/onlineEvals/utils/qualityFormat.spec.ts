@@ -20,7 +20,6 @@ import {
   distributionDataType,
   trendKind,
   trendPoints,
-  evaluatorAgentWhere,
   evaluatorTraceLink,
   formatCount,
   formatEdge,
@@ -329,13 +328,6 @@ describe("agent params", () => {
     expect(selectedAgents(agents, ALL, ALL, ALL)).toBeNull();
     expect(selectedAgents(agents, ALL, ALL, "1")?.map((a) => a.name)).toEqual(["a", "b"]);
     expect(selectedAgents(agents, "staging", ALL, ALL)).toEqual([]);
-  });
-
-  it("filters _evaluator by each selected agent's id, or its name without one", () => {
-    expect(evaluatorAgentWhere(agents)).toBe(
-      "(attributes_target_agent_id = 'a1') OR (attributes_target_agent_name = 'b')",
-    );
-    expect(evaluatorAgentWhere([])).toBeNull();
   });
 });
 
