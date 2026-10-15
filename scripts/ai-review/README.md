@@ -55,8 +55,11 @@ Actually executing the suite stays with `playwright.yml`; this agent only reads.
 
 Adding another conditional agent: define it in `AGENTS` (with `requiresFocus` if it is
 domain-scoped), add a `{ agent, matches }` entry to `CONDITIONAL_AGENTS`, register
-`ai-review-<key>` in `opencode.jsonc` with the same read-only tool policy, and add its glyph to
-`CATEGORY_GLYPH` and to `agents/coordinator.md`.
+`ai-review-<key>` in `opencode.jsonc` with the same read-only tool policy, and add its category to
+`CATEGORY_LABEL` and to the allowed `[Category]` list in `agents/coordinator.md`.
+
+The posted comment carries no emojis: the coordinator prompt bans them and `sanitizeReviewBody`
+strips any that slip through (outside code spans), via the helpers in `format.mjs`.
 
 ## Identity: how the comment gets its author
 

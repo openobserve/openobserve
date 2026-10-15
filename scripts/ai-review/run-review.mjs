@@ -15,6 +15,11 @@ import {
   genAiResponseAttributes,
   sha256,
 } from "./telemetry.mjs";
+import {
+  dropUnmatchedDetailsClose,
+  normalizeReviewersRow,
+  stripEmoji,
+} from "./format.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -67,21 +72,18 @@ const ANY_REVIEW_MARKER = "<!--\\s*ai-code-review[a-z0-9-]*\\s*-->";
 // The posted comment is branded "OpenObserve Code Review". These strings change ONLY how the
 // comment looks/reads — never what the reviewers find or decide. The engine is unchanged.
 const REVIEW_TITLE = "OpenObserve Code Review";
-const REVIEW_HEADING = `## 🔎 ${REVIEW_TITLE}`;
-// Matches the review heading line whether or not the model included the 🔎 emoji, and tolerates
-// a legacy "AI Code Review" heading (older comments / prompt drift) so re-review still finds and
-// normalizes the header. Case-insensitive, multiline.
-const REVIEW_HEADING_RE = /^#{1,3}[ \t]*(?:🔎[ \t]*)?(?:OpenObserve Code Review|AI Code Review)\b/mi;
-// Category → glyph, used by the deterministic fallback renderer to prefix each finding line so it
-// matches the coordinator's happy-path formatting. Cosmetic only.
-const CATEGORY_GLYPH = {
-  security: "🔒",
-  performance: "⚡",
-  "code-quality": "🧩", "code quality": "🧩", quality: "🧩",
-  documentation: "📝", docs: "📝",
-  release: "📦",
-  frontend: "🎨", ui: "🎨",
-  qa: "🧪", test: "🧪",
+const REVIEW_HEADING = `## ${REVIEW_TITLE}`;
+// Tolerates the legacy "AI Code Review" title; any glyph before it is already gone via stripEmoji.
+const REVIEW_HEADING_RE = /^#{1,3}[ \t]*(?:OpenObserve Code Review|AI Code Review)\b/mi;
+// Maps free-form reviewer categories to the canonical tags the coordinator prompt allows.
+const CATEGORY_LABEL = {
+  security: "Security",
+  performance: "Performance",
+  "code-quality": "Code Quality", "code quality": "Code Quality", quality: "Code Quality",
+  documentation: "Documentation", docs: "Documentation",
+  release: "Release",
+  frontend: "Frontend", ui: "Frontend",
+  qa: "QA", test: "QA",
 };
 const MAX_DIFF_TOKENS = 150_000;
 const AGENT_TIMEOUT_MS = 10 * 60 * 1000;
@@ -1015,6 +1017,10 @@ function sanitizeReviewBody(body) {
   // from the prompt or from a previous review can't end up carrying two of them.
   cleaned = cleaned.replace(new RegExp(ANY_REVIEW_MARKER, "gi"), "");
 
+  // The prompt bans emojis, but models drift and re-reviews echo older emoji-laden comments.
+  cleaned = stripEmoji(cleaned);
+  cleaned = dropUnmatchedDetailsClose(cleaned);
+
   // Drop any preamble the model emitted before the review proper ("Now I have all the
   // context. Let me produce the consolidated review."). Runs after marker stripping so a
   // leading marker can't anchor the search at index 0 and mask the preamble behind it.
@@ -1027,7 +1033,7 @@ function sanitizeReviewBody(body) {
   // Normalize the review heading to the branded title, dropping any trailing "(Label)" an older
   // comment or the model itself appended — the posted review must not name the model.
   cleaned = cleaned.replace(
-    /^#{1,3}[ \t]*(?:🔎[ \t]*)?(?:OpenObserve Code Review|AI Code Review)\b[ \t]*[^\n]*$/mi,
+    /^#{1,3}[ \t]*(?:OpenObserve Code Review|AI Code Review)\b[ \t]*[^\n]*$/mi,
     REVIEW_HEADING,
   );
 
@@ -1106,7 +1112,7 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
       "gen_ai.response.id": completion.responseId,
     });
     return {
-      text: completion.text,
+      text: normalizeReviewersRow(completion.text, ranReviewers),
       genAIResponseId: completion.responseId,
       fallback: false,
       error: null,
@@ -1163,13 +1169,13 @@ function buildFallbackReview(agentResults, tier, failedAgents) {
 ${REVIEW_HEADING}
 
 > [!TIP]
-> ### ✅ Approved
+> ### Approved
 > LGTM — No issues found by automated reviewers.
 
-**🔴 0 blockers · 🟡 0 warnings · 🔵 0 suggestions**
+**0 blockers · 0 warnings · 0 suggestions**
 
 <details>
-<summary>🧾 Review details</summary>
+<summary>Review details</summary>
 
 - Risk tier: ${tier}
 ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agentName).join(", ")}` : ""}
@@ -1178,12 +1184,14 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
   }
 
   const findingLine = f => {
-    const glyph = CATEGORY_GLYPH[(f.category || "").toLowerCase()] || "•";
     const loc = f.file && f.line && f.line !== "0" ? `\`${f.file}:${f.line}\` ` : f.file ? `\`${f.file}\` ` : "";
-    const cat = f.category ? `**[${f.category.charAt(0).toUpperCase() + f.category.slice(1)}]** ` : "";
-    const fix = f.suggestion ? ` (→ ${f.suggestion})` : "";
-    return `- ${glyph} ${loc}${cat}${f.summary}${fix}`;
+    const label = CATEGORY_LABEL[(f.category || "").toLowerCase()]
+      || (f.category ? f.category.charAt(0).toUpperCase() + f.category.slice(1) : "");
+    const cat = label ? `**[${label}]** ` : "";
+    const fix = f.suggestion ? ` **Fix:** ${f.suggestion.replace(/\s+/g, " ").trim()}` : "";
+    return `- ${loc}${cat}${f.summary}${fix}`;
   };
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
   const bySeverity = { critical: [], warning: [], suggestion: [] };
   for (const f of sorted) {
@@ -1193,13 +1201,13 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
 
   const sections = [];
   if (bySeverity.critical.length > 0) {
-    sections.push(`#### 🔴 Blockers`, ...bySeverity.critical.map(findingLine), "");
+    sections.push(`#### Blockers`, ...bySeverity.critical.map(findingLine), "");
   }
   if (bySeverity.warning.length > 0) {
-    sections.push(`#### 🟡 Warnings`, ...bySeverity.warning.map(findingLine), "");
+    sections.push(`#### Warnings`, ...bySeverity.warning.map(findingLine), "");
   }
   if (bySeverity.suggestion.length > 0) {
-    sections.push(`#### 🔵 Suggestions`, ...bySeverity.suggestion.map(findingLine), "");
+    sections.push(`#### Suggestions`, ...bySeverity.suggestion.map(findingLine), "");
   }
 
   const failureNote = failedAgents.length > 0
@@ -1214,13 +1222,13 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
 ${REVIEW_HEADING}
 
 > [!NOTE]
-> ### 💬 Approved with comments
+> ### Approved with comments
 > Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : ""}coordinator consolidation was skipped. Findings below are deduplicated but un-judged.${failureNote}${dedupNote}
 
-**🔴 ${bySeverity.critical.length} blocker · 🟡 ${bySeverity.warning.length} warning · 🔵 ${bySeverity.suggestion.length} suggestion**
+**${plural(bySeverity.critical.length, "blocker")} · ${plural(bySeverity.warning.length, "warning")} · ${plural(bySeverity.suggestion.length, "suggestion")}**
 
 <details open>
-<summary>📋 Show findings (${sorted.length})</summary>
+<summary>Findings (${sorted.length})</summary>
 
 ${sections.join("\n")}
 
@@ -1317,7 +1325,7 @@ async function main() {
       try {
         // The key's env var name is named in the log but not in the comment: it carries the
         // provider name, and the posted comment must not.
-        postReviewComment(prNumber, `${REVIEW_MARKER}\n${REVIEW_HEADING}\n\n> [!CAUTION]\n> ### ⛔ Not reviewed\n> The review API key is not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip. Please confirm the review secrets are provisioned.`);
+        postReviewComment(prNumber, `${REVIEW_MARKER}\n${REVIEW_HEADING}\n\n> [!CAUTION]\n> ### Not reviewed\n> The review API key is not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip. Please confirm the review secrets are provisioned.`);
       } catch (postErr) {
         console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
       }
@@ -1499,11 +1507,11 @@ async function main() {
         REVIEW_HEADING,
         ``,
         `> [!CAUTION]`,
-        `> ### ⛔ Not reviewed`,
+        `> ### Not reviewed`,
         `> All ${ranResults.length} reviewers failed, so there are no findings to report — this is an infrastructure failure, not an approval.`,
         ``,
         `<details>`,
-        `<summary>🧾 Reviewer failures (${failedAgents.length})</summary>`,
+        `<summary>Reviewer failures (${failedAgents.length})</summary>`,
         ``,
         detail,
         ``,
