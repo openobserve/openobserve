@@ -6784,6 +6784,8 @@
       "refresh": "Vernieuwen",
       "refreshCacheReload": "Cache vernieuwen en herladen",
       "moreRefreshOptions": "Meer vernieuwingsopties",
+      "autoRunDescription": "Voert query's uit bij openen en bij filter- of tijdwijzigingen.",
+      "autoRunScope": "Geldt voor alle dashboards, Logboeken en Traces.",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard niet gevonden of is verwijderd. Doorverwijzen naar dashboardlijst.",
       "failedToLoadDashboard": "Kan dashboard niet laden. Doorverwijzen naar dashboardlijst.",
@@ -6793,9 +6795,7 @@
       "panelMoveFailed": "Paneel verplaatsen mislukt",
       "failedToFetchReports": "Kan rapporten niet ophalen",
       "failedToUpdateJson": "Kan dashboard-JSON niet bijwerken: opslagmethode niet beschikbaar",
-      "failedToSaveChanges": "Kan dashboardwijzigingen niet opslaan",
-      "autoRunDescription": "Voert query's uit bij openen en bij filter- of tijdwijzigingen.",
-      "autoRunScope": "Geldt voor alle dashboards, Logboeken en Traces."
+      "failedToSaveChanges": "Kan dashboardwijzigingen niet opslaan"
     },
     "dynamicFunctionPopUp": {
       "property": "Eigenschap",
@@ -7091,6 +7091,8 @@
     "exitAnnotationsMode": "Annotatiemodus verlaten",
     "addAnnotations": "Annotaties toevoegen",
     "refreshToApplyVariables": "Vernieuwen om de nieuwste variabelwijzigingen toe te passen",
+    "refreshToApplyTimeRange": "Vernieuwen om het tijdsbereik toe te passen.",
+    "refreshToApplyTimeRangeAndVariables": "Vernieuwen om het tijdsbereik en wijzigingen aan variabelen toe te passen.",
     "moveToAnotherFolder": "Verplaats {type} naar een andere map",
     "rawQueryBuilder": {
       "query": "Query",
@@ -7273,9 +7275,7 @@
       "markerAria": "Exemplaar {value} op {time}"
     },
     "showExemplarsLabel": "Exemplaren tonen",
-    "showExemplarsHelp": "Tekent trace-voorbeelden op deze grafiek voor iedereen die het dashboard opent. Kijkers kunnen ze nog steeds verbergen via de paneelheader.",
-    "refreshToApplyTimeRange": "Vernieuwen om het tijdsbereik toe te passen.",
-    "refreshToApplyTimeRangeAndVariables": "Vernieuwen om het tijdsbereik en wijzigingen aan variabelen toe te passen."
+    "showExemplarsHelp": "Tekent trace-voorbeelden op deze grafiek voor iedereen die het dashboard opent. Kijkers kunnen ze nog steeds verbergen via de paneelheader."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8215,7 +8215,13 @@
       "emptyTitle": "Geen uitvoeringen in de afgelopen {days} dagen",
       "emptyDescription": "Het dashboard wordt gevuld zodra de alarmkalibratie is uitgevoerd."
     },
+    "lastRun": {
+      "succeeded": "De laatste uitvoering is geslaagd {time}.",
+      "failed": "De laatste uitvoering is mislukt {time}, dus de nieuwste samenvatting is mogelijk verouderd: {error}",
+      "none": "Er is nog geen uitvoering geprobeerd."
+    },
     "settings": {
+      "title": "Instellingen voor alarmkalibratie",
       "schedule": "Planning",
       "enabled": "Alarmkalibratie uitvoeren voor deze organisatie",
       "enabledHelp": "Als dit uit staat, heeft de organisatie geen geplande uitvoering. Als je het aanzet, is de eerste uitvoering onmiddellijk aan de beurt.",
@@ -8239,8 +8245,7 @@
       "runNowHeading": "Nu uitvoeren",
       "findingsHeading": "Bevindingen en toegang",
       "findingsDesc": "Elke uitvoering schrijft zijn bevindingen als logrecords naar de {stream}-stream van deze organisatie, bewaard volgens de retentie van die stream.",
-      "accessNote": "Voor bevindingen geldt geen toegangscontrole per alarm. Iedereen die de {stream}-stream kan doorzoeken, ziet bevindingen over elk alarm in de organisatie, inclusief alarmen die ze niet kunnen openen. Alarmkalibratie verstuurt geen meldingen.",
-      "openPage": "Alarmkalibratie openen",
+      "accessNote": "De machtiging Alarmkalibratie in een rol bepaalt de toegang: Get om bevindingen te lezen, Update om deze instellingen te wijzigen en Create om een uitvoering aan te vragen. Bevindingen omvatten elk alarm in de organisatie, inclusief alarmen die de lezer niet kan openen. Alarmkalibratie verstuurt geen meldingen.",
       "frequencyRange": "Kies een cadans tussen 1 minuut en 30 dagen.",
       "windowRange": "Kies een venster tussen 1 minuut en 1 jaar."
     }
@@ -9812,9 +9817,6 @@
     "sloLongWindow": "Lang venster",
     "sloShortWindow": "Kort venster",
     "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond.",
-    "builtinBadge": "Systeem",
-    "builtinBadgeHint": "Een ingebouwd alarm: je kunt het uitschakelen of bewerken, maar niet verwijderen of hernoemen.",
-    "builtinDeleteDisabled": "Ingebouwd alarm, kan niet worden verwijderd",
     "seconds": "Seconden",
     "downtimes": {
       "newTitle": "Nieuwe downtime",
@@ -11377,8 +11379,6 @@
     }
   },
   "settings": {
-    "alertCalibration": "Alarmkalibratie",
-    "alertCalibrationDesc": "Plan de taak die controleert hoe je alarmen zich gedragen",
     "header": "Instellingen",
     "correlationSettings": "Correlatie-instellingen",
     "generalLabel": "Generaal",

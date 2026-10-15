@@ -6784,6 +6784,8 @@
       "refresh": "Aggiorna",
       "refreshCacheReload": "Aggiorna cache e ricarica",
       "moreRefreshOptions": "Altre opzioni di aggiornamento",
+      "autoRunDescription": "Esegue le query all'apertura e quando cambiano filtri o intervallo di tempo",
+      "autoRunScope": "Si applica a tutte le dashboard, Log e Tracce",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard non trovato o è stato eliminato. Reindirizzamento all'elenco dei dashboard.",
       "failedToLoadDashboard": "Impossibile caricare il dashboard. Reindirizzamento all'elenco dei dashboard.",
@@ -6793,9 +6795,7 @@
       "panelMoveFailed": "Spostamento pannello fallito",
       "failedToFetchReports": "Impossibile recuperare i rapporti",
       "failedToUpdateJson": "Impossibile aggiornare il JSON del dashboard: metodo di salvataggio non disponibile",
-      "failedToSaveChanges": "Impossibile salvare le modifiche al dashboard",
-      "autoRunDescription": "Esegue le query all'apertura e quando cambiano filtri o intervallo di tempo",
-      "autoRunScope": "Si applica a tutte le dashboard, Log e Tracce"
+      "failedToSaveChanges": "Impossibile salvare le modifiche al dashboard"
     },
     "dynamicFunctionPopUp": {
       "property": "Proprietà",
@@ -7091,6 +7091,8 @@
     "exitAnnotationsMode": "Esci dalla modalità annotazioni",
     "addAnnotations": "Aggiungi annotazioni",
     "refreshToApplyVariables": "Aggiorna per applicare le ultime modifiche alle variabili",
+    "refreshToApplyTimeRange": "Aggiorna per applicare l'intervallo di tempo",
+    "refreshToApplyTimeRangeAndVariables": "Aggiorna per applicare l'intervallo di tempo e le modifiche alle variabili",
     "moveToAnotherFolder": "Sposta {type} in un'altra cartella",
     "rawQueryBuilder": {
       "query": "Query",
@@ -7273,9 +7275,7 @@
       "markerAria": "Esemplare {value} a {time}"
     },
     "showExemplarsLabel": "Mostra esemplari",
-    "showExemplarsHelp": "Disegna campioni di traccia su questo grafico per tutti coloro che aprono la dashboard. I visualizzatori possono comunque nasconderli dall'intestazione del pannello.",
-    "refreshToApplyTimeRange": "Aggiorna per applicare l'intervallo di tempo",
-    "refreshToApplyTimeRangeAndVariables": "Aggiorna per applicare l'intervallo di tempo e le modifiche alle variabili"
+    "showExemplarsHelp": "Disegna campioni di traccia su questo grafico per tutti coloro che aprono la dashboard. I visualizzatori possono comunque nasconderli dall'intestazione del pannello."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8215,7 +8215,13 @@
       "emptyTitle": "Nessuna esecuzione negli ultimi {days} giorni",
       "emptyDescription": "La dashboard si popola dopo la prima esecuzione della calibrazione degli avvisi."
     },
+    "lastRun": {
+      "succeeded": "L'ultima esecuzione è riuscita {time}.",
+      "failed": "L'ultima esecuzione non è riuscita {time}, quindi il digest più recente potrebbe non essere aggiornato: {error}",
+      "none": "Non è ancora stata tentata alcuna esecuzione."
+    },
     "settings": {
+      "title": "Impostazioni Calibrazione avvisi",
       "schedule": "Pianificazione",
       "enabled": "Esegui la calibrazione degli avvisi per questa organizzazione",
       "enabledHelp": "Se disattivata, l'organizzazione non ha esecuzioni pianificate. Attivandola, la prima esecuzione è prevista subito.",
@@ -8239,8 +8245,7 @@
       "runNowHeading": "Esegui ora",
       "findingsHeading": "Risultati e accesso",
       "findingsDesc": "Ogni esecuzione scrive i propri risultati come record di log nello stream {stream} di questa organizzazione, conservati secondo la retention di quello stream.",
-      "accessNote": "I risultati non hanno controllo di accesso per singolo avviso. Chiunque possa cercare nello stream {stream} vede i risultati relativi a ogni avviso dell'organizzazione, compresi gli avvisi che non può aprire. La calibrazione degli avvisi non invia notifiche.",
-      "openPage": "Apri Calibrazione degli avvisi",
+      "accessNote": "Il permesso Calibrazione avvisi in un ruolo determina l'accesso: Get per leggere i risultati, Update per modificare queste impostazioni e Create per richiedere un'esecuzione. I risultati coprono ogni avviso nell'organizzazione, inclusi gli avvisi che il lettore non può aprire. La calibrazione avvisi non invia notifiche.",
       "frequencyRange": "Scegli una cadenza tra 1 minuto e 30 giorni.",
       "windowRange": "Scegli una finestra tra 1 minuto e 1 anno."
     }
@@ -9812,9 +9817,6 @@
     "sloLongWindow": "Finestra lunga",
     "sloShortWindow": "Finestra breve",
     "sloCloneDisabled": "Gli avvisi SLO vengono creati nella loro pagina SLO, quindi non possono essere clonati da qui.",
-    "builtinBadge": "Sistema",
-    "builtinBadgeHint": "Un avviso integrato: puoi disattivarlo o modificarlo, ma non eliminarlo o rinominarlo.",
-    "builtinDeleteDisabled": "Avviso integrato, impossibile eliminarlo",
     "seconds": "Secondi",
     "downtimes": {
       "newTitle": "Nuovo downtime",
@@ -11377,8 +11379,6 @@
     }
   },
   "settings": {
-    "alertCalibration": "Calibrazione degli avvisi",
-    "alertCalibrationDesc": "Pianifica il job che verifica come si comportano i tuoi avvisi",
     "header": "Impostazioni",
     "correlationSettings": "Impostazioni di correlazione",
     "generalLabel": "Generale",

@@ -183,8 +183,8 @@ const formatAgo = (micros: number) =>
 const data = useLatestRead(async () => {
   const range = lookbackRange(Date.now() * 1000);
   const [emissions, flagged] = await Promise.all([
-    search<RunRow>(runsSql(), range),
-    search<RuleTally>(flaggedByRuleSql(), range),
+    search<RunRow>("", range),
+    search<RuleTally>("/rules", range),
   ]);
   return { rows: latestPerWindow(emissions), flagged };
 });

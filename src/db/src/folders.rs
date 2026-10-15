@@ -163,17 +163,9 @@ pub async fn ensure_default_folder(
         description: DEFAULT_FOLDER.to_owned(),
         icon: None,
     };
-    ensure_folder(org_id, default_folder, folder_type).await
-}
 
-/// Like [`ensure_default_folder`], for any folder with a fixed id.
-#[tracing::instrument(skip(folder))]
-pub async fn ensure_folder(
-    org_id: &str,
-    folder: Folder,
-    folder_type: FolderType,
-) -> Result<Folder, FolderError> {
-    let (_id, folder, created) = table::folders::get_or_create(org_id, folder, folder_type).await?;
+    let (_id, folder, created) =
+        table::folders::get_or_create(org_id, default_folder, folder_type).await?;
     if !created {
         return Ok(folder);
     }

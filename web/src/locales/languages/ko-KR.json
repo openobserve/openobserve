@@ -6784,6 +6784,8 @@
       "refresh": "새로고침",
       "refreshCacheReload": "캐시 새로 고침 및 다시 로드",
       "moreRefreshOptions": "추가 새로 고침 옵션",
+      "autoRunDescription": "열 때와 필터/시간 변경 시 쿼리를 실행합니다",
+      "autoRunScope": "모든 대시보드, 로그 및 트레이스에 적용됩니다",
       "dashboard": "대시보드",
       "dashboardNotFound": "대시보드를 찾을 수 없거나 삭제되었습니다. 대시보드 목록으로 이동합니다.",
       "failedToLoadDashboard": "대시보드를 불러오지 못했습니다. 대시보드 목록으로 이동합니다.",
@@ -6793,9 +6795,7 @@
       "panelMoveFailed": "패널 이동 실패",
       "failedToFetchReports": "리포트를 가져오지 못했습니다.",
       "failedToUpdateJson": "대시보드 JSON 업데이트 실패: 저장 메서드를 사용할 수 없습니다.",
-      "failedToSaveChanges": "대시보드 변경 사항 저장 실패",
-      "autoRunDescription": "열 때와 필터/시간 변경 시 쿼리를 실행합니다",
-      "autoRunScope": "모든 대시보드, 로그 및 트레이스에 적용됩니다"
+      "failedToSaveChanges": "대시보드 변경 사항 저장 실패"
     },
     "dynamicFunctionPopUp": {
       "property": "속성",
@@ -7091,6 +7091,8 @@
     "exitAnnotationsMode": "주석 모드 종료",
     "addAnnotations": "주석 추가",
     "refreshToApplyVariables": "최신 변수 변경 사항을 적용하려면 새로고침하세요",
+    "refreshToApplyTimeRange": "시간 범위를 적용하려면 새로고침하세요",
+    "refreshToApplyTimeRangeAndVariables": "시간 범위와 변수 변경 사항을 적용하려면 새로고침하세요",
     "moveToAnotherFolder": "{type}을(를) 다른 폴더로 이동",
     "rawQueryBuilder": {
       "query": "쿼리",
@@ -7273,9 +7275,7 @@
       "markerAria": "{time}의 예시 {value}"
     },
     "showExemplarsLabel": "예시 표시",
-    "showExemplarsHelp": "대시보드를 여는 모든 사람을 위해 이 차트에 트레이스 샘플을 그립니다. 뷰어는 패널 헤더에서 여전히 숨길 수 있습니다.",
-    "refreshToApplyTimeRange": "시간 범위를 적용하려면 새로고침하세요",
-    "refreshToApplyTimeRangeAndVariables": "시간 범위와 변수 변경 사항을 적용하려면 새로고침하세요"
+    "showExemplarsHelp": "대시보드를 여는 모든 사람을 위해 이 차트에 트레이스 샘플을 그립니다. 뷰어는 패널 헤더에서 여전히 숨길 수 있습니다."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8215,7 +8215,13 @@
       "emptyTitle": "최근 {days}일 동안 실행 없음",
       "emptyDescription": "알림 캘리브레이션이 실행되면 대시보드가 채워집니다."
     },
+    "lastRun": {
+      "succeeded": "마지막 실행이 {time}에 성공했습니다.",
+      "failed": "마지막 실행이 {time}에 실패하여 최신 다이제스트가 오래되었을 수 있습니다: {error}",
+      "none": "아직 실행을 시도하지 않았습니다."
+    },
     "settings": {
+      "title": "알림 캘리브레이션 설정",
       "schedule": "일정",
       "enabled": "이 조직에 대해 알림 캘리브레이션 실행",
       "enabledHelp": "꺼져 있으면 이 조직에는 예약된 실행이 없습니다. 켜면 첫 실행이 즉시 예정됩니다.",
@@ -8239,8 +8245,7 @@
       "runNowHeading": "지금 실행",
       "findingsHeading": "결과 및 접근",
       "findingsDesc": "각 실행은 결과를 이 조직의 {stream} 스트림에 로그 레코드로 기록하며, 해당 스트림의 보존 기간 동안 보관됩니다.",
-      "accessNote": "결과는 알림별로 접근이 제어되지 않습니다. {stream} 스트림을 검색할 수 있는 사람은 열 수 없는 알림을 포함해 조직의 모든 알림에 대한 결과를 볼 수 있습니다. 알림 캘리브레이션은 어떠한 알림도 보내지 않습니다.",
-      "openPage": "알림 캘리브레이션 열기",
+      "accessNote": "역할의 알림 캘리브레이션 권한이 액세스를 결정합니다: 결과를 읽으려면 Get, 이 설정을 변경하려면 Update, 실행을 요청하려면 Create가 필요합니다. 결과는 조직의 모든 알림을 포함하며, 읽는 사람이 열 수 없는 알림도 포함됩니다. 알림 캘리브레이션은 알림을 전송하지 않습니다.",
       "frequencyRange": "1분에서 30일 사이의 주기를 선택하세요.",
       "windowRange": "1분에서 1년 사이의 기간을 선택하세요."
     }
@@ -9812,9 +9817,6 @@
     "sloLongWindow": "긴 기간",
     "sloShortWindow": "짧은 기간",
     "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다.",
-    "builtinBadge": "시스템",
-    "builtinBadgeHint": "기본 제공 알림: 끄거나 편집할 수 있지만 삭제하거나 이름을 변경할 수는 없습니다.",
-    "builtinDeleteDisabled": "기본 제공 알림은 삭제할 수 없습니다",
     "seconds": "초",
     "downtimes": {
       "newTitle": "새 다운타임",
@@ -11377,8 +11379,6 @@
     }
   },
   "settings": {
-    "alertCalibration": "알림 캘리브레이션",
-    "alertCalibrationDesc": "알림이 어떻게 동작하는지 점검하는 작업을 예약합니다",
     "header": "설정",
     "correlationSettings": "상관관계 설정",
     "generalLabel": "일반",

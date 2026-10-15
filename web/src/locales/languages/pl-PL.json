@@ -6784,6 +6784,8 @@
       "refresh": "Odśwież",
       "refreshCacheReload": "Odśwież pamięć podręczną i przeładuj",
       "moreRefreshOptions": "Więcej opcji odświeżania",
+      "autoRunDescription": "Uruchamia zapytania przy otwarciu oraz przy zmianach filtra/czasu",
+      "autoRunScope": "Dotyczy wszystkich pulpitów, Logów i Trace",
       "dashboard": "Pulpit nawigacyjny",
       "dashboardNotFound": "Pulpit nawigacyjny nie został znaleziony lub został usunięty. Przekierowanie do listy pulpitów nawigacyjnych.",
       "failedToLoadDashboard": "Nie udało się załadować pulpitu nawigacyjnego. Przekierowanie do listy pulpitów nawigacyjnych.",
@@ -6793,9 +6795,7 @@
       "panelMoveFailed": "Przeniesienie panelu nie powiodło się",
       "failedToFetchReports": "Nie udało się pobrać raportów",
       "failedToUpdateJson": "Nie udało się zaktualizować JSON pulpitu nawigacyjnego: metoda zapisu niedostępna",
-      "failedToSaveChanges": "Nie udało się zapisać zmian na pulpicie nawigacyjnym",
-      "autoRunDescription": "Uruchamia zapytania przy otwarciu oraz przy zmianach filtra/czasu",
-      "autoRunScope": "Dotyczy wszystkich pulpitów, Logów i Trace"
+      "failedToSaveChanges": "Nie udało się zapisać zmian na pulpicie nawigacyjnym"
     },
     "dynamicFunctionPopUp": {
       "property": "Właściwość",
@@ -7091,6 +7091,8 @@
     "exitAnnotationsMode": "Wyjdź z trybu adnotacji",
     "addAnnotations": "Dodaj adnotacje",
     "refreshToApplyVariables": "Odśwież, aby zastosować najnowsze zmiany zmiennych",
+    "refreshToApplyTimeRange": "Odśwież, aby zastosować zakres czasu",
+    "refreshToApplyTimeRangeAndVariables": "Odśwież, aby zastosować zakres czasu i zmiany zmiennych",
     "moveToAnotherFolder": "Przenieś {type} do innego folderu",
     "rawQueryBuilder": {
       "query": "Zapytanie",
@@ -7273,9 +7275,7 @@
       "markerAria": "Exemplar {value} o {time}"
     },
     "showExemplarsLabel": "Pokaż exemplary",
-    "showExemplarsHelp": "Rysuje próbki trace na tym wykresie dla wszystkich, którzy otworzą pulpit. Przeglądający nadal mogą je ukryć w nagłówku panelu.",
-    "refreshToApplyTimeRange": "Odśwież, aby zastosować zakres czasu",
-    "refreshToApplyTimeRangeAndVariables": "Odśwież, aby zastosować zakres czasu i zmiany zmiennych"
+    "showExemplarsHelp": "Rysuje próbki trace na tym wykresie dla wszystkich, którzy otworzą pulpit. Przeglądający nadal mogą je ukryć w nagłówku panelu."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8215,7 +8215,13 @@
       "emptyTitle": "Brak uruchomień w ciągu ostatnich {days} dni",
       "emptyDescription": "Pulpit wypełni się po uruchomieniu kalibracji alertów."
     },
+    "lastRun": {
+      "succeeded": "Ostatnie uruchomienie zakończyło się pomyślnie {time}.",
+      "failed": "Ostatnie uruchomienie nie powiodło się {time}, więc najnowszy przegląd może być nieaktualny: {error}",
+      "none": "Nie podjęto jeszcze żadnej próby uruchomienia."
+    },
     "settings": {
+      "title": "Ustawienia kalibracji alertów",
       "schedule": "Harmonogram",
       "enabled": "Uruchamiaj kalibrację alertów dla tej organizacji",
       "enabledHelp": "Gdy opcja jest wyłączona, organizacja nie ma zaplanowanego uruchomienia. Włączenie jej sprawia, że pierwsze uruchomienie ma nastąpić natychmiast.",
@@ -8239,8 +8245,7 @@
       "runNowHeading": "Uruchom teraz",
       "findingsHeading": "Ustalenia i dostęp",
       "findingsDesc": "Każde uruchomienie zapisuje swoje ustalenia jako rekordy logów w strumieniu {stream} tej organizacji, przechowywane zgodnie z okresem retencji tego strumienia.",
-      "accessNote": "Ustalenia nie mają kontroli dostępu na poziomie poszczególnych alertów. Każdy, kto może przeszukiwać strumień {stream}, widzi ustalenia dotyczące wszystkich alertów w organizacji, w tym alertów, których nie może otworzyć. Kalibracja alertów nie wysyła powiadomień.",
-      "openPage": "Otwórz Kalibrację alertów",
+      "accessNote": "Uprawnienie Kalibracja alertów w roli decyduje o dostępie: Get umożliwia odczyt ustaleń, Update — zmianę tych ustawień, a Create — zlecenie uruchomienia. Ustalenia obejmują każdy alert w organizacji, w tym alerty, których czytelnik nie może otworzyć. Kalibracja alertów nie wysyła żadnych powiadomień.",
       "frequencyRange": "Wybierz częstotliwość od 1 minuty do 30 dni.",
       "windowRange": "Wybierz okno od 1 minuty do 1 roku."
     }
@@ -9812,9 +9817,6 @@
     "sloLongWindow": "Długie okno",
     "sloShortWindow": "Krótkie okno",
     "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować.",
-    "builtinBadge": "System",
-    "builtinBadgeHint": "Wbudowany alert: możesz go wyłączyć lub edytować, ale nie możesz go usunąć ani zmienić jego nazwy.",
-    "builtinDeleteDisabled": "Wbudowany alert, nie można go usunąć",
     "seconds": "Sekundy",
     "downtimes": {
       "newTitle": "Nowa przerwa",
@@ -11377,8 +11379,6 @@
     }
   },
   "settings": {
-    "alertCalibration": "Kalibracja alertów",
-    "alertCalibrationDesc": "Zaplanuj zadanie sprawdzające zachowanie alertów",
     "header": "Ustawienia",
     "correlationSettings": "Ustawienia korelacji",
     "generalLabel": "Ustawienia ogólne",

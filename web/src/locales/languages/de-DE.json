@@ -6784,6 +6784,8 @@
       "refresh": "Aktualisieren",
       "refreshCacheReload": "Cache aktualisieren & neu laden",
       "moreRefreshOptions": "Weitere Aktualisierungsoptionen",
+      "autoRunDescription": "Führt Abfragen beim Öffnen und bei Filter-/Zeitänderungen aus",
+      "autoRunScope": "Gilt für alle Dashboards, Logs und Traces",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard nicht gefunden oder wurde gelöscht. Weiterleitung zur Dashboard-Liste.",
       "failedToLoadDashboard": "Dashboard konnte nicht geladen werden. Weiterleitung zur Dashboard-Liste.",
@@ -6793,9 +6795,7 @@
       "panelMoveFailed": "Panel-Verschiebung fehlgeschlagen",
       "failedToFetchReports": "Berichte konnten nicht abgerufen werden",
       "failedToUpdateJson": "Dashboard-JSON konnte nicht aktualisiert werden: Speichermethode nicht verfügbar",
-      "failedToSaveChanges": "Dashboard-Änderungen konnten nicht gespeichert werden",
-      "autoRunDescription": "Führt Abfragen beim Öffnen und bei Filter-/Zeitänderungen aus",
-      "autoRunScope": "Gilt für alle Dashboards, Logs und Traces"
+      "failedToSaveChanges": "Dashboard-Änderungen konnten nicht gespeichert werden"
     },
     "dynamicFunctionPopUp": {
       "property": "Eigenschaft",
@@ -7091,6 +7091,8 @@
     "exitAnnotationsMode": "Anmerkungsmodus beenden",
     "addAnnotations": "Anmerkungen hinzufügen",
     "refreshToApplyVariables": "Aktualisieren, um die neuesten Variablenänderungen anzuwenden",
+    "refreshToApplyTimeRange": "Aktualisieren, um den Zeitbereich anzuwenden",
+    "refreshToApplyTimeRangeAndVariables": "Aktualisieren, um den Zeitbereich und Variablenänderungen anzuwenden",
     "moveToAnotherFolder": "{type} in einen anderen Ordner verschieben",
     "rawQueryBuilder": {
       "query": "Abfrage",
@@ -7273,9 +7275,7 @@
       "markerAria": "Exemplar {value} um {time}"
     },
     "showExemplarsLabel": "Exemplare anzeigen",
-    "showExemplarsHelp": "Zeichnet Trace-Stichproben in diesem Diagramm für alle, die das Dashboard öffnen. Betrachter können sie weiterhin über die Panel-Kopfzeile ausblenden.",
-    "refreshToApplyTimeRange": "Aktualisieren, um den Zeitbereich anzuwenden",
-    "refreshToApplyTimeRangeAndVariables": "Aktualisieren, um den Zeitbereich und Variablenänderungen anzuwenden"
+    "showExemplarsHelp": "Zeichnet Trace-Stichproben in diesem Diagramm für alle, die das Dashboard öffnen. Betrachter können sie weiterhin über die Panel-Kopfzeile ausblenden."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8215,7 +8215,13 @@
       "emptyTitle": "Keine Läufe in den letzten {days} Tagen",
       "emptyDescription": "Das Dashboard füllt sich, sobald die Alarmkalibrierung gelaufen ist."
     },
+    "lastRun": {
+      "succeeded": "Der letzte Lauf war um {time} erfolgreich.",
+      "failed": "Der letzte Lauf ist um {time} fehlgeschlagen, daher ist die neueste Zusammenfassung möglicherweise veraltet: {error}",
+      "none": "Bisher wurde noch kein Lauf versucht."
+    },
     "settings": {
+      "title": "Einstellungen für die Alarmkalibrierung",
       "schedule": "Zeitplan",
       "enabled": "Alarmkalibrierung für diese Organisation ausführen",
       "enabledHelp": "Im ausgeschalteten Zustand hat die Organisation keinen geplanten Lauf. Beim Einschalten ist der erste Lauf sofort fällig.",
@@ -8239,8 +8245,7 @@
       "runNowHeading": "Jetzt ausführen",
       "findingsHeading": "Befunde und Zugriff",
       "findingsDesc": "Jeder Lauf schreibt seine Befunde als Log-Datensätze in den Stream {stream} dieser Organisation, die gemäß der Aufbewahrung dieses Streams aufbewahrt werden.",
-      "accessNote": "Befunde sind nicht pro Alarm zugriffsgesteuert. Jeder, der den Stream {stream} durchsuchen kann, sieht Befunde zu jedem Alarm der Organisation, auch zu Alarmen, die er nicht öffnen kann. Die Alarmkalibrierung versendet keine Benachrichtigungen.",
-      "openPage": "Alarmkalibrierung öffnen",
+      "accessNote": "Die Berechtigung „Alarmkalibrierung“ in einer Rolle entscheidet über den Zugriff: Get zum Lesen der Befunde, Update zum Ändern dieser Einstellungen und Create zum Anfordern eines Laufs. Befunde umfassen jeden Alarm in der Organisation, einschließlich Alarmen, die der Leser nicht öffnen kann. Die Alarmkalibrierung sendet keine Benachrichtigungen.",
       "frequencyRange": "Wählen Sie ein Intervall zwischen 1 Minute und 30 Tagen.",
       "windowRange": "Wählen Sie ein Fenster zwischen 1 Minute und 1 Jahr."
     }
@@ -9812,9 +9817,6 @@
     "sloLongWindow": "Langes Zeitfenster",
     "sloShortWindow": "Kurzes Zeitfenster",
     "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden.",
-    "builtinBadge": "System",
-    "builtinBadgeHint": "Ein integrierter Alarm: Sie können ihn deaktivieren oder bearbeiten, aber nicht löschen oder umbenennen.",
-    "builtinDeleteDisabled": "Integrierter Alarm, kann nicht gelöscht werden",
     "seconds": "Sekunden",
     "downtimes": {
       "newTitle": "Neues Wartungsfenster",
@@ -11377,8 +11379,6 @@
     }
   },
   "settings": {
-    "alertCalibration": "Alarmkalibrierung",
-    "alertCalibrationDesc": "Planen Sie den Job, der prüft, wie sich Ihre Alarme verhalten",
     "header": "Einstellungen",
     "correlationSettings": "Korrelationseinstellungen",
     "generalLabel": "Allgemeines",

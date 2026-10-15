@@ -6784,6 +6784,8 @@
       "refresh": "Actualizar",
       "refreshCacheReload": "Actualizar caché y recargar",
       "moreRefreshOptions": "Más opciones de actualización",
+      "autoRunDescription": "Ejecuta las consultas al abrir y ante cambios de filtro o tiempo",
+      "autoRunScope": "Se aplica a todos los dashboards, Logs y Trazas",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard no encontrado o ha sido eliminado. Redirigiendo a la lista de dashboards.",
       "failedToLoadDashboard": "Error al cargar el dashboard. Redirigiendo a la lista de dashboards.",
@@ -6793,9 +6795,7 @@
       "panelMoveFailed": "Error al mover el panel",
       "failedToFetchReports": "Error al obtener los reportes",
       "failedToUpdateJson": "Error al actualizar el JSON del dashboard: método de guardado no disponible",
-      "failedToSaveChanges": "Error al guardar los cambios del dashboard",
-      "autoRunDescription": "Ejecuta las consultas al abrir y ante cambios de filtro o tiempo",
-      "autoRunScope": "Se aplica a todos los dashboards, Logs y Trazas"
+      "failedToSaveChanges": "Error al guardar los cambios del dashboard"
     },
     "dynamicFunctionPopUp": {
       "property": "Propiedad",
@@ -7091,6 +7091,8 @@
     "exitAnnotationsMode": "Salir del modo de anotaciones",
     "addAnnotations": "Agregar anotaciones",
     "refreshToApplyVariables": "Actualice para aplicar los últimos cambios de variables",
+    "refreshToApplyTimeRange": "Actualiza para aplicar el rango de tiempo",
+    "refreshToApplyTimeRangeAndVariables": "Actualiza para aplicar el rango de tiempo y los cambios de variables",
     "moveToAnotherFolder": "Mover {type} a otra carpeta",
     "rawQueryBuilder": {
       "query": "Consulta",
@@ -7273,9 +7275,7 @@
       "markerAria": "Ejemplar {value} a las {time}"
     },
     "showExemplarsLabel": "Mostrar ejemplares",
-    "showExemplarsHelp": "Dibuja muestras de trazas en este gráfico para todos los que abran el dashboard. Los visores aún pueden ocultarlas desde el encabezado del panel.",
-    "refreshToApplyTimeRange": "Actualiza para aplicar el rango de tiempo",
-    "refreshToApplyTimeRangeAndVariables": "Actualiza para aplicar el rango de tiempo y los cambios de variables"
+    "showExemplarsHelp": "Dibuja muestras de trazas en este gráfico para todos los que abran el dashboard. Los visores aún pueden ocultarlas desde el encabezado del panel."
   },
   "panel": {
     "addPivotShort": "+P",
@@ -8215,7 +8215,13 @@
       "emptyTitle": "Sin ejecuciones en los últimos {days} días",
       "emptyDescription": "El dashboard se completa una vez que se haya ejecutado la calibración de alertas."
     },
+    "lastRun": {
+      "succeeded": "La última ejecución se completó correctamente {time}.",
+      "failed": "La última ejecución falló {time}, por lo que el resumen más reciente puede estar desactualizado: {error}",
+      "none": "Todavía no se ha intentado ninguna ejecución."
+    },
     "settings": {
+      "title": "Configuración de Calibración de alertas",
       "schedule": "Programación",
       "enabled": "Ejecutar la calibración de alertas para esta organización",
       "enabledHelp": "Mientras está desactivada, la organización no tiene ejecuciones programadas. Al activarla, la primera ejecución vence de inmediato.",
@@ -8239,8 +8245,7 @@
       "runNowHeading": "Ejecutar ahora",
       "findingsHeading": "Hallazgos y acceso",
       "findingsDesc": "Cada ejecución escribe sus hallazgos como registros de log en el stream {stream} de esta organización, conservados según la retención de ese stream.",
-      "accessNote": "Los hallazgos no tienen control de acceso por alerta. Cualquiera que pueda buscar en el stream {stream} ve los hallazgos de todas las alertas de la organización, incluidas las alertas que no puede abrir. La calibración de alertas no envía notificaciones.",
-      "openPage": "Abrir Calibración de alertas",
+      "accessNote": "El permiso Calibración de alertas en un rol determina el acceso: Get para leer los hallazgos, Update para cambiar esta configuración y Create para solicitar una ejecución. Los hallazgos abarcan todas las alertas de la organización, incluidas las alertas que el lector no puede abrir. La calibración de alertas no envía notificaciones.",
       "frequencyRange": "Elige una cadencia entre 1 minuto y 30 días.",
       "windowRange": "Elige una ventana entre 1 minuto y 1 año."
     }
@@ -9812,9 +9817,6 @@
     "sloLongWindow": "Ventana larga",
     "sloShortWindow": "Ventana corta",
     "sloCloneDisabled": "Las alertas SLO se crean en su página SLO, por lo que no se pueden clonar desde aquí.",
-    "builtinBadge": "Sistema",
-    "builtinBadgeHint": "Una alerta integrada: puedes desactivarla o editarla, pero no eliminarla ni cambiarle el nombre.",
-    "builtinDeleteDisabled": "Alerta integrada, no se puede eliminar",
     "seconds": "Segundos",
     "downtimes": {
       "newTitle": "Nueva inactividad",
@@ -11377,8 +11379,6 @@
     }
   },
   "settings": {
-    "alertCalibration": "Calibración de alertas",
-    "alertCalibrationDesc": "Programa el trabajo que comprueba cómo se comportan tus alertas",
     "header": "Ajustes",
     "correlationSettings": "Configuración de correlación",
     "generalLabel": "General",

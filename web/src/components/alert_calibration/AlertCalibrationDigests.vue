@@ -34,7 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="flex h-full min-h-0 flex-col">
-      <div class="px-page-edge shrink-0 py-3">
+      <div class="px-page-edge flex shrink-0 flex-col gap-3 py-3">
+        <AlertCalibrationLastRun v-if="config" only-failure />
         <OStatStrip :items="stats" data-test="alert-calibration-digests-stats" />
       </div>
 
@@ -224,6 +225,7 @@ import { alertCalibrationConfigQuery } from "@/services/alert_calibration.querie
 import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import AlertCalibrationTabs from "./AlertCalibrationTabs.vue";
 import AlertCalibrationActions from "./AlertCalibrationActions.vue";
+import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
 import {
   coverageVerdict,
@@ -232,8 +234,6 @@ import {
   latestRun,
   lookbackRange,
   runKey,
-  runsSql,
-  runsWithAlertSql,
   RUNS_LOOKBACK_DAYS,
   SEARCH_SIZE,
   type RunRow,
@@ -253,7 +253,7 @@ const config = computed(() => configQuery.data.value ?? null);
 const nowMicros = () => Date.now() * 1000;
 
 const runs = useLatestRead(async () => {
-  const emissions = await searchDigests<RunRow>(runsSql(), lookbackRange(nowMicros()));
+  const emissions = await searchDigests<RunRow>("", lookbackRange(nowMicros()));
   return { emissions: emissions.length, rows: latestPerWindow(emissions) };
 });
 const rows = computed(() => runs.data.value?.rows ?? []);
@@ -263,7 +263,10 @@ const scope = ref<Scope>("all");
 const matching = useLatestRead(async () => {
   const name = search.value.trim();
   if (!name) return null;
-  const hits = await searchDigests<RunRow>(runsWithAlertSql(name), lookbackRange(nowMicros()));
+  const hits = await searchDigests<RunRow>("/alerts", {
+    alert_name: name,
+    ...lookbackRange(nowMicros()),
+  });
   return new Set(hits.map(runKey));
 });
 
