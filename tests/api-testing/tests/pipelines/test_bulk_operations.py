@@ -207,14 +207,16 @@ def _delete_functions_quietly(client: OpenObserveClient, names: list[str], *, or
 
 
 @pytest.fixture(scope="module")
-def other_org(client: OpenObserveClient) -> str:
+def other_org(client: OpenObserveClient) -> Generator[str, None, None]:
     """Identifier of a second organization, for the cross-org cases.
 
-    Module-scoped and never deleted: `DELETE /api/organizations/{id}` answers
-    404 even for a just-created org on this build, which
+    Teardown is best-effort on purpose. `DELETE /api/organizations/{id}` answers
+    404 even for a just-created org on this build —
     `tests/orgs/test_organisations.py::test_delete_organization_observed_broken`
-    already documents as an xfail. One leftover org per module is the smallest
-    footprint available until that endpoint works.
+    documents that as an xfail, and #15241 is the open bug — so today this leaves
+    one org behind per module, the smallest footprint available. Attempting the
+    delete anyway rather than skipping it means this fixture starts cleaning up
+    on its own once #15394 lands, with no edit here.
 
     Org names take alphanumerics, spaces and underscores only — no hyphens.
     """
@@ -222,7 +224,13 @@ def other_org(client: OpenObserveClient) -> str:
     assert resp.status_code == 200, f"setup: create org failed: {resp.status_code} {resp.text}"
     identifier = resp.json().get("identifier")
     assert identifier, f"setup: created org has no identifier: {resp.json()}"
-    return identifier
+
+    yield identifier
+
+    try:
+        client.delete(f"api/organizations/{identifier}", prefix="")
+    except Exception as e:  # noqa: BLE001 - teardown must not mask the test result
+        logger.warning("other_org cleanup failed for %s: %s", identifier, e)
 
 
 @pytest.fixture

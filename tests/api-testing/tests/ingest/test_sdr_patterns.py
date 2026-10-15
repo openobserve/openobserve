@@ -398,10 +398,12 @@ def test_sdr_08_search_around_is_single_stream(create_session, base_url, redacte
 def other_org(create_session, base_url):
     """Identifier of a second org, for the cross-org case.
 
-    Never deleted: `DELETE /api/organizations/{id}` answers 404 even for a
-    just-created org on this build, which
+    Teardown is best-effort: `DELETE /api/organizations/{id}` answers 404 even
+    for a just-created org on this build (#15241, and
     `tests/orgs/test_organisations.py::test_delete_organization_observed_broken`
-    documents as an xfail. Names take alphanumerics and underscores only.
+    pins it as an xfail), so this leaves one org behind for now. Trying the
+    delete anyway means it starts cleaning up by itself once #15394 lands.
+    Names take alphanumerics and underscores only.
     """
     resp = create_session.post(
         f"{base_url}api/organizations", json={"name": f"sdr_auto_org_{_suffix()}"}
@@ -410,7 +412,10 @@ def other_org(create_session, base_url):
         pytest.skip(f"cannot create a second org ({resp.status_code}); cross-org case cannot run")
     identifier = resp.json().get("identifier")
     assert identifier, f"created org has no identifier: {resp.text}"
-    return identifier
+
+    yield identifier
+
+    create_session.delete(f"{base_url}api/organizations/{identifier}")
 
 
 def _bulk_delete(session, base_url, ids, org=ORG_ID):
