@@ -20,16 +20,18 @@ pub mod installations;
 pub mod links;
 pub mod settings;
 
-#[cfg(feature = "enterprise")]
 use axum::{
     Json,
-    extract::{
-        Query,
-        rejection::{JsonRejection, QueryRejection},
-    },
+    body::{Body, Bytes},
+    extract::{FromRequest, Request, rejection::JsonRejection},
+    http::StatusCode,
+    response::Response,
+};
+#[cfg(feature = "enterprise")]
+use axum::{
+    extract::{Query, rejection::QueryRejection},
     response::IntoResponse,
 };
-use axum::{http::StatusCode, response::Response};
 use serde::{Deserialize, Serialize};
 use utoipa::IntoParams;
 
@@ -63,6 +65,26 @@ pub struct ManifestQuery {
     pub name: Option<String>,
     /// Adds the channel-history scopes and events.
     pub channel_history: Option<bool>,
+}
+
+/// A JSON body, or `{}` when the request has no body at all, as `curl -X POST` sends it.
+#[derive(Debug)]
+pub struct JsonOrEmpty(pub serde_json::Value);
+
+impl<S: Send + Sync> FromRequest<S> for JsonOrEmpty {
+    type Rejection = JsonRejection;
+
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        let headers = req.headers().clone();
+        let bytes = Bytes::from_request(req, state).await?;
+        if bytes.is_empty() {
+            return Ok(Self(serde_json::json!({})));
+        }
+        let mut req = Request::new(Body::from(bytes));
+        *req.headers_mut() = headers;
+        let Json(value) = Json::<serde_json::Value>::from_request(req, state).await?;
+        Ok(Self(value))
+    }
 }
 
 /// O2's `{"code","message"}` body with the given status; anything outside 400-599 becomes 500.
@@ -174,6 +196,63 @@ mod tests {
             .await
             .unwrap();
         serde_json::from_slice(&bytes).unwrap()
+    }
+
+    async fn json_or_empty(
+        content_type: Option<&str>,
+        raw: &'static str,
+    ) -> Result<serde_json::Value, JsonRejection> {
+        let mut req = axum::http::Request::builder().method("POST");
+        if let Some(content_type) = content_type {
+            req = req.header(axum::http::header::CONTENT_TYPE, content_type);
+        }
+        JsonOrEmpty::from_request(req.body(Body::from(raw)).unwrap(), &())
+            .await
+            .map(|JsonOrEmpty(value)| value)
+    }
+
+    #[tokio::test]
+    async fn a_request_without_a_body_reads_as_an_empty_object() {
+        assert_eq!(
+            json_or_empty(None, "").await.unwrap(),
+            serde_json::json!({})
+        );
+        assert_eq!(
+            json_or_empty(Some("application/json"), "").await.unwrap(),
+            serde_json::json!({})
+        );
+        assert_eq!(
+            json_or_empty(Some("application/json"), r#"{"channel_id":"C0CHAN"}"#)
+                .await
+                .unwrap(),
+            serde_json::json!({"channel_id": "C0CHAN"})
+        );
+    }
+
+    #[tokio::test]
+    async fn a_body_that_is_not_json_is_still_refused() {
+        for (content_type, raw) in [
+            (None, "{}"),
+            (None, "channel_id=C0CHAN"),
+            (Some("text/plain"), "{}"),
+            (Some("application/json"), "{not json"),
+        ] {
+            assert!(
+                json_or_empty(content_type, raw).await.is_err(),
+                "{content_type:?} {raw}"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_test_route_reads_no_body_as_no_channel_and_refuses_text() {
+        use o2_enterprise::enterprise::slack::health::TestRequest;
+        let empty = json_or_empty(None, "").await.map(Json);
+        let req: TestRequest = parse("default", empty).unwrap();
+        assert_eq!(req, TestRequest::default());
+        let text = json_or_empty(None, "channel_id=C0CHAN").await.map(Json);
+        assert!(parse::<TestRequest>("default", text).is_err());
     }
 
     #[tokio::test]
