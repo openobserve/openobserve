@@ -3515,4 +3515,43 @@ mod tests {
             assert_eq!(search.calls.load(Ordering::SeqCst), 0, "{reason:?}");
         }
     }
+
+    #[tokio::test]
+    async fn gate11_a_built_panel_with_an_unparseable_query_stays_withheld_at_the_deadline() {
+        let search = FakeSearch {
+            hits: 1,
+            refuse: Some((NotAvailableReason::Unauthorized, "FRM")),
+            ..Default::default()
+        };
+        let mut panel = typed_panel("p", "table", "sql", "SELECT * FROM \"s\"", None);
+        let mut unparseable = panel.queries[0].clone();
+        unparseable.query = Some("SELEC * FRM".into());
+        panel.queries.push(unparseable);
+        let run = Run {
+            panels: vec![run_one(&search, panel).await],
+            ..Default::default()
+        };
+        let live = materialize::Live {
+            dashboard_updated_at: 1,
+            link_rev: 1,
+            settings_rev: 0,
+        };
+        let a = materialize::assemble(live, (10, 20), run, None, &BTreeSet::new(), 20, 0, 300, 0.0);
+        let stored = store::Stored {
+            header: a.header,
+            manifest: a.manifest,
+            body_zst: bytes::Bytes::new(),
+        };
+        let manifest = &stored.manifest.panels["p"];
+        assert!(manifest.unparsed);
+        assert_eq!(manifest.sources, vec![(StreamType::Logs, "s".to_string())]);
+        assert_eq!(manifest.outcome, store::PanelOutcome::Withheld);
+        let (link, dash, _) = ctx_parts();
+        let engine = materialize::tests::fake(&link, &dash);
+        let header = authz_check::recheck(engine, &link, &stored, 100)
+            .await
+            .unwrap();
+        assert!(header.is_withheld("p"));
+        assert_eq!(header.next_retry_at, stored.header.next_retry_at);
+    }
 }

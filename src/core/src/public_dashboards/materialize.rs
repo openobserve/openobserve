@@ -1153,7 +1153,7 @@ fn file_status(
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use std::sync::{
         Mutex,
         atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicUsize, Ordering},
@@ -1168,7 +1168,7 @@ mod tests {
     const DAY_SECS: i64 = 86_400;
 
     /// An in-process engine: panels end as `classes` says, streams in `denied` are refused.
-    struct Fake {
+    pub(in super::super) struct Fake {
         link: Mutex<PublicDashboard>,
         dashboard: Mutex<Option<Dashboard>>,
         settings_rev: AtomicI64,
@@ -1406,7 +1406,7 @@ mod tests {
         }
     }
 
-    fn fake(link: &PublicDashboard, dash: &Dashboard) -> &'static Fake {
+    pub(in super::super) fn fake(link: &PublicDashboard, dash: &Dashboard) -> &'static Fake {
         Box::leak(Box::new(Fake {
             link: Mutex::new(link.clone()),
             dashboard: Mutex::new(Some(dash.clone())),
