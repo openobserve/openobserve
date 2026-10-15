@@ -6504,13 +6504,10 @@
       "variableSuffix": "{name} (変数)"
     },
     "queryVariable": {
-      "typeQuery": "Query",
-      "typeQueryDescription": "Values returned by your own SQL or PromQL query.",
-      "typeQueryValuesDescription": "Distinct values of one field in a stream.",
+      "typeQueryValuesDescription": "Values of a field in a stream, or from your own SQL or PromQL query.",
       "typeConstantDescription": "A fixed value that viewers cannot change.",
       "typeTextboxDescription": "Free text that viewers type in.",
       "typeCustomDescription": "A list of options you enter by hand.",
-      "language": "Query language",
       "query": "Query",
       "sqlHelp": "Return at least one column. Use $name to reference another variable.",
       "promqlHelp": "Use one of the supported functions. Use $name to reference another variable.",
@@ -6537,6 +6534,7 @@
       "labelFieldHelp": "Shown in the dropdown. Defaults to the value.",
       "runPreviewFirst": "Run the preview to choose a column",
       "queryRequired": "Query is required",
+      "promqlOperatorUnsupported": "Not available for PromQL",
       "cappedHint": "Showing the first {count} values",
       "loadFailedReason": "Could not load values: {reason}",
       "undefinedVariables": "Not defined on this dashboard: {names}. These placeholders are sent to the query as written.",
