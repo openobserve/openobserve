@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #notices>
           <span
             v-if="usersMode && result && result.step1Sessions !== null"
-            class="text-text-secondary flex items-center gap-1 text-xs"
+            class="text-text-secondary flex items-center gap-1 px-4 text-xs"
             data-test="rum-analytics-funnel-left-out"
             ><OIcon name="info-outline" size="sm" />{{
               t("rum.analytics.funnel.leftOut", {
@@ -314,6 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!identitySql"
             variant="info"
             dense
+            class="mx-4"
             :content="
               pa.identityGapText.value
                 ? t('rum.analytics.funnel.identityHintReason', { reason: pa.identityGapText.value })
@@ -333,6 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OBanner>
           <NamedEventsNotice
             :status="eventsStatus"
+            class="mx-4"
             data-test="rum-analytics-funnel"
             @retry="pa.retryEvents()"
           />
@@ -340,6 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="usersMode && pa.sampleRatio.value > 1"
             variant="default"
             dense
+            class="mx-4"
             :content="t('rum.analytics.funnel.usersExact')"
             data-test="rum-analytics-funnel-users-exact"
           />
@@ -355,6 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="partial"
               variant="warning"
               dense
+              class="mx-4"
               :content="t('rum.analytics.partial')"
               data-test="rum-analytics-funnel-partial"
             />
@@ -384,17 +388,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #footer>
           <span
             v-if="!funnelFailed && def.x?.length"
-            class="text-text-secondary text-xs"
+            class="text-text-secondary px-4 text-xs"
             data-test="rum-analytics-funnel-exclusions-caption"
             >{{ exclusionsCaption }}</span
           >
           <template v-if="def.breakdown && breakdown && funnelPanel.status === 'ok'">
-            <span class="text-text-secondary text-xs">{{
+            <span class="text-text-secondary px-4 text-xs">{{
               t("rum.analytics.funnel.breakdownTimeHidden")
             }}</span>
             <span
               v-if="def.breakdown === 'app'"
-              class="text-text-secondary text-xs"
+              class="text-text-secondary px-4 text-xs"
               data-test="rum-analytics-funnel-by-app-rules"
               >{{ t("rum.analytics.funnel.byAppRules", { app: raw(pa.state.app) }) }}</span
             >
