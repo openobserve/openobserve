@@ -32,7 +32,9 @@ use {
         dashboards::{Dashboard, reports::Report, v8::Panel},
         pipeline::Pipeline,
     },
+    infra::table::entity::public_dashboards::Model as PublicDashboard,
     serde_json::Value,
+    std::sync::Arc,
 };
 
 use crate::authz::QuerySource;
@@ -82,11 +84,52 @@ pub enum ReportRefusal {
     DashboardLoad(anyhow::Error),
 }
 
-/// One enabled report's view of a dashboard: the tab it asks for and its variable values.
+/// The save a failing public-link lookup refuses, since the guard could not see every reader.
+#[cfg(feature = "enterprise")]
+pub const PUBLIC_LINKS_UNVERIFIED: &str =
+    "Could not verify public links for this dashboard. Try again.";
+
+/// One reader's view of a dashboard: an enabled report, or one tab of a public link.
 #[cfg(feature = "enterprise")]
 struct RenderingReport {
     tab: Option<String>,
     variables: Vec<(String, String)>,
+    /// A public link's own values, which its panels read by scope as the link's build does.
+    link: Option<Arc<LinkReader>>,
+}
+
+#[cfg(feature = "enterprise")]
+impl RenderingReport {
+    /// What `panel` of `tab` reads for this reader, before or after the edit.
+    fn panel_sources(
+        &self,
+        org_id: &str,
+        tab: &str,
+        panel: &Value,
+        values: &HashMap<String, String>,
+        edited: bool,
+    ) -> Vec<QuerySource> {
+        let Some(link) = &self.link else {
+            return panel_sources(org_id, panel, values);
+        };
+        let resolver = if edited { &link.after } else { &link.before };
+        let id = panel_id(panel);
+        let lang = |l: QueryLanguage| match l {
+            QueryLanguage::Sql => "sql",
+            QueryLanguage::PromQl => "promql",
+        };
+        // Left unfilled, a value only the build's values query picks stays a placeholder.
+        panel_sources_with(org_id, panel, &HashMap::new(), |text, l| {
+            resolver.substitute(tab, &id, text, lang(l))
+        })
+    }
+}
+
+/// A public link's frozen values over the stored and the edited dashboard.
+#[cfg(feature = "enterprise")]
+struct LinkReader {
+    before: crate::public_dashboards::LinkValues,
+    after: crate::public_dashboards::LinkValues,
 }
 
 /// What an edit changed that a report could read differently; panels are keyed `(tab, panel)`.
@@ -270,6 +313,16 @@ pub fn panel_sources(
     panel: &serde_json::Value,
     values: &HashMap<String, String>,
 ) -> Vec<QuerySource> {
+    panel_sources_with(org_id, panel, values, |text, _| text.to_string())
+}
+
+/// [`panel_sources`] with every query text and stream name passed through `fill` first.
+pub fn panel_sources_with(
+    org_id: &str,
+    panel: &serde_json::Value,
+    values: &HashMap<String, String>,
+    fill: impl Fn(&str, QueryLanguage) -> String,
+) -> Vec<QuerySource> {
     let promql = panel
         .get("queryType")
         .and_then(|t| t.as_str())
@@ -289,7 +342,14 @@ pub fn panel_sources(
         let fields = query.get("fields");
         let stream_type = fields.map_or(fallback_type, |f| json_stream_type(f, fallback_type));
         if let Some(text) = query.get("query").and_then(|q| q.as_str()) {
-            sources.extend(panel_query_sources(org_id, text, lang, stream_type, values));
+            let text = fill(text, lang);
+            sources.extend(panel_query_sources(
+                org_id,
+                &text,
+                lang,
+                stream_type,
+                values,
+            ));
         }
         let vrl = query.get("vrlFunctionQuery").and_then(|v| v.as_str());
         if let Some(vrl) = vrl.map(str::trim).filter(|v| !v.is_empty()) {
@@ -298,18 +358,16 @@ pub fn panel_sources(
                 source: vrl.to_string(),
             });
         }
-        if let Some(source) =
-            fields.and_then(|f| named_stream_source(org_id, f, stream_type, values))
-        {
-            sources.push(source);
-        }
         let joins = query
             .get("joins")
             .and_then(|j| j.as_array())
             .into_iter()
             .flatten();
-        for join in joins {
-            if let Some(source) = named_stream_source(org_id, join, stream_type, values) {
+        for named in fields.into_iter().chain(joins) {
+            let name = named.get("stream").and_then(|s| s.as_str());
+            let filled = name.map(|name| fill(name, QueryLanguage::Sql));
+            if let Some(source) = stream_name_source(org_id, filled.as_deref(), stream_type, values)
+            {
                 sources.push(source);
             }
         }
@@ -809,6 +867,8 @@ async fn stored_dashboard(
         .ok_or_else(|| Response::from(DashboardError::DashboardNotFound))
 }
 
+/// The readers are the enabled reports and every tab of every link on the dashboard, paused and
+/// expired ones included, since a resume or an extension makes them build again.
 #[cfg(feature = "enterprise")]
 async fn guard_stored_edit(
     org_id: &str,
@@ -817,14 +877,53 @@ async fn guard_stored_edit(
     stored: &Dashboard,
     edited: &Dashboard,
 ) -> Result<(), Response> {
-    let Some(edited) = dashboard_json(edited) else {
+    let links = move || async move {
+        let db = infra::db::get_orm_client_rw().await;
+        let links = infra::table::public_dashboards::list_by_dashboard(db, org_id, dashboard_id);
+        Ok::<_, anyhow::Error>(links.await?)
+    };
+    guard_stored_edit_with(
+        org_id,
+        user_id,
+        stored,
+        edited,
+        || rendering_reports(org_id, dashboard_id),
+        links,
+    )
+    .await
+}
+
+#[cfg(feature = "enterprise")]
+async fn guard_stored_edit_with<R, RFut, L, LFut>(
+    org_id: &str,
+    user_id: &str,
+    stored: &Dashboard,
+    edited: &Dashboard,
+    reports: R,
+    links: L,
+) -> Result<(), Response>
+where
+    R: FnOnce() -> RFut,
+    RFut: Future<Output = Vec<RenderingReport>>,
+    L: FnOnce() -> LFut,
+    LFut: Future<Output = Result<Vec<PublicDashboard>, anyhow::Error>>,
+{
+    let Some(edited_json) = dashboard_json(edited) else {
         return Ok(());
     };
-    let stored = dashboard_json(stored).unwrap_or(Value::Null);
-    guard_edit(org_id, user_id, &stored, &edited, || {
-        rendering_reports(org_id, dashboard_id)
-    })
-    .await
+    let stored_json = dashboard_json(stored).unwrap_or(Value::Null);
+    let edited_json = &edited_json;
+    let readers = move || async move {
+        let mut readers = reports().await;
+        // Unlike the report lookup, a failed link lookup refuses: a missed link would publish.
+        let links = links().await.map_err(|e| {
+            log::error!("[background_access] {org_id}: public link lookup failed: {e}");
+            common::meta::http::HttpResponse::service_unavailable(PUBLIC_LINKS_UNVERIFIED)
+        })?;
+        readers.extend(public_link_readers(&links, stored, edited, edited_json));
+        Ok(readers)
+    };
+    guard_edit(org_id, user_id, &stored_json, edited_json, readers).await
 }
 
 /// `reports` runs only when the edit changed something a report could read differently.
@@ -838,15 +937,57 @@ async fn guard_edit<F, Fut>(
 ) -> Result<(), Response>
 where
     F: FnOnce() -> Fut,
-    Fut: Future<Output = Vec<RenderingReport>>,
+    Fut: Future<Output = Result<Vec<RenderingReport>, Response>>,
 {
     let edits = QueryEdits::between(stored, edited);
     if edits.is_empty() {
         return Ok(());
     }
-    let reports = reports().await;
+    let reports = reports().await?;
     let sources = edit_sources(org_id, stored, edited, &edits, &reports);
     guard_write(org_id, user_id, &sources).await
+}
+
+/// One reader per link per tab of the edited dashboard, since a public link shows every tab.
+#[cfg(feature = "enterprise")]
+fn public_link_readers(
+    links: &[PublicDashboard],
+    stored: &Dashboard,
+    edited: &Dashboard,
+    edited_json: &Value,
+) -> Vec<RenderingReport> {
+    let tabs = tab_ids(edited_json);
+    let tabs: Vec<Option<String>> = if tabs.is_empty() {
+        vec![None]
+    } else {
+        tabs.into_iter().map(Some).collect()
+    };
+    let mut out = Vec::new();
+    for link in links {
+        let frozen = link.frozen_variables.as_deref();
+        let reader = Arc::new(LinkReader {
+            before: crate::public_dashboards::LinkValues::new(stored, frozen),
+            after: crate::public_dashboards::LinkValues::new(edited, frozen),
+        });
+        // Values-query streams take the link's global values, as a report's do.
+        let globals: Vec<(String, String)> = frozen
+            .and_then(|f| serde_json::from_str::<serde_json::Map<String, Value>>(f).ok())
+            .into_iter()
+            .flatten()
+            .filter(|(key, _)| !key.contains(".t.") && !key.contains(".p."))
+            .filter_map(|(key, value)| match value {
+                Value::String(s) => Some((key, s)),
+                Value::Number(n) => Some((key, n.to_string())),
+                _ => None,
+            })
+            .collect();
+        out.extend(tabs.iter().map(|tab| RenderingReport {
+            tab: tab.clone(),
+            variables: globals.clone(),
+            link: Some(reader.clone()),
+        }));
+    }
+    out
 }
 
 /// A failed lookup checks nothing: the edit itself reads no report.
@@ -891,6 +1032,7 @@ async fn rendering_reports(org_id: &str, dashboard_id: &str) -> Vec<RenderingRep
                     .into_iter()
                     .map(|v| (v.key, v.value))
                     .collect(),
+                link: None,
             });
         }
     }
@@ -916,13 +1058,13 @@ fn edit_sources(
         let moved = new_tab != rendered_tab(stored, tab).0;
         for panel in panels {
             let key = (new_tab.clone(), panel_id(panel));
-            let reads = panel_sources(org_id, panel, &new_values);
+            let reads = report.panel_sources(org_id, &new_tab, panel, &new_values, true);
             let changed = moved
                 || edits.panels.contains(&key)
                 || (edits.variables
                     && before
                         .get(&key)
-                        .map(|old| panel_sources(org_id, old, &old_values))
+                        .map(|old| report.panel_sources(org_id, &key.0, old, &old_values, false))
                         != Some(reads.clone()));
             if changed {
                 sources.extend(reads);
@@ -984,7 +1126,8 @@ fn variable_sources(
             continue;
         };
         let stream_type = json_stream_type(data, StreamType::Logs);
-        if let Some(source) = named_stream_source(org_id, data, stream_type, values) {
+        let name = data.get("stream").and_then(|s| s.as_str());
+        if let Some(source) = stream_name_source(org_id, name, stream_type, values) {
             sources.push(source);
         }
     }
@@ -1080,13 +1223,13 @@ fn json_stream_type(value: &serde_json::Value, fallback: StreamType) -> StreamTy
         .map_or(fallback, StreamType::from)
 }
 
-fn named_stream_source(
+fn stream_name_source(
     org_id: &str,
-    value: &serde_json::Value,
+    name: Option<&str>,
     stream_type: StreamType,
     values: &HashMap<String, String>,
 ) -> Option<QuerySource> {
-    let name = value.get("stream").and_then(|s| s.as_str())?;
+    let name = name?;
     if name.is_empty() {
         return None;
     }
@@ -1487,11 +1630,12 @@ mod tests {
     }
 
     #[cfg(all(feature = "enterprise", feature = "test-utils"))]
-    fn rendering(tab: &str) -> Vec<RenderingReport> {
-        vec![RenderingReport {
+    fn rendering(tab: &str) -> Result<Vec<RenderingReport>, Response> {
+        Ok(vec![RenderingReport {
             tab: Some(tab.to_string()),
             variables: Vec::new(),
-        }]
+            link: None,
+        }])
     }
 
     #[cfg(all(feature = "enterprise", feature = "test-utils"))]
@@ -1600,5 +1744,242 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(dashboard_json(&dashboard), None);
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn v8_panel(id: &str, sql: &str) -> serde_json::Value {
+        json!({
+            "id": id, "type": "table", "title": id, "description": "",
+            "config": { "show_legends": false, "legends_position": null },
+            "queryType": "sql",
+            "queries": [{
+                "query": sql, "customQuery": true,
+                "fields": { "stream": "", "stream_type": "logs", "x": [], "y": [],
+                            "filter": { "filterType": "group", "logicalOperator": "AND", "conditions": [] } },
+                "config": { "promql_legend": "" }
+            }]
+        })
+    }
+
+    /// Three tabs of one panel each, reading `streams`, with a panel-scoped `stream` variable.
+    #[cfg(feature = "enterprise")]
+    fn three_tabs(streams: [&str; 3]) -> Dashboard {
+        let tabs: Vec<_> = streams
+            .iter()
+            .enumerate()
+            .map(|(i, stream)| {
+                json!({ "tabId": format!("t{}", i + 1), "name": "", "panels": [
+                    v8_panel(&format!("p{}", i + 1), &format!("SELECT * FROM {stream}"))
+                ]})
+            })
+            .collect();
+        Dashboard {
+            version: 8,
+            v8: Some(
+                serde_json::from_value(json!({
+                    "title": "d",
+                    "tabs": tabs,
+                    "variables": { "list": [{
+                        "type": "custom", "name": "stream", "label": "S", "value": "safe",
+                        "scope": "panels", "panels": ["p1"]
+                    }]}
+                }))
+                .unwrap(),
+            ),
+            ..Default::default()
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn public_link(frozen: serde_json::Value) -> PublicDashboard {
+        PublicDashboard {
+            id: "l1".into(),
+            org_id: "o1".into(),
+            folder_id: "f1".into(),
+            dashboard_id: "d1".into(),
+            slug: "k8Zt2mR7aB3cD4eF5gH6Qx".into(),
+            name: "n".into(),
+            visibility: 1,
+            time_ranges: None,
+            default_range_key: None,
+            frozen_variables: Some(frozen.to_string()),
+            refresh_secs: 300,
+            dashboard_version: 8,
+            published_by: "publisher@example.com".into(),
+            enabled: false,
+            expires_at: None,
+            created_by: "publisher@example.com".into(),
+            updated_by: None,
+            created_at: 0,
+            updated_at: 0,
+            rev: 1,
+            deleted_at: None,
+            last_accessed_at: None,
+            access_count: 0,
+        }
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    async fn guard_with_links(
+        user: &str,
+        stored: &Dashboard,
+        edited: &Dashboard,
+        links: Result<Vec<PublicDashboard>, anyhow::Error>,
+    ) -> Result<(), Response> {
+        guard_stored_edit_with(
+            "o1",
+            user,
+            stored,
+            edited,
+            || async { Vec::new() },
+            || async { links },
+        )
+        .await
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    fn editor() -> String {
+        let user = format!("{}@example.com", config::ider::uuid());
+        let checker = crate::authz::fake_checker();
+        for name in ["safe", "first", "second", "third"] {
+            checker.grant_read(
+                &user,
+                &crate::authz::TypedStream {
+                    org_id: "o1".to_string(),
+                    stream_type: StreamType::Logs,
+                    name: name.to_string(),
+                },
+            );
+        }
+        user
+    }
+
+    /// No report renders these tabs; the link alone makes every tab a reader.
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn gate04_an_edit_introducing_a_stream_is_refused_on_tab_1_and_tab_3() {
+        let user = editor();
+        let stored = three_tabs(["first", "second", "third"]);
+        for edited in [
+            three_tabs(["secret", "second", "third"]),
+            three_tabs(["first", "second", "secret"]),
+        ] {
+            assert!(
+                guard_with_links(&user, &stored, &edited, Ok(vec![]))
+                    .await
+                    .is_ok(),
+                "without a link or report nothing renders the edit"
+            );
+            let resp = guard_with_links(&user, &stored, &edited, Ok(vec![public_link(json!({}))]))
+                .await
+                .unwrap_err();
+            assert_eq!(resp.status(), axum::http::StatusCode::FORBIDDEN);
+            assert_eq!(
+                message(resp).await,
+                "Unauthorized Access: no read permission on logs/secret"
+            );
+        }
+        let readable = three_tabs(["first", "safe", "third"]);
+        let links = Ok(vec![public_link(json!({}))]);
+        assert!(
+            guard_with_links(&user, &stored, &readable, links)
+                .await
+                .is_ok()
+        );
+    }
+
+    /// The same edited dashboards `guard_panel_add` and `guard_panel_update` build from a panel
+    /// write, and the full PUT body, all reach the link readers.
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn gate04_full_put_and_panel_writes_are_guarded_for_public_links() {
+        let user = editor();
+        let stored = three_tabs(["first", "second", "third"]);
+        let secret: Panel = serde_json::from_value(v8_panel("p3", "SELECT * FROM secret")).unwrap();
+
+        let full_put = three_tabs(["first", "second", "secret"]);
+        let mut updated = stored.clone();
+        crate::dashboards::replace_panel(&mut updated, "p3", Some("t3"), secret.clone()).unwrap();
+        let mut added = stored.clone();
+        let new_panel = Panel {
+            id: "p9".to_string(),
+            ..secret
+        };
+        crate::dashboards::insert_panel(&mut added, Some("t3"), new_panel).unwrap();
+
+        for edited in [full_put, updated, added] {
+            let links = Ok(vec![public_link(json!({}))]);
+            let resp = guard_with_links(&user, &stored, &edited, links)
+                .await
+                .unwrap_err();
+            assert_eq!(
+                message(resp).await,
+                "Unauthorized Access: no read permission on logs/secret"
+            );
+        }
+    }
+
+    /// The report resolver reads the dashboard default `safe`; the link's build runs the panel's
+    /// frozen `secret`, so the guard must check `secret`.
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn gate04_a_panel_scoped_frozen_value_is_resolved_as_the_build_resolves_it() {
+        let user = editor();
+        let stored = three_tabs(["first", "second", "third"]);
+        let mut edited = stored.clone();
+        let templated: Panel =
+            serde_json::from_value(v8_panel("p1", "SELECT * FROM $stream")).unwrap();
+        crate::dashboards::replace_panel(&mut edited, "p1", Some("t1"), templated).unwrap();
+
+        let (stored_json, edited_json) = (
+            dashboard_json(&stored).unwrap(),
+            dashboard_json(&edited).unwrap(),
+        );
+        let report = || async { rendering("t1") };
+        assert!(
+            guard_edit("o1", &user, &stored_json, &edited_json, report)
+                .await
+                .is_ok(),
+            "a report renders the dashboard default"
+        );
+
+        let link = public_link(json!({ "stream.p.p1": "secret" }));
+        let resp = guard_with_links(&user, &stored, &edited, Ok(vec![link]))
+            .await
+            .unwrap_err();
+        assert_eq!(
+            message(resp).await,
+            "Unauthorized Access: no read permission on logs/secret"
+        );
+        let link = public_link(json!({ "stream.p.p1": "safe" }));
+        assert!(
+            guard_with_links(&user, &stored, &edited, Ok(vec![link]))
+                .await
+                .is_ok()
+        );
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn gate04_a_failing_link_lookup_refuses_the_save() {
+        let user = editor();
+        let stored = three_tabs(["first", "second", "third"]);
+        let edited = three_tabs(["first", "second", "safe"]);
+        let failed = Err(anyhow::anyhow!("primary unavailable"));
+        let resp = guard_with_links(&user, &stored, &edited, failed)
+            .await
+            .unwrap_err();
+        assert_eq!(resp.status(), axum::http::StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(message(resp).await, PUBLIC_LINKS_UNVERIFIED);
+
+        // An edit that reads nothing new never looks links up, so it cannot fail on them.
+        let mut renamed = stored.clone();
+        renamed.set_title("renamed".to_string());
+        let failed = Err(anyhow::anyhow!("primary unavailable"));
+        assert!(
+            guard_with_links(&user, &stored, &renamed, failed)
+                .await
+                .is_ok()
+        );
     }
 }
