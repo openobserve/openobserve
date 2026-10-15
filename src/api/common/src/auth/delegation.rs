@@ -13,12 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(any(feature = "enterprise", test))]
-use std::collections::HashSet;
 #[cfg(feature = "enterprise")]
 use std::{
     collections::HashMap,
     sync::{LazyLock, Mutex},
+};
+#[cfg(any(feature = "enterprise", test))]
+use std::{
+    collections::HashSet,
+    time::{Duration, Instant},
 };
 
 use axum::http::Method;
@@ -37,7 +40,7 @@ const V2_API_PREFIX: &str = "v2";
 #[cfg(any(feature = "enterprise", test))]
 const PROXY_PREFIX: &str = "/proxy/";
 #[cfg(any(feature = "enterprise", test))]
-const LINK_CACHE_TTL_MICROS: i64 = 30_000_000;
+const LINK_CACHE_TTL: Duration = Duration::from_secs(30);
 #[cfg(any(feature = "enterprise", test))]
 const TOUCH_INTERVAL_MICROS: i64 = 60_000_000;
 #[cfg(feature = "enterprise")]
@@ -175,7 +178,7 @@ struct LinkFacts {
     refusal: Option<&'static str>,
     orgs: HashSet<String>,
     last_used_at: i64,
-    loaded_at: i64,
+    loaded: Instant,
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -184,10 +187,10 @@ impl LinkFacts {
         link: Option<ExternalIdentityLink>,
         installation: Option<SlackInstallation>,
         connections: Vec<SlackOrgConnection>,
-        now: i64,
+        loaded: Instant,
     ) -> Self {
         let Some(link) = link else {
-            return Self::refused("unknown link", now);
+            return Self::refused("unknown link", loaded);
         };
         let refusal = if link.revoked_at.is_some() {
             Some("link revoked")
@@ -202,18 +205,18 @@ impl LinkFacts {
             refusal,
             orgs: connections.into_iter().map(|c| c.org_id).collect(),
             last_used_at: link.last_used_at,
-            loaded_at: now,
+            loaded,
         }
     }
 
-    fn refused(reason: &'static str, now: i64) -> Self {
+    fn refused(reason: &'static str, loaded: Instant) -> Self {
         Self {
             installation_id: String::new(),
             user_email: String::new(),
             refusal: Some(reason),
             orgs: HashSet::new(),
             last_used_at: 0,
-            loaded_at: now,
+            loaded,
         }
     }
 
@@ -230,8 +233,9 @@ impl LinkFacts {
         Ok(())
     }
 
-    fn is_fresh(&self, now: i64) -> bool {
-        now - self.loaded_at < LINK_CACHE_TTL_MICROS
+    /// Monotonic, so a wall-clock step can neither keep a stale entry nor drop a fresh one.
+    fn is_fresh(&self, now: Instant) -> bool {
+        now.saturating_duration_since(self.loaded) < LINK_CACHE_TTL
     }
 }
 
@@ -243,13 +247,13 @@ pub async fn validate_delegated(
     path_prefix: &str,
     method: &Method,
 ) -> Result<AuthValidationResult, AuthError> {
-    use o2_enterprise::enterprise::slack;
+    use o2_enterprise::enterprise::{common::config::get_config as get_o2_config, slack};
 
-    let now = config::utils::time::now_micros();
-    let claims = verified_claims(token, signing_keys(), now / 1_000_000, slack::enabled_for)?;
-    let base_uri = config::get_config().common.base_uri.clone();
-    check_route(path, path_prefix, &base_uri, method, &claims)?;
-    let facts = link_facts(&claims.lid, now).await?;
+    let now_secs = config::utils::time::now_micros() / 1_000_000;
+    let slack_on = get_o2_config().slack.enabled;
+    let claims = verified_claims(token, slack_on, signing_keys, now_secs, slack::enabled_for)?;
+    check_route(path, path_prefix, method, &claims)?;
+    let facts = link_facts(&claims.lid, Instant::now()).await?;
     facts.admit(&claims)?;
     let Some(user) = openobserve_core::users::get_user(Some(&claims.org), &claims.sub).await else {
         return Err(forbidden("not a member of the org"));
@@ -341,15 +345,20 @@ const fn v2(segments: &'static [Seg], methods: &'static [&'static str]) -> Scope
     }
 }
 
+/// Slack off answers before the keys are derived, so stray `o2dt.` bearers cost nothing.
 #[cfg(any(feature = "enterprise", test))]
 fn verified_claims(
     token: &str,
-    keys: anyhow::Result<Keys>,
+    slack_on: bool,
+    keys: impl FnOnce() -> anyhow::Result<Keys>,
     now_secs: i64,
     enabled_for: impl Fn(&str) -> bool,
 ) -> Result<Claims, AuthError> {
-    let keys = keys.map_err(|e| {
-        log::warn!("delegated token refused: no signing key: {e}");
+    if !slack_on {
+        return Err(unauthorized());
+    }
+    let keys = keys().map_err(|e| {
+        log::debug!("delegated token refused: no signing key: {e}");
         unauthorized()
     })?;
     let claims = verify(&keys, token, now_secs).map_err(|e: DelegationError| {
@@ -369,14 +378,13 @@ fn verified_claims(
 fn check_route(
     path: &str,
     path_prefix: &str,
-    base_uri: &str,
     method: &Method,
     claims: &Claims,
 ) -> Result<(), AuthError> {
     if path_prefix == PROXY_PREFIX {
         return Err(forbidden("proxy routes are not delegated"));
     }
-    let relative = relative_path(path, path_prefix, base_uri);
+    let relative = relative_path(path);
     match path_org(relative) {
         None => Err(forbidden("route has no org")),
         Some(org) if org != claims.org => Err(forbidden("token is for another org")),
@@ -387,14 +395,10 @@ fn check_route(
     }
 }
 
-/// The validator's own normalisation, so a token sees the same org as Basic auth would.
+/// Already below `/api`; stripping `/api/` again would read an org named `api` as a prefix.
 #[cfg(any(feature = "enterprise", test))]
-fn relative_path<'a>(uri_path: &'a str, path_prefix: &str, base_uri: &str) -> &'a str {
-    let path = uri_path
-        .strip_prefix(format!("{base_uri}{path_prefix}").as_str())
-        .or_else(|| uri_path.strip_prefix("/api/"))
-        .unwrap_or(uri_path);
-    path.strip_prefix('/').unwrap_or(path)
+fn relative_path(uri_path: &str) -> &str {
+    uri_path.strip_prefix('/').unwrap_or(uri_path)
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -432,7 +436,7 @@ fn signing_keys() -> anyhow::Result<Keys> {
 }
 
 #[cfg(feature = "enterprise")]
-async fn link_facts(lid: &str, now: i64) -> Result<LinkFacts, AuthError> {
+async fn link_facts(lid: &str, now: Instant) -> Result<LinkFacts, AuthError> {
     use o2_enterprise::enterprise::slack::store;
 
     if let Some(facts) = cached_link(lid, now) {
@@ -452,16 +456,22 @@ async fn link_facts(lid: &str, now: i64) -> Result<LinkFacts, AuthError> {
             now,
         ))
     };
-    let facts = load.await.map_err(|e| {
-        log::error!("delegated token: loading link {lid} failed: {e}");
-        forbidden("link unavailable")
-    })?;
+    let facts = loaded_facts(load.await, lid)?;
     remember_link(lid, facts.clone());
     Ok(facts)
 }
 
+/// A failed read is 503, so the caller retries instead of reading it as a permission denial.
+#[cfg(any(feature = "enterprise", test))]
+fn loaded_facts(loaded: anyhow::Result<LinkFacts>, lid: &str) -> Result<LinkFacts, AuthError> {
+    loaded.map_err(|e| {
+        log::error!("delegated token: loading link {lid} failed: {e}");
+        AuthError::Unavailable("Service Unavailable".to_string())
+    })
+}
+
 #[cfg(feature = "enterprise")]
-fn cached_link(lid: &str, now: i64) -> Option<LinkFacts> {
+fn cached_link(lid: &str, now: Instant) -> Option<LinkFacts> {
     let cache = LINK_CACHE.lock().ok()?;
     cache.get(lid).filter(|f| f.is_fresh(now)).cloned()
 }
@@ -472,7 +482,7 @@ fn remember_link(lid: &str, facts: LinkFacts) {
         return;
     };
     if cache.len() >= LINK_CACHE_MAX {
-        let now = facts.loaded_at;
+        let now = Instant::now();
         cache.retain(|_, f| f.is_fresh(now));
         if cache.len() >= LINK_CACHE_MAX {
             cache.clear();
@@ -560,17 +570,12 @@ mod tests {
             Err(AuthError::Forbidden(_)) => 403,
             Err(AuthError::NotFound(_)) => 404,
             Err(AuthError::Locked { .. }) => 429,
+            Err(AuthError::Unavailable(_)) => 503,
         }
     }
 
-    fn route(path: &str, prefix: &str, base_uri: &str, method: Method) -> u16 {
-        status(check_route(
-            path,
-            prefix,
-            base_uri,
-            &method,
-            &claims("acme"),
-        ))
+    fn route(path: &str, prefix: &str, method: Method) -> u16 {
+        status(check_route(path, prefix, &method, &claims("acme")))
     }
 
     fn link() -> ExternalIdentityLink {
@@ -607,23 +612,36 @@ mod tests {
         claims: &Claims,
     ) -> u16 {
         let connections = orgs.iter().map(|o| connection(o)).collect();
-        status(LinkFacts::from_rows(link, installation, connections, NOW).admit(claims))
+        status(LinkFacts::from_rows(link, installation, connections, Instant::now()).admit(claims))
     }
 
     #[test]
     fn refused_when_slack_disabled() {
         let token = token(&claims("acme"));
         assert_eq!(
-            status(verified_claims(&token, Ok(keys()), NOW_SECS, |_| false)),
+            status(verified_claims(
+                &token,
+                true,
+                || Ok(keys()),
+                NOW_SECS,
+                |_| false
+            )),
             401
         );
         assert_eq!(
-            status(verified_claims(&token, Ok(keys()), NOW_SECS, |_| true)),
+            status(verified_claims(
+                &token,
+                true,
+                || Ok(keys()),
+                NOW_SECS,
+                |_| true
+            )),
             200
         );
         let no_key = verified_claims(
             &token,
-            Err(anyhow::anyhow!("no master key")),
+            true,
+            || Err(anyhow::anyhow!("no master key")),
             NOW_SECS,
             |_| true,
         );
@@ -631,11 +649,39 @@ mod tests {
     }
 
     #[test]
+    fn slack_off_refuses_before_reading_the_signing_keys() {
+        let token = token(&claims("acme"));
+        let refused = verified_claims(
+            &token,
+            false,
+            || panic!("signing keys were read with Slack off"),
+            NOW_SECS,
+            |_| true,
+        );
+        assert_eq!(status(refused), 401);
+    }
+
+    #[test]
+    fn a_link_that_cannot_be_loaded_is_503_not_a_denial() {
+        let failed = loaded_facts(Err(anyhow::anyhow!("database is down")), "lnk_01");
+        assert_eq!(status(failed), 503);
+        let facts =
+            LinkFacts::from_rows(Some(link()), Some(installation()), vec![], Instant::now());
+        assert_eq!(loaded_facts(Ok(facts.clone()), "lnk_01").ok(), Some(facts));
+    }
+
+    #[test]
     fn enabled_for_is_asked_about_the_token_org() {
         let token = token(&claims("acme"));
         let only_other = |org: &str| org == "other";
         assert_eq!(
-            status(verified_claims(&token, Ok(keys()), NOW_SECS, only_other)),
+            status(verified_claims(
+                &token,
+                true,
+                || Ok(keys()),
+                NOW_SECS,
+                only_other
+            )),
             401
         );
     }
@@ -662,7 +708,13 @@ mod tests {
             }),
         ] {
             assert_eq!(
-                status(verified_claims(&bad, Ok(keys()), NOW_SECS, |_| true)),
+                status(verified_claims(
+                    &bad,
+                    true,
+                    || Ok(keys()),
+                    NOW_SECS,
+                    |_| true
+                )),
                 401,
                 "{bad}"
             );
@@ -676,21 +728,39 @@ mod tests {
             ..claims("acme")
         });
         assert_eq!(
-            status(verified_claims(&token, Ok(keys()), NOW_SECS, |_| true)),
+            status(verified_claims(
+                &token,
+                true,
+                || Ok(keys()),
+                NOW_SECS,
+                |_| true
+            )),
             403
         );
     }
 
     #[test]
     fn path_org_must_match() {
-        assert_eq!(route("/api/acme/_search", "/api/", "", Method::POST), 200);
-        assert_eq!(route("/api/other/_search", "/api/", "", Method::POST), 403);
-        assert_eq!(route("/other/_search", "/api/", "", Method::POST), 403);
+        assert_eq!(route("/acme/_search", "/api/", Method::POST), 200);
+        assert_eq!(route("/other/_search", "/api/", Method::POST), 403);
+        assert_eq!(route("/v2/other/downtimes", "/api/", Method::POST), 403);
+        assert_eq!(route("/acmeX/streams", "/api/", Method::GET), 403);
+    }
+
+    #[test]
+    fn an_org_named_api_cannot_shift_the_path_org() {
+        let kv = claims("kv");
+        for path in ["/api/kv/_search", "/api/v2/kv/downtimes"] {
+            assert_eq!(
+                status(check_route(path, "/api/", &Method::POST, &kv)),
+                403,
+                "{path} is org `api` below `/api`"
+            );
+        }
         assert_eq!(
-            route("/api/v2/other/downtimes", "/api/", "", Method::POST),
-            403
+            status(check_route("/kv/_search", "/api/", &Method::POST, &kv)),
+            200
         );
-        assert_eq!(route("/api/acmeX/streams", "/api/", "", Method::GET), 403);
     }
 
     #[test]
@@ -702,70 +772,27 @@ mod tests {
         assert_eq!(path_org("organizations"), None);
         assert_eq!(path_org(""), None);
         assert_eq!(path_org("/streams"), None);
-        assert_eq!(
-            route("/api/v2/acme/downtimes", "/api/", "", Method::POST),
-            200
-        );
-        assert_eq!(route("/v2/acme/downtimes", "/api/", "", Method::POST), 200);
+        assert_eq!(route("/v2/acme/downtimes", "/api/", Method::POST), 200);
     }
 
     #[test]
-    fn base_uri_does_not_shift_the_org() {
-        for base in ["", "/abc", "/o2/x"] {
-            assert_eq!(
-                relative_path(&format!("{base}/api/acme/streams"), "/api/", base),
-                "acme/streams"
-            );
-            assert_eq!(
-                route(
-                    &format!("{base}/api/acme/streams"),
-                    "/api/",
-                    base,
-                    Method::GET
-                ),
-                200
-            );
-            assert_eq!(
-                route(
-                    &format!("{base}/api/other/streams"),
-                    "/api/",
-                    base,
-                    Method::GET
-                ),
-                403
-            );
-            assert_eq!(
-                route("/acme/streams", "/api/", base, Method::GET),
-                200,
-                "nested router path"
-            );
-        }
+    fn the_path_is_read_as_the_nested_router_passes_it() {
+        assert_eq!(relative_path("/acme/streams"), "acme/streams");
+        assert_eq!(relative_path("/api/acme/streams"), "api/acme/streams");
+        assert_eq!(route("/acme/streams", "/api/", Method::GET), 200);
+        assert_eq!(route("/other/streams", "/api/", Method::GET), 403);
     }
 
     #[test]
     fn org_less_and_proxy_routes_are_refused() {
-        for path in [
-            "/api/organizations",
-            "/api/license",
-            "/api/acme",
-            "/api/invites",
-            "/api/",
-        ] {
-            assert_eq!(route(path, "/api/", "", Method::GET), 403, "{path}");
+        for path in ["/organizations", "/license", "/acme", "/invites", "/"] {
+            assert_eq!(route(path, "/api/", Method::GET), 403, "{path}");
         }
         assert_eq!(
-            route(
-                "/proxy/acme/https://example.com/x",
-                "/proxy/",
-                "",
-                Method::GET
-            ),
+            route("/proxy/acme/https://example.com/x", "/proxy/", Method::GET),
             403
         );
-        assert_eq!(
-            route("/proxy/acme/_search", "/proxy/", "", Method::POST),
-            403
-        );
+        assert_eq!(route("/proxy/acme/_search", "/proxy/", Method::POST), 403);
     }
 
     #[test]
@@ -896,9 +923,11 @@ mod tests {
 
     #[test]
     fn link_facts_live_30_seconds_and_touches_wait_a_minute() {
-        let facts = LinkFacts::from_rows(Some(link()), Some(installation()), vec![], NOW);
-        assert!(facts.is_fresh(NOW + LINK_CACHE_TTL_MICROS - 1));
-        assert!(!facts.is_fresh(NOW + LINK_CACHE_TTL_MICROS));
+        let loaded = Instant::now();
+        let facts = LinkFacts::from_rows(Some(link()), Some(installation()), vec![], loaded);
+        assert!(facts.is_fresh(loaded));
+        assert!(facts.is_fresh(loaded + LINK_CACHE_TTL - Duration::from_nanos(1)));
+        assert!(!facts.is_fresh(loaded + LINK_CACHE_TTL));
         assert!(!touch_due(NOW, NOW + 59_999_999));
         assert!(touch_due(NOW, NOW + 60_000_000));
     }
