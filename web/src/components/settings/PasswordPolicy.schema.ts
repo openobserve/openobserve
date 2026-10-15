@@ -23,6 +23,9 @@ import { DEFAULT_COMPLEXITY } from "@/utils/passwordComplexity";
 
 const nonNegativeInt = z.coerce.number().int().min(0);
 
+// Matches MAX_PASSWORD_LEN in the Rust config.
+const MAX_PASSWORD_LENGTH = 128;
+
 /** The server's default policy, shown until the real one loads. */
 export const INITIAL_POLICY: PasswordPolicy = {
   ...DEFAULT_COMPLEXITY,
@@ -71,8 +74,7 @@ export const makePolicySchema = (t: TranslateFn) =>
     const issue = (path: string[], message: string) =>
       zctx.addIssue({ code: z.ZodIssueCode.custom, path, message });
 
-    // 0 is "unbounded", anything else must leave room for the minimum.
-    if (val.max_length !== 0 && val.max_length < val.min_length) {
+    if (val.max_length < val.min_length || val.max_length > MAX_PASSWORD_LENGTH) {
       issue(["max_length"], t("passwordPolicy.maxLengthTooSmall"));
     }
     // Equal is valid (warn from the first sign-in); only a LONGER window describes a deadline that never exists.

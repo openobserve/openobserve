@@ -1,3 +1,4 @@
+import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import { withFeatureGate } from "@/utils/enterpriseFeatures";
@@ -305,6 +306,23 @@ const useManagementRoutes = () => {
         },
       ],
     );
+  }
+  if (config.isEnterprise == "true" || config.isCloud == "true") {
+    routes[0].children.push({
+      path: "alert_calibration",
+      name: "alertCalibrationSettings",
+      component: () => import("@/components/settings/AlertCalibrationSettings.vue"),
+      meta: { titleKey: "settings.alertCalibration" },
+      // Synchronous: `useStore` and `routeGuard` read the injection context, which an await loses.
+      beforeEnter(to: any, from: any, next: any) {
+        // `=== false`, not falsy: a cold load with `/config` still in flight must not bounce.
+        if (useStore().state.zoConfig?.alert_calibration_enabled === false) {
+          next({ name: "general", query: to.query });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    });
   }
   if (config.isCloud == "true") {
     routes[0].children.push(
