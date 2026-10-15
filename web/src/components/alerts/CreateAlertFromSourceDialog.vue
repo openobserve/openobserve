@@ -220,7 +220,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import DOMPurify from "dompurify";
+import { useColorizedQuery } from "@/composables/useColorizedQuery";
 import { copyToClipboard } from "@/utils/clipboard";
 import type {
   AlertBuildOptions,
@@ -306,30 +306,20 @@ const pickedQuery = computed(
       ?.query ?? "",
 );
 
-const pickedQueryHtml = ref("");
-let colorizeRun = 0;
+const pickedQueryColoured = useColorizedQuery(
+  () => ({
+    query: pickQueryOnly.value ? pickedQuery.value : "",
+    language: props.prefill?.queryType === "promql" ? "promql" : "sql",
+  }),
+  // Loaded on demand: the colorizer pulls in Monaco, and this dialog sits in the app shell.
+  (query, language) =>
+    import("@/utils/query/colorizeQuery").then((module) => module.colorizeQuery(query, language)),
+);
 
 const escapedText = (text: string) =>
   Object.assign(document.createElement("div"), { textContent: text }).innerHTML;
 
-watch(
-  () => [pickQueryOnly.value, pickedQuery.value, props.prefill?.queryType] as const,
-  async ([active, query, queryType]) => {
-    const run = ++colorizeRun;
-    pickedQueryHtml.value = escapedText(query);
-    if (!active || !query) return;
-    try {
-      // Loaded on demand: the colorizer pulls in Monaco, and this dialog sits in the app shell.
-      const { colorizeQuery } = await import("@/utils/query/colorizeQuery");
-      const html = await colorizeQuery(query, queryType === "promql" ? "promql" : "sql");
-      // A later pick or prefill started its own run while this one awaited.
-      if (run === colorizeRun) pickedQueryHtml.value = DOMPurify.sanitize(html);
-    } catch {
-      // The plain text already shown is the fallback when the colorizer cannot load.
-    }
-  },
-  { immediate: true },
-);
+const pickedQueryHtml = computed(() => pickedQueryColoured.value || escapedText(pickedQuery.value));
 
 const onQueryChange = (value: unknown) => {
   if (typeof value !== "number" || value === props.prefill?.queryIndex) return;

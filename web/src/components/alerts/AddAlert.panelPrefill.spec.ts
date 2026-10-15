@@ -23,6 +23,13 @@ import i18n from "@/locales";
 import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
 import { normalizePrefill, warn } from "@/utils/alerts/alertPrefill";
 import { ALERT_PREFILL_KEY } from "@/utils/alerts/alertPrefillStorage";
+import { usePanelAlertCreation } from "@/composables/dashboard/usePanelActions";
+import {
+  alertCreationDialog,
+  closeAlertCreationDialog,
+  rebuildAlertPrefill,
+} from "@/composables/alerts/useAlertCreation";
+import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
@@ -138,9 +145,11 @@ interface AlertFormView {
       sql: string;
       aggregation: { having: Record<string, unknown> } | null;
     };
+    trigger_condition: { threshold: number; operator: string };
   };
   getAlertPayload: () => {
     query_condition: { type: string; sql: string; aggregation: unknown };
+    trigger_condition: { threshold: number; operator: string };
   };
 }
 
@@ -169,6 +178,10 @@ const openBuilderQuery = async (picked: boolean, guessed = false) => {
   });
   if (guessed)
     prefill.warnings.push(warn("thresholdColumnGuessed", "warning", { column: "y_axis_1" }));
+  return mountWithPrefill(prefill);
+};
+
+const mountWithPrefill = async (prefill: AlertPrefill) => {
   sessionStorage.setItem(ALERT_PREFILL_KEY, JSON.stringify(normalizePrefill(prefill)));
   const wrapper = mount(AddAlert, {
     global: { provide: { store }, plugins: [i18n], stubs },
@@ -176,6 +189,30 @@ const openBuilderQuery = async (picked: boolean, guessed = false) => {
   });
   for (let round = 0; round < 5; round++) await flushPromises();
   return wrapper;
+};
+
+/** Right-click query B's line, then pick builder query A in the dialog, as a user would. */
+const openAfterPickingAnotherQuery = async () => {
+  closeAlertCreationDialog();
+  usePanelAlertCreation({
+    panelSchema: {
+      value: { id: "p", title: "Retries", queryType: "sql", queries: [builtQuery, builtQuery] },
+    },
+    allowAlertCreation: { value: true },
+    metadata: { value: { queries: [] } },
+    selectedTimeObj: {
+      value: { value_type: "relative", relative_value: 15, relative_period: "Minutes" },
+    },
+    contextMenuData: { value: null },
+    store,
+    router: { push: vi.fn() },
+    emit: vi.fn(),
+  }).handleCreateAlert({ condition: "above", threshold: 4.42, panelQueryIndex: 1 });
+  rebuildAlertPrefill({ queryIndex: 0 });
+  const prefill = alertCreationDialog.value?.prefill;
+  closeAlertCreationDialog();
+  if (!prefill) throw new Error("the multi-query dialog did not open");
+  return mountWithPrefill(prefill);
 };
 
 describe("AddAlert — a threshold right-clicked on a builder query", () => {
@@ -213,5 +250,21 @@ describe("AddAlert — a threshold right-clicked on a builder query", () => {
     expect(
       wrapper.find('[data-test="add-alert-prefill-warning-thresholdColumnGuessed"]').text(),
     ).toContain("The threshold was applied to y_axis_1; check it is the value you meant.");
+  });
+
+  it("leaves the trigger at the form default when the clicked threshold is not carried", async () => {
+    wrapper = await openAfterPickingAnotherQuery();
+    const form = formOf(wrapper).formData;
+
+    expect(form.query_condition.type).toBe("sql");
+    expect(form.query_condition.sql).not.toContain("HAVING");
+    expect(form.trigger_condition).toMatchObject({ operator: ">=", threshold: 3 });
+
+    const saved = formOf(wrapper).getAlertPayload();
+    expect(saved.query_condition.aggregation).toBeNull();
+    expect(saved.trigger_condition).toMatchObject({ operator: ">=", threshold: 3 });
+    expect(
+      wrapper.find('[data-test="add-alert-prefill-warning-thresholdNotCarried"]').exists(),
+    ).toBe(true);
   });
 });

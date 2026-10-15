@@ -573,10 +573,15 @@ export default defineComponent({
             const hit = props.findLineOnContextMenu
               ? lineSeriesHit(pixelPoint as PixelPoint, option ?? {})
               : null;
+            // A trellis subplot past the first has its own axis, so a named line is read on it.
+            const ownPoint = hit
+              ? chart.convertFromPixel({ seriesIndex: hit.seriesIndex }, pixelPoint)
+              : null;
+            const ownValue = Array.isArray(ownPoint) ? Number(ownPoint[1]) : NaN;
             emit("domcontextmenu", {
               x: event.clientX,
               y: event.clientY,
-              value: Number(yAxisValue),
+              value: Number.isFinite(ownValue) ? ownValue : Number(yAxisValue),
               ...(hit ?? {}),
             });
           }

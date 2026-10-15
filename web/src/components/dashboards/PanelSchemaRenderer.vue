@@ -2289,7 +2289,6 @@ export default defineComponent({
       contextMenuData,
       onChartContextMenu,
       onChartDomContextMenu,
-      hasSeveralVisibleQueries,
       findsLineOnContextMenu,
       hideContextMenu,
       handleCreateAlert,

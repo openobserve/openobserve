@@ -314,6 +314,8 @@ export function usePanelAlertCreation({
         metadataQueries: metadata.value?.queries,
       });
       prefill.warnings.push(...thresholdWarnings(prefill, index));
+      // SQL save drops the aggregation, yet the form would read it as a threshold and force ">= 1 row".
+      if (!carriesThreshold(index)) prefill.aggregation = null;
       return alertSource?.value ? { ...prefill, source: alertSource.value } : prefill;
     };
 

@@ -739,6 +739,17 @@ describe("ChartRenderer", () => {
         return wrapper.emitted("domcontextmenu")?.at(-1)?.[0];
       };
 
+      it("reads a near-missed line's value on its own subplot axis", async () => {
+        const mockChart = await twoLines();
+        vi.mocked(mockChart.convertFromPixel).mockImplementation(
+          (finder: { gridIndex?: number }) => (finder.gridIndex === 0 ? [0, -14.43] : [0, 9.53]),
+        );
+        await wrapper.setProps({ findLineOnContextMenu: true });
+
+        expect(await rightClick(75, 81)).toMatchObject({ seriesIndex: 1, value: 9.53 });
+        expect(await rightClick(50, 300)).toEqual({ x: 50, y: 300, value: -14.43 });
+      });
+
       it("names the line when asked, so a multi-query alert knows its query", async () => {
         await twoLines();
         await wrapper.setProps({ findLineOnContextMenu: true });

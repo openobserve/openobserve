@@ -233,7 +233,11 @@ describe("PanelSchemaRenderer", () => {
           $t: (key: string) => key,
         },
         stubs: {
-          ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
+          ChartRenderer: {
+            name: "ChartRenderer",
+            props: ["findLineOnContextMenu"],
+            template: '<div data-test="chart-renderer"></div>',
+          },
           TableRenderer: { template: '<div data-test="table-renderer"></div>' },
           GeoMapRenderer: { template: '<div data-test="geomap-renderer"></div>' },
           MapsRenderer: { template: '<div data-test="maps-renderer"></div>' },
@@ -245,6 +249,12 @@ describe("PanelSchemaRenderer", () => {
         },
       },
     });
+  };
+
+  /** Whether the panel asks the chart to name the line under a right-click. */
+  const findsLine = async () => {
+    await nextTick();
+    return wrapper.findComponent({ name: "ChartRenderer" }).props("findLineOnContextMenu");
   };
 
   /** The loader's state for the next mount: data and metadata as the executors store them. */
@@ -2334,7 +2344,7 @@ describe("PanelSchemaRenderer", () => {
         expect(clickedQuery(2)).toBe(1);
       });
 
-      it("maps past an empty query slot the executor never ran, which leaves a hole in its data", () => {
+      it("maps past an empty query slot the executor never ran, which leaves a hole in its data", async () => {
         const holey = <T>(first: T, third: T): T[] => {
           const entries: T[] = [];
           entries[0] = first;
@@ -2358,14 +2368,14 @@ describe("PanelSchemaRenderer", () => {
           },
         };
 
-        expect(wrapper.vm.hasSeveralVisibleQueries).toBe(true);
+        expect(await findsLine()).toBe(true);
         expect(clickedQuery(0)).toBe(0);
         expect(clickedQuery(1)).toBe(2);
         expect(wrapper.vm.contextMenuData.yField).toBe(0);
       });
     });
 
-    it("maps the one visible, time-shifted SQL query's series past a hidden one", () => {
+    it("maps the one visible, time-shifted SQL query's series past a hidden one", async () => {
       mockLoadedData(
         [[], [], []],
         [
@@ -2392,8 +2402,7 @@ describe("PanelSchemaRenderer", () => {
         },
       };
 
-      expect(wrapper.vm.hasSeveralVisibleQueries).toBe(false);
-      expect(wrapper.vm.findsLineOnContextMenu).toBe(false);
+      expect(await findsLine()).toBe(false);
       wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0 });
       expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(1);
       expect(wrapper.vm.contextMenuData.yField).toBe(1);
@@ -2401,7 +2410,7 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(1);
     });
 
-    it("looks for the clicked line on a single query plotting two y fields", () => {
+    it("looks for the clicked line on a single query plotting two y fields", async () => {
       const query = defaultProps.panelSchema.queries[0];
       wrapper = createWrapper({
         allowAlertCreation: true,
@@ -2416,8 +2425,7 @@ describe("PanelSchemaRenderer", () => {
         },
       });
 
-      expect(wrapper.vm.hasSeveralVisibleQueries).toBe(false);
-      expect(wrapper.vm.findsLineOnContextMenu).toBe(true);
+      expect(await findsLine()).toBe(true);
     });
 
     it("reads a forecast line's start and the clicked point's time, for the forecast alert", () => {
