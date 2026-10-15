@@ -20,10 +20,15 @@ use config::{
         stream::StreamType,
         traces::session::{quote_identifier, quote_sql_string},
     },
+    utils::json,
 };
+use hashbrown::HashMap;
 use infra::errors::Error;
 
-use super::{plan::TraceColumns, response::TraceBatch};
+use super::{
+    plan::{TraceColumns, TraceListPlan},
+    response::TraceBatch,
+};
 use crate::traces::schema_compat;
 
 pub struct TraceSearchContext {
@@ -56,6 +61,26 @@ impl TraceSearchContext {
             false,
         )
         .await
+    }
+
+    /// Swaps each hit's filtered aggregates for its trace's aggregates over every span in `range`.
+    pub async fn summarize_traces(
+        &self,
+        plan: &TraceListPlan,
+        base_request: &Request,
+        hits: Vec<json::Value>,
+        range: (i64, i64),
+    ) -> Result<Vec<json::Value>, Error> {
+        let ids = sanitize_trace_ids(
+            hits.iter()
+                .filter_map(|hit| hit.get("trace_id").and_then(json::Value::as_str)),
+        );
+        let Some(request) = plan.summary_request(&self.stream_name, base_request, &ids, range)
+        else {
+            return Ok(hits);
+        };
+        let response = self.search(&request).await?;
+        Ok(merge_summaries(hits, response.hits))
     }
 
     pub async fn fill_services(
@@ -153,24 +178,58 @@ pub fn build_partition_query(stream_name: &str) -> String {
     format!("SELECT * FROM {}", quote_identifier(stream_name))
 }
 
+pub fn trace_id_list_sql(trace_ids: &[String]) -> String {
+    trace_ids
+        .iter()
+        .map(|id| quote_sql_string(id))
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
 fn build_service_breakdown_query(
     stream_name: &str,
     service_key_expr: &str,
     svc_type_select: &str,
     trace_ids: &[String],
 ) -> String {
-    let trace_ids_sql = trace_ids
-        .iter()
-        .map(|id| quote_sql_string(id))
-        .collect::<Vec<_>>()
-        .join(",");
     format!(
         "SELECT trace_id, {service_key_expr} AS service_name{svc_type_select}, \
          count(*) AS svc_count, max(duration) AS svc_duration \
-         FROM {} WHERE trace_id IN ({trace_ids_sql}) \
+         FROM {} WHERE trace_id IN ({}) \
          GROUP BY trace_id, {service_key_expr}",
-        quote_identifier(stream_name)
+        quote_identifier(stream_name),
+        trace_id_list_sql(trace_ids)
     )
+}
+
+// Trace IDs come from stored rows, so they are reduced to hex and '-' before reaching SQL.
+fn sanitize_trace_ids<'a>(ids: impl Iterator<Item = &'a str>) -> Vec<String> {
+    ids.map(|id| {
+        id.chars()
+            .filter(|c| c.is_ascii_hexdigit() || *c == '-')
+            .collect::<String>()
+    })
+    .filter(|id| !id.is_empty())
+    .collect()
+}
+
+// A hit missing from the full summary keeps its filtered aggregates rather than vanishing.
+fn merge_summaries(hits: Vec<json::Value>, full: Vec<json::Value>) -> Vec<json::Value> {
+    let mut full = full
+        .into_iter()
+        .filter_map(|hit| {
+            let id = hit.get("trace_id")?.as_str()?.to_string();
+            Some((id, hit))
+        })
+        .collect::<HashMap<_, _>>();
+    hits.into_iter()
+        .map(|hit| {
+            hit.get("trace_id")
+                .and_then(json::Value::as_str)
+                .and_then(|id| full.remove(id))
+                .unwrap_or(hit)
+        })
+        .collect()
 }
 
 fn service_request(
@@ -180,17 +239,7 @@ fn service_request(
     columns: &TraceColumns,
     range: (i64, i64),
 ) -> Request {
-    // Trace IDs come from stored rows, so they are reduced to hex and '-' before reaching SQL.
-    let ids = batch
-        .multi_service_ids
-        .iter()
-        .map(|id| {
-            id.chars()
-                .filter(|c| c.is_ascii_hexdigit() || *c == '-')
-                .collect::<String>()
-        })
-        .filter(|id| !id.is_empty())
-        .collect::<Vec<_>>();
+    let ids = sanitize_trace_ids(batch.multi_service_ids.iter().map(String::as_str));
     // NULL for instrumented services, the inferred kind ("database", "queue", ...) otherwise.
     let service_type = if columns.has_inferred_service {
         ", max(infer_service_type) AS service_type"
@@ -280,6 +329,44 @@ mod tests {
         assert_eq!(
             build_partition_query("evil\" x"),
             "SELECT * FROM \"evil\"\" x\""
+        );
+    }
+
+    #[test]
+    fn full_summaries_replace_filtered_aggregates_in_page_order() {
+        let filtered = vec![
+            json::json!({"trace_id": "t", "trace_start_time": 20_000, "trace_end_time": 40_000,
+                "span_count": 1, "error_count": 0, "service_count": 1,
+                "first_service_name": "api"}),
+            json::json!({"trace_id": "gone", "span_count": 1}),
+        ];
+        let full = vec![
+            json::json!({"trace_id": "other", "span_count": 9}),
+            json::json!({"trace_id": "t", "trace_start_time": 0, "trace_end_time": 100_000,
+                "span_count": 3, "error_count": 1, "service_count": 3,
+                "root_service_name": "gateway", "root_operation_name": "root"}),
+        ];
+        let merged = merge_summaries(filtered, full);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0]["span_count"], 3);
+        assert_eq!(
+            merged[1],
+            json::json!({"trace_id": "gone", "span_count": 1})
+        );
+
+        let batch = TraceBatch::from_hits(&merged, (0, 1));
+        assert_eq!(batch.multi_service_ids, ["t"]);
+        let item = json::to_value(&batch.traces["t"]).unwrap();
+        assert_eq!(item["spans"], json::json!([3, 1]));
+        assert_eq!(item["duration"], 100);
+        assert_eq!(item["first_event"]["service_name"], "gateway");
+    }
+
+    #[test]
+    fn trace_ids_are_reduced_to_hex_and_dashes() {
+        assert_eq!(
+            sanitize_trace_ids(["a-B!", "x') OR 1=1", "zz"].into_iter()),
+            ["a-B", "11"]
         );
     }
 
