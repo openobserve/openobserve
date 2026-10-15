@@ -52,6 +52,17 @@ impl Counters {
         self.over_budget_at(key, window, max, Instant::now())
     }
 
+    /// Whether `key` already spent `max` hits in its window; counts nothing.
+    pub fn exhausted(&self, key: &str, window: Duration, max: u32) -> bool {
+        let Ok(state) = self.state.lock() else {
+            return false;
+        };
+        state
+            .hits
+            .get(key)
+            .is_some_and(|(n, at)| Instant::now().duration_since(*at) < window && *n >= max)
+    }
+
     fn over_budget_at(&self, key: &str, window: Duration, max: u32, now: Instant) -> bool {
         let Ok(mut state) = self.state.lock() else {
             return false;
@@ -156,5 +167,18 @@ mod tests {
     #[test]
     fn unresolved_clients_log_as_unknown() {
         assert_eq!(client_ip(None), UNKNOWN_IP);
+    }
+
+    #[test]
+    fn exhausted_reads_the_budget_without_counting() {
+        let counters = Counters::default();
+        let window = Duration::from_secs(60);
+        assert!(!counters.exhausted("slug", window, 2));
+        assert!(!counters.over_budget("slug", window, 2));
+        assert!(!counters.exhausted("slug", window, 2));
+        assert!(!counters.over_budget("slug", window, 2));
+        assert!(counters.exhausted("slug", window, 2));
+        assert!(counters.exhausted("slug", window, 2), "a peek is not a hit");
+        assert!(!counters.exhausted("other", window, 2));
     }
 }

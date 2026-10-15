@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The public serving plane. Registered in `basic_routes` without auth middleware or OpenFGA;
-//! the slug is the only credential. Every gate reads the link and org settings rows from the
-//! primary, so revoke, pause, expiry and the org switch apply on the next request.
+//! The public serving plane: no auth, the slug is the credential, every gate reads the primary.
 
 use std::{sync::LazyLock, time::Duration};
 
@@ -74,9 +72,7 @@ enum Servable {
     Ok(Box<Model>, i64),
 }
 
-/// Resolve a slug to a servable link and its org's settings rev, or why it isn't served: unknown,
-/// revoked, draft or switched off gives a uniform 404 (no existence oracle); paused 503; expired
-/// 410.
+/// A servable link and its org's settings rev, or why not: 404 (no existence oracle), 503, 410.
 async fn resolve(slug: &str) -> Servable {
     if !config::get_config().public_dashboards.enabled || !is_public_dashboard_slug(slug) {
         return Servable::NotFound;
@@ -126,7 +122,7 @@ async fn trial_ok(org: &str) -> bool {
 
 async fn evict_link(pd: &Model) {
     for range in core_pd::time_ranges(pd).ranges {
-        store::evict(&store::key(&pd.org_id, &pd.id, &range.key())).await;
+        store::evict_if_indexed(&store::key(&pd.org_id, &pd.id, &range.key())).await;
     }
 }
 
@@ -169,7 +165,7 @@ pub async fn data(
     Query(params): Query<DataParams>,
     headers: HeaderMap,
 ) -> Response {
-    if rate_limited(ip.map(|e| e.0)) {
+    if rate_limited(ip.map(|e| e.0)) || slug_exhausted(&slug) {
         return with_headers(too_many_requests(READ_WINDOW));
     }
     let if_none_match = headers
@@ -238,8 +234,8 @@ async fn serve_data(slug: &str, range_key: Option<&str>, if_none_match: Option<&
     };
     let range_key = range_key.map_or_else(|| default_range_key(&pd), str::to_string);
     let Some(range) = offered_range(&pd, &range_key) else {
-        // A range removed by an edit leaves its file behind until someone asks for it.
-        store::evict(&store::key(&pd.org_id, &pd.id, &range_key)).await;
+        // A removed range's file goes on a later ask; a made-up key costs only a read lock.
+        store::evict_if_indexed(&store::key(&pd.org_id, &pd.id, &range_key)).await;
         return StatusCode::NOT_FOUND.into_response();
     };
     let dash = match dashboards::get_by_id_primary(&pd.org_id, &pd.dashboard_id).await {
@@ -261,25 +257,25 @@ async fn serve_data(slug: &str, range_key: Option<&str>, if_none_match: Option<&
             dashboard: &dash,
             range,
             now,
+            if_none_match,
         },
     )
     .await;
-    respond(&pd, served, if_none_match, now)
+    respond(&pd, served, now)
 }
 
-/// Turns a read into its response: 304 on a matching ETag, else the body, counted per slug.
-fn respond(pd: &Model, served: Served, if_none_match: Option<&str>, now: i64) -> Response {
-    if let Served::Data {
-        response, outcome, ..
-    } = &served
-    {
-        let etag = format!("\"{}\"", response.rev);
-        if if_none_match.is_some_and(|v| etag_matches(v, &response.rev)) {
-            materialize::count_read(&pd.org_id, "not_modified");
-            let mut resp = StatusCode::NOT_MODIFIED.into_response();
-            set_header(&mut resp, header::ETAG, &etag);
-            return resp;
+/// Turns a read into its response; a body counts against the slug's budget, a 304 never does.
+fn respond(pd: &Model, served: Served, now: i64) -> Response {
+    if let Served::NotModified { rev, retry_hint } = &served {
+        materialize::count_read(&pd.org_id, "not_modified");
+        let mut resp = StatusCode::NOT_MODIFIED.into_response();
+        set_header(&mut resp, header::ETAG, &format!("\"{rev}\""));
+        if let Some(secs) = retry_hint {
+            set_header(&mut resp, header::RETRY_AFTER, &secs.to_string());
         }
+        return resp;
+    }
+    if let Served::Data { outcome, .. } = &served {
         materialize::count_read(&pd.org_id, outcome);
     }
     if !matches!(served, Served::Gone) && slug_limited(&pd.slug) {
@@ -320,7 +316,7 @@ fn respond(pd: &Model, served: Served, if_none_match: Option<&str>, now: i64) ->
             set_header(&mut resp, header::RETRY_AFTER, &retry_after.to_string());
             resp
         }
-        Served::Gone => unavailable(),
+        Served::Gone | Served::NotModified { .. } => unavailable(),
     }
 }
 
@@ -336,19 +332,16 @@ fn set_header(resp: &mut Response, name: header::HeaderName, value: &str) {
     }
 }
 
-/// `If-None-Match` names this rev, weak or strong, alone or in a list.
-fn etag_matches(header_value: &str, rev: &str) -> bool {
-    header_value.split(',').any(|tag| {
-        let tag = tag.trim();
-        let tag = tag.strip_prefix("W/").unwrap_or(tag);
-        tag == "*" || tag.trim_matches('"') == rev
-    })
-}
-
-/// True if this link is over its per-minute budget of responses with a body; 0 rpm disables it.
+/// Counts one response with a body against the link's per-minute budget; 0 rpm disables it.
 fn slug_limited(slug: &str) -> bool {
     let rpm = config::get_config().public_dashboards.slug_rpm;
     rpm != 0 && SLUG_READS.over_budget(slug, READ_WINDOW, rpm)
+}
+
+/// Whether the link already spent its budget, checked before any read or flight; counts nothing.
+fn slug_exhausted(slug: &str) -> bool {
+    let rpm = config::get_config().public_dashboards.slug_rpm;
+    rpm != 0 && SLUG_READS.exhausted(slug, READ_WINDOW, rpm)
 }
 
 /// The range a request without `range` gets: the link's default, as the page opens on.
@@ -720,14 +713,6 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn if_none_match_accepts_weak_strong_and_listed_tags() {
-        assert!(etag_matches("\"abc\"", "abc"));
-        assert!(etag_matches("W/\"abc\"", "abc"));
-        assert!(etag_matches("\"x\", \"abc\"", "abc"));
-        assert!(!etag_matches("\"abd\"", "abc"));
-    }
-
     fn data_response(rev: &str) -> Served {
         Served::Data {
             response: Box::new(config::meta::public_dashboards::DataResponse {
@@ -760,21 +745,25 @@ mod tests {
         };
         let rpm = config::get_config().public_dashboards.slug_rpm as usize;
         for _ in 0..rpm + 50 {
-            let resp = respond(&pd, data_response("r1"), Some("\"r1\""), 0);
+            let not_modified = Served::NotModified {
+                rev: "r1".into(),
+                retry_hint: Some(4),
+            };
+            let resp = respond(&pd, not_modified, 0);
             assert_eq!(resp.status(), StatusCode::NOT_MODIFIED);
             assert_eq!(resp.headers()[header::ETAG], "\"r1\"");
+            assert_eq!(resp.headers()[header::RETRY_AFTER], "4");
         }
-        let resp = respond(&pd, data_response("r2"), Some("\"r1\""), 0);
-        assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(resp.headers()[header::ETAG], "\"r2\"");
-        assert_eq!(resp.headers()[header::RETRY_AFTER], "4");
-        for _ in 1..rpm {
-            assert_eq!(
-                respond(&pd, data_response("r2"), None, 0).status(),
-                StatusCode::OK
-            );
+        assert!(!slug_exhausted(&pd.slug), "a 304 never counts");
+        for _ in 0..rpm {
+            let resp = respond(&pd, data_response("r2"), 0);
+            assert_eq!(resp.status(), StatusCode::OK);
+            assert_eq!(resp.headers()[header::ETAG], "\"r2\"");
+            assert_eq!(resp.headers()[header::RETRY_AFTER], "4");
         }
-        let resp = respond(&pd, data_response("r2"), None, 0);
+        // The data handler now answers 429 before resolve() or any flight work.
+        assert!(slug_exhausted(&pd.slug));
+        let resp = respond(&pd, data_response("r2"), 0);
         assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
     }
 
@@ -789,17 +778,17 @@ mod tests {
             estimated_secs: 1,
             progress: 0.5,
         });
-        let resp = respond(&pd, building, None, 0);
+        let resp = respond(&pd, building, 0);
         assert_eq!(resp.status(), StatusCode::ACCEPTED);
         assert_eq!(resp.headers()[header::RETRY_AFTER], "3");
         let cooldown = Served::Cooldown(NotReadyResponse::Cooldown {
             last_error_at: Some(1),
             next_retry_at: 90_500_000,
         });
-        let resp = respond(&pd, cooldown, None, 0);
+        let resp = respond(&pd, cooldown, 0);
         assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(resp.headers()[header::RETRY_AFTER], "91");
-        let resp = respond(&pd, Served::Unavailable { retry_after: 6 }, None, 0);
+        let resp = respond(&pd, Served::Unavailable { retry_after: 6 }, 0);
         assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(resp.headers()[header::RETRY_AFTER], "6");
     }

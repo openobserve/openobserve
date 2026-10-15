@@ -312,7 +312,7 @@ impl TraceFamily {
     /// Stops new children and aborts every running one.
     pub async fn cancel(&self) {
         self.cancelled.store(true, Ordering::SeqCst);
-        search_service::abort_trace_family(&self.prefix).await;
+        search_service::abort_trace_family(&format!("{}-", self.prefix)).await;
     }
 }
 

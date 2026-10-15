@@ -326,6 +326,9 @@ pub struct ResultBody {
     pub panels: BTreeMap<String, PanelResult>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub variables: Vec<PublicVariable>,
+    /// The frozen-value key of each entry of `variables`; it stays in the result file.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variable_keys: Vec<String>,
 }
 
 /// Why a served result is due again.
@@ -423,6 +426,17 @@ pub struct PublicVariable {
 impl PublicVariable {
     /// One entry per visible scope instance, valued from `values` by its key (`name.t.<tab>`).
     pub fn list(dash: &Dashboard, values: &BTreeMap<String, serde_json::Value>) -> Vec<Self> {
+        Self::list_keyed(dash, values)
+            .into_iter()
+            .map(|(_, v)| v)
+            .collect()
+    }
+
+    /// [`Self::list`] with each entry's frozen-value key.
+    pub fn list_keyed(
+        dash: &Dashboard,
+        values: &BTreeMap<String, serde_json::Value>,
+    ) -> Vec<(String, Self)> {
         let Some(list) = dash.v8.as_ref().and_then(|v8| v8.variables.as_ref()) else {
             return vec![];
         };
@@ -453,11 +467,14 @@ impl PublicVariable {
                     };
                 instances
                     .into_iter()
-                    .map(|(key, tab_id, panel_id)| Self {
-                        label: label.clone(),
-                        value: values.get(&key).cloned().unwrap_or(serde_json::Value::Null),
-                        tab_id,
-                        panel_id,
+                    .map(|(key, tab_id, panel_id)| {
+                        let entry = Self {
+                            label: label.clone(),
+                            value: values.get(&key).cloned().unwrap_or(serde_json::Value::Null),
+                            tab_id,
+                            panel_id,
+                        };
+                        (key, entry)
                     })
                     .collect::<Vec<_>>()
             })

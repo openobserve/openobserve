@@ -45,7 +45,9 @@ use super::{
     authz_check,
     flight::{Built, Failure, Flight, Flights, Kind, Outcome, Start, TraceFamily, Wait, drain_by},
     intent, mask,
-    store::{self, Header, Manifest, ManifestPanel, PanelOutcome, Stored},
+    store::{
+        self, Header, Manifest, ManifestPanel, PanelOutcome, PanelSummary, Stored, ValuesDependency,
+    },
 };
 
 const SECOND: i64 = 1_000_000;
@@ -162,6 +164,10 @@ impl PanelRun {
 #[derive(Clone, Debug, Default)]
 pub struct Run {
     pub variables: Vec<PublicVariable>,
+    /// The frozen-value key of each entry of `variables`.
+    pub variable_keys: Vec<String>,
+    /// Every values query a variable value came from, with its streams.
+    pub values_dependencies: Vec<ValuesDependency>,
     pub panels: Vec<PanelRun>,
 }
 
@@ -223,6 +229,11 @@ pub enum Served {
     Cooldown(NotReadyResponse),
     /// 503: no permit for a cold build, or the authorization check failed closed.
     Unavailable { retry_after: u64 },
+    /// 304: the reader already holds this rev; `retry_hint` as for a 200.
+    NotModified {
+        rev: String,
+        retry_hint: Option<u64>,
+    },
     /// The flight found the link no longer servable.
     Gone,
 }
@@ -234,6 +245,8 @@ pub struct ReadRequest<'a> {
     pub dashboard: &'a Dashboard,
     pub range: TimeRange,
     pub now: i64,
+    /// The request's If-None-Match; a matching rev is answered without reading the body.
+    pub if_none_match: Option<&'a str>,
 }
 
 /// The read path of design 4.2 after the link gates: deadline check, due rules, flight, masking.
@@ -347,7 +360,7 @@ pub fn assemble(
     eff_secs: i64,
     jitter: f64,
 ) -> Assembled {
-    let max_age = i64::from(get_config().public_dashboards.max_panel_age_hours) * 3600 * SECOND;
+    let max_age = max_age_micros();
     let ran = run
         .panels
         .iter()
@@ -404,7 +417,10 @@ pub fn assemble(
         ..Default::default()
     };
     let mut panels = BTreeMap::new();
-    let mut manifest = Manifest::new();
+    let mut manifest = Manifest {
+        variables: run.values_dependencies.clone(),
+        ..Default::default()
+    };
     for mut p in run.panels {
         match p.class {
             Class::Denied => {
@@ -424,7 +440,7 @@ pub fn assemble(
             Class::Transient => {
                 header.incomplete_count += 1;
                 let old = prior_panels.and_then(|b| b.get(&p.id));
-                let old_manifest = prior.and_then(|pr| pr.stored.manifest.get(&p.id));
+                let old_manifest = prior.and_then(|pr| pr.stored.manifest.panels.get(&p.id));
                 match retain(old, old_manifest, &p, retainable, now, max_age) {
                     Some((result, m)) => {
                         header.retained_count += 1;
@@ -442,10 +458,19 @@ pub fn assemble(
         if matches!(p.result.state, PanelState::NotAvailable { .. }) {
             header.unavailable_count += 1;
         }
-        manifest.insert(p.id.clone(), p.manifest);
+        manifest.panels.insert(p.id.clone(), p.manifest);
         panels.insert(p.id, p.result);
     }
     header.panel_count = u16::try_from(panels.len()).unwrap_or(u16::MAX);
+    header.panels = panels
+        .iter()
+        .map(|(id, p)| PanelSummary {
+            id: id.clone(),
+            intent: p.intent.clone(),
+            state: p.state.clone(),
+            built_at: p.built_at,
+        })
+        .collect();
     let kind = if header.incomplete_count > 0 {
         fail(&mut header, live, now, eff_secs, jitter, first_error);
         BuildKind::Partial
@@ -459,6 +484,7 @@ pub fn assemble(
         body: Some(ResultBody {
             panels,
             variables: run.variables,
+            variable_keys: run.variable_keys,
         }),
         kind,
     }
@@ -602,28 +628,40 @@ pub fn deadline_passed(header: &Header, now: i64) -> bool {
     header.has_body() && now - header.auth_checked_at >= authz_check::AUTH_DEADLINE_MICROS
 }
 
-/// The hex rev over everything visible in a response (design 4.4); also the ETag.
-pub fn rev(header: &Header, response: &DataResponse) -> String {
-    let panels: Vec<(&String, &PanelState)> = response
-        .panels
-        .iter()
-        .map(|(id, p)| (id, &p.state))
-        .collect();
+/// The hex rev over everything visible in a response (design 4.4), from the header alone.
+pub fn rev(
+    header: &Header,
+    states: &[(String, PanelState)],
+    stale_reason: Option<StaleReason>,
+    refreshing: bool,
+    next_retry_at: Option<i64>,
+    fresh_until: Option<i64>,
+) -> String {
     let doc = serde_json::json!([
         header.incarnation,
         header.withheld_panels,
-        panels,
-        response.stale,
-        response.stale_reason,
-        response.refreshing,
-        response.next_retry_at,
-        response.last_error_at,
-        response.dashboard_updated_at,
-        response.link_rev,
-        response.settings_rev,
-        response.fresh_until,
+        header.withheld_variables,
+        states,
+        stale_reason.is_some(),
+        stale_reason,
+        refreshing,
+        next_retry_at,
+        header.last_error_at,
+        header.dashboard_updated_at,
+        header.link_rev,
+        header.settings_rev,
+        fresh_until,
     ]);
     format!("{:016x}", gxhash::new().sum64(&doc.to_string()))
+}
+
+/// Whether an If-None-Match value names this rev, weak or strong, alone or in a list.
+pub fn etag_matches(header_value: &str, rev: &str) -> bool {
+    header_value.split(',').any(|tag| {
+        let tag = tag.trim();
+        let tag = tag.strip_prefix("W/").unwrap_or(tag);
+        tag == "*" || tag.trim_matches('"') == rev
+    })
 }
 
 /// The poll hint while refreshing: `max(3 s, the remaining expected build time)` plus up to 20%.
@@ -668,8 +706,7 @@ fn fail(
     header.attempted_revs = Some(live.as_array());
 }
 
-/// Prior data of a failed panel, kept only with an unchanged intent, young data and passing
-/// sources.
+/// A failed panel's prior data, kept with an unchanged intent, young data, passing sources.
 fn retain(
     old: Option<&PanelResult>,
     old_manifest: Option<&ManifestPanel>,
@@ -718,7 +755,7 @@ async fn retainable(
         return out;
     };
     for p in run.panels.iter().filter(|p| p.class == Class::Transient) {
-        let Some(m) = prior.stored.manifest.get(&p.id) else {
+        let Some(m) = prior.stored.manifest.panels.get(&p.id) else {
             continue;
         };
         if prior.stored.header.is_withheld(&p.id) {
@@ -837,6 +874,18 @@ async fn serve_file(
     } else {
         flights.get(key).filter(|f| f.kind == Kind::Build)
     };
+    let retry_hint = flight.as_ref().map(|f| {
+        retry_hint(
+            Some(f),
+            header.build_ms,
+            req.now,
+            rand::random_range(0.0..=0.2),
+        )
+    });
+    let rev = rev_for(&header, req, intents, due.reason, flight.is_some(), eff);
+    if req.if_none_match.is_some_and(|v| etag_matches(v, &rev)) {
+        return Served::NotModified { rev, retry_hint };
+    }
     let Some(body) = store::body(key, &header).await else {
         // Replaced or evicted since the header read: answer as a miss.
         return serve_cold(engine, flights, key, None, req, intents, live).await;
@@ -849,15 +898,8 @@ async fn serve_file(
         due.reason,
         flight.is_some(),
         eff,
+        rev,
     );
-    let retry_hint = flight.as_ref().map(|f| {
-        retry_hint(
-            Some(f),
-            header.build_ms,
-            req.now,
-            rand::random_range(0.0..=0.2),
-        )
-    });
     Served::Data {
         response: Box::new(response),
         retry_hint,
@@ -950,7 +992,23 @@ fn once(
     };
     let eff = effective_secs(req.link, &req.range);
     let due = due(&built.header, live, req.range.is_relative(), eff, req.now);
-    let response = envelope(&built.header, body, req, intents, due.reason, false, eff);
+    let rev = rev_for(&built.header, req, intents, due.reason, false, eff);
+    if req.if_none_match.is_some_and(|v| etag_matches(v, &rev)) {
+        return Served::NotModified {
+            rev,
+            retry_hint: None,
+        };
+    }
+    let response = envelope(
+        &built.header,
+        body,
+        req,
+        intents,
+        due.reason,
+        false,
+        eff,
+        rev,
+    );
     Served::Data {
         response: Box::new(response),
         retry_hint: None,
@@ -972,6 +1030,7 @@ fn start_build(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn envelope(
     header: &Header,
     body: &ResultBody,
@@ -980,18 +1039,17 @@ fn envelope(
     reason: Option<StaleReason>,
     refreshing: bool,
     eff: i64,
+    rev: String,
 ) -> DataResponse {
-    let max_age = i64::from(get_config().public_dashboards.max_panel_age_hours) * 3600 * SECOND;
-    let built_at = header.built_at.unwrap_or_default();
-    let mut response = DataResponse {
-        rev: String::new(),
-        built_at,
+    DataResponse {
+        rev,
+        built_at: header.built_at.unwrap_or_default(),
         window: Window {
             start: header.window_start,
             end: header.window_end,
         },
         refresh_secs: eff,
-        fresh_until: req.range.is_relative().then_some(built_at + eff * SECOND),
+        fresh_until: fresh_until(header, req, eff),
         stale: reason.is_some(),
         stale_reason: reason,
         refreshing,
@@ -1000,11 +1058,39 @@ fn envelope(
         dashboard_updated_at: header.dashboard_updated_at,
         link_rev: header.link_rev,
         settings_rev: header.settings_rev,
-        variables: body.variables.clone(),
-        panels: mask::mask(body, header, intents, req.now, max_age),
-    };
-    response.rev = rev(header, &response);
-    response
+        variables: mask::variables(body, header),
+        panels: mask::mask(body, header, intents, req.now, max_age_micros()),
+    }
+}
+
+fn rev_for(
+    header: &Header,
+    req: &ReadRequest<'_>,
+    intents: &BTreeMap<String, String>,
+    reason: Option<StaleReason>,
+    refreshing: bool,
+    eff: i64,
+) -> String {
+    let states = mask::visible_states(header, intents, req.now, max_age_micros());
+    let next_retry_at = header.next_retry_at.filter(|t| *t > req.now);
+    rev(
+        header,
+        &states,
+        reason,
+        refreshing,
+        next_retry_at,
+        fresh_until(header, req, eff),
+    )
+}
+
+fn fresh_until(header: &Header, req: &ReadRequest<'_>, eff: i64) -> Option<i64> {
+    req.range
+        .is_relative()
+        .then_some(header.built_at.unwrap_or_default() + eff * SECOND)
+}
+
+fn max_age_micros() -> i64 {
+    i64::from(get_config().public_dashboards.max_panel_age_hours) * 3600 * SECOND
 }
 
 fn file_status(
@@ -1025,6 +1111,7 @@ fn file_status(
     let sources = with_sources.then(|| {
         stored
             .manifest
+            .panels
             .iter()
             .map(|(id, m)| (id.clone(), m.sources.clone()))
             .collect()
@@ -1119,9 +1206,20 @@ mod tests {
                     fake_run(id, &classes, manifest, n, now)
                 })
                 .collect();
+            // One variable whose value came from a values query on stream `vals`.
             Run {
-                variables: vec![],
                 panels,
+                variables: vec![PublicVariable {
+                    label: "svc".into(),
+                    value: json!("checkout"),
+                    tab_id: None,
+                    panel_id: None,
+                }],
+                variable_keys: vec!["svc".into()],
+                values_dependencies: vec![ValuesDependency {
+                    variable: "svc".into(),
+                    sources: vec![(StreamType::Logs, "vals".into())],
+                }],
             }
         }
 
@@ -1147,7 +1245,13 @@ mod tests {
                 anyhow::bail!("the authorizer is down");
             }
             let denied = self.denied.lock().unwrap();
-            Ok(!panel.sources.iter().any(|(_, s)| denied.contains(s)))
+            let mut streams = panel.sources.iter().chain(
+                panel
+                    .values_dependencies
+                    .iter()
+                    .flat_map(|d| d.sources.iter()),
+            );
+            Ok(!streams.any(|(_, s)| denied.contains(s)))
         }
 
         async fn trial_ok(&self, _org: &str) -> bool {
@@ -1316,6 +1420,7 @@ mod tests {
                 dashboard: dash,
                 range,
                 now,
+                if_none_match: None,
             },
         )
         .await
@@ -1435,7 +1540,7 @@ mod tests {
                 window_end: 60 * SECOND,
                 ..Default::default()
             },
-            manifest: Manifest::new(),
+            manifest: Manifest::default(),
             body: Some(ResultBody::default()),
             kind: BuildKind::Complete,
         };
@@ -1504,9 +1609,12 @@ mod tests {
         let flights = flights(8, 1);
         let now = now_micros();
         data(&read_at(engine, flights, &link, &dash, rel(3600), now).await);
+        let before = header(&link, &rel(3600)).await;
         engine.authz_down.store(true, Ordering::SeqCst);
         let served = read_at(engine, flights, &link, &dash, rel(3600), now + 16 * MIN).await;
         assert!(matches!(served, Served::Unavailable { .. }), "{served:?}");
+        // An outage records nothing: the header is not rewritten and no panel is withheld.
+        assert_eq!(header(&link, &rel(3600)).await, before);
         engine.authz_down.store(false, Ordering::SeqCst);
         *engine.member.lock().unwrap() = None;
         let served = read_at(engine, flights, &link, &dash, rel(3600), now + 16 * MIN).await;
@@ -1948,7 +2056,6 @@ mod tests {
     #[test]
     fn gate15_panels_beyond_the_cap_are_withheld_as_too_many() {
         let run = Run {
-            variables: vec![],
             panels: vec![PanelRun::not_available(
                 "p11",
                 Class::Structural,
@@ -1959,6 +2066,7 @@ mod tests {
                 },
                 None,
             )],
+            ..Default::default()
         };
         let live = Live {
             dashboard_updated_at: 1,
@@ -1975,5 +2083,165 @@ mod tests {
                 reason: NotAvailableReason::TooManyPanels
             }
         );
+    }
+
+    #[tokio::test]
+    async fn gate02_a_variable_from_a_lost_values_stream_is_nulled_at_the_deadline() {
+        let link = link(json!([{ "type": "absolute", "start": 0, "end": 3_600_000_000_i64 }]));
+        let range = TimeRange::Absolute {
+            start: 0,
+            end: 3_600_000_000,
+        };
+        let dash = dashboard(&[("p1", "s1")]);
+        let engine = fake(&link, &dash);
+        let flights = flights(8, 1);
+        let now = now_micros();
+        let resp = data(&read_at(engine, flights, &link, &dash, range, now).await).clone();
+        assert_eq!(resp.variables[0].value, json!("checkout"));
+        engine.denied.lock().unwrap().insert("vals".into());
+        let resp =
+            data(&read_at(engine, flights, &link, &dash, range, now + 16 * MIN).await).clone();
+        assert_eq!(resp.variables[0].value, serde_json::Value::Null);
+        assert_eq!(header(&link, &range).await.withheld_variables, ["svc"]);
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(
+            !json.contains("checkout") && !json.contains("variable_keys"),
+            "{json}"
+        );
+        // Access comes back: the value returns and the file is due for a rebuild.
+        engine.denied.lock().unwrap().clear();
+        let resp =
+            data(&read_at(engine, flights, &link, &dash, range, now + 32 * MIN).await).clone();
+        assert_eq!(resp.variables[0].value, json!("checkout"));
+        assert_eq!(resp.stale_reason, Some(StaleReason::Retry));
+        settle(flights).await;
+    }
+
+    #[tokio::test]
+    async fn gate06_a_failed_denial_rewrite_serves_the_masked_result_once_and_evicts_the_file() {
+        let link = link(json!([{ "type": "relative", "secs": 3600 }]));
+        let dash = dashboard(&[("p1", "secret"), ("p2", "public")]);
+        let engine = fake(&link, &dash);
+        let flights = flights(8, 1);
+        let now = now_micros();
+        data(&read_at(engine, flights, &link, &dash, rel(3600), now).await);
+        let key = store::key(&link.org_id, &link.id, "r3600");
+        engine.denied.lock().unwrap().insert("secret".into());
+        store::FAIL_WRITES.insert(key.clone());
+        let served = read_at(engine, flights, &link, &dash, rel(3600), now + 16 * MIN).await;
+        store::FAIL_WRITES.remove(&key);
+        let Served::Data {
+            response, outcome, ..
+        } = &served
+        else {
+            panic!("expected data, got {served:?}");
+        };
+        assert_eq!(*outcome, "denied_masked");
+        assert_eq!(
+            reason(response, "p1"),
+            Some(NotAvailableReason::Unauthorized)
+        );
+        assert!(response.panels["p1"].data.is_empty());
+        assert!(
+            store::read_header(&key).await.is_none(),
+            "the old file is gone"
+        );
+        // The next read is a miss and builds; p1 stays withheld by the new build's own check.
+        engine
+            .classes
+            .lock()
+            .unwrap()
+            .insert("p1".into(), Class::Denied);
+        let resp =
+            data(&read_at(engine, flights, &link, &dash, rel(3600), now + 16 * MIN).await).clone();
+        assert_eq!(reason(&resp, "p1"), Some(NotAvailableReason::Unauthorized));
+        assert_eq!(build_no(&resp, "p2"), 2);
+    }
+
+    #[tokio::test]
+    async fn gate06_a_removed_and_re_added_range_serves_only_the_newest_body() {
+        let both = json!([
+            { "type": "relative", "secs": 3600 },
+            { "type": "relative", "secs": 86400 }
+        ]);
+        let mut link = link(both.clone());
+        let dash = dashboard(&[("p1", "s1")]);
+        let engine = fake(&link, &dash);
+        let flights = flights(8, 1);
+        let now = now_micros();
+        let first = data(&read_at(engine, flights, &link, &dash, rel(DAY_SECS), now).await).clone();
+        // The range leaves the link and comes back with a new rev.
+        link.time_ranges = Some(json!([{ "type": "relative", "secs": 3600 }]).to_string());
+        link.rev += 1;
+        link.time_ranges = Some(both.to_string());
+        link.rev += 1;
+        *engine.link.lock().unwrap() = link.clone();
+        let stale =
+            data(&read_at(engine, flights, &link, &dash, rel(DAY_SECS), now + MIN).await).clone();
+        assert_eq!(stale.stale_reason, Some(StaleReason::Link));
+        assert!(stale.refreshing);
+        assert_ne!(stale.rev, first.rev);
+        settle(flights).await;
+        let fresh =
+            data(&read_at(engine, flights, &link, &dash, rel(DAY_SECS), now + MIN).await).clone();
+        assert_eq!(build_no(&fresh, "p1"), 2);
+        assert_eq!(fresh.link_rev, link.rev);
+        assert_ne!(fresh.rev, stale.rev);
+    }
+
+    #[tokio::test]
+    async fn gate06_a_matching_etag_is_answered_from_the_header_with_the_poll_hint() {
+        let link = link(json!([{ "type": "relative", "secs": 3600 }]));
+        let dash = dashboard(&[("p1", "s1")]);
+        let engine = fake(&link, &dash);
+        let flights = flights(8, 1);
+        let now = now_micros();
+        let first = data(&read_at(engine, flights, &link, &dash, rel(3600), now).await).clone();
+        let key = store::key(&link.org_id, &link.id, "r3600");
+        let tag = format!("\"{}\"", first.rev);
+        let served = read(
+            engine,
+            flights,
+            ReadRequest {
+                link: &link,
+                settings_rev: 0,
+                dashboard: &dash,
+                range: rel(3600),
+                now,
+                if_none_match: Some(&tag),
+            },
+        )
+        .await;
+        assert!(
+            matches!(&served, Served::NotModified { rev, retry_hint: None } if *rev == first.rev)
+        );
+        // Due: the refresh changes rev, and a poll that already holds it gets a 304 with the hint.
+        engine.delay_ms.store(500, Ordering::SeqCst);
+        let request = |tag| ReadRequest {
+            link: &link,
+            settings_rev: 0,
+            dashboard: &dash,
+            range: rel(3600),
+            now: now + 6 * MIN,
+            if_none_match: tag,
+        };
+        let refreshing = data(&read(engine, flights, request(Some(&tag))).await).clone();
+        assert!(refreshing.refreshing);
+        let tag = format!("\"{}\"", refreshing.rev);
+        let served = read(engine, flights, request(Some(&tag))).await;
+        assert!(
+            matches!(&served, Served::NotModified { retry_hint: Some(s), .. } if *s >= MIN_RETRY_SECS),
+            "{served:?}"
+        );
+        settle(flights).await;
+        assert!(store::read_header(&key).await.is_some());
+    }
+
+    #[test]
+    fn if_none_match_accepts_weak_strong_and_listed_tags() {
+        assert!(etag_matches("\"abc\"", "abc"));
+        assert!(etag_matches("W/\"abc\"", "abc"));
+        assert!(etag_matches("\"x\", \"abc\"", "abc"));
+        assert!(!etag_matches("\"abd\"", "abc"));
     }
 }
