@@ -63,6 +63,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <div v-if="affected.length" class="flex flex-col gap-1.5">
+        <OText variant="label" as="div">{{ t("alertCalibration.detail.affectedAlerts") }}</OText>
+        <ul class="flex flex-col gap-1">
+          <li
+            v-for="alert in affected"
+            :key="alert.alert_id || alert.alert_name"
+            class="flex min-w-0 items-baseline justify-between gap-3"
+            data-test="alert-calibration-finding-affected-alert"
+          >
+            <OTruncatedText class="text-text-body min-w-0 text-xs font-medium">
+              {{ alert.alert_name }}
+            </OTruncatedText>
+            <span class="text-text-secondary shrink-0 text-xs tabular-nums">
+              {{
+                t("alertCalibration.detail.affectedAlertImpact", {
+                  skipped: formatEvidence(t, alert.skipped_windows, "count"),
+                  late: formatEvidence(t, alert.late_evaluations, "count"),
+                  evaluations: formatEvidence(t, alert.evaluations, "count"),
+                })
+              }}
+            </span>
+          </li>
+        </ul>
+      </div>
+
       <div v-if="actions.length" class="flex flex-col gap-1.5">
         <OText variant="label" as="div">{{ t("alertCalibration.detail.proposedActions") }}</OText>
         <div class="flex flex-wrap gap-1.5">
@@ -90,7 +115,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import type { FindingRecord } from "./digests";
+import { parseAffectedAlerts, type FindingRecord } from "./digests";
 import { ACTION_META, isProposedAction, RULE_META } from "./rules";
 import { CONFIDENCE_LABEL, formatEvidence, SEVERITY_BADGE, SEVERITY_LABEL } from "./format";
 
@@ -108,6 +133,11 @@ const evidence = computed(() =>
   })),
 );
 
+const affected = computed(() => {
+  const column = meta.value.affectedAlertsColumn;
+  return column ? parseAffectedAlerts(props.finding[column]) : [];
+});
+
 /** `actions` is comma-joined; an action this build does not know still shows, by its raw name. */
 const actions = computed<{ name: string; label: I18nText; description?: I18nText }[]>(() =>
   (props.finding.actions ?? "")
@@ -118,7 +148,10 @@ const actions = computed<{ name: string; label: I18nText; description?: I18nText
         ? {
             name,
             label: t(ACTION_META[name].labelKey),
-            description: t(ACTION_META[name].descriptionKey),
+            description: t(
+              ACTION_META[name].descriptionKey,
+              ACTION_META[name].descriptionParams ?? {},
+            ),
           }
         : { name, label: raw(name) },
     ),

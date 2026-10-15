@@ -8181,7 +8181,6 @@
       "suggestionsOnly": "Alleen suggesties, er wordt niets automatisch toegepast",
       "filterAll": "Alle",
       "showingCapped": "Toont {shown} van {total} bevindingen: de zoekopdracht stopte bij {count} records.",
-      "perAlertNote": "De stream bevat één record per bevinding per benoemd alarm, dus een bevinding zonder benoemd alarm heeft geen kaart.",
       "nothingTitle": "Niets te melden",
       "nothingDescription": "Geen dekkingsgat en niets afgewezen: over {count} alarmen binnen bereik vond alarmkalibratie niets.",
       "noneFoundTitle": "Niets gevonden",

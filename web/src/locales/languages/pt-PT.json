@@ -8181,7 +8181,6 @@
       "suggestionsOnly": "Apenas sugestões, nada é aplicado automaticamente",
       "filterAll": "Todos",
       "showingCapped": "Exibindo {shown} de {total} achados: a busca parou em {count} registros.",
-      "perAlertNote": "O stream contém um registro por achado por alerta nomeado, portanto um achado que não nomeia nenhum alerta não tem cartão.",
       "nothingTitle": "Nada a relatar",
       "nothingDescription": "Sem lacuna de cobertura e nada recusado: em {count} alertas no escopo, a calibração de alertas não encontrou nada.",
       "noneFoundTitle": "Nenhum encontrado",

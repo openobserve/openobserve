@@ -8181,7 +8181,6 @@
       "suggestionsOnly": "Yalnızca öneriler, hiçbir şey otomatik uygulanmaz",
       "filterAll": "Tümü",
       "showingCapped": "{total} bulgunun {shown} tanesi gösteriliyor: arama {count} kayıtta durdu.",
-      "perAlertNote": "Akış, adlandırılmış her uyarı için her bulguya bir kayıt tutar, bu nedenle hiçbir uyarı adı belirtmeyen bir bulgunun kartı yoktur.",
       "nothingTitle": "Bildirilecek bir şey yok",
       "nothingDescription": "Kapsam boşluğu yok ve hiçbir şey reddedilmedi: kapsamdaki {count} uyarı genelinde uyarı kalibrasyonu hiçbir şey bulamadı.",
       "noneFoundTitle": "Hiçbiri bulunamadı",

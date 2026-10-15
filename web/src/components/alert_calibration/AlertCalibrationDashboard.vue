@@ -120,6 +120,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-body">{{ t(RULE_META[row.rule_id].labelKey) }}</span>
             </div>
           </template>
+          <template #cell-alerts="{ row }">
+            <span v-if="RULE_META[row.rule_id].affectedAlertsColumn" class="text-text-muted">{{
+              raw("—")
+            }}</span>
+            <template v-else>{{ row.alerts_flagged }}</template>
+          </template>
         </OTable>
       </AlertCalibrationPanel>
     </div>

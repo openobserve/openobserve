@@ -8176,7 +8176,6 @@
       "suggestionsOnly": "僅為建議，不會自動套用任何變更",
       "filterAll": "全部",
       "showingCapped": "顯示 {total} 筆發現項目中的 {shown} 筆：搜尋在 {count} 筆紀錄停止。",
-      "perAlertNote": "串流會為每個具名警示的每筆發現項目保留一筆紀錄，因此未指名警示的發現項目不會有卡片。",
       "nothingTitle": "沒有可報告的內容",
       "nothingDescription": "沒有涵蓋缺口且沒有任何項目被拒絕：在範圍內的 {count} 個警示中，警示校準未發現任何問題。",
       "noneFoundTitle": "未發現任何項目",

@@ -22,7 +22,8 @@ export const RUNS_LOOKBACK_DAYS = 14;
 
 const MICROS_PER_DAY = 86_400_000_000;
 
-export type RuleId = "failure" | "no_destination" | "noise" | "notify_failed" | "silent";
+export type RuleId =
+  "failure" | "no_destination" | "noise" | "notify_failed" | "scheduler_health" | "silent";
 export type Severity = "Info" | "Low" | "Medium" | "High";
 export type Confidence = "Low" | "Medium" | "High";
 
@@ -69,6 +70,15 @@ export type FindingRecord = DigestRecord &
   Required<Pick<DigestRecord, "rule_id" | "severity" | "confidence" | "title" | "actions">>;
 
 export type CoverageVerdict = "none" | "gap" | "full";
+
+/** One alert an org-wide finding lists; the digest stores the list as one JSON column. */
+export interface AffectedAlert {
+  alert_id: string;
+  alert_name: string;
+  skipped_windows: number;
+  late_evaluations: number;
+  evaluations: number;
+}
 
 const COVERAGE_COLUMNS: (keyof Coverage)[] = [
   "coverage_unreadable_definitions",
@@ -170,6 +180,30 @@ export const latestRun = (rows: RunRow[]): RunRow | null =>
 /** Clean needs full coverage and nothing declined as well as zero findings: a zero alone may mean nothing was judged. */
 export const isClean = (row: RunRow) =>
   row.finding_count === 0 && !row.coverage_gap && row.skip_count === 0;
+
+/** A missing or malformed column lists nothing, rather than failing the card. */
+export function parseAffectedAlerts(value: unknown): AffectedAlert[] {
+  if (typeof value !== "string" || value === "") return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .filter(
+      (item): item is Record<string, unknown> =>
+        typeof item === "object" && item !== null && typeof item.alert_name === "string",
+    )
+    .map((item) => ({
+      alert_id: String(item.alert_id ?? ""),
+      alert_name: String(item.alert_name),
+      skipped_windows: Number(item.skipped_windows) || 0,
+      late_evaluations: Number(item.late_evaluations) || 0,
+      evaluations: Number(item.evaluations) || 0,
+    }));
+}
 
 export function coverageVerdict(row: RunRow): CoverageVerdict {
   if (row.coverage_stream_substrate_empty) return "none";

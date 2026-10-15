@@ -8181,7 +8181,6 @@
       "suggestionsOnly": "제안일 뿐이며 자동으로 적용되는 것은 없습니다",
       "filterAll": "전체",
       "showingCapped": "{total}개 발견 사항 중 {shown}개 표시: 검색이 {count}개 레코드에서 중단되었습니다.",
-      "perAlertNote": "스트림에는 명명된 알림별로 발견 사항당 하나의 레코드가 있으므로, 알림을 명명하지 않은 발견 사항에는 카드가 없습니다.",
       "nothingTitle": "보고할 내용 없음",
       "nothingDescription": "커버리지 공백도 없고 판정 제외도 없음: 범위 내 {count}개 알림 전체에서 알림 캘리브레이션은 아무것도 발견하지 못했습니다.",
       "noneFoundTitle": "찾은 항목 없음",

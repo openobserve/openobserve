@@ -22,6 +22,7 @@ import {
   latestEmission,
   latestPerWindow,
   latestRun,
+  parseAffectedAlerts,
   type DigestRecord,
   type RuleId,
   type RunRow,
@@ -165,5 +166,37 @@ describe("the formatting", () => {
     expect(formatEvidence(gt, true, "boolean")).toBe("Yes");
     expect(formatEvidence(gt, false, "boolean")).toBe("No");
     expect(formatEvidence(gt, undefined, "boolean")).toBe("—");
+  });
+});
+
+describe("an org-wide finding's affected alerts", () => {
+  it("reads the listed alerts back out of their one JSON column", () => {
+    const column = JSON.stringify([
+      {
+        alert_id: "a2",
+        alert_name: "disk",
+        skipped_windows: 3,
+        late_evaluations: 0,
+        evaluations: 100,
+      },
+      {
+        alert_id: "a1",
+        alert_name: "cpu",
+        skipped_windows: 0,
+        late_evaluations: 40,
+        evaluations: 100,
+      },
+    ]);
+    expect(parseAffectedAlerts(column).map((a) => [a.alert_name, a.skipped_windows])).toEqual([
+      ["disk", 3],
+      ["cpu", 0],
+    ]);
+  });
+
+  it("lists nothing for a missing or malformed column, and drops entries without a name", () => {
+    for (const value of [undefined, "", "not json", "{}", 42]) {
+      expect(parseAffectedAlerts(value)).toEqual([]);
+    }
+    expect(parseAffectedAlerts(JSON.stringify([{ alert_id: "a1" }, null, "x"]))).toEqual([]);
   });
 });

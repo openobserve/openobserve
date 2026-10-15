@@ -8181,7 +8181,6 @@
       "suggestionsOnly": "仅为建议，不会自动应用任何更改",
       "filterAll": "全部",
       "showingCapped": "显示 {total} 个发现项中的 {shown} 个：搜索在 {count} 条记录处停止。",
-      "perAlertNote": "数据流中每个具名告警的每条发现项各占一条记录，因此未指明告警的发现项没有卡片。",
       "nothingTitle": "无内容可报告",
       "nothingDescription": "没有覆盖缺口，也没有未判定项：在范围内的 {count} 个告警中，告警校准未发现任何问题。",
       "noneFoundTitle": "未发现任何项",

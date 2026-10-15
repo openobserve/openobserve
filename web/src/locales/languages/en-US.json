@@ -8064,6 +8064,7 @@
       "noDestination": "No destination",
       "noise": "Noise",
       "notifyFailed": "Notification failed",
+      "schedulerHealth": "Scheduler lag",
       "silent": "Silent"
     },
     "evidence": {
@@ -8080,6 +8081,11 @@
       "failureRatio": "Failure ratio",
       "history": "History",
       "deliveredThroughIncidents": "Delivered through incidents",
+      "affectedAlerts": "Affected alerts",
+      "skippedWindows": "Skipped windows",
+      "lateEvaluations": "Late evaluations",
+      "lateRatio": "Late share",
+      "longestDelay": "Longest delay",
       "yes": "Yes",
       "no": "No"
     },
@@ -8097,7 +8103,13 @@
       "repairDestination": "Repair destination",
       "repairDestinationDesc": "Delivery fails on a destination the alert uses.",
       "attachDestination": "Attach destination",
-      "attachDestinationDesc": "Give the alert somewhere to deliver to."
+      "attachDestinationDesc": "Give the alert somewhere to deliver to.",
+      "reduceEvaluationFrequency": "Evaluate less often",
+      "reduceEvaluationFrequencyDesc": "Lengthen the frequency of the listed alerts, so each one asks less of the scheduler.",
+      "consolidateAlerts": "Merge similar alerts",
+      "consolidateAlertsDesc": "Alerts that query the same stream on the same schedule can often become one alert.",
+      "scaleAlertScheduler": "Scale the alert scheduler",
+      "scaleAlertSchedulerDesc": "Needs your operator: raise {concurrency}, add alert nodes, or raise {pullers}."
     },
     "severity": {
       "high": "High",
@@ -8181,7 +8193,7 @@
       "suggestionsOnly": "Suggestions only, nothing is applied automatically",
       "filterAll": "All",
       "showingCapped": "Showing {shown} of {total} findings: the search stopped at {count} records.",
-      "perAlertNote": "The stream holds one record per finding per named alert, so a finding that names no alert has no card.",
+      "perSubjectNote": "A finding that names several alerts has one card for each, so the cards outnumber the findings.",
       "nothingTitle": "Nothing to report",
       "nothingDescription": "No coverage gap and nothing declined: across {count} alerts in scope, alert calibration found nothing.",
       "noneFoundTitle": "None found",
@@ -8195,6 +8207,8 @@
       "declinedNotWritten": "The per-alert reasons are not written to the stream, only this count.",
       "evidence": "Evidence",
       "alert": "Alert",
+      "affectedAlerts": "Most affected alerts",
+      "affectedAlertImpact": "{skipped} skipped, {late} of {evaluations} late",
       "proposedActions": "Proposed actions"
     },
     "dashboard": {

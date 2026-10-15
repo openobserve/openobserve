@@ -8181,7 +8181,6 @@
       "suggestionsOnly": "Chỉ là gợi ý, không có gì được áp dụng tự động",
       "filterAll": "Tất cả",
       "showingCapped": "Đang hiển thị {shown} trong {total} phát hiện: tìm kiếm đã dừng ở {count} bản ghi.",
-      "perAlertNote": "Stream lưu một bản ghi cho mỗi phát hiện của mỗi cảnh báo được nêu tên, nên một phát hiện không nêu cảnh báo nào sẽ không có thẻ.",
       "nothingTitle": "Không có gì để báo cáo",
       "nothingDescription": "Không có khoảng trống bao phủ và không có gì bị từ chối: trong {count} cảnh báo thuộc phạm vi, hiệu chỉnh cảnh báo không tìm thấy gì.",
       "noneFoundTitle": "Không tìm thấy",

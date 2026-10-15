@@ -8181,7 +8181,6 @@
       "suggestionsOnly": "Nur Vorschläge, nichts wird automatisch angewendet",
       "filterAll": "Alle",
       "showingCapped": "Zeige {shown} von {total} Befunden: Die Suche endete bei {count} Datensätzen.",
-      "perAlertNote": "Der Stream enthält einen Datensatz pro Befund und benanntem Alarm, daher hat ein Befund ohne Alarmnamen keine Karte.",
       "nothingTitle": "Nichts zu berichten",
       "nothingDescription": "Keine Abdeckungslücke und nichts abgelehnt: Über {count} Alarme im Geltungsbereich hat die Alarmkalibrierung nichts gefunden.",
       "noneFoundTitle": "Nichts gefunden",

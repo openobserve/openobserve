@@ -8181,7 +8181,6 @@
       "suggestionsOnly": "Solo suggerimenti, nulla viene applicato automaticamente",
       "filterAll": "Tutti",
       "showingCapped": "Visualizzazione di {shown} riscontri su {total}: la ricerca si è fermata a {count} record.",
-      "perAlertNote": "Lo stream contiene un record per riscontro per ogni avviso denominato, quindi un riscontro che non nomina alcun avviso non ha una scheda.",
       "nothingTitle": "Niente da segnalare",
       "nothingDescription": "Nessuna lacuna di copertura e nulla rifiutato: su {count} avvisi nell'ambito, la calibrazione degli avvisi non ha trovato nulla.",
       "noneFoundTitle": "Nessun riscontro trovato",

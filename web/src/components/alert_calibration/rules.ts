@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import type { I18nKey } from "@/types/i18n";
+import { raw, type I18nKey, type I18nText } from "@/types/i18n";
 import type { RuleId } from "./digests";
 
 export type EvidenceFormat = "count" | "ratio" | "seconds" | "text" | "boolean";
@@ -31,10 +31,19 @@ export interface RuleMeta {
   /** The rule's `min_history`: a window shorter than this makes every run decline the rule for every alert. */
   minHistoryMinutes: number;
   evidence: EvidenceField[];
+  /** Set on an org-wide rule: its finding names no alert and lists the affected ones in this column. */
+  affectedAlertsColumn?: `evidence_${string}`;
 }
 
 /** Ordered as the engine registers its default rules. */
-export const RULE_IDS: RuleId[] = ["failure", "no_destination", "noise", "notify_failed", "silent"];
+export const RULE_IDS: RuleId[] = [
+  "failure",
+  "no_destination",
+  "noise",
+  "notify_failed",
+  "scheduler_health",
+  "silent",
+];
 
 export const RULE_META: Record<RuleId, RuleMeta> = {
   failure: {
@@ -130,6 +139,44 @@ export const RULE_META: Record<RuleId, RuleMeta> = {
       },
     ],
   },
+  scheduler_health: {
+    labelKey: "alertCalibration.rules.schedulerHealth",
+    icon: "hourglass-empty",
+    minHistoryMinutes: 24 * 60,
+    evidence: [
+      {
+        column: "evidence_schedulerhealth_affected_alerts",
+        labelKey: "alertCalibration.evidence.affectedAlerts",
+        format: "count",
+      },
+      {
+        column: "evidence_schedulerhealth_skipped_windows",
+        labelKey: "alertCalibration.evidence.skippedWindows",
+        format: "count",
+      },
+      {
+        column: "evidence_schedulerhealth_late_evaluations",
+        labelKey: "alertCalibration.evidence.lateEvaluations",
+        format: "count",
+      },
+      {
+        column: "evidence_schedulerhealth_evaluations",
+        labelKey: "alertCalibration.evidence.evaluations",
+        format: "count",
+      },
+      {
+        column: "evidence_schedulerhealth_late_ratio",
+        labelKey: "alertCalibration.evidence.lateRatio",
+        format: "ratio",
+      },
+      {
+        column: "evidence_schedulerhealth_max_delay_secs",
+        labelKey: "alertCalibration.evidence.longestDelay",
+        format: "seconds",
+      },
+    ],
+    affectedAlertsColumn: "evidence_schedulerhealth_top_alerts",
+  },
   silent: {
     labelKey: "alertCalibration.rules.silent",
     icon: "history-toggle-off",
@@ -161,9 +208,19 @@ export type ProposedAction =
   | "ReviewForDeletion"
   | "FixAlertQuery"
   | "RepairDestination"
-  | "AttachDestination";
+  | "AttachDestination"
+  | "ReduceEvaluationFrequency"
+  | "ConsolidateAlerts"
+  | "ScaleAlertScheduler";
 
-export const ACTION_META: Record<ProposedAction, { labelKey: I18nKey; descriptionKey: I18nKey }> = {
+export interface ActionMeta {
+  labelKey: I18nKey;
+  descriptionKey: I18nKey;
+  /** Settings named inside the description, kept out of the catalogue so no translation alters them. */
+  descriptionParams?: Record<string, I18nText>;
+}
+
+export const ACTION_META: Record<ProposedAction, ActionMeta> = {
   RaiseThreshold: {
     labelKey: "alertCalibration.actions.raiseThreshold",
     descriptionKey: "alertCalibration.actions.raiseThresholdDesc",
@@ -191,6 +248,22 @@ export const ACTION_META: Record<ProposedAction, { labelKey: I18nKey; descriptio
   AttachDestination: {
     labelKey: "alertCalibration.actions.attachDestination",
     descriptionKey: "alertCalibration.actions.attachDestinationDesc",
+  },
+  ReduceEvaluationFrequency: {
+    labelKey: "alertCalibration.actions.reduceEvaluationFrequency",
+    descriptionKey: "alertCalibration.actions.reduceEvaluationFrequencyDesc",
+  },
+  ConsolidateAlerts: {
+    labelKey: "alertCalibration.actions.consolidateAlerts",
+    descriptionKey: "alertCalibration.actions.consolidateAlertsDesc",
+  },
+  ScaleAlertScheduler: {
+    labelKey: "alertCalibration.actions.scaleAlertScheduler",
+    descriptionKey: "alertCalibration.actions.scaleAlertSchedulerDesc",
+    descriptionParams: {
+      concurrency: raw("ZO_ALERT_SCHEDULE_CONCURRENCY"),
+      pullers: raw("ZO_SCHEDULER_PER_MODULE_PULLERS"),
+    },
   },
 };
 

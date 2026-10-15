@@ -8181,7 +8181,6 @@
       "suggestionsOnly": "Tylko sugestie, nic nie jest stosowane automatycznie",
       "filterAll": "Wszystkie",
       "showingCapped": "Wyświetlanie {shown} z {total} ustaleń: wyszukiwanie zatrzymało się na {count} rekordach.",
-      "perAlertNote": "Strumień przechowuje jeden rekord na ustalenie dla każdego nazwanego alertu, więc ustalenie, które nie wskazuje żadnego alertu, nie ma karty.",
       "nothingTitle": "Nie ma nic do zgłoszenia",
       "nothingDescription": "Brak luki w pokryciu i nic nie odrzucono: wśród {count} alertów w zakresie kalibracja alertów nie znalazła nic.",
       "noneFoundTitle": "Nie znaleziono",

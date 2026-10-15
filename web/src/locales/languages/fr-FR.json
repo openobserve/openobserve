@@ -8181,7 +8181,6 @@
       "suggestionsOnly": "Suggestions uniquement, rien n'est appliqué automatiquement",
       "filterAll": "Tous",
       "showingCapped": "Affichage de {shown} sur {total} constats : la recherche s'est arrêtée à {count} enregistrements.",
-      "perAlertNote": "Le flux contient un enregistrement par constat et par alerte nommée ; un constat qui ne nomme aucune alerte n'a donc pas de carte.",
       "nothingTitle": "Rien à signaler",
       "nothingDescription": "Aucune lacune de couverture et aucun refus : sur {count} alertes du périmètre, la calibration des alertes n'a rien trouvé.",
       "noneFoundTitle": "Aucun résultat",

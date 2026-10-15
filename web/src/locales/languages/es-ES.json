@@ -8181,7 +8181,6 @@
       "suggestionsOnly": "Solo sugerencias, nada se aplica automáticamente",
       "filterAll": "Todos",
       "showingCapped": "Mostrando {shown} de {total} hallazgos: la búsqueda se detuvo en {count} registros.",
-      "perAlertNote": "El stream contiene un registro por hallazgo por cada alerta nombrada, por lo que un hallazgo que no nombra ninguna alerta no tiene tarjeta.",
       "nothingTitle": "Nada que reportar",
       "nothingDescription": "Sin brechas de cobertura y nada rechazado: en {count} alertas en alcance, la calibración de alertas no encontró nada.",
       "noneFoundTitle": "No se encontró ninguno",
