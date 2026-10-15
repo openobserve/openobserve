@@ -130,6 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :workflows="workflows"
             :destination-options="formattedDestinations"
             :error="destinationsError"
+            :notifies-nobody="notifiesNobody"
+            show-status
+            :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
             @refresh="$emit('refresh:destinations')"
@@ -140,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-else>
           <!-- Period -->
           <div
+            v-if="!isForecastMode"
             ref="periodFieldRef"
             class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
           >
@@ -289,14 +293,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :workflows="workflows"
             :destination-options="formattedDestinations"
             :error="destinationsError"
+            :notifies-nobody="notifiesNobody"
+            show-status
+            :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
             @refresh="$emit('refresh:destinations')"
           />
         </template>
 
-        <!-- Creates Incident toggle — shown for all alert types -->
-        <div class="mb-4! flex items-start max-md:gap-3">
+        <!-- Creates Incident toggle — all alert types, enterprise/cloud with Incidents on -->
+        <div v-if="incidentsEnabled" class="mb-4! flex items-start max-md:gap-3">
           <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
             {{ t("alerts.alertSettings.createsIncident") }}
             <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
@@ -311,11 +318,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.alertSettings.notifyOnRecovery") }}
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.alertSettings.notifyOnRecoveryTooltip')" side="right" />
+              <OTooltip
+                :content="
+                  notifiesNobody
+                    ? t('alerts.alertSettings.notifyOnRecoveryNeedsDestination')
+                    : t('alerts.alertSettings.notifyOnRecoveryTooltip')
+                "
+                side="right"
+              />
             </div>
             <div class="flex flex-col gap-1">
-              <OFormSwitch name="notify_on_recovery" data-test="alert-notify-on-recovery-toggle" />
-              <template v-if="formData?.notify_on_recovery">
+              <!-- A recovery closes what a firing delivered; with no target nothing is
+                   delivered, so it cannot be turned on. It can still be turned off. -->
+              <OFormSwitch
+                name="notify_on_recovery"
+                :disabled="notifiesNobody && !formData?.notify_on_recovery"
+                data-test="alert-notify-on-recovery-toggle"
+              />
+              <template v-if="formData?.notify_on_recovery && !notifiesNobody">
                 <div
                   v-for="row in recoveryPlan"
                   :key="row.name"
@@ -336,13 +356,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <AlertDestinationsField
-            v-if="formData?.notify_on_recovery"
+            v-if="formData?.notify_on_recovery && !notifiesNobody"
             class="me-2 mb-4!"
             :destinations="recoveryDestinations"
             :workflows="[]"
             :destination-options="formattedDestinations"
             :label="t('alerts.alertSettings.recoveryDestinations')"
-            :required="false"
             :tooltip="t('alerts.alertSettings.recoveryDestinationsTooltip')"
             :supports-workflows="false"
             @update:destinations="$emit('update:recoveryDestinations', $event)"
@@ -383,6 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, inject, ref, type PropType } from "vue";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useStore } from "vuex";
+import config from "@/aws-exports";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -390,6 +410,7 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
+import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
@@ -465,6 +486,14 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
 
+    // Same gate as the Incidents menu: enterprise/cloud build AND the backend
+    // /config flag. `=== true` keeps it hidden while /config is still loading.
+    const incidentsEnabled = computed(
+      () =>
+        (config.isEnterprise === "true" || config.isCloud === "true") &&
+        store.state.zoConfig?.incidents_enabled === true,
+    );
+
     // Field refs consumed by the parent's AlertFocusManager (registered off the
     // step ref). Scheduled-only.
     const periodFieldRef = ref<any>(null);
@@ -486,13 +515,21 @@ export default defineComponent({
         : computed(() => undefined);
     const periodError = fieldError("trigger_condition.period");
     const silenceError = fieldError("trigger_condition.silence");
-    // Destinations is NOT an OFormSelect any more (AlertDestinationsField below
-    // is a plain controlled component covering destinations + workflows), so its
-    // schema error has no wrapper to render it — surface it the same way period
-    // and silence do. The rule is "at least one destination OR workflow" and is
-    // keyed on `destinations` in AddAlert.schema.ts, so it lands on this path.
+    // AlertDestinationsField is not an OForm* wrapper, so it cannot render its own schema error.
     const destinationsError = fieldError("destinations");
+    const notifiesNobody = computed(
+      () =>
+        !hasDeliveryTarget({
+          destinations: props.destinations,
+          workflows: props.workflows,
+          oncall_team: props.formData?.oncall_team,
+        }),
+    );
     const pendingPeriodError = fieldError("_ui.pendingPeriod");
+    // Forecast mode fixes the period and reads its own history window, so a period field would only compete with it.
+    const isForecastMode = form
+      ? form.useStore((s: any) => !!s.values?._ui?.forecast)
+      : computed(() => false);
 
     // General field get/set — same shape as QueryConfig's `fv`/`setFV`: a
     // reactive snapshot registers the dependency, the synchronous
@@ -691,6 +728,7 @@ export default defineComponent({
       hasChatRecovery,
       t,
       store,
+      incidentsEnabled,
       handlePeriodChange,
       // Field refs for the parent focus manager
       periodFieldRef,
@@ -698,8 +736,10 @@ export default defineComponent({
       destinationsFieldRef,
       pendingPeriodFieldRef,
       periodError,
+      isForecastMode,
       silenceError,
       destinationsError,
+      notifiesNobody,
       pendingPeriodError,
       pendingPeriodWarning,
       pendingPeriodUnit,

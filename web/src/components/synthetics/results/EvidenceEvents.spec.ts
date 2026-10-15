@@ -256,12 +256,13 @@ describe("EvidenceEvents", () => {
     expect(on.find(sel).classes()).not.toContain("truncate");
   });
 
-  it("drops the step cell's truncate when wrapping, same as the message cell", () => {
+  it("leaves the step cell's cut to the table cell, and wraps it when wrapping", () => {
     const off = mountEvents({ wrap: false });
     const on = mountEvents({ wrap: true });
     const sel = '[data-test="synthetics-evidence-events-step"]';
-    expect(off.find(sel).classes()).toContain("truncate");
-    expect(on.find(sel).classes()).not.toContain("truncate");
+    expect(off.find(sel).classes()).not.toContain("truncate");
+    expect(off.find(sel).attributes("title")).toBeUndefined();
+    expect(on.find(sel).classes()).toContain("whitespace-normal");
   });
 
   it("right-aligns Took, so durations line up on their digits", () => {
@@ -311,12 +312,6 @@ describe("EvidenceEvents", () => {
     // TanStack infers a numeric column as sort-desc-first, unlike the string
     // Step column above — still a visible reorder of the un-sorted input.
     expect(statusText()).toEqual(["500", "404", "200"]);
-  });
-
-  it("labels the footer count instead of leaving a bare number", () => {
-    expect(mountEvents({ mode: "panel" }).findComponent(OTable).props("footerTitle")).toBe(
-      "Events",
-    );
   });
 
   it("lets the inline step list expand a row to the full record", async () => {

@@ -6,6 +6,7 @@
 // (at your option) any later version.
 
 import http from "@/services/http";
+import analytics from "./product_analytics";
 
 export type PromptType = "text" | "chat";
 export type PromptStatus = "active" | "archived";
@@ -148,7 +149,8 @@ const llmPromptsService = {
     const response = await http().get(base(orgId), {
       params: {
         includeArchived: options.includeArchived ?? false,
-        ...(options.folderId ? { folderId: options.folderId } : {}),
+        // `folder` is what the permission check reads; it also filters.
+        ...(options.folderId ? { folder: options.folderId } : {}),
       },
     });
     return response.data?.list ?? [];
@@ -160,8 +162,13 @@ const llmPromptsService = {
     idempotencyKey?: string,
   ): Promise<PromptMutationResult> {
     const response = await http().post(base(orgId), input, {
+      params: { folder: input.folderId || "default" },
       ...(idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : {}),
     });
+    // created=false means identical content was deduped; replayed means an idempotent retry.
+    if (response.data?.created === true && !response.data?.replayed) {
+      analytics.track("llm_prompt_created", { type: input.type });
+    }
     return response.data;
   },
 
@@ -196,6 +203,9 @@ const llmPromptsService = {
       params: options.ifHead == null ? undefined : { if_head: options.ifHead },
       ...(options.idempotencyKey ? { headers: { "Idempotency-Key": options.idempotencyKey } } : {}),
     });
+    if (response.data?.created === true && !response.data?.replayed) {
+      analytics.track("llm_prompt_version_created");
+    }
     return response.data;
   },
 
@@ -234,8 +244,11 @@ const llmPromptsService = {
   async match(
     orgId: string,
     input: PromptContentInput & { type: PromptType },
+    folderId?: string,
   ): Promise<PromptMatch[]> {
-    const response = await http().post(`${base(orgId)}/match`, input);
+    const response = await http().post(`${base(orgId)}/match`, input, {
+      params: folderId ? { folder: folderId } : undefined,
+    });
     return response.data?.matches ?? [];
   },
 

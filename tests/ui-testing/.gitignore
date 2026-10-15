@@ -10,6 +10,7 @@ node_modules
 /test-results/
 /playwright-report/
 /blob-report/
+/setup-debug/
 /playwright/.cache/
 playwright-tests/utils/auth/
 coverage/

@@ -20,12 +20,13 @@
 // hosts below mirror that wiring with a schema composed from
 // makeAlertSettingsShape / createAlertSettingsSchema.
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, nextTick } from "vue";
 import { createStore } from "vuex";
 import { z } from "zod";
 import i18n from "@/locales";
+import config from "@/aws-exports";
 import AlertSettings from "./AlertSettings.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import {
@@ -38,7 +39,8 @@ import {
 // i18n-driven messages (real locale keys) — same `t` the component renders with.
 const t = (key: string, named?: Record<string, unknown>): string =>
   (i18n.global.t as any)(key, named);
-const DESTINATIONS_REQUIRED_MESSAGE = t("alerts.validation.destinationRequired");
+const SILENCE_REQUIRED_MESSAGE = t("alerts.validation.silenceNonNegative");
+const NO_DESTINATION_NOTE = t("alerts.alertSettings.noDestinationNote");
 
 // routeToCreateDestination uses vue-router — stub it so no router plugin is needed.
 vi.mock("vue-router", () => ({
@@ -59,12 +61,12 @@ vi.mock("@/services/workflows", async (importOriginal) => {
   });
 });
 
-function makeStore() {
+function makeStore(zoConfig: Record<string, any> = {}) {
   return createStore({
     state: {
       theme: "light",
       selectedOrganization: { identifier: "test-org" },
-      zoConfig: { min_auto_refresh_interval: 60 },
+      zoConfig: { min_auto_refresh_interval: 60, ...zoConfig },
     },
   });
 }
@@ -92,7 +94,12 @@ function makeFormData(overrides: Record<string, any> = {}) {
 // AddAlert.schema.ts reuses the same fragments via createAlertSettingsSchema).
 const parentSchema = z.object({ ...makeAlertSettingsShape(t) });
 
-function makeDescendantHost(isRealTime = "true", defaultOverrides: Record<string, any> = {}) {
+function makeDescendantHost(
+  isRealTime = "true",
+  defaultOverrides: Record<string, any> = {},
+  formDataOverrides: Record<string, any> = {},
+  destinations: string[] = [],
+) {
   return defineComponent({
     components: { OForm, AlertSettings },
     setup() {
@@ -103,15 +110,15 @@ function makeDescendantHost(isRealTime = "true", defaultOverrides: Record<string
         creates_incident: false,
         ...defaultOverrides,
       };
-      const formData = makeFormData();
-      return { schema, defaultValues, formData, isRealTime };
+      const formData = makeFormData(formDataOverrides);
+      return { schema, defaultValues, formData, isRealTime, destinations };
     },
     template: `
       <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
         <AlertSettings
           :form-data="formData"
           :is-real-time="isRealTime"
-          :destinations="[]"
+          :destinations="destinations"
           :formatted-destinations="['dest-a','dest-b']"
         />
       </OForm>
@@ -119,8 +126,12 @@ function makeDescendantHost(isRealTime = "true", defaultOverrides: Record<string
   });
 }
 
-function mountDescendant(isRealTime = "true", defaultOverrides: Record<string, any> = {}) {
-  return mount(makeDescendantHost(isRealTime, defaultOverrides), {
+function mountDescendant(
+  isRealTime = "true",
+  defaultOverrides: Record<string, any> = {},
+  formDataOverrides: Record<string, any> = {},
+) {
+  return mount(makeDescendantHost(isRealTime, defaultOverrides, formDataOverrides), {
     global: { plugins: [makeStore(), i18n] },
   });
 }
@@ -134,7 +145,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(host.findAllComponents({ name: "OForm" }).length).toBe(1);
     expect(host.findComponent(AlertSettings).exists()).toBe(true);
     // R3: no errors before the first submit.
-    expect(host.text()).not.toContain(DESTINATIONS_REQUIRED_MESSAGE);
+    expect(host.find('[role="alert"]').exists()).toBe(false);
   });
 
   it("typing a step field updates the PARENT form's state", async () => {
@@ -148,7 +159,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
   });
 
   it("the parent handleSubmit surfaces the step's field errors", async () => {
-    const host = mountDescendant("true");
+    const host = mountDescendant("true", { trigger_condition: { silence: "", period: 10 } });
     const parentForm = hostForm(host);
 
     await parentForm.handleSubmit();
@@ -156,28 +167,38 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     await nextTick();
 
     expect(parentForm.state.isValid).toBe(false);
-    // The destinations rule (from the composed shape) renders in the step's field.
-    expect(host.text()).toContain(DESTINATIONS_REQUIRED_MESSAGE);
+    // The silence rule (from the composed shape) renders in the step's field.
+    expect(host.text()).toContain(SILENCE_REQUIRED_MESSAGE);
   });
 
-  // Regression (#13156): AlertTargetsSelect replaced the name=-bound destinations
-  // select, so this error is hand-rendered — and it shipped WITHOUT role="alert".
-  // AddAlert's focusOnFirstError finds the tab that owns an invalid field by
-  // scanning [role="alert"] messages; without the marker, saving from the
-  // Advanced tab with no destination toasted "fix the highlighted fields" but
-  // never brought the Alert Rules tab forward. The cross-tab specs in
-  // AddAlert.spec.ts seed a synthetic message (steps are stubbed there), so the
-  // REAL markup's marker must be pinned here.
-  it("renders the destinations error as [role=alert] so focusOnFirstError can find its tab", async () => {
+  it("submits with no destination and says no destination is notified", async () => {
     const host = mountDescendant("true");
-    await hostForm(host).handleSubmit();
+    const parentForm = hostForm(host);
+
+    await parentForm.handleSubmit();
     await flushPromises();
     await nextTick();
 
-    const error = host.find('[data-test="alert-settings-destinations-error"]');
-    expect(error.exists()).toBe(true);
-    expect(error.attributes("role")).toBe("alert");
-    expect(error.text()).toBe(DESTINATIONS_REQUIRED_MESSAGE);
+    expect(parentForm.state.isValid).toBe(true);
+    expect(host.find('[data-test="alert-settings-destinations-error"]').exists()).toBe(false);
+    expect(host.find('[data-test="alert-settings-destinations-note"]').text()).toContain(
+      NO_DESTINATION_NOTE,
+    );
+  });
+
+  it.each([
+    ["an on-call team is set", "sre", false],
+    ["the on-call team is blank", "  ", true],
+  ])("shows the no-destination note only when needed: %s", (_case, team, shown) => {
+    // On-call teams only page in enterprise and cloud builds.
+    const isEnterprise = config.isEnterprise;
+    config.isEnterprise = "true";
+    try {
+      const host = mountDescendant("true", {}, { oncall_team: team });
+      expect(host.find('[data-test="alert-settings-destinations-note"]').exists()).toBe(shown);
+    } finally {
+      config.isEnterprise = isEnterprise;
+    }
   });
 
   it("passes submit when valid — string number input coerces via the schema", async () => {
@@ -260,6 +281,16 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(trigger.silence).toBe(10);
   });
 
+  it("hides the period in Forecast mode, whose query reads its own history window", async () => {
+    const host = mountDescendant("false", {
+      _ui: { forecast: { U: "up", T: 1, direction: "rises", W: "2d", H: 7 } },
+    });
+    expect(host.find('[data-test="alert-settings-period-input"]').exists()).toBe(false);
+    hostForm(host).setFieldValue("_ui.forecast", null);
+    await flushPromises();
+    expect(host.find('[data-test="alert-settings-period-input"]').exists()).toBe(true);
+  });
+
   it("preserves every data-test (scheduled branch)", () => {
     const host = mountDescendant("false");
     for (const dt of [
@@ -268,10 +299,88 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
       "alert-destinations-select",
       "alert-settings-refresh-destinations-btn",
       "create-destination-btn",
-      "alert-creates-incident-toggle",
     ]) {
       expect(host.find(`[data-test="${dt}"]`).exists()).toBe(true);
     }
+  });
+});
+
+// ── Creates Incident: enterprise/cloud + incidents_enabled only ─────────────
+// Incidents is an enterprise feature: the OSS backend always reports
+// `incidents_enabled: false`, and the enterprise one only correlates when it
+// is on. The toggle follows the same gate as the Incidents menu.
+// A recovery closes what a firing delivered, so with nowhere to send there is nothing to recover.
+describe("AlertSettings — Notify on recovery with nowhere to send", () => {
+  const SWITCH = '[data-test="alert-notify-on-recovery-toggle-btn"]';
+  const mountScheduled = (recoveryOn: boolean, destinations: string[] = []) =>
+    mount(
+      makeDescendantHost(
+        "false",
+        { notify_on_recovery: recoveryOn },
+        { notify_on_recovery: recoveryOn },
+        destinations,
+      ),
+      { global: { plugins: [makeStore(), i18n] } },
+    );
+  const recoveryFieldShown = (host: any) =>
+    host
+      .findAllComponents({ name: "AlertDestinationsField" })
+      .some(
+        (field: any) => field.props("label") === t("alerts.alertSettings.recoveryDestinations"),
+      );
+
+  it("cannot be turned on without a destination", () => {
+    expect(mountScheduled(false).find(SWITCH).attributes("disabled")).toBeDefined();
+  });
+
+  // Left on from before, it must stay switchable so the user can clear it.
+  it("can still be turned off, but hides what it would send", () => {
+    const host = mountScheduled(true);
+    expect(host.find(SWITCH).attributes("disabled")).toBeUndefined();
+    expect(host.find('[data-test^="alert-notify-on-recovery-plan-"]').exists()).toBe(false);
+    expect(recoveryFieldShown(host)).toBe(false);
+  });
+
+  it("works as before once a destination is picked", () => {
+    const host = mountScheduled(true, ["dest-a"]);
+    expect(host.find(SWITCH).attributes("disabled")).toBeUndefined();
+    expect(host.find('[data-test="alert-notify-on-recovery-plan-dest-a"]').exists()).toBe(true);
+    expect(recoveryFieldShown(host)).toBe(true);
+  });
+});
+
+describe("AlertSettings — Creates Incident toggle visibility", () => {
+  const original = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
+  afterEach(() => {
+    config.isEnterprise = original.isEnterprise;
+    config.isCloud = original.isCloud;
+  });
+
+  it.each([
+    ["hidden in OSS with the flag off", "false", "false", false, false],
+    ["hidden in OSS even with the flag on", "false", "false", true, false],
+    ["hidden in enterprise with Incidents disabled", "true", "false", false, false],
+    ["hidden in enterprise before /config loads", "true", "false", undefined, false],
+    ["shown in enterprise with Incidents enabled", "true", "false", true, true],
+    ["shown in cloud with Incidents enabled", "false", "true", true, true],
+  ])("%s", (_label, isEnterprise, isCloud, incidentsEnabled, visible) => {
+    config.isEnterprise = isEnterprise;
+    config.isCloud = isCloud;
+    const host = mount(makeDescendantHost("false"), {
+      global: { plugins: [makeStore({ incidents_enabled: incidentsEnabled }), i18n] },
+    });
+    expect(host.find('[data-test="alert-creates-incident-toggle"]').exists()).toBe(visible);
+  });
+
+  it("appears once /config reports incidents enabled", async () => {
+    config.isEnterprise = "true";
+    const store = makeStore();
+    const host = mount(makeDescendantHost("true"), { global: { plugins: [store, i18n] } });
+    expect(host.find('[data-test="alert-creates-incident-toggle"]').exists()).toBe(false);
+
+    store.state.zoConfig.incidents_enabled = true;
+    await nextTick();
+    expect(host.find('[data-test="alert-creates-incident-toggle"]').exists()).toBe(true);
   });
 });
 
@@ -364,88 +473,25 @@ describe("AlertSettings.schema — period rules unchanged by the silence fix", (
   });
 });
 
-// ── "destination OR workflow" (enterprise/cloud) ─────────────────────────────
-// Pre-migration this lived in the component's hand-rolled validate(); that method
-// was deleted by the zod migration, so the rule now rides on the schema via the
-// `allowWorkflows` flag. OSS must be untouched: the flag defaults to false and
-// keeps the original "destinations >= 1" rule and message. Enterprise/cloud
-// relaxes it to "at least ONE of destinations | workflows", reported on the
-// `destinations` path so AlertSettings can surface it under the combined
-// AlertTargetsSelect control.
-describe("AlertSettings.schema — destination OR workflow", () => {
-  const DEST_ONLY = t("alerts.validation.destinationRequired");
-  const EITHER = t("alerts.destinationOrWorkflowRequired");
+// ── Destinations are optional: the field notes that no destination is notified instead of erroring ──
+describe("AlertSettings.schema — destinations are optional", () => {
+  const schema = createAlertSettingsSchema(t, false);
   const base = {
     trigger_condition: { silence: 10, period: 10 },
     creates_incident: false,
   };
 
-  describe("OSS (allowWorkflows omitted — default false)", () => {
-    const schema = createAlertSettingsSchema(t, false);
-
-    it("REJECTS empty destinations with the ORIGINAL message", () => {
-      const r = schema.safeParse({ ...base, destinations: [] });
-      expect(r.success).toBe(false);
-      expect(r.success ? [] : r.error.issues.map((i: any) => i.message)).toContain(DEST_ONLY);
-    });
-
-    it("does NOT accept a workflow as a substitute for a destination", () => {
-      // OSS has no workflows feature; a stray value must not satisfy the rule.
-      const r = schema.safeParse({
-        ...base,
-        destinations: [],
-        workflows: ["wf-1"],
-      });
-      expect(r.success).toBe(false);
-    });
-
-    it("ACCEPTS a destination", () => {
-      expect(schema.safeParse({ ...base, destinations: ["email"] }).success).toBe(true);
-    });
+  it.each([
+    ["no destination and no workflow", { destinations: [], workflows: [] }],
+    ["both keys absent", {}],
+    ["a destination", { destinations: ["email"] }],
+    ["a workflow and no destination", { destinations: [], workflows: ["wf-1"] }],
+  ])("ACCEPTS %s", (_case, targets) => {
+    expect(schema.safeParse({ ...base, ...targets }).success).toBe(true);
   });
 
-  describe("enterprise/cloud (allowWorkflows = true)", () => {
-    const schema = createAlertSettingsSchema(t, false, true);
-
-    it("ACCEPTS a destination and no workflow", () => {
-      const r = schema.safeParse({
-        ...base,
-        destinations: ["email"],
-        workflows: [],
-      });
-      expect(r.success).toBe(true);
-    });
-
-    it("ACCEPTS a workflow and NO destination (the new capability)", () => {
-      const r = schema.safeParse({
-        ...base,
-        destinations: [],
-        workflows: ["wf-1"],
-      });
-      expect(r.success).toBe(true);
-    });
-
-    it("ACCEPTS both", () => {
-      const r = schema.safeParse({
-        ...base,
-        destinations: ["email"],
-        workflows: ["wf-1"],
-      });
-      expect(r.success).toBe(true);
-    });
-
-    it("REJECTS neither, with the combined message on the destinations path", () => {
-      const r = schema.safeParse({ ...base, destinations: [], workflows: [] });
-      expect(r.success).toBe(false);
-      const issues = r.success ? [] : r.error.issues;
-      expect(issues.map((i: any) => i.message)).toContain(EITHER);
-      // Path matters: AlertSettings reads fieldError("destinations") to render it.
-      expect(issues.some((i: any) => i.path.join(".") === "destinations")).toBe(true);
-    });
-
-    it("REJECTS when both keys are absent entirely", () => {
-      expect(schema.safeParse({ ...base }).success).toBe(false);
-    });
+  it("still REJECTS a destination list that is not an array", () => {
+    expect(schema.safeParse({ ...base, destinations: "email" }).success).toBe(false);
   });
 });
 
@@ -518,16 +564,8 @@ describe("AlertSettings — combined destinations + workflows target control", (
     }
   });
 
-  it("still renders the destinations validation error under the control", async () => {
-    // The control is no longer an OForm* wrapper, so the schema error has no
-    // renderer of its own — the step surfaces it via fieldError("destinations").
+  it("shows the no-destination note under the control before any submit", () => {
     const host = mountDescendant("true");
-    const parentForm = hostForm(host);
-
-    await parentForm.handleSubmit();
-    await flushPromises();
-    await nextTick();
-
-    expect(host.text()).toContain(DESTINATIONS_REQUIRED_MESSAGE);
+    expect(host.text()).toContain(NO_DESTINATION_NOTE);
   });
 });

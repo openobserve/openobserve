@@ -120,9 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Right: dashboards table -->
       <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
-        <div class="bg-card-glass-bg h-full">
+        <div class="bg-card-glass-bg flex h-full flex-col">
+          <div
+            v-show="showFirstData"
+            class="shrink-0 px-5 pt-5 empty:hidden"
+            data-test="dashboards-first-data"
+          >
+            <FirstDataPanel v-if="showFirstData" signal="any" variant="compact" />
+          </div>
           <OTable
-            class="h-full w-full"
+            class="min-h-0 w-full flex-1"
             ref="oTableRef"
             :data="dashboards"
             :columns="columns"
@@ -134,9 +141,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             show-index
             :global-filter="filterQuery"
             :show-global-filter="false"
-            :footer-title="t('dashboard.header')"
-            :page-size="20"
+            :page-size="pageSize"
             :page-size-options="[20, 50, 100, 250, 500]"
+            @update:page-size="pageSize = $event"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            @update:sort-by="sortBy = $event"
+            @update:sort-order="sortOrder = $event"
             :current-page="currentPage"
             @update:current-page="onPageChange"
             selection="multiple"
@@ -210,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #cell-name="{ row, value }">
-              <span class="inline-flex items-center gap-1">
+              <span class="flex min-w-0 items-center gap-1">
                 <!-- One-click favorite toggle — filled gold star when
                      favorited, neutral outline otherwise. -->
                 <OButton
@@ -226,11 +237,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-favorite-toggle-${value}`"
                   @click.stop="toggleFavorite(row)"
                 />
-                <span
+                <OTruncatedText
                   class="text-text-body"
                   :data-test="`dashboard-name-cell-${value}`"
-                  :title="value"
-                  >{{ value }}</span
+                  >{{ value }}</OTruncatedText
                 >
                 <!-- At-a-glance indicator: shows which dashboard is the org
                      home dashboard without an interactive icon on every row. -->
@@ -252,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-body font-mono text-xs" :title="value">{{ value }}</span>
             </template>
             <template #cell-description="{ value }">
-              <span class="text-text-body" :title="value">{{ value || "—" }}</span>
+              <span class="text-text-body">{{ value || "—" }}</span>
             </template>
             <template #cell-owner="{ value }">
               <OUserCell :value="value" />
@@ -271,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
-                <span class="truncate">{{ row.folder }}</span>
+                <OTruncatedText>{{ row.folder }}</OTruncatedText>
               </button>
             </template>
             <template #cell-actions="{ row }">
@@ -400,45 +410,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </template>
-            <template #bottom>
-              <div class="flex w-full items-center justify-between gap-4 py-1">
-                <div class="flex shrink-0 items-center text-xs font-normal max-md:hidden">
-                  {{ resultTotal || 0 }} {{ t("dashboard.header") }}
-                </div>
-                <div v-if="selectedIds.length > 0" class="bulk-action-bar flex items-center gap-2">
-                  <span class="text-text-body me-1 text-sm">{{
-                    t("dashboard.dashboards.selected", { count: selectedIds.length })
-                  }}</span>
-                  <OButton
-                    variant="outline"
-                    size="sm-action"
-                    data-test="dashboard-list-move-across-folders-btn"
-                    @click="moveMultipleDashboards"
-                    icon-left="drive-file-move"
-                  >
-                    {{ t("common.move") }}
-                  </OButton>
-                  <OButton
-                    variant="outline"
-                    size="sm-action"
-                    icon-left="download"
-                    data-test="dashboard-list-export-dashboards-btn"
-                    @click="multipleExportDashboard"
-                  >
-                    {{ t("common.export") }}
-                  </OButton>
-                  <OButton
-                    variant="outline-destructive"
-                    size="sm-action"
-                    icon-left="delete"
-                    data-test="dashboard-list-delete-dashboards-btn"
-                    :loading="bulkDeleteLoading"
-                    @click="openBulkDeleteDialog"
-                  >
-                    {{ t("common.delete") }}
-                  </OButton>
-                </div>
-              </div>
+            <template #selection-actions>
+              <OButton
+                variant="outline"
+                size="sm"
+                data-test="dashboard-list-move-across-folders-btn"
+                @click="moveMultipleDashboards"
+                icon-left="drive-file-move"
+              >
+                {{ t("common.move") }}
+              </OButton>
+              <OButton
+                variant="outline"
+                size="sm"
+                icon-left="download"
+                data-test="dashboard-list-export-dashboards-btn"
+                @click="multipleExportDashboard"
+              >
+                {{ t("common.export") }}
+              </OButton>
+              <OButton
+                variant="outline-destructive"
+                size="sm"
+                icon-left="delete"
+                data-test="dashboard-list-delete-dashboards-btn"
+                :loading="bulkDeleteLoading"
+                @click="openBulkDeleteDialog"
+              >
+                {{ t("common.delete") }}
+              </OButton>
             </template>
           </OTable>
         </div>
@@ -563,6 +563,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import { useRoute, useRouter } from "vue-router";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
@@ -585,6 +586,7 @@ import useNotifications from "@/composables/useNotifications";
 import { debounce } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { useLoading } from "@/composables/useLoading";
+import { useListViewState } from "@/composables/useListViewState";
 import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
@@ -592,7 +594,9 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import analytics from "@/services/product_analytics";
 import { useFavoriteDashboards, FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -639,6 +643,8 @@ const asCaughtError = (e: unknown): CaughtError => (e ?? {}) as CaughtError;
 export default defineComponent({
   name: "Dashboards",
   components: {
+    FirstDataPanel,
+    OTruncatedText,
     OUserCell,
     OTimeCell,
     OPageLayout,
@@ -685,14 +691,35 @@ export default defineComponent({
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref<string | null>(null);
     const selectedFolderToEdit = ref<string | null>(null);
-    const searchQuery = ref("");
+    const savedView = useListViewState("dashboards", {
+      searchQuery: "",
+      filterQuery: "",
+      searchAcrossFolders: false,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+      pageSize: 20,
+    });
+    const searchQuery = ref(savedView.searchQuery);
     const filteredResults = ref<DashboardSearchResult[]>([]);
     const confirmDeleteFolderDialog = ref<boolean>(false);
     const selectedDashboardToMove = ref<DashboardRow | null>(null);
     const selectedDashboardIdToMove = ref<string[] | null>(null);
     const showMoveDashboardDialog = ref(false);
-    const searchAcrossFolders = ref(false);
-    const filterQuery = ref("");
+    const searchAcrossFolders = ref(savedView.searchAcrossFolders);
+    const filterQuery = ref(savedView.filterQuery);
+    const sortBy = ref<string>(savedView.sortBy);
+    const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+    const pageSize = ref<number>(savedView.pageSize);
+    watch([searchQuery, filterQuery, searchAcrossFolders, sortBy, sortOrder, pageSize], () => {
+      Object.assign(savedView, {
+        searchQuery: searchQuery.value,
+        filterQuery: filterQuery.value,
+        searchAcrossFolders: searchAcrossFolders.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+        pageSize: pageSize.value,
+      });
+    });
     const folderSearchQuery = ref("");
     const selectedIds = ref<string[]>([]);
     const { track } = useReo();
@@ -967,7 +994,7 @@ export default defineComponent({
             // A folder switched away from mid-flight must not stamp over the one now active.
             if (activeFolderId.value === FAVORITES_FOLDER_ID) stampFolders(favFolders);
           });
-          searchAcrossFolders.value = false;
+          if (switching) searchAcrossFolders.value = false;
           router.push({
             path: "/dashboards",
             query: {
@@ -1000,7 +1027,9 @@ export default defineComponent({
           }
         } finally {
           loading.value = false;
-          searchAcrossFolders.value = false;
+          // The landing run is the return-from-detail restore, which keeps the saved cross-folder search.
+          if (switching) searchAcrossFolders.value = false;
+          else if (searchAcrossFolders.value && searchQuery.value) void runAcrossFoldersSearch();
           router.push({
             path: "/dashboards",
             query: {
@@ -1028,6 +1057,25 @@ export default defineComponent({
       }
     });
 
+    const runAcrossFoldersSearch = async () => {
+      loading.value = true;
+      try {
+        // Cancel any in-flight search
+        if (currentSearchAbortController) {
+          currentSearchAbortController.abort();
+        }
+        currentSearchAbortController = new AbortController();
+        const searchResults = await fetchSearchResults.execute(searchQuery.value);
+        filteredResults.value = toRaw(searchResults);
+      } catch (error) {
+        if (asCaughtError(error).name !== "AbortError") {
+          filteredResults.value = [];
+        }
+      } finally {
+        loading.value = false;
+      }
+    };
+
     watch(searchAcrossFolders, async (newVal) => {
       if (newVal) {
         // If searching across folders, use searchQuery
@@ -1036,23 +1084,7 @@ export default defineComponent({
           filterQuery.value = "";
         }
         if (searchQuery.value) {
-          loading.value = true;
-          try {
-            // Cancel any in-flight search
-            if (currentSearchAbortController) {
-              currentSearchAbortController.abort();
-            }
-            currentSearchAbortController = new AbortController();
-            const searchResults = await fetchSearchResults.execute(searchQuery.value);
-            filteredResults.value = toRaw(searchResults);
-          } catch (error) {
-            if (asCaughtError(error).name !== "AbortError") {
-              filteredResults.value = [];
-              // Handle error state
-            }
-          } finally {
-            loading.value = false;
-          }
+          await runAcrossFoldersSearch();
         } else {
           // If no search query, clear filtered results
           filteredResults.value = [];
@@ -1191,6 +1223,7 @@ export default defineComponent({
           data,
           folderId || "default",
         );
+        analytics.track("dashboard_created");
 
         // Post-write reload: the duplicate will not appear from a cache hit.
         await getDashboards(true);
@@ -1391,11 +1424,13 @@ export default defineComponent({
       { flush: "sync" },
     );
 
-    const resultTotal = computed(function () {
-      // Derived from the rendered rows so the footer count matches what the
-      // favorites filter / cross-folder search actually shows.
-      return dashboards.value.length;
-    });
+    // mounted only while it can show, so a list with dashboards or an org with data runs no hidden watcher
+    const showFirstData = computed(
+      () =>
+        !loading.value &&
+        !dashboards.value.length &&
+        store.state.organizationData?.isDataIngested === false,
+    );
 
     const deleteDashboard = async () => {
       if (selectedDelete.value) {
@@ -1412,6 +1447,7 @@ export default defineComponent({
               ? selectedDelete.value.folder_id
               : (activeFolderId.value ?? "default"),
           );
+          analytics.track("dashboard_deleted", { count: 1 });
           showPositiveNotification(
             deletedWasHome
               ? t("dashboard.pinnedDeletedPinRemoved")
@@ -1690,6 +1726,9 @@ export default defineComponent({
         // across the per-folder calls.
         const successful = responses.flatMap((r: any) => r?.data?.successful ?? []);
         const unsuccessful = responses.flatMap((r: any) => r?.data?.unsuccessful ?? []);
+        if (successful.length > 0) {
+          analytics.track("dashboard_deleted", { count: successful.length });
+        }
         if (responses.some((r: any) => r?.data)) {
           const successCount = successful.length;
           const failCount = unsuccessful.length;
@@ -1819,6 +1858,7 @@ export default defineComponent({
       dashboard,
       columns,
       loading,
+      showFirstData,
       refreshing,
       lastUpdatedAt,
       forbidden,
@@ -1828,7 +1868,6 @@ export default defineComponent({
       importDashboard,
       migrationOptions,
       openMigration,
-      resultTotal,
       routeToViewD,
       showDeleteDialogFn,
       confirmDeleteDialog,
@@ -1871,6 +1910,9 @@ export default defineComponent({
       selectedIds,
       currentPage,
       onPageChange,
+      pageSize,
+      sortBy,
+      sortOrder,
       multipleExportDashboard,
       moveMultipleDashboards,
       openBulkDeleteDialog,

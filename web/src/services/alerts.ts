@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 import type {
   CompositeAlertValidationRequest,
   CompositeAlertValidationResponse,
@@ -64,7 +65,12 @@ const alerts = {
     return http().get(url);
   },
   create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
-    return http().post(`/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`, data);
+    return http()
+      .post(`/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`, data)
+      .then((res) => {
+        analytics.track("alert_created");
+        return res;
+      });
   },
   update: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
     return http().put(
@@ -115,7 +121,12 @@ const alerts = {
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().post(url, data);
+    return http()
+      .post(url, data)
+      .then((res) => {
+        analytics.track("alert_created");
+        return res;
+      });
   },
   update_by_alert_id: (org_identifier: string, data: any, folder_id?: any) => {
     let url = `/api/v2/${org_identifier}/alerts/${data.id}`;
@@ -124,16 +135,31 @@ const alerts = {
     }
     if (data.alert_type === "composite") {
       const { id: _id, ...body } = data;
-      return http().put(url, body);
+      return http()
+        .put(url, body)
+        .then((res) => {
+          analytics.track("alert_updated");
+          return res;
+        });
     }
-    return http().put(url, data);
+    return http()
+      .put(url, data)
+      .then((res) => {
+        analytics.track("alert_updated");
+        return res;
+      });
   },
   delete_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().delete(url);
+    return http()
+      .delete(url)
+      .then((res) => {
+        analytics.track("alert_deleted", { count: 1 });
+        return res;
+      });
   },
   toggle_state_by_alert_id: (
     org_identifier: string,
@@ -145,21 +171,38 @@ const alerts = {
     if (folder_id) {
       url += `&folder=${folder_id}`;
     }
-    return http().patch(url);
+    return http()
+      .patch(url)
+      .then((res) => {
+        analytics.track(enable ? "alert_enabled" : "alert_disabled", { count: 1 });
+        return res;
+      });
   },
   bulkToggleState: (org_identifier: string, enable: boolean, data: any, folder_id?: string) => {
     let url = `/api/v2/${org_identifier}/alerts/bulk/enable?value=${enable}`;
     if (folder_id) {
       url += `&folder=${folder_id}`;
     }
-    return http().post(url, data);
+    return http()
+      .post(url, data)
+      .then((res) => {
+        const count = res.data?.successful?.length ?? 0;
+        if (count > 0) analytics.track(enable ? "alert_enabled" : "alert_disabled", { count });
+        return res;
+      });
   },
   bulkDelete: (org_identifier: string, data: any, folder_id?: string) => {
     let url = `/api/v2/${org_identifier}/alerts/bulk`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().delete(url, { data });
+    return http()
+      .delete(url, { data })
+      .then((res) => {
+        const count = res.data?.successful?.length ?? 0;
+        if (count > 0) analytics.track("alert_deleted", { count });
+        return res;
+      });
   },
   /** Every alert attached to one SLO (Feature 5). Filters on the indexed
    *  `slo_id` column server-side, and unlike the burn-pair lookup it includes
@@ -229,6 +272,8 @@ const alerts = {
     const params = new URLSearchParams();
     if (query.anomaly_id) params.append("anomaly_id", query.anomaly_id);
     if (query.alert_id) params.append("alert_id", query.alert_id);
+    if (query.downtime_id) params.append("downtime_id", query.downtime_id);
+    if (query.status) params.append("status", query.status);
     if (query.start_time) params.append("start_time", query.start_time);
     if (query.end_time) params.append("end_time", query.end_time);
     params.append("from", query.from || "0");
@@ -267,7 +312,12 @@ const alerts = {
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().patch(url);
+    return http()
+      .patch(url)
+      .then((res) => {
+        analytics.track("alert_manually_triggered");
+        return res;
+      });
   },
   generate_sql: (org_identifier: string, data: any) => {
     return http().post(`/api/v2/${org_identifier}/alerts/generate_sql`, data);
@@ -283,7 +333,12 @@ const alerts = {
     if (folder_id) {
       url += `?folder=${folder_id}`;
     }
-    return http().post(url, data);
+    return http()
+      .post(url, data)
+      .then((res) => {
+        analytics.track("alert_created");
+        return res;
+      });
   },
   // POST /api/v2/{org}/alerts/{id}/export — returns config with runtime fields stripped
   export_by_id: (org_identifier: string, alert_id: string) => {
@@ -291,7 +346,12 @@ const alerts = {
   },
   // PATCH /api/v2/{org}/alerts/{id}/retrain — triggers model retrain (anomaly configs only)
   retrain_by_id: (org_identifier: string, alert_id: string) => {
-    return http().patch(`/api/v2/${org_identifier}/alerts/${alert_id}/retrain`);
+    return http()
+      .patch(`/api/v2/${org_identifier}/alerts/${alert_id}/retrain`)
+      .then((res) => {
+        analytics.track("anomaly_detection_training_started");
+        return res;
+      });
   },
   // GET /api/v2/{org}/alerts/{id}/groups — per-group states of a multi-alert,
   // most severe first, plus the PRE-cap counts the "N of M firing" chip needs.
@@ -327,6 +387,8 @@ export interface AlertHistoryQuery {
   from: string | number;
   size: string | number;
   alert_id?: string;
+  downtime_id?: string;
+  status?: string;
   sort_by?: string;
   sort_order?: string;
   [extra: string]: unknown;

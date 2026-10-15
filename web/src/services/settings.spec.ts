@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import settings from "@/services/settings";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock the http service
 vi.mock("@/services/http", () => ({
@@ -354,5 +357,25 @@ describe("settings service", () => {
         customText,
       );
     });
+  });
+});
+
+describe("settings product analytics", () => {
+  beforeEach(() => {
+    vi.mocked(analytics.track).mockClear();
+  });
+
+  it("tracks after createLogo succeeds", async () => {
+    (http as any).mockImplementation(() => ({ post: vi.fn().mockResolvedValue({ data: {} }) }));
+    await settings.createLogo("org1", new FormData(), "dark");
+    expect(analytics.track).toHaveBeenCalledWith("org_logo_uploaded", { theme: "dark" });
+  });
+
+  it("does not track when createLogo fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({
+      post: vi.fn().mockRejectedValue(new Error("boom")),
+    }));
+    await expect(settings.createLogo("org1", new FormData(), "dark")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

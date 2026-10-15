@@ -94,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :languages="['vrl', 'javascript']"
                     :default-language="transType === '1' ? 'javascript' : 'vrl'"
                     :query="formData.function"
+                    v-model:nlp-mode="functionEditorNlpMode"
                     :hide-nl-toggle="!store.state.zoConfig.ai_enabled"
                     :disable-ai="!store.state.zoConfig.ai_enabled"
                     :disable-ai-reason="raw('')"
@@ -214,7 +215,7 @@ import {
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
-import segment from "../../services/segment_analytics";
+import analytics from "../../services/product_analytics";
 import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
@@ -323,6 +324,10 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const editorRef: any = ref(null);
     const functionEditorPlaceholderFlag = ref(true);
+    // Externally controlled so the AI bar only opens on explicit user action
+    // (the AI toggle/close button) — VRL text never looks like a natural-
+    // language query, so auto-detection here is only ever a false positive.
+    const functionEditorNlpMode = ref(false);
     const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
     const { placeholder: jsPlaceholder } = useJsPlaceholder();
     let editorobj: any = null;
@@ -359,20 +364,18 @@ export default defineComponent({
         store.state.selectedOrganization?.identifier === "_meta",
     );
 
-    // Transform type options for the VRL/JS radio group.
+    // Transform type options for the VRL/JS radio group. JavaScript is
+    // always present (shown locked, not hidden, when not entitled) — except
+    // an already-JS function keeps it genuinely unlocked even where JS isn't
+    // offered (e.g. a build that lost the entitlement), so editing it renders
+    // the right language instead of a locked option under the active value.
     const transformTypeOptions = computed(() => {
-      const options = [{ label: t("function.vrl"), value: "0" }];
-
-      // An already-JS function keeps the JS option even where JS isn't offered
-      // (e.g. a build that lost the entitlement), so editing it renders the right
-      // language instead of a radio group with nothing selected.
       const editingJsFunction = String((props.modelValue as any)?.transType ?? "0") === "1";
-
-      if (isJsAllowed.value || editingJsFunction) {
-        options.push({ label: raw("JavaScript"), value: "1" });
-      }
-
-      return options;
+      const jsUnlocked = isJsAllowed.value || editingJsFunction;
+      return [
+        { label: t("function.vrl"), value: "0" },
+        { label: raw("JavaScript"), value: "1", disabled: !jsUnlocked },
+      ];
     });
 
     const beingUpdated = computed(() => props.isUpdated);
@@ -481,6 +484,19 @@ export default defineComponent({
     // `function`/`params` (Monaco body / hidden constant) come from formData.
     // Awaited so OForm's isSubmitting drives the Save spinner.
     const onSubmit = async (value: AddFunctionForm) => {
+      // Defense in depth — the JS toggle option's own `disabled` already
+      // blocks selecting it, but that attribute can be stripped via
+      // devtools. The backend also rejects a JS function on a build that
+      // doesn't unlock it, but fail fast here instead of round-tripping.
+      const editingJsFunction = String((props.modelValue as any)?.transType ?? "0") === "1";
+      if (value.transType === "1" && !isJsAllowed.value && !editingJsFunction) {
+        toast({
+          variant: "error",
+          message: t("enterpriseFeature.locked", { feature: raw("JavaScript") }),
+        });
+        return;
+      }
+
       const loadingNotification = toast({
         variant: "loading",
         message: t("toastMessages.functions.pleaseWait"),
@@ -520,7 +536,7 @@ export default defineComponent({
         loadingNotification();
       }
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Save Function",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -663,6 +679,7 @@ export default defineComponent({
       indexOptions,
       editorRef,
       functionEditorPlaceholderFlag,
+      functionEditorNlpMode,
       vrlPlaceholder,
       jsPlaceholder,
       editorobj,

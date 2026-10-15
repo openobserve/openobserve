@@ -86,8 +86,8 @@ export class IamFormValidationPage {
         this.updateRoleCancelBtn   = '[data-test="add-user-dialog"] [data-test="o-dialog-secondary-btn"]';
 
         // ── Add Role "Start from" preset (new) ────────────────────────────────
-        this.roleStartFromCustom   = '[data-test="add-role-start-from-custom-radio"]';
-        this.roleStartFromReadonly = '[data-test="add-role-start-from-readonly-radio"]';
+        this.roleStartFromSelect   = '[data-test="add-role-start-from-select-trigger"]';
+        this.roleStartFromOption   = (value) => `[data-test="add-role-start-from-select-option"][data-test-value="${value}"]`;
 
         // ── Edit Role / Edit Group pages (auto-route + dirty state, new) ───────
         this.editRolePage          = '[data-test="edit-role-page"]';
@@ -225,9 +225,13 @@ export class IamFormValidationPage {
         await this.page.locator(this.roleCancelBtn).click();
     }
 
-    // Select the "Read-only" start-from preset before submitting the role form.
+    async selectRoleStartFrom(value) {
+        await this.page.locator(this.roleStartFromSelect).click();
+        await this.page.locator(this.roleStartFromOption(value)).click();
+    }
+
     async selectRoleStartFromReadonly() {
-        await this.page.locator(this.roleStartFromReadonly).click();
+        await this.selectRoleStartFrom('readonly');
     }
 
     // Delete the first role/group in the list via its row trash icon, keyed by name.
@@ -317,8 +321,8 @@ export class IamFormValidationPage {
     getAddUserDialogLocator()     { return this.page.locator(this.addUserDialog); }
 
     // New-behavior getters (start-from, auto-route, delete banner, dirty dots)
-    getRoleStartFromCustomLocator()   { return this.page.locator(this.roleStartFromCustom); }
-    getRoleStartFromReadonlyLocator() { return this.page.locator(this.roleStartFromReadonly); }
+    getRoleStartFromSelectLocator()   { return this.page.locator(this.roleStartFromSelect); }
+    getRoleStartFromOptionLocator(value) { return this.page.locator(this.roleStartFromOption(value)); }
     getEditRolePageLocator()          { return this.page.locator(this.editRolePage); }
     getEditRolePermsSectionLocator()  { return this.page.locator(this.editRolePermsSection); }
     getEditRolePermsDirtyDotLocator() { return this.page.locator(this.editRolePermsDirtyDot); }

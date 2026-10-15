@@ -61,7 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filter-mode="client"
         :default-columns="false"
         :show-global-filter="false"
-        :footer-title="t('iam.roles')"
         dense
       >
         <template #cell-select="{ row }">

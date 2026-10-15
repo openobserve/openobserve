@@ -124,13 +124,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <template v-for="(ref, index) in secondaryRefs" :key="ref.key">
                     <span v-if="index" aria-hidden="true">{{ REF_SEPARATOR }}</span>
-                    <span
-                      class="min-w-0 truncate"
-                      :data-test="`ai-dataset-item-detail-ref-${ref.key}`"
-                    >
+                    <OTruncatedText :data-test="`ai-dataset-item-detail-ref-${ref.key}`">
                       {{ ref.label }}
                       <span class="font-mono">{{ ref.value }}</span>
-                    </span>
+                    </OTruncatedText>
                   </template>
                 </div>
               </div>
@@ -281,6 +278,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmDatasetsService, { type LlmDatasetItem } from "@/services/llm-datasets.service";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineOptions({ name: "DatasetItemDetail" });
 

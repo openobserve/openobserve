@@ -173,6 +173,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!loading && incidentDetails"
         class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
+        <div v-if="incidentDetails.muted_by_downtime_id" class="shrink-0 px-3 pt-2">
+          <OBanner
+            variant="warning"
+            dense
+            inline-actions
+            icon="notifications-paused"
+            data-test="incident-detail-muted-banner"
+          >
+            {{ mutedBannerText }}
+            <template #actions>
+              <OButton
+                variant="ghost"
+                size="sm"
+                data-test="incident-detail-muted-view"
+                @click="openMutingDowntime"
+              >
+                {{ t("toastMessages.downtimes.viewDowntime") }}
+              </OButton>
+            </template>
+          </OBanner>
+        </div>
         <!-- Tab Content Container -->
         <div class="flex flex-1 overflow-hidden">
           <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
@@ -459,9 +480,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 font-mono text-xs"
                             >
-                              <span class="min-w-0 flex-1 truncate">{{
+                              <OTruncatedText class="flex-1">{{
                                 incidentDetails?.id || raw("N/A")
-                              }}</span>
+                              }}</OTruncatedText>
                               <OIcon
                                 :name="copiedField === 'incident_id' ? 'check' : 'content-copy'"
                                 size="sm"
@@ -484,9 +505,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
                             >
-                              <span class="min-w-0 flex-1 truncate">{{
+                              <OTruncatedText class="flex-1">{{
                                 incidentDetails?.title || raw("N/A")
-                              }}</span>
+                              }}</OTruncatedText>
                               <OIcon
                                 :name="copiedField === 'incident_title' ? 'check' : 'content-copy'"
                                 size="sm"
@@ -607,10 +628,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span class="text-text-secondary text-xs">
                             {{ t("alerts.incidents.onCallTeam") }}
                           </span>
-                          <span class="text-text-body truncate text-xs">
+                          <OTruncatedText class="text-text-body text-xs">
                             {{ raw(oncallTeamName) }}
-                            <OTooltip side="bottom" :content="raw(oncallTeamName)" />
-                          </span>
+                          </OTruncatedText>
                         </div>
                         <div class="flex items-center justify-between gap-2">
                           <span class="text-text-secondary text-xs">
@@ -701,9 +721,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :key="liaison.id"
                             class="flex items-center justify-between gap-2"
                           >
-                            <span class="text-text-body truncate text-xs">
+                            <OTruncatedText class="text-text-body text-xs">
                               {{ raw(oncallTeamNameFor(liaison.team_id)) }}
-                            </span>
+                            </OTruncatedText>
                             <OTag type="oncallResponseState" :value="liaison.state" size="sm" />
                           </span>
                         </div>
@@ -897,17 +917,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ index + 1 }}.
                               </span>
                               <div class="min-w-0 flex-1">
-                                <OTooltip
-                                  v-if="alert.name.length > 30"
-                                  :content="raw(alert.name)"
-                                />
-                                <span class="block truncate font-medium">
-                                  {{
-                                    alert.name.length > 30
-                                      ? alert.name.substring(0, 30) + "..."
-                                      : alert.name
-                                  }}
-                                </span>
+                                <OTruncatedText class="block font-medium">
+                                  {{ alert.name }}
+                                </OTruncatedText>
                               </div>
                               <div class="w-30 flex-shrink-0">
                                 <span :class="'text-text-secondary'">
@@ -1060,9 +1072,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.stream_name") }}
                               </span>
-                              <span :class="'text-text-body'" class="truncate text-sm font-medium">
+                              <OTruncatedText :class="'text-text-body'" class="text-sm font-medium">
                                 {{ alerts[selectedAlertIndex]?.stream_name || raw("N/A") }}
-                              </span>
+                              </OTruncatedText>
                             </div>
                           </div>
 
@@ -1472,6 +1484,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
+import { formatWindowTime } from "@/utils/downtimes/schedule";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import {
@@ -1527,6 +1542,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
@@ -1557,7 +1573,9 @@ export default defineComponent({
     OUserCell,
     OIcon,
     OTag,
+    OTruncatedText,
     OInlineEdit,
+    OBanner,
   },
   emits: ["close", "status-updated", "sendToAiChat"],
   setup(props, { emit }) {
@@ -1599,6 +1617,35 @@ export default defineComponent({
     const incidentDetails = ref<(IncidentWithAlerts & { correlation_reason?: string }) | null>(
       null,
     );
+    // The downtimes list is read only to name the downtime that mutes this incident.
+    const { downtimeOf, nameOf } = useDowntimeLookup(
+      () => !!incidentDetails.value?.muted_by_downtime_id,
+    );
+
+    const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const mutedBannerText = computed(() => {
+      const id = incidentDetails.value?.muted_by_downtime_id;
+      if (!id) return "";
+      const end = downtimeOf(id)?.current_window?.end;
+      return end
+        ? t("alerts.downtimes.incident.bannerUntil", {
+            name: nameOf(id),
+            end: formatWindowTime(end, viewerZone),
+          })
+        : t("alerts.downtimes.incident.banner", { name: nameOf(id) });
+    });
+    const openMutingDowntime = () => {
+      const id = incidentDetails.value?.muted_by_downtime_id;
+      if (!id) return;
+      void router.push({
+        name: "downtimeDetail",
+        params: { id },
+        query: {
+          org_identifier: store.state.selectedOrganization?.identifier,
+          folder: downtimeOf(id)?.folder_id,
+        },
+      });
+    };
     // The on-call record this incident paged, if any. Null in OSS, when
     // on-call is off, and when nothing was routed — all of which mean the
     // panel simply does not render.
@@ -3620,6 +3667,8 @@ export default defineComponent({
     };
 
     return {
+      mutedBannerText,
+      openMutingDowntime,
       raw,
       t,
       store,

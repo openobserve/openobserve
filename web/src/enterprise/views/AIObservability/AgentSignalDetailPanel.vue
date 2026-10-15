@@ -131,12 +131,14 @@
           <!-- Trace id renders with an "open in new tab" icon so it's clear the
                row opens the trace in a new browser tab, not in place. -->
           <template #cell-trace_id="{ row }">
-            <span
-              class="text-text-link inline-flex items-center gap-1 hover:underline"
-              :title="t('aiObservability.behavior.detail.openInNewTab')"
-            >
-              <OIcon name="open-in-new" size="xs" class="opacity-70" />
-              <span class="truncate font-mono">{{ row.trace_id }}</span>
+            <span class="text-text-link inline-flex max-w-full items-center gap-1 hover:underline">
+              <OIcon
+                name="open-in-new"
+                size="xs"
+                class="opacity-70"
+                :title="t('aiObservability.behavior.detail.openInNewTab')"
+              />
+              <OTruncatedText class="font-mono">{{ row.trace_id }}</OTruncatedText>
             </span>
           </template>
         </OTable>
@@ -159,6 +161,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import searchService from "@/services/search";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { buildAgentClimbFilter } from "./agentClimbFilter";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 interface SignalRow {
   signalType: "loop" | "failure" | "cost";

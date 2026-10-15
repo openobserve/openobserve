@@ -190,6 +190,7 @@ fn create_system_settings_table(backend: DbBackend) -> TableCreateStatement {
 
 fn create_scope_index() -> IndexCreateStatement {
     Index::create()
+        .if_not_exists()
         .name("idx_system_settings_scope")
         .table(SystemSettings::Table)
         .col(SystemSettings::Scope)
@@ -198,6 +199,7 @@ fn create_scope_index() -> IndexCreateStatement {
 
 fn create_org_index() -> IndexCreateStatement {
     Index::create()
+        .if_not_exists()
         .name("idx_system_settings_org")
         .table(SystemSettings::Table)
         .col(SystemSettings::OrgId)
@@ -206,6 +208,7 @@ fn create_org_index() -> IndexCreateStatement {
 
 fn create_user_index() -> IndexCreateStatement {
     Index::create()
+        .if_not_exists()
         .name("idx_system_settings_user")
         .table(SystemSettings::Table)
         .col(SystemSettings::OrgId)
@@ -215,6 +218,7 @@ fn create_user_index() -> IndexCreateStatement {
 
 fn create_key_index() -> IndexCreateStatement {
     Index::create()
+        .if_not_exists()
         .name("idx_system_settings_key")
         .table(SystemSettings::Table)
         .col(SystemSettings::SettingKey)
@@ -223,6 +227,7 @@ fn create_key_index() -> IndexCreateStatement {
 
 fn create_category_index() -> IndexCreateStatement {
     Index::create()
+        .if_not_exists()
         .name("idx_system_settings_category")
         .table(SystemSettings::Table)
         .col(SystemSettings::SettingCategory)
@@ -231,6 +236,7 @@ fn create_category_index() -> IndexCreateStatement {
 
 fn create_unique_setting_index() -> IndexCreateStatement {
     Index::create()
+        .if_not_exists()
         .name("idx_system_settings_unique")
         .table(SystemSettings::Table)
         .col(SystemSettings::Scope)
@@ -260,7 +266,7 @@ enum SystemSettings {
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::DbBackend;
+    use sea_orm::{Database, DbBackend};
     use sea_query::SqliteQueryBuilder;
 
     use super::*;
@@ -320,5 +326,29 @@ mod tests {
         let stmt = create_system_settings_table(DbBackend::Postgres);
         let sql = stmt.build(SqliteQueryBuilder);
         assert!(sql.contains("system_settings"));
+    }
+
+    #[tokio::test]
+    async fn test_up_reruns_when_table_and_indexes_exist() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let manager = SchemaManager::new(&db);
+        Migration.up(&manager).await.unwrap();
+        Migration
+            .up(&manager)
+            .await
+            .expect("re-running must not fail on the existing indexes");
+        for idx in [
+            "idx_system_settings_scope",
+            "idx_system_settings_org",
+            "idx_system_settings_user",
+            "idx_system_settings_key",
+            "idx_system_settings_category",
+            "idx_system_settings_unique",
+        ] {
+            assert!(
+                manager.has_index("system_settings", idx).await.unwrap(),
+                "{idx}"
+            );
+        }
     }
 }

@@ -15,6 +15,7 @@
 
 import type { Ref } from "vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import analytics from "@/services/product_analytics";
 import type { I18nText } from "@/types/i18n";
 
 type Staged = { object: string; permission: string };
@@ -86,6 +87,10 @@ export const useRoleSave = (deps: SaveDeps) => {
     updateRoleOne
       .mutateAsync({ role_id: editingRole.value, payload })
       .then(async () => {
+        analytics.track("role_updated", {
+          permissions_changed: payload.add.length + payload.remove.length > 0,
+          members_changed: payload.add_users.length + payload.remove_users.length > 0,
+        });
         // combine permissionsHash and selectedPermissionsHash
 
         toast({

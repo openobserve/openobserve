@@ -497,6 +497,8 @@ pub struct PanelConfig {
     panel_time_range: Option<PanelTimeRange>,
     #[serde(skip_serializing_if = "Option::is_none")]
     show_exemplars: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    axis_label_mode: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -704,6 +706,16 @@ pub struct QueryConfig {
     time_shift: Option<Vec<TimeShift>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     query_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    formula: Option<String>,
+    #[serde(rename = "ref", default, skip_serializing_if = "Option::is_none")]
+    query_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hide: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    query_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    promql_legend_fallback: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -1386,6 +1398,11 @@ mod tests {
             max: None,
             time_shift: None,
             query_label: None,
+            formula: None,
+            query_ref: None,
+            hide: None,
+            query_type: None,
+            promql_legend_fallback: None,
         };
         let json = serde_json::to_string(&qc).unwrap();
         assert!(!json.contains("step_value"));
@@ -1804,5 +1821,38 @@ mod tests {
         assert_eq!(cfg.show_exemplars, None);
         let json = serde_json::to_value(&cfg).unwrap();
         assert!(json.get("show_exemplars").is_none());
+    }
+
+    #[test]
+    fn test_panel_config_axis_label_mode_round_trip() {
+        for mode in ["auto", "show", "hide"] {
+            let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+                "show_legends": true,
+                "legends_position": null,
+                "base_map": null,
+                "map_view": null,
+                "axis_label_mode": mode
+            }))
+            .unwrap();
+            assert_eq!(cfg.axis_label_mode.as_deref(), Some(mode));
+            let json = serde_json::to_value(&cfg).unwrap();
+            assert_eq!(json["axis_label_mode"], serde_json::json!(mode));
+            let back: PanelConfig = serde_json::from_value(json).unwrap();
+            assert_eq!(back, cfg);
+        }
+    }
+
+    #[test]
+    fn test_panel_config_axis_label_mode_absent_when_none() {
+        let cfg: PanelConfig = serde_json::from_value(serde_json::json!({
+            "show_legends": false,
+            "legends_position": null,
+            "base_map": null,
+            "map_view": null
+        }))
+        .unwrap();
+        assert_eq!(cfg.axis_label_mode, None);
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert!(json.get("axis_label_mode").is_none());
     }
 }

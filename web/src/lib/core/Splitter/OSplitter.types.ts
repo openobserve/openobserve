@@ -12,6 +12,7 @@ export interface OSplitterProps {
   separatorClass?: string;
   separatorStyle?: StyleValue;
   beforeClass?: string;
+  afterClass?: string;
 }
 
 export interface OSplitterEmits {

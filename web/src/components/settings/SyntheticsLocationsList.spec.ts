@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
@@ -101,7 +102,9 @@ const OTableStub = {
           <slot name="cell-actions" :row="row" />
         </div>
       </div>
-      <div data-test="table-bottom"><slot name="bottom" /></div>
+      <div data-test="table-bottom">
+        <slot v-if="selectedIds && selectedIds.length" name="selection-actions" />
+      </div>
     </div>
   `,
   props: [
@@ -263,8 +266,6 @@ const createMockI18n = () =>
             exportSuccess: "Locations exported successfully",
             exportFailed: "Failed to export locations",
             fetchFailed: "Failed to fetch locations",
-            bottomHeader: "locations",
-            selectedCount: "{selected} of {total} locations selected",
             bulkEnabledSuccess: "{count} locations enabled",
             bulkDisabledSuccess: "{count} locations disabled",
             bulkEnabledPartial: "{success} of {total} locations enabled",
@@ -315,6 +316,8 @@ function mountComponent(store?: ReturnType<typeof createMockStore>) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // Tests
 // ═══════════════════════════════════════════════════════════════════════════════
+
+beforeEach(() => resetListViewState());
 
 describe("SyntheticsLocationsList", () => {
   let wrapper: VueWrapper<any>;
@@ -413,7 +416,6 @@ describe("SyntheticsLocationsList", () => {
       expect(wrapper.vm.locations).toHaveLength(2);
       expect(wrapper.vm.locations[0].label).toBe("AWS US East");
       expect(wrapper.vm.locations[1].label).toBe("GCP Europe");
-      expect(wrapper.vm.resultTotal).toBe(2);
     });
 
     it("filters out private locations, keeping only public ones", async () => {
@@ -432,7 +434,6 @@ describe("SyntheticsLocationsList", () => {
       expect(ids).toEqual(["pub-1", "pub-2"]);
       expect(ids).not.toContain("priv-1");
       expect(ids).not.toContain("priv-2");
-      expect(wrapper.vm.resultTotal).toBe(2);
     });
 
     it("shows loading state while fetching, and clears it afterward", async () => {
@@ -489,7 +490,6 @@ describe("SyntheticsLocationsList", () => {
       await flushPromises();
 
       expect(wrapper.vm.locations).toHaveLength(0);
-      expect(wrapper.vm.resultTotal).toBe(0);
     });
   });
 
@@ -557,12 +557,6 @@ describe("SyntheticsLocationsList", () => {
       wrapper.vm.filterQuery = "nonexistent";
       await nextTick();
       expect(wrapper.vm.visibleRows).toHaveLength(0);
-    });
-
-    it("updates resultTotal after filtering", async () => {
-      wrapper.vm.filterQuery = "aws";
-      await nextTick();
-      expect(wrapper.vm.resultTotal).toBe(1);
     });
 
     it("shows filtered empty state when search yields no results", async () => {
@@ -928,7 +922,6 @@ describe("SyntheticsLocationsList", () => {
 
       expect(wrapper.vm.locations).toHaveLength(1);
       expect(wrapper.vm.locations[0].id).toBe("loc-2");
-      expect(wrapper.vm.resultTotal).toBe(1);
     });
 
     it("does NOT delete when the user cancels the confirmation", async () => {
@@ -1012,7 +1005,6 @@ describe("SyntheticsLocationsList", () => {
 
       expect(wrapper.vm.locations).toHaveLength(1);
       expect(wrapper.vm.locations[0].id).toBe("loc-3");
-      expect(wrapper.vm.resultTotal).toBe(1);
     });
 
     it("handles partial failures during bulk delete", async () => {
@@ -1235,11 +1227,6 @@ describe("SyntheticsLocationsList", () => {
         false,
       );
     });
-
-    it("shows count text with total when no rows selected", () => {
-      wrapper.vm.selectedLocations = [];
-      expect(wrapper.vm.resultTotal).toBe(2);
-    });
   });
 
   // ── Refresh ──────────────────────────────────────────────────────────────────
@@ -1294,7 +1281,43 @@ describe("SyntheticsLocationsList", () => {
       await flushPromises();
 
       expect(wrapper.vm.locations).toHaveLength(0);
-      expect(wrapper.vm.resultTotal).toBe(0);
+    });
+  });
+});
+
+describe("list view state", () => {
+  it("restores search, page size, page and sort from the saved view", async () => {
+    Object.assign(useListViewState("synthetics-locations", {}), {
+      filterQuery: "abc",
+      pageSize: 50,
+      currentPage: 2,
+      sortBy: "label",
+      sortOrder: "desc",
+    });
+    const w: any = mountComponent();
+    await flushPromises();
+    expect(w.vm.filterQuery).toBe("abc");
+    expect(w.vm.pageSize).toBe(50);
+    expect(w.vm.currentPage).toBe(2);
+    expect(w.vm.sortBy).toBe("label");
+    expect(w.vm.sortOrder).toBe("desc");
+    w.unmount();
+  });
+
+  it("saves list state so it survives unmount", async () => {
+    const w: any = mountComponent();
+    await flushPromises();
+    w.vm.filterQuery = "xyz";
+    w.vm.pageSize = 100;
+    w.vm.sortBy = "label";
+    w.vm.sortOrder = "desc";
+    await flushPromises();
+    w.unmount();
+    expect(useListViewState("synthetics-locations", {})).toMatchObject({
+      filterQuery: "xyz",
+      pageSize: 100,
+      sortBy: "label",
+      sortOrder: "desc",
     });
   });
 });

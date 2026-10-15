@@ -17,8 +17,8 @@ use std::{
     collections::{HashMap, HashSet},
     io::Write,
     sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
+        Arc, LazyLock,
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
 };
 
@@ -29,18 +29,20 @@ use config::{
     cluster::{LOCAL_NODE, LOCAL_NODE_ID},
     ider::SnowflakeIdGenerator,
     meta::{
-        alerts::alert::Alert,
+        alerts::{TriggerCondition, alert::Alert},
         promql::HASH_LABEL,
         self_reporting::usage::{RequestStats, RunOutcome, TriggerData, TriggerDataType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
+        triggers::ScheduledTriggerData,
     },
     utils::{
         flatten,
-        json::*,
+        json::{self, *},
         schema::format_partition_key,
         time::{DAY_MICRO_SECS, HOUR_MICRO_SECS},
     },
 };
+use dashmap::{DashMap, mapref::entry::Entry};
 use db::{
     self,
     alerts::{alert::scheduler_key, realtime_triggers::REALTIME_ALERT_TRIGGERS},
@@ -60,7 +62,7 @@ use super::{
     pipeline::{batch_execution::ExecutablePipeline, db as pipeline},
 };
 use crate::{
-    alerts::alert::AlertExt,
+    alerts::alert::{AlertError, AlertExt, NotificationOutcome, send_attempted},
     common::{
         infra::config::STREAM_ALERTS,
         meta::stream::{SchemaEvolution, SchemaRecords},
@@ -70,12 +72,19 @@ use crate::{
 pub mod columnar;
 pub mod grpc;
 pub mod ingestion_service;
+pub mod rejections;
 
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
 /// Global atomic counter for round-robin distribution of requests across memory table buckets.
 /// This ensures even distribution of ingestion load across multiple buckets in axum.
 static REQUEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+/// `org/alert -> until`, taken before the downtime check so concurrent requests run it once.
+static REALTIME_FLOOR_CLAIMS: LazyLock<DashMap<String, (i64, u64)>> = LazyLock::new(DashMap::new);
+
+/// Tells claims of one key apart, so a request releases only its own.
+static REALTIME_FLOOR_TOKENS: AtomicU64 = AtomicU64::new(0);
 
 /// Memoizes the write partition per time bucket while no partition key is enabled.
 pub struct PartitionMemo<'a> {
@@ -151,6 +160,7 @@ pub async fn get_stream_partition_keys(
 
 #[inline(always)]
 pub async fn get_stream_executable_pipelines(stream: &StreamParams) -> Vec<ExecutablePipeline> {
+    pipeline::report_broken_realtime_pipelines(stream).await;
     pipeline::get_executable_pipelines(stream).await
 }
 
@@ -182,10 +192,7 @@ pub async fn get_stream_alerts(
             .filter(|alert| alert.enabled && alert.is_real_time)
             .filter(|alert| {
                 let key = format!("{}/{}", stream.org_id, alert.id.as_ref().unwrap());
-                match triggers_cache.get(&key) {
-                    Some(v) => !v.is_silenced,
-                    None => true,
-                }
+                realtime_alert_is_live(triggers_cache.get(&key))
             })
             .collect::<Vec<_>>();
         if alerts.is_empty() {
@@ -233,58 +240,60 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             alert.org_id,
             alert.name
         );
-        match alert
-            .send_notification(&trace_id, val, now, None, now, None, None, None, &[], None)
-            .await
-        {
-            Err(e) => {
+        // Only an org with an alert downtime pays for the identity work the claim guards.
+        let floor_key = format!("{}/{module_key}", alert.org_id);
+        let floor_claim = if crate::alerts::downtimes::any_for(
+            &alert.org_id,
+            config::meta::downtimes::TargetModule::Alerts,
+        ) {
+            let Some(token) =
+                claim_realtime_floor(&floor_key, now, TriggerCondition::min_silence_micros())
+            else {
+                log::debug!(
+                    "Realtime alert {}/{} already evaluated inside its floor on this node",
+                    alert.org_id,
+                    alert.name
+                );
+                continue;
+            };
+            Some(token)
+        } else {
+            None
+        };
+        let delivered = if let Some(downtime) = realtime_downtime(alert, val, now).await {
+            log::info!(
+                "Realtime alert {}/{} suppressed by downtime {}",
+                alert.org_id,
+                alert.name,
+                downtime.id
+            );
+            crate::alerts::alert::record_suppressed_run(
+                &mut trigger_data_stream,
+                "alerts",
+                downtime.id,
+            );
+            false
+        } else {
+            let outcome = alert
+                .send_notification(&trace_id, val, now, None, now, None, None, None, &[], None)
+                .await;
+            record_realtime_delivery(&mut trigger_data_stream, &outcome);
+            if let Err(e) = &outcome {
                 log::error!("Failed to send notification: {e}");
-                trigger_data_stream.status = RunOutcome::NotifyFailed;
-                trigger_data_stream.error =
-                    Some(format!("error sending notification for alert: {e}"));
             }
-            Ok(outcome) => {
-                let success_msg = outcome.success_message.trim().to_owned();
-                let error_msg = outcome.error_message.trim().to_owned();
-                if !error_msg.is_empty() {
-                    trigger_data_stream.error = Some(error_msg);
-                }
-                if !success_msg.is_empty() {
-                    trigger_data_stream.success_response = Some(success_msg);
-                }
-                // enforce a minimum silence floor so a high-volume stream cannot
-                // fire (and write to the db) once per matching request
-                let silence_micros = alert.trigger_condition.effective_silence_micros();
-                if silence_micros > 0 {
-                    log::debug!(
-                        "Realtime alert {}/{}/{}/{} triggered successfully, hence applying silence period",
-                        alert.org_id,
-                        alert.stream_type,
-                        alert.stream_name,
-                        alert.name
-                    );
-
-                    let next_run_at = Utc::now().timestamp_micros() + silence_micros;
-                    // After the notification is sent successfully, we need to update
-                    // the silence period of the trigger
-                    if let Err(e) = db::scheduler::update_trigger(
-                        db::scheduler::Trigger {
-                            org: alert.org_id.to_string(),
-                            module: db::scheduler::TriggerModule::Alert,
-                            module_key,
-                            is_silenced: true,
-                            is_realtime: true,
-                            next_run_at,
-                            ..Default::default()
-                        },
-                        false,
-                        "",
-                    )
-                    .await
-                    {
-                        log::error!("Failed to update trigger: {e}");
-                    }
-                    trigger_data_stream.next_run_at = next_run_at;
+            outcome.is_ok()
+        };
+        #[cfg(feature = "enterprise")]
+        record_realtime_mute(alert, &trigger_data_stream).await;
+        match realtime_silence_micros(alert, &trigger_data_stream, delivered) {
+            Some(silence_micros) => {
+                trigger_data_stream.next_run_at =
+                    apply_realtime_silence(alert, module_key, silence_micros, now).await;
+            }
+            // A failed send keeps no floor, so the next matching request retries it.
+            None => {
+                if let Some(token) = floor_claim {
+                    release_realtime_floor(&floor_key, token);
                 }
             }
         }
@@ -543,6 +552,101 @@ pub fn schema_records_to_entries(
         .collect()
 }
 
+/// All streams while the pattern manager is down, else those whose pattern failed to build.
+#[cfg(any(feature = "vectorscan", test))]
+fn unscannable_streams<'a>(
+    streams: &[(&'a str, u64)],
+    manager_up: bool,
+    unbuilt: impl Fn(&str) -> bool,
+) -> Vec<(&'a str, u64)> {
+    streams
+        .iter()
+        .copied()
+        .filter(|(stream, _)| !manager_up || unbuilt(stream))
+        .collect()
+}
+
+/// Each stream plus its pipelines' fixed same-type destinations, with the source's record count.
+#[cfg(feature = "vectorscan")]
+pub async fn with_pipeline_destinations(
+    org_id: &str,
+    stream_type: StreamType,
+    streams: &[(&str, u64)],
+) -> Vec<(String, u64)> {
+    let mut all: Vec<(String, u64)> = streams.iter().map(|(s, n)| (s.to_string(), *n)).collect();
+    // Walking pipelines clones each compiled one, so skip it when nothing would be refused.
+    if !config::get_config().common.sdr_fail_closed {
+        return all;
+    }
+    for (stream, records) in streams {
+        let params = StreamParams::new(org_id, stream, stream_type);
+        for pipeline in get_stream_executable_pipelines(&params).await {
+            for dest in pipeline.get_all_destination_streams() {
+                let same_scope = dest.org_id == org_id && dest.stream_type == stream_type;
+                if same_scope && !all.iter().any(|(s, _)| *s == dest.stream_name) {
+                    all.push((dest.stream_name.to_string(), *records));
+                }
+            }
+        }
+    }
+    all
+}
+
+/// `ZO_SDR_FAIL_CLOSED`: why a write must be refused before any pipeline runs.
+#[cfg(feature = "vectorscan")]
+pub async fn sdr_fail_closed_refusal(
+    org_id: &str,
+    stream_type: StreamType,
+    streams: &[(&str, u64)],
+    exempt: impl Fn(&str) -> bool,
+) -> Option<String> {
+    use config::meta::self_reporting::redaction::{
+        DataWindow, EvidenceScope, FailPosture, fail_closed_rejection,
+    };
+    if !config::get_config().common.sdr_fail_closed {
+        return None;
+    }
+    let unscannable = match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+        Ok(mgr) => unscannable_streams(streams, true, |stream| {
+            mgr.has_unbuilt_patterns(
+                org_id,
+                stream_type,
+                stream,
+                o2_enterprise::enterprise::re_patterns::ApplyTime::Ingestion,
+            )
+        }),
+        Err(e) => {
+            log::error!("[SDR] pattern manager unavailable for org {org_id}: {e}");
+            unscannable_streams(streams, false, |_| true)
+        }
+    };
+    let reason = fail_closed_rejection(
+        true,
+        org_id,
+        stream_type,
+        unscannable.iter().map(|(stream, _)| *stream),
+        &exempt,
+    )?;
+    for (stream, records) in unscannable.iter().filter(|(stream, _)| !exempt(stream)) {
+        crate::self_reporting::redaction_evidence::publish_scan_unavailable(
+            &EvidenceScope::new(org_id, stream, stream_type),
+            FailPosture::Closed,
+            *records,
+            DataWindow::default(),
+        )
+        .await;
+    }
+    log::error!("[SDR] {reason}");
+    Some(reason)
+}
+
+/// The fail-closed redaction refusal, as opposed to an overload or another resource error.
+#[cfg(any(feature = "vectorscan", test))]
+pub fn is_sdr_fail_closed_refusal(e: &Error) -> bool {
+    matches!(e, Error::ResourceError(reason)
+        if config::meta::self_reporting::redaction::is_fail_closed_rejection(reason))
+}
+
 /// Only a server fault is 500: a batch the client must fix is 400 and an overload is 503.
 pub fn write_error_status(e: &Error) -> http::StatusCode {
     match e {
@@ -635,6 +739,11 @@ pub async fn check_ingestion_allowed(
     ingester::check_memtable_size().map_err(|e| Error::ResourceError(e.to_string()))?;
 
     Ok(())
+}
+
+/// Whether a write must look its stream up to see if it is new; Cloud reports every new stream.
+pub fn checks_for_new_stream(org_id: &str) -> bool {
+    cfg!(feature = "cloud") || !infra::schema::org_has_user_stream(org_id)
 }
 
 pub fn get_val_for_attr(attr_val: &Value) -> Value {
@@ -813,11 +922,181 @@ pub fn refactor_map(
     new_map
 }
 
+/// The downtime that silences a real-time firing, only when every ingested row is muted.
+#[cfg(feature = "enterprise")]
+async fn realtime_downtime(
+    alert: &Alert,
+    rows: &[Map<String, Value>],
+    now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    if !crate::alerts::downtimes::any_for(
+        &alert.org_id,
+        config::meta::downtimes::TargetModule::Alerts,
+    ) {
+        return None;
+    }
+    let alert_id = alert.id.as_ref()?.to_string();
+    let (folder, _) = alert::get_alert_from_cache(&alert.org_id, &alert_id).await?;
+    let identity = crate::alerts::scheduler::handlers::downtime_identities(alert, rows).await;
+    crate::alerts::scheduler::handlers::muted_in_every_group(&identity, |dims| {
+        crate::alerts::downtimes::active_for_alert(
+            &alert.org_id,
+            &alert_id,
+            &folder.folder_id,
+            dims,
+            now,
+        )
+    })
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn realtime_downtime(
+    _alert: &Alert,
+    _rows: &[Map<String, Value>],
+    _now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    None
+}
+
+/// The Muted chip of a real-time run, set by a suppressed run and cleared by a send.
+#[cfg(feature = "enterprise")]
+async fn record_realtime_mute(alert: &Alert, run: &TriggerData) {
+    if let Some(alert_id) = alert.id.as_ref() {
+        crate::alerts::scheduler::handlers::record_last_downtime(
+            &alert.org_id,
+            &alert_id.to_string(),
+            realtime_last_downtime(run),
+        )
+        .await;
+    }
+}
+
+/// A suppressed run's downtime; any other real-time run reached a send and clears the chip.
+#[cfg(feature = "enterprise")]
+fn realtime_last_downtime(run: &TriggerData) -> Option<&str> {
+    match run.status {
+        RunOutcome::Suppressed => run.downtime_id.as_deref(),
+        _ => None,
+    }
+}
+
+/// The token of the one caller that may evaluate `key` until `now + floor_micros` on this node.
+fn claim_realtime_floor(key: &str, now: i64, floor_micros: i64) -> Option<u64> {
+    let token = REALTIME_FLOOR_TOKENS.fetch_add(1, Ordering::Relaxed);
+    match REALTIME_FLOOR_CLAIMS.entry(key.to_string()) {
+        Entry::Occupied(held) if held.get().0 > now => None,
+        Entry::Occupied(mut expired) => {
+            expired.insert((now + floor_micros, token));
+            Some(token)
+        }
+        Entry::Vacant(free) => {
+            free.insert((now + floor_micros, token));
+            Some(token)
+        }
+    }
+}
+
+/// Drops the claim only while `token` still holds it, never a later request's.
+fn release_realtime_floor(key: &str, token: u64) {
+    REALTIME_FLOOR_CLAIMS.remove_if(key, |_, (_, held)| *held == token);
+}
+
+/// A realtime alert is evaluated unless its trigger is inside a silence.
+fn realtime_alert_is_live(trigger: Option<&db::scheduler::Trigger>) -> bool {
+    trigger.is_none_or(|t| !t.is_silenced)
+}
+
+/// A suppressed run keeps the rate-limit floor only, so the first firing after the window pages.
+fn realtime_silence_micros(alert: &Alert, run: &TriggerData, delivered: bool) -> Option<i64> {
+    match run.status {
+        RunOutcome::Suppressed => Some(TriggerCondition::min_silence_micros()),
+        _ if delivered => Some(alert.trigger_condition.effective_silence_micros()),
+        _ => None,
+    }
+}
+
+/// Silences the trigger for `silence_micros` and returns the wakeup time it wrote.
+async fn apply_realtime_silence(
+    alert: &Alert,
+    module_key: String,
+    silence_micros: i64,
+    fired_at: i64,
+) -> i64 {
+    log::debug!(
+        "Realtime alert {}/{}/{}/{} silenced for {silence_micros}us",
+        alert.org_id,
+        alert.stream_type,
+        alert.stream_name,
+        alert.name
+    );
+    let next_run_at = Utc::now().timestamp_micros() + silence_micros;
+    if let Err(e) = db::scheduler::update_trigger(
+        silenced_realtime_trigger(&alert.org_id, module_key, next_run_at, fired_at),
+        false,
+        "",
+    )
+    .await
+    {
+        log::error!("Failed to update trigger: {e}");
+    }
+    next_run_at
+}
+
+fn silenced_realtime_trigger(
+    org: &str,
+    module_key: String,
+    next_run_at: i64,
+    fired_at: i64,
+) -> db::scheduler::Trigger {
+    db::scheduler::Trigger {
+        org: org.to_string(),
+        module: db::scheduler::TriggerModule::Alert,
+        module_key,
+        is_silenced: true,
+        is_realtime: true,
+        next_run_at,
+        // Realtime rows carry no other data, and the wakeup clones it forward.
+        data: json::to_string(&ScheduledTriggerData {
+            last_satisfied_at: Some(fired_at),
+            ..Default::default()
+        })
+        .unwrap_or_default(),
+        ..Default::default()
+    }
+}
+
 /// The span of one write partition, which a record's time bucket is counted in.
 fn partition_bucket_micros(time_level: PartitionTimeLevel) -> i64 {
     match time_level {
         PartitionTimeLevel::Daily => DAY_MICRO_SECS,
         PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => HOUR_MICRO_SECS,
+    }
+}
+
+fn record_realtime_delivery(
+    trigger_data_stream: &mut TriggerData,
+    outcome: &Result<NotificationOutcome, AlertError>,
+) {
+    trigger_data_stream.delivery_attempted = Some(send_attempted(outcome));
+    match outcome {
+        Err(e) => {
+            trigger_data_stream.status = RunOutcome::NotifyFailed;
+            trigger_data_stream.error = Some(format!("error sending notification for alert: {e}"));
+        }
+        Ok(outcome) => {
+            // Any undelivered destination is a failure, even when others succeeded.
+            if !outcome.failed.is_empty() {
+                trigger_data_stream.status = RunOutcome::NotifyFailed;
+            }
+            let success_msg = outcome.success_message.trim().to_owned();
+            let error_msg = outcome.error_message.trim().to_owned();
+            if !error_msg.is_empty() {
+                trigger_data_stream.error = Some(error_msg);
+            }
+            if !success_msg.is_empty() {
+                trigger_data_stream.success_response = Some(success_msg);
+            }
+        }
     }
 }
 
@@ -829,6 +1108,112 @@ mod tests {
     use transform::compile_vrl_function;
 
     use super::*;
+
+    #[test]
+    fn test_only_the_fail_closed_refusal_is_recognised() {
+        let reason = config::meta::self_reporting::redaction::fail_closed_rejection(
+            true,
+            "acme",
+            StreamType::Logs,
+            ["app"].into_iter(),
+            |_| false,
+        )
+        .expect("refused");
+        assert!(is_sdr_fail_closed_refusal(&Error::ResourceError(
+            reason.clone()
+        )));
+        assert!(!is_sdr_fail_closed_refusal(&Error::ResourceError(
+            "memtable is full".to_string()
+        )));
+        assert!(!is_sdr_fail_closed_refusal(&Error::IngestionError(reason)));
+    }
+
+    #[test]
+    fn test_unscannable_streams_is_every_stream_while_the_manager_is_down() {
+        let streams = [("app", 3), ("audit", 1)];
+        assert_eq!(
+            unscannable_streams(&streams, false, |_| false),
+            vec![("app", 3), ("audit", 1)]
+        );
+    }
+
+    #[test]
+    fn test_unscannable_streams_is_only_unbuilt_streams_once_the_manager_is_up() {
+        let streams = [("app", 3), ("audit", 1)];
+        assert_eq!(
+            unscannable_streams(&streams, true, |stream| stream == "audit"),
+            vec![("audit", 1)]
+        );
+        assert!(unscannable_streams(&streams, true, |_| false).is_empty());
+    }
+
+    #[test]
+    fn test_silenced_realtime_trigger_records_when_it_fired() {
+        let trigger = silenced_realtime_trigger("org1", "key1".to_string(), 2_000, 1_000);
+        assert!(trigger.is_silenced && trigger.is_realtime);
+        assert_eq!(trigger.next_run_at, 2_000);
+        let data: ScheduledTriggerData = json::from_str(&trigger.data).unwrap();
+        assert_eq!(data.last_satisfied_at, Some(1_000));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_overlapping_requests_inside_the_floor_record_one_suppressed_row() {
+        let key = "org1/overlapping-floor";
+        let floor = TriggerCondition::min_silence_micros();
+        // The coordinator never answers here, so only the claim stands between the requests.
+        let runs = (0..16).map(|_| {
+            tokio::spawn(async move {
+                tokio::task::yield_now().await;
+                claim_realtime_floor(key, 1_000_000, floor).is_some()
+            })
+        });
+        let admitted = futures::future::join_all(runs)
+            .await
+            .into_iter()
+            .filter(|claimed| *claimed.as_ref().unwrap())
+            .count();
+        assert_eq!(admitted, 1, "one Suppressed row per floor period");
+        assert!(claim_realtime_floor(key, 1_000_000 + floor - 1, floor).is_none());
+        assert!(claim_realtime_floor(key, 1_000_000 + floor, floor).is_some());
+    }
+
+    #[test]
+    fn test_a_failed_send_releases_the_floor() {
+        let key = "org1/released-floor";
+        let floor = TriggerCondition::min_silence_micros();
+        let token = claim_realtime_floor(key, 0, floor).unwrap();
+        release_realtime_floor(key, token);
+        assert!(claim_realtime_floor(key, 1, floor).is_some());
+    }
+
+    #[test]
+    fn test_a_slow_failed_request_cannot_release_a_newer_claim() {
+        let key = "org1/slow-failed-floor";
+        let floor = TriggerCondition::min_silence_micros();
+        let a = claim_realtime_floor(key, 0, floor).unwrap();
+        // A outlives its floor, so B takes the expired claim before A fails.
+        let b = claim_realtime_floor(key, floor, floor).unwrap();
+        release_realtime_floor(key, a);
+        assert!(claim_realtime_floor(key, floor + 1, floor).is_none());
+        release_realtime_floor(key, b);
+        assert!(claim_realtime_floor(key, floor + 2, floor).is_some());
+    }
+
+    #[test]
+    fn test_only_a_send_or_a_suppression_silences_a_realtime_alert() {
+        let mut alert = Alert::default();
+        alert.trigger_condition.silence = 60;
+        let failed = TriggerData {
+            status: RunOutcome::NotifyFailed,
+            ..Default::default()
+        };
+        assert_eq!(realtime_silence_micros(&alert, &failed, false), None);
+        assert_eq!(
+            realtime_silence_micros(&alert, &failed, true),
+            Some(3_600_000_000)
+        );
+        assert!(realtime_alert_is_live(None));
+    }
 
     #[test]
     fn test_format_partition_key() {
@@ -1471,6 +1856,151 @@ mod tests {
         assert_eq!(
             write_error_status(&Error::IngestionError("disk failure".to_string())),
             http::StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    /// The identity `realtime_downtime` decides on: one map per ingested row.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_realtime_batch_is_muted_only_when_every_row_is() {
+        use crate::alerts::scheduler::handlers::{identities_by_key, muted_in_every_group};
+
+        let groups = [config::meta::correlation::FieldAlias {
+            id: "service".to_string(),
+            display: "Service".to_string(),
+            group: None,
+            fields: vec!["service".to_string()],
+            is_workload_type: false,
+        }];
+        let row = |service: &str| {
+            serde_json::json!({ "service": service })
+                .as_object()
+                .cloned()
+                .unwrap()
+        };
+        let mut alert = Alert::default();
+        alert.is_real_time = true;
+        let decide = |rows: &[Map<String, Value>], muted: &[&str]| {
+            let identity: Vec<_> = identities_by_key(&alert, rows, &groups)
+                .into_iter()
+                .map(|(_, dims)| dims)
+                .collect();
+            muted_in_every_group(&identity, |dims| {
+                let service = dims.get("service")?;
+                muted
+                    .contains(&service.as_str())
+                    .then(|| config::meta::downtimes::ActiveDowntime {
+                        id: format!("dt-{service}"),
+                        name: service.clone(),
+                        ends_at: 1,
+                        incident_mode: Default::default(),
+                    })
+            })
+            .map(|d| d.id)
+        };
+
+        let (payments, checkout) = (row("payments"), row("checkout"));
+        let mixed = [payments.clone(), checkout.clone()];
+        let reversed = [checkout, payments];
+        assert_eq!(decide(&mixed, &["payments"]), None);
+        assert_eq!(decide(&reversed, &["payments"]), None);
+        assert_eq!(
+            decide(&mixed, &["payments", "checkout"]).as_deref(),
+            Some("dt-payments")
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_suppressed_realtime_run_sets_the_muted_chip_and_the_next_send_clears_it() {
+        let mut muted = realtime_row();
+        crate::alerts::alert::record_suppressed_run(&mut muted, "alerts", "dt-1".to_string());
+        assert_eq!(realtime_last_downtime(&muted), Some("dt-1"));
+        assert_eq!(muted.delivery_attempted, Some(false));
+
+        let mut delivered = realtime_row();
+        record_realtime_delivery(&mut delivered, &Ok(NotificationOutcome::default()));
+        assert_eq!(realtime_last_downtime(&delivered), None);
+        let mut failed = realtime_row();
+        let error = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        record_realtime_delivery(&mut failed, &error);
+        assert_eq!(realtime_last_downtime(&failed), None);
+    }
+
+    fn realtime_row() -> TriggerData {
+        TriggerData {
+            status: RunOutcome::Firing,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_realtime_send_that_reached_every_destination_stays_firing() {
+        let mut row = realtime_row();
+        let delivered = Ok(NotificationOutcome {
+            succeeded: vec!["slack".to_string()],
+            attempted: true,
+            success_message: " sent ".to_string(),
+            ..Default::default()
+        });
+        record_realtime_delivery(&mut row, &delivered);
+        assert_eq!(row.status, RunOutcome::Firing);
+        assert_eq!(row.success_response.as_deref(), Some("sent"));
+        assert_eq!(row.error, None);
+        assert_eq!(row.delivery_attempted, Some(true));
+    }
+
+    #[test]
+    fn test_realtime_alert_wired_to_nothing_fired_without_a_delivery_attempt() {
+        let mut row = realtime_row();
+        record_realtime_delivery(&mut row, &Ok(NotificationOutcome::default()));
+        assert_eq!(row.status, RunOutcome::Firing);
+        assert_eq!(row.delivery_attempted, Some(false));
+    }
+
+    #[test]
+    fn test_realtime_send_that_partially_failed_is_notify_failed() {
+        let mut row = realtime_row();
+        let partial = Ok(NotificationOutcome {
+            succeeded: vec!["slack".to_string()],
+            failed: vec!["pagerduty".to_string()],
+            attempted: true,
+            success_message: "sent to slack".to_string(),
+            error_message: "pagerduty timed out".to_string(),
+        });
+        record_realtime_delivery(&mut row, &partial);
+        assert_eq!(row.status, RunOutcome::NotifyFailed);
+        assert_eq!(row.delivery_attempted, Some(true));
+        assert_eq!(row.error.as_deref(), Some("pagerduty timed out"));
+        assert_eq!(row.success_response.as_deref(), Some("sent to slack"));
+    }
+
+    #[test]
+    fn test_new_stream_lookup_is_skipped_once_the_org_has_a_user_stream() {
+        let org = "ingestion_new_stream_lookup_org";
+        let key = format!("{org}/logs/app");
+        let mut map = hashbrown::HashMap::new();
+        assert!(checks_for_new_stream(org));
+        infra::schema::insert_latest(&mut map, key.clone(), SchemaCache::new(Schema::empty()));
+        assert_eq!(checks_for_new_stream(org), cfg!(feature = "cloud"));
+        infra::schema::remove_latest(&mut map, &key);
+        assert!(checks_for_new_stream(org));
+    }
+
+    #[test]
+    fn test_realtime_send_that_failed_is_notify_failed() {
+        let mut row = realtime_row();
+        let failed = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        record_realtime_delivery(&mut row, &failed);
+        assert_eq!(row.status, RunOutcome::NotifyFailed);
+        assert_eq!(row.delivery_attempted, Some(true));
+        assert_eq!(
+            row.error.as_deref(),
+            Some("error sending notification for alert: http 500")
         );
     }
 }

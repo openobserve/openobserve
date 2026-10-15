@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
           <OTable
+            ref="oTableRef"
             :frame="false"
             data-test="synthetics-locations-list-table"
             :data="visibleRows"
@@ -57,8 +58,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selected-ids="selectedLocationIds"
             selection="multiple"
             pagination="client"
-            :page-size="20"
+            :page-size="pageSize"
             :page-size-options="[10, 20, 50, 100]"
+            :current-page="currentPage"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            @update:page-size="pageSize = $event"
+            @update:current-page="currentPage = $event"
+            @update:sort-by="sortBy = $event"
+            @update:sort-order="sortOrder = $event"
             sorting="client"
             filter-mode="client"
             :default-columns="false"
@@ -207,51 +215,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdown>
               </div>
             </template>
-            <template #bottom>
-              <div class="flex h-12 w-full items-center justify-between gap-1">
-                <span class="text-secondary min-w-25 text-xs">
-                  <template v-if="selectedLocations.length > 0">
-                    {{
-                      t("synthetics.locations.selectedCount", {
-                        selected: selectedLocations.length,
-                        total: resultTotal,
-                      })
-                    }}
-                  </template>
-                  <span v-else class="max-md:hidden">
-                    {{ resultTotal }} {{ t("synthetics.locations.bottomHeader") }}
-                  </span>
-                </span>
-                <template v-if="selectedLocations.length > 0">
-                  <OButton
-                    variant="outline"
-                    size="sm"
-                    icon-left="play-arrow"
-                    data-test="synthetics-locations-enable-selected-btn"
-                    :disabled="!!bulkActionLoading"
-                    @click="bulkToggleEnabled(true)"
-                    >{{ t("synthetics.locations.enable") }}</OButton
-                  >
-                  <OButton
-                    variant="outline"
-                    size="sm"
-                    icon-left="pause"
-                    data-test="synthetics-locations-disable-selected-btn"
-                    :disabled="!!bulkActionLoading"
-                    @click="bulkToggleEnabled(false)"
-                    >{{ t("synthetics.locations.disable") }}</OButton
-                  >
-                  <OButton
-                    variant="outline-destructive"
-                    size="sm"
-                    icon-left="delete"
-                    data-test="synthetics-locations-delete-selected-btn"
-                    :loading="!!bulkActionLoading"
-                    @click="openBulkDeleteConfirm"
-                    >{{ t("common.delete") }}</OButton
-                  >
-                </template>
-              </div>
+            <template #selection-actions>
+              <OButton
+                variant="outline"
+                size="sm"
+                icon-left="play-arrow"
+                data-test="synthetics-locations-enable-selected-btn"
+                :disabled="!!bulkActionLoading"
+                @click="bulkToggleEnabled(true)"
+                >{{ t("synthetics.locations.enable") }}</OButton
+              >
+              <OButton
+                variant="outline"
+                size="sm"
+                icon-left="pause"
+                data-test="synthetics-locations-disable-selected-btn"
+                :disabled="!!bulkActionLoading"
+                @click="bulkToggleEnabled(false)"
+                >{{ t("synthetics.locations.disable") }}</OButton
+              >
+              <OButton
+                variant="outline-destructive"
+                size="sm"
+                icon-left="delete"
+                data-test="synthetics-locations-delete-selected-btn"
+                :loading="!!bulkActionLoading"
+                @click="openBulkDeleteConfirm"
+                >{{ t("common.delete") }}</OButton
+              >
             </template>
           </OTable>
         </div>
@@ -276,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, onMounted, defineComponent, computed } from "vue";
+import { ref, onMounted, defineComponent, computed, watch } from "vue";
 import type { Ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -297,6 +288,7 @@ import syntheticsService from "@/services/synthetics";
 import SyntheticsLocationForm from "./SyntheticsLocationForm.vue";
 import ImportSyntheticsLocations from "./ImportSyntheticsLocations.vue";
 import type { SyntheticsLocationRecord } from "@/types/synthetics";
+import { useListViewState } from "@/composables/useListViewState";
 
 export default defineComponent({
   name: "SyntheticsLocationsList",
@@ -314,7 +306,29 @@ export default defineComponent({
     ImportSyntheticsLocations,
   },
   setup() {
-    const filterQuery = ref("");
+    const viewState = useListViewState("synthetics-locations", {
+      filterQuery: "",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
+    const pageSize = ref(viewState.pageSize);
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref(viewState.sortOrder);
+    const oTableRef = ref<any>(null);
+
+    watch([filterQuery, pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
     const { t } = useI18nTyped();
     const store = useStore();
     const { confirm } = useConfirmDialog();
@@ -377,11 +391,18 @@ export default defineComponent({
     ];
 
     const locations = ref<SyntheticsLocationRecord[]>([]);
+    // setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
+    watch(
+      locations,
+      () => {
+        setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+      },
+      { once: true },
+    );
     const selectedLocations: Ref<SyntheticsLocationRecord[]> = ref([]);
     const listLoading = ref(false);
     const bulkActionLoading = ref(false);
     const toggleLoadingMap = ref<Record<string, boolean>>({});
-    const resultTotal = ref(0);
     const showImportDialog = ref(false);
 
     const formDialog = ref({
@@ -405,15 +426,13 @@ export default defineComponent({
 
     const filterData = (rows: any[], query: string) => {
       const q = query.toLowerCase();
-      const filtered = rows.filter(
+      return rows.filter(
         (row) =>
           row.label?.toLowerCase().includes(q) ||
           row.id?.toLowerCase().includes(q) ||
           row.provider?.toLowerCase().includes(q) ||
           row.region?.toLowerCase().includes(q),
       );
-      resultTotal.value = filtered.length;
-      return filtered;
     };
 
     const visibleRows = computed(() => {
@@ -431,7 +450,6 @@ export default defineComponent({
         locations.value = ((data.locations ?? []) as SyntheticsLocationRecord[]).filter(
           (l) => l.kind === "public",
         );
-        resultTotal.value = locations.value.length;
       } catch (error: any) {
         toast({
           message: error?.response?.data?.message || t("synthetics.locations.fetchFailed"),
@@ -564,7 +582,6 @@ export default defineComponent({
         // Remove the local row in-place instead of re-fetching.
         const idx = locations.value.findIndex((l) => l.id === id);
         if (idx !== -1) locations.value.splice(idx, 1);
-        resultTotal.value = locations.value.length;
         toast({
           message: t("synthetics.locations.deleteSuccess"),
           variant: "success",
@@ -605,7 +622,6 @@ export default defineComponent({
         }
         // Remove successful deletes from local array in-place.
         locations.value = locations.value.filter((l) => !successIds.has(l.id));
-        resultTotal.value = locations.value.length;
         if (successCount === ids.length) {
           toast({
             message: t("synthetics.locations.bulkDeleteSuccess", { count: successCount }),
@@ -667,10 +683,14 @@ export default defineComponent({
       t,
       store,
       filterQuery,
+      pageSize,
+      currentPage,
+      sortBy,
+      sortOrder,
+      oTableRef,
       columns,
       locations,
       listLoading,
-      resultTotal,
       visibleRows,
       selectedLocations,
       selectedLocationIds,

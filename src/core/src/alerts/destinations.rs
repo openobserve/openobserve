@@ -160,7 +160,7 @@ pub async fn save(
                 // persisting so the alert fire path can't be tricked into reading
                 // internal services via a destination saved with a malicious URL.
                 if let Err(e) =
-                    common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(
+                    common::utils::ssrf_guard::SsrfGuard::validate_destination_url_with_config_async(
                         &endpoint.url,
                     )
                     .await
@@ -179,8 +179,10 @@ pub async fn save(
                 return Err(DestinationError::EmptyUrl);
             }
             if let Err(e) =
-                common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&endpoint.url)
-                    .await
+                common::utils::ssrf_guard::SsrfGuard::validate_destination_url_with_config_async(
+                    &endpoint.url,
+                )
+                .await
             {
                 return Err(DestinationError::SsrfBlocked(e));
             }

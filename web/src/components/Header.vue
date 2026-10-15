@@ -221,15 +221,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div class="header-utility-icons flex items-center gap-x-2">
-          <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel.
+          <!-- AI CHAT TOGGLE: Enterprise/Cloud feature to toggle AI chat panel.
            Leads the utility-icon cluster, set off by a separator from the
-           org selector so it reads as the primary action in this group. -->
-          <template v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled">
+           org selector so it reads as the primary action in this group.
+           Shown locked (not hidden) in builds that don't unlock it. -->
+          <template v-if="aiButtonVisible">
             <OButton
               variant="ghost"
               size="icon-toolbar"
               @click="toggleAIChat"
               data-test="menu-link-ai-item"
+              :aria-label="t('menu.aiAssistant')"
               class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
               :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
               @mouseenter="handleMouseEnter"
@@ -239,7 +241,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :src="getBtnLogo"
                 class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
               />
+              <span
+                v-if="!aiAccess.allowed"
+                aria-hidden="true"
+                class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
+              >
+                <OIcon name="lock" size="xs" class="text-warning-600 size-2.5!" />
+              </span>
               <OTooltip
+                v-if="aiAccess.allowed"
                 side="bottom"
                 align="center"
                 :content="t('menu.aiAssistant')"
@@ -257,6 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-toolbar"
             class="max-md:hidden"
             data-test="menu-link-slack-item"
+            :aria-label="raw('Slack')"
             @click="openSlack"
           >
             <component :is="slackIcon" class="size-5 shrink-0" />
@@ -271,6 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-toolbar"
                 class="max-md:hidden"
                 data-test="menu-link-help-item"
+                :aria-label="t('menu.help')"
               >
                 <OIcon name="help-outline" size="sm" class="size-5!" />
                 <OTooltip side="top" align="center" :content="t('menu.help')" />
@@ -331,6 +343,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-toolbar"
                 data-test="header-my-account-profile-icon"
+                :aria-label="
+                  user.given_name ? user.given_name + ' ' + user.family_name : user.email
+                "
               >
                 <OIcon :name="user.picture ? user.picture : 'person'" size="sm" class="size-5!" />
                 <OTooltip
@@ -350,49 +365,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <ODropdownSeparator />
 
-              <!-- Language selector — nested sub-dropdown (click to open) -->
-              <div
-                data-test="header-language-submenu-trigger"
-                class="hover:bg-dropdown-item-hover-bg relative flex cursor-pointer items-center gap-3 px-3 py-1.5 text-sm leading-[1.2] select-none max-md:flex-wrap"
-                @click.stop="showLanguageSubmenu = !showLanguageSubmenu"
-              >
-                <OIcon size="xs" name="language" class="padding-none" />
-                <span class="flex-1 whitespace-nowrap">{{ t("menu.language") }}</span>
-                <span class="inline-flex items-center gap-1.5 whitespace-nowrap opacity-75">
-                  <img
-                    v-if="selectedLanguage.icon && selectedLanguage.icon.startsWith('img:')"
-                    :src="selectedLanguage.icon.slice(4)"
-                    :alt="selectedLanguage.label"
-                    class="rounded-default inline-block h-3 w-4 shrink-0 object-cover"
-                  />
-                  <OIcon
-                    v-else-if="selectedLanguage.icon"
-                    size="xs"
-                    :name="selectedLanguage.icon"
-                    class="padding-none"
-                  />
-                  <span>{{ selectedLanguage.label }}</span>
-                </span>
-                <OIcon size="xs" name="chevron-right" />
+              <!-- A menuitem cannot hold menuitems, so the list is the row's sibling inside one positioned wrapper. -->
+              <div class="relative" role="none">
+                <ODropdownItem
+                  data-test="header-language-submenu-trigger"
+                  class="focus-visible:ring-focus-ring-accent focus-visible:ring-2 focus-visible:ring-inset"
+                  aria-haspopup="menu"
+                  :aria-expanded="showLanguageSubmenu"
+                  @select="onLanguageRowSelect"
+                  @keydown="onLanguageRowKeydown"
+                >
+                  <template #icon-left>
+                    <OIcon size="xs" name="language" class="padding-none" />
+                  </template>
+                  <span class="flex-1 whitespace-nowrap">{{ t("menu.language") }}</span>
+                  <span class="inline-flex items-center gap-1.5 whitespace-nowrap opacity-75">
+                    <img
+                      v-if="selectedLanguage.icon && selectedLanguage.icon.startsWith('img:')"
+                      :src="selectedLanguage.icon.slice(4)"
+                      :alt="selectedLanguage.label"
+                      class="rounded-default inline-block h-3 w-4 shrink-0 object-cover"
+                    />
+                    <OIcon
+                      v-else-if="selectedLanguage.icon"
+                      size="xs"
+                      :name="selectedLanguage.icon"
+                      class="padding-none"
+                    />
+                    <span>{{ selectedLanguage.label }}</span>
+                  </span>
+                  <OIcon size="xs" name="chevron-right" />
+                </ODropdownItem>
 
-                <!-- Submenu — absolutely positioned to the left of parent dropdown -->
                 <div
                   v-if="showLanguageSubmenu"
-                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute end-full top-0 z-9999 me-1 min-w-50 border py-1 shadow-lg max-md:static max-md:me-0 max-md:mt-1 max-md:w-full max-md:min-w-0 max-md:basis-full max-md:shadow-none dark:shadow-lg"
+                  ref="languageListRef"
+                  role="group"
+                  :aria-label="t('menu.language')"
+                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute end-full top-0 z-9999 me-1 min-w-50 border py-1 shadow-lg max-lg:static max-lg:me-0 max-lg:mt-1 max-lg:w-full max-lg:min-w-0 max-lg:shadow-none dark:shadow-lg"
                   data-test="language-dropdown-item"
-                  @click.stop
+                  @keydown="onLanguageListKeydown"
                 >
-                  <button
+                  <ODropdownItem
                     v-for="lang in langList"
                     :key="lang.code"
-                    type="button"
                     :data-test="`language-dropdown-item-${lang.code}`"
-                    class="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-1.5 text-start text-sm leading-[1.2] text-inherit"
-                    :class="[
-                      'hover:bg-dropdown-item-hover-bg',
-                      { 'font-semibold': selectedLanguage.code === lang.code },
-                    ]"
-                    @click="
+                    :class="{ 'font-semibold': selectedLanguage.code === lang.code }"
+                    @select="
                       changeLanguage(lang);
                       showLanguageSubmenu = false;
                     "
@@ -406,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon v-else-if="lang.icon" size="xs" :name="lang.icon" />
                     <span class="flex-1">{{ lang.label }}</span>
                     <OIcon v-if="selectedLanguage.code === lang.code" size="xs" name="check" />
-                  </button>
+                  </ODropdownItem>
                 </div>
               </div>
               <ODropdownSeparator />
@@ -447,16 +466,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType, computed, ref } from "vue";
+import { defineComponent, PropType, computed, nextTick, ref } from "vue";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import useBreakpoint from "@/composables/useBreakpoint";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OrganizationSelector from "./OrganizationSelector.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -577,11 +599,99 @@ export default defineComponent({
       }).href;
     });
 
-    // Enterprise upgrade dialog state
-    const showEnterpriseDialog = ref(false);
+    // Enterprise upgrade dialog state — a module-level singleton (see the
+    // composable) so a locked feature's tooltip link elsewhere in the app can
+    // open the SAME dialog instance this header button does.
+    const { isOpen: showEnterpriseDialog, open: openEnterpriseDialog } =
+      useEnterpriseUpgradeDialog();
 
-    // Language sub-menu state (nested submenu pattern matching original UX)
     const showLanguageSubmenu = ref(false);
+    const languageListRef = ref<HTMLElement | null>(null);
+    const { lgUp } = useBreakpoint();
+
+    const languageItems = (): HTMLElement[] =>
+      Array.from(
+        languageListRef.value?.querySelectorAll<HTMLElement>(
+          '[data-test^="language-dropdown-item-"]',
+        ) ?? [],
+      );
+
+    const focusSelectedLanguage = async () => {
+      await nextTick();
+      const items = languageItems();
+      const selected = items.find(
+        (el) => el.dataset.test === `language-dropdown-item-${props.selectedLanguage.code}`,
+      );
+      (selected ?? items[0])?.focus();
+    };
+
+    const focusLanguageRow = () => {
+      const row = languageListRef.value?.parentElement?.querySelector<HTMLElement>(
+        '[data-test="header-language-submenu-trigger"]',
+      );
+      row?.focus();
+    };
+
+    const closeLanguageList = () => {
+      focusLanguageRow();
+      showLanguageSubmenu.value = false;
+    };
+
+    // preventDefault keeps the profile menu open; reka closes it on any unprevented select.
+    const onLanguageRowSelect = (event: Event) => {
+      event.preventDefault();
+      showLanguageSubmenu.value = !showLanguageSubmenu.value;
+      if (showLanguageSubmenu.value) focusSelectedLanguage();
+    };
+
+    // Either horizontal arrow opens: the chevron points inline-end while the list opens inline-start.
+    const onLanguageRowKeydown = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      event.stopPropagation();
+      showLanguageSubmenu.value = true;
+      focusSelectedLanguage();
+    };
+
+    const onLanguageListKeydown = (event: KeyboardEvent) => {
+      const items = languageItems();
+      const index = items.indexOf(document.activeElement as HTMLElement);
+      const awayKey = document.documentElement.dir === "rtl" ? "ArrowLeft" : "ArrowRight";
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        items[(index + step + items.length) % items.length]?.focus();
+      } else if (event.key === "Escape") {
+        closeLanguageList();
+      } else if (event.key === awayKey) {
+        // Below lg the list sits inline under its row, so there is nothing to the side to return to.
+        if (!lgUp.value) return;
+        closeLanguageList();
+      } else {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    // AI chat toggle — shown locked (not hidden) in builds that don't unlock
+    // it. Same `ai_enabled`-is-an-admin-preference-not-an-upsell-target
+    // reasoning as QueryEditor.vue's floating AI icon: an entitled org that's
+    // turned AI off still never sees the button at all.
+    //
+    // NOT `buildFeatureGateContext()` — that reads the `@/aws-exports`
+    // singleton directly, but this component takes edition info as its own
+    // `config` PROP (so a host can inject it / tests can override it) rather
+    // than importing the module. Build the context from the prop instead.
+    const aiAccess = computed(() =>
+      checkFeatureAccess("aiAssistant", {
+        isEnterprise: props.config.isEnterprise === "true",
+        isCloud: props.config.isCloud === "true",
+        rbac: props.store.state.zoConfig?.rbac_enabled !== false,
+      }),
+    );
+    const aiButtonVisible = computed(
+      () => !aiAccess.value.allowed || Boolean(props.store.state.zoConfig.ai_enabled),
+    );
 
     // Computed property for enterprise button text based on deployment type
     const enterpriseButtonText = computed(() => {
@@ -623,6 +733,10 @@ export default defineComponent({
     };
 
     const toggleAIChat = () => {
+      if (!aiAccess.value.allowed) {
+        openEnterpriseDialog();
+        return;
+      }
       emit("toggleAIChat");
     };
 
@@ -669,11 +783,6 @@ export default defineComponent({
       emit("updateOrganization");
     };
 
-    // Open enterprise upgrade dialog
-    const openEnterpriseDialog = () => {
-      showEnterpriseDialog.value = true;
-    };
-
     return {
       isDark,
       t,
@@ -684,11 +793,17 @@ export default defineComponent({
       ingestionQuotaColor,
       showEnterpriseDialog,
       showLanguageSubmenu,
+      languageListRef,
+      onLanguageRowSelect,
+      onLanguageRowKeydown,
+      onLanguageListKeydown,
       updateOrganization,
       goToHome,
       homeUrl,
       goToAbout,
       toggleAIChat,
+      aiAccess,
+      aiButtonVisible,
       openSlack,
       navigateToOpenAPI,
       navigateToDocs,

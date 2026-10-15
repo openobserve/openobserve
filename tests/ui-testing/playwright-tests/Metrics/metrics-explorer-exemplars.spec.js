@@ -9,7 +9,9 @@ const { PREFIX, HIST, COUNTER } = RUN;
 
 const CARD = `${HIST}_bucket`;
 const cardSel = (name) => `[data-test="metrics-explorer-card-${name}"]`;
+// The off toggle lives in the detail view; once on, the card shows it at rest too, under the same id.
 const toggleSel = (name) => `[data-test="metrics-explorer-card-exemplars-${name}"]`;
+const detailPoints = '[data-test="metrics-detail-overview"] [data-test="dashboard-panel-exemplar-points"]';
 
 test.describe('Metrics explorer exemplars', () => {
   test.describe.configure({ mode: 'serial' });
@@ -42,7 +44,8 @@ test.describe('Metrics explorer exemplars', () => {
     const restInfo = page.locator(`[data-test="metrics-explorer-card-rest-info-${CARD}"]`);
     await expect(restInfo).toContainText('heatmap');
 
-    await page.locator(cardSel(CARD)).hover();
+    await pm.metricsExplorerPage.openMetricDetails(CARD);
+    await pm.metricsExplorerPage.expectDetailOpen(CARD);
     const toggle = page.locator(toggleSel(CARD));
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await expect(toggle).toHaveAttribute('data-swaps-variant', 'percentiles');
@@ -50,10 +53,11 @@ test.describe('Metrics explorer exemplars', () => {
 
     await expect(page.locator(toggleSel(CARD))).toHaveAttribute('aria-pressed', 'true');
     await expect.poll(async () => {
-      const list = page.locator(`${cardSel(CARD)} [data-test="dashboard-panel-exemplar-points"]`);
+      const list = page.locator(detailPoints);
       return (await list.count()) ? Number(await list.getAttribute('data-count')) : 0;
     }, { timeout: 30_000 }).toBeGreaterThan(0);
-    await page.mouse.move(0, 0);
+
+    await page.locator(pm.metricsExplorerPage.detailClose).click();
     await expect(restInfo).toContainText('percentiles');
 
     const requests = log.exemplars();
@@ -75,8 +79,12 @@ test.describe('Metrics explorer exemplars', () => {
     await pm.metricsExplorerPage.gotoExplorer();
     const search = page.locator('[data-test="metrics-explorer-search"] input');
     await search.fill(PREFIX);
-    await page.locator(cardSel(CARD)).hover();
+    await pm.metricsExplorerPage.openMetricDetails(CARD);
+    await pm.metricsExplorerPage.expectDetailOpen(CARD);
     await page.locator(toggleSel(CARD)).click();
+    await expect(page.locator(`[data-test="metrics-explorer-card-exemplars-loading-${CARD}"]`)).toBeVisible();
+    // Back on the grid the card is still fetching; filtering it out must abort that fetch.
+    await page.locator(pm.metricsExplorerPage.detailClose).click();
     await expect(page.locator(`[data-test="metrics-explorer-card-exemplars-loading-${CARD}"]`)).toBeVisible();
     await search.fill(`${PREFIX}_requests`);
     await expect.poll(() => aborted.length, { timeout: 10_000 }).toBeGreaterThan(0);

@@ -92,8 +92,8 @@ vi.mock("@/utils/commons", () => ({
   getFoldersListByType: vi.fn(() => Promise.resolve()),
 }));
 
-// Mock segment analytics
-vi.mock("@/services/segment_analytics", () => ({
+// Mock product analytics
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },

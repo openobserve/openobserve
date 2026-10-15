@@ -41,7 +41,6 @@
         :frame="false"
         :show-global-filter="false"
         :row-class="loopRowClass"
-        :footer-title="t('aiObservability.behavior.footerLoops')"
         class="min-h-0 flex-1"
         show-index
         pagination="client"
@@ -70,7 +69,6 @@
         :frame="false"
         :show-global-filter="false"
         :row-class="failureRowClass"
-        :footer-title="t('aiObservability.behavior.footerFailures')"
         class="min-h-0 flex-1"
         show-index
         pagination="client"

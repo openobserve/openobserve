@@ -41,6 +41,8 @@ use usage_reporting::http_report_metrics;
 use crate::{search as SearchService, service::setup_tracing_with_trace_id};
 
 pub mod alert;
+#[cfg(feature = "enterprise")]
+pub mod alert_calibration;
 pub mod backfill;
 pub mod composite;
 pub mod composite_graph_lock;
@@ -49,6 +51,7 @@ pub mod deduplication;
 pub mod derived_streams;
 pub mod destination_usage;
 pub mod destinations;
+pub mod downtimes;
 pub mod external_alerts;
 #[cfg(feature = "enterprise")]
 pub mod grouping;
@@ -57,6 +60,9 @@ pub mod incidents;
 pub mod notifications;
 #[cfg(feature = "enterprise")]
 pub mod org_config;
+#[cfg(feature = "enterprise")]
+pub mod prebuilt;
+mod prom_rule;
 pub mod recovery;
 pub mod scheduler;
 pub mod templates;
@@ -164,6 +170,16 @@ impl QueryConditionExt for QueryCondition {
                 return Ok(eval_results);
             }
             QueryType::PromQL => {
+                if self.promql_rule_mode {
+                    return prom_rule::evaluate(
+                        self,
+                        org_id,
+                        end_time,
+                        &trace_id,
+                        search_event_context,
+                    )
+                    .await;
+                }
                 let Some(v) = self.promql.as_ref() else {
                     return Ok(eval_results);
                 };
@@ -242,7 +258,13 @@ impl QueryConditionExt for QueryCondition {
                 )
                 .await
                 {
-                    Ok(v) => v,
+                    Ok(v) if !v.warnings.is_empty() => {
+                        return Err(anyhow::anyhow!(
+                            "Partial response: {}",
+                            v.warnings.join(", ")
+                        ));
+                    }
+                    Ok(v) => v.value,
                     // A failed search is an ERROR, not an empty result. Returning
                     // Ok here would record outcome=Normal/level=Ok and refresh
                     // `level_at`, silently clearing a prior Critical — an error

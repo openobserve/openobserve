@@ -50,12 +50,12 @@
             :data-test="`ai-playground-scorer-${entry.id}`"
             @update:model-value="(checked: unknown) => toggle(entry.id, checked === true)"
           />
-          <span
-            class="min-w-0 truncate font-mono text-xs font-semibold"
+          <OTruncatedText
+            class="font-mono text-xs font-semibold"
             :class="entry.blocked ? 'text-text-muted' : 'text-text-heading'"
           >
             {{ raw(entry.name) }}
-          </span>
+          </OTruncatedText>
           <OTag
             v-if="entry.referenceBased"
             variant="warning-soft"
@@ -156,6 +156,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import { entityId } from "@/enterprise/components/onlineEvals/utils/evalEntity";
 import { scorerEvidence } from "@/enterprise/views/AIObservability/playgroundDraft";
 import type { Scorer } from "@/services/online-evals.service";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const props = defineProps<{
   scorers: Scorer[];

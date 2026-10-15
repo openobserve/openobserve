@@ -16,6 +16,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
 import domainManagement from "./domainManagement";
 import http from "./http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock the http service with a scoped namespace
 vi.mock("./http", () => ({
@@ -236,5 +239,33 @@ describe("domainManagement Service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${metaOrg}/domain_management`);
     });
+  });
+});
+
+describe("domainManagement product analytics", () => {
+  beforeEach(() => {
+    vi.mocked(analytics.track).mockClear();
+  });
+
+  it("tracks after updateDomainRestrictions succeeds", async () => {
+    (http as any).mockImplementation(() => ({ put: vi.fn().mockResolvedValue({ data: {} }) }));
+    await domainManagement.updateDomainRestrictions("_meta", {
+      name: "d",
+      allowAllUsers: true,
+      allowedEmails: [],
+    });
+    expect(analytics.track).toHaveBeenCalledWith("domain_restrictions_updated");
+  });
+
+  it("does not track when updateDomainRestrictions fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({ put: vi.fn().mockRejectedValue(new Error("boom")) }));
+    await expect(
+      domainManagement.updateDomainRestrictions("_meta", {
+        name: "d",
+        allowAllUsers: true,
+        allowedEmails: [],
+      }),
+    ).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

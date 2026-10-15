@@ -25,14 +25,22 @@
 //!
 //! [state]: config::meta::alerts::state
 
+use std::collections::HashMap;
+
 use config::meta::alerts::{level::AlertLevel, state::EvalLedgerWrite};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, FromQueryResult, QueryFilter, QueryOrder,
+    QuerySelect, Set,
+};
 
 use super::entity::alert_eval_intervals;
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
+
+/// Chunked so a large org cannot emit an unbounded `IN (...)` that some drivers reject outright.
+const ALERT_ID_PREDICATE_CHUNK: usize = 500;
 
 /// One stored interval, as the SLI reader sees it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,6 +71,12 @@ impl From<alert_eval_intervals::Model> for AlertEvalInterval {
             to_us: m.to_us,
         }
     }
+}
+
+#[derive(FromQueryResult)]
+struct EarliestFrom {
+    alert_id: String,
+    earliest: i64,
 }
 
 /// Fold one measured evaluation into the ledger, inside the caller's
@@ -235,6 +249,42 @@ pub async fn earliest_from_us_with<C: sea_orm::ConnectionTrait>(
         .map(|m| m.from_us))
 }
 
+/// [`earliest_from_us`] for many alerts of one org; an alert with no interval is left out.
+pub async fn earliest_from_us_many(
+    org: &str,
+    alert_ids: &[String],
+) -> Result<HashMap<String, i64>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    earliest_from_us_many_with(client, org, alert_ids).await
+}
+
+/// [`earliest_from_us_many`] against a caller-supplied connection.
+pub async fn earliest_from_us_many_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    alert_ids: &[String],
+) -> Result<HashMap<String, i64>, errors::Error> {
+    use alert_eval_intervals::Column;
+
+    let mut earliest = HashMap::new();
+    for chunk in alert_ids.chunks(ALERT_ID_PREDICATE_CHUNK) {
+        // One aggregate per chunk: a range scan per alert would cost a round trip per id.
+        let rows = alert_eval_intervals::Entity::find()
+            .select_only()
+            .column(Column::AlertId)
+            .column_as(Column::FromUs.min(), "earliest")
+            // An alert id reused by another org must not lend this one its history.
+            .filter(Column::Org.eq(org))
+            .filter(Column::AlertId.is_in(chunk.iter().cloned()))
+            .group_by(Column::AlertId)
+            .into_model::<EarliestFrom>()
+            .all(conn)
+            .await?;
+        earliest.extend(rows.into_iter().map(|row| (row.alert_id, row.earliest)));
+    }
+    Ok(earliest)
+}
+
 /// Retention, mirroring `alert_states::delete_transitions_before`.
 ///
 /// Keyed on `to_us` so a run that is still open — or one that ended after the
@@ -341,8 +391,18 @@ mod tests {
         from_us: i64,
         to_us: i64,
     ) -> i64 {
+        seed_in(conn, "myorg", alert_id, from_us, to_us).await
+    }
+
+    async fn seed_in<C: sea_orm::ConnectionTrait>(
+        conn: &C,
+        org: &str,
+        alert_id: &str,
+        from_us: i64,
+        to_us: i64,
+    ) -> i64 {
         alert_eval_intervals::ActiveModel {
-            org: Set("myorg".to_string()),
+            org: Set(org.to_string()),
             alert_id: Set(alert_id.to_string()),
             level: Set(AlertLevel::Ok.to_i32()),
             frequency_secs: Set(FREQ),
@@ -883,6 +943,61 @@ mod tests {
         assert_eq!(
             earliest_from_us_with(&db, "alert-1").await.unwrap(),
             Some(T0 + 900 * SEC)
+        );
+    }
+
+    #[tokio::test]
+    async fn many_alerts_each_get_their_own_oldest_beginning_and_one_without_history_none() {
+        let db = db().await;
+        seed(&db, "alert-1", T0 + 500 * SEC, T0 + 600 * SEC).await;
+        seed(&db, "alert-1", T0, T0 + 100 * SEC).await;
+        seed(&db, "alert-2", T0 + 200 * SEC, T0 + 300 * SEC).await;
+        let ids = ["alert-1", "alert-2", "alert-3"].map(String::from);
+
+        let earliest = earliest_from_us_many_with(&db, "myorg", &ids)
+            .await
+            .unwrap();
+        assert_eq!(
+            earliest,
+            HashMap::from([
+                ("alert-1".to_string(), T0),
+                ("alert-2".to_string(), T0 + 200 * SEC)
+            ])
+        );
+    }
+
+    #[tokio::test]
+    async fn many_alerts_never_take_history_from_the_same_id_in_another_org() {
+        let db = db().await;
+        seed_in(&db, "other", "alert-1", T0, T0 + 100 * SEC).await;
+        seed(&db, "alert-1", T0 + 900 * SEC, T0 + 1000 * SEC).await;
+
+        let ids = ["alert-1".to_string()];
+        let earliest = earliest_from_us_many_with(&db, "myorg", &ids)
+            .await
+            .unwrap();
+        assert_eq!(
+            earliest,
+            HashMap::from([("alert-1".to_string(), T0 + 900 * SEC)])
+        );
+    }
+
+    #[tokio::test]
+    async fn many_alerts_are_read_across_every_chunk_of_ids() {
+        let db = db().await;
+        let ids: Vec<String> = (0..=2 * ALERT_ID_PREDICATE_CHUNK)
+            .map(|i| format!("alert-{i}"))
+            .collect();
+        let last = ids.last().unwrap().clone();
+        seed(&db, &ids[0], T0, T0 + 100 * SEC).await;
+        seed(&db, &last, T0 + 200 * SEC, T0 + 300 * SEC).await;
+
+        let earliest = earliest_from_us_many_with(&db, "myorg", &ids)
+            .await
+            .unwrap();
+        assert_eq!(
+            earliest,
+            HashMap::from([(ids[0].clone(), T0), (last, T0 + 200 * SEC)])
         );
     }
 }

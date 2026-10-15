@@ -597,4 +597,39 @@ describe("AppPerformance.vue", () => {
       expect(wrapper.vm.store.state.zoConfig.min_auto_refresh_interval).toBe(5);
     });
   });
+
+  describe("Auto Run", () => {
+    afterEach(() => {
+      localStorage.removeItem("oo_toggle_auto_run");
+    });
+
+    it("hides the Auto Run menu when the server flag is off", () => {
+      expect(wrapper.vm.isAutoRunAvailable).toBe(false);
+      expect(wrapper.find('[data-test="rum-performance-refresh-options-btn"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("offers the Auto Run menu and drops the apply-changes state when it is on", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: true });
+      await nextTick();
+
+      expect(wrapper.vm.isAutoRunOn).toBe(true);
+      expect(wrapper.vm.isVariablesChanged).toBe(false);
+      expect(wrapper.find('[data-test="rum-performance-refresh-options-btn"]').exists()).toBe(true);
+    });
+
+    it("keeps the apply-changes state when Auto Run is turned off", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: true });
+      wrapper.vm.toggleAutoRun();
+      await nextTick();
+
+      expect(localStorage.getItem("oo_toggle_auto_run")).toBe("false");
+
+      expect(wrapper.vm.isAutoRunOn).toBe(false);
+      expect(wrapper.vm.isVariablesChanged).toBe(true);
+    });
+  });
 });

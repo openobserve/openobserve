@@ -24,6 +24,11 @@
 //! `durationNano`, `mappingIndex`, etc.) fail deserialization without this pass.
 
 use config::utils::json;
+use opentelemetry_proto::tonic::{
+    collector::profiles::v1development::ExportProfilesServiceRequest,
+    common::v1::{AnyValue, ArrayValue, KeyValueList, any_value::Value},
+};
+use serde::de::Error as _;
 
 const INTEGRAL_KEYS: &[&str] = &[
     "timeUnixNano",
@@ -62,10 +67,130 @@ const INTEGRAL_ARRAY_KEYS: &[&str] = &[
 pub fn normalize(body: &mut json::Value) {
     json::canonicalize_floats(body);
     normalize_value(body);
-    // opentelemetry-proto's AnyValue JSON serde does not understand
-    // stringValueStrindex; expand it to stringValue via the dictionary.
-    expand_string_value_strindexes(body);
     ensure_defaults(body);
+}
+
+pub fn deserialize(mut body: json::Value) -> Result<ExportProfilesServiceRequest, json::Error> {
+    // The upstream AnyValue visitor cannot decode stringValueStrindex.
+    let mut values = Vec::new();
+    if let Some(attributes) = body.pointer_mut("/dictionary/attributeTable") {
+        take_attribute_values(attributes, &mut values)?;
+    }
+    if let Some(resources) = body
+        .get_mut("resourceProfiles")
+        .and_then(json::Value::as_array_mut)
+    {
+        for resource in resources {
+            if let Some(attributes) = resource.pointer_mut("/resource/attributes") {
+                take_attribute_values(attributes, &mut values)?;
+            }
+            if let Some(scopes) = resource
+                .get_mut("scopeProfiles")
+                .and_then(json::Value::as_array_mut)
+            {
+                for scope in scopes {
+                    if let Some(attributes) = scope.pointer_mut("/scope/attributes") {
+                        take_attribute_values(attributes, &mut values)?;
+                    }
+                }
+            }
+        }
+    }
+    let mut request: ExportProfilesServiceRequest = json::from_value(body)?;
+    let mut values = values.into_iter();
+    if let Some(dictionary) = &mut request.dictionary {
+        for attribute in &mut dictionary.attribute_table {
+            attribute.value = values.next().flatten();
+        }
+    }
+    for resource in &mut request.resource_profiles {
+        if let Some(resource) = &mut resource.resource {
+            for attribute in &mut resource.attributes {
+                attribute.value = values.next().flatten();
+            }
+        }
+        for scope in &mut resource.scope_profiles {
+            if let Some(scope) = &mut scope.scope {
+                for attribute in &mut scope.attributes {
+                    attribute.value = values.next().flatten();
+                }
+            }
+        }
+    }
+    Ok(request)
+}
+
+fn take_attribute_values(
+    attributes: &mut json::Value,
+    values: &mut Vec<Option<AnyValue>>,
+) -> Result<(), json::Error> {
+    if let Some(attributes) = attributes.as_array_mut() {
+        for attribute in attributes {
+            if attribute.get("key").is_none() {
+                ensure_common_key_value_defaults(attribute);
+            }
+            let value = attribute.get_mut("value").map(json::Value::take);
+            values.push(
+                value
+                    .filter(|value| !value.is_null())
+                    .map(deserialize_any_value)
+                    .transpose()?,
+            );
+        }
+    }
+    Ok(())
+}
+
+fn deserialize_any_value(mut value: json::Value) -> Result<AnyValue, json::Error> {
+    if value.as_object().is_some_and(json::Map::is_empty) {
+        return Ok(AnyValue::default());
+    }
+    if let Some(index) = value.get_mut("stringValueStrindex") {
+        return json::from_value(index.take()).map(|index| AnyValue {
+            value: Some(Value::StringValueStrindex(index)),
+        });
+    }
+    if let Some(array) = value.get_mut("arrayValue") {
+        ensure_collection_values(array)?;
+        let values: Vec<json::Value> = json::from_value(
+            array
+                .get_mut("values")
+                .map(json::Value::take)
+                .unwrap_or(json::Value::Null),
+        )?;
+        let values = values
+            .into_iter()
+            .map(deserialize_any_value)
+            .collect::<Result<_, _>>()?;
+        return Ok(AnyValue {
+            value: Some(Value::ArrayValue(ArrayValue { values })),
+        });
+    }
+    if let Some(list) = value.get_mut("kvlistValue") {
+        ensure_collection_values(list)?;
+        let mut values = Vec::new();
+        if let Some(attributes) = list.get_mut("values") {
+            take_attribute_values(attributes, &mut values)?;
+        }
+        let mut list: KeyValueList = json::from_value(list.take())?;
+        for (attribute, value) in list.values.iter_mut().zip(values) {
+            attribute.value = value;
+        }
+        return Ok(AnyValue {
+            value: Some(Value::KvlistValue(list)),
+        });
+    }
+    json::from_value(value)
+}
+
+fn ensure_collection_values(value: &mut json::Value) -> Result<(), json::Error> {
+    let value = value
+        .as_object_mut()
+        .ok_or_else(|| json::Error::custom("profile collection must be an object"))?;
+    if !value.contains_key("values") {
+        value.insert("values".to_string(), json::Value::Array(vec![]));
+    }
+    Ok(())
 }
 
 fn normalize_value(value: &mut json::Value) {
@@ -182,52 +307,6 @@ fn decode_hex(raw: &str) -> Option<Vec<u8>> {
 fn decode_base64(raw: &str) -> Option<Vec<u8>> {
     use base64::Engine;
     base64::engine::general_purpose::STANDARD.decode(raw).ok()
-}
-
-/// Rewrite `{ "stringValueStrindex": N }` → `{ "stringValue": "<stringTable[N]>" }`
-/// so serde's AnyValue visitor (which only knows classic OTLP value keys) succeeds.
-fn expand_string_value_strindexes(body: &mut json::Value) {
-    let string_table = body
-        .get("dictionary")
-        .and_then(|d| d.get("stringTable"))
-        .and_then(|t| t.as_array())
-        .cloned()
-        .unwrap_or_default();
-    expand_string_value_strindexes_in_value(body, &string_table);
-}
-
-fn expand_string_value_strindexes_in_value(value: &mut json::Value, string_table: &[json::Value]) {
-    match value {
-        json::Value::Array(items) => {
-            for item in items {
-                expand_string_value_strindexes_in_value(item, string_table);
-            }
-        }
-        json::Value::Object(map) => {
-            for child in map.values_mut() {
-                expand_string_value_strindexes_in_value(child, string_table);
-            }
-            let Some(index_val) = map.remove("stringValueStrindex") else {
-                return;
-            };
-            let index = match index_val {
-                json::Value::Number(n) => n.as_i64().unwrap_or(0),
-                json::Value::String(s) => s.parse::<i64>().unwrap_or(0),
-                _ => 0,
-            };
-            let resolved = if index > 0 {
-                string_table
-                    .get(index as usize)
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string()
-            } else {
-                String::new()
-            };
-            map.insert("stringValue".to_string(), json::Value::String(resolved));
-        }
-        _ => {}
-    }
 }
 
 fn ensure_defaults(body: &mut json::Value) {
@@ -557,9 +636,8 @@ fn ensure_value_type_defaults(value_type: &mut json::Value) {
 #[cfg(test)]
 mod tests {
     use config::utils::json;
-    use opentelemetry_proto::tonic::collector::profiles::v1development::ExportProfilesServiceRequest;
 
-    use super::normalize;
+    use super::{Value, deserialize, normalize};
 
     #[test]
     fn accepts_standard_otlp_json_camel_case() {
@@ -583,8 +661,7 @@ mod tests {
 
         normalize(&mut payload);
 
-        let req = serde_json::from_value::<ExportProfilesServiceRequest>(payload)
-            .expect("OTLP/JSON camelCase payload should deserialize");
+        let req = deserialize(payload).expect("OTLP/JSON camelCase payload should deserialize");
         let profile = &req.resource_profiles[0].scope_profiles[0].profiles[0];
         assert_eq!(profile.time_unix_nano, 1735732800000000000);
         assert_eq!(profile.duration_nano, 1000000000);
@@ -603,8 +680,7 @@ mod tests {
 
         normalize(&mut payload);
 
-        serde_json::from_value::<ExportProfilesServiceRequest>(payload)
-            .expect("dictionary defaults should satisfy serde requirements");
+        deserialize(payload).expect("dictionary defaults should satisfy serde requirements");
     }
 
     #[test]
@@ -655,7 +731,7 @@ mod tests {
         });
 
         normalize(&mut payload);
-        let req = serde_json::from_value::<ExportProfilesServiceRequest>(payload)
+        let req = deserialize(payload)
             .expect("location without mappingIndex should deserialize after normalize");
         let loc = &req.dictionary.as_ref().unwrap().location_table[1];
         assert_eq!(loc.mapping_index, 0);
@@ -669,8 +745,7 @@ mod tests {
     fn accepts_omitted_top_level_resource_profiles() {
         let mut payload = json::json!({});
         normalize(&mut payload);
-        let req = serde_json::from_value::<ExportProfilesServiceRequest>(payload)
-            .expect("empty object should deserialize after normalize");
+        let req = deserialize(payload).expect("empty object should deserialize after normalize");
         assert!(req.resource_profiles.is_empty());
         assert!(req.dictionary.is_none());
     }
@@ -695,7 +770,7 @@ mod tests {
             ]
         });
         normalize(&mut payload);
-        let req = serde_json::from_value::<ExportProfilesServiceRequest>(payload)
+        let req = deserialize(payload)
             .expect("profile without timeUnixNano/durationNano should deserialize");
         let profile = &req.resource_profiles[0].scope_profiles[0].profiles[0];
         assert_eq!(profile.time_unix_nano, 0);
@@ -715,8 +790,8 @@ mod tests {
             ]
         });
         normalize(&mut payload);
-        let req = serde_json::from_value::<ExportProfilesServiceRequest>(payload)
-            .expect("omitted empty scopeProfiles/profiles should deserialize");
+        let req =
+            deserialize(payload).expect("omitted empty scopeProfiles/profiles should deserialize");
         assert_eq!(req.resource_profiles.len(), 2);
         assert!(req.resource_profiles[0].scope_profiles.is_empty());
         assert_eq!(req.resource_profiles[1].scope_profiles.len(), 1);
@@ -728,7 +803,7 @@ mod tests {
     }
 
     #[test]
-    fn expands_string_value_strindex_via_string_table() {
+    fn preserves_string_value_strindex_for_validation() {
         let mut payload = json::json!({
             "dictionary": {
                 "stringTable": ["", "thread.name", "worker-1"],
@@ -748,15 +823,163 @@ mod tests {
             "resourceProfiles": []
         });
         normalize(&mut payload);
-        let req = serde_json::from_value::<ExportProfilesServiceRequest>(payload)
-            .expect("stringValueStrindex should expand before serde");
+        let req = deserialize(payload).expect("stringValueStrindex should deserialize unchanged");
         let attr = &req.dictionary.as_ref().unwrap().attribute_table[1];
         match attr.value.as_ref().and_then(|v| v.value.as_ref()) {
-            Some(opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(s)) => {
-                assert_eq!(s, "worker-1");
-            }
-            other => panic!("expected StringValue, got {other:?}"),
+            Some(Value::StringValueStrindex(index)) => assert_eq!(*index, 2),
+            other => panic!("expected StringValueStrindex, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn collector_empty_any_value_json_sentinel_is_accepted() {
+        let mut payload = json::json!({
+            "dictionary": {"attributeTable": [{"value": {}}]},
+            "resourceProfiles": [{"scopeProfiles": [{"profiles": [{"samples": [{"values": [1]}]}]}]}]
+        });
+        normalize(&mut payload);
+        let request = deserialize(payload).unwrap();
+        assert_eq!(
+            request.dictionary.as_ref().unwrap().attribute_table[0].value,
+            Some(super::AnyValue::default())
+        );
+        super::super::validation::validate(&request).unwrap();
+    }
+
+    #[test]
+    fn nonempty_unknown_any_value_shapes_are_rejected() {
+        for value in [
+            json::json!({"unknownValue": 1}),
+            json::json!({"unknownValue": {}}),
+        ] {
+            let mut payload =
+                json::json!({"dictionary": {"attributeTable": [{}, {"value": value}]}});
+            normalize(&mut payload);
+            assert!(deserialize(payload).is_err());
+        }
+    }
+
+    #[test]
+    fn omitted_empty_collection_values_match_explicit_empty_lists() {
+        for collection in ["arrayValue", "kvlistValue"] {
+            let mut requests = Vec::new();
+            for content in [json::json!({}), json::json!({"values": []})] {
+                let mut value = json::json!({});
+                value[collection] = content;
+                let mut payload =
+                    json::json!({"dictionary": {"attributeTable": [{}, {"value": value}]}});
+                normalize(&mut payload);
+                let request = deserialize(payload).unwrap();
+                super::super::validation::validate(&request).unwrap();
+                requests.push(request);
+            }
+            assert_eq!(requests[0], requests[1]);
+        }
+    }
+
+    #[test]
+    fn active_empty_collections_do_not_qualify_as_zero_sentinels() {
+        for value in [
+            json::json!({"arrayValue": {}}),
+            json::json!({"kvlistValue": {}}),
+        ] {
+            let mut payload = json::json!({"dictionary": {"attributeTable": [{"value": value}]}});
+            normalize(&mut payload);
+            let request = deserialize(payload).unwrap();
+            assert_eq!(
+                super::super::validation::validate(&request).unwrap_err(),
+                "dictionary.attribute_table[0] must be the zero value"
+            );
+        }
+    }
+
+    #[test]
+    fn malformed_collection_values_and_containers_are_rejected() {
+        for collection in ["arrayValue", "kvlistValue"] {
+            for invalid in [
+                json::Value::Null,
+                json::json!({}),
+                json::json!(true),
+                json::json!(7),
+                json::json!("bad"),
+            ] {
+                let mut value = json::json!({});
+                value[collection] = json::json!({"values": invalid});
+                let mut payload =
+                    json::json!({"dictionary": {"attributeTable": [{}, {"value": value}]}});
+                normalize(&mut payload);
+                assert!(
+                    deserialize(payload).is_err(),
+                    "invalid {collection} values accepted"
+                );
+            }
+            for invalid in [
+                json::Value::Null,
+                json::json!([]),
+                json::json!([[]]),
+                json::json!(true),
+                json::json!(7),
+                json::json!("bad"),
+            ] {
+                let mut value = json::json!({});
+                value[collection] = invalid;
+                let mut payload =
+                    json::json!({"dictionary": {"attributeTable": [{}, {"value": value}]}});
+                normalize(&mut payload);
+                assert!(
+                    deserialize(payload).is_err(),
+                    "invalid {collection} container accepted"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn preserves_nested_and_resource_scope_string_references() {
+        let mut payload = json::json!({
+            "dictionary": {
+                "stringTable": ["", "thread.name", "worker-1"],
+                "attributeTable": [{}, {"keyStrindex": 1, "value": {"arrayValue": {"values": [{"stringValueStrindex": "2"}, {"kvlistValue": {"values": [{"key": "nested", "value": {"stringValueStrindex": -1}}]}}]}}}]
+            },
+            "resourceProfiles": [{
+                "resource": {"attributes": [{"key": "service.name", "value": {"stringValueStrindex": 2}}]},
+                "scopeProfiles": [{"scope": {"attributes": [{"key": "scope.label", "value": {"stringValueStrindex": 99}}]}}]
+            }]
+        });
+        normalize(&mut payload);
+        let request = deserialize(payload).unwrap();
+        let resource = request.resource_profiles[0].resource.as_ref().unwrap();
+        assert_eq!(
+            resource.attributes[0].value.as_ref().unwrap().value,
+            Some(Value::StringValueStrindex(2))
+        );
+        let scope = request.resource_profiles[0].scope_profiles[0]
+            .scope
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            scope.attributes[0].value.as_ref().unwrap().value,
+            Some(Value::StringValueStrindex(99))
+        );
+        let dictionary = request.dictionary.as_ref().unwrap();
+        assert!(dictionary.attribute_table[0].value.is_none());
+        let Some(Value::ArrayValue(array)) = dictionary.attribute_table[1]
+            .value
+            .as_ref()
+            .unwrap()
+            .value
+            .as_ref()
+        else {
+            panic!("expected array");
+        };
+        assert_eq!(array.values[0].value, Some(Value::StringValueStrindex(2)));
+        let Some(Value::KvlistValue(list)) = array.values[1].value.as_ref() else {
+            panic!("expected kvlist");
+        };
+        assert_eq!(
+            list.values[0].value.as_ref().unwrap().value,
+            Some(Value::StringValueStrindex(-1))
+        );
     }
 
     #[test]
@@ -780,8 +1003,7 @@ mod tests {
             "resourceProfiles": []
         });
         normalize(&mut payload);
-        let req = serde_json::from_value::<ExportProfilesServiceRequest>(payload)
-            .expect("hex link ids should convert to byte arrays");
+        let req = deserialize(payload).expect("hex link ids should convert to byte arrays");
         let link = &req.dictionary.as_ref().unwrap().link_table[1];
         assert_eq!(link.trace_id.len(), 16);
         assert_eq!(link.span_id.len(), 8);
@@ -810,8 +1032,7 @@ mod tests {
             ]
         });
         normalize(&mut payload);
-        let req = serde_json::from_value::<ExportProfilesServiceRequest>(payload)
-            .expect("base64 originalPayload should decode before serde");
+        let req = deserialize(payload).expect("base64 originalPayload should decode before serde");
         assert_eq!(
             req.resource_profiles[0].scope_profiles[0].profiles[0].original_payload,
             vec![1, 2, 3]
@@ -846,8 +1067,7 @@ mod tests {
             ]
         });
         normalize(&mut payload);
-        let req = serde_json::from_value::<ExportProfilesServiceRequest>(payload)
-            .expect("omitted key with keyStrindex should deserialize");
+        let req = deserialize(payload).expect("omitted key with keyStrindex should deserialize");
         let attr = &req.resource_profiles[0]
             .resource
             .as_ref()
@@ -867,8 +1087,7 @@ mod tests {
         )
         .unwrap();
         normalize(&mut payload);
-        let req = serde_json::from_value::<ExportProfilesServiceRequest>(payload)
-            .expect("non-canonical doubles should deserialize");
+        let req = deserialize(payload).expect("non-canonical doubles should deserialize");
         let attributes = &req.resource_profiles[0]
             .resource
             .as_ref()

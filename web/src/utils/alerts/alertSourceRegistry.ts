@@ -88,6 +88,14 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     defaultThreshold: "matching-rows",
     showQueryPreview: true,
   },
+  explorer: {
+    id: "explorer",
+    labelKey: "alerts.prefill.sources.explorer.label",
+    toastKey: "alerts.prefill.sources.explorer.toast",
+    icon: "shield-alert-outline",
+    defaultThreshold: "matching-rows",
+    showQueryPreview: true,
+  },
   dbm: {
     id: "dbm",
     labelKey: "alerts.prefill.sources.dbm.label",
@@ -113,6 +121,15 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     // client-observed spans and this one reads the engine's own lock views;
     // sharing a source id would tell the user "imported from Database
     // Monitoring" for two measurements that must not be compared.
+    defaultThreshold: "count",
+    showQueryPreview: true,
+  },
+  rumfunnel: {
+    id: "rumfunnel",
+    labelKey: "alerts.prefill.sources.rumfunnel.label",
+    toastKey: "alerts.prefill.sources.rumfunnel.toast",
+    icon: "shield-alert-outline",
+    // The conversion row filter is the whole condition, so any returned row fires.
     defaultThreshold: "count",
     showQueryPreview: true,
   },

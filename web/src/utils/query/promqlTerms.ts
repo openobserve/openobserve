@@ -249,6 +249,11 @@ export const FUNCTION_TERMS: PromqlTerm[] = [
     info: raw("Calculate the per-second derivative over series in a range vector (for gauges)"),
   },
   {
+    label: "end",
+    detail: "function",
+    info: raw("Return the query end timestamp in seconds"),
+  },
+  {
     label: "exp",
     detail: "function",
     info: raw("Calculate exponential function for input vector values"),
@@ -375,9 +380,19 @@ export const FUNCTION_TERMS: PromqlTerm[] = [
     info: raw("Return the median absolute deviation over time for input series"),
   },
   {
+    label: "max_of",
+    detail: "function",
+    info: raw("Return the larger of two scalars"),
+  },
+  {
     label: "max_over_time",
     detail: "function",
     info: raw("Return the maximum value over time for input series"),
+  },
+  {
+    label: "min_of",
+    detail: "function",
+    info: raw("Return the smaller of two scalars"),
   },
   {
     label: "min_over_time",
@@ -440,6 +455,11 @@ export const FUNCTION_TERMS: PromqlTerm[] = [
     info: raw("Convert degrees to radians for input series"),
   },
   {
+    label: "range",
+    detail: "function",
+    info: raw("Return the query range in seconds"),
+  },
+  {
     label: "rate",
     detail: "function",
     info: raw("Calculate per-second increase over a range vector (for counters)"),
@@ -498,6 +518,16 @@ export const FUNCTION_TERMS: PromqlTerm[] = [
     label: "sqrt",
     detail: "function",
     info: raw("Return the square root for input series"),
+  },
+  {
+    label: "start",
+    detail: "function",
+    info: raw("Return the query start timestamp in seconds"),
+  },
+  {
+    label: "step",
+    detail: "function",
+    info: raw("Return the query step in seconds"),
   },
   {
     label: "stddev_over_time",

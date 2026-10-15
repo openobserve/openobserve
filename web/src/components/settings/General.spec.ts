@@ -61,6 +61,8 @@ vi.mock("@/services/config", async (importOriginal) => {
   });
 });
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 vi.mock("@/composables/useLoading", () => ({
   useLoading: (fn: Function) => ({
     execute: fn,
@@ -85,6 +87,9 @@ import organizations from "@/services/organizations";
 import settingsService from "@/services/settings";
 import configService from "@/services/config";
 import DOMPurify from "dompurify";
+import analytics from "@/services/product_analytics";
+import config from "@/aws-exports";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 const mockOrganizations = organizations as any;
 const mockSettingsService = settingsService as any;
@@ -359,6 +364,28 @@ describe("General", () => {
       });
     });
 
+    it("tracks org_general_settings_saved once the save succeeds", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(analytics.track).toHaveBeenCalledWith("org_general_settings_saved", {
+        custom_theme: false,
+      });
+    });
+
+    it("does not track org_general_settings_saved when the save fails", async () => {
+      mockOrganizations.post_organization_settings.mockRejectedValue({ message: "Server error" });
+
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
     it("should handle save error without message", async () => {
       mockOrganizations.post_organization_settings.mockRejectedValue({});
 
@@ -389,6 +416,80 @@ describe("General", () => {
 
       const enterpriseSection = wrapper.find("#enterpriseFeature");
       expect(enterpriseSection.exists()).toBe(false);
+    });
+  });
+
+  // customBranding is self-hosted-only (cloudOffers: false): OSS sees the
+  // section locked-but-visible (disabled controls + lock), pure Cloud doesn't
+  // see it at all — same split as the other cloudOffers:false gates (e.g.
+  // cipherKeys in settings/index.vue).
+  describe("Custom branding gating", () => {
+    const originalIsEnterprise = config.isEnterprise;
+    const originalIsCloud = config.isCloud;
+
+    afterEach(() => {
+      config.isEnterprise = originalIsEnterprise;
+      config.isCloud = originalIsCloud;
+    });
+
+    it("should keep the branding section visible but locked on OSS", () => {
+      mockStore.state.zoConfig.meta_org = "test-org";
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      const wrapper = createWrapper();
+
+      expect(wrapper.find("#enterpriseFeature").exists()).toBe(true);
+      const lockedText = wrapper.find('[data-test="settings_ent_logo_custom_text_locked"]');
+      expect(lockedText.exists()).toBe(true);
+      // Clickable (not disabled) — the wrapping row opens the upgrade dialog
+      // on click instead of the field being an inert disabled control.
+      expect(lockedText.find("input").attributes("disabled")).toBeUndefined();
+      expect(
+        wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload_locked"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="setting_ent_custom_logo_dark_img_file_upload_locked"]').exists(),
+      ).toBe(true);
+      // The functional controls must not render alongside the locked ones.
+      expect(wrapper.find('[data-test="settings_ent_logo_custom_text"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="settings_ent_logo_custom_text_edit_btn"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("opens the upgrade dialog when a locked branding row is clicked", async () => {
+      mockStore.state.zoConfig.meta_org = "test-org";
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      const wrapper = createWrapper();
+
+      const { isOpen, close } = useEnterpriseUpgradeDialog();
+      close();
+      await wrapper.find('[data-test="settings_ent_logo_custom_text_locked"]').trigger("click");
+      expect(isOpen.value).toBe(true);
+    });
+
+    it("should hide the branding section entirely on a pure Cloud build", () => {
+      mockStore.state.zoConfig.meta_org = "test-org";
+      config.isEnterprise = "false";
+      config.isCloud = "true";
+      const wrapper = createWrapper();
+
+      expect(wrapper.find("#enterpriseFeature").exists()).toBe(false);
+    });
+
+    it("should render the functional (unlocked) controls on Enterprise", () => {
+      mockStore.state.zoConfig.meta_org = "test-org";
+      config.isEnterprise = "true";
+      config.isCloud = "false";
+      const wrapper = createWrapper();
+
+      expect(wrapper.find('[data-test="settings_ent_logo_custom_text_locked"]').exists()).toBe(
+        false,
+      );
+      expect(
+        wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload_locked"]').exists(),
+      ).toBe(false);
     });
   });
 

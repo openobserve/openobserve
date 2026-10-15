@@ -19,6 +19,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import oncallService from "@/services/oncall";
 import { userKeys } from "@/services/users.querykeys";
 import store from "@/test/unit/helpers/store";
@@ -67,8 +68,10 @@ const stubs = {
   // draws rather than a column-def function OTable never calls.
   OTable: {
     name: "OTable",
-    props: ["data", "columns", "error"],
+    props: ["data", "columns", "error", "currentPage", "pageSize", "sortBy", "sortOrder"],
+    emits: ["update:currentPage", "update:pageSize", "update:sortBy", "update:sortOrder"],
     template: `<div>
+      <slot name='toolbar' />
       <slot v-if="error" name='error' />
       <template v-else>
         <div v-for="(row, i) in (data || [])" :key="i" data-test="row">
@@ -86,7 +89,12 @@ const stubs = {
     emits: ["action"],
     template: `<div>{{ description }}<button @click="$emit('action')">{{ actionLabel }}</button></div>`,
   },
-  OSearchInput: { name: "OSearchInput", template: "<input />" },
+  OSearchInput: {
+    name: "OSearchInput",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template: "<input />",
+  },
   // `props` declared deliberately: a stub that does not declare what it is
   // passed drops it silently, and an assertion about a tooltip then passes
   // with no tooltip mounted.
@@ -129,6 +137,7 @@ function onCallCell(wrapper: any, _row?: unknown) {
 describe("OnCallTeams", () => {
   beforeEach(() => {
     __resetOnCallRoutingConfig();
+    resetListViewState();
     vi.clearAllMocks();
     mockConfirm.mockResolvedValue(true);
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
@@ -274,6 +283,55 @@ describe("OnCallTeams", () => {
     await flushPromises();
 
     expect(service.whoIsOnCall).toHaveBeenCalledTimes(2);
+  });
+
+  describe("list view state", () => {
+    const seed = () =>
+      useListViewState("oncall-teams", {
+        search: "",
+        currentPage: 1,
+        pageSize: 20,
+        sortBy: "",
+        sortOrder: "asc" as "asc" | "desc",
+      });
+
+    it("restores search, page, page size and sort on mount", async () => {
+      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+      Object.assign(seed(), {
+        search: "plat",
+        currentPage: 2,
+        pageSize: 50,
+        sortBy: "name",
+        sortOrder: "desc",
+      });
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OSearchInput" }).props("modelValue")).toBe("plat");
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("currentPage")).toBe(2);
+      expect(table.props("pageSize")).toBe(50);
+      expect(table.props("sortBy")).toBe("name");
+      expect(table.props("sortOrder")).toBe("desc");
+    });
+
+    it("saves search, page and sort changes", async () => {
+      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      wrapper.findComponent({ name: "OSearchInput" }).vm.$emit("update:modelValue", "pay");
+      await flushPromises();
+      const table = wrapper.findComponent({ name: "OTable" });
+      table.vm.$emit("update:currentPage", 3);
+      table.vm.$emit("update:sortBy", "name");
+      await flushPromises();
+
+      const saved = seed();
+      expect(saved.search).toBe("pay");
+      expect(saved.currentPage).toBe(3);
+      expect(saved.sortBy).toBe("name");
+    });
   });
 
   it("opens a team on row click", async () => {
@@ -508,5 +566,55 @@ describe("OnCallTeams", () => {
     await flushPromises();
     expect(spy).toHaveBeenCalledWith(usersExpiry);
     spy.mockRestore();
+  });
+
+  /// A phone's action column holds one control, so the row's buttons are mirrored in a menu that must act the same.
+  describe("the phone row menu", () => {
+    const menuStubs = {
+      ...stubs,
+      ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        emits: ["select"],
+        template: `<button @click="$emit('select')"><slot /></button>`,
+      },
+    };
+
+    async function rendered() {
+      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+      const wrapper = mount(OnCallTeams, { global: { plugins: [i18n, store], stubs: menuStubs } });
+      await flushPromises();
+      return wrapper;
+    }
+
+    it("shows the buttons from md up and the menu below it, never both", async () => {
+      const wrapper = await rendered();
+
+      for (const action of ["edit", "delete"]) {
+        expect(wrapper.find(`[data-test="oncall-team-${action}-team_1"]`).classes()).toContain(
+          "max-md:hidden",
+        );
+      }
+      expect(wrapper.find('[data-test="oncall-teams-row-more-actions"]').classes()).toContain(
+        "md:hidden",
+      );
+    });
+
+    it("edits the team the row is for", async () => {
+      const wrapper = await rendered();
+      await wrapper.find('[data-test="oncall-team-edit-team_1-menu"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OnCallTeamForm" }).props("team")).toEqual(
+        expect.objectContaining({ id: "team_1" }),
+      );
+    });
+
+    it("asks before deleting, as the button does", async () => {
+      const wrapper = await rendered();
+      await wrapper.find('[data-test="oncall-team-delete-team_1-menu"]').trigger("click");
+
+      expect(wrapper.find('[data-test="confirm"]').text()).toContain("Platform");
+    });
   });
 });

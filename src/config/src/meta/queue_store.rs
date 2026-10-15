@@ -14,10 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Queue backend selection.
-//!
-//! Unlike [`crate::meta::meta_store::MetaStore`], parsing is strict: an
-//! unknown `ZO_QUEUE_STORE` value is a configuration error instead of a
-//! silent fallback to another backend.
 
 use std::{fmt, str::FromStr};
 

@@ -21,13 +21,14 @@
       :key="JSON.stringify(data) + index"
     >
       <div class="mb-1.25 flex justify-between">
-        <div
+        <OTruncatedText
+          as="div"
           @click="onDrilldownClick(index)"
-          class="w-62.5 cursor-pointer truncate ps-2.5"
+          class="w-62.5 cursor-pointer ps-2.5"
           :data-test="`dashboard-addpanel-config-drilldown-name-${index}`"
         >
           {{ Number(index) + 1 }}. {{ data.name }}
-        </div>
+        </OTruncatedText>
         <OIcon
           class="me-1 cursor-pointer"
           size="sm"
@@ -64,10 +65,11 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default defineComponent({
   name: "Drilldown",
-  components: { DrilldownPopUp, OButton, OIcon },
+  components: { OTruncatedText, DrilldownPopUp, OButton, OIcon },
   props: ["variablesData"],
   setup() {
     const { t } = useI18nTyped();

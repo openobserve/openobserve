@@ -99,7 +99,7 @@ import destinationService from "@/services/alert_destination";
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
   OPageHeader: {
-    template: '<div data-test="synthetics-header"><slot name="title" /><slot /></div>',
+    template: '<div data-test="synthetics-header"><slot /></div>',
     props: ["title", "subtitle", "back"],
   },
   // Mirrors the real OButton slot contract (OButton.vue): only `icon-left`,
@@ -145,9 +145,6 @@ const baseStubs = {
   CheckSshConfig: {
     template: '<div data-test="synthetics-ssh-config" />',
     props: ["check"],
-  },
-  BetaBadge: {
-    template: '<span data-test="beta-badge">BETA</span>',
   },
 };
 
@@ -244,13 +241,6 @@ describe("CreateProtocolCheck", () => {
       const saveBtn = wrapper.find('[data-test="synthetics-create-save-btn"]');
       expect(saveBtn.exists()).toBe(true);
       expect(saveBtn.find('[data-test^="icon-"]').exists()).toBe(false);
-    });
-
-    it("should render the Beta badge in the page title", async () => {
-      wrapper = mountPage("http");
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
   });
 

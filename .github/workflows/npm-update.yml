@@ -1,9 +1,9 @@
-name: Weekly NPM Update
+name: Quarterly NPM Update
 
 on:
   schedule:
-    # Run every Monday at 9:00 AM UTC
-    - cron: '0 9 * * 1'
+    # Run at 9:00 AM UTC on the 1st of Jan, Apr, Jul and Oct
+    - cron: '0 9 1 */3 *'
   workflow_dispatch: # Allow manual trigger
 
 permissions:
@@ -13,9 +13,7 @@ permissions:
 jobs:
   update-dependencies:
     name: Update NPM Dependencies
-    # This job only bumps the manifest and opens the PR. Type check, unit tests
-    # and build all run as normal PR checks on the resulting pull request, so
-    # nothing here needs to install node_modules or compile anything.
+    # Bumps the manifest, gates on the OSS license check, and opens the PR; type check, tests and build run as PR checks.
     runs-on: ubuntu-latest
 
     env:
@@ -47,12 +45,14 @@ jobs:
           node-version: 24
 
       - name: Configure Git
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
         run: |
-          # Commit as a real user rather than the bot, so the commit and the PR
-          # share one author and the PR shows up under their own filters.
-          # Without these, `git commit` below aborts with "Please tell me who you
-          # are" — Actions runners have no global git identity of their own.
-          
+          # Commit as the PAT owner so the commit and the PR share one author.
+          read -r LOGIN ID < <(gh api user --jq '"\(.login) \(.id)"')
+          git config user.name "$LOGIN"
+          git config user.email "${ID}+${LOGIN}@users.noreply.github.com"
+
       - name: Create update branch
         run: |
           BRANCH_NAME="chore/npm-update-$(date +%Y%m%d)"
@@ -94,11 +94,29 @@ jobs:
           # Apply the same upgrades that were just reported.
           npx --yes npm-check-updates -u $NCU_ARGS
 
+          # Locked typescript-eslint family versions conflict with the bumped peer ranges (ERESOLVE); re-resolve them.
+          node -e '
+            const fs = require("fs");
+            const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+            for (const k of Object.keys(lock.packages)) {
+              if (/node_modules\/(@typescript-eslint\/|typescript-eslint$)/.test(k)) delete lock.packages[k];
+            }
+            fs.writeFileSync("package-lock.json", JSON.stringify(lock, null, 2) + "\n");
+          '
+
           # Regenerate package-lock.json only — node_modules is never needed
           # here, and skipping the install keeps this job to well under a minute.
-          npm install --package-lock-only
+          npm install --package-lock-only --ignore-scripts
 
           echo "Dependencies updated successfully"
+
+      - name: Check licenses
+        if: steps.check_updates.outputs.has_updates == 'true'
+        run: |
+          cd web
+          # Keep the allow-list identical to .github/workflows/js-license-checker.yml.
+          npm ci --ignore-scripts
+          npx --yes license-checker --production --json --onlyAllow="MIT;ISC;Apache-2.0;BSD;MPL-2.0;Unlicense;CC0-1.0;CC-BY-4.0;Artistic-2.0;UNLICENSED;Python-2.0;BlueOak-1.0.0" > /dev/null
 
       - name: Generate update summary
         if: steps.check_updates.outputs.has_updates == 'true'
@@ -113,7 +131,7 @@ jobs:
             "$RUNNER_TEMP/upgrades.json")
 
           cat > "$RUNNER_TEMP/pr_body.md" <<EOF
-          ## 📦 Weekly NPM Dependencies Update
+          ## 📦 Quarterly NPM Dependencies Update
 
           This automated PR updates \`web/\` npm packages to their latest versions
           and regenerates \`package-lock.json\`.
@@ -138,7 +156,7 @@ jobs:
 
           ---
 
-          🤖 This PR was automatically created by the Weekly NPM Update workflow
+          🤖 This PR was automatically created by the Quarterly NPM Update workflow
           EOF
 
           echo "summary_created=true" >> $GITHUB_OUTPUT

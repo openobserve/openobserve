@@ -20,7 +20,7 @@ import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { queryClient } from "@/composables/query/queryClient";
 import { orgSummaryQuery } from "@/services/organizations.queries";
 import {
@@ -74,9 +74,7 @@ let orgResolveTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const track = (event: string, properties: Record<string, any> = {}) => {
   try {
-    // RudderStack is never identify()'d in this app, so every event is
-    // anonymous unless org/user context rides in the properties themselves.
-    segment.track(event, {
+    analytics.track(event, {
       org_id: store.state.selectedOrganization?.identifier,
       user_id: store.state.userInfo?.email,
       ...properties,

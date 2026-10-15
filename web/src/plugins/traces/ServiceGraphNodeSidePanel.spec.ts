@@ -1410,4 +1410,44 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(dropdownBtn.exists()).toBe(false);
     });
   });
+  // ---------------------------------------------------------------------------
+  // RED charts: per-second Rate on an explicit interval
+  // ---------------------------------------------------------------------------
+
+  describe("RED chart queries", () => {
+    const panels = (w: VueWrapper) => (w.vm as any).dashboardData?.tabs?.[0]?.panels ?? [];
+    const rate = (w: VueWrapper) => panels(w).find((p: any) => p.title === "Rate");
+    // The traces datetime this panel receives is in microseconds, like the metrics dashboard's.
+    const rangeOf = (seconds: number) => ({ startTime: NOW - seconds * 1_000_000, endTime: NOW });
+
+    it("leaves no interval placeholder in any panel query", async () => {
+      wrapper = mountPanel();
+      await flushPromises();
+      expect(panels(wrapper).length).toBeGreaterThan(0);
+      for (const panel of panels(wrapper)) {
+        expect(panel.queries[0].query).not.toContain("[INTERVAL");
+      }
+    });
+
+    it("plots Rate as spans per second over a 30-minute range", async () => {
+      wrapper = mountPanel({ timeRange: rangeOf(30 * 60) });
+      await flushPromises();
+      expect(rate(wrapper).queries[0].query).toContain("histogram(_timestamp, '15 second')");
+      expect(rate(wrapper).queries[0].query).toContain("count(*) / 15.0");
+    });
+
+    it("plots Rate per second on hourly buckets over 6 hours", async () => {
+      wrapper = mountPanel({ timeRange: rangeOf(6 * 3600) });
+      await flushPromises();
+      expect(rate(wrapper).queries[0].query).toContain("histogram(_timestamp, '1 hour')");
+      expect(rate(wrapper).queries[0].query).toContain("count(*) / 3600.0");
+    });
+
+    it("labels Rate in spans/s", async () => {
+      wrapper = mountPanel();
+      await flushPromises();
+      expect(rate(wrapper).config.unit).toBe("custom");
+      expect(rate(wrapper).config.unit_custom).toBe("spans/s");
+    });
+  });
 });

@@ -127,7 +127,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="max-w-62.5"
         :data-test="`profiles-filter-chip-${filter.key}`"
       >
-        <span class="truncate font-mono text-xs">{{ filter.key }} = {{ filter.value }}</span>
+        <OTruncatedText class="font-mono text-xs"
+          >{{ filter.key }} = {{ filter.value }}</OTruncatedText
+        >
         <template #trailing>
           <button
             type="button"
@@ -395,6 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useRoute, type LocationQuery } from "vue-router";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
@@ -403,11 +406,13 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import CommonFlameGraph from "@/components/common/FlameGraphView.vue";
 import streamService from "@/services/stream";
 import profilesService, {
+  parseProfileFilters,
   type ProfileFilter,
   type ProfilesMergeResponse,
   type ProfilesQueryBody,
@@ -433,16 +438,29 @@ type StackRow = {
   total: number;
   hasChildren: boolean;
 };
+type RouteSeed = {
+  stream: string;
+  range: { startTime: number; endTime: number } | null;
+  service: string | null;
+  profileType: string | null;
+  filters: ProfileFilter[];
+  view: ProfileView | null;
+};
+
+const PROFILE_VIEWS: ProfileView[] = ["top", "flame", "tree"];
 
 const { t } = useI18nTyped();
 const store = useStore();
+const route = useRoute();
+const pageRouteName = route.name;
 
-const dateState = ref({
+const defaultDateState = () => ({
   startTime: 0,
   endTime: 0,
   relativeTimePeriod: "15m",
   valueType: "relative",
 });
+const dateState = ref(defaultDateState());
 const streamOptions = ref<SelectOption[]>([]);
 const selectedStream = ref<string | null>(null);
 const selectedService = ref<string | null>(null);
@@ -471,10 +489,16 @@ const errorMessage = ref("");
 let metaRequestSeq = 0;
 let queryRequestSeq = 0;
 let tagValuesRequestSeq = 0;
+let initRunSeq = 0;
+// Holds the stream and date watchers off while a route seed is applied or dropped, so they cannot reset it or reload.
+let seeding = false;
+let lastRunSeeded = false;
 
 const orgIdentifier = computed(
   () => store.state.selectedOrganization?.identifier as string | undefined,
 );
+// A newer initPage (org or route change) supersedes every request started before it.
+const isStaleRun = (run: number, org: string) => run !== initRunSeq || org !== orgIdentifier.value;
 
 const serviceOptions = computed<SelectOption[]>(() =>
   (metaResponse.value?.services ?? []).map((value) => ({ label: raw(value), value })),
@@ -861,7 +885,9 @@ const loadTagValues = async () => {
 const loadStreams = async () => {
   const org = orgIdentifier.value;
   if (!org) return;
+  const run = initRunSeq;
   const response = await streamService.nameList(org, "profiles", false);
+  if (isStaleRun(run, org)) return;
   const list = Array.isArray(response?.data?.list) ? response.data.list : [];
   streamOptions.value = list
     .map((item: Record<string, unknown>) => String(item.name ?? item.stream_name ?? ""))
@@ -885,12 +911,13 @@ const loadMeta = async () => {
   const range = resolveTimeRange();
   if (!org || !stream || !range) return;
   const requestSeq = ++metaRequestSeq;
+  const run = initRunSeq;
   try {
     const response = await profilesService.meta(org, stream, {
       start_time: range.startTime,
       end_time: range.endTime,
     });
-    if (requestSeq !== metaRequestSeq) return;
+    if (requestSeq !== metaRequestSeq || isStaleRun(run, org)) return;
     metaResponse.value = response.data;
     const firstService = serviceOptions.value[0]?.value ?? null;
     const firstProfileType = profileTypeOptions.value[0]?.value ?? null;
@@ -914,7 +941,7 @@ const loadMeta = async () => {
       clearDraftTag();
     }
   } catch (error) {
-    if (requestSeq !== metaRequestSeq) return;
+    if (requestSeq !== metaRequestSeq || isStaleRun(run, org)) return;
     errorMessage.value = buildErrorMessage(error);
   }
 };
@@ -926,6 +953,7 @@ const runQuery = async () => {
   const payload = queryPayload(range);
   if (!org || !stream || !payload) return;
   const requestSeq = ++queryRequestSeq;
+  const run = initRunSeq;
   queryLoading.value = true;
   errorMessage.value = "";
   try {
@@ -933,12 +961,12 @@ const runQuery = async () => {
       profilesService.series(org, stream, payload),
       profilesService.merge(org, stream, { ...payload, max_nodes: 4096 }),
     ]);
-    if (requestSeq !== queryRequestSeq) return;
+    if (requestSeq !== queryRequestSeq || isStaleRun(run, org)) return;
     seriesResponse.value = seriesResult.data;
     mergeResult.value = mergeResponseValue.data;
     resetStackExpansion(mergeResponseValue.data.root);
   } catch (error) {
-    if (requestSeq !== queryRequestSeq) return;
+    if (requestSeq !== queryRequestSeq || isStaleRun(run, org)) return;
     errorMessage.value = buildErrorMessage(error);
   } finally {
     if (requestSeq === queryRequestSeq) {
@@ -947,12 +975,59 @@ const runQuery = async () => {
   }
 };
 
+const queryString = (value: LocationQuery[string]) => (typeof value === "string" ? value : "");
+
+const parseRouteSeed = (query: LocationQuery): RouteSeed | null => {
+  const stream = queryString(query.stream);
+  if (!stream) return null;
+  const from = Number(query.from);
+  const to = Number(query.to);
+  const type = queryString(query.profile_type);
+  const view = queryString(query.view);
+  return {
+    stream,
+    range: from > 0 && to > from ? { startTime: from, endTime: to } : null,
+    service: queryString(query.service_name) || null,
+    profileType: type ? `${type}\u0000${queryString(query.profile_unit)}` : null,
+    filters: parseProfileFilters(queryString(query.filters)),
+    view: PROFILE_VIEWS.find((item) => item === view) ?? null,
+  };
+};
+
+const applyRouteSeed = (seed: RouteSeed) => {
+  selectedStream.value = seed.stream;
+  if (seed.range) {
+    dateState.value = { ...seed.range, relativeTimePeriod: "", valueType: "absolute" };
+  }
+  selectedService.value = seed.service;
+  selectedProfileType.value = seed.profileType;
+};
+
 const initPage = async () => {
-  resetProfilesState();
-  await loadStreams();
-  if (!selectedStream.value) return;
-  await loadMeta();
-  await runQuery();
+  const seed = parseRouteSeed(route.query);
+  const run = ++initRunSeq;
+  const unseed = !seed && lastRunSeeded;
+  lastRunSeeded = !!seed;
+  seeding = !!seed || unseed;
+  try {
+    resetProfilesState();
+    if (seed) applyRouteSeed(seed);
+    if (unseed) {
+      selectedStream.value = null;
+      dateState.value = defaultDateState();
+    }
+    await loadStreams();
+    if (run !== initRunSeq || !selectedStream.value) return;
+    await loadMeta();
+    if (run !== initRunSeq) return;
+    if (seed) {
+      appliedFilters.value = seed.filters;
+      if (seed.view) activeView.value = seed.view;
+    }
+    await runQuery();
+  } finally {
+    if (run === initRunSeq) seeding = false;
+  }
 };
 
 watch(draftTagKey, async (key, previousKey) => {
@@ -973,7 +1048,7 @@ watch([selectedService, selectedProfileType], async () => {
 });
 
 watch(selectedStream, async (stream, previousStream) => {
-  if (!stream || stream === previousStream) return;
+  if (seeding || !stream || stream === previousStream) return;
   clearDraftTag();
   selectedService.value = null;
   appliedFilters.value = [];
@@ -982,6 +1057,7 @@ watch(selectedStream, async (stream, previousStream) => {
 });
 
 watch(dateState, async () => {
+  if (seeding) return;
   await loadMeta();
   if (draftTagKey.value) {
     await loadTagValues();
@@ -995,5 +1071,13 @@ watch(
     await initPage();
   },
   { immediate: true },
+);
+
+watch(
+  () => JSON.stringify(parseRouteSeed(route.query)),
+  async () => {
+    if (route.name !== pageRouteName) return;
+    await initPage();
+  },
 );
 </script>

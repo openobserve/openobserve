@@ -42,7 +42,7 @@ vi.mock("../../../utils/azureIntegrations", () => ({
   generateAzureDashboardURL: vi.fn(() => "https://mock-dashboard-url"),
 }));
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: { track: vi.fn() },
 }));
 
@@ -166,5 +166,41 @@ describe("AzureConfig.vue", () => {
       (wrapper.vm as any).handleDeploy();
       expect(window.open).toHaveBeenCalled();
     });
+  });
+});
+
+describe("AzureConfig.vue: first event status", () => {
+  it("mounts one status bar for the org, last on the page, whose Copy command re-copies the first block", async () => {
+    const wrapper = mount(AzureConfig, {
+      global: {
+        plugins: [mockI18n, mockRouter],
+        provide: { store: mockStore },
+        stubs: {
+          FirstEventStatus: {
+            name: "FirstEventStatus",
+            props: ["org", "signal"],
+            emits: ["copy-command"],
+            template: '<div data-test="first-event-status" />',
+          },
+        },
+      },
+      attachTo: document.body,
+    });
+    const bars = wrapper.findAllComponents({ name: "FirstEventStatus" });
+    expect(bars).toHaveLength(1);
+    expect(bars[0].props("org")).toBe("test-org");
+    expect(wrapper.element.lastElementChild?.getAttribute("data-test")).toBe("first-event-status");
+
+    const buttons = wrapper.findAll('[data-test^="ingestion-"][data-test$="-code-block-copy-btn"]');
+    expect(buttons.length).toBeGreaterThan(0);
+    const clicks: string[] = [];
+    for (const button of buttons) {
+      button.element.addEventListener("click", () =>
+        clicks.push(button.attributes("data-test") ?? ""),
+      );
+    }
+    bars[0].vm.$emit("copy-command");
+    expect(clicks).toEqual([buttons[0].attributes("data-test")]);
+    wrapper.unmount();
   });
 });

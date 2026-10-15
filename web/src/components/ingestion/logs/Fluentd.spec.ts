@@ -40,10 +40,10 @@ vi.mock("../../../aws-exports", () => ({
   },
 }));
 
-// Mock CopyContent component to avoid its dependencies
-vi.mock("@/components/CopyContent.vue", () => ({
+// Mock CredentialCodeBlock component to avoid its dependencies
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     props: ["content"],
     template: '<div class="copy-content-mock">{{ content }}</div>',
   },
@@ -249,15 +249,15 @@ describe("Fluentd", () => {
     expect(content).toContain("</auth>");
   });
 
-  // Test 17: CopyContent component integration
-  it("should render CopyContent component", () => {
-    const copyContent = wrapper.findComponent({ name: "CopyContent" });
+  // Test 17: CredentialCodeBlock component integration
+  it("should render CredentialCodeBlock component", () => {
+    const copyContent = wrapper.findComponent({ name: "CredentialCodeBlock" });
     expect(copyContent.exists()).toBe(true);
   });
 
-  // Test 18: CopyContent content prop
-  it("should pass content to CopyContent component", () => {
-    const copyContent = wrapper.findComponent({ name: "CopyContent" });
+  // Test 18: CredentialCodeBlock content prop
+  it("should pass content to CredentialCodeBlock component", () => {
+    const copyContent = wrapper.findComponent({ name: "CredentialCodeBlock" });
     expect(copyContent.props("content")).toBe(wrapper.vm.content);
   });
 
@@ -414,7 +414,7 @@ describe("Fluentd", () => {
     expect(content).toContain("endpoint http://localhost:5080/api/test_org/default/_json");
 
     // Verify component rendering
-    const copyComponent = wrapper.findComponent({ name: "CopyContent" });
+    const copyComponent = wrapper.findComponent({ name: "CredentialCodeBlock" });
     expect(copyComponent.exists()).toBe(true);
     expect(copyComponent.props("content")).toBe(content);
   });

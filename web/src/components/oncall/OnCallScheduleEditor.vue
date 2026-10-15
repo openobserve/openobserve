@@ -373,6 +373,7 @@ import {
 } from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import {
   formatMinuteOfDay,
   fromZonedInputValue,
@@ -910,6 +911,10 @@ async function save() {
   saving.value = true;
   try {
     await scheduleWrite.mutateAsync({ timezone: props.timezone, rotations });
+    analytics.track("oncall_schedule_saved", {
+      source: "editor",
+      rotation_count: rotations.length,
+    });
     toast({ variant: "success", message: t("oncall.scheduleSaved") });
     // Stored, so no longer new — the close watcher would otherwise read this
     // rotation as abandoned and drop it straight back out of the draft.

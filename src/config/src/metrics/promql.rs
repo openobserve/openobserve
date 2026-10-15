@@ -31,6 +31,8 @@ pub struct IndexBlocksCacheMetrics {
     pub used: Gauge,
     pub evictions: IntCounter,
     pub hits: IntCounter,
+    pub misses: IntCounter,
+    pub partial_hits: IntCounter,
 }
 
 impl Default for IndexBlocksCacheMetrics {
@@ -53,7 +55,17 @@ impl Default for IndexBlocksCacheMetrics {
             .expect("Metric created"),
             hits: IntCounter::with_opts(options(
                 "hits_total",
-                "Successful block metadata cache key lookups before file binding validation.",
+                "Successful enabled block metadata cache key lookups before file binding validation, including partial hits; disabled-cache lookups excluded.",
+            ))
+            .expect("Metric created"),
+            misses: IntCounter::with_opts(options(
+                "misses_total",
+                "Absent keys in initial enabled block metadata cache lookups; disabled-cache lookups excluded.",
+            ))
+            .expect("Metric created"),
+            partial_hits: IntCounter::with_opts(options(
+                "partial_hits_total",
+                "Initial enabled block metadata cache key hits missing requested label columns, a subset of hits; disabled-cache lookups excluded.",
             ))
             .expect("Metric created"),
         }
@@ -62,17 +74,29 @@ impl Default for IndexBlocksCacheMetrics {
 
 impl Collector for IndexBlocksCacheMetrics {
     fn desc(&self) -> Vec<&Desc> {
-        [&self.used as &dyn Collector, &self.evictions, &self.hits]
-            .into_iter()
-            .flat_map(Collector::desc)
-            .collect()
+        [
+            &self.used as &dyn Collector,
+            &self.evictions,
+            &self.hits,
+            &self.misses,
+            &self.partial_hits,
+        ]
+        .into_iter()
+        .flat_map(Collector::desc)
+        .collect()
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
-        [&self.used as &dyn Collector, &self.evictions, &self.hits]
-            .into_iter()
-            .flat_map(Collector::collect)
-            .collect()
+        [
+            &self.used as &dyn Collector,
+            &self.evictions,
+            &self.hits,
+            &self.misses,
+            &self.partial_hits,
+        ]
+        .into_iter()
+        .flat_map(Collector::collect)
+        .collect()
     }
 }
 
@@ -144,13 +168,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn exactly_three_zero_families_exist_before_lookup() {
+    fn exactly_five_zero_families_exist_before_lookup() {
         let registry = prometheus::Registry::new();
         registry
             .register(Box::new(IndexBlocksCacheMetrics::default()))
             .unwrap();
         let families = registry.gather();
-        assert_eq!(families.len(), 3);
+        assert_eq!(families.len(), 5);
         assert_eq!(
             families
                 .iter()
@@ -159,6 +183,8 @@ mod tests {
             vec![
                 "zo_metrics_blocks_cache_evictions_total",
                 "zo_metrics_blocks_cache_hits_total",
+                "zo_metrics_blocks_cache_misses_total",
+                "zo_metrics_blocks_cache_partial_hits_total",
                 "zo_metrics_blocks_cache_used_bytes",
             ]
         );

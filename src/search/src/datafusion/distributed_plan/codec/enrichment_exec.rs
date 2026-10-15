@@ -32,6 +32,13 @@ pub fn try_decode(
     _inputs: &[Arc<dyn ExecutionPlan>],
     _registry: &dyn FunctionRegistry,
 ) -> Result<Arc<dyn ExecutionPlan>> {
+    if !is_plain_name(&node.org_id) || !is_plain_name(&node.stream_name) {
+        return internal_err!(
+            "EnrichmentExec invalid table {}/{}",
+            node.org_id,
+            node.stream_name
+        );
+    }
     let schema = Arc::new(convert_required!(node.schema)?);
     Ok(Arc::new(EnrichmentExec::new(
         node.trace_id,
@@ -62,6 +69,11 @@ pub fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()>
         ))
     })?;
     Ok(())
+}
+
+/// Org and table names become local directory names, so they must be a single path segment.
+fn is_plain_name(name: &str) -> bool {
+    !name.is_empty() && !name.contains(['/', '\\']) && !name.contains("..")
 }
 
 #[cfg(test)]
@@ -101,6 +113,65 @@ mod tests {
         assert_eq!(plan.stream_name(), plan2.stream_name());
         assert_eq!(plan.schema(), plan2.schema());
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_decoded_names_escaping_table_dir_are_error() -> Result<()> {
+        use config::utils::enrichment_local_cache::get_table_dir;
+        use datafusion::arrow::array::{Int32Array, RecordBatch};
+        use parquet::arrow::ArrowWriter;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let outside = tempfile::tempdir().unwrap();
+        let table_dir = outside.path().join("outside_table");
+        std::fs::create_dir_all(&table_dir)?;
+        let batch =
+            RecordBatch::try_new(schema.clone(), vec![Arc::new(Int32Array::from(vec![7]))])?;
+        let mut writer = ArrowWriter::try_new(
+            std::fs::File::create(table_dir.join("1.parquet"))?,
+            schema.clone(),
+            None,
+        )?;
+        writer.write(&batch)?;
+        writer.close()?;
+        // the OS only resolves `..` through directories that exist, as they do on a live node
+        std::fs::create_dir_all(get_table_dir("org_a"))?;
+        let up = "../".repeat(64);
+        let outside_rel = outside.path().to_str().unwrap().trim_start_matches('/');
+        let cases = [
+            (
+                "org_a".to_string(),
+                format!("{up}{outside_rel}/outside_table"),
+            ),
+            (
+                format!("org_a/{up}{outside_rel}"),
+                "outside_table".to_string(),
+            ),
+        ];
+
+        for (org_id, stream_name) in cases {
+            let plan: Arc<dyn ExecutionPlan> = Arc::new(EnrichmentExec::new(
+                "trace".to_string(),
+                org_id.clone(),
+                stream_name.clone(),
+                schema.clone(),
+            ));
+            let codec = super::super::get_physical_extension_codec();
+            let bytes = physical_plan_to_bytes_with_extension_codec(plan, &codec)?;
+            let ctx = datafusion::prelude::SessionContext::new();
+            let ret = match physical_plan_from_bytes_with_extension_codec(
+                &bytes,
+                &ctx.task_ctx(),
+                &codec,
+            ) {
+                Ok(decoded) => datafusion::physical_plan::collect(decoded, ctx.task_ctx())
+                    .await
+                    .map(|b| b.iter().map(|b| b.num_rows()).sum::<usize>()),
+                Err(e) => Err(e),
+            };
+            assert!(ret.is_err(), "{org_id} / {stream_name} was read: {ret:?}");
+        }
         Ok(())
     }
 }

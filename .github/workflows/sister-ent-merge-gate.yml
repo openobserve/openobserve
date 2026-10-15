@@ -1,0 +1,63 @@
+name: Sister Enterprise Merge Gate
+
+# An OSS PR with an open, same-named o2-enterprise PR must wait: enterprise merges first.
+# Checks once when "Merge when ready" is clicked (and on later pushes) and again on the
+# merge-queue commit; it never waits. If it fails, merge the enterprise PR, then re-run this job.
+# Make the job `Sister Enterprise PR` a required check on main.
+#
+# REQUIRED — secrets.ORG_ADMIN_TOKEN: o2-enterprise Pull requests: read.
+
+on:
+  # pull_request_target: the base copy of this file runs, and no PR code is checked out.
+  pull_request_target:
+    types: [auto_merge_enabled, synchronize]
+  merge_group:
+
+concurrency:
+  group: sister-ent-merge-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: read
+
+jobs:
+  sister-ent:
+    name: Sister Enterprise PR
+    if: ${{ github.event_name == 'merge_group' || github.event.pull_request.auto_merge != null }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          ENT_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          OSS: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          # refs/heads/gh-readonly-queue/main/pr-<number>-<sha>
+          QUEUE_REF: ${{ github.event.merge_group.head_ref }}
+        run: |
+          set -euo pipefail
+          if [ -n "$QUEUE_REF" ]; then
+            PR=${QUEUE_REF##*/pr-}; PR=${PR%%-*}
+          fi
+          read -r HEAD_REPO BRANCH AUTHOR < <(gh api "repos/$OSS/pulls/$PR" \
+            --jq '"\(.head.repo.full_name // "-") \(.head.ref) \(.user.login)"')
+
+          # A fork branch is not a paired branch. Dependabot-triggered runs get no ORG_ADMIN_TOKEN.
+          if [ "$HEAD_REPO" != "$OSS" ] || [ "$AUTHOR" = "dependabot[bot]" ]; then
+            echo "Not a paired branch; nothing to check."
+            exit 0
+          fi
+
+          ENT=openobserve/o2-enterprise
+          # PR metadata survives branch deletion and squash merges. The newest same-repo PR wins.
+          STATE=$(GH_TOKEN="$ENT_TOKEN" gh pr list --repo "$ENT" --head "$BRANCH" --state all -L 100 \
+            --json state,headRefName,headRepository,createdAt |
+            jq -r --arg b "$BRANCH" --arg r "$ENT" \
+              '[.[] | select(.headRefName == $b and .headRepository.nameWithOwner == $r)]
+               | sort_by(.createdAt) | last | .state // "NONE"')
+
+          if [ "$STATE" = "OPEN" ]; then
+            echo "::error::The sister o2-enterprise PR for '$BRANCH' is open. Merge it first, then re-run this job."
+            exit 1
+          fi
+          echo "Sister o2-enterprise PR: $STATE. Nothing to wait for."

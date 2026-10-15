@@ -55,6 +55,7 @@ service:
 export default function snowflakeCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
+      id: "snowflake",
       name: raw("Snowflake"),
       tagline: t("ingestion.setupCard.snowflakeTagline"),
       logo: getImageURL("images/ingestion/snowflake.svg"),

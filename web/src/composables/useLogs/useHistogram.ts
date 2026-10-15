@@ -17,7 +17,7 @@ import { useStore } from "vuex";
 
 import { searchState, type HistogramTitleParts } from "@/composables/useLogs/searchState";
 
-import { INTERVAL_MAP, type IntervalMapKey } from "@/utils/logs/constants";
+import { BREAKDOWN_EMPTY_VALUE, INTERVAL_MAP, type IntervalMapKey } from "@/utils/logs/constants";
 
 // Severity-aware sort order for stacked histogram breakdown categories.
 // Lower index = bottom of stack (least severe), higher = top (most severe).
@@ -185,11 +185,7 @@ export const useHistogram = () => {
         const breakdownField: string | null =
           searchObj.data.queryResults.histogram_breakdown_field ?? null;
 
-        // hasBreakdown is true only when the backend both returned a
-        // breakdown field AND the aggs actually contain zo_sql_breakdown values.
-        const hasBreakdown =
-          !!breakdownField &&
-          searchObj.data.queryResults.aggs.some((item: any) => item.zo_sql_breakdown !== undefined);
+        const hasBreakdown = !!breakdownField;
 
         if (hasBreakdown) {
           // --- Stacked breakdown path ---
@@ -206,42 +202,38 @@ export const useHistogram = () => {
           // would appear to grow outward from the center as partitions stream in.
           const timestampSet = new Set<string>();
 
-          // Seed from previously accumulated pages
+          // histogramResults holds only the zero-fill rows, which add timestamps and never a category
           histogramResults.value.forEach((item: any) => {
             if (item.zo_sql_key !== undefined && item.zo_sql_key !== null) {
               timestampSet.add(item.zo_sql_key);
             }
-            if (item.zo_sql_breakdown === undefined || item.zo_sql_breakdown === null) return;
-            const key = `${item.zo_sql_key}|||${item.zo_sql_breakdown}`;
-            breakdownMap.set(key, JSON.parse(JSON.stringify(item)));
           });
 
-          // Merge current page aggs into the map
+          // Merge current page aggs into the map.
           searchObj.data.queryResults.aggs.forEach((item: any) => {
             if (item.zo_sql_key !== undefined && item.zo_sql_key !== null) {
               timestampSet.add(item.zo_sql_key);
             }
-            const cat = item.zo_sql_breakdown;
-            if (cat === undefined || cat === null) return;
+            // missing key, null and "" are all the NULL group; the two backend paths return it differently
+            const cat = String(item.zo_sql_breakdown ?? BREAKDOWN_EMPTY_VALUE);
             const key = `${item.zo_sql_key}|||${cat}`;
             if (breakdownMap.has(key)) {
               breakdownMap.get(key)!.zo_sql_num += parseInt(item.zo_sql_num, 10);
             } else {
-              breakdownMap.set(key, { ...item, zo_sql_num: parseInt(item.zo_sql_num, 10) });
+              breakdownMap.set(key, {
+                ...item,
+                zo_sql_breakdown: cat,
+                zo_sql_num: parseInt(item.zo_sql_num, 10),
+              });
             }
           });
 
           // Sorted unique timestamps (ISO strings sort lexicographically = chronologically)
           const allTimestamps = [...timestampSet].sort();
 
-          // Coerce to string — numeric breakdown values (e.g. severity=0, status=404)
-          // come back as JSON numbers. Without this, .toLowerCase() / .localeCompare()
-          // below would throw a TypeError.
           const rawCategories = [
             ...new Set([...breakdownMap.values()].map((r) => r.zo_sql_breakdown)),
-          ]
-            .filter((c) => c !== undefined && c !== null)
-            .map((c) => String(c));
+          ];
 
           const allCategories = rawCategories.sort((a, b) => {
             const aRank = SEVERITY_ORDER[a.toLowerCase()] ?? 100;
@@ -262,11 +254,7 @@ export const useHistogram = () => {
           breakdownMap.forEach((row) => {
             const idx = tsIndex.get(row.zo_sql_key);
             if (idx === undefined) return;
-            const raw = row.zo_sql_breakdown;
-            if (raw === undefined || raw === null) return;
-            // Coerce to match seriesMap's string keys (handles numeric 0, booleans, etc.)
-            const cat = String(raw);
-            const bucket = seriesMap.get(cat);
+            const bucket = seriesMap.get(row.zo_sql_breakdown);
             if (bucket) bucket[idx] += row.zo_sql_num;
           });
 
@@ -370,6 +358,9 @@ export const useHistogram = () => {
   };
 
   const generateHistogramSkeleton = () => {
+    // A held or empty run builds no request, which leaves no time range to lay the skeleton on.
+    const startTime = searchObj.data.customDownloadQueryObj?.query?.start_time;
+    if (startTime === undefined) return;
     if (
       Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "aggs") &&
       searchObj.data.queryResults.aggs
@@ -384,7 +375,7 @@ export const useHistogram = () => {
       searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval
         ? searchObj.data.queryResults.histogram_interval * 1000000
         : intervalMs;
-      const startTimeDate = new Date(searchObj.data.customDownloadQueryObj.query.start_time / 1000); // Convert microseconds to milliseconds
+      const startTimeDate = new Date(startTime / 1000); // Convert microseconds to milliseconds
       if (searchObj.meta.resultGrid.chartInterval.includes("second")) {
         startTimeDate.setSeconds(startTimeDate.getSeconds() > 30 ? 30 : 0, 0); // Round to the nearest whole minute
       } else if (searchObj.meta.resultGrid.chartInterval.includes("1 minute")) {

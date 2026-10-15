@@ -607,7 +607,24 @@ describe("convertPromQLChartData", () => {
         mockPromQLResponse,
         mockContext.panelSchema,
         mockContext.store,
+        { parentQueryIndex: undefined, nameSuffixes: undefined },
       );
+    });
+
+    it("passes the time-shift map and name suffixes to processPromQLData", async () => {
+      const { processPromQLData } = await import("./shared/dataProcessor");
+      vi.mocked(processPromQLData).mockClear();
+
+      await convertPromQLChartData(mockPromQLResponse, {
+        ...mockContext,
+        parentQueryIndex: [0, 0],
+        nameSuffixes: ["", "1 day ago"],
+      });
+
+      expect(vi.mocked(processPromQLData).mock.calls[0][3]).toEqual({
+        parentQueryIndex: [0, 0],
+        nameSuffixes: ["", "1 day ago"],
+      });
     });
 
     it("should pass chartPanelRef to converter", async () => {

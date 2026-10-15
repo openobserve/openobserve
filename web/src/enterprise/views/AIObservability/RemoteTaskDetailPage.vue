@@ -163,6 +163,30 @@
                 </span>
               </dd>
             </dl>
+            <OButton
+              v-if="hasAuthSecret"
+              variant="outline"
+              size="sm"
+              icon-left="key"
+              class="mt-3"
+              :disabled="!canEdit"
+              data-test="ai-remote-task-detail-replace-credentials"
+              @click="credentialsDialogOpen = true"
+            >
+              {{ t("aiObservability.remoteTasks.credentialsDialog.open") }}
+              <OTooltip
+                v-if="!canEdit"
+                side="bottom"
+                :content="t('aiObservability.remoteTasks.statusHint.retired')"
+              />
+            </OButton>
+            <RemoteTaskCredentialsDialog
+              v-if="hasAuthSecret && canEdit"
+              v-model:open="credentialsDialogOpen"
+              :org-id="orgId"
+              :entity-id="entityId"
+              :auth="task.auth"
+            />
           </RemoteTaskDetailSection>
 
           <RemoteTaskDetailSection
@@ -308,7 +332,7 @@
                 <span v-else class="text-text-secondary">{{ DASH }}</span>
               </template>
               <template #cell-endpoint="{ row }">
-                <span class="text-text-secondary line-clamp-1 font-mono text-xs">
+                <span class="text-text-secondary font-mono text-xs">
                   {{ row.endpoint }}
                 </span>
               </template>
@@ -401,6 +425,7 @@ import { useMutation } from "@tanstack/vue-query";
 import RemoteTaskSigningPanel from "@/enterprise/components/AIObservability/RemoteTaskSigningPanel.vue";
 import RemoteTaskTestRunPanel from "@/enterprise/components/AIObservability/RemoteTaskTestRunPanel.vue";
 import RemoteTaskDetailSection from "@/enterprise/components/AIObservability/RemoteTaskDetailSection.vue";
+import RemoteTaskCredentialsDialog from "@/enterprise/components/AIObservability/RemoteTaskCredentialsDialog.vue";
 import { type LlmExperiment } from "@/services/llm-experiments.service";
 import { aiExperimentDetailRoute } from "./experimentRoutes";
 import {
@@ -442,6 +467,12 @@ const title = computed<I18nText>(() =>
 );
 const state = computed(() => (task.value ? remoteTaskState(task.value) : "draft"));
 const canEdit = computed(() => Boolean(task.value && canEditRemoteTask(task.value)));
+/** Only a stored auth secret can be replaced. A registered draft holds one too. The
+ *  button follows Edit: shown but disabled, with the same hint, once the task is retired. */
+const hasAuthSecret = computed(
+  () => task.value?.auth.type !== "none" && Boolean(task.value?.auth.usesSecret),
+);
+const credentialsDialogOpen = ref(false);
 const hasDraft = computed(() => versions.value.some((version) => version.isDraft));
 const timeoutLabel = computed<I18nText>(() =>
   task.value ? raw(`${Math.round(task.value.timeoutMs / 1000)} s`) : DASH,

@@ -120,14 +120,11 @@ fn decode_snappy(
         return Ok((decoded.len() <= limit).then(|| decoded.into()));
     }
 
-    // the block preamble carries the decoded length, so oversize is caught before allocating
-    if snap::raw::decompress_len(compressed).map_err(invalid_snappy)? > limit {
-        return Ok(None);
+    match config::utils::snappy::decode_raw_snappy(compressed, limit) {
+        Ok(decoded) => Ok(Some(decoded.into())),
+        Err(snap::Error::TooBig { .. }) => Ok(None),
+        Err(e) => Err(invalid_snappy(e)),
     }
-    snap::raw::Decoder::new()
-        .decompress_vec(compressed)
-        .map(|decoded| Some(decoded.into()))
-        .map_err(invalid_snappy)
 }
 
 fn invalid_snappy(e: impl std::fmt::Display) -> BoxError {

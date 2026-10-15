@@ -46,6 +46,7 @@ const ODialogStub = {
     "secondaryButtonLoading",
     "neutralButtonLoading",
     "primaryButtonColor",
+    "initialFocus",
   ],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
@@ -262,6 +263,21 @@ describe("ConfirmDialog", () => {
     wrapper = buildWrapper({ okColor: "destructive" });
     const dialog = wrapper.findComponent(ODialogStub);
     expect(dialog.props("primaryButtonColor")).toBe("destructive");
+  });
+
+  it("starts on the primary button unless a destructive confirm asks for Cancel", () => {
+    expect(wrapper.findComponent(ODialogStub).props("initialFocus")).toBe("primary");
+    wrapper.unmount();
+    wrapper = buildWrapper({ focusCancel: true, okVariant: "destructive" });
+    const dialog = wrapper.findComponent(ODialogStub);
+    expect(dialog.props("initialFocus")).toBe("secondary");
+    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+    expect(dialog.props("persistent")).toBeFalsy();
+  });
+
+  it("closes when the dialog is dismissed with Escape", async () => {
+    await wrapper.findComponent(ODialogStub).vm.$emit("update:open", false);
+    expect(wrapper.emitted("update:modelValue")?.[0]).toEqual([false]);
   });
 
   it("preserves default OK label when okLabel is not provided", () => {
