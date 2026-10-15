@@ -15,6 +15,8 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { shallowMount, flushPromises } from "@vue/test-utils";
+import { inject } from "vue";
+import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
 // Comprehensive service mocks - these prevent real API calls
 vi.mock("@/services/dashboards", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -251,6 +253,7 @@ vi.mock("moment-timezone", () => ({
 
 import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
 import i18n from "@/locales";
+import enUS from "@/locales/languages/en-US.json";
 import store from "@/test/unit/helpers/store";
 import analytics from "@/services/product_analytics";
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -495,6 +498,166 @@ describe("ViewDashboard", () => {
       wrapper.vm.toggleAutoRun();
       expect(localStorage.getItem("oo_toggle_auto_run")).toBe("false");
       expect(wrapper.vm.isAutoRunOn).toBe(false);
+    });
+
+    describe("on open", () => {
+      let freshOnOpen: any;
+      const mountWithToolbar = () =>
+        createWrapper({
+          global: {
+            plugins: [i18n, store],
+            renderStubDefaultSlot: true,
+            stubs: {
+              OPageLayout: {
+                setup() {
+                  freshOnOpen = inject(DASHBOARD_FRESH_ON_OPEN, null);
+                },
+                template: '<div><slot name="actions" /></div>',
+              },
+              ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+            },
+          },
+        });
+      const relativePanel = {
+        id: "P1",
+        config: {
+          panel_time_enabled: true,
+          panel_time_range: { type: "relative", relativeTimePeriod: "1h" },
+        },
+      };
+
+      beforeEach(() => {
+        freshOnOpen = null;
+      });
+
+      it("keeps the refresh options reachable while panels load", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        wrapper.vm.handleEmittedData(false);
+        await flushPromises();
+
+        const option = (dataTest: string) => wrapper.findComponent(`[data-test="${dataTest}"]`);
+        expect(wrapper.vm.arePanelsLoading).toBe(true);
+        expect(option("dashboard-refresh-options-btn").props("disabled")).toBe(false);
+        expect(option("dashboard-refresh-without-cache-btn").props("disabled")).toBe(true);
+        expect(option("dashboard-auto-run-toggle-btn").props("disabled")).toBe(false);
+      });
+
+      it("enables Refresh cache & reload again once panels finish", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        wrapper.vm.handleEmittedData(false);
+        wrapper.vm.handleEmittedData(true);
+        await flushPromises();
+
+        expect(
+          wrapper
+            .findComponent('[data-test="dashboard-refresh-without-cache-btn"]')
+            .props("disabled"),
+        ).toBe(false);
+      });
+
+      it("describes Auto Run on dashboards with the dashboard-only copy", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        const toggle = wrapper.find('[data-test="dashboard-auto-run-toggle-btn"]');
+        expect(toggle.text()).toContain("dashboard.viewDashboard.autoRunDescription");
+        expect(toggle.text()).not.toContain("search.liveModeTooltip");
+        const tooltips = wrapper
+          .findAllComponents({ name: "OTooltip" })
+          .map((tooltip: any) => tooltip.props("content"));
+        expect(tooltips).toContain("dashboard.viewDashboard.autoRunDescription");
+        expect(tooltips).not.toContain("dashboard.viewDashboard.autoRunScope");
+        expect(tooltips).not.toContain("search.autoRunEnabled");
+      });
+
+      it("says below the description that Auto Run applies beyond this dashboard", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        const toggle = wrapper.find('[data-test="dashboard-auto-run-toggle-btn"]');
+        const lines = toggle.findAll("div").map((line: any) => line.text());
+        expect(lines).toEqual([
+          "search.turnOffLiveMode",
+          "dashboard.viewDashboard.autoRunDescription",
+          "dashboard.viewDashboard.autoRunScope",
+        ]);
+        expect(toggle.find('[data-test="dashboard-auto-run-scope"]').classes()).toEqual(
+          expect.arrayContaining(["text-text-secondary", "text-xs"]),
+        );
+      });
+
+      it("keeps the scope line whether Auto Run is on or off", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+        const toggle = () => wrapper.find('[data-test="dashboard-auto-run-toggle-btn"]');
+        const scope = () => toggle().find('[data-test="dashboard-auto-run-scope"]');
+
+        expect(toggle().text()).toContain("search.turnOffLiveMode");
+        expect(scope().text()).toBe("dashboard.viewDashboard.autoRunScope");
+
+        wrapper.vm.toggleAutoRun();
+        await flushPromises();
+
+        expect(toggle().text()).toContain("search.turnOnLiveMode");
+        expect(scope().text()).toBe("dashboard.viewDashboard.autoRunScope");
+      });
+
+      it("ships the approved English copy for both lines", () => {
+        expect(enUS.dashboard.viewDashboard.autoRunDescription).toBe(
+          "Runs queries on open and on filter/time changes",
+        );
+        expect(enUS.dashboard.viewDashboard.autoRunScope).toBe(
+          "Applies to all dashboards, Logs and Traces",
+        );
+      });
+
+      it("provides a gate that needs Auto Run and a relative effective range", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+        const globalPanel = { id: "P2", config: {} };
+
+        wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "15m" };
+        expect(freshOnOpen.appliesTo(globalPanel)).toBe(true);
+
+        wrapper.vm.selectedDate = { valueType: "absolute", startTime: 1, endTime: 2 };
+        expect(freshOnOpen.appliesTo(globalPanel)).toBe(false);
+        expect(freshOnOpen.appliesTo(relativePanel)).toBe(true);
+
+        wrapper.vm.toggleAutoRun();
+        expect(freshOnOpen.appliesTo(relativePanel)).toBe(false);
+      });
+
+      it("reports each panel's effective range whether or not Auto Run is on", async () => {
+        setAutoQuery(false);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+        const globalPanel = { id: "P2", config: {} };
+
+        wrapper.vm.selectedDate = { valueType: "absolute", startTime: 1, endTime: 2 };
+        expect(freshOnOpen.isRelativeRange(globalPanel)).toBe(false);
+        expect(freshOnOpen.isRelativeRange(relativePanel)).toBe(true);
+
+        wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "15m" };
+        expect(freshOnOpen.isRelativeRange(globalPanel)).toBe(true);
+      });
+
+      it("never applies while the server flag is off", async () => {
+        setAutoQuery(false);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        expect(freshOnOpen.appliesTo(relativePanel)).toBe(false);
+      });
     });
   });
 

@@ -267,9 +267,99 @@ pub async fn reject(
     HttpResponse::ok("successfully rejected")
 }
 
-/// get own membership
+/// remove a member org from own billing group
 #[utoipa::path(
     delete,
+    path = "/{org_id}/billing_group/members/{member_org_id}",
+    context_path = "/api",
+    operation_id = "RemoveBillingGroupMember",
+    summary = "remove a member org from own billing group",
+    description = "remove a member org from own billing group, the member becomes a free org",
+    params(
+        ("org_id" = String, Path, description = "Payer Organization id"),
+        ("member_org_id" = String, Path, description = "Member Organization id"),
+    ),
+    responses(
+        (
+            status = 200,
+            description = "Empty response",
+            body = (),
+            content_type = "application/json",
+        ),
+        (status = 400, description = "Invalid request", content_type = "application/json")
+    ),
+    tag = "Organizations",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn remove_member(
+    Headers(user_email): Headers<UserEmail>,
+    Path((org_id, member_org_id)): Path<(String, String)>,
+) -> Response {
+    let user = user_email.user_id;
+
+    log::info!("user {user} is removing org {member_org_id} from billing group of org {org_id}");
+
+    if let Err(e) = billing_group::remove_billing_member(&org_id, &member_org_id).await {
+        return HttpResponse::bad_request(format!("error in removing member: {e}"));
+    }
+    HttpResponse::ok("successfully removed")
+}
+
+/// leave own billing group as a member
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/billing_group/membership",
+    context_path = "/api",
+    operation_id = "LeaveBillingGroup",
+    summary = "leave own billing group as a member",
+    description = "leave own billing group as a member, the org becomes a free org",
+    params(
+        ("org_id" = String, Path, description = "Member Organization id"),
+    ),
+    responses(
+        (
+            status = 200,
+            description = "Empty response",
+            body = (),
+            content_type = "application/json",
+        ),
+        (status = 400, description = "Invalid request", content_type = "application/json")
+    ),
+    tag = "Organizations",
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn leave_group(
+    Headers(user_email): Headers<UserEmail>,
+    Path(org_id): Path<String>,
+) -> Response {
+    let user = user_email.user_id;
+
+    let membership = match billing_group::list_billing_membership_of(&org_id).await {
+        Ok(Some(m)) => m,
+        Ok(None) => {
+            return HttpResponse::bad_request("org is not part of a billing group".to_string());
+        }
+        Err(e) => return HttpResponse::bad_request(format!("error in leaving billing group: {e}")),
+    };
+
+    log::info!(
+        "user {user} is removing org {org_id} from billing group of org {}",
+        membership.payer_org_id
+    );
+
+    if let Err(e) = billing_group::remove_billing_member(&membership.payer_org_id, &org_id).await {
+        return HttpResponse::bad_request(format!("error in leaving billing group: {e}"));
+    }
+    HttpResponse::ok("successfully left")
+}
+
+/// get own membership
+#[utoipa::path(
+    get,
     path = "/{org_id}/billing_group/membership",
     context_path = "/api",
     operation_id = "GetBIllingGRoupMembership",
@@ -325,7 +415,7 @@ pub async fn check_membership(Path(org_id): Path<String>) -> Response {
 
 /// get members of self
 #[utoipa::path(
-    delete,
+    get,
     path = "/{org_id}/billing_group/members",
     context_path = "/api",
     operation_id = "GetBIllingGRoupMembers",
@@ -378,5 +468,129 @@ pub async fn check_members(Path(org_id): Path<String>) -> Response {
             log::error!("error checking billing group members for {org_id} : {e}");
             HttpResponse::internal_error(format!("error in checking members : {e}"))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::http::StatusCode;
+    use config::meta::organization::OrganizationType;
+    use svix_ksuid::{Ksuid, KsuidLike};
+
+    use super::*;
+
+    const USER: &str = "billing-group-handler-test@zo.dev";
+
+    async fn db() {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        ONCE.get_or_init(|| async {
+            // The cloud config check panics on empty values; the migrations read that config.
+            // SAFETY: the single-threaded body of a `OnceCell` initialiser, before the refresh.
+            unsafe {
+                for key in [
+                    "O2_STRIPE_SECRET_KEY",
+                    "O2_STRIPE_WEBHOOK_SECRET",
+                    "O2_AZURE_TENANT_ID",
+                    "O2_AZURE_CLIENT_ID",
+                    "O2_AZURE_CLIENT_SECRET",
+                ] {
+                    std::env::set_var(key, "test");
+                }
+            }
+            o2_enterprise::enterprise::common::config::refresh_config().unwrap();
+            std::fs::create_dir_all(&config::get_config().common.data_db_dir).unwrap();
+            infra::db_init().await.unwrap();
+            infra::table::migrate().await.unwrap();
+            o2_enterprise::enterprise::cloud::migrate().await.unwrap();
+            // `customer_billings` has foreign keys to `users` and `organizations`.
+            if infra::table::users::get(USER).await.is_err() {
+                infra::table::users::add(infra::table::users::UserRecord {
+                    email: USER.to_string(),
+                    first_name: "billing".to_string(),
+                    last_name: "group".to_string(),
+                    password: "hash".to_string(),
+                    salt: "salt".to_string(),
+                    is_root: false,
+                    password_ext: None,
+                    user_type: config::meta::user::UserType::Internal,
+                    created_at: 0,
+                    updated_at: 0,
+                    must_reset_password: false,
+                    password_reset_reason: None,
+                    flagged_at: None,
+                    password_updated_at: None,
+                })
+                .await
+                .unwrap();
+            }
+        })
+        .await;
+    }
+
+    /// Fresh org ids per test; `linked` puts the member in the payer's group.
+    async fn orgs(name: &str, linked: bool) -> (String, String) {
+        db().await;
+        let id = Ksuid::new(None, None).to_string();
+        let (payer, member) = (format!("payer_{name}_{id}"), format!("member_{name}_{id}"));
+        for org in [&payer, &member] {
+            infra::table::organizations::add(org, org, OrganizationType::Custom)
+                .await
+                .unwrap();
+        }
+        if linked {
+            billing_group::add_as_billing_member(USER, &payer, &member, None)
+                .await
+                .unwrap();
+        }
+        (payer, member)
+    }
+
+    fn user() -> Headers<UserEmail> {
+        Headers(UserEmail {
+            user_id: USER.to_string(),
+        })
+    }
+
+    #[tokio::test]
+    async fn test_remove_member_by_payer_returns_ok() {
+        let (payer, member) = orgs("remove_ok", true).await;
+
+        let response = remove_member(user(), Path((payer, member.clone()))).await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let membership = billing_group::list_billing_membership_of(&member).await;
+        assert!(membership.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_remove_member_by_other_org_returns_bad_request() {
+        let (payer, member) = orgs("remove_other", true).await;
+        let (other, _) = orgs("remove_other_payer", false).await;
+
+        let response = remove_member(user(), Path((other, member.clone()))).await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let membership = billing_group::list_billing_membership_of(&member).await;
+        assert_eq!(membership.unwrap().unwrap().payer_org_id, payer);
+    }
+
+    #[tokio::test]
+    async fn test_leave_group_by_member_returns_ok() {
+        let (_, member) = orgs("leave_ok", true).await;
+
+        let response = leave_group(user(), Path(member.clone())).await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let membership = billing_group::list_billing_membership_of(&member).await;
+        assert!(membership.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_leave_group_by_standalone_org_returns_bad_request() {
+        let (_, standalone) = orgs("leave_standalone", false).await;
+
+        let response = leave_group(user(), Path(standalone)).await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 }

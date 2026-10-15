@@ -6680,6 +6680,8 @@
       "refresh": "Refresh",
       "refreshCacheReload": "Refresh cache & reload",
       "moreRefreshOptions": "More refresh options",
+      "autoRunDescription": "Runs queries on open and on filter/time changes",
+      "autoRunScope": "Applies to all dashboards, Logs and Traces",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard not found or has been deleted. Redirecting to dashboard list.",
       "failedToLoadDashboard": "Failed to load dashboard. Redirecting to dashboard list.",
@@ -6962,6 +6964,8 @@
     "exitAnnotationsMode": "Exit Annotations Mode",
     "addAnnotations": "Add Annotations",
     "refreshToApplyVariables": "Refresh to apply latest variable changes",
+    "refreshToApplyTimeRange": "Refresh to apply the time range",
+    "refreshToApplyTimeRangeAndVariables": "Refresh to apply the time range and variable changes",
     "moveToAnotherFolder": "Move {type} To Another Folder",
     "rawQueryBuilder": {
       "query": "Query",
@@ -7770,7 +7774,7 @@
       "inviteSent": "Invite Sent Successfully",
       "inviteSameOrg": "An Organization Cannot Invite Itself",
       "childHeadline": "Billing managed by",
-      "childHeroSub": "Your usage is billed to this organization. Plan changes and invoices are handled by the parent organization — there's nothing to manage here.",
+      "childHeroSub": "Your usage is billed to this organization. Plan changes and invoices are handled by the parent organization.",
       "invitesPanelHint": "These organizations have invited you to join their billing group. If you accept, this organization's usage will be billed to them.",
       "inviteTabPrompt": "Invite another organization to join your billing group. Their usage will be billed to this organization.",
       "emptyTitle": "Start Billing Group",
@@ -7790,7 +7794,15 @@
       "currentOrgTitle": "Current Organization",
       "memberOrgsTitle": "Member Organizations",
       "searchMemberOrg": "Search Organization",
-      "noMemberMatch": "No Matching Organizations"
+      "noMemberMatch": "No Matching Organizations",
+      "remove": "Remove",
+      "removeTitle": "Remove {name} from your billing group?",
+      "removeBody": "This organization becomes a free organization and pays for its own usage. Free plan limits apply. Its users, data, and past usage are not affected.",
+      "removed": "Organization removed from billing group",
+      "leave": "Leave billing group",
+      "leaveTitle": "Leave the billing group of {name}?",
+      "leaveBody": "This organization becomes a free organization and pays for its own usage. Free plan limits apply. Your users, data, and past usage are not affected.",
+      "left": "Left billing group"
     },
     "azureMarketplace": {
       "noTokenFound": "No Marketplace Token Found",

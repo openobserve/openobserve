@@ -6689,7 +6689,9 @@
       "panelMoveFailed": "面板移动失败",
       "failedToFetchReports": "获取报告失败",
       "failedToUpdateJson": "更新仪表盘JSON失败：保存方法不可用",
-      "failedToSaveChanges": "保存仪表盘更改失败"
+      "failedToSaveChanges": "保存仪表盘更改失败",
+      "autoRunDescription": "打开时以及过滤器/时间变更时运行查询",
+      "autoRunScope": "适用于所有仪表盘、日志和追踪"
     },
     "dynamicFunctionPopUp": {
       "property": "属性",
@@ -7143,7 +7145,9 @@
       "markerAria": "示例 {value}，时间 {time}"
     },
     "showExemplarsLabel": "显示示例",
-    "showExemplarsHelp": "在打开该仪表盘的所有人的图表上绘制追踪样本。查看者仍可从面板标题栏隐藏它们。"
+    "showExemplarsHelp": "在打开该仪表盘的所有人的图表上绘制追踪样本。查看者仍可从面板标题栏隐藏它们。",
+    "refreshToApplyTimeRange": "刷新以应用时间范围",
+    "refreshToApplyTimeRangeAndVariables": "刷新以应用时间范围和变量变更"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7770,7 +7774,7 @@
       "inviteSent": "邀请已成功发送",
       "inviteSameOrg": "组织无法邀请自己",
       "childHeadline": "账单由管理",
-      "childHeroSub": "您的使用量将向该组织收费。计划变更和发票由上级组织处理——这里没有什么可管理的。",
+      "childHeroSub": "您的用量由该组织付费。计划变更和账单由父组织处理。",
       "invitesPanelHint": "这些组织已邀请您加入他们的账单组。如果您接受，则该组织的使用量将向他们收费。",
       "inviteTabPrompt": "邀请其他组织加入您的账单组。它们的使用量将向该组织收费。",
       "emptyTitle": "启动账单组",
@@ -7790,7 +7794,15 @@
       "currentOrgTitle": "当前组织",
       "memberOrgsTitle": "成员组织",
       "searchMemberOrg": "搜索组织",
-      "noMemberMatch": "无匹配的组织"
+      "noMemberMatch": "无匹配的组织",
+      "remove": "移除",
+      "removeTitle": "从计费组中移除 {name}？",
+      "removeBody": "该组织将变为免费组织，自行支付其用量。适用免费计划限制。其用户、数据和历史用量不受影响。",
+      "removed": "组织已从计费组移除",
+      "leave": "退出计费组",
+      "leaveTitle": "退出 {name} 的计费组？",
+      "leaveBody": "该组织将变为免费组织，自行支付其用量。适用免费计划限制。您的用户、数据和历史用量不受影响。",
+      "left": "已退出计费组"
     },
     "azureMarketplace": {
       "noTokenFound": "未找到 Marketplace 令牌",
