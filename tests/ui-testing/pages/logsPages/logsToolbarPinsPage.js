@@ -1,10 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Page object for the Logs search-bar "More" menu and the controls an operator
-// pins out of it onto the toolbar. The pin choice is persisted in localStorage
-// by web/src/composables/useToolbarPins.ts, so this object also owns reading and
-// seeding those keys — a pin that renders but is not persisted looks identical
-// on screen and silently reverts next session.
+// Page object for the Logs search-bar "More" menu and the controls pinned out of
+// it onto the toolbar. useToolbarPins.ts persists the choice in localStorage, so
+// this object also owns reading and seeding those keys.
 
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -13,7 +11,7 @@ export class LogsToolbarPinsPage {
   constructor(page) {
     this.page = page;
 
-    // ===== STORAGE CONTRACT (useToolbarPins.ts) =====
+    // ===== STORAGE KEYS (useToolbarPins.ts) =====
     this.pinsKey = 'logs_toolbar_pinned_items';
     this.histogramDecidedKey = 'logs_toolbar_histogram_pin_decided';
     this.tracesPinsKey = 'traces_toolbar_pinned_items';
@@ -21,11 +19,8 @@ export class LogsToolbarPinsPage {
     // ===== LOCATORS =====
     this.moreMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
 
-    // Traces runs the same composable under its own scope. useToolbarPins keeps
-    // ONE module-level scopeStates map, which only actually gets shared while both
-    // scopes live in the same document — so the cross-scope tests move between
-    // Logs and Traces by nav-rail click (client-side routing), never page.goto,
-    // which would reload the SPA and rebuild the map per page.
+    // Traces uses the same composable under its own scope. Cross-scope tests move
+    // by nav-rail click, never page.goto, so both scopes share one document.
     this.logsNavLink = '[data-test="menu-link-\\/logs-item"]';
     this.tracesNavLink = '[data-test="menu-link-\\/traces-item"]';
     this.tracesMoreMenuButton = '[data-test="traces-search-bar-more-menu-btn"]';
@@ -35,11 +30,10 @@ export class LogsToolbarPinsPage {
     };
     this.tracesMetricsPinnedControl = '[data-test="traces-search-bar-metrics-pinned-btn"]';
 
-    // The pin button's title is the only rendered signal of pin state, so it is
-    // how a collapsed-but-still-pinned control is told from an unpinned one.
+    // The pin button's title is the only rendered signal of pin state.
     this.pinTitle = { pinned: 'Unpin from toolbar', unpinned: 'Pin to toolbar' };
 
-    // Pin toggle for each control, inside the More menu.
+    // Pin toggles, inside the More menu.
     this.pinToggle = {
       histogram: '[data-test="logs-search-bar-menu-pin-histogram-btn"]',
       sqlMode: '[data-test="logs-search-bar-menu-pin-sql-mode-btn"]',
@@ -55,47 +49,34 @@ export class LogsToolbarPinsPage {
       sqlMode: '[data-test="logs-search-bar-sql-mode-pinned-btn"]',
       quickMode: '[data-test="logs-search-bar-quick-mode-pinned-btn"]',
       savedViews: '[data-test="logs-search-bar-saved-views-pinned"]',
-      // No syntaxGuide entry on purpose — see assertablePinOrder below. Its
-      // data-test is handed to a component that never renders it, so a selector
-      // here would match nothing and quietly pass any assertion made against it.
-      // Add it back only once SyntaxGuide.vue binds the attribute to its button.
-      //
-      // Lives on the right toolbar, so it is outside the left-section width
-      // budget and is the one pin that renders at any viewport width.
+      // No syntaxGuide entry on purpose — see assertablePinOrder below.
+      // functionEditor sits on the right toolbar, outside the width budget, so it
+      // is the one pin that renders at any viewport width.
       functionEditor: '[data-test="logs-search-bar-function-editor-pinned-btn"]',
     };
 
-    // Priority order the left section keeps pinned items in — histogram is kept
-    // longest, the syntax guide is dropped first. Also the canonical render order.
+    // Fit priority, and the canonical render order: histogram is kept longest.
     this.leftSectionOrder = ['histogram', 'sqlMode', 'quickMode', 'savedViews', 'syntaxGuide'];
 
-    // The syntax guide is pinnable but not assertable: SearchBar.vue passes
-    // data-test="logs-search-bar-syntax-guide-pinned-btn" (and ...-syntax-guide-btn
-    // in the menu) to the SyntaxGuide component, whose root is an ODropdown, so
-    // neither attribute ever reaches the DOM — every variant renders only
-    // data-cy="syntax-guide-button". Assertions use the controls that do carry a
-    // hook; savedViews is then the last of them in priority order.
-    //
-    // Derived from pinnedControl rather than hand-filtered, so a control can only
-    // become assertable by gaining a selector that actually renders — a dead
-    // entry cannot reintroduce a silently-matching-nothing assertion.
+    // The syntax guide is pinnable but not assertable: SearchBar.vue hands its
+    // data-test to the SyntaxGuide component, whose ODropdown root drops it, so it
+    // never reaches the DOM. Derived from pinnedControl so a control only becomes
+    // assertable by having a selector that actually renders.
     this.assertablePinOrder = this.leftSectionOrder.filter((key) => key in this.pinnedControl);
   }
 
   // ===== SETUP =====
 
   /**
-   * Seeds pin storage before the app boots.
-   * `pins` is written verbatim when a string, so a test can seed corrupt JSON;
-   * `decided` controls the histogram default-pin flag. Pass undefined to clear.
+   * Seeds pin storage before the app boots. A string `pins` is written verbatim,
+   * so a test can seed corrupt JSON; `decided` sets the histogram default flag.
    */
   async seedPinStorage({ pins, decided } = {}) {
     await this.page.addInitScript(
       ([key, value, decidedKey, decidedValue]) => {
         try {
-          // addInitScript re-runs on every navigation, a reload included. Seeding
-          // twice would wipe whatever the test just pinned, so the sentinel makes
-          // this a one-shot: sessionStorage survives a reload in the same tab.
+          // addInitScript re-runs on every navigation, so seed once or a reload
+          // would wipe what the test just pinned.
           if (sessionStorage.getItem('__pinSeedApplied') === '1') return;
           sessionStorage.setItem('__pinSeedApplied', '1');
           if (value === null) localStorage.removeItem(key);
@@ -127,11 +108,8 @@ export class LogsToolbarPinsPage {
     await this.expectToolbarReady();
   }
 
-  /**
-   * Marks the current document so a later check can prove it was never reloaded.
-   * A full load wipes `window`, so the stamp surviving is proof that routing
-   * stayed client-side and the module-level scopeStates map was really shared.
-   */
+  /** Marks the document; a full load wipes `window`, so the stamp surviving
+   * proves routing stayed client-side and the scopeStates map was shared. */
   async stampDocument() {
     await this.page.evaluate(() => {
       window.__pinDocStamp = 'logs-toolbar-pins';
@@ -146,7 +124,7 @@ export class LogsToolbarPinsPage {
     ).toBe('logs-toolbar-pins');
   }
 
-  /** Client-side route change via the nav rail — keeps the document alive. */
+  /** Client-side route change — keeps the document alive. */
   async gotoTracesViaNav() {
     await this.page.locator(this.tracesNavLink).click();
     await expect(this.page.locator(this.tracesMoreMenuButton)).toBeVisible();
@@ -173,14 +151,12 @@ export class LogsToolbarPinsPage {
   }
 
   /**
-   * Resizes, then waits for the pinned set to stop changing.
-   * availableLeftWidth is recomputed from a ResizeObserver, so the fitted set
-   * settles a frame or more after the viewport changes — reading layout straight
-   * away races that recompute and flakes the prefix assertion on a slower host.
+   * Resizes, then waits for the pinned set to stop changing: availableLeftWidth
+   * comes from a ResizeObserver, so reading layout at once races the recompute.
    */
   async setViewportWidthAndSettle(width) {
     await this.page.setViewportSize({ width, height: 1024 });
-    // Two frames lets the observer fire and Vue flush before polling starts.
+    // Two frames lets the observer fire and Vue flush before polling.
     await this.page.evaluate(
       () =>
         new Promise((resolve) =>
@@ -248,7 +224,7 @@ export class LogsToolbarPinsPage {
     return this.page.evaluate((key) => localStorage.getItem(key), this.tracesPinsKey);
   }
 
-  /** Assertable pinned controls currently on the toolbar, left to right. */
+  /** Assertable pinned controls on the toolbar, left to right. */
   async getVisiblePinnedOrder() {
     const seen = [];
     for (const key of this.assertablePinOrder) {
@@ -263,7 +239,7 @@ export class LogsToolbarPinsPage {
 
   // ===== ASSERTIONS =====
 
-  /** The More button is always present, so it marks the toolbar as rendered. */
+  /** The More button is always present, so it marks the toolbar rendered. */
   async expectToolbarReady() {
     await expect(this.page.locator(this.moreMenuButton)).toBeVisible();
   }
@@ -276,18 +252,11 @@ export class LogsToolbarPinsPage {
     await expect(this.page.locator(this.pinnedControl[key])).toBeHidden();
   }
 
-  /**
-   * A control collapsed off the toolbar must still be *pinned* — only its
-   * rendering moved. The More menu's pin button title is the rendered signal:
-   * asserting the menu entry alone would pass whatever the pin state, since that
-   * entry is unconditional.
-   */
+  /** A collapsed control must still be pinned — only its rendering moved. */
   async expectCollapsedButStillPinned(key) {
     await this.expectPinnedHidden(key);
     await this.openMoreMenu();
-    // The toggle living in the menu is the "still reachable" half; its title is
-    // the "still pinned" half. Asserting the menu entry alone would hold whatever
-    // the pin state, since those entries are unconditional.
+    // The toggle in the menu is "still reachable"; its title, "still pinned".
     await expect(this.page.locator(this.pinToggle[key])).toHaveAttribute(
       'title',
       this.pinTitle.pinned,

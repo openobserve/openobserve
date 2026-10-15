@@ -13,23 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-// Logs toolbar pins — the "More" menu lets an operator pin view controls out
-// onto the search toolbar, and the choice is remembered across sessions in
-// localStorage (web/src/composables/useToolbarPins.ts).
-//
-// Covers:
-//   - the histogram is pinned by default, until the user decides otherwise
-//   - unpinning the default survives a reload (the "decided" flag)
-//   - a pin survives a reload
-//   - an unknown key in stored pins is ignored, and dropped on the next write
-//   - corrupt pin storage falls back to the defaults instead of throwing
-//   - logs pins never leak into the traces toolbar's own scope
-//   - pinned controls render in canonical order, not the order they were clicked
-//   - a pinned control that no longer fits collapses back into the More menu
-//
-// Creates nothing server-side: the toolbar renders regardless of query state and
-// every precondition is seeded into localStorage, which dies with the browser
-// context. No cleanup.spec.js entry is needed.
+// Logs toolbar pins: the "More" menu pins view controls onto the search toolbar,
+// and useToolbarPins.ts remembers the choice in localStorage. Seeds that storage
+// directly, so no ingestion or server-side setup is involved.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -46,21 +32,18 @@ test.describe('Logs toolbar pins', () => {
   });
 
   test.afterEach(async () => {
-    // Pins live only in this context's localStorage, so there is nothing to tear
-    // down — the context is discarded between tests.
-    testLogger.debug('No teardown required: pin state is per-context localStorage');
+    // Pin state is per-context localStorage, discarded with the context.
+    testLogger.debug('No teardown required');
   });
 
   test('histogram is pinned by default until the user decides', {
     tag: ['@toolbarPins', '@logs', '@P0', '@all'],
   }, async () => {
-    // No stored pins and no decided flag — the default-pin fallback applies.
     await pm.logsToolbarPinsPage.seedPinStorage();
     await pm.logsToolbarPinsPage.navigateToLogs(getOrgIdentifier());
 
     await pm.logsToolbarPinsPage.expectPinnedVisible('histogram');
-    // The default is a fallback, not a stored choice: nothing is written until
-    // the user actually toggles something.
+    // A fallback, not a stored choice: nothing is written until the user toggles.
     expect(await pm.logsToolbarPinsPage.readHistogramDecidedFlag()).toBeNull();
 
     testLogger.info('Histogram renders pinned on a profile that never chose');
@@ -75,8 +58,7 @@ test.describe('Logs toolbar pins', () => {
 
     await pm.logsToolbarPinsPage.togglePin('histogram');
     await pm.logsToolbarPinsPage.expectPinnedHidden('histogram');
-    // Without this flag the default-pin fallback re-applies on every load and
-    // silently undoes the user's choice.
+    // Without this flag the default re-applies each load and undoes the unpin.
     expect(await pm.logsToolbarPinsPage.readHistogramDecidedFlag()).toBe('true');
 
     await pm.logsToolbarPinsPage.reload();
@@ -105,8 +87,6 @@ test.describe('Logs toolbar pins', () => {
   test('an unknown stored pin is ignored and dropped on the next write', {
     tag: ['@toolbarPins', '@logs', '@P1', '@all'],
   }, async () => {
-    // A key outside the logs scope must never reach the toolbar, and must not
-    // survive the next persist — otherwise it accumulates forever.
     await pm.logsToolbarPinsPage.seedPinStorage({ pins: ['bogus', 'sqlMode'], decided: true });
     await pm.logsToolbarPinsPage.navigateToLogs(getOrgIdentifier());
 
@@ -130,8 +110,7 @@ test.describe('Logs toolbar pins', () => {
 
     await pm.logsToolbarPinsPage.expectPinnedVisible('histogram');
 
-    // And the next write recovers the key rather than appending to the garbage:
-    // a pin toggle must leave a valid array behind.
+    // The next write must recover the key, not append to the garbage.
     await pm.logsToolbarPinsPage.togglePin('sqlMode');
     const recovered = await pm.logsToolbarPinsPage.readPins();
     expect(Array.isArray(recovered)).toBe(true);
@@ -143,41 +122,31 @@ test.describe('Logs toolbar pins', () => {
   test('logs pins do not leak into the traces toolbar scope', {
     tag: ['@toolbarPins', '@logs', '@traces', '@P1', '@all'],
   }, async () => {
-    // useToolbarPins keeps ONE module-level scopeStates map for both scopes, and
-    // that map is only genuinely shared while both scopes are instantiated in the
-    // same document. So this test moves between Logs and Traces by nav-rail click
-    // (client-side routing) — a page.goto would reload the SPA and rebuild the map
-    // per page, leaving only storage-key isolation under test, which
-    // useToolbarPins.spec.ts already covers. gotoTracesViaNav/gotoLogsViaNav
-    // assert a document stamp survives, so the one-document premise is enforced
-    // rather than assumed.
+    // The scopes share one module-level map only within a single document, so
+    // this moves by nav-rail click, never page.goto. The nav helpers assert a
+    // document stamp survives, which enforces that.
     const pins = pm.logsToolbarPinsPage;
     await pins.seedPinStorage();
     await pins.navigateToLogs(getOrgIdentifier());
     await pins.stampDocument();
 
-    // quickMode is a logs-only key: it is not in the traces scope's key list.
+    // quickMode is not in the traces scope's key list.
     await pins.togglePin('quickMode');
     expect(await pins.readPins()).toContain('quickMode');
 
     await pins.gotoTracesViaNav();
-    // The traces scope is really instantiated — its own default is pinned — so
-    // the assertions below are about isolation, not about an absent scope.
+    // Its own default being pinned proves the traces scope really instantiated.
     await pins.expectTracesPinState('savedViews', true);
     await pins.expectTracesPinState('histogram', false);
     await pins.expectTracesMetricsPinnedHidden();
 
-    // Writing the traces scope must persist only traces keys, and must not pick
-    // up the logs-only pin through the shared map.
     await pins.toggleTracesPin('histogram');
     const tracesPins = JSON.parse((await pins.readTracesPins()) ?? 'null');
     expect(tracesPins).toContain('savedViews');
     expect(tracesPins).toContain('histogram');
     expect(tracesPins).not.toContain('quickMode');
 
-    // Back on Logs in the SAME document, so the logs scope is read from the live
-    // shared map rather than re-read from storage: the traces write must have left
-    // both the in-memory state and the stored key alone.
+    // Same document, so this reads the live shared map, not storage.
     await pins.gotoLogsViaNav();
     await pins.expectPinnedVisible('quickMode');
     expect(await pins.readPins()).toContain('quickMode');
@@ -189,7 +158,7 @@ test.describe('Logs toolbar pins', () => {
   test('pinned controls render in canonical order, not click order', {
     tag: ['@toolbarPins', '@logs', '@P1', '@all'],
   }, async () => {
-    // Pinned in reverse priority, so insertion order would put saved views first.
+    // Pinned in reverse priority: insertion order would put saved views first.
     await pm.logsToolbarPinsPage.seedPinStorage({ pins: [], decided: true });
     await pm.logsToolbarPinsPage.navigateToLogs(getOrgIdentifier());
 
@@ -211,45 +180,30 @@ test.describe('Logs toolbar pins', () => {
     await pins.seedPinStorage({ pins: pins.leftSectionOrder, decided: true });
     await pins.navigateToLogs(getOrgIdentifier());
 
-    // Pinned items are fitted greedily in priority order, so whatever survives at
-    // a given width must be a PREFIX of that order — asserting the prefix pins the
-    // documented behaviour ("histogram kept longest") without hard-coding the
-    // breakpoints, which depend on font metrics and would be flaky across hosts.
-    //
-    // The count is NOT monotonic in viewport width: as the toolbar narrows, the
-    // toggle group collapses to icons and then to a dropdown, which shrinks
-    // baseReservedWidth (440 -> 230 -> 120) and can FREE budget for pins. So only
-    // the prefix shape is asserted per width, never "narrower means fewer".
+    // Items are fitted greedily in priority order, so the survivors at any width
+    // are a PREFIX of it. Asserting the prefix avoids hard-coding breakpoints,
+    // which move with font metrics. Note the count is NOT monotonic in width: a
+    // narrower toolbar collapses the toggle group, freeing budget for pins.
     const widths = [1700, 1300, 1100, 900, 700];
     const kept = [];
     for (const width of widths) {
-      // Resizing recomputes availableLeftWidth off a ResizeObserver, so the set
-      // has to settle before it is read — otherwise this races the recompute.
       const visible = await pins.setViewportWidthAndSettle(width);
       expect(visible, `pinned items at ${width}px must be a priority prefix`).toEqual(
         pins.assertablePinOrder.slice(0, visible.length),
       );
       kept.push({ width, visible, count: visible.length });
     }
-    // All of them fit when there is room, and some width in the sweep drops at
-    // least one — otherwise the prefix assertions above never saw a collapse.
+    // Guards against a sweep where nothing ever collapsed.
     expect(kept[0].count).toBe(pins.assertablePinOrder.length);
 
-    // Which width collapses, and which controls it drops, both move with font
-    // metrics — and since the count is non-monotonic it is not necessarily the
-    // narrowest width. So take the first width that dropped anything, whatever it
-    // is, and derive the dropped set from that width's own count instead of
-    // naming a control or a breakpoint.
+    // Take the first width that dropped anything and derive the dropped set from
+    // its own count, rather than naming a control or a breakpoint.
     const collapsedAt = kept.find((entry) => entry.count < pins.assertablePinOrder.length);
     expect(collapsedAt, 'no width in the sweep dropped a pinned control').toBeDefined();
     const dropped = pins.assertablePinOrder.slice(collapsedAt.count);
-    // Kept items are a prefix (asserted above), so the dropped ones are exactly
-    // the remaining suffix — together they must still be the whole priority order.
     expect(collapsedAt.visible.concat(dropped)).toEqual(pins.assertablePinOrder);
 
-    // Nothing is lost: back at that width, every dropped control is off the
-    // toolbar yet the More menu still reports it pinned — only the rendering
-    // collapsed.
+    // Nothing is lost: each dropped control is off the toolbar but still pinned.
     await pins.setViewportWidthAndSettle(collapsedAt.width);
     for (const key of dropped) {
       await pins.expectCollapsedButStillPinned(key);
