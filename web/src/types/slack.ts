@@ -375,6 +375,9 @@ export interface SlackUninstallResponse {
   revoked: true;
   affected: SlackUninstallAffected;
   delete_app_url?: string | null;
+  /** Start over only: false when Slack kept the app O2 created, with Slack's reason. */
+  app_deleted?: boolean | null;
+  app_delete_error?: string | null;
 }
 
 export interface SlackChannelsParams {

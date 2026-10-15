@@ -27,6 +27,35 @@ export const makeHelpContactSchema = () =>
   z.object({ help_contact: trimmed().max(HELP_CONTACT_MAX_LENGTH) });
 export type HelpContactForm = z.infer<ReturnType<typeof makeHelpContactSchema>>;
 
+const CONFIG_TOKEN_PREFIX = "xoxe-";
+const APP_TOKEN_PREFIX = "xapp-";
+
+// Slack's prefixes name a token's kind, so a token pasted into the wrong field is caught before Slack is called.
+export const configTokenIssue = (t: Translate, value: string): string | null => {
+  if (!value || value.startsWith(CONFIG_TOKEN_PREFIX)) return null;
+  const key = value.startsWith("xoxe.")
+    ? "slackApp.tokens.configAccessToken"
+    : "slackApp.tokens.notConfigToken";
+  return t(key, { prefix: CONFIG_TOKEN_PREFIX, page: "api.slack.com/apps" });
+};
+
+export const appTokenIssue = (t: Translate, value: string): string | null =>
+  !value || value.startsWith(APP_TOKEN_PREFIX)
+    ? null
+    : t("slackApp.tokens.notAppToken", { prefix: APP_TOKEN_PREFIX });
+
+type TokenFields = { config_refresh_token?: string; app_token?: string };
+
+const checkTokenKinds = (t: Translate, v: TokenFields, ctx: z.RefinementCtx): void => {
+  const issues: [keyof TokenFields, string | null][] = [
+    ["config_refresh_token", configTokenIssue(t, v.config_refresh_token ?? "")],
+    ["app_token", appTokenIssue(t, v.app_token ?? "")],
+  ];
+  for (const [path, message] of issues) {
+    if (message) ctx.addIssue({ code: "custom", path: [path], message });
+  }
+};
+
 // One form for Step 2: the configuration-token path, or Set up manually (which alone asks for app secrets).
 export const makeCreateAppSchema = (t: Translate, isManual: () => boolean) =>
   z
@@ -46,8 +75,10 @@ export const makeCreateAppSchema = (t: Translate, isManual: () => boolean) =>
       };
       if (!isManual()) {
         require("config_refresh_token", "slackApp.wizard.create.tokenRequired");
+        checkTokenKinds(t, { config_refresh_token: v.config_refresh_token }, ctx);
         return;
       }
+      if (v.mode === "socket") checkTokenKinds(t, { app_token: v.app_token }, ctx);
       require("client_id", "slackApp.wizard.create.clientIdRequired");
       require("client_secret", "slackApp.wizard.create.clientSecretRequired");
       // HTTP mode verifies Slack's requests with the signing secret.
@@ -74,7 +105,9 @@ export const createAppDefaults = (): CreateAppForm => ({
 });
 
 export const makeAppTokenSchema = (t: Translate) =>
-  z.object({ app_token: trimmed().min(1, t("slackApp.wizard.install.appTokenRequired")) });
+  z
+    .object({ app_token: trimmed().min(1, t("slackApp.wizard.install.appTokenRequired")) })
+    .superRefine((v, ctx) => checkTokenKinds(t, v, ctx));
 export type AppTokenForm = z.infer<ReturnType<typeof makeAppTokenSchema>>;
 
 export const makeCredentialsSchema = (t: Translate, firstField: string) =>
@@ -89,7 +122,8 @@ export const makeCredentialsSchema = (t: Translate, firstField: string) =>
     .refine((v) => Object.values(v).some((field) => field.length > 0), {
       path: [firstField],
       message: t("slackApp.credentials.atLeastOne"),
-    });
+    })
+    .superRefine((v, ctx) => checkTokenKinds(t, v, ctx));
 export type CredentialsForm = z.infer<ReturnType<typeof makeCredentialsSchema>>;
 export const credentialsDefaults = (): CredentialsForm => ({
   app_token: "",

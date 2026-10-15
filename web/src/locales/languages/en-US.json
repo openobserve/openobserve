@@ -25185,7 +25185,10 @@
         "finishInstall": "Finish install",
         "startOver": "Start over",
         "startOverTitle": "Start over?",
-        "startOverMessage": "This deletes the unfinished Slack app {appId} and its stored credentials, so no second app is left behind."
+        "startOverMessage": "This deletes the unfinished Slack app {appId} and its stored credentials, so no second app is left behind.",
+        "appLeftTitle": "The Slack app {appId} is still in Slack",
+        "appNotDeleted": "OpenObserve could not delete it, so delete it in Slack yourself. Slack's answer:",
+        "appNotCreatedByO2": "OpenObserve did not create this app, so it stays in Slack. Delete it there if you no longer need it."
       },
       "test": {
         "title": "Step 4 · Test and linking",
@@ -25325,9 +25328,15 @@
       "description": "Enter only what changed. Links and destinations stay.",
       "unreadable": "The stored credentials could not be decrypted. Re-enter them to bring Slack back.",
       "botTokenHint": "A new bot token comes from Reinstall, never a paste.",
+      "installerUserToken": "Install to Workspace in Slack's app settings also leaves you a user token for sign-in only ({scopes}) that OpenObserve never sees or uses. Revoke it with Slack's {method}; Revoke All OAuth Tokens there would cut off OpenObserve's bot too. Deleting the app ends it.",
       "configToken": "Configuration refresh token",
       "atLeastOne": "Enter at least one credential",
       "saved": "Credentials updated"
+    },
+    "tokens": {
+      "notConfigToken": "This is not a configuration refresh token. Copy the refresh token from {page} › Your App Configuration Tokens; it starts with {prefix}",
+      "configAccessToken": "This is the configuration access token. Paste the refresh token shown with it; it starts with {prefix}",
+      "notAppToken": "This is not an app-level token. Generate one on the app's Basic Information page › App-Level Tokens with the connections:write scope; it starts with {prefix}"
     },
     "uninstall": {
       "disconnectTitle": "Disconnect this org from {team}?",
