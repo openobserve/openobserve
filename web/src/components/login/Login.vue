@@ -306,14 +306,12 @@ export default defineComponent({
 
     const loginWithSSo = async () => {
       try {
-        authService.get_dex_login().then((res) => {
-          if (res) {
-            window.location.href = withSignupHint(res);
-            return;
-          }
-        });
-      } catch (error) {
-        console.error("Error during redirection:");
+        const res = await authService.get_dex_login();
+        if (res) window.location.href = withSignupHint(res);
+      } catch (error: any) {
+        // The browser aborts this request when the user leaves the page before it returns.
+        if (error?.code === "ECONNABORTED") return;
+        console.error("Error during redirection:", error);
       }
     };
 

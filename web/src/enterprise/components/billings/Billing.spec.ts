@@ -857,7 +857,41 @@ describe("Billing Component", () => {
       testWrapper.unmount();
     });
 
-    it("still logs non-401 billing errors", async () => {
+    it("does not log a 403, which only means the user has no billing access", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const forbiddenError: any = new Error("Request failed with status code 403");
+      forbiddenError.response = { status: 403 };
+      (BillingService.list_subscription as any).mockRejectedValue(forbiddenError);
+
+      const testWrapper = mount(Billing, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "router-view": true,
+            OIcon: true,
+            ConfirmDialog: true,
+            Usage: true,
+            AppTabs: {
+              template: "<div></div>",
+              props: ["tabs", "activeTab"],
+              emits: ["update:activeTab"],
+            },
+          },
+        },
+      });
+
+      await testWrapper.vm.$nextTick();
+      await testWrapper.vm.$nextTick();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(testWrapper.vm.billingProvider).toBe("");
+
+      consoleErrorSpy.mockRestore();
+      testWrapper.unmount();
+    });
+
+    it("still logs billing errors other than 401 and 403", async () => {
       const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       (BillingService.list_subscription as any).mockRejectedValue(new Error("Network error"));
 

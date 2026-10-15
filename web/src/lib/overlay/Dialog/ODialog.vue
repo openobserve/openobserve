@@ -147,7 +147,8 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
 // non-printable keys — Escape must keep reaching reka's dismiss layer.
 function handleContentKeydown(e: KeyboardEvent) {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.key.length !== 1) return;
+  // Browser autofill dispatches keydown events with no `key`.
+  if (typeof e.key !== "string" || e.key.length !== 1) return;
   if (isInputFocused(e.target)) return;
   e.stopPropagation();
 }
