@@ -1362,6 +1362,13 @@ describe("assertJoinFree over every builder (AC-55)", () => {
         QUERIES.funnelSql(s, id, { ...d, breakdown: null }, opts),
       ]),
     funnelPanelSql: () => defs.map((d) => QUERIES.funnelPanelSql(s, d, opts)),
+    funnelTrendSql: () =>
+      defs.flatMap((d) => [
+        QUERIES.funnelTrendSql(s, id, d, bounds, { a: 1, b: 2 }, opts),
+        QUERIES.funnelTrendSql(s, id, { ...d, breakdown: null }, bounds, { a: 1, b: 2 }, opts),
+      ]),
+    funnelTrendPanelSql: () =>
+      defs.map((d) => QUERIES.funnelTrendPanelSql(s, d, { a: 1, b: 2 }, "1 day", opts)),
     funnelAlertSql: () => defs.map((d) => QUERIES.funnelAlertSql(s, id, d, 50, opts)),
     nextStepsSql: () => defs.map((d) => QUERIES.nextStepsSql(s, id, d, opts)),
     dropoffNextSql: () =>
