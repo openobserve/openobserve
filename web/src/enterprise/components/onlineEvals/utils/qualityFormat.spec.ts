@@ -10,6 +10,7 @@ import { ALL_AGENTS_VALUE } from "@/plugins/traces/llmAgentFilter";
 import {
   DEFAULT_QUALITY_RANGE,
   agentParamsFor,
+  barShare,
   bucketLabel,
   chartFilterFromQuery,
   chartFilterLabel,
@@ -24,6 +25,7 @@ import {
   formatCount,
   formatFixed,
   formatNumber,
+  formatPercent,
   formatScoreValue,
   healthSortValue,
   nextChartFilter,
@@ -588,5 +590,23 @@ describe("numbers by size", () => {
       healthyThreshold: { direction: "gte", value: 250_000_000 },
     } as any;
     expect(String(thresholdForConfig(config).label)).toBe("≥ 250,000,000");
+  });
+});
+
+describe("unhealthy share at the ends", () => {
+  it("never shows 0.0% for some or 100.0% for not all", () => {
+    expect(formatPercent(1, 5000)).toBe("<0.1%");
+    expect(formatPercent(4999, 5000)).toBe(">99.9%");
+    expect(formatPercent(0, 5)).toBe("0.0%");
+    expect(formatPercent(5, 5)).toBe("100.0%");
+    expect(formatPercent(25, 100)).toBe("25.0%");
+    expect(formatPercent(1, 0)).toBe("—");
+  });
+
+  it("keeps a visible sliver of bar for any non-zero share", () => {
+    expect(barShare(1 / 5000)).toBe(0.02);
+    expect(barShare(0.5)).toBe(0.5);
+    expect(barShare(0)).toBe(0);
+    expect(barShare(null)).toBe(0);
   });
 });
