@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The org's public dashboard switch and link limit. Enterprise maps both methods to the org
-//! settings permission; the role check holds on its own where OpenFGA is off or absent.
+//! The org's public dashboard switch and link limit; the role check holds without OpenFGA.
 
 use axum::{Json, extract::Path, response::Response};
 use common::meta::http::HttpResponse as MetaHttpResponse;
@@ -35,8 +34,7 @@ pub async fn get(Path(org_id): Path<String>, Headers(user): Headers<UserEmail>) 
     }
 }
 
-/// PUT /{org_id}/settings/public_dashboards — a lower limit stops new links and keeps existing
-/// ones; switching off stops serving at once.
+/// PUT /{org_id}/settings/public_dashboards — a lower limit stops new links only.
 pub async fn put(
     Path(org_id): Path<String>,
     Headers(user): Headers<UserEmail>,

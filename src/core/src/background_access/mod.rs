@@ -118,8 +118,8 @@ impl RenderingReport {
             QueryLanguage::Sql => "sql",
             QueryLanguage::PromQl => "promql",
         };
-        // Left unfilled, a value only the build's values query picks stays a placeholder.
-        panel_sources_with(org_id, panel, &HashMap::new(), |text, l| {
+        // A value only the build's values query picks is checked at its dashboard default.
+        panel_sources_with(org_id, panel, values, |text, l| {
             resolver.substitute(tab, &id, text, lang(l))
         })
     }
@@ -867,8 +867,7 @@ async fn stored_dashboard(
         .ok_or_else(|| Response::from(DashboardError::DashboardNotFound))
 }
 
-/// The readers are the enabled reports and every tab of every link on the dashboard, paused and
-/// expired ones included, since a resume or an extension makes them build again.
+/// Readers: enabled reports and every tab of every live link, paused and expired ones included.
 #[cfg(feature = "enterprise")]
 async fn guard_stored_edit(
     org_id: &str,
@@ -878,7 +877,7 @@ async fn guard_stored_edit(
     edited: &Dashboard,
 ) -> Result<(), Response> {
     let links = move || async move {
-        let db = infra::db::get_orm_client_rw().await;
+        let db = crate::public_dashboards::gate_db().await;
         let links = infra::table::public_dashboards::list_by_dashboard(db, org_id, dashboard_id);
         Ok::<_, anyhow::Error>(links.await?)
     };
@@ -1888,8 +1887,8 @@ mod tests {
         );
     }
 
-    /// The same edited dashboards `guard_panel_add` and `guard_panel_update` build from a panel
-    /// write, and the full PUT body, all reach the link readers.
+    /// The full PUT body and the dashboards the panel-write guards build all reach the link
+    /// readers.
     #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     #[tokio::test]
     async fn gate04_full_put_and_panel_writes_are_guarded_for_public_links() {
@@ -1919,8 +1918,7 @@ mod tests {
         }
     }
 
-    /// The report resolver reads the dashboard default `safe`; the link's build runs the panel's
-    /// frozen `secret`, so the guard must check `secret`.
+    /// A report resolves the dashboard default `safe`; the link's build runs its frozen `secret`.
     #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     #[tokio::test]
     async fn gate04_a_panel_scoped_frozen_value_is_resolved_as_the_build_resolves_it() {
@@ -1978,6 +1976,43 @@ mod tests {
         let failed = Err(anyhow::anyhow!("primary unavailable"));
         assert!(
             guard_with_links(&user, &stored, &renamed, failed)
+                .await
+                .is_ok()
+        );
+    }
+
+    /// A stream picked only by the build's values query cannot be known at save, so the refusal
+    /// names the variable; a value saved on the dashboard is checked as reports check it.
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn gate04_a_values_query_stream_is_checked_at_its_saved_value_or_named() {
+        let user = editor();
+        let with_variable = |value: Option<&str>| -> Dashboard {
+            let mut json = dashboard_json(&three_tabs(["first", "second", "third"])).unwrap();
+            json["variables"]["list"] = json!([{
+                "type": "query_values", "name": "src", "label": "S", "value": value,
+                "query_data": { "stream_type": "logs", "stream": "first", "field": "name" }
+            }]);
+            json["tabs"][1]["panels"][0] = v8_panel("p2", "SELECT * FROM $src");
+            Dashboard {
+                version: 8,
+                v8: Some(serde_json::from_value(json).unwrap()),
+                ..Default::default()
+            }
+        };
+        let stored = three_tabs(["first", "second", "third"]);
+        let link = || Ok(vec![public_link(json!({}))]);
+
+        let resp = guard_with_links(&user, &stored, &with_variable(None), link())
+            .await
+            .unwrap_err();
+        let msg = message(resp).await;
+        assert!(
+            msg.contains("unresolved variable src in stream position"),
+            "{msg}"
+        );
+        assert!(
+            guard_with_links(&user, &stored, &with_variable(Some("second")), link())
                 .await
                 .is_ok()
         );
