@@ -39,6 +39,7 @@ import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import { usePanelEditorFocus } from "@/composables/dashboard/usePanelEditorFocus";
 
 const mockDashboardPanelData = {
   data: {
@@ -180,6 +181,34 @@ describe("ConfigPanel", () => {
       },
     });
   };
+
+  describe("focus=top-n deep link", () => {
+    it("consumes the request, opens the Data section and focuses the Top N input", async () => {
+      const panelData = {
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          queries: [
+            {
+              ...mockDashboardPanelData.data.queries[0],
+              fields: { breakdown: [{ alias: "breakdown_1" }] },
+            },
+          ],
+        },
+      };
+      const { requestFocus, pendingFocus } = usePanelEditorFocus();
+      requestFocus("top-n");
+      wrapper = createWrapper({ dashboardPanelData: panelData });
+      document.body.appendChild(wrapper.element);
+      await flushPromises();
+      await new Promise((r) => setTimeout(r, 120));
+
+      expect(pendingFocus.value).toBeNull();
+      expect((wrapper.vm as any).expandedSections.data).toBe(true);
+      const input = wrapper.find('[data-test="dashboard-config-top_results"] input');
+      expect(document.activeElement).toBe(input.element);
+    });
+  });
 
   describe("Component Rendering", () => {
     it("should render config panel with description field", () => {

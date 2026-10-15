@@ -1807,6 +1807,75 @@ describe("usePanelDataLoader", () => {
         expect(loader.data.value).toBeDefined();
       });
 
+      it("restores the server diagnostics with the cached result, so a first view shows its notices", async () => {
+        const panelSchema = createMockPanelSchema({
+          queryConfig: { vrlFunctionQuery: ".parsed = parse_json!(.log)" },
+        });
+        const functionError = "error[E203]: syntax error";
+        mockCacheData = {
+          key: {
+            panelSchema: panelSchema.value,
+            variablesData: [],
+            forceLoad: false,
+            dashboardId: "test-dashboard",
+            folderId: "test-folder",
+          },
+          value: {
+            data: [[{ x: 1 }, { x: 2 }]],
+            loading: false,
+            errorDetail: { message: "", code: "" },
+            metadata: { queries: [{ panelQueryIndex: 0 }] },
+            annotations: [],
+            resultMetaData: [
+              [
+                { took: 10, scan_size: 5, scan_records: 100, function_error: [functionError] },
+                {
+                  took: 5,
+                  is_partial: true,
+                  function_error: ["Warn: results are capped to meet default limit"],
+                },
+              ],
+            ],
+            lastTriggeredAt: Date.now(),
+            isPartialData: false,
+            isOperationCancelled: false,
+          },
+          cacheTimeRange: { start_time: Date.now() - 3600000, end_time: Date.now() },
+        };
+
+        allowPanelToBecomeVisible();
+
+        const loader = usePanelDataLoader(
+          panelSchema,
+          createMockSelectedTimeObj(),
+          createMockVariablesData(),
+          ref({ offsetWidth: 1000 }),
+          ref(false),
+          ref("dashboards"),
+          ref("test-dashboard"),
+          ref("test-folder"),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(false),
+        );
+
+        await loader.loadData();
+
+        expect(loader.panelDiagnostics.value.functionErrors).toEqual([functionError]);
+        expect(loader.panelDiagnostics.value.rowsCapped).toBe(true);
+        expect(loader.panelDiagnostics.value.serverPartial).toBe(true);
+        expect(loader.panelDiagnostics.value.queries[0]).toMatchObject({
+          took: 15,
+          scanSizeMb: 5,
+          scanRecords: 100,
+          rowsReturned: 2,
+        });
+        expect(loader.isPartialData.value).toBe(false);
+      });
+
       it("should handle cache with different time ranges", async () => {
         const panelSchema = createMockPanelSchema();
         const selectedTimeObj = ref({

@@ -299,6 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedDateForViewPanel="viewPanelSelectedDate"
             :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
             :searchType="searchType"
+            :viewOnly="!!viewOnly"
             @close-panel="() => (showViewPanel = false)"
             @update:initial-variable-values="updateInitialVariableValues"
           />
