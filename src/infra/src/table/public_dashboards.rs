@@ -360,6 +360,45 @@ pub async fn upsert_settings<C: ConnectionTrait>(
     updated_by: &str,
     now: i64,
 ) -> Result<settings::Model, errors::Error> {
+    let columns = [settings::Column::Enabled, settings::Column::MaxLinks];
+    upsert_settings_columns(db, org_id, enabled, max_links, &columns, updated_by, now).await
+}
+
+/// Writes only the org's switch; a concurrent write of its link limit is kept. A new row has no
+/// limit of its own.
+pub async fn set_settings_enabled<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    enabled: bool,
+    updated_by: &str,
+    now: i64,
+) -> Result<settings::Model, errors::Error> {
+    let columns = [settings::Column::Enabled];
+    upsert_settings_columns(db, org_id, enabled, None, &columns, updated_by, now).await
+}
+
+/// Writes only the org's link limit; a concurrent write of its switch is kept. A new row is on.
+pub async fn set_settings_max_links<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    max_links: Option<i32>,
+    updated_by: &str,
+    now: i64,
+) -> Result<settings::Model, errors::Error> {
+    let columns = [settings::Column::MaxLinks];
+    upsert_settings_columns(db, org_id, true, max_links, &columns, updated_by, now).await
+}
+
+/// Inserts the row, or on an existing one updates `columns` and the rev and audit fields only.
+async fn upsert_settings_columns<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    enabled: bool,
+    max_links: Option<i32>,
+    columns: &[settings::Column],
+    updated_by: &str,
+    now: i64,
+) -> Result<settings::Model, errors::Error> {
     let row = settings::ActiveModel {
         org_id: Set(org_id.to_string()),
         rev: Set(now),
@@ -378,12 +417,12 @@ pub async fn upsert_settings<C: ConnectionTrait>(
                         Expr::value(now),
                     ]),
                 )
-                .update_columns([
-                    settings::Column::Enabled,
-                    settings::Column::MaxLinks,
-                    settings::Column::UpdatedAt,
-                    settings::Column::UpdatedBy,
-                ])
+                .update_columns(
+                    columns
+                        .iter()
+                        .copied()
+                        .chain([settings::Column::UpdatedAt, settings::Column::UpdatedBy]),
+                )
                 .to_owned(),
         )
         .exec(db)
@@ -664,6 +703,31 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(third.rev, 500);
+    }
+
+    #[tokio::test]
+    async fn each_settings_writer_keeps_the_other_column() {
+        let db = db().await;
+        // New rows: the switch writer leaves no limit, the limit writer leaves the org on.
+        let row = set_settings_enabled(&db, "a", false, "admin", 10)
+            .await
+            .unwrap();
+        assert_eq!((row.enabled, row.max_links), (false, None));
+        let row = set_settings_max_links(&db, "b", Some(3), "plan_sync", 10)
+            .await
+            .unwrap();
+        assert_eq!((row.enabled, row.max_links), (true, Some(3)));
+
+        // The plan sync does not undo a kill switch, and the switch does not undo an upgrade.
+        let row = set_settings_max_links(&db, "a", Some(50), "plan_sync", 20)
+            .await
+            .unwrap();
+        assert_eq!((row.enabled, row.max_links, row.rev), (false, Some(50), 20));
+        let row = set_settings_enabled(&db, "b", false, "admin", 20)
+            .await
+            .unwrap();
+        assert_eq!((row.enabled, row.max_links, row.rev), (false, Some(3), 20));
+        assert_eq!(row.updated_by, "admin");
     }
 
     #[tokio::test]
