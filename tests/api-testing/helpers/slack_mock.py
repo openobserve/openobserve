@@ -18,7 +18,7 @@ Run it standalone::
 Control endpoints (JSON):
 
 - ``GET  /_mock/health``                 liveness
-- ``GET  /_mock/requests[?method=m]``    every recorded call: method, form, bearer, at
+- ``GET  /_mock/requests[?method=m]``    every recorded call: method, form, bearer, at, response (ok calls)
 - ``POST /_mock/reset``                  forget calls, apps, tokens and failures; reseed the team
 - ``POST /_mock/fail``                   ``{"method", "error", "times"?, "http_status"?, "retry_after"?}``
 - ``POST /_mock/apps``                   register an app: ``{"app_id", "client_id", "client_secret", "signing_secret"?}``
@@ -395,7 +395,9 @@ def m_chat_post_message(st: MockState, form: dict[str, str], bearer: str | None)
     if not form.get("channel"):
         raise SlackError("channel_not_found")
     ts = f"{time.time():.6f}"
-    return {"channel": form["channel"], "ts": ts, "message": {"text": form.get("text", ""), "ts": ts}}
+    # Posting to a user id lands in the DM, and Slack answers with the DM's own channel id.
+    channel = "D" + form["channel"][1:] if form["channel"].startswith("U") else form["channel"]
+    return {"channel": channel, "ts": ts, "message": {"text": form.get("text", ""), "ts": ts}}
 
 
 def m_chat_update(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
@@ -406,6 +408,39 @@ def m_chat_update(st: MockState, form: dict[str, str], bearer: str | None) -> di
 def m_chat_post_ephemeral(st: MockState, _form: dict[str, str], bearer: str | None) -> dict[str, Any]:
     st.bot(bearer)
     return {"message_ts": f"{time.time():.6f}"}
+
+
+def m_agents_sessions_set_status(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
+    st.bot(bearer)
+    if form.get("status") not in ("active", "processing", "suspended", "closed"):
+        raise SlackError("invalid_status")
+    if not form.get("thread_ts"):
+        raise SlackError("thread_ts_required")
+    return {"status": form["status"], "agent_status": form["status"]}
+
+
+def m_chat_start_stream(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
+    st.bot(bearer)
+    if not form.get("channel") or not form.get("thread_ts"):
+        raise SlackError("invalid_arguments")
+    return {"channel": form["channel"], "ts": f"{time.time():.6f}"}
+
+
+def m_chat_append_stream(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
+    st.bot(bearer)
+    return {"channel": form.get("channel", ""), "ts": form.get("ts", "")}
+
+
+def m_chat_stop_stream(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
+    st.bot(bearer)
+    return {"channel": form.get("channel", ""), "ts": form.get("ts", "")}
+
+
+def m_chat_delete(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
+    st.bot(bearer)
+    if not form.get("channel") or not form.get("ts"):
+        raise SlackError("message_not_found")
+    return {"channel": form["channel"], "ts": form["ts"]}
 
 
 def m_views_publish(st: MockState, form: dict[str, str], bearer: str | None) -> dict[str, Any]:
@@ -443,6 +478,11 @@ METHODS: dict[str, Handler] = {
     "chat.postMessage": m_chat_post_message,
     "chat.update": m_chat_update,
     "chat.postEphemeral": m_chat_post_ephemeral,
+    "chat.startStream": m_chat_start_stream,
+    "chat.appendStream": m_chat_append_stream,
+    "chat.stopStream": m_chat_stop_stream,
+    "chat.delete": m_chat_delete,
+    "agents.sessions.setStatus": m_agents_sessions_set_status,
     "views.publish": m_views_publish,
     "files.getUploadURLExternal": m_files_get_upload_url_external,
     "files.completeUploadExternal": m_files_complete_upload_external,
@@ -503,6 +543,7 @@ class SlackMockHandler(BaseHTTPRequestHandler):
                     raise SlackError("unknown_method")
                 self.state.take_failure(method)
                 body = handler(self.state, form, bearer)
+                self.state.calls[-1]["response"] = body
             except SlackError as e:
                 if e.http_status != 200:
                     headers = {"Retry-After": str(e.retry_after)} if e.retry_after is not None else {}

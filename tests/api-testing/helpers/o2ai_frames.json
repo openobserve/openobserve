@@ -1,0 +1,732 @@
+{
+ "_comment": "o2-ai SSE frames recorded by running o2-ai's process_opencode_event and build_completion_event (branch agent-slack-answer-fields, A3) on its recorded fixtures (tests/fixtures/opencode_replay_session.json, searchsql_recorded_outputs.json, already anonymized). In-band error frames are o2-ai app.py's own payloads. Re-record with ~/o2-slack-build-p1/run/p11/record_o2ai_frames.py.",
+ "turns": {
+  "chart": [
+   {
+    "type": "tool_call",
+    "tool": "SearchSQL",
+    "message": "Querying logs",
+    "context": {
+     "org_id": "default",
+     "type": "logs",
+     "request_body": {
+      "query": {
+       "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5",
+       "start_time": 1784530385630000,
+       "end_time": 1784533985630000
+      }
+     },
+     "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5"
+    },
+    "call_id": "c1"
+   },
+   {
+    "type": "tool_result",
+    "tool": "SearchSQL",
+    "success": true,
+    "message": "SearchSQL completed successfully",
+    "response": null,
+    "chart_series": {
+     "x_unit": "us",
+     "series": [
+      {
+       "name": "y_axis_1",
+       "points": [
+        [
+         1791969480000000,
+         391
+        ],
+        [
+         1791969540000000,
+         454
+        ],
+        [
+         1791969600000000,
+         463
+        ],
+        [
+         1791969660000000,
+         460
+        ],
+        [
+         1791969720000000,
+         467
+        ],
+        [
+         1791969780000000,
+         456
+        ],
+        [
+         1791969840000000,
+         461
+        ],
+        [
+         1791969900000000,
+         454
+        ],
+        [
+         1791969960000000,
+         473
+        ],
+        [
+         1791970020000000,
+         509
+        ],
+        [
+         1791970080000000,
+         497
+        ],
+        [
+         1791970140000000,
+         477
+        ],
+        [
+         1791970200000000,
+         515
+        ],
+        [
+         1791970260000000,
+         505
+        ],
+        [
+         1791970320000000,
+         505
+        ],
+        [
+         1791970380000000,
+         529
+        ],
+        [
+         1791970440000000,
+         518
+        ],
+        [
+         1791970500000000,
+         534
+        ],
+        [
+         1791970560000000,
+         532
+        ],
+        [
+         1791970620000000,
+         523
+        ],
+        [
+         1791970680000000,
+         531
+        ],
+        [
+         1791970740000000,
+         526
+        ],
+        [
+         1791970800000000,
+         508
+        ],
+        [
+         1791970860000000,
+         505
+        ],
+        [
+         1791970920000000,
+         541
+        ],
+        [
+         1791970980000000,
+         529
+        ],
+        [
+         1791971040000000,
+         522
+        ],
+        [
+         1791971100000000,
+         503
+        ],
+        [
+         1791971160000000,
+         541
+        ],
+        [
+         1791971220000000,
+         514
+        ],
+        [
+         1791971280000000,
+         555
+        ],
+        [
+         1791971340000000,
+         509
+        ],
+        [
+         1791971400000000,
+         545
+        ],
+        [
+         1791971460000000,
+         491
+        ],
+        [
+         1791971520000000,
+         513
+        ],
+        [
+         1791971580000000,
+         506
+        ],
+        [
+         1791971640000000,
+         514
+        ],
+        [
+         1791971700000000,
+         492
+        ],
+        [
+         1791971760000000,
+         488
+        ],
+        [
+         1791971820000000,
+         491
+        ],
+        [
+         1791971880000000,
+         475
+        ],
+        [
+         1791971940000000,
+         498
+        ],
+        [
+         1791972000000000,
+         489
+        ],
+        [
+         1791972060000000,
+         491
+        ],
+        [
+         1791972120000000,
+         520
+        ],
+        [
+         1791972180000000,
+         491
+        ],
+        [
+         1791972240000000,
+         505
+        ],
+        [
+         1791972300000000,
+         537
+        ],
+        [
+         1791972360000000,
+         536
+        ],
+        [
+         1791972420000000,
+         504
+        ],
+        [
+         1791972480000000,
+         540
+        ],
+        [
+         1791972540000000,
+         534
+        ],
+        [
+         1791972600000000,
+         498
+        ],
+        [
+         1791972660000000,
+         510
+        ],
+        [
+         1791972720000000,
+         488
+        ],
+        [
+         1791972780000000,
+         484
+        ],
+        [
+         1791972840000000,
+         474
+        ],
+        [
+         1791972900000000,
+         483
+        ],
+        [
+         1791972960000000,
+         510
+        ],
+        [
+         1791973020000000,
+         444
+        ],
+        [
+         1791973080000000,
+         79
+        ]
+       ]
+      }
+     ]
+    },
+    "call_args": {
+     "org_id": "default",
+     "type": "logs",
+     "request_body": {
+      "query": {
+       "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5",
+       "start_time": 1784530385630000,
+       "end_time": 1784533985630000
+      }
+     }
+    },
+    "call_id": "c1"
+   },
+   {
+    "type": "message_delta",
+    "content": "Queries held steady at ~400/min.\n\nConfidence: high"
+   },
+   {
+    "type": "complete",
+    "history": [
+     {
+      "role": "user",
+      "content": "how many queries per minute?"
+     },
+     {
+      "role": "assistant",
+      "content": "Queries held steady at ~400/min.\n\nConfidence: high"
+     }
+    ],
+    "compacted": false,
+    "usage": {
+     "input_tokens": 0,
+     "output_tokens": 0,
+     "prompt_tokens": 0,
+     "completion_tokens": 0,
+     "tokens_in": 0,
+     "tokens_out": 0,
+     "total_tokens": 0,
+     "cached_tokens": 0,
+     "llm_calls": 0,
+     "cost": null
+    },
+    "chart_series": {
+     "x_unit": "us",
+     "series": [
+      {
+       "name": "y_axis_1",
+       "points": [
+        [
+         1791969480000000,
+         391
+        ],
+        [
+         1791969540000000,
+         454
+        ],
+        [
+         1791969600000000,
+         463
+        ],
+        [
+         1791969660000000,
+         460
+        ],
+        [
+         1791969720000000,
+         467
+        ],
+        [
+         1791969780000000,
+         456
+        ],
+        [
+         1791969840000000,
+         461
+        ],
+        [
+         1791969900000000,
+         454
+        ],
+        [
+         1791969960000000,
+         473
+        ],
+        [
+         1791970020000000,
+         509
+        ],
+        [
+         1791970080000000,
+         497
+        ],
+        [
+         1791970140000000,
+         477
+        ],
+        [
+         1791970200000000,
+         515
+        ],
+        [
+         1791970260000000,
+         505
+        ],
+        [
+         1791970320000000,
+         505
+        ],
+        [
+         1791970380000000,
+         529
+        ],
+        [
+         1791970440000000,
+         518
+        ],
+        [
+         1791970500000000,
+         534
+        ],
+        [
+         1791970560000000,
+         532
+        ],
+        [
+         1791970620000000,
+         523
+        ],
+        [
+         1791970680000000,
+         531
+        ],
+        [
+         1791970740000000,
+         526
+        ],
+        [
+         1791970800000000,
+         508
+        ],
+        [
+         1791970860000000,
+         505
+        ],
+        [
+         1791970920000000,
+         541
+        ],
+        [
+         1791970980000000,
+         529
+        ],
+        [
+         1791971040000000,
+         522
+        ],
+        [
+         1791971100000000,
+         503
+        ],
+        [
+         1791971160000000,
+         541
+        ],
+        [
+         1791971220000000,
+         514
+        ],
+        [
+         1791971280000000,
+         555
+        ],
+        [
+         1791971340000000,
+         509
+        ],
+        [
+         1791971400000000,
+         545
+        ],
+        [
+         1791971460000000,
+         491
+        ],
+        [
+         1791971520000000,
+         513
+        ],
+        [
+         1791971580000000,
+         506
+        ],
+        [
+         1791971640000000,
+         514
+        ],
+        [
+         1791971700000000,
+         492
+        ],
+        [
+         1791971760000000,
+         488
+        ],
+        [
+         1791971820000000,
+         491
+        ],
+        [
+         1791971880000000,
+         475
+        ],
+        [
+         1791971940000000,
+         498
+        ],
+        [
+         1791972000000000,
+         489
+        ],
+        [
+         1791972060000000,
+         491
+        ],
+        [
+         1791972120000000,
+         520
+        ],
+        [
+         1791972180000000,
+         491
+        ],
+        [
+         1791972240000000,
+         505
+        ],
+        [
+         1791972300000000,
+         537
+        ],
+        [
+         1791972360000000,
+         536
+        ],
+        [
+         1791972420000000,
+         504
+        ],
+        [
+         1791972480000000,
+         540
+        ],
+        [
+         1791972540000000,
+         534
+        ],
+        [
+         1791972600000000,
+         498
+        ],
+        [
+         1791972660000000,
+         510
+        ],
+        [
+         1791972720000000,
+         488
+        ],
+        [
+         1791972780000000,
+         484
+        ],
+        [
+         1791972840000000,
+         474
+        ],
+        [
+         1791972900000000,
+         483
+        ],
+        [
+         1791972960000000,
+         510
+        ],
+        [
+         1791973020000000,
+         444
+        ],
+        [
+         1791973080000000,
+         79
+        ]
+       ]
+      }
+     ]
+    },
+    "is_partial": null,
+    "searched_range": {
+     "start_us": 1784530385630000,
+     "end_us": 1784533985630000
+    },
+    "confidence": "high",
+    "trace_id": "trace-1"
+   }
+  ],
+  "partial": [
+   {
+    "type": "tool_call",
+    "tool": "SearchSQL",
+    "message": "Querying logs",
+    "context": {
+     "org_id": "default",
+     "type": "logs",
+     "request_body": {
+      "query": {
+       "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5",
+       "start_time": 1784530385630000,
+       "end_time": 1784533985630000
+      }
+     },
+     "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5"
+    },
+    "call_id": "c1"
+   },
+   {
+    "type": "tool_result",
+    "tool": "SearchSQL",
+    "success": true,
+    "message": "SearchSQL completed successfully",
+    "response": null,
+    "is_partial": true,
+    "call_args": {
+     "org_id": "default",
+     "type": "logs",
+     "request_body": {
+      "query": {
+       "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5",
+       "start_time": 1784530385630000,
+       "end_time": 1784533985630000
+      }
+     }
+    },
+    "call_id": "c1"
+   },
+   {
+    "type": "message_delta",
+    "content": "The top query ran 12 times.\n\nConfidence: medium"
+   },
+   {
+    "type": "complete",
+    "history": [
+     {
+      "role": "user",
+      "content": "which query ran most?"
+     },
+     {
+      "role": "assistant",
+      "content": "The top query ran 12 times.\n\nConfidence: medium"
+     }
+    ],
+    "compacted": false,
+    "usage": {
+     "input_tokens": 0,
+     "output_tokens": 0,
+     "prompt_tokens": 0,
+     "completion_tokens": 0,
+     "tokens_in": 0,
+     "tokens_out": 0,
+     "total_tokens": 0,
+     "cached_tokens": 0,
+     "llm_calls": 0,
+     "cost": null
+    },
+    "chart_series": null,
+    "is_partial": true,
+    "searched_range": {
+     "start_us": 1784530385630000,
+     "end_us": 1784533985630000
+    },
+    "confidence": "medium",
+    "trace_id": "trace-1"
+   }
+  ],
+  "plain": [
+   {
+    "type": "message_delta",
+    "content": "Hello! How "
+   },
+   {
+    "type": "message_delta",
+    "content": "can I help?"
+   },
+   {
+    "type": "complete",
+    "history": [
+     {
+      "role": "user",
+      "content": "hello"
+     },
+     {
+      "role": "assistant",
+      "content": "Hello! How can I help?"
+     }
+    ],
+    "compacted": false,
+    "usage": {
+     "input_tokens": 0,
+     "output_tokens": 0,
+     "prompt_tokens": 0,
+     "completion_tokens": 0,
+     "tokens_in": 0,
+     "tokens_out": 0,
+     "total_tokens": 0,
+     "cached_tokens": 0,
+     "llm_calls": 0,
+     "cost": null
+    },
+    "chart_series": null,
+    "is_partial": null,
+    "searched_range": null,
+    "confidence": null,
+    "trace_id": "trace-1"
+   }
+  ]
+ },
+ "in_band_errors": {
+  "turn_in_progress": {
+   "type": "error",
+   "recoverable": true,
+   "code": "turn_in_progress",
+   "message": "another turn of this conversation is still running"
+  },
+  "stale_epoch": {
+   "type": "error",
+   "message": "A newer turn of this conversation has started.",
+   "recoverable": false,
+   "category": "stale_epoch",
+   "code": "stale_epoch"
+  },
+  "restore_required": {
+   "type": "error",
+   "message": "This conversation must be restored on this replica; retry.",
+   "recoverable": true,
+   "category": "restore_required",
+   "code": "restore_required",
+   "opencode_session_id": "ses_0001",
+   "local_max_seq": -1
+  }
+ }
+}

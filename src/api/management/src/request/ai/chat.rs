@@ -15,8 +15,6 @@
 
 //! AI chat handlers: legacy `PromptRequest`s forwarded to the o2-ai agent service.
 
-#[cfg(feature = "enterprise")]
-use audit::report_http as report_to_audit;
 use axum::{
     Json,
     body::Body,
@@ -30,6 +28,7 @@ use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, extractors::Headers};
 use serde::Deserialize;
 #[cfg(feature = "enterprise")]
 use {
+    audit::report_with_protocol,
     futures::StreamExt,
     o2_enterprise::enterprise::{
         ai::{
@@ -40,8 +39,9 @@ use {
                 SESSION_OWNER_UNAVAILABLE, get_agent_client, is_session_owner_unavailable,
             },
         },
-        common::config::get_config as get_o2_config,
+        common::{auditor::Protocol, config::get_config as get_o2_config},
     },
+    openobserve_api_common::auth::delegation::DelegatedCaller,
 };
 
 use crate::{
@@ -86,6 +86,78 @@ const RCA_CHAT_CLIENT_KEYS: [&str; 8] = [
     "request_timestamp",
     "user_timezone",
 ];
+
+/// Set by the Slack bridge as `<team>:<channel>:<event_id>`; trusted only on a delegated call.
+#[cfg(feature = "enterprise")]
+const SLACK_EVENT_HEADER: &str = "x-o2-slack-event";
+#[cfg(feature = "enterprise")]
+const SLACK_REDACTED: &str = "[REDACTED: slack]";
+/// o2-ai refuses `confirm_timeout_secs` outside 1..=600 with a 422.
+#[cfg(feature = "enterprise")]
+const MAX_CONFIRM_TIMEOUT_SECS: u32 = 600;
+
+/// The audit identity shared by every record of one `chat_stream` call.
+#[cfg(feature = "enterprise")]
+struct ChatAudit {
+    user_id: String,
+    org_id: String,
+    trace_id: String,
+    protocol: Protocol,
+    body: String,
+}
+
+#[cfg(feature = "enterprise")]
+impl ChatAudit {
+    /// A Slack turn is audited without the question text, which stays in Slack.
+    fn new(
+        headers: &axum::http::HeaderMap,
+        delegated: bool,
+        user_id: &str,
+        org_id: &str,
+        trace_id: &str,
+        prompt: &PromptRequest,
+    ) -> Self {
+        let (protocol, body) = if delegated {
+            let mut body = serde_json::to_value(prompt).unwrap_or_default();
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert("messages".to_string(), SLACK_REDACTED.into());
+                let event = headers
+                    .get(SLACK_EVENT_HEADER)
+                    .and_then(|v| v.to_str().ok());
+                obj.insert("slack_event".to_string(), event.into());
+            }
+            (Protocol::Slack, body.to_string())
+        } else {
+            (
+                Protocol::Http,
+                serde_json::to_string(prompt).unwrap_or_default(),
+            )
+        };
+        Self {
+            user_id: user_id.to_string(),
+            org_id: org_id.to_string(),
+            trace_id: trace_id.to_string(),
+            protocol,
+            body,
+        }
+    }
+
+    async fn report(&self, code: u16, error_message: Option<String>) {
+        report_with_protocol(
+            self.protocol.clone(),
+            self.user_id.clone(),
+            self.org_id.clone(),
+            self.trace_id.clone(),
+            code,
+            error_message,
+            "POST".to_string(),
+            format!("/api/{}/ai/chat_stream", self.org_id),
+            String::new(),
+            self.body.clone(),
+        )
+        .await;
+    }
+}
 
 /// Picks the agent and its context; RCA only when the caller clears the RCA endpoint's own bar.
 #[cfg(feature = "enterprise")]
@@ -180,6 +252,30 @@ fn select_chat_agent(
 }
 
 /// A hyphenated UUID only: the id lands in outbound URLs and routing keys (a URN would carry `:`).
+/// The agent context: the path org, plus a fork seed only when the Slack bridge sent it.
+#[cfg(feature = "enterprise")]
+fn agent_context(
+    context: &serde_json::Map<String, serde_json::Value>,
+    org_id: &str,
+    delegated: bool,
+) -> serde_json::Value {
+    let mut context = serde_json::Value::Object(context.clone());
+    if let Some(obj) = context.as_object_mut() {
+        obj.insert("org_id".to_string(), org_id.into());
+        if !delegated {
+            obj.remove(FORK_SEED_CONTEXT_KEY);
+        }
+    }
+    context
+}
+
+#[cfg(feature = "enterprise")]
+fn confirm_timeout(requested: Option<u32>) -> Option<u32> {
+    requested
+        .filter(|secs| *secs > 0)
+        .map(|secs| secs.min(MAX_CONFIRM_TIMEOUT_SECS))
+}
+
 fn is_valid_session_id(val: &str) -> bool {
     val.len() == 36 && uuid::Uuid::try_parse(val).is_ok()
 }
@@ -289,6 +385,7 @@ fn ai_upstream_error_response(error: anyhow::Error) -> Response {
             Json(serde_json::json!({
                 "code": SESSION_OWNER_UNAVAILABLE,
                 "error": message,
+                "error_code": SESSION_OWNER_UNAVAILABLE,
             })),
         )
             .into_response();
@@ -296,9 +393,14 @@ fn ai_upstream_error_response(error: anyhow::Error) -> Response {
     let status = o2_enterprise::enterprise::ai::client::upstream_error_status(&error)
         .and_then(|status| StatusCode::from_u16(status).ok())
         .unwrap_or(StatusCode::BAD_GATEWAY);
+    let error_code = o2_enterprise::enterprise::ai::client::upstream_error_code(&error);
     (
         status,
-        Json(serde_json::json!({ "code": status.as_u16(), "error": message })),
+        Json(serde_json::json!({
+            "code": status.as_u16(),
+            "error": message,
+            "error_code": error_code,
+        })),
     )
         .into_response()
 }
@@ -607,15 +709,8 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             })
             .collect();
 
-        // Merge org_id into context
-        let mut context = serde_json::to_value(&prompt_body.context).unwrap_or_default();
-        if let Some(obj) = context.as_object_mut() {
-            obj.insert(
-                "org_id".to_string(),
-                serde_json::Value::String(org_id.clone()),
-            );
-            obj.remove(FORK_SEED_CONTEXT_KEY);
-        }
+        let delegated = parts.extensions.get::<DelegatedCaller>().is_some();
+        let context = agent_context(&prompt_body.context, org_id_str, delegated);
 
         // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
         // Must be done before context is moved into QueryRequest
@@ -666,6 +761,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             known_seq: None,
             known_opencode_session_id: None,
             session_epoch: None,
+            confirm_timeout_secs: confirm_timeout(prompt_body.confirm_timeout_secs),
             ..QueryRequest::new(last_user_message, context)
         };
 
@@ -982,25 +1078,24 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     #[cfg(feature = "enterprise")]
     {
         let org_id_str = org_id.clone();
-        let mut code = StatusCode::OK.as_u16();
-        let body_bytes_str = serde_json::to_string(&prompt_body).unwrap_or_default();
+        let delegated = parts.extensions.get::<DelegatedCaller>().is_some();
+        let audit = ChatAudit::new(
+            &parts.headers,
+            delegated,
+            &user_id,
+            &org_id_str,
+            &trace_id,
+            &prompt_body,
+        );
 
         // Check if AI/agent is enabled
         if !get_o2_config().ai.enabled {
-            let error_message = Some("AI is not enabled".to_string());
-            code = StatusCode::BAD_REQUEST.as_u16();
-            report_to_audit(
-                user_id.clone(),
-                org_id_str.clone(),
-                trace_id.clone(),
-                code,
-                error_message,
-                "POST".to_string(),
-                format!("/api/{}/ai/chat_stream", org_id_str),
-                String::new(),
-                body_bytes_str,
-            )
-            .await;
+            audit
+                .report(
+                    StatusCode::BAD_REQUEST.as_u16(),
+                    Some("AI is not enabled".to_string()),
+                )
+                .await;
             return MetaHttpResponse::bad_request("AI is not enabled");
         }
 
@@ -1029,20 +1124,12 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         let client = match get_agent_client() {
             Some(c) => c,
             None => {
-                let error_message = Some("Agent service not configured".to_string());
-                code = StatusCode::BAD_REQUEST.as_u16();
-                report_to_audit(
-                    user_id.clone(),
-                    org_id_str.clone(),
-                    trace_id.clone(),
-                    code,
-                    error_message,
-                    "POST".to_string(),
-                    format!("/api/{}/ai/chat_stream", org_id_str),
-                    String::new(),
-                    body_bytes_str,
-                )
-                .await;
+                audit
+                    .report(
+                        StatusCode::BAD_REQUEST.as_u16(),
+                        Some("Agent service not configured".to_string()),
+                    )
+                    .await;
                 return MetaHttpResponse::bad_request("Agent service not configured");
             }
         };
@@ -1070,15 +1157,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             })
             .collect();
 
-        let mut context = serde_json::to_value(&prompt_body.context).unwrap_or_default();
-        if let Some(obj) = context.as_object_mut() {
-            obj.insert(
-                "org_id".to_string(),
-                serde_json::Value::String(org_id_str.clone()),
-            );
-            // Only a server-built fork seed may claim the fork framing.
-            obj.remove(FORK_SEED_CONTEXT_KEY);
-        }
+        let context = agent_context(&prompt_body.context, &org_id_str, delegated);
 
         // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
         // Must be done before context is moved into QueryRequest
@@ -1129,6 +1208,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             known_seq: None,
             known_opencode_session_id: None,
             session_epoch: None,
+            confirm_timeout_secs: confirm_timeout(prompt_body.confirm_timeout_secs),
             ..QueryRequest::new(last_user_message, context)
         };
 
@@ -1192,18 +1272,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 lease,
                 registration,
             } = admitted;
-            report_to_audit(
-                user_id.clone(),
-                org_id_str.clone(),
-                trace_id.clone(),
-                code,
-                None,
-                "POST".to_string(),
-                format!("/api/{}/ai/chat_stream", org_id_str),
-                String::new(),
-                body_bytes_str,
-            )
-            .await;
+            audit.report(StatusCode::OK.as_u16(), None).await;
             let session_id = row.session_id.clone();
 
             // o2-ai forwards only events past `known_seq` (restore_required when it holds fewer).
@@ -1295,18 +1364,12 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                     use opentelemetry::trace::TraceContextExt;
                     span_cx.span().end();
                 }
-                report_to_audit(
-                    user_id.clone(),
-                    org_id_str.clone(),
-                    trace_id.clone(),
-                    response.status().as_u16(),
-                    Some("Upstream AI request failed".to_string()),
-                    "POST".to_string(),
-                    format!("/api/{}/ai/chat_stream", org_id_str),
-                    String::new(),
-                    body_bytes_str,
-                )
-                .await;
+                audit
+                    .report(
+                        response.status().as_u16(),
+                        Some("Upstream AI request failed".to_string()),
+                    )
+                    .await;
                 return response;
             }
         };
@@ -1324,33 +1387,16 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 use opentelemetry::trace::TraceContextExt;
                 span_cx.span().end();
             }
-            report_to_audit(
-                user_id.clone(),
-                org_id_str.clone(),
-                trace_id.clone(),
-                response.status().as_u16(),
-                Some("AI credit authorization failed after upstream acceptance".to_string()),
-                "POST".to_string(),
-                format!("/api/{}/ai/chat_stream", org_id_str),
-                String::new(),
-                body_bytes_str,
-            )
-            .await;
+            audit
+                .report(
+                    response.status().as_u16(),
+                    Some("AI credit authorization failed after upstream acceptance".to_string()),
+                )
+                .await;
             return response;
         }
 
-        report_to_audit(
-            user_id.clone(),
-            org_id_str.clone(),
-            trace_id.clone(),
-            code,
-            None,
-            "POST".to_string(),
-            format!("/api/{}/ai/chat_stream", org_id_str),
-            String::new(),
-            body_bytes_str,
-        )
-        .await;
+        audit.report(StatusCode::OK.as_u16(), None).await;
 
         // Keep the OTel span alive for the full stream.
         let s = async_stream::stream! {
@@ -1795,6 +1841,190 @@ mod tests {
             .unwrap();
         let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(body["code"], SESSION_OWNER_UNAVAILABLE);
+        assert_eq!(body["error_code"], SESSION_OWNER_UNAVAILABLE);
+    }
+
+    /// A stand-in o2-ai answering every streamed turn with `status` and `body`, as FastAPI would.
+    #[cfg(feature = "enterprise")]
+    async fn o2ai_refusing(status: u16, body: &'static str) -> String {
+        use axum::{Router, routing::post};
+
+        let app = Router::new().route(
+            "/o2_agent/{agent}/query/stream",
+            post(move || async move {
+                (
+                    StatusCode::from_u16(status).unwrap(),
+                    [("content-type", "application/json")],
+                    body,
+                )
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        format!("http://{addr}")
+    }
+
+    /// What `chat_stream` answers (persistence off) when the real client meets that o2-ai.
+    #[cfg(feature = "enterprise")]
+    async fn upstream_refusal(base: &str) -> (StatusCode, serde_json::Value) {
+        let client =
+            o2_enterprise::enterprise::ai::client::AiAgentClient::new(base, false).unwrap();
+        let error = client
+            .query_stream(
+                DEFAULT_AGENT_TYPE,
+                QueryRequest::new("q".to_string(), serde_json::json!({})),
+                "Bearer o2dt.x.y",
+            )
+            .await
+            .unwrap_err();
+        let response = ai_upstream_error_response(error);
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, serde_json::from_slice(&body).unwrap())
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn every_o2ai_refusal_code_reaches_the_body_as_error_code() {
+        for (status, body, code) in [
+            (
+                404,
+                r#"{"detail":{"code":"session_not_found","session_id":"s1","reason":"unknown"}}"#,
+                "session_not_found",
+            ),
+            (
+                409,
+                r#"{"detail":{"code":"turn_in_progress","message":"another turn of this conversation is still running"}}"#,
+                "turn_in_progress",
+            ),
+            (
+                409,
+                r#"{"detail":{"code":"session_owner_unavailable"}}"#,
+                "session_owner_unavailable",
+            ),
+            (
+                400,
+                r#"{"detail":{"code":"epoch_out_of_range","message":"x","session_epoch":9,"current_epoch":2}}"#,
+                "epoch_out_of_range",
+            ),
+            (
+                503,
+                r#"{"code":"internal_secret_required"}"#,
+                "internal_secret_required",
+            ),
+        ] {
+            let (got, json) = upstream_refusal(&o2ai_refusing(status, body).await).await;
+            assert_eq!(json["error_code"], code, "{json}");
+            let want = if code == "session_owner_unavailable" {
+                StatusCode::CONFLICT
+            } else {
+                StatusCode::from_u16(status).unwrap()
+            };
+            assert_eq!(got, want, "{json}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_codeless_or_unreachable_upstream_still_carries_error_code() {
+        let (status, json) =
+            upstream_refusal(&o2ai_refusing(429, r#"{"detail":"slow"}"#).await).await;
+        assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+        assert!(json["error_code"].is_null(), "{json}");
+        assert!(json.as_object().unwrap().contains_key("error_code"));
+
+        let (status, json) = upstream_refusal("http://127.0.0.1:9").await;
+        assert_eq!(status, StatusCode::BAD_GATEWAY);
+        assert!(
+            json.as_object().unwrap().contains_key("error_code"),
+            "{json}"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn prompt(context: serde_json::Value) -> PromptRequest {
+        serde_json::from_value(serde_json::json!({
+            "messages": [{"role": "user", "content": "why are checkouts failing?"}],
+            "context": context,
+            "confirm_timeout_secs": 900,
+        }))
+        .unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn fork_seed_kept_only_for_delegated() {
+        let body = prompt(serde_json::json!({"o2_fork_seed": true, "currentPage": "slack"}));
+        let browser = agent_context(&body.context, "prod", false);
+        assert!(browser.get(FORK_SEED_CONTEXT_KEY).is_none(), "{browser}");
+        assert_eq!(browser["org_id"], "prod");
+        let slack = agent_context(&body.context, "prod", true);
+        assert_eq!(slack[FORK_SEED_CONTEXT_KEY], true);
+        assert_eq!(slack["org_id"], "prod");
+        assert_eq!(slack["currentPage"], "slack");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn confirm_timeout_is_capped_at_600_and_zero_means_unset() {
+        assert_eq!(
+            prompt(serde_json::json!({})).confirm_timeout_secs,
+            Some(900)
+        );
+        assert_eq!(confirm_timeout(Some(900)), Some(600));
+        assert_eq!(confirm_timeout(Some(600)), Some(600));
+        assert_eq!(confirm_timeout(Some(30)), Some(30));
+        assert_eq!(confirm_timeout(Some(0)), None);
+        assert_eq!(confirm_timeout(None), None);
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn slack_event_headers() -> axum::http::HeaderMap {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert(SLACK_EVENT_HEADER, "T0TEAM:C0CHAN:Ev0001".parse().unwrap());
+        headers
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_slack_turn_is_audited_without_the_question_and_with_its_slack_event() {
+        let body = prompt(serde_json::json!({"currentPage": "slack"}));
+        let audit = ChatAudit::new(
+            &slack_event_headers(),
+            true,
+            "ann@acme.io",
+            "prod",
+            "t1",
+            &body,
+        );
+        assert_eq!(audit.protocol, Protocol::Slack);
+        assert!(!audit.body.contains("checkouts"), "{}", audit.body);
+        let json: serde_json::Value = serde_json::from_str(&audit.body).unwrap();
+        assert_eq!(json["messages"], SLACK_REDACTED);
+        assert_eq!(json["slack_event"], "T0TEAM:C0CHAN:Ev0001");
+        assert_eq!(json["context"]["currentPage"], "slack");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_browser_request_with_a_forged_slack_event_is_audited_in_full_as_http() {
+        let body = prompt(serde_json::json!({}));
+        let audit = ChatAudit::new(
+            &slack_event_headers(),
+            false,
+            "ann@acme.io",
+            "prod",
+            "t1",
+            &body,
+        );
+        assert_eq!(audit.protocol, Protocol::Http);
+        let json: serde_json::Value = serde_json::from_str(&audit.body).unwrap();
+        assert_eq!(json["messages"][0]["content"], "why are checkouts failing?");
+        assert!(json.get("slack_event").is_none(), "{json}");
+        assert_eq!(audit.body, serde_json::to_string(&body).unwrap());
     }
 
     #[test]
