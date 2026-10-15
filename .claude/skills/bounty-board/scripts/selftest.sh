@@ -149,6 +149,8 @@ issue_json '["bug-me-not","autofix","Needs-Testing"]' '[]'
 expect 10 "gate skips Needs-Testing" env PATH="$T/bin:$PATH" "$HERE/gate-issue.sh" --hunt openobserve 42 "$T/g"
 issue_json '["bug-me-not","Test-Assist-Testing-Completed"]' '[]'
 expect 10 "gate skips Test-Assist-Testing-Completed" env PATH="$T/bin:$PATH" "$HERE/gate-issue.sh" openobserve 42 "$T/g"
+issue_json '["bug-me-not","Test-Assist-Queued"]' '[]'
+expect 10 "gate skips any Test-Assist-* label" env PATH="$T/bin:$PATH" "$HERE/gate-issue.sh" openobserve 42 "$T/g"
 issue_json '["bug-me-not","QA Test Not Needed"]' '[]'
 expect 0 "gate ignores QA Test Not Needed" env PATH="$T/bin:$PATH" "$HERE/gate-issue.sh" openobserve 42 "$T/g"
 issue_json '["bug-me-not","autofix"]' '["author1","dev1"]'; graph_json "editor9"

@@ -45,13 +45,15 @@ Shell variables do not survive between Bash tool calls, so every command below u
 
 | script | does |
 |---|---|
-| `gate-issue.sh [--hunt] <repo> <n> <work>` | rule 3; writes `issue.json`, `body.md`, `comments.jsonl`, `me.txt`; exit 0 pass, 10 skip, else error |
+| `gate-issue.sh [--hunt] <repo> <n> <work>` | rule 3; writes `issue.json`, `body.md`, `comments.jsonl`, `issue-graph.json`, `me.txt`; exit 0 pass, 10 skip, else error |
 | `parse-bug-items.mjs <body.md>` | checklist → items JSON; `paths` come from the Where section, or from all details only when an item has no **Where:** label |
 | `triage-rules.mjs filter <parsed> <repo>` | rule 2 → `candidates`, `target_repo`, per-item `reason` |
 | `triage-rules.mjs render <parsed> <filter> <verdict.json\|-> <repo> <n> <me> <out>` | `verdict-comment.md` (table, `item N` never `#N`, mentions defused, hidden marker last) and `verdict-result.json` (`label`) |
 | `triage-rules.mjs marker <comments.jsonl> <repo> <n>` | newest trusted verdict marker (rule 7), or `null` |
 | `triage-rules.mjs hunt-items <parsed> <repo> <marker>` | accepted items still valid on the current body, `dropped`, `body_changed`, `target_repo` |
 | `triage-rules.mjs spec-change <hunt.json>` | the spec's Change section, issue text fenced so it cannot break out |
+| `triage-rules.mjs paths <parsed> <i,j,...>` | the Where paths of those items, one per line (`allowed.txt` for `scope-check.sh`) |
+| `triage-rules.mjs protected-regex` | the protected-path ERE that `scope-check.sh` matches case-insensitively |
 | `checkouts.sh [dir]` | `openobserve=<path>`, plus `private=<path>` and `private_repo=<name>` when a private repo config is found (override with `BB_OSS_DIR` / `BB_PRIVATE_DIR`) |
 | `private-config.mjs json\|env` | the private repo config (validated) or `null`; read it with `json` when you need its facts, never paste them into public text |
 | `prepare-worktree.sh <repo> <n> <target_repo> <target checkout>` | fetches `origin/main`, creates or reuses `../wt-autofix-<repo>-<n>` on `autofix/<repo>-issue-<n>` next to the target checkout; prints `worktree=`, `branch=`, `ledger=` |
