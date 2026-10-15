@@ -309,7 +309,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
             <OTooltip :content="t('alerts.alertSettings.createsIncidentTooltip')" side="right" />
           </div>
-          <OFormSwitch name="creates_incident" data-test="alert-creates-incident-toggle" />
+          <div class="flex flex-col gap-1">
+            <OFormSwitch name="creates_incident" data-test="alert-creates-incident-toggle" />
+            <span
+              v-if="perGroupIncidents"
+              class="text-text-secondary text-xs"
+              data-test="alert-creates-incident-per-group-hint"
+            >
+              {{ t("alerts.alertSettings.createsIncidentPerGroupHint") }}
+            </span>
+          </div>
         </div>
 
         <!-- Scheduled only: realtime, composite and anomaly alerts keep no episode, so neither field can act. -->
@@ -542,6 +551,13 @@ export default defineComponent({
     const setFV = (name: string, value: any): void => {
       form?.setFieldValue?.(name, value);
     };
+    // Per-group alerting with incidents opens one incident per group, capped per evaluation.
+    const perGroupIncidents = computed(
+      () =>
+        !!fv("creates_incident") &&
+        (!!fv("query_condition.aggregation.multi_alert") ||
+          !!fv("query_condition.promql_multi_alert")),
+    );
 
     // Pending period — TWO values, same split as QueryConfig's Check every:
     //   • pendingPeriodUnit + `_ui.pendingPeriod` → the DISPLAY unit/value.
@@ -729,6 +745,7 @@ export default defineComponent({
       t,
       store,
       incidentsEnabled,
+      perGroupIncidents,
       handlePeriodChange,
       // Field refs for the parent focus manager
       periodFieldRef,

@@ -196,6 +196,19 @@ describe("IncidentTimeline - getUserId", () => {
     await flushPromises();
     expect((w.vm as any).getUserId({})).toBe("System");
   });
+
+  it("renders a change made by the system account as a System row", async () => {
+    const w = await mountComp();
+    await flushPromises();
+    const vm = w.vm as any;
+    const swept = { type: "Resolved", data: { user_id: "system@openobserve.ai" } };
+    const unattributed = { type: "Resolved", data: {} };
+    expect(vm.getUserId(swept)).toBe("System");
+    expect(vm.getEventLayout(swept)).toBe(vm.getEventLayout(unattributed));
+    expect(vm.getUserId({ type: "Resolved", data: { user_id: "alice@example.com" } })).toBe(
+      "alice@example.com",
+    );
+  });
 });
 
 describe("IncidentTimeline - getEventIcon", () => {

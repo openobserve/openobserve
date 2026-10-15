@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInlineEdit
           v-if="incidentDetails"
           :model-value="incidentDetails.title ?? ''"
+          class="max-md:[&_.truncate]:overflow-visible max-md:[&_.truncate]:break-words max-md:[&_.truncate]:whitespace-normal"
           data-test="incident-detail-title"
           :aria-label="t('alerts.incidents.title_field')"
           :edit-hint="t('alerts.incidents.editIncidentTitleTooltip')"
@@ -216,9 +217,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Tab Content Area -->
             <div class="px-page-edge relative flex flex-1 flex-col overflow-hidden pt-4 pb-2">
               <!-- Overview Tab Content - REDESIGNED -->
-              <div v-if="activeTab === 'overview'" class="flex flex-1 flex-col overflow-hidden">
+              <div
+                v-if="activeTab === 'overview'"
+                class="flex flex-1 flex-col overflow-hidden max-md:overflow-y-auto"
+                data-test="incident-overview-content"
+              >
                 <!-- SECTION 1: Hero Metrics (100px height) -->
-                <div class="mb-3 flex h-25 gap-3">
+                <div class="mb-3 flex h-25 gap-3 max-md:grid max-md:h-auto max-md:grid-cols-2">
                   <!-- 1. Total Alerts Card -->
                   <div
                     class="border-card-glass-border rounded-default bg-card-glass-bg flex flex-1 cursor-pointer flex-col justify-between border p-3 transition-all duration-200"
@@ -342,14 +347,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- SECTION 2: Main Content (2:1 Ratio Layout) with calc(100vh - 236px) height (was 276px) -->
-                <div class="flex h-[calc(100vh-23.75rem)] flex-1 gap-3">
+                <div
+                  class="flex h-[calc(100vh-23.75rem)] flex-1 gap-3 max-md:h-auto max-md:flex-none max-md:flex-col"
+                >
                   <!-- PART 1: Primary Content (66.67% width) -->
-                  <div class="flex w-2/3 flex-col gap-3">
+                  <div class="flex w-2/3 flex-col gap-3 max-md:w-full">
                     <!-- 2.1A: Top Row - Incident Details (2/3) + Incident Timeline (1/3) -->
-                    <div class="flex h-1/2 gap-3">
+                    <div class="flex h-1/2 gap-3 max-md:h-auto max-md:flex-col">
                       <!-- Incident Timeline (33.33% width) -->
                       <div
-                        class="border-card-glass-border rounded-default bg-card-glass-bg flex w-1/3 flex-col overflow-hidden border"
+                        class="border-card-glass-border rounded-default bg-card-glass-bg flex w-1/3 flex-col overflow-hidden border max-md:max-h-80 max-md:w-full"
                       >
                         <!-- Header -->
                         <div class="flex items-center justify-between px-4 py-3">
@@ -461,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <!-- Incident Details (66.67% width) -->
                       <div
-                        class="border-card-glass-border rounded-default bg-card-glass-bg flex w-2/3 flex-col overflow-hidden border"
+                        class="border-card-glass-border rounded-default bg-card-glass-bg flex w-2/3 flex-col overflow-hidden border max-md:w-full"
                       >
                         <!-- Header -->
                         <div class="px-4 pt-2 pb-1">
@@ -585,7 +592,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- alert activity -->
                     <!-- 2.1B: Alert Activity Chart (50% height, full width) -->
                     <div
-                      class="border-card-glass-border rounded-default bg-card-glass-bg flex h-1/2 flex-col overflow-hidden border"
+                      class="border-card-glass-border rounded-default bg-card-glass-bg flex h-1/2 flex-col overflow-hidden border max-md:h-80"
                     >
                       <!-- Header -->
                       <div class="px-4 pt-2 pb-1">
@@ -606,7 +613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- PART 2: Sidebar Content (33.33% width) - 3 sections -->
-                  <div class="flex h-full w-1/3 flex-col gap-2">
+                  <div class="flex h-full w-1/3 flex-col gap-2 max-md:h-auto max-md:w-full">
                     <!-- Who this incident woke. Absent entirely when it paged
                          nobody, which is also the OSS and on-call-disabled
                          case, so no feature flag is needed. -->
@@ -744,7 +751,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- 2.2A: Manage Panel (40% of available height after gaps) -->
                     <div
-                      class="border-card-glass-border rounded-default bg-card-glass-bg flex h-[calc(35%-0.4rem)] flex-col overflow-hidden border"
+                      class="border-card-glass-border rounded-default bg-card-glass-bg flex h-[calc(35%-0.4rem)] flex-col overflow-hidden border max-md:h-auto max-md:max-h-80"
                     >
                       <!-- Header -->
                       <div class="px-4 pt-2 pb-1">
@@ -889,7 +896,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- 2.2C: Alert Flow Panel (25% of available height after gaps) - Conditional -->
                     <div
                       v-if="sortedAlertsByTriggerCount?.length"
-                      class="border-card-glass-border rounded-default bg-card-glass-bg flex h-[calc(30%-0.25rem)] flex-col overflow-hidden border"
+                      class="border-card-glass-border rounded-default bg-card-glass-bg flex h-[calc(30%-0.25rem)] flex-col overflow-hidden border max-md:h-auto max-md:max-h-80"
                     >
                       <!-- Header -->
                       <div class="px-4 pt-2 pb-1">
@@ -942,6 +949,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :incident-id="incidentDetails?.id || ''"
                 :visible="activeTab === 'activity'"
                 :refresh-trigger="timelineRefreshTrigger"
+                @comment-posted="recordCommentPosted"
               />
 
               <!-- Incident Analysis Tab Content -->
@@ -976,9 +984,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Alert Triggers Tab Content -->
-              <div v-if="activeTab === 'alertTriggers'" class="flex flex-1 overflow-hidden">
+              <div
+                v-if="activeTab === 'alertTriggers'"
+                class="flex flex-1 overflow-hidden max-md:flex-col max-md:overflow-y-auto"
+                data-test="incident-triggers-content"
+              >
                 <!-- Left Section: Alert Triggers Table -->
-                <div class="flex flex-1 flex-col overflow-hidden pe-2 pt-4">
+                <div
+                  class="flex flex-1 flex-col overflow-hidden pe-2 pt-4 max-md:min-h-96 max-md:flex-none max-md:pe-0"
+                >
                   <div
                     :class="[
                       'border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border',
@@ -993,7 +1007,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Right Section: Trigger Details -->
-                <div class="flex w-100 flex-shrink-0 flex-col pt-4">
+                <div class="flex w-100 flex-shrink-0 flex-col pt-4 max-md:w-full">
                   <div
                     :class="[
                       'border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border',
@@ -1079,60 +1093,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
 
                           <!-- Threshold & Period -->
-                          <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
-                            <div class="flex flex-col gap-0.5">
+                          <div
+                            v-if="!isSelectedComposite && selectedAlertFacts"
+                            class="grid grid-cols-2 gap-2"
+                          >
+                            <div
+                              v-if="selectedAlertFacts.threshold"
+                              class="flex min-w-0 flex-col gap-0.5"
+                            >
                               <span :class="'text-text-secondary'" class="text-3xs">
-                                {{ t("alerts.messages.thresholdMarkLine") }}
-                              </span>
-                              <span :class="'text-text-body'" class="text-sm font-medium">
-                                {{ alerts[selectedAlertIndex]?.trigger_condition?.operator || "" }}
                                 {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.threshold ||
-                                  raw("N/A")
+                                  selectedAlertFacts.groupBy
+                                    ? t("alerts.incidents.perGroupThreshold")
+                                    : t("alerts.messages.thresholdMarkLine")
                                 }}
+                              </span>
+                              <span
+                                :class="'text-text-body'"
+                                class="text-sm font-medium break-words"
+                                data-test="incident-alert-threshold"
+                              >
+                                {{ selectedAlertFacts.threshold }}
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
                               <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.period") }}
                               </span>
-                              <span :class="'text-text-body'" class="text-sm font-medium">
-                                {{
-                                  formatPeriod(
-                                    alerts[selectedAlertIndex]?.trigger_condition?.period,
-                                  )
-                                }}
+                              <span
+                                :class="'text-text-body'"
+                                class="text-sm font-medium"
+                                data-test="incident-alert-period"
+                              >
+                                {{ selectedAlertFacts.period }}
                               </span>
                             </div>
                           </div>
 
+                          <!-- Group by, for a per-group alert -->
+                          <div
+                            v-if="!isSelectedComposite && selectedAlertFacts?.groupBy"
+                            class="flex flex-col gap-0.5"
+                          >
+                            <span :class="'text-text-secondary'" class="text-3xs">
+                              {{ t("alerts.groupBy") }}
+                            </span>
+                            <span
+                              :class="'text-text-body'"
+                              class="text-sm font-medium break-words"
+                              data-test="incident-alert-group-by"
+                            >
+                              {{ selectedAlertFacts.groupBy }}
+                            </span>
+                          </div>
+
                           <!-- Frequency & Silence -->
-                          <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
+                          <div
+                            v-if="!isSelectedComposite && selectedAlertFacts"
+                            class="grid grid-cols-2 gap-2"
+                          >
                             <div class="flex flex-col gap-0.5">
                               <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.frequency") }}
                               </span>
-                              <span :class="'text-text-body'" class="text-sm font-medium">
-                                {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.frequency ||
-                                  raw("N/A")
-                                }}
-                                {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.frequency_type ||
-                                  "min"
-                                }}
+                              <span
+                                :class="'text-text-body'"
+                                class="text-sm font-medium break-words"
+                                data-test="incident-alert-frequency"
+                              >
+                                {{ selectedAlertFacts.frequency }}
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
                               <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.silence") }}
                               </span>
-                              <span :class="'text-text-body'" class="text-sm font-medium">
-                                {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.silence ||
-                                  raw("N/A")
-                                }}
-                                {{ t("common.min") }}
+                              <span
+                                :class="'text-text-body'"
+                                class="text-sm font-medium"
+                                data-test="incident-alert-silence"
+                              >
+                                {{ selectedAlertFacts.silence }}
                               </span>
                             </div>
                           </div>
@@ -1525,6 +1566,11 @@ import serviceStreamsApi, {
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
+import {
+  alertGroupBy,
+  alertThresholdText,
+  formatMinutesDuration,
+} from "@/utils/alerts/alertCondition";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
@@ -1547,6 +1593,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useIncidentViewSummary } from "@/composables/alerts/useIncidentViewSummary";
 import {
   isPaidOverageConsentError,
   usePaidOverageConsent,
@@ -1614,6 +1661,8 @@ export default defineComponent({
     const loading = ref(false);
     const updating = ref(false);
     // Backend also returns a top-level correlation_reason not declared on IncidentWithAlerts.
+    const viewSummary = useIncidentViewSummary();
+    const recordCommentPosted = () => viewSummary.recordAction("comment");
     const incidentDetails = ref<(IncidentWithAlerts & { correlation_reason?: string }) | null>(
       null,
     );
@@ -2608,6 +2657,7 @@ export default defineComponent({
         const response = await incidentsService.get(org, incidentId);
 
         incidentDetails.value = response.data;
+        viewSummary.start(response.data);
         void loadOnCallResponse(org, incidentId);
         triggers.value = response.data.triggers || [];
         // Composites have no `alerts` row, so the live-definition resolver
@@ -2695,6 +2745,7 @@ export default defineComponent({
     });
 
     const close = () => {
+      viewSummary.end();
       // Clear correlation data when closing
       correlationData.value = null;
       correlationError.value = null;
@@ -2766,6 +2817,8 @@ export default defineComponent({
         incidentDetails.value.acknowledged_at = response.data.acknowledged_at;
         incidentDetails.value.updated_at = response.data.updated_at || Date.now() * 1000;
         editableStatus.value = response.data.status;
+        if (newStatus === "acknowledged") viewSummary.recordAction("ack");
+        if (newStatus === "resolved") viewSummary.recordAction("resolve");
         toast({
           variant: "success",
           message: t("alerts.incidents.statusUpdated"),
@@ -2773,6 +2826,17 @@ export default defineComponent({
         // Mark data as stale so incident list will refresh when navigating back
         store.dispatch("incidents/setShouldRefresh", true);
         emit("status-updated");
+        // A status change acks, re-arms or closes the page server-side, so the panel must reread it.
+        await queryClient.invalidateQueries({
+          queryKey: responsesForIncidentQuery(
+            store.state.selectedOrganization.identifier,
+            incidentDetails.value.id,
+          ).queryKey,
+        });
+        void loadOnCallResponse(
+          store.state.selectedOrganization.identifier,
+          incidentDetails.value.id,
+        );
 
         // Refresh events in timeline if Activity tab is active
         if (activeTab.value === "activity") {
@@ -2783,11 +2847,11 @@ export default defineComponent({
         if (newStatus === "open" && incidentDetails.value?.id) {
           await checkAnalysisInFlight(incidentDetails.value.id);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
         toast({
           variant: "error",
-          message: t("alerts.incidents.statusUpdateFailed"),
+          message: error?.response?.data?.message || t("alerts.incidents.statusUpdateFailed"),
         });
       } finally {
         updating.value = false;
@@ -2807,7 +2871,18 @@ export default defineComponent({
       return updateStatus("acknowledged");
     };
     const resolveIncident = () => updateStatus("resolved");
-    const reopenIncident = () => updateStatus("open");
+    // Back to open re-pages the on-call team, from a reopen and from a withdrawn acknowledgement alike.
+    const reopenIncident = async () => {
+      const ok = await confirm({
+        title: t("alerts.incidents.reopenConfirmTitle"),
+        message: t("alerts.incidents.reopenConfirmMessage"),
+        confirmLabel: t("alerts.incidents.reopenConfirmLabel"),
+        cancelLabel: t("alerts.incidents.acknowledgeConfirmCancelLabel"),
+        persistent: false,
+      });
+      if (!ok) return;
+      return updateStatus("open");
+    };
 
     // Title editing. OInlineEdit owns the open/close and the Escape-restores
     // behaviour; this only has to persist a committed value. `isEditingTitle`
@@ -2872,21 +2947,30 @@ export default defineComponent({
       }
     };
 
-    const formatPeriod = (periodInSeconds: number | undefined) => {
-      if (!periodInSeconds) return raw("N/A");
-
-      // Convert seconds to minutes
-      if (periodInSeconds >= 60) {
-        const minutes = Math.floor(periodInSeconds / 60);
-        const seconds = periodInSeconds % 60;
-        if (seconds === 0) {
-          return t("alerts.incidents.periodMinutes", { minutes });
-        }
-        return t("alerts.incidents.periodMinutesSeconds", { minutes, seconds });
-      }
-
-      return t("alerts.incidents.periodSeconds", { seconds: periodInSeconds });
-    };
+    // Same units and formatters as the alert form: period and silence in minutes, frequency in seconds.
+    const selectedAlertFacts = computed(() => {
+      const alert = alerts.value?.[selectedAlertIndex.value];
+      if (!alert) return null;
+      const tc = alert.trigger_condition ?? {};
+      const groupBy = alertGroupBy(alert);
+      const frequency =
+        tc.frequency_type === "cron" && tc.cron
+          ? String(tc.cron)
+          : formatMinutesDuration(tc.frequency == null ? null : Number(tc.frequency) / 60, t);
+      return {
+        // A plain SQL alert's condition is its query, shown below; its row gate is not a threshold.
+        threshold:
+          alert.query_condition?.type === "sql" && !groupBy ? null : alertThresholdText(alert),
+        groupBy: groupBy
+          ? groupBy.length > 0
+            ? groupBy.join(", ")
+            : t("alerts.incidents.perSeries")
+          : null,
+        period: formatMinutesDuration(tc.period == null ? null : Number(tc.period), t),
+        frequency,
+        silence: formatMinutesDuration(tc.silence == null ? null : Number(tc.silence), t),
+      };
+    });
 
     // Transform V1 format conditions (or/and structure) to readable expression
     function transformToExpression(data: any, wrap = true): any {
@@ -2955,45 +3039,12 @@ export default defineComponent({
       return typeof conditionData === "string" ? conditionData : "--";
     };
 
-    // Handle status change from dropdown
+    // The manage-panel chips must behave exactly like the header buttons, confirm and all.
     const handleStatusChange = async (newStatus: "open" | "acknowledged" | "resolved") => {
       if (!incidentDetails.value || updating.value) return;
-
-      updating.value = true;
-      try {
-        const response = await updateIncidentStatus.mutateAsync({
-          id: incidentDetails.value.id,
-          status: newStatus,
-        });
-
-        // Update local state with the actual status from the API response
-        incidentDetails.value.status = response.data.status;
-        editableStatus.value = response.data.status;
-
-        toast({
-          variant: "success",
-          message: t("toastMessages.alerts.incidentStatusUpdatedTo", {
-            status: response.data.status,
-          }),
-        });
-        // Mark data as stale so incident list will refresh
-        store.dispatch("incidents/setShouldRefresh", true);
-
-        // Refresh events in timeline if Activity tab is active
-        if (activeTab.value === "activity") {
-          timelineRefreshTrigger.value++;
-        }
-      } catch (error: any) {
-        console.error("Failed to update status:", error);
-        toast({
-          variant: "error",
-          message: error?.response?.data?.message || t("alerts.incidents.statusUpdateFailed"),
-        });
-        // Revert on error
-        editableStatus.value = incidentDetails.value.status;
-      } finally {
-        updating.value = false;
-      }
+      if (newStatus === "acknowledged") return acknowledgeIncident();
+      if (newStatus === "open") return reopenIncident();
+      return updateStatus(newStatus);
     };
 
     // Handle trigger row click - find the alert index by name
@@ -3551,6 +3602,7 @@ export default defineComponent({
 
     const triggerRca = async (options: { buildOnPrevious?: boolean } = {}) => {
       if (!incidentDetails.value) return;
+      viewSummary.recordAction("analyze");
 
       const incidentId = incidentDetails.value.id;
       const org = store.state.selectedOrganization.identifier;
@@ -3748,10 +3800,11 @@ export default defineComponent({
       statusOptions,
       severityOptions,
       handleStatusChange,
+      recordCommentPosted,
       handleSeverityChange,
       handleTriggerRowClick,
       getStatusLabel,
-      formatPeriod,
+      selectedAlertFacts,
       formatCustomConditions,
       formatTimestamp,
       formatTimestampUTC,

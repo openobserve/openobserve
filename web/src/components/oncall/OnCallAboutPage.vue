@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    the prose around it is not, so it is dropped rather than
                    shown verbatim. -->
               <router-link
-                v-if="fallbackRoutedId"
+                v-if="fallbackRoutedId && teamId"
                 class="text-accent font-medium"
                 :to="{
                   name: 'onCallTeamDetail',
@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <ODescriptionItem :label="t('oncall.team')">
           <router-link
+            v-if="teamId"
             class="text-accent"
             :to="{
               name: 'onCallTeamDetail',
@@ -98,6 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ raw(teamName) }}
           </router-link>
+          <span v-else data-test="oncall-about-no-team">{{ t("oncall.notRoutedToTeam") }}</span>
         </ODescriptionItem>
 
         <ODescriptionItem v-if="subjectStream" :label="t('oncall.subjectStream')">
@@ -201,7 +203,8 @@ import { copyToClipboard } from "@/utils/clipboard";
 const props = withDefaults(
   defineProps<{
     orgId: string;
-    teamId: string;
+    /** `null` for a page no routing rule sent to a team. */
+    teamId: string | null;
     teamName: string;
     subjectType: SubjectType;
     sourceId: string;

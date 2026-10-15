@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 mod base;
+pub mod incidents;
 pub mod oncall;
 pub mod promql;
 
@@ -31,6 +32,7 @@ pub fn init() {
     base::register(registry);
     promql::register(registry);
     oncall::register(registry);
+    incidents::register(registry);
 }
 
 pub fn create_const_labels() -> HashMap<String, String> {

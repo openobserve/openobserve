@@ -27,6 +27,9 @@ use o2_enterprise::enterprise::super_cluster::queue::{
     IncidentMessage, IncidentUnmuteMessage, Message,
 };
 
+/// The kind an `AddAlert` from a region that predates `alert_kind` stands for.
+const DEFAULT_ALERT_KIND: &str = "internal";
+
 pub(crate) async fn process(msg: Message) -> Result<()> {
     let msg = msg.try_into().map_err(|e| {
         infra::errors::Error::Message(format!("[INCIDENTS] Failed to deserialize: {e}"))
@@ -64,11 +67,27 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
             first_alert_at,
             title,
             muted_by_downtime_id,
+            incident_id,
         } => {
             log::debug!(
-                "[SUPER_CLUSTER:incidents] Create incident org={org_id} key_type={key_type}"
+                "[SUPER_CLUSTER:incidents] Create incident org={org_id} key_type={key_type} id={incident_id:?}"
             );
-            alert_incidents::create_with_mute(
+            // A sender that predates the id gets a local one, as before.
+            let Some(incident_id) = incident_id else {
+                alert_incidents::create_with_mute(
+                    &org_id,
+                    &severity,
+                    group_values,
+                    &key_type,
+                    first_alert_at,
+                    title,
+                    muted_by_downtime_id,
+                )
+                .await?;
+                return Ok(());
+            };
+            if !alert_incidents::create_with_id(
+                &incident_id,
                 &org_id,
                 &severity,
                 group_values,
@@ -77,17 +96,23 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
                 title,
                 muted_by_downtime_id,
             )
-            .await?;
+            .await?
+            {
+                log::debug!(
+                    "[SUPER_CLUSTER:incidents] incident {org_id}/{incident_id} already exists; create skipped"
+                );
+            }
         }
         IncidentMessage::UpdateStatus {
             org_id,
             incident_id,
             status,
+            actor,
         } => {
             log::debug!(
                 "[SUPER_CLUSTER:incidents] Update status org={org_id} id={incident_id} status={status}"
             );
-            alert_incidents::update_status(&org_id, &incident_id, &status).await?;
+            apply_status(&org_id, &incident_id, &status, actor.as_deref()).await?;
         }
         IncidentMessage::AddAlert {
             org_id,
@@ -96,6 +121,7 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
             alert_name,
             alert_fired_at,
             correlation_reason,
+            alert_kind,
         } => {
             log::debug!(
                 "[SUPER_CLUSTER:incidents] Add alert to org_id={org_id} incident id={incident_id} alert={alert_id}",
@@ -104,7 +130,7 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
                 &incident_id,
                 &alert_id,
                 &alert_name,
-                "internal",
+                alert_kind.as_deref().unwrap_or(DEFAULT_ALERT_KIND),
                 alert_fired_at,
                 &correlation_reason,
             )
@@ -121,6 +147,28 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
             );
             alert_incidents::resolve_alert_firings(&incident_id, &alert_id, resolved_at).await?;
         }
+    }
+    Ok(())
+}
+
+/// An acknowledgement takes the guarded path so the replica's row names who acknowledged it.
+async fn apply_status(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+    actor: Option<&str>,
+) -> Result<()> {
+    let Some(actor) = actor.filter(|_| status == "acknowledged") else {
+        alert_incidents::update_status(org_id, incident_id, status).await?;
+        return Ok(());
+    };
+    if alert_incidents::acknowledge(org_id, incident_id, actor)
+        .await?
+        .is_none()
+    {
+        return Err(infra::errors::Error::Message(format!(
+            "[INCIDENTS] acknowledge for {org_id}/{incident_id} arrived before the incident; retrying"
+        )));
     }
     Ok(())
 }

@@ -76,6 +76,37 @@ pub(crate) struct AnomalyRunRecord {
     pub(crate) end_us: i64,
 }
 
+/// What correlating a multi-alert's groups into incidents decided for this evaluation.
+#[cfg(feature = "enterprise")]
+#[derive(Debug, Default)]
+struct GroupsCorrelated {
+    /// At least one group's incident owned the notification.
+    handled: bool,
+    notify_error: Option<String>,
+    /// `None` when no group correlated.
+    notify_attempted: Option<bool>,
+    incident_ids: Vec<String>,
+    /// Rows of the groups whose correlation errored; nothing has notified for them.
+    failed_rows: Vec<config::utils::json::Map<String, config::utils::json::Value>>,
+}
+
+#[cfg(feature = "enterprise")]
+impl GroupsCorrelated {
+    fn record(&mut self, correlated: crate::alerts::incidents::CorrelatedIncident) {
+        self.handled = true;
+        self.incident_ids
+            .push(correlated.outcome.incident_id().to_string());
+        self.notify_attempted =
+            Some(self.notify_attempted.unwrap_or(false) || correlated.notify_attempted);
+        if let Some(error) = correlated.notify_error {
+            self.notify_error = Some(match self.notify_error.take() {
+                Some(earlier) => format!("{earlier}; {error}"),
+                None => error,
+            });
+        }
+    }
+}
+
 /// Returns `false` on a failed write; the per-group caller MUST check it or it dispatches stale.
 #[must_use]
 async fn persist_alert_run_state(
@@ -114,7 +145,7 @@ async fn persist_alert_run_state(
             }
         };
         let at = now_micros();
-        let plan = if alert.query_condition.promql_rule_mode {
+        let mut plan = if alert.query_condition.promql_rule_mode {
             config::meta::alerts::prom_rule::plan_rule_updates(
                 alert_id,
                 classification,
@@ -131,9 +162,31 @@ async fn persist_alert_run_state(
                 alert.pending_period_sec,
             )
         };
+        // Only the incident path keeps an episode on the grouped rollup row.
+        let owns_episode = !episode.incident_ids.is_empty()
+            || plan
+                .rollup()
+                .is_some_and(|state| state.episode_id.is_some());
+        let recovered = owns_episode
+            .then(|| {
+                plan.apply_episode(classification.firing_observed > 0, episode, at, || {
+                    episode
+                        .episode_id
+                        .clone()
+                        .unwrap_or_else(config::ider::uuid)
+                })
+            })
+            .flatten();
         if let Err(e) = db::alerts::alert_states::persist_group_plan(&plan, alert_id).await {
             log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
             return false;
+        }
+        if let Some(closed) = recovered
+            && let Some(state) = plan.rollup()
+        {
+            let event =
+                config::meta::alerts::recovery::recovery_event(&alert.org_id, state, closed, at);
+            crate::alerts::recovery::dispatch_recovery(alert, &event).await;
         }
 
         // A composite reads only this multi-alert's rollup row. Nudge its
@@ -2672,31 +2725,189 @@ pub(crate) async fn correlate_muted_incident(
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
     downtime: &config::meta::downtimes::ActiveDowntime,
 ) {
-    let Some(first_row) = rows.first() else {
+    if rows.is_empty() {
         return;
-    };
+    }
     let incidents_enabled = o2_enterprise::enterprise::common::config::get_config()
         .incidents
         .enabled;
     if !correlates_muted_firing(alert.creates_incident, incidents_enabled, downtime) {
         return;
     }
-    if let Err(e) = crate::alerts::incidents::correlate_alert_to_incident(
-        alert,
-        first_row,
-        rows,
-        triggered_at,
-        eval_level,
-        Some(downtime),
-    )
-    .await
-    {
-        log::error!(
-            "[SCHEDULER trace_id {trace_id}] muted incident correlation failed for {}/{}: {e}",
+    for group in &incident_groups(alert, rows) {
+        let Some(representative) = group.first() else {
+            continue;
+        };
+        if let Err(e) = crate::alerts::incidents::correlate_alert_to_incident(
+            alert,
+            representative,
+            group,
+            triggered_at,
+            eval_level,
+            Some(downtime),
+        )
+        .await
+        {
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] muted incident correlation failed for {}/{}: {e}",
+                alert.org_id,
+                alert.name
+            );
+        }
+    }
+}
+
+/// A multi-alert's rows, one list per group up to the cap; anything else stays one group.
+#[cfg(feature = "enterprise")]
+fn incident_groups(
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+) -> Vec<Vec<config::utils::json::Map<String, config::utils::json::Value>>> {
+    let incidents = &o2_enterprise::enterprise::common::config::get_config().incidents;
+    if !splits_incident_groups(
+        alert.query_condition.multi_alert_enabled(),
+        incidents.strict_correlation,
+    ) {
+        return vec![rows.to_vec()];
+    }
+    let cap = incidents.max_groups_per_eval;
+    let group_by = alert_group_by(alert);
+    let (groups, overflow) =
+        distinct_group_rows(rows, |row| downtime_row_key(alert, &group_by, row), cap);
+    if overflow > 0 {
+        log::warn!(
+            "[SCHEDULER] {}/{}: {overflow} group(s) past the cap of {cap} joined the first group's incident",
             alert.org_id,
             alert.name
         );
     }
+    groups
+}
+
+/// Only a multi-alert under strict correlation gets one incident per group.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn splits_incident_groups(multi_alert: bool, strict_correlation: bool) -> bool {
+    multi_alert && strict_correlation
+}
+
+/// Sends the rows of groups whose correlation failed straight to the alert's destinations.
+#[cfg(feature = "enterprise")]
+#[allow(clippy::too_many_arguments)]
+async fn notify_uncorrelated_rows(
+    trace_id: &str,
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+    rows_end_time: i64,
+    start_time: i64,
+    triggered_at: i64,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    actual_value: Option<f64>,
+    episode_key: Option<String>,
+) -> Option<String> {
+    // Workflows are dispatched for every row by the alert-level send, so only destinations go here.
+    let mut destinations_only = alert.clone();
+    destinations_only.workflows.clear();
+    match destinations_only
+        .send_notification(
+            trace_id,
+            rows,
+            rows_end_time,
+            Some(start_time),
+            triggered_at,
+            eval_level,
+            actual_value,
+            None,
+            &[],
+            episode_key,
+        )
+        .await
+    {
+        Ok(outcome) => {
+            let error = outcome.error_message.trim();
+            (!error.is_empty()).then(|| error.to_string())
+        }
+        Err(e) => Some(format!(
+            "direct notification of uncorrelated groups failed: {e}"
+        )),
+    }
+}
+
+/// Rows per distinct key in first-seen order, capped; the overflow groups' rows join the first.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn distinct_group_rows<R: Clone>(
+    rows: &[R],
+    row_key: impl Fn(&R) -> String,
+    cap: usize,
+) -> (Vec<Vec<R>>, usize) {
+    let cap = cap.max(1);
+    let mut index: HashMap<String, usize> = HashMap::new();
+    let mut groups: Vec<Vec<R>> = Vec::new();
+    let mut overflow_keys = std::collections::HashSet::new();
+    for row in rows {
+        let key = row_key(row);
+        if let Some(&i) = index.get(&key) {
+            groups[i].push(row.clone());
+        } else if groups.len() < cap {
+            index.insert(key, groups.len());
+            groups.push(vec![row.clone()]);
+        } else {
+            overflow_keys.insert(key);
+            groups[0].push(row.clone());
+        }
+    }
+    (groups, overflow_keys.len())
+}
+
+/// Correlates each group on its own row, so every group finds its own incident.
+#[cfg(feature = "enterprise")]
+async fn correlate_incident_groups(
+    trace_id: &str,
+    alert: &config::meta::alerts::alert::Alert,
+    groups: &[Vec<config::utils::json::Map<String, config::utils::json::Value>>],
+    triggered_at: i64,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
+) -> GroupsCorrelated {
+    let mut out = GroupsCorrelated::default();
+    for group in groups {
+        let Some(representative) = group.first() else {
+            continue;
+        };
+        match crate::alerts::incidents::correlate_alert_to_incident(
+            alert,
+            representative,
+            group,
+            triggered_at,
+            eval_level,
+            None,
+        )
+        .await
+        {
+            Ok(Some(correlated)) => {
+                log::info!(
+                    "[SCHEDULER trace_id {trace_id}] Alert {}/{} correlated to incident {} (service: {})",
+                    alert.org_id,
+                    alert.name,
+                    correlated.outcome.incident_id(),
+                    correlated.outcome.service_name(),
+                );
+                out.record(correlated);
+            }
+            Ok(None) => log::debug!(
+                "[SCHEDULER trace_id {trace_id}] No incident correlation for alert {}/{}",
+                alert.org_id,
+                alert.name,
+            ),
+            Err(e) => {
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] Error in incident correlation of one group of {}/{}, notifying its rows directly: {e}",
+                    alert.org_id,
+                    alert.name
+                );
+                out.failed_rows.extend(group.iter().cloned());
+            }
+        }
+    }
+    out
 }
 
 /// Whether a matched single-series run is still inside its pending period.
@@ -3628,7 +3839,7 @@ async fn handle_alert_triggers(
     let mut episode_delivered = false;
     // Only the enterprise correlation block assigns this.
     #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
-    let mut episode_incident_id: Option<String> = None;
+    let mut episode_incident_ids = config::meta::alerts::recovery::EpisodeIncidents::default();
     // A failed incident page marks this run's record, not the alert state.
     #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
     let mut durable_outcome: Option<RunOutcome> = None;
@@ -3904,50 +4115,45 @@ async fn handle_alert_triggers(
             && o2_enterprise::enterprise::common::config::get_config()
                 .incidents
                 .enabled
-            && let Some(first_row) = correlation_rows.first()
+            && !correlation_rows.is_empty()
         {
-            match crate::alerts::incidents::correlate_alert_to_incident(
+            let correlated = correlate_incident_groups(
+                &scheduler_trace_id,
                 &alert,
-                first_row,
-                correlation_rows,
+                &incident_groups(&alert, correlation_rows),
                 triggered_at,
                 eval_level,
-                None,
             )
-            .await
-            {
-                Ok(Some(correlated)) => {
-                    log::info!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{} correlated to incident {} (service: {})",
-                        new_trigger.org,
-                        alert.name,
-                        correlated.outcome.incident_id(),
-                        correlated.outcome.service_name(),
-                    );
-                    // Notification was handled inside correlate_alert_to_incident
-                    // (sent for new incidents/alert types, suppressed for repeats).
-                    // The incident owns the resolve too, so the episode records it.
-                    episode_incident_id = Some(correlated.outcome.incident_id().to_string());
-                    trigger_data_stream.delivery_attempted = Some(correlated.notify_attempted);
-                    (true, correlated.notify_error)
-                }
-                Ok(None) => {
-                    log::debug!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] No incident correlation for alert {}/{}",
-                        new_trigger.org,
-                        alert.name,
-                    );
-                    (false, None)
-                }
-                Err(e) => {
-                    log::error!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Error in incident correlation, falling back to direct notification: org_id: {}, error: {e}",
-                        new_trigger.org
-                    );
-                    // Fall through to direct notification — don't silently lose the notification.
-                    (false, None)
+            .await;
+            // The incidents own the resolve too, so the episode records every one of them.
+            episode_incident_ids =
+                config::meta::alerts::recovery::EpisodeIncidents::new(correlated.incident_ids);
+            if correlated.notify_attempted.is_some() {
+                trigger_data_stream.delivery_attempted = correlated.notify_attempted;
+            }
+            let mut notify_error = correlated.notify_error;
+            // A partial failure only; when nothing correlated the whole run falls back below.
+            if correlated.handled && !correlated.failed_rows.is_empty() {
+                let fallback_error = notify_uncorrelated_rows(
+                    &scheduler_trace_id,
+                    &alert,
+                    &correlated.failed_rows,
+                    trigger_results.end_time,
+                    start_time,
+                    triggered_at,
+                    eval_level,
+                    trigger_results.actual_value,
+                    episode_key.clone(),
+                )
+                .await;
+                if let Some(error) = fallback_error {
+                    notify_error = Some(match notify_error {
+                        Some(earlier) => format!("{earlier}; {error}"),
+                        None => error,
+                    });
                 }
             }
+            (correlated.handled, notify_error)
         } else {
             (false, None)
         };
@@ -4412,7 +4618,7 @@ async fn handle_alert_triggers(
             trigger_results.rule_value.as_deref(),
             &config::meta::alerts::recovery::EpisodeInput {
                 delivered: episode_delivered,
-                incident_id: episode_incident_id,
+                incident_ids: episode_incident_ids,
                 keep_firing_for_secs: alert.keep_firing_for,
                 episode_id: episode_key,
             },
@@ -9123,5 +9329,46 @@ mod tests {
         let kept =
             record_incident_notify_failure(&mut workflow_failed, "slack: http 500".to_string());
         assert_eq!(kept, RunOutcome::NotifyFailed);
+    }
+
+    #[test]
+    fn only_a_strict_multi_alert_splits_its_incident_groups() {
+        assert!(splits_incident_groups(true, true));
+        assert!(
+            !splits_incident_groups(true, false),
+            "off: first row only, as before"
+        );
+        assert!(!splits_incident_groups(false, true));
+        assert!(!splits_incident_groups(false, false));
+    }
+
+    #[test]
+    fn distinct_group_rows_keeps_one_list_per_group_in_first_seen_order() {
+        let rows = ["a1", "b1", "a2", "c1", "b2"];
+        let key = |row: &&str| row[..1].to_string();
+        let (groups, overflow) = distinct_group_rows(&rows, key, 10);
+        assert_eq!(groups, vec![vec!["a1", "a2"], vec!["b1", "b2"], vec!["c1"]]);
+        assert_eq!(overflow, 0);
+    }
+
+    #[test]
+    fn distinct_group_rows_folds_groups_past_the_cap_into_the_first() {
+        let rows = ["a1", "b1", "c1", "a2", "d1", "c2"];
+        let key = |row: &&str| row[..1].to_string();
+        let (groups, overflow) = distinct_group_rows(&rows, key, 2);
+        assert_eq!(groups, vec![vec!["a1", "c1", "a2", "d1", "c2"], vec!["b1"]]);
+        assert_eq!(overflow, 2, "c and d are the groups past the cap");
+    }
+
+    #[test]
+    fn distinct_group_rows_treats_a_zero_cap_as_one_and_empty_rows_as_no_groups() {
+        let rows = ["a1", "b1"];
+        let key = |row: &&str| row[..1].to_string();
+        let (groups, overflow) = distinct_group_rows(&rows, key, 0);
+        assert_eq!(groups, vec![vec!["a1", "b1"]]);
+        assert_eq!(overflow, 1);
+        let (none, overflow) = distinct_group_rows(&[] as &[&str], key, 3);
+        assert!(none.is_empty());
+        assert_eq!(overflow, 0);
     }
 }

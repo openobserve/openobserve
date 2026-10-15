@@ -71,6 +71,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const emit = defineEmits<{ (e: "comment-posted"): void }>();
 
 const store = useStore();
 const { t } = useI18nTyped();
@@ -108,6 +109,7 @@ const submitComment = async () => {
   submitting.value = true;
   try {
     await incidentsService.postComment(props.orgId, props.incidentId, text);
+    emit("comment-posted");
     commentText.value = "";
     await fetchEvents();
     toast({
@@ -132,9 +134,12 @@ const isCommentEvent = (event: any): boolean => {
 // Get user ID from event. `SYSTEM_USER_ID` is a stable sentinel, never display
 // text — the guards below and getAvatarColor() compare against it.
 const SYSTEM_USER_ID = "System";
+// The account automatic changes are made as (stale sweep, recovery), never a person.
+const SYSTEM_ACTOR_EMAIL = "system@openobserve.ai";
 
 const getUserId = (event: any): string => {
-  return event.data?.user_id || SYSTEM_USER_ID;
+  const userId = event.data?.user_id;
+  return !userId || userId === SYSTEM_ACTOR_EMAIL ? SYSTEM_USER_ID : userId;
 };
 
 // Get current user ID

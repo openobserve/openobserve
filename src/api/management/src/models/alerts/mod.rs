@@ -1820,8 +1820,7 @@ mod tests {
             assert!(
                 meta_alerts::grouping::validate_multi_alert(
                     &meta.query_condition,
-                    &meta.trigger_condition,
-                    false,
+                    &meta.trigger_condition
                 )
                 .is_ok()
             );

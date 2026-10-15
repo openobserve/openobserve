@@ -372,6 +372,26 @@ describe("AlertSettings — Creates Incident toggle visibility", () => {
     expect(host.find('[data-test="alert-creates-incident-toggle"]').exists()).toBe(visible);
   });
 
+  it.each([
+    ["a per-group SQL alert", { aggregation: { multi_alert: true } }, true, true],
+    ["a per-series PromQL alert", { promql_multi_alert: true }, true, true],
+    ["a per-group alert without incidents", { aggregation: { multi_alert: true } }, false, false],
+    ["an ordinary alert with incidents", {}, true, false],
+  ])("explains per-group incidents for %s", (_label, queryCondition, createsIncident, shown) => {
+    config.isEnterprise = "true";
+    config.isCloud = "false";
+    const host = mount(
+      makeDescendantHost("false", {
+        creates_incident: createsIncident,
+        query_condition: queryCondition,
+      }),
+      { global: { plugins: [makeStore({ incidents_enabled: true }), i18n] } },
+    );
+    const hint = host.find('[data-test="alert-creates-incident-per-group-hint"]');
+    expect(hint.exists()).toBe(shown);
+    if (shown) expect(hint.text()).toContain("One incident per group");
+  });
+
   it("appears once /config reports incidents enabled", async () => {
     config.isEnterprise = "true";
     const store = makeStore();

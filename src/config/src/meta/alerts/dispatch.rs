@@ -671,7 +671,7 @@ mod tests {
             last_notified_level: last_notified,
             episode_id: None,
             episode_opened_at: None,
-            episode_incident_id: None,
+            episode_incident_id: Default::default(),
             recovering_since: None,
         }
     }

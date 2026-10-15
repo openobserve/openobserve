@@ -583,8 +583,7 @@ mod tests {
             assert_eq!(
                 crate::meta::alerts::grouping::validate_multi_alert(
                     &alert.query_condition,
-                    &alert.trigger_condition,
-                    false,
+                    &alert.trigger_condition
                 )
                 .is_ok(),
                 threshold != 2,

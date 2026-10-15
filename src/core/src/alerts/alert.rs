@@ -141,8 +141,7 @@ pub enum AlertError {
 
     /// Per-group alerting (`multi_alert`) has its own admissibility rules —
     /// group_by, orderable operator, "any group" count gates, and the v1
-    /// exclusions for incidents and multi-window comparison (alerts_2.md
-    /// M-9/M-10, §5.5 MN-11).
+    /// exclusion of multi-window comparison (alerts_2.md M-9/M-10).
     #[error("Invalid per-group alert configuration: {0}")]
     InvalidMultiAlert(config::meta::alerts::grouping::MultiAlertError),
 
@@ -435,7 +434,7 @@ pub(crate) async fn create_default_alerts_folder(org_id: &str) -> Result<Folder,
         })
 }
 
-/// Per-group alerting admissibility (M-9/M-10, §5.5 MN-11).
+/// Per-group alerting admissibility (M-9/M-10).
 ///
 /// A no-op for every alert that has not opted in — which is every alert that
 /// predates the feature, since the flag cannot be present in JSON written
@@ -459,13 +458,11 @@ fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
     config::meta::alerts::grouping::validate_multi_alert(
         &alert.query_condition,
         &alert.trigger_condition,
-        alert.creates_incident,
     )
     .map_err(AlertError::InvalidMultiAlert)?;
 
     // Checked here, not in `validate_multi_alert`, because the grouping
     // config is a sibling of the query condition rather than part of it.
-    // Same shape as MN-11's incidents rule.
     let notification_grouping = alert
         .deduplication
         .as_ref()
@@ -4641,7 +4638,7 @@ mod threshold_validation_tests {
     }
 
     // ── Per-group alerting rules as `prepare_alert` applies them ───────────
-    // (M-9/M-10, §5.5 MN-11.)
+    // (M-9/M-10.)
     //
     // SCOPE, stated plainly so these are not mistaken for boundary tests:
     // they call `validate_multi_alert_config` — the function `prepare_alert`
@@ -4712,12 +4709,12 @@ mod threshold_validation_tests {
     #[test]
     fn test_promql_multi_alert_is_no_longer_waved_through_for_lacking_an_aggregation() {
         let mut alert = promql_multi_alert_fixture();
-        alert.creates_incident = true;
+        alert.trigger_condition.threshold = 2;
         assert!(alert.query_condition.aggregation.is_none());
         let err = validate_rules(&alert).unwrap_err();
         assert!(
-            format!("{err}").contains("incident"),
-            "expected the MN-11 rejection, got: {err}"
+            format!("{err}").contains("group-count"),
+            "expected the M-10 rejection, got: {err}"
         );
     }
 
@@ -4765,18 +4762,12 @@ mod threshold_validation_tests {
     }
 
     #[test]
-    fn test_the_rules_reject_multi_alert_with_incidents() {
-        // MN-11. Without this wiring the pure rule exists but every API
-        // client can still create the unsupported combination.
-        let mut alert = multi_alert_fixture();
-        alert.creates_incident = true;
-
-        let err = validate_rules(&alert).expect_err("must be rejected");
-        assert!(matches!(err, AlertError::InvalidMultiAlert(_)));
-        assert!(
-            err.to_string().contains("creates_incident"),
-            "the message must name the field: {err}"
-        );
+    fn test_a_multi_alert_with_incidents_saves() {
+        // Correlation opens one incident per group, up to the cap, so the pair is valid.
+        for mut alert in [multi_alert_fixture(), promql_multi_alert_fixture()] {
+            alert.creates_incident = true;
+            assert!(validate_rules(&alert).is_ok());
+        }
     }
 
     #[test]
@@ -4861,7 +4852,6 @@ mod threshold_validation_tests {
         // Misconfiguration is user input, not a server fault — the same 400
         // the other threshold validations produce.
         for variant in [
-            config::meta::alerts::grouping::MultiAlertError::IncidentsUnsupported,
             config::meta::alerts::grouping::MultiAlertError::NotGrouped,
             config::meta::alerts::grouping::MultiAlertError::CountGateNotAnyGroup,
             config::meta::alerts::grouping::MultiAlertError::MultiTimeRangeUnsupported,
