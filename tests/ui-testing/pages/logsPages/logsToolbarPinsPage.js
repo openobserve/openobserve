@@ -20,7 +20,6 @@ export class LogsToolbarPinsPage {
 
     // ===== LOCATORS =====
     this.moreMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
-    this.savedViewsMenuListButton = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
 
     // Traces runs the same composable under its own scope. useToolbarPins keeps
     // ONE module-level scopeStates map, which only actually gets shared while both
@@ -278,7 +277,9 @@ export class LogsToolbarPinsPage {
   async expectCollapsedButStillPinned(key) {
     await this.expectPinnedHidden(key);
     await this.openMoreMenu();
-    await expect(this.page.locator(this.savedViewsMenuListButton)).toBeVisible();
+    // The toggle living in the menu is the "still reachable" half; its title is
+    // the "still pinned" half. Asserting the menu entry alone would hold whatever
+    // the pin state, since those entries are unconditional.
     await expect(this.page.locator(this.pinToggle[key])).toHaveAttribute(
       'title',
       this.pinTitle.pinned,

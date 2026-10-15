@@ -231,21 +231,33 @@ test.describe('Logs toolbar pins', () => {
       );
       kept.push({ width, visible, count: visible.length });
     }
-    const counts = kept.map((entry) => entry.count);
-    // All of them fit when there is room, and some width in the sweep drops one —
-    // otherwise the prefix assertions above never exercised a collapse.
+    // All of them fit when there is room, and some width in the sweep drops at
+    // least one — otherwise the prefix assertions above never saw a collapse.
     expect(kept[0].count).toBe(pins.assertablePinOrder.length);
-    expect(Math.min(...counts)).toBeLessThan(pins.assertablePinOrder.length);
 
-    // Nothing is lost: saved views has dropped off the toolbar at the narrowest
-    // width, yet the More menu still reports it as pinned — only the rendering
-    // collapsed. Asserted on the set rather than on a count, so no pixel
-    // threshold is baked in.
-    expect(kept[kept.length - 1].visible).not.toContain('savedViews');
-    await pins.expectCollapsedButStillPinned('savedViews');
+    // Which width collapses, and which controls it drops, both move with font
+    // metrics — and since the count is non-monotonic it is not necessarily the
+    // narrowest width. So take the first width that dropped anything, whatever it
+    // is, and derive the dropped set from that width's own count instead of
+    // naming a control or a breakpoint.
+    const collapsedAt = kept.find((entry) => entry.count < pins.assertablePinOrder.length);
+    expect(collapsedAt, 'no width in the sweep dropped a pinned control').toBeDefined();
+    const dropped = pins.assertablePinOrder.slice(collapsedAt.count);
+    // Kept items are a prefix (asserted above), so the dropped ones are exactly
+    // the remaining suffix — together they must still be the whole priority order.
+    expect(collapsedAt.visible.concat(dropped)).toEqual(pins.assertablePinOrder);
+
+    // Nothing is lost: back at that width, every dropped control is off the
+    // toolbar yet the More menu still reports it pinned — only the rendering
+    // collapsed.
+    await pins.setViewportWidthAndSettle(collapsedAt.width);
+    for (const key of dropped) {
+      await pins.expectCollapsedButStillPinned(key);
+    }
 
     testLogger.info(
-      `Pinned items kept per width: ${kept.map((e) => `${e.width}px:${e.count}`).join(', ')}`,
+      `Pinned items kept per width: ${kept.map((e) => `${e.width}px:${e.count}`).join(', ')}` +
+        ` | first collapse at ${collapsedAt.width}px, dropped: ${dropped.join(', ')}`,
     );
   });
 });
