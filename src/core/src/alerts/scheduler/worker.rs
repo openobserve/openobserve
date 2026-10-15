@@ -318,6 +318,11 @@ impl SchedulerJobPuller {
                 let job_id = trigger.id;
                 let job_key = trigger.module_key.clone();
                 let claim = trigger.module.completes_by_claim().then(|| trigger.clone());
+                let max_lifetime_secs = keep_alive_lifetime_secs(
+                    &trigger.module,
+                    self.config.alert_schedule_timeout,
+                    self.config.report_schedule_timeout,
+                );
                 let (tx, mut rx) = mpsc::channel::<()>(1);
                 let scheduled_job = ScheduledJob {
                     trace_id: trace_id.clone(),
@@ -330,8 +335,6 @@ impl SchedulerJobPuller {
                 let ttl = self.config.keep_alive_interval_secs;
                 let alert_timeout = self.config.alert_schedule_timeout;
                 let report_timeout = self.config.report_schedule_timeout;
-                // Maximum lifetime for keep-alive: use the larger timeout * 3
-                let max_lifetime_secs = std::cmp::max(alert_timeout, report_timeout) * 3;
                 tokio::task::spawn(async move {
                     let start_time = tokio::time::Instant::now();
                     let max_lifetime = tokio::time::Duration::from_secs(max_lifetime_secs as u64);
@@ -605,6 +608,18 @@ impl Scheduler {
 
         log::info!("[SCHEDULER] Shutdown complete");
         Ok(())
+    }
+}
+
+/// The longest a puller keeps a claim alive; a calibration pass bounds itself and may need longer.
+fn keep_alive_lifetime_secs(
+    module: &TriggerModule,
+    alert_timeout: i64,
+    report_timeout: i64,
+) -> i64 {
+    match module {
+        TriggerModule::AlertCalibration => super::calibration::claim_lifetime_secs(),
+        _ => std::cmp::max(alert_timeout, report_timeout) * 3,
     }
 }
 
