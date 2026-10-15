@@ -99,17 +99,6 @@ describe("PaidOverageConsentDialog", () => {
     );
   });
 
-  it("names the payer by its name when the server sends one", () => {
-    activeRequest.value = {
-      status: status({
-        payer: { org_id: "3Kg0acme", name: "Acme Payer", enabled: false, can_manage: false },
-      }),
-    };
-    const wrapper = mountDialog();
-    expect(wrapper.text()).toContain("Acme Payer");
-    expect(wrapper.text()).not.toContain("3Kg0acme");
-  });
-
   // The prompt has no stable per-credit rate to show, so Billing is the price source.
   it("links to billing and writes nothing on the way out", async () => {
     const wrapper = mountDialog();

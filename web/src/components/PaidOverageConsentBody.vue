@@ -6,7 +6,7 @@
     <p class="text-text-body text-sm" data-test="paid-overage-billing-cycle-copy">
       {{
         activeRequest.status.payer
-          ? t("paidUsage.consentBillingPayer", { payer: payerName })
+          ? t("paidUsage.consentBillingPayer", { payer: activeRequest.status.payer.org_id })
           : t("paidUsage.consentBilling")
       }}
     </p>
@@ -26,9 +26,8 @@
     <div v-if="activeRequest.status.payer" class="text-text-secondary text-sm">
       {{
         t("paidUsage.memberAndPayerRequired", {
-          organization:
-            activeRequest.status.organization.name ?? activeRequest.status.organization.org_id,
-          payer: payerName,
+          organization: activeRequest.status.organization.org_id,
+          payer: activeRequest.status.payer.org_id,
         })
       }}
     </div>
@@ -40,7 +39,7 @@
     >
       {{
         activeRequest.status.payer && !activeRequest.status.payer.can_manage
-          ? t("paidUsage.contactPayerAdmin", { payer: payerName })
+          ? t("paidUsage.contactPayerAdmin", { payer: activeRequest.status.payer.org_id })
           : t("paidUsage.contactOrganizationAdmin")
       }}
     </div>
@@ -73,10 +72,6 @@ const store = useStore();
 const { activeRequest, acknowledgementChecked, errorMessage, canEnable, decline } =
   usePaidOverageConsent();
 const translatedError = computed(() => (errorMessage.value ? t(errorMessage.value as never) : ""));
-const payerName = computed(() => {
-  const payer = activeRequest.value?.status.payer;
-  return payer?.name ?? payer?.org_id ?? "";
-});
 
 // Leaving the prompt writes nothing, so the next paid attempt prompts again.
 function openBilling() {

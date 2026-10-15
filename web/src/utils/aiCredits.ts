@@ -23,7 +23,7 @@ export const isAiCreditsExhausted = (body: any): boolean =>
 export function aiCreditsRemedy(body: any, t: TranslateFn): I18nText | undefined {
   if (body?.remedy === "subscribe") {
     return body.payer_org_id
-      ? t("billing.aiPayerSubscribeMessage", { payer: body.payer_org_name ?? body.payer_org_id })
+      ? t("billing.aiPayerSubscribeMessage", { payer: body.payer_org_id })
       : t("billing.aiExhaustedMessage");
   }
   if (body?.remedy === "contact_account_manager") return t("billing.aiContractExhaustedMessage");

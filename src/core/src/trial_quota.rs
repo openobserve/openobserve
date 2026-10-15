@@ -1164,18 +1164,8 @@ pub fn record_billable_ai_usage(org_id: &str, ctx: &AiUsageContext, feature: Tri
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PaidOverageOrganizationStatus {
     pub org_id: String,
-    /// Display name, so messages name the organization instead of its identifier.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
     pub enabled: bool,
     pub can_manage: bool,
-}
-
-/// An organization's display name, for messages that name the payer.
-async fn org_name(org_id: Option<&str>) -> Option<String> {
-    crate::organization::get_org(org_id?)
-        .await
-        .map(|org| org.name)
 }
 
 /// Billing eligibility attached to cumulative paid-overage state.
@@ -1280,13 +1270,11 @@ pub async fn paid_overage_status_for_user(
 ) -> PaidOverageStatus {
     let organization = PaidOverageOrganizationStatus {
         org_id: org_id.to_string(),
-        name: org_name(Some(org_id)).await,
         enabled: resolution.organization_enabled,
         can_manage: can_manage_paid_overage(org_id, user_email).await,
     };
     let payer = match (resolution.payer_org_id, resolution.payer_enabled) {
         (Some(payer_org_id), Some(enabled)) => Some(PaidOverageOrganizationStatus {
-            name: org_name(Some(&payer_org_id)).await,
             enabled,
             can_manage: can_manage_paid_overage(&payer_org_id, user_email).await,
             org_id: payer_org_id,
@@ -1344,7 +1332,6 @@ pub enum AiUsageAuthorizationError {
         remedy: PaymentRemedy,
         /// Set for a billing-group member, whose payer org holds the subscription.
         payer_org_id: Option<String>,
-        payer_org_name: Option<String>,
     },
     #[error("AI usage authorization is temporarily unavailable: {0}")]
     Unavailable(String),
@@ -1392,7 +1379,6 @@ async fn authorize_paid_overage(
                     "AI credit limit exhausted. Contact your account manager to add more credits."
                         .to_string(),
                 remedy: PaymentRemedy::ContactAccountManager,
-                payer_org_name: org_name(resolution.payer_org_id.as_deref()).await,
                 payer_org_id: resolution.payer_org_id,
             })
         }
@@ -1400,7 +1386,6 @@ async fn authorize_paid_overage(
             Err(AiUsageAuthorizationError::PaymentRequired {
                 message: exhausted_message.to_string(),
                 remedy: PaymentRemedy::Subscribe,
-                payer_org_name: org_name(resolution.payer_org_id.as_deref()).await,
                 payer_org_id: resolution.payer_org_id,
             })
         }
@@ -1449,7 +1434,6 @@ pub struct AiUsageResponse {
     pub requires_additional_credits: bool,
     /// Set for a billing-group member, whose payer org holds the subscription.
     pub payer_org_id: Option<String>,
-    pub payer_org_name: Option<String>,
     pub costs: AiCreditCosts,
     /// Free credits each feature used; `None` when the breakdown could not be read.
     pub used_by_feature: Option<AiCreditCosts>,
@@ -1592,7 +1576,6 @@ impl From<PoolUsageResponse> for AiUsageResponse {
             credits_remaining: usage.remaining,
             requires_additional_credits: usage.requires_additional_credits,
             payer_org_id: usage.payer_org_id,
-            payer_org_name: None,
             used_by_feature: None,
             costs: AiCreditCosts {
                 chat: TrialQuotaFeature::AiChat.cost(),
@@ -1607,7 +1590,6 @@ impl From<PoolUsageResponse> for AiUsageResponse {
 pub async fn get_usage(org_id: &str) -> AiUsageResponse {
     let pool = TrialQuotaPool::AiCredits;
     let mut usage: AiUsageResponse = get_pool_usage(org_id, pool).await.into();
-    usage.payer_org_name = org_name(usage.payer_org_id.as_deref()).await;
     usage.used_by_feature =
         infra::table::trial_quota_usage::get_usage_by_feature(org_id, pool.feature_keys())
             .await

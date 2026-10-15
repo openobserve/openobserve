@@ -200,18 +200,6 @@ describe("PaidAiUsageControl", () => {
     expect(w.text()).toContain("Waiting for acme to turn it on");
   });
 
-  it("names the payer by its name when the server sends one", async () => {
-    services.getConsent.mockResolvedValue({
-      data: consentStatus({
-        organization: { org_id: "member", enabled: true, can_manage: true },
-        payer: { org_id: "3Kg0acme", name: "Acme Payer", enabled: false, can_manage: false },
-        effective: false,
-      }),
-    });
-    const w = await mountControl();
-    expect(w.text()).toContain("Waiting for Acme Payer to turn it on");
-  });
-
   it("shows a member's own consent while it waits, so the member can turn it off", async () => {
     services.getConsent.mockResolvedValue({
       data: consentStatus({

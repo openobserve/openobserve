@@ -126,20 +126,6 @@ describe("O2AICreditsNotice", () => {
     expect(w.get('[data-test="o2-ai-credits-exhausted"]').attributes("role")).toBe("status");
   });
 
-  it("names a member's payer by its name, not its identifier", async () => {
-    mockGetAiUsage.mockResolvedValue(
-      usage({
-        mode: "exhausted",
-        credits_remaining: 0,
-        payer_org_id: "3Kg0acme",
-        payer_org_name: "Acme Payer",
-      }),
-    );
-    const text = (await mountNotice()).text();
-    expect(text).toContain("managed by Acme Payer");
-    expect(text).not.toContain("3Kg0acme");
-  });
-
   it("points contract orgs to their account manager, without Plans", async () => {
     mockGetAiUsage.mockResolvedValue(
       usage({ mode: "exhausted", credits_remaining: 0, requires_additional_credits: true }),

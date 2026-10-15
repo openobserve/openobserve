@@ -17,9 +17,7 @@
             usage!.requires_additional_credits
               ? t("billing.aiContractExhaustedMessage")
               : usage!.payer_org_id
-                ? t("billing.aiPayerSubscribeMessage", {
-                    payer: usage!.payer_org_name ?? usage!.payer_org_id,
-                  })
+                ? t("billing.aiPayerSubscribeMessage", { payer: usage!.payer_org_id })
                 : t("billing.aiExhaustedMessage")
           }}
         </div>
