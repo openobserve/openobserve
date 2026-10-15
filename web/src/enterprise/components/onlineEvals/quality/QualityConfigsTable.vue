@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query/useOrgId";
@@ -294,7 +294,8 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
-const search = ref("");
+// Owned by the page, like the tile filter, so it survives opening a config and coming back.
+const search = defineModel<string>("search", { default: "" });
 
 const filteredRows = computed(() => {
   const query = search.value.trim().toLowerCase();
