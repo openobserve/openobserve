@@ -115,6 +115,8 @@ test.describe('Dashboard time range apply and Auto Run', { tag: ['@dashboards', 
     const autoRun = pm.dashboardAutoRun;
     await autoRun.pinAutoQuery(true);
     await autoRun.setStoredAutoRun(null);
+    // The full config is cached from base load; reload so the pinned auto_query_enabled is fetched before the SPA-only dashboard creation.
+    await page.reload();
     const timestamp = Date.now();
     const dashboardName = `Dashboard_TimeRange_Panel_${timestamp}`;
     const { panelId } = await createDashboardWithPanelTime(page, pm, {
@@ -148,6 +150,8 @@ test.describe('Dashboard time range apply and Auto Run', { tag: ['@dashboards', 
     const autoRun = pm.dashboardAutoRun;
     await autoRun.pinAutoQuery(true);
     await autoRun.setStoredAutoRun(null);
+    // The full config is cached from base load; reload so the pinned auto_query_enabled is fetched before the SPA-only dashboard creation.
+    await page.reload();
     const timestamp = Date.now();
     const dashboardName = `Dashboard_TimeRange_View_${timestamp}`;
     const { panelId } = await createDashboardWithPanelTime(page, pm, {

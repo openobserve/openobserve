@@ -1,6 +1,0 @@
-{
-  "group": "Dashboards-Panel-Level-DateTime-Config",
-  "spec_filename": "dashboard-time-range-apply.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}

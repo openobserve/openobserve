@@ -1,9 +1,0 @@
-[
-  { "title": "global time range applies immediately with Auto Run on and the picker has no Apply button", "action": "new", "verifies": "the dashboard picker renders no Apply button and a relative pick applies at once (panel re-queries once, URL gains period=6d, Refresh not warning)" },
-  { "title": "with Auto Run off a relative pick defers to a yellow Refresh which commits it", "action": "new", "verifies": "with Auto Run off a pick is deferred (no re-query, URL unchanged, yellow Refresh with 'Refresh to apply the time range' tooltip) until Refresh is clicked" },
-  { "title": "turning Auto Run on auto-applies a waiting time range", "action": "new", "verifies": "toggling Auto Run back on applies a deferred pick without an explicit Refresh click" },
-  { "title": "panel-level picker applies in view mode with Auto Run on and defers with Auto Run off", "action": "new", "verifies": "the per-panel picker uses the same gate: applies at once (URL gains pt-period) with Auto Run on, defers (ghost-warning refresh) with Auto Run off" },
-  { "title": "the full-screen view panel applies with the same time gate", "action": "new", "verifies": "the full-screen view panel applies at once with Auto Run on and defers (warning refresh) with Auto Run off" },
-  { "title": "fresh-on-open re-queries relative panels exactly once", "action": "new", "verifies": "a fresh visit with Auto Run on and a relative range re-queries each relative panel exactly once and no more" },
-  { "title": "Auto Run unavailable degrades to deferred apply", "action": "new", "verifies": "with auto_query_enabled=false the Auto Run toggle is hidden and a time pick defers to manual Refresh" }
-]
