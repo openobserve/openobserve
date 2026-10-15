@@ -16,6 +16,7 @@ import DashboardSqlAutocomplete from "./dashboardPages/dashboard-sql-autocomplet
 import DashboardPromQLEditor from "./dashboardPages/dashboard-promql-editor";
 import DashboardMultiSQL from "./dashboardPages/dashboard-multi-sql";
 import DashboardMaxQueryRange from "./dashboardPages/dashboard-max-query-range";
+import DashboardNotices from "./dashboardPages/dashboard-notices.js";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
 import DashboardCellExplorerPage from "./dashboardPages/dashboard-cell-explorer";
 import DashboardLegendsCopy from "./dashboardPages/dashboard-legends-copy";
@@ -185,6 +186,7 @@ class PageManager {
     this.dashboardPromQLEditor = new DashboardPromQLEditor(page);
     this.dashboardMultiSQL = new DashboardMultiSQL(page);
     this.dashboardMaxQueryRange = new DashboardMaxQueryRange(page);
+    this.dashboardNotices = new DashboardNotices(page);
     this.dashboardDrilldown = new DashboardDrilldownPage(page);
     this.dashboardCellExplorer = new DashboardCellExplorerPage(page);
     this.dashboardLegendsCopy = new DashboardLegendsCopy(page);
