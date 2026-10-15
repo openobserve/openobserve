@@ -168,6 +168,16 @@ describe("QualityConfigsTable", () => {
     expect(wrapper.find('[data-test="quality-configs-unhealthy-gro"]').exists()).toBe(false);
   });
 
+  it("keeps the Unhealthy bar out of the accessible name, so its minimum sliver is never announced", () => {
+    const wrapper = mountTable({
+      rows: [row({ configId: "tiny", status: "attention", total: 5000, unhealthy: 1 })],
+    });
+    const cell = wrapper.find('[data-test="quality-configs-unhealthy-tiny"]');
+    const bar = cell.find('[role="progressbar"]');
+    expect(bar.attributes("aria-hidden")).toBe("true");
+    expect(cell.text()).toContain("<0.1%");
+  });
+
   it("colours the Unhealthy bar green, orange or red by share, and keeps the text and its colours", () => {
     const wrapper = mountTable({
       rows: [
