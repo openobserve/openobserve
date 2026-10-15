@@ -85,6 +85,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @hide="setTimeForVariables"
               data-test="dashboard-global-date-time-picker"
             />
+            <span
+              v-if="draftStatusText"
+              class="text-text-secondary inline-flex items-center gap-1 text-xs whitespace-nowrap max-md:hidden"
+              aria-live="polite"
+              data-test="dashboard-panel-draft-status"
+            >
+              <OIcon :name="draftStatus === 'error' ? 'error-outline' : 'check-circle'" size="xs" />
+              <span>{{ draftStatusText }}</span>
+              <OTooltip
+                v-if="draftStatus === 'error'"
+                :content="t('panelDraft.saveFailedTooltip')"
+                side="bottom"
+              />
+            </span>
             <OButton
               v-if="!isMobile"
               variant="outline-destructive"
@@ -209,6 +223,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OPageHeader>
       </OForm>
     </template>
+    <OContent v-if="draftBanner" class="shrink-0 py-2">
+      <OBanner
+        :variant="['restore', 'restored'].includes(draftBanner.kind) ? 'info' : 'warning'"
+        :icon="['restore', 'restored'].includes(draftBanner.kind) ? 'history' : 'warning'"
+        dense
+        inline-actions
+        :data-test="
+          draftBanner.kind === 'deleted'
+            ? 'dashboard-panel-draft-banner-deleted'
+            : draftBanner.kind === 'restored'
+              ? 'dashboard-panel-draft-banner-restored'
+              : 'dashboard-panel-draft-banner'
+        "
+      >
+        <div class="font-medium">
+          {{
+            draftBanner.kind === "deleted"
+              ? t("panelDraft.deletedTitle")
+              : draftBanner.kind === "restored"
+                ? t("panelDraft.restoredTitle", { time: draftBannerTime })
+                : t("panelDraft.bannerTitle", { time: draftBannerTime })
+          }}
+        </div>
+        <div v-if="draftBanner.kind === 'stale'" class="text-xs">
+          {{ t("panelDraft.staleMessage") }}
+        </div>
+        <div v-else-if="draftBanner.kind === 'deleted'" class="text-xs">
+          {{ t("panelDraft.deletedMessage", { time: draftBannerTime }) }}
+        </div>
+        <template #actions>
+          <OButton
+            v-if="draftBanner.kind === 'restored'"
+            variant="outline"
+            size="sm"
+            data-test="dashboard-panel-draft-revert"
+            @click="revertToSaved"
+            >{{
+              draftBanner.record.isNew ? t("panelDraft.discardDraft") : t("panelDraft.revert")
+            }}</OButton
+          >
+          <template v-else>
+            <OButton
+              v-if="draftBanner.kind === 'deleted'"
+              variant="primary"
+              size="sm"
+              data-test="dashboard-panel-draft-save-as-new"
+              @click="saveDraftAsNewPanel"
+              >{{ t("panelDraft.saveAsNew") }}</OButton
+            >
+            <OButton
+              v-else
+              variant="primary"
+              size="sm"
+              data-test="dashboard-panel-draft-restore"
+              @click="restoreDraft"
+              >{{ t("panelDraft.restore") }}</OButton
+            >
+            <OButton
+              variant="outline"
+              size="sm"
+              data-test="dashboard-panel-draft-discard"
+              @click="discardStoredDraft"
+              >{{ t("panelDraft.discardDraft") }}</OButton
+            >
+          </template>
+        </template>
+      </OBanner>
+    </OContent>
     <!-- PanelEditor Content Area -->
     <PanelEditor
       ref="panelEditorRef"
@@ -232,6 +314,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data="panelTitle"
       data-test="query-inspector-dialog"
     />
+
+    <ODialog
+      v-model:open="leaveDialogOpen"
+      size="sm"
+      :title="t('panelDraft.leaveTitle')"
+      :primary-button-label="t('panelDraft.keepAsDraft')"
+      :secondary-button-label="t('panelDraft.discardChanges')"
+      secondary-button-variant="outline-destructive"
+      :neutral-button-label="t('panelDraft.keepEditing')"
+      data-test="dashboard-panel-leave-dialog"
+      @click:primary="keepAsDraftAndLeave"
+      @click:secondary="discardChangesAndLeave"
+      @click:neutral="leaveDialogOpen = false"
+    >
+      <div class="flex flex-col gap-2 text-sm">
+        <p>
+          {{
+            draftStatus === "saved"
+              ? t("panelDraft.leaveMessageSaved")
+              : t("panelDraft.leaveMessage")
+          }}
+        </p>
+        <p class="text-text-secondary text-xs">{{ t("panelDraft.leaveNote") }}</p>
+      </div>
+    </ODialog>
 
     <!-- Add Variable Drawer -->
     <div
@@ -265,6 +372,7 @@ import {
   reactive,
   onUnmounted,
   onMounted,
+  onBeforeUnmount,
   defineAsyncComponent,
   provide,
   inject,
@@ -327,6 +435,23 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import {
+  PANEL_DRAFT_AUTOSAVE_MS,
+  deletePanelDraft,
+  formatPanelDraftTime,
+  getPanelDraft,
+  isPanelDraftStale,
+  isPanelDraftStorageAvailable,
+  markPanelDraftKept,
+  newPanelDraftId,
+  panelDraftKey,
+  savePanelDraft,
+  type PanelDraftRecord,
+} from "@/composables/dashboard/usePanelDraft";
+import { findPanelById } from "@/utils/dashboard/findPanel";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -341,6 +466,9 @@ export default defineComponent({
     OButton,
     OPageLayout,
     OPageHeader,
+    OContent,
+    OBanner,
+    ODialog,
     OForm,
     OFormInlineEdit,
     ODropdown,
@@ -365,7 +493,7 @@ export default defineComponent({
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
-    const { t } = useI18nTyped();
+    const { t, locale } = useI18nTyped();
     const { isMobile } = useBreakpoint();
     const router = useRouter();
     const route = useRoute();
@@ -671,6 +799,9 @@ export default defineComponent({
 
       // remove beforeUnloadHandler event listener
       window.removeEventListener("beforeunload", beforeUnloadHandler);
+      window.removeEventListener("pagehide", onDraftPageHide);
+      document.removeEventListener("visibilitychange", onDraftVisibilityChange);
+      if (draftClock) clearInterval(draftClock);
       window.removeEventListener("pointerdown", captureBaselineOnFirstInput, true);
       window.removeEventListener("keydown", captureBaselineOnFirstInput, true);
 
@@ -687,6 +818,10 @@ export default defineComponent({
     onMounted(async () => {
       // assign the route query params
       routeQueryParamsOnMount = JSON.parse(JSON.stringify(route?.query ?? {}));
+      delete routeQueryParamsOnMount.draftId;
+      delete routeQueryParamsOnMount.restoreDraft;
+      captureDraftIdentity();
+      const draftStorageReady = isPanelDraftStorageAvailable();
 
       errorData.errors = [];
 
@@ -701,6 +836,8 @@ export default defineComponent({
           route.query.folder,
           route.query.tab,
         );
+
+        draftBase = JSON.parse(JSON.stringify(panelData ?? null));
 
         try {
           Object.assign(dashboardPanelData.data, JSON.parse(JSON.stringify(panelData ?? {})));
@@ -755,7 +892,10 @@ export default defineComponent({
 
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
+      window.addEventListener("pagehide", onDraftPageHide);
+      document.addEventListener("visibilitychange", onDraftVisibilityChange);
       await loadDashboard();
+      await initPanelDrafts(draftStorageReady);
 
       // Call makeAutoSQLQuery after dashboard data is loaded
       // Only generate SQL if we're in auto query mode
@@ -1180,9 +1320,7 @@ export default defineComponent({
       updateDateTime();
     };
 
-    const goBack = async () => {
-      // Clean up variables created during this session (on discard)
-      // Remove variables that were created in this session from the dashboard data
+    const cleanupSessionVariables = () => {
       if (
         variablesCreatedInSession.value.length > 0 &&
         currentDashboardData.data?.variables?.list
@@ -1191,12 +1329,12 @@ export default defineComponent({
           (v: any) => !variablesCreatedInSession.value.includes(v.name),
         );
       }
-
-      // Clear the tracking arrays
       variablesCreatedInSession.value = [];
       variablesWithCurrentPanel.value = [];
+    };
 
-      return router.push({
+    const navigateToDashboard = () =>
+      router.push({
         path: "/dashboards/view",
         query: {
           ...routeQueryParamsOnMount,
@@ -1206,10 +1344,409 @@ export default defineComponent({
           tab: route.query.tab ?? currentDashboardData?.data?.tabs?.[0]?.tabId,
         },
       });
+
+    interface DraftIdentity {
+      userId: string;
+      org: string;
+      dashboardId: string;
+      folder: string;
+      tab: string;
+      panelId: string | null;
+      draftId: string | null;
+    }
+    type DraftBanner = {
+      kind: "restore" | "stale" | "deleted" | "restored";
+      record: PanelDraftRecord;
     };
 
+    // Captured at mount: an org switch rewrites the route before this editor unmounts.
+    let draftIdentity: DraftIdentity | null = null;
+    let draftBase: unknown = null;
+    let draftWrittenThisSession = false;
+    // False while another session's draft sits at this key unresolved; this session must not overwrite or delete it.
+    let ownsDraftKey = true;
+    let preRestoreData: any = null;
+    let preRestoreBase: unknown = null;
+    let draftLeaveHandled = false;
+    let editorLeaving = false;
+    let draftTimer: ReturnType<typeof setTimeout> | null = null;
+    let draftClock: ReturnType<typeof setInterval> | null = null;
+    const draftsEnabled = ref(false);
+    const draftStatus = ref<"idle" | "saving" | "saved" | "error">("idle");
+    const draftSavedAt = ref<number | null>(null);
+    const draftNow = ref(Date.now());
+    const draftBanner = ref<DraftBanner | null>(null);
+    const leaveDialogOpen = ref(false);
+
+    const draftStatusText = computed(() => {
+      if (draftStatus.value === "saving") return t("panelDraft.savingStatus");
+      if (draftStatus.value === "error") return t("panelDraft.saveFailedStatus");
+      if (draftStatus.value === "saved" && draftSavedAt.value) {
+        const time = formatPanelDraftTime(
+          draftSavedAt.value,
+          locale.value,
+          draftNow.value,
+          t("panelDraft.justNow"),
+        );
+        return t("panelDraft.savedStatus", { time: time.relative });
+      }
+      return "";
+    });
+
+    const draftBannerTime = computed(() =>
+      draftBanner.value
+        ? formatPanelDraftTime(
+            draftBanner.value.record.updatedAt,
+            locale.value,
+            draftNow.value,
+            t("panelDraft.justNow"),
+          ).full
+        : "",
+    );
+
+    const captureDraftIdentity = () => {
+      draftIdentity = {
+        userId: String(store.state.userInfo?.email ?? ""),
+        org: String(store.state.selectedOrganization?.identifier ?? ""),
+        dashboardId: String(route.query.dashboard ?? ""),
+        folder: String(route.query.folder ?? "default"),
+        tab: String(route.query.tab ?? ""),
+        panelId: route.query.panelId ? String(route.query.panelId) : null,
+        draftId: route.query.draftId ? String(route.query.draftId) : null,
+      };
+    };
+
+    const hasDraftTarget = () => !!(draftIdentity?.panelId || draftIdentity?.draftId);
+
+    // Minted on the first write so a refresh or Back reopens this same new-panel draft.
+    const ensureDraftId = () => {
+      if (!draftIdentity || hasDraftTarget()) return;
+      draftIdentity.draftId = newPanelDraftId();
+      if (!editorLeaving) {
+        router.replace({ query: { ...route.query, draftId: draftIdentity.draftId } });
+      }
+    };
+
+    const clearDraftTimer = () => {
+      if (draftTimer) clearTimeout(draftTimer);
+      draftTimer = null;
+    };
+
+    // Starts the write synchronously, so the snapshot is taken before an unmount resets the editor.
+    const flushDraft = (): Promise<boolean> => {
+      clearDraftTimer();
+      const identity = draftIdentity;
+      if (!draftsEnabled.value || !identity?.dashboardId) return Promise.resolve(false);
+      if (!hasUnsavedChanges()) {
+        if (!draftWrittenThisSession || !hasDraftTarget()) return Promise.resolve(false);
+        draftWrittenThisSession = false;
+        draftStatus.value = "idle";
+        return deletePanelDraft(identity, identity).then(() => false);
+      }
+      if (!ownsDraftKey) forkDraftKey();
+      ensureDraftId();
+      draftStatus.value = "saving";
+      const list = currentDashboardData.data?.variables?.list ?? [];
+      return savePanelDraft({
+        ...identity,
+        base: draftBase,
+        data: dashboardPanelData.data,
+        variables: list.filter((v: any) => variablesCreatedInSession.value.includes(v.name)),
+        variablesWithCurrentPanel: variablesWithCurrentPanel.value,
+      }).then(
+        () => {
+          draftWrittenThisSession = true;
+          draftStatus.value = "saved";
+          draftSavedAt.value = Date.now();
+          draftNow.value = Date.now();
+          return true;
+        },
+        () => {
+          draftStatus.value = "error";
+          return false;
+        },
+      );
+    };
+
+    // Edits made while an older draft is unresolved go to their own key, so both survive.
+    const forkDraftKey = () => {
+      if (!draftIdentity) return;
+      draftIdentity.draftId = newPanelDraftId();
+      ownsDraftKey = true;
+      if (!editorLeaving) {
+        router.replace({ query: { ...route.query, draftId: draftIdentity.draftId } });
+      }
+    };
+
+    const markDraftKept = () => {
+      if (!draftIdentity || !hasDraftTarget()) return;
+      markPanelDraftKept(draftIdentity.dashboardId, panelDraftKey(draftIdentity, draftIdentity));
+    };
+
+    const scheduleDraftSave = () => {
+      if (!draftsEnabled.value || editorLeaving) return;
+      clearDraftTimer();
+      draftTimer = setTimeout(() => {
+        draftTimer = null;
+        void flushDraft();
+      }, PANEL_DRAFT_AUTOSAVE_MS);
+    };
+
+    const leaveKeepingDraft = async () => {
+      editorLeaving = true;
+      const kept = await flushDraft();
+      draftLeaveHandled = true;
+      if (kept) markDraftKept();
+    };
+
+    const flushDraftOnExit = () => {
+      if (draftLeaveHandled) return;
+      editorLeaving = true;
+      draftLeaveHandled = true;
+      void flushDraft().then((kept) => kept && markDraftKept());
+    };
+
+    const onDraftPageHide = () => {
+      if (!draftLeaveHandled) void flushDraft();
+    };
+
+    const onDraftVisibilityChange = () => {
+      if (document.visibilityState === "hidden" && !draftLeaveHandled) void flushDraft();
+    };
+
+    const storedDraftKind = (record: PanelDraftRecord): DraftBanner["kind"] => {
+      if (record.isNew) return "restore";
+      const serverPanel = findPanelById(
+        currentDashboardData.data,
+        record.panelId,
+        currentTabId.value,
+      )?.panel;
+      if (!serverPanel) return "deleted";
+      return isPanelDraftStale(record, serverPanel) ? "stale" : "restore";
+    };
+
+    const checkForStoredDraft = async (restoreRequested: boolean) => {
+      if (!draftIdentity || !hasDraftTarget()) return;
+      const record = await getPanelDraft(draftIdentity, draftIdentity);
+      if (!record) return;
+      ownsDraftKey = false;
+      const kind = storedDraftKind(record);
+      // Opening from the drafts tray or badge already chose the draft; stale and deleted ones still ask.
+      if (restoreRequested && kind === "restore") {
+        await applyDraftRecord(record);
+        draftBanner.value = { kind: "restored", record };
+        return;
+      }
+      draftBanner.value = { kind, record };
+    };
+
+    const initPanelDrafts = async (ready: Promise<boolean>) => {
+      if (draftIdentity && !draftIdentity.tab) draftIdentity.tab = currentTabId.value ?? "";
+      draftsEnabled.value = await ready;
+      if (!draftsEnabled.value || forceSkipBeforeUnloadListener) return;
+      draftClock = setInterval(() => {
+        draftNow.value = Date.now();
+      }, 30_000);
+      const restoreRequested = route.query.restoreDraft === "1";
+      if (restoreRequested) {
+        const query: Record<string, any> = { ...route.query };
+        delete query.restoreDraft;
+        router.replace({ query });
+      }
+      await checkForStoredDraft(restoreRequested);
+    };
+
+    const restoreDraftVariables = async (record: PanelDraftRecord) => {
+      const stored = (record.variables ?? []) as any[];
+      if (!stored.length) return;
+      if (!currentDashboardData.data.variables) {
+        currentDashboardData.data.variables = { list: [] };
+      }
+      const list = currentDashboardData.data.variables.list;
+      stored.forEach((variable: any) => {
+        if (!list.some((v: any) => v.name === variable.name)) {
+          list.push(JSON.parse(JSON.stringify(variable)));
+        }
+        if (!variablesCreatedInSession.value.includes(variable.name)) {
+          variablesCreatedInSession.value.push(variable.name);
+        }
+      });
+      variablesWithCurrentPanel.value = [
+        ...new Set([...variablesWithCurrentPanel.value, ...record.variablesWithCurrentPanel]),
+      ];
+      await reinitializeVariables();
+    };
+
+    const applyDraftRecord = async (record: PanelDraftRecord) => {
+      // The click on Restore already armed the baseline; a programmatic restore must arm it too.
+      if (panelBaseline === null) {
+        panelBaseline = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      }
+      preRestoreData = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      preRestoreBase = draftBase;
+      await adoptDraftKey(record);
+      const data = JSON.parse(JSON.stringify(record.data));
+      const serverPanel = editMode.value
+        ? findPanelById(currentDashboardData.data, draftIdentity?.panelId, currentTabId.value)
+            ?.panel
+        : undefined;
+      // The grid position belongs to the dashboard, which may have moved the panel since.
+      if (serverPanel?.layout) data.layout = JSON.parse(JSON.stringify(serverPanel.layout));
+      Object.assign(dashboardPanelData.data, data);
+      const queryCount = dashboardPanelData.data.queries?.length ?? 0;
+      if (dashboardPanelData.layout.currentQueryIndex >= queryCount) {
+        dashboardPanelData.layout.currentQueryIndex = queryCount > 0 ? queryCount - 1 : 0;
+      }
+      dashboardPanelData.layout.vrlFunctionToggle = isQueryVrlEnabled(
+        dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex],
+      );
+      draftBase = record.isNew ? null : record.base;
+      await restoreDraftVariables(record);
+      await nextTick();
+      runQuery();
+    };
+
+    // This session now continues the stored draft, dropping any copy it forked meanwhile.
+    const adoptDraftKey = async (record: PanelDraftRecord) => {
+      if (!draftIdentity) return;
+      const forked = draftIdentity.draftId && draftIdentity.draftId !== record.draftId;
+      if (forked && draftWrittenThisSession) await deletePanelDraft(draftIdentity, draftIdentity);
+      if (forked) {
+        const query: Record<string, any> = { ...route.query };
+        if (record.draftId) query.draftId = record.draftId;
+        else delete query.draftId;
+        router.replace({ query });
+      }
+      draftIdentity.panelId = record.panelId;
+      draftIdentity.draftId = record.draftId;
+      draftWrittenThisSession = false;
+      ownsDraftKey = true;
+    };
+
+    const restoreDraft = async () => {
+      const banner = draftBanner.value;
+      if (!banner) return;
+      draftBanner.value = null;
+      await applyDraftRecord(banner.record);
+      scheduleDraftSave();
+    };
+
+    const revertToSaved = async () => {
+      const banner = draftBanner.value;
+      if (!banner || !draftIdentity) return;
+      draftBanner.value = null;
+      clearDraftTimer();
+      await deletePanelDraft(draftIdentity, draftIdentity);
+      draftWrittenThisSession = false;
+      draftStatus.value = "idle";
+      if (preRestoreData) {
+        const data: any = dashboardPanelData.data;
+        Object.keys(data).forEach((key) => {
+          if (!(key in preRestoreData)) delete data[key];
+        });
+        Object.assign(data, JSON.parse(JSON.stringify(preRestoreData)));
+        draftBase = preRestoreBase;
+      }
+      if (variablesCreatedInSession.value.length) {
+        cleanupSessionVariables();
+        await reinitializeVariables();
+      }
+      panelBaseline = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      await nextTick();
+      runQuery();
+    };
+
+    const discardAndLeave = async () => {
+      draftLeaveHandled = true;
+      editorLeaving = true;
+      clearDraftTimer();
+      if (draftIdentity && hasDraftTarget() && ownsDraftKey) {
+        await deletePanelDraft(draftIdentity, draftIdentity);
+      }
+      cleanupSessionVariables();
+      isUnsavedTrackingActive = false;
+      const failure = await navigateToDashboard();
+      if (failure) {
+        draftLeaveHandled = false;
+        editorLeaving = false;
+      }
+      return failure;
+    };
+
+    const discardStoredDraft = async () => {
+      const banner = draftBanner.value;
+      if (!banner || !draftIdentity) return;
+      draftBanner.value = null;
+      await deletePanelDraft(draftIdentity, banner.record);
+      if (!draftIdentity.draftId || draftIdentity.draftId === banner.record.draftId) {
+        ownsDraftKey = true;
+      }
+      // A deleted panel leaves nothing to edit once its draft is gone.
+      if (banner.kind === "deleted") await discardAndLeave();
+    };
+
+    const saveDraftAsNewPanel = async () => {
+      const banner = draftBanner.value;
+      if (!banner || !draftIdentity) return;
+      draftBanner.value = null;
+      await deletePanelDraft(draftIdentity, banner.record);
+      editMode.value = false;
+      draftIdentity.panelId = null;
+      draftIdentity.draftId = newPanelDraftId();
+      ownsDraftKey = true;
+      const query: Record<string, any> = { ...route.query, draftId: draftIdentity.draftId };
+      delete query.panelId;
+      await router.replace({ query });
+      await applyDraftRecord({
+        ...banner.record,
+        panelId: null,
+        draftId: draftIdentity.draftId,
+        isNew: true,
+        base: null,
+      });
+      await nextTick();
+      await form.handleSubmit();
+    };
+
+    const goBack = async () => {
+      if (draftsEnabled.value && !draftLeaveHandled) await leaveKeepingDraft();
+      cleanupSessionVariables();
+      const failure = await navigateToDashboard();
+      if (failure && draftsEnabled.value) {
+        draftLeaveHandled = false;
+        editorLeaving = false;
+      }
+      return failure;
+    };
+
+    // Discard asks only when there is something to lose and a draft could keep it.
+    const requestLeave = () => {
+      if (draftsEnabled.value && hasUnsavedChanges()) {
+        leaveDialogOpen.value = true;
+        return;
+      }
+      return goBack();
+    };
+
+    const keepAsDraftAndLeave = async () => {
+      leaveDialogOpen.value = false;
+      await goBack();
+    };
+
+    const discardChangesAndLeave = async () => {
+      leaveDialogOpen.value = false;
+      await discardAndLeave();
+    };
+
+    watch(() => dashboardPanelData.data, scheduleDraftSave, { deep: true });
+    watch(variablesCreatedInSession, scheduleDraftSave, { deep: true });
+
     const beforeUnloadHandler = (e: any) => {
-      //check is data updated or not
+      // With drafts the edits survive the unload, so the browser prompt is not needed.
+      if (draftsEnabled.value) {
+        void flushDraft();
+        return;
+      }
       if (hasUnsavedChanges()) {
         // Display a confirmation message
         const confirmMessage = t("dashboard.unsavedMessage"); // Some browsers require a return statement to display the message
@@ -1223,9 +1760,22 @@ export default defineComponent({
     // in cases where org is changed, we need to force a nvaigation, without warning
     let forceSkipBeforeUnloadListener = false;
 
-    onBeforeRouteLeave((to, from, next) => {
+    onBeforeUnmount(() => {
+      clearDraftTimer();
+      // An org switch remounts the editor without a route leave, so this is its only chance to keep the edits.
+      flushDraftOnExit();
+    });
+
+    onBeforeRouteLeave(async (to, from, next) => {
       // check if it is a force navigation, then allow
       if (forceSkipBeforeUnloadListener) {
+        flushDraftOnExit();
+        next();
+        return;
+      }
+
+      if (draftsEnabled.value) {
+        if (!draftLeaveHandled) await leaveKeepingDraft();
         next();
         return;
       }
@@ -1234,18 +1784,7 @@ export default defineComponent({
       if (from.path === "/dashboards/add_panel" && hasUnsavedChanges()) {
         const confirmMessage = t("dashboard.unsavedMessage");
         if (window.confirm(confirmMessage)) {
-          // User confirmed navigation - clean up variables created during this session
-          if (
-            variablesCreatedInSession.value.length > 0 &&
-            currentDashboardData.data?.variables?.list
-          ) {
-            currentDashboardData.data.variables.list =
-              currentDashboardData.data.variables.list.filter(
-                (v: any) => !variablesCreatedInSession.value.includes(v.name),
-              );
-          }
-          variablesCreatedInSession.value = [];
-          variablesWithCurrentPanel.value = [];
+          cleanupSessionVariables();
           // User confirmed, allow navigation
           next();
         } else {
@@ -1443,6 +1982,13 @@ export default defineComponent({
         });
 
         isUnsavedTrackingActive = false;
+        clearDraftTimer();
+        draftLeaveHandled = true;
+        editorLeaving = true;
+        // A draft this session neither restored nor wrote belongs to another session and outlives the save.
+        if (draftIdentity && hasDraftTarget() && ownsDraftKey) {
+          await deletePanelDraft(draftIdentity, draftIdentity);
+        }
 
         // The author sees the value just saved, not an older view-mode override of this panel.
         clearExemplarOverride(
@@ -1798,6 +2344,37 @@ export default defineComponent({
       // Don't reload dashboard - user is canceling/discarding the variable creation
     };
 
+    const reinitializeVariables = async () => {
+      const variablesList = currentDashboardData.data?.variables?.list ?? [];
+      // Re-initialize manager with updated list
+      await variablesManager.initialize(variablesList, currentDashboardData.data);
+
+      // Restore visibility
+      // 1. Tab visibility
+      const tabId = currentTabId.value;
+      if (tabId) {
+        variablesManager.setTabVisibility(tabId, true);
+      }
+
+      // 2. Panel visibility (Edit Mode)
+      if (editMode.value && route.query.panelId) {
+        variablesManager.setPanelVisibility(route.query.panelId as string, true);
+      } else {
+        // 3. Panel visibility (Add Mode - current_panel)
+        // In add mode, mark "current_panel" as visible so variables can load
+        variablesManager.setPanelVisibility("current_panel", true);
+      }
+
+      // 4. Additionally, if any variable uses "current_panel", ensure it's visible
+      if (variablesWithCurrentPanel.value.length > 0) {
+        variablesManager.setPanelVisibility("current_panel", true);
+      }
+
+      // 5. Trigger variable data reload to ensure new variables are displayed
+      // Wait for Vue to process the manager updates
+      await nextTick();
+    };
+
     /**
      * Handles saving a variable - reloads dashboard to reflect the saved variable
      */
@@ -1863,33 +2440,7 @@ export default defineComponent({
 
       selectedVariableToEdit.value = null;
 
-      // Re-initialize manager with updated list
-      await variablesManager.initialize(variablesList, currentDashboardData.data);
-
-      // Restore visibility
-      // 1. Tab visibility
-      const tabId = currentTabId.value;
-      if (tabId) {
-        variablesManager.setTabVisibility(tabId, true);
-      }
-
-      // 2. Panel visibility (Edit Mode)
-      if (editMode.value && route.query.panelId) {
-        variablesManager.setPanelVisibility(route.query.panelId as string, true);
-      } else {
-        // 3. Panel visibility (Add Mode - current_panel)
-        // In add mode, mark "current_panel" as visible so variables can load
-        variablesManager.setPanelVisibility("current_panel", true);
-      }
-
-      // 4. Additionally, if any variable uses "current_panel", ensure it's visible
-      if (variablesWithCurrentPanel.value.length > 0) {
-        variablesManager.setPanelVisibility("current_panel", true);
-      }
-
-      // 5. Trigger variable data reload to ensure new variables are displayed
-      // Wait for Vue to process the manager updates
-      await nextTick();
+      await reinitializeVariables();
 
       // The VariablesValueSelector components should automatically pick up
       // the new variables from the manager through their computed properties
@@ -1987,11 +2538,25 @@ export default defineComponent({
       currentPanelId,
       panelEditorRef,
       dashboardDataForPanelEditor,
+      draftsEnabled,
+      draftStatus,
+      draftStatusText,
+      draftBanner,
+      draftBannerTime,
+      restoreDraft,
+      discardStoredDraft,
+      saveDraftAsNewPanel,
+      revertToSaved,
+      leaveDialogOpen,
+      requestLeave,
+      keepAsDraftAndLeave,
+      discardChangesAndLeave,
+      flushDraft,
     };
   },
   methods: {
     goBackToDashboardList() {
-      this.goBack();
+      this.requestLeave();
     },
   },
 });

@@ -278,8 +278,9 @@ export class MetricsBuilderPage {
         return this.page.locator('[data-test="dashboard-panel-discard"]');
     }
 
-    getDashboardConfirmPrimaryBtn() {
-        return this.page.locator('[data-test="o-dialog-primary-btn"]').first();
+    // "Discard changes" in the panel editor's leave dialog, so no browser draft is kept.
+    getDashboardLeaveDiscardBtn() {
+        return this.page.locator('[data-test="dashboard-panel-leave-dialog"] [data-test="o-dialog-secondary-btn"]');
     }
 
     getEditStreamInput() {

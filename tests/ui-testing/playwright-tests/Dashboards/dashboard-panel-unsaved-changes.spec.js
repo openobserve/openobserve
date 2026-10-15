@@ -1,11 +1,11 @@
 /**
- * Dashboard panel editor — "unsaved changes" guard (PR #14806, issue #7454).
+ * Dashboard panel editor — "unsaved changes" guard (PR #14806, issue #7454) and
+ * browser-only panel drafts.
  *
- * The editor used to flag ANY deep mutation of dashboardPanelData.data after
- * mount as a user edit, so load-time effects (defaults, stream auto-select)
- * produced a confirm dialog on leave even when nothing was touched. It now
- * snapshots a baseline on the user's FIRST pointer/key event and compares
- * against it on leave, so pre-input mutations and reverted edits do not warn.
+ * The editor snapshots a baseline on the user's FIRST pointer/key event and
+ * compares against it, so load-time effects and reverted edits are not edits.
+ * A real edit is kept as a browser draft: leaving never raises a native
+ * confirm, and Discard opens the in-app "Leave panel editor?" dialog.
  *
  * Each test owns its dashboard and deletes it in afterEach.
  */
@@ -14,6 +14,7 @@ const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures
 const testLogger = require("../utils/test-logger.js");
 const { safeWaitForNetworkIdle } = require("../utils/wait-helpers.js");
 import PageManager from "../../pages/page-manager.js";
+import { PANEL_LEAVE_DIALOG, settlePanelLeave } from "../../pages/dashboardPages/panel-leave-dialog.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import {
   waitForDashboardPage,
@@ -21,8 +22,6 @@ import {
   addSimplePanel,
   setupTestDashboard,
 } from "./utils/dashCreation.js";
-
-const UNSAVED_MESSAGE = "You have unsaved changes. Are you sure you want to leave?";
 
 const CLEANUP_BUDGET_MS = 90000;
 
@@ -96,16 +95,20 @@ async function expectDiscardWithoutPrompt(page, pm) {
   ).toEqual([]);
 }
 
-/** Click Discard, accept the expected confirm, and return the dialog messages. */
-async function expectDiscardPrompts(page, pm) {
-  const watcher = captureDialogs(page, { accept: true });
+/** Click Discard, answer the in-app leave dialog, and return any native dialog messages. */
+async function expectDiscardOpensLeaveDialog(page, pm, choice) {
+  const watcher = captureDialogs(page);
+  let shown;
   try {
     await pm.dashboardPanelActions.getPanelDiscardBtn().click();
-    await page.waitForURL((url) => !url.pathname.includes("add_panel"), { timeout: 30000 });
+    await expect(page.locator(PANEL_LEAVE_DIALOG)).toContainText("Leave panel editor?", {
+      timeout: 15000,
+    });
+    shown = await settlePanelLeave(page, { choice });
   } finally {
     watcher.dispose();
   }
-  return watcher.messages;
+  return { shown, messages: watcher.messages };
 }
 
 /** Return to the dashboard list and delete the test dashboard. */
@@ -200,7 +203,7 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
   );
 
   test(
-    "discarding a real edit still warns and leaves the editor on accept",
+    "discarding a real edit opens the leave dialog instead of a native confirm",
     { tag: ["@dashboard-panel-unsaved-changes", "@all", "@dashboards", "@P0"] },
     async ({ page }) => {
       const panelName = pm.dashboardPanelActions.generateUniquePanelName("unsaved");
@@ -209,12 +212,77 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       await openSavedPanelEditor(page, pm, panelName);
       await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "b");
 
-      const messages = await expectDiscardPrompts(page, pm);
-      expect(
-        messages,
-        "an actual panel edit must still raise the unsaved-changes confirm"
-      ).toContain(UNSAVED_MESSAGE);
-      testLogger.info("Real edit raised the unsaved-changes confirm");
+      const { shown, messages } = await expectDiscardOpensLeaveDialog(page, pm, "discard");
+      expect(shown, "an actual panel edit must open the leave dialog").toBe(true);
+      expect(messages, "the leave dialog replaces the native confirm").toEqual([]);
+      await expect(page.locator('[data-test="dashboard-drafts-chip"]')).toHaveCount(0);
+      testLogger.info("Real edit opened the in-app leave dialog");
+    }
+  );
+
+  test(
+    "browser Back with an edit keeps a draft that the dashboard shows at once",
+    { tag: ["@dashboard-panel-unsaved-changes", "@all", "@dashboards", "@P1"] },
+    async ({ page }) => {
+      const panelName = pm.dashboardPanelActions.generateUniquePanelName("unsaved");
+      dashboardName = await createDashboardWithPanel(page, pm, panelName);
+
+      await openSavedPanelEditor(page, pm, panelName);
+      await pm.dashboardPanelActions.addPanelName(`${panelName}_back`);
+
+      const watcher = captureDialogs(page);
+      try {
+        await page.goBack();
+        await page.waitForURL((url) => !url.pathname.includes("add_panel"), { timeout: 30000 });
+      } finally {
+        watcher.dispose();
+      }
+      expect(watcher.messages).toEqual([]);
+      // No reload: the chip and badge must appear from the write made while leaving.
+      await expect(page.locator('[data-test="dashboard-drafts-chip"]')).toContainText(
+        "1 unsaved draft",
+        { timeout: 15000 }
+      );
+      await expect(page.locator('[data-test="dashboard-panel-draft-badge"]')).toHaveCount(1);
+      await expect(page.getByText("Draft kept.")).toBeVisible({ timeout: 15000 });
+    }
+  );
+
+  test(
+    "keeping an edit as a draft marks the panel and reopens it with the draft applied",
+    { tag: ["@dashboard-panel-unsaved-changes", "@all", "@dashboards", "@P0"] },
+    async ({ page }) => {
+      const panelName = pm.dashboardPanelActions.generateUniquePanelName("unsaved");
+      dashboardName = await createDashboardWithPanel(page, pm, panelName);
+
+      await openSavedPanelEditor(page, pm, panelName);
+      await pm.dashboardPanelActions.addPanelName(`${panelName}_draft`);
+
+      const { shown, messages } = await expectDiscardOpensLeaveDialog(page, pm, "keep");
+      expect(shown).toBe(true);
+      expect(messages).toEqual([]);
+
+      await expect(page.locator('[data-test="dashboard-drafts-chip"]')).toContainText(
+        "1 unsaved draft",
+        { timeout: 15000 }
+      );
+      await expect(page.getByText("Draft kept.")).toBeVisible({ timeout: 15000 });
+
+      // The badge is an explicit choice, so the editor opens with the draft already applied.
+      await page.locator('[data-test="dashboard-panel-draft-badge"]').first().click();
+      await page.waitForURL((url) => url.pathname.includes("add_panel"), { timeout: 30000 });
+      await expect(page.locator('[data-test="dashboard-panel-draft-banner-restored"]')).toContainText(
+        "Restored your draft from"
+      );
+      await expect(page.locator('[data-test="dashboard-panel-name-value"]').first()).toContainText(
+        `${panelName}_draft`
+      );
+
+      // Discarding from the dialog deletes the draft, so the dashboard shows none.
+      await pm.dashboardPanelActions.getPanelDiscardBtn().click();
+      await settlePanelLeave(page, { choice: "discard" });
+      await expect(page.locator('[data-test="dashboard-drafts-chip"]')).toHaveCount(0);
+      testLogger.info("Draft kept, restored and discarded");
     }
   );
 

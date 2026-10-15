@@ -1058,10 +1058,8 @@ test.describe("Dashboard Table Chart Pagination Feature - PromQL Tables", () => 
 
     testLogger.info('Verified pagination works for PromQL table chart');
 
-    // The router guard (onBeforeRouteLeave) fires window.confirm when leaving with
-    // unsaved changes. Accept it so navigation to ViewDashboard completes.
-    page.once('dialog', dialog => dialog.accept());
-    await pm.dashboardPanelActions.discardPanelBtn.click();
+    // Discard opens the in-app leave dialog for an edited panel; discardPanel answers it.
+    await pm.dashboardPanelActions.discardPanel();
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });

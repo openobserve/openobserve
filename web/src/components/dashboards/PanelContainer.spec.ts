@@ -20,6 +20,8 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import config from "@/aws-exports";
+import { computed, ref } from "vue";
+import { PANEL_DRAFTS_KEY } from "@/composables/dashboard/usePanelDraft";
 
 // Mock shortURL service
 vi.mock("@/services/short_url", () => ({
@@ -194,7 +196,7 @@ describe("PanelContainer", () => {
     }
   });
 
-  const createWrapper = (props = {}, extraStubs = {}) => {
+  const createWrapper = (props = {}, extraStubs = {}, provide = {}) => {
     return mount(PanelContainer, {
       props: {
         ...defaultProps,
@@ -305,6 +307,7 @@ describe("PanelContainer", () => {
           },
           $router: { push: vi.fn(), replace: vi.fn() },
         },
+        provide,
       },
     });
   };
@@ -332,6 +335,56 @@ describe("PanelContainer", () => {
   });
 
   describe("Panel Header", () => {
+    const draftsContext = (status: string) => {
+      const entry = {
+        record: { panelId: "panel-1", updatedAt: Date.now() },
+        status,
+        tabId: "default-tab",
+      };
+      const entries = ref([entry]);
+      return {
+        entry,
+        ctx: {
+          entries,
+          byPanelId: computed(() => new Map([["panel-1", entry]])),
+          open: vi.fn(),
+          remove: vi.fn(),
+          removeForPanel: vi.fn(),
+        },
+      };
+    };
+
+    it("shows a Draft badge that opens the editor when this panel has a draft", async () => {
+      const { entry, ctx } = draftsContext("edited");
+      wrapper = createWrapper({}, {}, { [PANEL_DRAFTS_KEY as symbol]: ctx });
+
+      const badge = wrapper.find('[data-test="dashboard-panel-draft-badge"]');
+      expect(badge.text()).toContain("Draft");
+      await badge.trigger("click");
+      expect(ctx.open).toHaveBeenCalledWith(entry);
+    });
+
+    it("warns in the delete confirm that the panel's draft goes too", () => {
+      const { ctx } = draftsContext("edited");
+      wrapper = createWrapper({}, {}, { [PANEL_DRAFTS_KEY as symbol]: ctx });
+      const confirm = wrapper.findComponent({ name: "ConfirmDialog" });
+      expect(confirm.props("warningMessage")).toBe(
+        "Your unsaved draft of this panel will be deleted too.",
+      );
+    });
+
+    it("marks an outdated draft and hides the badge without a drafts provider", () => {
+      const { ctx } = draftsContext("stale");
+      wrapper = createWrapper({}, {}, { [PANEL_DRAFTS_KEY as symbol]: ctx });
+      expect(wrapper.find('[data-test="dashboard-panel-draft-badge"]').text()).toContain(
+        "Draft · outdated",
+      );
+      wrapper.unmount();
+
+      wrapper = createWrapper();
+      expect(wrapper.find('[data-test="dashboard-panel-draft-badge"]').exists()).toBe(false);
+    });
+
     it("should display panel title", () => {
       wrapper = createWrapper();
 

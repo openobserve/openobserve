@@ -1228,9 +1228,59 @@ describe("Commons Utility Functions", () => {
 
       expect(mockDashboard.tabs[0].panels[0]).toBe(panelData);
     });
+
+    it("updates a panel that was moved to another tab instead of writing index -1", async () => {
+      const dashboardId = "dashboard-moved";
+      const panelData = { id: "panel-1", title: "Edited" };
+      const mockDashboard: any = {
+        tabs: [
+          { tabId: "tab-1", panels: [{ id: "panel-2", title: "Other" }] },
+          { tabId: "tab-2", panels: [{ id: "panel-1", title: "Panel 1" }] },
+        ],
+      };
+
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      (dashboardService.get_Dashboard as any).mockResolvedValue({
+        data: { version: 1, v1: mockDashboard, hash: 123 },
+      });
+
+      await updatePanel(mockStore, dashboardId, panelData, "f", "tab-1");
+
+      expect(mockDashboard.tabs[1].panels[0]).toBe(panelData);
+      expect(mockDashboard.tabs[0].panels).toEqual([{ id: "panel-2", title: "Other" }]);
+      expect(mockDashboard.tabs[0].panels[-1]).toBeUndefined();
+    });
+
+    it("throws instead of saving when the panel no longer exists", async () => {
+      const dashboardId = "dashboard-gone";
+      mockStore.state.organizationData.allDashboardData[dashboardId] = {
+        tabs: [{ tabId: "tab-1", panels: [] }],
+      };
+      (dashboardService.save as any).mockClear();
+
+      await expect(
+        updatePanel(mockStore, dashboardId, { id: "panel-1" }, "f", "tab-1"),
+      ).rejects.toThrow();
+      expect(dashboardService.save).not.toHaveBeenCalled();
+    });
   });
 
   describe("getPanel", () => {
+    it("finds a panel that was moved to another tab", async () => {
+      const dashboardId = "dashboard-moved-get";
+      mockStore.state.organizationData.allDashboardData[dashboardId] = {
+        tabs: [
+          { tabId: "tab-1", panels: [] },
+          { tabId: "tab-2", panels: [{ id: "panel-1", title: "Moved" }] },
+        ],
+      };
+
+      const result = await getPanel(mockStore, dashboardId, "panel-1", "f", "tab-1");
+
+      expect(result).toEqual({ id: "panel-1", title: "Moved" });
+    });
+
     it("should return panel by ID from specified tab", async () => {
       const dashboardId = "dashboard-1";
       const panelId = "panel-2";
