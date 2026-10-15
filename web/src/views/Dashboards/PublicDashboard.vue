@@ -412,7 +412,8 @@ const panelEntry = (panel: { id: string; type?: string }) => {
     data: result.data ?? [],
     metadata: result.metadata ?? { queries: [] },
     resultMetaData: result.resultMetaData ?? [],
-    isPartialData: !!result.state?.partial,
+    // A server-side partial build, not an interrupted load: the panel shows the Partial notice.
+    serverPartial: !!result.state?.partial,
     dimmed: !!result.state?.retained,
     notice: panelBadge(result),
   };

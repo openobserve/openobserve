@@ -901,7 +901,7 @@ describe("PublicDashboard viewer", () => {
     const injected = grid(w).props("injectedPanelData");
     expect(injected.kept).toMatchObject({ dimmed: true, data: [[{ y: 1 }]] });
     expect(injected.kept.notice).toMatch(/^from \d{2}:04/);
-    expect(injected.part).toMatchObject({ isPartialData: true, dimmed: false });
+    expect(injected.part).toMatchObject({ serverPartial: true, dimmed: false });
     expect(injected.cut.notice).toBe("Showing the first 1,000 rows");
     expect(injected.big.errorDetail.message).toBe("This panel isn't available on the public view.");
   });
