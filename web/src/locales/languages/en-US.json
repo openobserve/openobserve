@@ -8621,6 +8621,7 @@
     "summaryActive": "Active",
     "summaryPaused": "Paused",
     "summaryFailed": "Failed",
+    "summaryFiring": "Firing",
     "summaryRecent": "Triggered < 15m",
     "summaryTotal": "Total",
     "webhook": "Web Hook",
