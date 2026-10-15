@@ -63,6 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </template>
         <template #actions>
+          <PanelDraftsTray
+            v-if="!isFullscreen && !isEditingLayout && store.state.printMode !== true"
+            :tabs="currentDashboardData.data?.tabs || []"
+          />
           <!-- Add panel is the most-used action, so it leads the toolbar. -->
           <OButton
             v-if="!isFullscreen && !isEditingLayout"
@@ -580,6 +584,9 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useLayoutEditDraft } from "@/composables/dashboard/useLayoutEditDraft";
+import { PANEL_DRAFTS_KEY, usePanelDraftsList } from "@/composables/dashboard/usePanelDraft";
+import PanelDraftsTray from "@/components/dashboards/PanelDraftsTray.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
@@ -625,6 +632,7 @@ export default defineComponent({
     ScheduledDashboards,
     PanelLayoutSettings,
     DashboardJsonEditor,
+    PanelDraftsTray,
     OButton,
     OButtonGroup,
     ODropdown,
@@ -651,6 +659,43 @@ export default defineComponent({
       showErrorNotification,
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
+
+    // Opening from the tray or badge already chose the draft, so the editor applies it without asking.
+    const openPanelDraft = (entry) => {
+      const query = { ...route.query };
+      delete query.panelId;
+      delete query.draftId;
+      const target = {};
+      if (entry.record.panelId) target.panelId = entry.record.panelId;
+      if (entry.record.draftId) target.draftId = entry.record.draftId;
+      return router.push({
+        path: "/dashboards/add_panel",
+        query: {
+          ...query,
+          org_identifier: store.state.selectedOrganization.identifier,
+          dashboard: String(route.query.dashboard),
+          folder: route.query.folder ?? "default",
+          tab: entry.tabId,
+          ...target,
+          restoreDraft: "1",
+        },
+      });
+    };
+
+    const panelDrafts = usePanelDraftsList({
+      scope: () => {
+        if (!route.query.dashboard || store.state.printMode === true) return null;
+        return {
+          userId: String(store.state.userInfo?.email ?? ""),
+          org: String(store.state.selectedOrganization?.identifier ?? ""),
+          dashboardId: String(route.query.dashboard),
+        };
+      },
+      dashboard: () => currentDashboardData.data,
+      open: openPanelDraft,
+      onKeptDraft: () => toast({ variant: "info", message: t("panelDraft.keptToast") }),
+    });
+    provide(PANEL_DRAFTS_KEY, panelDrafts);
 
     // Variables manager will be initialized by RenderDashboardCharts
     // and we'll receive a reference to it via the @variablesManagerReady event
@@ -1904,6 +1949,8 @@ export default defineComponent({
           route.query.folder ?? "default",
           route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
         );
+        // The delete confirm told the user the panel's drafts go with it.
+        await panelDrafts.removeForPanel(String(panelId));
         await loadDashboard();
 
         showPositiveNotification(t("dashboard.viewDashboard.panelDeleted"), {

@@ -305,6 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </ODialog>
       <div v-if="!panels.length">
+        <PanelDraftsEmptyHint v-if="!viewOnly" :tab-id="selectedTabId" />
         <!-- if data not available show nodata component -->
         <NoPanel
           @update:Panel="addPanelData"
@@ -343,6 +344,7 @@ import { useRoute } from "vue-router";
 import { updateDashboard } from "../../utils/commons";
 import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
+import PanelDraftsEmptyHint from "@/components/dashboards/PanelDraftsEmptyHint.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
 import useNotifications from "@/composables/useNotifications";
@@ -448,6 +450,7 @@ export default defineComponent({
     PanelContainer,
     DateTimePickerDashboard,
     NoPanel,
+    PanelDraftsEmptyHint,
     VariablesValueSelector,
     ViewPanel,
     TabList,

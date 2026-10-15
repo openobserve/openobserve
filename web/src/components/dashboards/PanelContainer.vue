@@ -57,6 +57,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ props.data.title }}
         </OTruncatedText>
+        <OBadge
+          v-if="draftEntry && !viewOnly && !simplifiedPanelView"
+          clickable
+          :variant="draftEntry.status === 'stale' ? 'warning-soft' : 'primary-soft'"
+          size="sm"
+          :icon="draftEntry.status === 'stale' ? 'warning' : 'edit-note'"
+          class="me-1 shrink-0"
+          data-test="dashboard-panel-draft-badge"
+          @click.stop="panelDrafts?.open(draftEntry)"
+        >
+          <span class="inline-flex items-center">{{
+            draftEntry.status === "stale" ? t("panelDraft.badgeStale") : t("panelDraft.badge")
+          }}</span>
+          <OTooltip :content="draftBadgeTooltip" side="bottom" />
+        </OBadge>
         <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
           v-if="curatedBadge"
@@ -469,6 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('panel.deletePanelTitle')"
       :message="t('panel.deletePanelMessage')"
+      :warning-message="draftEntry ? t('panelDraft.panelDeleteWarning') : undefined"
       @update:ok="deletePanelDialog"
       @update:cancel="confirmDeletePanelDialog = false"
       v-model="confirmDeletePanelDialog"
@@ -496,6 +512,7 @@ import {
   watch,
   onBeforeUnmount,
   onMounted,
+  inject,
 } from "vue";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
@@ -510,6 +527,8 @@ import { getUUID, processQueryMetadataErrors, b64EncodeUnicode } from "@/utils/z
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import { PANEL_DRAFTS_KEY, formatPanelDraftTime } from "@/composables/dashboard/usePanelDraft";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -585,6 +604,7 @@ export default defineComponent({
   ],
   components: {
     OTag,
+    OBadge,
     PanelSchemaRenderer,
     PanelBar,
     QueryInspector,
@@ -607,7 +627,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
-    const { t } = useI18nTyped();
+    const { t, locale } = useI18nTyped();
     // Curated pages stamp this; stored dashboards never carry it, so the badge
     // and the body dimming are both invisible outside them (§6.3).
     const curatedBadge = computed(
@@ -645,6 +665,22 @@ export default defineComponent({
     );
     // need PanleSchemaRendererRef for table download as a csv
     const PanleSchemaRendererRef: any = ref(null);
+
+    // Provided by the dashboard view only, so previews and other hosts never show draft markers.
+    const panelDrafts = inject(PANEL_DRAFTS_KEY, null);
+    const draftEntry = computed(() => panelDrafts?.byPanelId.value.get(props.data?.id) ?? null);
+    const draftBadgeTooltip = computed(() => {
+      if (!draftEntry.value) return raw("");
+      const time = formatPanelDraftTime(
+        draftEntry.value.record.updatedAt,
+        locale.value,
+        Date.now(),
+        t("panelDraft.justNow"),
+      ).full;
+      return draftEntry.value.status === "stale"
+        ? t("panelDraft.badgeStaleTooltip", { time })
+        : t("panelDraft.badgeTooltip", { time });
+    });
 
     const exemplarsEligible = computed(() => isExemplarEligible(props.data));
     const exemplarKey = computed(() =>
@@ -1158,6 +1194,9 @@ export default defineComponent({
 
     return {
       props,
+      panelDrafts,
+      draftEntry,
+      draftBadgeTooltip,
       exemplarsEligible,
       exemplarOverride,
       exemplarsOn,
