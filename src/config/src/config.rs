@@ -2076,12 +2076,6 @@ pub struct Common {
         help = "Enable shared memtable across multiple organizations"
     )]
     pub feature_shared_memtable_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_WAL_PACK_ENABLED",
-        default = true,
-        help = "Persist metrics memtables into packed wal files (one file per rotation instead of one file per stream)"
-    )]
-    pub feature_wal_pack_enabled: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -2435,12 +2429,6 @@ pub struct Common {
     pub min_auto_refresh_interval: u32,
     #[env_config(name = "ZO_ADDITIONAL_REPORTING_ORGS", default = "")]
     pub additional_reporting_orgs: String,
-    #[env_config(
-        name = "ZO_USAGE_REPORT_TO_OWN_ORG",
-        default = true,
-        help = "Report alert/report triggers to the originating organization in addition to _meta org"
-    )]
-    pub usage_report_to_own_org: bool,
     #[env_config(
         name = "ZO_USE_STREAM_SETTINGS_FOR_PARTITIONS_ENABLED",
         default = false,
@@ -3099,12 +3087,6 @@ pub struct Limit {
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
-    #[env_config(
-        name = "ZO_METRICS_INDEX_ENABLED",
-        default = false,
-        help = "Enable experimental metrics indexing and sample blocks for newly written metrics data."
-    )]
-    pub metrics_index_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
     #[env_config(
@@ -3206,7 +3188,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_COMPACT_TANTIVY_BUILDER_THREAD_NUM",
         default = 2,
-        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. less than or equal to 1 disables (single-threaded)"
+        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. Minimum 2"
     )]
     pub tantivy_builder_thread_num: usize,
 }
@@ -4784,6 +4766,9 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
     }
+    if cfg.compact.tantivy_builder_thread_num < 2 {
+        cfg.compact.tantivy_builder_thread_num = 2;
+    }
     if !cfg.compact.fast_mode && cfg.common.local_mode {
         cfg.compact.fast_mode = true;
     }
@@ -5556,30 +5541,6 @@ mod tests {
 
         cfg.route.dispatch_strategy = RouteDispatchStrategy::Other;
         assert!(check_route_config(&cfg).is_err());
-    }
-
-    #[test]
-    fn test_usage_report_to_own_org_field_exists() {
-        // Test that usage_report_to_own_org field exists and is accessible
-        let cfg = Config::init().unwrap();
-        // Verify the field is accessible as a boolean
-        let _value: bool = cfg.common.usage_report_to_own_org;
-        // Test passes if we can access the field without error
-    }
-
-    #[test]
-    fn test_usage_report_to_own_org_env_override() {
-        // Test that environment variable can override the default
-        unsafe {
-            std::env::set_var("ZO_USAGE_REPORT_TO_OWN_ORG", "false");
-        }
-        let cfg = Config::init().unwrap();
-        // Note: This test may fail if the config is already loaded
-        // In that case, we just verify the field exists
-        let _ = cfg.common.usage_report_to_own_org;
-        unsafe {
-            std::env::remove_var("ZO_USAGE_REPORT_TO_OWN_ORG");
-        }
     }
 
     #[test]

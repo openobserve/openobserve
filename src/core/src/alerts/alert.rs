@@ -285,9 +285,6 @@ pub enum AlertError {
     )]
     AlertSourceOfSlos { slos: String },
 
-    #[error("{name} is a built-in alert: it can be switched off or edited, not deleted or renamed")]
-    BuiltinAlert { name: String },
-
     #[error("this alert is referenced by one or more composite alerts")]
     AlertReferencedByComposites {
         /// Captured while holding the organization graph lock. HTTP callers
@@ -1358,9 +1355,6 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     #[cfg(feature = "enterprise")]
     if let Some(ref id) = alert.id {
         let (_, old_alert) = get_by_id(conn, org_id, id.to_owned()).await?;
-        if let Some(refusal) = builtin_change_refused(&old_alert, Some(&alert)) {
-            return Err(refusal);
-        }
         let old_workflows = old_alert.workflows;
 
         if old_workflows != alert.workflows {
@@ -1608,12 +1602,6 @@ pub async fn delete_by_id_user<C: ConnectionTrait>(
 ) -> Result<(), AlertError> {
     let locker = lock_composite_graph(org_id).await?;
     let result = async {
-        #[cfg(feature = "enterprise")]
-        if let Some(refusal) =
-            builtin_change_refused(&get_by_id(conn, org_id, alert_id).await?.1, None)
-        {
-            return Err(refusal);
-        }
         ensure_alerts_not_referenced(conn, org_id, &[alert_id]).await?;
         let dependents =
             crate::slo::service::slos_sourced_from_alert(org_id, &alert_id.to_string())
@@ -1738,16 +1726,6 @@ async fn ensure_alerts_not_referenced<C: ConnectionTrait>(
     })
 }
 
-/// A built-in is found by its name, so a rename would remove it as surely as a delete.
-#[cfg(feature = "enterprise")]
-fn builtin_change_refused(old: &Alert, new: Option<&Alert>) -> Option<AlertError> {
-    let kept =
-        new.is_some_and(|new| new.name == old.name && crate::alerts::prebuilt::is_builtin(new));
-    (crate::alerts::prebuilt::is_builtin(old) && !kept).then(|| AlertError::BuiltinAlert {
-        name: old.name.clone(),
-    })
-}
-
 /// The refusal a delete owes the SLOs measuring from this alert, or `None` when
 /// nothing does.
 fn delete_blocked_by(dependents: &[config::meta::slo::Slo]) -> Option<AlertError> {
@@ -1867,26 +1845,6 @@ mod slo_source_guard_tests {
     }
 
     // ---- the delete guard ---------------------------------------------------
-
-    #[cfg(feature = "enterprise")]
-    #[test]
-    fn a_built_in_alert_can_be_edited_but_not_deleted_or_renamed() {
-        let mut builtin = Alert::default();
-        builtin.name = "o2_alert_evaluation_failures".to_string();
-        builtin.stream_type = config::meta::stream::StreamType::Logs;
-        builtin.stream_name = config::meta::self_reporting::usage::TRIGGERS_STREAM.to_string();
-        let mut edited = builtin.clone();
-        edited.enabled = true;
-        assert!(builtin_change_refused(&builtin, Some(&edited)).is_none());
-        assert!(builtin_change_refused(&builtin, None).is_some());
-        let mut renamed = builtin.clone();
-        renamed.name = "cpu_high".to_string();
-        assert!(builtin_change_refused(&builtin, Some(&renamed)).is_some());
-        assert!(builtin_change_refused(&renamed, None).is_none());
-        let mut swapped = builtin.clone();
-        swapped.name = "o2_scheduler_job_backlog".to_string();
-        assert!(builtin_change_refused(&builtin, Some(&swapped)).is_some());
-    }
 
     /// "Some SLO depends on this" is not something a user can act on, so the
     /// refusal names them.

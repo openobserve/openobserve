@@ -701,7 +701,12 @@ pub async fn get_opts(file: &str, options: GetOptions) -> object_store::Result<G
     options.check_preconditions(&meta)?;
 
     let range = match options.range {
-        Some(r) => r.as_range(meta.size).unwrap(),
+        Some(r) => r
+            .as_range(meta.size)
+            .map_err(|e| object_store::Error::Precondition {
+                path: file.to_string(),
+                source: Box::new(e),
+            })?,
         None => 0..meta.size,
     };
 
@@ -1570,6 +1575,28 @@ mod tests {
                 .unwrap_err(),
             object_store::Error::NotFound { .. }
         ));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn get_opts_rejects_a_range_past_a_short_cached_file() {
+        let key = format!(
+            "files/default/logs/short/2026/10/15/10/{}.parquet",
+            config::ider::uuid()
+        );
+        set(&key, Bytes::from_static(b"0123456789abcdef"))
+            .await
+            .unwrap();
+        std::fs::write(get_file_path(&key).unwrap(), b"").unwrap();
+        let options = GetOptions {
+            range: Some((8..16).into()),
+            ..Default::default()
+        };
+        assert!(matches!(
+            get_opts(&key, options).await,
+            Err(object_store::Error::Precondition { .. })
+        ));
+        remove(&key).await.unwrap();
     }
 
     #[test]

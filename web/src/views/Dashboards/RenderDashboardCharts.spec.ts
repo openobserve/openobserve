@@ -97,10 +97,20 @@ vi.mock("gridstack/dist/gridstack.min.css", () => ({}));
 const mockNotifications = {
   showPositiveNotification: vi.fn(),
   showErrorNotification: vi.fn(),
-  showConfictErrorNotificationWithRefreshBtn: vi.fn(),
 };
+const mockOpenConflict = vi.fn();
+vi.mock("@/composables/dashboard/useDashboardSaveConflict", () => ({
+  useDashboardSaveConflict: () => ({
+    isConflict: (error: any) => error?.response?.status === 409,
+    openConflict: mockOpenConflict,
+  }),
+}));
 // `run` is the real save body handed to useLoading, so the save path can be driven directly.
-const mockLoading: { isLoading: any; execute: any; run?: () => Promise<boolean> } = {
+const mockLoading: {
+  isLoading: any;
+  execute: any;
+  run?: (change?: string) => Promise<boolean>;
+} = {
   isLoading: ref(false),
   execute: vi.fn(),
 };
@@ -1185,18 +1195,34 @@ describe("RenderDashboardCharts", () => {
       expect(wrapper.emitted("refresh")).toBeUndefined();
     });
 
-    it("returns false, shows the conflict toast and reloads on a 409", async () => {
+    it("returns false and opens the save-conflict dialog with my layout on a 409, without reloading", async () => {
+      mockOpenConflict.mockClear();
       wrapper = createWrapper();
       vi.mocked(updateDashboard).mockRejectedValueOnce({
         response: { status: 409, data: { message: "Dashboard was changed elsewhere" } },
       });
 
       await expect(mockLoading.run!()).resolves.toBe(false);
-      expect(mockNotifications.showConfictErrorNotificationWithRefreshBtn).toHaveBeenCalledWith(
-        "Dashboard was changed elsewhere",
-        expect.any(Function),
+      expect(mockOpenConflict).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dashboardId: wrapper.props("dashboardData").dashboardId,
+          mine: wrapper.props("dashboardData"),
+          change: "Moved or resized panels",
+        }),
       );
-      expect(wrapper.emitted("refresh")).toHaveLength(1);
+      expect(mockNotifications.showErrorNotification).not.toHaveBeenCalled();
+      expect(wrapper.emitted("refresh")).toBeUndefined();
+    });
+
+    it("names the caller's change in the conflict dialog when one is passed", async () => {
+      mockOpenConflict.mockClear();
+      wrapper = createWrapper({ layoutMode: "edit" });
+      vi.mocked(updateDashboard).mockRejectedValueOnce({ response: { status: 409 } });
+
+      await expect(mockLoading.run!("Edited the dashboard JSON")).resolves.toBe(false);
+      expect(mockOpenConflict).toHaveBeenCalledWith(
+        expect.objectContaining({ change: "Edited the dashboard JSON" }),
+      );
     });
 
     it("returns false and shows an error on a network failure", async () => {

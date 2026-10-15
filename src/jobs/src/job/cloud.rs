@@ -161,6 +161,7 @@ async fn run_trial_quota_flush() {
         openobserve_core::trial_quota::flush_to_db().await;
         openobserve_core::trial_quota::refresh_limits_from_db().await;
         openobserve_core::trial_quota::refresh_paid_overage_from_db().await;
+        openobserve_core::trial_quota::refresh_usage_from_db().await;
     }
 }
 

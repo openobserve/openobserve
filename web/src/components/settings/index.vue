@@ -70,7 +70,6 @@ import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
-import { isAlertCalibrationEnabled } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 
 export default defineComponent({
   name: "AppSettings",
@@ -113,7 +112,6 @@ export default defineComponent({
       syntheticsLocations: "synthetics_locations",
       correlationSettings: "correlation_settings",
       genAiAgentMapping: "gen_ai_agent_mapping",
-      alertCalibrationSettings: "alert_calibration",
     };
 
     const settingsTab = ref(
@@ -417,16 +415,6 @@ export default defineComponent({
           locked: !nodesAccess.allowed,
           lockedMessage: nodesAccess.message,
           dataTest: "nodes-tab",
-          group: "Operations",
-        },
-        {
-          key: "alert_calibration",
-          label: t("settings.alertCalibration"),
-          description: t("settings.alertCalibrationDesc"),
-          icon: "tune",
-          to: { name: "alertCalibrationSettings", query: { org_identifier: org } },
-          visible: isAlertCalibrationEnabled(z),
-          dataTest: "alert-calibration-settings-tab",
           group: "Operations",
         },
         {

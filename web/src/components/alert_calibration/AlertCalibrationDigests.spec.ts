@@ -31,7 +31,13 @@ vi.mock("@/services/alert_calibration", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services/alert_calibration")>();
   return {
     ...actual,
-    default: { ...actual.default, getConfig: vi.fn(), searchDigests: vi.fn(), requestRun: vi.fn() },
+    default: {
+      ...actual.default,
+      getConfig: vi.fn(),
+      getStatus: vi.fn(),
+      readDigests: vi.fn(),
+      requestRun: vi.fn(),
+    },
   };
 });
 
@@ -73,7 +79,7 @@ const mountPage = async () => {
         component: { template: "<div />" },
       },
       {
-        path: "/settings/alert_calibration",
+        path: "/alert-calibration/settings",
         name: "alertCalibrationSettings",
         component: { template: "<div />" },
       },
@@ -112,10 +118,11 @@ describe("AlertCalibrationDigests", () => {
         updated_at: 1,
       },
     } as never);
+    vi.mocked(alertCalibration.getStatus).mockResolvedValue({ data: { last_run: null } } as never);
   });
 
   it("lists a run pulled twice once, as its newest emission", async () => {
-    vi.mocked(alertCalibration.searchDigests).mockResolvedValue([
+    vi.mocked(alertCalibration.readDigests).mockResolvedValue([
       run(NOW - DAY_MICROS, NOW - 100, 3),
       run(NOW - DAY_MICROS, NOW - 200, 5),
       run(NOW - 2 * DAY_MICROS, NOW - 300, 0),
@@ -128,19 +135,34 @@ describe("AlertCalibrationDigests", () => {
     wrapper.unmount();
   });
 
-  it("reads a digest stream that does not exist yet as no runs, not as a failure", async () => {
-    vi.mocked(alertCalibration.searchDigests).mockRejectedValue({
-      response: { status: 400, data: { code: 20002, message: "Search stream not found" } },
-    });
+  it("reads runs through the module's endpoint, not a search of the digest stream", async () => {
+    vi.mocked(alertCalibration.readDigests).mockResolvedValue([]);
     const wrapper = await mountPage();
+    expect(alertCalibration.readDigests).toHaveBeenCalledWith(
+      "default",
+      "",
+      expect.objectContaining({ start_time: expect.any(Number), end_time: expect.any(Number) }),
+      expect.anything(),
+    );
     expect(wrapper.text()).toContain("No runs in the last 14 days");
-    expect(wrapper.text()).not.toContain("Runs unavailable");
+    wrapper.unmount();
+  });
+
+  it("says why the newest digest is stale when the last run failed", async () => {
+    vi.mocked(alertCalibration.readDigests).mockResolvedValue([]);
+    vi.mocked(alertCalibration.getStatus).mockResolvedValue({
+      data: { last_run: { status: "error", error: "query timed out", finished_at: NOW - 100 } },
+    } as never);
+    const wrapper = await mountPage();
+    expect(wrapper.find('[data-test="alert-calibration-last-run-failed"]').text()).toContain(
+      "query timed out",
+    );
     wrapper.unmount();
   });
 
   it("opens a run by its window", async () => {
     const latest = run(NOW - DAY_MICROS, NOW - 100, 1);
-    vi.mocked(alertCalibration.searchDigests).mockResolvedValue([latest]);
+    vi.mocked(alertCalibration.readDigests).mockResolvedValue([latest]);
     const wrapper = await mountPage();
     await wrapper.find("tbody tr").trigger("click");
     await flushPromises();
@@ -153,7 +175,7 @@ describe("AlertCalibrationDigests", () => {
   });
 
   it("leaves for the alert list once /config says the deployment has it off", async () => {
-    vi.mocked(alertCalibration.searchDigests).mockResolvedValue([]);
+    vi.mocked(alertCalibration.readDigests).mockResolvedValue([]);
     store.state.zoConfig = { ...store.state.zoConfig, alert_calibration_enabled: false };
     const page = await mountPage();
     expect(page.router.currentRoute.value.name).toBe("alertList");
