@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Per-range build state for the publisher, read from the querier that owns each link. Both
-//! routes are authenticated and carry the link's GET or LIST permission; the owning querier is
-//! reached over the internal gRPC channel, never an anonymous route.
+//! Per-range build state from the querier owning each link, reached over internal gRPC.
 
 use axum::{
     extract::{Path, Query},
@@ -32,8 +30,7 @@ pub struct BatchParams {
     ids: Option<String>,
 }
 
-/// GET /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/status — one link's ranges with
-/// the streams each panel's data came from.
+/// GET /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/status, with sources.
 pub async fn link(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
 ) -> Response {
@@ -55,8 +52,7 @@ pub async fn link(
     }
 }
 
-/// GET /{org_id}/public_dashboards/status?ids=a,b — the org list's batch, without sources; a link
-/// whose owning querier does not answer is left out.
+/// GET /{org_id}/public_dashboards/status?ids=a,b — no sources; unreachable owners left out.
 pub async fn batch(Path(org_id): Path<String>, Query(params): Query<BatchParams>) -> Response {
     if let Some(r) = feature_gate() {
         return r;

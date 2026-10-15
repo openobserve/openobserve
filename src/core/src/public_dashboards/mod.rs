@@ -71,7 +71,7 @@ use infra::{
     },
 };
 use materialize::{Capture, Class, Engine, PanelRun, Run};
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, DatabaseConnection, TransactionTrait};
 use store::{ExecutedQuery, ManifestPanel, ValuesDependency};
 use variables::{PanelVars, QueryVars};
 
@@ -106,7 +106,7 @@ pub struct SearchEngine;
 #[async_trait]
 impl Engine for SearchEngine {
     async fn capture(&self, link_id: &str) -> Result<Option<Capture>, anyhow::Error> {
-        let db = get_orm_client_rw().await;
+        let db = gate_db().await;
         let Some(link) = pd_table::get(db, link_id).await? else {
             return Ok(None);
         };
@@ -251,6 +251,11 @@ impl PanelSearch for SearchEngine {
 #[error("{0}")]
 pub struct Invalid(pub String);
 
+/// A request the caller may not make; the admin API refuses it with 403 and this message.
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub struct Forbidden(pub String);
+
 /// Identifiers returned after publishing.
 pub struct PublishResult {
     pub id: String,
@@ -281,8 +286,7 @@ pub struct PublicLinkView {
     pub access_count: i64,
 }
 
-/// A link's frozen values over one dashboard, resolved per panel by scope as the build resolves
-/// them before any values query; a value only a values query can pick stays a placeholder.
+/// A link's frozen values resolved per panel as its build does, before any values query.
 pub struct LinkValues {
     vars: QueryVars,
 }
@@ -468,6 +472,11 @@ impl Collected {
     }
 }
 
+/// The pool every lifecycle and security gate reads, so a lagging replica never decides one.
+pub async fn gate_db() -> &'static DatabaseConnection {
+    get_orm_client_rw().await
+}
+
 /// Publish a link; it runs no query until someone opens it.
 pub async fn create(
     org: &str,
@@ -512,7 +521,8 @@ pub async fn create(
         last_accessed_at: None,
         access_count: 0,
     };
-    match pd_table::insert_capped(db, &model, org_max, dashboard_max).await? {
+    let queue = replication::enabled();
+    match pd_table::insert_capped(db, &model, org_max, dashboard_max, queue).await? {
         CreateOutcome::Created => {
             replication::replicate(&model).await;
             Ok(PublishResult { id, slug })
@@ -598,7 +608,7 @@ pub async fn get_link(
     dashboard_id: &str,
     id: &str,
 ) -> Result<Option<PublicDashboard>, anyhow::Error> {
-    Ok(pd_table::get_on_dashboard(get_orm_client_rw().await, org, dashboard_id, id).await?)
+    Ok(pd_table::get_on_dashboard(gate_db().await, org, dashboard_id, id).await?)
 }
 
 /// Replace a link's settings in place; its slug never changes.
@@ -661,10 +671,10 @@ pub async fn pause_for_departed_publisher(link: PublicDashboard) -> Result<(), a
     set_paused(&link, updated_by).await.map(|_| ())
 }
 
-/// Called after a membership delete commits: pauses every link the user published in the org.
-/// A failure is logged; the 15-minute deadline check pauses that link on its next read.
+/// After a membership delete: pauses the user's links; a failure is left to the deadline check.
 pub async fn pause_departed_publisher_links(org: &str, user: &str) {
-    let paused = pause_departed_on(get_orm_client_rw().await, org, user, replication::send).await;
+    let db = get_orm_client_rw().await;
+    let paused = pause_departed_on(db, org, user, replication::enabled(), replication::send).await;
     if paused > 0 {
         log::info!("[public_dashboards] paused {paused} links of {user}, who left {org}");
     }
@@ -717,9 +727,11 @@ fn check_plan_owned_max_links(
     requested: Option<i32>,
 ) -> Result<(), anyhow::Error> {
     match requested {
-        Some(n) if Some(n) != stored => Err(anyhow::anyhow!(
+        Some(n) if Some(n) != stored => Err(Forbidden(
             "The link limit follows the organization's plan; changing it needs root permission"
-        )),
+                .to_string(),
+        )
+        .into()),
         _ => Ok(()),
     }
 }
@@ -794,12 +806,13 @@ pub async fn revoke_all_for_dashboard(org: &str, dashboard_id: &str) -> Result<(
     Ok(())
 }
 
-/// Revoke every link in an org; called by org cleanup.
+/// Revoke every link in an org and drop its settings row; called by org cleanup.
 pub async fn revoke_all_for_org(org: &str) -> Result<(), anyhow::Error> {
-    for link in pd_table::list(get_orm_client_rw().await, org).await? {
+    let db = get_orm_client_rw().await;
+    for link in pd_table::list(db, org).await? {
         delete(org, &link.id).await?;
     }
-    Ok(())
+    Ok(pd_table::delete_settings(db, org).await?)
 }
 
 /// Hard-delete links whose 30-day soft-delete memory has run out.
@@ -1038,20 +1051,22 @@ async fn edit<F>(org: &str, id: &str, change: F) -> Result<PublicDashboard, anyh
 where
     F: FnMut(&mut PublicDashboard) -> Result<(), anyhow::Error>,
 {
-    let row = edit_on(get_orm_client_rw().await, org, id, change).await?;
+    let queue = replication::enabled();
+    let row = edit_on(get_orm_client_rw().await, org, id, queue, change).await?;
     replication::replicate(&row).await;
     Ok(row)
 }
 
-/// A lost race re-reads the row and applies the change again.
+/// A lost race re-reads the row and applies the change again; `queue` writes its outbox entry.
 async fn edit_on<C, F>(
     db: &C,
     org: &str,
     id: &str,
+    queue: bool,
     mut change: F,
 ) -> Result<PublicDashboard, anyhow::Error>
 where
-    C: ConnectionTrait,
+    C: ConnectionTrait + TransactionTrait,
     F: FnMut(&mut PublicDashboard) -> Result<(), anyhow::Error>,
 {
     for _ in 0..EDIT_ATTEMPTS {
@@ -1063,8 +1078,9 @@ where
         };
         let seen = row.rev;
         change(&mut row)?;
-        row.rev = pd_table::next_rev(seen, now_micros());
-        if pd_table::update_cas(db, &row, seen).await? {
+        let now = now_micros();
+        row.rev = pd_table::next_rev(seen, now);
+        if pd_table::update_cas_queued(db, &row, seen, queue, now).await? {
             return Ok(row);
         }
     }
@@ -1103,10 +1119,10 @@ fn create_gate(settings: Option<&OrgSettings>) -> Result<u32, String> {
     Ok(org_link_limit(settings))
 }
 
-/// Returns how many links were paused; each pause is its own compare-and-set and Put.
-async fn pause_departed_on<C, F, Fut>(db: &C, org: &str, user: &str, emit: F) -> usize
+/// Returns how many links were paused; each pause is its own compare-and-set and queued Put.
+async fn pause_departed_on<C, F, Fut>(db: &C, org: &str, user: &str, queue: bool, emit: F) -> usize
 where
-    C: ConnectionTrait,
+    C: ConnectionTrait + TransactionTrait,
     F: Fn(PublicDashboard) -> Fut,
     Fut: std::future::Future<Output = Result<(), anyhow::Error>>,
 {
@@ -1128,9 +1144,11 @@ where
             l.updated_at = now;
             Ok::<(), anyhow::Error>(())
         };
-        match edit_on(db, org, &link.id, pause).await {
+        match edit_on(db, org, &link.id, queue, pause).await {
             Ok(row) => {
-                replication::replicate_on(db, &row, &emit).await;
+                if queue {
+                    replication::deliver_on(db, &row, &emit).await;
+                }
                 paused += 1;
             }
             Err(e) => log::error!(
@@ -1158,7 +1176,7 @@ async fn authorize_variable_edit(
     crate::authz::authorize_query_sources(user_id, &sources)
         .await
         .map_err(|denied| {
-            anyhow::anyhow!(crate::authz::stream_access_message(&link.org_id, &denied))
+            Forbidden(crate::authz::stream_access_message(&link.org_id, &denied)).into()
         })
 }
 
@@ -1172,10 +1190,11 @@ fn variable_edit_sources(
     use crate::authz::QuerySource;
 
     let old = parse_frozen_vars(link.frozen_variables.as_deref());
-    let changed: BTreeSet<&String> = frozen
-        .iter()
-        .filter(|(key, value)| old.get(*key) != Some(*value))
-        .map(|(key, _)| key)
+    // A removed key falls back to the dashboard's default, which the editor must read too.
+    let changed: BTreeSet<&String> = old
+        .keys()
+        .chain(frozen.keys())
+        .filter(|key| old.get(*key) != frozen.get(*key))
         .collect();
     let Some(v8) = dash.v8.as_ref().filter(|_| !changed.is_empty()) else {
         return vec![];
@@ -2737,7 +2756,9 @@ mod tests {
         let paid = create_gate(None).unwrap();
         for i in 0..5 {
             let link = replication::tests::link(&format!("l{i}"));
-            let made = pd_table::insert_capped(&db, &link, paid, 10).await.unwrap();
+            let made = pd_table::insert_capped(&db, &link, paid, 10, false)
+                .await
+                .unwrap();
             assert_eq!(made, CreateOutcome::Created);
         }
         let row = pd_table::upsert_settings(&db, "o", true, Some(3), "admin", 10)
@@ -2747,7 +2768,7 @@ mod tests {
         assert_eq!(free, 3);
         let sixth = replication::tests::link("l5");
         assert_eq!(
-            pd_table::insert_capped(&db, &sixth, free, 10)
+            pd_table::insert_capped(&db, &sixth, free, 10, false)
                 .await
                 .unwrap(),
             CreateOutcome::OrgFull
@@ -2770,7 +2791,9 @@ mod tests {
                 tokio::spawn(async move {
                     let mut link = replication::tests::link(&format!("l{i}"));
                     link.dashboard_id = format!("d{i}");
-                    pd_table::insert_capped(&db, &link, cap, 10).await.unwrap()
+                    pd_table::insert_capped(&db, &link, cap, 10, false)
+                        .await
+                        .unwrap()
                 })
             })
             .collect();
@@ -2784,8 +2807,8 @@ mod tests {
         assert_eq!(pd_table::list(&*db, "o").await.unwrap().len(), 3);
     }
 
-    /// After the membership delete: each of the user's live links is paused with its own
-    /// compare-and-set and Put; a failed Put waits in the outbox until it is delivered.
+    /// Each live link of the leaver is paused and queued; a failed Put stays queued until
+    /// delivered.
     #[tokio::test]
     async fn gate14_the_departure_hook_pauses_the_links_and_recovers_from_a_failed_emit() {
         use std::sync::atomic::Ordering;
@@ -2801,12 +2824,14 @@ mod tests {
         revoked.deleted_at = Some(1);
         let other = replication::tests::link("other");
         for link in [&theirs, &paused_already, &revoked, &other] {
-            pd_table::insert_capped(&db, link, 10, 10).await.unwrap();
+            pd_table::insert_capped(&db, link, 10, 10, false)
+                .await
+                .unwrap();
         }
 
         let queue = replication::tests::Queue::default();
         queue.down.store(true, Ordering::SeqCst);
-        let paused = pause_departed_on(&db, "o", "leaver@example.com", queue.emitter()).await;
+        let paused = pause_departed_on(&db, "o", "leaver@example.com", true, queue.emitter()).await;
         assert_eq!(paused, 1);
         let row = pd_table::get(&db, "theirs").await.unwrap().unwrap();
         assert!(!row.enabled);
@@ -2896,6 +2921,12 @@ mod tests {
             sql(variable_edit_sources(&link, &dash, &global)),
             ["SELECT * FROM fixed WHERE env = 'staging'"]
         );
+        // Removing a frozen value falls back to the dashboard default, which is checked too.
+        let removed = frozen(json!({ "env": "prod" }));
+        assert_eq!(
+            sql(variable_edit_sources(&link, &dash, &removed)),
+            ["SELECT * FROM safe"]
+        );
     }
 
     #[cfg(all(feature = "enterprise", feature = "test-utils"))]
@@ -2919,6 +2950,7 @@ mod tests {
         let err = authorize_variable_edit(&link, &dash, &to("secret"), &editor)
             .await
             .unwrap_err();
+        assert!(err.downcast_ref::<Forbidden>().is_some());
         assert_eq!(
             err.to_string(),
             "Unauthorized Access: no read permission on logs/secret"
@@ -2940,7 +2972,7 @@ mod tests {
         // Raising, lowering or setting a limit on a missing row is refused with 403.
         for (stored, requested) in [(Some(3), Some(50)), (Some(50), Some(10)), (None, Some(50))] {
             let err = check_plan_owned_max_links(stored, requested).unwrap_err();
-            assert!(err.to_string().contains("permission"), "{err}");
+            assert!(err.downcast_ref::<Forbidden>().is_some(), "{err}");
         }
     }
 
@@ -3269,5 +3301,47 @@ mod tests {
             "no child after the cancel"
         );
         assert!(values.failed.contains("svc"));
+    }
+
+    /// The body of the first `fn` whose signature starts with `signature` in `src`.
+    fn fn_body<'a>(src: &'a str, signature: &str) -> &'a str {
+        let start = src
+            .find(signature)
+            .unwrap_or_else(|| panic!("{signature} moved"));
+        let rest = &src[start..];
+        let end = if signature.starts_with(' ') {
+            "\n    }\n"
+        } else {
+            "\n}\n"
+        };
+        &rest[..rest.find(end).unwrap()]
+    }
+
+    #[tokio::test]
+    async fn gate08_every_lifecycle_gate_reads_the_primary_pool() {
+        use infra::db::get_orm_client_ro;
+
+        assert!(std::ptr::eq(gate_db().await, get_orm_client_rw().await));
+        assert!(!std::ptr::eq(gate_db().await, get_orm_client_ro().await));
+        let this = include_str!("mod.rs");
+        for signature in ["    async fn capture(", "pub async fn get_link("] {
+            let body = fn_body(this, signature);
+            assert!(body.contains("gate_db()"), "{signature}");
+        }
+        assert!(
+            fn_body(this, "pub async fn publisher_is_member(").contains("get_optional_primary")
+        );
+        assert!(
+            fn_body(include_str!("status.rs"), "pub async fn live_links(").contains("gate_db()")
+        );
+        let guard = include_str!("../background_access/mod.rs");
+        assert!(fn_body(guard, "async fn guard_stored_edit(").contains("gate_db()"));
+        for (file, src) in [
+            ("status.rs", include_str!("status.rs")),
+            ("materialize.rs", include_str!("materialize.rs")),
+            ("authz_check.rs", include_str!("authz_check.rs")),
+        ] {
+            assert!(!src.contains("get_orm_client_ro"), "{file}");
+        }
     }
 }

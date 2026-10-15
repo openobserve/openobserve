@@ -25,7 +25,7 @@ use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::meta::public_dashboards::PublicDashboardConfig;
 use infra::table::entity::public_dashboards::Model as PublicDashboard;
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::public_dashboards::{Invalid, LINK_NOT_FOUND};
+use openobserve_core::public_dashboards::{Forbidden, Invalid, LINK_NOT_FOUND};
 
 use crate::service::auth::UserEmail;
 #[cfg(feature = "enterprise")]
@@ -35,12 +35,12 @@ pub(super) fn map_err(ctx: &str, e: anyhow::Error) -> Response {
     if let Some(invalid) = e.downcast_ref::<Invalid>() {
         return MetaHttpResponse::bad_request(&invalid.0);
     }
+    if let Some(forbidden) = e.downcast_ref::<Forbidden>() {
+        return MetaHttpResponse::forbidden(&forbidden.0);
+    }
     let msg = e.to_string();
     if msg == "dashboard not found" || msg == LINK_NOT_FOUND {
         return MetaHttpResponse::not_found(msg);
-    }
-    if msg.contains("permission") {
-        return MetaHttpResponse::forbidden(msg);
     }
     tracing::error!("[public_dashboards] {ctx}: {e}");
     // The raw error names tables and drivers; it stays in the log.
@@ -325,6 +325,14 @@ mod tests {
         assert_eq!(map_err("create", missing).status(), StatusCode::NOT_FOUND);
         let gone = anyhow::anyhow!(LINK_NOT_FOUND);
         assert_eq!(map_err("pause", gone).status(), StatusCode::NOT_FOUND);
+        let forbidden = anyhow::Error::new(Forbidden("no read permission on logs/s".into()));
+        assert_eq!(map_err("update", forbidden).status(), StatusCode::FORBIDDEN);
+        // A driver error that mentions permission is still a 500 with nothing of it shown.
+        let driver = anyhow::anyhow!("permission denied for table public_dashboards");
+        assert_eq!(
+            map_err("update", driver).status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
         let other = anyhow::anyhow!("connection refused");
         assert_eq!(
             map_err("create", other).status(),

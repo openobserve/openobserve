@@ -265,8 +265,7 @@ pub struct LinkStatusReport {
     pub last_accessed_at: Option<i64>,
 }
 
-/// The org's public dashboard settings as the settings API reads and writes them; a null
-/// `max_links` means the env default.
+/// The org's settings as the settings API has them; a null `max_links` is the env default.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OrgPublicDashboardSettings {
     pub enabled: bool,

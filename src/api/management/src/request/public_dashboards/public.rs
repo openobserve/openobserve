@@ -34,13 +34,10 @@ use config::{
     router::is_public_dashboard_slug,
     utils::time::now_micros,
 };
-use infra::{
-    db::get_orm_client_rw,
-    table::{
-        dashboards,
-        entity::{public_dashboard_org_settings::Model as OrgSettings, public_dashboards::Model},
-        public_dashboards as table,
-    },
+use infra::table::{
+    dashboards,
+    entity::{public_dashboard_org_settings::Model as OrgSettings, public_dashboards::Model},
+    public_dashboards as table,
 };
 use openobserve_core::public_dashboards::{
     self as core_pd, ENGINE, access,
@@ -48,6 +45,7 @@ use openobserve_core::public_dashboards::{
     materialize::{self, MIN_RETRY_SECS, ReadRequest, Served},
     store,
 };
+use sea_orm::ConnectionTrait;
 use serde::Deserialize;
 
 use crate::request::public_rate_limit::{Counters, client_ip, too_many_requests};
@@ -74,10 +72,13 @@ enum Servable {
 
 /// A servable link and its org's settings rev, or why not: 404 (no existence oracle), 503, 410.
 async fn resolve(slug: &str) -> Servable {
+    resolve_on(core_pd::gate_db().await, slug).await
+}
+
+async fn resolve_on<C: ConnectionTrait>(db: &C, slug: &str) -> Servable {
     if !config::get_config().public_dashboards.enabled || !is_public_dashboard_slug(slug) {
         return Servable::NotFound;
     }
-    let db = get_orm_client_rw().await;
     let pd = match table::get_by_slug(db, slug).await {
         Ok(Some(pd)) => pd,
         Ok(None) => return Servable::NotFound,
@@ -225,7 +226,16 @@ async fn serve_config(slug: &str) -> Response {
 
 /// The materializer entry point (design 4.2); ETag and 304 are decided on the masked result.
 async fn serve_data(slug: &str, range_key: Option<&str>, if_none_match: Option<&str>) -> Response {
-    let (pd, settings_rev) = match resolve(slug).await {
+    serve_data_on(core_pd::gate_db().await, slug, range_key, if_none_match).await
+}
+
+async fn serve_data_on<C: ConnectionTrait>(
+    db: &C,
+    slug: &str,
+    range_key: Option<&str>,
+    if_none_match: Option<&str>,
+) -> Response {
+    let (pd, settings_rev) = match resolve_on(db, slug).await {
         Servable::Ok(pd, settings_rev) => (pd, settings_rev),
         Servable::Unavailable => return unavailable(),
         Servable::Expired => return expired(),
@@ -373,7 +383,8 @@ fn rate_limited(ip: Option<RealIp>) -> bool {
 }
 
 /// The slug is a bearer secret, so no response is indexed or leaks it through `Referer`.
-fn with_headers(mut resp: Response) -> Response {
+/// The privacy headers every public dashboard response carries, the router's own included.
+pub fn with_headers(mut resp: Response) -> Response {
     let headers = resp.headers_mut();
     headers.insert(
         header::X_CONTENT_TYPE_OPTIONS,
@@ -791,5 +802,68 @@ mod tests {
         let resp = respond(&pd, Served::Unavailable { retry_after: 6 }, 0);
         assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(resp.headers()[header::RETRY_AFTER], "6");
+    }
+
+    async fn sqlite() -> sea_orm::DatabaseConnection {
+        let mut opts = sea_orm::ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = sea_orm::Database::connect(opts).await.unwrap();
+        table::create_tables_for_tests(&db).await.unwrap();
+        db
+    }
+
+    /// A lagging copy still shows the link live; the gates read the primary, which has moved on,
+    /// so no pause, revoke or org switch is ever answered with data or a validating 304.
+    #[tokio::test]
+    async fn gate08_a_stale_replica_never_decides_a_gate() {
+        let slug = "k8Zt2mR7aB3cD4eF5gH6Qx";
+        let live = Model {
+            slug: slug.into(),
+            time_ranges: Some(r#"[{"type":"relative","secs":3600}]"#.into()),
+            default_range_key: Some("r3600".into()),
+            ..link()
+        };
+        let replica = sqlite().await;
+        table::insert_capped(&replica, &live, 50, 10, false)
+            .await
+            .unwrap();
+        assert!(matches!(resolve_on(&replica, slug).await, Servable::Ok(..)));
+
+        let paused = Model {
+            enabled: false,
+            ..live.clone()
+        };
+        let revoked = Model {
+            deleted_at: Some(1),
+            ..live.clone()
+        };
+        for (row, org_on, expected) in [
+            (paused, true, StatusCode::SERVICE_UNAVAILABLE),
+            (revoked, true, StatusCode::NOT_FOUND),
+            (live.clone(), false, StatusCode::NOT_FOUND),
+        ] {
+            let primary = sqlite().await;
+            table::insert_capped(&primary, &row, 50, 10, false)
+                .await
+                .unwrap();
+            if !org_on {
+                table::set_settings_enabled(&primary, "o", false, "admin", 1)
+                    .await
+                    .unwrap();
+            }
+            let resp = serve_data_on(&primary, slug, Some("r3600"), Some("\"r1\"")).await;
+            assert_eq!(resp.status(), expected);
+            assert!(resp.headers().get(header::ETAG).is_none());
+        }
+    }
+
+    /// Every gate of this plane reads through `gate_db`, never the read-only pool.
+    #[test]
+    fn gate08_the_public_plane_reads_no_replica() {
+        let src = include_str!("public.rs");
+        let (production, _) = src.split_once("#[cfg(test)]").unwrap();
+        assert!(!production.contains("get_orm_client_ro"));
+        assert!(production.contains("resolve_on(core_pd::gate_db().await, slug)"));
+        assert!(production.contains("serve_data_on(core_pd::gate_db().await"));
     }
 }

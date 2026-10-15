@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The publisher's status call. A link's result files live on the querier its slug hashes to, so
-//! the node that took the authenticated request asks that querier over the internal gRPC channel,
-//! which only accepts the cluster's internal token.
+//! The publisher's status call, answered by the querier owning the slug over internal gRPC.
 
 use std::collections::BTreeMap;
 
@@ -29,7 +27,6 @@ use config::{
 };
 use infra::{
     cluster,
-    db::get_orm_client_rw,
     table::{entity::public_dashboards::Model as PublicDashboard, public_dashboards as pd_table},
 };
 use proto::cluster_rpc::{PublicDashboardStatusRequest, query_cache_client::QueryCacheClient};
@@ -63,7 +60,7 @@ pub async fn local_reports(
 
 /// The org's live links among `ids`, read from the primary, in the order asked.
 pub async fn live_links(org: &str, ids: &[String]) -> Result<Vec<PublicDashboard>, anyhow::Error> {
-    let db = get_orm_client_rw().await;
+    let db = super::gate_db().await;
     let mut out = Vec::with_capacity(ids.len());
     for id in ids {
         if let Some(link) = pd_table::get(db, id)
@@ -76,8 +73,7 @@ pub async fn live_links(org: &str, ids: &[String]) -> Result<Vec<PublicDashboard
     Ok(out)
 }
 
-/// Reports from each link's owning querier, in the order of `links`; best effort, so a link
-/// whose owner cannot be reached is left out.
+/// Reports from each link's owning querier in the order of `links`; unreachable owners left out.
 pub async fn reports(links: &[PublicDashboard], with_sources: bool) -> Vec<LinkStatusReport> {
     let mut owners = Vec::with_capacity(links.len());
     for link in links {
@@ -109,8 +105,7 @@ pub async fn reports(links: &[PublicDashboard], with_sources: bool) -> Vec<LinkS
     links.iter().filter_map(|l| by_id.remove(&l.id)).collect()
 }
 
-/// The querier owning a slug on the Interactive ring, as the router routes the public reads;
-/// `None` when it is this node, or when no ring exists, as on a single node.
+/// The slug's owner on the Interactive ring, as the router routes; `None` is this node or no ring.
 async fn owner_of(slug: &str) -> Option<String> {
     let name =
         cluster::get_node_from_consistent_hash(slug, &Role::Querier, Some(RoleGroup::Interactive))
@@ -196,8 +191,7 @@ mod tests {
         assert_eq!(owner_of("k8Zt2mR7aB3cD4eF5gH6Qx").await, None);
     }
 
-    /// The drawer says "Never viewed" only from `access_count`; a viewed link whose file is gone
-    /// reads "Not cached" with its count.
+    /// "Never viewed" comes from `access_count`; a viewed link whose file is gone reads not cached.
     #[tokio::test]
     async fn gate14_not_cached_and_never_viewed_are_told_apart() {
         let mut never = link("never-viewed-link");

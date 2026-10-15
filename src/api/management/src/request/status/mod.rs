@@ -234,6 +234,9 @@ struct ConfigResponse<'a> {
     synthetics_enabled: bool,
     /// Hides the publish button and the Public links view when the feature is off.
     public_dashboards_enabled: bool,
+    /// The operator's refresh floor after clamping; the share form shows each range's floor from
+    /// it.
+    public_dashboard_min_refresh_secs: u32,
     oncall_enabled: bool,
     /// Enterprise-only private locations; the UI gates their views on this flag.
     synthetics_private_locations_enabled: bool,
@@ -614,6 +617,7 @@ pub async fn zo_config(
         composite_alerts_available,
         synthetics_enabled,
         public_dashboards_enabled: cfg.public_dashboards.enabled,
+        public_dashboard_min_refresh_secs: cfg.public_dashboards.min_refresh_secs,
         oncall_enabled,
         synthetics_private_locations_enabled,
         synthetics_browser_max_steps,
@@ -2495,5 +2499,18 @@ mod tests {
             json["ingest_allowed_in_future"],
             cfg.limit.ingest_allowed_in_future
         );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_the_public_dashboard_refresh_floor() {
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["public_dashboard_min_refresh_secs"], 60);
+        assert_eq!(json["public_dashboards_enabled"], true);
     }
 }
