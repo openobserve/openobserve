@@ -351,6 +351,20 @@ describe("QualityConfigDetail", () => {
     expect(wrapper.find('[data-test="quality-detail-error"]').exists()).toBe(true);
   });
 
+  it("drops a restored chart filter the backend rejects, and loads the scores without it", async () => {
+    scores.mockImplementation((_org, _id, params) =>
+      params.bucket_from != null
+        ? Promise.reject({ response: { status: 400 } })
+        : Promise.resolve(PAGE),
+    );
+    const wrapper = mountDetail({}, { initialFilter: { kind: "bucket", from: 0, to: 0 } });
+    await flushPromises();
+    await flushPromises();
+    expect(scores.mock.calls.at(-1)?.[2]).not.toHaveProperty("bucket_from");
+    expect(wrapper.find('[data-test="quality-detail-error"]').exists()).toBe(false);
+    expect(wrapper.emitted("position")?.at(-1)?.[0]).toMatchObject({ filter: null });
+  });
+
   it("takes the type and the threshold from the Score Config when the list has no row", async () => {
     const config: ScoreConfig = {
       id: "row-1",
@@ -394,13 +408,9 @@ describe("QualityConfigDetail", () => {
     scores.mockResolvedValue({ ...PAGE, list: [score("s1"), score("s2"), score("s3")], total: 3 });
     const wrapper = mountDetail();
     await flushPromises();
-    expect(wrapper.emitted("position")?.at(-1)).toEqual([
-      { page: 0, scoreId: "s1", filter: null },
-    ]);
+    expect(wrapper.emitted("position")?.at(-1)).toEqual([{ page: 0, scoreId: "s1", filter: null }]);
     await wrapper.find('[data-test="score-s3"]').trigger("click");
-    expect(wrapper.emitted("position")?.at(-1)).toEqual([
-      { page: 0, scoreId: "s3", filter: null },
-    ]);
+    expect(wrapper.emitted("position")?.at(-1)).toEqual([{ page: 0, scoreId: "s3", filter: null }]);
   });
 
   it("reopens the chart filter with its page and score, so Back lands in the same list", async () => {
@@ -412,7 +422,10 @@ describe("QualityConfigDetail", () => {
       }),
     );
     const filter: QualityChartFilter = { kind: "value", value: "medium" };
-    const wrapper = mountDetail({}, { initialPage: 1, initialScoreId: "s11", initialFilter: filter });
+    const wrapper = mountDetail(
+      {},
+      { initialPage: 1, initialScoreId: "s11", initialFilter: filter },
+    );
     await flushPromises();
     expect(scores.mock.calls[0][2]).toMatchObject({ from: 10, value: "medium" });
     expect(wrapper.find('[data-test="pane-stub"]').text()).toBe("s11");

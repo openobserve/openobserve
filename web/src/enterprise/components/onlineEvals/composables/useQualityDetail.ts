@@ -92,6 +92,15 @@ export function useQualityDetail(opts: {
     ),
   );
 
+  // A filter the data cannot take (a bucket on a categorical config, from an old or edited link) fails
+  // with a 400 that is never retried; drop it so the scores load instead of a dead-end error.
+  watch(
+    () => httpStatus(scoresQuery.error.value),
+    (status) => {
+      if (status === 400 && filter.value) filter.value = null;
+    },
+  );
+
   const data = computed(() => scoresQuery.data.value);
   const distribution = computed(() => data.value?.distribution ?? []);
   const timeline = computed(() => data.value?.timeline ?? []);
