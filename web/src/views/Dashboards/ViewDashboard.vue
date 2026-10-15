@@ -130,11 +130,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               v-else
-              :variant="isRefreshPending ? 'warning' : 'outline'"
+              :variant="isRefreshPending ? 'pending' : 'outline'"
               size="icon-toolbar"
               @click="refreshData()"
               :disabled="arePanelsLoading"
               :loading="arePanelsLoading"
+              :aria-label="refreshTooltip"
               data-test="dashboard-refresh-btn"
               :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
             >
@@ -1657,7 +1658,7 @@ export default defineComponent({
 
     const refreshOptionsVariant = computed(() => {
       if (config.isEnterprise == "true" && arePanelsLoading.value) return "outline-destructive";
-      return isRefreshPending.value ? "warning" : "outline";
+      return isRefreshPending.value ? "pending" : "outline";
     });
 
     const refreshData = async (withoutCache = false) => {

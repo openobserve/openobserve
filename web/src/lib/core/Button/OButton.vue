@@ -119,6 +119,14 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-button-warning-focus-ring",
     "disabled:opacity-60",
   ].join(" "),
+  // A stale result awaiting a re-run is not an alert, so it stays off the solid warning fill.
+  pending: [
+    "bg-button-pending-bg text-button-pending-text border border-button-pending-bg",
+    "enabled:hover:bg-button-pending-hover-bg enabled:hover:border-button-pending-hover-bg",
+    "enabled:active:bg-button-pending-active-bg enabled:active:border-button-pending-active-bg",
+    "focus-visible:ring-3 focus-visible:ring-button-pending-focus-ring",
+    "disabled:opacity-60",
+  ].join(" "),
   // Neutral ghost: inherits parent text color — used for compact inline action buttons
   // where no color accent is desired (e.g. field adder buttons +X +Y +B +F)
   "ghost-neutral": [
@@ -288,6 +296,7 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "filter-exclude": "opacity-60",
   "ghost-warning": "opacity-60",
   warning: "opacity-60",
+  pending: "opacity-60",
   "ghost-neutral": "opacity-50",
   "outline-destructive": "opacity-50",
   "cancel-query": "opacity-60",

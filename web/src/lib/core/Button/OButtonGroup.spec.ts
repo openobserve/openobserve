@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
+import { h } from "vue";
 import OButtonGroup from "./OButtonGroup.vue";
 import OButton from "./OButton.vue";
 
@@ -65,6 +66,33 @@ describe("OButtonGroup", () => {
       },
     });
     expect(wrapper.findAll("button")).toHaveLength(2);
+  });
+
+  it("divides solid pending segments with the darker pending divider instead of the grey one", () => {
+    const wrapper = mount(OButtonGroup, {
+      slots: {
+        default: () => [
+          h(OButton, { variant: "pending" }, () => "Apply"),
+          h(OButton, { variant: "pending", size: "icon-sm", iconLeft: "keyboard-arrow-down" }),
+        ],
+      },
+    });
+    const buttons = wrapper.findAll("button");
+    expect(buttons).toHaveLength(2);
+    for (const button of buttons) {
+      expect(button.attributes("data-o2-variant")).toBe("pending");
+      expect(button.classes()).toContain("border-button-pending-bg");
+      expect(button.classes()).toContain("rounded-default");
+    }
+    expect(wrapper.classes()).toContain("[&>*:not(:first-child)]:border-s-0");
+    expect(wrapper.classes()).toContain(
+      "[&>[data-o2-variant=pending]:not(:last-child)]:border-e-button-pending-divider",
+    );
+  });
+
+  it("drops the pending divider when the group is not divided", () => {
+    const wrapper = mount(OButtonGroup, { props: { divided: false } });
+    expect(wrapper.classes().join(" ")).not.toContain("button-pending-divider");
   });
 
   // --- Attrs passthrough ---

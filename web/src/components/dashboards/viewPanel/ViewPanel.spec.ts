@@ -1289,6 +1289,22 @@ describe("ViewPanel", () => {
       expect(wrapper.vm.showApplyHint).toBe(false);
     });
 
+    it("marks an unapplied change with the pending variant and names it for screen readers", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      const refreshButton = () =>
+        wrapper
+          .findAllComponents({ name: "OButton" })
+          .find((b: any) => b.attributes("data-test") === "dashboard-viewpanel-refresh-data-btn");
+
+      expect(refreshButton().props("variant")).toBe("outline");
+      expect(refreshButton().vm.$attrs["aria-label"]).toBe("common.refresh");
+
+      await changeAppliedVariables();
+      expect(refreshButton().props("variant")).toBe("pending");
+      expect(refreshButton().vm.$attrs["aria-label"]).toBe("dashboard.refreshToApplyVariables");
+    });
+
     it("hides the Auto Run menu when the server flag is off", async () => {
       setAutoQuery(false);
       wrapper = createWrapper();
