@@ -145,6 +145,12 @@ export const oncallKeys = {
   contactsAll: (org: string) => orgKey(org, "oncall", "contacts"),
   contact: (org: string, userEmail: string) => orgKey(org, "oncall", "contacts", userEmail),
   telephony: (org: string) => orgKey(org, "oncall", "telephony"),
+  /** The org's connected Slack workspace; a connect or disconnect moves it. */
+  chatInstalls: (org: string) => orgKey(org, "oncall", "chat", "installs"),
+  /** The deployment's Slack app manifest URLs; only a config change moves them. */
+  slackManifestUrls: (org: string) => orgKey(org, "oncall", "chat", "slack", "manifest"),
+  /** The caller's own Slack link; a Confirm or Unlink moves it. */
+  mySlackLink: (org: string) => orgKey(org, "oncall", "chat", "identities", "me"),
 
   routingConfig: (org: string) => orgKey(org, "oncall", "routing", "config"),
 };

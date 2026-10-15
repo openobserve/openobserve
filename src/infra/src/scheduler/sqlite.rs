@@ -15,8 +15,11 @@
 
 use async_trait::async_trait;
 use chrono::Duration;
-use config::utils::time::now_micros;
-use sqlx::Row;
+use config::{
+    meta::triggers::{OncallSlackSyncData, SlackSyncFinish},
+    utils::{json, time::now_micros},
+};
+use sqlx::{Pool, Row, Sqlite};
 
 use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_max_retries};
 use crate::{
@@ -56,6 +59,36 @@ WHERE id = $4 AND claim_epoch = $5 AND status = $6;"#;
 const COMPLETE_CLAIM_QUERY: &str = r#"UPDATE scheduled_jobs
 SET status = $1, retries = $2, next_run_at = $3,
     is_realtime = $4, is_silenced = $5, end_time = $6, data = $7
+WHERE id = $8 AND claim_epoch = $9 AND status = $10;"#;
+
+// SY-2 arm: insert, or pull a waiting row earlier, or re-wait a completed one, never before
+// `not_before`; a row held by a pass only counts the arm.
+const ARM_SLACK_SYNC_QUERY: &str = r#"INSERT INTO scheduled_jobs
+    (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at, start_time, end_time, data)
+VALUES ($1, $2, $3, false, false, $4, 0, $5, 0, 0, $6)
+ON CONFLICT (org, module, module_key) DO UPDATE SET
+    next_run_at = CASE scheduled_jobs.status
+        WHEN $4 THEN MAX(MIN(scheduled_jobs.next_run_at, excluded.next_run_at),
+            COALESCE(json_extract(scheduled_jobs.data, '$.not_before'), 0))
+        WHEN $7 THEN MAX(excluded.next_run_at,
+            COALESCE(json_extract(scheduled_jobs.data, '$.not_before'), 0))
+        ELSE scheduled_jobs.next_run_at END,
+    data = CASE WHEN scheduled_jobs.status = $8
+        THEN json_set(scheduled_jobs.data, '$.armed_during_pass',
+            COALESCE(json_extract(scheduled_jobs.data, '$.armed_during_pass'), 0) + 1)
+        ELSE scheduled_jobs.data END,
+    status = CASE WHEN scheduled_jobs.status = $7 THEN $4 ELSE scheduled_jobs.status END;"#;
+
+// SY-2 finish: the pass's outcome if no arm came in, else wait again at max(now, not_before);
+// either way the pass's attempt and backoff are kept and the arm counter is not reset.
+const FINISH_SLACK_SYNC_QUERY: &str = r#"UPDATE scheduled_jobs SET
+    status = CASE WHEN COALESCE(json_extract(data, '$.armed_during_pass'), 0) = $1
+        THEN $2 ELSE $3 END,
+    next_run_at = CASE WHEN COALESCE(json_extract(data, '$.armed_during_pass'), 0) = $1
+        THEN $4 ELSE MAX($5, $6) END,
+    retries = 0,
+    data = json_set($7, '$.armed_during_pass',
+        COALESCE(json_extract(data, '$.armed_during_pass'), 0))
 WHERE id = $8 AND claim_epoch = $9 AND status = $10;"#;
 
 pub struct SqliteScheduler {}
@@ -434,6 +467,21 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(result.rows_affected() == 1)
     }
 
+    async fn arm_slack_sync(&self, org: &str, response_id: &str, at: i64) -> Result<()> {
+        arm_slack_sync_in(&CLIENT_RW.clone(), org, response_id, at).await
+    }
+
+    async fn finish_slack_sync(
+        &self,
+        claim: &Trigger,
+        read_armed: i64,
+        finish: SlackSyncFinish,
+        data: &OncallSlackSyncData,
+        now: i64,
+    ) -> Result<bool> {
+        finish_slack_sync_in(&CLIENT_RW.clone(), claim, read_armed, finish, data, now).await
+    }
+
     /// Returns the Trigger jobs with "Waiting" status.
     /// Steps:
     /// - Lock the Sqlite client for read-write
@@ -632,9 +680,171 @@ SELECT COUNT(*) as num FROM scheduled_jobs;"#,
     }
 }
 
+/// Runs the SY-2 arm on `pool`.
+async fn arm_slack_sync_in(
+    pool: &Pool<Sqlite>,
+    org: &str,
+    response_id: &str,
+    at: i64,
+) -> Result<()> {
+    sqlx::query(ARM_SLACK_SYNC_QUERY)
+        .bind(org)
+        .bind(TriggerModule::OncallSlackSync)
+        .bind(response_id)
+        .bind(TriggerStatus::Waiting)
+        .bind(at)
+        .bind(json::to_string(&OncallSlackSyncData::default())?)
+        .bind(TriggerStatus::Completed)
+        .bind(TriggerStatus::Processing)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Runs the SY-2 finish on `pool`.
+async fn finish_slack_sync_in(
+    pool: &Pool<Sqlite>,
+    claim: &Trigger,
+    read_armed: i64,
+    finish: SlackSyncFinish,
+    data: &OncallSlackSyncData,
+    now: i64,
+) -> Result<bool> {
+    let (status, next_run_at) = match finish {
+        SlackSyncFinish::Done => (TriggerStatus::Completed, claim.next_run_at),
+        SlackSyncFinish::Retry => (TriggerStatus::Waiting, data.not_before),
+    };
+    let result = sqlx::query(FINISH_SLACK_SYNC_QUERY)
+        .bind(read_armed)
+        .bind(status)
+        .bind(TriggerStatus::Waiting)
+        .bind(next_run_at)
+        .bind(now)
+        .bind(data.not_before)
+        .bind(json::to_string(data)?)
+        .bind(claim.id)
+        .bind(claim.claim_epoch)
+        .bind(TriggerStatus::Processing)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() == 1)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{COMPLETE_CLAIM_QUERY, KEEP_ALIVE_CLAIM_QUERY, PULL_QUERY, SqliteScheduler};
+    use config::meta::triggers::{OncallSlackSyncData, SlackSyncFinish};
+    use sqlx::{Pool, Sqlite};
+
+    use super::{
+        COMPLETE_CLAIM_QUERY, KEEP_ALIVE_CLAIM_QUERY, PULL_QUERY, PULL_QUERY_BY_MODULE,
+        SqliteScheduler, Trigger, TriggerModule, TriggerStatus, arm_slack_sync_in,
+        finish_slack_sync_in,
+    };
+    use crate::scheduler::slack_sync_tests::{self as cases, KEY, ORG, SyncDb};
+
+    // One in-memory database with the scheduler table and its unique key; one connection, one db.
+    struct SqliteDb(Pool<Sqlite>);
+
+    impl SyncDb for SqliteDb {
+        async fn fresh() -> Self {
+            let pool = sqlx::sqlite::SqlitePoolOptions::new()
+                .max_connections(1)
+                .connect("sqlite::memory:")
+                .await
+                .unwrap();
+            sqlx::query(
+                "CREATE TABLE scheduled_jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, \
+                 org VARCHAR(100) NOT NULL, module INT NOT NULL, module_key VARCHAR(256) NOT NULL, \
+                 is_realtime BOOLEAN DEFAULT false NOT NULL, is_silenced BOOLEAN DEFAULT false NOT NULL, \
+                 status INT NOT NULL, start_time BIGINT, end_time BIGINT, retries INT NOT NULL, \
+                 next_run_at BIGINT NOT NULL, data TEXT NOT NULL, claim_epoch BIGINT DEFAULT 0 NOT NULL)",
+            )
+            .execute(&pool)
+            .await
+            .unwrap();
+            sqlx::query(
+                "CREATE UNIQUE INDEX scheduled_jobs_org_module_key_idx \
+                 ON scheduled_jobs (org, module, module_key)",
+            )
+            .execute(&pool)
+            .await
+            .unwrap();
+            Self(pool)
+        }
+
+        async fn arm(&self, at: i64) {
+            arm_slack_sync_in(&self.0, ORG, KEY, at).await.unwrap();
+        }
+
+        async fn finish(
+            &self,
+            claim: &Trigger,
+            read_armed: i64,
+            finish: SlackSyncFinish,
+            data: &OncallSlackSyncData,
+            now: i64,
+        ) -> bool {
+            finish_slack_sync_in(&self.0, claim, read_armed, finish, data, now)
+                .await
+                .unwrap()
+        }
+
+        async fn claim(&self, now: i64) -> Vec<Trigger> {
+            sqlx::query_as::<_, Trigger>(PULL_QUERY_BY_MODULE)
+                .bind(TriggerStatus::Processing)
+                .bind(now)
+                .bind(TriggerModule::Report)
+                .bind(now + 60_000_000)
+                .bind(now + 60_000_000)
+                .bind(TriggerStatus::Waiting)
+                .bind(now)
+                .bind(true)
+                .bind(false)
+                .bind(TriggerModule::OncallSlackSync)
+                .bind(10)
+                .fetch_all(&self.0)
+                .await
+                .unwrap()
+        }
+
+        async fn set(&self, status: TriggerStatus, next_run_at: i64, data: &str) {
+            sqlx::query("UPDATE scheduled_jobs SET status = $1, next_run_at = $2, data = $3")
+                .bind(status)
+                .bind(next_run_at)
+                .bind(data)
+                .execute(&self.0)
+                .await
+                .unwrap();
+        }
+
+        async fn row(&self) -> Trigger {
+            sqlx::query_as::<_, Trigger>("SELECT * FROM scheduled_jobs WHERE module_key = $1")
+                .bind(KEY)
+                .fetch_one(&self.0)
+                .await
+                .unwrap()
+        }
+    }
+
+    #[tokio::test]
+    async fn an_arm_follows_sy2_on_every_row_state() {
+        cases::an_arm_follows_sy2_on_every_row_state::<SqliteDb>().await;
+    }
+
+    #[tokio::test]
+    async fn a_finish_applies_the_pass_unless_an_arm_came_in() {
+        cases::a_finish_applies_the_pass_unless_an_arm_came_in::<SqliteDb>().await;
+    }
+
+    #[tokio::test]
+    async fn a_finish_of_a_reclaimed_row_changes_nothing() {
+        cases::a_finish_of_a_reclaimed_row_changes_nothing::<SqliteDb>().await;
+    }
+
+    #[tokio::test]
+    async fn an_arm_mid_pass_gives_exactly_one_more_pass_after_it() {
+        cases::an_arm_mid_pass_gives_exactly_one_more_pass_after_it::<SqliteDb>().await;
+    }
 
     #[test]
     fn test_sqlite_scheduler_new() {

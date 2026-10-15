@@ -101,6 +101,8 @@ export default defineComponent({
       announcementBannerEditor: "announcements",
       pipelineDestinations: "pipeline_destinations",
       telephonySettings: "telephony",
+      slackSettings: "slack",
+      slackAppSettings: "slack_app",
       alertTemplates: "templates",
       modelPricing: "model_pricing",
       modelPricingEditor: "model_pricing",
@@ -144,7 +146,7 @@ export default defineComponent({
           query: { org_identifier: store.state.selectedOrganization?.identifier },
         });
       };
-      // Nodes, License, Password policy, Query Management and Announcements are enterprise-only meta-org pages.
+      // Nodes, License, Password policy, Query Management, Announcements and Slack app are enterprise-only meta-org pages.
       const notMeta =
         store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false");
       if (
@@ -153,7 +155,8 @@ export default defineComponent({
           name === "passwordPolicy" ||
           name === "query_management" ||
           name === "announcementBanners" ||
-          name === "announcementBannerEditor") &&
+          name === "announcementBannerEditor" ||
+          name === "slackAppSettings") &&
         notMeta
       ) {
         toGeneral();
@@ -330,6 +333,18 @@ export default defineComponent({
           group: "Destinations",
         },
         {
+          key: "slack",
+          label: t("oncallSlack.title"),
+          description: t("oncallSlack.subtitle"),
+          icon: "slack",
+          to: { name: "slackSettings", query: { org_identifier: org } },
+          visible: z.oncall_enabled !== false && z.oncall_slack !== "off" && oncallAccess.visible,
+          locked: !oncallAccess.allowed,
+          lockedMessage: oncallAccess.message,
+          dataTest: "slack-settings-tab",
+          group: "Destinations",
+        },
+        {
           key: "storageSettings",
           label: t("storage_settings.tabLabel"),
           description: t("settings.storageSettingsDesc"),
@@ -417,6 +432,19 @@ export default defineComponent({
           locked: !nodesAccess.allowed,
           lockedMessage: nodesAccess.message,
           dataTest: "nodes-tab",
+          group: "Operations",
+        },
+        {
+          key: "slack_app",
+          label: t("oncallSlackApp.title"),
+          description: t("oncallSlackApp.subtitle"),
+          icon: "slack",
+          to: { name: "slackAppSettings", query: { org_identifier: org } },
+          // Not gated on oncall_slack: the operator copies the manifest before Slack is set up.
+          visible: meta && z.oncall_enabled !== false && oncallAccess.visible,
+          locked: !oncallAccess.allowed,
+          lockedMessage: oncallAccess.message,
+          dataTest: "slack-app-settings-tab",
           group: "Operations",
         },
         {

@@ -22,7 +22,7 @@ use std::{
 
 use config::{
     RwHashMap, ider,
-    meta::oncall::{Team, TeamMember},
+    meta::oncall::{SlackRoomEdit, Team, TeamMember},
     utils::time::now_micros,
 };
 use sea_orm::{
@@ -118,6 +118,10 @@ fn to_team(m: oncall_teams::Model) -> Team {
         description: m.description,
         // Carried on the struct, so a whole-row super-cluster snapshot replicates the team's room.
         channel_destinations: to_channel(m.channel_destinations),
+        slack_workspace_id: m.slack_workspace_id,
+        slack_channel_id: m.slack_channel_id,
+        slack_channel_name: m.slack_channel_name,
+        slack_same_room_destination: m.slack_same_room_destination,
         created_at: m.created_at,
         updated_at: m.updated_at,
     }
@@ -168,6 +172,10 @@ pub async fn create(
         description: Set(description),
         // Not `[]`: an empty list means "no channel" and ignores the destinations it inherits.
         channel_destinations: Set(None),
+        slack_workspace_id: Set(None),
+        slack_channel_id: Set(None),
+        slack_channel_name: Set(None),
+        slack_same_room_destination: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -206,23 +214,76 @@ pub async fn set_channel(
     id: &str,
     destinations: Option<Vec<String>>,
 ) -> Result<bool, errors::Error> {
+    Ok(
+        update_channel(org_id, id, destinations, &SlackRoomEdit::Keep)
+            .await?
+            .is_some(),
+    )
+}
+
+/// Sets the team's channel like [`set_channel`] and applies `slack` to its Slack fields. [strong]
+pub async fn update_channel(
+    org_id: &str,
+    id: &str,
+    destinations: Option<Vec<String>>,
+    slack: &SlackRoomEdit,
+) -> Result<Option<Team>, errors::Error> {
     let client = get_orm_client_rw().await;
     let Some(existing) = oncall_teams::Entity::find_by_id(id)
         .filter(oncall_teams::Column::OrgId.eq(org_id))
         .one(client)
         .await?
     else {
-        return Ok(false);
+        return Ok(None);
     };
     let stored = destinations
         .as_ref()
         .map(|d| serde_json::to_string(d).unwrap_or_else(|_| "[]".to_string()));
     let mut model: oncall_teams::ActiveModel = existing.into();
     model.channel_destinations = Set(stored);
+    match slack {
+        SlackRoomEdit::Keep => {}
+        SlackRoomEdit::SameRoom(destination) => {
+            model.slack_same_room_destination = Set(destination.clone());
+        }
+        SlackRoomEdit::Clear => {
+            model.slack_workspace_id = Set(None);
+            model.slack_channel_id = Set(None);
+            model.slack_channel_name = Set(None);
+            model.slack_same_room_destination = Set(None);
+        }
+    }
     model.updated_at = Set(now_micros());
-    model.update(client).await?;
+    let team = to_team(model.update(client).await?);
     invalidate_and_publish_team(org_id, id).await;
-    Ok(true)
+    Ok(Some(team))
+}
+
+/// Stores the Slack channel `/oncall here` named for the team (RO-1, CM-5); `None` if no team.
+/// [strong]
+pub async fn set_slack_room(
+    org_id: &str,
+    id: &str,
+    workspace_id: &str,
+    channel_id: &str,
+    channel_name: &str,
+) -> Result<Option<Team>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let Some(existing) = oncall_teams::Entity::find_by_id(id)
+        .filter(oncall_teams::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+    else {
+        return Ok(None);
+    };
+    let mut model: oncall_teams::ActiveModel = existing.into();
+    model.slack_workspace_id = Set(Some(workspace_id.to_string()));
+    model.slack_channel_id = Set(Some(channel_id.to_string()));
+    model.slack_channel_name = Set(Some(channel_name.to_string()));
+    model.updated_at = Set(now_micros());
+    let team = to_team(model.update(client).await?);
+    invalidate_and_publish_team(org_id, id).await;
+    Ok(Some(team))
 }
 
 pub async fn get(org_id: &str, id: &str) -> Result<Option<Team>, errors::Error> {
@@ -522,6 +583,10 @@ mod tests {
             timezone: "Asia/Kolkata".into(),
             description: Some("owns queriers".into()),
             channel_destinations: None,
+            slack_workspace_id: Some("T1".into()),
+            slack_channel_id: Some("C1".into()),
+            slack_channel_name: Some("#oncall".into()),
+            slack_same_room_destination: Some("oncall-hook".into()),
             created_at: 10,
             updated_at: 20,
         };
@@ -531,6 +596,20 @@ mod tests {
         assert_eq!(t.timezone, "Asia/Kolkata");
         assert_eq!(t.description.as_deref(), Some("owns queriers"));
         assert_eq!((t.created_at, t.updated_at), (10, 20));
+        assert_eq!(
+            [
+                t.slack_workspace_id,
+                t.slack_channel_id,
+                t.slack_channel_name,
+                t.slack_same_room_destination
+            ],
+            [
+                m.slack_workspace_id,
+                m.slack_channel_id,
+                m.slack_channel_name,
+                m.slack_same_room_destination
+            ]
+        );
     }
 
     /// Membership is a flat fact: this person is on this team. Which rung

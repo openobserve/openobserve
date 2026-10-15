@@ -554,6 +554,9 @@ pub struct Response {
     /// owned by an incident, so this stays `None` for most firings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub incident_id: Option<String>,
+    /// Region that opened the page (`""` without super cluster); only that region sends chat.
+    #[serde(default)]
+    pub home_region: Option<String>,
     /// Revision of the write this record came from, and what a replica accepts
     /// or refuses a snapshot on. The queue redelivers an unacked message behind
     /// newer ones, so a blind apply lets an older snapshot un-acknowledge a
@@ -641,6 +644,12 @@ impl Response {
     /// problem, just with nothing left to try automatically.
     pub fn is_exhausted(&self) -> bool {
         self.exhausted_at.is_some() && !self.state.is_terminal()
+    }
+
+    /// Whether this region sends the page's chat (FL-6); no home region counts as empty. [pure]
+    pub fn sends_for(&self, this_region: &str, super_cluster_on: bool) -> bool {
+        let home = self.home_region.as_deref().unwrap_or_default();
+        home == this_region && !(home.is_empty() && super_cluster_on)
     }
 }
 
@@ -816,9 +825,12 @@ pub fn dependents_all_clear(impacted: &[Response], confirmed_id: &str) -> bool {
 /// Three stages and no more: the room needs "somebody was woken", "somebody has
 /// it" and "it is over, and why". Every rung in between is the ladder's
 /// business, and posting them turns a flapping alert into channel noise.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ChannelPostStage {
+    // Variant order is the page's order; `is_behind` compares by it, so never reorder.
     Paged,
     Acknowledged,
     Resolved,
@@ -844,6 +856,16 @@ impl ChannelPostStage {
             ResponseState::Resolved => Some(Self::Resolved),
             ResponseState::Triaged => None,
         }
+    }
+
+    /// The stage to render for a page in this state, `Triaged` showing as paged. [pure]
+    pub fn current(state: ResponseState) -> Self {
+        Self::of(state).unwrap_or(Self::Paged)
+    }
+
+    /// Whether the page has moved past this stage, so a post of it would be stale. [pure]
+    pub fn is_behind(self, state: ResponseState) -> bool {
+        self < Self::current(state)
     }
 }
 
@@ -1305,6 +1327,7 @@ mod tests {
             closed_at,
             incident_id: None,
             exhausted_at: None,
+            home_region: None,
             updated_at: 1_000,
         }
     }
@@ -1691,6 +1714,34 @@ mod tests {
         assert!(dependents_all_clear(&[], "anything"));
     }
 
+    /// FL-6: only the home region sends; empty is single-region and needs super cluster off.
+    #[test]
+    fn test_sends_for_only_the_home_region() {
+        let cases = [
+            (Some("eu"), "eu", true, true),
+            (Some("eu"), "us", true, false),
+            (Some("eu"), "eu", false, true),
+            (Some("eu"), "", false, false),
+            (Some(""), "", false, true),
+            (Some(""), "", true, false),
+            (Some(""), "eu", true, false),
+            (None, "", false, true),
+            (None, "", true, false),
+            (None, "eu", true, false),
+        ];
+        for (home, here, super_cluster_on, want) in cases {
+            let page = Response {
+                home_region: home.map(str::to_string),
+                ..sample(None, None)
+            };
+            assert_eq!(
+                page.sends_for(here, super_cluster_on),
+                want,
+                "home {home:?}, here {here:?}, super cluster {super_cluster_on}"
+            );
+        }
+    }
+
     // ── The team channel's copy of the record (Change 1) ────────────────────
 
     const URL: &str = "https://o2.example/web/oncall/responses/resp_1?org_identifier=default";
@@ -1741,6 +1792,30 @@ mod tests {
             Some(ChannelPostStage::Resolved)
         );
         assert_eq!(ChannelPostStage::of(ResponseState::Triaged), None);
+    }
+
+    /// RO-5 renders the stage of the page as re-read; RO-6 skips a post the page has moved past.
+    #[test]
+    fn test_the_current_stage_and_whether_a_requested_stage_is_behind_it() {
+        use ChannelPostStage::{Acknowledged as A, Paged as P, Resolved as R};
+        use ResponseState::{Acknowledged, Resolved, Triaged, Triggered};
+        // (page state, its current stage, which requested stages are behind it)
+        let table = [
+            (Triggered, P, [false, false, false]),
+            (Triaged, P, [false, false, false]),
+            (Acknowledged, A, [true, false, false]),
+            (Resolved, R, [true, true, false]),
+        ];
+        for (state, current, behind) in table {
+            assert_eq!(ChannelPostStage::current(state), current, "{state:?}");
+            for (requested, want) in [P, A, R].into_iter().zip(behind) {
+                assert_eq!(
+                    requested.is_behind(state),
+                    want,
+                    "{requested} on a {state:?} page"
+                );
+            }
+        }
     }
 
     /// The whole point of the change: the room learns what fired and who has

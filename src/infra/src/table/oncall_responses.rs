@@ -62,6 +62,7 @@ fn to_response(m: oncall_responses::Model) -> Option<Response> {
         closed_at: m.closed_at,
         incident_id: m.incident_id,
         exhausted_at: m.exhausted_at,
+        home_region: m.home_region,
         updated_at: m.updated_at,
     })
 }
@@ -136,6 +137,7 @@ fn to_event(m: oncall_response_events::Model) -> Option<ResponseEvent> {
 /// The unique index on `(org_id, subject_type, subject_id)` makes this safe to
 /// call from several nodes at once: the second caller gets a constraint
 /// violation rather than a duplicate record, and should read the existing one.
+#[allow(clippy::too_many_arguments)]
 pub async fn open(
     org_id: &str,
     subject: &SubjectRef,
@@ -144,6 +146,7 @@ pub async fn open(
     title: Option<&str>,
     role: ResponderRole,
     origin_response_id: Option<&str>,
+    home_region: &str,
 ) -> Result<Response, errors::Error> {
     let client = get_orm_client_rw().await;
     let model = oncall_responses::ActiveModel {
@@ -170,6 +173,7 @@ pub async fn open(
         // Copied at open, so the page keeps pointing where the alert pointed when it fired.
         runbook_url: Set(runbook_for(org_id, subject).await),
         exhausted_at: Set(None),
+        home_region: Set(Some(home_region.to_string())),
         updated_at: Set(now_micros()),
     };
     let inserted = model.insert(client).await?;
@@ -181,6 +185,7 @@ pub async fn open(
 }
 
 /// Reads the record for a firing, or creates it. Returns `(record, created)`.
+#[allow(clippy::too_many_arguments)]
 pub async fn open_or_get(
     org_id: &str,
     subject: &SubjectRef,
@@ -189,6 +194,7 @@ pub async fn open_or_get(
     title: Option<&str>,
     role: ResponderRole,
     origin_response_id: Option<&str>,
+    home_region: &str,
 ) -> Result<(Response, bool), errors::Error> {
     if let Some(found) = get_by_subject(org_id, subject).await? {
         return Ok((found, false));
@@ -201,6 +207,7 @@ pub async fn open_or_get(
         title,
         role,
         origin_response_id,
+        home_region,
     )
     .await
     {
@@ -1622,6 +1629,7 @@ mod tests {
             incident_id: None,
             runbook_url: None,
             exhausted_at: None,
+            home_region: None,
             updated_at: 1_000,
         }
     }

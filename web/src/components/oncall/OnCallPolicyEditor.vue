@@ -407,17 +407,23 @@
               <div v-if="current" class="flex flex-col gap-2">
                 <div class="flex flex-wrap items-center gap-2">
                   <OText variant="label" class="w-32 shrink-0">{{ t("oncall.channels") }}</OText>
-                  <OCheckbox
-                    v-for="channel in CHANNELS"
-                    :key="channel"
-                    :model-value="current.channels.includes(channel)"
-                    :label="t(`oncall.channel_${channel}`)"
-                    :disabled="!canConfigure"
-                    :data-test="`oncall-policy-channel-${current.priority}-${channel}`"
-                    @update:model-value="
-                      (on: CheckboxModelValue) => toggleChannel(current!, channel, on === true)
-                    "
-                  />
+                  <span v-for="channel in channels" :key="channel" class="flex items-center gap-1">
+                    <OCheckbox
+                      :model-value="current.channels.includes(channel)"
+                      :label="t(`oncall.channel_${channel}`)"
+                      :disabled="!canConfigure || (channel === 'email' && emailLocked)"
+                      :data-test="`oncall-policy-channel-${current.priority}-${channel}`"
+                      @update:model-value="
+                        (on: CheckboxModelValue) => toggleChannel(current!, channel, on === true)
+                      "
+                    />
+                    <OIcon
+                      v-if="channel === 'email' && emailLocked"
+                      name="lock"
+                      size="xs"
+                      class="text-text-secondary"
+                    />
+                  </span>
                 </div>
                 <div class="flex flex-col items-start gap-2 ps-34 max-md:ps-0">
                   <OText variant="meta" data-test="oncall-policy-channels-hint">
@@ -426,6 +432,13 @@
                         priority: raw(priorityLabel(current.priority)),
                       })
                     }}
+                  </OText>
+                  <OText
+                    v-if="emailLocked && !slackNotConnected"
+                    variant="meta"
+                    data-test="oncall-policy-email-locked"
+                  >
+                    {{ t("oncallSlack.policyEmailLocked") }}
                   </OText>
                   <span
                     v-if="phoneWithoutEmail(current)"
@@ -444,6 +457,21 @@
                       @click="openTelephony"
                     >
                       {{ t("oncall.policyNoProviderLink") }}
+                    </OButton>
+                  </OBanner>
+                  <OBanner
+                    v-if="slackNotConnected"
+                    variant="info"
+                    data-test="oncall-policy-slack-not-connected"
+                  >
+                    {{ t("oncallSlack.policyNotConnected") }}
+                    <OButton
+                      variant="ghost-primary"
+                      size="xs"
+                      data-test="oncall-policy-slack-settings-link"
+                      @click="openSlackSettings"
+                    >
+                      {{ t("oncallSlack.policyNotConnectedLink") }}
                     </OButton>
                   </OBanner>
                 </div>
@@ -541,6 +569,17 @@
                   {{ t("oncall.teamChannelSilent") }}
                 </span>
               </div>
+
+              <!-- Sits under the team channel because the old webhook it may replace is chosen there. -->
+              <OnCallTeamSlackChannel
+                v-if="slackOffered && teamChannel"
+                :org-id="orgId"
+                :team-id="props.teamId"
+                :team-name="props.teamName"
+                :channel="teamChannel"
+                :saving="savingChannel"
+                @save="saveTeamSlack"
+              />
             </div>
           </OTabPanel>
 
@@ -595,7 +634,9 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OnCallL0Editor from "@/components/oncall/OnCallL0Editor.vue";
+import OnCallTeamSlackChannel from "@/components/oncall/OnCallTeamSlackChannel.vue";
 import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -624,6 +665,7 @@ import {
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
   Channel,
+  SetTeamChannelBody,
   TeamChannel,
   EscalationTarget,
   L0Policy,
@@ -662,8 +704,10 @@ const props = withDefaults(
      * stored id as the name somebody recognises.
      */
     rotations?: Rotation[];
+    /** For the `/oncall here {team}` guidance under the Slack channel. */
+    teamName?: string;
   }>(),
-  { rotations: () => [] },
+  { rotations: () => [], teamName: "" },
 );
 const emit = defineEmits<{
   saved: [];
@@ -675,10 +719,6 @@ const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
-
-// Only channels a Notifier can actually send. Rendering the rest would let
-// somebody tick SMS and receive nothing.
-const CHANNELS = DELIVERABLE_CHANNELS;
 
 /// Enough faces to read the row as "people", not enough to wrap it. The count
 /// beside them carries the real number.
@@ -775,14 +815,31 @@ async function fetchTeamChannel() {
 
 /// `null` clears the override; an array (even empty) is the team's own list.
 async function saveTeamChannel(destinations: string[] | null) {
+  // The PUT replaces the whole setting, so a ticked same-room webhook still in the new list rides along.
+  const same = teamChannel.value?.slack_same_room_destination;
+  const list = destinations ?? props.policy?.destinations ?? [];
+  const body: SetTeamChannelBody = { destinations };
+  if (same && list.includes(same)) body.slack_same_room_destination = same;
+  await writeTeamChannel(body);
+}
+
+/// The Slack row's change, sent with the team's own list unchanged.
+async function saveTeamSlack(slack: Omit<SetTeamChannelBody, "destinations">) {
+  const current = teamChannel.value;
+  const destinations = current?.source === "team" ? current.destinations : null;
+  await writeTeamChannel({ destinations, ...slack });
+}
+
+async function writeTeamChannel(body: SetTeamChannelBody) {
   savingChannel.value = true;
   try {
-    const res = await saveChannelWrite.mutateAsync(destinations);
+    const res = await saveChannelWrite.mutateAsync(body);
     // The drawer stays open on this answer, and an invalidation cannot repaint a ref.
     teamChannel.value = res.data ?? null;
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
     toast({ variant: "success", message: t("oncall.teamChannelSaved") });
   } catch (err: any) {
+    noteConfigurationDenied(err);
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.teamChannelSaveFailed"),
@@ -791,6 +848,22 @@ async function saveTeamChannel(destinations: string[] | null) {
     savingChannel.value = false;
   }
 }
+
+// Hidden only when the deployment has Slack off, like its Settings entry.
+const slackOffered = computed(() => store.state.zoConfig?.oncall_slack !== "off");
+
+// Only channels a Notifier can send; a stored Slack tick stays visible so it can be unticked.
+const channels = computed(() =>
+  DELIVERABLE_CHANNELS.filter(
+    (c) => c !== "slack" || slackOffered.value || current.value?.channels.includes("slack"),
+  ),
+);
+/// DM-3: a page never goes by Slack alone, so Email stays ticked and locked while Slack is.
+const emailLocked = computed(() => current.value?.channels.includes("slack") ?? false);
+/// DM-2: with no active install every Slack DM is skipped; an unread team channel says nothing.
+const slackNotConnected = computed(
+  () => emailLocked.value && teamChannel.value?.slack_connected === false,
+);
 
 /// Only read to answer one question: does the final action's safety net
 /// exist. A failure leaves the warning off — a false "no default team" on a
@@ -1162,6 +1235,7 @@ function addStep(rung: PriorityRung) {
 function toggleChannel(rung: PriorityRung, channel: Channel, on: boolean) {
   if (on) {
     if (!rung.channels.includes(channel)) rung.channels.push(channel);
+    if (channel === "slack" && !rung.channels.includes("email")) rung.channels.push("email");
   } else {
     rung.channels = rung.channels.filter((c) => c !== channel);
   }
@@ -1169,6 +1243,11 @@ function toggleChannel(rung: PriorityRung, channel: Channel, on: boolean) {
 
 function openTelephony() {
   router.push({ name: "telephonySettings", query: { org_identifier: orgId.value } });
+}
+
+/// Opens Settings → Slack, where an org admin connects the workspace.
+function openSlackSettings() {
+  router.push({ name: "slackSettings", query: { org_identifier: orgId.value } });
 }
 
 function onL0Update(value: L0Policy) {

@@ -1078,6 +1078,7 @@ describe("CHANNEL_WAKES", () => {
   // how a team discovers at 3 a.m. that their P1 only ever sent an email.
   it.each([
     ["email", false],
+    ["slack", false],
     ["sms", true],
     ["voice", true],
     ["webhook", false],

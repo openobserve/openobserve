@@ -360,6 +360,7 @@
               :team-id="teamId"
               :policy="policy"
               :rotations="teamRotations"
+              :team-name="team?.name ?? ''"
               @saved="onPolicySaved"
               @open-members="activeTab = 'members'"
             />

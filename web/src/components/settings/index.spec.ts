@@ -208,6 +208,43 @@ describe("SettingsIndex", () => {
       expect(telephony().visible).toBe(false);
     });
 
+    it.each([
+      [{ oncall_enabled: true, oncall_slack: "on" }, true],
+      [{ oncall_enabled: true, oncall_slack: "needs_key" }, true],
+      [{ oncall_enabled: true, oncall_slack: "off" }, false],
+      [{ oncall_enabled: false, oncall_slack: "on" }, false],
+    ])("lists Slack with the page's icon; with %o it is visible: %s", (flags, visible) => {
+      mockStore.state.zoConfig = { service_streams_enabled: true, ...flags } as any;
+      const slack = getAllItems(createWrapper()).find((i: any) => i.key === "slack");
+      expect(slack).toMatchObject({
+        icon: "slack",
+        group: "Destinations",
+        dataTest: "slack-settings-tab",
+        to: { name: "slackSettings", query: { org_identifier: "test-org" } },
+        visible,
+      });
+    });
+
+    it.each([
+      [true, { oncall_enabled: true, oncall_slack: "off" }, true],
+      [false, { oncall_enabled: true, oncall_slack: "on" }, false],
+      [true, { oncall_enabled: false, oncall_slack: "off" }, false],
+    ])(
+      "lists Slack app in Operations only in the admin org (meta %s, %o): %s",
+      (meta, flags, visible) => {
+        mockIsMetaOrg.value = meta;
+        mockStore.state.zoConfig = { service_streams_enabled: true, ...flags } as any;
+        const app = getAllItems(createWrapper()).find((i: any) => i.key === "slack_app");
+        expect(app).toMatchObject({
+          icon: "slack",
+          group: "Operations",
+          dataTest: "slack-app-settings-tab",
+          to: { name: "slackAppSettings", query: { org_identifier: "test-org" } },
+          visible,
+        });
+      },
+    );
+
     it("should include synthetics_locations item with correct properties", () => {
       const wrapper = createWrapper();
       const items = getAllItems(wrapper);
@@ -278,6 +315,28 @@ describe("SettingsIndex", () => {
     router.currentRoute.value = originalRoute;
   });
 
+  it("maps the slackAppSettings route to the slack_app section", () => {
+    const originalRoute = router.currentRoute.value;
+    router.currentRoute.value = {
+      ...router.currentRoute.value,
+      name: "slackAppSettings",
+      path: "/slack_app",
+    } as any;
+    expect(createWrapper().vm.settingsTab).toBe("slack_app");
+    router.currentRoute.value = originalRoute;
+  });
+
+  it("maps the slackSettings route to the slack section", () => {
+    const originalRoute = router.currentRoute.value;
+    router.currentRoute.value = {
+      ...router.currentRoute.value,
+      name: "slackSettings",
+      path: "/slack",
+    } as any;
+    expect(createWrapper().vm.settingsTab).toBe("slack");
+    router.currentRoute.value = originalRoute;
+  });
+
   describe("Theme integration", () => {
     // regexIcon is computed internally and used in settingsItems icon field
     // (not directly exposed on vm), so we verify it via the sectionGroups items.
@@ -314,7 +373,7 @@ describe("SettingsIndex", () => {
       expect(generalGroup).toBeDefined();
     });
 
-    it("should contain a Destinations group holding Pipeline Destinations, then Telephony", () => {
+    it("should contain a Destinations group holding Pipeline Destinations, Telephony, then Slack", () => {
       const wrapper = createWrapper();
       const groups = wrapper.vm.sectionGroups as any[];
       const destGroup = groups.find((g: any) => g.label === "Destinations");
@@ -322,6 +381,7 @@ describe("SettingsIndex", () => {
       expect(destGroup.items.map((i: any) => i.key)).toEqual([
         "pipeline_destinations",
         "telephony",
+        "slack",
       ]);
     });
 
@@ -533,7 +593,7 @@ describe("SettingsIndex", () => {
       });
     });
 
-    it.each(["announcementBanners", "announcementBannerEditor"])(
+    it.each(["announcementBanners", "announcementBannerEditor", "slackAppSettings"])(
       "should redirect %s to general outside the meta org",
       async (name) => {
         mockStore.state.zoConfig = { meta_org: "_meta", service_streams_enabled: true };
@@ -554,6 +614,25 @@ describe("SettingsIndex", () => {
         }
       },
     );
+
+    it("should NOT redirect slackAppSettings inside the meta org", async () => {
+      mockStore.state.zoConfig = { meta_org: "_meta", service_streams_enabled: true };
+      mockIsMetaOrg.value = true;
+
+      const awsConfig = await import("@/aws-exports");
+      vi.mocked(awsConfig.default).isEnterprise = "true";
+
+      const originalRoute = router.currentRoute.value;
+      router.currentRoute.value = { ...originalRoute, name: "slackAppSettings" } as any;
+      try {
+        createWrapper();
+        expect(mockRouterPush).not.toHaveBeenCalledWith(
+          expect.objectContaining({ path: "/settings/general" }),
+        );
+      } finally {
+        router.currentRoute.value = originalRoute;
+      }
+    });
 
     it("should NOT redirect syntheticsLocations on an OSS build with synthetics on", async () => {
       mockStore.state.zoConfig = {

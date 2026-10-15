@@ -30,6 +30,12 @@ vi.mock("@/composables/shared/router", () => ({
         meta: { titleKey: "login.login" },
       },
       {
+        // Mirrors the Slack link confirm record in composables/shared/router.ts.
+        path: "/oncall/slack/link",
+        name: "onCallSlackLink",
+        component: { template: "<div>Confirm</div>" },
+      },
+      {
         // Mirrors the /signup record in composables/shared/router.ts.
         path: "/signup",
         redirect: (to: any) => ({ path: "/login", query: { ...to.query, mode: "signup" } }),
@@ -229,6 +235,22 @@ describe("router/index (factory)", () => {
       await router.push({ path: "/logs" }).catch(() => {});
       // The guard stores the current URL under 'redirectURI' before redirecting to /login
       expect(window.sessionStorage.getItem("redirectURI")).not.toBeNull();
+    });
+
+    /// LN-1: a logged-out open of the Slack confirm link returns to it, token and org included.
+    it("returns a logged-out Slack confirm link to itself after login", async () => {
+      window.sessionStorage.clear();
+      window.history.replaceState({}, "", "/oncall/slack/link?t=tok&org_identifier=acme");
+      vi.mocked(getDecodedUserInfo).mockReturnValue(null);
+      store = buildStore(false);
+      router = createAppRouter(store);
+
+      await router.push("/oncall/slack/link?t=tok&org_identifier=acme").catch(() => {});
+
+      expect(router.currentRoute.value.path).toBe("/login");
+      expect(window.sessionStorage.getItem("redirectURI")).toBe(
+        `${window.location.origin}/oncall/slack/link?t=tok&org_identifier=acme`,
+      );
     });
 
     it("should store short_url query param when present", async () => {

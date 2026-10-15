@@ -2,7 +2,7 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import { withFeatureGate } from "@/utils/enterpriseFeatures";
-import { oncallRouteGuard } from "./oncallRouteGuard";
+import { oncallRouteGuard, oncallSlackRouteGuard } from "./oncallRouteGuard";
 
 const Settings = () => import("@/components/settings/index.vue");
 
@@ -218,6 +218,25 @@ const useManagementRoutes = () => {
             titleKey: "telephony.title",
           },
           component: () => import("@/components/settings/TelephonySettings.vue"),
+          beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
+        },
+        {
+          path: "slack",
+          name: "slackSettings",
+          meta: {
+            titleKey: "oncallSlack.title",
+          },
+          component: () => import("@/components/settings/SlackSettings.vue"),
+          beforeEnter: withFeatureGate("oncall", oncallSlackRouteGuard),
+        },
+        // Admin org only; the Settings page sends any other org back to General.
+        {
+          path: "slack_app",
+          name: "slackAppSettings",
+          meta: {
+            titleKey: "oncallSlackApp.title",
+          },
+          component: () => import("@/components/settings/SlackAppSettings.vue"),
           beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
         },
         {

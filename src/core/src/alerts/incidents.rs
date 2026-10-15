@@ -3648,6 +3648,7 @@ mod tests {
             priority: 2,
             responder_role: ResponderRole::Owner,
             exhausted_at: None,
+            home_region: None,
             origin_response_id: None,
             state,
             opened_at: 0,

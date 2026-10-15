@@ -58,6 +58,12 @@ import type {
   PutTelephonyBody,
   TelephonyView,
   OrgTelephonyView,
+  ChatInstallView,
+  ChatLinkView,
+  SlackLinkPreview,
+  SlackManifestUrls,
+  SetTeamChannelBody,
+  TeamSlackTestResult,
   TestPageResult,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
@@ -378,11 +384,23 @@ const oncall = {
   }: {
     org_identifier: string;
     team_id: string;
-    data: { destinations: string[] | null };
+    data: SetTeamChannelBody;
   }) =>
     http().put<TeamChannel>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/channel`,
       data,
+    ),
+
+  /// One plain bot message to the team's Slack channel; answers what to fix when it cannot post.
+  testTeamSlackChannel: ({
+    org_identifier,
+    team_id,
+  }: {
+    org_identifier: string;
+    team_id: string;
+  }) =>
+    http().post<TeamSlackTestResult>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/slack/test`,
     ),
 
   /// Org-scoped, deliberately not per team. All three params optional; both
@@ -850,6 +868,70 @@ const oncall = {
 
   deleteTelephony: ({ org_identifier }: { org_identifier: string }) =>
     http().delete<{ deleted: boolean }>(`/api/${org_identifier}/telephony`),
+
+  /// Issues the Slack approval URL; nothing opens before this answers, so a 403 never shows a popup.
+  startSlackInstall: ({ org_identifier }: { org_identifier: string }) =>
+    http().post<{ url: string }>(`/api/${org_identifier}/oncall/chat/slack/install/start`),
+
+  /// Redeems the code the callback page relayed; a workspace another org holds answers 409.
+  exchangeSlackInstall: ({
+    org_identifier,
+    code,
+    state,
+  }: {
+    org_identifier: string;
+    code: string;
+    state: string;
+  }) =>
+    http().post<ChatInstallView>(`/api/${org_identifier}/oncall/chat/slack/install/exchange`, {
+      code,
+      state,
+    }),
+
+  /// The org's connected Slack workspace, if any; never the bot token.
+  listChatInstalls: ({ org_identifier }: { org_identifier: string }) =>
+    http().get<ChatInstallView[]>(`/api/${org_identifier}/oncall/chat/installs`),
+
+  /// Disconnects the workspace; people's links are kept for a reconnect.
+  deleteChatInstall: ({
+    org_identifier,
+    workspace_id,
+  }: {
+    org_identifier: string;
+    workspace_id: string;
+  }) =>
+    http().delete<{ message: string }>(
+      `/api/${org_identifier}/oncall/chat/installs/${encodeURIComponent(workspace_id)}`,
+    ),
+
+  /// This deployment's Slack app manifest URLs; only the admin org is answered.
+  getSlackManifestUrls: ({ org_identifier }: { org_identifier: string }) =>
+    http().get<SlackManifestUrls>(`/api/${org_identifier}/oncall/chat/slack/manifest`),
+
+  /// DMs the caller a Confirm button; links nothing until that Confirm (LN-5).
+  startSlackLink: ({ org_identifier }: { org_identifier: string }) =>
+    http().post<{ sent: boolean }>(`/api/${org_identifier}/oncall/chat/slack/link/start`),
+
+  /// Names the Slack account the token links, without linking it; the org comes from the link's URL, so it is escaped.
+  previewSlackLink: ({ org_identifier, t }: { org_identifier: string; t: string }) =>
+    http().post<SlackLinkPreview>(
+      `/api/${encodeURIComponent(org_identifier)}/oncall/chat/slack/link/preview`,
+      { t },
+    ),
+
+  /// Links the Slack account the token names to the caller; the org comes from the link's URL, so it is escaped.
+  confirmSlackLink: ({ org_identifier, t }: { org_identifier: string; t: string }) =>
+    http().post<ChatLinkView>(`/api/${encodeURIComponent(org_identifier)}/oncall/chat/slack/link`, {
+      t,
+    }),
+
+  /// The caller's own Slack link, or null; never anybody else's.
+  getMySlackLink: ({ org_identifier }: { org_identifier: string }) =>
+    http().get<ChatLinkView | null>(`/api/${org_identifier}/oncall/chat/identities/me`),
+
+  /// Unlinks the caller's own Slack account.
+  unlinkMySlack: ({ org_identifier }: { org_identifier: string }) =>
+    http().delete<{ unlinked: boolean }>(`/api/${org_identifier}/oncall/chat/identities/me`),
 
   /// Somebody stands in for the rotation over a window. Outside it the
   /// rotation resolves as normal, which is what makes an override safe.

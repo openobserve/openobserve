@@ -233,6 +233,7 @@ struct ConfigResponse<'a> {
     composite_alerts_available: bool,
     synthetics_enabled: bool,
     oncall_enabled: bool,
+    oncall_slack: config::meta::oncall::SlackAvailability,
     /// Enterprise-only private locations; the UI gates their views on this flag.
     synthetics_private_locations_enabled: bool,
     /// Server-side step cap (`ZO_SYNTHETICS_BROWSER_MAX_STEPS`); the UI budget must follow it.
@@ -490,6 +491,14 @@ pub async fn zo_config(
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
     let synthetics_browser_max_steps = cfg.synthetics.browser_max_steps;
     let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
+    let oncall_slack = enterprise_value!(
+        config::meta::oncall::SlackAvailability::Off,
+        config::meta::oncall::SlackAvailability::of(
+            o2cfg.oncall.enabled,
+            o2cfg.oncall.slack_is_set(),
+            infra::table::cipher::is_encrypting(),
+        )
+    );
 
     #[cfg(feature = "cloud")]
     let build_type = "cloud";
@@ -612,6 +621,7 @@ pub async fn zo_config(
         composite_alerts_available,
         synthetics_enabled,
         oncall_enabled,
+        oncall_slack,
         synthetics_private_locations_enabled,
         synthetics_browser_max_steps,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),

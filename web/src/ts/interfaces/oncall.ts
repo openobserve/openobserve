@@ -74,6 +74,8 @@ export type AlertPriorityValue = 1 | 2 | 3 | 4 | 5;
 
 export type Channel =
   | "email"
+  /** A DM from the org's Slack app to the person's linked Slack account. */
+  | "slack"
   | "sms"
   | "voice"
   /** An existing alert Destination — Slack, Teams, or any HTTP endpoint. */
@@ -349,6 +351,28 @@ export interface TeamChannel {
   team_id: string;
   destinations: string[];
   source: "team" | "policy";
+  /** Only `/oncall here` sets a team's Slack channel; the read never carries its workspace id. */
+  slack_channel_set?: boolean;
+  slack_channel_name?: string | null;
+  /** Only while it is still one of the team's webhook destinations (RO-1). */
+  slack_same_room_destination?: string | null;
+  /** RO-2: the channel is in the org's connected workspace. */
+  slack_native?: boolean;
+  slack_connected?: boolean;
+}
+
+/** `PUT /oncall/teams/{id}/channel` body; an omitted same-room destination unticks it. */
+export interface SetTeamChannelBody {
+  destinations: string[] | null;
+  slack_same_room_destination?: string;
+  clear_slack?: boolean;
+}
+
+/** `POST /oncall/teams/{id}/slack/test` (RO-7): `advice` is the server's words for what to fix. */
+export interface TeamSlackTestResult {
+  ok: boolean;
+  class: "ok" | "channel_problem" | "not_connected" | "no_channel";
+  advice: string | null;
 }
 
 export interface Unavailability {
@@ -1215,6 +1239,44 @@ export interface VerificationRefusalBody {
   reason: RefusalReason;
   tries_left?: number;
   retry_after_secs?: number;
+}
+
+/** `/config` `oncall_slack`: whether this deployment offers Slack to orgs (IN-2). */
+export type SlackAvailability = "off" | "needs_key" | "on";
+
+/** `GET /oncall/chat/installs` row: the org's connected Slack workspace; the bot token never comes back. */
+export interface ChatInstallView {
+  workspace_id: string;
+  workspace_name: string;
+  status: "active" | "revoked";
+  installed_by: string;
+  installed_at: number;
+}
+
+/** `GET /_meta/oncall/chat/slack/manifest`: the deployment addresses the Slack app manifest needs; never a secret. */
+export interface SlackManifestUrls {
+  command_url: string;
+  interact_url: string;
+  redirect_url: string;
+}
+
+/** `GET /oncall/chat/identities/me` and a Confirm's answer: the caller's own Slack link (RB-6). */
+export interface ChatLinkView {
+  workspace_id: string;
+  workspace_name?: string | null;
+  /** False for a link kept from before a Disconnect; it works again on reconnect. */
+  connected: boolean;
+  slack_user_id: string;
+  email: string;
+  linked_at: number;
+}
+
+/** `POST /oncall/chat/slack/link/preview`: the Slack account a link token names, shown before Confirm (LN-6). */
+export interface SlackLinkPreview {
+  name?: string | null;
+  email?: string | null;
+  /** True only for a confirmed Slack email equal to the caller's, any case. */
+  same_email: boolean;
 }
 
 /** `GET /telephony`: the deployment's account is reported by presence and From number only, never its SID or token. */

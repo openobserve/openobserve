@@ -133,7 +133,7 @@ describe("OnCallPolicyEditor", () => {
     service.getContact.mockResolvedValue({ data: contact(true) } as any);
   });
 
-  it("offers the deliverable channels in the order Email, SMS, Voice call, Chat / webhook", async () => {
+  it("offers the deliverable channels in the order Email, Slack, SMS, Voice call, Chat / webhook", async () => {
     const wrapper = render();
     await flushPromises();
 
@@ -142,6 +142,7 @@ describe("OnCallPolicyEditor", () => {
       .map((el) => [el.attributes("data-test"), el.text()]);
     expect(ticks).toEqual([
       ["oncall-policy-channel-1-email", "Email"],
+      ["oncall-policy-channel-1-slack", "Slack"],
       ["oncall-policy-channel-1-sms", "SMS"],
       ["oncall-policy-channel-1-voice", "Voice call"],
       ["oncall-policy-channel-1-webhook", "Chat / webhook"],
@@ -221,6 +222,106 @@ describe("OnCallPolicyEditor", () => {
       const wrapper = render();
       await flushPromises();
       expect(note(wrapper).exists()).toBe(false);
+    });
+  });
+
+  /// DM-3, DM-2, D13: Slack never pages alone, and an org without Slack connected skips it.
+  describe("the Slack tick", () => {
+    const tick = async (wrapper: ReturnType<typeof render>, channel: string, on: boolean) => {
+      wrapper
+        .findComponent(`[data-test="oncall-policy-channel-1-${channel}"]`)
+        .vm.$emit("update:modelValue", on);
+      await flushPromises();
+    };
+    const email = (wrapper: ReturnType<typeof render>) =>
+      wrapper.find('[data-test="oncall-policy-channel-1-email"] input');
+    const locked = (wrapper: ReturnType<typeof render>) =>
+      wrapper.find('[data-test="oncall-policy-email-locked"]');
+    const banner = (wrapper: ReturnType<typeof render>) =>
+      wrapper.find('[data-test="oncall-policy-slack-not-connected"]');
+    const withSlack = (connected: boolean) =>
+      service.getTeamChannel.mockResolvedValue({
+        data: {
+          team_id: "team_1",
+          destinations: [],
+          source: "policy",
+          slack_connected: connected,
+        },
+      } as any);
+
+    it("is not offered when the deployment has Slack off", async () => {
+      const config = store.state.zoConfig;
+      store.state.zoConfig = { ...config, oncall_slack: "off" };
+      try {
+        const wrapper = render();
+        await flushPromises();
+        expect(wrapper.find('[data-test="oncall-policy-channel-1-slack"]').exists()).toBe(false);
+      } finally {
+        store.state.zoConfig = config;
+      }
+    });
+
+    it("keeps a stored Slack tick on a Slack-off deployment so it can be unticked", async () => {
+      const config = store.state.zoConfig;
+      store.state.zoConfig = { ...config, oncall_slack: "off" };
+      try {
+        const stored = { ...policy, rungs: [{ ...policy.rungs[0], channels: ["email", "slack"] }] };
+        const wrapper = mount(OnCallPolicyEditor, {
+          props: { teamId: "team_1", policy: stored, open: true, rotations: ROTATIONS },
+          global: { plugins: [i18n, store], stubs },
+        });
+        await flushPromises();
+        const slack = wrapper.find('[data-test="oncall-policy-channel-1-slack"] input');
+        expect((slack.element as HTMLInputElement).checked).toBe(true);
+        expect(email(wrapper).attributes("disabled")).toBeDefined();
+        expect(locked(wrapper).exists()).toBe(true);
+
+        await tick(wrapper, "slack", false);
+        expect(email(wrapper).attributes("disabled")).toBeUndefined();
+        expect(locked(wrapper).exists()).toBe(false);
+      } finally {
+        store.state.zoConfig = config;
+      }
+    });
+
+    it("ticks and locks Email with the reason, and unticking Slack unlocks Email still ticked", async () => {
+      withSlack(true);
+      const wrapper = render();
+      await flushPromises();
+      await tick(wrapper, "email", false);
+
+      await tick(wrapper, "slack", true);
+      expect((email(wrapper).element as HTMLInputElement).checked).toBe(true);
+      expect(email(wrapper).attributes("disabled")).toBeDefined();
+      expect(locked(wrapper).text()).toBe(
+        "Email stays on with Slack: people without a linked Slack account still get the email.",
+      );
+      expect(banner(wrapper).exists()).toBe(false);
+
+      await tick(wrapper, "slack", false);
+      expect((email(wrapper).element as HTMLInputElement).checked).toBe(true);
+      expect(email(wrapper).attributes("disabled")).toBeUndefined();
+      expect(locked(wrapper).exists()).toBe(false);
+    });
+
+    it("says Slack is skipped, with a Settings link, when the org has no Slack connected", async () => {
+      withSlack(false);
+      const wrapper = render();
+      await flushPromises();
+      expect(banner(wrapper).exists()).toBe(false);
+
+      await tick(wrapper, "slack", true);
+      expect(banner(wrapper).text()).toContain(
+        "Slack is not connected, so Slack DMs are skipped and these pages go by the other ticks.",
+      );
+      expect(locked(wrapper).exists()).toBe(false);
+      expect(email(wrapper).attributes("disabled")).toBeDefined();
+
+      await wrapper.find('[data-test="oncall-policy-slack-settings-link"]').trigger("click");
+      expect(push).toHaveBeenCalledWith({
+        name: "slackSettings",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
     });
   });
 
@@ -613,6 +714,67 @@ describe("OnCallPolicyEditor", () => {
 
       expect(service.setTeamChannel).toHaveBeenCalledWith(
         expect.objectContaining({ data: { destinations: null } }),
+      );
+    });
+
+    /// The PUT replaces the whole setting, so a ticked same-room webhook still listed is resent.
+    it("keeps a ticked same-room webhook that is still in the new list", async () => {
+      service.getTeamChannel.mockResolvedValue({
+        data: {
+          team_id: "team_1",
+          destinations: ["slack-eng"],
+          source: "team",
+          slack_same_room_destination: "slack-eng",
+        },
+      } as any);
+      service.setTeamChannel.mockResolvedValue({
+        data: { team_id: "team_1", destinations: ["slack-eng"], source: "policy" },
+      } as any);
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: {
+          teamId: "team_1",
+          policy: { ...policy, destinations: ["slack-eng"] },
+          open: true,
+          rotations: ROTATIONS,
+        },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-team-channel-clear"]').trigger("click");
+      await flushPromises();
+
+      expect(service.setTeamChannel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { destinations: null, slack_same_room_destination: "slack-eng" },
+        }),
+      );
+    });
+
+    /// The Slack row's change goes out with the team's own list, not a reset to the policy.
+    it("sends the Slack row's clear with the team's own list", async () => {
+      service.getTeamChannel.mockResolvedValue({
+        data: {
+          team_id: "team_1",
+          destinations: ["slack-eng"],
+          source: "team",
+          slack_channel_set: true,
+          slack_channel_name: "pay",
+          slack_native: true,
+          slack_connected: true,
+        },
+      } as any);
+      service.setTeamChannel.mockResolvedValue({
+        data: { team_id: "team_1", destinations: ["slack-eng"], source: "team" },
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-team-slack-clear"]').trigger("click");
+      await flushPromises();
+
+      expect(service.setTeamChannel).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { destinations: ["slack-eng"], clear_slack: true } }),
       );
     });
 

@@ -17,11 +17,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { queryClient } from "@/composables/query/queryClient";
 import { LIVE_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import {
+  chatInstallsQuery,
   confirmCodeMutation,
   contactQuery,
   createOwnershipRuleMutation,
   deleteOwnershipRuleMutation,
+  deleteChatInstallMutation,
   deleteTelephonyMutation,
+  exchangeSlackInstallMutation,
   oncallTeamsQuery,
   pagedResponsesQuery,
   responsesQuery,
@@ -214,5 +217,20 @@ describe("the org's phone provider", () => {
   // The save carries the plaintext token, so its mutation must not outlive the dialog.
   it("drops a save from the mutation cache as soon as nothing observes it", () => {
     expect(saveTelephonyMutation(ORG).gcTime).toBe(0);
+  });
+});
+
+describe("the org's Slack workspace", () => {
+  it("reads on the settings tier", () => {
+    expect(chatInstallsQuery(ORG).staleTime).toBe(NORMAL_STALE_TIME);
+  });
+
+  it.each([
+    ["finishing a connect", exchangeSlackInstallMutation],
+    ["disconnecting it", deleteChatInstallMutation],
+  ])("%s re-reads the connected workspace", (_, mutation) => {
+    const scopes = mutation(ORG).meta?.invalidates ?? [];
+    const key = oncallKeys.chatInstalls(ORG);
+    expect(scopes.some((scope) => scope.every((part, i) => part === key[i]))).toBe(true);
   });
 });

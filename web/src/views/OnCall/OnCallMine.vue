@@ -80,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OContent v-else y class="flex flex-col gap-5">
       <!-- Phone first: until it is verified, nothing below can reach the reader. -->
       <OnCallPhoneCard ref="phoneRef" />
+      <OnCallSlackCard v-if="slackOffered" ref="slackRef" />
 
       <div
         class="card-container rounded-surface bg-surface-base border-border-default flex flex-col gap-2 border px-4 py-3"
@@ -169,6 +170,7 @@ import { useStore } from "vuex";
 
 import OnCallMyDeliveries from "@/components/oncall/OnCallMyDeliveries.vue";
 import OnCallPhoneCard from "@/components/oncall/OnCallPhoneCard.vue";
+import OnCallSlackCard from "@/components/oncall/OnCallSlackCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
@@ -192,6 +194,9 @@ const mine = ref<MyOnCall | null>(null);
 const loaded = ref(false);
 const lastFetchedAt = ref<number | null>(null);
 const unavailable = ref(false);
+
+// Mockup decision 9: only a deployment with Slack off hides the card; a cold load has not read /config yet.
+const slackOffered = computed(() => store.state.zoConfig?.oncall_slack !== "off");
 
 const teamNames = computed(() =>
   Object.fromEntries((mine.value?.teams ?? []).map((team) => [team.team_id, team.team_name])),
@@ -251,12 +256,18 @@ function openTeam(teamId: string) {
 const refreshing = ref(false);
 const deliveriesRef = ref<{ refresh: () => Promise<void> } | null>(null);
 const phoneRef = ref<{ refresh: () => Promise<void> } | null>(null);
+const slackRef = ref<{ refresh: () => Promise<void> } | null>(null);
 
 /// Named, so the click event cannot land on `force`.
 async function refreshPage() {
   refreshing.value = true;
   try {
-    await Promise.all([fetchMine(true), deliveriesRef.value?.refresh(), phoneRef.value?.refresh()]);
+    await Promise.all([
+      fetchMine(true),
+      deliveriesRef.value?.refresh(),
+      phoneRef.value?.refresh(),
+      slackRef.value?.refresh(),
+    ]);
   } finally {
     refreshing.value = false;
   }

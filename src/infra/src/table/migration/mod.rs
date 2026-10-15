@@ -223,6 +223,8 @@ mod m20261009_000005_create_downtime_notifications;
 mod m20261012_000001_create_alert_calibration_configs;
 mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
+mod m20261014_000001_create_oncall_chat_tables;
+mod m20261014_000002_add_oncall_slack_columns;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -338,6 +340,16 @@ pub(crate) async fn create_downtime_notifications_for_test(
 ) -> Result<(), DbErr> {
     use sea_orm_migration::MigrationTrait;
     m20261009_000005_create_downtime_notifications::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+/// Builds the chat tables with their unique keys, which `create_table_from_entity` omits.
+#[cfg(test)]
+pub(crate) async fn create_oncall_chat_tables_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20261014_000001_create_oncall_chat_tables::Migration
         .up(&SchemaManager::new(db))
         .await
 }
@@ -575,6 +587,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261007_000002_add_redact_tools_to_ai_chat_shares::Migration),
             Box::new(m20261013_000001_create_oncall_phone_verifications::Migration),
             Box::new(m20261013_000002_create_org_telephony::Migration),
+            Box::new(m20261014_000001_create_oncall_chat_tables::Migration),
+            Box::new(m20261014_000002_add_oncall_slack_columns::Migration),
         ]
     }
 }
@@ -642,6 +656,7 @@ mod tests {
         (106, "m20261007_000001_create_ai_chat_turns"),
         (107, "m20261007_000002_add_redact_tools_to_ai_chat_shares"),
         (108, "m20261013_000002_create_org_telephony"),
+        (109, "m20261014_000002_add_oncall_slack_columns"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -775,6 +790,10 @@ mod tests {
             (
                 "m20260923_000001_create_ai_chat_sessions",
                 "m20261007_000001_create_ai_chat_turns",
+            ),
+            (
+                "m20260806_000001_create_oncall_tables",
+                "m20261014_000002_add_oncall_slack_columns",
             ),
         ] {
             assert!(

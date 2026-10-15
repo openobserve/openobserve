@@ -24,7 +24,10 @@ import {
 } from "@/composables/query/cachePolicy";
 import type {
   CauseGroup,
+  ChatInstallView,
+  ChatLinkView,
   Contact,
+  SlackManifestUrls,
   CoverageGaps,
   EscalationProgress,
   MyDeliveries,
@@ -44,6 +47,7 @@ import type {
   Rotation,
   PutTelephonyBody,
   RoutingConfig,
+  SetTeamChannelBody,
   TeamLoad,
   TelephonyView,
   TeamOverview,
@@ -421,6 +425,33 @@ export const telephonyQuery = (org: string) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
+/** The org's connected Slack workspace; a settings read, at most one row (IN-8). */
+export const chatInstallsQuery = (org: string) =>
+  queryOptions({
+    queryKey: oncallKeys.chatInstalls(org),
+    queryFn: async (): Promise<ChatInstallView[]> =>
+      (await oncallService.listChatInstalls({ org_identifier: org })).data ?? [],
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+/** The caller's own Slack link, or null; read on the same tier as their phone. */
+export const mySlackLinkQuery = (org: string) =>
+  queryOptions({
+    queryKey: oncallKeys.mySlackLink(org),
+    queryFn: async (): Promise<ChatLinkView | null> =>
+      (await oncallService.getMySlackLink({ org_identifier: org })).data ?? null,
+    staleTime: LIVE_STALE_TIME,
+  });
+
+/** The deployment's Slack app manifest URLs; an admin-org settings read (IN-3). */
+export const slackManifestUrlsQuery = (org: string) =>
+  queryOptions({
+    queryKey: oncallKeys.slackManifestUrls(org),
+    queryFn: async (): Promise<SlackManifestUrls> =>
+      (await oncallService.getSlackManifestUrls({ org_identifier: org })).data,
+    staleTime: NORMAL_STALE_TIME,
+  });
+
 export const unavailabilityQuery = (org: string, userEmail?: string, from?: number, to?: number) =>
   queryOptions({
     queryKey: oncallKeys.unavailability(org, userEmail, from, to),
@@ -529,12 +560,8 @@ export const setTeamPolicyMutation = (org: string, teamId: string) =>
 
 export const setTeamChannelMutation = (org: string, teamId: string) =>
   mutationOptions({
-    mutationFn: (destinations: string[] | null) =>
-      oncallService.setTeamChannel({
-        org_identifier: org,
-        team_id: teamId,
-        data: { destinations },
-      }),
+    mutationFn: (data: SetTeamChannelBody) =>
+      oncallService.setTeamChannel({ org_identifier: org, team_id: teamId, data }),
     meta: { invalidates: [oncallKeys.team(org, teamId)], silentError: true },
   });
 
@@ -878,4 +905,61 @@ export const deleteTelephonyMutation = (org: string) =>
   mutationOptions({
     mutationFn: () => oncallService.deleteTelephony({ org_identifier: org }),
     meta: { invalidates: telephonyWriteScopes(org), silentError: true },
+  });
+
+/** Stores nothing, so it expires nothing; the page renders its refusals itself. */
+export const startSlackInstallMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: () => oncallService.startSlackInstall({ org_identifier: org }),
+    meta: { silentError: true },
+  });
+
+/** Finishes a connect with the relayed code and state, then re-reads the workspace. */
+export const exchangeSlackInstallMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: ({ code, state }: { code: string; state: string }) =>
+      oncallService.exchangeSlackInstall({ org_identifier: org, code, state }),
+    meta: { invalidates: [oncallKeys.chatInstalls(org)], silentError: true },
+  });
+
+/** Disconnects the org's workspace, then re-reads it. */
+export const deleteChatInstallMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (workspaceId: string) =>
+      oncallService.deleteChatInstall({ org_identifier: org, workspace_id: workspaceId }),
+    meta: { invalidates: [oncallKeys.chatInstalls(org)], silentError: true },
+  });
+
+/** A link changes the card and whether a Slack DM reaches the person on each team. */
+const slackLinkWriteScopes = (org: string) => [
+  oncallKeys.mySlackLink(org),
+  oncallKeys.teamsAll(org),
+];
+
+/** Sends the Confirm DM; nothing is linked yet, so nothing expires. */
+export const startSlackLinkMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: () => oncallService.startSlackLink({ org_identifier: org }),
+    meta: { silentError: true },
+  });
+
+/** Names the token's Slack account before Confirm; it writes nothing, so nothing expires. */
+export const previewSlackLinkMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (t: string) => oncallService.previewSlackLink({ org_identifier: org, t }),
+    meta: { silentError: true },
+  });
+
+/** Confirms a link from the Slack DM's token, then re-reads the link. */
+export const confirmSlackLinkMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (t: string) => oncallService.confirmSlackLink({ org_identifier: org, t }),
+    meta: { invalidates: slackLinkWriteScopes(org), silentError: true },
+  });
+
+/** Unlinks the caller's own Slack account, then re-reads the link. */
+export const unlinkSlackMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: () => oncallService.unlinkMySlack({ org_identifier: org }),
+    meta: { invalidates: slackLinkWriteScopes(org), silentError: true },
   });

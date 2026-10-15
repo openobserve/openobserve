@@ -24,3 +24,12 @@ export const oncallRouteGuard = (to: any, from: any, next: any) => {
   }
   routeGuard(to, from, next);
 };
+
+/** The Slack page also closes on an explicit `oncall_slack: "off"`, matching its Settings entry. */
+export const oncallSlackRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.oncall_slack === "off") {
+    next("/");
+    return;
+  }
+  oncallRouteGuard(to, from, next);
+};

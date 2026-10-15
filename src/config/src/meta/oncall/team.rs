@@ -49,6 +49,15 @@ pub struct Team {
     /// to carry a column it cannot see.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub channel_destinations: Option<Vec<String>>,
+    /// The Slack workspace of the team's room; on `Team` so `TeamPut` replicates the room.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slack_workspace_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slack_channel_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slack_channel_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slack_same_room_destination: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -601,6 +610,10 @@ mod tests {
             description: None,
             // Never set, as every team created before the field reads: the policy's list stands.
             channel_destinations: None,
+            slack_workspace_id: None,
+            slack_channel_id: None,
+            slack_channel_name: None,
+            slack_same_room_destination: None,
             created_at: 0,
             updated_at: 0,
         }

@@ -24,7 +24,7 @@ use config::{
     utils::time::now_micros,
 };
 use infra::table::downtime_notifications::{self as log_table, DowntimeNotification};
-use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+pub use o2_enterprise::enterprise::common::config::this_region;
 
 use super::{DowntimeError, MatchCounts};
 use crate::alerts::templates::{DOWNTIME_EMAIL_TITLE, downtime_templates};
@@ -74,15 +74,6 @@ impl Escape {
                 .replace('\'', "&#39;"),
             Self::Plain => value.to_string(),
         }
-    }
-}
-
-pub fn this_region() -> String {
-    let o2 = get_o2_config();
-    if o2.super_cluster.enabled {
-        o2.super_cluster.region.clone()
-    } else {
-        String::new()
     }
 }
 

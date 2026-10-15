@@ -937,14 +937,15 @@ pub fn update_channels(channels: &[Channel]) -> Vec<Channel> {
         .collect()
 }
 
-/// The channel set a downgraded firing is notified on: SMS and voice dropped, order kept. [pure]
+/// The channel set a downgraded firing is notified on: SMS, voice and Slack dropped, order kept.
+/// [pure]
 pub fn quieter_channels(channels: &[Channel]) -> Vec<Channel> {
     channels
         .iter()
         .copied()
         .filter(|c| match c {
             Channel::Email | Channel::Webhook => true,
-            Channel::Sms | Channel::Voice => false,
+            Channel::Sms | Channel::Voice | Channel::Slack => false,
         })
         .collect()
 }
@@ -1041,7 +1042,7 @@ pub fn verdict_lines(analysis: &AnalysisState, decision: &SeverityDecision) -> V
 /// update — which is why the update is ledger-deduped and the edit is not.
 pub fn updates_in_place(channel: Channel) -> bool {
     match channel {
-        Channel::Email | Channel::Webhook | Channel::Sms | Channel::Voice => false,
+        Channel::Email | Channel::Webhook | Channel::Sms | Channel::Voice | Channel::Slack => false,
     }
 }
 
@@ -3225,6 +3226,7 @@ mod tests {
                 Channel::Email,
                 Channel::Sms,
                 Channel::Voice,
+                Channel::Slack,
                 Channel::Webhook
             ]),
             vec![Channel::Email]
@@ -3238,6 +3240,7 @@ mod tests {
             (vec![Channel::Email], vec![Channel::Email]),
             (vec![Channel::Sms], vec![]),
             (vec![Channel::Voice], vec![]),
+            (vec![Channel::Slack], vec![]),
             (vec![Channel::Webhook], vec![Channel::Webhook]),
             (
                 vec![
@@ -3378,6 +3381,7 @@ mod tests {
             Channel::Webhook,
             Channel::Sms,
             Channel::Voice,
+            Channel::Slack,
         ] {
             assert!(
                 !updates_in_place(c),

@@ -41,6 +41,25 @@ describe("scrubAuthParams", () => {
     expect(scrubAuthParams(undefined)).toBeUndefined();
   });
 
+  it.each([
+    [
+      "https://o2.example.com/web/oncall/slack/link?t=v1.abc.def&org_identifier=acme",
+      "https://o2.example.com/web/oncall/slack/link?t=redacted&org_identifier=acme",
+    ],
+    ["/web/oncall/slack/link/?t=v1.abc", "/web/oncall/slack/link/?t=redacted"],
+    [
+      "/oncall/slack/link?org_identifier=acme&t=v1.abc",
+      "/oncall/slack/link?org_identifier=acme&t=redacted",
+    ],
+  ])("redacts the Slack link token on the confirm page: %s", (url, expected) => {
+    expect(scrubAuthParams(url)).toBe(expected);
+  });
+
+  it("leaves another page's t parameter alone", () => {
+    const url = "/web/dashboards/view?t=1700000000&org_identifier=acme";
+    expect(scrubAuthParams(url)).toBe(url);
+  });
+
   it("does not touch parameters that merely contain the token names", () => {
     const url = "/web/tokens?id_token_name=prod&use_code=true";
     expect(scrubAuthParams(url)).toBe(url);
