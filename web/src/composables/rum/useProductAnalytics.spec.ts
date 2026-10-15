@@ -229,6 +229,50 @@ describe("useProductAnalytics", () => {
     expect(pa.toQuery("productAnalyticsFunnelBuilder")).not.toHaveProperty("fc");
   });
 
+  it("round-trips the trend view, its pair and interval as fv, fp and fi, never inside the funnel", () => {
+    const pa = useProductAnalytics();
+    const funnel = encodeDef({
+      s: [
+        ["p", "/a"],
+        ["c", "b"],
+        ["p", "/c"],
+      ],
+      u: "sessions",
+      w: "session",
+    });
+    pa.initFromRoute({ app: "web", funnel, fv: "trend", fp: "2-3", fi: "week" });
+    expect(pa.funnelView.value).toBe("trend");
+    expect(pa.funnelPair.value).toEqual({ a: 2, b: 3 });
+    expect(pa.funnelInterval.value).toBe("week");
+    const q = pa.toQuery("productAnalyticsFunnelBuilder");
+    expect([q.fv, q.fp, q.fi]).toEqual(["trend", "2-3", "week"]);
+    expect(decodeDef(q.funnel as string)).not.toHaveProperty("fv");
+    expect(pa.toQuery("productAnalyticsFunnels")).not.toHaveProperty("fv");
+    resetProductAnalytics();
+    pa.initFromRoute(q);
+    expect([pa.funnelView.value, pa.funnelInterval.value]).toEqual(["trend", "week"]);
+    expect(pa.funnelPair.value).toEqual({ a: 2, b: 3 });
+    pa.initFromRoute({ app: "web", funnel });
+    expect([pa.funnelView.value, pa.funnelPair.value, pa.funnelInterval.value]).toEqual([
+      "steps",
+      null,
+      "auto",
+    ]);
+    const plain = pa.toQuery("productAnalyticsFunnelBuilder");
+    for (const k of ["fv", "fp", "fi"]) expect(plain).not.toHaveProperty(k);
+  });
+
+  it("ignores unknown fv, fp and fi values without flagging the link", () => {
+    const pa = useProductAnalytics();
+    pa.initFromRoute({ app: "web", fv: "chart", fp: "6-1", fi: "hour" });
+    expect([pa.funnelView.value, pa.funnelPair.value, pa.funnelInterval.value]).toEqual([
+      "steps",
+      null,
+      "auto",
+    ]);
+    expect(pa.invalidParams.value).toEqual([]);
+  });
+
   it("ignores an unknown fc value without flagging the link", () => {
     const pa = useProductAnalytics();
     pa.initFromRoute({ app: "web", fc: "week" });

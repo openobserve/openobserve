@@ -15,6 +15,7 @@
 
 import { sqlIn, sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import {
+  BREAKDOWN_TOP,
   CONTAINER_SUFFIXES,
   FILTER_FIELDS,
   type AppExclusions,
@@ -111,6 +112,11 @@ export type SampleRatio = 1 | 2 | 4 | 8 | 16;
 export interface BuildOpts {
   events: NamedEvent[];
   sample: SampleRatio;
+}
+/** A trend's step pair, 1-based, `a` before `b`. */
+export interface FunnelPair {
+  a: number;
+  b: number;
 }
 export interface RegexPass {
   pattern: string;
@@ -1435,6 +1441,7 @@ const funnelCtes = (
   def: FunnelDef,
   events: NamedEvent[],
   dim: string | null,
+  entry: number | null = null,
 ): { ctes: string[]; users: boolean } => {
   const { users, windowMs, partition } = chainShape(id, def);
   const n = def.steps.length;
@@ -1463,6 +1470,7 @@ const funnelCtes = (
     ...(vnAvail ? ["MIN(view_name) AS vn"] : []),
     ...extra,
     ...(newSince !== null ? ["MIN(date) AS t0"] : []),
+    ...(entry !== null ? ["MIN(_timestamp) AS ts"] : []),
     ...(pass ? [pass.xi] : []),
   ];
   const rowFilter = [
@@ -1480,6 +1488,7 @@ const funnelCtes = (
     ...(url && vnAvail ? ["vn"] : []),
     ...extra.map(colAlias),
     ...(newSince !== null ? ["t0"] : []),
+    ...(entry !== null ? ["ts"] : []),
   ];
   const errorKeep = errorKeepPredicates(scope, all, events)
     .map((e) => ` OR ${e}`)
@@ -1490,7 +1499,7 @@ const funnelCtes = (
     `x00 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)}${funnelFilterKeeps(scope, def)} AND (${rowFilter}${pass?.widen ?? ""}) GROUP BY session_id, type, ${groupKey(scope, errors.length > 0)})`,
     `x0 AS (SELECT sid, t, ty, ${k}${carry.map((c) => `, ${c}`).join("")} FROM ${filtered("x00", pass, x0Where)})`,
     ...near,
-    `x1 AS (SELECT sid, t, ty, k${dim ? ", dim" : ""}, ${stepFlags(scope, def, events, true)}, ${users ? `${UID_WINDOW} AS uid` : "CAST(NULL AS VARCHAR) AS uid"}${newSince !== null ? ", t0" : ""} FROM ${near.length ? "x1a" : "x0"})`,
+    `x1 AS (SELECT sid, t, ty, k${dim ? ", dim" : ""}, ${stepFlags(scope, def, events, true)}, ${users ? `${UID_WINDOW} AS uid` : "CAST(NULL AS VARCHAR) AS uid"}${newSince !== null ? ", t0" : ""}${entry !== null ? ", ts" : ""} FROM ${near.length ? "x1a" : "x0"})`,
   ];
   let source = "x1";
   if (users) {
@@ -1499,7 +1508,16 @@ const funnelCtes = (
       ...p.between.map((x) => `mx${x.j}`),
       ...p.within.map((x) => `ma${x.j}`),
     ];
-    const x2Cols = ["sid", "t", "ty", "k", ...(dim ? ["dim"] : []), ...flags, "uid"];
+    const x2Cols = [
+      "sid",
+      "t",
+      "ty",
+      "k",
+      ...(dim ? ["dim"] : []),
+      ...flags,
+      "uid",
+      ...(entry !== null ? ["ts"] : []),
+    ];
     const rows = flags.map((f) => `${f} = 1`).join(" OR ");
     if (newSince !== null)
       ctes.push(
@@ -1518,6 +1536,9 @@ const funnelCtes = (
   const exs = p.between.map((x) => `${exAgg(x.j)} AS ex${x.j}`);
   const seen = p.n1.map((i) => `SUM(m${i}) AS seen${i}`);
   const firstDim = "first_value(dim ORDER BY CASE WHEN m1 = 1 THEN 0 ELSE 1 END, t) AS dim";
+  // Server time in µs, so buckets compare with range bounds; t is the device clock in ms.
+  const entryCols = entry !== null ? [`MIN(CASE WHEN m${entry} = 1 THEN ts END) AS entry_ts`] : [];
+  const entryCarry = entry !== null ? ["entry_ts"] : [];
   if (users && windowMs) {
     // A windowed sequence spans the user's sessions, so it aggregates the user's rows directly.
     const su = [
@@ -1530,17 +1551,18 @@ const funnelCtes = (
       ...seen,
       "COUNT(DISTINCT CASE WHEN m1 = 1 THEN sid END) AS s1s",
       ...(dim ? [firstDim] : []),
+      ...entryCols,
     ];
     ctes.push(
       `su AS (SELECT ${su.join(", ")} FROM ${source} GROUP BY ${partition}, CASE WHEN uid IS NULL THEN 1 ELSE 0 END)`,
-      `pu AS (SELECT anon, ${[...fromStepTimes(p, true), "s1s", ...(dim ? ["dim"] : [])].join(", ")} FROM su)`,
+      `pu AS (SELECT anon, ${[...fromStepTimes(p, true), "s1s", ...(dim ? ["dim"] : []), ...entryCarry].join(", ")} FROM su)`,
     );
     return { ctes, users };
   }
   const dimCols = dim ? [firstDim, "MIN(CASE WHEN m1 = 1 THEN t END) AS t1"] : [];
   ctes.push(
-    `s AS (SELECT ${["sid", "MAX(uid) AS uid", f, ...ungatedTimes(p), ...exs, ...seen, ...dimCols].join(", ")} FROM ${source} GROUP BY sid)`,
-    `ps AS (SELECT ${["sid", "uid", ...fromStepTimes(p, false), ...(dim ? ["dim", "t1"] : [])].join(", ")} FROM s)`,
+    `s AS (SELECT ${["sid", "MAX(uid) AS uid", f, ...ungatedTimes(p), ...exs, ...seen, ...dimCols, ...entryCols].join(", ")} FROM ${source} GROUP BY sid)`,
+    `ps AS (SELECT ${["sid", "uid", ...fromStepTimes(p, false), ...(dim ? ["dim", "t1"] : []), ...entryCarry].join(", ")} FROM s)`,
   );
   if (users) {
     const pu = [
@@ -1554,6 +1576,8 @@ const funnelCtes = (
         ({ j, e }) => `CASE WHEN MAX(r${e.b ?? e.a}) = 0 THEN MAX(xr${j}) ELSE 0 END AS xr${j}`,
       ),
       ...(dim ? ["first_value(dim ORDER BY t1) AS dim"] : []),
+      // A user enters at the earliest session that reached the pair's first step.
+      ...(entry !== null ? [`MIN(CASE WHEN r${entry} = 1 THEN entry_ts END) AS entry_ts`] : []),
     ];
     ctes.push(
       `pu AS (SELECT ${pu.join(", ")} FROM ps GROUP BY COALESCE(uid, 's:' || sid), CASE WHEN uid IS NULL THEN 1 ELSE 0 END)`,
@@ -1614,6 +1638,41 @@ export function funnelSql(
   );
 }
 
+/** Each unit's entry into `pair.a`, bucketed by `boundariesUs`; a breakdown keeps the top values and folds the rest. */
+export function funnelTrendSql(
+  scope: AnalyticsScope,
+  id: IdentitySql | null,
+  def: FunnelDef,
+  boundariesUs: number[],
+  pair: FunnelPair,
+  opts: BuildOpts,
+): string {
+  const dim = breakdownField(scope, def);
+  const { ctes, users } = funnelCtes(scope, id, def, opts.events, dim, pair.a);
+  const { a, b } = pair;
+  const bk = periodCase(boundariesUs, "entry_ts");
+  const m = boundariesUs.length;
+  const from = users ? "pu WHERE anon = 0" : "ps";
+  if (!dim) {
+    return withCtes(
+      ctes,
+      `SELECT ${bk} AS bk, SUM(r${a}) AS ca, SUM(r${b}) AS cb FROM ${from}${users ? " AND" : " WHERE"} r${a} = 1 GROUP BY bk ORDER BY bk LIMIT ${m}`,
+    );
+  }
+  // Ranked by step-1 units, like the breakdown table, so both show the same values.
+  const top = `un = 0 AND rk <= ${BREAKDOWN_TOP}`;
+  return withCtes(
+    [
+      ...ctes,
+      `tb AS (SELECT dim, CASE WHEN r${a} = 1 THEN ${bk} END AS bk, SUM(r1) AS c1, SUM(r${a}) AS ca, SUM(r${b}) AS cb FROM ${from} GROUP BY dim, CASE WHEN r${a} = 1 THEN ${bk} END)`,
+      "tk AS (SELECT *, SUM(c1) OVER (PARTITION BY dim) AS tot, CASE WHEN dim IS NULL OR dim = '' THEN 1 ELSE 0 END AS un FROM tb)",
+      "tr AS (SELECT *, DENSE_RANK() OVER (ORDER BY un, tot DESC, dim) AS rk FROM tk)",
+      `tg AS (SELECT CASE WHEN ${top} THEN dim END AS gd, un, bk, ca, cb FROM tr WHERE bk IS NOT NULL)`,
+    ],
+    `SELECT gd AS dim, MIN(un) AS un, bk, SUM(ca) AS ca, SUM(cb) AS cb FROM tg GROUP BY gd, bk ORDER BY bk, gd LIMIT ${m * (BREAKDOWN_TOP + 1)}`,
+  );
+}
+
 export function funnelPanelSql(scope: AnalyticsScope, def: FunnelDef, opts: BuildOpts): string {
   const sessionsDef: FunnelDef = { ...def, unit: "sessions", window: "session", breakdown: null };
   const { ctes } = funnelCtes(scope, null, sessionsDef, opts.events, null);
@@ -1631,6 +1690,23 @@ export function funnelPanelSql(scope: AnalyticsScope, def: FunnelDef, opts: Buil
     `SELECT unnest(make_array(${labels.join(", ")})) AS x_axis_1, unnest(make_array(${range1(n)
       .map((i) => `c${i}`)
       .join(", ")})) AS y_axis_1 FROM fin`,
+  );
+}
+
+/** The dashboard's trend line: histogram buckets each session's entry time, so the panel follows the dashboard's time picker. */
+export function funnelTrendPanelSql(
+  scope: AnalyticsScope,
+  def: FunnelDef,
+  pair: FunnelPair,
+  interval: string,
+  opts: BuildOpts,
+): string {
+  const sessionsDef: FunnelDef = { ...def, unit: "sessions", window: "session", breakdown: null };
+  const { ctes } = funnelCtes(scope, null, sessionsDef, opts.events, null, pair.a);
+  const { a, b } = pair;
+  return withCtes(
+    ctes,
+    `SELECT histogram(entry_ts, ${lit(interval)}) AS x_axis_1, ROUND(100.0 * SUM(r${b}) / SUM(r${a}), 1) AS y_axis_1 FROM ps WHERE r${a} = 1 GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 1000`,
   );
 }
 
@@ -2132,10 +2208,10 @@ export function branchSessionsSql(
   );
 }
 
-const periodCase = (boundariesUs: number[]): string => {
+const periodCase = (boundariesUs: number[], col = "_timestamp"): string => {
   const whens = boundariesUs
     .slice(1)
-    .map((b, i) => `WHEN _timestamp < ${Math.trunc(b)} THEN ${i}`)
+    .map((b, i) => `WHEN ${col} < ${Math.trunc(b)} THEN ${i}`)
     .join(" ");
   return `CASE ${whens} ELSE ${boundariesUs.length - 1} END`;
 };

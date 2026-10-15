@@ -1776,7 +1776,7 @@ export function branchPredicate(flow: PathFlow, target: BranchTarget): string {
   );
 }
 
-type Period = "day" | "week" | "month";
+export type Period = "day" | "week" | "month";
 
 const periodStart = (d: Date, g: Period): Date =>
   g === "day"
@@ -1787,6 +1787,13 @@ const periodStart = (d: Date, g: Period): Date =>
 
 const nextPeriod = (d: Date, g: Period): Date =>
   g === "day" ? addDays(d, 1) : g === "week" ? addWeeks(d, 1) : addMonths(d, 1);
+
+/** Where the period starting at `startUs` ends, stepped in the zone's wall time like the boundaries. */
+export const periodEndUs = (startUs: number, timezone: string, g: Period): number =>
+  fromZonedTime(
+    nextPeriod(toZonedTime(new Date(startUs / 1000), timezone), g),
+    timezone,
+  ).getTime() * 1000;
 
 // Boundaries are stepped in zoned wall time and converted back, so a DST day is 23 or 25 hours long.
 const boundaries = (
@@ -1823,7 +1830,7 @@ const monthBlocked = (endUs: number, dataStartUs: number | null): boolean => {
   return days !== null && days < MONTH_DATA_DAYS;
 };
 
-const autoGranularity = (
+export const autoGranularity = (
   startUs: number,
   endUs: number,
   dataStartUs: number | null,
@@ -1872,11 +1879,7 @@ export function retentionPeriods(
   const { out, clipped } = boundaries(startUs, endUs, timezone, g, dataStartUs);
   if (out.length > MAX_PERIODS) return { tooMany: true };
   if (out.length < MIN_PERIODS) return { tooShort: true };
-  const lastEnd =
-    fromZonedTime(
-      nextPeriod(toZonedTime(new Date(out[out.length - 1] / 1000), timezone), g),
-      timezone,
-    ).getTime() * 1000;
+  const lastEnd = periodEndUs(out[out.length - 1], timezone, g);
   return {
     granularity: g,
     boundariesUs: out,
