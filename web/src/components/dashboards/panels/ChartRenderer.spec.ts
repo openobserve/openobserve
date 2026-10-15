@@ -665,6 +665,51 @@ describe("ChartRenderer", () => {
         expect(await rightClick(75, 81)).toEqual({ x: 75, y: 81, value: 6 });
       });
 
+      it("names no line on a smooth chart, whose curves leave the straight segments", async () => {
+        await twoLines({}, { smooth: true });
+        await wrapper.setProps({ findLineOnContextMenu: true });
+
+        expect(await rightClick(75, 81)).toEqual({ x: 75, y: 81, value: 6 });
+      });
+
+      const oneLine = async (data: unknown[]) => {
+        const echarts = await import("echarts/core");
+        const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
+        vi.mocked(mockChart.getOption).mockReturnValue({ series: [{ type: "line", data }] });
+        vi.mocked(mockChart.convertFromPixel).mockReturnValue([0, 6]);
+        vi.mocked(mockChart.convertToPixel).mockImplementation(
+          (_finder: unknown, value: (string | number)[]) => [
+            Number(value[0]) * 100,
+            Number(value[1]) * 10,
+          ],
+        );
+        await wrapper.setProps({ findLineOnContextMenu: true });
+      };
+
+      it("treats PromQL NaN samples as gaps and still finds the line past them", async () => {
+        await oneLine([
+          [0, 1],
+          [1, 1],
+          [2, "NaN"],
+          [3, 5],
+          [4, 9],
+        ]);
+
+        expect(await rightClick(350, 70)).toMatchObject({ seriesIndex: 0 });
+        expect(await rightClick(200, 30)).not.toHaveProperty("seriesIndex");
+      });
+
+      it("finds a line whose rows come newest first", async () => {
+        await oneLine([
+          [3, 9],
+          [2, 5],
+          [1, 1],
+          [0, 1],
+        ]);
+
+        expect(await rightClick(250, 70)).toMatchObject({ seriesIndex: 0, dataIndex: 0 });
+      });
+
       it("skips a line switched off in the legend", async () => {
         await twoLines({ legend: [{ selected: { a: true, b: false } }] });
         await wrapper.setProps({ findLineOnContextMenu: true });

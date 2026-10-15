@@ -53,18 +53,18 @@ const placedNear = (
     for (const index of step === 0 ? [mid] : [mid - step, mid + step]) {
       if (index < low || index > high) continue;
       const x = xAt(index);
-      if (x !== null) return { index, x };
+      if (x !== null && Number.isFinite(x)) return { index, x };
     }
   }
   return null;
 };
 
-/** Last placed index whose x is at or left of `x`, -1 when none; null when an x cannot be placed. */
+/** Last placed index whose x is at or left of `x`, -1 when none, for points ascending in x. */
 const lastIndexAtOrBefore = (
   count: number,
   x: number,
   xAt: (index: number) => number | null,
-): number | null => {
+): number => {
   let low = 0;
   let high = count - 1;
   let last = -1;
@@ -72,7 +72,6 @@ const lastIndexAtOrBefore = (
     const mid = (low + high) >> 1;
     const placed = placedNear(mid, low, high, xAt);
     if (!placed) break;
-    if (!Number.isFinite(placed.x)) return null;
     // Indexes between `mid` and the placed one are gaps, so the search may skip past both.
     if (placed.x <= x) {
       last = placed.index;
@@ -84,6 +83,17 @@ const lastIndexAtOrBefore = (
   return last;
 };
 
+const nearAscendingX = (
+  count: number,
+  cursorX: number,
+  xAt: (index: number) => number | null,
+  tolerance: number,
+): [number, number] => {
+  const from = lastIndexAtOrBefore(count, cursorX - tolerance, xAt);
+  const to = lastIndexAtOrBefore(count, cursorX + tolerance, xAt);
+  return [Math.max(0, from), Math.min(count - 1, to + 1)];
+};
+
 /** The data indexes whose segments can pass within `tolerance` of `cursorX`; `xAt` is null for a gap. */
 export const indexesNearX = (
   count: number,
@@ -91,10 +101,13 @@ export const indexesNearX = (
   xAt: (index: number) => number | null,
   tolerance: number = LINE_HIT_TOLERANCE,
 ): [number, number] | null => {
-  const from = lastIndexAtOrBefore(count, cursorX - tolerance, xAt);
-  const to = lastIndexAtOrBefore(count, cursorX + tolerance, xAt);
-  if (from === null || to === null || count === 0) return null;
-  return [Math.max(0, from), Math.min(count - 1, to + 1)];
+  const first = count > 0 ? placedNear(0, 0, count - 1, xAt) : null;
+  const last = count > 0 ? placedNear(count - 1, 0, count - 1, xAt) : null;
+  if (!first || !last) return null;
+  if (first.x <= last.x) return nearAscendingX(count, cursorX, xAt, tolerance);
+  // Rows sorted newest first run right to left, so search them mirrored.
+  const [from, to] = nearAscendingX(count, cursorX, (index) => xAt(count - 1 - index), tolerance);
+  return [count - 1 - to, count - 1 - from];
 };
 
 const gap = (a: PixelPoint, b: PixelPoint): number => Math.hypot(a[0] - b[0], a[1] - b[1]);

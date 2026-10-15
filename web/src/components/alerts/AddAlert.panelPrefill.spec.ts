@@ -21,7 +21,7 @@ import AddAlert from "@/components/alerts/AddAlert.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
-import { normalizePrefill } from "@/utils/alerts/alertPrefill";
+import { normalizePrefill, warn } from "@/utils/alerts/alertPrefill";
 import { ALERT_PREFILL_KEY } from "@/utils/alerts/alertPrefillStorage";
 
 vi.mock("@/composables/useStreams", () => ({
@@ -57,18 +57,18 @@ vi.mock("@/services/search", () => ({
 }));
 
 vi.mock("@/utils/zincutils", async () => {
-  const actual: any = await vi.importActual("@/utils/zincutils");
+  const actual = await vi.importActual<typeof import("@/utils/zincutils")>("@/utils/zincutils");
   return {
     ...actual,
     getUUID: vi.fn(() => "mock-uuid"),
     getTimezonesByOffset: vi.fn(() => Promise.resolve(["UTC"])),
-  } as any;
+  };
 });
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn(() => vi.fn()) }));
 
 // The form reads `route.query.prefill` to decide whether a prefill is pending.
-const prefillRoute: any = {
+const prefillRoute = {
   value: {
     query: { prefill: "panel", folder: "default" },
     params: {},
@@ -77,7 +77,7 @@ const prefillRoute: any = {
   },
 };
 vi.mock("vue-router", async () => {
-  const actual: any = await vi.importActual("vue-router");
+  const actual = await vi.importActual<typeof import("vue-router")>("vue-router");
   return {
     ...actual,
     useRouter: () => ({
@@ -131,7 +131,22 @@ const builtQuery = {
   },
 };
 
-const openBuilderQuery = async (picked: boolean) => {
+interface AlertFormView {
+  formData: {
+    query_condition: {
+      type: string;
+      sql: string;
+      aggregation: { having: Record<string, unknown> } | null;
+    };
+  };
+  getAlertPayload: () => {
+    query_condition: { type: string; sql: string; aggregation: unknown };
+  };
+}
+
+const formOf = (wrapper: ReturnType<typeof mount>) => wrapper.vm as unknown as AlertFormView;
+
+const openBuilderQuery = async (picked: boolean, guessed = false) => {
   const prefill = buildPrefillFromPanel({
     panelTitle: "Retries",
     panelType: "line",
@@ -152,6 +167,8 @@ const openBuilderQuery = async (picked: boolean) => {
     yAxisColumn: "y_axis_1",
     timeRange: { value_type: "relative", relative_value: 15, relative_period: "Minutes" },
   });
+  if (guessed)
+    prefill.warnings.push(warn("thresholdColumnGuessed", "warning", { column: "y_axis_1" }));
   sessionStorage.setItem(ALERT_PREFILL_KEY, JSON.stringify(normalizePrefill(prefill)));
   const wrapper = mount(AddAlert, {
     global: { provide: { store }, plugins: [i18n], stubs },
@@ -162,7 +179,7 @@ const openBuilderQuery = async (picked: boolean) => {
 };
 
 describe("AddAlert — a threshold right-clicked on a builder query", () => {
-  let wrapper: any;
+  let wrapper: ReturnType<typeof mount> | null = null;
 
   afterEach(() => {
     wrapper?.unmount();
@@ -176,17 +193,25 @@ describe("AddAlert — a threshold right-clicked on a builder query", () => {
     ["on a single-query panel", false],
   ])("%s, is saved once, as a HAVING in the SQL", async (_name, picked) => {
     wrapper = await openBuilderQuery(picked);
-    const condition = wrapper.vm.formData.query_condition;
+    const condition = formOf(wrapper).formData.query_condition;
 
     expect(condition.type).toBe("sql");
     expect(condition.sql.match(/HAVING/g)).toHaveLength(1);
     expect(condition.sql).toContain('HAVING "y_axis_1" >= 4.42');
-    expect(condition.aggregation.having).toMatchObject({ operator: ">=", value: 1 });
+    expect(condition.aggregation?.having).toMatchObject({ operator: ">=", value: 1 });
 
-    const saved = wrapper.vm.getAlertPayload().query_condition;
+    const saved = formOf(wrapper).getAlertPayload().query_condition;
     expect(saved.type).toBe("sql");
     expect(saved.sql.match(/HAVING/g)).toHaveLength(1);
     expect(saved.sql).toContain('HAVING "y_axis_1" >= 4.42');
     expect(saved.aggregation).toBeNull();
+  });
+
+  it("states on the form when the threshold column was a guess", async () => {
+    wrapper = await openBuilderQuery(false, true);
+
+    expect(
+      wrapper.find('[data-test="add-alert-prefill-warning-thresholdColumnGuessed"]').text(),
+    ).toContain("The threshold was applied to y_axis_1; check it is the value you meant.");
   });
 });

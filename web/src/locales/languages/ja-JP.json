@@ -9610,6 +9610,7 @@
         "continue": "アラートに進む",
         "queryChoiceLabel": "クエリでアラート",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "このパネルには複数のクエリがあります。アラートを作成するクエリを選択してください。",
         "streamLabel": "ストリーム",
         "thresholdLabel": "アラート対象",
         "thresholdMatchingRows": "一致する行",
@@ -9691,7 +9692,9 @@
         "rumFunnelSnapshot": "このアラートはファネルの SQL のコピーを保持します。後でファネルやその名前付きイベントを編集しても、このアラートは変更されません。",
         "rumFunnelSteps": "ファネルでコンバージョンをアラートするには、少なくとも 2 つのステップが必要です。",
         "textFilterDropped": "このストリームには全文検索（FTS）フィールドがないため、検索フィルターは引き継がれませんでした。必要な場合はアラートクエリに追加してください。",
-        "heldFilterDropped": "ログページで先に「Run as」を選択する必要があるため、検索フィルターは引き継がれませんでした。必要な場合はアラートクエリに追加してください。"
+        "heldFilterDropped": "ログページで先に「Run as」を選択する必要があるため、検索フィルターは引き継がれませんでした。必要な場合はアラートクエリに追加してください。",
+        "thresholdColumnGuessed": "しきい値は {column} に適用されました。意図した値であることを確認してください。",
+        "thresholdNotCarried": "別のクエリを選択したため、チャートのしきい値 {value} は適用されませんでした。"
       }
     },
     "saveFailed": "アラートを保存できませんでした。",

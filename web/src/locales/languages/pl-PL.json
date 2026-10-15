@@ -9610,6 +9610,7 @@
         "continue": "Przejdź do alertu",
         "queryChoiceLabel": "Alert dla zapytania",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "Ten panel zawiera kilka zapytań. Wybierz, na podstawie którego utworzyć alert.",
         "streamLabel": "Strumień",
         "thresholdLabel": "Alert na",
         "thresholdMatchingRows": "Pasujące wiersze",
@@ -9691,7 +9692,9 @@
         "rumFunnelSnapshot": "Ten alert przechowuje kopię SQL lejka. Późniejsze zmiany lejka lub jego zdarzeń nazwanych nie wpływają na nią.",
         "rumFunnelSteps": "Lejek wymaga co najmniej dwóch kroków, zanim będzie mógł alertować o konwersji.",
         "textFilterDropped": "Twój filtr wyszukiwania nie został przeniesiony, ponieważ ten strumień nie ma pól wyszukiwania pełnotekstowego (FTS). Dodaj go do zapytania alertu, jeśli jest potrzebny.",
-        "heldFilterDropped": "Twój filtr wyszukiwania nie został przeniesiony, ponieważ najpierw wymaga wyboru „Uruchom jako” na stronie logów. Dodaj go do zapytania alertu, jeśli jest potrzebny."
+        "heldFilterDropped": "Twój filtr wyszukiwania nie został przeniesiony, ponieważ najpierw wymaga wyboru „Uruchom jako” na stronie logów. Dodaj go do zapytania alertu, jeśli jest potrzebny.",
+        "thresholdColumnGuessed": "Próg zastosowano do {column}; sprawdź, czy to wartość, o którą chodziło.",
+        "thresholdNotCarried": "Próg {value} z wykresu nie został zastosowany, ponieważ wybrano inne zapytanie."
       }
     },
     "saveFailed": "Nie można zapisać alertu.",

@@ -191,9 +191,15 @@ describe("usePanelActions", () => {
       rebuildAlertPrefill({ queryIndex: 1 });
       expect(alertCreationDialog.value?.prefill.sql).toBe('select count(*) as "warns" from logs');
       expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toBeUndefined();
+      expect(alertCreationDialog.value?.prefill.warnings.map((w) => w.key)).toContain(
+        "thresholdNotCarried",
+      );
 
       rebuildAlertPrefill({ queryIndex: 0 });
       expect(alertCreationDialog.value?.prefill.meta?.sqlHaving?.value).toBe(10);
+      expect(alertCreationDialog.value?.prefill.warnings.map((w) => w.key)).not.toContain(
+        "thresholdNotCarried",
+      );
       closeAlertCreationDialog();
     });
 
@@ -349,7 +355,7 @@ describe("usePanelActions", () => {
         });
       });
 
-      it("leaves the threshold to the form when the click names no y field", () => {
+      it("falls back to the first y field and says so when the click names none", () => {
         const args = twoY();
         usePanelAlertCreation(args as any).handleCreateAlert({
           condition: "above",
@@ -358,11 +364,20 @@ describe("usePanelActions", () => {
         });
 
         const prefill = alertCreationDialog.value?.prefill;
-        expect(prefill?.meta?.sqlHaving).toBeUndefined();
+        expect(prefill?.meta?.sqlHaving).toEqual({
+          column: "y_axis_1",
+          operator: ">=",
+          value: 250,
+        });
         expect(prefill?.aggregation?.having).toMatchObject({ operator: ">=", value: 1 });
+        expect(prefill?.warnings).toContainEqual({
+          key: "thresholdColumnGuessed",
+          level: "warning",
+          params: { column: "y_axis_1" },
+        });
       });
 
-      it("does the same on a single-query panel, which still goes straight to the form", () => {
+      it("works the same on a single-query panel, which still goes straight to the form", () => {
         const args = twoY();
         args.panelSchema.value.queries.pop();
         args.contextMenuData.value = { yField: 1 };
@@ -376,10 +391,19 @@ describe("usePanelActions", () => {
           value: 250,
         });
 
+        expect(readAlertPrefill()?.warnings.map((w) => w.key)).not.toContain(
+          "thresholdColumnGuessed",
+        );
+
         args.contextMenuData.value = {};
         api.handleCreateAlert({ condition: "above", threshold: 250 });
         expect(alertCreationDialog.value).toBeNull();
-        expect(readAlertPrefill()?.meta?.sqlHaving).toBeUndefined();
+        expect(readAlertPrefill()?.meta?.sqlHaving).toEqual({
+          column: "y_axis_1",
+          operator: ">=",
+          value: 250,
+        });
+        expect(readAlertPrefill()?.warnings.map((w) => w.key)).toContain("thresholdColumnGuessed");
         expect(args.router.push).toHaveBeenCalledTimes(2);
       });
     });
@@ -501,6 +525,11 @@ describe("usePanelActions", () => {
       expect(prefill?.queryIndex).toBe(0);
       expect(prefill?.promql).toBe("avg(disk_used)");
       expect(prefill?.promqlCondition).toBeUndefined();
+      expect(prefill?.warnings).toContainEqual({
+        key: "thresholdNotCarried",
+        level: "warning",
+        params: { value: "3" },
+      });
 
       rebuildAlertPrefill({ queryIndex: 1 });
       expect(alertCreationDialog.value?.prefill.promqlCondition).toEqual({

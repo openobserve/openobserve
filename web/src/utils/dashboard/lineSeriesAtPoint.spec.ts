@@ -81,6 +81,15 @@ describe("indexesNearX", () => {
     expect(indexesNearX(9, 85, xAt, 6)).toEqual([1, 8]);
   });
 
+  it("searches rows that run right to left", () => {
+    expect(indexesNearX(100, 505, (index) => (99 - index) * 10, 6)).toEqual([47, 50]);
+  });
+
+  it("steps over points whose x cannot be placed", () => {
+    const xAt = (index: number) => (index === 4 ? NaN : index * 10);
+    expect(indexesNearX(9, 45, xAt, 6)).toEqual([3, 6]);
+  });
+
   it("gives up on a series whose x cannot be placed, or that has no points", () => {
     expect(indexesNearX(10, 50, () => NaN)).toBeNull();
     expect(indexesNearX(0, 50, every10)).toBeNull();

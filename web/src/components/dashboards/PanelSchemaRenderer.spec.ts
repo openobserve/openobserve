@@ -2298,6 +2298,68 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(0);
     });
 
+    describe("a multi-query SQL panel's series mapped back to their query", () => {
+      const loaded = (data: unknown[][], metadataQueries: Record<string, unknown>[]) =>
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+          data: ref(data),
+          loading: ref(false),
+          errorDetail: ref({ message: "", code: "" }),
+          metadata: ref({ queries: metadataQueries }),
+          resultMetaData: ref({}),
+          annotations: ref([]),
+          lastTriggeredAt: ref(null),
+          isCachedDataDifferWithCurrentTimeRange: ref(false),
+          searchRequestTraceIds: ref([]),
+          loadingProgressPercentage: ref(0),
+          isPartialData: ref(false),
+        } as unknown as ReturnType<typeof usePanelDataLoader>);
+      const clickedQuery = (position: number) => {
+        wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: position });
+        return wrapper.vm.contextMenuData.panelQueryIndex;
+      };
+      const query = defaultProps.panelSchema.queries[0];
+      const series = (count: number) =>
+        Array.from({ length: count }, (_, position) => ({
+          name: `s${position}`,
+          _queryIndex: position,
+        }));
+
+      it("sends a time-shifted series to its parent query", () => {
+        loaded(
+          [[], [], []],
+          [
+            { panelQueryIndex: 0, timeRangeGap: { seconds: 0 } },
+            { panelQueryIndex: 0, timeRangeGap: { seconds: 86400 } },
+            { panelQueryIndex: 1, timeRangeGap: { seconds: 0 } },
+          ],
+        );
+        wrapper = createWrapper({
+          allowAlertCreation: true,
+          panelSchema: { ...defaultProps.panelSchema, queries: [query, query] },
+        });
+        wrapper.vm.panelData = { options: { series: series(3) } };
+
+        expect(clickedQuery(1)).toBe(0);
+        expect(clickedQuery(2)).toBe(1);
+      });
+
+      it("skips an empty query slot the executor never ran", () => {
+        loaded([[], []], [{ panelQueryIndex: 0 }, { panelQueryIndex: 2 }]);
+        wrapper = createWrapper({
+          allowAlertCreation: true,
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            queries: [query, { ...query, query: "" }, query],
+          },
+        });
+        wrapper.vm.panelData = { options: { series: series(2) } };
+
+        expect(wrapper.vm.hasSeveralVisibleQueries).toBe(true);
+        expect(clickedQuery(0)).toBe(0);
+        expect(clickedQuery(1)).toBe(2);
+      });
+    });
+
     it("leaves a series' own query untouched when only one query is visible, but names its y field", () => {
       vi.mocked(usePanelDataLoader).mockReturnValueOnce({
         data: ref([[], []]),

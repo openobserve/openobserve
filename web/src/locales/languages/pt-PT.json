@@ -9610,6 +9610,7 @@
         "continue": "Continuar para o alerta",
         "queryChoiceLabel": "Alertar sobre a consulta",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "Este painel tem várias consultas. Selecione a partir de qual deseja criar o alerta.",
         "streamLabel": "Stream",
         "thresholdLabel": "Alertar sobre",
         "thresholdMatchingRows": "Linhas correspondentes",
@@ -9691,7 +9692,9 @@
         "rumFunnelSnapshot": "Este alerta mantém uma cópia do SQL do funil. Edições posteriores no funil ou em seus eventos nomeados não a alteram.",
         "rumFunnelSteps": "Um funil precisa de pelo menos duas etapas antes de poder alertar sobre conversão.",
         "textFilterDropped": "Seu filtro de pesquisa não foi transferido porque este stream não tem campos de pesquisa de texto completo (FTS). Adicione-o à consulta do alerta se precisar.",
-        "heldFilterDropped": "Seu filtro de pesquisa não foi transferido porque ele precisa primeiro de uma opção \"Executar como\" na página de registros. Adicione-o à consulta do alerta se precisar."
+        "heldFilterDropped": "Seu filtro de pesquisa não foi transferido porque ele precisa primeiro de uma opção \"Executar como\" na página de registros. Adicione-o à consulta do alerta se precisar.",
+        "thresholdColumnGuessed": "O limite foi aplicado a {column}; verifique se é o valor pretendido.",
+        "thresholdNotCarried": "O limite {value} do gráfico não foi aplicado porque escolheu uma consulta diferente."
       }
     },
     "saveFailed": "Não foi possível salvar o alerta.",

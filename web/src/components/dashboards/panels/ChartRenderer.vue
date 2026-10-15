@@ -159,6 +159,7 @@ interface LineSeriesOption {
   name?: string;
   stack?: string;
   step?: string | boolean;
+  smooth?: boolean | number;
   data?: unknown;
 }
 
@@ -175,10 +176,10 @@ const datumValue = (datum: unknown, dataIndex: number): (string | number)[] => {
   return [dataIndex, (inner ?? datum) as string | number];
 };
 
-/** A datum the line does not draw: missing, or with no y. */
+/** A datum the line does not draw: missing, or with no finite y (PromQL sends "NaN" samples). */
 const isGap = (datum: unknown): boolean => {
   const y = datum === null || datum === undefined ? null : datumValue(datum, 0)[1];
-  return y === null || y === undefined || y === "";
+  return y === null || y === undefined || y === "" || !Number.isFinite(Number(y));
 };
 
 export default defineComponent({
@@ -427,8 +428,13 @@ export default defineComponent({
 
     const linePixels = (cursor: PixelPoint, option: ChartOptionLike): LineSeriesPixels[] => {
       const series = (Array.isArray(option.series) ? option.series : []) as LineSeriesOption[];
-      // Stacked and step lines are not drawn through their raw points, so those would name the wrong series.
-      if (series.some((entry) => entry?.type === "line" && (entry.stack || entry.step))) return [];
+      // Stacked, step and smooth lines are not drawn as straight segments between their raw points.
+      if (
+        series.some(
+          (entry) => entry?.type === "line" && (entry.stack || entry.step || entry.smooth),
+        )
+      )
+        return [];
       const legends = (Array.isArray(option.legend) ? option.legend : []) as {
         selected?: Record<string, boolean>;
       }[];
@@ -447,7 +453,7 @@ export default defineComponent({
         const xAt = (dataIndex: number) =>
           isGap(data[dataIndex])
             ? null
-            : (pixelOf(datumValue(data[dataIndex], dataIndex))?.[0] ?? NaN);
+            : (pixelOf(datumValue(data[dataIndex], dataIndex))?.[0] ?? null);
         const nearby = indexesNearX(data.length, cursor[0], xAt);
         if (!nearby) return [];
         const points: (PixelPoint | null)[] = [];

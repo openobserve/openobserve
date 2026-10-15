@@ -9610,6 +9610,7 @@
         "continue": "Uyarıya devam et",
         "queryChoiceLabel": "Uyarılacak sorgu",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "Bu panelde birden fazla sorgu var. Uyarının oluşturulacağı sorguyu seçin.",
         "streamLabel": "Akış",
         "thresholdLabel": "Uyarı kaynağı",
         "thresholdMatchingRows": "Eşleşen satırlar",
@@ -9691,7 +9692,9 @@
         "rumFunnelSnapshot": "Bu uyarı, huninin SQL'inin bir kopyasını tutar. Hunide veya adlandırılmış olaylarında sonradan yapılan düzenlemeler bunu değiştirmez.",
         "rumFunnelSteps": "Bir huninin dönüşüm üzerine uyarı verebilmesi için en az iki adıma ihtiyacı vardır.",
         "textFilterDropped": "Arama filtreniz taşınamadı çünkü bu akışta tam metin arama (FTS) alanı yok. Gerekirse uyarı sorgusuna ekleyin.",
-        "heldFilterDropped": "Arama filtreniz taşınamadı çünkü önce günlükler sayfasında bir 'Run as' seçimi gerekiyor. Gerekirse uyarı sorgusuna ekleyin."
+        "heldFilterDropped": "Arama filtreniz taşınamadı çünkü önce günlükler sayfasında bir 'Run as' seçimi gerekiyor. Gerekirse uyarı sorgusuna ekleyin.",
+        "thresholdColumnGuessed": "Eşik {column} için uygulandı; kastettiğiniz değer olduğunu kontrol edin.",
+        "thresholdNotCarried": "Farklı bir sorgu seçtiğiniz için grafikteki {value} eşiği uygulanmadı."
       }
     },
     "saveFailed": "Uyarı kaydedilemedi.",
