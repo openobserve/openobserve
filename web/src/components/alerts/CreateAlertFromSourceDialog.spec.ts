@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 
@@ -21,6 +21,14 @@ import CreateAlertFromSourceDialog from "@/components/alerts/CreateAlertFromSour
 import { ALERT_PREFILL_VERSION, type AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import { buildPrefillFromPanel, panelQueryChoices } from "@/utils/alerts/prefill/fromPanel";
 import { normalizePrefill } from "@/utils/alerts/alertPrefill";
+
+const { copyToClipboard } = vi.hoisted(() => ({ copyToClipboard: vi.fn() }));
+vi.mock("@/utils/clipboard", () => ({ copyToClipboard }));
+// Monaco's tokenizer does not run in jsdom; the markup it yields is all this dialog renders.
+vi.mock("@/utils/query/colorizeQuery", () => ({
+  colorizeQuery: async (query: string, lang: string) =>
+    `<span class="text-query-syntax-keyword" data-lang="${lang}">${query}</span><script>x</script>`,
+}));
 
 // ODialog and OCodeBlock are portal/highlighter heavy — stub them down to what
 // this component's own logic needs.
@@ -353,6 +361,44 @@ describe("CreateAlertFromSourceDialog", () => {
       expect(has("create-alert-warning-absoluteToRolling")).toBe(false);
     });
 
+    it("shows the whole picked query, colorized like the Query Inspector, and copies it", async () => {
+      const multiLine = "sum by (instance) (\n  rate(io_ops[1m])\n)";
+      wrapper = mountDialog(
+        panelPick({
+          queryChoices: [choices[0], { ...choices[1], query: multiLine }],
+        }),
+      );
+      await flushPromises();
+
+      const block = wrapper.find('[data-test="create-alert-picked-query"]');
+      expect(block.text()).toContain("Query");
+      const text = wrapper.find('[data-test="create-alert-picked-query-text"]');
+      expect(text.classes()).toEqual(
+        expect.arrayContaining(["font-mono", "whitespace-pre-wrap", "break-all", "max-h-40"]),
+      );
+      const keyword = text.find(".text-query-syntax-keyword");
+      expect(keyword.attributes("data-lang")).toBe("promql");
+      expect(keyword.element.textContent).toBe(multiLine);
+      expect(text.find("script").exists()).toBe(false);
+
+      await wrapper.find('[data-test="create-alert-picked-query-copy"]').trigger("click");
+      expect(copyToClipboard).toHaveBeenCalledWith(multiLine, expect.any(Function));
+    });
+
+    it("follows the pick, showing the newly chosen query", async () => {
+      wrapper = mountDialog(panelPick());
+      await flushPromises();
+      expect(wrapper.find('[data-test="create-alert-picked-query-text"]').text()).toBe(
+        "sum(rate(io_ops[1m]))",
+      );
+
+      await wrapper.setProps({ prefill: panelPick({ queryIndex: 0, promql: "avg(disk_used)" }) });
+      await flushPromises();
+      expect(wrapper.find('[data-test="create-alert-picked-query-text"]').text()).toBe(
+        "avg(disk_used)",
+      );
+    });
+
     it("hands the hidden non-blocking warnings on to the form", async () => {
       wrapper = mountDialog(panelPick());
       await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
@@ -392,12 +438,14 @@ describe("CreateAlertFromSourceDialog", () => {
         }),
       );
       expect(has("create-alert-query-picker-intro")).toBe(false);
+      expect(has("create-alert-picked-query")).toBe(false);
       expect(has("create-alert-threshold-shape")).toBe(true);
       expect(has("create-alert-query-preview")).toBe(true);
     });
 
     it("leaves other sources' query choice dialog unchanged", () => {
       wrapper = mountDialog(panelPick({ source: "logs" }));
+      expect(has("create-alert-picked-query")).toBe(false);
       expect(has("create-alert-query-picker-intro")).toBe(false);
       expect(has("create-alert-threshold-shape")).toBe(true);
       expect(has("create-alert-window")).toBe(true);

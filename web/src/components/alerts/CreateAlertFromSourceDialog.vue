@@ -63,6 +63,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
+      <!-- The whole picked query, laid out like the panel's Query Inspector. -->
+      <div v-if="pickQueryOnly && pickedQuery" data-test="create-alert-picked-query">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold tracking-wider">
+            {{ t("alerts.prefill.dialog.queryLabel") }}
+          </span>
+          <OButton
+            variant="ghost-primary"
+            size="sm"
+            icon-left="content-copy"
+            data-test="create-alert-picked-query-copy"
+            @click="copyToClipboard(pickedQuery, t)"
+          >
+            {{ t("common.copy") }}
+          </OButton>
+        </div>
+        <div
+          v-if="pickedQueryHtml"
+          class="rounded-default bg-theme-body-bg-primary border-card-glass-border mt-1 max-h-40 [scrollbar-width:thin] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap"
+          data-test="create-alert-picked-query-text"
+          v-html="pickedQueryHtml"
+        ></div>
+        <div
+          v-else
+          class="rounded-default bg-theme-body-bg-primary border-card-glass-border mt-1 max-h-40 [scrollbar-width:thin] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap"
+          data-test="create-alert-picked-query-text"
+          v-text="pickedQuery"
+        ></div>
+      </div>
+
       <!-- Stream picker — only when the surface offered a choice. Alerts are
            single-stream; silently taking the first one is a trap. -->
       <div v-if="hasStreamChoice" class="flex flex-col gap-2">
@@ -198,6 +228,9 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import DOMPurify from "dompurify";
+import { copyToClipboard } from "@/utils/clipboard";
 import type {
   AlertBuildOptions,
   AlertPatternMode,
@@ -275,6 +308,29 @@ const shownWarnings = computed(() => {
   const warnings = props.prefill?.warnings ?? [];
   return pickQueryOnly.value ? warnings.filter((w) => w.level === "blocking") : warnings;
 });
+
+/** The executed text of the picked query, as the option tooltip shows it but with its own line breaks. */
+const pickedQuery = computed(
+  () =>
+    props.prefill?.queryChoices?.find((choice) => choice.index === props.prefill?.queryIndex)
+      ?.query ?? "",
+);
+
+const pickedQueryHtml = ref("");
+
+watch(
+  () => [pickQueryOnly.value, pickedQuery.value, props.prefill?.queryType] as const,
+  async ([active, query, queryType]) => {
+    pickedQueryHtml.value = "";
+    if (!active || !query) return;
+    // Loaded on demand: the colorizer pulls in Monaco, and this dialog sits in the app shell.
+    const { colorizeQuery } = await import("@/utils/query/colorizeQuery");
+    const html = await colorizeQuery(query, queryType === "promql" ? "promql" : "sql");
+    // A newer pick may have landed while this one was colorizing.
+    if (pickedQuery.value === query) pickedQueryHtml.value = DOMPurify.sanitize(html);
+  },
+  { immediate: true },
+);
 
 const onQueryChange = (value: unknown) => {
   if (typeof value !== "number" || value === props.prefill?.queryIndex) return;
