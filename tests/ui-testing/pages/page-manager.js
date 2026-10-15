@@ -125,6 +125,7 @@ import { SharedComponentsFormValidationPage } from "./generalPages/sharedCompone
 import { SettingsFormValidationPage } from "./generalPages/settingsFormValidationPage.js";
 import { PasswordPolicyPage } from "./generalPages/passwordPolicyPage.js";
 import { AiToolsetsFormValidationPage } from "./generalPages/aiToolsetsFormValidationPage.js";
+import { AiAssistantCreditsPage } from "./generalPages/aiAssistantCreditsPage.js";
 import { RumFormValidationPage } from "./generalPages/rumFormValidationPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
@@ -327,6 +328,7 @@ class PageManager {
     // ===== ANOMALY DETECTION PAGE OBJECTS =====
     this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.commonActions);
     this.aiToolsetsFormValidation = new AiToolsetsFormValidationPage(page);
+    this.aiAssistantCreditsPage = new AiAssistantCreditsPage(page);
 
     // ===== ONLINE EVALS PAGE OBJECTS =====
     this.llmProvidersPage = new LlmProvidersPage(page);

@@ -1,0 +1,32 @@
+{
+  "feature_slug": "ai-assistant-credits",
+  "feature_title": "AI Assistant Credits & Paid Usage Consent",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "aiAssistantCredits.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/aiAssistantCredits.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/O2AIChat.vue",
+    "web/src/components/ai-assistant/chat/O2AICreditsNotice.vue",
+    "web/src/components/ai-assistant/chat/O2AIPaidUsageConsent.vue",
+    "web/src/components/ai-assistant/chat/O2AIChatMessage.vue",
+    "web/src/components/PaidOverageConsentDialog.vue",
+    "web/src/components/PaidOverageConsentBody.vue",
+    "web/src/components/QueryEditor.vue",
+    "web/src/components/CodeQueryEditor.vue",
+    "web/src/components/alerts/IncidentRCAAnalysis.vue",
+    "web/src/composables/useChatStream.ts",
+    "web/src/composables/useChatHistory.ts",
+    "web/src/composables/useNLQuery.ts",
+    "web/src/utils/aiCredits.ts",
+    "web/src/services/billings.ts",
+    "web/src/enterprise/components/billings/PaidAiUsageControl.vue",
+    "web/src/enterprise/components/billings/Billing.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
