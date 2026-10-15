@@ -1182,7 +1182,7 @@ export default defineComponent({
     const alertableQueries = computed(() =>
       alertableQueryIndexes(panelSchema.value?.queries ?? [], visibleQueryIndexes.value),
     );
-    // Only a multi-query panel asks which query, so only it needs the clicked series' query resolved.
+    // Several alertable queries mean the alert has to learn which one a right-click meant.
     const hasSeveralVisibleQueries = computed(() => alertableQueries.value.length > 1);
     // A threshold needs the clicked line when there are several queries, or several y fields of one.
     const findsLineOnContextMenu = computed(
@@ -1208,9 +1208,7 @@ export default defineComponent({
           ? panelData.value?.options?.series?.[event.seriesIndex]
           : undefined;
       const panelQueryIndex =
-        hasSeveralVisibleQueries.value &&
-        panelSchema.value?.queryType !== "promql" &&
-        typeof series?._queryIndex === "number"
+        panelSchema.value?.queryType !== "promql" && typeof series?._queryIndex === "number"
           ? sqlPanelQueryIndex(series._queryIndex)
           : series?._panelQueryIndex;
       openAlertContextMenu({

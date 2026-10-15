@@ -310,7 +310,6 @@ describe("CreateAlertFromSourceDialog", () => {
       expect(String(select.props("options")[0].label)).toBe(
         `Total retries: ${long.replace(/\s+/g, " ")}`,
       );
-      // The list matches the field's width, so a long option cuts to one line instead of widening it.
       expect(select.props("dropdownStyle")).toEqual({ width: "var(--reka-select-trigger-width)" });
     });
 
@@ -352,7 +351,7 @@ describe("CreateAlertFromSourceDialog", () => {
       wrapper = mountDialog(panelPick());
 
       expect(wrapper.find('[data-test="create-alert-query-picker-intro"]').text()).toBe(
-        "This panel has multiple queries. Select which one to create the alert from.",
+        "There are multiple queries. Select which one to create the alert from.",
       );
       const select = wrapper.findComponent({ name: "OSelect" });
       expect(select.props("modelValue")).toBe(1);
@@ -515,7 +514,6 @@ describe("CreateAlertFromSourceDialog", () => {
       const trigger = wrapper.find(`#${intro.attributes("for")}`);
       expect(trigger.exists()).toBe(true);
       expect(trigger.text()).toContain("IO: sum(rate(io_ops[1m]))");
-      // The shown value cuts with CSS and reveals the whole query on hover only when cut.
       expect(trigger.find('[data-test="o-truncated-text"]').text()).toBe(
         "IO: sum(rate(io_ops[1m]))",
       );

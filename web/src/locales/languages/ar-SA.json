@@ -9610,7 +9610,7 @@
         "continue": "استمر في التنبيه",
         "queryChoiceLabel": "تنبيه على الاستعلام",
         "queryChoiceOption": "{name}: {query}",
-        "pickQueryIntro": "تحتوي هذه اللوحة على عدة استعلامات. اختر الاستعلام الذي سيتم إنشاء التنبيه منه.",
+        "pickQueryIntro": "توجد عدة استعلامات. اختر الاستعلام الذي سيتم إنشاء التنبيه منه.",
         "streamLabel": "البث",
         "thresholdLabel": "تنبيه مفعل",
         "thresholdMatchingRows": "الصفوف المتطابقة",

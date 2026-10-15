@@ -9610,7 +9610,7 @@
         "continue": "继续到告警",
         "queryChoiceLabel": "告警所针对的查询",
         "queryChoiceOption": "{name}：{query}",
-        "pickQueryIntro": "此面板包含多个查询。请选择用于创建告警的查询。",
+        "pickQueryIntro": "有多个查询。请选择用于创建告警的查询。",
         "streamLabel": "数据流",
         "thresholdLabel": "告警条件",
         "thresholdMatchingRows": "匹配行",

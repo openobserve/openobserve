@@ -567,6 +567,16 @@ describe("usePanelActions", () => {
       expect(alertCreationDialog.value?.prefill.source).toBe("explorer");
     });
 
+    it("alerts on the visible query when a series names a hidden one", () => {
+      const args = { ...makePromql(), visibleQueryIndexes: { value: [1] } };
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({ condition: "above", threshold: 5, panelQueryIndex: 0 });
+
+      expect(alertCreationDialog.value).toBeNull();
+      expect(readAlertPrefill()?.promql).toBe("sum(rate(io_ops[1m]))");
+    });
+
     it("skips the dialog for a clicked series when only its query is visible", () => {
       const args = { ...makePromql(), visibleQueryIndexes: { value: [1] } };
       const api = usePanelAlertCreation(args as any);

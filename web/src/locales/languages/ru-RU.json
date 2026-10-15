@@ -9610,7 +9610,7 @@
         "continue": "Перейти к оповещению",
         "queryChoiceLabel": "Оповещение по запросу",
         "queryChoiceOption": "{name}: {query}",
-        "pickQueryIntro": "На этой панели несколько запросов. Выберите, на основе какого создать оповещение.",
+        "pickQueryIntro": "Есть несколько запросов. Выберите, на основе какого создать оповещение.",
         "streamLabel": "Поток",
         "thresholdLabel": "Оповещение по",
         "thresholdMatchingRows": "Совпадающие строки",

@@ -117,7 +117,11 @@ import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 import { withChartFont } from "@/utils/fonts";
 import {
   indexesNearX,
+  isLineStrokeEvent,
   lineSeriesAtPoint,
+  nearestIndexByX,
+  withLineStrokeEvents,
+  type LineStrokeEvent,
   type LineSeriesPixels,
   type PixelPoint,
 } from "@/utils/dashboard/lineSeriesAtPoint";
@@ -160,6 +164,7 @@ interface LineSeriesOption {
   stack?: string;
   step?: string | boolean;
   smooth?: boolean | number;
+  connectNulls?: boolean;
   data?: unknown;
 }
 
@@ -363,8 +368,49 @@ export default defineComponent({
       });
     };
 
+    const chartOptions = (options: Record<string, unknown>) =>
+      withChartFont(withLineStrokeEvents(options, props.findLineOnContextMenu));
+
+    // The data point nearest the cursor along x, for a right-click on a line's stroke between points.
+    const nearestDataIndex = (seriesIndex: number, cursorX: number): number | undefined => {
+      const data = (chart?.getOption()?.series as LineSeriesOption[] | undefined)?.[seriesIndex]
+        ?.data;
+      if (!Array.isArray(data)) return undefined;
+      const xAt = (dataIndex: number) => {
+        if (isGap(data[dataIndex])) return null;
+        const pixel = chart?.convertToPixel(
+          { seriesIndex },
+          datumValue(data[dataIndex], dataIndex),
+        );
+        return Array.isArray(pixel) && Number.isFinite(pixel[0]) ? Number(pixel[0]) : null;
+      };
+      return nearestIndexByX(data.length, cursorX, xAt);
+    };
+
+    // The stroke has no data point of its own, so the threshold is read at the cursor.
+    const handleLineStrokeContextMenu = (params: LineStrokeEvent) => {
+      const offset = [params.event?.offsetX, params.event?.offsetY];
+      const point = chart?.convertFromPixel({ gridIndex: 0 }, offset);
+      const value = Array.isArray(point) ? Number(point[1]) : NaN;
+      const event = params.event?.event;
+      if (!event || !Number.isFinite(value)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      emit("domcontextmenu", {
+        x: event.clientX,
+        y: event.clientY,
+        value,
+        seriesIndex: params.seriesIndex,
+        dataIndex: nearestDataIndex(params.seriesIndex, Number(offset[0])),
+      });
+    };
+
     // Handle ECharts contextmenu event when clicking on data points
     const handleContextMenu = (params: any) => {
+      if (isLineStrokeEvent(params)) {
+        handleLineStrokeContextMenu(params);
+        return;
+      }
       // Get chart type from the first series
       const chartType = chart?.getOption()?.series?.[0]?.type;
 
@@ -428,10 +474,12 @@ export default defineComponent({
 
     const linePixels = (cursor: PixelPoint, option: ChartOptionLike): LineSeriesPixels[] => {
       const series = (Array.isArray(option.series) ? option.series : []) as LineSeriesOption[];
-      // Stacked, step and smooth lines are not drawn as straight segments between their raw points.
+      // Off-stroke clicks only: a stacked, step, smooth or null-bridging line is not straight segments between neighbours.
       if (
         series.some(
-          (entry) => entry?.type === "line" && (entry.stack || entry.step || entry.smooth),
+          (entry) =>
+            entry?.type === "line" &&
+            (entry.stack || entry.step || entry.smooth || entry.connectNulls),
         )
       )
         return [];
@@ -508,7 +556,7 @@ export default defineComponent({
 
           // Emit domcontextmenu event for alert creation
           if (yAxisValue !== null && yAxisValue !== undefined && !isNaN(Number(yAxisValue))) {
-            // A line hides its symbols until hovered, so a click on the line itself hits no series.
+            // A click just off a straight line still names it; a click on any stroke arrives as a line-stroke event.
             const hit = props.findLineOnContextMenu
               ? lineSeriesHit(pixelPoint as PixelPoint, option ?? {})
               : null;
@@ -527,10 +575,12 @@ export default defineComponent({
 
     const chartInitialSetUp = () => {
       chart?.on("mousemove", (params: any) => {
+        if (isLineStrokeEvent(params)) return;
         emit("mousemove", params);
         mouseHoverEffectFn(params);
       });
       chart?.on("mouseout", (params: any) => {
+        if (isLineStrokeEvent(params)) return;
         emit("mouseout", params);
         mouseOutEffectFn();
       });
@@ -590,10 +640,12 @@ export default defineComponent({
         }
       });
       chart?.on("click", function (params: any) {
+        if (isLineStrokeEvent(params)) return;
         emit("click", params);
       });
 
       chart?.on("mouseover", function (params: any) {
+        if (isLineStrokeEvent(params)) return;
         emit("mouseover", params);
       });
 
@@ -706,7 +758,7 @@ export default defineComponent({
           // Use notMerge flag from data prop if available, otherwise default to true
           const notMerge = props.data?.notMerge !== undefined ? props.data.notMerge : true;
           const lazyUpdate = props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
-          chart?.setOption(withChartFont(options), { lazyUpdate, notMerge });
+          chart?.setOption(chartOptions(options), { lazyUpdate, notMerge });
           chart?.setOption({ animation: true }, { lazyUpdate: true });
         } catch (e: any) {
           emit("error", {
@@ -742,7 +794,7 @@ export default defineComponent({
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
-          chart?.setOption(withChartFont(props?.data?.options || {}), {
+          chart?.setOption(chartOptions(props?.data?.options || {}), {
             lazyUpdate: true,
             notMerge: true,
           });
@@ -801,7 +853,7 @@ export default defineComponent({
           }
           observeContainerResize();
         }
-        chart?.setOption(withChartFont(props?.data?.options || {}), {
+        chart?.setOption(chartOptions(props?.data?.options || {}), {
           lazyUpdate: true,
           notMerge: true,
         });
@@ -891,7 +943,7 @@ export default defineComponent({
             renderer: props.renderType,
           });
         }
-        chart?.setOption(withChartFont(props?.data?.options || {}), {
+        chart?.setOption(chartOptions(props?.data?.options || {}), {
           lazyUpdate: true,
           notMerge: true,
         });
@@ -918,6 +970,20 @@ export default defineComponent({
     });
 
     watch(
+      () => props.findLineOnContextMenu,
+      () => {
+        try {
+          chart?.setOption(chartOptions(props?.data?.options || {}), {
+            lazyUpdate: true,
+            notMerge: true,
+          });
+        } catch (error) {
+          console.error("Error during setOption", error);
+        }
+      },
+    );
+
+    watch(
       () => props.height,
       async () => {
         try {
@@ -937,7 +1003,7 @@ export default defineComponent({
           await nextTick();
           chart?.resize();
           try {
-            chart?.setOption(withChartFont(props?.data?.options || {}), {
+            chart?.setOption(chartOptions(props?.data?.options || {}), {
               lazyUpdate: true,
               notMerge: true,
             });

@@ -9610,7 +9610,7 @@
         "continue": "Przejdź do alertu",
         "queryChoiceLabel": "Alert dla zapytania",
         "queryChoiceOption": "{name}: {query}",
-        "pickQueryIntro": "Ten panel zawiera kilka zapytań. Wybierz, na podstawie którego utworzyć alert.",
+        "pickQueryIntro": "Dostępnych jest kilka zapytań. Wybierz, na podstawie którego utworzyć alert.",
         "streamLabel": "Strumień",
         "thresholdLabel": "Alert na",
         "thresholdMatchingRows": "Pasujące wiersze",

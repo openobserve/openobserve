@@ -230,8 +230,9 @@ export function usePanelAlertCreation({
     // A forecast is fitted to the clicked series, so it cannot move to another query.
     const offerChoice = visible.length > 1 && !isForecast;
     const clicked = selection.panelQueryIndex;
+    // A hidden query draws nothing, so a series naming one was mislabelled; a forecast keeps its own query.
     const queryIndex =
-      clicked !== undefined && (!offerChoice || visible.includes(clicked)) ? clicked : visible[0];
+      clicked !== undefined && (isForecast || visible.includes(clicked)) ? clicked : visible[0];
     const query = queries[queryIndex];
     if (!query) {
       return;

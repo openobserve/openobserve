@@ -28,6 +28,31 @@ export interface LineSeriesHit {
   dataIndex: number;
 }
 
+export interface LineStrokeEvent {
+  seriesIndex: number;
+  event?: { offsetX?: number; offsetY?: number; event?: MouseEvent };
+}
+
+/** Makes each line's drawn stroke report mouse events, whatever its shape, while `on`. */
+export const withLineStrokeEvents = (
+  options: Record<string, unknown>,
+  on: boolean,
+): Record<string, unknown> =>
+  on && Array.isArray(options.series)
+    ? {
+        ...options,
+        series: (options.series as { type?: string }[]).map((entry) =>
+          entry?.type === "line" ? { ...entry, triggerEvent: "line" } : entry,
+        ),
+      }
+    : options;
+
+/** An event from a line's stroke rather than a data point; only `withLineStrokeEvents` makes strokes report. */
+export const isLineStrokeEvent = (params: unknown): params is LineStrokeEvent => {
+  const event = params as { selfType?: string; seriesIndex?: unknown } | null;
+  return event?.selfType === "line" && typeof event.seriesIndex === "number";
+};
+
 /** Screen pixels a click may miss a drawn line by and still count as on it. */
 export const LINE_HIT_TOLERANCE = 6;
 
@@ -108,6 +133,24 @@ export const indexesNearX = (
   // Rows sorted newest first run right to left, so search them mirrored.
   const [from, to] = nearAscendingX(count, cursorX, (index) => xAt(count - 1 - index), tolerance);
   return [count - 1 - to, count - 1 - from];
+};
+
+/** The placed index whose x is closest to `cursorX`, or undefined when nothing is placed. */
+export const nearestIndexByX = (
+  count: number,
+  cursorX: number,
+  xAt: (index: number) => number | null,
+): number | undefined => {
+  const nearby = indexesNearX(count, cursorX, xAt, 0);
+  if (!nearby) return undefined;
+  let best: { index: number; distance: number } | undefined;
+  for (let index = nearby[0]; index <= nearby[1]; index++) {
+    const x = xAt(index);
+    if (x === null || !Number.isFinite(x)) continue;
+    const distance = Math.abs(x - cursorX);
+    if (!best || distance < best.distance) best = { index, distance };
+  }
+  return best?.index;
 };
 
 const gap = (a: PixelPoint, b: PixelPoint): number => Math.hypot(a[0] - b[0], a[1] - b[1]);

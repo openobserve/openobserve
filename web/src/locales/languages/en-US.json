@@ -9610,7 +9610,7 @@
         "continue": "Continue to alert",
         "queryChoiceLabel": "Alert on query",
         "queryChoiceOption": "{name}: {query}",
-        "pickQueryIntro": "This panel has multiple queries. Select which one to create the alert from.",
+        "pickQueryIntro": "There are multiple queries. Select which one to create the alert from.",
         "streamLabel": "Stream",
         "thresholdLabel": "Alert on",
         "thresholdMatchingRows": "Matching rows",

@@ -595,6 +595,98 @@ describe("ChartRenderer", () => {
       });
     });
 
+    describe("a line's own stroke", () => {
+      const strokeEvent = (seriesIndex: number) => ({
+        componentType: "series",
+        componentSubType: "line",
+        selfType: "line",
+        seriesIndex,
+        event: {
+          offsetX: 75,
+          offsetY: 81,
+          event: { clientX: 7, clientY: 8, preventDefault: vi.fn(), stopPropagation: vi.fn() },
+        },
+      });
+      const chartMock = async () => {
+        const echarts = await import("echarts/core");
+        return vi.mocked(echarts.init).mock.results[0]?.value;
+      };
+      const handlerFor = (mockChart: { on: { mock: { calls: unknown[][] } } }, name: string) =>
+        mockChart.on.mock.calls.find((call) => call[0] === name)?.[1] as (params: unknown) => void;
+
+      it("reports events only while the panel needs to know which line was meant", async () => {
+        const mockChart = await chartMock();
+        const lastSeries = () =>
+          vi.mocked(mockChart.setOption).mock.calls.at(-1)?.[0].series as Record<string, unknown>[];
+
+        await wrapper.setProps({
+          data: {
+            ...mockChartData,
+            options: { ...mockChartData.options, series: [{ type: "line" }, { type: "bar" }] },
+          },
+        });
+        await flushPromises();
+        expect(lastSeries().map((entry) => entry.triggerEvent)).toEqual([undefined, undefined]);
+
+        await wrapper.setProps({ findLineOnContextMenu: true });
+        await flushPromises();
+        expect(lastSeries().map((entry) => entry.triggerEvent)).toEqual(["line", undefined]);
+      });
+
+      it("keeps stroke events away from click, hover and move, which drive drilldown and exemplars", async () => {
+        const mockChart = await chartMock();
+        mockHoveredSeriesState.value.setHoveredSeriesName = vi.fn();
+        mockHoveredSeriesState.value.setIndex = vi.fn();
+        for (const name of ["click", "mouseover", "mouseout", "mousemove"]) {
+          handlerFor(mockChart, name)(strokeEvent(0));
+          expect(wrapper.emitted(name)).toBeUndefined();
+          handlerFor(mockChart, name)({ seriesIndex: 0, dataIndex: 2 });
+          expect(wrapper.emitted(name)).toHaveLength(1);
+        }
+      });
+
+      it("names the right-clicked line of any shape, reading the threshold at the cursor", async () => {
+        const mockChart = await chartMock();
+        vi.mocked(mockChart.getOption).mockReturnValue({
+          series: [
+            {
+              type: "line",
+              smooth: true,
+              data: [
+                [0, 1],
+                [1, 9],
+              ],
+            },
+            {
+              type: "line",
+              smooth: true,
+              stack: "s",
+              data: [
+                [0, 5],
+                [1, 9],
+              ],
+            },
+          ],
+        });
+        vi.mocked(mockChart.convertFromPixel).mockReturnValue([0.75, 6]);
+        vi.mocked(mockChart.convertToPixel).mockImplementation(
+          (_finder: unknown, value: number[]) => [value[0] * 100, value[1] * 10],
+        );
+
+        handlerFor(mockChart, "contextmenu")(strokeEvent(1));
+        await flushPromises();
+
+        expect(wrapper.emitted("domcontextmenu")?.at(-1)?.[0]).toEqual({
+          x: 7,
+          y: 8,
+          value: 6,
+          seriesIndex: 1,
+          dataIndex: 1,
+        });
+        expect(wrapper.emitted("contextmenu")).toBeUndefined();
+      });
+    });
+
     describe("a right-click on a line between its symbols", () => {
       const twoLines = async (extra: Record<string, unknown> = {}, second = {}) => {
         const echarts = await import("echarts/core");
@@ -651,26 +743,20 @@ describe("ChartRenderer", () => {
         expect(await rightClick(50, 300)).not.toHaveProperty("seriesIndex");
       });
 
-      it("names no line on a stacked chart, where a line is drawn above its own values", async () => {
-        await twoLines({}, { stack: "q1-stack" });
-        await wrapper.setProps({ findLineOnContextMenu: true });
+      it.each([
+        ["stacked", { stack: "q1-stack" }],
+        ["step", { step: "end" }],
+        ["smooth", { smooth: true }],
+        ["null-bridging", { connectNulls: true }],
+      ])(
+        "leaves a near miss on a %s line unnamed, since its stroke is not straight segments",
+        async (_shape, second) => {
+          await twoLines({}, second);
+          await wrapper.setProps({ findLineOnContextMenu: true });
 
-        expect(await rightClick(75, 81)).toEqual({ x: 75, y: 81, value: 6 });
-      });
-
-      it("names no line on a step chart, which is not drawn through straight segments", async () => {
-        await twoLines({}, { step: "end" });
-        await wrapper.setProps({ findLineOnContextMenu: true });
-
-        expect(await rightClick(75, 81)).toEqual({ x: 75, y: 81, value: 6 });
-      });
-
-      it("names no line on a smooth chart, whose curves leave the straight segments", async () => {
-        await twoLines({}, { smooth: true });
-        await wrapper.setProps({ findLineOnContextMenu: true });
-
-        expect(await rightClick(75, 81)).toEqual({ x: 75, y: 81, value: 6 });
-      });
+          expect(await rightClick(75, 81)).toEqual({ x: 75, y: 81, value: 6 });
+        },
+      );
 
       const oneLine = async (data: unknown[]) => {
         const echarts = await import("echarts/core");

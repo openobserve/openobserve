@@ -9610,7 +9610,7 @@
         "continue": "Weiter zum Alarm",
         "queryChoiceLabel": "Warnmeldung für Abfrage",
         "queryChoiceOption": "{name}: {query}",
-        "pickQueryIntro": "Dieses Panel hat mehrere Abfragen. Wählen Sie aus, aus welcher der Alarm erstellt werden soll.",
+        "pickQueryIntro": "Es gibt mehrere Abfragen. Wählen Sie aus, aus welcher der Alarm erstellt werden soll.",
         "streamLabel": "Stream",
         "thresholdLabel": "Alarm bei",
         "thresholdMatchingRows": "Übereinstimmende Zeilen",

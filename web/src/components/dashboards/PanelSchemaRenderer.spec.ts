@@ -2360,12 +2360,18 @@ describe("PanelSchemaRenderer", () => {
       });
     });
 
-    it("leaves a series' own query untouched when only one query is visible, but names its y field", () => {
+    it("maps the one visible, time-shifted SQL query's series past a hidden one", () => {
       vi.mocked(usePanelDataLoader).mockReturnValueOnce({
-        data: ref([[], []]),
+        data: ref([[], [], []]),
         loading: ref(false),
         errorDetail: ref({ message: "", code: "" }),
-        metadata: ref({ queries: [{ panelQueryIndex: 0 }, { panelQueryIndex: 1 }] }),
+        metadata: ref({
+          queries: [
+            { panelQueryIndex: 0, timeRangeGap: { seconds: 0 } },
+            { panelQueryIndex: 1, timeRangeGap: { seconds: 0 } },
+            { panelQueryIndex: 1, timeRangeGap: { seconds: 86400 } },
+          ],
+        }),
         resultMetaData: ref({}),
         annotations: ref([]),
         lastTriggeredAt: ref(null),
@@ -2373,7 +2379,7 @@ describe("PanelSchemaRenderer", () => {
         searchRequestTraceIds: ref([]),
         loadingProgressPercentage: ref(0),
         isPartialData: ref(false),
-      } as any);
+      } as unknown as ReturnType<typeof usePanelDataLoader>);
       const query = defaultProps.panelSchema.queries[0];
       wrapper = createWrapper({
         allowAlertCreation: true,
@@ -2382,16 +2388,23 @@ describe("PanelSchemaRenderer", () => {
           queries: [{ ...query, config: { hide: true } }, query],
         },
       });
+      // convertSQLData labels these from the unfiltered metadata, so they claim the hidden query.
       wrapper.vm.panelData = {
-        options: { series: [{ name: "b", _queryIndex: 0, _panelQueryIndex: 0, yAxisGroup: 1 }] },
+        options: {
+          series: [
+            { name: "b", _queryIndex: 0, _panelQueryIndex: 0, yAxisGroup: 1 },
+            { name: "b (1 day ago)", _queryIndex: 1, _panelQueryIndex: 0 },
+          ],
+        },
       };
-
-      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0 });
 
       expect(wrapper.vm.hasSeveralVisibleQueries).toBe(false);
       expect(wrapper.vm.findsLineOnContextMenu).toBe(false);
-      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(0);
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0 });
+      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(1);
       expect(wrapper.vm.contextMenuData.yField).toBe(1);
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 1 });
+      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(1);
     });
 
     it("looks for the clicked line on a single query plotting two y fields", () => {

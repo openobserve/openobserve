@@ -9610,7 +9610,7 @@
         "continue": "Continuar a la alerta",
         "queryChoiceLabel": "Alertar sobre la consulta",
         "queryChoiceOption": "{name}: {query}",
-        "pickQueryIntro": "Este panel tiene varias consultas. Selecciona desde cuál crear la alerta.",
+        "pickQueryIntro": "Hay varias consultas. Selecciona desde cuál crear la alerta.",
         "streamLabel": "Stream",
         "thresholdLabel": "Alertar sobre",
         "thresholdMatchingRows": "Filas coincidentes",

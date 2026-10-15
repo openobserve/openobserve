@@ -9605,7 +9605,7 @@
         "continue": "繼續前往警示",
         "queryChoiceLabel": "對查詢發出警示",
         "queryChoiceOption": "{name}: {query}",
-        "pickQueryIntro": "此面板包含多個查詢。請選擇要用來建立警示的查詢。",
+        "pickQueryIntro": "有多個查詢。請選擇要用來建立警示的查詢。",
         "streamLabel": "串流",
         "thresholdLabel": "警示條件",
         "thresholdMatchingRows": "符合的資料列",

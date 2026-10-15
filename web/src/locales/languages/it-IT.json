@@ -9610,7 +9610,7 @@
         "continue": "Continua all'avviso",
         "queryChoiceLabel": "Avvisa sulla query",
         "queryChoiceOption": "{name}: {query}",
-        "pickQueryIntro": "Questo pannello ha più query. Seleziona quella da cui creare l'avviso.",
+        "pickQueryIntro": "Ci sono più query. Seleziona quella da cui creare l'avviso.",
         "streamLabel": "Stream",
         "thresholdLabel": "Avviso su",
         "thresholdMatchingRows": "Righe corrispondenti",

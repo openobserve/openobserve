@@ -9610,7 +9610,7 @@
         "continue": "アラートに進む",
         "queryChoiceLabel": "クエリでアラート",
         "queryChoiceOption": "{name}: {query}",
-        "pickQueryIntro": "このパネルには複数のクエリがあります。アラートを作成するクエリを選択してください。",
+        "pickQueryIntro": "複数のクエリがあります。アラートを作成するクエリを選択してください。",
         "streamLabel": "ストリーム",
         "thresholdLabel": "アラート対象",
         "thresholdMatchingRows": "一致する行",

@@ -9610,7 +9610,7 @@
         "continue": "Uyarıya devam et",
         "queryChoiceLabel": "Uyarılacak sorgu",
         "queryChoiceOption": "{name}: {query}",
-        "pickQueryIntro": "Bu panelde birden fazla sorgu var. Uyarının oluşturulacağı sorguyu seçin.",
+        "pickQueryIntro": "Birden fazla sorgu var. Uyarının oluşturulacağı sorguyu seçin.",
         "streamLabel": "Akış",
         "thresholdLabel": "Uyarı kaynağı",
         "thresholdMatchingRows": "Eşleşen satırlar",

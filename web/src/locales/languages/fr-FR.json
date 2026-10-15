@@ -9610,7 +9610,7 @@
         "continue": "Continuer vers l'alerte",
         "queryChoiceLabel": "Alerter sur la requête",
         "queryChoiceOption": "{name} : {query}",
-        "pickQueryIntro": "Ce panneau contient plusieurs requêtes. Sélectionnez celle à partir de laquelle créer l'alerte.",
+        "pickQueryIntro": "Il y a plusieurs requêtes. Sélectionnez celle à partir de laquelle créer l'alerte.",
         "streamLabel": "Flux",
         "thresholdLabel": "Alerte sur",
         "thresholdMatchingRows": "Lignes correspondantes",

@@ -9610,7 +9610,7 @@
         "continue": "경고로 계속",
         "queryChoiceLabel": "알림 대상 쿼리",
         "queryChoiceOption": "{name}: {query}",
-        "pickQueryIntro": "이 패널에는 여러 쿼리가 있습니다. 경고를 생성할 쿼리를 선택하십시오.",
+        "pickQueryIntro": "여러 쿼리가 있습니다. 경고를 생성할 쿼리를 선택하십시오.",
         "streamLabel": "스트림",
         "thresholdLabel": "경고 대상",
         "thresholdMatchingRows": "일치하는 행",

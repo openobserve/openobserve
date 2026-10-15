@@ -9610,7 +9610,7 @@
         "continue": "Tiếp tục đến cảnh báo",
         "queryChoiceLabel": "Cảnh báo theo truy vấn",
         "queryChoiceOption": "{name}: {query}",
-        "pickQueryIntro": "Bảng điều khiển này có nhiều truy vấn. Hãy chọn truy vấn để tạo cảnh báo.",
+        "pickQueryIntro": "Có nhiều truy vấn. Hãy chọn truy vấn để tạo cảnh báo.",
         "streamLabel": "Luồng",
         "thresholdLabel": "Cảnh báo trên",
         "thresholdMatchingRows": "Các hàng khớp",

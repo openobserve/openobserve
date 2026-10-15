@@ -9610,7 +9610,7 @@
         "continue": "Doorgaan naar alert",
         "queryChoiceLabel": "Alarm op query",
         "queryChoiceOption": "{name}: {query}",
-        "pickQueryIntro": "Dit paneel heeft meerdere query's. Kies op basis van welke query je het alert wilt maken.",
+        "pickQueryIntro": "Er zijn meerdere query's. Kies op basis van welke query je het alert wilt maken.",
         "streamLabel": "Stream",
         "thresholdLabel": "Alert op",
         "thresholdMatchingRows": "Overeenkomende rijen",
