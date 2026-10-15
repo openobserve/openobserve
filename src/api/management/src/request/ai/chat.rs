@@ -28,7 +28,6 @@ use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, extractors::Headers};
 use serde::Deserialize;
 #[cfg(feature = "enterprise")]
 use {
-    audit::report_with_protocol,
     futures::StreamExt,
     o2_enterprise::enterprise::{
         ai::{
@@ -39,7 +38,10 @@ use {
                 SESSION_OWNER_UNAVAILABLE, get_agent_client, is_session_owner_unavailable,
             },
         },
-        common::{auditor::Protocol, config::get_config as get_o2_config},
+        common::{
+            auditor::{AuditMessage, DelegatedAudit, Protocol, ResponseMeta},
+            config::get_config as get_o2_config,
+        },
     },
     openobserve_api_common::auth::delegation::DelegatedCaller,
 };
@@ -88,9 +90,7 @@ const RCA_CHAT_CLIENT_KEYS: [&str; 8] = [
 ];
 
 /// Set by the Slack bridge as `<team>:<channel>:<event_id>`; trusted only on a delegated call.
-#[cfg(feature = "enterprise")]
-const SLACK_EVENT_HEADER: &str = "x-o2-slack-event";
-#[cfg(feature = "enterprise")]
+pub const SLACK_EVENT_HEADER: &str = "x-o2-slack-event";
 const SLACK_REDACTED: &str = "[REDACTED: slack]";
 /// o2-ai refuses `confirm_timeout_secs` outside 1..=600 with a 422.
 #[cfg(feature = "enterprise")]
@@ -104,6 +104,7 @@ struct ChatAudit {
     trace_id: String,
     protocol: Protocol,
     body: String,
+    delegated: Option<DelegatedAudit>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -111,22 +112,18 @@ impl ChatAudit {
     /// A Slack turn is audited without the question text, which stays in Slack.
     fn new(
         headers: &axum::http::HeaderMap,
-        delegated: bool,
+        delegated: Option<&DelegatedCaller>,
         user_id: &str,
         org_id: &str,
         trace_id: &str,
         prompt: &PromptRequest,
     ) -> Self {
-        let (protocol, body) = if delegated {
-            let mut body = serde_json::to_value(prompt).unwrap_or_default();
-            if let Some(obj) = body.as_object_mut() {
-                obj.insert("messages".to_string(), SLACK_REDACTED.into());
-                let event = headers
-                    .get(SLACK_EVENT_HEADER)
-                    .and_then(|v| v.to_str().ok());
-                obj.insert("slack_event".to_string(), event.into());
-            }
-            (Protocol::Slack, body.to_string())
+        let (protocol, body) = if delegated.is_some() {
+            let event = headers
+                .get(SLACK_EVENT_HEADER)
+                .and_then(|v| v.to_str().ok());
+            let body = serde_json::to_value(prompt).unwrap_or_default();
+            (Protocol::Slack, slack_audit_body(body, event))
         } else {
             (
                 Protocol::Http,
@@ -139,23 +136,37 @@ impl ChatAudit {
             trace_id: trace_id.to_string(),
             protocol,
             body,
+            delegated: delegated.map(|caller| DelegatedAudit {
+                link_id: caller.link_id.clone(),
+                jti: caller.jti.clone(),
+            }),
+        }
+    }
+
+    /// Built here, not by `report_with_protocol`, which has no `delegated` parameter (request 20).
+    fn message(&self, code: u16, error_message: Option<String>) -> AuditMessage {
+        AuditMessage {
+            user_email: self.user_id.clone(),
+            org_id: self.org_id.clone(),
+            _timestamp: config::utils::time::now_micros(),
+            protocol: self.protocol.clone(),
+            response_meta: ResponseMeta {
+                http_method: "POST".to_string(),
+                http_path: format!("/api/{}/ai/chat_stream", self.org_id),
+                http_query_params: String::new(),
+                http_body: self.body.clone(),
+                http_response_code: code,
+                error_msg: error_message,
+                trace_id: Some(self.trace_id.clone()),
+            },
+            delegated: self.delegated.clone(),
         }
     }
 
     async fn report(&self, code: u16, error_message: Option<String>) {
-        report_with_protocol(
-            self.protocol.clone(),
-            self.user_id.clone(),
-            self.org_id.clone(),
-            self.trace_id.clone(),
-            code,
-            error_message,
-            "POST".to_string(),
-            format!("/api/{}/ai/chat_stream", self.org_id),
-            String::new(),
-            self.body.clone(),
-        )
-        .await;
+        if get_o2_config().common.audit_enabled {
+            audit::audit(self.message(code, error_message)).await;
+        }
     }
 }
 
@@ -251,7 +262,6 @@ fn select_chat_agent(
     (RCA_AGENT_TYPE, rca_context)
 }
 
-/// A hyphenated UUID only: the id lands in outbound URLs and routing keys (a URN would carry `:`).
 /// The agent context: the path org, plus a fork seed only when the Slack bridge sent it.
 #[cfg(feature = "enterprise")]
 fn agent_context(
@@ -276,6 +286,7 @@ fn confirm_timeout(requested: Option<u32>) -> Option<u32> {
         .map(|secs| secs.min(MAX_CONFIRM_TIMEOUT_SECS))
 }
 
+/// A hyphenated UUID only: the id lands in outbound URLs and routing keys (a URN would carry `:`).
 fn is_valid_session_id(val: &str) -> bool {
     val.len() == 36 && uuid::Uuid::try_parse(val).is_ok()
 }
@@ -564,6 +575,18 @@ fn extract_passthrough_headers(
     }
 
     result
+}
+
+/// The audit body of a Slack turn: the question stays in Slack, `slack_event` names the message.
+pub fn slack_audit_body(mut body: serde_json::Value, slack_event: Option<&str>) -> String {
+    match body.as_object_mut() {
+        Some(obj) => {
+            obj.insert("messages".to_string(), SLACK_REDACTED.into());
+            obj.insert("slack_event".to_string(), slack_event.into());
+        }
+        None => body = SLACK_REDACTED.into(),
+    }
+    body.to_string()
 }
 
 /// CreateChat
@@ -1078,10 +1101,11 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     #[cfg(feature = "enterprise")]
     {
         let org_id_str = org_id.clone();
-        let delegated = parts.extensions.get::<DelegatedCaller>().is_some();
+        let caller = parts.extensions.get::<DelegatedCaller>();
+        let delegated = caller.is_some();
         let audit = ChatAudit::new(
             &parts.headers,
-            delegated,
+            caller,
             &user_id,
             &org_id_str,
             &trace_id,
@@ -1989,12 +2013,23 @@ mod tests {
     }
 
     #[cfg(feature = "enterprise")]
+    fn bridge_caller() -> DelegatedCaller {
+        DelegatedCaller {
+            link_id: "lnk_01".to_string(),
+            installation_id: "inst_01".to_string(),
+            org: "prod".to_string(),
+            jti: "jti-0001".to_string(),
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
     #[test]
     fn a_slack_turn_is_audited_without_the_question_and_with_its_slack_event() {
         let body = prompt(serde_json::json!({"currentPage": "slack"}));
+        let caller = bridge_caller();
         let audit = ChatAudit::new(
             &slack_event_headers(),
-            true,
+            Some(&caller),
             "ann@acme.io",
             "prod",
             "t1",
@@ -2010,11 +2045,41 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[test]
+    fn a_slack_turn_record_names_the_link_and_the_token() {
+        let caller = bridge_caller();
+        let audit = ChatAudit::new(
+            &slack_event_headers(),
+            Some(&caller),
+            "ann@acme.io",
+            "prod",
+            "t1",
+            &prompt(serde_json::json!({})),
+        );
+        let message = audit.message(200, None);
+        assert_eq!(
+            message.delegated,
+            Some(DelegatedAudit {
+                link_id: "lnk_01".to_string(),
+                jti: "jti-0001".to_string(),
+            })
+        );
+        assert_eq!(message.protocol, Protocol::Slack);
+        assert_eq!(message.response_meta.http_path, "/api/prod/ai/chat_stream");
+        assert_eq!(message.response_meta.trace_id.as_deref(), Some("t1"));
+        let json = serde_json::to_value(&message).unwrap();
+        assert_eq!(
+            json["delegated"],
+            serde_json::json!({"link_id": "lnk_01", "jti": "jti-0001"})
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
     fn a_browser_request_with_a_forged_slack_event_is_audited_in_full_as_http() {
         let body = prompt(serde_json::json!({}));
         let audit = ChatAudit::new(
             &slack_event_headers(),
-            false,
+            None,
             "ann@acme.io",
             "prod",
             "t1",
@@ -2025,6 +2090,29 @@ mod tests {
         assert_eq!(json["messages"][0]["content"], "why are checkouts failing?");
         assert!(json.get("slack_event").is_none(), "{json}");
         assert_eq!(audit.body, serde_json::to_string(&body).unwrap());
+        assert_eq!(audit.message(200, None).delegated, None);
+    }
+
+    #[test]
+    fn the_slack_audit_body_drops_the_question_and_keeps_the_rest() {
+        let body = serde_json::json!({
+            "messages": [{"role": "user", "content": "why are checkouts failing?"}],
+            "context": {"currentPage": "slack"},
+        });
+        let json: serde_json::Value =
+            serde_json::from_str(&slack_audit_body(body, Some("T0TEAM:C0CHAN:Ev0001"))).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "messages": SLACK_REDACTED,
+                "context": {"currentPage": "slack"},
+                "slack_event": "T0TEAM:C0CHAN:Ev0001",
+            })
+        );
+        assert_eq!(
+            slack_audit_body(serde_json::json!("why are checkouts failing?"), None),
+            serde_json::json!(SLACK_REDACTED).to_string()
+        );
     }
 
     #[test]
