@@ -30,7 +30,7 @@ use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 
 use super::{
-    plan::{TraceListPlan, TraceSchema},
+    plan::{TraceColumns, TraceListPlan},
     query::{TraceSearchContext, build_partition_query},
     response::{TraceBatch, TraceResponseItem},
 };
@@ -288,7 +288,7 @@ async fn run(
 
         let Some(batch) = load_batch(
             &ctx,
-            &plan.schema,
+            &plan.columns,
             &deliverable_q1,
             (p_start, p_end),
             &base_req,
@@ -357,7 +357,7 @@ async fn run(
 
         let Some(batch) = load_batch(
             &ctx,
-            &plan.schema,
+            &plan.columns,
             &deliverable_q1,
             (start_time, end_time),
             &base_req,
@@ -411,7 +411,7 @@ async fn run(
 
 async fn load_batch(
     ctx: &TraceSearchContext,
-    schema: &TraceSchema,
+    columns: &TraceColumns,
     hits: &[json::Value],
     range: (i64, i64),
     base_request: &Request,
@@ -424,7 +424,7 @@ async fn load_batch(
     }
     let service_range = batch.range;
     if let Err(error) = ctx
-        .fill_services(&mut batch, base_request, schema, service_range)
+        .fill_services(&mut batch, base_request, columns, service_range)
         .await
     {
         log::error!(

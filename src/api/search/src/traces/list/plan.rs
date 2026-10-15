@@ -36,8 +36,8 @@ pub enum TraceListMode {
 pub struct TraceListPlan {
     pub options: TraceListOptions,
     pub sort: TraceSort,
-    pub schema: TraceSchema,
-    pub validated: Option<schema_compat::ValidatedLlmSchema>,
+    pub columns: TraceColumns,
+    pub llm_schema: Option<schema_compat::ValidatedLlmSchema>,
     pub mode: TraceListMode,
 }
 
@@ -63,9 +63,9 @@ impl TraceListPlan {
     }
 
     fn sql(&self, stream_name: &str) -> String {
-        let extra_selects = self.schema.aggregate_selects();
-        let sql = match &self.validated {
-            Some(validated) => build_llm_trace_query(stream_name, validated, &extra_selects),
+        let extra_selects = self.columns.aggregate_selects();
+        let sql = match &self.llm_schema {
+            Some(llm_schema) => build_llm_trace_query(stream_name, llm_schema, &extra_selects),
             None => build_trace_query(stream_name, &extra_selects),
         };
         let filter = match self.mode {
@@ -238,17 +238,17 @@ impl TraceSort {
 }
 
 #[derive(Default)]
-pub struct TraceSchema {
+pub struct TraceColumns {
     has_ref_parent_id: bool,
-    pub has_infer: bool,
+    pub has_inferred_service: bool,
 }
 
-impl TraceSchema {
+impl TraceColumns {
     pub fn from_schema(schema: Option<&Schema>) -> Self {
         Self {
             has_ref_parent_id: schema
                 .is_some_and(|s| s.field_with_name("reference_parent_span_id").is_ok()),
-            has_infer: schema.is_some_and(|s| {
+            has_inferred_service: schema.is_some_and(|s| {
                 s.field_with_name(openobserve_core::traces::inferred::INFER_SERVICE_NAME)
                     .is_ok()
             }),
@@ -256,7 +256,7 @@ impl TraceSchema {
     }
 
     pub fn service_key(&self) -> &'static str {
-        if self.has_infer {
+        if self.has_inferred_service {
             "COALESCE(infer_service_name, service_name)"
         } else {
             "service_name"
@@ -363,8 +363,8 @@ mod tests {
             let plan = TraceListPlan {
                 options: TraceListOptions::parse(&query, mode).unwrap(),
                 sort: TraceSort::parse(&query).unwrap(),
-                schema: TraceSchema::from_schema(Some(&schema)),
-                validated: None,
+                columns: TraceColumns::from_schema(Some(&schema)),
+                llm_schema: None,
                 mode,
             };
             let sql = plan.sql("trace\" stream");
@@ -392,8 +392,8 @@ mod tests {
             let plan = TraceListPlan {
                 options: TraceListOptions::parse(&query, mode).unwrap(),
                 sort: TraceSort::parse(&query).unwrap(),
-                schema: TraceSchema::default(),
-                validated: None,
+                columns: TraceColumns::default(),
+                llm_schema: None,
                 mode,
             };
             assert!(plan.sql("traces").contains(expected));

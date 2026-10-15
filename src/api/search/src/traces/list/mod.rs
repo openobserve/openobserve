@@ -22,8 +22,8 @@ use axum::response::Response;
 use config::meta::{search::Response as SearchResponse, stream::StreamType};
 use hashbrown::HashMap;
 use infra::errors::Error;
+use plan::{TraceColumns, TraceListOptions, TraceSort, validate_filter};
 pub use plan::{TraceListMode, TraceListPlan};
-use plan::{TraceListOptions, TraceSchema, TraceSort, validate_filter};
 pub use query::TraceSearchContext;
 use response::TraceBatch;
 pub use stream::stream_response;
@@ -54,7 +54,7 @@ pub async fn prepare(
     let is_llm = infra::schema::get_is_llm_stream(org_id, stream_name, StreamType::Traces).await;
     let schema =
         infra::schema::get_stream_schema_from_cache(org_id, stream_name, StreamType::Traces).await;
-    let validated = if is_llm {
+    let llm_schema = if is_llm {
         Some(match schema.as_ref() {
             Some(schema) => schema_compat::validate_llm_schema(schema, stream_name)
                 .map_err(|error| MetaHttpResponse::bad_request(error.to_string()))?,
@@ -72,8 +72,8 @@ pub async fn prepare(
     Ok(TraceListPlan {
         options,
         sort,
-        validated,
-        schema: TraceSchema::from_schema(schema.as_ref()),
+        llm_schema,
+        columns: TraceColumns::from_schema(schema.as_ref()),
         mode,
     })
 }
@@ -90,7 +90,7 @@ pub async fn run(ctx: &TraceSearchContext, plan: &TraceListPlan) -> Result<Trace
     let mut batch = TraceBatch::from_hits(&response.hits, options.range);
     drop(response);
     // Unlike streaming, the breakdown keeps the requested range instead of the widened batch.range.
-    ctx.fill_services(&mut batch, &request, &plan.schema, options.range)
+    ctx.fill_services(&mut batch, &request, &plan.columns, options.range)
         .await
         .inspect_err(|error| {
             log::error!("get traces latest service-breakdown error: {error:?}");

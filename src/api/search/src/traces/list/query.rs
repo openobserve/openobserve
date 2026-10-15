@@ -23,7 +23,7 @@ use config::{
 };
 use infra::errors::Error;
 
-use super::{plan::TraceSchema, response::TraceBatch};
+use super::{plan::TraceColumns, response::TraceBatch};
 use crate::traces::schema_compat;
 
 pub struct TraceSearchContext {
@@ -62,13 +62,13 @@ impl TraceSearchContext {
         &self,
         batch: &mut TraceBatch,
         base_request: &Request,
-        schema: &TraceSchema,
+        columns: &TraceColumns,
         range: (i64, i64),
     ) -> Result<(), Error> {
         if batch.multi_service_ids.is_empty() {
             return Ok(());
         }
-        let request = service_request(&self.stream_name, batch, base_request, schema, range);
+        let request = service_request(&self.stream_name, batch, base_request, columns, range);
         let response = self.search(&request).await?;
         batch.fill_services(response.hits);
         Ok(())
@@ -177,7 +177,7 @@ fn service_request(
     stream_name: &str,
     batch: &TraceBatch,
     base_request: &Request,
-    schema: &TraceSchema,
+    columns: &TraceColumns,
     range: (i64, i64),
 ) -> Request {
     // Trace IDs come from stored rows, so they are reduced to hex and '-' before reaching SQL.
@@ -192,14 +192,14 @@ fn service_request(
         .filter(|id| !id.is_empty())
         .collect::<Vec<_>>();
     // NULL for instrumented services, the inferred kind ("database", "queue", ...) otherwise.
-    let service_type = if schema.has_infer {
+    let service_type = if columns.has_inferred_service {
         ", max(infer_service_type) AS service_type"
     } else {
         ""
     };
     let mut request = base_request.clone();
     request.query.sql =
-        build_service_breakdown_query(stream_name, schema.service_key(), service_type, &ids);
+        build_service_breakdown_query(stream_name, columns.service_key(), service_type, &ids);
     request.query.from = 0;
     // The breakdown has at most one row per service counted in Q1, so one request fetches all.
     request.query.size = batch.multi_service_total;
@@ -302,8 +302,8 @@ mod tests {
             let plan = TraceListPlan {
                 options: TraceListOptions::parse(&query, mode).unwrap(),
                 sort: TraceSort::parse(&query).unwrap(),
-                schema: TraceSchema::default(),
-                validated: None,
+                columns: TraceColumns::default(),
+                llm_schema: None,
                 mode,
             };
             let base = plan.request("stream");
@@ -325,7 +325,7 @@ mod tests {
                 TraceListMode::Complete => (100, 150),
                 TraceListMode::Streaming => batch.range,
             };
-            let request = service_request("stream", &batch, &base, &plan.schema, range);
+            let request = service_request("stream", &batch, &base, &plan.columns, range);
             assert_eq!(
                 request.query.sql,
                 "SELECT trace_id, service_name AS service_name, count(*) AS svc_count, max(duration) AS svc_duration FROM \"stream\" WHERE trace_id IN ('a-b') GROUP BY trace_id, service_name"
