@@ -63,6 +63,7 @@ import type {
   SlackCreateInstallationResponse,
   SlackInstallExchangeResponse,
   SlackTestResponse,
+  SlackUninstallResponse,
 } from "@/types/slack";
 import { buildSlackManifestUrlFrom } from "@/utils/slackManifest";
 import { isSlackUrl, serverMessageOf, statusOf } from "@/utils/slackLink";
@@ -170,6 +171,7 @@ const createApp = async (value: CreateAppForm): Promise<void> => {
         channel_history: value.channel_history,
       };
   created.value = await createInstallation.mutateAsync(body);
+  leftApp.value = null;
   installedTeam.value = null;
   step.value = 3;
 };
@@ -199,6 +201,8 @@ const installedTeam = ref<string | null>(null);
 const alreadyInstalled = ref<SlackAlreadyInstalledResponse | null>(null);
 const appTokenSaved = ref(false);
 const startOverOpen = ref(false);
+// The Slack app Start over left behind: O2 could not delete it, or never created it.
+const leftApp = ref<{ appId: string; url: string; failed: boolean; reason: string } | null>(null);
 const installUrl = useMutation(() => installUrlMutation(org.value));
 const installExchange = useMutation(() => installExchangeMutation(org.value));
 const uninstall = useMutation(() => uninstallInstallationMutation(org.value));
@@ -242,11 +246,23 @@ const saveAppToken = async (value: AppTokenForm): Promise<void> => {
 };
 const startOver = async (): Promise<void> => {
   if (!installationId.value) return;
+  const appId = current.value?.app_id ?? "";
+  let result: SlackUninstallResponse;
   try {
-    await uninstall.mutateAsync(installationId.value);
+    result = await uninstall.mutateAsync(installationId.value);
   } catch {
     return;
   }
+  const url = result.delete_app_url;
+  leftApp.value =
+    url && isSlackUrl(url, "api.slack.com")
+      ? {
+          appId,
+          url,
+          failed: result.app_deleted === false,
+          reason: result.app_delete_error ?? "",
+        }
+      : null;
   created.value = null;
   installedTeam.value = null;
   alreadyInstalled.value = null;
@@ -448,6 +464,45 @@ const nextBlocked = computed(() => {
           <h3 class="text-text-heading m-0 text-base font-semibold">
             {{ t("slackApp.wizard.create.title") }}
           </h3>
+          <OBanner
+            v-if="leftApp"
+            variant="warning"
+            icon="warning"
+            data-test="slack-wizard-app-left"
+          >
+            <div class="flex flex-col gap-0.5">
+              <span class="font-medium">
+                {{ t("slackApp.wizard.install.appLeftTitle", { appId: leftApp.appId }) }}
+              </span>
+              <span>
+                {{
+                  leftApp.failed
+                    ? t("slackApp.wizard.install.appNotDeleted")
+                    : t("slackApp.wizard.install.appNotCreatedByO2")
+                }}
+              </span>
+              <span
+                v-if="leftApp.failed && leftApp.reason"
+                data-test="slack-wizard-app-left-reason"
+              >
+                {{ raw(leftApp.reason) }}
+              </span>
+            </div>
+            <template #actions>
+              <OButton
+                as="a"
+                :href="leftApp.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="outline"
+                size="sm-action"
+                icon-right="open-in-new"
+                data-test="slack-wizard-delete-app"
+              >
+                {{ t("slackApp.uninstall.deleteApp") }}
+              </OButton>
+            </template>
+          </OBanner>
           <OFormRadioGroup
             name="mode"
             :label="t('slackApp.wizard.create.modeLabel')"

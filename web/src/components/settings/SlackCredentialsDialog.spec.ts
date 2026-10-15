@@ -18,7 +18,13 @@ import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import slack from "@/services/slack";
 import SlackCredentialsDialog from "./SlackCredentialsDialog.vue";
-import { installationView, makeSlackStore, ok } from "@/test/unit/helpers/slack";
+import {
+  FAKE_APP_TOKEN,
+  FAKE_CONFIG_REFRESH_TOKEN,
+  installationView,
+  makeSlackStore,
+  ok,
+} from "@/test/unit/helpers/slack";
 import type { InstallationView } from "@/types/slack";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -77,11 +83,13 @@ describe("SlackCredentialsDialog (row 8)", () => {
   it("sends only the fields that changed, then closes", async () => {
     const w = mountDialog();
     await flushPromises();
-    await body().find('[data-test="slack-credentials-app_token"] input').setValue("xapp-1-new");
+    await body()
+      .find('[data-test="slack-credentials-app_token"] input')
+      .setValue("xapp-1-A0SAMPLE01-1-new");
     await body().find("form").trigger("submit");
     await vi.waitFor(() =>
       expect(slack.updateCredentials).toHaveBeenCalledWith("acme", "inst-1", {
-        app_token: "xapp-1-new",
+        app_token: "xapp-1-A0SAMPLE01-1-new",
       }),
     );
     await flushPromises();
@@ -89,6 +97,31 @@ describe("SlackCredentialsDialog (row 8)", () => {
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({ variant: "success", message: "Credentials updated" }),
     );
+  });
+
+  it("refuses a token pasted into the other token's field before Slack is called", async () => {
+    mountDialog();
+    await flushPromises();
+    await body()
+      .find('[data-test="slack-credentials-app_token"] input')
+      .setValue(FAKE_CONFIG_REFRESH_TOKEN);
+    await body()
+      .find('[data-test="slack-credentials-config_refresh_token"] input')
+      .setValue(FAKE_APP_TOKEN);
+    await body().find("form").trigger("submit");
+    await vi.waitFor(() => expect(body().text()).toContain("This is not an app-level token"));
+    expect(body().text()).toContain("This is not a configuration refresh token");
+    expect(slack.updateCredentials).not.toHaveBeenCalled();
+  });
+
+  it("says O2 never uses the installer's user token from a reinstall in Slack and how to end it", async () => {
+    mountDialog();
+    await flushPromises();
+    const note = body().find('[data-test="slack-credentials-installer-token-note"]').text();
+    expect(note).toContain("openid, email, profile");
+    expect(note).toContain("OpenObserve never sees or uses");
+    expect(note).toContain("auth.revoke");
+    expect(note).toContain("Deleting the app ends it");
   });
 
   it("refuses an empty update", async () => {

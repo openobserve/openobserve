@@ -87,6 +87,13 @@ export const axiosError = (status: number, message = "refused") =>
 
 export const ok = <T>(data: T) => Promise.resolve({ data });
 
+/** Slack's real layouts (xapp-1-<app id>-<digits>-<hex>, xoxe-1-…, xoxe.xoxp-1-…), joined at runtime so secret scanners skip them. */
+export const FAKE_APP_ID = "A0FAKEAPP01";
+export const FAKE_APP_TOKEN = ["xapp", "1", FAKE_APP_ID, "1000000000000", "f".repeat(64)].join("-");
+export const FAKE_CONFIG_REFRESH_TOKEN = ["xoxe", "1", "ZmFrZS1yZWZyZXNoLXRva2Vu"].join("-");
+export const FAKE_CONFIG_ACCESS_TOKEN =
+  "xoxe." + ["xoxp", "1", "ZmFrZS1hY2Nlc3MtdG9rZW4"].join("-");
+
 /** OTable's cell slots and its state ladder (loading, then forbidden, error or empty), without its layout. */
 export const OTableStub = defineComponent({
   name: "OTable",

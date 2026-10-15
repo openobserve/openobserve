@@ -24,7 +24,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { updateCredentialsMutation } from "@/services/slack.queries";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { InstallationView, SlackCredentialsRequest } from "@/types/slack";
 import {
   credentialsDefaults,
@@ -113,6 +113,14 @@ const submit = async (value: CredentialsForm): Promise<void> => {
         :data-test="`slack-credentials-${field.name}`"
       />
       <p class="text-text-secondary m-0 text-xs">{{ t("slackApp.credentials.botTokenHint") }}</p>
+      <p class="text-text-secondary m-0 text-xs" data-test="slack-credentials-installer-token-note">
+        {{
+          t("slackApp.credentials.installerUserToken", {
+            scopes: raw("openid, email, profile"),
+            method: raw("auth.revoke"),
+          })
+        }}
+      </p>
     </OForm>
   </ODialog>
 </template>

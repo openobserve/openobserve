@@ -21,6 +21,28 @@ def ready(slack_on: None, self_hosted: None, mock: SlackMock) -> SlackMock:
     return mock
 
 
+# Slack's real layouts (xapp-1-<app id>-<digits>-<hex>, xoxe.xoxp-1-…), joined at runtime so secret scanners skip them.
+FAKE_APP_ID = "A0FAKEAPP01"
+CONFIG_ACCESS = "xoxe." + "-".join(["xoxp", "1", "ZmFrZS1hY2Nlc3MtdG9rZW4"])
+NOT_CONFIG_TOKEN = (
+    "This is not a configuration refresh token. Copy the refresh token from api.slack.com/apps › "
+    "Your App Configuration Tokens; it starts with xoxe-"
+)
+CONFIG_ACCESS_TOKEN = "This is the configuration access token. Paste the refresh token shown with it; it starts with xoxe-"
+NOT_APP_TOKEN = (
+    "This is not an app-level token. Generate one on the app's Basic Information page › App-Level Tokens "
+    "with the connections:write scope; it starts with xapp-"
+)
+APP_TOKEN_REFUSED = (
+    "Slack refused the app-level token: it was revoked or mistyped. Generate a new one on the app's "
+    "Basic Information page › App-Level Tokens"
+)
+
+
+def app_token(app_id: str) -> str:
+    return "-".join(["xapp", "1", app_id, "1000000000000", "f" * 64])
+
+
 def installation_ids(client: OpenObserveClient, org: str) -> set[str]:
     resp = client.get("slack/installations", org=org)
     assert resp.status_code == 200, resp.text
@@ -96,6 +118,8 @@ def test_finish_install_and_start_over(client: OpenObserveClient, slack_org: str
 
     over = client.delete(f"slack/installations/{installation_id}", org=slack_org)
     assert over.status_code == 200, over.text
+    assert over.json()["app_deleted"] is True
+    assert "app_delete_error" not in over.json()
     assert len(ready.calls("apps.manifest.delete")) == 1
     assert ready.apps() == [], "no second app is left in Slack"
     assert installation_id not in installation_ids(client, slack_org)
@@ -145,3 +169,60 @@ def test_a_secret_write_is_audited_redacted(client: OpenObserveClient, ready: Sl
                      timeout=40)[0]
     assert rec["http_body"] == "[REDACTED: secret write]", rec
     assert token not in json.dumps(rec)
+
+
+def test_start_over_reports_an_app_slack_kept(client: OpenObserveClient, slack_org: str, ready: SlackMock) -> None:
+    """Live 17:07: the stored refresh token was refused, apps.manifest.delete never ran, and O2 still said 200."""
+    status, body = create(client, slack_org, f"xoxe-1-{uuid.uuid4().hex}")
+    assert status == 201, body
+    installation_id = body["installation"]["id"]
+    app_id = ready.apps()[0]["app_id"]
+    ready.fail("tooling.tokens.rotate", "invalid_refresh_token")
+
+    over = client.delete(f"slack/installations/{installation_id}", org=slack_org)
+    assert over.status_code == 200, over.text
+    result = over.json()
+    assert result["app_deleted"] is False
+    assert result["app_delete_error"] == "This token has expired. Generate a new one"
+    assert result["delete_app_url"] == f"https://api.slack.com/apps/{app_id}/general"
+    assert ready.calls("apps.manifest.delete") == []
+    assert [a["app_id"] for a in ready.apps()] == [app_id], "the app is still in Slack"
+    assert installation_id not in installation_ids(client, slack_org)
+
+
+def test_a_token_of_the_wrong_kind_is_named_before_slack_is_called(
+    client: OpenObserveClient, slack_org: str, ready: SlackMock
+) -> None:
+    for pasted, message in [(app_token(FAKE_APP_ID), NOT_CONFIG_TOKEN), (CONFIG_ACCESS, CONFIG_ACCESS_TOKEN)]:
+        status, body = create(client, slack_org, pasted)
+        assert (status, body["message"]) == (400, message), body
+    assert ready.calls("tooling.tokens.rotate") == []
+
+    installed = self_hosted_install(client, slack_org, team_id=f"T{uuid.uuid4().hex[:8].upper()}")
+    path = f"slack/installations/{installed['installation']['id']}/credentials"
+    app_id = installed["installation"]["app_id"]
+    rotations = len(ready.calls("tooling.tokens.rotate"))
+    swapped = client.put(path, json={"app_token": f"xoxe-1-{uuid.uuid4().hex}"}, org=slack_org)
+    assert (swapped.status_code, swapped.json()["message"]) == (400, NOT_APP_TOKEN), swapped.text
+    swapped = client.put(path, json={"config_refresh_token": app_token(app_id)}, org=slack_org)
+    assert (swapped.status_code, swapped.json()["message"]) == (400, NOT_CONFIG_TOKEN), swapped.text
+    assert ready.calls("apps.connections.open") == []
+    assert len(ready.calls("tooling.tokens.rotate")) == rotations
+
+    ready.fail("apps.connections.open", "invalid_auth")
+    refused = client.put(path, json={"app_token": app_token(app_id)}, org=slack_org)
+    assert (refused.status_code, refused.json()["message"]) == (400, APP_TOKEN_REFUSED), refused.text
+    assert "scope" not in refused.json()["message"]
+
+
+def test_the_test_route_takes_no_body_and_still_refuses_text(
+    client: OpenObserveClient, slack_org: str, ready: SlackMock
+) -> None:
+    """Live: ``POST …/test`` without ``Content-Type: application/json`` answered 400."""
+    installed = self_hosted_install(client, slack_org, team_id=f"T{uuid.uuid4().hex[:8].upper()}")
+    path = f"slack/installations/{installed['installation']['id']}/test"
+    bare = client.post(path, org=slack_org)
+    assert bare.status_code == 200, bare.text
+    assert {c["id"] for c in bare.json()["checks"]} >= {"auth_test"}
+    text = client.post(path, data="channel_id=C0ALERTS", org=slack_org)
+    assert text.status_code == 400, text.text

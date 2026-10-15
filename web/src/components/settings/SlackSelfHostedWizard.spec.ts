@@ -20,6 +20,9 @@ import slack from "@/services/slack";
 import SlackSelfHostedWizard from "./SlackSelfHostedWizard.vue";
 import {
   ConfirmDialogStub,
+  FAKE_APP_TOKEN,
+  FAKE_CONFIG_ACCESS_TOKEN,
+  FAKE_CONFIG_REFRESH_TOKEN,
   OTableStub,
   axiosError,
   fakePopup,
@@ -293,6 +296,31 @@ describe("SlackSelfHostedWizard Step 2", () => {
     expect(w.text()).toContain("App created · A0SAMPLE01");
   });
 
+  it("refuses an app-level or configuration access token in the configuration-token field before Slack is called", async () => {
+    const w = await toStep2();
+    const field = w.find('[data-test="slack-wizard-config-token"] input');
+    await field.setValue(FAKE_APP_TOKEN);
+    await w.find('[data-test="slack-wizard-create-form"]').trigger("submit");
+    await vi.waitFor(() => expect(w.text()).toContain("This is not a configuration refresh token"));
+    expect(w.text()).toContain("it starts with xoxe-");
+    await field.setValue(FAKE_CONFIG_ACCESS_TOKEN);
+    await w.find('[data-test="slack-wizard-create-form"]').trigger("submit");
+    await vi.waitFor(() => expect(w.text()).toContain("This is the configuration access token"));
+    expect(slack.createInstallation).not.toHaveBeenCalled();
+  });
+
+  it("refuses a configuration token in Set up manually's app-level token field", async () => {
+    const w = await toStep2();
+    await w.find('[data-test="slack-wizard-manual"]').trigger("click");
+    await flushPromises();
+    await w.find('[data-test="slack-wizard-client-id"] input').setValue("1.2");
+    await w.find('[data-test="slack-wizard-client-secret"] input').setValue("secret");
+    await w.find('[data-test="slack-wizard-app-token"] input').setValue(FAKE_CONFIG_REFRESH_TOKEN);
+    await w.find('[data-test="slack-wizard-create-form"]').trigger("submit");
+    await vi.waitFor(() => expect(w.text()).toContain("This is not an app-level token"));
+    expect(slack.createInstallation).not.toHaveBeenCalled();
+  });
+
   it("AC-7.9 Set up manually asks for the client ID and secret and links the prefilled manifest", async () => {
     const w = await toStep2();
     await w.find('[data-test="slack-wizard-manual"]').trigger("click");
@@ -437,6 +465,64 @@ describe("SlackSelfHostedWizard Step 3", () => {
     await flushPromises();
     expect(slack.uninstallInstallation).toHaveBeenCalledWith("acme", "inst-1");
     expect(step(w)).toBe("2");
+  });
+
+  it("Start over tells the admin to delete the app in Slack when Slack kept it", async () => {
+    vi.mocked(slack.uninstallInstallation).mockReturnValue(
+      ok({
+        revoked: true,
+        affected: { orgs: 1, destinations: [], links_revoked: 0 },
+        delete_app_url: "https://api.slack.com/apps/A0SAMPLE01/general",
+        app_deleted: false,
+        app_delete_error: "This token has expired. Generate a new one",
+      }) as any,
+    );
+    const w = await mountWizard(pending);
+    await w.find('[data-test="slack-wizard-start-over"]').trigger("click");
+    await w.find('[data-test-stub="confirm-ok"]').trigger("click");
+    await flushPromises();
+    expect(step(w)).toBe("2");
+    const banner = w.find('[data-test="slack-wizard-app-left"]');
+    expect(banner.text()).toContain("The Slack app A0SAMPLE01 is still in Slack");
+    expect(banner.text()).toContain("OpenObserve could not delete it");
+    expect(w.find('[data-test="slack-wizard-app-left-reason"]').text()).toBe(
+      "This token has expired. Generate a new one",
+    );
+    expect(w.find('[data-test="slack-wizard-delete-app"]').attributes("href")).toBe(
+      "https://api.slack.com/apps/A0SAMPLE01/general",
+    );
+  });
+
+  it("Start over that deleted the app leaves nothing to clean up", async () => {
+    vi.mocked(slack.uninstallInstallation).mockReturnValue(
+      ok({
+        revoked: true,
+        affected: { orgs: 1, destinations: [], links_revoked: 0 },
+        delete_app_url: null,
+        app_deleted: true,
+      }) as any,
+    );
+    const w = await mountWizard(pending);
+    await w.find('[data-test="slack-wizard-start-over"]').trigger("click");
+    await w.find('[data-test-stub="confirm-ok"]').trigger("click");
+    await flushPromises();
+    expect(step(w)).toBe("2");
+    expect(w.find('[data-test="slack-wizard-app-left"]').exists()).toBe(false);
+  });
+
+  it("refuses a configuration token in the app-level token field after Allow", async () => {
+    const w = await mountWizard(pending);
+    await w.find('[data-test="slack-wizard-allow"]').trigger("click");
+    await flushPromises();
+    postCallback(popup);
+    await flushPromises();
+    await w
+      .find('[data-test="slack-wizard-app-token-field"] input')
+      .setValue(FAKE_CONFIG_REFRESH_TOKEN);
+    await w.find('[data-test="slack-wizard-app-token-form"]').trigger("submit");
+    await vi.waitFor(() => expect(w.text()).toContain("This is not an app-level token"));
+    expect(w.text()).toContain("App-Level Tokens with the connections:write scope");
+    expect(slack.updateCredentials).not.toHaveBeenCalled();
   });
 
   it("asks Socket Mode for the app-level token after Allow, then allows Next", async () => {
