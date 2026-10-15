@@ -1745,7 +1745,7 @@ mod tests {
         assert_eq!(dashboard_json(&dashboard), None);
     }
 
-    #[cfg(feature = "enterprise")]
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     fn v8_panel(id: &str, sql: &str) -> serde_json::Value {
         json!({
             "id": id, "type": "table", "title": id, "description": "",
@@ -1761,7 +1761,7 @@ mod tests {
     }
 
     /// Three tabs of one panel each, reading `streams`, with a panel-scoped `stream` variable.
-    #[cfg(feature = "enterprise")]
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     fn three_tabs(streams: [&str; 3]) -> Dashboard {
         let tabs: Vec<_> = streams
             .iter()
@@ -1789,7 +1789,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "enterprise")]
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     fn public_link(frozen: serde_json::Value) -> PublicDashboard {
         PublicDashboard {
             id: "l1".into(),

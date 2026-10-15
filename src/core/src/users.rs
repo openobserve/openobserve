@@ -1876,14 +1876,16 @@ mod tests {
         links::create_tables_for_tests(get_orm_client_rw().await)
             .await
             .unwrap();
-        let email = "public-link-publisher@example.com";
-        create_user_with_history(email).await;
+        // The test database outlives the run, so nothing here may collide with an earlier run.
         let id = config::ider::uuid();
+        let email = format!("publisher-{id}@example.com");
+        let email = email.as_str();
+        create_user_with_history(email).await;
         let link = Link {
             id: id.clone(),
             org_id: "dummy".to_string(),
             folder_id: "default".to_string(),
-            dashboard_id: "d1".to_string(),
+            dashboard_id: id.clone(),
             slug: config::utils::rand::generate_random_string(22),
             name: "Exec view".to_string(),
             visibility: 1,
@@ -1904,9 +1906,10 @@ mod tests {
             last_accessed_at: None,
             access_count: 0,
         };
-        links::insert_capped(get_orm_client_rw().await, &link, 50, 10, false)
+        let created = links::insert_capped(get_orm_client_rw().await, &link, u32::MAX, 1, false)
             .await
             .unwrap();
+        assert_eq!(created, links::CreateOutcome::Created);
 
         let resp = remove_user_from_org("dummy", email, "admin@zo.dev")
             .await
