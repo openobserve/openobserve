@@ -91,9 +91,9 @@ def installed_http(client: OpenObserveClient, slack_org: str, ready: SlackMock) 
 
 
 def mention(app_id: str, event_id: str, *, thread_ts: str | None = None) -> bytes:
-    """An ``app_mention`` event_callback in the shape Slack sends (ids anonymized)."""
+    """An ``app_mention`` event_callback in the shape Slack sends (ids anonymized); the user is a mock member, as commit 10 reads ``users.info``."""
     event: dict[str, Any] = {
-        "type": "app_mention", "user": "U0ALICE", "text": "<@U0BOT> errors in checkout?",
+        "type": "app_mention", "user": "U0DANA", "text": "<@U0BOT> errors in checkout?",
         "ts": f"{time.time():.6f}", "team": MOCK_TEAM, "user_team": MOCK_TEAM,
         "channel": "C0OPS", "event_ts": f"{time.time():.6f}",
     }

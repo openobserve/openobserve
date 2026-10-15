@@ -17,6 +17,7 @@
 
 pub mod inbound;
 pub mod installations;
+pub mod links;
 pub mod settings;
 
 #[cfg(feature = "enterprise")]
@@ -83,7 +84,26 @@ fn caller(org_id: &str, user_id: &str) -> o2_enterprise::enterprise::slack::auth
 
 #[cfg(feature = "enterprise")]
 fn slack_error(e: o2_enterprise::enterprise::slack::error::SlackApiError) -> Response {
-    error_response(e.status, &e.message)
+    error_with_detail(e.status, &e.message, e.error_detail, e.hint)
+}
+
+/// The link pages tell two 403s apart by `error_detail`, and show `hint` (the help contact).
+#[cfg(any(feature = "enterprise", test))]
+fn error_with_detail(
+    status: u16,
+    message: &str,
+    error_detail: Option<String>,
+    hint: Option<String>,
+) -> Response {
+    let mut response = error_response(status, message);
+    if error_detail.is_some() || hint.is_some() {
+        let mut body = MetaHttpResponse::error(response.status().as_u16(), message);
+        body.error_detail = error_detail;
+        body.hint = hint;
+        *response.body_mut() =
+            axum::body::Body::from(serde_json::to_vec(&body).unwrap_or_default());
+    }
+    response
 }
 
 /// A body that does not fit still answers 404 while Slack is off for the org, like every route.
@@ -148,6 +168,26 @@ mod tests {
             assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
             assert_eq!(body(response).await["code"], 500);
         }
+    }
+
+    #[tokio::test]
+    async fn a_refusal_with_a_detail_carries_error_detail_and_hint() {
+        let response = error_with_detail(
+            403,
+            "You don't have access to OpenObserve in Acme yet",
+            Some("no_access".into()),
+            Some("#o2-help".into()),
+        );
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        assert_eq!(
+            body(response).await,
+            serde_json::json!({"code": 403, "message": "You don't have access to OpenObserve in Acme yet", "error_detail": "no_access", "hint": "#o2-help"})
+        );
+        let plain = error_with_detail(410, "This link expired", None, None);
+        assert_eq!(
+            body(plain).await,
+            serde_json::json!({"code": 410, "message": "This link expired"})
+        );
     }
 
     #[cfg(feature = "enterprise")]

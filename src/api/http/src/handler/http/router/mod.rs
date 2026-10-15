@@ -470,6 +470,7 @@ fn is_slack_secret_write(method: &Method, slack: &[&str]) -> bool {
             ["install", "exchange"]
                 | ["installations"]
                 | ["connection", "confirm"]
+                | ["link-requests", "confirm"]
                 | ["installations", _, "connection"]
         ) | (&Method::PUT, ["installations", _, "credentials"])
     )
@@ -2285,8 +2286,14 @@ fn oncall_routes(router: Router) -> Router {
 /// Slack install and settings routes (section 7.2); the paths match the ENT `SLACK_ROUTE_ROWS`.
 #[rustfmt::skip]
 pub fn slack_routes() -> Router {
-    use slack::{installations as inst, settings as set};
+    use slack::{installations as inst, links as lnk, settings as set};
     Router::new()
+        .route("/{org_id}/slack/link-requests/confirm", post(lnk::confirm))
+        .route("/{org_id}/slack/link-requests/{request_id}/start", post(lnk::start))
+        .route("/{org_id}/slack/link-requests/{request_id}/resend", post(lnk::resend))
+        .route("/{org_id}/slack/links/me", get(lnk::links_me))
+        .route("/{org_id}/slack/links/{link_id}", delete(lnk::delete_link))
+        .route("/{org_id}/slack/links", get(lnk::list_links))
         .route("/{org_id}/slack/install/start", post(inst::install_start))
         .route("/{org_id}/slack/install/exchange", post(inst::install_exchange))
         .route("/{org_id}/slack/prerequisites", get(inst::prerequisites))
@@ -2628,6 +2635,12 @@ mod tests {
             ),
             (Method::GET, "/default/slack/installations/I1/help-contact"),
             (Method::PUT, "/default/slack/installations/I1/help-contact"),
+            (Method::POST, "/default/slack/link-requests/R1/start"),
+            (Method::POST, "/default/slack/link-requests/confirm"),
+            (Method::POST, "/default/slack/link-requests/R1/resend"),
+            (Method::GET, "/default/slack/links/me"),
+            (Method::DELETE, "/default/slack/links/L1"),
+            (Method::GET, "/default/slack/links"),
         ];
         for (method, path) in routes {
             let req = Request::builder()
@@ -2657,6 +2670,7 @@ mod tests {
             (Method::PUT, "api/org/slack/installations/I1/credentials"),
             (Method::POST, "api/org/slack/connection/confirm"),
             (Method::POST, "api/org/slack/installations/I1/connection"),
+            (Method::POST, "api/org/slack/link-requests/confirm"),
             (Method::POST, "base/api/org/slack/installations"),
         ] {
             assert!(is_secret_write(&method, path), "{method} {path}");
@@ -2676,6 +2690,8 @@ mod tests {
             (Method::POST, "api/org/slack/installations/I1/link-all"),
             (Method::PUT, "api/org/slack/installations/I1/linking"),
             (Method::GET, "api/org/slack/installations/I1/credentials"),
+            (Method::POST, "api/org/slack/link-requests/R1/start"),
+            (Method::POST, "api/org/slack/link-requests/R1/resend"),
             (Method::POST, "api/org/streams/slack/installations"),
         ] {
             assert!(!is_secret_write(&method, path), "{method} {path}");

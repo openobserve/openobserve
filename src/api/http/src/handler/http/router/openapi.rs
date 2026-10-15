@@ -346,6 +346,12 @@ use crate::{
         openobserve_api_management::request::slack::settings::delete_channel_default,
         openobserve_api_management::request::slack::settings::get_help_contact,
         openobserve_api_management::request::slack::settings::put_help_contact,
+        openobserve_api_management::request::slack::links::start,
+        openobserve_api_management::request::slack::links::confirm,
+        openobserve_api_management::request::slack::links::resend,
+        openobserve_api_management::request::slack::links::links_me,
+        openobserve_api_management::request::slack::links::delete_link,
+        openobserve_api_management::request::slack::links::list_links,
         synthetics::list_synthetics,
         synthetics::create_synthetic,
         synthetics::get_synthetic,
@@ -1191,6 +1197,18 @@ mod tests {
             "put",
             "/api/{org_id}/slack/installations/{installation_id}/help-contact",
         ),
+        (
+            "post",
+            "/api/{org_id}/slack/link-requests/{request_id}/start",
+        ),
+        ("post", "/api/{org_id}/slack/link-requests/confirm"),
+        (
+            "post",
+            "/api/{org_id}/slack/link-requests/{request_id}/resend",
+        ),
+        ("get", "/api/{org_id}/slack/links/me"),
+        ("delete", "/api/{org_id}/slack/links/{link_id}"),
+        ("get", "/api/{org_id}/slack/links"),
     ];
 
     // Ends at the column-0 close brace, so an item after the body is never scraped into it.
@@ -1457,6 +1475,27 @@ mod tests {
                 .get("204")
                 .is_some()
         );
+        assert!(
+            paths["/api/{org_id}/slack/links/{link_id}"]["delete"]["responses"]
+                .get("204")
+                .is_some()
+        );
+        assert!(
+            paths["/api/{org_id}/slack/link-requests/{request_id}/resend"]["post"]["responses"]
+                .get("202")
+                .is_some()
+        );
+        for path in [
+            "/api/{org_id}/slack/link-requests/{request_id}/start",
+            "/api/{org_id}/slack/link-requests/confirm",
+        ] {
+            for status in ["400", "410", "429"] {
+                assert!(
+                    paths[path]["post"]["responses"].get(status).is_some(),
+                    "{path} {status}"
+                );
+            }
+        }
     }
 
     #[test]
