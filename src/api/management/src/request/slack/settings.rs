@@ -17,7 +17,10 @@
 
 use axum::{
     Json,
-    extract::{Path, Query},
+    extract::{
+        Path, Query,
+        rejection::{JsonRejection, QueryRejection},
+    },
     response::Response,
 };
 #[cfg(feature = "enterprise")]
@@ -29,7 +32,7 @@ use openobserve_core::auth::UserEmail;
 use super::not_supported;
 use super::{ChannelsQuery, CursorQuery};
 #[cfg(feature = "enterprise")]
-use super::{caller, parse, respond};
+use super::{caller, parse, parse_query, respond};
 
 /// SlackGetLinking
 #[utoipa::path(
@@ -100,7 +103,7 @@ pub async fn get_linking(
 pub async fn put_linking(
     Path((org_id, installation_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<serde_json::Value>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -145,11 +148,15 @@ pub async fn put_linking(
 )]
 pub async fn link_matches(
     Path((org_id, installation_id)): Path<(String, String)>,
-    Query(query): Query<CursorQuery>,
+    query: Result<Query<CursorQuery>, QueryRejection>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        let query = match parse_query(&org_id, query) {
+            Ok(query) => query,
+            Err(response) => return response,
+        };
         let caller = caller(&org_id, &user_email.user_id);
         let cursor = query.cursor.as_deref().filter(|c| !c.is_empty());
         respond(ent::settings::link_matches(&caller, &installation_id, cursor).await)
@@ -229,11 +236,15 @@ pub async fn link_all(
 )]
 pub async fn channels(
     Path((org_id, installation_id)): Path<(String, String)>,
-    Query(query): Query<ChannelsQuery>,
+    query: Result<Query<ChannelsQuery>, QueryRejection>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        let query = match parse_query(&org_id, query) {
+            Ok(query) => query,
+            Err(response) => return response,
+        };
         let caller = caller(&org_id, &user_email.user_id);
         let q = query.q.as_deref().filter(|q| !q.is_empty());
         let cursor = query.cursor.as_deref().filter(|c| !c.is_empty());
@@ -356,7 +367,7 @@ pub async fn get_channel_default(
 pub async fn put_channel_default(
     Path((org_id, installation_id, channel_id)): Path<(String, String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<serde_json::Value>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -490,7 +501,7 @@ pub async fn get_help_contact(
 pub async fn put_help_contact(
     Path((org_id, installation_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<serde_json::Value>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -524,13 +535,13 @@ mod tests {
                 user_id: "root@example.com".to_string(),
             })
         };
-        let body = || Json(serde_json::json!({}));
+        let body = || Ok(Json(serde_json::json!({})));
         let responses = vec![
             get_linking(one(), user()).await,
             put_linking(one(), user(), body()).await,
-            link_matches(one(), Query(CursorQuery::default()), user()).await,
+            link_matches(one(), Ok(Query(CursorQuery::default())), user()).await,
             link_all(one(), user()).await,
-            channels(one(), Query(ChannelsQuery::default()), user()).await,
+            channels(one(), Ok(Query(ChannelsQuery::default())), user()).await,
             channel_defaults(one(), user()).await,
             get_channel_default(channel(), user()).await,
             put_channel_default(channel(), user(), body()).await,

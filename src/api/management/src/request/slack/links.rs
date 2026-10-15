@@ -17,7 +17,10 @@
 
 use axum::{
     Json,
-    extract::{Path, Query},
+    extract::{
+        Path, Query,
+        rejection::{JsonRejection, QueryRejection},
+    },
     response::Response,
 };
 #[cfg(feature = "enterprise")]
@@ -30,7 +33,7 @@ use utoipa::IntoParams;
 #[cfg(not(feature = "enterprise"))]
 use super::not_supported;
 #[cfg(feature = "enterprise")]
-use super::{caller, parse, respond};
+use super::{caller, parse, parse_query, respond};
 
 /// Query of the admin link list.
 #[derive(Debug, Default, Deserialize, Serialize, IntoParams)]
@@ -73,7 +76,7 @@ pub struct LinksQuery {
 pub async fn start(
     Path((org_id, request_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<serde_json::Value>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -118,7 +121,7 @@ pub async fn start(
 pub async fn confirm(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<serde_json::Value>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -165,7 +168,7 @@ pub async fn confirm(
 pub async fn resend(
     Path((org_id, request_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<serde_json::Value>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -292,11 +295,15 @@ pub async fn delete_link(
 )]
 pub async fn list_links(
     Path(org_id): Path<String>,
-    Query(query): Query<LinksQuery>,
+    query: Result<Query<LinksQuery>, QueryRejection>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        let query = match parse_query(&org_id, query) {
+            Ok(query) => query,
+            Err(response) => return response,
+        };
         let q = ent::links::LinksQuery {
             installation_id: query.installation_id.filter(|i| !i.is_empty()),
             cursor: query.cursor.filter(|c| !c.is_empty()),

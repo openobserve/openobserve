@@ -2500,20 +2500,20 @@ mod tests {
 
     #[tokio::test]
     async fn test_zo_config_reports_slack_per_org() {
-        let response = zo_config(Path("default".to_string()), None)
-            .await
-            .into_response();
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         let reason = if cfg!(feature = "enterprise") {
             "flag"
         } else {
             "edition"
         };
-        assert_eq!(json["slack_enabled"], false, "{json}");
-        assert_eq!(json["slack_disabled_reason"], reason, "{json}");
-        assert!(json["slack_home_region"].is_null(), "{json}");
+        for org in ["default", "acme_eu"] {
+            let response = zo_config(Path(org.to_string()), None).await.into_response();
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(json["slack_enabled"], false, "{org}: {json}");
+            assert_eq!(json["slack_disabled_reason"], reason, "{org}: {json}");
+            assert!(json["slack_home_region"].is_null(), "{org}: {json}");
+        }
     }
 }
