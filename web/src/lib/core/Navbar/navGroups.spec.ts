@@ -835,11 +835,13 @@ describe("GATE_PREDICATES", () => {
     modelPricing: false,
     serviceStreams: true,
     onlineEvals: false,
+    oncallEnabled: false,
     databaseMonitoring: false,
     downtimesEnabled: false,
     alertCalibrationEnabled: false,
     fleetEnabled: false,
     hiddenMenus: new Set<string>(),
+    features: {},
     ...over,
   });
 
@@ -847,6 +849,13 @@ describe("GATE_PREDICATES", () => {
     expect(GATE_PREDICATES.fleet(ctx({ isEnterprise: true, fleetEnabled: true }))).toBe(true);
     expect(GATE_PREDICATES.fleet(ctx({ isEnterprise: true }))).toBe(false);
     expect(GATE_PREDICATES.fleet(ctx({ fleetEnabled: true }))).toBe(false);
+  });
+
+  it("oncall stays open while the license locks it, so the entries can show the lock", () => {
+    expect(GATE_PREDICATES.oncall(ctx({ oncallEnabled: true }))).toBe(true);
+    expect(GATE_PREDICATES.oncall(ctx({ features: { oncall: "locked" } }))).toBe(true);
+    expect(GATE_PREDICATES.oncall(ctx({ features: { oncall: "hidden" } }))).toBe(false);
+    expect(GATE_PREDICATES.oncall(ctx())).toBe(false);
   });
 
   it("databaseMonitoring gates on the runtime flag ALONE — it is an OSS feature", () => {

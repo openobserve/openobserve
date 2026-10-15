@@ -18,6 +18,9 @@ import {
   useAIObservabilityShellRoute,
   useAIObservabilityExtraRoutes,
 } from "@/composables/shared/useAIObservabilityRoutes";
+import { routeGuard } from "@/utils/zincutils";
+import { featureLockedPath, featureState } from "@/utils/featureGate";
+import store from "@/stores";
 
 const Billing = () => import("@/enterprise/components/billings/Billing.vue");
 const Plans = () => import("@/enterprise/components/billings/plans.vue");
@@ -58,7 +61,19 @@ const useEnvRoutes = () => {
   ];
 
   const homeChildRoutes = [
-    useAIObservabilityShellRoute(),
+    {
+      ...useAIObservabilityShellRoute(),
+      beforeEnter(to: any, from: any, next: any) {
+        if (featureState(store.state.zoConfig?.features, "ai_observability") === "locked") {
+          next({
+            path: featureLockedPath("ai_observability"),
+            query: { org_identifier: to.query.org_identifier },
+          });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    },
     ...useAIObservabilityExtraRoutes(),
     {
       path: "billings",

@@ -16,6 +16,7 @@
 import type { NavItem, RailEntry, SubnavChild, NavGateContext } from "./ONavbar.types";
 import { raw, type I18nKey, type TranslateFn } from "@/types/i18n";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
+import { featureState } from "@/utils/featureGate";
 
 /**
  * Visibility gates — each predicate mirrors the EXACT `visible` condition the
@@ -47,7 +48,8 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   // On-call: backend /config flag `oncall_enabled` (enterprise
   // O2_ONCALL_ENABLED). `!== false`, matching oncallRouteGuard, so the flyout
   // does not blink out while /config is still in flight on a cold load.
-  oncall: (c) => c.oncallEnabled,
+  // A locked license also reports the flag false, yet the entries stay to show the lock.
+  oncall: (c) => c.oncallEnabled || featureState(c.features, "oncall") === "locked",
   // The runtime flag is the whole gate for the MENU ENTRY, which is not
   // enterprise-only. Three of Database Monitoring's seven tabs (deadlocks,
   // blocked queries, table health) ARE enterprise-only, but they are gated
@@ -201,6 +203,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "incidentList",
         requires: "incidentList",
         gate: "incidents",
+        feature: "incidents",
       },
       {
         titleKey: "menu.downtimes",
@@ -237,6 +240,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "onCallResponses",
         categoryKey: "menu.onCall",
         gate: "oncall",
+        feature: "oncall",
       },
       {
         titleKey: "oncall.teams",
@@ -244,6 +248,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "onCallTeams",
         categoryKey: "menu.onCall",
         gate: "oncall",
+        feature: "oncall",
       },
       {
         titleKey: "oncall.routingNav",
@@ -251,6 +256,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "onCallRouting",
         categoryKey: "menu.onCall",
         gate: "oncall",
+        feature: "oncall",
       },
       // Same icon as the page's own header, so the menu and the page read as one place.
       {
@@ -259,6 +265,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "onCallMine",
         categoryKey: "menu.onCall",
         gate: "oncall",
+        feature: "oncall",
       },
       // Where external alerts (Grafana, Alertmanager, etc.) feed Incidents.
       // Gated on incidentList, not alertList: this only makes sense where
@@ -269,6 +276,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         icon: "webhook",
         name: "alertSources",
         requires: "incidentList",
+        feature: "incidents",
       },
     ],
   },
@@ -372,6 +380,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "workflows",
         requires: "workflows",
         gate: "workflows",
+        feature: "workflows",
       },
       { titleKey: "function.header", icon: "function", name: "functionList", requires: "pipeline" },
       {

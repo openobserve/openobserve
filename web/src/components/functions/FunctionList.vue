@@ -349,6 +349,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { downloadFile } from "@/utils/dom";
+import { forbiddenState } from "@/utils/featureGate";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import {
   bulkDeleteFunctionsMutation,
@@ -482,7 +483,7 @@ export default defineComponent({
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = functions.error.value;
-      return e?.status === 403 || e?.response?.status === 403;
+      return forbiddenState(e) || e?.status === 403;
     });
     const fetching = functions.isFetching;
     // Epoch ms of the last successful read — drives the button's "1m ago" label.

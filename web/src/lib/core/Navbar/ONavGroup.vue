@@ -65,6 +65,7 @@ import {
 import type { Point } from "./hoverIntent";
 import { findContentFocusTarget } from "./railFocus";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { featureLockedPath, featureState } from "@/utils/featureGate";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useTrialPaywall } from "@/composables/useTrialPaywall";
 import {
@@ -116,16 +117,25 @@ const flyoutStyle = ref<Record<string, string>>({});
 // group is worth collapsing into at all.
 const gateContext = useNavGateContext();
 
-// A child shows when its route is registered and custom_hide_menus doesn't
-// name it. A FeatureKey `gate` then decides locked vs. unlocked instead of
-// show vs. hide (dropped only if `checkFeatureAccess` says not `visible` at
+const childState = (c: SubnavChild) =>
+  c.feature ? featureState(gateContext.value.features, c.feature) : "enabled";
+const isLocked = (c: SubnavChild) => childState(c) === "locked";
+
+// A child shows when its route is registered, custom_hide_menus doesn't
+// name it and its license feature isn't hidden. A FeatureKey `gate` then
+// decides locked vs. unlocked instead of show vs. hide (dropped only if `checkFeatureAccess` says not `visible` at
 // all); a non-FeatureKey gate (plain on/off flag) keeps the old hide-on-fail
 // behavior, which also still applies on top once a FeatureKey's edition
 // check passes (e.g. On-Call hides when the admin flag is off, not just the
 // edition).
 const visibleChildren = computed<SubnavChild[]>(() =>
   props.children
-    .filter((c) => router.hasRoute(c.name) && !gateContext.value.hiddenMenus.has(c.name))
+    .filter(
+      (c) =>
+        router.hasRoute(c.name) &&
+        !gateContext.value.hiddenMenus.has(c.name) &&
+        childState(c) !== "hidden",
+    )
     .flatMap((c): SubnavChild[] => {
       if (!c.gate) return [{ ...c, locked: false }];
       if (isFeatureKey(c.gate)) {
@@ -285,6 +295,12 @@ const isGroupActive = computed(() => activeChild.value !== null);
 const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier);
 
 function childTo(child: SubnavChild) {
+  if (child.feature && isLocked(child)) {
+    return {
+      path: featureLockedPath(child.feature),
+      query: { org_identifier: orgIdentifier.value },
+    };
+  }
   const route = router.currentRoute.value;
   const query: LocationQueryRaw = route.name === child.name ? { ...route.query } : {};
   if (orgIdentifier.value) query.org_identifier = orgIdentifier.value;
@@ -732,7 +748,7 @@ function onChildMouseenter(event: MouseEvent) {
               <span class="leading-tight">{{ childLabel(child) }}</span>
               <BetaBadge v-if="child.beta" size="xs" />
               <OIcon
-                v-if="isChildPaywalled(child) || child.locked"
+                v-if="isChildPaywalled(child) || child.locked || isLocked(child)"
                 name="lock"
                 size="xs"
                 class="ms-auto shrink-0"
@@ -783,7 +799,7 @@ function onChildMouseenter(event: MouseEvent) {
             <span class="leading-tight">{{ childLabel(block.child) }}</span>
             <BetaBadge v-if="block.child.beta" size="xs" />
             <OIcon
-              v-if="isChildPaywalled(block.child) || block.child.locked"
+              v-if="isChildPaywalled(block.child) || block.child.locked || isLocked(block.child)"
               name="lock"
               size="xs"
               class="ms-auto shrink-0"
@@ -893,7 +909,7 @@ function onChildMouseenter(event: MouseEvent) {
                 <span class="leading-none">{{ childLabel(child) }}</span>
                 <BetaBadge v-if="child.beta" size="xs" />
                 <OIcon
-                  v-if="isChildPaywalled(child) || child.locked"
+                  v-if="isChildPaywalled(child) || child.locked || isLocked(child)"
                   name="lock"
                   size="xs"
                   class="ms-auto shrink-0"
@@ -949,7 +965,7 @@ function onChildMouseenter(event: MouseEvent) {
               <span class="leading-none">{{ childLabel(block.child) }}</span>
               <BetaBadge v-if="block.child.beta" size="xs" />
               <OIcon
-                v-if="isChildPaywalled(block.child) || block.child.locked"
+                v-if="isChildPaywalled(block.child) || block.child.locked || isLocked(block.child)"
                 name="lock"
                 size="xs"
                 class="ms-auto shrink-0"

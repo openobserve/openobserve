@@ -520,16 +520,20 @@ pub async fn zo_config(
     let custom_hide_menus = enterprise_value!("", &o2cfg.common.custom_hide_menus);
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
     // AI needs o2-ai to answer; with no agent target its buttons could only fail, so report it off.
-    let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled && o2cfg.ai.has_agent_target());
-    let ai_chat_persistence_enabled = enterprise_value!(
+    let ai_enabled = enterprise_value!(
         false,
-        o2cfg.ai.enabled && o2cfg.ai.has_agent_target() && o2cfg.ai.chat_persistence_enabled
+        o2cfg.ai.enabled && o2cfg.ai.has_agent_target() && check_features(&[Feature::AiAssistant])
     );
-    let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
+    let ai_chat_persistence_enabled =
+        enterprise_value!(false, ai_enabled && o2cfg.ai.chat_persistence_enabled);
+    let incidents_enabled = enterprise_value!(
+        false,
+        o2cfg.incidents.enabled && check_features(&[Feature::Incidents])
+    );
     // Incident analysis needs RCA on and an agent to answer.
     let incidents_rca_enabled = enterprise_value!(
         false,
-        o2cfg.incidents.enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
+        incidents_enabled && o2cfg.incidents.rca_enabled && o2cfg.ai.has_agent_target()
     );
     let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
     let fleet_enabled = enterprise_value!(false, openobserve_core::fleet::enabled());
@@ -546,7 +550,10 @@ pub async fn zo_config(
     let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
     let synthetics_browser_max_steps = cfg.synthetics.browser_max_steps;
-    let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
+    let oncall_enabled = enterprise_value!(
+        false,
+        o2cfg.oncall.enabled && check_features(&[Feature::Oncall])
+    );
     let slack_disabled_reason = enterprise_value!(
         Some(DisabledReason::Edition),
         o2_enterprise::enterprise::slack::disabled_reason(&org_id)
@@ -576,12 +583,12 @@ pub async fn zo_config(
     let billing_group_allowed_orgs = o2cfg.cloud.billing_group_allowed_orgs.clone();
 
     #[cfg(feature = "enterprise")]
-    let workflows_enabled = o2cfg.common.workflows_enabled;
+    let workflows_enabled = o2cfg.common.workflows_enabled && check_features(&[Feature::Workflows]);
 
     #[cfg(feature = "enterprise")]
     let featuremap: HashMap<Feature, FeatureState> = Feature::all()
         .map(|variant| {
-            // these flags are license-masked, so off-but-entitled means the operator turned it off
+            // operator-off hides whatever the license says; operator-on but unlicensed locks
             let switched_on = match variant {
                 Feature::AiAssistant => o2cfg.ai.enabled,
                 Feature::Incidents => o2cfg.incidents.enabled,
@@ -596,7 +603,7 @@ pub async fn zo_config(
                 .custom_hide_menus
                 .split(',')
                 .any(|m| m.trim() == key);
-            let state = if listed || (entitled && !switched_on) {
+            let state = if listed || !switched_on {
                 FeatureState::Hidden
             } else if entitled {
                 FeatureState::Enabled

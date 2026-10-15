@@ -617,6 +617,7 @@ import QuickMuteDialog from "@/components/alerts/downtimes/QuickMuteDialog.vue";
 import { useRowMute } from "@/composables/downtimes/useRowMute";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import type { ForbiddenState } from "@/utils/featureGate";
 
 type Mode = "all" | "browser";
 
@@ -655,7 +656,7 @@ const props = withDefaults(
     mode: Mode;
     data: any[];
     loading?: boolean;
-    forbidden?: boolean;
+    forbidden?: ForbiddenState;
     /** IANA zone for the Last Check tooltip. Passed in: this table is a leaf
      *  component and must not reach into the store for it. */
     timezone?: string;

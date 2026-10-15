@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- AI CHAT TOGGLE: Enterprise/Cloud feature to toggle AI chat panel.
            Leads the utility-icon cluster, set off by a separator from the
            org selector so it reads as the primary action in this group.
-           Shown locked (not hidden) in builds that don't unlock it. -->
+           Shown locked (not hidden) in builds or licenses that don't unlock it. -->
           <template v-if="aiButtonVisible">
             <OButton
               variant="ghost"
@@ -248,18 +248,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
               />
               <span
-                v-if="!aiAccess.allowed"
+                v-if="aiLocked"
                 aria-hidden="true"
                 class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
               >
                 <OIcon name="lock" size="xs" class="text-warning-600 size-2.5!" />
               </span>
               <OTooltip
-                v-if="aiAccess.allowed"
+                v-if="!aiLocked"
                 side="bottom"
                 align="center"
                 :content="t('menu.aiAssistant')"
                 shortcut-id="aiChatToggle"
+              />
+              <OTooltip
+                v-else-if="aiLicenseLocked"
+                side="bottom"
+                align="center"
+                :content="t('featureLock.title', { feature: t('menu.aiAssistant') })"
               />
             </OButton>
           </template>
@@ -525,6 +531,7 @@ import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import { isGateOpen, useNavGateContext } from "@/lib/core/Navbar/useNavGateContext";
 
 import { getImageURL } from "@/utils/zincutils";
+import { featureLockedPath, featureState } from "@/utils/featureGate";
 import { chartColor } from "@/utils/chartTheme";
 
 export default defineComponent({
@@ -731,8 +738,12 @@ export default defineComponent({
         rbac: props.store.state.zoConfig?.rbac_enabled !== false,
       }),
     );
+    const aiLicenseLocked = computed(
+      () => featureState(props.store.state.zoConfig?.features, "ai_assistant") === "locked",
+    );
+    const aiLocked = computed(() => !aiAccess.value.allowed || aiLicenseLocked.value);
     const aiButtonVisible = computed(
-      () => !aiAccess.value.allowed || Boolean(props.store.state.zoConfig.ai_enabled),
+      () => aiLocked.value || Boolean(props.store.state.zoConfig.ai_enabled),
     );
     const aiSlotPending = computed(
       () => aiAccess.value.allowed && !props.store.state.zoConfig?.version,
@@ -791,6 +802,13 @@ export default defineComponent({
     const toggleAIChat = () => {
       if (!aiAccess.value.allowed) {
         openEnterpriseDialog();
+        return;
+      }
+      if (aiLicenseLocked.value) {
+        router.push({
+          path: featureLockedPath("ai_assistant"),
+          query: { org_identifier: props.store.state.selectedOrganization?.identifier },
+        });
         return;
       }
       emit("toggleAIChat");
@@ -876,7 +894,8 @@ export default defineComponent({
       homeUrl,
       goToAbout,
       toggleAIChat,
-      aiAccess,
+      aiLocked,
+      aiLicenseLocked,
       aiButtonVisible,
       linkedAccountsVisible,
       showLinkedAccounts,

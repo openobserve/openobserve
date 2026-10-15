@@ -295,6 +295,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
+import { forbiddenState } from "@/utils/featureGate";
 
 export default defineComponent({
   name: "RegexPatternList",
@@ -430,7 +431,7 @@ export default defineComponent({
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = regexPatternsList.error.value;
-      return e?.status === 403 || e?.response?.status === 403;
+      return forbiddenState(e) || e?.status === 403;
     });
     // Request in flight, with rows still on screen — the refresh button's
     // spinner. `listLoading` stays for the skeleton, which only a cold read wants.

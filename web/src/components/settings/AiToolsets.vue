@@ -214,6 +214,7 @@ import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { useListViewState } from "@/composables/useListViewState";
+import { forbiddenState } from "@/utils/featureGate";
 import aiToolsetsService from "@/services/ai_toolsets";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
@@ -267,7 +268,7 @@ export default defineComponent({
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = toolsetsList.error.value;
-      return e?.status === 403 || e?.response?.status === 403;
+      return forbiddenState(e) || e?.status === 403;
     });
     const viewState = useListViewState("ai-toolsets", {
       filterQuery: "",

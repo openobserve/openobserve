@@ -1806,4 +1806,70 @@ describe("ONavGroup", () => {
       expect(inline.find('[data-test="nav-group-item-logstreams-lock"]').exists()).toBe(false);
     });
   });
+
+  describe("license feature state of a child", () => {
+    const workflowsChild: SubnavChild = {
+      titleKey: "menu.workflows",
+      icon: "schema",
+      name: "workflows",
+      feature: "workflows",
+    };
+
+    async function mountWithFeature(state?: "enabled" | "locked" | "hidden", withRoute = true) {
+      const router = makeRouter();
+      if (withRoute) {
+        router.addRoute({
+          path: "/workflows",
+          name: "workflows",
+          component: { template: "<div />" },
+        });
+      }
+      const featureStore = createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: { features: state ? { workflows: state } : {} },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+      wrapper = mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children: [...children, workflowsChild],
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        global: {
+          plugins: [router, featureStore, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      await hoverOpen();
+    }
+
+    it("shows a locked child with a lock, linking to the upsell page", async () => {
+      await mountWithFeature("locked");
+      const item = flyout().get('[data-test="nav-group-item-workflows"]');
+      expect(item.attributes("href")).toBe("/feature-locked/workflows?org_identifier=default");
+      expect(item.find('[data-test="nav-group-item-workflows-lock"]').exists()).toBe(true);
+    });
+
+    it("drops a hidden child", async () => {
+      await mountWithFeature("hidden");
+      expect(flyout().find('[data-test="nav-group-item-workflows"]').exists()).toBe(false);
+    });
+
+    it("links an enabled or unsent feature to its own route, without a lock", async () => {
+      await mountWithFeature();
+      const item = flyout().get('[data-test="nav-group-item-workflows"]');
+      expect(item.attributes("href")).toBe("/workflows?org_identifier=default");
+      expect(item.find('[data-test="nav-group-item-workflows-lock"]').exists()).toBe(false);
+    });
+
+    it("keeps the route check for a locked feature", async () => {
+      await mountWithFeature("locked", false);
+      expect(flyout().find('[data-test="nav-group-item-workflows"]').exists()).toBe(false);
+    });
+  });
 });

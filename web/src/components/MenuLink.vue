@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon v-if="icon" :name="icon" size="md" class="size-5.5!" />
           <component v-else-if="hasIconComponent" :is="iconComponent" class="o-icon size-5.5" />
           <div
-            v-if="locked"
+            v-if="locked || licenseLocked"
             class="bg-surface-base absolute -top-1 -right-1 z-1 flex h-3.5 w-3.5 items-center justify-center rounded-full"
           >
             <OIcon name="lock" size="xs" class="text-warning-600" />
@@ -178,6 +178,12 @@ export default defineComponent({
     badge: {
       type: Number,
       default: 0,
+    },
+
+    // License-locked: navigates normally (its link is the upsell page) but carries the lock badge.
+    licenseLocked: {
+      type: Boolean,
+      default: false,
     },
 
     // Trigger mode — render as a non-navigating <button> that opens a submenu

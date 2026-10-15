@@ -1023,8 +1023,11 @@ pub async fn send_workflow_trigger(
     metadata: HashMap<String, Value>,
     data: &[Value],
 ) -> Result<(), anyhow::Error> {
-    let o2_cfg = get_o2_config();
-    if !o2_cfg.common.workflows_enabled {
+    if !get_o2_config().common.workflows_enabled
+        || !o2_enterprise::enterprise::license::check_features(&[
+            config::meta::feature::Feature::Workflows,
+        ])
+    {
         return Ok(());
     }
 
@@ -1073,8 +1076,11 @@ pub fn workflow_history_key(
 }
 
 pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
-    let o2_cfg = get_o2_config();
-    if !o2_cfg.common.workflows_enabled {
+    if !get_o2_config().common.workflows_enabled
+        || !o2_enterprise::enterprise::license::check_features(&[
+            config::meta::feature::Feature::Workflows,
+        ])
+    {
         return;
     }
     match get_nats_lock(format!(

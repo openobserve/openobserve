@@ -15,6 +15,7 @@
 
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
+import { featureLockedPath, featureState } from "@/utils/featureGate";
 import store from "@/stores";
 import {
   withFeatureGate as withFeatureGateBase,
@@ -30,6 +31,13 @@ const withFeatureGate: typeof withFeatureGateBase = (key, guard, getContext) =>
     guard,
     getContext ?? (() => buildFeatureGateContext(store.state.zoConfig)),
   );
+
+// Checked before the flag guards: a locked feature also reports its legacy flag false.
+const redirectIfLocked = (feature: string, to: any, next: any): boolean => {
+  if (featureState(store.state.zoConfig?.features, feature) !== "locked") return false;
+  next({ path: featureLockedPath(feature), query: { org_identifier: to.query.org_identifier } });
+  return true;
+};
 
 // Synthetics routes are gated on the backend /config flag `synthetics_enabled`
 // (`ZO_SYNTHETICS_ENABLED`), not on the build: synthetics ships in OSS. Direct URL
@@ -66,10 +74,21 @@ const privateLocationRouteGuard = (to: any, from: any, next: any) => {
 // never flashes in) — the two are not meant to match. Same split as
 // syntheticsRouteGuard above.
 const workflowsRouteGuard = (to: any, from: any, next: any) => {
+  if (redirectIfLocked("workflows", to, next)) return;
   if (store.state.zoConfig?.workflows_enabled === false) {
     next("/");
     return;
   }
+  routeGuard(to, from, next);
+};
+
+const lockableOncallRouteGuard = (to: any, from: any, next: any) => {
+  if (redirectIfLocked("oncall", to, next)) return;
+  oncallRouteGuard(to, from, next);
+};
+
+const incidentsRouteGuard = (to: any, from: any, next: any) => {
+  if (redirectIfLocked("incidents", to, next)) return;
   routeGuard(to, from, next);
 };
 
@@ -297,14 +316,14 @@ const useEnterpriseRoutes = () => {
       name: "onCallResponses",
       component: OnCallResponses,
       meta: { titleKey: "oncall.responsesTitle", allowOnEmptyData: true },
-      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
+      beforeEnter: withFeatureGate("oncall", lockableOncallRouteGuard),
     },
     {
       path: "oncall/responses/:responseId",
       name: "onCallResponseDetail",
       component: OnCallResponseDetail,
       meta: { titleKey: "oncall.responseDetail", allowOnEmptyData: true },
-      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
+      beforeEnter: withFeatureGate("oncall", lockableOncallRouteGuard),
     },
     {
       // A page again. It was retired to a redirect for being a stub that
@@ -320,14 +339,14 @@ const useEnterpriseRoutes = () => {
       name: "onCallMine",
       component: OnCallMine,
       meta: { titleKey: "oncall.mineTitle", allowOnEmptyData: true },
-      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
+      beforeEnter: withFeatureGate("oncall", lockableOncallRouteGuard),
     },
     {
       path: "oncall/teams",
       name: "onCallTeams",
       component: OnCallTeams,
       meta: { titleKey: "oncall.teamsTitle", allowOnEmptyData: true },
-      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
+      beforeEnter: withFeatureGate("oncall", lockableOncallRouteGuard),
     },
     {
       // The tab is part of the URL, so a schedule somebody sends is the
@@ -343,21 +362,21 @@ const useEnterpriseRoutes = () => {
       name: "onCallTeamDetail",
       component: OnCallTeamDetail,
       meta: { titleKey: "oncall.teamDetail", allowOnEmptyData: true },
-      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
+      beforeEnter: withFeatureGate("oncall", lockableOncallRouteGuard),
     },
     {
       path: "oncall/policies",
       name: "onCallPolicies",
       component: OnCallPolicies,
       meta: { titleKey: "oncall.policiesTitle", allowOnEmptyData: true },
-      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
+      beforeEnter: withFeatureGate("oncall", lockableOncallRouteGuard),
     },
     {
       path: "oncall/routing",
       name: "onCallRouting",
       component: OnCallRouting,
       meta: { titleKey: "oncall.routingTitle", allowOnEmptyData: true },
-      beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
+      beforeEnter: withFeatureGate("oncall", lockableOncallRouteGuard),
     },
   );
 
@@ -369,7 +388,7 @@ const useEnterpriseRoutes = () => {
       meta: {
         titleKey: "menu.incidents",
       },
-      beforeEnter: withFeatureGate("incidents", routeGuard),
+      beforeEnter: withFeatureGate("incidents", incidentsRouteGuard),
     },
     {
       path: "incidents/:id",
@@ -378,7 +397,7 @@ const useEnterpriseRoutes = () => {
       meta: {
         titleKey: "routeTitles.incidentDetail",
       },
-      beforeEnter: withFeatureGate("incidents", routeGuard),
+      beforeEnter: withFeatureGate("incidents", incidentsRouteGuard),
     },
   );
 

@@ -1,4 +1,17 @@
 {
+  "featureLock": {
+    "routeTitle": "Not in your license",
+    "title": "{feature} is not included in your license",
+    "description": "Your administrator can add it by updating the license, or contact sales to get a license that includes it.",
+    "thisFeature": "This feature",
+    "viewLicense": "View license",
+    "contactSales": "Contact sales",
+    "locked": "Requires a license",
+    "toastTitle": "Not included in your license",
+    "toastMessage": "Your license does not include: {features}. Ask your administrator to update the license.",
+    "toastMessageGeneric": "Your license does not include this feature. Ask your administrator to update the license.",
+    "dialogScope": "Only these features are blocked; everything else keeps working."
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "No history yet",
