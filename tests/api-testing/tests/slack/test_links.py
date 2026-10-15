@@ -212,6 +212,29 @@ def test_uninstall_revokes_and_counts_the_links_although_slack_reports_revoked_t
     assert my_links(dana, slack_org) == []
 
 
+def test_a_failed_uninstall_keeps_the_links_and_a_retry_counts_them(
+    client: OpenObserveClient, slack_org: str, ready: SlackMock
+) -> None:
+    _, dana = make_user(client, slack_org, "editor", email=f"dana_{uniq()}@acme.test")
+    team = new_team(ready, slack_user("U0DANA", "", f"dana_{uniq()}@elsewhere.test"))
+    inst = http_install(client, slack_org, team)
+    send_mention(client, inst, team, "U0DANA")
+    confirmed = sign_in_with_slack(dana, slack_org, link_prompt(ready, "U0DANA"), slack_user_id="U0DANA", team_id=team)
+    assert confirmed.status_code == 200, confirmed.text
+
+    body = {"method": "apps.uninstall", "error": "service_unavailable", "http_status": 503}
+    requests.post(f"{ready.base_url}/_mock/fail", json=body, timeout=5).raise_for_status()
+    failed = client.delete(f"slack/installations/{inst['id']}", org=slack_org)
+    assert failed.status_code == 502, failed.text
+    assert len(my_links(dana, slack_org)) == 1, "a failed uninstall must not revoke the link"
+
+    requests.post(f"{ready.base_url}/_mock/uninstall_events", json={"settle": 3}, timeout=5).raise_for_status()
+    gone = client.delete(f"slack/installations/{inst['id']}", org=slack_org)
+    assert gone.status_code == 200, gone.text
+    assert gone.json()["affected"]["links_revoked"] == 1, gone.json()
+    assert my_links(dana, slack_org) == []
+
+
 @pytest.mark.parametrize(
     "flags",
     [{"is_restricted": True}, {"is_ultra_restricted": True}, {"is_email_confirmed": False}],
