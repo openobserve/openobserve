@@ -913,7 +913,6 @@ mod tests {
 
         let schema = block_schema(None, false);
         let rows = [(1, 10, Some(1f64.to_bits())), (1, 20, Some(2f64.to_bits()))];
-        let enabled = config::get_config().compact.metrics_index_enabled;
         for configured_format in [FileFormat::Parquet, FileFormat::Vortex] {
             for (ingester, closed_hour) in [(false, true), (false, false), (true, false)] {
                 let (mode, output) = if ingester {
@@ -960,7 +959,7 @@ mod tests {
                 let mut actual = sample_rows_for(format, bytes::Bytes::from(data.clone())).await;
                 actual.sort_unstable();
                 assert_eq!(actual, rows);
-                assert_eq!(path.is_some(), enabled && closed_hour && !ingester);
+                assert_eq!(path.is_some(), closed_hour && !ingester);
                 if let Some(path) = path {
                     let encoded = tokio::fs::read(path).await.unwrap();
                     assert!(!encoded.starts_with(b"ARROW1"));
