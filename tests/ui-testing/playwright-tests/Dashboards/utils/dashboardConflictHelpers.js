@@ -10,6 +10,11 @@ const testLogger = require("../../utils/test-logger.js");
  * wrapper), which handles both self-hosted Basic Auth and cloud cookie auth.
  */
 
+/** Unique dashboard-name suffix (timestamp + random base36) so each test owns its dashboard. */
+export function uniqueSuffix() {
+  return `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
 /** Parse dashboardId / folder / panelId from the current URL query string. */
 export function getDashboardFromUrl(page) {
   const url = new URL(page.url());

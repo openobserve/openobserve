@@ -20,11 +20,10 @@ import {
   secondActorRenameTitle,
   secondActorTouchPanel,
   triggerPanelEditorConflict,
+  uniqueSuffix,
 } from "./utils/dashboardConflictHelpers.js";
 
 const SECOND_ACTOR_TITLE = "Conflict_SecondActor";
-
-const uniqueSuffix = () => `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
 test.describe("Dashboard save conflict resolution", () => {
   test.describe.configure({ mode: "parallel" });
@@ -74,6 +73,14 @@ test.describe("Dashboard save conflict resolution", () => {
       await expect(pm.dashboardPage.dashboardNameTitle).toContainText(SECOND_ACTOR_TITLE, {
         timeout: 30000,
       });
+      // The pending edit was a panel rename that was never saved: after Reload
+      // the panel still carries its original name and the edited name is gone.
+      await expect(pm.dashboardPanelActions.getEditPanelDropdown(panelName)).toBeVisible({
+        timeout: 30000,
+      });
+      await expect(
+        pm.dashboardPanelActions.getEditPanelDropdown(`${panelName}_edited`)
+      ).toBeHidden({ timeout: 15000 });
       await conflict.expectUnsavedBannerHidden();
       testLogger.info("Reload discarded the pending edit and adopted the latest version");
     }
@@ -165,11 +172,12 @@ test.describe("Dashboard save conflict resolution", () => {
       const { dashboardId, folder } = dashboardRef;
 
       const conflict = pm.dashboardSaveConflict;
-      await triggerPanelEditorConflict(page, pm, {
-        panelName,
-        renamedName: `${panelName}_unresolved`,
-        secondActor: () => secondActorRenameTitle(pm.apiCleanup, dashboardId, folder, SECOND_ACTOR_TITLE),
-      });
+
+      // The banner only renders on the dashboard view, so trigger the conflict from the layout-edit save that stays on it.
+      await pm.dashboardPanelActions.enterLayoutEdit();
+      await pm.dashboardPanelActions.applyPanelHeight(panelName, 14);
+      await secondActorRenameTitle(pm.apiCleanup, dashboardId, folder, SECOND_ACTOR_TITLE);
+      await pm.dashboardPanelActions.layoutEditSaveBtn.click();
 
       await conflict.expectMainStepVisible();
       await conflict.close();
