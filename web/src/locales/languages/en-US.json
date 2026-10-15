@@ -9209,7 +9209,7 @@
       "noticeSkipAbsence": "Absence grading fell behind the Look Back Window; the span that could no longer be fetched was skipped and recorded.",
       "noticeSkipScored": "The gap since the last detection run exceeded both the Look Back Window and the server's catch-up limit, so the older closed buckets were skipped without being judged.",
       "noticeWindowFloor": "Window too narrow",
-      "noticeWindowFloorTooltip": "The Look Back Window is below Check Every plus one Detection Resolution, so a run with no earlier progress to resume from cannot judge a complete bucket. Raise the window to clear this notice.",
+      "noticeWindowFloorTooltip": "The Look Back Window is below Check Every plus one Detection Resolution, so a run with no earlier progress to resume from cannot judge a complete bucket. The notice clears once a run has progress to resume from; raise the window to avoid it.",
       "noticeWindowSkip": "Buckets skipped",
       "notifications": "Notifications",
       "notificationsTooltip": "When enabled, a notification will be sent to the selected destination whenever an anomaly is detected.",
