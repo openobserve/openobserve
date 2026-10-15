@@ -30,7 +30,7 @@ use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 
 use super::{
-    plan::{TraceListMode, TraceListPlan, TraceSchema},
+    plan::{TraceListPlan, TraceSchema},
     query::{TraceSearchContext, build_partition_query},
     response::{TraceBatch, TraceResponseItem},
 };
@@ -171,6 +171,7 @@ async fn run(
         None
     };
 
+    // Partition boundaries follow the querier count, so a global `from` can shift between pages.
     let mut hits_seen: i64 = 0;
     let hits_to_skip = from;
     let hits_to_deliver = size;
@@ -417,7 +418,7 @@ async fn load_batch(
     sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     log_ctx: &str,
 ) -> Option<TraceBatch> {
-    let mut batch = TraceBatch::from_hits(hits, range, TraceListMode::Streaming);
+    let mut batch = TraceBatch::from_hits(hits, range);
     if !batch.multi_service_ids.is_empty() && sender.is_closed() {
         return None;
     }

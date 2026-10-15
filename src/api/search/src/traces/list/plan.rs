@@ -100,6 +100,7 @@ pub struct TraceListOptions {
 impl TraceListOptions {
     pub fn parse(query: &HashMap<String, String>, mode: TraceListMode) -> Result<Self, String> {
         let filter = query.get("filter").cloned().unwrap_or_default();
+        // Streaming rejects a bad filter before any other 400; complete checks it last in prepare.
         if mode == TraceListMode::Streaming {
             validate_filter(&filter)?;
         }
@@ -163,6 +164,7 @@ impl TraceListOptions {
             return;
         }
         match mode {
+            // Re-ingested spans can sit far from the trace_id's time; narrowing then finds nothing.
             TraceListMode::Complete if timestamp >= self.range.0 && timestamp <= self.range.1 => {
                 self.range = (
                     timestamp - 60 * 1_000_000,

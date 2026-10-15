@@ -149,6 +149,10 @@ pub fn build_trace_query(stream_name: &str, extra_selects: &str) -> String {
     )
 }
 
+pub fn build_partition_query(stream_name: &str) -> String {
+    format!("SELECT * FROM {}", quote_identifier(stream_name))
+}
+
 fn build_service_breakdown_query(
     stream_name: &str,
     service_key_expr: &str,
@@ -169,10 +173,6 @@ fn build_service_breakdown_query(
     )
 }
 
-pub fn build_partition_query(stream_name: &str) -> String {
-    format!("SELECT * FROM {}", quote_identifier(stream_name))
-}
-
 fn service_request(
     stream_name: &str,
     batch: &TraceBatch,
@@ -180,6 +180,7 @@ fn service_request(
     schema: &TraceSchema,
     range: (i64, i64),
 ) -> Request {
+    // Trace IDs come from stored rows, so they are reduced to hex and '-' before reaching SQL.
     let ids = batch
         .multi_service_ids
         .iter()
@@ -190,6 +191,7 @@ fn service_request(
         })
         .filter(|id| !id.is_empty())
         .collect::<Vec<_>>();
+    // NULL for instrumented services, the inferred kind ("database", "queue", ...) otherwise.
     let service_type = if schema.has_infer {
         ", max(infer_service_type) AS service_type"
     } else {
@@ -199,6 +201,7 @@ fn service_request(
     request.query.sql =
         build_service_breakdown_query(stream_name, schema.service_key(), service_type, &ids);
     request.query.from = 0;
+    // The breakdown has at most one row per service counted in Q1, so one request fetches all.
     request.query.size = batch.multi_service_total;
     request.query.start_time = range.0;
     request.query.end_time = range.1;
@@ -317,7 +320,6 @@ mod tests {
                     "zo_sql_duration": 150_000, "service_count": 2,
                 })],
                 (100, 150),
-                mode,
             );
             let range = match mode {
                 TraceListMode::Complete => (100, 150),

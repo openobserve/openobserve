@@ -65,6 +65,7 @@ pub async fn prepare(
     };
     options.restrict_range(max_query_range);
     let sort = TraceSort::parse(query).map_err(MetaHttpResponse::bad_request)?;
+    // Kept last so the complete endpoint reports earlier 400s first, as before.
     if mode == TraceListMode::Complete {
         validate_filter(&options.filter).map_err(MetaHttpResponse::bad_request)?;
     }
@@ -86,7 +87,7 @@ pub async fn run(ctx: &TraceSearchContext, plan: &TraceListPlan) -> Result<Trace
     if response.hits.is_empty() {
         return Ok(TraceListResult::Empty(Box::new(response)));
     }
-    let mut batch = TraceBatch::from_hits(&response.hits, options.range, TraceListMode::Complete);
+    let mut batch = TraceBatch::from_hits(&response.hits, options.range);
     drop(response);
     // Unlike streaming, the breakdown keeps the requested range instead of the widened batch.range.
     ctx.fill_services(&mut batch, &request, &plan.schema, options.range)

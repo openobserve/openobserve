@@ -17,7 +17,7 @@ use config::utils::json;
 use hashbrown::HashMap;
 use serde::Serialize;
 
-use super::plan::{TraceListMode, TraceSort};
+use super::plan::TraceSort;
 
 #[derive(Debug, Serialize)]
 pub struct TraceResponseItem {
@@ -53,7 +53,7 @@ pub struct TraceBatch {
 }
 
 impl TraceBatch {
-    pub fn from_hits(hits: &[json::Value], range: (i64, i64), mode: TraceListMode) -> Self {
+    pub fn from_hits(hits: &[json::Value], range: (i64, i64)) -> Self {
         let mut batch = Self {
             traces: HashMap::with_capacity(hits.len()),
             multi_service_ids: Vec::new(),
@@ -61,25 +61,17 @@ impl TraceBatch {
             range,
         };
         for item in hits {
-            let (trace_id, trace_start_time, trace_end_time) = match mode {
-                TraceListMode::Complete => {
-                    let id = item.get("trace_id").unwrap().as_str().unwrap().to_string();
-                    let start = json::get_int_value(item.get("trace_start_time").unwrap());
-                    let end = json::get_int_value(item.get("trace_end_time").unwrap());
-                    let _duration = json::get_int_value(item.get("zo_sql_duration").unwrap());
-                    (id, start, end)
-                }
-                TraceListMode::Streaming => (
-                    item.get("trace_id")
-                        .and_then(json::Value::as_str)
-                        .unwrap_or_default()
-                        .to_string(),
-                    json::get_int_value(item.get("trace_start_time").unwrap_or_default()),
-                    json::get_int_value(item.get("trace_end_time").unwrap_or_default()),
-                ),
-            };
+            let trace_id = item
+                .get("trace_id")
+                .and_then(json::Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            let trace_start_time =
+                json::get_int_value(item.get("trace_start_time").unwrap_or_default());
+            let trace_end_time =
+                json::get_int_value(item.get("trace_end_time").unwrap_or_default());
             batch.expand_range(trace_start_time, trace_end_time);
-            if mode == TraceListMode::Streaming && trace_id.is_empty() {
+            if trace_id.is_empty() {
                 continue;
             }
             insert_summary(&mut batch, item, trace_id, trace_start_time, trace_end_time);
@@ -304,31 +296,25 @@ mod tests {
 
     #[test]
     fn summary_conversion_preserves_labels_duration_and_llm_fields() {
-        for mode in [TraceListMode::Complete, TraceListMode::Streaming] {
-            let batch = TraceBatch::from_hits(&[summary("a", 1)], (100, 150), mode);
-            let hit = json::to_value(&batch.traces["a"]).unwrap();
-            assert_eq!(
-                hit,
-                json::json!({
-                    "trace_id": "a", "start_time": 100_000, "end_time": 150_000,
-                    "duration": 50, "spans": [3, 1],
-                    "service_name": [{"service_name": "gateway", "count": 3, "duration": 40}],
-                    "first_event": {"service_name": "gateway", "operation_name": "request"},
-                    "gen_ai_usage_input_tokens": 10, "gen_ai_usage_output_tokens": 20,
-                    "gen_ai_usage_total_tokens": 30, "gen_ai_usage_cost": 0.5,
-                    "gen_ai_input_messages": "hello", "models": ["model"]
-                })
-            );
-        }
+        let batch = TraceBatch::from_hits(&[summary("a", 1)], (100, 150));
+        let hit = json::to_value(&batch.traces["a"]).unwrap();
+        assert_eq!(
+            hit,
+            json::json!({
+                "trace_id": "a", "start_time": 100_000, "end_time": 150_000,
+                "duration": 50, "spans": [3, 1],
+                "service_name": [{"service_name": "gateway", "count": 3, "duration": 40}],
+                "first_event": {"service_name": "gateway", "operation_name": "request"},
+                "gen_ai_usage_input_tokens": 10, "gen_ai_usage_output_tokens": 20,
+                "gen_ai_usage_total_tokens": 30, "gen_ai_usage_cost": 0.5,
+                "gen_ai_input_messages": "hello", "models": ["model"]
+            })
+        );
     }
 
     #[test]
     fn multi_service_rows_are_filled_only_into_selected_traces() {
-        let mut batch = TraceBatch::from_hits(
-            &[summary("a", 2), summary("b", 1)],
-            (100, 150),
-            TraceListMode::Complete,
-        );
+        let mut batch = TraceBatch::from_hits(&[summary("a", 2), summary("b", 1)], (100, 150));
         assert_eq!(batch.multi_service_ids, ["a"]);
         assert_eq!(batch.multi_service_total, 2);
         batch.fill_services(vec![
@@ -348,22 +334,19 @@ mod tests {
     }
 
     #[test]
-    fn conversion_preserves_range_boundaries_and_count_overflow() {
+    fn conversion_widens_range_and_zeroes_count_overflow() {
         let mut hit = summary("a", 1);
         hit["span_count"] = json::json!(65_536);
-        for mode in [TraceListMode::Complete, TraceListMode::Streaming] {
-            let batch = TraceBatch::from_hits(&[hit.clone()], (100, 150), mode);
-            assert_eq!(batch.range, (100, 151));
-            assert_eq!(batch.traces["a"].spans[0], 0);
-        }
+        let batch = TraceBatch::from_hits(&[hit], (100, 150));
+        assert_eq!(batch.range, (100, 151));
+        assert_eq!(batch.traces["a"].spans[0], 0);
     }
 
     #[test]
-    fn streaming_still_skips_missing_ids_after_expanding_the_range() {
+    fn rows_without_trace_id_are_skipped_after_widening_the_range() {
         let batch = TraceBatch::from_hits(
             &[json::json!({"trace_start_time": 50_000, "trace_end_time": 200_000})],
             (100, 150),
-            TraceListMode::Streaming,
         );
         assert!(batch.traces.is_empty());
         assert_eq!(batch.range, (50, 201));
@@ -381,11 +364,7 @@ mod tests {
             (true, true, ["a", "b"]),
             (true, false, ["b", "a"]),
         ] {
-            let batch = TraceBatch::from_hits(
-                &[first.clone(), second.clone()],
-                (100, 150),
-                TraceListMode::Complete,
-            );
+            let batch = TraceBatch::from_hits(&[first.clone(), second.clone()], (100, 150));
             let hits = batch.into_sorted_items(TraceSort {
                 by_duration,
                 ascending,
