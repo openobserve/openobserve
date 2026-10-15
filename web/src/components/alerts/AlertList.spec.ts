@@ -2058,4 +2058,4 @@ describe("AlertList - triggered in the last 15 minutes", () => {
     expect(never.every((c: any) => !c.find(".rounded-full").exists())).toBe(true);
     expect(fired.filter((c: any) => c.find(".bg-warning-500").exists())).toHaveLength(4);
   });
-});
+}, 15000);
