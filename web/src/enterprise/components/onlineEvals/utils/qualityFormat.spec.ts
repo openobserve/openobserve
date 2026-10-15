@@ -21,6 +21,10 @@ import {
   trendPoints,
   evaluatorAgentWhere,
   evaluatorTraceLink,
+  formatCount,
+  formatFixed,
+  formatNumber,
+  formatScoreValue,
   healthSortValue,
   nextChartFilter,
   qualityRangeFromQuery,
@@ -39,6 +43,7 @@ import {
   unhealthyTone,
   type QualityRow,
 } from "./qualityFormat";
+import { thresholdForConfig } from "./scoreThreshold";
 
 function row(overrides: Partial<QualityRow>): QualityRow {
   return {
@@ -548,5 +553,40 @@ describe("chart filter in the URL", () => {
     expect(chartFilterFromQuery({ bucket: "x" })).toBeNull();
     expect(chartFilterFromQuery({ value: "" })).toBeNull();
     expect(chartFilterFromQuery({ value: ["a", "b"] })).toBeNull();
+  });
+});
+
+describe("numbers by size", () => {
+  it("groups thousands and keeps tiny values distinct", () => {
+    expect(formatNumber(1_000_000_000)).toBe("1,000,000,000");
+    expect(formatNumber(0.7)).toBe("0.7");
+    expect(formatNumber(0)).toBe("0");
+    expect(formatNumber(-0.5)).toBe("-0.5");
+    expect(formatNumber(0.000324)).toBe("0.00032");
+    expect(formatFixed(462_522_542.5)).toBe("462,522,542.50");
+    expect(formatFixed(0.7)).toBe("0.70");
+    expect(formatFixed(0.000324)).toBe("0.00032");
+    expect(formatScoreValue(0.0003, "numeric")).not.toBe(formatScoreValue(0.0007, "numeric"));
+    expect(formatCount(150_000)).toBe("150,000");
+  });
+
+  it("labels a tiny range by its real edges", () => {
+    expect(bucketLabel({ key: 3, lower: 0.0003, upper: 0.0004, count: 1, unhealthy: 0 })).toBe(
+      "0.0003–0.0004",
+    );
+  });
+
+  it("groups the counts in the typical score and the threshold in the rule", () => {
+    const top = typicalScore(
+      row({ dataType: "boolean", total: 5000, topValue: { key: false, count: 4999 } }),
+      gt,
+    );
+    expect(String(top?.sub)).toContain("4,999 of 5,000");
+    const config = {
+      name: "c",
+      dataType: "numeric",
+      healthyThreshold: { direction: "gte", value: 250_000_000 },
+    } as any;
+    expect(String(thresholdForConfig(config).label)).toBe("≥ 250,000,000");
   });
 });

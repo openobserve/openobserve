@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`quality-detail-scope-${option.value}`"
           >
             {{ option.label }}
-            <span class="font-semibold tabular-nums">{{ option.count }}</span>
+            <span class="font-semibold tabular-nums">{{ formatCount(option.count) }}</span>
           </OToggleGroupItem>
         </OToggleGroup>
       </div>
@@ -148,6 +148,7 @@ import {
   QUALITY_SCOPES,
   chartFilterFromQuery,
   chartFilterToQuery,
+  formatCount,
   scoreConfigLink,
   type QualityChartFilter,
   type QualityOnly,
