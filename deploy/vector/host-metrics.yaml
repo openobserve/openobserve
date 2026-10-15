@@ -1,0 +1,17 @@
+sources:
+  host_metrics:
+    type: host_metrics
+    scrape_interval_secs: 60
+
+sinks:
+  openobserve_metrics:
+    type: prometheus_remote_write
+    inputs: [host_metrics]
+    endpoint: "${OPENOBSERVE_URL}/api/${OPENOBSERVE_ORG}/prometheus/api/v1/write"
+    auth:
+      strategy: basic
+      user: "${OPENOBSERVE_USER}"
+      password: "${OPENOBSERVE_PASSCODE}"
+    compression: snappy
+    healthcheck:
+      enabled: false
