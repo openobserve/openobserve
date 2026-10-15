@@ -2,7 +2,7 @@
 //
 // A Score Config's healthy rule as text ("≥ 0.7", "true", "low, medium"), and the SQL escape the score queries share.
 
-import { raw, type I18nText } from "@/types/i18n";
+import { gt, raw, type I18nText } from "@/types/i18n";
 
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { dataTypeOf, valueOf } from "./evalEntity";
@@ -38,8 +38,10 @@ export function thresholdForConfig(config: ScoreConfig): { label: I18nText } {
   }
 
   if (type === "categorical") {
-    const list: string[] = ht.healthy_categories || ht.healthyCategories || [];
-    return { label: raw(Array.isArray(list) ? list.join(", ") : "") };
+    const list: unknown = ht.healthy_categories ?? ht.healthyCategories;
+    if (!Array.isArray(list)) return { label: raw("") };
+    // A missing list means no threshold, but the backend marks every score unhealthy for an empty one, so the rule says so.
+    return { label: list.length ? raw(list.join(", ")) : gt("onlineEvals.quality.noHealthyValue") };
   }
 
   if (type === "boolean") {
