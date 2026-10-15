@@ -1148,7 +1148,7 @@ export default defineComponent({
       searchQuery: "",
       filterQuery: "",
       searchAcrossFolders: false,
-      stateFilter: null as "active" | "paused" | "failed" | "recent" | null,
+      stateFilter: null as "active" | "paused" | "failed" | "firing" | "recent" | null,
       sortBy: "",
       sortOrder: "asc" as "asc" | "desc",
       perPage: 20,
@@ -1429,6 +1429,10 @@ export default defineComponent({
     const isMutedFiring = (row: { active_downtime?: unknown; last_outcome?: unknown }): boolean =>
       !!row.active_downtime && isFiringOutcome(row.last_outcome);
 
+    // Counts muted firings too: a downtime silences the notification, not the firing state.
+    const isFiringRow = (row: any): boolean =>
+      showRunOutcome(row) && isFiringOutcome(row?.last_outcome);
+
     // Never present the outcome as live state: it is the result of the LAST
     // evaluation, so it is always qualified with when that ran.
     const runOutcomeTooltip = (row: any) => {
@@ -1500,6 +1504,7 @@ export default defineComponent({
       let active = 0;
       let paused = 0;
       let failed = 0;
+      let firing = 0;
       let recent = 0;
       for (const r of rows) {
         // active = unpaused (enabled); paused = disabled. These two partition the
@@ -1509,9 +1514,10 @@ export default defineComponent({
         else paused += 1;
         if (r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed")
           failed += 1;
+        if (isFiringRow(r)) firing += 1;
         if (recencyLevel(r.last_satisfied_at_raw) === "hot") recent += 1;
       }
-      return { active, paused, failed, recent, total: rows.length };
+      return { active, paused, failed, firing, recent, total: rows.length };
     });
 
     // Stat tiles for the summary strip. `tone` is the single source of colour so
@@ -1524,9 +1530,7 @@ export default defineComponent({
       const hasData = c.total > 0;
       const v = (n: number): string | number => (hasData ? n : "—");
       const share = hasData ? c.total : undefined;
-      // Severity-descending so what needs attention sits on the left (matches the
-      // Incidents / Eval Jobs strips): failed (error) → recent (warning) → active
-      // (healthy) → paused (inert) → Total last.
+      // Severity-descending, matching the Incidents / Eval Jobs strips; Total stays last.
       return [
         {
           key: "failed",
@@ -1536,6 +1540,15 @@ export default defineComponent({
           tone: "error",
           max: share,
           dataTest: "alert-summary-failed",
+        },
+        {
+          key: "firing",
+          label: t("alerts.summaryFiring"),
+          value: v(c.firing),
+          icon: "notifications-active",
+          tone: "error",
+          max: share,
+          dataTest: "alert-summary-firing",
         },
         {
           key: "recent",
@@ -1582,13 +1595,14 @@ export default defineComponent({
     // Clicking a summary tile filters the table to that state (toggle); the
     // "total" tile clears it. Counts on the tiles stay full (from filteredResults)
     // so you always see the folder totals; only the table rows are filtered.
-    const stateFilter = ref<"active" | "paused" | "failed" | "recent" | null>(
+    const stateFilter = ref<"active" | "paused" | "failed" | "firing" | "recent" | null>(
       savedAlertListFilters.stateFilter,
     );
     const displayedAlerts = computed(() => {
       const rows = filteredResults.value || [];
       const f = stateFilter.value;
       if (!f) return rows;
+      if (f === "firing") return rows.filter(isFiringRow);
       if (f === "recent")
         return rows.filter((r: any) => recencyLevel(r.last_satisfied_at_raw) === "hot");
       if (f === "failed")
@@ -1605,7 +1619,9 @@ export default defineComponent({
         return;
       }
       stateFilter.value =
-        stateFilter.value === key ? null : (key as "active" | "paused" | "failed" | "recent");
+        stateFilter.value === key
+          ? null
+          : (key as "active" | "paused" | "failed" | "firing" | "recent");
     };
 
     const activeFolderToMove = ref("default");
