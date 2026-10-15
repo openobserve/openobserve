@@ -277,8 +277,6 @@ const clockOffset = ref(0);
 // Local time a 429 or a temporary 503 ends, for its countdown; `holdKind` says which one.
 const cooldownUntil = ref<number | null>(null);
 const holdKind = ref<"ratelimited" | "cooldown" | null>(null);
-// The last refresh hint, for a 304 that carries none while the body is still refreshing.
-let lastHintMs: number | null = null;
 // Anonymous viewers have no saved timezone, so dates read in the browser's.
 const viewerTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 // RenderDashboardCharts and TabList read and switch the active tab through this.
@@ -591,6 +589,8 @@ const hold = (kind: "ratelimited" | "cooldown", untilMs: number | null, localNow
 
 // A failed read keeps what is on screen, except a paused link, which must stop showing it.
 const failedRead = (e: unknown, shown: boolean): PollOutcome => {
+  // Each answer replaces the last hold; only a 429 or a temporary 503 sets a new one.
+  holdKind.value = null;
   const res = responseOf(e);
   const localNow = Date.now();
   if (res?.headers) clockOffset.value = clockOffsetMs(res.headers, localNow);
@@ -638,10 +638,8 @@ const check = async (): Promise<PollOutcome> => {
     if (requestId !== dataRequestId) return { kind: "error" };
     const localNow = Date.now();
     clockOffset.value = clockOffsetMs(res.headers, localNow);
-    const sent = retryAfterMs(res.headers, clockOffset.value, localNow);
-    // A 304 may omit Retry-After; while the body still refreshes, the last hint stands.
-    const hint = sent ?? (res.status === 304 && current?.refreshing ? lastHintMs : null);
-    lastHintMs = hint;
+    const hint = retryAfterMs(res.headers, clockOffset.value, localNow);
+    holdKind.value = null;
     if (res.status === 202) {
       if (!current) state.value = "building";
       return { kind: "wait", retryAfterMs: hint };
@@ -652,7 +650,6 @@ const check = async (): Promise<PollOutcome> => {
       bodyKey.value = key;
     }
     state.value = "ready";
-    holdKind.value = null;
     const next = body.value as DataBody;
     if (configBehind(next)) {
       configSyncedRev = next.rev;
@@ -690,7 +687,9 @@ function showRange(key: string | null) {
   selectedKey.value = key;
   body.value = null;
   bodyKey.value = null;
-  state.value = "loading";
+  // A 429 holds this viewer on every range, so the new one waits it out under the same message.
+  const limited = holdKind.value === "ratelimited" && (cooldownUntil.value ?? 0) > Date.now();
+  state.value = limited ? "ratelimited" : "loading";
   poller.start();
 }
 
