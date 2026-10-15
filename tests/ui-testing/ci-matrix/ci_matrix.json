@@ -537,7 +537,8 @@
       "traceGenAiParts.spec.js",
       "tracesCharts.spec.js",
       "traceSessionReplay.spec.js",
-      "traces-jk-navigation.spec.js"
+      "traces-jk-navigation.spec.js",
+      "service-graph-side-panel.spec.js"
     ],
     "disabled": []
   },
@@ -558,7 +559,7 @@
   },
   {
     "testfolder": "Synthetics",
-    "_comment": "Own shard because the synthetics routes only exist when the server runs with ZO_SYNTHETICS_ENABLED=true (router registers /api/{org}/synthetics* conditionally). The flag is read once at process start, so it cannot vary between tests sharing a backend — each shard gets its own OpenObserve process; every other shard omits synthetics_enabled and keeps the default (false). Pinned to 3 workers: every create/list test writes a check and 5 concurrent writers trip SQLite's 'database is locked' (SLO shard precedent). Results/run-detail pages are fed by seeding the synthetics_results streams in beforeAll — no probe runs on CI. status-pages-enterprise-gating lives here because the status-page routes sit inside the same gate.",
+    "_comment": "Own shard because the synthetics routes only exist when the server runs with ZO_SYNTHETICS_ENABLED=true (router registers /api/{org}/synthetics* conditionally). The flag is read once at process start, so it cannot vary between tests sharing a backend \u2014 each shard gets its own OpenObserve process; every other shard omits synthetics_enabled and keeps the default (false). Pinned to 3 workers: every create/list test writes a check and 5 concurrent writers trip SQLite's 'database is locked' (SLO shard precedent). Results/run-detail pages are fed by seeding the synthetics_results streams in beforeAll \u2014 no probe runs on CI. status-pages-enterprise-gating lives here because the status-page routes sit inside the same gate.",
     "actual_folder": "Synthetics",
     "browser": "chrome",
     "synthetics_enabled": "true",
