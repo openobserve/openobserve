@@ -15,6 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { reactive } from "vue";
 
 // A fresh panel-data object per test so mounting can reset it in place and the
 // assertions see the metrics defaults the container applied.
@@ -46,6 +47,8 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
 const editorRunQuery = vi.hoisted(() => vi.fn());
 /** What the query editor inside PanelEditor injects as `runQuery` for ⌘/Ctrl+Enter. */
 const injectedRunQuery = vi.hoisted(() => ({ current: null as any }));
+/** The stub's exposed staleness state, as refs so the container's computed tracks them. */
+const editorState = vi.hoisted(() => ({ current: null as any }));
 
 // The real PanelEditor pulls in ECharts + the whole dashboard config surface;
 // none of that is what this container's own logic needs. Stub it, but keep its
@@ -53,7 +56,7 @@ const injectedRunQuery = vi.hoisted(() => ({ current: null as any }));
 // the container drives the chart through `panelEditorRef.runQuery()`, so a stub
 // without it makes the auto-run silently no-op and the test prove nothing.
 vi.mock("@/components/dashboards/PanelEditor", async () => {
-  const { inject } = await import("vue");
+  const { inject, ref } = await import("vue");
   return {
     PanelEditor: {
       name: "PanelEditor",
@@ -61,7 +64,12 @@ vi.mock("@/components/dashboards/PanelEditor", async () => {
       emits: ["add-to-dashboard", "chart-api-error"],
       setup: (_: any, { expose }: any) => {
         injectedRunQuery.current = inject("runQuery", null);
-        expose({ runQuery: editorRunQuery });
+        editorState.current = {
+          isOutDated: ref(false),
+          isLoading: ref(false),
+          chartData: ref(undefined),
+        };
+        expose({ runQuery: editorRunQuery, ...editorState.current });
         return {};
       },
       template:
@@ -177,6 +185,42 @@ describe("MetricsVisualize", () => {
    * populated query bar above a blank chart and make them press Refresh to see
    * the thing they just clicked.
    */
+  describe("run-query staleness", () => {
+    it("is pending after a builder edit changes the query, and clears once that query has run", async () => {
+      panelData.current = reactive(makePanelData());
+      const wrapper = mountVisualize();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      expect(vm.isRunQueryPending).toBe(false);
+
+      panelData.current.data.queries[0].query = "avg(up)";
+      editorState.current.chartData.value = JSON.parse(JSON.stringify(panelData.current.data));
+      await flushPromises();
+      expect(vm.isRunQueryPending).toBe(false);
+
+      panelData.current.data.queries[0].query = "up";
+      await flushPromises();
+      expect(vm.isRunQueryPending).toBe(true);
+
+      editorState.current.isLoading.value = true;
+      await flushPromises();
+      expect(vm.isRunQueryPending).toBe(false);
+
+      editorState.current.isLoading.value = false;
+      editorState.current.chartData.value = JSON.parse(JSON.stringify(panelData.current.data));
+      await flushPromises();
+      expect(vm.isRunQueryPending).toBe(false);
+    });
+
+    it("follows the editor's own out-of-date flag", async () => {
+      const wrapper = mountVisualize();
+      await flushPromises();
+      editorState.current.isOutDated.value = true;
+      await flushPromises();
+      expect((wrapper.vm as any).isRunQueryPending).toBe(true);
+    });
+  });
+
   describe("a seeded open runs its query", () => {
     const SEED = {
       type: "line",

@@ -1784,6 +1784,38 @@ describe("MetricsExplorer wiring", () => {
       shortcuts.handlers = {};
     });
 
+    it("marks Run pending while the Visualize pane reports a stale chart, only in Visualize", async () => {
+      const stale = ref(false);
+      const wrapper = mountExplorer({
+        OButton: { template: '<button v-bind="$attrs"><slot /></button>' },
+        MetricsVisualize: {
+          setup: () => ({
+            runQuery: visualizeRunQuery,
+            onUserRun: visualizeOnUserRun,
+            applyPanelData: visualizeApplyPanelData,
+            dashboardPanelData: visualizePanel,
+            isRunQueryPending: stale,
+          }),
+          emits: ["run"],
+          template: '<div data-test="metrics-explorer-visualize">visualize</div>',
+        },
+      });
+      (wrapper.vm as any).setMode("visualize");
+      await flushPromises();
+      expect(wrapper.find(RUN).attributes("variant")).toBe("primary");
+      expect(wrapper.find(RUN).attributes("aria-label")).toBeUndefined();
+
+      stale.value = true;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(RUN).attributes("variant")).toBe("pending");
+      expect(wrapper.find(RUN).attributes("aria-label")).toBe("search.runQueryPendingLabel");
+      expect(wrapper.find(RUN).attributes("data-run-pending")).toBe("true");
+
+      (wrapper.vm as any).setMode("explore");
+      await flushPromises();
+      expect((wrapper.vm as any).isVisualizePending).toBe(false);
+    });
+
     it("Visualize has a Run button and History; the grid modes do not", async () => {
       const wrapper = withButtons();
       expect(wrapper.find(RUN).exists()).toBe(false);

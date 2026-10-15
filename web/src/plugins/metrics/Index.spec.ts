@@ -122,6 +122,7 @@ vi.mock("lodash-es", () => ({
 // Import the component AFTER all mocks are registered
 // ---------------------------------------------------------------------------
 import MetricsIndex from "./Index.vue";
+import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 
 // ---------------------------------------------------------------------------
 // Shared mock store
@@ -148,6 +149,8 @@ const createWrapper = (props: Record<string, any> = {}) => {
         // Heavy async / complex children
         PanelEditor: {
           template: "<div class='panel-editor' data-test='panel-editor'><slot /></div>",
+          name: "PanelEditor",
+          data: () => ({ isOutDated: false }),
           methods: { runQuery: vi.fn() },
         },
         DateTimePickerDashboard: {
@@ -776,6 +779,52 @@ describe("Metrics Index — disable ref and loading state", () => {
     await flushPromises();
     const btn = wrapper.find('[data-test="metrics-apply"]');
     expect(btn.attributes("disabled")).toBeFalsy();
+  });
+
+  it("marks Run query pending after an unrun PromQL edit and clears it once the edit runs", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    const vm = wrapper.vm as any;
+    const runButton = () => wrapper.find('[data-test="metrics-apply"]');
+    // A query edit needs an API call, so the config auto-apply leaves the last-run snapshot alone.
+    vi.mocked(checkIfConfigChangeRequiredApiCallOrNot).mockReturnValue(true);
+    try {
+      vm.chartData = JSON.parse(JSON.stringify(vm.dashboardPanelData.data));
+      await nextTick();
+      expect(runButton().attributes("data-o2-variant")).toBe("primary");
+      expect(runButton().attributes("aria-label")).toBeUndefined();
+
+      vm.dashboardPanelData.data.queries[0].query = "rate(up[5m])";
+      await nextTick();
+      expect(runButton().attributes("data-o2-variant")).toBe("pending");
+      expect(runButton().attributes("aria-label")).toBe("search.runQueryPendingLabel");
+
+      vm.chartData = JSON.parse(JSON.stringify(vm.dashboardPanelData.data));
+      await nextTick();
+      expect(runButton().attributes("data-o2-variant")).toBe("primary");
+    } finally {
+      vm.dashboardPanelData.data.queries[0].query = "";
+      vi.mocked(checkIfConfigChangeRequiredApiCallOrNot).mockReturnValue(false);
+    }
+  });
+
+  it("follows the editor's out-of-date flag, but never while a query runs", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    const editor = wrapper.findComponent({ name: "PanelEditor" });
+    const runButton = () => wrapper.find('[data-test="metrics-apply"]');
+    (editor.vm as any).isOutDated = true;
+    await nextTick();
+    expect(runButton().attributes("data-o2-variant")).toBe("pending");
+
+    (wrapper.vm as any).disable = true;
+    await nextTick();
+    expect(runButton().attributes("data-o2-variant")).toBe("primary");
+
+    (wrapper.vm as any).disable = false;
+    (editor.vm as any).isOutDated = false;
+    await nextTick();
+    expect(runButton().attributes("data-o2-variant")).toBe("primary");
   });
 
   it("run-query button becomes disabled when disable is true", async () => {
