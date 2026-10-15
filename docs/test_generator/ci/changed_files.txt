@@ -1,0 +1,4 @@
+tests/ui-testing/ci-matrix/ci_matrix.json
+tests/ui-testing/pages/logsPages/logsToolbarPinsPage.js
+tests/ui-testing/pages/page-manager.js
+tests/ui-testing/playwright-tests/Logs/logsToolbarPins.spec.js
