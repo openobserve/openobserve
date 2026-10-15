@@ -2639,12 +2639,14 @@ export default defineComponent({
       autoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
       autoCompleteData.value.streamType = searchObj.data.stream.streamType ?? "logs";
       autoCompleteData.value.streamName = searchObj.data.stream.selectedStream?.[0] ?? "";
+      autoCompleteData.value.fieldValues = props.fieldValues;
     };
     watch(
       () => [
         store.state.selectedOrganization?.identifier,
         searchObj.data.stream.streamType,
         searchObj.data.stream.selectedStream?.[0],
+        props.fieldValues,
       ],
       syncSuggestStreamContext,
       { immediate: true },
