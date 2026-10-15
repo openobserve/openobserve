@@ -355,7 +355,9 @@ describe("QualityScorePane", () => {
     const failed = mountPane();
     await flushPromises();
     expect(io(failed)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
-    expect(unavailable(failed).text()).toBe("Full text not available");
+    expect(unavailable(failed).text()).toBe(
+      "Showing a short preview. The full trace could not be loaded.",
+    );
     expect(skeletons(failed)).toEqual([]);
 
     traceDetails
@@ -364,7 +366,9 @@ describe("QualityScorePane", () => {
     const empty = mountPane();
     await flushPromises();
     expect(io(empty)).toEqual(["Write VRL to parse JSON from my nginx logs."]);
-    expect(unavailable(empty).text()).toBe("Full text not available");
+    expect(unavailable(empty).text()).toBe(
+      "Showing a short preview. The full trace could not be loaded.",
+    );
   });
 
   it("does not fetch for a session score or a score without a source stream", async () => {

@@ -17157,7 +17157,7 @@
         "next": "Next score",
         "reasoning": "Reasoning",
         "noReasoning": "No reasoning recorded",
-        "fullTextUnavailable": "Full text not available",
+        "fullTextUnavailable": "Showing a short preview. The full trace could not be loaded.",
         "open": {
           "span": "Open span",
           "trace": "Open trace",
