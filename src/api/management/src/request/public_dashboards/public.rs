@@ -387,8 +387,7 @@ fn rate_limited(ip: Option<RealIp>) -> bool {
     rpm != 0 && READS.over_budget(&client_ip(ip), READ_WINDOW, rpm)
 }
 
-/// The slug is a bearer secret, so no response is indexed or leaks it through `Referer`.
-/// The privacy headers every public dashboard response carries, the router's own included.
+/// The privacy headers on every public response, the router's own included; the slug is a secret.
 pub fn with_headers(mut resp: Response) -> Response {
     let headers = resp.headers_mut();
     headers.insert(
@@ -425,8 +424,7 @@ fn unavailable() -> Response {
         .into_response()
 }
 
-/// Project a viewer-safe layout from the dashboard: v8 tabs/panels with query
-/// text and stream names stripped. (v8 only in this cut.)
+/// A viewer-safe v8 layout, with query text and stream names stripped.
 fn project_layout(dash: &Dashboard) -> (String, serde_json::Value) {
     let Some(v8) = dash.v8.as_ref() else {
         return (String::new(), serde_json::Value::Null);
@@ -436,9 +434,7 @@ fn project_layout(dash: &Dashboard) -> (String, serde_json::Value) {
     (v8.title.clone(), layout)
 }
 
-/// Recursively drop keys that would leak SQL/PromQL, filter predicates, or
-/// stream internals. Data is pre-materialized, so none of these are needed to
-/// render; every one of them can carry author-authored query text or literals.
+/// Drops every key that can carry query text, filter literals or stream internals.
 fn strip_secrets(v: &mut serde_json::Value) {
     match v {
         serde_json::Value::Object(map) => {
@@ -817,8 +813,7 @@ mod tests {
         db
     }
 
-    /// A lagging copy still shows the link live; the gates read the primary, which has moved on,
-    /// so no pause, revoke or org switch is ever answered with data or a validating 304.
+    /// A stale replica still shows the link live; the primary-read gates never serve data or a 304.
     #[tokio::test]
     async fn gate08_a_stale_replica_never_decides_a_gate() {
         let slug = "k8Zt2mR7aB3cD4eF5gH6Qx";
@@ -868,6 +863,7 @@ mod tests {
         let src = include_str!("public.rs");
         let (production, _) = src.split_once("#[cfg(test)]").unwrap();
         assert!(!production.contains("get_orm_client_ro"));
+        assert!(!production.contains("dashboards::get_by_id("));
         assert!(production.contains("resolve_on(core_pd::gate_db().await, slug)"));
         assert!(production.contains("serve_data_on(core_pd::gate_db().await"));
     }

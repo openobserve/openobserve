@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Table ops for public dashboard links, org settings and the replication outbox. The caller picks
-//! the connection: lifecycle reads and every write use the primary, lists may use the read-only
-//! pool.
+//! Table ops for public dashboard links, org settings and the outbox; the caller picks the pool.
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait,
@@ -232,8 +230,7 @@ pub async fn update_cas_queued<C: TransactionTrait>(
     Ok(true)
 }
 
-/// Writes the semantic columns of `next` only while the stored rev is still `seen`; false when
-/// another write won. Counter columns are never written here.
+/// Writes the semantic columns only while the stored rev is `seen`; counters are never written.
 pub async fn update_cas<C: ConnectionTrait>(
     db: &C,
     next: &links::Model,
@@ -545,6 +542,7 @@ pub async fn outbox_delete<C: ConnectionTrait>(
 }
 
 /// Creates the three tables if absent, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
 pub async fn create_tables_for_tests(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
     super::migration::create_public_dashboards_schema_for_test(db).await
 }
@@ -1103,5 +1101,49 @@ mod tests {
         assert!(!update_cas_queued(&db, &stale, 1, true, 6).await.unwrap());
         assert_eq!(entries(&db).await, [("l".to_string(), 2)]);
         assert_eq!(get(&db, "l").await.unwrap().unwrap().rev, 2);
+    }
+
+    #[tokio::test]
+    async fn gate07_only_a_reasserted_apply_queues_its_put() {
+        let db = db().await;
+        async fn queued(db: &DatabaseConnection) -> Vec<(String, i64)> {
+            outbox_list_due(db, i64::MAX, 10)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|e| (e.link_id, e.rev))
+                .collect()
+        }
+        // Taken: an insert, then a newer rev.
+        let first = replicated("l", 10, 10);
+        assert_eq!(
+            apply_replicated(&db, &first, "b", "a", 0).await.unwrap(),
+            Applied::Taken
+        );
+        let newer = replicated("l", 20, 20);
+        assert_eq!(
+            apply_replicated(&db, &newer, "b", "a", 0).await.unwrap(),
+            Applied::Taken
+        );
+        // Kept: an older rev.
+        assert_eq!(
+            apply_replicated(&db, &first, "b", "a", 0).await.unwrap(),
+            Applied::Kept
+        );
+        assert!(queued(&db).await.is_empty());
+
+        // Reasserted: an equal rev from a region that loses the tie.
+        let rival = links::Model {
+            name: "rival".into(),
+            ..replicated("l", 20, 19)
+        };
+        let Applied::Reasserted(row) = apply_replicated(&db, &rival, "b", "a", 1_000)
+            .await
+            .unwrap()
+        else {
+            panic!("the local write wins the tie");
+        };
+        assert_eq!(row.rev, 1_000);
+        assert_eq!(queued(&db).await, [("l".to_string(), 1_000)]);
     }
 }

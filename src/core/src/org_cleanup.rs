@@ -979,8 +979,7 @@ pub async fn promote_expired() -> Result<usize, anyhow::Error> {
     Ok(promoted)
 }
 
-/// Background job: hourly, promote expired pending_deletion orgs to `deleting` and hard-delete
-/// public links whose soft-delete retention has run out.
+/// Hourly: promote expired pending_deletion orgs and hard-delete links revoked 30 days ago.
 pub async fn run_promotion_scheduler() -> Result<(), anyhow::Error> {
     spawn_pausable_job!("org_deletion_promotion", POLL_INTERVAL_SECS, {
         match promote_expired().await {

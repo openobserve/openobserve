@@ -234,8 +234,7 @@ struct ConfigResponse<'a> {
     synthetics_enabled: bool,
     /// Hides the publish button and the Public links view when the feature is off.
     public_dashboards_enabled: bool,
-    /// The operator's refresh floor after clamping; the share form shows each range's floor from
-    /// it.
+    /// The clamped operator refresh floor; the share form shows each range's floor from it.
     public_dashboard_min_refresh_secs: u32,
     oncall_enabled: bool,
     /// Enterprise-only private locations; the UI gates their views on this flag.

@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! `SeaORM` Entity for the public_dashboards table: one public link to a dashboard.
-//!
-//! `slug` is the globally unique, unguessable public identifier that resolves the org without an
-//! org in the URL. `rev` changes only on semantic writes; `deleted_at` keeps a revoked link as a
-//! soft-deleted row for 30 days so a replicated older write cannot bring it back.
+//! `SeaORM` Entity for public_dashboards; `deleted_at` keeps a revoked link for 30 days.
 
 use sea_orm::entity::prelude::*;
 
