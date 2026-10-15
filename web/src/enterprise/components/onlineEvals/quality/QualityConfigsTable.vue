@@ -192,10 +192,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`quality-configs-unhealthy-${row.configId}`"
           @click.stop="emit('open', row, 'unhealthy')"
         >
+          <!-- Decorative: the text beside it states the share, and the minimum sliver would announce a wrong value. -->
           <OProgressBar
             :value="barShare(unhealthyShare(row))"
             :variant="unhealthyTone(unhealthyShare(row)) ?? 'default'"
             size="sm"
+            aria-hidden="true"
           />
           <!-- Wraps rather than clips the percent when the counts run to six digits. -->
           <span class="flex flex-wrap items-baseline gap-x-1.5 text-xs">
