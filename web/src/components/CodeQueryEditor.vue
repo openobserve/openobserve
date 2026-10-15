@@ -1278,6 +1278,8 @@ export default defineComponent({
       isGenerating,
       handleGenerateSQL,
       streamingResponse,
+      // Read by the AI bar after a generation: set when the server refused it.
+      refusalNotice,
       t,
       aiIcon,
       toggleNlpMode,

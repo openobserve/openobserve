@@ -132,20 +132,25 @@ vi.mock("@/composables/useLogs/searchState", () => ({
 
 const nlq = vi.hoisted(() => ({
   generateSQL: vi.fn(() => Promise.resolve(null as string | null)),
-  refusalNotice: { value: "" },
+  refusalNotice: null as unknown as { value: string },
   showErrorNotification: vi.fn(),
 }));
 
-vi.mock("@/composables/useNLQuery", () => ({
-  useNLQuery: () => ({
-    detectNaturalLanguage: vi.fn(() => false),
-    generateSQL: nlq.generateSQL,
-    transformToSQL: vi.fn((_nl: string, sql: string) => sql),
-    isGenerating: { value: false },
-    streamingResponse: { value: "" },
-    refusalNotice: nlq.refusalNotice,
-  }),
-}));
+vi.mock("@/composables/useNLQuery", async () => {
+  // A real ref, so the exposed refusalNotice unwraps on the component like it does in the app.
+  const { ref } = await import("vue");
+  nlq.refusalNotice = ref("");
+  return {
+    useNLQuery: () => ({
+      detectNaturalLanguage: vi.fn(() => false),
+      generateSQL: nlq.generateSQL,
+      transformToSQL: vi.fn((_nl: string, sql: string) => sql),
+      isGenerating: { value: false },
+      streamingResponse: { value: "" },
+      refusalNotice: nlq.refusalNotice,
+    }),
+  };
+});
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({
@@ -450,6 +455,8 @@ describe("CodeQueryEditor", () => {
       const wrapper = createWrapper();
 
       await expect(wrapper.vm.handleGenerateSQL("show error rows")).resolves.toBeUndefined();
+      // Exposed so the AI bar records it instead of the unchanged query.
+      expect(wrapper.vm.refusalNotice).toBe(notice);
 
       expect(nlq.showErrorNotification).toHaveBeenCalledTimes(1);
       expect(nlq.showErrorNotification).toHaveBeenCalledWith(notice);
