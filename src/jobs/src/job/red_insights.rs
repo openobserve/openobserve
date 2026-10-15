@@ -25,7 +25,7 @@ use openobserve_core::{
     anomaly_detection,
     traces::red_insights::{
         self, FOLDER_NAME, MANAGED_TAG, MAX_CREATES, MAX_SERVICES, MIN_REQUESTS_24H,
-        ManagedDetector, ServiceVolume, StreamRead,
+        ManagedDetector, Repair, ServiceVolume, StreamRead,
     },
 };
 
@@ -95,6 +95,10 @@ async fn reconcile(org_id: &str, prefetched: Option<Vec<serde_json::Value>>) -> 
     let mut reads = read_streams(org_id).await;
     let volumes = service_volumes(org_id, &mut reads).await;
     let detectors: Vec<_> = configs.iter().filter_map(managed_detector).collect();
+    let repairs: Vec<_> = detectors
+        .iter()
+        .filter_map(|d| Some((d.id.clone(), red_insights::repair(d)?)))
+        .collect();
     retire_removed_streams(org_id, &detectors, &mut reads).await;
     let existing = red_insights::on_read_streams(detectors, &reads);
     // Uncapped here: a signal the template skips must not use up the per-cycle create budget.
@@ -108,6 +112,11 @@ async fn reconcile(org_id: &str, prefetched: Option<Vec<serde_json::Value>>) -> 
     );
     for id in &plan.delete {
         delete(org_id, id).await;
+    }
+    for (id, repair) in repairs {
+        if !plan.delete.contains(&id) {
+            update(org_id, &id, repair).await;
+        }
     }
 
     let templates: Vec<_> = plan
@@ -176,12 +185,27 @@ fn managed_detector(config: &serde_json::Value) -> Option<ManagedDetector> {
             .and_then(|v| v.as_bool())
             .unwrap_or(true),
         current,
+        detection_window_seconds: config
+            .get("detection_window_seconds")
+            .and_then(|v| v.as_i64())
+            .unwrap_or_default(),
+        unservable: red_insights::is_unservable(config_str(config, "last_error")),
     })
 }
 
 async fn delete(org_id: &str, anomaly_id: &str) {
     if let Err(e) = anomaly_detection::delete_config(org_id, anomaly_id).await {
         log::error!("[RED insights] org {org_id}: failed to delete {anomaly_id}: {e}");
+    }
+}
+
+async fn update(org_id: &str, anomaly_id: &str, repair: Repair) {
+    match anomaly_detection::update_config(org_id, anomaly_id, repair.into_request()).await {
+        Ok(_) if repair.disable => {
+            log::info!("[RED insights] org {org_id}: disabled unservable detector {anomaly_id}")
+        }
+        Ok(_) => {}
+        Err(e) => log::error!("[RED insights] org {org_id}: failed to update {anomaly_id}: {e}"),
     }
 }
 

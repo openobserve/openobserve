@@ -6662,4 +6662,23 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn red_insights_recognises_the_g5_refusal() {
+        use o2_enterprise::enterprise::anomaly_detection::servability::{
+            Servability, ServabilityEvidence, assess_servability,
+        };
+
+        let dead = ServabilityEvidence {
+            slot_baselines: vec![Some(0.0); 168],
+            buckets_observed: 2016,
+        };
+        let Servability::Unservable(reason) = assess_servability(&dead) else {
+            panic!("an all-zero week must be refused");
+        };
+        assert!(
+            crate::traces::red_insights::is_unservable(&reason),
+            "{reason}"
+        );
+    }
 }
