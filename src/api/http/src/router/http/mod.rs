@@ -114,15 +114,7 @@ pub async fn dispatch(req: Request) -> Response {
         return route(req, path, None).await;
     }
     // The router's own 404, 502 and 503 answer the anonymous viewer too.
-    let mut resp = public_dashboards::public::with_headers(route(req, path, public_slug).await);
-    // A ring change is brief; without a hint the viewer would read the 503 as a paused link.
-    if resp.status() == StatusCode::SERVICE_UNAVAILABLE
-        && !resp.headers().contains_key(header::RETRY_AFTER)
-    {
-        let hint = header::HeaderValue::from_static(PUBLIC_RETRY_AFTER_SECS);
-        resp.headers_mut().insert(header::RETRY_AFTER, hint);
-    }
-    resp
+    public_dashboards::public::with_headers(route(req, path, public_slug).await)
 }
 
 async fn route(req: Request, path: String, public_slug: Option<String>) -> Response {
@@ -146,7 +138,7 @@ async fn route(req: Request, path: String, public_slug: Option<String>) -> Respo
                 error,
                 start.elapsed().as_millis()
             );
-            return (StatusCode::SERVICE_UNAVAILABLE, error).into_response();
+            return no_nodes(&path, error);
         }
     };
 
@@ -365,8 +357,18 @@ fn proxy_error_response(
         None if is_splunk_collector_route(path) => {
             splunk_server_busy(StatusCode::SERVICE_UNAVAILABLE)
         }
-        None => (StatusCode::SERVICE_UNAVAILABLE, "No online nodes").into_response(),
+        None => no_nodes(path, "No online nodes"),
     }
+}
+
+/// The router's own 503, with a retry hint on public paths; a querier's 503 passes through as is.
+fn no_nodes(path: &str, body: impl Into<String>) -> Response {
+    let mut resp = (StatusCode::SERVICE_UNAVAILABLE, body.into()).into_response();
+    if public_dashboard_slug(path).is_some() {
+        let hint = header::HeaderValue::from_static(PUBLIC_RETRY_AFTER_SECS);
+        resp.headers_mut().insert(header::RETRY_AFTER, hint);
+    }
+    resp
 }
 
 /// Proxies a querier request with body-based routing for consistent hashing.
@@ -429,7 +431,7 @@ async fn proxy_by_key(
             "No online querier nodes",
             start.elapsed().as_millis()
         );
-        return (StatusCode::SERVICE_UNAVAILABLE, "No online querier nodes").into_response();
+        return no_nodes(&path, "No online querier nodes");
     };
     // get node by name
     let Some(primary) = cluster::get_cached_node_by_name(&node_name).await else {
@@ -440,7 +442,7 @@ async fn proxy_by_key(
             "No online querier nodes",
             start.elapsed().as_millis()
         );
-        return (StatusCode::SERVICE_UNAVAILABLE, "No online querier nodes").into_response();
+        return no_nodes(&path, "No online querier nodes");
     };
 
     // Preferred (consistent-hash) node first, then the other online queriers as
@@ -1062,9 +1064,13 @@ mod tests {
         }
     }
 
+    /// Both public-route proxy tests read the global querier ring, so they take turns.
+    static RING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
     // No querier is online in a unit test, so a well-formed slug reaching the proxy answers 503.
     #[tokio::test]
     async fn a_well_formed_public_dashboard_slug_is_proxied_to_a_querier() {
+        let _ring = RING.lock().await;
         for path in [
             "/api/public_dashboards/k8Zt2mR7aB3cD4eF5gH6Qx",
             "/api/public_dashboards/k8Zt2mR7aB3cD4eF5gH6Qx/data?range=r3600",
@@ -1075,6 +1081,46 @@ mod tests {
             assert_public_headers(&resp);
             assert_eq!(resp.headers()[header::RETRY_AFTER], PUBLIC_RETRY_AFTER_SECS);
         }
+    }
+
+    /// A querier's 503 for a paused link has no Retry-After by contract; the router adds none.
+    #[tokio::test]
+    async fn a_queriers_public_503_passes_through_without_a_retry_hint() {
+        let _ring = RING.lock().await;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let upstream =
+            axum::Router::new().fallback(|| async { (StatusCode::SERVICE_UNAVAILABLE, "paused") });
+        tokio::spawn(async move { axum::serve(listener, upstream).await.unwrap() });
+
+        let mut node = test_node(9100);
+        node.name = format!("public-dashboard-upstream-{port}");
+        node.uuid = format!("public-dashboard-upstream-{port}");
+        node.http_addr = format!("http://127.0.0.1:{port}");
+        cluster::add_node_to_cache(node.clone()).await;
+        cluster::add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive))
+            .await;
+
+        let path = "/api/public_dashboards/k8Zt2mR7aB3cD4eF5gH6Qx/data?range=r3600";
+        let req = Request::builder().uri(path).body(Body::empty()).unwrap();
+        let resp = dispatch(req).await;
+
+        cluster::remove_node_from_consistent_hash(
+            &node,
+            &Role::Querier,
+            Some(RoleGroup::Interactive),
+        )
+        .await;
+        node.status = config::meta::cluster::NodeStatus::Offline;
+        cluster::add_node_to_cache(node).await;
+
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert!(resp.headers().get(header::RETRY_AFTER).is_none());
+        assert_public_headers(&resp);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(&body[..], b"paused");
     }
 
     #[tokio::test]
