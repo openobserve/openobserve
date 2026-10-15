@@ -277,7 +277,7 @@ mod tests {
         datatypes::{DataType, Field, Schema},
         record_batch::RecordBatch,
     };
-    use config::{FileFormat, TIMESTAMP_COL_NAME};
+    use config::{FileFormat, INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME};
     use parquet::{
         arrow::{AsyncArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder},
         file::properties::WriterProperties,
@@ -519,6 +519,89 @@ mod tests {
             tantivy::schema::FieldType::I64(_)
         ));
         assert_eq!(index.reader().unwrap().searcher().num_docs(), 10);
+    }
+
+    /// FTS columns land in `_all` and numeric index fields are indexed as raw
+    /// text, with doc_ids preserved across a multi-row_group merge.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_fts_and_numeric_index_fields() {
+        let total_rows = 10usize;
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("content", DataType::Utf8, false),
+            Field::new("code", DataType::Int64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(
+                    (0..total_rows as i64).map(|i| 1000 + i).collect::<Vec<_>>(),
+                )),
+                Arc::new(StringArray::from(
+                    (0..total_rows)
+                        .map(|i| {
+                            if i % 2 == 1 {
+                                "request failed"
+                            } else {
+                                "request served"
+                            }
+                        })
+                        .collect::<Vec<_>>(),
+                )),
+                Arc::new(Int64Array::from(
+                    (0..total_rows)
+                        .map(|i| if i % 2 == 1 { 500 } else { 200 })
+                        .collect::<Vec<i64>>(),
+                )),
+            ],
+        )
+        .unwrap();
+        let buf = create_test_parquet_bytes_fixed_rg(vec![batch], 4).await;
+
+        let index = super::build_index(
+            RamDirectory::create(),
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(&["content".to_string()], &["code".to_string()], &schema),
+            2,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        let tantivy_schema = index.schema();
+        let all_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).unwrap();
+        let code_field = tantivy_schema.get_field("code").unwrap();
+        assert!(tantivy_schema.get_field("content").is_err());
+
+        let reader = index.reader().unwrap();
+        let searcher = reader.searcher();
+        assert_eq!(searcher.num_docs() as usize, total_rows);
+        let search = |term: tantivy::Term| -> Vec<usize> {
+            let q = tantivy::query::TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
+            let mut ids: Vec<usize> = searcher
+                .search(&q, &tantivy::collector::DocSetCollector)
+                .unwrap()
+                .into_iter()
+                .map(|addr| addr.doc_id as usize)
+                .collect();
+            ids.sort_unstable();
+            ids
+        };
+
+        let odd_rows: Vec<usize> = (0..total_rows).filter(|i| i % 2 == 1).collect();
+        assert_eq!(
+            search(tantivy::Term::from_field_text(all_field, "failed")),
+            odd_rows
+        );
+        assert_eq!(
+            search(tantivy::Term::from_field_text(all_field, "request")),
+            (0..total_rows).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            search(tantivy::Term::from_field_text(code_field, "500")),
+            odd_rows
+        );
     }
 
     mod vortex_tests {
