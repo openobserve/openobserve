@@ -55,6 +55,17 @@ pub const PKCE_STATE_ORG: &str = "o2_pkce_state";
 pub const ACCESS_TOKEN: &str = "access_token";
 pub const REFRESH_TOKEN: &str = "refresh_token";
 pub const ID_TOKEN_HEADER: &str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
+/// Modules routed as `/v2/{org_id}/{module}`; any other path names its org in the first segment.
+const V2_ORG_MODULES: [&str; 8] = [
+    "alerts",
+    "folders",
+    "reports",
+    "synthetics",
+    "incidents",
+    "downtimes",
+    "workflows",
+    "alert_calibration",
+];
 
 /// Extracted request data that can be safely passed across await points
 /// This is Send + Sync because all fields are Send + Sync
@@ -321,6 +332,15 @@ fn is_org_agnostic_read(path: &str) -> bool {
         segments.as_slice(),
         [_org, "password_complexity"] | ["api", _org, "password_complexity"]
     )
+}
+
+/// The org a request path names, which a `/v2/{org_id}/{module}` route carries second.
+fn org_from_path<'a>(path_columns: &[&'a str]) -> &'a str {
+    match *path_columns {
+        ["v2", org, module, ..] if V2_ORG_MODULES.contains(&module) => org,
+        [org, ..] => org,
+        [] => "",
+    }
 }
 
 /// Compare a password under the lockout policy, recording the attempt.
@@ -914,21 +934,7 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
     {
         return Ok(());
     }
-    // Hack for v2 apis
-    let org_id = if path_columns.len() > 2
-        && path_columns[0].eq("v2")
-        && (path_columns[2].eq("alerts")
-            || path_columns[2].eq("folders")
-            || path_columns[2].eq("reports")
-            || path_columns[2].eq("synthetics")
-            || path_columns[2].eq("incidents")
-            || path_columns[2].eq("downtimes")
-            || path_columns[2].eq("workflows"))
-    {
-        path_columns[1]
-    } else {
-        path_columns[0]
-    };
+    let org_id = org_from_path(&path_columns);
 
     if openobserve_core::organization::get_org(org_id)
         .await
@@ -2580,24 +2586,32 @@ mod tests {
     }
 
     #[test]
-    fn test_v2_api_prefix_handling() {
-        // Test V2 API prefix handling
-        let v2_path_columns = ["v2", "org_id", "logs"];
-        let org_id = if v2_path_columns.len() > 1 && v2_path_columns[0].eq("v2") {
-            v2_path_columns[1]
-        } else {
-            "default"
-        };
-        assert_eq!(org_id, "org_id");
+    fn a_v2_route_names_its_org_second_and_any_other_path_first() {
+        assert_eq!(
+            org_from_path(&["v2", "acme", "alert_calibration", "config"]),
+            "acme"
+        );
+        assert_eq!(org_from_path(&["v2", "acme", "downtimes"]), "acme");
+        assert_eq!(org_from_path(&["acme", "logs", "_json"]), "acme");
+        assert_eq!(org_from_path(&["v2", "acme", "unlisted"]), "v2");
+    }
 
-        // Test non-V2 path
-        let normal_path_columns = ["org_id", "logs"];
-        let org_id_normal = if normal_path_columns.len() > 1 && normal_path_columns[0].eq("v2") {
-            normal_path_columns[1]
-        } else {
-            "default"
-        };
-        assert_eq!(org_id_normal, "default");
+    // A v2 module missing from the list resolves its org as "v2", and every request then 404s.
+    #[test]
+    fn every_v2_route_module_resolves_its_org_from_the_path() {
+        let router = include_str!("../../../http/src/handler/http/router/mod.rs");
+        let modules: std::collections::BTreeSet<&str> = router
+            .split("\"/v2/{org_id}/")
+            .skip(1)
+            .filter_map(|rest| rest.split(['/', '"']).next())
+            .collect();
+        assert!(!modules.is_empty());
+        for module in modules {
+            assert!(
+                V2_ORG_MODULES.contains(&module),
+                "{module} is routed as /v2/{{org_id}}/{module} but missing from V2_ORG_MODULES"
+            );
+        }
     }
 
     #[test]
