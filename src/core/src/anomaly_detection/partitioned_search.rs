@@ -408,16 +408,9 @@ impl SliceSearch for EngineSearch<'_> {
     }
 
     async fn search(&self, trace_id: &str, req: &Request) -> Result<Response> {
-        // JSON output turns NaN and infinity into null, which would read as an omitted SQL NULL.
-        search_service::search_rejecting_nonfinite(
-            trace_id,
-            self.org_id,
-            self.stream_type,
-            None,
-            req,
-        )
-        .await
-        .map_err(|e| anyhow::anyhow!("{e}"))
+        search_service::search(trace_id, self.org_id, self.stream_type, None, req)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e}"))
     }
 }
 
@@ -942,7 +935,7 @@ mod tests {
         }
     }
 
-    /// Leader output for one slice: the nonfinite scan, then the real JSON and table conversion.
+    /// Uses the leader JSON and table conversion so null handling matches production.
     struct ArrowSearch {
         plan: Option<SearchPartitionResponse>,
         batches: Mutex<VecDeque<RecordBatch>>,
@@ -970,11 +963,6 @@ mod tests {
                 .unwrap()
                 .pop_front()
                 .expect("unscripted search");
-            if let Some(column) =
-                search_service::cluster::nonfinite_float_column(std::slice::from_ref(&batch))
-            {
-                anyhow::bail!("column '{column}' holds a NaN or infinite value");
-            }
             Ok(table_response(&batch))
         }
     }
@@ -1886,7 +1874,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn nonfinite_aggregates_fail_and_nulls_are_omitted_for_one_or_many_partitions() {
+    async fn nonfinite_aggregates_become_nulls_for_one_or_many_partitions() {
         let finite_and_null = || {
             vec![
                 arrow_rows(&[(T0, Some(2.0))]),
@@ -1898,8 +1886,9 @@ mod tests {
             let mut sliced = finite_and_null();
             sliced[2] = arrow_rows(&[(T0 + 2 * FIVE_MIN_US, Some(bad))]);
             let engine = arrow_engine(Some(three_slices()), sliced);
-            let err = run_arrow(&engine).await.unwrap_err().to_string();
-            assert!(err.contains("'value'") && err.contains("trace-2"), "{err}");
+            let points = run_arrow(&engine).await.unwrap();
+            assert_eq!(points.len(), 1);
+            assert_eq!((points[0].timestamp_us, points[0].value), (T0, 2.0));
             assert_eq!(engine.searched.load(Ordering::SeqCst), 3);
 
             let whole = arrow_rows(&[
@@ -1908,8 +1897,9 @@ mod tests {
                 (T0 + 2 * FIVE_MIN_US, Some(bad)),
             ]);
             let engine = arrow_engine(Some(plan(vec![[WINDOW.0, WINDOW.1]])), vec![whole]);
-            let err = run_arrow(&engine).await.unwrap_err().to_string();
-            assert!(err.contains("'value'"), "{err}");
+            let points = run_arrow(&engine).await.unwrap();
+            assert_eq!(points.len(), 1);
+            assert_eq!((points[0].timestamp_us, points[0].value), (T0, 2.0));
         }
 
         let engine = arrow_engine(Some(three_slices()), finite_and_null());
