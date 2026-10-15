@@ -100,10 +100,10 @@ export default class DashboardNotices {
   async clickNoticeAction(noticeId, actionId) {
     const action = this.noticeAction(actionId);
     for (let attempt = 0; attempt < 3; attempt++) {
-      await this.openNoticeTooltip(noticeId);
-      await action.waitFor({ state: "visible", timeout: 5000 });
-      await this.page.waitForTimeout(500);
       try {
+        await this.openNoticeTooltip(noticeId);
+        await action.waitFor({ state: "visible", timeout: 5000 });
+        await this.page.waitForTimeout(500);
         await action.click({ timeout: 5000 });
         return;
       } catch (error) {

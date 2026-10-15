@@ -85,7 +85,7 @@ test.describe("Dashboard Panel Notices testcases", () => {
         .toString(36)
         .slice(2, 8)}`;
 
-      await ingestionHighCardinality(streamName);
+      await ingestionHighCardinality(pm.page, streamName);
       await pm.dashboardMaxQueryRange.waitForStreamReady(streamName);
 
       await pm.dashboardList.menuItem("dashboards-item");
@@ -125,7 +125,7 @@ test.describe("Dashboard Panel Notices testcases", () => {
         pm.dashboardNotices.noticeAction("use-top-n")
       ).toBeVisible();
 
-      await pm.dashboardNotices.noticeAction("use-top-n").click();
+      await pm.dashboardNotices.clickNoticeAction("series-cap", "use-top-n");
       await pm.page.waitForURL(/add_panel/, { timeout: 20000 });
       const url = new URL(pm.page.url());
       expect(url.searchParams.get("focus")).toBe("top-n");
@@ -150,7 +150,7 @@ test.describe("Dashboard Panel Notices testcases", () => {
         .toString(36)
         .slice(2, 8)}`;
 
-      await ingestionHighCardinality(streamName);
+      await ingestionHighCardinality(pm.page, streamName);
       await pm.dashboardMaxQueryRange.waitForStreamReady(streamName);
 
       await pm.dashboardList.menuItem("dashboards-item");
@@ -311,7 +311,7 @@ test.describe("Dashboard Panel Notices testcases", () => {
 
       // "Refresh" re-runs the panel — a new search fires.
       const searchDone = pm.dashboardMaxQueryRange.createSearchResponsePromise();
-      await pm.dashboardNotices.noticeAction("refresh").click();
+      await pm.dashboardNotices.clickNoticeAction("partial", "refresh");
       await searchDone;
 
       testLogger.info("Partial notice rendered and Refresh re-ran the panel");
