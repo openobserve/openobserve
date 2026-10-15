@@ -324,11 +324,11 @@ describe("QualityConfigsTable", () => {
       expect(table.find('[data-test="quality-tiles"]').exists()).toBe(false);
       expect(table.text()).not.toContain("Every config gives a result");
     }
-    expect(
-      mountTable({ rows: [], tiles: none, loading: true })
-        .find('[data-test="quality-tiles"]')
-        .exists(),
-    ).toBe(true);
+    const loading = mountTable({ rows: [], tiles: none, loading: true });
+    expect(loading.find('[data-test="quality-tiles"]').exists()).toBe(true);
+    // No rows yet is not "every config gives a result".
+    expect(loading.find('[data-test="quality-tile-without-result-note"]').exists()).toBe(false);
+    expect(loading.text()).not.toContain("Every config gives a result");
   });
 
   it("offers Show them only when there is something to show and the tile is not already on", () => {
