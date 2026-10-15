@@ -1211,6 +1211,87 @@ describe("PlayerTracesTab", () => {
   });
 
   // =========================================================================
+  // Search bar
+  // =========================================================================
+
+  describe("search bar", () => {
+    beforeEach(async () => {
+      wrapper.unmount();
+      setupSuccessfulMocks(
+        [
+          createRumHit(),
+          createRumHit({
+            _trace_id: "trace-0f9e8d7c6b5a",
+            _view_url: "https://example.com/checkout",
+            _view_id: "view-2",
+          }),
+        ],
+        [
+          createTraceMetadata(),
+          createTraceMetadata({
+            trace_id: "trace-0f9e8d7c6b5a",
+            start_time: 1_010_000_000,
+            end_time: 1_012_000_000,
+            spans: [4, 1],
+            first_event: { service_name: "checkout", operation_name: "POST /api/orders" },
+          }),
+        ],
+      );
+      wrapper = mountComponent();
+      await flushPromises();
+    });
+
+    const search = async (value: string) => {
+      await wrapper.find('[data-test="rum-player-traces-tab-search"] input').setValue(value);
+      await flushPromises();
+    };
+
+    const rowCount = () => wrapper.findAll('[data-test^="table-row-"]').length;
+
+    it("should list every trace while the search is empty", () => {
+      expect(wrapper.find('[data-test="rum-player-traces-tab-search"]').exists()).toBe(true);
+      expect(rowCount()).toBe(2);
+    });
+
+    it("should filter by request name, ignoring case", async () => {
+      await search("post /API/orders");
+      expect(rowCount()).toBe(1);
+      expect(wrapper.text()).toContain("POST /api/orders");
+      expect(wrapper.text()).not.toContain("GET /api/products");
+    });
+
+    it("should filter by page and by trace id", async () => {
+      await search("/products");
+      expect(rowCount()).toBe(1);
+      expect(wrapper.text()).toContain("GET /api/products");
+
+      await search("0f9e8d7c");
+      expect(rowCount()).toBe(1);
+      expect(wrapper.text()).toContain("POST /api/orders");
+    });
+
+    it("should count only the matching traces and their errors", async () => {
+      const countBadge = () => wrapper.find('[data-test="rum-player-traces-tab-count-badge"]');
+      const errorBadge = () =>
+        wrapper.find('[data-test="rum-player-traces-tab-error-count-badge"]');
+      expect(countBadge().text()).toContain("2");
+      expect(errorBadge().exists()).toBe(true);
+
+      await search("products");
+      expect(countBadge().text()).toContain("1");
+      expect(errorBadge().exists()).toBe(false);
+    });
+
+    it("should show no rows when nothing matches, and all again once cleared", async () => {
+      await search("no-such-request");
+      expect(rowCount()).toBe(0);
+
+      await search("");
+      expect(rowCount()).toBe(2);
+    });
+  });
+
+  // =========================================================================
   // Formatting utilities — additional coverage
   // =========================================================================
 

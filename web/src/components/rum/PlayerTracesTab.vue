@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="rum-player-traces-tab-count-badge"
           class="me-[0.6rem]"
           >{{
-            `${formatLargeNumber(correlatedViews.length)} ${t("menu.traces").toLowerCase()}`
+            `${formatLargeNumber(searchedViews.length)} ${t("menu.traces").toLowerCase()}`
           }}</OTag
         >
         <OTag
@@ -164,6 +164,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="rum-player-traces-tab-error-count-badge"
           >{{ `${formatLargeNumber(totalErrorCount)} ${t("rum.errorTraces")}` }}</OTag
         >
+        <div class="ms-auto w-[18rem] max-w-[50%]">
+          <OInput
+            v-model="traceSearch"
+            clearable
+            :placeholder="t('traces.sessionDetail.searchPlaceholder')"
+            data-test="rum-player-traces-tab-search"
+          />
+        </div>
       </div>
 
       <!-- Traces table -->
@@ -172,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-player-traces-tab-table"
       >
         <OTable
-          :data="correlatedViews"
+          :data="searchedViews"
           :columns="traceColumns"
           :row-height="32"
           :default-columns="false"
@@ -238,6 +246,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import TraceStatusCell from "@/plugins/traces/components/TraceStatusCell.vue";
@@ -291,8 +300,23 @@ const metadataLoading = ref(false);
 const metadataError = ref<string | null>(null);
 const traceSearchWindow = ref<{ start: number; end: number } | null>(null);
 
+const traceSearch = ref("");
+
+// Search over what each row shows: the page, the request name and the trace id.
+const searchedViews = computed(() => {
+  const term = traceSearch.value.trim().toLowerCase();
+  if (!term) return correlatedViews.value;
+  return correlatedViews.value.filter((view) =>
+    [pageRoute(view), traceDisplayName(view), view.traceId].some((value) =>
+      String(value ?? "")
+        .toLowerCase()
+        .includes(term),
+    ),
+  );
+});
+
 const totalErrorCount = computed(
-  () => correlatedViews.value.filter((v) => (v.metadata?.errorCount || 0) > 0).length,
+  () => searchedViews.value.filter((v) => (v.metadata?.errorCount || 0) > 0).length,
 );
 
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
