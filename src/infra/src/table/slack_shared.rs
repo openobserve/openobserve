@@ -22,7 +22,10 @@ use config::{
         json,
     },
 };
-use sea_orm::{DbErr, SqlErr};
+use sea_orm::{
+    DbErr, EntityTrait, SqlErr, UpdateMany,
+    sea_query::{Expr, IntoIden},
+};
 use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
@@ -36,18 +39,6 @@ pub(super) async fn secrets_key(needed: bool) -> Result<Option<Vec<u8>>, Error> 
         return Ok(None);
     }
     key_if_encrypting(cipher::is_encrypting(), cipher::get_dek).await
-}
-
-async fn key_if_encrypting<F, Fut>(encrypting: bool, fetch: F) -> Result<Option<Vec<u8>>, Error>
-where
-    F: FnOnce(&'static str) -> Fut,
-    Fut: Future<Output = Result<Vec<u8>, Error>>,
-{
-    // Checked first because `get_dek` mints and stores a DEK even while encryption is off.
-    if !encrypting {
-        return Ok(None);
-    }
-    fetch(META_ORG_ID).await.map(Some)
 }
 
 /// The stored form of a secret: `AESenc:` text under `key`, or null without a key.
@@ -79,16 +70,35 @@ pub(super) fn enum_text<T: Serialize>(value: &T) -> Result<String, Error> {
     }
 }
 
+/// The error names the column only: stored values can be user content and end up in logs.
 pub(super) fn parse_enum<T: DeserializeOwned>(column: &str, text: &str) -> Result<T, Error> {
     json::from_value(json::Value::String(text.to_string()))
-        .map_err(|_| Error::Message(format!("unknown {column} value: {text}")))
+        .map_err(|_| Error::Message(format!("unknown {column} value")))
 }
 
-pub(super) fn parse_json<T: DeserializeOwned + Default>(text: Option<&str>) -> Result<T, Error> {
-    Ok(match text {
-        Some(text) => json::from_str(text)?,
-        None => T::default(),
-    })
+/// The error names the column only: serde quotes the offending text, such as a bot answer.
+pub(super) fn parse_json<T: DeserializeOwned + Default>(
+    column: &str,
+    text: Option<&str>,
+) -> Result<T, Error> {
+    match text {
+        Some(text) => {
+            json::from_str(text).map_err(|_| Error::Message(format!("undecodable {column} json")))
+        }
+        None => Ok(T::default()),
+    }
+}
+
+/// Adds `origin_region` to a partial update when the caller knows the writing region.
+pub(super) fn with_region<E: EntityTrait>(
+    update: UpdateMany<E>,
+    column: impl IntoIden,
+    origin_region: Option<&str>,
+) -> UpdateMany<E> {
+    match origin_region {
+        Some(region) => update.col_expr(column, Expr::value(region)),
+        None => update,
+    }
 }
 
 /// Keeps the rows this binary can decode, so one value from a newer release never fails a list.
@@ -146,9 +156,21 @@ pub(super) fn db_err(e: DbErr) -> Error {
     }
 }
 
+async fn key_if_encrypting<F, Fut>(encrypting: bool, fetch: F) -> Result<Option<Vec<u8>>, Error>
+where
+    F: FnOnce(&'static str) -> Fut,
+    Fut: Future<Output = Result<Vec<u8>, Error>>,
+{
+    // Checked first because `get_dek` mints and stores a DEK even while encryption is off.
+    if !encrypting {
+        return Ok(None);
+    }
+    fetch(META_ORG_ID).await.map(Some)
+}
+
 #[cfg(test)]
 mod tests {
-    use config::meta::slack::ThreadKind;
+    use config::meta::slack::{BotAnswer, ThreadKind};
 
     use super::*;
 
@@ -199,6 +221,20 @@ mod tests {
             ThreadKind::Link
         );
         assert!(parse_enum::<ThreadKind>("kind", "alert").is_err());
+    }
+
+    #[test]
+    fn decode_errors_name_the_field_never_the_value() {
+        let e = parse_enum::<ThreadKind>("kind", "secret-kind-text").unwrap_err();
+        assert!(e.to_string().contains("kind"), "{e}");
+        assert!(!e.to_string().contains("secret"), "{e}");
+        let e = parse_json::<Vec<BotAnswer>>("bot_answers", Some(r#"["the secret answer"]"#))
+            .unwrap_err();
+        assert!(e.to_string().contains("bot_answers"), "{e}");
+        assert!(!e.to_string().contains("secret"), "{e}");
+        let e =
+            parse_json::<Vec<BotAnswer>>("bot_answers", Some(r#"[{"ts": "secret"#)).unwrap_err();
+        assert!(!e.to_string().contains("secret"), "{e}");
     }
 
     #[test]

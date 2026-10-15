@@ -22,7 +22,7 @@ use sea_orm::{
 
 use super::{
     entity::external_identity_links::{ActiveModel, Column, Entity, Model},
-    slack_shared::{db_err, decode_all, decode_pages, enum_text, parse_enum},
+    slack_shared::{db_err, decode_all, decode_pages, enum_text, parse_enum, with_region},
 };
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
@@ -75,6 +75,35 @@ pub async fn delete(id: &str) -> Result<(), Error> {
 /// Keeps `unlinked` rows: they are the record that suppresses automatic linking.
 pub async fn delete_revoked_before(at: i64) -> Result<u64, Error> {
     delete_revoked_before_with(get_orm_client_rw().await, at).await
+}
+
+/// `revoke` that also stamps `origin_region`, the form every v1 write goes through.
+pub async fn revoke_in_region(
+    id: &str,
+    reason: RevokedReason,
+    at: i64,
+    origin_region: &str,
+) -> Result<(), Error> {
+    revoke_in_region_with(get_orm_client_rw().await, id, reason, at, origin_region).await
+}
+
+/// Moves a live link off `from_org` only; false when it was revoked or repointed meanwhile.
+pub async fn repoint_default_org(
+    id: &str,
+    from_org: &str,
+    to_org: &str,
+    at: i64,
+    origin_region: &str,
+) -> Result<bool, Error> {
+    repoint_default_org_with(
+        get_orm_client_rw().await,
+        id,
+        from_org,
+        to_org,
+        at,
+        origin_region,
+    )
+    .await
 }
 
 pub async fn put_with<C: ConnectionTrait>(
@@ -153,7 +182,7 @@ pub async fn list_by_email_with<C: ConnectionTrait>(
     email: &str,
 ) -> Result<Vec<ExternalIdentityLink>, Error> {
     let models = live()
-        .filter(Column::UserEmail.eq(email))
+        .filter(Column::UserEmail.eq(email.to_lowercase()))
         .order_by_asc(Column::Id)
         .all(conn)
         .await?;
@@ -166,14 +195,7 @@ pub async fn revoke_with<C: ConnectionTrait>(
     reason: RevokedReason,
     at: i64,
 ) -> Result<(), Error> {
-    Entity::update_many()
-        .col_expr(Column::RevokedAt, Expr::value(at))
-        .col_expr(Column::RevokedReason, Expr::value(enum_text(&reason)?))
-        .col_expr(Column::UpdatedAt, Expr::value(at))
-        .filter(Column::Id.eq(id))
-        .exec(conn)
-        .await?;
-    Ok(())
+    revoke_columns(conn, id, reason, at, None).await
 }
 
 pub async fn touch_last_used_with<C: ConnectionTrait>(
@@ -209,6 +231,55 @@ pub async fn delete_revoked_before_with<C: ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(result.rows_affected)
+}
+
+pub async fn revoke_in_region_with<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    reason: RevokedReason,
+    at: i64,
+    origin_region: &str,
+) -> Result<(), Error> {
+    revoke_columns(conn, id, reason, at, Some(origin_region)).await
+}
+
+pub async fn repoint_default_org_with<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    from_org: &str,
+    to_org: &str,
+    at: i64,
+    origin_region: &str,
+) -> Result<bool, Error> {
+    let result = Entity::update_many()
+        .col_expr(Column::DefaultOrgId, Expr::value(to_org))
+        .col_expr(Column::UpdatedAt, Expr::value(at))
+        .col_expr(Column::OriginRegion, Expr::value(origin_region))
+        .filter(Column::Id.eq(id))
+        .filter(Column::DefaultOrgId.eq(from_org))
+        .filter(Column::RevokedAt.is_null())
+        .filter(Column::DeletedAt.is_null())
+        .exec(conn)
+        .await?;
+    Ok(result.rows_affected > 0)
+}
+
+async fn revoke_columns<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    reason: RevokedReason,
+    at: i64,
+    origin_region: Option<&str>,
+) -> Result<(), Error> {
+    let update = Entity::update_many()
+        .col_expr(Column::RevokedAt, Expr::value(at))
+        .col_expr(Column::RevokedReason, Expr::value(enum_text(&reason)?))
+        .col_expr(Column::UpdatedAt, Expr::value(at));
+    with_region(update, Column::OriginRegion, origin_region)
+        .filter(Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
 /// Raw rows, so the cursor moves past rows that fail to decode.
@@ -250,7 +321,7 @@ fn to_active(row: &ExternalIdentityLink) -> Result<ActiveModel, Error> {
         external_enterprise_id: Set(row.external_enterprise_id.clone()),
         external_team_id: Set(row.external_team_id.clone()),
         external_user_id: Set(row.external_user_id.clone()),
-        user_email: Set(row.user_email.clone()),
+        user_email: Set(row.user_email.to_lowercase()),
         default_org_id: Set(row.default_org_id.clone()),
         link_method: Set(enum_text(&row.link_method)?),
         created_at: Set(row.created_at),
@@ -525,5 +596,83 @@ mod tests {
         assert_eq!(left, ["l2", "l3", "l4"]);
         delete_with(&db, "l4").await.unwrap();
         assert_eq!(get_with(&db, "l4").await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn region_aware_revoke_writes_both_replication_columns() {
+        let db = db().await;
+        put_with(&db, &link("l1", "i1", "U1")).await.unwrap();
+        revoke_in_region_with(&db, "l1", RevokedReason::OrgDeleted, 500, "eu-west")
+            .await
+            .unwrap();
+        let read = get_with(&db, "l1").await.unwrap().unwrap();
+        assert_eq!(
+            read,
+            ExternalIdentityLink {
+                revoked_at: Some(500),
+                revoked_reason: Some(RevokedReason::OrgDeleted),
+                updated_at: 500,
+                origin_region: "eu-west".to_string(),
+                ..link("l1", "i1", "U1")
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn repoint_moves_only_a_live_link_still_on_the_old_org() {
+        let db = db().await;
+        put_with(&db, &link("l1", "i1", "U1")).await.unwrap();
+        assert!(
+            !repoint_default_org_with(&db, "l1", "other", "beta", 300, "eu-west")
+                .await
+                .unwrap(),
+            "the link no longer defaults to the old org"
+        );
+        assert!(
+            repoint_default_org_with(&db, "l1", "acme", "beta", 300, "eu-west")
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            get_with(&db, "l1").await.unwrap().unwrap(),
+            ExternalIdentityLink {
+                default_org_id: "beta".to_string(),
+                updated_at: 300,
+                origin_region: "eu-west".to_string(),
+                ..link("l1", "i1", "U1")
+            }
+        );
+
+        put_with(&db, &link("l2", "i1", "U2")).await.unwrap();
+        revoke_with(&db, "l2", RevokedReason::Unlinked, 400)
+            .await
+            .unwrap();
+        let revoked = get_with(&db, "l2").await.unwrap().unwrap();
+        assert!(
+            !repoint_default_org_with(&db, "l2", "acme", "beta", 450, "eu-west")
+                .await
+                .unwrap()
+        );
+        assert_eq!(get_with(&db, "l2").await.unwrap().unwrap(), revoked);
+    }
+
+    #[tokio::test]
+    async fn user_email_is_stored_and_matched_lower_cased() {
+        let db = db().await;
+        put_with(
+            &db,
+            &ExternalIdentityLink {
+                user_email: "Alice@Acme.COM".to_string(),
+                ..link("l1", "i1", "U1")
+            },
+        )
+        .await
+        .unwrap();
+        let read = get_with(&db, "l1").await.unwrap().unwrap();
+        assert_eq!(read.user_email, "alice@acme.com");
+        assert_eq!(
+            ids(list_by_email_with(&db, "ALICE@acme.com").await.unwrap()),
+            ["l1"]
+        );
     }
 }
