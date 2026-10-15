@@ -17,7 +17,6 @@ use std::sync::LazyLock as Lazy;
 
 use anyhow::Result;
 use config::{
-    get_config,
     meta::{
         self_reporting::usage::{self},
         stream::StreamType,
@@ -41,20 +40,12 @@ static INITIALIZED_ORGS: Lazy<DashSet<String>> = Lazy::new(DashSet::new);
 /// * `org_id` - The organization ID to initialize the triggers stream for
 ///
 /// # Behavior
-/// - Only applies when ZO_USAGE_REPORT_TO_OWN_ORG is enabled
 /// - Uses lock-free per-org tracking to ensure initialization happens only once per restart
 /// - Auto-generates field list from TriggerData struct via reflection
 /// - Creates schema directly without ingesting sample data
 /// - Does NOT manipulate defined_schema_fields (no UDS filtering for system streams)
 /// - Never blocks ingestion even if initialization fails
 pub async fn ensure_triggers_stream_initialized(org_id: &str) -> Result<()> {
-    let cfg = get_config();
-
-    // Only initialize when usage_report_to_own_org is enabled
-    if !cfg.common.usage_report_to_own_org {
-        return Ok(());
-    }
-
     // Check if already initialized (lock-free read)
     if INITIALIZED_ORGS.contains(org_id) {
         return Ok(());
@@ -80,6 +71,20 @@ pub async fn ensure_triggers_stream_initialized(org_id: &str) -> Result<()> {
     }
 }
 
+/// The stream's full schema, inferred from a `TriggerData` with every field populated.
+pub(crate) fn expected_schema() -> Result<arrow_schema::Schema> {
+    let sample = config::meta::self_reporting::usage::TriggerData::init_for_reflection();
+    let json_value = config::utils::json::to_value(&sample)?;
+    let json_map = json_value
+        .as_object()
+        .ok_or_else(|| anyhow::anyhow!("Failed to convert TriggerData to JSON object"))?;
+    Ok(config::utils::schema::infer_json_schema_from_map(
+        usage::TRIGGERS_STREAM,
+        StreamType::Logs,
+        std::iter::once(json_map),
+    )?)
+}
+
 /// Internal function that performs the actual schema initialization.
 /// This should only be called by ensure_triggers_stream_initialized.
 ///
@@ -95,22 +100,7 @@ async fn initialize_triggers_stream_schema(org_id: &str) -> Result<()> {
         "[SELF-REPORTING] Creating triggers stream schema for {org_id}/{stream_name} via reflection"
     );
 
-    // Create a sample TriggerData with all fields populated (for schema inference)
-    let sample_trigger = config::meta::self_reporting::usage::TriggerData::init_for_reflection();
-
-    // Convert to JSON value to infer Arrow schema
-    let json_value = config::utils::json::to_value(&sample_trigger)?;
-    let json_map = json_value
-        .as_object()
-        .ok_or_else(|| anyhow::anyhow!("Failed to convert TriggerData to JSON object"))?;
-
-    // Infer Arrow schema from the JSON (uses OpenObserve's schema inference)
-    // Pass as iterator of a single map
-    let expected_schema = config::utils::schema::infer_json_schema_from_map(
-        stream_name,
-        stream_type,
-        std::iter::once(json_map),
-    )?;
+    let expected_schema = expected_schema()?;
 
     if infra::schema::get(org_id, stream_name, stream_type)
         .await
@@ -137,6 +127,9 @@ async fn initialize_triggers_stream_schema(org_id: &str) -> Result<()> {
                 "[SELF-REPORTING] Successfully created triggers stream schema for {org_id}/{stream_name} with {} fields",
                 expected_schema.fields().len()
             );
+            // The org now gets trigger rows, so its built-in alerts have something to watch.
+            #[cfg(feature = "enterprise")]
+            crate::alerts::prebuilt::seed_org_in_background(org_id);
             Ok(())
         }
         Err(e) => {
@@ -207,13 +200,6 @@ mod tests {
             .collect::<std::collections::HashSet<_>>()
             .len();
         assert_eq!(unique_count, field_names.len());
-    }
-
-    #[tokio::test]
-    async fn test_ensure_triggers_stream_initialized_meta_org() {
-        // Should return Ok immediately for META org
-        let result = ensure_triggers_stream_initialized(config::META_ORG_ID).await;
-        assert!(result.is_ok());
     }
 
     #[tokio::test]

@@ -41,7 +41,7 @@ const downtimeBanner = (url: string): Banner => ({
   variant: "warning",
   ends_at: (NOW_MS + 20 * 60_000) * 1000,
   dismissible: true,
-  cta: { text: raw("View downtimes"), url },
+  ctas: [{ text: raw("View downtimes"), url }],
 });
 
 const mountBanner = async () => {
@@ -75,7 +75,7 @@ describe("AnnouncementBanner", () => {
     banners.value = [downtimeBanner("/web/downtimes?status=active&scope=all")];
     const { wrapper, router } = await mountBanner();
 
-    const cta = wrapper.get('[data-test="announcement-banner-cta-downtime:dt-1:1"]');
+    const cta = wrapper.get('[data-test="announcement-banner-cta-downtime:dt-1:1-0"]');
     expect(cta.attributes("target")).toBeUndefined();
     await cta.trigger("click");
     await flushPromises();
@@ -92,7 +92,7 @@ describe("AnnouncementBanner", () => {
     banners.value = [downtimeBanner("https://status.example.com/incident")];
     const { wrapper } = await mountBanner();
 
-    const cta = wrapper.get('[data-test="announcement-banner-cta-downtime:dt-1:1"]');
+    const cta = wrapper.get('[data-test="announcement-banner-cta-downtime:dt-1:1-0"]');
     expect(cta.attributes("href")).toBe("https://status.example.com/incident");
     expect(cta.attributes("target")).toBe("_blank");
   });

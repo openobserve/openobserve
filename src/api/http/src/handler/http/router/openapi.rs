@@ -82,6 +82,7 @@ use crate::{
         openobserve_api_search::traces::time_index::get_trace_time_range,
         openobserve_api_search::traces::time_index::get_org_trace_time_range,
         openobserve_api_search::traces::dag::get_trace_dag,
+        openobserve_api_search::rum::lookup::lookup,
         openobserve_api_search::profiles::meta::get_profiles_meta,
         openobserve_api_search::profiles::tag_values::get_profiles_tag_values,
         openobserve_api_search::profiles::series::profiles_series_get,
@@ -645,6 +646,7 @@ use crate::{
         (name = "Synthetics", description = "Synthetic monitoring — uptime and browser checks (enterprise)"),
         (name = "Downtimes", description = "Scheduled windows that keep evaluating alerts, anomaly detections, synthetics checks and SLOs but notify nobody (enterprise)"),
         (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
+        (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -716,6 +718,9 @@ pub struct ApiDoc;
     openobserve_api_management::request::organization::password_policy::get_policy,
     openobserve_api_management::request::organization::password_policy::set_policy,
     openobserve_api_management::request::organization::password_policy::get_password_complexity,
+    openobserve_api_management::request::alert_calibration::config::get_alert_calibration_config,
+    openobserve_api_management::request::alert_calibration::config::update_alert_calibration_config,
+    openobserve_api_management::request::alert_calibration::digests::run_alert_calibration,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,

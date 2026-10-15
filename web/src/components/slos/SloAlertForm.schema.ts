@@ -65,11 +65,6 @@ export const makeSloAlertSchema = (t: Translator) =>
         add(["silenceMinutes"], t("slos.validation.silenceNonNegative"));
       }
 
-      // Either channel satisfies the server, so this is a rule about the PAIR.
-      if ((val.destinations?.length ?? 0) === 0 && (val.workflows?.length ?? 0) === 0) {
-        add(["destinations"], t("slos.validation.targetsRequired"));
-      }
-
       const c = val.condition ?? {};
       const isBurnRate = c.kind === "burn_rate";
 

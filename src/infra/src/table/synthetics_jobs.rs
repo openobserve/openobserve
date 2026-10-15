@@ -261,14 +261,15 @@ pub async fn get_by_id<C: ConnectionTrait>(
 /// Deletes all pending checks for a synthetic (called on check delete).
 pub async fn drain_check<C: ConnectionTrait>(
     conn: &C,
+    org_id: &str,
     synthetics_id: &str,
 ) -> Result<u64, errors::Error> {
-    let sql = "DELETE FROM synthetics_jobs WHERE synthetics_id = $1";
+    let sql = "DELETE FROM synthetics_jobs WHERE synthetics_id = $1 and org_id = $2";
     let res = conn
         .execute(Statement::from_sql_and_values(
             conn.get_database_backend(),
             sql,
-            [Value::from(synthetics_id)],
+            [Value::from(synthetics_id), Value::from(org_id)],
         ))
         .await?;
     Ok(res.rows_affected())

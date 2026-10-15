@@ -1424,7 +1424,11 @@ fn combined_banner(active: &[ActiveWindow]) -> Option<Banner> {
         starts_at: active.iter().map(|a| a.window.start).min(),
         ends_at: active.iter().map(|a| a.window.end).min(),
         dismissible: true,
-        cta: Some(cta),
+        cta: Some(cta.clone()),
+        ctas: vec![cta],
+        text_size: None,
+        colors: None,
+        icon: None,
         orgs: None,
         counts: Some(
             per_module

@@ -78,7 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         content-class="max-w-[25rem] whitespace-normal break-words text-xs"
       >
         <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
-          <span class="cursor-pointer truncate">{{ (row as any).name || "—" }}</span>
+          <span
+            class="cursor-pointer truncate"
+            :data-test="`${dataTest}-name-${(row as any).id}`"
+            >{{ (row as any).name || "—" }}</span
+          >
           <MutedChip
             v-if="(row as any).active_downtime"
             :downtime="(row as any).active_downtime"

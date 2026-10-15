@@ -1541,6 +1541,7 @@ export default defineComponent({
             if (activePermalink.value) void resolveActivePermalink(permalinkResolveContext());
           } else {
             endSharedLinkSession();
+            resetLiveMode();
           }
 
           if (
@@ -1729,9 +1730,17 @@ export default defineComponent({
       loadLogsData("url");
     }
 
+    // Live mode skips the histogram, so a carried-over interval leaves the new org without one.
+    function resetLiveMode() {
+      if (store.state.refreshIntervalID) clearInterval(store.state.refreshIntervalID);
+      searchObj.meta.refreshInterval = 0;
+      autoRun.engine.onRefreshIntervalChanged(0);
+    }
+
     function handleOrganizationChange() {
       bumpSelectionToken();
       autoRun.engine.resetScope("org");
+      resetLiveMode();
       endSharedLinkSession();
       searchObj.meta.freeTextScan = {};
       searchObj.loading = true;

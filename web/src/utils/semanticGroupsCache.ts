@@ -15,6 +15,7 @@
 
 // The fetch lives here rather than in a composable because chart code, which reads these directly, cannot reach one.
 
+import { isCancelledError } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
 import { semanticGroupsQuery } from "@/services/service_streams.queries";
 import { isServiceStreamKey, serviceStreamKeys } from "@/services/service_streams.querykeys";
@@ -58,7 +59,8 @@ export async function loadSemanticGroups(
     // A 403 means this org/user simply isn't entitled to semantic groups —
     // every caller already falls back to `[]` and keeps going, so this is an
     // expected permission state, not a failure worth logging as an error.
-    if (err?.response?.status !== 403) {
+    // A cancellation is another caller force-refreshing the query, not a failed load.
+    if (err?.response?.status !== 403 && !isCancelledError(err)) {
       console.error("Error loading semantic groups:", err);
     }
     return [];

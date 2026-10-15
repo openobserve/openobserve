@@ -88,21 +88,13 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         const uniqueSuffix = Math.random().toString(36).substring(2, 8);
         testLogger.info('Testing condition operator toggle', { uniqueSuffix });
 
-        // Create prerequisite template and destination to ensure Add Alert button is enabled
-        // This fixes flaky behavior where button is disabled when no destinations exist
+        // The Add Alert button needs a template to exist
         const templateName = 'auto_template_toggle_' + uniqueSuffix;
-        const destinationName = 'auto_dest_toggle_' + uniqueSuffix;
 
         await pm.alertTemplatesPage.navigateToTemplates();
         await pm.alertTemplatesPage.waitForTemplateListReady();
         await pm.alertTemplatesPage.createTemplate(templateName);
         testLogger.info('Template created', { templateName });
-
-        await pm.alertDestinationsPage.navigateToDestinations();
-        await pm.alertDestinationsPage.waitForDestinationListReady();
-        const destinationUrl = notificationSinkUrl();
-        await pm.alertDestinationsPage.createDestination(destinationName, destinationUrl, templateName);
-        testLogger.info('Destination created', { destinationName });
 
         // Navigate back to alerts page
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;

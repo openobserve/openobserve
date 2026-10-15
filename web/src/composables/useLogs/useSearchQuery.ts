@@ -29,7 +29,7 @@ import config from "@/aws-exports";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { hasLimitClause } from "@/utils/query/nonSqlLimit";
-import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { buildContextualSqlMessage, isParserLimitation } from "@/utils/query/sqlDiagnostics";
@@ -336,8 +336,6 @@ export const useSearchQuery = (t: TranslateFn) => {
 
   const { searchObj, notificationMsg, initialQueryPayload, searchAggData } = searchState();
 
-  const { semanticGroups } = useServiceCorrelation();
-
   const filterContext = (): FilterResolveContext =>
     buildFilterContext(searchObj, store.state.zoConfig);
 
@@ -356,7 +354,9 @@ export const useSearchQuery = (t: TranslateFn) => {
 
   const multiStreamFields = (): MultiStreamFieldContext => ({
     selectedStreamFields: searchObj.data.stream.selectedStreamFields,
-    fieldToGroupId: buildFieldToGroupIdMap(semanticGroups.value),
+    fieldToGroupId: buildFieldToGroupIdMap(
+      getCachedSemanticGroups(store.state.selectedOrganization?.identifier ?? "") ?? [],
+    ),
     parse: (sql: string) => fnParsedSQL(sql),
     unparse: (ast: any) => fnUnparsedSQL(ast),
   });

@@ -256,6 +256,7 @@ import analytics from "@/services/product_analytics";
 import ShareButton from "@/components/common/ShareButton.vue";
 import { getDashboard } from "@/utils/commons.ts";
 import { getManager } from "@/lib/vue-shortcut-manager";
+import { DASHBOARD_FRESH_PANEL_TIME } from "@/composables/dashboard/dashboardFreshPanelTime";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -411,6 +412,70 @@ describe("ViewDashboard", () => {
 
       expect(wrapper.vm.isAutoRunOn).toBe(false);
       expect(wrapper.vm.isVariablesChanged).toBe(true);
+    });
+
+    describe("a panel's time for an Auto Run reload", () => {
+      const MINUTE_MICROS = 60_000_000;
+      const lastRefreshEnd = (Date.now() - 45 * 60_000) * 1000;
+
+      const mountWithAppliedRange = async (appliedRange: Record<string, unknown>) => {
+        setAutoQuery(true);
+        wrapper = createWrapper();
+        await flushPromises();
+        wrapper.vm.currentDashboardData.data = {
+          tabs: [{ tabId: "tab-1", name: "Tab 1", panels: [{ id: "p-1", type: "line" }] }],
+        };
+        // The picker still holds an hour that was picked but never applied.
+        wrapper.vm.dateTimePicker = {
+          getConsumableDateTime: () => ({
+            startTime: lastRefreshEnd - 60 * MINUTE_MICROS,
+            endTime: lastRefreshEnd,
+          }),
+        };
+        wrapper.vm.selectedDate = appliedRange;
+        await flushPromises();
+        return wrapper.vm.$.provides[DASHBOARD_FRESH_PANEL_TIME as symbol];
+      };
+
+      it("moves the applied relative range up to now, ignoring a range nobody applied", async () => {
+        const resolveFreshPanelTime = await mountWithAppliedRange({
+          valueType: "relative",
+          relativeTimePeriod: "15m",
+          startTime: lastRefreshEnd - 15 * MINUTE_MICROS,
+          endTime: lastRefreshEnd,
+        });
+
+        const askedAt = Date.now() * 1000;
+        const time = resolveFreshPanelTime("p-1");
+
+        expect(time.end_time.getTime()).toBeGreaterThanOrEqual(askedAt);
+        expect(time.end_time.getTime() - time.start_time.getTime()).toBe(15 * MINUTE_MICROS);
+        expect(resolveFreshPanelTime("not-on-this-dashboard")).toBeUndefined();
+      });
+
+      it("returns an applied absolute range unchanged", async () => {
+        const resolveFreshPanelTime = await mountWithAppliedRange({
+          valueType: "absolute",
+          startTime: lastRefreshEnd - 30 * MINUTE_MICROS,
+          endTime: lastRefreshEnd,
+        });
+
+        expect(resolveFreshPanelTime("p-1")).toEqual({
+          start_time: new Date(lastRefreshEnd - 30 * MINUTE_MICROS),
+          end_time: new Date(lastRefreshEnd),
+        });
+      });
+
+      it("resolves nothing once Auto Run is off", async () => {
+        const resolveFreshPanelTime = await mountWithAppliedRange({
+          valueType: "relative",
+          relativeTimePeriod: "15m",
+        });
+
+        wrapper.vm.toggleAutoRun();
+
+        expect(resolveFreshPanelTime("p-1")).toBeUndefined();
+      });
     });
 
     it("is unavailable and off when the server flag is off", async () => {

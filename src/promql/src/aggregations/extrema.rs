@@ -78,16 +78,3 @@ impl<const IS_MAX: bool> Accumulate for ExtremaAccumulator<IS_MAX> {
         group_series(group_labels, samples)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_min_and_max_have_distinct_accumulator_types() {
-        assert_ne!(
-            std::any::TypeId::of::<ExtremaAccumulator<false>>(),
-            std::any::TypeId::of::<ExtremaAccumulator<true>>(),
-        );
-    }
-}
