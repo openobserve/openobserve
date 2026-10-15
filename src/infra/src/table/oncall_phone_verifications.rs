@@ -310,6 +310,8 @@ async fn confirm_in<C: TransactionTrait>(
     now: i64,
 ) -> Result<Option<Vec<(String, String)>>, errors::Error> {
     let txn = db.begin().await?;
+    // Profiles before the code row, as `reserve_code_in` does, so the two cannot deadlock.
+    profiles_to_lock(user_email, target).all(&txn).await?;
     // Spent first: a code a resend replaced, or another confirm spent, verifies nothing.
     let spent = Entity::update_many()
         .col_expr(Column::CodeHash, Expr::value(Option::<String>::None))
