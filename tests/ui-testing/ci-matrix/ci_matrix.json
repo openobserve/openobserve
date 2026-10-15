@@ -354,7 +354,8 @@
       "timezoneDisplay.spec.js",
       "searchPatternsMultiStream.spec.js",
       "logsActionReasons.spec.js",
-      "logsSearchCancelled.spec.js"
+      "logsSearchCancelled.spec.js",
+      "logsToolbarPins.spec.js"
     ],
     "disabled": [
       {
