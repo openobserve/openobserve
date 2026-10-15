@@ -23,7 +23,7 @@ use config::{
 };
 use futures::future::join_all;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
-use tantivy::{directory::MmapDirectory, indexer::merge_indices};
+use tantivy::indexer::merge_indices;
 use tokio::task::JoinHandle;
 use vortex::{
     VortexSessionDefault,
@@ -36,7 +36,10 @@ use vortex::{
 };
 
 use super::{TantivyIndexSchema, convert_batch_to_docs_sync};
-use crate::index_builder::reader::{ChunkSelector, chunk_iter};
+use crate::{
+    index_builder::reader::{ChunkSelector, chunk_iter},
+    scratch_directory::ScratchDirectory,
+};
 
 pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
     tantivy_dir: D,
@@ -173,7 +176,7 @@ where
         let selector = make_selector(chunk_idx);
         tasks.push(tokio::task::spawn_blocking(move || {
             let _permit = permit;
-            let dir = MmapDirectory::create_from_tempdir()?;
+            let dir = ScratchDirectory::new()?;
             build_segment(chunk_idx, buf_c, selector, index_schema_c, dir)
         }));
     }
