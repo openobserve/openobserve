@@ -281,7 +281,7 @@ pub async fn delete_link(
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), LinksQuery),
     responses(
-        (status = 200, description = "`{\"links\", \"next_cursor\"}`", content_type = "application/json", body = Object),
+        (status = 200, description = "`{\"links\": [{\"id\", \"slack_user_id\", \"user_email\", \"link_method\", \"created_at\", \"last_used_at\", \"default_org_is_this_org\"}], \"next_cursor\"}`", content_type = "application/json", body = Object),
         (status = 403, description = "Not an admin, or the OSS build", content_type = "application/json", body = ()),
         (status = 404, description = "Slack is not enabled for this organization, or the installation is not connected", content_type = "application/json", body = ()),
     ),
