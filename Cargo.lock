@@ -12757,6 +12757,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tantivy",
+ "tempfile",
  "tokio",
  "vortex",
  "zstd",
