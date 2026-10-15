@@ -177,10 +177,9 @@ describe("PublicDashboard viewer", () => {
     expect(has(w, "dashboards-public-dashboard-error")).toBe(false);
   });
 
-  it.each([
-    ["a 304 that repeats the hint", { etag: '"a"', "retry-after": "5" }],
-    ["a 304 with only its ETag, keeping the last hint", { etag: '"a"' }],
-  ])("polls at the Retry-After hint while refreshing, through %s", async (_name, notModified) => {
+  it("polls at the Retry-After hint while refreshing, through a 304 that repeats it", async () => {
+    // The server sends Retry-After on every refreshing 304.
+    const notModified = { etag: '"a"', "retry-after": "5" };
     vi.useFakeTimers();
     vi.setSystemTime(1_800_000_020_000);
     (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
@@ -247,6 +246,51 @@ describe("PublicDashboard viewer", () => {
     await vi.advanceTimersByTimeAsync(60_000);
     expect(grid(w).props("injectedPanelData").p1.data).toEqual([[{ y: 2 }]]);
     expect(w.findComponent({ name: "OBanner" }).exists()).toBe(false);
+  });
+
+  it("drops the hold banner once the next answer is not a 429 or a 503", async () => {
+    vi.useFakeTimers();
+    vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
+    vi.mocked(service.getData)
+      .mockResolvedValueOnce(okSnapshot([[{ y: 1 }]]) as never)
+      .mockRejectedValueOnce({ response: { status: 429, headers: { "retry-after": "60" } } })
+      .mockResolvedValueOnce({
+        status: 202,
+        headers: { "retry-after": "5" },
+        data: { state: "building" },
+      } as never)
+      .mockRejectedValueOnce(new Error("Network Error"));
+    const w = buildWrapper();
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(w.findComponent({ name: "OBanner" }).exists()).toBe(true);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(service.getData).toHaveBeenCalledTimes(3);
+    expect(w.findComponent({ name: "OBanner" }).exists()).toBe(false);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(service.getData).toHaveBeenCalledTimes(4);
+    expect(w.findComponent({ name: "OBanner" }).exists()).toBe(false);
+    expect(grid(w).props("injectedPanelData").p1.data).toEqual([[{ y: 1 }]]);
+  });
+
+  it("says Too many requests when the viewer switches range during a 429 hold", async () => {
+    vi.useFakeTimers();
+    vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
+    vi.mocked(service.getData)
+      .mockResolvedValueOnce(okSnapshot([[{ y: 1 }]]) as never)
+      .mockRejectedValueOnce({ response: { status: 429, headers: { "retry-after": "60" } } })
+      .mockResolvedValue(okSnapshot([[{ y: 2 }]]) as never);
+    const w = mountWithPicker();
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(60_000);
+    pickRange(w, "r86400");
+    await flushPromises();
+    expect(w.text()).toContain("Too many requests");
+    expect(has(w, "dashboards-public-dashboard-loading")).toBe(false);
+    expect(service.getData).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(service.getData).toHaveBeenLastCalledWith("abc", "r86400", undefined);
+    expect(grid(w).props("injectedPanelData").p1.data).toEqual([[{ y: 2 }]]);
   });
 
   it("treats a 503 with Retry-After as a temporary hold, not a turned-off link", async () => {

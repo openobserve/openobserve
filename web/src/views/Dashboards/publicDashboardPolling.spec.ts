@@ -406,7 +406,6 @@ describe("viewer polling (design 4.7)", () => {
       const gaps: number[] = [];
       const pollers = Array.from({ length: viewers }, () => {
         let rev: string | null = null;
-        let lastHintMs: number | null = null;
         let lastReadAt: number | null = null;
         return createPoller({
           isHidden: () => false,
@@ -417,9 +416,8 @@ describe("viewer polling (design 4.7)", () => {
             lastReadAt = now;
             const res = server.read(rev);
             rev = res.rev;
-            const sent = res.retryAfter === null ? null : res.retryAfter * 1000;
-            lastHintMs = sent ?? (res.status === 304 && res.refreshing ? lastHintMs : null);
-            return { kind: "body", refreshing: res.refreshing, hintMs: lastHintMs };
+            const hintMs = res.retryAfter === null ? null : res.retryAfter * 1000;
+            return { kind: "body", refreshing: res.refreshing, hintMs };
           },
         });
       });

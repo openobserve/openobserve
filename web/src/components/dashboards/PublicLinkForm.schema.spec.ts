@@ -97,6 +97,8 @@ describe("PublicLinkForm effective refresh", () => {
     // A floor between minutes rounds up to the next minute.
     expect(effectiveRefreshSecs(60, 86_401 * 288)).toBe(86_460);
     expect(effectiveRefreshSecs(30, 60)).toBe(60);
+    // 1,441 minutes ÷ 288 is 300.2 s: the exact quotient rounds up to 6 minutes, as on the server.
+    expect(effectiveRefreshSecs(300, 1441 * 60)).toBe(360);
     // A raised operator minimum lifts every range.
     expect(effectiveRefreshSecs(300, 3600, 600)).toBe(600);
   });
