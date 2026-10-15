@@ -30,17 +30,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <BetaBadge />
       </span>
     </template>
-    <template #title-trail>
-      <span
-        tabindex="0"
-        class="text-text-secondary flex items-center"
-        :aria-label="t('rum.analytics.sdkSampled')"
-        data-test="rum-analytics-sdk-sampling"
-      >
-        <OIcon name="info-outline" size="sm" />
-        <OTooltip
-          :content="t('rum.analytics.sdkSampledTip', { field: raw('sessionSampleRate') })"
-        />
+    <template #subtitle>
+      <span class="flex min-w-0 items-center gap-1">
+        <OTruncatedText class="leading-normal">{{ t("rum.analytics.subtitle") }}</OTruncatedText>
+        <span
+          tabindex="0"
+          class="text-text-secondary flex shrink-0 items-center"
+          :aria-label="t('rum.analytics.sdkSampled')"
+          data-test="rum-analytics-sdk-sampling"
+        >
+          <OIcon name="info-outline" size="xs" />
+          <OTooltip
+            :content="t('rum.analytics.sdkSampledTip', { field: raw('sessionSampleRate') })"
+          />
+        </span>
       </span>
     </template>
     <template #actions>
@@ -339,6 +342,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
