@@ -43,7 +43,7 @@ pub use openobserve_core::traces::{
     service_graph::{self, get_current_topology, get_edge_history},
 };
 use openobserve_core::{auth::UserEmail, traces};
-use tracing::Span;
+use tracing::{Instrument, Span};
 
 use crate::{
     common::{
@@ -268,9 +268,8 @@ pub async fn get_latest_traces(
         stream_name,
         user_id.to_string(),
         trace_id.clone(),
-        http_span,
     );
-    let result = match list::run(&context, &plan).await {
+    let result = match list::run(&context, &plan).instrument(http_span).await {
         Ok(result) => result,
         Err(err) => {
             record_latest_traces_metrics(&org_id, "500", start.elapsed().as_secs_f64());
@@ -374,13 +373,7 @@ pub async fn get_latest_traces_stream(
         Ok(plan) => plan,
         Err(response) => return response,
     };
-    let context = list::TraceSearchContext::new(
-        org_id,
-        stream_name,
-        user_id.to_string(),
-        trace_id,
-        Span::none(),
-    );
+    let context = list::TraceSearchContext::new(org_id, stream_name, user_id.to_string(), trace_id);
     list::stream_response(context, plan, http_span)
 }
 

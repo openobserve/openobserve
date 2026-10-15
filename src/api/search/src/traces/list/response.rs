@@ -78,7 +78,7 @@ impl TraceBatch {
                     json::get_int_value(item.get("trace_end_time").unwrap_or_default()),
                 ),
             };
-            batch.expand_range(trace_start_time, trace_end_time, mode);
+            batch.expand_range(trace_start_time, trace_end_time);
             if mode == TraceListMode::Streaming && trace_id.is_empty() {
                 continue;
             }
@@ -123,24 +123,12 @@ impl TraceBatch {
         traces
     }
 
-    fn expand_range(&mut self, start: i64, end: i64, mode: TraceListMode) {
-        match mode {
-            TraceListMode::Complete => {
-                if start / 1000 < self.range.0 {
-                    self.range.0 = start / 1000;
-                }
-                if end / 1000 > self.range.1 {
-                    self.range.1 = end / 1000 + 1;
-                }
-            }
-            TraceListMode::Streaming => {
-                if start > 0 && start / 1000 < self.range.0 {
-                    self.range.0 = start / 1000;
-                }
-                if end > 0 && end / 1000 + 1 > self.range.1 {
-                    self.range.1 = end / 1000 + 1;
-                }
-            }
+    fn expand_range(&mut self, start: i64, end: i64) {
+        if start > 0 && start / 1000 < self.range.0 {
+            self.range.0 = start / 1000;
+        }
+        if end > 0 && end / 1000 + 1 > self.range.1 {
+            self.range.1 = end / 1000 + 1;
         }
     }
 }
@@ -363,12 +351,11 @@ mod tests {
     fn conversion_preserves_range_boundaries_and_count_overflow() {
         let mut hit = summary("a", 1);
         hit["span_count"] = json::json!(65_536);
-        let complete = TraceBatch::from_hits(&[hit.clone()], (100, 150), TraceListMode::Complete);
-        let streaming = TraceBatch::from_hits(&[hit], (100, 150), TraceListMode::Streaming);
-        assert_eq!(complete.range, (100, 150));
-        assert_eq!(streaming.range, (100, 151));
-        assert_eq!(complete.traces["a"].spans[0], 0);
-        assert_eq!(streaming.traces["a"].spans[0], 0);
+        for mode in [TraceListMode::Complete, TraceListMode::Streaming] {
+            let batch = TraceBatch::from_hits(&[hit.clone()], (100, 150), mode);
+            assert_eq!(batch.range, (100, 151));
+            assert_eq!(batch.traces["a"].spans[0], 0);
+        }
     }
 
     #[test]

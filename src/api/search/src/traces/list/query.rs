@@ -16,18 +16,14 @@
 use config::{
     TIMESTAMP_COL_NAME,
     meta::{
-        search::{Query, Request, Response, SearchEventType},
+        search::{Request, Response},
         stream::StreamType,
         traces::session::{quote_identifier, quote_sql_string},
     },
 };
 use infra::errors::Error;
-use tracing::{Instrument, Span};
 
-use super::{
-    plan::{TraceListMode, TraceListPlan, TraceSchema},
-    response::TraceBatch,
-};
+use super::{plan::TraceSchema, response::TraceBatch};
 use crate::traces::schema_compat;
 
 pub(in crate::traces) struct TraceSearchContext {
@@ -35,7 +31,6 @@ pub(in crate::traces) struct TraceSearchContext {
     pub(super) stream_name: String,
     pub(super) user_id: String,
     pub(super) trace_id: String,
-    span: Span,
 }
 
 impl TraceSearchContext {
@@ -44,41 +39,12 @@ impl TraceSearchContext {
         stream_name: String,
         user_id: String,
         trace_id: String,
-        span: Span,
     ) -> Self {
         Self {
             org_id,
             stream_name,
             user_id,
             trace_id,
-            span,
-        }
-    }
-
-    pub(super) fn request(
-        &self,
-        plan: &TraceListPlan,
-        sql: String,
-        range: (i64, i64),
-        from: i64,
-        size: i64,
-    ) -> Request {
-        Request {
-            query: Query {
-                sql,
-                from,
-                size,
-                start_time: range.0,
-                end_time: range.1,
-                ..Default::default()
-            },
-            timeout: plan.options.timeout,
-            use_cache: plan.options.use_cache,
-            search_type: match plan.mode {
-                TraceListMode::Complete => None,
-                TraceListMode::Streaming => Some(SearchEventType::UI),
-            },
-            ..Default::default()
         }
     }
 
@@ -94,7 +60,6 @@ impl TraceSearchContext {
             None,
             false,
         )
-        .instrument(self.span.clone())
         .await
     }
 
@@ -322,24 +287,19 @@ mod tests {
 
     #[test]
     fn service_followup_preserves_request_settings_and_uses_coordinator_range() {
-        use config::utils::json;
+        use config::{meta::search::SearchEventType, utils::json};
         use hashbrown::HashMap;
 
-        use super::super::plan::{TraceListOptions, TraceSort};
+        use super::super::plan::{TraceListMode, TraceListOptions, TraceListPlan, TraceSort};
 
         let query = HashMap::from_iter([
             ("start_time".to_string(), "100".to_string()),
             ("end_time".to_string(), "150".to_string()),
             ("timeout".to_string(), "17".to_string()),
             ("use_cache".to_string(), "false".to_string()),
+            ("from".to_string(), "10".to_string()),
+            ("size".to_string(), "25".to_string()),
         ]);
-        let ctx = TraceSearchContext::new(
-            "org".to_string(),
-            "stream".to_string(),
-            "user".to_string(),
-            "request-id".to_string(),
-            Span::none(),
-        );
         for mode in [TraceListMode::Complete, TraceListMode::Streaming] {
             let plan = TraceListPlan {
                 options: TraceListOptions::parse(&query, mode).unwrap(),
@@ -348,13 +308,7 @@ mod tests {
                 validated: None,
                 mode,
             };
-            let base = ctx.request(
-                &plan,
-                "SELECT ... WHERE service_name = 'api'".to_string(),
-                (100, 150),
-                10,
-                25,
-            );
+            let base = plan.request("stream");
             assert_eq!(
                 base.search_type,
                 match mode {

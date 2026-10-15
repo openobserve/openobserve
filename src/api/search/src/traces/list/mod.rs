@@ -52,11 +52,8 @@ pub(super) async fn prepare(
     )
     .await;
     let is_llm = infra::schema::get_is_llm_stream(org_id, stream_name, StreamType::Traces).await;
-    let schema = if is_llm || mode == TraceListMode::Complete {
-        infra::schema::get_stream_schema_from_cache(org_id, stream_name, StreamType::Traces).await
-    } else {
-        None
-    };
+    let schema =
+        infra::schema::get_stream_schema_from_cache(org_id, stream_name, StreamType::Traces).await;
     let validated = if is_llm {
         Some(match schema.as_ref() {
             Some(schema) => schema_compat::validate_llm_schema(schema, stream_name)
@@ -85,13 +82,7 @@ pub(super) async fn run(
     plan: &TraceListPlan,
 ) -> Result<TraceListResult, Error> {
     let options = &plan.options;
-    let request = ctx.request(
-        plan,
-        plan.sql(&ctx.stream_name, &plan.schema),
-        options.range,
-        options.from,
-        options.size,
-    );
+    let request = plan.request(&ctx.stream_name);
     let response = ctx.search(&request).await.inspect_err(|error| {
         log::error!("get traces latest data error: {error:?}");
     })?;
@@ -100,6 +91,7 @@ pub(super) async fn run(
     }
     let mut batch = TraceBatch::from_hits(&response.hits, options.range, TraceListMode::Complete);
     drop(response);
+    // Unlike streaming, the breakdown keeps the requested range instead of the widened batch.range.
     ctx.fill_services(&mut batch, &request, &plan.schema, options.range)
         .await
         .inspect_err(|error| {

@@ -25,7 +25,6 @@ use config::{
     utils::json,
 };
 use futures::stream::StreamExt;
-use hashbrown::HashMap;
 use search_service::{self as SearchService, streaming::sorting::TopKHeap};
 use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
@@ -92,8 +91,6 @@ async fn run(
     let (start_time, end_time) = plan.options.range;
     let from = plan.options.from;
     let size = plan.options.size;
-    let sort_order = plan.sort.order();
-    let sql_order_expr = plan.sort.sql();
     let use_cache = plan.options.use_cache;
     let range_error = plan.options.range_error.clone();
     if sender
@@ -104,9 +101,7 @@ async fn run(
         return;
     }
 
-    let schema = TraceSchema::load(&org_id, &stream_name).await;
-    let query_sql = plan.sql(&stream_name, &schema);
-    let base_req = ctx.request(&plan, query_sql, (start_time, end_time), 0, 0);
+    let base_req = plan.request(&stream_name);
 
     let partition_req = SearchPartitionRequest {
         sql: build_partition_query(&stream_name),
@@ -147,8 +142,8 @@ async fn run(
     }
 
     let total_partitions = partitions.len();
-    let is_non_ts_order_by = !sql_order_expr.starts_with("zo_sql_timestamp");
-    let partitions_desc: Vec<[i64; 2]> = if sql_order_expr == "zo_sql_timestamp ASC" {
+    let is_non_ts_order_by = plan.sort.by_duration;
+    let partitions_desc: Vec<[i64; 2]> = if !is_non_ts_order_by && plan.sort.ascending {
         log::info!(
             "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order=ASC",
             partitions.len()
@@ -159,7 +154,7 @@ async fn run(
             "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order={}",
             partitions.len(),
             if is_non_ts_order_by {
-                format!("non-ts ({sql_order_expr}), TopKHeap")
+                format!("non-ts ({}), TopKHeap", plan.sort.sql())
             } else {
                 "DESC".to_string()
             }
@@ -294,8 +289,9 @@ async fn run(
             continue;
         }
 
-        let Some(traces_data) = load_batch(
+        let Some(batch) = load_batch(
             &ctx,
+            &plan.schema,
             &deliverable_q1,
             (p_start, p_end),
             &base_req,
@@ -307,14 +303,8 @@ async fn run(
             return;
         };
 
-        let mut partition_hits: Vec<&TraceResponseItem> = traces_data.values().collect();
-        if sort_order == "ASC" {
-            partition_hits.sort_by_key(|k| k.start_time);
-        } else {
-            partition_hits.sort_by_key(|k| std::cmp::Reverse(k.start_time));
-        }
-
-        let deliverable: Vec<serde_json::Value> = partition_hits
+        let deliverable: Vec<serde_json::Value> = batch
+            .into_sorted_items(plan.sort)
             .iter()
             .map(|t| serde_json::to_value(t).unwrap_or(serde_json::Value::Null))
             .collect();
@@ -368,8 +358,9 @@ async fn run(
             return;
         }
 
-        let Some(traces_data) = load_batch(
+        let Some(batch) = load_batch(
             &ctx,
+            &plan.schema,
             &deliverable_q1,
             (start_time, end_time),
             &base_req,
@@ -385,7 +376,7 @@ async fn run(
             .iter()
             .filter_map(|item| {
                 let tid = item.get("trace_id").and_then(|v| v.as_str())?;
-                traces_data.get(tid)
+                batch.traces.get(tid)
             })
             .collect();
 
@@ -423,20 +414,20 @@ async fn run(
 
 async fn load_batch(
     ctx: &TraceSearchContext,
+    schema: &TraceSchema,
     hits: &[json::Value],
     range: (i64, i64),
     base_request: &Request,
     sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     log_ctx: &str,
-) -> Option<HashMap<String, TraceResponseItem>> {
+) -> Option<TraceBatch> {
     let mut batch = TraceBatch::from_hits(hits, range, TraceListMode::Streaming);
-    let schema = TraceSchema::load(&ctx.org_id, &ctx.stream_name).await;
     if !batch.multi_service_ids.is_empty() && sender.is_closed() {
         return None;
     }
     let service_range = batch.range;
     if let Err(error) = ctx
-        .fill_services(&mut batch, base_request, &schema, service_range)
+        .fill_services(&mut batch, base_request, schema, service_range)
         .await
     {
         log::error!(
@@ -446,7 +437,7 @@ async fn load_batch(
         let _ = sender.send(Err(error)).await;
         return None;
     }
-    Some(batch.traces)
+    Some(batch)
 }
 
 fn select_timestamp_page(

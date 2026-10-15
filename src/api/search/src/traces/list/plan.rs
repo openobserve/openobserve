@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use arrow_schema::Schema;
-use config::{TIMESTAMP_COL_NAME, meta::stream::StreamType, utils::time::now_micros};
+use config::{
+    TIMESTAMP_COL_NAME,
+    meta::search::{Query, Request, SearchEventType},
+    utils::time::now_micros,
+};
 use hashbrown::HashMap;
 
 use super::{
@@ -38,8 +42,28 @@ pub(in crate::traces) struct TraceListPlan {
 }
 
 impl TraceListPlan {
-    pub(super) fn sql(&self, stream_name: &str, schema: &TraceSchema) -> String {
-        let extra_selects = schema.aggregate_selects();
+    pub(super) fn request(&self, stream_name: &str) -> Request {
+        Request {
+            query: Query {
+                sql: self.sql(stream_name),
+                from: self.options.from,
+                size: self.options.size,
+                start_time: self.options.range.0,
+                end_time: self.options.range.1,
+                ..Default::default()
+            },
+            timeout: self.options.timeout,
+            use_cache: self.options.use_cache,
+            search_type: match self.mode {
+                TraceListMode::Complete => None,
+                TraceListMode::Streaming => Some(SearchEventType::UI),
+            },
+            ..Default::default()
+        }
+    }
+
+    fn sql(&self, stream_name: &str) -> String {
+        let extra_selects = self.schema.aggregate_selects();
         let sql = match &self.validated {
             Some(validated) => build_llm_trace_query(stream_name, validated, &extra_selects),
             None => build_trace_query(stream_name, &extra_selects),
@@ -194,11 +218,8 @@ impl TraceSort {
         } else {
             "zo_sql_timestamp"
         };
-        format!("{field} {}", self.order())
-    }
-
-    pub(super) fn order(self) -> &'static str {
-        if self.ascending { "ASC" } else { "DESC" }
+        let order = if self.ascending { "ASC" } else { "DESC" };
+        format!("{field} {order}")
     }
 
     pub(super) fn sort(self, hits: &mut [TraceResponseItem]) {
@@ -233,13 +254,6 @@ impl TraceSchema {
                     .is_ok()
             }),
         }
-    }
-
-    pub(super) async fn load(org_id: &str, stream_name: &str) -> Self {
-        let schema =
-            infra::schema::get_stream_schema_from_cache(org_id, stream_name, StreamType::Traces)
-                .await;
-        Self::from_schema(schema.as_ref())
     }
 
     pub(super) fn service_key(&self) -> &'static str {
@@ -354,7 +368,7 @@ mod tests {
                 validated: None,
                 mode,
             };
-            let sql = plan.sql("trace\" stream", &plan.schema);
+            let sql = plan.sql("trace\" stream");
             assert!(sql.contains(
                 "count(DISTINCT COALESCE(infer_service_name, service_name)) AS service_count"
             ));
@@ -383,7 +397,7 @@ mod tests {
                 validated: None,
                 mode,
             };
-            assert!(plan.sql("traces", &plan.schema).contains(expected));
+            assert!(plan.sql("traces").contains(expected));
         }
     }
 }
