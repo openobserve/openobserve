@@ -1,14 +1,14 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
 test.describe("Billing Group Remove Member & Leave Group testcases", () => {
   test.describe.configure({ mode: 'parallel' });
 
-  // The billing_group route and its DELETE endpoints only exist on a cloud build
-  // (web/src/enterprise/composables/router.ts + backend #[cfg(feature = "cloud")]).
-  test.skip(!isCloudEnvironment(), 'Billing group is Cloud-only');
+  // The billing_group frontend route renders on any enterprise build
+  // (web/src/enterprise/composables/router.ts, gated by config.isEnterprise), but the
+  // backend membership/remove/leave endpoints are #[cfg(feature = "cloud")] only, so the
+  // render smoke test still runs here while the action tests stay fixme'd below.
 
   let pm;
 
