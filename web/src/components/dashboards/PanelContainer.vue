@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OButton
           v-if="!viewOnly && !simplifiedPanelView && !isLayoutEditing"
-          :variant="variablesDataUpdated ? 'ghost-warning' : 'ghost'"
+          :variant="variablesDataUpdated || isTimeRangeWaiting ? 'ghost-warning' : 'ghost'"
           size="icon"
           @click="() => onRefreshPanel(false)"
           :title="t('panel.refreshPanel')"
@@ -242,11 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="isPanelLoading"
           icon-left="refresh"
         >
-          <OTooltip
-            :content="
-              variablesDataUpdated ? t('panel.refreshToApplyVariables') : t('panel.refresh')
-            "
-          />
+          <OTooltip :content="refreshTooltip" />
         </OButton>
         <!-- simplifiedPanelView panels are ephemeral (Insights / Drill down): delete without a confirm -->
         <OButton
@@ -581,6 +577,7 @@ export default defineComponent({
     "simplifiedPanelView",
     "shouldRefreshWithoutCache",
     "showLegendsButton",
+    "isTimeRangeWaiting",
     "layoutMode",
   ],
   components: {
@@ -1050,6 +1047,15 @@ export default defineComponent({
       });
     });
 
+    const refreshTooltip = computed(() => {
+      if (props.isTimeRangeWaiting) {
+        return variablesDataUpdated.value
+          ? t("dashboard.refreshToApplyTimeRangeAndVariables")
+          : t("dashboard.refreshToApplyTimeRange");
+      }
+      return variablesDataUpdated.value ? t("panel.refreshToApplyVariables") : t("panel.refresh");
+    });
+
     const errorData = ref("");
     const onError = (error: any) => {
       if (typeof error === "string") {
@@ -1190,6 +1196,7 @@ export default defineComponent({
       movePanelDialog,
       onRefreshPanel,
       variablesDataUpdated,
+      refreshTooltip,
       onError,
       errorData,
       isPanelLoading,

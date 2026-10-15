@@ -84,7 +84,7 @@ test.describe('Dashboard variables Auto Run', { tag: ['@dashboards', '@dashboard
     const plainBase = await autoRun.settledRunCount('plain');
     expect(autoRun.runsOf('var')[base - 1]).toContain(`'${initial}'`);
 
-    await autoRun.expectRefreshTooltip('Auto run enabled');
+    await autoRun.expectRefreshTooltip('Runs queries on open and on filter/time changes');
     await autoRun.openRefreshOptions();
     await autoRun.expectAutoRunToggleLabel('Turn off Auto Run');
     await autoRun.closeMenu();
