@@ -6689,7 +6689,9 @@
       "panelMoveFailed": "Di chuyển panel thất bại",
       "failedToFetchReports": "Không thể tải báo cáo",
       "failedToUpdateJson": "Không thể cập nhật JSON dashboard: Phương thức lưu không khả dụng",
-      "failedToSaveChanges": "Không thể lưu thay đổi dashboard"
+      "failedToSaveChanges": "Không thể lưu thay đổi dashboard",
+      "autoRunDescription": "Chạy truy vấn khi mở và khi bộ lọc/thời gian thay đổi",
+      "autoRunScope": "Áp dụng cho tất cả bảng điều khiển, Nhật ký và Trace"
     },
     "dynamicFunctionPopUp": {
       "property": "Thuộc tính",
@@ -7143,7 +7145,9 @@
       "markerAria": "Exemplar {value} lúc {time}"
     },
     "showExemplarsLabel": "Hiển thị exemplar",
-    "showExemplarsHelp": "Vẽ mẫu trace trên biểu đồ này cho tất cả những ai mở bảng điều khiển. Người xem vẫn có thể ẩn chúng từ tiêu đề panel."
+    "showExemplarsHelp": "Vẽ mẫu trace trên biểu đồ này cho tất cả những ai mở bảng điều khiển. Người xem vẫn có thể ẩn chúng từ tiêu đề panel.",
+    "refreshToApplyTimeRange": "Làm mới để áp dụng phạm vi thời gian",
+    "refreshToApplyTimeRangeAndVariables": "Làm mới để áp dụng phạm vi thời gian và các thay đổi biến"
   },
   "panel": {
     "addPivotShort": "+P",

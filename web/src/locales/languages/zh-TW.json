@@ -6684,7 +6684,9 @@
       "panelMoveFailed": "面板移動失敗",
       "failedToFetchReports": "取得報告失敗",
       "failedToUpdateJson": "更新儀表板 JSON 失敗：儲存方法不可用",
-      "failedToSaveChanges": "儲存儀表板變更失敗"
+      "failedToSaveChanges": "儲存儀表板變更失敗",
+      "autoRunDescription": "開啟時以及篩選/時間變更時執行查詢",
+      "autoRunScope": "適用於所有儀表板、日誌與追蹤"
     },
     "dynamicFunctionPopUp": {
       "property": "屬性",
@@ -7138,7 +7140,9 @@
       "markerAria": "{time} 的範例 {value}"
     },
     "showExemplarsLabel": "顯示範例",
-    "showExemplarsHelp": "為所有開啟儀表板的人在此圖表上繪製追蹤樣本。檢視者仍可從面板標題隱藏它們。"
+    "showExemplarsHelp": "為所有開啟儀表板的人在此圖表上繪製追蹤樣本。檢視者仍可從面板標題隱藏它們。",
+    "refreshToApplyTimeRange": "重新整理以套用時間範圍",
+    "refreshToApplyTimeRangeAndVariables": "重新整理以套用時間範圍與變數變更"
   },
   "panel": {
     "addPivotShort": "+P",

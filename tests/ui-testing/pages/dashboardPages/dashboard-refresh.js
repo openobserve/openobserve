@@ -16,7 +16,7 @@ export default class DashboardTimeRefresh {
     this.absolutetimeTime = page.locator(
       '[data-test="date-time-absolute-tab"]'
     );
-    this.applyBtn = page.locator('[data-test="date-time-apply-btn"]');
+    this.dateTimeMenu = page.locator("#date-time-menu").first();
     this.selectTime = page.locator('[data-test="date-time-relative-10-m-btn"]');
     this.refreshBtnManual = page.locator(
       '[data-test="logs-search-bar-refresh-interval-btn"]'
@@ -133,17 +133,18 @@ export default class DashboardTimeRefresh {
     await endCell.waitFor({ state: "attached" });
     await endCell.evaluate((el) => el.click());
 
+    // Apply the selection: Apply where the picker still has one, else close it and Apply or Refresh as needed.
     await applyPickedDateTime(this.page);
 
     // Wait for the date picker dropdown to fully close. If the dropdown
     // remains open it overlays the panel's primary buttons (e.g.
     // dashboard-apply) and downstream clicks time out.
     try {
-      await this.applyBtn.waitFor({ state: "hidden", timeout: 5000 });
+      await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 });
     } catch {
       // Fallback: press Escape to dismiss any lingering portal.
       await this.page.keyboard.press("Escape");
-      await this.applyBtn.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+      await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
     }
   }
 

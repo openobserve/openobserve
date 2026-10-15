@@ -6689,7 +6689,9 @@
       "panelMoveFailed": "فشل نقل اللوحة",
       "failedToFetchReports": "فشل في جلب التقارير",
       "failedToUpdateJson": "فشل تحديث لوحة التحكم JSON: طريقة الحفظ غير متوفرة",
-      "failedToSaveChanges": "فشل في حفظ تغييرات لوحة التحكم"
+      "failedToSaveChanges": "فشل في حفظ تغييرات لوحة التحكم",
+      "autoRunDescription": "يشغّل الاستعلامات عند الفتح وعند تغييرات عامل التصفية/الوقت",
+      "autoRunScope": "ينطبق على جميع لوحات المعلومات والسجلات والآثار"
     },
     "dynamicFunctionPopUp": {
       "property": "الملكية",
@@ -7143,7 +7145,9 @@
       "markerAria": "النموذج {value} عند {time}"
     },
     "showExemplarsLabel": "إظهار النماذج",
-    "showExemplarsHelp": "يرسم عينات الآثار على هذا المخطط لكل من يفتح لوحة المعلومات. لا يزال بإمكان المشاهدين إخفاؤها من رأس اللوحة."
+    "showExemplarsHelp": "يرسم عينات الآثار على هذا المخطط لكل من يفتح لوحة المعلومات. لا يزال بإمكان المشاهدين إخفاؤها من رأس اللوحة.",
+    "refreshToApplyTimeRange": "تحديث لتطبيق النطاق الزمني",
+    "refreshToApplyTimeRangeAndVariables": "تحديث لتطبيق النطاق الزمني وتغييرات المتغيرات"
   },
   "panel": {
     "addPivotShort": "+P",

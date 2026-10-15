@@ -8668,6 +8668,8 @@
       "query": "b80a37564fbb3c07"
     },
     "refresh": "0e91610117029a62",
+    "refreshToApplyTimeRange": "e404e3e3af5f63d3",
+    "refreshToApplyTimeRangeAndVariables": "eaf57930d373fb22",
     "refreshToApplyVariableChanges": "60322c93e195602d",
     "refreshToApplyVariables": "313f2c3169259c79",
     "reloadDashboards": "a55d967a917d64d2",
@@ -9049,6 +9051,8 @@
     },
     "variables": "c41ce2cc0050e675",
     "viewDashboard": {
+      "autoRunDescription": "98bc79a6b46bcff3",
+      "autoRunScope": "2dbe81022223af39",
       "dashboard": "67b696468610b879",
       "dashboardNotFound": "70cfe75710a014e9",
       "failedToFetchReports": "79e14eb05d39e505",

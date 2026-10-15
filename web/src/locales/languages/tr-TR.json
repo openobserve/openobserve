@@ -6689,7 +6689,9 @@
       "panelMoveFailed": "Panel taşıma başarısız",
       "failedToFetchReports": "Raporlar alınamadı",
       "failedToUpdateJson": "Pano JSON güncellenemedi: Kaydetme yöntemi mevcut değil",
-      "failedToSaveChanges": "Pano değişiklikleri kaydedilemedi"
+      "failedToSaveChanges": "Pano değişiklikleri kaydedilemedi",
+      "autoRunDescription": "Açıldığında ve filtre/zaman değişikliklerinde sorguları çalıştırır",
+      "autoRunScope": "Tüm gösterge panoları, Günlükler ve İzler için geçerlidir"
     },
     "dynamicFunctionPopUp": {
       "property": "Özellik",
@@ -7143,7 +7145,9 @@
       "markerAria": "{time} zamanındaki örnek {value}"
     },
     "showExemplarsLabel": "Örnekleri göster",
-    "showExemplarsHelp": "Bu grafikte, gösterge panosunu açan herkes için iz örneklerini çizer. Görüntüleyenler bunları yine de panel başlığından gizleyebilir."
+    "showExemplarsHelp": "Bu grafikte, gösterge panosunu açan herkes için iz örneklerini çizer. Görüntüleyenler bunları yine de panel başlığından gizleyebilir.",
+    "refreshToApplyTimeRange": "Zaman aralığını uygulamak için yenileyin",
+    "refreshToApplyTimeRangeAndVariables": "Zaman aralığını ve değişken değişikliklerini uygulamak için yenileyin"
   },
   "panel": {
     "addPivotShort": "+P",

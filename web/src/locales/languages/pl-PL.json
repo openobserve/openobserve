@@ -6689,7 +6689,9 @@
       "panelMoveFailed": "Przeniesienie panelu nie powiodło się",
       "failedToFetchReports": "Nie udało się pobrać raportów",
       "failedToUpdateJson": "Nie udało się zaktualizować JSON pulpitu nawigacyjnego: metoda zapisu niedostępna",
-      "failedToSaveChanges": "Nie udało się zapisać zmian na pulpicie nawigacyjnym"
+      "failedToSaveChanges": "Nie udało się zapisać zmian na pulpicie nawigacyjnym",
+      "autoRunDescription": "Uruchamia zapytania przy otwarciu oraz przy zmianach filtra/czasu",
+      "autoRunScope": "Dotyczy wszystkich pulpitów, Logów i Trace"
     },
     "dynamicFunctionPopUp": {
       "property": "Właściwość",
@@ -7143,7 +7145,9 @@
       "markerAria": "Exemplar {value} o {time}"
     },
     "showExemplarsLabel": "Pokaż exemplary",
-    "showExemplarsHelp": "Rysuje próbki trace na tym wykresie dla wszystkich, którzy otworzą pulpit. Przeglądający nadal mogą je ukryć w nagłówku panelu."
+    "showExemplarsHelp": "Rysuje próbki trace na tym wykresie dla wszystkich, którzy otworzą pulpit. Przeglądający nadal mogą je ukryć w nagłówku panelu.",
+    "refreshToApplyTimeRange": "Odśwież, aby zastosować zakres czasu",
+    "refreshToApplyTimeRangeAndVariables": "Odśwież, aby zastosować zakres czasu i zmiany zmiennych"
   },
   "panel": {
     "addPivotShort": "+P",

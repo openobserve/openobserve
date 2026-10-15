@@ -6689,7 +6689,9 @@
       "panelMoveFailed": "Paneel verplaatsen mislukt",
       "failedToFetchReports": "Kan rapporten niet ophalen",
       "failedToUpdateJson": "Kan dashboard-JSON niet bijwerken: opslagmethode niet beschikbaar",
-      "failedToSaveChanges": "Kan dashboardwijzigingen niet opslaan"
+      "failedToSaveChanges": "Kan dashboardwijzigingen niet opslaan",
+      "autoRunDescription": "Voert query's uit bij openen en bij filter- of tijdwijzigingen.",
+      "autoRunScope": "Geldt voor alle dashboards, Logboeken en Traces."
     },
     "dynamicFunctionPopUp": {
       "property": "Eigenschap",
@@ -7143,7 +7145,9 @@
       "markerAria": "Exemplaar {value} op {time}"
     },
     "showExemplarsLabel": "Exemplaren tonen",
-    "showExemplarsHelp": "Tekent trace-voorbeelden op deze grafiek voor iedereen die het dashboard opent. Kijkers kunnen ze nog steeds verbergen via de paneelheader."
+    "showExemplarsHelp": "Tekent trace-voorbeelden op deze grafiek voor iedereen die het dashboard opent. Kijkers kunnen ze nog steeds verbergen via de paneelheader.",
+    "refreshToApplyTimeRange": "Vernieuwen om het tijdsbereik toe te passen.",
+    "refreshToApplyTimeRangeAndVariables": "Vernieuwen om het tijdsbereik en wijzigingen aan variabelen toe te passen."
   },
   "panel": {
     "addPivotShort": "+P",

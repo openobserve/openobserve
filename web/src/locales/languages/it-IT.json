@@ -6689,7 +6689,9 @@
       "panelMoveFailed": "Spostamento pannello fallito",
       "failedToFetchReports": "Impossibile recuperare i rapporti",
       "failedToUpdateJson": "Impossibile aggiornare il JSON del dashboard: metodo di salvataggio non disponibile",
-      "failedToSaveChanges": "Impossibile salvare le modifiche al dashboard"
+      "failedToSaveChanges": "Impossibile salvare le modifiche al dashboard",
+      "autoRunDescription": "Esegue le query all'apertura e quando cambiano filtri o intervallo di tempo",
+      "autoRunScope": "Si applica a tutte le dashboard, Log e Tracce"
     },
     "dynamicFunctionPopUp": {
       "property": "Proprietà",
@@ -7143,7 +7145,9 @@
       "markerAria": "Esemplare {value} a {time}"
     },
     "showExemplarsLabel": "Mostra esemplari",
-    "showExemplarsHelp": "Disegna campioni di traccia su questo grafico per tutti coloro che aprono la dashboard. I visualizzatori possono comunque nasconderli dall'intestazione del pannello."
+    "showExemplarsHelp": "Disegna campioni di traccia su questo grafico per tutti coloro che aprono la dashboard. I visualizzatori possono comunque nasconderli dall'intestazione del pannello.",
+    "refreshToApplyTimeRange": "Aggiorna per applicare l'intervallo di tempo",
+    "refreshToApplyTimeRangeAndVariables": "Aggiorna per applicare l'intervallo di tempo e le modifiche alle variabili"
   },
   "panel": {
     "addPivotShort": "+P",

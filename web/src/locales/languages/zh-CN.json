@@ -6689,7 +6689,9 @@
       "panelMoveFailed": "面板移动失败",
       "failedToFetchReports": "获取报告失败",
       "failedToUpdateJson": "更新仪表盘JSON失败：保存方法不可用",
-      "failedToSaveChanges": "保存仪表盘更改失败"
+      "failedToSaveChanges": "保存仪表盘更改失败",
+      "autoRunDescription": "打开时以及过滤器/时间变更时运行查询",
+      "autoRunScope": "适用于所有仪表盘、日志和追踪"
     },
     "dynamicFunctionPopUp": {
       "property": "属性",
@@ -7143,7 +7145,9 @@
       "markerAria": "示例 {value}，时间 {time}"
     },
     "showExemplarsLabel": "显示示例",
-    "showExemplarsHelp": "在打开该仪表盘的所有人的图表上绘制追踪样本。查看者仍可从面板标题栏隐藏它们。"
+    "showExemplarsHelp": "在打开该仪表盘的所有人的图表上绘制追踪样本。查看者仍可从面板标题栏隐藏它们。",
+    "refreshToApplyTimeRange": "刷新以应用时间范围",
+    "refreshToApplyTimeRangeAndVariables": "刷新以应用时间范围和变量变更"
   },
   "panel": {
     "addPivotShort": "+P",

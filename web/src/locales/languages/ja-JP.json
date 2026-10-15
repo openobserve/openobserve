@@ -6689,7 +6689,9 @@
       "panelMoveFailed": "パネルの移動に失敗しました",
       "failedToFetchReports": "レポートの取得に失敗しました",
       "failedToUpdateJson": "ダッシュボードJSONの更新に失敗しました：保存メソッドが利用できません",
-      "failedToSaveChanges": "ダッシュボードの変更の保存に失敗しました"
+      "failedToSaveChanges": "ダッシュボードの変更の保存に失敗しました",
+      "autoRunDescription": "開いたときとフィルター/時間変更時にクエリを実行します",
+      "autoRunScope": "すべてのダッシュボード、ログ、トレースに適用されます"
     },
     "dynamicFunctionPopUp": {
       "property": "プロパティ",
@@ -7143,7 +7145,9 @@
       "markerAria": "{time} のエグザンプラー {value}"
     },
     "showExemplarsLabel": "エグザンプラーを表示",
-    "showExemplarsHelp": "このダッシュボードを開くすべてのユーザーに対して、このグラフにトレースサンプルを描画します。閲覧者はパネルヘッダーから非表示にできます。"
+    "showExemplarsHelp": "このダッシュボードを開くすべてのユーザーに対して、このグラフにトレースサンプルを描画します。閲覧者はパネルヘッダーから非表示にできます。",
+    "refreshToApplyTimeRange": "時間範囲を適用するには更新してください",
+    "refreshToApplyTimeRangeAndVariables": "時間範囲と変数の変更を適用するには更新してください"
   },
   "panel": {
     "addPivotShort": "+P",

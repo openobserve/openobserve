@@ -6689,7 +6689,9 @@
       "panelMoveFailed": "Panel-Verschiebung fehlgeschlagen",
       "failedToFetchReports": "Berichte konnten nicht abgerufen werden",
       "failedToUpdateJson": "Dashboard-JSON konnte nicht aktualisiert werden: Speichermethode nicht verfügbar",
-      "failedToSaveChanges": "Dashboard-Änderungen konnten nicht gespeichert werden"
+      "failedToSaveChanges": "Dashboard-Änderungen konnten nicht gespeichert werden",
+      "autoRunDescription": "Führt Abfragen beim Öffnen und bei Filter-/Zeitänderungen aus",
+      "autoRunScope": "Gilt für alle Dashboards, Logs und Traces"
     },
     "dynamicFunctionPopUp": {
       "property": "Eigenschaft",
@@ -7143,7 +7145,9 @@
       "markerAria": "Exemplar {value} um {time}"
     },
     "showExemplarsLabel": "Exemplare anzeigen",
-    "showExemplarsHelp": "Zeichnet Trace-Stichproben in diesem Diagramm für alle, die das Dashboard öffnen. Betrachter können sie weiterhin über die Panel-Kopfzeile ausblenden."
+    "showExemplarsHelp": "Zeichnet Trace-Stichproben in diesem Diagramm für alle, die das Dashboard öffnen. Betrachter können sie weiterhin über die Panel-Kopfzeile ausblenden.",
+    "refreshToApplyTimeRange": "Aktualisieren, um den Zeitbereich anzuwenden",
+    "refreshToApplyTimeRangeAndVariables": "Aktualisieren, um den Zeitbereich und Variablenänderungen anzuwenden"
   },
   "panel": {
     "addPivotShort": "+P",

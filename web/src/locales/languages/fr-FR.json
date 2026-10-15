@@ -6689,7 +6689,9 @@
       "panelMoveFailed": "Échec du déplacement du panneau",
       "failedToFetchReports": "Échec de la récupération des rapports",
       "failedToUpdateJson": "Échec de la mise à jour du JSON du tableau de bord : méthode de sauvegarde non disponible",
-      "failedToSaveChanges": "Échec de la sauvegarde des modifications du tableau de bord"
+      "failedToSaveChanges": "Échec de la sauvegarde des modifications du tableau de bord",
+      "autoRunDescription": "Exécute les requêtes à l'ouverture et lors des modifications de filtre ou de plage horaire",
+      "autoRunScope": "S'applique à tous les tableaux de bord, Logs et Traces"
     },
     "dynamicFunctionPopUp": {
       "property": "Propriété",
@@ -7143,7 +7145,9 @@
       "markerAria": "Exemplaire {value} à {time}"
     },
     "showExemplarsLabel": "Afficher les exemplaires",
-    "showExemplarsHelp": "Dessine les échantillons de traces sur ce graphique pour toute personne qui ouvre le tableau de bord. Les spectateurs peuvent toujours les masquer depuis l'en-tête du panneau."
+    "showExemplarsHelp": "Dessine les échantillons de traces sur ce graphique pour toute personne qui ouvre le tableau de bord. Les spectateurs peuvent toujours les masquer depuis l'en-tête du panneau.",
+    "refreshToApplyTimeRange": "Actualisez pour appliquer la plage horaire",
+    "refreshToApplyTimeRangeAndVariables": "Actualisez pour appliquer la plage horaire et les modifications de variables"
   },
   "panel": {
     "addPivotShort": "+P",
