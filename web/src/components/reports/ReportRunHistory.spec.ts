@@ -22,10 +22,11 @@ import reports from "@/services/reports";
 import ReportRunHistory from "./ReportRunHistory.vue";
 
 const replace = vi.fn();
+const routeQuery: Record<string, string> = {};
 vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRouter: () => ({ push: vi.fn(), replace, resolve: () => ({ fullPath: "/" }) }),
-  useRoute: () => ({ query: {} }),
+  useRoute: () => ({ query: routeQuery }),
 }));
 
 vi.mock("@/services/reports", async (importOriginal) => {
@@ -64,6 +65,7 @@ const mountHistory = (props: Record<string, unknown> = {}) =>
 
 describe("ReportRunHistory", () => {
   beforeEach(() => {
+    for (const k of Object.keys(routeQuery)) delete routeQuery[k];
     vi.mocked(reports.getHistory).mockReset();
     vi.mocked(reports.getHistory).mockResolvedValue({ data: RESPONSE } as any);
   });
@@ -138,5 +140,25 @@ describe("ReportRunHistory", () => {
     await flushPromises();
     (w.vm as any).openRun(RESPONSE.hits[0]);
     expect(replace).toHaveBeenCalledWith({ query: { run: "10" } });
+  });
+
+  it("narrows the window to the linked run's day when the run is not on the loaded page", async () => {
+    const ts = 1_760_000_000_000_000;
+    routeQuery.run = `${ts}-2`;
+    const w = mountHistory();
+    await flushPromises();
+    const query = vi.mocked(reports.getHistory).mock.calls.at(-1)![1];
+    const halfDay = 12 * 60 * 60 * 1000 * 1000;
+    expect(query.start_time).toBe(ts - halfDay);
+    expect(query.end_time).toBe(ts + halfDay);
+    expect(query.from).toBe(0);
+    expect((w.vm as any).range).toBe("custom");
+  });
+
+  it("keeps the current window when the linked run is already loaded", async () => {
+    routeQuery.run = "10";
+    mountHistory();
+    await flushPromises();
+    expect(vi.mocked(reports.getHistory)).toHaveBeenCalledTimes(1);
   });
 });

@@ -535,6 +535,23 @@ const selectedRun = computed<ReportRunHit | null>(() => {
   return rows.value.find((r) => runKey(r) === key) ?? null;
 });
 
+/** A shared link may point outside the current window or page; the key carries the run's timestamp, so narrow the view to that day once. */
+const HALF_DAY_US = 12 * 60 * 60 * 1000 * 1000;
+let retargetedForLink = false;
+watch(rows, () => {
+  const key = route.query.run;
+  if (retargetedForLink || typeof key !== "string" || !key || !history.isSuccess.value) return;
+  if (rows.value.some((r) => runKey(r) === key)) return;
+  const ts = Number(key.split("-")[0]);
+  if (!Number.isFinite(ts) || ts <= 0) return;
+  retargetedForLink = true;
+  customRange.value = { start: ts - HALF_DAY_US, end: ts + HALF_DAY_US };
+  range.value = "custom";
+  tile.value = null;
+  triggerSource.value = "all";
+  currentPage.value = 1;
+});
+
 const openRun = (row: ReportRunHit) =>
   router.replace({ query: { ...route.query, run: runKey(row) } });
 

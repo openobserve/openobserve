@@ -60,7 +60,7 @@ const router = useRouter();
 const orgId = useOrgId();
 const recipients = ref<string[] | null>(null);
 const recipientsFailed = ref(false);
-const trigger = useMutation(triggerReportMutation(orgId.value));
+const trigger = useMutation(() => triggerReportMutation(orgId.value));
 
 watch(
   () => props.open,
