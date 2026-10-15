@@ -905,8 +905,7 @@ pub fn basic_routes() -> Router {
             .route("/status/{slug}", get(status_pages::public::page));
     }
 
-    // Always registered: the handlers answer 404 while the env flag or the org switch is off. A
-    // router has no result files, so there these paths fall to its proxy, keyed by the slug.
+    // Not on routers: they have no result files, so these paths fall to the slug-keyed proxy.
     if !config::cluster::LOCAL_NODE.is_router() {
         router = router
             .route(
