@@ -21,9 +21,13 @@
 //! Pricing is based on publicly available information from model providers and
 //! is updated as of March 2026.
 
-use std::sync::LazyLock as Lazy;
+use std::{collections::HashMap, sync::LazyLock as Lazy};
 
-use config::meta::model_pricing::{UtcTimeWindow, windows_match};
+use config::meta::model_pricing::{
+    MatchKind, ModelPricingDefinition, PricingSource, PricingTierDefinition, TierCondition,
+    TierOperator, UtcTimeWindow, windows_match,
+};
+use db::model_pricing::{CachedModelPricing, find_pricing_sync_at};
 use regex::Regex;
 use tiktoken_rs::{get_bpe_from_model, o200k_base};
 
@@ -36,37 +40,74 @@ pub fn calculate_token_count(model_name: &str, prompt: &str) -> i64 {
     tokens.len() as i64
 }
 
-/// Calculate cost from token usage
+/// The price [`resolve_pricing`] selected for a model name.
+#[derive(Debug)]
+pub enum ResolvedPricing {
+    /// A definition from the org / meta-org / built-in pricing tables.
+    Definition(ModelPricingDefinition),
+    /// An entry of the compiled-in [`MODEL_PRICING`] fallback table.
+    Compiled(&'static ModelPricing),
+}
+
+/// Result of [`resolve_pricing`]: the selected price and how its pattern matched the model.
+#[derive(Debug)]
+pub struct PricingResolution {
+    pub pricing: ResolvedPricing,
+    pub match_kind: MatchKind,
+}
+
+/// Resolve the price for `model_name`. Every cost calculation goes through this one resolver.
 ///
-/// # Arguments
-/// * `model_name` - Name of the model (e.g., "gpt-4", "claude-sonnet-4-6")
-/// * `input_tokens` - Number of input tokens
-/// * `output_tokens` - Number of output tokens
-/// * `ts_micros` - Span start time in microseconds, used to resolve tiers that are restricted to
-///   recurring UTC time-of-day windows (peak / off-peak pricing). Pass `None` when the time is
-///   unknown — the unrestricted tier is used instead.
+/// `entries` are the org's effective pricing definitions (`get_org_pricing_entries`); they are
+/// ranked by `find_pricing_sync_at` (exact before approximate, then org > meta-org > built-in,
+/// then `valid_from`, then order). The compiled-in [`MODEL_PRICING`] table is the lowest-priority
+/// source below them, under the same rule: an exact compiled-in match beats an approximate
+/// definition match, and between equal match kinds the definition wins.
 ///
-/// # Returns
-/// * `Some((input_cost, output_cost, total_cost))` if pricing is found
-/// * `None` if no pricing information is available for this model
-pub fn calculate_cost(
+/// `span_ts_micros` filters definitions by `valid_from`; `None` means the time is unknown.
+pub fn resolve_pricing(
+    entries: &[CachedModelPricing],
     model_name: &str,
-    input_tokens: i64,
-    output_tokens: i64,
-    ts_micros: Option<i64>,
-) -> Option<(f64, f64, f64)> {
-    // Find matching pricing
-    let pricing = MODEL_PRICING.iter().find(|p| p.matches(model_name))?;
+    span_ts_micros: Option<i64>,
+) -> Option<PricingResolution> {
+    let definition = find_pricing_sync_at(entries, model_name, span_ts_micros);
+    // An exact definition cannot be beaten; skip scanning the compiled-in table.
+    let compiled = match &definition {
+        Some(d) if d.match_kind == MatchKind::Exact => None,
+        _ => find_compiled(&MODEL_PRICING, model_name),
+    };
+    match definition {
+        Some(d) if compiled.is_none_or(|(_, kind)| kind <= d.match_kind) => {
+            Some(PricingResolution {
+                pricing: ResolvedPricing::Definition(d.definition),
+                match_kind: d.match_kind,
+            })
+        }
+        _ => compiled.map(|(pricing, match_kind)| PricingResolution {
+            pricing: ResolvedPricing::Compiled(pricing),
+            match_kind,
+        }),
+    }
+}
 
-    // Get appropriate tier
-    let tier = pricing.get_tier(input_tokens, ts_micros);
-
-    // Calculate costs (tokens / 1,000,000 * price_per_million)
-    let input_cost = (input_tokens as f64 / 1_000_000.0) * tier.input_price_per_million;
-    let output_cost = (output_tokens as f64 / 1_000_000.0) * tier.output_price_per_million;
-    let total_cost = input_cost + output_cost;
-
-    Some((input_cost, output_cost, total_cost))
+/// Best match for `model_name` in a compiled-in table: the first exact match, else the first
+/// approximate one. The table is ordered most specific first, so among approximate matches that
+/// order decides (e.g. `claude-sonnet-4-5` before `claude-sonnet-4` for a dated snapshot name).
+fn find_compiled<'a>(
+    table: &'a [ModelPricing],
+    model_name: &str,
+) -> Option<(&'a ModelPricing, MatchKind)> {
+    let mut approximate = None;
+    for pricing in table {
+        match pricing.match_kind(model_name) {
+            Some(MatchKind::Exact) => return Some((pricing, MatchKind::Exact)),
+            Some(MatchKind::Approximate) if approximate.is_none() => {
+                approximate = Some((pricing, MatchKind::Approximate));
+            }
+            _ => {}
+        }
+    }
+    approximate
 }
 
 /// Canonicalize a raw model name string to a stable identifier.
@@ -74,16 +115,13 @@ pub fn calculate_cost(
 /// Different vendors/instrumentation frameworks report the same model under
 /// different raw strings (e.g. "anthropic/claude-sonnet-4-6" vs.
 /// "claude-sonnet-4-6"), which otherwise land as distinct nodes/keys in
-/// aggregations like the service graph. This reuses the same pattern list as
-/// `calculate_cost` so cost lookup and node identity stay consistent.
+/// aggregations like the service graph. This uses the same compiled-in table
+/// lookup as cost resolution so cost lookup and node identity stay consistent.
 ///
 /// Returns `None` if no known pattern matches (caller should fall back to the
 /// raw string).
 pub fn canonical_model_pattern(model_name: &str) -> Option<&'static str> {
-    MODEL_PRICING
-        .iter()
-        .find(|p| p.matches(model_name))
-        .map(|p| p.pattern.as_str())
+    find_compiled(&MODEL_PRICING, model_name).map(|(p, _)| p.pattern.as_str())
 }
 
 /// All known model-name patterns in match priority order (most specific
@@ -112,6 +150,33 @@ impl PricingTier {
     /// fallback used when no restricted tier applies.
     fn is_unrestricted(&self) -> bool {
         self.min_input_tokens.is_none() && self.utc_windows.is_empty()
+    }
+
+    /// This tier as a pricing tier definition: prices per token, and the token threshold as an
+    /// `input >= N` condition. Time windows only come from [`ModelPricing::peak_off_peak`], so a
+    /// windowed tier is its peak tier.
+    fn to_definition(&self) -> PricingTierDefinition {
+        let name = if !self.utc_windows.is_empty() {
+            "Peak"
+        } else if self.min_input_tokens.is_some() {
+            "Extended Context"
+        } else {
+            "Default"
+        };
+        PricingTierDefinition {
+            name: name.to_string(),
+            condition: self.min_input_tokens.map(|min| TierCondition {
+                usage_key: "input".to_string(),
+                operator: TierOperator::Gte,
+                value: min as f64,
+            }),
+            prices: HashMap::from([
+                ("input".to_string(), self.input_price_per_million / 1_000_000.0),
+                ("output".to_string(), self.output_price_per_million / 1_000_000.0),
+            ]),
+            utc_windows: self.utc_windows.clone(),
+            ..Default::default()
+        }
     }
 }
 
@@ -204,9 +269,37 @@ impl ModelPricing {
             .unwrap_or_else(|| self.tiers.last().unwrap())
     }
 
-    /// Check if this pricing matches the given model name
-    pub fn matches(&self, model_name: &str) -> bool {
-        self.compiled.is_match(model_name)
+    /// `(input_cost, output_cost, total_cost)` in USD for the given token counts, using the
+    /// tier that applies at `ts_micros` (`None` = unknown time: unrestricted tier).
+    pub fn cost(
+        &self,
+        input_tokens: i64,
+        output_tokens: i64,
+        ts_micros: Option<i64>,
+    ) -> (f64, f64, f64) {
+        let tier = self.get_tier(input_tokens, ts_micros);
+        // tokens / 1,000,000 * price_per_million
+        let input_cost = (input_tokens as f64 / 1_000_000.0) * tier.input_price_per_million;
+        let output_cost = (output_tokens as f64 / 1_000_000.0) * tier.output_price_per_million;
+        (input_cost, output_cost, input_cost + output_cost)
+    }
+
+    /// How this pricing's pattern matches the given model name, if at all.
+    pub fn match_kind(&self, model_name: &str) -> Option<MatchKind> {
+        MatchKind::of(&self.compiled, model_name)
+    }
+
+    /// This entry as a read-only built-in pricing definition, for responses that show which
+    /// pricing matched.
+    pub fn to_definition(&self) -> ModelPricingDefinition {
+        ModelPricingDefinition {
+            name: self.canonical.clone(),
+            match_pattern: self.pattern.clone(),
+            enabled: true,
+            tiers: self.tiers.iter().map(PricingTier::to_definition).collect(),
+            source: PricingSource::BuiltIn,
+            ..Default::default()
+        }
     }
 }
 
@@ -477,6 +570,17 @@ pub fn model_canonical_names() -> impl Iterator<Item = (&'static str, &'static s
 mod tests {
     use super::*;
 
+    /// Price `model_name` with the compiled-in table alone.
+    fn calculate_cost(
+        model_name: &str,
+        input_tokens: i64,
+        output_tokens: i64,
+        ts_micros: Option<i64>,
+    ) -> Option<(f64, f64, f64)> {
+        let (pricing, _) = find_compiled(&MODEL_PRICING, model_name)?;
+        Some(pricing.cost(input_tokens, output_tokens, ts_micros))
+    }
+
     #[test]
     fn test_canonical_model_pattern_merges_vendor_prefix_variants() {
         // Introspection instance (Google-ADK/gateway style, direct-vs-gateway path)
@@ -535,7 +639,11 @@ mod tests {
                 !canonical.contains(['\\', '(', ')', '[', ']', '?', '*', '+', '^', '$', '|', '\'']),
                 "{pattern} -> {canonical}"
             );
-            assert!(p.matches(canonical), "{pattern} does not match {canonical}");
+            assert_eq!(
+                p.match_kind(canonical),
+                Some(MatchKind::Exact),
+                "{pattern} does not match {canonical} exactly"
+            );
         }
         assert!(pairs.contains(&("gpt-5\\.2-pro", "gpt-5.2-pro")));
         assert!(pairs.contains(&("(?i)deepseek-v4-pro", "deepseek-v4-pro")));
@@ -590,9 +698,10 @@ mod tests {
     #[test]
     fn test_model_pricing_matches() {
         let pricing = ModelPricing::simple("gpt-4", "gpt-4", 30.0, 60.0);
-        assert!(pricing.matches("gpt-4"));
-        assert!(pricing.matches("gpt-4-0613"));
-        assert!(!pricing.matches("gpt-3.5-turbo"));
+        assert_eq!(pricing.match_kind("gpt-4"), Some(MatchKind::Exact));
+        assert_eq!(pricing.match_kind("gpt-4-0613"), Some(MatchKind::Approximate));
+        assert_eq!(pricing.match_kind("azure/gpt-4"), Some(MatchKind::Approximate));
+        assert_eq!(pricing.match_kind("gpt-3.5-turbo"), None);
     }
 
     #[test]
@@ -607,29 +716,29 @@ mod tests {
     fn test_dot_escape_matches_exact_version() {
         // gpt-5.2 pattern uses \\. to match literal dot — should NOT match "gpt-512"
         let pricing = ModelPricing::simple("gpt-5\\.2", "gpt-5.2", 1.75, 14.00);
-        assert!(pricing.matches("gpt-5.2"));
-        assert!(pricing.matches("gpt-5.2-something"));
-        assert!(!pricing.matches("gpt-512"));
-        assert!(!pricing.matches("gpt-5x2"));
+        assert_eq!(pricing.match_kind("gpt-5.2"), Some(MatchKind::Exact));
+        assert_eq!(pricing.match_kind("gpt-5.2-something"), Some(MatchKind::Approximate));
+        assert_eq!(pricing.match_kind("gpt-512"), None);
+        assert_eq!(pricing.match_kind("gpt-5x2"), None);
     }
 
     #[test]
     fn test_dot_escape_gemini_versions() {
         // Gemini patterns use \\. for version dots
         let pricing = ModelPricing::simple("gemini-2\\.5-flash", "gemini-2.5-flash", 0.30, 2.50);
-        assert!(pricing.matches("gemini-2.5-flash"));
-        assert!(pricing.matches("gemini-2.5-flash-001"));
-        assert!(!pricing.matches("gemini-225-flash"));
-        assert!(!pricing.matches("gemini-2x5-flash"));
+        assert_eq!(pricing.match_kind("gemini-2.5-flash"), Some(MatchKind::Exact));
+        assert_eq!(pricing.match_kind("gemini-2.5-flash-001"), Some(MatchKind::Approximate));
+        assert_eq!(pricing.match_kind("gemini-225-flash"), None);
+        assert_eq!(pricing.match_kind("gemini-2x5-flash"), None);
     }
 
     #[test]
     fn test_dot_escape_gpt_3_5() {
         // gpt-3.5 uses \\. — should not match gpt-315 or gpt-3X5
         let pricing = ModelPricing::simple("gpt-3\\.5-turbo", "gpt-3.5-turbo", 0.50, 1.50);
-        assert!(pricing.matches("gpt-3.5-turbo"));
-        assert!(pricing.matches("gpt-3.5-turbo-0125"));
-        assert!(!pricing.matches("gpt-315-turbo"));
+        assert_eq!(pricing.match_kind("gpt-3.5-turbo"), Some(MatchKind::Exact));
+        assert_eq!(pricing.match_kind("gpt-3.5-turbo-0125"), Some(MatchKind::Approximate));
+        assert_eq!(pricing.match_kind("gpt-315-turbo"), None);
     }
 
     #[test]
@@ -809,5 +918,107 @@ mod tests {
         assert!(gpt4_count > 0);
         assert!(gpt35_count > 0);
         assert!(claude_count > 0);
+    }
+
+    // ── Exact vs approximate resolution ───────────────────────────────────
+
+    #[test]
+    fn test_find_compiled_picks_exact_over_approximate() {
+        // Deliberately least-specific first: first-match order alone would pick GPT-5.4.
+        let table = vec![
+            ModelPricing::simple("gpt-5\\.4", "gpt-5.4", 2.50, 15.00),
+            ModelPricing::simple("gpt-5\\.4-mini", "gpt-5.4-mini", 0.40, 1.60),
+            ModelPricing::simple("claude-opus-5", "claude-opus-5", 5.00, 25.00),
+            ModelPricing::simple("claude-opus-5-5", "claude-opus-5-5", 6.00, 30.00),
+        ];
+        let kind_of =
+            |model: &str| find_compiled(&table, model).map(|(p, k)| (p.canonical.as_str(), k));
+
+        assert_eq!(kind_of("gpt-5.4-mini"), Some(("gpt-5.4-mini", MatchKind::Exact)));
+        assert_eq!(kind_of("gpt-5.4"), Some(("gpt-5.4", MatchKind::Exact)));
+        assert_eq!(kind_of("claude-opus-5-5"), Some(("claude-opus-5-5", MatchKind::Exact)));
+        assert_eq!(kind_of("claude-opus-5"), Some(("claude-opus-5", MatchKind::Exact)));
+        // No exact match: the first approximate one in table order.
+        assert_eq!(kind_of("gpt-5.4-nano"), Some(("gpt-5.4", MatchKind::Approximate)));
+        assert_eq!(kind_of("o3"), None);
+    }
+
+    fn definition_entry(name: &str, pattern: &str) -> CachedModelPricing {
+        CachedModelPricing {
+            definition: ModelPricingDefinition {
+                name: name.to_string(),
+                match_pattern: pattern.to_string(),
+                ..Default::default()
+            },
+            compiled_regex: Regex::new(pattern).unwrap(),
+        }
+    }
+
+    /// `(definition name or "compiled:<canonical>", match kind)` for a resolution.
+    fn resolved(entries: &[CachedModelPricing], model: &str) -> Option<(String, MatchKind)> {
+        resolve_pricing(entries, model, None).map(|r| {
+            let source = match r.pricing {
+                ResolvedPricing::Definition(d) => d.name,
+                ResolvedPricing::Compiled(p) => format!("compiled:{}", p.canonical),
+            };
+            (source, r.match_kind)
+        })
+    }
+
+    #[test]
+    fn test_resolve_pricing_definition_wins_between_equal_kinds() {
+        // Both exact.
+        let entries = vec![definition_entry("org-gpt-4o", "(?i)^gpt-4o$")];
+        assert_eq!(
+            resolved(&entries, "gpt-4o"),
+            Some(("org-gpt-4o".to_string(), MatchKind::Exact))
+        );
+        // Both approximate.
+        let entries = vec![definition_entry("org-gpt-4o", "(?i)gpt-4o")];
+        assert_eq!(
+            resolved(&entries, "gpt-4o-2024-08-06"),
+            Some(("org-gpt-4o".to_string(), MatchKind::Approximate))
+        );
+    }
+
+    #[test]
+    fn test_resolve_pricing_compiled_exact_beats_definition_approximate() {
+        let entries = vec![definition_entry("org-gpt-4", "(?i)gpt-4")];
+        assert_eq!(
+            resolved(&entries, "gpt-4o"),
+            Some(("compiled:gpt-4o".to_string(), MatchKind::Exact))
+        );
+    }
+
+    #[test]
+    fn test_resolve_pricing_falls_back_to_compiled_table() {
+        assert_eq!(
+            resolved(&[], "claude-sonnet-4-6"),
+            Some(("compiled:claude-sonnet-4-6".to_string(), MatchKind::Exact))
+        );
+        assert_eq!(
+            resolved(&[], "anthropic/claude-sonnet-4-6"),
+            Some(("compiled:claude-sonnet-4-6".to_string(), MatchKind::Approximate))
+        );
+        assert_eq!(resolved(&[], "unknown-model-xyz"), None);
+    }
+
+    #[test]
+    fn test_to_definition_prices_like_the_compiled_entry() {
+        let sonnet = find_compiled(&MODEL_PRICING, "claude-sonnet-4-6").unwrap().0;
+        let def = sonnet.to_definition();
+        assert_eq!(def.source, PricingSource::BuiltIn);
+        assert_eq!(def.match_pattern, "claude-sonnet-4-6");
+        for input in [100_000i64, 300_000] {
+            let usage = HashMap::from([("input".to_string(), input), ("output".to_string(), 1_000)]);
+            let result = db::model_pricing::calculate_cost_from_definition(
+                &def,
+                &usage,
+                None,
+                &config::meta::model_pricing::PricingContext::default(),
+            );
+            let (_, _, total) = sonnet.cost(input, 1_000, None);
+            assert!((result.cost["total"] - total).abs() < 1e-12, "input={input}");
+        }
     }
 }

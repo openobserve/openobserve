@@ -278,12 +278,8 @@ impl OtelIngestionProcessor {
             // than as 1970-01-01, which would land every such span in a time-of-day tier.
             let span_ts_micros = (span_start_nanos != 0)
                 .then(|| i64::try_from(span_start_nanos / 1_000).unwrap_or(i64::MAX));
-            let matched_pricing = extracted.model_name.as_ref().and_then(|mn| {
-                crate::db::model_pricing::find_pricing_sync_at(
-                    org_pricing_entries,
-                    mn,
-                    span_ts_micros,
-                )
+            let resolved_pricing = extracted.model_name.as_ref().and_then(|mn| {
+                pricing::resolve_pricing(org_pricing_entries, mn, span_ts_micros)
             });
             let tokenizer_key: &str = extracted.model_name.as_deref().unwrap_or("");
 
@@ -312,42 +308,44 @@ impl OtelIngestionProcessor {
 
             let (billable_usage, tier_usage) = build_pricing_usage(&usage, input_includes_cache);
 
-            if cost.is_empty() {
-                if let Some(pricing_def) = matched_pricing {
-                    let ctx = pricing_context(
-                        &pricing_def,
-                        span_attributes,
-                        resource_attributes,
-                        &extracted.model_params,
-                    );
-                    let result =
-                        crate::db::model_pricing::calculate_cost_from_definition_with_tier_usage(
+            if cost.is_empty()
+                && let Some(resolved) = resolved_pricing
+            {
+                match resolved.pricing {
+                    pricing::ResolvedPricing::Definition(pricing_def) => {
+                        let ctx = pricing_context(
                             &pricing_def,
-                            &billable_usage,
-                            &tier_usage,
-                            span_ts_micros,
-                            &ctx,
+                            span_attributes,
+                            resource_attributes,
+                            &extracted.model_params,
                         );
-                    if !result.cost.is_empty() {
-                        log::debug!(
-                            "[model_pricing] model='{}' pattern='{}' tier='{}' total_cost={:.8}",
-                            extracted.model_name.as_deref().unwrap_or(""),
-                            pricing_def.match_pattern,
-                            result.tier_name,
-                            result.cost.get("total").copied().unwrap_or(0.0),
-                        );
-                        cost = result.cost;
-                        add_cache_derived_costs(&mut cost, &tier_usage, &result.prices);
+                        let result =
+                            crate::db::model_pricing::calculate_cost_from_definition_with_tier_usage(
+                                &pricing_def,
+                                &billable_usage,
+                                &tier_usage,
+                                span_ts_micros,
+                                &ctx,
+                            );
+                        if !result.cost.is_empty() {
+                            log::debug!(
+                                "[model_pricing] model='{}' pattern='{}' match={:?} tier='{}' total_cost={:.8}",
+                                extracted.model_name.as_deref().unwrap_or(""),
+                                pricing_def.match_pattern,
+                                resolved.match_kind,
+                                result.tier_name,
+                                result.cost.get("total").copied().unwrap_or(0.0),
+                            );
+                            cost = result.cost;
+                            add_cache_derived_costs(&mut cost, &tier_usage, &result.prices);
+                        }
                     }
-                } else if let Some(ref model_name) = extracted.model_name {
-                    let input_tokens = billable_usage.get("input").cloned().unwrap_or_default();
-                    let output_tokens = billable_usage.get("output").cloned().unwrap_or_default();
-                    if let Some((input_cost, output_cost, total_cost)) = pricing::calculate_cost(
-                        model_name,
-                        input_tokens,
-                        output_tokens,
-                        span_ts_micros,
-                    ) {
+                    pricing::ResolvedPricing::Compiled(model_pricing) => {
+                        let input_tokens = billable_usage.get("input").cloned().unwrap_or_default();
+                        let output_tokens =
+                            billable_usage.get("output").cloned().unwrap_or_default();
+                        let (input_cost, output_cost, total_cost) =
+                            model_pricing.cost(input_tokens, output_tokens, span_ts_micros);
                         cost.insert("input".to_string(), input_cost);
                         cost.insert("output".to_string(), output_cost);
                         cost.insert("total".to_string(), total_cost);

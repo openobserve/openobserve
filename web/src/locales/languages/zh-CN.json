@@ -14131,6 +14131,8 @@
     "tip2": "验证具有匹配正则表达式模式的规则是否存在且已启用",
     "tip3": "从列表中创建新的模型定价规则",
     "matchFound": "已找到匹配项",
+    "approximateMatchFound": "近似匹配",
+    "approximateMatchDesc": "此规则仅匹配“{modelName}”的一部分，因此其价格可能属于其他模型。请添加与完整名称匹配的规则。",
     "matchPriority": "匹配优先级",
     "defaultPricingTier": "默认定价等级",
     "pricePerMTokens": "价格/1M 词元",

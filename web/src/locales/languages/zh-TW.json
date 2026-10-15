@@ -14126,6 +14126,8 @@
     "tip2": "確認存在具有符合的正規表示式模式且已啟用的規則",
     "tip3": "從列表建立新的模型定價規則",
     "matchFound": "找到符合",
+    "approximateMatchFound": "近似符合",
+    "approximateMatchDesc": "此規則僅符合「{modelName}」的一部分，因此其價格可能屬於其他模型。請新增符合完整名稱的規則。",
     "matchPriority": "比對優先順序",
     "defaultPricingTier": "預設定價層級",
     "pricePerMTokens": "價格 / 1M 權杖",

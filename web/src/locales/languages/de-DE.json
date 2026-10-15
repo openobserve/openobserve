@@ -14131,6 +14131,8 @@
     "tip2": "Stellen Sie sicher, dass eine Regel mit einem passenden Regex-Muster existiert und aktiviert ist",
     "tip3": "Erstellen Sie eine neue Modellpreisregel aus der Liste",
     "matchFound": "Spiel gefunden",
+    "approximateMatchFound": "Ungefähre Übereinstimmung",
+    "approximateMatchDesc": "Diese Regel stimmt nur mit einem Teil von „{modelName}“ überein, daher kann ihr Preis zu einem anderen Modell gehören. Fügen Sie eine Regel hinzu, die den vollständigen Namen abdeckt.",
     "matchPriority": "Priorität des Spiels",
     "defaultPricingTier": "Standard-Preisstufe",
     "pricePerMTokens": "Preis//1 Million Tokens",

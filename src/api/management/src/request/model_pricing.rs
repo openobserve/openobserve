@@ -22,9 +22,11 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::model_pricing::{
-    BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingSource, PricingTierDefinition,
+    BUILT_IN_ORG, META_ORG, MatchKind, ModelPricingDefinition, PricingSource,
+    PricingTierDefinition,
 };
 use db::model_pricing;
+use openobserve_core::traces::otel::pricing::{ResolvedPricing, resolve_pricing};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
 use {
@@ -118,34 +120,37 @@ pub async fn list(
             .then_with(|| a.name.cmp(&b.name))
     });
 
-    // Build a parent-children hierarchy based on regex overlap.
+    // Build a parent-children hierarchy that mirrors the runtime resolver.
     //
-    // For each item (processed in priority order) we derive a testable literal string from its
-    // match_pattern (by stripping flags/anchors and extracting the literal prefix). We then check
-    // whether any already-placed parent's compiled regex matches that test string. If yes the item
-    // is a child (shadowed by that parent). If no, it becomes a new parent.
-    //
-    // This reflects actual runtime behaviour: a parent with pattern `(?i)claude-3` genuinely
-    // shadows any built-in whose pattern starts with "claude-3" (e.g. "claude-3-haiku").
+    // For each item (processed in priority order) we derive a representative model name from its
+    // match_pattern (by stripping flags, anchors and an optional prefix group, then taking the
+    // literal part). An already-placed parent shadows the item when the resolver would pick the
+    // parent for that name: the parent matches it at least as exactly as the item itself does
+    // (an exact match beats an approximate one; equal kinds fall back to priority order, which
+    // the parent already wins). So an org `(?i)claude-3` no longer shadows a built-in
+    // `claude-3-haiku` that matches its own name exactly.
     let never_matches = regex::Regex::new("$^").unwrap();
     let mut parents: Vec<(ModelPricingDefinition, regex::Regex)> = Vec::new();
 
     for item in all_items {
+        let compiled = regex::RegexBuilder::new(&item.match_pattern)
+            .size_limit(db::model_pricing::REGEX_SIZE_LIMIT)
+            .build()
+            .unwrap_or_else(|_| never_matches.clone());
         let test_str = derive_test_string(&item.match_pattern);
 
-        let parent_idx = if !test_str.is_empty() {
-            parents.iter().position(|(_, re)| re.is_match(&test_str))
-        } else {
+        let parent_idx = if test_str.is_empty() {
             None
+        } else {
+            let own_kind = MatchKind::of(&compiled, &test_str);
+            parents.iter().position(|(_, re)| {
+                MatchKind::of(re, &test_str).is_some_and(|kind| Some(kind) >= own_kind)
+            })
         };
 
         if let Some(idx) = parent_idx {
             parents[idx].0.children.push(item);
         } else {
-            let compiled = regex::RegexBuilder::new(&item.match_pattern)
-                .size_limit(db::model_pricing::REGEX_SIZE_LIMIT)
-                .build()
-                .unwrap_or_else(|_| never_matches.clone());
             parents.push((item, compiled));
         }
     }
@@ -608,11 +613,45 @@ fn strip_leading_flags(s: &str) -> &str {
     rest
 }
 
+/// Strip one leading optional group such as `(?:[\w-]+[/.:])*` (a provider/route prefix like
+/// `openai/` or `us.anthropic.`). Only a group quantified with `*` or `?` is stripped, because it
+/// can match nothing; any other leading group is part of the model name and is kept.
+fn strip_leading_optional_group(s: &str) -> &str {
+    if !s.starts_with('(') {
+        return s;
+    }
+    let mut depth = 0usize;
+    let mut in_class = false;
+    let mut chars = s.char_indices();
+    while let Some((i, c)) = chars.next() {
+        match c {
+            '\\' => {
+                chars.next();
+            }
+            '[' if !in_class => in_class = true,
+            ']' if in_class => in_class = false,
+            '(' if !in_class => depth += 1,
+            ')' if !in_class => {
+                depth -= 1;
+                if depth == 0 {
+                    let rest = &s[i + 1..];
+                    return match rest.strip_prefix(['*', '?']) {
+                        Some(after) => after.strip_prefix('?').unwrap_or(after),
+                        None => s,
+                    };
+                }
+            }
+            _ => {}
+        }
+    }
+    s
+}
+
 /// Derive a testable literal string from a regex pattern.
 ///
-/// Strips inline flags and leading `^` anchors, then walks the pattern character by character
-/// collecting literal characters. Stops at the first unescaped regex metacharacter
-/// (`(`, `)`, `[`, `]`, `{`, `}`, `*`, `+`, `?`, `|`, `$`, `^`, `.`).
+/// Strips inline flags, leading `^` anchors and one leading optional prefix group, then walks the
+/// pattern character by character collecting literal characters. Stops at the first unescaped
+/// regex metacharacter (`(`, `)`, `[`, `]`, `{`, `}`, `*`, `+`, `?`, `|`, `$`, `^`, `.`).
 /// Backslash-escaped characters are treated as their literal value (e.g. `\.` → `.`).
 ///
 /// Examples:
@@ -620,9 +659,10 @@ fn strip_leading_flags(s: &str) -> &str {
 ///   `(?i)gpt-4o(?:-\d{4}[-\d]*)?$`   → `"gpt-4o"`
 ///   `(?i)claude-3-sonnet$`            → `"claude-3-sonnet"`
 ///   `(?i)gpt-3\.5`                    → `"gpt-3.5"`
+///   `(?i)^(?:[\w-]+[/.:])*gpt-5\.4(?:-\d{8})?$` → `"gpt-5.4"`
 fn derive_test_string(pattern: &str) -> String {
     let s = strip_leading_flags(pattern.trim());
-    let s = s.trim_start_matches('^');
+    let s = strip_leading_optional_group(s.trim_start_matches('^'));
     let mut result = String::new();
     let mut iter = s.chars().peekable();
     while let Some(c) = iter.next() {
@@ -662,8 +702,13 @@ pub struct TestModelMatchRequest {
 /// Response for the test-model-match endpoint.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct TestModelMatchResponse {
-    /// The matched pricing definition, or null if no definition matched.
+    /// The matched pricing definition, or null if no definition matched. A match from the
+    /// compiled-in fallback table is shown as a built-in definition without an id.
     pub matched: Option<ModelPricingDefinition>,
+    /// How the matched pattern covers the model name: `exact` when it matches the whole name,
+    /// `approximate` when the name continues before or after the match (the price may belong
+    /// to a different model). Null if nothing matched.
+    pub match_kind: Option<MatchKind>,
     /// The name of the selected pricing tier, or null if no definition matched.
     pub tier: Option<String>,
     /// Index of the selected tier in `matched.tiers`, which stays unambiguous when names repeat.
@@ -718,9 +763,14 @@ pub async fn test_model_match(
     }
 
     let entries = model_pricing::get_org_pricing_entries(&org_id);
-    let matched = model_pricing::find_pricing_sync_at(&entries, &req.model_name, req.timestamp);
+    let resolved = resolve_pricing(&entries, &req.model_name, req.timestamp);
+    let match_kind = resolved.as_ref().map(|r| r.match_kind);
+    let matched = resolved.map(|r| match r.pricing {
+        ResolvedPricing::Definition(definition) => definition,
+        ResolvedPricing::Compiled(pricing) => pricing.to_definition(),
+    });
 
-    let (tier, tier_index, costs, total_cost) = if let Some(ref def) = matched {
+    let (tier, tier_index, costs, total_cost) = if let Some(def) = &matched {
         let ctx = openobserve_core::traces::otel::processor::pricing_context_for_test_endpoint(
             def,
             &req.attributes,
@@ -740,6 +790,7 @@ pub async fn test_model_match(
 
     MetaHttpResponse::json(TestModelMatchResponse {
         matched,
+        match_kind,
         tier,
         tier_index,
         costs,
@@ -891,6 +942,21 @@ mod tests {
     #[test]
     fn test_derive_test_string_stops_at_pipe() {
         assert_eq!(derive_test_string("foo|bar"), "foo");
+    }
+
+    #[test]
+    fn test_derive_test_string_skips_optional_provider_prefix_group() {
+        assert_eq!(
+            derive_test_string(r"(?i)^(?:[\w-]+[/.:])*gpt-5\.4-mini(?:-\d{4}-\d{2}-\d{2}|-\d{8})?$"),
+            "gpt-5.4-mini"
+        );
+        assert_eq!(derive_test_string(r"(?i)(?:openai/)?gpt-4o"), "gpt-4o");
+    }
+
+    #[test]
+    fn test_derive_test_string_keeps_required_leading_group() {
+        // A group that must match is part of the name; it stops literal collection.
+        assert_eq!(derive_test_string(r"(?i)(gpt|o)-4"), "");
     }
 
     // ── validate_definition ───────────────────────────────────────────────────

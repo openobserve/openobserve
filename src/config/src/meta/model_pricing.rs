@@ -84,8 +84,40 @@ impl From<&str> for PricingSource {
     }
 }
 
+/// How a pricing pattern matched a model name.
+///
+/// Ordered so that `Exact > Approximate`: when several patterns match, an exact match wins.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MatchKind {
+    /// The pattern matched only part of the model name: the name continues before or after
+    /// the match (e.g. `gpt-5\.4` matching `gpt-5.4-mini`). The span is still priced, but the
+    /// price may belong to a different model.
+    Approximate,
+    /// The pattern matched the whole model name.
+    Exact,
+}
+
+impl MatchKind {
+    /// Match `pattern` against `model_name`; `None` when it does not match at all.
+    ///
+    /// Exactness is judged from the span `find` reports, i.e. with leftmost-first semantics: an
+    /// alternation whose earlier branch is a prefix of a later one (`gpt-4|gpt-4o` on `gpt-4o`)
+    /// reports the shorter match and so counts as approximate. Anchor such patterns with `$`.
+    pub fn of(pattern: &regex::Regex, model_name: &str) -> Option<Self> {
+        pattern.find(model_name).map(|m| {
+            if m.start() == 0 && m.end() == model_name.len() {
+                MatchKind::Exact
+            } else {
+                MatchKind::Approximate
+            }
+        })
+    }
+}
+
 /// A user-defined model pricing definition that maps model names (via regex) to pricing tiers.
-/// These definitions take priority over the built-in pricing in `pricing.rs`.
+/// These definitions take priority over the compiled-in pricing in `pricing.rs` unless only the
+/// compiled-in table matches the model name exactly (see [`MatchKind`]).
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 #[serde(default)]
 pub struct ModelPricingDefinition {

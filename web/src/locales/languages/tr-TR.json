@@ -14131,6 +14131,8 @@
     "tip2": "Eşleşen regex desenine sahip bir kuralın var olduğunu ve etkinleştirildiğini doğrulayın",
     "tip3": "Listeden yeni bir model fiyatlandırma kuralı oluşturun",
     "matchFound": "Eşleşme Bulundu",
+    "approximateMatchFound": "Yaklaşık Eşleşme",
+    "approximateMatchDesc": "Bu kural \"{modelName}\" adının yalnızca bir kısmıyla eşleşiyor, bu nedenle fiyatı farklı bir modele ait olabilir. Tam adla eşleşen bir kural ekleyin.",
     "matchPriority": "Eşleşme Önceliği",
     "defaultPricingTier": "Varsayılan fiyatlandırma katmanı",
     "pricePerMTokens": "Fiyat/1 milyon token",

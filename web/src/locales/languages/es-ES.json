@@ -14131,6 +14131,8 @@
     "tip2": "Verifique que exista y esté habilitada una regla con un patrón de expresiones regulares coincidente",
     "tip3": "Crea una nueva regla de precios de modelo a partir de la lista",
     "matchFound": "Se encontró una coincidencia",
+    "approximateMatchFound": "Coincidencia aproximada",
+    "approximateMatchDesc": "Esta regla coincide solo con parte de \"{modelName}\", por lo que su precio puede corresponder a otro modelo. Añade una regla que coincida con el nombre completo.",
     "matchPriority": "Prioridad de coincidencia",
     "defaultPricingTier": "Nivel de precios predeterminado",
     "pricePerMTokens": "Precio: 1 millón de fichas",

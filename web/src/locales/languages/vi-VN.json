@@ -14131,6 +14131,8 @@
     "tip2": "Xác minh quy tắc có mẫu regex khớp tồn tại và được kích hoạt",
     "tip3": "Tạo quy tắc giá mô hình mới từ danh sách",
     "matchFound": "Đã tìm thấy kết quả khớp",
+    "approximateMatchFound": "Khớp gần đúng",
+    "approximateMatchDesc": "Quy tắc này chỉ khớp một phần của \"{modelName}\", vì vậy giá có thể thuộc về một mô hình khác. Hãy thêm quy tắc khớp với tên đầy đủ.",
     "matchPriority": "Ưu tiên khớp",
     "defaultPricingTier": "Bậc giá mặc định",
     "pricePerMTokens": "Giá / 1M token",

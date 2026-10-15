@@ -14131,6 +14131,8 @@
     "tip2": "正規表現パターンが一致するルールが存在し、有効になっていることを確認します",
     "tip3": "リストから新しいモデル価格設定ルールを作成する",
     "matchFound": "一致するものが見つかりました",
+    "approximateMatchFound": "近似一致",
+    "approximateMatchDesc": "このルールは \"{modelName}\" の一部にのみ一致するため、価格が別のモデルのものである可能性があります。完全な名前に一致するルールを追加してください。",
     "matchPriority": "マッチプライオリティ",
     "defaultPricingTier": "デフォルト価格階層",
     "pricePerMTokens": "価格/100万トークン",

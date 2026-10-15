@@ -14131,6 +14131,8 @@
     "tip2": "Controleer of een regel met een overeenkomend regex-patroon bestaat en is ingeschakeld",
     "tip3": "Maak een nieuwe prijsregel voor modellen op basis van de lijst",
     "matchFound": "Match gevonden",
+    "approximateMatchFound": "Benaderde match",
+    "approximateMatchDesc": "Deze regel komt slechts met een deel van \"{modelName}\" overeen, dus de prijs kan van een ander model zijn. Voeg een regel toe die de volledige naam dekt.",
     "matchPriority": "Prioriteit van wedstrijden",
     "defaultPricingTier": "Standaardprijsniveau",
     "pricePerMTokens": "Prijs/1 miljoen tokens",

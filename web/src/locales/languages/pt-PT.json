@@ -14131,6 +14131,8 @@
     "tip2": "Verifique se existe uma regra com um padrão regex correspondente e se está ativada",
     "tip3": "Crie uma nova regra de preço do modelo a partir da lista",
     "matchFound": "Correspondência encontrada",
+    "approximateMatchFound": "Correspondência aproximada",
+    "approximateMatchDesc": "Esta regra corresponde apenas a parte de \"{modelName}\", pelo que o preço pode pertencer a outro modelo. Adicione uma regra que corresponda ao nome completo.",
     "matchPriority": "Prioridade de correspondência",
     "defaultPricingTier": "Nível de preço padrão",
     "pricePerMTokens": "Preço/ 1M de tokens",

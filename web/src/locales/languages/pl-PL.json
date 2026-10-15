@@ -14131,6 +14131,8 @@
     "tip2": "Upewnij się, że istnieje reguła z pasującym wzorcem regex i jest włączona",
     "tip3": "Utwórz nową regułę cenową modelu z listy",
     "matchFound": "Znaleziono dopasowanie",
+    "approximateMatchFound": "Przybliżone dopasowanie",
+    "approximateMatchDesc": "Ta reguła pasuje tylko do części \"{modelName}\", więc jej cena może należeć do innego modelu. Dodaj regułę pasującą do pełnej nazwy.",
     "matchPriority": "Priorytet dopasowania",
     "defaultPricingTier": "Domyślny poziom cenowy",
     "pricePerMTokens": "Cena / 1M tokenów",

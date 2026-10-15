@@ -14131,6 +14131,8 @@
     "tip2": "Verify a rule with a matching regex pattern exists and is enabled",
     "tip3": "Create a new model pricing rule from the list",
     "matchFound": "Match Found",
+    "approximateMatchFound": "Approximate Match",
+    "approximateMatchDesc": "This rule matches only part of \"{modelName}\", so its price may belong to a different model. Add a rule that matches the full name.",
     "matchPriority": "Match Priority",
     "defaultPricingTier": "Default pricing tier",
     "pricePerMTokens": "Price / 1M tokens",
