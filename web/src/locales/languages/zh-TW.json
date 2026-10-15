@@ -23799,5 +23799,16 @@
       "title": "建議",
       "subtitle": "當您有空時——這些能減少雜訊或節省您的時間。"
     }
+  },
+  "panelDraft": {
+    "promptTitle": "You have an unsaved panel from {time}",
+    "continue": "Continue",
+    "startNew": "Start new",
+    "leaveTitle": "Leave panel editor?",
+    "leaveMessage": "Your new panel isn't on the dashboard yet. Keep as draft saves it on this browser, and Add Panel offers it back next time.",
+    "keepAsDraft": "Keep as draft",
+    "discardChanges": "Discard changes",
+    "keepEditing": "Keep editing",
+    "panelMissingOnSave": "This panel no longer exists on the dashboard. Reload the dashboard and add it again."
   }
 }

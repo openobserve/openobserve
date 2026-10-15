@@ -23804,5 +23804,16 @@
       "title": "제안",
       "subtitle": "시간이 되실 때 확인해 보세요 — 노이즈를 줄이거나 시간을 절약해 줍니다."
     }
+  },
+  "panelDraft": {
+    "promptTitle": "You have an unsaved panel from {time}",
+    "continue": "Continue",
+    "startNew": "Start new",
+    "leaveTitle": "Leave panel editor?",
+    "leaveMessage": "Your new panel isn't on the dashboard yet. Keep as draft saves it on this browser, and Add Panel offers it back next time.",
+    "keepAsDraft": "Keep as draft",
+    "discardChanges": "Discard changes",
+    "keepEditing": "Keep editing",
+    "panelMissingOnSave": "This panel no longer exists on the dashboard. Reload the dashboard and add it again."
   }
 }
