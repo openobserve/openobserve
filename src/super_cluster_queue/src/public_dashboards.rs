@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Applies public dashboard link rows replicated from the region a publisher edited in.
-//!
-//! The apply never goes through the link service, which would publish again and loop between
-//! regions; the one exception is a local write that wins a tie of equal revisions, which is sent
-//! once more under a new revision so both regions converge. Result files are region-local.
+//! Applies replicated public dashboard link rows through the raw table layer, never re-publishing.
 
 use infra::errors::{Error, Result};
 use o2_enterprise::enterprise::super_cluster::queue::{

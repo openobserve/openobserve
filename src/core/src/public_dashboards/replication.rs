@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Super-cluster replication of link rows: one Put after every semantic write, an outbox that
-//! retries failed emits, and the apply order of the consumer. Result files never replicate.
+//! Super-cluster replication of link rows: queued Puts, outbox retries and the apply order.
 
 use std::future::Future;
 
@@ -43,10 +42,10 @@ pub fn enabled() -> bool {
     false
 }
 
-/// Sends the row to the other regions; a failed send is queued in the outbox.
+/// Sends the row its write already queued in the outbox; a failed send stays queued for retry.
 pub async fn replicate(row: &PublicDashboard) {
     if enabled() {
-        replicate_on(get_orm_client_rw().await, row, emit).await;
+        deliver_on(get_orm_client_rw().await, row, emit).await;
     }
 }
 
@@ -72,28 +71,32 @@ pub async fn apply(json: &str, origin: &str) -> Result<(), anyhow::Error> {
     let applied =
         pd_table::apply_replicated(db, &incoming, origin, &local_origin(), now_micros()).await?;
     if let Applied::Reasserted(row) = applied {
-        replicate_on(db, row.as_ref(), send).await;
+        deliver_on(db, row.as_ref(), send).await;
     }
     Ok(())
 }
 
-pub(crate) async fn replicate_on<C, F, Fut>(db: &C, row: &PublicDashboard, emit: F)
+/// The row's outbox entry is written with the row, so only a delivered send removes it.
+pub(crate) async fn deliver_on<C, F, Fut>(db: &C, row: &PublicDashboard, emit: F)
 where
     C: ConnectionTrait,
     F: Fn(PublicDashboard) -> Fut,
     Fut: Future<Output = Result<(), anyhow::Error>>,
 {
-    let Err(e) = emit(row.clone()).await else {
-        return;
+    let result = match emit(row.clone()).await {
+        Ok(()) => pd_table::outbox_delete(db, &row.id, row.rev).await,
+        Err(e) => {
+            log::error!(
+                "[public_dashboards] replicating link {} at rev {} failed, left for retry: {e}",
+                row.id,
+                row.rev
+            );
+            return;
+        }
     };
-    log::error!(
-        "[public_dashboards] replicating link {} at rev {} failed, queued for retry: {e}",
-        row.id,
-        row.rev
-    );
-    if let Err(e) = pd_table::outbox_put(db, &row.id, row.rev, now_micros()).await {
+    if let Err(e) = result {
         log::error!(
-            "[public_dashboards] queueing link {} for replication failed: {e}",
+            "[public_dashboards] clearing the outbox of link {}: {e}",
             row.id
         );
     }
@@ -231,68 +234,75 @@ pub(crate) mod tests {
         }
     }
 
+    async fn queued(db: &DatabaseConnection) -> Vec<(String, i64, i32)> {
+        pd_table::outbox_list_due(db, i64::MAX, 10)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|e| (e.link_id, e.rev, e.attempts))
+            .collect()
+    }
+
+    /// Every semantic write queues its Put with the row, so a crash before the send loses nothing.
     #[tokio::test]
-    async fn gate07_a_failed_emit_is_repaired_by_the_outbox() {
+    async fn gate07_a_crash_between_the_commit_and_the_emit_is_repaired_by_the_outbox() {
         let db = db().await;
-        let mut row = link("l");
-        pd_table::insert_capped(&db, &row, 10, 10).await.unwrap();
+        let row = link("l");
+        pd_table::insert_capped(&db, &row, 10, 10, true)
+            .await
+            .unwrap();
+        assert_eq!(queued(&db).await, [("l".to_string(), 1, 0)]);
+
+        // The process dies after the commit: nothing was sent, the entry carries the revoke.
+        let revoke = |l: &mut PublicDashboard| {
+            l.deleted_at = Some(9);
+            Ok::<(), anyhow::Error>(())
+        };
+        let revoked = crate::public_dashboards::edit_on(&db, "o", "l", true, revoke)
+            .await
+            .unwrap();
+        assert_eq!(queued(&db).await, [("l".to_string(), revoked.rev, 0)]);
+
         let queue = Queue::default();
         queue.down.store(true, Ordering::SeqCst);
-
-        replicate_on(&db, &row, queue.emitter()).await;
-        assert_eq!(
-            pd_table::outbox_list_due(&db, i64::MAX, 10)
-                .await
-                .unwrap()
-                .len(),
-            1
-        );
-        // Still down: the entry stays and counts the attempt.
         assert_eq!(retry_outbox_on(&db, queue.emitter(), now_micros()).await, 0);
-        let entry = &pd_table::outbox_list_due(&db, i64::MAX, 10).await.unwrap()[0];
-        assert_eq!((entry.rev, entry.attempts), (1, 1));
+        assert_eq!(queued(&db).await, [("l".to_string(), revoked.rev, 1)]);
 
-        // A newer local write lands before the queue recovers; the retry sends that one.
-        row.enabled = false;
-        row.rev = 5;
-        assert!(pd_table::update_cas(&db, &row, 1).await.unwrap());
         queue.down.store(false, Ordering::SeqCst);
         assert_eq!(retry_outbox_on(&db, queue.emitter(), now_micros()).await, 1);
         let sent = queue.sent.lock().unwrap().clone();
-        assert_eq!(sent.len(), 1);
-        assert_eq!((sent[0].rev, sent[0].enabled), (5, false));
-        assert!(
-            pd_table::outbox_list_due(&db, i64::MAX, 10)
-                .await
-                .unwrap()
-                .is_empty()
-        );
+        assert_eq!((sent[0].rev, sent[0].deleted_at), (revoked.rev, Some(9)));
+        assert!(queued(&db).await.is_empty());
     }
 
     #[tokio::test]
-    async fn gate07_a_delivered_emit_leaves_nothing_in_the_outbox() {
+    async fn gate07_a_delivered_emit_clears_its_entry_and_a_failed_one_keeps_it() {
         let db = db().await;
         let row = link("l");
-        pd_table::insert_capped(&db, &row, 10, 10).await.unwrap();
+        pd_table::insert_capped(&db, &row, 10, 10, true)
+            .await
+            .unwrap();
         let queue = Queue::default();
-        replicate_on(&db, &row, queue.emitter()).await;
+        deliver_on(&db, &row, queue.emitter()).await;
         assert_eq!(queue.sent.lock().unwrap().len(), 1);
-        assert!(
-            pd_table::outbox_list_due(&db, i64::MAX, 10)
-                .await
-                .unwrap()
-                .is_empty()
-        );
+        assert!(queued(&db).await.is_empty());
+
+        let pause = |l: &mut PublicDashboard| {
+            l.enabled = false;
+            Ok::<(), anyhow::Error>(())
+        };
+        let paused = crate::public_dashboards::edit_on(&db, "o", "l", true, pause)
+            .await
+            .unwrap();
+        queue.down.store(true, Ordering::SeqCst);
+        deliver_on(&db, &paused, queue.emitter()).await;
+        assert_eq!(queued(&db).await, [("l".to_string(), paused.rev, 0)]);
 
         // An entry whose row was purged is dropped without sending anything.
+        queue.down.store(false, Ordering::SeqCst);
         pd_table::outbox_put(&db, "gone", 3, 1).await.unwrap();
-        assert_eq!(retry_outbox_on(&db, queue.emitter(), now_micros()).await, 0);
-        assert!(
-            pd_table::outbox_list_due(&db, i64::MAX, 10)
-                .await
-                .unwrap()
-                .is_empty()
-        );
+        assert_eq!(retry_outbox_on(&db, queue.emitter(), now_micros()).await, 1);
+        assert!(queued(&db).await.is_empty());
     }
 
     #[test]

@@ -228,7 +228,6 @@ mod workflow_folder_id;
 
 pub(crate) use m20261015_000001_create_public_dashboards::forget_draft_migrations;
 
-#[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn create_public_dashboards_schema_for_test(
     db: &sea_orm::DatabaseConnection,
 ) -> Result<(), DbErr> {
