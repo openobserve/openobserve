@@ -25,6 +25,8 @@ function keysOf(entries: RailEntry[]): string[] {
  */
 const oncallOff = (gate: string) => gate !== "oncall";
 const oncallOn = () => true;
+// OSS serves neither on-call nor alert calibration, which are both enterprise-gated.
+const ossGates = (gate: string) => gate !== "oncall" && gate !== "alertCalibration";
 
 /**
  * `keysOf` minus the Infra tile. Infra is `standalone` — it absorbs nothing and
@@ -245,6 +247,7 @@ describe("groupNavLinks", () => {
       "alertLibrary",
       "sloList",
       "incidentList",
+      "alertCalibration",
       "alertSources",
     ]);
   });
@@ -284,14 +287,14 @@ describe("groupNavLinks", () => {
         e.type === "linkGroup" && e.item.name === "reliability",
     );
     const outside = reliability?.children.filter((c) => !c.categoryKey).map((c) => c.name);
-    expect(outside).toEqual(["sloList", "incidentList", "alertSources"]);
+    expect(outside).toEqual(["sloList", "incidentList", "alertCalibration", "alertSources"]);
   });
 
   it("drops Incidents from Reliability on OSS (no incidents route)", () => {
     const entries = groupNavLinks(
       [link("home"), link("alertList"), link("sloList")],
       undefined,
-      oncallOff,
+      ossGates,
     );
     expect(keysWithoutInfra(entries)).toEqual(["link:home", "linkGroup:reliability"]);
     const reliability = entries.find(
@@ -319,6 +322,7 @@ describe("groupNavLinks", () => {
       "alertDestinations",
       "alertTemplates",
       "alertLibrary",
+      "alertCalibration",
     ]);
   });
 
@@ -783,6 +787,7 @@ describe("ship guards (AC-15, AC-22, D-27)", () => {
       "sloList",
       "incidentList",
       "downtimes",
+      "alertCalibration",
       "onCallResponses",
       "onCallTeams",
       "onCallRouting",

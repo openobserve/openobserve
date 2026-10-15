@@ -95,7 +95,7 @@ function deferred<T>() {
 
 function mountMenu(props: Record<string, unknown> = {}) {
   return mount(SubtestMenu, {
-    props: { ownCheckId: "self", disabled: false, compositionEnabled: true, ...props },
+    props: { ownCheckId: "self", disabled: false, ...props },
     attachTo: document.body,
     global: { plugins: [store, i18n], stubs: { OTooltip: OTooltipStub } },
   }) as VueWrapper;
@@ -136,14 +136,6 @@ describe("SubtestMenu", () => {
     expect(wrapper.get(TRIGGER).attributes("disabled")).toBeUndefined();
     expect(list).not.toHaveBeenCalled();
     expect(wrapper.find(MENU).exists()).toBe(false);
-  });
-
-  it("is disabled, with the existing reason, when composition is off", () => {
-    wrapper = mountMenu({ compositionEnabled: false });
-
-    expect(wrapper.get(TRIGGER).attributes("disabled")).toBeDefined();
-    const tips = wrapper.findAllComponents(OTooltipStub).map((c) => c.props("content"));
-    expect(tips).toContain("Subtests are not enabled on this deployment.");
   });
 
   it("is disabled like Add step while the journey cannot take a row", () => {
