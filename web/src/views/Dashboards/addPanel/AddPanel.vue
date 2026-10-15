@@ -209,6 +209,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OPageHeader>
       </OForm>
     </template>
+    <OContent v-if="storedDraft" class="shrink-0 py-2">
+      <OBanner
+        variant="info"
+        icon="history"
+        dense
+        inline-actions
+        data-test="dashboard-panel-draft-prompt"
+      >
+        {{ t("panelDraft.promptTitle", { time: storedDraftTime }) }}
+        <template #actions>
+          <OButton
+            variant="primary"
+            size="sm"
+            data-test="dashboard-panel-draft-continue"
+            @click="continueStoredDraft"
+            >{{ t("panelDraft.continue") }}</OButton
+          >
+          <OButton
+            variant="outline"
+            size="sm"
+            data-test="dashboard-panel-draft-start-new"
+            @click="startNewPanel"
+            >{{ t("panelDraft.startNew") }}</OButton
+          >
+        </template>
+      </OBanner>
+    </OContent>
     <!-- PanelEditor Content Area -->
     <PanelEditor
       ref="panelEditorRef"
@@ -232,6 +259,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data="panelTitle"
       data-test="query-inspector-dialog"
     />
+
+    <ODialog
+      v-model:open="leaveDialogOpen"
+      size="sm"
+      :title="t('panelDraft.leaveTitle')"
+      :primary-button-label="t('panelDraft.keepAsDraft')"
+      :secondary-button-label="t('panelDraft.discardChanges')"
+      secondary-button-variant="outline-destructive"
+      :neutral-button-label="t('panelDraft.keepEditing')"
+      data-test="dashboard-panel-leave-dialog"
+      @click:primary="keepAsDraftAndLeave"
+      @click:secondary="discardChangesAndLeave"
+      @click:neutral="leaveDialogOpen = false"
+    >
+      <p class="text-sm">{{ t("panelDraft.leaveMessage") }}</p>
+    </ODialog>
 
     <!-- Add Variable Drawer -->
     <div
@@ -265,6 +308,7 @@ import {
   reactive,
   onUnmounted,
   onMounted,
+  onBeforeUnmount,
   defineAsyncComponent,
   provide,
   inject,
@@ -327,6 +371,21 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import {
+  PANEL_DRAFT_AUTOSAVE_MS,
+  deletePanelDraft,
+  formatPanelDraftTime,
+  getPanelDraft,
+  isPanelDraftStorageAvailable,
+  newPanelDraftId,
+  prunePanelDrafts,
+  savePanelDraft,
+  type PanelDraftRecord,
+  type PanelDraftScope,
+} from "@/composables/dashboard/usePanelDraft";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -341,6 +400,9 @@ export default defineComponent({
     OButton,
     OPageLayout,
     OPageHeader,
+    OContent,
+    OBanner,
+    ODialog,
     OForm,
     OFormInlineEdit,
     ODropdown,
@@ -365,7 +427,7 @@ export default defineComponent({
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
-    const { t } = useI18nTyped();
+    const { t, locale } = useI18nTyped();
     const { isMobile } = useBreakpoint();
     const router = useRouter();
     const route = useRoute();
@@ -671,6 +733,7 @@ export default defineComponent({
 
       // remove beforeUnloadHandler event listener
       window.removeEventListener("beforeunload", beforeUnloadHandler);
+      document.removeEventListener("visibilitychange", onDraftVisibilityChange);
       window.removeEventListener("pointerdown", captureBaselineOnFirstInput, true);
       window.removeEventListener("keydown", captureBaselineOnFirstInput, true);
 
@@ -687,6 +750,7 @@ export default defineComponent({
     onMounted(async () => {
       // assign the route query params
       routeQueryParamsOnMount = JSON.parse(JSON.stringify(route?.query ?? {}));
+      delete routeQueryParamsOnMount.draftId;
 
       errorData.errors = [];
 
@@ -756,6 +820,7 @@ export default defineComponent({
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
       await loadDashboard();
+      if (!editMode.value) await initPanelDraft();
 
       // Call makeAutoSQLQuery after dashboard data is loaded
       // Only generate SQL if we're in auto query mode
@@ -1180,9 +1245,7 @@ export default defineComponent({
       updateDateTime();
     };
 
-    const goBack = async () => {
-      // Clean up variables created during this session (on discard)
-      // Remove variables that were created in this session from the dashboard data
+    const cleanupSessionVariables = () => {
       if (
         variablesCreatedInSession.value.length > 0 &&
         currentDashboardData.data?.variables?.list
@@ -1191,12 +1254,17 @@ export default defineComponent({
           (v: any) => !variablesCreatedInSession.value.includes(v.name),
         );
       }
-
-      // Clear the tracking arrays
       variablesCreatedInSession.value = [];
       variablesWithCurrentPanel.value = [];
+    };
 
-      return router.push({
+    const goBack = async () => {
+      // The draft must be written before the session's variables are cleaned up below.
+      if (draftKeepsEditsOnLeave()) await flushDraftOnExit();
+      // Clean up variables created during this session (on discard)
+      cleanupSessionVariables();
+
+      const failure = await router.push({
         path: "/dashboards/view",
         query: {
           ...routeQueryParamsOnMount,
@@ -1206,9 +1274,231 @@ export default defineComponent({
           tab: route.query.tab ?? currentDashboardData?.data?.tabs?.[0]?.tabId,
         },
       });
+      if (failure) draftExitFlushed = false;
+      return failure;
     };
 
+    // ── New-panel draft: one per user, org and dashboard, only while adding a panel ──
+    let draftScope: (PanelDraftScope & { folder: string }) | null = null;
+    let draftId: string | null = null;
+    // Set once the session saved or discarded, so nothing writes the draft back afterwards.
+    let draftClosed = false;
+    let draftExitFlushed = false;
+    let draftTimer: ReturnType<typeof setTimeout> | null = null;
+    const draftsEnabled = ref(false);
+    const storedDraft = ref<PanelDraftRecord | null>(null);
+    const leaveDialogOpen = ref(false);
+
+    const storedDraftTime = computed(() =>
+      storedDraft.value ? formatPanelDraftTime(storedDraft.value.updatedAt, locale.value) : "",
+    );
+
+    // An unanswered prompt leaves two sets of edits at stake, so leaving falls back to the native confirm.
+    const draftKeepsEditsOnLeave = () => draftsEnabled.value && !storedDraft.value;
+
+    const clearDraftTimer = () => {
+      if (draftTimer) clearTimeout(draftTimer);
+      draftTimer = null;
+    };
+
+    // Takes the snapshot synchronously, so an unmount right after cannot reset the editor first.
+    const flushDraft = async (): Promise<void> => {
+      clearDraftTimer();
+      const scope = draftScope;
+      // An unanswered prompt means the stored draft is not this session's to overwrite.
+      if (!draftsEnabled.value || draftClosed || !scope || storedDraft.value) return;
+      if (!hasUnsavedChanges()) {
+        if (draftId) await deletePanelDraft(scope, draftId);
+        return;
+      }
+      if (!draftId) {
+        draftId = newPanelDraftId();
+        if (!draftExitFlushed) router.replace({ query: { ...route.query, draftId } });
+      }
+      const list = currentDashboardData.data?.variables?.list ?? [];
+      try {
+        await savePanelDraft({
+          ...scope,
+          draftId,
+          tab: currentTabId.value ?? "",
+          data: dashboardPanelData.data,
+          variables: list.filter((v: any) => variablesCreatedInSession.value.includes(v.name)),
+          variablesWithCurrentPanel: variablesWithCurrentPanel.value,
+        });
+      } catch {
+        /* storage full or blocked: the edits stay in the open editor */
+      }
+    };
+
+    const flushDraftOnExit = () => {
+      if (draftExitFlushed) return Promise.resolve();
+      draftExitFlushed = true;
+      return flushDraft();
+    };
+
+    const scheduleDraftSave = () => {
+      if (!draftsEnabled.value || draftClosed || draftExitFlushed) return;
+      clearDraftTimer();
+      draftTimer = setTimeout(() => {
+        draftTimer = null;
+        void flushDraft();
+      }, PANEL_DRAFT_AUTOSAVE_MS);
+    };
+
+    const closeDraft = async () => {
+      draftClosed = true;
+      clearDraftTimer();
+      if (draftScope && draftId) await deletePanelDraft(draftScope, draftId);
+    };
+
+    const onDraftVisibilityChange = () => {
+      if (document.visibilityState === "hidden") void flushDraft();
+    };
+
+    const reinitializeVariables = async () => {
+      const variablesList = currentDashboardData.data?.variables?.list ?? [];
+      // Re-initialize manager with updated list
+      await variablesManager.initialize(variablesList, currentDashboardData.data);
+
+      // Restore visibility
+      // 1. Tab visibility
+      const tabId = currentTabId.value;
+      if (tabId) {
+        variablesManager.setTabVisibility(tabId, true);
+      }
+
+      // 2. Panel visibility (Edit Mode)
+      if (editMode.value && route.query.panelId) {
+        variablesManager.setPanelVisibility(route.query.panelId as string, true);
+      } else {
+        // 3. Panel visibility (Add Mode - current_panel)
+        // In add mode, mark "current_panel" as visible so variables can load
+        variablesManager.setPanelVisibility("current_panel", true);
+      }
+
+      // 4. Additionally, if any variable uses "current_panel", ensure it's visible
+      if (variablesWithCurrentPanel.value.length > 0) {
+        variablesManager.setPanelVisibility("current_panel", true);
+      }
+
+      // 5. Trigger variable data reload to ensure new variables are displayed
+      // Wait for Vue to process the manager updates
+      await nextTick();
+    };
+
+    const restoreDraftVariables = async (record: PanelDraftRecord) => {
+      const stored = (record.variables ?? []) as any[];
+      if (!stored.length) return;
+      if (!currentDashboardData.data.variables) {
+        currentDashboardData.data.variables = { list: [] };
+      }
+      const list = currentDashboardData.data.variables.list;
+      stored.forEach((variable: any) => {
+        if (!list.some((v: any) => v.name === variable.name)) {
+          list.push(JSON.parse(JSON.stringify(variable)));
+        }
+        if (!variablesCreatedInSession.value.includes(variable.name)) {
+          variablesCreatedInSession.value.push(variable.name);
+        }
+      });
+      variablesWithCurrentPanel.value = [
+        ...new Set([...variablesWithCurrentPanel.value, ...record.variablesWithCurrentPanel]),
+      ];
+      await reinitializeVariables();
+    };
+
+    const applyDraft = async (record: PanelDraftRecord) => {
+      // The restored panel must count as unsaved against the empty one it replaces.
+      if (panelBaseline === null) {
+        panelBaseline = JSON.parse(JSON.stringify(dashboardPanelData.data));
+      }
+      draftId = record.draftId;
+      const query: Record<string, any> = { ...route.query, draftId };
+      const tabs = currentDashboardData.data?.tabs ?? [];
+      if (record.tab && tabs.some((tab: any) => tab?.tabId == record.tab)) {
+        query.tab = record.tab;
+        variablesManager.setTabVisibility(record.tab, true);
+      }
+      await router.replace({ query });
+      Object.assign(dashboardPanelData.data, JSON.parse(JSON.stringify(record.data)));
+      const queryCount = dashboardPanelData.data.queries?.length ?? 0;
+      if (dashboardPanelData.layout.currentQueryIndex >= queryCount) {
+        dashboardPanelData.layout.currentQueryIndex = queryCount > 0 ? queryCount - 1 : 0;
+      }
+      dashboardPanelData.layout.vrlFunctionToggle = isQueryVrlEnabled(
+        dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex],
+      );
+      await restoreDraftVariables(record);
+      await nextTick();
+      runQuery();
+    };
+
+    const initPanelDraft = async () => {
+      if (forceSkipBeforeUnloadListener || !(await isPanelDraftStorageAvailable())) return;
+      draftScope = {
+        userId: String(store.state.userInfo?.email ?? ""),
+        org: String(store.state.selectedOrganization?.identifier ?? ""),
+        dashboardId: String(route.query.dashboard ?? ""),
+        folder: String(route.query.folder ?? "default"),
+      };
+      draftsEnabled.value = true;
+      document.addEventListener("visibilitychange", onDraftVisibilityChange);
+      void prunePanelDrafts();
+      const record = await getPanelDraft(draftScope);
+      if (!record) return;
+      // A refresh or Back into this same draft reopens it without asking.
+      if (route.query.draftId && route.query.draftId === record.draftId) {
+        await applyDraft(record);
+        return;
+      }
+      storedDraft.value = record;
+    };
+
+    const continueStoredDraft = async () => {
+      const record = storedDraft.value;
+      if (!record) return;
+      storedDraft.value = null;
+      await applyDraft(record);
+    };
+
+    const startNewPanel = async () => {
+      if (!storedDraft.value || !draftScope) return;
+      storedDraft.value = null;
+      await deletePanelDraft(draftScope);
+      scheduleDraftSave();
+    };
+
+    // Only a new panel with edits asks; everything else leaves as on main.
+    const requestLeave = () => {
+      if (draftKeepsEditsOnLeave() && hasUnsavedChanges()) {
+        leaveDialogOpen.value = true;
+        return;
+      }
+      return goBack();
+    };
+
+    const keepAsDraftAndLeave = async () => {
+      leaveDialogOpen.value = false;
+      // Keeping explicitly replaces an older draft the prompt was still offering.
+      storedDraft.value = null;
+      await goBack();
+    };
+
+    const discardChangesAndLeave = async () => {
+      leaveDialogOpen.value = false;
+      await closeDraft();
+      await goBack();
+    };
+
+    watch(() => dashboardPanelData.data, scheduleDraftSave, { deep: true });
+    watch(variablesCreatedInSession, scheduleDraftSave, { deep: true });
+
     const beforeUnloadHandler = (e: any) => {
+      // A new panel's edits survive the unload as a draft, so the browser prompt is not needed.
+      if (draftKeepsEditsOnLeave()) {
+        void flushDraft();
+        return;
+      }
       //check is data updated or not
       if (hasUnsavedChanges()) {
         // Display a confirmation message
@@ -1223,9 +1513,20 @@ export default defineComponent({
     // in cases where org is changed, we need to force a nvaigation, without warning
     let forceSkipBeforeUnloadListener = false;
 
-    onBeforeRouteLeave((to, from, next) => {
+    // An org switch remounts the editor without a route leave, so this is its only chance to keep the edits.
+    onBeforeUnmount(() => {
+      if (draftsEnabled.value) void flushDraftOnExit();
+    });
+
+    onBeforeRouteLeave(async (to, from, next) => {
       // check if it is a force navigation, then allow
       if (forceSkipBeforeUnloadListener) {
+        next();
+        return;
+      }
+
+      if (draftKeepsEditsOnLeave()) {
+        await flushDraftOnExit();
         next();
         return;
       }
@@ -1235,17 +1536,7 @@ export default defineComponent({
         const confirmMessage = t("dashboard.unsavedMessage");
         if (window.confirm(confirmMessage)) {
           // User confirmed navigation - clean up variables created during this session
-          if (
-            variablesCreatedInSession.value.length > 0 &&
-            currentDashboardData.data?.variables?.list
-          ) {
-            currentDashboardData.data.variables.list =
-              currentDashboardData.data.variables.list.filter(
-                (v: any) => !variablesCreatedInSession.value.includes(v.name),
-              );
-          }
-          variablesCreatedInSession.value = [];
-          variablesWithCurrentPanel.value = [];
+          cleanupSessionVariables();
           // User confirmed, allow navigation
           next();
         } else {
@@ -1443,6 +1734,7 @@ export default defineComponent({
         });
 
         isUnsavedTrackingActive = false;
+        if (draftsEnabled.value) await closeDraft();
 
         // The author sees the value just saved, not an older view-mode override of this panel.
         clearExemplarOverride(
@@ -1863,33 +2155,7 @@ export default defineComponent({
 
       selectedVariableToEdit.value = null;
 
-      // Re-initialize manager with updated list
-      await variablesManager.initialize(variablesList, currentDashboardData.data);
-
-      // Restore visibility
-      // 1. Tab visibility
-      const tabId = currentTabId.value;
-      if (tabId) {
-        variablesManager.setTabVisibility(tabId, true);
-      }
-
-      // 2. Panel visibility (Edit Mode)
-      if (editMode.value && route.query.panelId) {
-        variablesManager.setPanelVisibility(route.query.panelId as string, true);
-      } else {
-        // 3. Panel visibility (Add Mode - current_panel)
-        // In add mode, mark "current_panel" as visible so variables can load
-        variablesManager.setPanelVisibility("current_panel", true);
-      }
-
-      // 4. Additionally, if any variable uses "current_panel", ensure it's visible
-      if (variablesWithCurrentPanel.value.length > 0) {
-        variablesManager.setPanelVisibility("current_panel", true);
-      }
-
-      // 5. Trigger variable data reload to ensure new variables are displayed
-      // Wait for Vue to process the manager updates
-      await nextTick();
+      await reinitializeVariables();
 
       // The VariablesValueSelector components should automatically pick up
       // the new variables from the manager through their computed properties
@@ -1987,11 +2253,21 @@ export default defineComponent({
       currentPanelId,
       panelEditorRef,
       dashboardDataForPanelEditor,
+      draftsEnabled,
+      storedDraft,
+      storedDraftTime,
+      continueStoredDraft,
+      startNewPanel,
+      leaveDialogOpen,
+      requestLeave,
+      keepAsDraftAndLeave,
+      discardChangesAndLeave,
+      flushDraft,
     };
   },
   methods: {
     goBackToDashboardList() {
-      this.goBack();
+      this.requestLeave();
     },
   },
 });
