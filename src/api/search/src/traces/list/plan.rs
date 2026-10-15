@@ -28,21 +28,21 @@ use super::{
 use crate::{common::utils::http::get_use_cache_from_request, traces::schema_compat};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(in crate::traces) enum TraceListMode {
+pub enum TraceListMode {
     Complete,
     Streaming,
 }
 
-pub(in crate::traces) struct TraceListPlan {
-    pub(in crate::traces) options: TraceListOptions,
-    pub(in crate::traces) sort: TraceSort,
-    pub(super) schema: TraceSchema,
-    pub(super) validated: Option<schema_compat::ValidatedLlmSchema>,
-    pub(super) mode: TraceListMode,
+pub struct TraceListPlan {
+    pub options: TraceListOptions,
+    pub sort: TraceSort,
+    pub schema: TraceSchema,
+    pub validated: Option<schema_compat::ValidatedLlmSchema>,
+    pub mode: TraceListMode,
 }
 
 impl TraceListPlan {
-    pub(super) fn request(&self, stream_name: &str) -> Request {
+    pub fn request(&self, stream_name: &str) -> Request {
         Request {
             query: Query {
                 sql: self.sql(stream_name),
@@ -87,21 +87,18 @@ impl TraceListPlan {
     }
 }
 
-pub(in crate::traces) struct TraceListOptions {
-    pub(super) filter: String,
-    pub(in crate::traces) from: i64,
-    pub(in crate::traces) size: i64,
-    pub(super) range: (i64, i64),
-    pub(super) timeout: i64,
-    pub(super) use_cache: bool,
-    pub(in crate::traces) range_error: String,
+pub struct TraceListOptions {
+    pub filter: String,
+    pub from: i64,
+    pub size: i64,
+    pub range: (i64, i64),
+    timeout: i64,
+    pub use_cache: bool,
+    pub range_error: String,
 }
 
 impl TraceListOptions {
-    pub(super) fn parse(
-        query: &HashMap<String, String>,
-        mode: TraceListMode,
-    ) -> Result<Self, String> {
+    pub fn parse(query: &HashMap<String, String>, mode: TraceListMode) -> Result<Self, String> {
         let filter = query.get("filter").cloned().unwrap_or_default();
         if mode == TraceListMode::Streaming {
             validate_filter(&filter)?;
@@ -152,7 +149,7 @@ impl TraceListOptions {
         Ok(options)
     }
 
-    pub(super) fn restrict_range(&mut self, max_hours: i64) {
+    pub fn restrict_range(&mut self, max_hours: i64) {
         if max_hours > 0 && (self.range.1 - self.range.0) > max_hours * 3600 * 1_000_000 {
             self.range.0 = self.range.1 - max_hours * 3600 * 1_000_000;
             self.range_error = format!(
@@ -181,13 +178,13 @@ impl TraceListOptions {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(in crate::traces) struct TraceSort {
-    pub(super) by_duration: bool,
-    pub(super) ascending: bool,
+pub struct TraceSort {
+    pub by_duration: bool,
+    pub ascending: bool,
 }
 
 impl TraceSort {
-    pub(super) fn parse(query: &HashMap<String, String>) -> Result<Self, String> {
+    pub fn parse(query: &HashMap<String, String>) -> Result<Self, String> {
         let field = query
             .get("sort_by")
             .map_or("start_time", String::as_str)
@@ -212,7 +209,7 @@ impl TraceSort {
         })
     }
 
-    pub(super) fn sql(self) -> String {
+    pub fn sql(self) -> String {
         let field = if self.by_duration {
             "zo_sql_duration"
         } else {
@@ -222,7 +219,7 @@ impl TraceSort {
         format!("{field} {order}")
     }
 
-    pub(super) fn sort(self, hits: &mut [TraceResponseItem]) {
+    pub fn sort(self, hits: &mut [TraceResponseItem]) {
         let key = |hit: &TraceResponseItem| {
             if self.by_duration {
                 hit.duration
@@ -239,13 +236,13 @@ impl TraceSort {
 }
 
 #[derive(Default)]
-pub(super) struct TraceSchema {
+pub struct TraceSchema {
     has_ref_parent_id: bool,
-    pub(super) has_infer: bool,
+    pub has_infer: bool,
 }
 
 impl TraceSchema {
-    pub(super) fn from_schema(schema: Option<&Schema>) -> Self {
+    pub fn from_schema(schema: Option<&Schema>) -> Self {
         Self {
             has_ref_parent_id: schema
                 .is_some_and(|s| s.field_with_name("reference_parent_span_id").is_ok()),
@@ -256,7 +253,7 @@ impl TraceSchema {
         }
     }
 
-    pub(super) fn service_key(&self) -> &'static str {
+    pub fn service_key(&self) -> &'static str {
         if self.has_infer {
             "COALESCE(infer_service_name, service_name)"
         } else {
@@ -287,7 +284,7 @@ impl TraceSchema {
     }
 }
 
-pub(super) fn validate_filter(filter: &str) -> Result<(), String> {
+pub fn validate_filter(filter: &str) -> Result<(), String> {
     config::utils::sql::validate_optional_where_fragment(filter)
         .map_err(|error| format!("invalid filter: {error}"))
 }

@@ -22,20 +22,20 @@ use axum::response::Response;
 use config::meta::{search::Response as SearchResponse, stream::StreamType};
 use hashbrown::HashMap;
 use infra::errors::Error;
-pub(super) use plan::{TraceListMode, TraceListPlan};
+pub use plan::{TraceListMode, TraceListPlan};
 use plan::{TraceListOptions, TraceSchema, TraceSort, validate_filter};
-pub(super) use query::TraceSearchContext;
+pub use query::TraceSearchContext;
 use response::TraceBatch;
-pub(super) use stream::stream_response;
+pub use stream::stream_response;
 
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, traces::schema_compat};
 
-pub(super) enum TraceListResult {
+pub enum TraceListResult {
     Empty(Box<SearchResponse>),
     Complete(TraceBatch),
 }
 
-pub(super) async fn prepare(
+pub async fn prepare(
     org_id: &str,
     stream_name: &str,
     user_id: &str,
@@ -77,10 +77,7 @@ pub(super) async fn prepare(
     })
 }
 
-pub(super) async fn run(
-    ctx: &TraceSearchContext,
-    plan: &TraceListPlan,
-) -> Result<TraceListResult, Error> {
+pub async fn run(ctx: &TraceSearchContext, plan: &TraceListPlan) -> Result<TraceListResult, Error> {
     let options = &plan.options;
     let request = plan.request(&ctx.stream_name);
     let response = ctx.search(&request).await.inspect_err(|error| {

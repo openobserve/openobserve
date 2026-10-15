@@ -26,20 +26,15 @@ use infra::errors::Error;
 use super::{plan::TraceSchema, response::TraceBatch};
 use crate::traces::schema_compat;
 
-pub(in crate::traces) struct TraceSearchContext {
-    pub(super) org_id: String,
-    pub(super) stream_name: String,
-    pub(super) user_id: String,
-    pub(super) trace_id: String,
+pub struct TraceSearchContext {
+    pub org_id: String,
+    pub stream_name: String,
+    pub user_id: String,
+    pub trace_id: String,
 }
 
 impl TraceSearchContext {
-    pub(in crate::traces) fn new(
-        org_id: String,
-        stream_name: String,
-        user_id: String,
-        trace_id: String,
-    ) -> Self {
+    pub fn new(org_id: String, stream_name: String, user_id: String, trace_id: String) -> Self {
         Self {
             org_id,
             stream_name,
@@ -48,7 +43,7 @@ impl TraceSearchContext {
         }
     }
 
-    pub(super) async fn search(&self, request: &Request) -> Result<Response, Error> {
+    pub async fn search(&self, request: &Request) -> Result<Response, Error> {
         search_service::cache::search(
             &self.trace_id,
             &self.org_id,
@@ -63,7 +58,7 @@ impl TraceSearchContext {
         .await
     }
 
-    pub(super) async fn fill_services(
+    pub async fn fill_services(
         &self,
         batch: &mut TraceBatch,
         base_request: &Request,
@@ -80,7 +75,7 @@ impl TraceSearchContext {
     }
 }
 
-pub(super) fn build_llm_trace_query(
+pub fn build_llm_trace_query(
     stream_name: &str,
     validated: &schema_compat::ValidatedLlmSchema,
     extra_selects: &str,
@@ -143,7 +138,7 @@ pub(super) fn build_llm_trace_query(
     }
 }
 
-pub(super) fn build_trace_query(stream_name: &str, extra_selects: &str) -> String {
+pub fn build_trace_query(stream_name: &str, extra_selects: &str) -> String {
     format!(
         "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
         min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
@@ -154,7 +149,7 @@ pub(super) fn build_trace_query(stream_name: &str, extra_selects: &str) -> Strin
     )
 }
 
-pub(super) fn build_service_breakdown_query(
+fn build_service_breakdown_query(
     stream_name: &str,
     service_key_expr: &str,
     svc_type_select: &str,
@@ -174,7 +169,7 @@ pub(super) fn build_service_breakdown_query(
     )
 }
 
-pub(super) fn build_partition_query(stream_name: &str) -> String {
+pub fn build_partition_query(stream_name: &str) -> String {
     format!("SELECT * FROM {}", quote_identifier(stream_name))
 }
 

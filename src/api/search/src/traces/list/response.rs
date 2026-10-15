@@ -20,40 +20,40 @@ use serde::Serialize;
 use super::plan::{TraceListMode, TraceSort};
 
 #[derive(Debug, Serialize)]
-pub(in crate::traces) struct TraceResponseItem {
-    pub(super) trace_id: String,
-    pub(super) start_time: i64,
-    pub(super) end_time: i64,
-    pub(super) duration: i64,
-    pub(super) spans: [u16; 2],
-    pub(super) service_name: Vec<TraceServiceNameItem>,
-    pub(super) first_event: serde_json::Value,
-    pub(super) gen_ai_usage_input_tokens: i64,
-    pub(super) gen_ai_usage_output_tokens: i64,
-    pub(super) gen_ai_usage_total_tokens: i64,
-    pub(super) gen_ai_usage_cost: f64,
-    pub(super) gen_ai_input_messages: Option<serde_json::Value>,
-    pub(super) models: Vec<String>,
+pub struct TraceResponseItem {
+    trace_id: String,
+    pub start_time: i64,
+    end_time: i64,
+    pub duration: i64,
+    spans: [u16; 2],
+    service_name: Vec<TraceServiceNameItem>,
+    first_event: serde_json::Value,
+    gen_ai_usage_input_tokens: i64,
+    gen_ai_usage_output_tokens: i64,
+    gen_ai_usage_total_tokens: i64,
+    gen_ai_usage_cost: f64,
+    gen_ai_input_messages: Option<serde_json::Value>,
+    models: Vec<String>,
 }
 
 #[derive(Debug, Default, Serialize)]
-pub(super) struct TraceServiceNameItem {
-    pub(super) service_name: String,
-    pub(super) count: u16,
-    pub(super) duration: i64,
+struct TraceServiceNameItem {
+    service_name: String,
+    count: u16,
+    duration: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(super) service_type: Option<String>,
+    service_type: Option<String>,
 }
 
-pub(in crate::traces) struct TraceBatch {
-    pub(super) traces: HashMap<String, TraceResponseItem>,
-    pub(super) multi_service_ids: Vec<String>,
-    pub(super) multi_service_total: i64,
-    pub(super) range: (i64, i64),
+pub struct TraceBatch {
+    pub traces: HashMap<String, TraceResponseItem>,
+    pub multi_service_ids: Vec<String>,
+    pub multi_service_total: i64,
+    pub range: (i64, i64),
 }
 
 impl TraceBatch {
-    pub(super) fn from_hits(hits: &[json::Value], range: (i64, i64), mode: TraceListMode) -> Self {
+    pub fn from_hits(hits: &[json::Value], range: (i64, i64), mode: TraceListMode) -> Self {
         let mut batch = Self {
             traces: HashMap::with_capacity(hits.len()),
             multi_service_ids: Vec::new(),
@@ -87,7 +87,7 @@ impl TraceBatch {
         batch
     }
 
-    pub(super) fn fill_services(&mut self, hits: Vec<json::Value>) {
+    pub fn fill_services(&mut self, hits: Vec<json::Value>) {
         for item in hits {
             let tid = item
                 .get("trace_id")
@@ -117,7 +117,7 @@ impl TraceBatch {
         }
     }
 
-    pub(in crate::traces) fn into_sorted_items(self, sort: TraceSort) -> Vec<TraceResponseItem> {
+    pub fn into_sorted_items(self, sort: TraceSort) -> Vec<TraceResponseItem> {
         let mut traces = self.traces.into_values().collect::<Vec<_>>();
         sort.sort(&mut traces);
         traces

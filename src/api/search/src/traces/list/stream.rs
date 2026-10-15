@@ -36,11 +36,7 @@ use super::{
 };
 use crate::search::error_utils::map_error_to_http_response;
 
-pub(in crate::traces) fn stream_response(
-    ctx: TraceSearchContext,
-    plan: TraceListPlan,
-    span: Span,
-) -> Response {
+pub fn stream_response(ctx: TraceSearchContext, plan: TraceListPlan, span: Span) -> Response {
     let trace_id = ctx.trace_id.clone();
     let (tx, rx) = mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(100);
     tokio::spawn(run(ctx, plan, tx).instrument(span));
