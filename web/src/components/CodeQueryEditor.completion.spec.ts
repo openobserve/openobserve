@@ -2027,7 +2027,7 @@ describe("value quotes, late values, the empty-values copy and the typed prefix"
     spy = vi
       .spyOn(document, "getElementById")
       .mockImplementation(() => document.createElement("div"));
-    mount(CodeQueryEditor, {
+    const wrapper = mount(CodeQueryEditor, {
       props: { editorId, language: "sql", query: "", keywords: FIELDS, ...props },
       global: { plugins: [createStore({ state: { theme: "light", zoConfig } })] },
     });
@@ -2038,7 +2038,13 @@ describe("value quotes, late values, the empty-values copy and the typed prefix"
     const editor = createdEditors.at(-1)!;
     const language = props.language ?? "sql";
     const registration = registerFn.mock.calls.filter((c: any) => c[0] === language).at(-1)![1];
-    return { api, editor, model: editor.getModel(), provide: registration.provideCompletionItems };
+    return {
+      api,
+      editor,
+      wrapper,
+      model: editor.getModel(),
+      provide: registration.provideCompletionItems,
+    };
   };
 
   // Puts the caret at the end of `before`, with `after` following it on the same line.
@@ -2169,6 +2175,44 @@ describe("value quotes, late values, the empty-values copy and the typed prefix"
       await new Promise((r) => setTimeout(r, 400));
       expect(triggers(editor)).toHaveLength(1);
     });
+
+    it(
+      "refills a second slow lookup after the range changes at the same caret",
+      { timeout: 30000 },
+      async () => {
+        const resolver = delayed(1300, ["error"]);
+        const { editor, model, provide, wrapper } = await mountWith("r-range", {
+          fieldValueResolver: resolver,
+          valuesTimeRange: { startTime: 1_000_000, endTime: 2_000_000 },
+        });
+        await ask(provide, editor, model, "SELECT * FROM logs WHERE level = ");
+        await vi.waitFor(() => expect(triggers(editor)).toHaveLength(1), { timeout: 3000 });
+        await wrapper.setProps({ valuesTimeRange: { startTime: 3_000_000, endTime: 4_000_000 } });
+        await ask(provide, editor, model, "SELECT * FROM logs WHERE level = ");
+        await vi.waitFor(() => expect(triggers(editor)).toHaveLength(2), { timeout: 3000 });
+      },
+    );
+
+    it(
+      "refills again once an answered lookup sits between two slow ones",
+      { timeout: 30000 },
+      async () => {
+        const slow = () => new Promise<string[]>((r) => setTimeout(() => r(["error"]), 1300));
+        const resolver = vi
+          .fn()
+          .mockImplementationOnce(slow)
+          .mockImplementationOnce(async () => ["error"])
+          .mockImplementationOnce(slow);
+        const { editor, model, provide } = await mountWith("r-scope", {
+          fieldValueResolver: resolver,
+        });
+        await ask(provide, editor, model, "SELECT * FROM logs WHERE level = ");
+        await vi.waitFor(() => expect(triggers(editor)).toHaveLength(1), { timeout: 3000 });
+        await ask(provide, editor, model, "SELECT * FROM logs WHERE level = ");
+        await ask(provide, editor, model, "SELECT * FROM logs WHERE level = ");
+        await vi.waitFor(() => expect(triggers(editor)).toHaveLength(2), { timeout: 3000 });
+      },
+    );
 
     it("does not refill after Esc", { timeout: 30000 }, async () => {
       const resolver = delayed(1300, ["error"]);
