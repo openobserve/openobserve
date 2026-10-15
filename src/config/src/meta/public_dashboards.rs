@@ -99,8 +99,9 @@ impl TimeRange {
 
     /// `ceil_to_minute(max(selected, window / 288, min_refresh))`, from the current settings.
     pub fn effective_refresh_secs(&self, selected: i64, min_refresh: i64) -> i64 {
+        // ceil(window / 288): a 1441-minute window needs 301 s, not 300.
         let secs = selected
-            .max(self.length_secs() / 288)
+            .max((self.length_secs().max(0) + 287) / 288)
             .max(min_refresh)
             .max(1);
         (secs + 59) / 60 * 60
@@ -689,6 +690,8 @@ mod tests {
         assert_eq!(rel(3600).effective_refresh_secs(60, 120), 120);
         assert_eq!(rel(3600).effective_refresh_secs(61, 60), 120);
         assert_eq!(rel(90_000).effective_refresh_secs(60, 60), 360);
+        assert_eq!(rel(1441 * 60).effective_refresh_secs(300, 60), 360);
+        assert_eq!(rel(1440 * 60).effective_refresh_secs(300, 60), 300);
         let abs = TimeRange::Absolute {
             start: 0,
             end: 7 * 86_400 * 1_000_000,

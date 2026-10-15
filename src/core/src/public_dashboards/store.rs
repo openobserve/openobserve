@@ -322,9 +322,10 @@ pub async fn write_raw(
     Ok(header.incarnation)
 }
 
-/// Evicts only a file the index holds, so a request for a made-up key takes no write lock.
+/// Evicts an indexed file, or any while the startup scan runs, since reads serve unscanned files.
 pub async fn evict_if_indexed(key: &str) {
-    if disk::public_dashboards_indexed(key).await {
+    let loading = !disk::LOADING_FROM_DISK_DONE.load(Ordering::Relaxed);
+    if loading || disk::public_dashboards_indexed(key).await {
         evict(key).await;
     }
 }
@@ -463,5 +464,20 @@ mod tests {
         assert!(body(&key, &read_back).await.is_none());
         evict(&key).await;
         assert!(read_header(&key).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn a_file_the_startup_scan_has_not_indexed_is_evicted_while_it_runs() {
+        assert!(
+            !disk::LOADING_FROM_DISK_DONE.load(Ordering::Relaxed),
+            "no scan in tests"
+        );
+        let key = key("o", &config::ider::uuid(), "r60");
+        let path = disk::get_file_path(&key).unwrap();
+        std::fs::create_dir_all(std::path::Path::new(&path).parent().unwrap()).unwrap();
+        std::fs::write(&path, b"from before the restart").unwrap();
+        assert!(!disk::public_dashboards_indexed(&key).await);
+        evict_if_indexed(&key).await;
+        assert!(!std::path::Path::new(&path).exists());
     }
 }

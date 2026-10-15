@@ -166,12 +166,12 @@ pub async fn data(
     Query(params): Query<DataParams>,
     headers: HeaderMap,
 ) -> Response {
-    if rate_limited(ip.map(|e| e.0)) || slug_exhausted(&slug) {
-        return with_headers(too_many_requests(READ_WINDOW));
-    }
     let if_none_match = headers
         .get(header::IF_NONE_MATCH)
         .and_then(|v| v.to_str().ok());
+    if rate_limited(ip.map(|e| e.0)) || shed_early(&slug, if_none_match) {
+        return with_headers(too_many_requests(READ_WINDOW));
+    }
     with_headers(serve_data(&slug, params.range.as_deref(), if_none_match).await)
 }
 
@@ -245,7 +245,7 @@ async fn serve_data_on<C: ConnectionTrait>(
     let range_key = range_key.map_or_else(|| default_range_key(&pd), str::to_string);
     let Some(range) = offered_range(&pd, &range_key) else {
         // A removed range's file goes on a later ask; a made-up key costs only a read lock.
-        store::evict_if_indexed(&store::key(&pd.org_id, &pd.id, &range_key)).await;
+        materialize::evict_removed_range(&pd, &range_key).await;
         return StatusCode::NOT_FOUND.into_response();
     };
     let dash = match dashboards::get_by_id_primary(&pd.org_id, &pd.dashboard_id).await {
@@ -348,7 +348,12 @@ fn slug_limited(slug: &str) -> bool {
     rpm != 0 && SLUG_READS.over_budget(slug, READ_WINDOW, rpm)
 }
 
-/// Whether the link already spent its budget, checked before any read or flight; counts nothing.
+/// Refuses an unconditional request over budget at once; a conditional one may still earn a 304.
+fn shed_early(slug: &str, if_none_match: Option<&str>) -> bool {
+    if_none_match.is_none() && slug_exhausted(slug)
+}
+
+/// Whether the link already spent its budget; counts nothing.
 fn slug_exhausted(slug: &str) -> bool {
     let rpm = config::get_config().public_dashboards.slug_rpm;
     rpm != 0 && SLUG_READS.exhausted(slug, READ_WINDOW, rpm)
@@ -865,5 +870,33 @@ mod tests {
         assert!(!production.contains("get_orm_client_ro"));
         assert!(production.contains("resolve_on(core_pd::gate_db().await, slug)"));
         assert!(production.contains("serve_data_on(core_pd::gate_db().await"));
+    }
+
+    #[test]
+    fn gate12_over_budget_a_current_etag_still_gets_304_and_a_stale_one_gets_429() {
+        let pd = Model {
+            slug: config::ider::uuid(),
+            ..link()
+        };
+        let rpm = config::get_config().public_dashboards.slug_rpm as usize;
+        for _ in 0..rpm {
+            assert_eq!(
+                respond(&pd, data_response("r2"), 0).status(),
+                StatusCode::OK
+            );
+        }
+        // Unconditional requests are refused before any read.
+        assert!(shed_early(&pd.slug, None));
+        // A conditional request runs the read; its outcome decides.
+        assert!(!shed_early(&pd.slug, Some("\"r2\"")));
+        let current = Served::NotModified {
+            rev: "r2".into(),
+            retry_hint: None,
+        };
+        assert_eq!(respond(&pd, current, 0).status(), StatusCode::NOT_MODIFIED);
+        // The rev moved on: the answer has a body, so the spent budget refuses it.
+        let stale = respond(&pd, data_response("r3"), 0);
+        assert_eq!(stale.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(stale.headers()[header::RETRY_AFTER], "60");
     }
 }

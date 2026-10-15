@@ -24,6 +24,7 @@ use config::{
 use infra::table::entity::public_dashboards::Model as PublicDashboard;
 
 use super::{
+    AuthorizerProbe,
     flight::{Built, Failure, Flights, Kind, Outcome, Start, Wait},
     materialize::Engine,
     store::{self, Header, ManifestPanel, PanelOutcome, Stored},
@@ -143,6 +144,7 @@ pub async fn recheck(
             return Err(Failure::Unavailable);
         }
     }
+    let probe = AuthorizerProbe::default();
     let mut header = stored.header.clone();
     let mut restored = false;
     for (id, panel) in &stored.manifest.panels {
@@ -154,14 +156,22 @@ pub async fn recheck(
                 | PanelOutcome::Partial
                 | PanelOutcome::Truncated
         );
-        let provable = !panel.sources.is_empty() || !panel.values_dependencies.is_empty();
+        // A dependency without streams came from an unparseable values query: nothing to prove.
+        let provable = (!panel.sources.is_empty() || !panel.values_dependencies.is_empty())
+            && panel
+                .values_dependencies
+                .iter()
+                .all(|d| !d.sources.is_empty());
         if !(served && !withheld) && !(withheld && provable) {
             continue;
         }
-        let allowed = engine.authorize(org, publisher, panel).await.map_err(|e| {
-            log::error!("public dashboard authorization failed: {e}");
-            Failure::Unavailable
-        })?;
+        let allowed = engine
+            .authorize(org, publisher, panel, &probe)
+            .await
+            .map_err(|e| {
+                log::error!("public dashboard authorization failed: {e}");
+                Failure::Unavailable
+            })?;
         match (allowed, withheld) {
             (false, false) => header.withheld_panels.push(WithheldPanel {
                 panel_id: id.clone(),
@@ -174,7 +184,7 @@ pub async fn recheck(
             _ => {}
         }
     }
-    restored |= recheck_variables(engine, org, publisher, stored, &mut header).await?;
+    restored |= recheck_variables(engine, org, publisher, stored, &mut header, &probe).await?;
     if restored {
         header.incomplete_count = header.incomplete_count.max(1);
         header.next_retry_at = Some(now);
@@ -190,15 +200,16 @@ async fn recheck_variables(
     publisher: &str,
     stored: &Stored,
     header: &mut Header,
+    probe: &AuthorizerProbe,
 ) -> Result<bool, Failure> {
     let mut restored = false;
     for dep in &stored.manifest.variables {
-        let probe = ManifestPanel {
+        let dep_panel = ManifestPanel {
             values_dependencies: vec![dep.clone()],
             ..Default::default()
         };
         let allowed = engine
-            .authorize(org, publisher, &probe)
+            .authorize(org, publisher, &dep_panel, probe)
             .await
             .map_err(|e| {
                 log::error!("public dashboard authorization failed: {e}");
