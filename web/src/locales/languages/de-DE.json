@@ -1694,6 +1694,7 @@
     "span": "Span",
     "spans": "Spans",
     "errorTraces": "Fehler-Traces",
+    "slowTraceFilter": "Langsam (≥ {seconds} s)",
     "failedToFetchTraces": "Das Abrufen der Tracedaten ist fehlgeschlagen. Bitte versuchen Sie es erneut.",
     "seekToMoment": "Suchen Sie in der Sitzung nach diesem Moment",
     "route": "Route",

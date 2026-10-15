@@ -1694,6 +1694,7 @@
     "span": "span",
     "spans": "span'ler",
     "errorTraces": "hata izleri",
+    "slowTraceFilter": "Yavaş (≥ {seconds} sn)",
     "failedToFetchTraces": "İz verileri alınamadı. Lütfen tekrar deneyin.",
     "seekToMoment": "Oturumda bu anı arayın",
     "route": "Güzergah",

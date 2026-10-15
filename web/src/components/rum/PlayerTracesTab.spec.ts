@@ -244,6 +244,27 @@ const globalStubs = {
     template: '<span data-test="trace-status-cell" />',
     props: ["item"],
   },
+  // Lists its options; tests pick values by emitting update:modelValue.
+  OSelect: {
+    name: "OSelect",
+    template: `
+      <div v-bind="$attrs">
+        <span v-for="option in options" :key="option.value" data-test="select-option">{{ option.label }}</span>
+      </div>
+    `,
+    inheritAttrs: false,
+    props: [
+      "modelValue",
+      "options",
+      "multiple",
+      "searchable",
+      "clearable",
+      "labelKey",
+      "valueKey",
+      "placeholder",
+    ],
+    emits: ["update:modelValue"],
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -1288,6 +1309,127 @@ describe("PlayerTracesTab", () => {
 
       await search("");
       expect(rowCount()).toBe(2);
+    });
+  });
+
+  // =========================================================================
+  // Status and page filters
+  // =========================================================================
+
+  describe("status and page filters", () => {
+    // Three traces: a fast success and a slow success on /products, a fast error on /checkout.
+    // The end-to-end duration runs from the RUM event (_date, ms) to the trace end (ns).
+    beforeEach(async () => {
+      wrapper.unmount();
+      setupSuccessfulMocks(
+        [
+          createRumHit({ _date: 1_000 }),
+          createRumHit({
+            _trace_id: "trace-0f9e8d7c6b5a",
+            _view_url: "https://example.com/checkout",
+            _view_id: "view-2",
+            _date: 1_010,
+          }),
+          createRumHit({ _trace_id: "trace-5a5a5a5a5a5a", _view_id: "view-3", _date: 20 }),
+        ],
+        [
+          createTraceMetadata(),
+          createTraceMetadata({
+            trace_id: "trace-0f9e8d7c6b5a",
+            start_time: 1_010_000_000,
+            end_time: 1_012_000_000,
+            spans: [4, 1],
+            first_event: { service_name: "checkout", operation_name: "POST /api/orders" },
+          }),
+          createTraceMetadata({
+            trace_id: "trace-5a5a5a5a5a5a",
+            start_time: 1_020_000_000,
+            end_time: 1_025_000_000,
+            first_event: { service_name: "reports", operation_name: "GET /api/report" },
+          }),
+        ],
+      );
+      wrapper = mountComponent();
+      await flushPromises();
+    });
+
+    const filter = (name: "status" | "page") =>
+      wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find(
+          (select) => select.attributes("data-test") === `rum-player-traces-tab-${name}-filter`,
+        )!;
+
+    const choose = async (name: "status" | "page", values: string[]) => {
+      filter(name).vm.$emit("update:modelValue", values);
+      await flushPromises();
+    };
+
+    const rowCount = () => wrapper.findAll('[data-test^="table-row-"]').length;
+
+    it("should check every status by default and list every trace", () => {
+      expect(filter("status").props("modelValue")).toEqual(["error", "success", "slow"]);
+      expect(filter("status").text()).toContain("Slow (≥ 1 s)");
+      expect(rowCount()).toBe(3);
+    });
+
+    it("should show only failed traces when only Error is checked", async () => {
+      await choose("status", ["error"]);
+      expect(rowCount()).toBe(1);
+      expect(wrapper.text()).toContain("POST /api/orders");
+    });
+
+    it("should show only traces of a second or more when only Slow is checked", async () => {
+      await choose("status", ["slow"]);
+      expect(rowCount()).toBe(1);
+      expect(wrapper.text()).toContain("GET /api/report");
+    });
+
+    it("should keep failed and slow traces when Success is unchecked", async () => {
+      await choose("status", ["error", "slow"]);
+      expect(rowCount()).toBe(2);
+      expect(wrapper.text()).not.toContain("GET /api/products");
+    });
+
+    it("should show every trace when no status is checked", async () => {
+      await choose("status", []);
+      expect(rowCount()).toBe(3);
+    });
+
+    it("should offer each visited page once, in visit order", () => {
+      const options = filter("page")
+        .findAll('[data-test="select-option"]')
+        .map((option) => option.text());
+      expect(options).toEqual(["/products", "/checkout"]);
+    });
+
+    it("should combine the page, status and search filters, and count only the matches", async () => {
+      const countBadge = () => wrapper.find('[data-test="rum-player-traces-tab-count-badge"]');
+
+      await choose("page", ["/products"]);
+      expect(rowCount()).toBe(2);
+      expect(countBadge().text()).toContain("2");
+      expect(wrapper.find('[data-test="rum-player-traces-tab-error-count-badge"]').exists()).toBe(
+        false,
+      );
+
+      await wrapper.find('[data-test="rum-player-traces-tab-search"] input').setValue("report");
+      await flushPromises();
+      expect(rowCount()).toBe(1);
+      expect(wrapper.text()).toContain("GET /api/report");
+
+      await choose("status", ["error"]);
+      expect(rowCount()).toBe(0);
+    });
+
+    it("should clear the page selection when the session changes", async () => {
+      await choose("page", ["/checkout"]);
+      expect(rowCount()).toBe(1);
+
+      await wrapper.setProps({ sessionId: "another-session" });
+      await flushPromises();
+      expect(filter("page").props("modelValue")).toEqual([]);
+      expect(rowCount()).toBe(3);
     });
   });
 

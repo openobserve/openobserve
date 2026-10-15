@@ -1694,6 +1694,7 @@
     "span": "span",
     "spans": "spans",
     "errorTraces": "traces d'erreur",
+    "slowTraceFilter": "Lent (≥ {seconds} s)",
     "failedToFetchTraces": "Échec de la récupération des données de trace. Veuillez réessayer.",
     "seekToMoment": "Recherchez ce moment de la session",
     "route": "Parcours",

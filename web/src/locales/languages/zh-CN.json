@@ -1694,6 +1694,7 @@
     "span": "Span",
     "spans": "Span",
     "errorTraces": "错误追踪",
+    "slowTraceFilter": "慢 (≥ {seconds} 秒)",
     "failedToFetchTraces": "获取追踪数据失败。请重试。",
     "seekToMoment": "跳转到会话中的此时刻",
     "route": "路由",

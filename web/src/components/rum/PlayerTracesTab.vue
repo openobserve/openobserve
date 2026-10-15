@@ -153,9 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           value="neutral"
           data-test="rum-player-traces-tab-count-badge"
           class="me-[0.6rem]"
-          >{{
-            `${formatLargeNumber(searchedViews.length)} ${t("menu.traces").toLowerCase()}`
-          }}</OTag
+          >{{ `${formatLargeNumber(visibleViews.length)} ${t("menu.traces").toLowerCase()}` }}</OTag
         >
         <OTag
           v-if="totalErrorCount > 0"
@@ -173,6 +171,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
+      <div class="flex shrink-0 items-center gap-2 pe-2 pb-1">
+        <div class="w-1/2">
+          <OSelect
+            v-model="selectedTraceStatuses"
+            :options="traceStatusOptions"
+            multiple
+            labelKey="label"
+            valueKey="value"
+            :placeholder="t('common.status')"
+            data-test="rum-player-traces-tab-status-filter"
+          />
+        </div>
+        <div class="w-1/2">
+          <OSelect
+            v-model="selectedPages"
+            :options="pageOptions"
+            multiple
+            searchable
+            clearable
+            labelKey="label"
+            valueKey="value"
+            :placeholder="t('rum.analytics.overview.allPages')"
+            data-test="rum-player-traces-tab-page-filter"
+          />
+        </div>
+      </div>
 
       <!-- Traces table -->
       <div
@@ -180,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-player-traces-tab-table"
       >
         <OTable
-          :data="searchedViews"
+          :data="visibleViews"
           :columns="traceColumns"
           :row-height="32"
           :default-columns="false"
@@ -222,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, computed, type PropType } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 import {
@@ -247,6 +271,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import TraceStatusCell from "@/plugins/traces/components/TraceStatusCell.vue";
@@ -302,21 +327,61 @@ const traceSearchWindow = ref<{ start: number; end: number } | null>(null);
 
 const traceSearch = ref("");
 
+// A request whose end-to-end duration reaches this counts as slow.
+const SLOW_TRACE_MS = 1000;
+
+const selectedTraceStatuses = ref<string[]>(["error", "success", "slow"]);
+const selectedPages = ref<string[]>([]);
+
+const traceStatusOptions = computed(() => [
+  { label: t("rum.playerEvents.error"), value: "error" },
+  { label: t("common.success"), value: "success" },
+  { label: t("rum.slowTraceFilter", { seconds: SLOW_TRACE_MS / 1000 }), value: "slow" },
+]);
+
+// The pages this session's traces came from, in the order they were first visited.
+const pageOptions = computed(() =>
+  [...new Set(correlatedViews.value.map(pageRoute).filter(Boolean))].map((page) => ({
+    label: raw(page),
+    value: page,
+  })),
+);
+
+// Like the Breadcrumbs type filter: a trace shows if it matches any checked status,
+// and an empty selection shows every trace.
+function matchesTraceStatus(view: any): boolean {
+  const statuses = selectedTraceStatuses.value;
+  if (!statuses.length) return true;
+  const hasError = (view.metadata?.errorCount || 0) > 0;
+  return (
+    (statuses.includes("error") && hasError) ||
+    (statuses.includes("success") && !hasError) ||
+    (statuses.includes("slow") && (view.metadata?.e2eDuration || 0) >= SLOW_TRACE_MS)
+  );
+}
+
 // Search over what each row shows: the page, the request name and the trace id.
-const searchedViews = computed(() => {
+function matchesTraceSearch(view: any, term: string): boolean {
+  return [pageRoute(view), traceDisplayName(view), view.traceId].some((value) =>
+    String(value ?? "")
+      .toLowerCase()
+      .includes(term),
+  );
+}
+
+const visibleViews = computed(() => {
   const term = traceSearch.value.trim().toLowerCase();
-  if (!term) return correlatedViews.value;
-  return correlatedViews.value.filter((view) =>
-    [pageRoute(view), traceDisplayName(view), view.traceId].some((value) =>
-      String(value ?? "")
-        .toLowerCase()
-        .includes(term),
-    ),
+  const pages = new Set(selectedPages.value);
+  return correlatedViews.value.filter(
+    (view) =>
+      matchesTraceStatus(view) &&
+      (!pages.size || pages.has(pageRoute(view))) &&
+      (!term || matchesTraceSearch(view, term)),
   );
 });
 
 const totalErrorCount = computed(
-  () => searchedViews.value.filter((v) => (v.metadata?.errorCount || 0) > 0).length,
+  () => visibleViews.value.filter((v) => (v.metadata?.errorCount || 0) > 0).length,
 );
 
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
@@ -804,6 +869,8 @@ watch(
   () => props.sessionId,
   () => {
     correlatedViews.value = [];
+    // Another session visited other pages.
+    selectedPages.value = [];
     selectedTrace.value = null;
     closeTraceDetail();
     fetchTraces();
