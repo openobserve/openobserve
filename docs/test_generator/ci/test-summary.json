@@ -1,0 +1,7 @@
+[
+  { "title": "should show the exhausted credits notice with Plans and Refresh actions", "action": "new", "verifies": "an out-of-credits org sees the exhausted notice, the Plans action and the Refresh action, and no Contact Sales action" },
+  { "title": "should show the low credits notice when free credits drop to 20% or less", "action": "new", "verifies": "a low-balance org sees the low-credits warning with the remaining/limit count and no Refresh action" },
+  { "title": "should show Contact Sales instead of Plans for an exhausted contract org", "action": "new", "verifies": "an exhausted contract org is offered Contact Sales and not the self-serve Plans action" },
+  { "title": "should re-check the balance and clear the exhausted notice after refresh", "action": "new", "verifies": "clicking Refresh re-fetches the balance and transitions the exhausted notice to the low notice" },
+  { "title": "should gate a chat turn on paid-usage consent and surface the declined notice on cancel", "action": "new", "verifies": "a refused chat turn shows the paid-usage consent card with the enable action gated on the checkbox, and cancelling surfaces the declined notice" }
+]

@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/aiAssistantCredits.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/sanity.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/ai-toolsets-form-validation.spec.js",
+    "tests/ui-testing/playwright-tests/Onboarding/billing.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_detail": "Add \"aiAssistantCredits.spec.js\" to the GeneralTests entry's run_files array in tests/ui-testing/ci-matrix/ci_matrix.json (the OSS matrix), and mirror it in the enterprise/cloud overlay matrices if they list GeneralTests shards separately.",
+  "rationale": "No existing Playwright E2E covers the AI Assistant credits notice or paid-usage consent. changed_files.txt contains only Vitest unit specs (web/src/**/*.spec.ts) and no tests/ui-testing/playwright-tests/**/*.spec.js; existing_tests_in_diff is false. The AI assistant is a global, cross-cutting chat surface (header toggle -> O2AIChat), so GeneralTests (not Logs/Metrics/Alerts) is the correct folder. The feature is cloud/enterprise-gated and its trigger states (exhausted/low credits, 402/412) are backend-set, so tests must stub the APIs via page.route — the same pattern already used in 32 existing specs (e.g. Onboarding/billing.spec.js)."
+}
