@@ -16,32 +16,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col" data-test="rum-analytics-funnel-steps-table">
-    <span
-      class="text-text-secondary px-2 pb-1 text-xs"
-      data-test="rum-analytics-funnel-order-label"
-      >{{ t("rum.analytics.funnel.orderLabel") }}</span
-    >
     <div
-      class="text-text-secondary border-border-default grid items-end gap-x-3 border-b px-2 pb-1.5 text-xs max-md:hidden"
+      class="text-text-secondary bg-surface-subtle rounded-default grid items-center gap-x-3 px-2 py-2 text-xs max-md:hidden"
       :class="gridClass"
+      data-test="rum-analytics-funnel-steps-header"
     >
       <span />
-      <span>{{ t("rum.analytics.funnel.step") }}</span>
-      <span class="text-end">{{ unitLabel }}</span>
-      <span class="text-end">{{ t("rum.analytics.funnel.ofFirst") }}</span>
-      <span class="text-end">{{ t("rum.analytics.funnel.ofPrevious") }}</span>
-      <span v-if="!hideTime" class="text-end underline decoration-dotted underline-offset-2"
-        >{{ t("rum.analytics.funnel.timeFromFirst") }}
-        <OTooltip :content="t('rum.analytics.funnel.timeTooltip', { unit: unitNoun })" />
+      <span
+        v-for="col in headerCols"
+        :key="col.id"
+        class="flex items-center gap-1"
+        :class="col.id === 'step' ? '' : 'justify-end'"
+        :data-test="`rum-analytics-funnel-col-${col.id}`"
+        >{{ col.label }}
+        <span class="flex items-center">
+          <OIcon name="info-outline" size="xs" :aria-label="col.tip" />
+          <OTooltip :content="col.tip" />
+        </span>
       </span>
-      <span>{{ t("rum.analytics.funnel.reached") }}</span>
-      <span v-if="!railEdits" />
+      <span />
+      <span />
     </div>
     <VueDraggableNext
       :model-value="def.steps"
       handle=".funnel-drag-handle"
       item-key="key"
-      :disabled="railEdits"
       @update:model-value="onDrag"
     >
       <div v-for="(step, i) in def.steps" :key="`${step.kind}:${step.key}:${i}`">
@@ -52,7 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="flex items-center gap-1">
             <OIcon
-              v-if="!railEdits"
               name="drag-indicator"
               size="sm"
               class="funnel-drag-handle text-text-secondary cursor-grab"
@@ -112,7 +110,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`rum-analytics-funnel-step-${i}-count`"
               >{{ formatCount(result.steps[i].units, sampled) }}</span
             >
-            <span class="text-end tabular-nums">{{ pct(result.steps[i].ofFirst) }}</span>
             <span class="text-end tabular-nums">{{
               i === 0 ? dash : pct(result.steps[i].ofPrevious)
             }}</span>
@@ -131,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <span v-else>{{ dash }}</span>
             </span>
+            <span class="text-end tabular-nums">{{ pct(result.steps[i].ofFirst) }}</span>
             <span class="min-w-24">
               <FunnelStepBar
                 :value="result.steps[i].ofFirst"
@@ -151,33 +149,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <OSkeleton v-for="n in hideTime ? 4 : 5" :key="n" type="text" class="h-5 w-full" />
           </template>
-          <span v-if="!railEdits" class="flex items-center justify-end gap-0.5">
+          <span class="flex items-center justify-end gap-0.5">
             <StepConditionPopover
               v-if="step.kind === 'p'"
               :step="step"
               :index="i"
               @update="(s) => replaceStep(i, s)"
             />
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              icon-left="arrow-upward"
-              :disabled="i === 0"
-              :aria-label="t('rum.analytics.funnel.moveUp')"
-              :data-test="`rum-analytics-funnel-step-${i}-move-up`"
-              @click="move(i, -1)"
-              ><OTooltip :content="t('rum.analytics.funnel.moveUp')"
-            /></OButton>
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              icon-left="arrow-downward"
-              :disabled="i === def.steps.length - 1"
-              :aria-label="t('rum.analytics.funnel.moveDown')"
-              :data-test="`rum-analytics-funnel-step-${i}-move-down`"
-              @click="move(i, 1)"
-              ><OTooltip :content="t('rum.analytics.funnel.moveDown')"
-            /></OButton>
             <OButton
               variant="ghost"
               size="icon-sm"
@@ -241,7 +219,6 @@ import FunnelStepBar from "@/components/rum/productAnalytics/funnelParts/FunnelS
 import StepConditionPopover from "@/components/rum/productAnalytics/funnelParts/StepConditionPopover.vue";
 import useStepLabels from "@/components/rum/productAnalytics/funnelParts/useStepLabels";
 import {
-  moveStep,
   removeStep,
   reorderSteps,
   stepOrder,
@@ -270,7 +247,6 @@ const props = defineProps<{
   unitLabel: I18nText;
   unitNoun: I18nText;
   hideTime: boolean;
-  railEdits?: boolean;
 }>();
 const emit = defineEmits<{
   "update:def": [FunnelDef];
@@ -284,15 +260,39 @@ const { labelOf, kindLabel, kindVariant, filterChips } = useStepLabels(
 );
 const dash = raw("—");
 
-const gridClass = computed(() => {
-  if (props.railEdits)
-    return props.hideTime
-      ? "grid-cols-[2rem_minmax(0,1fr)_5.5rem_5rem_5rem_minmax(6rem,18rem)]"
-      : "grid-cols-[2rem_minmax(0,1fr)_5.5rem_5rem_5rem_6.5rem_minmax(6rem,18rem)]";
-  return props.hideTime
-    ? "grid-cols-[3rem_minmax(0,1fr)_5.5rem_5rem_5rem_minmax(6rem,18rem)_6.5rem]"
-    : "grid-cols-[3rem_minmax(0,1fr)_5.5rem_5rem_5rem_6.5rem_minmax(6rem,18rem)_6.5rem]";
-});
+const gridClass = computed(() =>
+  props.hideTime
+    ? "grid-cols-[3rem_minmax(0,3fr)_5.5rem_7rem_5.5rem_minmax(6rem,2fr)_4rem]"
+    : "grid-cols-[3rem_minmax(0,3fr)_5.5rem_7rem_8rem_5.5rem_minmax(6rem,2fr)_4rem]",
+);
+
+const headerCols = computed(() => [
+  { id: "step", label: t("rum.analytics.funnel.step"), tip: t("rum.analytics.funnel.orderLabel") },
+  {
+    id: "unit",
+    label: props.unitLabel,
+    tip: t("rum.analytics.funnel.unitTooltip", { unit: props.unitLabel }),
+  },
+  {
+    id: "of-previous",
+    label: t("rum.analytics.funnel.ofPrevious"),
+    tip: t("rum.analytics.funnel.ofPreviousTooltip"),
+  },
+  ...(props.hideTime
+    ? []
+    : [
+        {
+          id: "time",
+          label: t("rum.analytics.funnel.timeFromFirst"),
+          tip: t("rum.analytics.funnel.timeTooltip", { unit: props.unitNoun }),
+        },
+      ]),
+  {
+    id: "of-first",
+    label: t("rum.analytics.funnel.ofFirst"),
+    tip: t("rum.analytics.funnel.ofFirstTooltip"),
+  },
+]);
 
 const numbersReady = computed(() => props.state.status === "ok");
 // A panel held for unreadable events has nothing coming, so a skeleton would promise numbers that never arrive.
@@ -325,8 +325,6 @@ const apply = (edit: FunnelEdit | null) => {
 
 const replaceStep = (i: number, step: StepRef) =>
   emit("update:def", { ...props.def, steps: props.def.steps.map((s, j) => (j === i ? step : s)) });
-
-const move = (i: number, by: number) => apply(moveStep(props.def, i, by));
 
 const remove = (i: number) => apply(removeStep(props.def, i));
 
