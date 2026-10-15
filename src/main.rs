@@ -184,8 +184,7 @@ async fn run() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("db init failed: {e}");
             }
-            // Not fatal: a node that waits out the lock leaves the reconcile to the node holding
-            // it.
+            // Logged, not fatal: the plan sync and the next start repair any row it misses.
             #[cfg(feature = "cloud")]
             if let Err(e) = o2_enterprise::enterprise::cloud::reconcile_plan_rows().await {
                 log::error!("public dashboard plan rows reconcile failed: {e}");
