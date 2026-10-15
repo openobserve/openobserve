@@ -2075,12 +2075,6 @@ pub struct Common {
         help = "Enable shared memtable across multiple organizations"
     )]
     pub feature_shared_memtable_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_WAL_PACK_ENABLED",
-        default = true,
-        help = "Persist metrics memtables into packed wal files (one file per rotation instead of one file per stream)"
-    )]
-    pub feature_wal_pack_enabled: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -3092,12 +3086,6 @@ pub struct Limit {
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
-    #[env_config(
-        name = "ZO_METRICS_INDEX_ENABLED",
-        default = false,
-        help = "Enable experimental metrics indexing and sample blocks for newly written metrics data."
-    )]
-    pub metrics_index_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
     #[env_config(
