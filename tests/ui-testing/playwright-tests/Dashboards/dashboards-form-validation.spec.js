@@ -15,6 +15,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { setupTestDashboard, deleteDashboard } = require('./utils/dashCreation.js');
 const { ingestion } = require('./utils/dashIngestion.js');
+const { settlePanelLeave } = require('../../pages/dashboardPages/panel-leave-dialog.js');
 
 // ── Fixture helpers ───────────────────────────────────────────────────────────
 
@@ -1164,18 +1165,11 @@ test.describe("Dashboard AddPanel panel name form validation", () => {
     }, async ({ page }) => {
         testLogger.info('TC-AP-003: Discard button navigates away from panel editor');
 
-        // Leaving the panel editor with unsaved edits fires AddPanel.vue's
-        // onBeforeRouteLeave window.confirm. Playwright auto-DISMISSES dialogs,
-        // and a dismissed confirm means next(false) — the route change is
-        // cancelled, so the click appears to do nothing and the URL wait below
-        // burns its full timeout. Accept it for the duration of the discard.
-        page.once('dialog', (dialog) => dialog.accept());
-
         await pm.dashboardsFormValidation.getPanelDiscardBtnLocator().waitFor({ state: 'visible', timeout: 5000 });
         await pm.dashboardsFormValidation.getPanelDiscardBtnLocator().click();
 
-        // After discard we should leave the /add_panel URL
-        await page.waitForURL(url => !url.pathname.includes('add_panel'), { timeout: 15000 });
+        // An edited panel opens the in-app leave dialog; answering it leaves /add_panel
+        await settlePanelLeave(page, { timeout: 15000 });
         testLogger.info('Navigated away from panel editor after Discard');
     });
 });

@@ -6,6 +6,7 @@
 // `.monaco-editor`, `.suggest-widget`, or `.monaco-list-row` DOM.
 
 const testLogger = require("../../playwright-tests/utils/test-logger.js");
+import { settlePanelLeave } from "./panel-leave-dialog.js";
 
 export default class DashboardPromQLEditor {
   constructor(page) {
@@ -82,6 +83,7 @@ export default class DashboardPromQLEditor {
       .catch(() => false);
     if (visible) {
       await this.discardPanelBtn.click().catch(() => {});
+      await settlePanelLeave(this.page, { timeout: 10000 }).catch(() => {});
     }
   }
 

@@ -1372,8 +1372,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const discardBtn = builder.getDashboardDiscardBtn();
     if (await discardBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await discardBtn.click();
-      // Handle confirmation dialog if appears
-      const confirmBtn = builder.getDashboardConfirmPrimaryBtn();
+      // An edited panel opens the leave dialog; discard so no browser draft is kept
+      const confirmBtn = builder.getDashboardLeaveDiscardBtn();
       if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
         await confirmBtn.click();
         await confirmBtn.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
