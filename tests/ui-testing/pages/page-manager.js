@@ -34,6 +34,7 @@ import { AlertLibraryPage } from "./alertsPages/alertLibraryPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
 import { AlertSaveQueryModePage } from "./alertsPages/alertSaveQueryModePage.js";
+import { AlertNoDestinationPage } from "./alertsPages/alertNoDestinationPage.js";
 import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
 import { IncidentsPage } from "./alertsPages/incidentsPage.js";
 import { SloListPage } from "./sloPages/sloListPage.js";
@@ -48,6 +49,10 @@ import { OnCallResponseDetailPage } from "./oncallPages/oncallResponseDetailPage
 import { OnCallCoveragePage } from "./oncallPages/oncallCoveragePage.js";
 import { OnCallPolicyEditorPage } from "./oncallPages/oncallPolicyEditorPage.js";
 import { OnCallMinePage } from "./oncallPages/oncallMinePage.js";
+import { SyntheticsListPage } from "./syntheticsPages/syntheticsListPage.js";
+import { SyntheticsCreatePage } from "./syntheticsPages/syntheticsCreatePage.js";
+import { SyntheticsResultsPage } from "./syntheticsPages/syntheticsResultsPage.js";
+import { SyntheticsSettingsPage } from "./syntheticsPages/syntheticsSettingsPage.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -200,6 +205,7 @@ class PageManager {
     this.alertHistoryPage = new AlertHistoryPage(page);
     this.alertDetailPage = new AlertDetailPage(page);
     this.alertSaveQueryModePage = new AlertSaveQueryModePage(page);
+    this.alertNoDestinationPage = new AlertNoDestinationPage(page);
     this.compositeAlertsPage = new CompositeAlertsPage(page);
     this.incidentsPage = new IncidentsPage(page);
 
@@ -218,6 +224,12 @@ class PageManager {
     this.oncallCoveragePage = new OnCallCoveragePage(page);
     this.oncallPolicyEditorPage = new OnCallPolicyEditorPage(page);
     this.oncallMinePage = new OnCallMinePage(page);
+
+    // ===== SYNTHETICS PAGE OBJECTS =====
+    this.syntheticsListPage = new SyntheticsListPage(page);
+    this.syntheticsCreatePage = new SyntheticsCreatePage(page);
+    this.syntheticsResultsPage = new SyntheticsResultsPage(page);
+    this.syntheticsSettingsPage = new SyntheticsSettingsPage(page);
 
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);

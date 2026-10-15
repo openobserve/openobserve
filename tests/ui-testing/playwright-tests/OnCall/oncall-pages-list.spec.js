@@ -371,13 +371,7 @@ test.describe('On-call pages list', {
     const service = uniqueName(`${workerPrefix(testInfo)}_svc`);
     await seedOnCallStream(page, stream, { services: [service] });
 
-    // TEAMLESS IS NOT DESTINATIONLESS. §4.2 refuses an alert carrying none of
-    // `oncall_team`, `destinations` and `workflows`, and the alert under test
-    // has to omit the FIRST of those — that is what leaves routing to the rules
-    // and lets nothing claim the page. So it carries a destination instead: an
-    // http sink pointed back at this instance, which satisfies §4.2 without
-    // naming an owner. Dropping all three was a seeding mistake, not a way to
-    // build an unrouted page.
+    // No `oncall_team`, so routing is left to the rules and nothing claims the page.
     const destination = await seedNotificationDestination(page, workerPrefix(testInfo));
     const alertName = uniqueName(`${workerPrefix(testInfo)}_alert`);
     const { pages } = await firePageAndWait(page, {

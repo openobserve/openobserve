@@ -42,6 +42,8 @@ use usage_reporting::publish_triggers_usage;
 const CONFIG_RETRY_SECS: i64 = 60;
 const MAX_CONFIG_RETRY_SECS: i64 = 86_400;
 
+type ConfigRead = Result<Option<CalibrationConfig>, InfraError>;
+
 /// What a calibration row carries from one pass to the next.
 #[derive(Default, Deserialize, Serialize)]
 struct JobData {
@@ -51,6 +53,8 @@ struct JobData {
 /// What a pass decided before any analysis.
 #[derive(Debug, PartialEq)]
 enum Pass<'a> {
+    /// The deployment switch is off, so the config is not even read.
+    SwitchedOff,
     /// The config is gone or unreadable; a delete may be in flight, so look again later.
     ConfigMiss {
         read_error: Option<String>,
@@ -62,24 +66,37 @@ enum Pass<'a> {
 }
 
 impl<'a> Pass<'a> {
-    fn decide(
-        read: &'a Result<Option<CalibrationConfig>, InfraError>,
-        retries: i32,
-        max_retries: i32,
-    ) -> Self {
+    /// `read` is `None` when the deployment switch is off and the config was never read.
+    fn decide(read: Option<&'a ConfigRead>, retries: i32, max_retries: i32) -> Self {
         match read {
-            Err(e) => Self::ConfigMiss {
+            None => Self::SwitchedOff,
+            Some(Err(e)) => Self::ConfigMiss {
                 read_error: Some(e.to_string()),
             },
-            Ok(None) => Self::ConfigMiss { read_error: None },
-            Ok(Some(config)) if retries >= max_retries => Self::Abandoned(config),
-            Ok(Some(config)) if !config.enabled => Self::Disabled(config),
-            Ok(Some(config)) => Self::Due(config),
+            Some(Ok(None)) => Self::ConfigMiss { read_error: None },
+            Some(Ok(Some(config))) if retries >= max_retries => Self::Abandoned(config),
+            Some(Ok(Some(config))) if !config.enabled => Self::Disabled(config),
+            Some(Ok(Some(config))) => Self::Due(config),
         }
     }
 
-    fn settle(&self, data: &mut JobData, retries: i32, now: i64) -> Outcome {
-        let (config, status, error) = match self {
+    /// `analysis` is a due pass's result: the window it analysed, or why it failed.
+    fn settle(
+        &self,
+        data: &mut JobData,
+        retries: i32,
+        now: i64,
+        analysis: Option<Result<(i64, i64), String>>,
+    ) -> Outcome {
+        let (config, status, error, window) = match self {
+            // A switched-off deployment costs each org one wake a day, not one per cadence.
+            Self::SwitchedOff => {
+                return Outcome::skipped(
+                    now,
+                    MAX_CONFIG_RETRY_SECS,
+                    "alert calibration is disabled for this deployment".to_string(),
+                );
+            }
             Self::ConfigMiss { read_error } => {
                 data.config_misses = data.config_misses.saturating_add(1);
                 let wait_secs = config_retry_secs(data.config_misses);
@@ -87,14 +104,11 @@ impl<'a> Pass<'a> {
                     Some(e) => format!("unreadable ({e})"),
                     None => "not found".to_string(),
                 };
-                return Outcome {
-                    status: RunOutcome::Skipped,
-                    error: Some(format!(
-                        "config {what} on {} passes in a row; retrying in {wait_secs}s",
-                        data.config_misses
-                    )),
-                    next_run_at: now.saturating_add(second_micros(wait_secs)),
-                };
+                let reason = format!(
+                    "config {what} on {} passes in a row; retrying in {wait_secs}s",
+                    data.config_misses
+                );
+                return Outcome::skipped(now, wait_secs, reason);
             }
             Self::Abandoned(config) => (
                 config,
@@ -102,24 +116,25 @@ impl<'a> Pass<'a> {
                 Some(format!(
                     "{retries} earlier attempts outlived their lease without finishing this pass"
                 )),
+                None,
             ),
             Self::Disabled(config) => (
                 config,
                 RunOutcome::Skipped,
                 Some("the org's alert calibration config is disabled".to_string()),
+                None,
             ),
-            // Analysis is enterprise-only and lands with its own wiring; until then nothing runs.
-            Self::Due(config) => (
-                config,
-                RunOutcome::Skipped,
-                Some("alert calibration analysis is not available yet".to_string()),
-            ),
+            Self::Due(config) => match analysis.unwrap_or_else(|| Err("no analysis ran".into())) {
+                Ok(window) => (config, RunOutcome::Succeeded, None, Some(window)),
+                Err(e) => (config, RunOutcome::Error, Some(e), None),
+            },
         };
         data.config_misses = 0;
         Outcome {
             status,
             error,
             next_run_at: next_by_cadence(now, config),
+            window,
         }
     }
 }
@@ -130,6 +145,19 @@ struct Outcome {
     status: RunOutcome,
     error: Option<String>,
     next_run_at: i64,
+    /// The window actually analysed, which a clamp may have shortened.
+    window: Option<(i64, i64)>,
+}
+
+impl Outcome {
+    fn skipped(now: i64, wait_secs: i64, reason: String) -> Self {
+        Self {
+            status: RunOutcome::Skipped,
+            error: Some(reason),
+            next_run_at: now.saturating_add(second_micros(wait_secs)),
+            window: None,
+        }
+    }
 }
 
 pub(super) async fn handle_triggers(
@@ -137,21 +165,23 @@ pub(super) async fn handle_triggers(
     mut trigger: Trigger,
 ) -> Result<(), anyhow::Error> {
     let started_at = now_micros();
-    let read =
-        alert_calibration::get_by_id(get_orm_client_ro().await, &trigger.org, &trigger.module_key)
-            .await;
-    if let Err(e) = &read {
-        log::error!(
-            "[alert_calibration] could not read config {} for org={}: {e}",
-            trigger.module_key,
-            trigger.org
-        );
-    }
+    let read = read_config(&trigger).await;
     let (_, max_retries) = get_scheduler_max_retries();
-    let pass = Pass::decide(&read, trigger.retries, max_retries);
+    let pass = Pass::decide(read.as_ref(), trigger.retries, max_retries);
+    let analysis = match &pass {
+        Pass::Due(config) => Some(analyse(&trigger, config).await.map_err(|e| {
+            log::error!(
+                "[alert_calibration] pass failed for config {} org={}: {e}",
+                trigger.module_key,
+                trigger.org
+            );
+            e.to_string()
+        })),
+        _ => None,
+    };
     let mut data: JobData = json::from_str(&trigger.data).unwrap_or_default();
     let finished_at = now_micros();
-    let outcome = pass.settle(&mut data, trigger.retries, finished_at);
+    let outcome = pass.settle(&mut data, trigger.retries, finished_at, analysis);
     let row = trigger_data(&trigger, &outcome, started_at, finished_at, trace_id);
     trigger.status = TriggerStatus::Waiting;
     trigger.retries = 0;
@@ -168,6 +198,62 @@ pub(super) async fn handle_triggers(
     }
     publish_triggers_usage(row);
     Ok(())
+}
+
+async fn read_config(trigger: &Trigger) -> Option<ConfigRead> {
+    if !deployment_enabled() {
+        return None;
+    }
+    let conn = get_orm_client_ro().await;
+    let read = alert_calibration::get_by_id(conn, &trigger.org, &trigger.module_key).await;
+    if let Err(e) = &read {
+        log::error!(
+            "[alert_calibration] could not read config {} for org={}: {e}",
+            trigger.module_key,
+            trigger.org
+        );
+    }
+    Some(read)
+}
+
+#[cfg(feature = "enterprise")]
+fn deployment_enabled() -> bool {
+    o2_enterprise::enterprise::alert_calibration_service::is_enabled()
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn deployment_enabled() -> bool {
+    false
+}
+
+/// The digest is the pass's only output, so a failed write fails the pass.
+#[cfg(feature = "enterprise")]
+async fn analyse(
+    trigger: &Trigger,
+    config: &CalibrationConfig,
+) -> Result<(i64, i64), anyhow::Error> {
+    use o2_enterprise::enterprise::alert_calibration_service::run_pass;
+
+    use crate::alerts::alert_calibration::{SearchAdapter, sink::write_digest_records};
+
+    let pass = run_pass(
+        &SearchAdapter,
+        &trigger.org,
+        &trigger.module_key,
+        trigger.next_run_at,
+        config.window_minutes,
+    )
+    .await?;
+    write_digest_records(&trigger.org, pass.records).await?;
+    Ok((pass.window.start_micros, pass.window.end_micros))
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn analyse(
+    _trigger: &Trigger,
+    _config: &CalibrationConfig,
+) -> Result<(i64, i64), anyhow::Error> {
+    anyhow::bail!("alert calibration is an enterprise feature")
 }
 
 /// Doubling from a minute to a day, so a deleted config stops costing a pull a minute.
@@ -193,6 +279,9 @@ fn trigger_data(
     finished_at: i64,
     trace_id: &str,
 ) -> TriggerData {
+    let (start_time, end_time) = outcome
+        .window
+        .unwrap_or((trigger.next_run_at, trigger.next_run_at));
     TriggerData {
         _timestamp: finished_at,
         org: trigger.org.clone(),
@@ -202,8 +291,8 @@ fn trigger_data(
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
         status: outcome.status.clone(),
-        start_time: trigger.next_run_at,
-        end_time: trigger.next_run_at,
+        start_time,
+        end_time,
         retries: trigger.retries,
         error: outcome.error.clone(),
         delay_in_secs: Some(Duration::microseconds(started_at - trigger.next_run_at).num_seconds()),
@@ -240,27 +329,46 @@ mod tests {
     }
 
     #[test]
-    fn a_pass_is_decided_by_the_config_read_the_retry_budget_and_the_switch() {
+    fn a_pass_is_decided_by_both_switches_the_config_read_and_the_retry_budget() {
+        assert_eq!(Pass::decide(None, 0, 3), Pass::SwitchedOff);
         let unreadable = Err(InfraError::DbError(DbError::SeaORMError(
             "down".to_string(),
         )));
         assert!(matches!(
-            Pass::decide(&unreadable, 0, 3),
+            Pass::decide(Some(&unreadable), 0, 3),
             Pass::ConfigMiss {
                 read_error: Some(_)
             }
         ));
         assert_eq!(
-            Pass::decide(&Ok(None), 0, 3),
+            Pass::decide(Some(&Ok(None)), 0, 3),
             Pass::ConfigMiss { read_error: None }
         );
         let enabled = Ok(Some(config(true, 30)));
-        assert!(matches!(Pass::decide(&enabled, 3, 3), Pass::Abandoned(_)));
-        assert!(matches!(Pass::decide(&enabled, 2, 3), Pass::Due(_)));
         assert!(matches!(
-            Pass::decide(&Ok(Some(config(false, 30))), 0, 3),
+            Pass::decide(Some(&enabled), 3, 3),
+            Pass::Abandoned(_)
+        ));
+        assert!(matches!(Pass::decide(Some(&enabled), 2, 3), Pass::Due(_)));
+        let disabled = Ok(Some(config(false, 30)));
+        assert!(matches!(
+            Pass::decide(Some(&disabled), 0, 3),
             Pass::Disabled(_)
         ));
+    }
+
+    #[test]
+    fn a_switched_off_deployment_looks_again_in_a_day_and_keeps_the_backoff() {
+        let mut data = JobData { config_misses: 3 };
+        let outcome = Pass::SwitchedOff.settle(&mut data, 0, NOW, None);
+        assert_eq!(outcome.status, RunOutcome::Skipped);
+        assert_eq!(outcome.next_run_at, NOW + 1440 * MINUTE);
+        assert_eq!(data.config_misses, 3);
+    }
+
+    #[tokio::test]
+    async fn a_switched_off_deployment_never_reads_the_config() {
+        assert!(read_config(&Trigger::default()).await.is_none());
     }
 
     #[test]
@@ -268,7 +376,7 @@ mod tests {
         let mut data = JobData::default();
         let waits: Vec<i64> = (0..12)
             .map(|_| {
-                let outcome = Pass::ConfigMiss { read_error: None }.settle(&mut data, 0, NOW);
+                let outcome = Pass::ConfigMiss { read_error: None }.settle(&mut data, 0, NOW, None);
                 assert_eq!(outcome.status, RunOutcome::Skipped);
                 (outcome.next_run_at - NOW) / 1_000_000
             })
@@ -279,15 +387,32 @@ mod tests {
     }
 
     #[test]
-    fn a_found_config_resets_the_backoff_and_re_arms_on_its_cadence() {
+    fn a_due_pass_reports_its_analysis_and_re_arms_on_its_cadence() {
         let mut data = JobData { config_misses: 5 };
         let enabled = config(true, 30);
-        let outcome = Pass::Due(&enabled).settle(&mut data, 0, NOW);
+        let done = Pass::Due(&enabled).settle(&mut data, 0, NOW, Some(Ok((NOW - MINUTE, NOW))));
         assert_eq!(data.config_misses, 0);
-        assert_eq!(outcome.next_run_at, NOW + 30 * MINUTE);
+        assert_eq!(
+            (done.status, done.next_run_at, done.window),
+            (
+                RunOutcome::Succeeded,
+                NOW + 30 * MINUTE,
+                Some((NOW - MINUTE, NOW))
+            )
+        );
+        let failed =
+            Pass::Due(&enabled).settle(&mut data, 0, NOW, Some(Err("querier down".into())));
+        assert_eq!(
+            (failed.status, failed.error, failed.window),
+            (RunOutcome::Error, Some("querier down".to_string()), None)
+        );
+    }
+
+    #[test]
+    fn a_non_positive_cadence_falls_back_to_daily() {
         for frequency in [0, -1, i32::MIN] {
-            let broken = config(true, frequency);
-            let outcome = Pass::Disabled(&broken).settle(&mut data, 0, NOW);
+            let broken = config(false, frequency);
+            let outcome = Pass::Disabled(&broken).settle(&mut JobData::default(), 0, NOW, None);
             assert_eq!(outcome.next_run_at, NOW + 1440 * MINUTE, "{frequency}");
         }
     }
@@ -295,14 +420,14 @@ mod tests {
     #[test]
     fn an_abandoned_pass_is_an_error_re_armed_on_its_cadence() {
         let enabled = config(true, 60);
-        let outcome = Pass::Abandoned(&enabled).settle(&mut JobData::default(), 3, NOW);
+        let outcome = Pass::Abandoned(&enabled).settle(&mut JobData::default(), 3, NOW, None);
         assert_eq!(outcome.status, RunOutcome::Error);
         assert_eq!(outcome.next_run_at, NOW + 60 * MINUTE);
         assert!(outcome.error.unwrap().starts_with("3 earlier attempts"));
     }
 
     #[test]
-    fn the_published_row_is_timed_from_the_due_time_and_the_claim() {
+    fn the_published_row_spans_the_analysed_window_and_is_timed_from_the_claim() {
         let trigger = Trigger {
             org: "default".to_string(),
             module_key: "cfg1".to_string(),
@@ -312,11 +437,16 @@ mod tests {
             ..Default::default()
         };
         let outcome = Outcome {
-            status: RunOutcome::Skipped,
+            status: RunOutcome::Succeeded,
             error: None,
             next_run_at: NOW + MINUTE,
+            window: Some((NOW - 60 * MINUTE, NOW - MINUTE)),
         };
         let row = trigger_data(&trigger, &outcome, NOW, NOW + 1_000_000, "t");
+        assert_eq!(
+            (row.start_time, row.end_time),
+            (NOW - 60 * MINUTE, NOW - MINUTE)
+        );
         assert_eq!(
             (row.delay_in_secs, row.time_in_queue_ms, row.retries),
             (Some(60), Some(120_000), 1)

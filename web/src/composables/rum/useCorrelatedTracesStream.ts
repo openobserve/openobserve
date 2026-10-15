@@ -95,6 +95,13 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     }
   };
 
+  /** The stream for an id found nowhere: `default`, unless the org's list shows it has no such stream. */
+  const fallbackTracesStream = async (): Promise<string | null> => {
+    const streams = await listTracesStreams();
+    if (!streams.length) return RUM_CORRELATION_TRACES_STREAM;
+    return streams.includes(RUM_CORRELATION_TRACES_STREAM) ? RUM_CORRELATION_TRACES_STREAM : null;
+  };
+
   /**
    * One `traces/time_range` pass over `traceIds`, chunked at the server's id
    * cap and issued in parallel. Splits the ids into the ones the index
@@ -382,5 +389,5 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     activeProbeTraceIds.clear();
   };
 
-  return { resolveTraceLocation, resolveTraceLocationsBulk, cancel };
+  return { resolveTraceLocation, resolveTraceLocationsBulk, fallbackTracesStream, cancel };
 }
