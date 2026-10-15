@@ -1,6 +1,0 @@
-[
-  { "title": "the alert calibration route redirects to the alert list on an OSS build", "action": "new", "verifies": "the OSS route guard bounces /alert-calibration to the alert list" },
-  { "title": "the digests list renders its page shell with the feature enabled", "action": "new", "verifies": "the digests view mounts its page shell (title, stats, table) when the feature is on" },
-  { "title": "the dashboard opens from the digests tab", "action": "new", "verifies": "the dashboard tab navigates from the digests view to the dashboard" },
-  { "title": "the settings page renders the configuration form", "action": "new", "verifies": "the settings view renders the configuration form" }
-]
