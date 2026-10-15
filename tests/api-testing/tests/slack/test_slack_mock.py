@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import threading
 from collections.abc import Generator
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 import requests
@@ -92,3 +94,10 @@ def test_a_harness_skip_fails_when_the_suite_is_required(monkeypatch: pytest.Mon
     monkeypatch.setenv("SLACK_SUITE_REQUIRED", "1")
     with pytest.raises(pytest.fail.Exception, match="SLACK_SUITE_REQUIRED=1 but mock unreachable"):
         harness_skip("mock unreachable")
+
+
+def test_the_socket_url_app_id_is_a_hash_like_live_slack(api: str) -> None:
+    url = slack(api, "apps.connections.open", bearer="xapp-1-A000001-1-mock")["url"]
+    query = parse_qs(urlparse(url).query)
+    assert set(query) == {"ticket", "app_id"}
+    assert re.fullmatch(r"[0-9a-f]{64}", query["app_id"][0]), url

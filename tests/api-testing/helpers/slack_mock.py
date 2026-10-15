@@ -33,12 +33,14 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import itertools
 import json
 import logging
 import sys
 import threading
 import time
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -352,10 +354,9 @@ def m_apps_uninstall(st: MockState, form: dict[str, str], bearer: str | None) ->
 def m_apps_connections_open(_st: MockState, _form: dict[str, str], bearer: str | None) -> dict[str, Any]:
     if not bearer or not bearer.startswith("xapp-"):
         raise SlackError("invalid_auth")
-    # Slack's app-level tokens read xapp-1-<app id>-…, and the socket URL names that app.
-    parts = bearer.split("-")
-    app = f"&app_id={parts[2]}" if len(parts) > 2 and parts[2].startswith("A") else ""
-    return {"url": f"wss://wss-primary.slack.com/link/?ticket=mock-ticket{app}"}
+    # Live Slack puts a 64-hex hash in the socket URL's app_id, never the A… app id.
+    app_hash = hashlib.sha256(bearer.encode()).hexdigest()
+    return {"url": f"wss://wss-primary.slack.com/link/?ticket={uuid.uuid4()}&app_id={app_hash}"}
 
 
 def page(items: list[dict[str, Any]], form: dict[str, str]) -> tuple[list[dict[str, Any]], str]:

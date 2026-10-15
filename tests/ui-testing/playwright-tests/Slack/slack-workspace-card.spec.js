@@ -84,7 +84,7 @@ test.describe('Slack workspace card', { tag: ['@slack', '@enterprise'] }, () => 
     await expect(slack.credentials.field('config_refresh_token')).toBeVisible();
     await expect(slack.credentials.field('signing_secret')).toHaveCount(0);
 
-    await slack.credentials.field('app_token').fill(`xapp-1-pw-${api.uniq()}`);
+    await slack.credentials.field('app_token').fill(api.appToken(install.app_id));
     await slack.credentials.save.click();
     await expect(slack.credentials.panel).toHaveCount(0, { timeout: 15000 });
     const { installations } = await api.listInstallations(apiContext, orgs.main);
