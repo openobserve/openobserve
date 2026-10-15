@@ -151,15 +151,10 @@ impl<'a> SupportedRun<'a> {
         &self,
         engine: &S,
         query_sql: &str,
-        partitioned: bool,
     ) -> Result<Vec<QueryDataPoint>> {
         let started = Instant::now();
         let req = self.search_request(query_sql);
-        let slices = if partitioned {
-            self.planned_slices(engine, &req).await?
-        } else {
-            vec![[self.window.0, self.window.1]]
-        };
+        let slices = self.planned_slices(engine, &req).await?;
         self.search_slices(engine, &req, &slices, started).await
     }
 
@@ -468,7 +463,7 @@ pub(super) fn supported_grid(
     proven_grid(literal, &metadata.histogram_interval, window)
 }
 
-/// Searches a supported query completely, partition by partition when the rollout flag is on.
+/// Searches a supported query completely, one validated partition at a time.
 pub(super) async fn execute_supported(
     org_id: &str,
     query_sql: &str,
@@ -483,8 +478,7 @@ pub(super) async fn execute_supported(
         org_id,
         stream_type: StreamType::from(stream_type),
     };
-    let partitioned = config::get_config().limit.anomaly_partitioned_search;
-    run.execute(&engine, query_sql, partitioned).await
+    run.execute(&engine, query_sql).await
 }
 
 pub(super) fn log_fallback(org_id: &str, anomaly_id: &str, reason: &str) {
@@ -922,7 +916,7 @@ mod tests {
             match self.plan.clone() {
                 Some(Ok(plan)) => Ok(plan),
                 Some(Err(e)) => Err(anyhow::anyhow!(e)),
-                None => panic!("planner called on the single-call path"),
+                None => panic!("planner response was not configured"),
             }
         }
 
@@ -964,7 +958,7 @@ mod tests {
             Ok(self
                 .plan
                 .clone()
-                .expect("planner called on the single-call path"))
+                .expect("planner response was not configured"))
         }
 
         async fn search(&self, _trace_id: &str, req: &Request) -> Result<Response> {
@@ -1664,13 +1658,13 @@ mod tests {
         Ok(response(vec![row(bucket, json!(value))]))
     }
 
-    async fn run(engine: &ScriptedSearch, partitioned: bool) -> Result<Vec<QueryDataPoint>> {
+    async fn run(engine: &ScriptedSearch) -> Result<Vec<QueryDataPoint>> {
         let run = SupportedRun::new("a1", "trace", WINDOW, GRID_5M)?;
-        run.execute(engine, SQL, partitioned).await
+        run.execute(engine, SQL).await
     }
 
     #[tokio::test]
-    async fn flag_on_searches_each_slice_in_ascending_order_with_the_full_budget() {
+    async fn searches_each_slice_in_ascending_order_with_the_full_budget() {
         let engine = ScriptedSearch::new(
             Some(three_slices()),
             vec![
@@ -1679,7 +1673,7 @@ mod tests {
                 slice_ok(T0 + 2 * FIVE_MIN_US, 3.0),
             ],
         );
-        let points = run(&engine, true).await.unwrap();
+        let points = run(&engine).await.unwrap();
         let got: Vec<_> = points.iter().map(|p| (p.timestamp_us, p.value)).collect();
         assert_eq!(got, vec![(T0, 1.0), (T0 + 2 * FIVE_MIN_US, 3.0)]);
         let budget = 5;
@@ -1704,27 +1698,31 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn flag_off_is_one_full_window_search_under_the_same_rules() {
-        let engine = ScriptedSearch::new(None, vec![slice_ok(T0 + FIVE_MIN_US, 2.0)]);
-        let points = run(&engine, false).await.unwrap();
+    async fn a_single_partition_plan_keeps_the_same_validation() {
+        let engine = ScriptedSearch::new(
+            Some(plan(vec![[WINDOW.0, WINDOW.1]])),
+            vec![slice_ok(T0 + FIVE_MIN_US, 2.0)],
+        );
+        let points = run(&engine).await.unwrap();
         assert_eq!(points.len(), 1);
-        assert_eq!(engine.planned.load(Ordering::SeqCst), 0);
+        assert_eq!(engine.planned.load(Ordering::SeqCst), 1);
         assert_eq!(
             engine.searched(),
             vec![("trace".to_string(), WINDOW.0, WINDOW.1, 5)]
         );
 
         let malformed = response(vec![row(T0, json!(1)), row(T0 + 1, json!(1))]);
-        let engine = ScriptedSearch::new(None, vec![Ok(malformed)]);
-        assert!(run(&engine, false).await.is_err());
+        let engine =
+            ScriptedSearch::new(Some(plan(vec![[WINDOW.0, WINDOW.1]])), vec![Ok(malformed)]);
+        assert!(run(&engine).await.is_err());
 
         let engine = ScriptedSearch::new(
-            None,
+            Some(plan(vec![[WINDOW.0, WINDOW.1]])),
             vec![Ok(response(
                 (0..5).map(|i| row(T0 + i, json!(1))).collect(),
             ))],
         );
-        let err = run(&engine, false).await.unwrap_err().to_string();
+        let err = run(&engine).await.unwrap_err().to_string();
         assert!(err.contains("budget"), "{err}");
     }
 
@@ -1741,7 +1739,7 @@ mod tests {
                 ],
             )
         };
-        let (result, ()) = tokio::join!(run(&engine, true), async {
+        let (result, ()) = tokio::join!(run(&engine), async {
             for _ in 0..20 {
                 tokio::task::yield_now().await;
             }
@@ -1758,7 +1756,7 @@ mod tests {
             Some(three_slices()),
             vec![slice_ok(T0, 1.0), Err("querier crashed".to_string())],
         );
-        let err = run(&engine, true).await.unwrap_err().to_string();
+        let err = run(&engine).await.unwrap_err().to_string();
         assert!(err.contains("querier crashed"), "{err}");
         assert!(err.contains("trace-1"), "{err}");
         assert!(
@@ -1778,7 +1776,7 @@ mod tests {
                 slice_ok(T0 + 2 * FIVE_MIN_US, 3.0),
             ],
         );
-        let err = run(&engine, true).await.unwrap_err().to_string();
+        let err = run(&engine).await.unwrap_err().to_string();
         assert!(err.contains("file list truncated"), "{err}");
         assert!(err.contains("trace-1"), "{err}");
         assert_eq!(engine.searched().len(), 2);
@@ -1791,7 +1789,7 @@ mod tests {
                 slice_ok(T0 + 2 * FIVE_MIN_US, 3.0),
             ],
         );
-        assert!(run(&engine, true).await.is_err());
+        assert!(run(&engine).await.is_err());
     }
 
     #[tokio::test]
@@ -1808,14 +1806,14 @@ mod tests {
         ];
         for p in plans {
             let engine = ScriptedSearch::new(Some(p), vec![]);
-            assert!(run(&engine, true).await.is_err());
+            assert!(run(&engine).await.is_err());
             assert!(engine.searched().is_empty());
         }
         let engine = ScriptedSearch {
             plan: Some(Err("planner down".to_string())),
             ..Default::default()
         };
-        let err = run(&engine, true).await.unwrap_err().to_string();
+        let err = run(&engine).await.unwrap_err().to_string();
         assert!(err.contains("planner down"), "{err}");
         assert!(engine.searched().is_empty());
     }
@@ -1826,7 +1824,7 @@ mod tests {
             Some(plan(vec![[WINDOW.0, WINDOW.1]])),
             vec![slice_ok(T0, 1.0)],
         );
-        assert_eq!(run(&engine, true).await.unwrap().len(), 1);
+        assert_eq!(run(&engine).await.unwrap().len(), 1);
         assert_eq!(
             engine.searched(),
             vec![("trace".to_string(), WINDOW.0, WINDOW.1, 5)]
@@ -1888,7 +1886,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn nonfinite_aggregates_fail_and_real_nulls_are_omitted_in_both_modes() {
+    async fn nonfinite_aggregates_fail_and_nulls_are_omitted_for_one_or_many_partitions() {
         let finite_and_null = || {
             vec![
                 arrow_rows(&[(T0, Some(2.0))]),
@@ -1900,7 +1898,7 @@ mod tests {
             let mut sliced = finite_and_null();
             sliced[2] = arrow_rows(&[(T0 + 2 * FIVE_MIN_US, Some(bad))]);
             let engine = arrow_engine(Some(three_slices()), sliced);
-            let err = run_arrow(&engine, true).await.unwrap_err().to_string();
+            let err = run_arrow(&engine).await.unwrap_err().to_string();
             assert!(err.contains("'value'") && err.contains("trace-2"), "{err}");
             assert_eq!(engine.searched.load(Ordering::SeqCst), 3);
 
@@ -1909,28 +1907,28 @@ mod tests {
                 (T0 + FIVE_MIN_US, None),
                 (T0 + 2 * FIVE_MIN_US, Some(bad)),
             ]);
-            let engine = arrow_engine(None, vec![whole]);
-            let err = run_arrow(&engine, false).await.unwrap_err().to_string();
+            let engine = arrow_engine(Some(plan(vec![[WINDOW.0, WINDOW.1]])), vec![whole]);
+            let err = run_arrow(&engine).await.unwrap_err().to_string();
             assert!(err.contains("'value'"), "{err}");
         }
 
         let engine = arrow_engine(Some(three_slices()), finite_and_null());
-        let on = run_arrow(&engine, true).await.unwrap();
+        let sliced = run_arrow(&engine).await.unwrap();
         let whole = arrow_rows(&[
             (T0, Some(2.0)),
             (T0 + FIVE_MIN_US, None),
             (T0 + 2 * FIVE_MIN_US, Some(3.5)),
         ]);
-        let engine = arrow_engine(None, vec![whole]);
-        let off = run_arrow(&engine, false).await.unwrap();
-        for points in [on, off] {
+        let engine = arrow_engine(Some(plan(vec![[WINDOW.0, WINDOW.1]])), vec![whole]);
+        let single = run_arrow(&engine).await.unwrap();
+        for points in [sliced, single] {
             let got: Vec<_> = points.iter().map(|p| (p.timestamp_us, p.value)).collect();
             assert_eq!(got, vec![(T0, 2.0), (T0 + 2 * FIVE_MIN_US, 3.5)]);
         }
     }
 
-    async fn run_arrow(engine: &ArrowSearch, partitioned: bool) -> Result<Vec<QueryDataPoint>> {
+    async fn run_arrow(engine: &ArrowSearch) -> Result<Vec<QueryDataPoint>> {
         let run = SupportedRun::new("a1", "trace", WINDOW, GRID_5M)?;
-        run.execute(engine, SQL, partitioned).await
+        run.execute(engine, SQL).await
     }
 }

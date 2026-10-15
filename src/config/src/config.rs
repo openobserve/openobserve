@@ -2920,12 +2920,6 @@ pub struct Limit {
         help = "Poll cadence in seconds for the alert calibration puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
     )]
     pub scheduler_alert_calibration_interval: i64,
-    #[env_config(
-        name = "ZO_ANOMALY_PARTITIONED_SEARCH",
-        default = false,
-        help = "Search supported generated anomaly training and detection queries one planned partition at a time instead of in one full-window search."
-    )]
-    pub anomaly_partitioned_search: bool,
     #[env_config(name = "ZO_SEARCH_JOB_WORKS", default = 1)]
     pub search_job_workers: i64,
     #[env_config(name = "ZO_SEARCH_JOB_SCHEDULE_INTERVAL", default = 10)] // seconds
