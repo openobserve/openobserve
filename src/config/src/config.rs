@@ -3384,6 +3384,12 @@ pub struct Nats {
         default = ""
     )]
     pub kv_watch_modules: String,
+    #[env_config(
+        name = "ZO_NATS_SUPER_CLUSTER_MAX_DELIVER",
+        help = "How many times a super cluster consumer receives a message it fails to process before giving it up, default is 10",
+        default = 10
+    )]
+    pub super_cluster_max_deliver: i64,
 }
 
 impl std::fmt::Debug for Nats {
@@ -3405,6 +3411,7 @@ impl std::fmt::Debug for Nats {
             event_storage,
             v211_support,
             kv_watch_modules,
+            super_cluster_max_deliver,
             password: _,
         } = self;
         f.debug_struct("Nats")
@@ -3425,6 +3432,7 @@ impl std::fmt::Debug for Nats {
             .field("event_storage", event_storage)
             .field("v211_support", v211_support)
             .field("kv_watch_modules", kv_watch_modules)
+            .field("super_cluster_max_deliver", super_cluster_max_deliver)
             .finish()
     }
 }
@@ -4977,6 +4985,9 @@ fn check_nats_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.nats.queue_max_size == 0 {
         cfg.nats.queue_max_size = 2048; // 2GB
     }
+    if cfg.nats.super_cluster_max_deliver < 1 {
+        cfg.nats.super_cluster_max_deliver = 10;
+    }
     cfg.nats.queue_max_size *= 1024 * 1024; // convert to bytes
     Ok(())
 }
@@ -5898,17 +5909,22 @@ mod tests {
     fn test_check_nats_config_defaults() {
         let mut cfg = Config::default();
         cfg.nats.queue_max_size = 0;
+        cfg.nats.super_cluster_max_deliver = 0;
         check_nats_config(&mut cfg).unwrap();
         // 2048 MB → bytes
         assert_eq!(cfg.nats.queue_max_size, 2048 * 1024 * 1024);
+        // a poison message must not be redelivered forever
+        assert_eq!(cfg.nats.super_cluster_max_deliver, 10);
     }
 
     #[test]
     fn test_check_nats_config_custom() {
         let mut cfg = Config::default();
         cfg.nats.queue_max_size = 1;
+        cfg.nats.super_cluster_max_deliver = 3;
         check_nats_config(&mut cfg).unwrap();
         assert_eq!(cfg.nats.queue_max_size, 1024 * 1024);
+        assert_eq!(cfg.nats.super_cluster_max_deliver, 3);
     }
 
     #[test]

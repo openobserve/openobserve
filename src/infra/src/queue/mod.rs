@@ -294,6 +294,27 @@ impl Message {
         }
         Ok(())
     }
+
+    /// Give the message up: the backend never redelivers it.
+    pub async fn term(&self) -> Result<()> {
+        match &self.ack {
+            AckHandle::Nats(msg) => msg
+                .ack_with(AckKind::Term)
+                .await
+                .map_err(|e| Error::Message(format!("term ack error:{e}")))?,
+            AckHandle::Memory(handle) => handle.ack(),
+        }
+        Ok(())
+    }
+
+    /// How many times this message has been delivered, counting this delivery,
+    /// or `None` when the backend does not count deliveries.
+    pub fn delivered(&self) -> Option<i64> {
+        match &self.ack {
+            AckHandle::Nats(msg) => msg.info().ok().map(|info| info.delivered),
+            AckHandle::Memory(_) => None,
+        }
+    }
 }
 
 /// Normalize a topic name so it is valid for every queue backend.
