@@ -1,0 +1,33 @@
+{
+  "feature_slug": "alert-calibration",
+  "feature_title": "Alert Calibration",
+  "area": "Alerts",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "alert-calibration.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alert-calibration.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alert_calibration/AlertCalibrationDashboard.vue",
+    "web/src/components/alert_calibration/AlertCalibrationDigests.vue",
+    "web/src/components/alert_calibration/AlertCalibrationDigestDetail.vue",
+    "web/src/components/alert_calibration/AlertCalibrationSettings.vue",
+    "web/src/components/alert_calibration/AlertCalibrationSettingsForm.vue",
+    "web/src/services/alert_calibration.ts",
+    "web/src/components/alerts/AlertList.vue",
+    "web/src/composables/shared/router.ts",
+    "web/src/lib/core/Navbar/navGroups.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Classified from the complete file list in changed_files.txt. The bulk of the change lives in open-source paths: src/api/** (router/mod.rs, openapi.rs, request/alert_calibration/digests.rs), src/core/src/alerts/** (sink.rs, scheduler/calibration.rs), src/db, src/jobs, and the web/src/** frontend. It also touches enterprise-owned paths under o2_openfga/** (model.fga, model.json, src/meta/mapping.rs, src/meta/route_permissions.rs), which is the o2-enterprise authorization crate registering the new alert_calibration routes. OSS implementation plus an enterprise permission layer = 'both'.",
+    "skip": "Not skipping. No tests-added label, no skip comment, and no explicit opt-out were present (trigger_comment.txt and feature_hint.txt are empty). The change is user-facing: it adds brand-new UI views (dashboard, digests list, digest detail, settings) and alters existing interaction (AlertList builtin alerts become selectable/deletable), so it does not fall under the docs/CI-only skip rule.",
+    "e2e": "E2E is warranted. The diff adds several new Vue views under web/src/components/alert_calibration/ (AlertCalibrationDashboard, AlertCalibrationDigests, AlertCalibrationDigestDetail, AlertCalibrationLastRun, AlertCalibrationSettings/Form), wires a new 'alert-calibration/settings' route and an 'alertCalibration' nav entry (beta) in navGroups.ts, and removes the builtin-alert lock in AlertList.vue so builtin alerts can now be selected and deleted. These are new and changed user flows that a browser test should exercise.",
+    "area": "Alerts is the closest product area. The feature is 'alert calibration', its components sit under web/src/components/alert_calibration/ and web/src/components/alerts/, and the nav entry is grouped under the alerts rail (requires 'alertList'). Sibling specs for alerts live in tests/ui-testing/playwright-tests/Alerts/ (e.g. alerts-deduplication-regression.spec.js, alerts-anomaly-detection.spec.js).",
+    "group": "The OSS ci_matrix.json is not present in this repo (only the enterprise overlay ci_matrix.ent.json is), but that overlay references an 'Alerts' testfolder in its disabled section and an 'Alerts-Anomaly' shard whose actual_folder is 'Alerts', so an 'Alerts' shard exists in the OSS matrix. 'Alerts' is the closest existing group for this feature; the new spec should join that shard.",
+    "existing_tests": "No Playwright E2E specs in the diff. The only spec files changed are Vitest unit tests under web/src/** (AlertCalibrationDigests.spec.ts, digests.spec.ts, useManagementRoutes.spec.ts, navGroups.spec.ts, AlertListBuiltin.spec.ts) plus the deleted settings spec; none live under tests/ui-testing/playwright-tests/, so there is no existing E2E coverage to enhance."
+  }
+}
