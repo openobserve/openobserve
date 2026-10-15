@@ -6178,6 +6178,7 @@
       "offline": "Can't reach the server. Please try again in a while.",
       "loading": "Loading dashboard…",
       "cooldown": "Can't load this dashboard right now. Trying again in {time}.",
+      "rateLimitedRetry": "Too many requests. Trying again in {time}.",
       "nextRefreshIn": "Next refresh in {time}",
       "updatedAt": "Updated {time}",
       "updatedRefreshing": "Updated {time} · Refreshing…",

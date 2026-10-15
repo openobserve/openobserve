@@ -18,11 +18,8 @@ export const LIFECYCLE_MS = 60_000;
 const LIFECYCLE_JITTER = 0.1;
 /** The floor of the server's Retry-After hint while a refresh runs. */
 export const REFRESH_POLL_MIN_MS = 3_000;
-const REFRESH_POLL_JITTER = 0.2;
 /** Waits for a failure that names no Retry-After. */
 export const BACKOFF_MS = [5_000, 10_000, 30_000, 60_000];
-// A read aimed at a server due time lands just after it.
-const DUE_GRACE_MS = 1_000;
 /** setTimeout fires at once past this many ms (about 24.8 days), so longer waits are chunked. */
 export const MAX_TIMER_MS = 2_147_483_647;
 
@@ -73,8 +70,8 @@ export function setLongTimeout(fn: () => void, ms: number): () => void {
 
 /** What one read of /data told the poller. Times are local epoch ms. */
 export type PollOutcome =
-  /** 200 or 304. `dueAtMs` is the next server time the body changes on its own (fresh_until, next_retry_at). */
-  | { kind: "body"; refreshing: boolean; hintMs: number | null; dueAtMs: number | null }
+  /** 200 or 304. `hintMs` is the server's Retry-After while a refresh runs. */
+  | { kind: "body"; refreshing: boolean; hintMs: number | null }
   /** 202, 503 or 429. `client` marks a limit on this viewer rather than on one range. */
   | { kind: "wait"; retryAfterMs: number | null; client?: boolean }
   | { kind: "error" }
@@ -128,15 +125,11 @@ export function createPoller(options: PollerOptions): Poller {
       return outcome.retryAfterMs;
     }
     failures = 0;
-    // Jitter only lengthens the refresh poll, so it never undercuts the hint.
-    if (outcome.refreshing) {
-      const hint = Math.max(REFRESH_POLL_MIN_MS, outcome.hintMs ?? 0);
-      return hint * (1 + REFRESH_POLL_JITTER * random());
-    }
     // Jitter only shortens the lifecycle check, so it stays at most a minute.
     const lifecycle = LIFECYCLE_MS * (1 - LIFECYCLE_JITTER * random());
-    const untilDue = outcome.dueAtMs === null ? -1 : outcome.dueAtMs - now();
-    return untilDue > 0 ? Math.min(lifecycle, untilDue + DUE_GRACE_MS) : lifecycle;
+    if (!outcome.refreshing) return lifecycle;
+    // The server already jitters its hint; a slow build's long hint still yields to the lifecycle check.
+    return Math.min(Math.max(REFRESH_POLL_MIN_MS, outcome.hintMs ?? 0), lifecycle);
   };
 
   const schedule = (ms: number) => {

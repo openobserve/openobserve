@@ -97,6 +97,8 @@ describe("PublicLinkForm effective refresh", () => {
     // A floor between minutes rounds up to the next minute.
     expect(effectiveRefreshSecs(60, 86_401 * 288)).toBe(86_460);
     expect(effectiveRefreshSecs(30, 60)).toBe(60);
+    // A raised operator minimum lifts every range.
+    expect(effectiveRefreshSecs(300, 3600, 600)).toBe(600);
   });
 
   it("names only the relative ranges whose floor is above the selection", () => {
@@ -106,6 +108,7 @@ describe("PublicLinkForm effective refresh", () => {
       { range: rel(30 * 86_400), secs: 9000 },
     ]);
     expect(slowerRanges(ranges, 21_600)).toEqual([]);
+    expect(slowerRanges([rel(3600)], 300, 600)).toEqual([{ range: rel(3600), secs: 600 }]);
   });
 });
 

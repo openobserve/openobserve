@@ -104,7 +104,16 @@
         </template>
       </OPageHeader>
 
-      <div v-if="failureNote" class="px-page-edge pt-2">
+      <div v-if="holdNote" class="px-page-edge pt-2">
+        <OBanner
+          variant="warning"
+          icon="warning"
+          dense
+          :content="holdNote"
+          data-test="dashboards-public-dashboard-held"
+        />
+      </div>
+      <div v-else-if="failureNote" class="px-page-edge pt-2">
         <OBanner
           variant="warning"
           icon="warning"
@@ -265,8 +274,11 @@ const bodyKey = ref<string | null>(null);
 const selectedKey = ref<string | null>(null);
 // Server clock minus local clock, from the last response's Date header.
 const clockOffset = ref(0);
-// Local time a 503 cooldown ends, for its countdown.
+// Local time a 429 or a temporary 503 ends, for its countdown; `holdKind` says which one.
 const cooldownUntil = ref<number | null>(null);
+const holdKind = ref<"ratelimited" | "cooldown" | null>(null);
+// The last refresh hint, for a 304 that carries none while the body is still refreshing.
+let lastHintMs: number | null = null;
 // Anonymous viewers have no saved timezone, so dates read in the browser's.
 const viewerTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 // RenderDashboardCharts and TabList read and switch the active tab through this.
@@ -474,11 +486,17 @@ const footerNote = computed<I18nText>(() =>
     : t("dashboard.publicDashboard.footerNote"),
 );
 
+const holdTime = computed(() => raw(countdown((cooldownUntil.value ?? nowMs.value) - nowMs.value)));
 const cooldownMessage = computed<I18nText>(() =>
-  t("dashboard.publicDashboard.cooldown", {
-    time: raw(countdown((cooldownUntil.value ?? nowMs.value) - nowMs.value)),
-  }),
+  t("dashboard.publicDashboard.cooldown", { time: holdTime.value }),
 );
+// The data on screen stays while a 429 or a temporary 503 holds; this says why it isn't updating.
+const holdNote = computed<I18nText | null>(() => {
+  if (state.value !== "ready" || !holdKind.value) return null;
+  return holdKind.value === "ratelimited"
+    ? t("dashboard.publicDashboard.rateLimitedRetry", { time: holdTime.value })
+    : cooldownMessage.value;
+});
 
 const ERROR_MESSAGES: Partial<Record<ViewState, () => I18nText>> = {
   notfound: () => t("dashboard.publicDashboard.notAvailable"),
@@ -560,16 +578,15 @@ const responseOf = (e: unknown) =>
 // Each read takes the next id, so a slower reply for a range switched away from is dropped.
 let dataRequestId = 0;
 
-const bodyOutcome = (b: DataBody, hintMs: number | null): PollOutcome => {
-  const due = [b.fresh_until, b.next_retry_at]
-    .map((at) => toLocalMs(at, clockOffset.value))
-    .filter((at): at is number => at !== null && at > Date.now());
-  return {
-    kind: "body",
-    refreshing: !!b.refreshing,
-    hintMs,
-    dueAtMs: due.length ? Math.min(...due) : null,
-  };
+const bodyOutcome = (b: DataBody, hintMs: number | null): PollOutcome => ({
+  kind: "body",
+  refreshing: !!b.refreshing,
+  hintMs,
+});
+
+const hold = (kind: "ratelimited" | "cooldown", untilMs: number | null, localNow: number) => {
+  holdKind.value = kind;
+  cooldownUntil.value = untilMs === null ? null : localNow + untilMs;
 };
 
 // A failed read keeps what is on screen, except a paused link, which must stop showing it.
@@ -584,12 +601,14 @@ const failedRead = (e: unknown, shown: boolean): PollOutcome => {
     return { kind: "final" };
   }
   if (status === 429) {
+    hold("ratelimited", hint, localNow);
     if (!shown) state.value = "ratelimited";
     return { kind: "wait", retryAfterMs: hint, client: true };
   }
-  if (status === 503 && res?.data?.state === "cooldown") {
-    const until = hint ?? msUntil(res.data.next_retry_at);
-    cooldownUntil.value = until === null ? null : localNow + until;
+  // A paused or blocked link answers 503 without Retry-After; capacity and authorization limits name one.
+  const cooldown = res?.data?.state === "cooldown";
+  if (status === 503 && (cooldown || hint !== null)) {
+    hold("cooldown", hint ?? (cooldown ? msUntil(res?.data?.next_retry_at) : null), localNow);
     if (!shown) state.value = "cooldown";
     return { kind: "wait", retryAfterMs: hint };
   }
@@ -619,7 +638,10 @@ const check = async (): Promise<PollOutcome> => {
     if (requestId !== dataRequestId) return { kind: "error" };
     const localNow = Date.now();
     clockOffset.value = clockOffsetMs(res.headers, localNow);
-    const hint = retryAfterMs(res.headers, clockOffset.value, localNow);
+    const sent = retryAfterMs(res.headers, clockOffset.value, localNow);
+    // A 304 may omit Retry-After; while the body still refreshes, the last hint stands.
+    const hint = sent ?? (res.status === 304 && current?.refreshing ? lastHintMs : null);
+    lastHintMs = hint;
     if (res.status === 202) {
       if (!current) state.value = "building";
       return { kind: "wait", retryAfterMs: hint };
@@ -630,6 +652,7 @@ const check = async (): Promise<PollOutcome> => {
       bodyKey.value = key;
     }
     state.value = "ready";
+    holdKind.value = null;
     const next = body.value as DataBody;
     if (configBehind(next)) {
       configSyncedRev = next.rev;

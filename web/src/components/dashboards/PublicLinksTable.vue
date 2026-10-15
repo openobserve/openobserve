@@ -16,6 +16,7 @@
 <template>
   <div class="flex h-full flex-col" data-test="dashboards-public-links">
     <OTable
+      ref="tableRef"
       class="min-h-0 flex-1"
       :data="visibleLinks"
       :columns="columns"
@@ -341,7 +342,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useMutation, useQuery } from "@tanstack/vue-query";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/vue-query";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -423,11 +424,21 @@ const forbidden = computed(
 );
 const loadFailed = computed(() => !!linksQuery.error.value && !forbidden.value);
 
+// The rows the table shows on its current page, after its own sorting and paging.
+const tableRef = ref<{
+  table?: { getRowModel: () => { rows: Array<{ original: PublicLink }> } };
+} | null>(null);
 // One batch call for the links on the page; "needs attention" exists only when it answers.
-const statusIds = computed(() => links.value.slice(0, STATUS_BATCH_MAX).map((link) => link.id));
+const statusIds = computed(() =>
+  (tableRef.value?.table?.getRowModel().rows ?? [])
+    .slice(0, STATUS_BATCH_MAX)
+    .map((row) => row.original.id),
+);
 const statusQuery = useQuery(() =>
   Object.assign(publicLinksStatusBatchQuery(orgId.value, statusIds.value), {
     enabled: !!orgId.value && statusIds.value.length > 0,
+    // Paging or filtering changes the ids; the tile stays while the next page's answer loads.
+    placeholderData: keepPreviousData,
   }),
 );
 const attentionKnown = computed(() => statusQuery.isSuccess.value);

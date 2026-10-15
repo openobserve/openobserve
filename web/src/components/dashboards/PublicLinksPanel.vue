@@ -681,6 +681,8 @@ import {
   rangeError,
   rangeFromPicker,
   rangeKey,
+  DEFAULT_MIN_REFRESH_SECS,
+  effectiveRefreshSecs,
   slowerRanges,
   sortRanges,
   todayIn,
@@ -943,12 +945,23 @@ const rangeStateColumns: OTableColumnDef[] = [
   },
 ];
 
+// The operator minimum the server applies to every link; older servers don't report it.
+const minRefreshSecs = computed<number>(
+  () => Number(store.state.zoConfig?.public_dashboard_min_refresh_secs) || DEFAULT_MIN_REFRESH_SECS,
+);
+
+// The default range's effective interval is how long the first viewer's result is shared.
 const createdBuildNote = computed<I18nText>(() => {
-  const link = createdLink.value;
-  if (!link || !hasRelativeRange(link)) return t("dashboard.publicLinks.createdBuildNoteOnce");
-  return t("dashboard.publicLinks.createdBuildNote", {
-    interval: refreshLabel(link.refresh_secs, t),
-  });
+  const range = createdLink.value?.time_range.default;
+  if (!createdLink.value || range?.type !== "relative") {
+    return t("dashboard.publicLinks.createdBuildNoteOnce");
+  }
+  const secs = effectiveRefreshSecs(
+    createdLink.value.refresh_secs,
+    range.secs,
+    minRefreshSecs.value,
+  );
+  return t("dashboard.publicLinks.createdBuildNote", { interval: refreshLabel(secs, t) });
 });
 
 const drawerTitle = computed<I18nText>(() =>
@@ -978,13 +991,15 @@ const ranges = form.useStore((s) => s.values.ranges);
 const selectedRefreshSecs = form.useStore((s) => s.values.refreshSecs);
 // Nothing is refused at save; a range whose own floor is slower says what it really gets.
 const refreshFloorHints = computed(() =>
-  slowerRanges(ranges.value, selectedRefreshSecs.value).map(({ range, secs }) => ({
-    key: rangeKey(range),
-    text: t("dashboard.publicLinks.refreshFloorHint", {
-      range: longRange(range, t, timezone.value),
-      interval: raw(durationFormatter(secs)),
+  slowerRanges(ranges.value, selectedRefreshSecs.value, minRefreshSecs.value).map(
+    ({ range, secs }) => ({
+      key: rangeKey(range),
+      text: t("dashboard.publicLinks.refreshFloorHint", {
+        range: longRange(range, t, timezone.value),
+        interval: raw(durationFormatter(secs)),
+      }),
     }),
-  })),
+  ),
 );
 // A duplicate row is still in the list until it's fixed, but is one choice.
 const defaultOptions = computed<RangeOption[]>(() =>

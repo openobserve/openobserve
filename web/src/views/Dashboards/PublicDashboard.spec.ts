@@ -145,7 +145,11 @@ const panelsConfig = (panels: Array<Record<string, unknown>>) => ({
 });
 
 describe("PublicDashboard viewer", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Lifecycle jitter off, so every cadence below is exact.
+    vi.spyOn(Math, "random").mockReturnValue(0);
+  });
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -173,10 +177,12 @@ describe("PublicDashboard viewer", () => {
     expect(has(w, "dashboards-public-dashboard-error")).toBe(false);
   });
 
-  it("polls at the Retry-After hint while refreshing, until refreshing is false", async () => {
+  it.each([
+    ["a 304 that repeats the hint", { etag: '"a"', "retry-after": "5" }],
+    ["a 304 with only its ETag, keeping the last hint", { etag: '"a"' }],
+  ])("polls at the Retry-After hint while refreshing, through %s", async (_name, notModified) => {
     vi.useFakeTimers();
     vi.setSystemTime(1_800_000_020_000);
-    vi.spyOn(Math, "random").mockReturnValue(0);
     (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
     const built = 1_800_000_000_000_000;
     const refreshing = {
@@ -186,7 +192,7 @@ describe("PublicDashboard viewer", () => {
     };
     vi.mocked(service.getData)
       .mockResolvedValueOnce(refreshing as never)
-      .mockResolvedValueOnce({ status: 304, headers: { "retry-after": "5" }, data: "" } as never)
+      .mockResolvedValueOnce({ status: 304, headers: notModified, data: "" } as never)
       .mockResolvedValueOnce({ status: 200, data: { ...okBody("b"), built_at: built } } as never);
     const w = mountWithActions();
     await flushPromises();
@@ -209,7 +215,7 @@ describe("PublicDashboard viewer", () => {
     expect(service.getData).toHaveBeenCalledTimes(3);
   });
 
-  it("aims the next read just after fresh_until when that comes before the lifecycle check", async () => {
+  it("reads only on the lifecycle check, not at fresh_until", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_800_000_020_000);
     (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
@@ -219,10 +225,53 @@ describe("PublicDashboard viewer", () => {
     });
     buildWrapper();
     await flushPromises();
-    await vi.advanceTimersByTimeAsync(10_900);
+    await vi.advanceTimersByTimeAsync(59_999);
     expect(service.getData).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(200);
+    await vi.advanceTimersByTimeAsync(1);
     expect(service.getData).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the data on screen through a 429 and says when it tries again", async () => {
+    vi.useFakeTimers();
+    vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
+    vi.mocked(service.getData)
+      .mockResolvedValueOnce(okSnapshot([[{ y: 1 }]]) as never)
+      .mockRejectedValueOnce({ response: { status: 429, headers: { "retry-after": "60" } } })
+      .mockResolvedValue(okSnapshot([[{ y: 2 }]]) as never);
+    const w = buildWrapper();
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(grid(w).props("injectedPanelData").p1.data).toEqual([[{ y: 1 }]]);
+    const banner = w.findComponent<typeof OBanner>({ name: "OBanner" });
+    expect(banner.props("content")).toBe("Too many requests. Trying again in 1:00.");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(grid(w).props("injectedPanelData").p1.data).toEqual([[{ y: 2 }]]);
+    expect(w.findComponent({ name: "OBanner" }).exists()).toBe(false);
+  });
+
+  it("treats a 503 with Retry-After as a temporary hold, not a turned-off link", async () => {
+    vi.useFakeTimers();
+    vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
+    const capacity = { response: { status: 503, headers: { "retry-after": "60" }, data: "" } };
+    vi.mocked(service.getData)
+      .mockResolvedValueOnce(okSnapshot([[{ y: 1 }]]) as never)
+      .mockRejectedValueOnce(capacity);
+    const shown = buildWrapper();
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(grid(shown).props("injectedPanelData").p1.data).toEqual([[{ y: 1 }]]);
+    expect(shown.findComponent<typeof OBanner>({ name: "OBanner" }).props("content")).toBe(
+      "Can't load this dashboard right now. Trying again in 1:00.",
+    );
+    expect(shown.text()).not.toContain("turned off");
+    shown.unmount();
+
+    vi.mocked(service.getData).mockReset().mockRejectedValueOnce(capacity);
+    const cold = mountWithActions();
+    await flushPromises();
+    expect(find(cold, "dashboards-public-dashboard-cooldown").text()).toBe(
+      "Can't load this dashboard right now. Trying again in 1:00.",
+    );
   });
 
   it("shows Loading dashboard on a 202 and reads again after exactly Retry-After", async () => {
@@ -357,7 +406,6 @@ describe("PublicDashboard viewer", () => {
 
   it("keeps the dashboard on screen through a network error and retries with backoff", async () => {
     vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0);
     vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
     vi.mocked(service.getData).mockResolvedValue({ status: 200, data: okBody("a") } as never);
     const w = buildWrapper();
@@ -393,7 +441,6 @@ describe("PublicDashboard viewer", () => {
   it("shows an absolute range's fixed window without a countdown, checking it each minute", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_800_000_020_000);
-    vi.spyOn(Math, "random").mockReturnValue(0);
     mockAbsoluteLink();
     const w = mountWithActions();
     await flushPromises();
@@ -452,7 +499,6 @@ describe("PublicDashboard viewer", () => {
   it("does not re-read nonstop on a 30-day interval", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_800_000_020_000);
-    vi.spyOn(Math, "random").mockReturnValue(0);
     vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
     vi.mocked(service.getData).mockResolvedValue({
       status: 200,
@@ -469,7 +515,6 @@ describe("PublicDashboard viewer", () => {
 
   it("pauses while hidden and checks at once when the page is visible again", async () => {
     vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0);
     const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(false);
     vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
     vi.mocked(service.getData).mockResolvedValue({ status: 200, data: okBody("a") } as never);
@@ -490,7 +535,6 @@ describe("PublicDashboard viewer", () => {
 
   it("keeps the body on a 304 and refetches the layout when the body is built from a newer link", async () => {
     vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0);
     vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
     vi.mocked(service.getData)
       .mockResolvedValueOnce(okSnapshot([[{ y: 1 }]]) as never)
@@ -512,7 +556,6 @@ describe("PublicDashboard viewer", () => {
 
   it("refetches the layout once for a body that is stale because the dashboard changed", async () => {
     vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0);
     vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
     vi.mocked(service.getData).mockResolvedValue({
       status: 200,
@@ -619,7 +662,6 @@ describe("PublicDashboard viewer", () => {
 
   it("moves to the default range when the one on screen was removed and now answers 404", async () => {
     vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0);
     vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
     vi.mocked(service.getData).mockResolvedValue(okSnapshot([]) as never);
     const w = mountWithPicker();
