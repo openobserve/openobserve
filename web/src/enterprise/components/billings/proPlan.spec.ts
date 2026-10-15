@@ -18,6 +18,9 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import proPlan from "@/enterprise/components/billings/proPlan.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const mockProFeatures = [
   {
@@ -372,6 +375,26 @@ describe("proPlan.vue", () => {
 
     it("should expose onSubscribe as a function", () => {
       expect(typeof wrapper.vm.onSubscribe).toBe("function");
+    });
+  });
+
+  describe("billing instrumentation guard", () => {
+    it("renders the subscribe id once and fires billing_subscribe_clicked once with the plan", async () => {
+      expect(wrapper.findAll('[data-test="billing-plans-pro-subscribe-btn"]')).toHaveLength(1);
+      await wrapper.find('[data-test="billing-plans-pro-subscribe-btn"]').trigger("click");
+      expect(vi.mocked(analytics.track).mock.calls).toEqual([
+        ["billing_subscribe_clicked", { plan: "pay-as-you-go" }],
+      ]);
+    });
+
+    it("renders the manage id once and fires billing_manage_subscription_clicked once with the plan", async () => {
+      wrapper.unmount();
+      wrapper = createWrapper({ planType: "pay-as-you-go" });
+      expect(wrapper.findAll('[data-test="billing-plans-pro-cancel-btn"]')).toHaveLength(1);
+      await wrapper.find('[data-test="billing-plans-pro-cancel-btn"]').trigger("click");
+      expect(vi.mocked(analytics.track).mock.calls).toEqual([
+        ["billing_manage_subscription_clicked", { plan: "pay-as-you-go" }],
+      ]);
     });
   });
 });

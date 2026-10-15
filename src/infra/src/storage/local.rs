@@ -159,7 +159,12 @@ impl ObjectStore for Local {
             .get_opts(&(format_key(&file, self.with_prefix).into()), options)
             .await
             .map_err(|e| {
-                log::error!("[STORAGE] get_opts local file: {file}, error: {e:?}");
+                // NotFound is a normal probe outcome (optional blobs, head checks), not a fault.
+                if matches!(e, object_store::Error::NotFound { .. }) {
+                    log::debug!("[STORAGE] get_opts local file: {file}, error: {e:?}");
+                } else {
+                    log::error!("[STORAGE] get_opts local file: {file}, error: {e:?}");
+                }
                 e
             })?;
 
@@ -215,13 +220,15 @@ impl ObjectStore for Local {
                 super::read_ranges_from_file(&handle, ranges)
             })
             .map_err(|error| {
-                log::error!("[STORAGE] get_ranges local file: {file}, error: {error:?}");
                 if error.kind() == std::io::ErrorKind::NotFound {
+                    // NotFound is a normal probe outcome, as in get_opts, not a fault.
+                    log::debug!("[STORAGE] get_ranges local file: {file}, error: {error:?}");
                     Error::NotFound {
                         path: file.clone(),
                         source: Box::new(error),
                     }
                 } else {
+                    log::error!("[STORAGE] get_ranges local file: {file}, error: {error:?}");
                     Error::Generic {
                         store: "LocalFileSystem",
                         source: Box::new(error),

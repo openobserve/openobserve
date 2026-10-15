@@ -29,6 +29,18 @@ vi.mock("@/composables/shared/router", () => ({
         component: { template: "<div>Login</div>" },
         meta: { titleKey: "login.login" },
       },
+      {
+        // Mirrors the /signup record in composables/shared/router.ts.
+        path: "/signup",
+        redirect: (to: any) => ({ path: "/login", query: { ...to.query, mode: "signup" } }),
+      },
+      {
+        // Mirrors the public shared-chat record: readable without signing in.
+        path: "/ai/public/:token",
+        name: "publicSharedChat",
+        component: { template: "<div>Public chat</div>" },
+        meta: { public: true },
+      },
     ],
     homeChildRoutes: [
       {
@@ -73,10 +85,8 @@ vi.mock("@/utils/zincutils", () => ({
   mergeRoutes: vi.fn((r1: any[], r2: any[]) => [...(r1 || []), ...(r2 || [])]),
 }));
 
-vi.mock("@/services/segment_analytics", () => ({
-  default: {
-    track: vi.fn(),
-  },
+vi.mock("@openobserve/browser-rum", () => ({
+  openobserveRum: { setViewName: vi.fn() },
 }));
 
 vi.mock("@/aws-exports", () => ({
@@ -95,7 +105,7 @@ vi.mock("@/layouts/MainLayout.vue", () => ({
 // ---------------------------------------------------------------------------
 import createAppRouter from "@/router/index";
 import { getDecodedUserInfo } from "@/utils/zincutils";
-import segment from "@/services/segment_analytics";
+import { openobserveRum } from "@openobserve/browser-rum";
 
 // ---------------------------------------------------------------------------
 // Helper: build a minimal Vuex store for tests
@@ -192,6 +202,18 @@ describe("router/index (factory)", () => {
       expect(guards).toBeDefined();
     });
 
+    it("lands /signup on /login with mode=signup and the original query intact", async () => {
+      await router.push("/signup?utm_source=blog").catch(() => {});
+      expect(router.currentRoute.value.path).toBe("/login");
+      expect(router.currentRoute.value.query).toEqual({ utm_source: "blog", mode: "signup" });
+    });
+
+    it("lets a public route through without a session", async () => {
+      await router.push("/ai/public/tok123").catch(() => {});
+      expect(router.currentRoute.value.name).toBe("publicSharedChat");
+      expect(router.currentRoute.value.params.token).toBe("tok123");
+    });
+
     it("should redirect to /login when navigating to a protected route without a session", async () => {
       // Simulate unauthenticated access to /logs; the guard should redirect to /login
       await router.push("/logs").catch(() => {});
@@ -245,12 +267,17 @@ describe("router/index (factory)", () => {
       router = createAppRouter(store);
     });
 
-    it("should call segment.track when user is authenticated", async () => {
-      const trackSpy = vi.mocked(segment.track);
-      await router.push("/logs").catch(() => {});
-      // After navigation, segment.track should eventually be called
-      // (may not be called synchronously in jsdom due to async guard resolution)
-      expect(trackSpy).toBeDefined();
+    it("sets the RUM view name to the route name after navigation", async () => {
+      vi.mocked(openobserveRum.setViewName).mockClear();
+      await router.push("/logs");
+      expect(openobserveRum.setViewName).toHaveBeenCalledWith("logs");
+    });
+
+    it("does not set the RUM view name when the navigation is aborted", async () => {
+      router.beforeEach(() => false);
+      vi.mocked(openobserveRum.setViewName).mockClear();
+      await router.push("/logs");
+      expect(openobserveRum.setViewName).not.toHaveBeenCalled();
     });
   });
 

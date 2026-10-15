@@ -13,16 +13,34 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const {
-    PREFIX, req, listRoles, createRole, setRolePerms, getPerms, sweepRoles, uniq, org, rbacEnabled,
+    ns, req, listRoles, createRole, setRolePerms, getPerms, makeTracker, uniq, org, rbacEnabled,
 } = require('./iam-fixtures.js');
+
+// This file's own namespace. Every artifact it creates lives under it, and its
+// sweeps delete only it: the eleven IAM specs run in parallel and, through a
+// shared `ui_auto` prefix, used to delete each other's fixtures mid-test.
+const NS = ns('stg');
+
+// What this spec made, so teardown deletes exactly that — never a prefix sweep,
+// which is what had the IAM specs deleting each other's fixtures mid-test.
+const made = makeTracker();
 
 const obj = (resource) => `${resource}:_all_${org()}`;
 
-test.describe('IAM · Edit Role · staged changes', () => {
+test.describe('IAM · Edit Role · staged changes', { tag: '@enterprise' }, () => {
+    // Serial, NOT parallel. every test in this file creates roles under one namespace and afterAll sweeps that
+    // namespace, and beforeAll/afterAll run once PER WORKER — not per file. Under
+    // `fullyParallel: true` this file's tests spread across workers, so each worker runs
+    // its own sweep and they delete each other's roles mid-test: measured as
+    // "teardown left roles behind: <this file's own prefix>". Serial pins the file to one
+    // worker, so there is exactly one setup and one teardown.
+    test.describe.configure({ mode: 'serial' });
+
     let pm;
 
     const openFresh = async (page, tag, seed = []) => {
-        const name = `${PREFIX}_st_${tag}_${uniq()}`;
+        const name = `${NS}_st_${tag}_${uniq()}`;
+        made.role(name);
         await createRole(page, name);
         if (seed.length) await setRolePerms(page, name, seed);
         await pm.rolesPage.gotoRoles();
@@ -33,16 +51,16 @@ test.describe('IAM · Edit Role · staged changes', () => {
 
     test.beforeAll(async ({ browser }) => {
         const page = await browser.newPage();
-        try { await sweepRoles(page); } finally { await page.close(); }
+        try { /* nothing to sweep: teardown deletes exactly what each test made */ } finally { await page.close(); }
     });
 
     test.afterAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            const removed = await sweepRoles(page);
+            const removed = (await made.cleanup(page)).roles;
             testLogger.info(`teardown removed ${removed.length} roles`);
-            const left = (await listRoles(page)).filter((r) => r.startsWith(PREFIX));
-            if (left.length) throw new Error(`teardown left roles behind: ${left}`);
+            const left = await made.survivors(page);
+            if (left.length) throw new Error(`teardown left its own artifacts behind: ${left}`);
         } finally { await page.close(); }
     });
 
@@ -55,7 +73,9 @@ test.describe('IAM · Edit Role · staged changes', () => {
         await pm.rolesPage.rolesTab.waitFor({ state: 'visible', timeout: 30000 });
     });
 
-    test('S-01 · ticking a grant marks the module unsaved and counts the change', async ({ page }) => {
+    test('S-01 · ticking a grant marks the module unsaved and counts the change', {
+        tag: ['@iam', '@iamRolesStaging', '@P1', '@all']
+    }, async ({ page }) => {
         await openFresh(page, 'mark');
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowList');
@@ -65,7 +85,9 @@ test.describe('IAM · Edit Role · staged changes', () => {
         await expect(pm.rolesPage.unsavedCount).toContainText('1');
     });
 
-    test('S-02 · unticking a saved grant marks it as a pending removal', async ({ page }) => {
+    test('S-02 · unticking a saved grant marks it as a pending removal', {
+        tag: ['@iam', '@iamRolesStaging', '@P1', '@all']
+    }, async ({ page }) => {
         await openFresh(page, 'rm', [{ object: obj('function'), permission: 'AllowList' }]);
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.revokeScope('function', 'AllowList');
@@ -74,7 +96,9 @@ test.describe('IAM · Edit Role · staged changes', () => {
         await expect(pm.rolesPage.unsavedCount).toContainText('1');
     });
 
-    test('S-03 · the drawer lists every staged change across modules', async ({ page }) => {
+    test('S-03 · the drawer lists every staged change across modules', {
+        tag: ['@iam', '@iamRolesStaging', '@P1', '@all']
+    }, async ({ page }) => {
         await openFresh(page, 'drawer');
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowList');
@@ -87,7 +111,9 @@ test.describe('IAM · Edit Role · staged changes', () => {
         await expect(pm.rolesPage.drawerUndoButtons()).toHaveCount(2);
     });
 
-    test('S-04 · undoing one change reverts exactly that one', async ({ page }) => {
+    test('S-04 · undoing one change reverts exactly that one', {
+        tag: ['@iam', '@iamRolesStaging', '@P1', '@all']
+    }, async ({ page }) => {
         await openFresh(page, 'undo1');
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowList');
@@ -103,7 +129,9 @@ test.describe('IAM · Edit Role · staged changes', () => {
     });
 
     // The drawer closes once nothing is left to review (useRoleSummary), so there is no empty state to wait for.
-    test('S-05 · undoing every change closes the drawer and drops Review Changes', async ({ page }) => {
+    test('S-05 · undoing every change closes the drawer and drops Review Changes', {
+        tag: ['@iam', '@iamRolesStaging', '@P1', '@all']
+    }, async ({ page }) => {
         const name = await openFresh(page, 'undoall');
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowList');
@@ -123,7 +151,9 @@ test.describe('IAM · Edit Role · staged changes', () => {
         expect(await getPerms(page, name)).toEqual([]);
     });
 
-    test('S-06 · Cancel discards staged changes', async ({ page }) => {
+    test('S-06 · Cancel discards staged changes', {
+        tag: ['@iam', '@iamRolesStaging', '@P1', '@all']
+    }, async ({ page }) => {
         const name = await openFresh(page, 'cancel');
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowList');
@@ -138,7 +168,9 @@ test.describe('IAM · Edit Role · staged changes', () => {
         expect(await getPerms(page, name)).toEqual([]);
     });
 
-    test('S-07 · staged changes survive switching modules', async ({ page }) => {
+    test('S-07 · staged changes survive switching modules', {
+        tag: ['@iam', '@iamRolesStaging', '@P1', '@all']
+    }, async ({ page }) => {
         await openFresh(page, 'switch');
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowList');
@@ -152,7 +184,9 @@ test.describe('IAM · Edit Role · staged changes', () => {
         expect(await pm.rolesPage.isChecked(pm.rolesPage.scopeCheckbox('function', 'AllowList'))).toBe(true);
     });
 
-    test('S-08 · saving clears the staged state and stores the grant', async ({ page }) => {
+    test('S-08 · saving clears the staged state and stores the grant', {
+        tag: ['@iam', '@iamRolesStaging', '@P0', '@all']
+    }, async ({ page }) => {
         const name = await openFresh(page, 'save');
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowList');
@@ -164,7 +198,9 @@ test.describe('IAM · Edit Role · staged changes', () => {
         await expect(pm.rolesPage.paneAdded).toHaveCount(0);
     });
 
-    test('S-09 · a saved role reloads with the same grants', async ({ page }) => {
+    test('S-09 · a saved role reloads with the same grants', {
+        tag: ['@iam', '@iamRolesStaging', '@P0', '@all']
+    }, async ({ page }) => {
         const name = await openFresh(page, 'reload');
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowAll');
@@ -177,7 +213,9 @@ test.describe('IAM · Edit Role · staged changes', () => {
         expect(await pm.rolesPage.isChecked(pm.rolesPage.scopeCheckbox('function', 'AllowAll'))).toBe(true);
     });
 
-    test('S-10 · a mixed add-and-remove batch sends both lists correctly', async ({ page }) => {
+    test('S-10 · a mixed add-and-remove batch sends both lists correctly', {
+        tag: ['@iam', '@iamRolesStaging', '@P0', '@all']
+    }, async ({ page }) => {
         const name = await openFresh(page, 'mixed', [
             { object: obj('function'), permission: 'AllowList' },
         ]);
@@ -195,7 +233,9 @@ test.describe('IAM · Edit Role · staged changes', () => {
             .toEqual([{ object: obj('function'), permission: 'AllowGet' }]);
     });
 
-    test('S-11 · a failed save surfaces an error AND keeps the staged work', async ({ page }) => {
+    test('S-11 · a failed save surfaces an error AND keeps the staged work', {
+        tag: ['@iam', '@iamRolesStaging', '@P0', '@all']
+    }, async ({ page }) => {
         await openFresh(page, 'fail');
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowList');
@@ -218,7 +258,9 @@ test.describe('IAM · Edit Role · staged changes', () => {
     });
 
     // A clean role has nothing to review, so the affordance is not offered at all.
-    test('S-12 · a clean role offers no Review Changes', async ({ page }) => {
+    test('S-12 · a clean role offers no Review Changes', {
+        tag: ['@iam', '@iamRolesStaging', '@P2', '@all']
+    }, async ({ page }) => {
         await openFresh(page, 'clean');
         await expect(pm.rolesPage.reviewChangesButton).toBeHidden();
     });

@@ -48,20 +48,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="session-detail-user-id"
         >
           <OIcon name="person" size="xs" class="text-text-secondary flex-shrink-0" />
-          <span class="max-w-64 truncate text-sm">{{ detail.userId }}</span>
+          <OTruncatedText class="max-w-64 text-sm">{{ detail.userId }}</OTruncatedText>
         </span>
       </template>
 
       <template #actions>
-        <TraceAnnotateMenu
-          v-if="canAnnotate"
-          ref-type="session"
-          :ref-id="sessionId"
-          :ref-trace-start-time="sessionEvaluationRange.startTime"
-          :source-stream="streamName"
-          compact
-          data-test="session-detail-annotate-btn"
-        />
+        <template v-if="canAnnotateContext">
+          <TraceAnnotateMenu
+            v-if="queuesAccess.allowed"
+            ref-type="session"
+            :ref-id="sessionId"
+            :ref-trace-start-time="sessionEvaluationRange.startTime"
+            :source-stream="streamName"
+            compact
+            data-test="session-detail-annotate-btn"
+          />
+          <!-- TraceAnnotateMenu has no disabled affordance of its own, so a
+               locked edition gets a stand-in button that opens the upgrade
+               dialog instead. -->
+          <OButton
+            v-else
+            variant="outline"
+            size="sm"
+            data-test="session-detail-annotate-btn"
+            @click="openUpgradeDialog"
+          >
+            {{ t("aiObservability.traceActions.annotate.button") }}
+            <template #icon-right
+              ><OIcon name="lock" size="sm" class="text-warning-600"
+            /></template>
+          </OButton>
+        </template>
         <OButton
           v-if="canManualEvaluate"
           variant="outline"
@@ -228,11 +245,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                room to render crisply and anchors each metric without crowding
                the label/value text. -->
                 <div class="flex items-center justify-between gap-2">
-                  <div
-                    class="text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold"
+                  <OTruncatedText
+                    as="div"
+                    class="text-2xs text-text-secondary leading-normal font-semibold"
                   >
                     {{ card.label }}
-                  </div>
+                  </OTruncatedText>
                   <span
                     class="rounded-default bg-surface-subtle text-text-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center"
                   >
@@ -460,17 +478,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ originalTurnIndex(trace.traceId) + 1 }}
                         </span>
                         <div class="flex min-w-0 flex-col gap-[0.15rem]">
-                          <div class="text-compact text-text-heading truncate font-semibold">
+                          <OTruncatedText
+                            as="div"
+                            :tooltip="false"
+                            class="text-compact text-text-heading font-semibold"
+                          >
                             {{ trace.turnUserMessage || "—" }}
-                          </div>
-                          <div
-                            class="truncate text-xs"
+                          </OTruncatedText>
+                          <OTruncatedText
+                            as="div"
+                            :tooltip="false"
+                            class="text-xs"
                             :class="
                               trace.status === 'error' ? 'text-error-500' : 'text-text-secondary'
                             "
                           >
                             {{ secondaryLine(trace) }}
-                          </div>
+                          </OTruncatedText>
                         </div>
                         <div class="flex min-w-0 flex-col gap-[0.2rem]">
                           <span
@@ -734,10 +758,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ i + 1 }}
                       </span>
-                      <span
-                        class="text-text-heading min-w-0 flex-1 truncate text-xs font-semibold"
-                        :title="row.name"
-                      >
+                      <span class="text-text-heading min-w-0 flex-1 truncate text-xs font-semibold">
                         {{ row.name }}
                       </span>
                       <span
@@ -927,6 +948,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -938,6 +960,8 @@ import SessionRibbon from "./SessionRibbon.vue";
 import ThreadView from "./ThreadView.vue";
 import ThreadToolCalls from "./ThreadToolCalls.vue";
 import config from "@/aws-exports";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 
 import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
 import { renderMarkdown } from "./markdown";
@@ -1016,13 +1040,14 @@ const canManualEvaluate = computed(() => {
 });
 const manualEvaluationOpen = ref(false);
 
-// Same enterprise gate as manual evaluation minus the online-eval flag —
-// queuing a session for human review does not require the eval engine.
-const canAnnotate = computed(() => {
+// Same non-edition conditions as manual evaluation minus the online-eval
+// flag — queuing a session for human review does not require the eval
+// engine. Drives the Annotate button's VISIBILITY so a locked edition still
+// shows it, just disabled.
+const canAnnotateContext = computed(() => {
   const range = sessionEvaluationRange.value;
   return (
     hasLlmSessionData.value &&
-    (config.isEnterprise === "true" || config.isCloud === "true") &&
     Boolean(orgIdentifier.value) &&
     Boolean(streamName.value) &&
     Boolean(sessionId.value) &&
@@ -1030,6 +1055,10 @@ const canAnnotate = computed(() => {
     range.startTime > 0
   );
 });
+// Annotating a session is the same capability as queuing it into AI
+// Observability's review Queues, so it shares that gate.
+const queuesAccess = useLockedAffordance("queues");
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
 // Per-turn rollups used by the KPI sub-lines. All values are measured from the
 // real trace rows returned by the session-detail API.

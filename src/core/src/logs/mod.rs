@@ -274,33 +274,38 @@ async fn write_logs_by_stream(
             continue; // skip
         }
 
-        // for cloud, we want to sent event when user creates a new stream
-        #[cfg(feature = "cloud")]
-        if get_stream(org_id, &stream_name, StreamType::Logs)
-            .await
-            .is_none()
+        if crate::ingestion::checks_for_new_stream(org_id)
+            && !infra::schema::exists(org_id, StreamType::Logs, &stream_name).await
         {
-            let org = match super::organization::get_org(org_id).await {
-                None => {
-                    return Err(Error::Message(format!(
-                        "org with id {org_id} not found in db"
-                    )));
-                }
-                Some(org) => org,
-            };
+            // for cloud, we want to sent event when user creates a new stream
+            #[cfg(feature = "cloud")]
+            if get_stream(org_id, &stream_name, StreamType::Logs)
+                .await
+                .is_none()
+            {
+                let org = match super::organization::get_org(org_id).await {
+                    None => {
+                        return Err(Error::Message(format!(
+                            "org with id {org_id} not found in db"
+                        )));
+                    }
+                    Some(org) => org,
+                };
 
-            super::self_reporting::cloud_events::enqueue_cloud_event(
-                super::self_reporting::cloud_events::CloudEvent {
-                    org_id: org.identifier.clone(),
-                    org_name: org.name.clone(),
-                    org_type: org.org_type.clone(),
-                    user: Some(user_email.to_string()),
-                    event: super::self_reporting::cloud_events::EventType::StreamCreated,
-                    subscription_type: None,
-                    stream_name: Some(stream_name.clone()),
-                },
-            )
-            .await;
+                super::self_reporting::cloud_events::enqueue_cloud_event(
+                    super::self_reporting::cloud_events::CloudEvent {
+                        org_id: org.identifier.clone(),
+                        org_name: org.name.clone(),
+                        org_type: org.org_type.clone(),
+                        user: Some(user_email.to_string()),
+                        event: super::self_reporting::cloud_events::EventType::StreamCreated,
+                        subscription_type: None,
+                        stream_name: Some(stream_name.clone()),
+                    },
+                )
+                .await;
+            }
+            super::onboarding::on_user_stream_created(org_id, StreamType::Logs, &stream_name);
         }
 
         // write json data by stream
@@ -415,15 +420,19 @@ async fn write_logs(
 
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    crate::ingestion::get_stream_alerts(
-        &[StreamParams {
-            org_id: org_id.to_owned().into(),
-            stream_name: stream_name.to_owned().into(),
-            stream_type: StreamType::Logs,
-        }],
-        &mut stream_alerts_map,
-    )
-    .await;
+    // Chat history never reaches a realtime alert, even one stored before alerts there were
+    // refused.
+    if !config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(stream_name) {
+        crate::ingestion::get_stream_alerts(
+            &[StreamParams {
+                org_id: org_id.to_owned().into(),
+                stream_name: stream_name.to_owned().into(),
+                stream_type: StreamType::Logs,
+            }],
+            &mut stream_alerts_map,
+        )
+        .await;
+    }
     let cur_stream_alerts =
         stream_alerts_map.get(&format!("{}/{}/{}", org_id, StreamType::Logs, stream_name));
     let mut triggers: TriggerAlertData =

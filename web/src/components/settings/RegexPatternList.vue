@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
           <OTable
+            ref="oTableRef"
             :frame="false"
             data-test="regex-pattern-list-table"
             :data="visibleRows"
@@ -50,8 +51,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selected-ids="selectedPatternIds"
             selection="multiple"
             pagination="client"
-            :page-size="20"
+            :page-size="pageSize"
             :page-size-options="[10, 20, 50, 100]"
+            :current-page="currentPage"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            @update:page-size="pageSize = $event"
+            @update:current-page="currentPage = $event"
+            @update:sort-by="sortBy = $event"
+            @update:sort-order="sortOrder = $event"
             sorting="client"
             filter-mode="client"
             :default-columns="false"
@@ -178,23 +186,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdown>
               </div>
             </template>
-            <template #bottom>
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-normal max-md:hidden">
-                  {{ t("regex_patterns.bottom_header", { count: resultTotal }) }}
-                </span>
-                <OButton
-                  v-if="selectedPatterns.length > 0"
-                  data-test="regex-pattern-list-delete-patterns-btn"
-                  variant="outline-destructive"
-                  size="sm-action"
-                  icon-left="delete"
-                  :loading="bulkDeleteLoading"
-                  @click="openBulkDeleteDialog"
-                >
-                  {{ t("settings.regexPatternList.delete") }}
-                </OButton>
-              </div>
+            <template #selection-actions>
+              <OButton
+                data-test="regex-pattern-list-delete-patterns-btn"
+                variant="outline-destructive"
+                size="sm"
+                icon-left="delete"
+                :loading="bulkDeleteLoading"
+                @click="openBulkDeleteDialog"
+              >
+                {{ t("settings.regexPatternList.delete") }}
+              </OButton>
             </template>
           </OTable>
         </div>
@@ -264,6 +266,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { useListViewState } from "@/composables/useListViewState";
 
 export default defineComponent({
   name: "RegexPatternList",
@@ -283,7 +286,29 @@ export default defineComponent({
     OTimeCell,
   },
   setup() {
-    const filterQuery = ref("");
+    const viewState = useListViewState("regex-patterns", {
+      filterQuery: "",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
+    const pageSize = ref(viewState.pageSize);
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref(viewState.sortOrder);
+    const oTableRef = ref<any>(null);
+
+    watch([filterQuery, pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
@@ -363,9 +388,16 @@ export default defineComponent({
     const confirmBulkDelete = ref(false);
     const bulkDeleteLoading = ref(false);
 
-    const resultTotal = ref(0);
-
     const listLoading = regexPatternsList.isPending;
+    // setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
+    watch(
+      listLoading,
+      (v) => {
+        if (v) return;
+        setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+      },
+      { once: true, immediate: true },
+    );
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = regexPatternsList.error.value;
@@ -413,7 +445,6 @@ export default defineComponent({
           filtered.push(rows[i]);
         }
       }
-      resultTotal.value = filtered.length;
       return filtered;
     };
 
@@ -433,7 +464,6 @@ export default defineComponent({
       regexPatterns,
       (rows: any[]) => {
         store.dispatch("setRegexPatterns", rows);
-        resultTotal.value = rows.length;
       },
       { immediate: true },
     );
@@ -628,10 +658,14 @@ export default defineComponent({
       store,
       router,
       filterQuery,
+      pageSize,
+      currentPage,
+      sortBy,
+      sortOrder,
+      oTableRef,
       columns,
       regexPatterns,
       filterData,
-      resultTotal,
       createRegexPattern,
       listLoading,
       fetching,

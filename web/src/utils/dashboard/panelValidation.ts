@@ -1,37 +1,7 @@
 import type { TranslateFn } from "@/types/i18n";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
-import { parseRegexPattern } from "@/utils/dashboard/tableConfigUtils";
-
-// will find first valid mapped value based on given fieldToCheck
-export const findFirstValidMappedValue = (value: any, mappings: any[], fieldToCheck: string) => {
-  return mappings?.find((v: any) => {
-    let isMatch = false;
-
-    // Check based on type
-    if (v?.type == "value") {
-      isMatch = v?.value == value;
-    } else if (v?.type == "range") {
-      if (v?.from && v?.to && !Number.isNaN(+v?.from) && !Number.isNaN(+v?.to)) {
-        isMatch = +v?.from <= +value && +v?.to >= +value;
-      }
-    } else if (v?.type == "regex") {
-      try {
-        const { pattern, flags } = parseRegexPattern(v?.pattern ?? "");
-        isMatch = new RegExp(pattern, flags).test(value);
-      } catch {
-        // invalid regex pattern, skip
-      }
-    }
-
-    // If a match is found, check if the required field (color or text) is valid
-    if (isMatch && v[fieldToCheck] != null && v[fieldToCheck] !== "") {
-      return true;
-    }
-
-    return false;
-  });
-};
+import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
 
 /**
  * Validates a single condition item
@@ -150,7 +120,7 @@ const validateHistogramIntervalArgument = (
  * @param conditions the conditions array
  * @param errors the array to push the errors to
  */
-function validateConditions(t: TranslateFn, conditions: any, errors: any) {
+export function validateConditions(t: TranslateFn, conditions: any, errors: any) {
   conditions.forEach((it: any) => {
     if (it.filterType === "condition") {
       validateConditionItem(t, it, errors);
@@ -681,7 +651,7 @@ const validateQueriesNotEmpty = (
   customMessage?: string,
 ) => {
   queries.forEach((q: any, index: number) => {
-    if (q && q?.query === "") {
+    if (q && (isFormulaQuery(q) ? q.config.formula : q?.query) === "") {
       errors.push(customMessage || t("dashboard.utils.queryIsEmpty", { index: index + 1 }));
     }
   });
@@ -788,7 +758,7 @@ const validateJoinField = (t: TranslateFn, join: any, errors: string[], joinInde
   });
 };
 
-const validateJoinFields = (t: TranslateFn, joins: any, errors: string[]) => {
+export const validateJoinFields = (t: TranslateFn, joins: any, errors: string[]) => {
   // validate join fields
   if (joins) {
     joins.forEach((join: any, index: number) => validateJoinField(t, join, errors, index));

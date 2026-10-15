@@ -60,6 +60,7 @@
         'o-splitter__after',
         'relative z-0 flex-1 shrink-0 overflow-hidden',
         horizontal ? 'w-full' : 'h-full',
+        afterClass,
       ]"
     >
       <slot name="after" />
@@ -81,6 +82,7 @@ const props = withDefaults(defineProps<OSplitterProps>(), {
   separatorClass: "",
   separatorStyle: () => ({}),
   beforeClass: "",
+  afterClass: "",
 });
 
 const emit = defineEmits<OSplitterEmits>();

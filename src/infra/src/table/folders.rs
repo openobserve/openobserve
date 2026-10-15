@@ -46,6 +46,21 @@ pub(crate) fn folder_type_into_i16(folder_type: FolderType) -> i16 {
         FolderType::Synthetics => 3,
         FolderType::Workflows => 4,
         FolderType::Prompts => 5,
+        FolderType::Downtimes => 6,
+    }
+}
+
+/// The inverse of [folder_type_into_i16].
+pub fn folder_type_from_i16(value: i16) -> Option<FolderType> {
+    match value {
+        0 => Some(FolderType::Dashboards),
+        1 => Some(FolderType::Alerts),
+        2 => Some(FolderType::Reports),
+        3 => Some(FolderType::Synthetics),
+        4 => Some(FolderType::Workflows),
+        5 => Some(FolderType::Prompts),
+        6 => Some(FolderType::Downtimes),
+        _ => None,
     }
 }
 
@@ -157,7 +172,16 @@ pub async fn get_or_create(
     folder: Folder,
     folder_type: FolderType,
 ) -> Result<(Ksuid, Folder, bool), errors::Error> {
-    let client = get_orm_client_rw().await;
+    get_or_create_with(get_orm_client_rw().await, org_id, folder, folder_type).await
+}
+
+/// [`get_or_create`] on a given connection.
+pub async fn get_or_create_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    folder: Folder,
+    folder_type: FolderType,
+) -> Result<(Ksuid, Folder, bool), errors::Error> {
     let folder_id = folder.folder_id.clone();
 
     if let Some(model) = get_model(client, org_id, &folder_id, folder_type).await? {
@@ -362,6 +386,25 @@ mod tests {
         assert_eq!(folder_type_into_i16(FolderType::Dashboards), 0);
         assert_eq!(folder_type_into_i16(FolderType::Alerts), 1);
         assert_eq!(folder_type_into_i16(FolderType::Reports), 2);
+        assert_eq!(folder_type_into_i16(FolderType::Prompts), 5);
+        assert_eq!(folder_type_into_i16(FolderType::Downtimes), 6);
+    }
+
+    #[test]
+    fn every_folder_type_round_trips_through_its_stored_number() {
+        for folder_type in [
+            FolderType::Dashboards,
+            FolderType::Alerts,
+            FolderType::Reports,
+            FolderType::Synthetics,
+            FolderType::Workflows,
+            FolderType::Prompts,
+            FolderType::Downtimes,
+        ] {
+            let n = folder_type_into_i16(folder_type);
+            assert_eq!(folder_type_from_i16(n), Some(folder_type));
+        }
+        assert_eq!(folder_type_from_i16(7), None);
     }
 
     #[test]

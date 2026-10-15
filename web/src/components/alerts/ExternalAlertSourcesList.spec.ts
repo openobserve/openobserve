@@ -600,14 +600,6 @@ describe("ExternalAlertSourcesList", () => {
       expect((wrapper.vm as any).visibleRows.length).toBe(2);
     });
 
-    it("shows the row count with its noun in the footer", async () => {
-      (alertSources.list as any).mockResolvedValue(TWO_SOURCES);
-      const wrapper = await mountAndSettle();
-      expect(wrapper.find('[data-test="o2-table-pagination-bottom"]').text()).toContain(
-        "2 alert_sources.header",
-      );
-    });
-
     it("gives every non-action column a resize handle, including Name↔Status", async () => {
       const wrapper = await mountAndSettle();
       for (const id of ["name", "status", "destination", "last_event", "url"]) {

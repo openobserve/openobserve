@@ -40,7 +40,9 @@ All token-backed and dark-mode-safe. Reuse these before inventing anything.
   tiles at the top of a list/dashboard. Data-driven via `:items`
   (`{ key, label, value, icon, tone, max?, trend?, selectable?, dataTest }`);
   `tone` (`success | warning | error | primary | info | orange | neutral`) is the
-  single colour knob. `max` draws a proportion bar (share of total). The tone icon
+  single colour knob. Pass `:loading` so values hold a skeleton until the first
+  load lands instead of reading "0" (copy-and-values.md § Loading is not zero).
+  `max` draws a proportion bar (share of total). The tone icon
   sits in a **rounded-square chip** (`rounded-default`) — every icon chip in the
   app is a rounded square, never a circle (`rounded-full`). Set `selectable` +
   `:selected-key` + `@select` to make tiles **double as filters**. Compose
@@ -186,8 +188,8 @@ Colour only earns attention if most of the screen stays quiet:
     tile is a label with a number stuck to it;
   - _almost always zero_ — "New this week" on a list that gains an item a quarter;
   - _derivable from its neighbours_ — "In use" beside "Unused" and "Total";
-  - _already in the footer_ — `footerTitle` renders "N Dashboards" under every
-    table, so a Total tile alone is not a reason to have a strip.
+  - _already in the footer_ — the pager prints "x – y of N" under every table,
+    so a Total tile alone is not a reason to have a strip.
     A page whose only candidates fail these gets **no strip** — keep the per-row
     signals (relative recency, a state rail, a count column) and stop. Dashboards,
     Service Accounts and Roles all ended up here: pages where a strip added pixels

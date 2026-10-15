@@ -471,8 +471,10 @@ export function resolveTokens(cssSources: string[]): {
       // Variant blocks ([data-variant=...]) are opt-in states, not the theme baseline —
       // skip them BEFORE the dark test, or `.dark [data-variant]` overwrites the real
       // unscoped dark values (it sorts later in the sheet).
-      if (prelude.includes("[data-")) continue;
-      const darkBlock = prelude.includes(".dark");
+      // A list like `:root, [data-x]` still declares the baseline through its unscoped member.
+      const baseline = prelude.split(",").filter((selector) => !selector.includes("[data-"));
+      if (!baseline.length) continue;
+      const darkBlock = baseline.some((selector) => selector.includes(".dark"));
       const target = darkBlock ? darkOverrides : light;
       for (const [name, value] of readDeclarations(css.slice(open + 1, end - 1))) {
         target.set(name, value);

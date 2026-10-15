@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-team-attention"
       >
         <span class="flex min-w-0 items-center gap-x-3">
-          <span class="text-text-secondary text-2xs shrink-0 tracking-wide uppercase">
+          <span class="text-text-secondary text-2xs shrink-0 tracking-wide uppercase max-md:hidden">
             {{ t("oncall.attentionHeading") }}
           </span>
           <span class="flex min-w-0 items-center gap-1.5" data-test="oncall-attention-worst">
@@ -52,10 +52,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <!-- The worst finding whole, on one line. The count moved into the
                  disclosure button, so nothing here can wrap the strip. -->
-            <span class="text-text-body min-w-0 truncate text-sm">
+            <!-- Touch has no hover to read a clipped sentence by, so below lg it gets a second line instead. -->
+            <OTruncatedText
+              class="text-text-body text-sm max-lg:line-clamp-2 max-lg:whitespace-normal"
+            >
               {{ worst.message }}
-              <OTooltip side="bottom" :content="worst.message" />
-            </span>
+            </OTruncatedText>
           </span>
         </span>
 
@@ -206,9 +208,9 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type {
   ConfigRisk,
   ConfigRisks,

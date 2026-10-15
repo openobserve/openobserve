@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import ODrawer from "./ODrawer.vue";
 import { DialogContent } from "reka-ui";
@@ -12,6 +12,16 @@ vi.mock("reka-ui", async (importOriginal) => {
     DialogPortal: actual.DialogContent, // render inline without teleport
   };
 });
+
+afterEach(() => {
+  document.body.innerHTML = "";
+});
+
+function findDrawerPanel(wrapper: ReturnType<typeof mount>) {
+  return wrapper
+    .findAllComponents(DialogContent)
+    .find((c) => c.attributes("data-o2-drawer") !== undefined)!;
+}
 
 describe("ODrawer", () => {
   it("renders the trigger slot", () => {
@@ -165,6 +175,20 @@ describe("ODrawer", () => {
     });
   });
 
+  // A subtitle wider than a phone-sized panel pushed the close button off screen while the block could not shrink.
+  it("lets the title block shrink below lg, and only there", () => {
+    const wrapper = mount(ODrawer, {
+      props: { open: true, title: "Quick start", subTitle: "A sentence longer than the panel" },
+    });
+    const title = wrapper
+      .findAll("span")
+      .find((span) => span.classes().includes("truncate") && span.text().includes("Quick start"));
+    const block = title!.element.parentElement!;
+
+    expect(block.classList.contains("shrink-0")).toBe(true);
+    expect(block.classList.contains("max-lg:shrink")).toBe(true);
+  });
+
   describe("sticky layout structure", () => {
     it("header has shrink-0 class (pinned, never scrolls)", () => {
       const wrapper = mount(ODrawer, {
@@ -211,16 +235,52 @@ describe("ODrawer", () => {
     });
   });
 
+  describe("open autofocus", () => {
+    it("focuses an autofocus element when the drawer has no form field or primary button", async () => {
+      const outsideButton = document.createElement("button");
+      document.body.appendChild(outsideButton);
+      const wrapper = mount(ODrawer, {
+        attachTo: document.body,
+        props: { open: true, title: "References" },
+        slots: {
+          default: '<button autofocus data-testid="autofocus-close">Close</button>',
+        },
+      });
+      const panel = findDrawerPanel(wrapper);
+      outsideButton.focus();
+
+      await panel.vm.$emit("openAutoFocus", new Event("openAutoFocus", { cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve));
+
+      expect(document.activeElement).toBe(wrapper.find('[data-testid="autofocus-close"]').element);
+      wrapper.unmount();
+    });
+
+    it("focuses the drawer panel when no focusable fallback exists", async () => {
+      const outsideButton = document.createElement("button");
+      document.body.appendChild(outsideButton);
+      const wrapper = mount(ODrawer, {
+        attachTo: document.body,
+        props: { open: true, title: "Read only" },
+        slots: {
+          default: '<p data-testid="read-only-copy">No actions available.</p>',
+        },
+      });
+      const panel = findDrawerPanel(wrapper);
+      outsideButton.focus();
+
+      await panel.vm.$emit("openAutoFocus", new Event("openAutoFocus", { cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve));
+
+      expect(document.activeElement).toBe(panel.element);
+      wrapper.unmount();
+    });
+  });
+
   describe("Escape key behaviour", () => {
     // reka-ui fires @escape-key-down via a document-level listener that does not
     // run in jsdom. We simulate it by calling vm.$emit('escapeKeyDown', …) on the
     // DialogContent component that owns the @escape-key-down handler.
-    function findDrawerPanel(wrapper: ReturnType<typeof mount>) {
-      return wrapper
-        .findAllComponents(DialogContent)
-        .find((c) => c.attributes("data-o2-drawer") !== undefined)!;
-    }
-
     it("emits update:open=false when Escape is pressed (non-persistent)", async () => {
       const wrapper = mount(ODrawer, {
         props: { open: true, title: "Test" },
@@ -239,6 +299,90 @@ describe("ODrawer", () => {
       const panel = findDrawerPanel(wrapper);
       await panel.vm.$emit("escapeKeyDown", new KeyboardEvent("keydown", { key: "Escape" }));
       expect(wrapper.emitted("update:open")).toBeFalsy();
+    });
+  });
+  describe("close focus (returnFocusTo / after-close)", () => {
+    const closeEvent = () => new Event("closeAutoFocus", { cancelable: true });
+
+    function mountWith(returnFocusTo?: () => HTMLElement | null) {
+      return mount(ODrawer, {
+        attachTo: document.body,
+        props: { open: true, title: "Details", returnFocusTo },
+        slots: { default: "<p>Body</p>" },
+      });
+    }
+
+    it("focuses the returnFocusTo element on close and scrolls it into view", async () => {
+      const row = document.createElement("tr");
+      row.tabIndex = 0;
+      row.scrollIntoView = vi.fn();
+      document.body.appendChild(row);
+      const wrapper = mountWith(() => row);
+      const event = closeEvent();
+
+      await findDrawerPanel(wrapper).vm.$emit("closeAutoFocus", event);
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(row);
+      expect(row.scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+      expect(wrapper.emitted("after-close")).toHaveLength(1);
+      wrapper.unmount();
+    });
+
+    it("keeps the default when the element is detached", async () => {
+      const detached = document.createElement("button");
+      detached.focus = vi.fn();
+      const wrapper = mountWith(() => detached);
+      const event = closeEvent();
+
+      await findDrawerPanel(wrapper).vm.$emit("closeAutoFocus", event);
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(detached.focus).not.toHaveBeenCalled();
+      expect(wrapper.emitted("after-close")).toHaveLength(1);
+      wrapper.unmount();
+    });
+
+    it("keeps the default when returnFocusTo returns null or is absent", async () => {
+      for (const returnFocusTo of [() => null, undefined]) {
+        const wrapper = mountWith(returnFocusTo);
+        const event = closeEvent();
+        await findDrawerPanel(wrapper).vm.$emit("closeAutoFocus", event);
+        expect(event.defaultPrevented).toBe(false);
+        expect(wrapper.emitted("after-close")).toHaveLength(1);
+        wrapper.unmount();
+      }
+    });
+
+    it("resolves the target at close time, not at open time", async () => {
+      const first = document.createElement("button");
+      const second = document.createElement("button");
+      document.body.append(first, second);
+      second.scrollIntoView = vi.fn();
+      let current = first;
+      const wrapper = mountWith(() => current);
+      current = second;
+
+      await findDrawerPanel(wrapper).vm.$emit("closeAutoFocus", closeEvent());
+
+      expect(document.activeElement).toBe(second);
+      wrapper.unmount();
+    });
+
+    it("focuses the element when the real dialog closes", async () => {
+      const row = document.createElement("tr");
+      row.tabIndex = 0;
+      row.scrollIntoView = vi.fn();
+      document.body.appendChild(row);
+      const wrapper = mountWith(() => row);
+      await new Promise((resolve) => setTimeout(resolve));
+
+      await wrapper.setProps({ open: false });
+      await new Promise((resolve) => setTimeout(resolve));
+
+      expect(document.activeElement).toBe(row);
+      expect(wrapper.emitted("after-close")).toHaveLength(1);
+      wrapper.unmount();
     });
   });
 });

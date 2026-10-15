@@ -20,7 +20,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { addCommasToNumber } from "@/utils/zincutils";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import {
   connectDataPopupSettled,
   connectDataPromptSessionKey,
@@ -46,7 +46,7 @@ const slackUrl = computed(() => getCommunitySlackUrl(store.state.zoConfig?.custo
 
 const track = (event: string, properties: Record<string, any> = {}) => {
   try {
-    segment.track(event, {
+    analytics.track(event, {
       org_id: store.state.selectedOrganization?.identifier,
       user_id: store.state.userInfo?.email,
       source: "standalone_day2",

@@ -46,7 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, type PropType } from "vue";
 import { type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
+import analytics from "@/services/product_analytics";
 import { maskText, b64EncodeStandard } from "../utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -70,6 +72,7 @@ export default defineComponent({
   },
   setup(props) {
     const store = useStore();
+    const router = useRouter();
     const { t } = useI18nTyped();
     const email = ref(store.state.userInfo.email);
     const passcode = ref(store.state.organizationData.organizationPasscode);
@@ -100,6 +103,12 @@ export default defineComponent({
         successMessage: t("common.contentCopiedSuccessfully"),
         errorMessage: t("common.copyContentError"),
         timeout: 5000,
+      }).then((copied) => {
+        if (copied) {
+          analytics.track("snippet_copied", {
+            route: router?.currentRoute.value.name,
+          });
+        }
       });
     };
 

@@ -16,21 +16,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OTable
+    ref="oTableRef"
     v-model:selected-ids="localSelectedIds"
     :columns="columns"
     :data="data"
     :loading="loading"
     :forbidden="forbidden"
     pagination="client"
-    :page-size="20"
+    :page-size="pageSize"
     :page-size-options="[10, 20, 25, 50]"
+    :current-page="currentPage"
+    :sort-by="sortBy"
+    :sort-order="sortOrder"
     row-key="id"
     selection="multiple"
     :show-global-filter="false"
     :persist-columns="true"
     table-id="synthetic-monitoring-table"
     :enable-column-resize="true"
-    :footer-title="resolvedFooterTitle"
     :empty-message="resolvedEmptyMessage"
     :data-test="dataTest"
     :horizontal-scroll="true"
@@ -38,6 +41,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :get-row-style="monitorRowStyle"
     show-index
     @row-click="(row: any) => emit('row-click', row)"
+    @update:current-page="emit('update:currentPage', $event)"
+    @update:page-size="emit('update:pageSize', $event)"
+    @update:sort-by="emit('update:sortBy', $event)"
+    @update:sort-order="emit('update:sortOrder', $event)"
   >
     <!-- Summary strip supplied by the parent (it owns the status facet). -->
     <template v-if="$slots.subheader" #subheader>
@@ -71,7 +78,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         content-class="max-w-[25rem] whitespace-normal break-words text-xs"
       >
         <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
-          <span class="cursor-pointer truncate">{{ (row as any).name || "—" }}</span>
+          <span
+            class="cursor-pointer truncate"
+            :data-test="`${dataTest}-name-${(row as any).id}`"
+            >{{ (row as any).name || "—" }}</span
+          >
+          <MutedChip
+            v-if="(row as any).active_downtime"
+            :downtime="(row as any).active_downtime"
+            :data-test="`${dataTest}-${(row as any).id}-muted`"
+          />
         </div>
       </OTooltip>
       <span v-else class="truncate">—</span>
@@ -394,6 +410,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("synthetics.table.move") }}
           </ODropdownItem>
 
+          <template v-if="downtimesEnabled">
+            <ODropdownSeparator />
+            <MuteMenuItems
+              :data-test-prefix="`${dataTest}-mute`"
+              @preset="(secs) => muteRows([row], secs)"
+              @until="openMuteDialog([row])"
+            />
+          </template>
+
           <ODropdownSeparator />
 
           <ODropdownItem
@@ -443,66 +468,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Footer with count + bulk action buttons -->
-    <template #bottom>
-      <div class="flex h-12 w-full items-center justify-between gap-1">
-        <span class="text-secondary min-w-25 text-xs">
-          <template v-if="localSelectedIds.length > 0">{{
-            t("synthetics.table.selectedCount", {
-              selected: localSelectedIds.length,
-              total: data.length,
-            })
-          }}</template>
-          <span v-else class="max-md:hidden">{{ data.length }} {{ resolvedFooterTitle }}</span>
-        </span>
-        <template v-if="localSelectedIds.length > 0">
+    <template #selection-actions>
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="pause"
+        :data-test="`${dataTest}-pause-selected-btn`"
+        :disabled="!!props.bulkActionLoading"
+        @click="emit('pause-selected')"
+        >{{ t("synthetics.table.pause") }}</OButton
+      >
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="play-arrow"
+        :data-test="`${dataTest}-enable-selected-btn`"
+        :disabled="!!props.bulkActionLoading"
+        @click="emit('enable-selected')"
+        >{{ t("synthetics.table.enable") }}</OButton
+      >
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="sound-sampler"
+        :data-test="`${dataTest}-trigger-selected-btn`"
+        :disabled="!!props.bulkActionLoading"
+        @click="emit('trigger-selected')"
+        >{{ t("synthetics.table.trigger") }}</OButton
+      >
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="drive-file-move"
+        :data-test="`${dataTest}-move-selected-btn`"
+        @click="emit('move-selected')"
+        >{{ t("synthetics.table.move") }}</OButton
+      >
+      <ODropdown v-if="downtimesEnabled" side="top">
+        <template #trigger>
           <OButton
             variant="outline"
             size="sm"
-            icon-left="pause"
-            :data-test="`${dataTest}-pause-selected-btn`"
-            :disabled="!!props.bulkActionLoading"
-            @click="emit('pause-selected')"
-            >{{ t("synthetics.table.pause") }}</OButton
+            icon-left="notifications-paused"
+            :data-test="`${dataTest}-mute-selected-btn`"
           >
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="play-arrow"
-            :data-test="`${dataTest}-enable-selected-btn`"
-            :disabled="!!props.bulkActionLoading"
-            @click="emit('enable-selected')"
-            >{{ t("synthetics.table.enable") }}</OButton
-          >
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="sound-sampler"
-            :data-test="`${dataTest}-trigger-selected-btn`"
-            :disabled="!!props.bulkActionLoading"
-            @click="emit('trigger-selected')"
-            >{{ t("synthetics.table.trigger") }}</OButton
-          >
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="drive-file-move"
-            :data-test="`${dataTest}-move-selected-btn`"
-            @click="emit('move-selected')"
-            >{{ t("synthetics.table.move") }}</OButton
-          >
-          <OButton
-            variant="outline-destructive"
-            size="sm"
-            icon-left="delete"
-            :data-test="`${dataTest}-delete-selected-btn`"
-            :loading="!!props.bulkActionLoading"
-            @click="emit('delete-selected')"
-            >{{ t("synthetics.table.delete") }}</OButton
-          >
+            {{ t("alerts.downtimes.mute.bulk") }}
+          </OButton>
         </template>
-      </div>
+        <MuteMenuItems
+          :data-test-prefix="`${dataTest}-bulk-mute`"
+          @preset="(secs) => muteRows(selectedRows, secs)"
+          @until="openMuteDialog(selectedRows)"
+        />
+      </ODropdown>
+      <OButton
+        variant="outline-destructive"
+        size="sm"
+        icon-left="delete"
+        :data-test="`${dataTest}-delete-selected-btn`"
+        :loading="!!props.bulkActionLoading"
+        @click="emit('delete-selected')"
+        >{{ t("synthetics.table.delete") }}</OButton
+      >
     </template>
   </OTable>
+
+  <QuickMuteDialog
+    v-if="downtimesEnabled"
+    v-model:open="muteDialogOpen"
+    :selection="muteSelection"
+  />
 
   <!-- Spark bar detail tooltip -->
   <Teleport to="body">
@@ -574,6 +609,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { resolveBadge, resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import MutedChip from "@/components/alerts/downtimes/MutedChip.vue";
+import MuteMenuItems from "@/components/alerts/downtimes/MuteMenuItems.vue";
+import QuickMuteDialog from "@/components/alerts/downtimes/QuickMuteDialog.vue";
+import { useRowMute } from "@/composables/downtimes/useRowMute";
 
 type Mode = "all" | "browser";
 
@@ -615,7 +654,6 @@ const props = withDefaults(
     /** IANA zone for the Last Check tooltip. Passed in: this table is a leaf
      *  component and must not reach into the store for it. */
     timezone?: string;
-    footerTitle?: I18nText;
     emptyMessage?: I18nText;
     dataTest?: string;
     toggleLoadingMap?: Record<string, boolean>;
@@ -628,8 +666,13 @@ const props = withDefaults(
      *  human label. Falls back to the raw id when a location isn't in the map
      *  (e.g. deleted since the check last ran). */
     locationNames?: Record<string, string>;
+    pageSize?: number;
+    currentPage?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
   }>(),
   {
+    pageSize: 20,
     loading: false,
     dataTest: "monitor-table",
     toggleLoadingMap: () => ({}),
@@ -662,21 +705,35 @@ const emit = defineEmits<{
   "trigger-selected": [];
   "navigate-to-folder": [folderId: string];
   "empty-action": [actionId: string];
+  "update:currentPage": [page: number];
+  "update:pageSize": [size: number];
+  "update:sortBy": [columnId: string];
+  "update:sortOrder": [order: "asc" | "desc"];
 }>();
+
+const oTableRef = ref<any>(null);
+
+defineExpose({ restorePage: (page: number) => oTableRef.value?.restorePage?.(page) });
 
 const { t } = useI18nTyped();
 
-// Not `withDefaults` defaults: those are evaluated once at module scope, which
-// would freeze the copy in whatever locale was active at first load.
-const resolvedFooterTitle = computed(
-  () => props.footerTitle ?? t("synthetics.table.checksFooterTitle"),
-);
+// Not a `withDefaults` default: that is evaluated once at module scope and would freeze the copy in the first-loaded locale.
 const resolvedEmptyMessage = computed(() => props.emptyMessage ?? t("search.noResult"));
 
 const localSelectedIds = computed({
   get: () => props.selectedIds ?? [],
   set: (val: string[]) => emit("update:selectedIds", val),
 });
+
+const { downtimesEnabled, muteDialogOpen, muteSelection, muteRows, openMuteDialog } =
+  useRowMute<any>(
+    () => "synthetics",
+    (row) => String(row.id),
+  );
+
+const selectedRows = computed(() =>
+  props.data.filter((row: any) => localSelectedIds.value.includes(String(row.id))),
+);
 
 // ── Column definitions per mode ─────────────────────────────────────
 

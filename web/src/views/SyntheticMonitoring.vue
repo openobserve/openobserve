@@ -17,17 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     class="relative"
+    :title="t('synthetics.pageTitle')"
     :subtitle="t('synthetics.pageSubtitle')"
     icon="radar"
     bleed
     tabs-below
   >
-    <template #title>
-      <span class="inline-flex items-center gap-2">
-        {{ t("synthetics.pageTitle") }}
-        <BetaBadge />
-      </span>
-    </template>
     <template #actions>
       <OButton
         v-if="activeSection === 'checks'"
@@ -125,12 +120,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- ── CHECKS TABLE ── -->
         <MonitorTable
+          ref="monitorTableRef"
           :mode="monitorTableMode"
+          :page-size="pageSize"
+          :current-page="currentPage"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:current-page="currentPage = $event"
+          @update:page-size="pageSize = $event"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           :data="filteredMonitors"
           :loading="loading"
           :forbidden="forbidden"
           :timezone="store.state.timezone"
-          :footer-title="footerTitle"
           :empty-message="emptyMessage"
           :selected-ids="selectedMonitorIds"
           :show-folder-column="searchAcrossFolders"
@@ -477,6 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { ActiveDowntime } from "@/services/downtimes";
 import { syntheticsKeys } from "@/services/synthetics.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { useQuery } from "@tanstack/vue-query";
@@ -512,7 +516,6 @@ import CheckTypePicker from "@/components/synthetics/CheckTypePicker.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
 import {
   mapResponseToBrowserCheck,
   buildCreateBrowserTestPayload,
@@ -530,6 +533,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import syntheticsService from "@/services/synthetics";
+import analytics from "@/services/product_analytics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
 import {
   syntheticsCreateRoute,
@@ -541,6 +545,7 @@ import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useListViewState } from "@/composables/useListViewState";
 
 const router = useRouter();
 const route = useRoute();
@@ -582,6 +587,7 @@ interface ApiMonitor {
   referenced_by: number;
   /** Absent for a check with no subtest reference. */
   reference_state?: "ok" | "missing" | "nested";
+  active_downtime?: ActiveDowntime | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -635,6 +641,7 @@ function mapMonitor(m: ApiMonitor) {
     steps: m.steps,
     referencedBy: m.referenced_by,
     referenceState: m.reference_state,
+    active_downtime: m.active_downtime ?? null,
   };
 }
 
@@ -779,12 +786,70 @@ watch(
   },
   { immediate: true },
 );
-const activeTab = ref("all");
+const savedView = useListViewState("synthetics", {
+  folder: "",
+  activeTab: "all",
+  statusFilter: "all",
+  typeFilter: "all",
+  locationFilter: "all",
+  search: "",
+  currentPage: 1,
+  pageSize: 20,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+// A stored page belongs to the folder it was viewed in; arriving on another folder starts at page 1.
+const savedFolder = (route.query.folder as string) ?? "default";
+if (savedView.folder && savedView.folder !== savedFolder) savedView.currentPage = 1;
+const activeTab = ref(savedView.activeTab);
 const monitorTableMode = computed(() => (activeTab.value === "browser" ? "browser" : "all"));
-const statusFilter = ref("all");
-const typeFilter = ref("all");
-const locationFilter = ref("all");
-const search = ref("");
+const statusFilter = ref(savedView.statusFilter);
+const typeFilter = ref(savedView.typeFilter);
+const locationFilter = ref(savedView.locationFilter);
+const search = ref(savedView.search);
+const currentPage = ref(savedView.currentPage);
+const pageSize = ref(savedView.pageSize);
+const sortBy = ref(savedView.sortBy);
+const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+const monitorTableRef = ref<InstanceType<typeof MonitorTable> | null>(null);
+
+watch([activeTab, statusFilter, typeFilter, locationFilter, search], () => {
+  currentPage.value = 1;
+});
+watch(
+  [
+    activeTab,
+    statusFilter,
+    typeFilter,
+    locationFilter,
+    search,
+    currentPage,
+    pageSize,
+    sortBy,
+    sortOrder,
+  ],
+  () => {
+    Object.assign(savedView, {
+      folder: activeFolderId.value,
+      activeTab: activeTab.value,
+      statusFilter: statusFilter.value,
+      typeFilter: typeFilter.value,
+      locationFilter: locationFilter.value,
+      search: search.value,
+      currentPage: currentPage.value,
+      pageSize: pageSize.value,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
+    });
+  },
+);
+// The first data load makes TanStack reset to page 0 on its own deferred queue; setTimeout(0) runs after it so the restored page wins.
+let pageRestored = false;
+watch(loading, (isLoading) => {
+  if (isLoading || pageRestored) return;
+  pageRestored = true;
+  setTimeout(() => monitorTableRef.value?.restorePage?.(currentPage.value), 0);
+});
 const showTypePicker = ref(false);
 
 // ── Folder state ───────────────────────────────────────────────────────
@@ -802,6 +867,8 @@ const activeFolderName = computed(() => {
 });
 
 watch(activeFolderId, async (newFolderId) => {
+  currentPage.value = 1;
+  savedView.folder = newFolderId;
   selectedMonitorIds.value = [];
   duplicateFolder.value = newFolderId;
   if (searchAcrossFolders.value) {
@@ -881,6 +948,8 @@ const bulkDeleteMonitors = async () => {
       { ids: selectedMonitorIds.value },
       searchAcrossFolders.value ? undefined : activeFolderId.value,
     );
+    // The bulk endpoint deletes all ids or fails, so a resolved call removed every selected test.
+    analytics.track("synthetic_test_deleted", { count: selectedMonitorIds.value.length });
     selectedMonitorIds.value = [];
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.bulkDeleteSuccess") });
@@ -1285,12 +1354,6 @@ const clearFilters = () => {
   locationFilter.value = "all";
 };
 
-const footerTitle = computed(() =>
-  activeTab.value === "browser"
-    ? t("synthetics.footer.browserTests")
-    : t("synthetics.footer.checks"),
-);
-
 const emptyMessage = computed(() =>
   activeTab.value === "browser" ? t("synthetics.empty.browserTests") : t("synthetics.empty.checks"),
 );
@@ -1395,6 +1458,9 @@ async function bulkTriggerMonitors() {
   );
   dismiss();
   const failed = results.filter((r) => r.status === "rejected").length;
+  if (toTrigger.length - failed > 0) {
+    analytics.track("synthetic_test_run_triggered", { count: toTrigger.length - failed });
+  }
   if (failed > 0) {
     toast({
       variant: "warning",
@@ -1627,6 +1693,7 @@ async function runMonitor(m: any) {
   });
   try {
     await syntheticsService.run(org, id, {}, m.folderId);
+    analytics.track("synthetic_test_run_triggered", { count: 1 });
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.triggerSuccessSingle", { name }) });
   } catch (err: any) {
@@ -1656,6 +1723,7 @@ async function deleteMonitor(m: any) {
   });
   try {
     await syntheticsService.delete(org, String(m.id), activeFolderId.value);
+    analytics.track("synthetic_test_deleted", { count: 1 });
     // Every cached folder, not just the one on screen: a cross-folder view deletes rows another folder's entry still holds.
     queryClient.setQueriesData({ queryKey: syntheticsKeys.monitorsAll(org) }, (old: any) => {
       if (!Array.isArray(old)) return undefined;

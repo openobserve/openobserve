@@ -18,10 +18,10 @@ import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import Curl from "@/components/ingestion/logs/Curl.vue";
 
-// Mock CopyContent component
-vi.mock("@/components/CopyContent.vue", () => ({
+// Mock CredentialCodeBlock component
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     props: ["content"],
     template: "<div class='copy-content-mock'>{{ content }}</div>",
   },
@@ -41,12 +41,12 @@ vi.mock("../../../utils/zincutils", () => ({
   maskText: vi.fn().mockImplementation((text) => `***${text.slice(-4)}`),
 }));
 
-vi.mock("../../../aws-exports", () => ({
-  default: {
-    aws_project_region: "us-east-1",
-    aws_appsync_graphqlEndpoint: "https://example.com/graphql",
-  },
+const awsConfig = vi.hoisted(() => ({
+  aws_project_region: "us-east-1",
+  aws_appsync_graphqlEndpoint: "https://example.com/graphql",
+  isCloud: "false",
 }));
+vi.mock("../../../aws-exports", () => ({ default: awsConfig }));
 
 const mockStore = createStore({
   state: {
@@ -96,7 +96,7 @@ describe("Curl", () => {
       expect(wrapper.vm.$options.name).toBe("curl-mechanism");
     });
 
-    it("should render CopyContent component", () => {
+    it("should render CredentialCodeBlock component", () => {
       wrapper = createWrapper();
       const copyContent = wrapper.find(".copy-content-mock");
       expect(copyContent.exists()).toBe(true);
@@ -281,17 +281,18 @@ describe("Curl", () => {
     });
   });
 
-  describe("CopyContent Component Integration", () => {
-    it("should pass content to CopyContent component", () => {
+  describe("CredentialCodeBlock Component Integration", () => {
+    it("should pass content to CredentialCodeBlock component", () => {
       wrapper = createWrapper();
       const copyContent = wrapper.find(".copy-content-mock");
       expect(copyContent.text()).toContain("curl");
     });
 
-    it("should render CopyContent with correct classes", () => {
+    it("should name the block with its slug", () => {
       wrapper = createWrapper();
-      const copyContentContainer = wrapper.find(".copy-content-container-cls");
-      expect(copyContentContainer.exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "CredentialCodeBlock" }).attributes("slug")).toBe(
+        "curl",
+      );
     });
   });
 
@@ -345,7 +346,7 @@ describe("Curl", () => {
       expect(container.exists()).toBe(true);
     });
 
-    it("should render only one CopyContent component", () => {
+    it("should render only one CredentialCodeBlock component", () => {
       wrapper = createWrapper();
       const copyComponents = wrapper.findAll(".copy-content-mock");
       expect(copyComponents).toHaveLength(1);
@@ -381,6 +382,26 @@ describe("Curl", () => {
         expect(jsonData[0]).toHaveProperty("job");
         expect(jsonData[0]).toHaveProperty("log");
       }
+    });
+  });
+
+  describe("TLS flag", () => {
+    // The snippet exactly as BASE rendered it, so a non-Cloud build stays byte-identical.
+    const baseSnippet =
+      'curl -u [EMAIL]:[PASSCODE] -k http://localhost:5080/api/test_org_123/default/_json -d "[{\\"level\\":\\"info\\",\\"job\\":\\"test\\",\\"log\\":\\"test message for openobserve\\"}]"';
+
+    it("renders today's snippet, -k included, on a non-Cloud build", () => {
+      awsConfig.isCloud = "false";
+      wrapper = createWrapper();
+      expect(wrapper.vm.content).toBe(baseSnippet);
+    });
+
+    it("drops -k and nothing else on a Cloud build", () => {
+      awsConfig.isCloud = "true";
+      wrapper = createWrapper();
+      expect(wrapper.vm.content).not.toMatch(/(^|\s)-k(\s|$)/);
+      expect(wrapper.vm.content).toBe(baseSnippet.replace(" -k", ""));
+      awsConfig.isCloud = "false";
     });
   });
 

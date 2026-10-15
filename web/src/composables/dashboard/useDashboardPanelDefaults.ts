@@ -168,6 +168,7 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
           min: 0,
           max: 100,
           time_shift: [],
+          hide: false,
         },
       },
     ],

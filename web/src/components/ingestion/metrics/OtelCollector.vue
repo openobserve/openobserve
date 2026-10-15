@@ -2,25 +2,25 @@
   <IngestionContent>
     <div class="flex flex-col gap-2">
       <div class="text-base font-semibold">{{ t("ingestion.hostMetricsReceiver") }}</div>
-      <ContentCopy :content="raw(getHostMetricsConfig)" />
+      <CredentialCodeBlock slug="metrics-otel-host-metrics" :content="getHostMetricsConfig" />
       <div class="text-text-secondary text-xs">
         {{ t("ingestion.hostMetricsReceiverNote", { attr: raw("host.name") }) }}
       </div>
     </div>
     <div class="flex flex-col gap-2">
       <div class="text-base font-semibold">{{ t("ingestion.otlpHttp") }}</div>
-      <ContentCopy :content="raw(getOtelHttpConfig)" />
+      <CredentialCodeBlock slug="metrics-otel-http" :content="getOtelHttpConfig" />
     </div>
     <div class="flex flex-col gap-2" v-if="showOtlpGrpc">
       <div class="text-base font-semibold">{{ t("ingestion.otlpGrpc") }}</div>
-      <ContentCopy :content="raw(getOtelGrpcConfig)" />
+      <CredentialCodeBlock slug="metrics-otel-grpc" :content="getOtelGrpcConfig" />
     </div>
   </IngestionContent>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import ContentCopy from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
 import { raw, useI18nTyped } from "@/types/i18n";

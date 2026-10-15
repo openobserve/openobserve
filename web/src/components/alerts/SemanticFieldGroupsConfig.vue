@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="w-full">
     <!-- Toolbar: caption left, actions right — the module tab already titles the page -->
     <div class="mb-2 flex items-center justify-between gap-4">
-      <div class="text-text-secondary min-w-0 truncate text-xs">
+      <OTruncatedText as="div" class="text-text-secondary text-xs">
         {{ t("correlation.semanticFieldGroupsCaption") }}
-      </div>
+      </OTruncatedText>
       <div class="flex shrink-0 items-center gap-2">
         <OButton
           data-test="correlation-semanticfieldgroup-export-json-btn"
@@ -173,6 +173,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const store = useStore();
 const { t } = useI18nTyped();

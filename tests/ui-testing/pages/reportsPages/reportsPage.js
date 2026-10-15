@@ -190,7 +190,8 @@ export class ReportsPage {
     await expect(async () => {
       await this.reportNameInputField.fill(TEST_REPORT_NAME);
       await this.page.waitForTimeout(1000);
-      await expect(this.reportNameInputField).toHaveValue(TEST_REPORT_NAME);
+      // Short timeout: the default expect timeout outlives the toPass budget, so a wiped value was never re-filled.
+      await expect(this.reportNameInputField).toHaveValue(TEST_REPORT_NAME, { timeout: 2000 });
     }).toPass({ timeout: 20000, intervals: [1000, 2000, 3000] });
   }
 

@@ -29,8 +29,8 @@ use config::meta::{
     self_reporting::usage::RunOutcome,
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
-    TransactionTrait,
+    ActiveModelTrait, ColumnTrait, EntityTrait, FromQueryResult, QueryFilter, QueryOrder,
+    QuerySelect, Set, TransactionTrait,
 };
 
 use super::entity::{alert_state_transitions, alert_states, alerts};
@@ -110,6 +110,116 @@ pub async fn get_rollups(alert_ids: &[String]) -> Result<Vec<AlertState>, errors
         .await?
         .into_iter()
         .map(Into::into)
+        .collect())
+}
+
+/// Records on the rollup row which downtime suppressed the latest firing run, or clears it.
+pub async fn set_last_downtime_id(
+    alert_id: &str,
+    downtime_id: Option<&str>,
+) -> Result<u64, errors::Error> {
+    let client = get_orm_client_rw().await;
+    set_last_downtime_id_with(client, alert_id, downtime_id).await
+}
+
+/// [`set_last_downtime_id`] against a caller-supplied connection.
+pub async fn set_last_downtime_id_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_id: &str,
+    downtime_id: Option<&str>,
+) -> Result<u64, errors::Error> {
+    let Some(downtime_id) = downtime_id else {
+        let res = alert_states::Entity::update_many()
+            .col_expr(
+                alert_states::Column::LastDowntimeId,
+                sea_orm::sea_query::Expr::value(Option::<String>::None),
+            )
+            .filter(alert_states::Column::AlertId.eq(alert_id))
+            .filter(alert_states::Column::GroupKey.eq(ROLLUP_GROUP_KEY))
+            .filter(alert_states::Column::LastDowntimeId.is_not_null())
+            .exec(conn)
+            .await?;
+        return Ok(res.rows_affected);
+    };
+    // A real-time alert never runs through the scheduler, so its rollup row may not exist yet.
+    let row = alert_states::ActiveModel {
+        alert_id: Set(alert_id.to_string()),
+        group_key: Set(ROLLUP_GROUP_KEY.to_string()),
+        last_downtime_id: Set(Some(downtime_id.to_string())),
+        ..Default::default()
+    };
+    let res = alert_states::Entity::insert(row)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::columns([
+                alert_states::Column::AlertId,
+                alert_states::Column::GroupKey,
+            ])
+            .update_column(alert_states::Column::LastDowntimeId)
+            .to_owned(),
+        )
+        .exec_without_returning(conn)
+        .await?;
+    Ok(res)
+}
+
+/// Forgets a downtime every alert recorded; returns those alerts, whose mute the caller closes.
+pub async fn clear_last_downtime_id(downtime_id: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    clear_last_downtime_id_with(client, downtime_id).await
+}
+
+/// [`clear_last_downtime_id`] against a caller-supplied connection.
+pub async fn clear_last_downtime_id_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    downtime_id: &str,
+) -> Result<Vec<String>, errors::Error> {
+    let mut alert_ids: Vec<String> = alert_states::Entity::find()
+        .select_only()
+        .column(alert_states::Column::AlertId)
+        .filter(alert_states::Column::LastDowntimeId.eq(downtime_id))
+        .into_tuple()
+        .all(conn)
+        .await?;
+    alert_ids.sort();
+    alert_ids.dedup();
+    if alert_ids.is_empty() {
+        return Ok(alert_ids);
+    }
+    alert_states::Entity::update_many()
+        .col_expr(
+            alert_states::Column::LastDowntimeId,
+            sea_orm::sea_query::Expr::value(Option::<String>::None),
+        )
+        .filter(alert_states::Column::LastDowntimeId.eq(downtime_id))
+        .exec(conn)
+        .await?;
+    Ok(alert_ids)
+}
+
+/// `alert_id -> last_downtime_id` for the alerts of a list page that carry one.
+pub async fn last_downtime_ids(
+    alert_ids: &[String],
+) -> Result<std::collections::HashMap<String, String>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    last_downtime_ids_with(client, alert_ids).await
+}
+
+/// [`last_downtime_ids`] against a caller-supplied connection.
+pub async fn last_downtime_ids_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_ids: &[String],
+) -> Result<std::collections::HashMap<String, String>, errors::Error> {
+    if alert_ids.is_empty() {
+        return Ok(Default::default());
+    }
+    Ok(alert_states::Entity::find()
+        .filter(alert_states::Column::AlertId.is_in(alert_ids.to_vec()))
+        .filter(alert_states::Column::GroupKey.eq(ROLLUP_GROUP_KEY))
+        .filter(alert_states::Column::LastDowntimeId.is_not_null())
+        .all(conn)
+        .await?
+        .into_iter()
+        .filter_map(|m| m.last_downtime_id.map(|id| (m.alert_id, id)))
         .collect())
 }
 
@@ -557,6 +667,7 @@ where
         episode_opened_at: Set(state.episode_opened_at),
         episode_incident_id: Set(state.episode_incident_id.clone()),
         recovering_since: Set(state.recovering_since),
+        last_downtime_id: sea_orm::ActiveValue::NotSet,
     };
 
     // Upsert on the composite primary key — rows are created lazily on an
@@ -663,12 +774,29 @@ where
         to_level: Set(t.to_level.map(|l| l.to_i32())),
         at: Set(t.at),
         value: Set(t.value),
+        rule_value: Set(t.rule_value.clone()),
         group_labels: Set(t.group_labels.clone()),
         ..Default::default()
     }
     .insert(txn)
     .await?;
     Ok(())
+}
+
+/// `None` for a row whose outcome this build does not know.
+fn transition_from_model(m: alert_state_transitions::Model) -> Option<StateTransition> {
+    Some(StateTransition {
+        alert_id: m.alert_id,
+        group_key: m.group_key,
+        from_outcome: m.from_outcome.and_then(RunOutcome::from_i32),
+        to_outcome: RunOutcome::from_i32(m.to_outcome)?,
+        from_level: m.from_level.and_then(AlertLevel::from_i32),
+        to_level: m.to_level.and_then(AlertLevel::from_i32),
+        at: m.at,
+        value: m.value,
+        rule_value: m.rule_value,
+        group_labels: m.group_labels,
+    })
 }
 
 /// Transitions for one alert, newest first.
@@ -702,19 +830,7 @@ pub async fn list_transitions_filtered(
         .all(client)
         .await?
         .into_iter()
-        .filter_map(|m| {
-            Some(StateTransition {
-                alert_id: m.alert_id,
-                group_key: m.group_key,
-                from_outcome: m.from_outcome.and_then(RunOutcome::from_i32),
-                to_outcome: RunOutcome::from_i32(m.to_outcome)?,
-                from_level: m.from_level.and_then(AlertLevel::from_i32),
-                to_level: m.to_level.and_then(AlertLevel::from_i32),
-                at: m.at,
-                value: m.value,
-                group_labels: m.group_labels,
-            })
-        })
+        .filter_map(transition_from_model)
         .collect())
 }
 
@@ -743,26 +859,11 @@ pub async fn list_transitions_between(
         .all(client)
         .await?
         .into_iter()
-        .filter_map(|m| {
-            Some(StateTransition {
-                alert_id: m.alert_id,
-                group_key: m.group_key,
-                from_outcome: m.from_outcome.and_then(RunOutcome::from_i32),
-                to_outcome: RunOutcome::from_i32(m.to_outcome)?,
-                from_level: m.from_level.and_then(AlertLevel::from_i32),
-                to_level: m.to_level.and_then(AlertLevel::from_i32),
-                at: m.at,
-                value: m.value,
-                group_labels: m.group_labels,
-            })
-        })
+        .filter_map(transition_from_model)
         .collect())
 }
 
-/// Batched counterpart to [`list_transitions_between`]: transitions for many
-/// alerts inside one window, grouped by alert id, oldest first per alert. Each
-/// lane is truncated to `per_alert_limit` in memory — the window itself bounds
-/// the fetch, so no per-alert SQL limit (and no N per-child queries) is needed.
+/// Each alert's transitions in a window, oldest first, at most `per_alert_limit` per alert.
 pub async fn list_transitions_between_many(
     alert_ids: &[String],
     group_key: Option<&str>,
@@ -770,43 +871,62 @@ pub async fn list_transitions_between_many(
     to: i64,
     per_alert_limit: u64,
 ) -> Result<std::collections::HashMap<String, Vec<StateTransition>>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    list_transitions_between_many_with(client, alert_ids, group_key, from, to, per_alert_limit)
+        .await
+}
+
+/// [`list_transitions_between_many`] against a caller-supplied connection.
+pub async fn list_transitions_between_many_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_ids: &[String],
+    group_key: Option<&str>,
+    from: i64,
+    to: i64,
+    per_alert_limit: u64,
+) -> Result<std::collections::HashMap<String, Vec<StateTransition>>, errors::Error> {
+    use alert_state_transitions::Column;
+    use sea_orm::sea_query::{Alias, Asterisk, Expr, Func, Order, Query, WindowStatement};
+
     let mut grouped: std::collections::HashMap<String, Vec<StateTransition>> =
         std::collections::HashMap::new();
     if alert_ids.is_empty() {
         return Ok(grouped);
     }
-    let client = get_orm_client_ro().await;
-    let mut query = alert_state_transitions::Entity::find()
-        .filter(alert_state_transitions::Column::AlertId.is_in(alert_ids.iter().cloned()))
-        .filter(alert_state_transitions::Column::At.gte(from))
-        .filter(alert_state_transitions::Column::At.lte(to));
+    // Ranked per alert, so one flapping alert cannot use up the other alerts' share of the rows.
+    let rank = Alias::new("lane_rank");
+    let lane = WindowStatement::partition_by(Column::AlertId)
+        .order_by(Column::At, Order::Asc)
+        .order_by(Column::Id, Order::Asc)
+        .to_owned();
+    let mut ranked = Query::select();
+    ranked
+        .column(Asterisk)
+        .expr_window_as(Func::cust(Alias::new("ROW_NUMBER")), lane, rank.clone())
+        .from(alert_state_transitions::Entity)
+        .and_where(Column::AlertId.is_in(alert_ids.iter().cloned()))
+        .and_where(Column::At.gte(from))
+        .and_where(Column::At.lte(to));
     if let Some(key) = group_key {
-        query = query.filter(alert_state_transitions::Column::GroupKey.eq(key));
+        ranked.and_where(Column::GroupKey.eq(key));
     }
-    let rows = query
-        .order_by_asc(alert_state_transitions::Column::At)
-        .limit(per_alert_limit.saturating_mul(alert_ids.len() as u64))
-        .all(client)
+    let query = Query::select()
+        .column(Asterisk)
+        .from_subquery(ranked, Alias::new("ranked"))
+        .and_where(Expr::col(rank).lte(per_alert_limit))
+        .order_by(Column::AlertId, Order::Asc)
+        .order_by(Column::At, Order::Asc)
+        .order_by(Column::Id, Order::Asc)
+        .to_owned();
+    let statement = conn.get_database_backend().build(&query);
+    let rows = alert_state_transitions::Model::find_by_statement(statement)
+        .all(conn)
         .await?;
-    for m in rows {
-        let Some(to_outcome) = RunOutcome::from_i32(m.to_outcome) else {
-            continue;
-        };
-        let transition = StateTransition {
-            alert_id: m.alert_id,
-            group_key: m.group_key,
-            from_outcome: m.from_outcome.and_then(RunOutcome::from_i32),
-            to_outcome,
-            from_level: m.from_level.and_then(AlertLevel::from_i32),
-            to_level: m.to_level.and_then(AlertLevel::from_i32),
-            at: m.at,
-            value: m.value,
-            group_labels: m.group_labels,
-        };
-        let lane = grouped.entry(transition.alert_id.clone()).or_default();
-        if lane.len() < per_alert_limit as usize {
-            lane.push(transition);
-        }
+    for transition in rows.into_iter().filter_map(transition_from_model) {
+        grouped
+            .entry(transition.alert_id.clone())
+            .or_default()
+            .push(transition);
     }
     Ok(grouped)
 }
@@ -875,6 +995,7 @@ mod tests {
             episode_opened_at: None,
             episode_incident_id: None,
             recovering_since: None,
+            last_downtime_id: None,
         }
     }
 
@@ -1170,6 +1291,7 @@ mod tests {
                 to_level: Some(AlertLevel::Critical),
                 at,
                 value: Some(9.5),
+                rule_value: None,
                 group_labels: None,
             }),
         }
@@ -1230,6 +1352,36 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(count_transitions(&db).await, 2);
+    }
+
+    #[tokio::test]
+    async fn last_downtime_id_is_kept_by_state_writes_and_cleared_on_demand() {
+        let db = db().await;
+        persist_with(&db, &update_for("alert-1", ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        persist_with(&db, &update_for("alert-2", ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+        let ids = vec!["alert-1".to_string(), "alert-2".to_string()];
+
+        assert_eq!(
+            set_last_downtime_id_with(&db, "alert-1", Some("dt-1"))
+                .await
+                .unwrap(),
+            1
+        );
+        persist_with(&db, &update_for("alert-1", ROLLUP_GROUP_KEY, 2_000), None)
+            .await
+            .unwrap();
+        let found = last_downtime_ids_with(&db, &ids).await.unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found.get("alert-1").map(String::as_str), Some("dt-1"));
+
+        set_last_downtime_id_with(&db, "alert-1", None)
+            .await
+            .unwrap();
+        assert!(last_downtime_ids_with(&db, &ids).await.unwrap().is_empty());
     }
 
     /// ...and on the group. One evaluation writes every group's transition at
@@ -1599,6 +1751,107 @@ mod tests {
         assert_eq!(count_intervals(&db).await, 1);
     }
 
+    async fn recorded(db: &sea_orm::DatabaseConnection, alert_id: &str, downtime_id: &str) {
+        use sea_orm::IntoActiveModel;
+
+        alert_states::Model {
+            alert_id: alert_id.to_string(),
+            last_downtime_id: Some(downtime_id.to_string()),
+            ..model(Some(RunOutcome::Suppressed.to_i32()))
+        }
+        .into_active_model()
+        .insert(db)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_edited_downtime_is_forgotten_by_every_alert_that_recorded_it() {
+        let db = db().await;
+        recorded(&db, "alert-1", "dt-1").await;
+        recorded(&db, "alert-2", "dt-1").await;
+        recorded(&db, "alert-3", "dt-2").await;
+        assert_eq!(
+            clear_last_downtime_id_with(&db, "dt-1").await.unwrap(),
+            ["alert-1", "alert-2"]
+        );
+        assert!(
+            clear_last_downtime_id_with(&db, "dt-1")
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let ids: Vec<String> = ["alert-1", "alert-2", "alert-3"].map(String::from).to_vec();
+        let left = last_downtime_ids_with(&db, &ids).await.unwrap();
+        assert_eq!(left.len(), 1);
+        assert_eq!(left.get("alert-3").map(String::as_str), Some("dt-2"));
+    }
+
+    #[tokio::test]
+    async fn an_unsuppressed_firing_clears_the_recorded_downtime_once() {
+        let db = db().await;
+        recorded(&db, "alert-1", "dt-1").await;
+        assert_eq!(
+            set_last_downtime_id_with(&db, "alert-1", None)
+                .await
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            set_last_downtime_id_with(&db, "alert-1", None)
+                .await
+                .unwrap(),
+            0,
+            "a row with nothing recorded is not rewritten"
+        );
+        let ids = vec!["alert-1".to_string()];
+        assert!(last_downtime_ids_with(&db, &ids).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_mute_of_an_alert_with_no_state_row_creates_its_rollup_row() {
+        let db = db().await;
+        set_last_downtime_id_with(&db, "realtime-1", Some("dt"))
+            .await
+            .unwrap();
+        let ids = vec!["realtime-1".to_string()];
+        let found = last_downtime_ids_with(&db, &ids).await.unwrap();
+        assert_eq!(found.get("realtime-1").map(String::as_str), Some("dt"));
+        let row = get_with(&db, "realtime-1", ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .expect("the rollup row is inserted");
+        assert_eq!(
+            row.last_outcome, None,
+            "the other columns keep their defaults"
+        );
+        assert_eq!(row.level, None);
+
+        // A second mute updates the row it made, and a clear leaves no record.
+        set_last_downtime_id_with(&db, "realtime-1", Some("dt-2"))
+            .await
+            .unwrap();
+        let found = last_downtime_ids_with(&db, &ids).await.unwrap();
+        assert_eq!(found.get("realtime-1").map(String::as_str), Some("dt-2"));
+        assert_eq!(
+            set_last_downtime_id_with(&db, "realtime-1", None)
+                .await
+                .unwrap(),
+            1
+        );
+        assert!(last_downtime_ids_with(&db, &ids).await.unwrap().is_empty());
+        // A clear of an alert with no row inserts nothing.
+        set_last_downtime_id_with(&db, "never-ran", None)
+            .await
+            .unwrap();
+        assert!(
+            get_with(&db, "never-ran", ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
     /// The episode axis has to survive the UPDATE half of the upsert, not only
     /// the INSERT.
     ///
@@ -1664,5 +1917,59 @@ mod tests {
         );
         assert!(stored.episode_opened_at.is_none());
         assert!(stored.episode_incident_id.is_none());
+    }
+    #[tokio::test]
+    async fn rule_value_transition_is_stored_as_text() {
+        let db = db().await;
+        for (i, value) in ["NaN", "+Inf", "-Inf", "0.25"].iter().enumerate() {
+            let mut update = update_at("host=a", 1_750_000_000_000_000 + i as i64);
+            let t = update.transition.as_mut().unwrap();
+            t.rule_value = Some((*value).into());
+            t.value = None;
+            write_transition(&db, t).await.unwrap();
+        }
+        let rows = alert_state_transitions::Entity::find()
+            .order_by_asc(alert_state_transitions::Column::At)
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(
+            rows.iter()
+                .map(|r| r.rule_value.as_deref().unwrap())
+                .collect::<Vec<_>>(),
+            ["NaN", "+Inf", "-Inf", "0.25"]
+        );
+        assert!(rows.iter().all(|r| r.value.is_none()));
+    }
+
+    async fn insert_transition(
+        db: &sea_orm::DatabaseConnection,
+        alert_id: &str,
+        group_key: &str,
+        at: i64,
+    ) {
+        let update = update_for(alert_id, group_key, at);
+        write_transition(db, update.transition.as_ref().unwrap())
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_flapping_alert_cannot_crowd_another_out_of_its_transitions() {
+        let db = db().await;
+        for at in 1..=10 {
+            insert_transition(&db, "noisy", "g", at).await;
+        }
+        insert_transition(&db, "quiet", "g", 200).await;
+        insert_transition(&db, "quiet", "other", 19).await;
+        insert_transition(&db, "quiet", "g", 20).await;
+        insert_transition(&db, "quiet", "g", 21).await;
+        let ids = ["noisy".to_string(), "quiet".to_string()];
+        let lanes = list_transitions_between_many_with(&db, &ids, Some("g"), 5, 100, 3)
+            .await
+            .unwrap();
+        let ats = |id: &str| lanes[id].iter().map(|t| t.at).collect::<Vec<_>>();
+        assert_eq!(ats("noisy"), [5, 6, 7]);
+        assert_eq!(ats("quiet"), [20, 21]);
     }
 }

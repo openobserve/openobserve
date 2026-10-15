@@ -176,10 +176,22 @@ async fn variable_record(
     org_id: &str,
     payload: SyntheticsVariablePayload,
 ) -> Result<SyntheticsVariableRecord> {
+    sealed_variable_record(org_id, payload, async || {
+        infra::table::cipher::get_dek(org_id).await
+    })
+    .await
+}
+
+/// The wire payload with its value encrypted under the DEK from `dek`, called only for a value.
+async fn sealed_variable_record(
+    org_id: &str,
+    payload: SyntheticsVariablePayload,
+    dek: impl AsyncFnOnce() -> Result<Vec<u8>>,
+) -> Result<SyntheticsVariableRecord> {
     let value = if payload.value.is_empty() {
         String::new()
     } else {
-        let dek = infra::table::cipher::get_dek(org_id).await?;
+        let dek = dek().await?;
         config::utils::encryption::encrypt_secret_value(&dek, &payload.value)
             .map_err(|e| Error::Message(format!("encrypt on apply failed: {e}")))?
     };
@@ -254,11 +266,15 @@ mod tests {
 
     #[tokio::test]
     async fn a_value_is_encrypted_before_it_is_stored() {
-        let Ok(record) = variable_record("org1", variable("hunter2")).await else {
-            return;
-        };
+        let dek = vec![4u8; 64];
+        let record = sealed_variable_record("org1", variable("hunter2"), async || Ok(dek.clone()))
+            .await
+            .unwrap();
         assert!(record.value.starts_with("AESenc:"), "{}", record.value);
-        assert_ne!(record.value, "hunter2");
+        assert_eq!(
+            config::utils::encryption::decrypt_secret_value(&dek, &record.value).unwrap(),
+            "hunter2"
+        );
     }
 
     #[tokio::test]

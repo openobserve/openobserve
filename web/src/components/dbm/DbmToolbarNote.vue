@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="TONE_TEXT[tone]"
     :data-test="dataTest"
   >
+    <OTooltip side="bottom" :content="detail ?? text" />
     <OIcon :name="icon ?? TONE_ICON[tone]" size="sm" class="shrink-0" />
     <span v-if="!compact" class="min-w-0 truncate max-xl:hidden" :data-test="`${dataTest}-text`">
       {{ text }}
     </span>
-    <OTooltip side="bottom" :content="detail ?? text" />
   </span>
 </template>
 

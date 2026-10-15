@@ -323,6 +323,12 @@ impl ScalarUDFImpl for RegxpMatchToFields {
             }
         };
 
+        if result.is_empty() {
+            return Err(DataFusionError::Execution(
+                "regexp_match_to_fields requires at least one input row".to_string(),
+            ));
+        }
+
         // 2. Unpack result and argument to construct returning struct
         let fields = regex_pattern_to_fields(&regexp_pattern, &ret_data_type)?;
 
@@ -565,5 +571,20 @@ mod tests {
         ];
         let result = ctx.sql(sql).await.unwrap().collect().await.unwrap();
         assert_batches_eq!(expected, &result);
+    }
+
+    #[tokio::test]
+    async fn test_regexp_match_to_fields_empty_input_does_not_panic() {
+        let schema = Arc::new(Schema::new(vec![Field::new("log", DataType::Utf8, false)]));
+        let batch = RecordBatch::new_empty(schema.clone());
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(ScalarUDF::from(RegxpMatchToFields::new()));
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let sql = r#"select regexp_match_to_fields(log, '(?P<a>[^\s]+)') as subquery from t"#;
+        let result = ctx.sql(sql).await.unwrap().collect().await;
+        assert!(result.is_err());
     }
 }

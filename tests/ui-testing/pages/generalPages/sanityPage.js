@@ -3,7 +3,7 @@ const { waitUtils } = require('../../playwright-tests/utils/wait-helpers.js');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
-import { openNavFlyoutChild } from '../commonActions.js';
+import { openNavFlyoutChild, gotoStreamsViaNav } from '../commonActions.js';
 
 export class SanityPage {
     constructor(page) {
@@ -632,8 +632,7 @@ export class SanityPage {
 
         const uniqueStreamName = `sanitylogstream_${generateSuffix()}`;
 
-        await this.streamsMenuItem.click();
-        await this.page.waitForLoadState('domcontentloaded');
+        await gotoStreamsViaNav(this.page);
 
         await this.addStreamButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.addStreamButton.click();
@@ -735,7 +734,7 @@ export class SanityPage {
     // Stream Stats Methods
     // ================================================================
     async displayResultsOnRefreshStats() {
-        await this.streamsMenuItem.click();
+        await gotoStreamsViaNav(this.page);
         await this.refreshStatsButton.click();
         await this.page.reload();
         await this.page.waitForLoadState('domcontentloaded');

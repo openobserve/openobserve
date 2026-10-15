@@ -9,6 +9,8 @@ assertion runs as a purpose-made editor or custom-role user.
 - Changing which labels are protected needs the same grant.
 - `prompt` grants are per prompt: list, match and resolve only reach prompts the
   caller can read, and `{id}` routes check the prompt itself.
+- Listing and creating are authorized on the prompt folder (`pfolder`), and a
+  grant on a folder reaches the prompts inside it.
 
 All artifacts are namespaced `prompt_rbac_*`; prompts are archived on teardown
 (the registry has no hard delete).
@@ -107,13 +109,13 @@ def env(create_session, base_url):
     role_id = f"prompt_rbac_role_{tag}"
     resp = root.post(f"{base_url}api/{ORG_ID}/roles", json={"role": role_id})
     assert resp.status_code in (200, 201), f"role create failed: {resp.status_code} {resp.text[:300]}"
-    # Prompt A only, plus the org-wide LIST the collection routes need.
+    # Prompt A only, plus the org-wide folder LIST the collection routes need.
     _grant(
         root,
         base_url,
         role_id,
         [
-            (f"prompt:_all_{ORG_ID}", "AllowList"),
+            (f"pfolder:_all_{ORG_ID}", "AllowList"),
             (f"prompt:{prompts['a']}", "AllowGet"),
             (f"prompt:{prompts['a']}", "AllowPut"),
         ],
@@ -220,6 +222,56 @@ def test_scoped_user_writes_only_granted_prompt(env, base_url):
     s, prompts = env["scoped"], env["prompts"]
     assert _move(s, base_url, prompts["a"], "staging", 2).status_code == 200
     assert _move(s, base_url, prompts["b"], "staging", 2).status_code == 403
+
+
+def test_folder_grant_reaches_its_prompts(env, base_url):
+    root, s = env["root"], env["scoped"]
+    tag = uuid.uuid4().hex[:6]
+    resp = root.post(
+        f"{base_url}api/v2/{ORG_ID}/folders/prompts",
+        json={"name": f"prompt_rbac_folder_{tag}", "description": ""},
+    )
+    assert resp.status_code == 200, resp.text
+    folder_id = resp.json()["folderId"]
+    name = f"prompt_rbac_in_folder_{tag}"
+    resp = root.post(
+        f"{base_url}api/{ORG_ID}/prompts",
+        params={"folder": folder_id},
+        json={
+            "name": name,
+            "folderId": folder_id,
+            "type": "text",
+            "payload": "You are an assistant.",
+            "config": {},
+            "commitMessage": "v1",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    entity_id = resp.json()["prompt"]["entityId"]
+    prompt = f"{base_url}api/{ORG_ID}/prompts/{entity_id}"
+    try:
+        assert s.get(prompt).status_code == 403
+
+        _grant(root, base_url, env["role_id"], [(f"pfolder:{folder_id}", "AllowGet")])
+        time.sleep(2)
+        assert s.get(prompt).status_code == 200
+        # Runtime callers name the prompt, never its folder.
+        resolve = f"{base_url}api/{ORG_ID}/prompts/resolve"
+        assert s.get(resolve, params={"name": name, "label": "latest"}).status_code == 200
+        # Read on the folder is not write, and not write into it either.
+        assert s.patch(prompt, json={"description": "x"}).status_code == 403
+        resp = s.patch(
+            f"{base_url}api/{ORG_ID}/prompts/{env['prompts']['a']}", json={"folderId": folder_id}
+        )
+        assert resp.status_code == 403, resp.text
+
+        # Once the prompt leaves the folder, the folder's grant stops reaching it.
+        assert root.patch(prompt, json={"folderId": "default"}).status_code == 200
+        time.sleep(2)
+        assert s.get(prompt).status_code == 403
+    finally:
+        root.post(f"{prompt}/archive")
+        root.delete(f"{base_url}api/v2/{ORG_ID}/folders/prompts/{folder_id}")
 
 
 def test_protected_label_grant_is_explicit(env, base_url):

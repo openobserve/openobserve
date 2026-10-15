@@ -1,6 +1,8 @@
 // Dashboard actions page
 // Methods : AddPanelName, SavePanel, ApplyDashboardBtn, AddNextPanel, GetTableRowCount, VerifyChartRenders
 
+import { SELECTORS, visibleOnly } from "./dashboard-selectors.js";
+
 export default class DashboardactionPage {
   constructor(page) {
     this.page = page;
@@ -14,6 +16,12 @@ export default class DashboardactionPage {
     this.panelSaveBtn = page.locator('[data-test="dashboard-panel-save"]');
     this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
     this.addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
+    this.layoutEditBtn = page.locator('[data-test="dashboard-edit-btn"]');
+    this.layoutEditSaveBtn = page.locator('[data-test="dashboard-edit-save-btn"]');
+    this.layoutEditDiscardBtn = page.locator('[data-test="dashboard-edit-discard-btn"]');
+    this.layoutEditUndoBtn = page.locator('[data-test="dashboard-edit-undo-btn"]');
+    this.layoutEditRedoBtn = page.locator('[data-test="dashboard-edit-redo-btn"]');
+    this.layoutEditChangesCount = page.locator('[data-test="dashboard-edit-changes-count"]');
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
     this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
@@ -181,6 +189,22 @@ export default class DashboardactionPage {
     return this.panelSaveBtn;
   }
 
+  // Raw discard-button locator for callers that must own the confirm dialog
+  // themselves (discardPanel() installs its own auto-accepting handler).
+  getPanelDiscardBtn() {
+    return this.discardPanelBtn;
+  }
+
+  getPanelBar() {
+    return this.panelBar;
+  }
+
+  // Scoped to the rendered layout branch: PanelEditor.vue mounts the field list
+  // twice, so the bare data-test matches 2 nodes.
+  getFieldListSearchInput() {
+    return this.page.locator(visibleOnly(SELECTORS.FIELD_LIST_SEARCH)).first();
+  }
+
   // Save panel button
   async savePanel() {
     await this.panelSaveBtn.waitFor({ state: "visible" });
@@ -306,10 +330,37 @@ export default class DashboardactionPage {
     const actionTestId = actionDataTestIds[action];
     if (!actionTestId) throw new Error(`Unknown action: ${action}`);
 
+    // The panel menu offers "Edit layout" only in layout edit mode, and only that item there.
+    if (action === "Layout") await this.enterLayoutEdit();
+
     await this.page
       .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
       .click();
     await this.page.locator(`[data-test="${actionTestId}"]`).click();
+  }
+
+  async enterLayoutEdit() {
+    await this.layoutEditBtn.waitFor({ state: "visible" });
+    await this.layoutEditBtn.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "visible" });
+  }
+
+  async saveLayoutEdit() {
+    await this.layoutEditSaveBtn.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
+  }
+
+  async discardLayoutEdit() {
+    await this.layoutEditDiscardBtn.click();
+    const confirm = this.page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
+    await Promise.race([
+      confirm.waitFor({ state: "visible" }),
+      this.layoutEditSaveBtn.waitFor({ state: "hidden" }),
+    ]).catch(() => {});
+    if (await confirm.isVisible()) await confirm.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
   }
 
   /**
@@ -496,6 +547,47 @@ export default class DashboardactionPage {
     // any subsequent search/filter operates on already-loaded data.
     await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     await this.page.waitForTimeout(1000);
+  }
+
+  // Legend is canvas-painted, so read series names via `_vnode` (`__vueParentComponent` is dev-only).
+  async getChartSeriesNames(scopeSelector = '[data-test="chart-renderer"]') {
+    return this.page.evaluate((scopeSel) => {
+      const scopes = Array.from(document.querySelectorAll(scopeSel));
+      const names = new Set();
+      const visited = new Set();
+      const walk = (node, depth) => {
+        if (!node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
+        visited.add(node);
+        const comp = node.component;
+        if (comp) {
+          const state = comp.setupState || {};
+          let chart = null;
+          try {
+            chart = "chart" in state ? state.chart : null;
+          } catch {
+            chart = null;
+          }
+          const host = state.chartRef;
+          if (
+            chart &&
+            typeof chart.getOption === "function" &&
+            host instanceof Element &&
+            scopes.some((scope) => scope.contains(host))
+          ) {
+            try {
+              for (const s of chart.getOption()?.series ?? []) if (s?.name) names.add(String(s.name));
+            } catch {
+              // A disposed instance throws; it draws nothing anyway.
+            }
+          }
+          walk(comp.subTree, depth + 1);
+        }
+        if (node.suspense) walk(node.suspense.activeBranch, depth + 1);
+        if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
+      };
+      walk(document.querySelector("#app")?._vnode, 0);
+      return [...names];
+    }, scopeSelector);
   }
 
   /**

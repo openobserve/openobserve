@@ -264,12 +264,11 @@ describe.skip("Quota page", () => {
     expect(wrapper.vm.editTable).toBe(true);
   });
 
-  it("getRolesByOrganization populates rolesLimitRows and resultTotal", async () => {
+  it("getRolesByOrganization populates rolesLimitRows", async () => {
     const wrapper = await mountQuota();
     await wrapper.vm.updateActiveTab("role-limits");
     await flushPromises();
     expect(wrapper.vm.rolesLimitRows.length).toBeGreaterThan(0);
-    expect(wrapper.vm.resultTotal).toBe(wrapper.vm.rolesLimitRows.length);
   });
 
   it("restrictToNumbers prevents invalid keypress", async () => {

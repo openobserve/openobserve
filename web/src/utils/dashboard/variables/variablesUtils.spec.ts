@@ -765,6 +765,15 @@ describe("Variables Utils", () => {
     it("returns undefined without variables", () => {
       expect(getVariablesReferencedInQueries(undefined, [{ query: "$a" }])).toBeUndefined();
     });
+
+    it("includes variables used only in a formula", () => {
+      expect(
+        getVariablesReferencedInQueries(
+          [{ name: "factor", type: "textbox" }],
+          [{ query: "", config: { formula: "A * $factor" } }],
+        )?.map((v) => v.name),
+      ).toEqual(["factor"]);
+    });
   });
 
   describe("processVariableContent with shared name prefixes", () => {

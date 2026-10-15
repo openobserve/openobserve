@@ -565,6 +565,63 @@ describe("ChartRenderer", () => {
       }
     });
 
+    it("carries the clicked series' index on domcontextmenu, for the alert's query", async () => {
+      const echarts = await import("echarts/core");
+      const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
+      vi.mocked(mockChart.getOption).mockReturnValue({ series: [{ type: "line" }] });
+      const contextMenuHandler = vi
+        .mocked(mockChart.on)
+        .mock.calls.find((call) => call[0] === "contextmenu")?.[1];
+      expect(contextMenuHandler).toBeDefined();
+
+      contextMenuHandler!({
+        seriesName: "b",
+        dataIndex: 3,
+        seriesIndex: 2,
+        value: [1609459200000, 7],
+        event: {
+          event: { clientX: 1, clientY: 2, preventDefault: vi.fn(), stopPropagation: vi.fn() },
+        },
+      });
+      await flushPromises();
+
+      expect(wrapper.emitted("domcontextmenu")?.[0][0]).toEqual({
+        x: 1,
+        y: 2,
+        value: 7,
+        seriesIndex: 2,
+        dataIndex: 3,
+      });
+    });
+
+    it("leaves the tooltip alone on both right-click paths; only an opened alert menu hides it", async () => {
+      const echarts = await import("echarts/core");
+      const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
+      vi.mocked(mockChart.getOption).mockReturnValue({ series: [{ type: "line" }] });
+      vi.mocked(mockChart.convertFromPixel).mockReturnValue([1609459200000, 5]);
+      vi.mocked(mockChart.dispatchAction).mockClear();
+      const seriesHandler = vi
+        .mocked(mockChart.on)
+        .mock.calls.find((call) => call[0] === "contextmenu")?.[1];
+
+      seriesHandler!({
+        seriesIndex: 0,
+        dataIndex: 1,
+        value: [1609459200000, 7],
+        event: {
+          event: { clientX: 1, clientY: 2, preventDefault: vi.fn(), stopPropagation: vi.fn() },
+        },
+      });
+      await wrapper.find('[data-test="chart-renderer"]').trigger("contextmenu", {
+        clientX: 10,
+        clientY: 20,
+      });
+      await flushPromises();
+
+      expect(wrapper.emitted("domcontextmenu")).toHaveLength(2);
+      expect(mockChart.dispatchAction).not.toHaveBeenCalledWith({ type: "hideTip" });
+    });
+
     it("should not emit domcontextmenu for non-bar/line chart types", async () => {
       const echarts = await import("echarts/core");
       const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
@@ -723,6 +780,51 @@ describe("ChartRenderer", () => {
       await flushPromises();
 
       expect(wrapper.exists()).toBe(true);
+    });
+  });
+
+  describe("legend isolation", () => {
+    it("toggles a series left out of the legend together with the series it follows", async () => {
+      const echarts = await import("echarts/core");
+      wrapper.unmount();
+      vi.clearAllMocks();
+      wrapper = mount(ChartRenderer, {
+        props: {
+          data: {
+            ...mockChartData,
+            options: {
+              ...mockChartData.options,
+              series: [
+                { name: "api-1", type: "line", data: [] },
+                { name: "api-2", type: "line", data: [] },
+                { name: "api-1 (1 day ago)", type: "line", data: [], _legendFollows: "api-1" },
+              ],
+            },
+          },
+          renderType: "canvas",
+          height: "100%",
+        },
+        global: {
+          plugins: [i18n],
+          provide: { store, hoveredSeriesState: mockHoveredSeriesState },
+        },
+      });
+      await flushPromises();
+      const chart = (echarts.init as any).mock.results.at(-1).value;
+      const onLegend = chart.on.mock.calls.find(
+        ([event]: any[]) => event === "legendselectchanged",
+      )[1];
+      chart.getOption.mockReturnValue({ legend: [{}] });
+
+      onLegend({ name: "api-2", selected: { "api-1": false, "api-2": true } });
+
+      const legend = chart.setOption.mock.calls.findLast(([option]: any[]) => option?.legend)[0]
+        .legend[0];
+      expect(legend.selected).toEqual({
+        "api-1": false,
+        "api-2": true,
+        "api-1 (1 day ago)": false,
+      });
     });
   });
 });

@@ -54,7 +54,7 @@ describe("Okta.vue", () => {
       global: {
         plugins: [store],
         stubs: {
-          CopyContent: {
+          CredentialCodeBlock: {
             template: '<div data-test="copy-content-stub">{{ content }}</div>',
             props: ["content"],
           },
@@ -70,7 +70,7 @@ describe("Okta.vue", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render CopyContent component", () => {
+    it("should render CredentialCodeBlock component", () => {
       const wrapper = mountComponent();
 
       expect(wrapper.find('[data-test="copy-content-stub"]').exists()).toBe(true);

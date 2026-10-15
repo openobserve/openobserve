@@ -190,14 +190,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-text-secondary text-2xs shrink-0">→</span>
                 <OTag type="alertLevel" :value="row.level" class="shrink-0" />
               </template>
-              <span
+              <OTruncatedText
                 v-if="row.group_label"
-                class="text-2xs text-text-secondary min-w-0 truncate"
+                class="text-2xs text-text-secondary"
                 data-test="alert-history-group-label"
               >
                 {{ t("alerts.historyTable.forGroup", { group: row.group_label }) }}
-                <OTooltip :content="row.group_label" :max-width="'18.75rem'" />
-              </span>
+              </OTruncatedText>
             </div>
           </template>
 
@@ -543,7 +542,7 @@ import { useQuery } from "@tanstack/vue-query";
 import { alertHistoryQuery, alertsListQuery } from "@/services/alerts.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, onMounted, watch, nextTick } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
@@ -560,6 +559,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -569,6 +569,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const route = useRoute();
 
 // Data
 // The query shape this page is currently reading (range + page + sort +
@@ -957,9 +958,10 @@ const closeErrorDialog = () => {
 };
 
 const goBack = () => {
+  const { folder, tab } = route.query;
   router.push({
     name: "alertList",
-    query: { org_identifier: store.state.selectedOrganization.identifier },
+    query: { org_identifier: store.state.selectedOrganization.identifier, folder, tab },
   });
 };
 

@@ -44,6 +44,7 @@ import windows from "./content/windows";
 import macos from "./content/macos";
 import gcp from "./content/gcp";
 import otlpTraces from "./content/otlpTraces";
+import nvidiaDcgm from "./content/nvidiaDcgm";
 
 /**
  * Given per-org substitutions and the caller's `t`, returns a data source's
@@ -72,6 +73,7 @@ const registry: Record<string, DataSourceCardBuilder> = {
   macos,
   gcp,
   otlpTraces,
+  nvidiaDcgm,
 };
 
 /** Whether a data source slug has an in-repo rich setup card. */

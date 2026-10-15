@@ -88,7 +88,7 @@ jobs:
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master
         with:
           toolchain: nightly-2026-05-20
 
@@ -367,6 +367,11 @@ jobs:
           - label: sqlite_meta_invalid_utf8
             env: ""
             target: tests/regression/test_sqlite_invalid_utf8_meta_startup.py
+
+          # Cross-tenant gRPC ingest (o2-enterprise#2821); needs no server env, the listener is on by default.
+          - label: grpc_ingest_org_binding
+            env: ""
+            target: tests/regression/test_grpc_ingest_org_binding.py
     steps:
       - uses: actions/checkout@v5
 

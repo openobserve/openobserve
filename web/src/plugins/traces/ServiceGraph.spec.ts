@@ -2275,4 +2275,34 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.find('[data-test="service-graph-density-btn"]').exists()).toBe(true);
     });
   });
+
+  describe("node side panel time range", () => {
+    it("resolves the range when the panel opens instead of passing stored start/end", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      const resolvedNow = { startTime: 3000000, endTime: 4000000 };
+      mockGetEffectiveTimeRange.mockReturnValueOnce(resolvedNow);
+
+      wrapper.vm.handleNodeClick({ dataType: "node", data: wrapper.vm.graphData.nodes[0] });
+      await flushPromises();
+
+      const panel = wrapper.findComponent({ name: "ServiceGraphSidePanel" });
+      expect(panel.props("timeRange")).toEqual(resolvedNow);
+      expect(mockGetEffectiveTimeRange).toHaveBeenLastCalledWith(mockSearchObj.data.datetime);
+    });
+
+    it("passes an absolute range through unchanged", async () => {
+      mockSearchObj.data.datetime.type = "absolute";
+      mockSearchObj.data.datetime.startTime = 1000;
+      mockSearchObj.data.datetime.endTime = 2000;
+      wrapper = createWrapper();
+      await flushPromises();
+
+      wrapper.vm.handleNodeClick({ dataType: "node", data: wrapper.vm.graphData.nodes[0] });
+      await flushPromises();
+
+      const panel = wrapper.findComponent({ name: "ServiceGraphSidePanel" });
+      expect(panel.props("timeRange")).toEqual({ startTime: 1000, endTime: 2000 });
+    });
+  });
 });

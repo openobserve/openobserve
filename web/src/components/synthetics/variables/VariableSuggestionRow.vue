@@ -34,11 +34,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="synthetics-variable-suggestion-name"
       >{{ suggestion.name }}</span
     >
-    <span
+    <OTruncatedText
       v-if="suggestion.envs.length"
-      class="text-text-secondary min-w-0 truncate text-xs"
+      class="text-text-secondary text-xs"
       data-test="synthetics-variable-suggestion-envs"
-      >{{ envsText }}</span
+      >{{ envsText }}</OTruncatedText
     >
     <span v-if="gapText" class="ms-auto flex shrink-0">
       <OTooltip :content="gapText" side="top">
@@ -70,6 +70,7 @@ import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { VariableSuggestion } from "./suggestions";
 
 const props = defineProps<{

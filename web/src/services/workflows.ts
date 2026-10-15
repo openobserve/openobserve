@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 const workflows = {
   // List the org's workflows in one folder. Omitting `folder` lets the backend
@@ -56,7 +57,12 @@ const workflows = {
     if (draft) params.set("draft", "true");
     if (folder) params.set("folder", folder);
     const qs = params.toString();
-    return http().post(`/api/${org_identifier}/workflows${qs ? `?${qs}` : ""}`, data);
+    return http()
+      .post(`/api/${org_identifier}/workflows${qs ? `?${qs}` : ""}`, data)
+      .then((res) => {
+        analytics.track("workflow_created", { draft: !!draft });
+        return res;
+      });
   },
 
   // Update an existing workflow by id. `draft=true` updates the drafts-table row
@@ -87,7 +93,12 @@ const workflows = {
     draft?: boolean;
   }) => {
     const url = `/api/${org_identifier}/workflows/${id}${draft ? "?draft=true" : ""}`;
-    return http().delete(url);
+    return http()
+      .delete(url)
+      .then((res) => {
+        analytics.track("workflow_deleted", { draft: !!draft, count: 1 });
+        return res;
+      });
   },
 
   // Promote a draft into a proper (published) workflow. The backend re-validates
@@ -109,7 +120,12 @@ const workflows = {
   }) => {
     const params = new URLSearchParams({ trigger_type });
     if (folder) params.set("folder", folder);
-    return http().post(`/api/${org_identifier}/workflows/promote/${id}?${params.toString()}`);
+    return http()
+      .post(`/api/${org_identifier}/workflows/promote/${id}?${params.toString()}`)
+      .then((res) => {
+        analytics.track("workflow_published");
+        return res;
+      });
   },
 
   // Enable/disable (pause/resume) a workflow.
@@ -149,7 +165,12 @@ const workflows = {
     suppress_destinations?: boolean;
   }) => {
     const url = `/api/${org_identifier}/workflows/test${draft ? "?draft=true" : ""}`;
-    return http().post(url, { workflow, inputs, from_node, suppress_destinations });
+    return http()
+      .post(url, { workflow, inputs, from_node, suppress_destinations })
+      .then((res) => {
+        analytics.track("workflow_test_run_completed", { from_node: !!from_node });
+        return res;
+      });
   },
 
   // Run history for a workflow. `start_time`/`end_time` are Unix microseconds;
@@ -205,7 +226,12 @@ const workflows = {
     from_node?: string;
   }) => {
     const url = `/api/${org_identifier}/workflows/${id}/retry`;
-    return http().post(url, { run_id, from_node });
+    return http()
+      .post(url, { run_id, from_node })
+      .then((res) => {
+        analytics.track("workflow_run_retried", { from_node: !!from_node });
+        return res;
+      });
   },
 };
 

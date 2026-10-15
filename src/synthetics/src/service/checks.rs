@@ -401,6 +401,7 @@ pub async fn list_synthetics(
             referenced_by,
             references,
             reference_state,
+            active_downtime: None,
         });
     }
 
@@ -748,7 +749,7 @@ async fn delete_synthetic_under_lock(
         .map_err(anyhow::Error::new)?;
 
     // Drain any queued checks before deleting.
-    synthetics_jobs::drain_check(conn, id)
+    synthetics_jobs::drain_check(conn, org_id, id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     synthetics_checks::delete(conn, org_id, id)
@@ -783,7 +784,7 @@ async fn delete_each_parents_first(
     let (first, last): (Vec<&String>, Vec<&String>) =
         ids.iter().partition(|id| parents.contains_key(*id));
     for id in first.into_iter().chain(last) {
-        synthetics_jobs::drain_check(conn, id)
+        synthetics_jobs::drain_check(conn, org_id, id)
             .await
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
         if synthetics_checks::delete(conn, org_id, id)
@@ -856,11 +857,7 @@ mod tests {
         needs_composition_lock, run_composition_mutation,
     };
     use crate::service::{
-        composition::{
-            CompositionError,
-            tests::{db_with_synthetics_defaults, subtests_flag},
-            validate_for_save,
-        },
+        composition::{CompositionError, tests::db_with_synthetics_defaults, validate_for_save},
         composition_lock,
     };
 
@@ -1097,7 +1094,6 @@ mod tests {
 
     #[tokio::test]
     async fn an_update_cannot_relabel_a_browser_check_to_skip_the_save_rules() {
-        let _flag = subtests_flag(false).await;
         let org = "org-x1";
         let db = db_with_synthetics_defaults().await;
         parent_and_child(&db, org).await;
@@ -1119,7 +1115,10 @@ mod tests {
         let err = validate_for_save(&db, org, Some("child"), &body)
             .await
             .unwrap_err();
-        assert!(matches!(err, CompositionError::WritesDisabled), "{err:?}");
+        assert!(
+            matches!(err, CompositionError::ReferencedCannotHoldSubtest(_)),
+            "{err:?}"
+        );
 
         let mut missing = check("gone", SyntheticType::Http);
         assert_eq!(
@@ -1145,7 +1144,6 @@ mod tests {
 
     #[tokio::test]
     async fn a_parent_save_racing_a_child_delete_cannot_commit_a_dangling_reference() {
-        let _flag = subtests_flag(true).await;
         race_parent_save_against_child_delete("org-t1-save-first", true).await;
         race_parent_save_against_child_delete("org-t1-delete-first", false).await;
     }
