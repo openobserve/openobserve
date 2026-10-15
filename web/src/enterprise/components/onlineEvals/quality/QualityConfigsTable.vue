@@ -94,7 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("onlineEvals.quality.tiles.ofTotal", { total: tiles.total })
                   }}</span>
                 </template>
-                <template #chart>
+                <!-- No rows yet would read as the all-clear, so the note waits for the list. -->
+                <template v-if="!loading" #chart>
                   <div
                     class="text-text-secondary flex flex-wrap items-center gap-x-1.5 text-xs"
                     data-test="quality-tile-without-result-note"
