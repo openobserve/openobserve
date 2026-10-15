@@ -18,7 +18,11 @@ import type {
   ExperimentCreatePayload,
   ExperimentPreview,
 } from "@/services/llm-experiments.service";
-import { createPreviewRequestGate, withPreviewScorers } from "./experimentPreview";
+import {
+  createPreviewRequestGate,
+  formatEstimatedCost,
+  withPreviewScorers,
+} from "./experimentPreview";
 
 const payload: ExperimentCreatePayload = {
   name: "Pinned preview",
@@ -71,5 +75,17 @@ describe("experiment preview coordination", () => {
 
     expect(gate.isCurrent(staleRequest)).toBe(false);
     expect(gate.isCurrent(gate.start())).toBe(true);
+  });
+});
+
+describe("formatEstimatedCost", () => {
+  it.each([
+    [0.0021, "$0.0021"],
+    [0.22, "$0.22"],
+    [10, "$10.00"],
+    [12345.6, "$12,345.60"],
+    [0, "$0.00"],
+  ])("formats %s as %s", (cost, text) => {
+    expect(formatEstimatedCost(cost)).toBe(text);
   });
 });

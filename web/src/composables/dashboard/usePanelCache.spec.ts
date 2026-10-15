@@ -214,6 +214,29 @@ describe("usePanelCache", () => {
       expect(result.timestamp).toBeTypeOf("number");
     });
 
+    it("keeps each partition's server diagnostics through a save and restore", async () => {
+      const cache = usePanelCache("folder1", "dashboard1", "panel-diag");
+      const key = { query: "diag" };
+      const partitions: any = [
+        { took: 10, scan_size: 5, is_partial: true, function_error: ["vrl failed"] },
+        { took: 3, result_cache_ratio: 100, function_error: [] },
+      ];
+      // The SQL executor hangs the merged hits on the partition array; only the partitions are panel state.
+      partitions.hits = [{ a: 1 }];
+
+      await cache.savePanelCache(
+        key,
+        { resultMetaData: [partitions], isPartialData: false },
+        { start_time: 1, end_time: 2 },
+      );
+      const result = await cache.getPanelCache(key);
+
+      expect(result.value.resultMetaData[0]).toEqual([
+        { took: 10, scan_size: 5, is_partial: true, function_error: ["vrl failed"] },
+        { took: 3, result_cache_ratio: 100, function_error: [] },
+      ]);
+    });
+
     it("should return null when no cache data exists", async () => {
       const cache = usePanelCache("folder1", "dashboard1", "panel1");
       const result = await cache.getPanelCache();

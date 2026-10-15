@@ -22,6 +22,29 @@ export default class DashboardactionPage {
     this.layoutEditUndoBtn = page.locator('[data-test="dashboard-edit-undo-btn"]');
     this.layoutEditRedoBtn = page.locator('[data-test="dashboard-edit-redo-btn"]');
     this.layoutEditChangesCount = page.locator('[data-test="dashboard-edit-changes-count"]');
+    this.layoutEditBadge = page.locator('[data-test="dashboard-edit-badge"]');
+    this.layoutDiscardDialog = page.locator('[data-test="dashboard-edit-discard-dialog"]');
+    this.layoutDiscardConfirmBtn = page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
+    this.layoutDiscardCancelBtn = page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-secondary-btn"]'
+    );
+    this.layoutSettingsHeightInput = page.locator('[data-test="panel-layout-settings-height-input-field"]');
+    this.layoutSettingsApplyBtn = page.locator(
+      '[data-test="panel-layout-settings-drawer"] [data-test="o-dialog-primary-btn"]'
+    );
+    this.panelDragGrip = page.locator('[data-test="dashboard-panel-drag"]');
+    this.lockedGrid = page.locator(".grid-stack.grid-stack-static");
+    this.editingGrid = page.locator(".grid-stack.layout-editing");
+    this.panelMenuEditPanel = page.locator('[data-test="dashboard-edit-panel"]');
+    this.panelMenuEditLayout = page.locator('[data-test="dashboard-edit-layout"]');
+    this.panelMenuDuplicate = page.locator('[data-test="dashboard-duplicate-panel"]');
+    this.panelMenuDelete = page.locator('[data-test="dashboard-delete-panel"]');
+    this.shareBtn = page.locator('[data-test="dashboard-share-btn"]');
+    this.settingsBtn = page.locator('[data-test="dashboard-setting-btn"]');
+    this.addTabBtn = page.locator('[data-test="dashboard-tab-add-btn"]');
+    this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
     this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
@@ -361,6 +384,60 @@ export default class DashboardactionPage {
     ]).catch(() => {});
     if (await confirm.isVisible()) await confirm.click();
     await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
+  }
+
+  getTabRenameBtn(tabId) {
+    return this.page.locator(`[data-test="dashboard-tab-${tabId}-rename-btn"]`);
+  }
+
+  async openPanelMenu(panelName) {
+    const dropdown = this.getEditPanelDropdown(panelName);
+    await dropdown.waitFor({ state: "visible", timeout: 30000 });
+    await dropdown.click();
+  }
+
+  async closePanelMenu() {
+    await this.page.keyboard.press("Escape");
+  }
+
+  // Already in layout edit mode: the dialog's Apply only adds a draft step, it never saves.
+  async applyPanelHeight(panelName, height) {
+    await this.openPanelMenu(panelName);
+    await this.panelMenuEditLayout.click();
+    await this.layoutSettingsHeightInput.waitFor({ state: "visible" });
+    await this.layoutSettingsHeightInput.fill(String(height));
+    await this.layoutSettingsApplyBtn.click();
+    await this.layoutSettingsHeightInput.waitFor({ state: "hidden" });
+  }
+
+  async undoLayoutEdit() {
+    await this.layoutEditUndoBtn.click();
+  }
+
+  async redoLayoutEdit() {
+    await this.layoutEditRedoBtn.click();
+  }
+
+  async requestLayoutDiscard() {
+    await this.layoutEditDiscardBtn.click();
+  }
+
+  async confirmLayoutDiscard() {
+    await this.layoutDiscardConfirmBtn.click();
+    await this.layoutDiscardDialog.waitFor({ state: "hidden" });
+  }
+
+  async cancelLayoutDiscard() {
+    await this.layoutDiscardCancelBtn.click();
+    await this.layoutDiscardDialog.waitFor({ state: "hidden" });
+  }
+
+  async clickDashboardBack() {
+    await this.dashboardBackBtn.click();
+  }
+
+  async pressLayoutShortcut(combo) {
+    await this.page.keyboard.press(combo);
   }
 
   /**

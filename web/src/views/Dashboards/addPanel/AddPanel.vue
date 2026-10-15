@@ -223,6 +223,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @chartApiError="handleChartApiError"
       @dataZoom="onDataZoom"
       @metaDataUpdated="metaDataValue"
+      @applyRequested="runQuery()"
+      @openQueryInspector="showViewPanel = true"
     />
 
     <!-- Query Inspector Dialog -->
@@ -230,6 +232,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showViewPanel"
       :metaData="metaData"
       :data="panelTitle"
+      :diagnostics="panelEditorRef?.panelDiagnostics"
+      :seriesLimit="panelEditorRef?.seriesLimit"
       data-test="query-inspector-dialog"
     />
 
@@ -295,6 +299,12 @@ import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
+import {
+  PANEL_EDITOR_FOCUS_PARAM,
+  parsePanelEditorFocus,
+  usePanelEditorFocus,
+  withoutFocusParam,
+} from "@/composables/dashboard/usePanelEditorFocus";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
@@ -538,6 +548,27 @@ export default defineComponent({
     // this is used to again assign query params on discard or save
     let routeQueryParamsOnMount: any = {};
 
+    const { focusInEditor } = usePanelEditorFocus();
+    // A notice's "Use Top N" / "Edit function" link lands here; the param is dropped once used.
+    let focusParamUsed = false;
+    const dropFocusParam = () => router.replace({ query: withoutFocusParam({ ...route.query }) });
+    // A concurrent replace here (date, variables) can cancel ours or spread a stale query back in.
+    watch(
+      () => route.fullPath,
+      () => {
+        if (focusParamUsed && route.query[PANEL_EDITOR_FOCUS_PARAM] !== undefined) {
+          dropFocusParam();
+        }
+      },
+    );
+    const applyFocusFromRoute = () => {
+      const target = parsePanelEditorFocus(route.query[PANEL_EDITOR_FOCUS_PARAM]);
+      if (!target) return;
+      focusParamUsed = true;
+      dropFocusParam();
+      focusInEditor(dashboardPanelData.layout, target);
+    };
+
     // ======= [START] default variable values
 
     const initialVariableValues: any = { value: {} };
@@ -686,7 +717,7 @@ export default defineComponent({
 
     onMounted(async () => {
       // assign the route query params
-      routeQueryParamsOnMount = JSON.parse(JSON.stringify(route?.query ?? {}));
+      routeQueryParamsOnMount = withoutFocusParam(JSON.parse(JSON.stringify(route?.query ?? {})));
 
       errorData.errors = [];
 
@@ -733,6 +764,7 @@ export default defineComponent({
         // Initialize PanelEditor's chartData after loading panel data
         panelEditorRef.value?.initChartData(dashboardPanelData.data);
         updateDateTime();
+        applyFocusFromRoute();
       } else {
         editMode.value = false;
         resetDashboardPanelDataAndAddTimeField();

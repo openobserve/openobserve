@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 mod attributes;
+mod dictionary_compat;
 mod otlp_json_compat;
 pub mod query;
 mod validation;
@@ -277,7 +278,7 @@ pub async fn otlp_json(
 
 pub async fn handle_otlp_request(
     org_id: &str,
-    request: ExportProfilesServiceRequest,
+    mut request: ExportProfilesServiceRequest,
     req_type: OtlpRequestType,
     in_stream_name: Option<&str>,
     user: IngestUser,
@@ -292,6 +293,7 @@ pub async fn handle_otlp_request(
         return Err(ingestion_gate_error(e));
     }
 
+    dictionary_compat::normalize(&mut request).map_err(ProfilesExportError::InvalidArgument)?;
     validation::validate(&request).map_err(ProfilesExportError::InvalidArgument)?;
 
     let start = std::time::Instant::now();

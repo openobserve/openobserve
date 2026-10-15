@@ -154,6 +154,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
 import { useChatHistory } from "@/composables/useChatHistory";
+import useAiChat from "@/composables/useAiChat";
 import type { ChatMessage } from "@/ts/interfaces/chat";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -274,6 +275,7 @@ const { saveToHistory } = useChatHistory(
   () => store.state.userInfo.email ?? "",
   () => store.state.selectedOrganization.identifier ?? "",
   t,
+  useAiChat().chatHistoryServer(),
 );
 const currentChatId = ref<number | null>(null);
 const chatMessages = ref<ChatMessage[]>([]);

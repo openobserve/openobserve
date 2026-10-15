@@ -78,6 +78,8 @@ export interface ExperimentCreatePayload {
   trialCount: number;
   metadata?: Record<string, unknown> | null;
   idempotencyKey?: string | null;
+  /** Required once the preview's cost estimate is over the warning threshold. */
+  confirmCostEstimate?: boolean;
 }
 
 /**
@@ -118,7 +120,24 @@ export interface ExperimentPreview {
   slotCount: number;
   pinnedScorers: PinnedExperimentScorer[];
   applicability?: ExperimentApplicability;
+  costEstimate?: ExperimentCostEstimate | null;
   sampleSlots: ExperimentSlot[];
+}
+
+/** An order-of-magnitude estimate of what the platform pays to run the experiment. */
+export interface ExperimentCostEstimate {
+  /** null when nothing could be priced. */
+  estimatedCost: number | null;
+  /** false for Remote/SDK tasks: the total is scoring cost only. */
+  taskCostEstimated: boolean;
+  /** Some dimension had no price, or the task side was left out (Remote/SDK). */
+  incomplete: boolean;
+  /** Some model in the run has no price, so the total is a lower bound. */
+  hasUnpricedModel: boolean;
+  /** USD amount above which a create needs confirmation; 0 switches it off. */
+  warningThreshold: number;
+  /** The estimate is above the threshold, so the create must send `confirmCostEstimate`. */
+  confirmationRequired: boolean;
 }
 
 export interface ExperimentScorerApplicability {
@@ -521,6 +540,28 @@ function value<T>(input: any, camel: string, snake: string, fallback: T): T {
   return (input?.[camel] ?? input?.[snake] ?? fallback) as T;
 }
 
+function normalizeCostEstimate(input: any): ExperimentCostEstimate | null {
+  if (!input) return null;
+  const cost = value<number | null>(input, "estimatedCost", "estimated_cost", null);
+  const taskCostEstimated = Boolean(
+    value(input, "taskCostEstimated", "task_cost_estimated", false),
+  );
+  // One entry per priced call site; a null cost means that model has no price.
+  const dimensions = value<any[] | null>(input, "dimensions", "dimensions", null);
+  return {
+    estimatedCost: cost === null ? null : Number(cost),
+    taskCostEstimated,
+    incomplete: Boolean(input.incomplete),
+    hasUnpricedModel: Array.isArray(dimensions)
+      ? dimensions.some((d) => value(d, "estimatedCost", "estimated_cost", null) === null)
+      : Boolean(input.incomplete) && taskCostEstimated,
+    warningThreshold: Number(value(input, "warningThreshold", "warning_threshold", 0)),
+    confirmationRequired: Boolean(
+      value(input, "confirmationRequired", "confirmation_required", false),
+    ),
+  };
+}
+
 function normalizePreview(input: any): ExperimentPreview {
   const applicability = value<any>(input, "applicability", "applicability", {});
   return {
@@ -575,6 +616,7 @@ function normalizePreview(input: any): ExperimentPreview {
         ),
       })),
     },
+    costEstimate: normalizeCostEstimate(value(input, "costEstimate", "cost_estimate", null)),
     sampleSlots: value<any[]>(input, "sampleSlots", "sample_slots", []).map((slot) => ({
       rowId: value(slot, "rowId", "row_id", ""),
       logicalId: value(slot, "logicalId", "logical_id", ""),

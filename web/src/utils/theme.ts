@@ -148,6 +148,15 @@ const pickButtonForeground = (bgHex: string): string => {
   return contrastRatio(white, bgHex) >= MIN_WHITE_CONTRAST ? white : darkText;
 };
 
+/** Text for an arbitrary user-chosen background, always at least WCAG AA (4.5:1). */
+export const pickReadableForeground = (bgHex: string): string => {
+  const darkText = cssToken("--color-grey-900", "#171717");
+  const white = "#FFFFFF";
+  const best = contrastRatio(white, bgHex) >= contrastRatio(darkText, bgHex) ? white : darkText;
+  // On mid-tones (luminance about 0.15-0.26) neither reaches 4.5, but pure black always does.
+  return contrastRatio(best, bgHex) >= 4.5 ? best : "#000000";
+};
+
 /**
  * Mix two colors together (similar to CSS color-mix)
  * @param color1 - First hex color code (e.g., "#3F7994")

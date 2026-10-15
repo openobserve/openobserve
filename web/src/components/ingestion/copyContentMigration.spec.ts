@@ -175,7 +175,7 @@ describe("CredentialCodeBlock", () => {
     const pre = wrapper.find('[data-test="ingestion-curl-code-block-pre"]');
     expect(pre.text()).toContain(maskSecret(PASSCODE));
     expect(wrapper.html()).not.toContain(PASSCODE);
-    await pre.trigger("click");
+    await wrapper.find('[data-test="ingestion-curl-code-block-copy-btn"]').trigger("click");
     await flushPromises();
     expect(copyMock.mock.calls[0][0]).toBe(
       `curl -u ${EMAIL}:${PASSCODE} https://h/api/acme-prod/default/_json`,
@@ -199,10 +199,24 @@ describe("CredentialCodeBlock", () => {
     wrapper.unmount();
   });
 
+  it("says the hidden token is included, with no click-to-copy hint", () => {
+    const wrapper = mountBlock();
+    expect(wrapper.find('[data-test="ingestion-curl-code-block-hint"]').text()).toBe(
+      "Copy includes the org's ingestion token, which stays hidden here.",
+    );
+    wrapper.unmount();
+  });
+
+  it("shows no hint for a snippet without a token", () => {
+    const wrapper = mountBlock("curl https://h/api/acme-prod/default/_json");
+    expect(wrapper.find('[data-test="ingestion-curl-code-block-hint"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it("restarts the page's first-event watch on a copy, like every other copy", async () => {
     const copied = vi.fn();
     const wrapper = mountBlock(template, makeStore(), { [FIRST_EVENT_SNIPPET_COPIED]: copied });
-    await wrapper.find('[data-test="ingestion-curl-code-block-pre"]').trigger("click");
+    await wrapper.find('[data-test="ingestion-curl-code-block-copy-btn"]').trigger("click");
     await flushPromises();
     expect(copied).toHaveBeenCalledTimes(1);
     wrapper.unmount();
@@ -210,7 +224,7 @@ describe("CredentialCodeBlock", () => {
 
   it("copies with no first-event watch on the page", async () => {
     const wrapper = mountBlock();
-    await wrapper.find('[data-test="ingestion-curl-code-block-pre"]').trigger("click");
+    await wrapper.find('[data-test="ingestion-curl-code-block-copy-btn"]').trigger("click");
     await flushPromises();
     expect(copyMock).toHaveBeenCalledTimes(1);
     wrapper.unmount();
@@ -235,7 +249,7 @@ describe("CredentialCodeBlock", () => {
       "org token · staging",
     );
     expect(wrapper.text()).toContain(maskSecret("stagingTOKENvalue987654321"));
-    await wrapper.find('[data-test="ingestion-curl-code-block-pre"]').trigger("click");
+    await wrapper.find('[data-test="ingestion-curl-code-block-copy-btn"]').trigger("click");
     await flushPromises();
     expect(copyMock.mock.calls[0][0]).toContain("stagingTOKENvalue987654321");
     wrapper.unmount();

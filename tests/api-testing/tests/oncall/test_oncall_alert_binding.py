@@ -9,8 +9,8 @@ to destinations, but the "where does this go" check only ever knew about
 destinations and workflows — so an alert whose entire purpose was to wake the
 owning team could not be saved without also nominating a webhook nobody wanted.
 Naming an on-call team IS naming somewhere for the alert to go, and §4.1 pins
-that; §4.2 pins the other side, so the check cannot be loosened into accepting
-an alert that goes nowhere at all.
+that. §4.2 changed with #15267: an alert naming none of the three now saves too,
+and evaluates without notifying anyone.
 
 §6 is advisory by design and the distinction is easy to lose: these are
 **warnings on a 200**, not refusals. Routing is not being changed at save time,
@@ -126,14 +126,20 @@ def test_an_alert_may_page_a_team_with_no_destination_at_all(
     assert stored.json().get("oncall_team") == binding_team, stored.text
 
 
-def test_an_alert_that_goes_nowhere_is_refused(
+def test_an_alert_that_goes_nowhere_still_saves(
         oncall: OnCallClient, binding_stream: str):
-    """§4.2 — none of the three, and the save is refused by name."""
+    """§4.2 — none of the three is accepted since #15267, and reads back empty."""
     payload = paging_alert(uniq("oncall_pt_nowhere"), binding_stream, destinations=[])
     payload["workflows"] = []
     resp = oncall.create_alert(payload)
-    assert resp.status_code == 400, resp.text
-    assert "destination or workflows is required" in resp.text.lower(), resp.text
+    assert resp.status_code == 200, resp.text
+
+    stored = oncall.get_alert(resp.json()["id"])
+    assert stored.status_code == 200, stored.text
+    body = stored.json()
+    assert body.get("destinations") == [], stored.text
+    assert body.get("workflows") == [], stored.text
+    assert not body.get("oncall_team"), stored.text
 
 
 def test_an_alert_naming_a_team_that_does_not_exist_is_refused(

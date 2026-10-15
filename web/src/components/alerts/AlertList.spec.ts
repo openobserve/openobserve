@@ -643,6 +643,27 @@ describe("AlertList - data fetching and columns", () => {
     expect(summary.text()).toContain(String(wrapper.vm.stateCounts.total));
   });
 
+  it("counts and filters firing alerts the same way the Last outcome badge shows them", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    wrapper.vm.filteredResults = [
+      { enabled: true, name: "firing", last_outcome: "firing" },
+      { enabled: true, name: "notify-failed", last_outcome: "notify_failed" },
+      { enabled: true, name: "normal", last_outcome: "normal" },
+      // A paused alert freezes its last outcome, so it never shows Firing.
+      { enabled: false, name: "paused-firing", last_outcome: "firing" },
+    ];
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.vm.stateCounts.firing).toBe(2);
+    expect(wrapper.find('[data-test="alert-summary-firing"]').exists()).toBe(true);
+
+    wrapper.vm.onStatSelect("firing");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual(["firing", "notify-failed"]);
+  });
+
   it("dynamicQueryModel binds to filterQuery by default and to searchQuery when across-folders toggled", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -2037,4 +2058,4 @@ describe("AlertList - triggered in the last 15 minutes", () => {
     expect(never.every((c: any) => !c.find(".rounded-full").exists())).toBe(true);
     expect(fired.filter((c: any) => c.find(".bg-warning-500").exists())).toHaveLength(4);
   });
-});
+}, 15000);

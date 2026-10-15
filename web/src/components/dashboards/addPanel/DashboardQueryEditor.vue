@@ -388,6 +388,12 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
+import {
+  isShown,
+  revealAndFocus,
+  usePanelEditorFocus,
+  waitForElement,
+} from "@/composables/dashboard/usePanelEditorFocus";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -943,6 +949,29 @@ export default defineComponent({
     const onUpdateToggle = () => {
       dashboardPanelData.meta.errors.queryErrors = [];
     };
+
+    // "Edit function" on a dashboard notice lands in the VRL editor, opened beside the query.
+    const { pendingFocus, takeFocus } = usePanelEditorFocus();
+    watch(
+      pendingFocus,
+      async () => {
+        if (promqlMode.value || !takeFocus("vrl")) return;
+        dashboardPanelData.layout.showQueryBar = true;
+        dashboardPanelData.layout.vrlFunctionToggle = true;
+        splitterModel.value = 70;
+        const el = await waitForElement(() => {
+          const found = document.querySelector<HTMLElement>(
+            '[data-test="dashboard-vrl-function-editor"]',
+          );
+          // The editor surface mounts after its pane, so wait for something that can take focus.
+          const ready = found?.querySelector("textarea, [contenteditable='true']");
+          return isShown(found) && ready ? found : null;
+        });
+        // The VRL pane sits beside the query, already in view; scrolling would push the chart preview off.
+        if (el) revealAndFocus(el, { scroll: false });
+      },
+      { immediate: true },
+    );
 
     const onFunctionToggle = (value: any, event?: any) => {
       // OSwitch's @update:model-value calls this with only the value (no event),

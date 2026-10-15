@@ -22,6 +22,57 @@ export class QueryManagementPage {
     // `visible !== false` items), so count 0 rather than merely hidden.
     this.queryManagementTab = page.locator('[data-test="query-management-tab"]');
     this.enterpriseLockedPage = page.locator('[data-test="enterprise-feature-locked"]');
+    this.queryListButton = page.locator('[data-test="queryList-btn"]');
+    this.queryDetailsTable = page.locator('[data-test="queryList-table"]');
+    this.tooltipBubble = page.locator('[data-test="o-tooltip-content"]');
+    this.queryTypeTabs = page.locator('[data-test="running-queries-query-type-tabs"]');
+    this.summaryList = page.locator('[data-test="running-queries-summary-list"]');
+    this.allQueriesList = page.locator('[data-test="running-queries-all-queries-list"]');
+    this.searchTypeFilter = this.allQueriesList.locator('[data-otoggle-value="dashboards"]');
+  }
+
+  async mockRunningQueries(queries) {
+    await this.page.route('**/api/*/query_manager/status', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: queries }) })
+    );
+  }
+
+  async openFirstQueryDetails() {
+    await this.queryListButton.first().click();
+    await expect(this.queryDetailsTable).toBeVisible({ timeout: 15000 });
+  }
+
+  sqlValueCell(sqlPrefix) {
+    return this.queryDetailsTable.getByText(sqlPrefix).first();
+  }
+
+  async hoverUntilTooltipShown(cell) {
+    await cell.hover();
+    await expect(this.tooltipBubble).toBeVisible({ timeout: 5000 });
+  }
+
+  // Records the bubble's bounding box on every frame, from now until stopSampling().
+  async startSamplingBubbleRects() {
+    await this.page.evaluate(() => {
+      window.__bubbleRects = [];
+      let on = true;
+      window.__stopBubbleSampling = () => (on = false);
+      const tick = () => {
+        document.querySelectorAll('[data-test="o-tooltip-content"]').forEach((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.width > 0) window.__bubbleRects.push({ left: r.left, top: r.top });
+        });
+        if (on) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+
+  async stopSamplingBubbleRects() {
+    return this.page.evaluate(() => {
+      window.__stopBubbleSampling();
+      return window.__bubbleRects;
+    });
   }
 
   baseUrl() {
@@ -53,5 +104,36 @@ export class QueryManagementPage {
   async expectEnterpriseLockedPage() {
     await expect(this.enterpriseLockedPage).toBeVisible({ timeout: 15000 });
     await expect(this.page).toHaveURL(/enterprise-locked\?feature=queryManagement/);
+  }
+
+  async stubRunningQueries(org, queries) {
+    await this.page.route(`**/api/${org}/query_manager/status`, (route) =>
+      route.fulfill({ json: { status: queries } })
+    );
+  }
+
+  async navigateToRunningQueries(org) {
+    await this.navigateToQueryManagement(org);
+    await expect(this.queryTypeTabs).toBeVisible({ timeout: 15000 });
+  }
+
+  queryTypeTab(value) {
+    return this.queryTypeTabs.locator(`[data-otoggle-value="${value}"]`);
+  }
+
+  async selectQueryTypeTab(value) {
+    await this.queryTypeTab(value).click();
+  }
+
+  async drillIntoUser(email) {
+    await this.summaryList.getByText(email, { exact: true }).first().click();
+  }
+
+  async expectAllQueriesViewFor(email) {
+    await expect(this.queryTypeTab('all')).toHaveAttribute('data-state', 'on');
+    await expect(this.allQueriesList).toBeVisible();
+    await expect(this.summaryList).toBeHidden();
+    await expect(this.searchTypeFilter).toBeVisible();
+    await expect(this.allQueriesList.getByText(email).first()).toBeVisible();
   }
 }

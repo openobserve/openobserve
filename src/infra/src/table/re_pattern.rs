@@ -112,9 +112,10 @@ pub async fn update_pattern(id: &str, new_pattern: &str) -> Result<(), errors::E
     Ok(())
 }
 
-pub async fn remove(id: &str) -> Result<(), errors::Error> {
+pub async fn remove(org_id: &str, id: &str) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
     Entity::delete_many()
+        .filter(Column::Org.eq(org_id))
         .filter(Column::Id.eq(id))
         .exec(client)
         .await?;
