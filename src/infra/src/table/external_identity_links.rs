@@ -22,7 +22,7 @@ use sea_orm::{
 
 use super::{
     entity::external_identity_links::{ActiveModel, Column, Entity, Model},
-    slack_shared::{db_err, decode_all, enum_text, parse_enum},
+    slack_shared::{db_err, decode_all, decode_pages, enum_text, parse_enum},
 };
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
@@ -136,16 +136,16 @@ pub async fn list_by_installation_with<C: ConnectionTrait>(
     cursor: Option<&str>,
     limit: u64,
 ) -> Result<Vec<ExternalIdentityLink>, Error> {
-    let mut query = live().filter(Column::InstallationId.eq(installation_id));
-    if let Some(cursor) = cursor {
-        query = query.filter(Column::Id.gt(cursor));
-    }
-    let models = query
-        .order_by_asc(Column::Id)
-        .limit(limit)
-        .all(conn)
-        .await?;
-    Ok(decode_rows(models))
+    decode_pages(
+        "external_identity_links",
+        limit,
+        cursor.map(str::to_string),
+        |after, n| installation_page(conn, installation_id, after, n),
+        |m: &Model| m.id.clone(),
+        |m| m.id.clone(),
+        from_model,
+    )
+    .await
 }
 
 pub async fn list_by_email_with<C: ConnectionTrait>(
@@ -209,6 +209,24 @@ pub async fn delete_revoked_before_with<C: ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(result.rows_affected)
+}
+
+/// Raw rows, so the cursor moves past rows that fail to decode.
+async fn installation_page<C: ConnectionTrait>(
+    conn: &C,
+    installation_id: &str,
+    after: Option<String>,
+    limit: u64,
+) -> Result<Vec<Model>, Error> {
+    let mut query = live().filter(Column::InstallationId.eq(installation_id));
+    if let Some(after) = after {
+        query = query.filter(Column::Id.gt(after));
+    }
+    Ok(query
+        .order_by_asc(Column::Id)
+        .limit(limit)
+        .all(conn)
+        .await?)
 }
 
 fn live() -> Select<Entity> {
@@ -422,6 +440,39 @@ mod tests {
         assert_eq!(page(Some("l2")).await, ["l3", "l4"]);
         assert_eq!(page(Some("l4")).await, ["l5"]);
         assert!(page(Some("l5")).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn list_by_installation_fills_the_page_past_undecodable_rows() {
+        let db = db().await;
+        for (id, user) in [
+            ("l1", "U1"),
+            ("l2", "U2"),
+            ("l3", "U3"),
+            ("l4", "U4"),
+            ("l5", "U5"),
+        ] {
+            put_with(&db, &link(id, "i1", user)).await.unwrap();
+        }
+        db.execute_unprepared(
+            "UPDATE external_identity_links SET link_method = 'from_a_newer_release' \
+             WHERE id IN ('l2', 'l3')",
+        )
+        .await
+        .unwrap();
+        let page = |cursor: Option<&'static str>, limit: u64| {
+            let db = &db;
+            async move {
+                ids(list_by_installation_with(db, "i1", cursor, limit)
+                    .await
+                    .unwrap())
+            }
+        };
+        assert_eq!(page(None, 2).await, ["l1", "l4"]);
+        assert_eq!(page(Some("l4"), 2).await, ["l5"]);
+        assert_eq!(page(Some("l1"), 1).await, ["l4"]);
+        assert_eq!(page(None, 10).await, ["l1", "l4", "l5"]);
+        assert!(page(None, 0).await.is_empty());
     }
 
     #[tokio::test]

@@ -110,6 +110,35 @@ pub(super) fn decode_all<M, T>(
         .collect()
 }
 
+/// Reads raw pages until `limit` rows decode or a raw page is short, so short still means done.
+pub(super) async fn decode_pages<M, T, K, F, Fut>(
+    table: &str,
+    limit: u64,
+    start: Option<K>,
+    mut fetch: F,
+    cursor_of: impl Fn(&M) -> K,
+    key: impl Fn(&M) -> String,
+    mut decode: impl FnMut(M) -> Result<T, Error>,
+) -> Result<Vec<T>, Error>
+where
+    F: FnMut(Option<K>, u64) -> Fut,
+    Fut: Future<Output = Result<Vec<M>, Error>>,
+{
+    let mut decoded = Vec::new();
+    let mut cursor = start;
+    while (decoded.len() as u64) < limit {
+        let want = limit - decoded.len() as u64;
+        let rows = fetch(cursor.take(), want).await?;
+        let short = (rows.len() as u64) < want;
+        cursor = rows.last().map(&cursor_of);
+        decoded.extend(decode_all(table, rows, &key, &mut decode));
+        if short {
+            break;
+        }
+    }
+    Ok(decoded)
+}
+
 pub(super) fn db_err(e: DbErr) -> Error {
     match e.sql_err() {
         Some(SqlErr::UniqueConstraintViolation(_)) => Error::DbError(DbError::UniqueViolation),
