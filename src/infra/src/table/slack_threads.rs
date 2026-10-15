@@ -18,19 +18,22 @@ use config::{
     utils::json,
 };
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, Iterable, QueryFilter, QueryOrder, QuerySelect,
-    Select, Set,
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, Iterable, QueryFilter, QueryOrder,
+    QuerySelect, Select, Set,
     sea_query::{Expr, OnConflict},
 };
 
 use super::{
     entity::slack_threads::{ActiveModel, Column, Entity, Model},
-    slack_shared::{db_err, decode_all, enum_text, parse_enum, parse_json},
+    slack_shared::{db_err, decode_pages, enum_text, parse_enum, parse_json},
 };
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors::Error,
 };
+
+/// (expires_at, installation_id, channel_id, thread_ts) of the last raw row read.
+type ExpiredCursor = (i64, String, String, String);
 
 pub async fn put(row: &SlackThread) -> Result<(), Error> {
     put_with(get_orm_client_rw().await, row).await
@@ -132,18 +135,23 @@ pub async fn list_expired_with<C: ConnectionTrait>(
     before: i64,
     limit: u64,
 ) -> Result<Vec<SlackThread>, Error> {
-    let models = live()
-        .filter(Column::ExpiresAt.lt(before))
-        .order_by_asc(Column::ExpiresAt)
-        .limit(limit)
-        .all(conn)
-        .await?;
-    Ok(decode_all(
+    decode_pages(
         "slack_threads",
-        models,
+        limit,
+        None,
+        |after, n| expired_page(conn, before, after, n),
+        |m: &Model| {
+            (
+                m.expires_at,
+                m.installation_id.clone(),
+                m.channel_id.clone(),
+                m.thread_ts.clone(),
+            )
+        },
         |m| format!("{}/{}/{}", m.installation_id, m.channel_id, m.thread_ts),
         from_model,
-    ))
+    )
+    .await
 }
 
 pub async fn delete_with<C: ConnectionTrait>(conn: &C, key: &SlackThreadKey) -> Result<(), Error> {
@@ -173,6 +181,40 @@ pub async fn delete_by_installation_with<C: ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(result.rows_affected)
+}
+
+/// Raw rows in (expires_at, key) order, so the cursor moves past rows that fail to decode.
+async fn expired_page<C: ConnectionTrait>(
+    conn: &C,
+    before: i64,
+    after: Option<ExpiredCursor>,
+    limit: u64,
+) -> Result<Vec<Model>, Error> {
+    let mut query = live().filter(Column::ExpiresAt.lt(before));
+    if let Some((expires_at, installation_id, channel_id, thread_ts)) = after {
+        let same_expiry = Condition::all().add(Column::ExpiresAt.eq(expires_at));
+        let same_installation = same_expiry
+            .clone()
+            .add(Column::InstallationId.eq(installation_id.clone()));
+        let same_channel = same_installation
+            .clone()
+            .add(Column::ChannelId.eq(channel_id.clone()));
+        query = query.filter(
+            Condition::any()
+                .add(Column::ExpiresAt.gt(expires_at))
+                .add(same_expiry.add(Column::InstallationId.gt(installation_id)))
+                .add(same_installation.add(Column::ChannelId.gt(channel_id)))
+                .add(same_channel.add(Column::ThreadTs.gt(thread_ts))),
+        );
+    }
+    Ok(query
+        .order_by_asc(Column::ExpiresAt)
+        .order_by_asc(Column::InstallationId)
+        .order_by_asc(Column::ChannelId)
+        .order_by_asc(Column::ThreadTs)
+        .limit(limit)
+        .all(conn)
+        .await?)
 }
 
 fn live() -> Select<Entity> {
@@ -337,6 +379,39 @@ mod tests {
             ["1.1", "1.2", "1.3"]
         );
         assert!(list_expired_with(&db, 100, 10).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn list_expired_fills_the_page_past_undecodable_rows() {
+        let db = db().await;
+        for (ts, expires_at) in [("1.1", 100), ("1.2", 100), ("1.3", 100), ("1.4", 200)] {
+            put_with(&db, &thread(ts, "acme", expires_at))
+                .await
+                .unwrap();
+        }
+        let other_channel = SlackThread {
+            channel_id: "C0".to_string(),
+            ..thread("1.9", "acme", 100)
+        };
+        put_with(&db, &other_channel).await.unwrap();
+        db.execute_unprepared(
+            "UPDATE slack_threads SET kind = 'from_a_newer_release' \
+             WHERE thread_ts IN ('1.1', '1.2')",
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            tss(list_expired_with(&db, 500, 2).await.unwrap()),
+            ["1.9", "1.3"]
+        );
+        assert_eq!(
+            tss(list_expired_with(&db, 500, 3).await.unwrap()),
+            ["1.9", "1.3", "1.4"]
+        );
+        assert_eq!(
+            tss(list_expired_with(&db, 500, 10).await.unwrap()),
+            ["1.9", "1.3", "1.4"]
+        );
     }
 
     #[tokio::test]
