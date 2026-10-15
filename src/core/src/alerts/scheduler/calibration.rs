@@ -18,6 +18,7 @@
 use chrono::Duration;
 use config::{
     cluster::LOCAL_NODE,
+    get_config,
     meta::{
         self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
         triggers::{Trigger, TriggerStatus},
@@ -41,6 +42,7 @@ use usage_reporting::publish_triggers_usage;
 
 const CONFIG_RETRY_SECS: i64 = 60;
 const MAX_CONFIG_RETRY_SECS: i64 = 86_400;
+const WRITE_ALLOWANCE_SECS: i64 = 60;
 
 type ConfigRead = Result<Option<CalibrationConfig>, InfraError>;
 
@@ -169,14 +171,17 @@ pub(super) async fn handle_triggers(
     let (_, max_retries) = get_scheduler_max_retries();
     let pass = Pass::decide(read.as_ref(), trigger.retries, max_retries);
     let analysis = match &pass {
-        Pass::Due(config) => Some(analyse(&trigger, config).await.map_err(|e| {
-            log::error!(
-                "[alert_calibration] pass failed for config {} org={}: {e}",
-                trigger.module_key,
-                trigger.org
-            );
-            e.to_string()
-        })),
+        Pass::Due(config) => {
+            let time_left = time_left(trigger.start_time, started_at, analysis_budget_secs());
+            Some(analyse(&trigger, config, time_left).await.map_err(|e| {
+                log::error!(
+                    "[alert_calibration] pass failed for config {} org={}: {e}",
+                    trigger.module_key,
+                    trigger.org
+                );
+                e.to_string()
+            }))
+        }
         _ => None,
     };
     let mut data: JobData = json::from_str(&trigger.data).unwrap_or_default();
@@ -198,6 +203,11 @@ pub(super) async fn handle_triggers(
     }
     publish_triggers_usage(row);
     Ok(())
+}
+
+/// How long the scheduler keeps a pass's claim alive: its analysis budget plus room to write.
+pub(super) fn claim_lifetime_secs() -> i64 {
+    analysis_budget_secs() + WRITE_ALLOWANCE_SECS
 }
 
 async fn read_config(trigger: &Trigger) -> Option<ConfigRead> {
@@ -231,19 +241,40 @@ fn deployment_enabled() -> bool {
 async fn analyse(
     trigger: &Trigger,
     config: &CalibrationConfig,
+    time_left: std::time::Duration,
 ) -> Result<(i64, i64), anyhow::Error> {
     use o2_enterprise::enterprise::alert_calibration_service::run_pass;
 
     use crate::alerts::alert_calibration::{SearchAdapter, sink::write_digest_records};
 
-    let pass = run_pass(
-        &SearchAdapter,
-        &trigger.org,
-        &trigger.module_key,
-        trigger.next_run_at,
-        config.window_minutes,
+    let pass = tokio::time::timeout(
+        time_left,
+        run_pass(
+            &SearchAdapter,
+            &trigger.org,
+            &trigger.module_key,
+            trigger.next_run_at,
+            config.window_minutes,
+        ),
+    )
+    .await
+    .map_err(|_| {
+        anyhow::anyhow!(
+            "the analysis ran past its {}s budget",
+            analysis_budget_secs()
+        )
+    })??;
+    let cfg = get_config();
+    // Only the claim's holder writes, or a pass that was claimed again lands its digest twice.
+    let held = infra::scheduler::keep_alive_claim(
+        trigger,
+        cfg.limit.alert_schedule_timeout,
+        cfg.limit.report_schedule_timeout,
     )
     .await?;
+    if !held {
+        anyhow::bail!("lost the claim before writing the digest");
+    }
     write_digest_records(&trigger.org, pass.records).await?;
     Ok((pass.window.start_micros, pass.window.end_micros))
 }
@@ -252,8 +283,22 @@ async fn analyse(
 async fn analyse(
     _trigger: &Trigger,
     _config: &CalibrationConfig,
+    _time_left: std::time::Duration,
 ) -> Result<(i64, i64), anyhow::Error> {
     anyhow::bail!("alert calibration is an enterprise feature")
+}
+
+fn analysis_budget_secs() -> i64 {
+    // The collector's longest chain is three searches in a row, each capped by the query timeout.
+    3 * get_config().limit.query_timeout as i64
+}
+
+/// Counted from the claim, since time spent queued for a worker uses up the same keep-alive.
+fn time_left(claimed_at: Option<i64>, now: i64, budget_secs: i64) -> std::time::Duration {
+    let deadline = claimed_at
+        .unwrap_or(now)
+        .saturating_add(second_micros(budget_secs));
+    std::time::Duration::from_micros(u64::try_from(deadline.saturating_sub(now)).unwrap_or(0))
 }
 
 /// Doubling from a minute to a day, so a deleted config stops costing a pull a minute.
@@ -424,6 +469,14 @@ mod tests {
         assert_eq!(outcome.status, RunOutcome::Error);
         assert_eq!(outcome.next_run_at, NOW + 60 * MINUTE);
         assert!(outcome.error.unwrap().starts_with("3 earlier attempts"));
+    }
+
+    #[test]
+    fn the_analysis_budget_runs_from_the_claim() {
+        let left = |claimed_at| time_left(claimed_at, NOW, 1800).as_secs();
+        assert_eq!(left(Some(NOW - 10 * MINUTE)), 1200);
+        assert_eq!(left(Some(NOW - 40 * MINUTE)), 0);
+        assert_eq!(left(None), 1800);
     }
 
     #[test]
