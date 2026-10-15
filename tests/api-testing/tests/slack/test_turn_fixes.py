@@ -3,7 +3,8 @@
 B-LIVE-6: Stop in the agent view cancels the turn in O2 when chats persist (the cancel used to be refused
 415, as O2 takes no state change without a JSON body). B-LIVE-15: every turn tells o2-ai where the org
 opens in OpenObserve (``context.webUrl``), through O2's own chat path unchanged. B-LIVE-10 and 11:
-deleting a question deletes every answer to it, re-asks included, and a stale list cannot answer it again.
+deleting a question deletes every answer to it, re-asks included, its chart file too, and a stale list cannot
+answer it again.
 B-LIVE-12: a turn that ends while its approval waits closes the card, and a later click is refused.
 
 Event shapes are the ones the live run recorded (LIVE-RESULTS.md, 2026-10-15). Needs the flag-on
@@ -160,6 +161,28 @@ def test_deleting_a_question_deletes_its_re_asked_answer_and_a_stale_list_cannot
     wait_until(lambda: [e for e in ephemerals(ready, "U0ANN") if "This question was deleted" in e.get("text", "")],
                "the refusal for the stale list")
     assert len(turns_for(o2ai, tag)) == turns, "no turn for a deleted question"
+
+
+def test_deleting_a_question_deletes_its_chart_file_by_the_id_slack_shared(
+    client: OpenObserveClient, slack_org: str, ready: SlackMock, o2ai: O2aiMock,  # noqa: F811
+) -> None:
+    team, inst, _ = setup_team(client, slack_org, ready, "U0ANN")
+    tag = uniq()
+    o2ai.script({"turn": "chart", "match": tag})
+    text = f"<@U0BOT> plot the queries per minute {tag}"
+    body, ts, _ = event(inst, team, "U0ANN", text)
+    send(client, inst, body)
+    shared = wait_until(lambda: [c for c in ready.calls("files.completeUploadExternal")
+                                 if c["form"].get("thread_ts") == ts and "response" in c], "the chart", timeout=30)
+    file_id = shared[0]["response"]["files"][0]["id"]
+    assert all(c["form"].get("file") != file_id for c in ready.calls("files.delete"))
+
+    for deletion in question_deleted(inst, team, "U0ANN", ts, text):
+        send(client, inst, deletion)
+    deleted = wait_until(lambda: [c for c in ready.calls("files.delete") if c["form"].get("file") == file_id],
+                         "the chart file deleted with its question")
+    assert deleted[0]["bearer"].startswith("xoxb-"), "the bot token, which uploaded it"
+    assert "response" in deleted[0], deleted[0]
 
 
 def test_a_turn_that_ends_while_its_approval_waits_closes_the_card_and_refuses_the_click(
