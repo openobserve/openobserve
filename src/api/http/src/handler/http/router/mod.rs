@@ -711,6 +711,18 @@ fn public_dashboard_admin_routes(router: Router) -> Router {
             "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/refresh",
             post(public_dashboards::admin::refresh),
         )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/status",
+            get(public_dashboards::status::link),
+        )
+        .route(
+            "/{org_id}/public_dashboards/status",
+            get(public_dashboards::status::batch),
+        )
+        .route(
+            "/{org_id}/settings/public_dashboards",
+            get(public_dashboards::settings::get).put(public_dashboards::settings::put),
+        )
 }
 
 pub fn proxy_routes(enable_auth: bool) -> Router {
@@ -867,16 +879,19 @@ pub fn basic_routes() -> Router {
             .route("/status/{slug}", get(status_pages::public::page));
     }
 
-    // Always registered: the handlers answer 404 while the env flag or the org switch is off.
-    router = router
-        .route(
-            "/api/public_dashboards/{slug}",
-            get(public_dashboards::public::config),
-        )
-        .route(
-            "/api/public_dashboards/{slug}/data",
-            get(public_dashboards::public::data),
-        );
+    // Always registered: the handlers answer 404 while the env flag or the org switch is off. A
+    // router has no result files, so there these paths fall to its proxy, keyed by the slug.
+    if !config::cluster::LOCAL_NODE.is_router() {
+        router = router
+            .route(
+                "/api/public_dashboards/{slug}",
+                get(public_dashboards::public::config),
+            )
+            .route(
+                "/api/public_dashboards/{slug}/data",
+                get(public_dashboards::public::data),
+            );
+    }
 
     // Unauthenticated like status pages: the share token is checked in the handler.
     #[cfg(feature = "enterprise")]
