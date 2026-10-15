@@ -588,7 +588,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_53 = version_compare::Version::from("0.0.53").unwrap();
     let v0_0_54 = version_compare::Version::from("0.0.54").unwrap();
     let v0_0_55 = version_compare::Version::from("0.0.55").unwrap();
-    let v0_0_56 = version_compare::Version::from("0.0.56").unwrap();
+    let v0_0_57 = version_compare::Version::from("0.0.57").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -717,7 +717,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] AI chat share permissions migration needed");
         pending.ai_chat_shares = true;
     }
-    if meta_version >= v0_0_56 && existing_model_version < v0_0_56 {
+    if meta_version >= v0_0_57 && existing_model_version < v0_0_57 {
         log::info!("[OFGA:Local] public dashboards permissions migration needed");
         pending.public_dashboards = true;
     }
@@ -776,10 +776,10 @@ mod tests {
     }
 
     #[test]
-    fn public_dashboards_back_fill_runs_once_across_0_0_56() {
-        assert!(pending_migrations("0.0.56", "0.0.55").public_dashboards);
-        assert!(!pending_migrations("0.0.56", "0.0.56").public_dashboards);
-        assert!(!pending_migrations("0.0.55", "0.0.54").public_dashboards);
+    fn public_dashboards_back_fill_runs_once_across_0_0_57() {
+        assert!(pending_migrations("0.0.57", "0.0.56").public_dashboards);
+        assert!(!pending_migrations("0.0.57", "0.0.57").public_dashboards);
+        assert!(!pending_migrations("0.0.56", "0.0.55").public_dashboards);
         let pending = PendingMigrations {
             public_dashboards: true,
             ..Default::default()
