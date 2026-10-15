@@ -45,7 +45,7 @@ export const emailTemplate = {
         .detail-row:last-child { border-bottom: none; }
         .detail-label { font-weight: bold; color: #666; }
         .detail-value { color: #333; }
-        .button { display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 20px 0; }
+        .button { display: inline-block; background-color: #0069d9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 20px 0; }
         .footer { background-color: #f8f9fa; padding: 15px; text-align: center; color: #666; font-size: 12px; }
     </style>
 </head>

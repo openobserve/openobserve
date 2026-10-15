@@ -18,7 +18,8 @@ use config::{get_config, meta::stream::StreamType};
 use o2_ratelimit::dataresource::default_rules::OpenapiInfo;
 use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
 use openobserve_api_management::request::{
-    gen_ai, keys, kv, service_accounts, service_streams, short_url, status, stream, synthetics,
+    gen_ai, keys, kv, rum_analytics, service_accounts, service_streams, short_url, status, stream,
+    synthetics,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::search::patterns;
@@ -81,6 +82,7 @@ use crate::{
         openobserve_api_search::traces::time_index::get_trace_time_range,
         openobserve_api_search::traces::time_index::get_org_trace_time_range,
         openobserve_api_search::traces::dag::get_trace_dag,
+        openobserve_api_search::rum::lookup::lookup,
         openobserve_api_search::profiles::meta::get_profiles_meta,
         openobserve_api_search::profiles::tag_values::get_profiles_tag_values,
         openobserve_api_search::profiles::series::profiles_series_get,
@@ -96,11 +98,13 @@ use crate::{
         openobserve_api_search::promql::labels_get,
         openobserve_api_search::promql::label_values,
         openobserve_api_search::promql::format_query_get,
+        openobserve_api_search::promql::parse_tree,
         enrichment_table::save_enrichment_table,
         enrichment_table::save_enrichment_table_from_url,
         rum::ingest::log,
         rum::ingest::data,
         rum::ingest::sessionreplay,
+        openobserve_api_management::request::ingest_rejections::recent_rejections,
         openobserve_api_search::search::search,
         openobserve_api_search::search::search_partition,
         openobserve_api_search::search::query_functions::list,
@@ -113,6 +117,10 @@ use crate::{
         openobserve_api_search::search::saved_view::get_view,
         openobserve_api_search::search::saved_view::get_views,
         openobserve_api_search::search::saved_view::update_view,
+        openobserve_api_management::request::query_history::record,
+        openobserve_api_management::request::query_history::list,
+        openobserve_api_management::request::query_history::star,
+        openobserve_api_management::request::query_history::delete,
         openobserve_api_management::request::folders::delete_folder,
         openobserve_api_management::request::folders::create_folder,
         openobserve_api_management::request::folders::list_folders,
@@ -275,6 +283,7 @@ use crate::{
         openobserve_api_management::request::alerts::deduplication::preview_semantic_groups_diff,
         openobserve_api_management::request::alerts::deduplication::save_semantic_groups,
         openobserve_api_management::request::alerts::dedup_stats::get_dedup_summary,
+        openobserve_api_management::request::metrics_usage::get_metric_usage,
         openobserve_api_management::request::slos::list_slos,
         openobserve_api_management::request::slos::get_slo,
         openobserve_api_management::request::slos::create_slo,
@@ -285,6 +294,17 @@ use crate::{
         openobserve_api_management::request::slos::move_slos,
         openobserve_api_management::request::slos::list_slo_eligible_alerts,
         openobserve_api_management::request::slos::preview_alert_sli,
+        openobserve_api_management::request::downtimes::list_downtimes,
+        openobserve_api_management::request::downtimes::create_downtime,
+        openobserve_api_management::request::downtimes::preview_downtime,
+        openobserve_api_management::request::downtimes::downtime_resources,
+        openobserve_api_management::request::downtimes::downtime_values,
+        openobserve_api_management::request::downtimes::get_downtime,
+        openobserve_api_management::request::downtimes::update_downtime,
+        openobserve_api_management::request::downtimes::cancel_downtime,
+        openobserve_api_management::request::downtimes::extend_downtime,
+        openobserve_api_management::request::downtimes::move_downtimes,
+        openobserve_api_management::request::downtimes::delete_downtime,
         synthetics::list_synthetics,
         synthetics::create_synthetic,
         synthetics::get_synthetic,
@@ -318,6 +338,18 @@ use crate::{
         synthetics::job_resolve,
         synthetics::job_lease,
         synthetics::job_ack,
+        rum_analytics::list_named_events,
+        rum_analytics::create_named_event,
+        rum_analytics::get_named_event,
+        rum_analytics::update_named_event,
+        rum_analytics::delete_named_event,
+        rum_analytics::deleted_event_names,
+        rum_analytics::named_event_funnels,
+        rum_analytics::list_funnels,
+        rum_analytics::create_funnel,
+        rum_analytics::get_funnel,
+        rum_analytics::update_funnel,
+        rum_analytics::delete_funnel,
     ),
     components(
         schemas(
@@ -407,6 +439,44 @@ use crate::{
             openobserve_api_management::request::alerts::incidents::IncidentSeverity,
             openobserve_api_management::request::alerts::incidents::IncidentStatus,
             config::meta::alerts::incidents::Incident,
+            config::meta::downtimes::Downtime,
+            config::meta::downtimes::DowntimeRequest,
+            config::meta::downtimes::DowntimeListItem,
+            config::meta::downtimes::DowntimeDetail,
+            config::meta::downtimes::ListDowntimesResponse,
+            config::meta::downtimes::PreviewRequest,
+            config::meta::downtimes::PreviewResponse,
+            config::meta::downtimes::ResourcesRequest,
+            config::meta::downtimes::ResourcesResponse,
+            config::meta::downtimes::ValuesRequest,
+            config::meta::downtimes::ValuesResponse,
+            config::meta::downtimes::ValueSuggestion,
+            config::meta::downtimes::MoveDowntimesRequest,
+            config::meta::downtimes::CreateDowntimeResponse,
+            config::meta::downtimes::ExtendDowntimeRequest,
+            config::meta::downtimes::ExtendDowntimeResponse,
+            config::meta::downtimes::DowntimeTarget,
+            config::meta::downtimes::TargetFolders,
+            config::meta::downtimes::DimensionCondition,
+            config::meta::downtimes::LogicalOp,
+            config::meta::downtimes::PairOperator,
+            config::meta::downtimes::TargetModule,
+            config::meta::downtimes::DowntimeSchedule,
+            config::meta::downtimes::Repeat,
+            config::meta::downtimes::DowntimeStatus,
+            config::meta::downtimes::DowntimeWindow,
+            config::meta::downtimes::ResourceValue,
+            config::meta::downtimes::SloCorrectionMode,
+            config::meta::downtimes::IncidentMode,
+            config::meta::downtimes::PreviewMatch,
+            config::meta::downtimes::ActiveDowntime,
+            config::meta::downtimes::CorrectionRef,
+            config::meta::downtimes::DowntimeStatusCounts,
+            config::meta::downtimes::AffectedItems,
+            config::meta::downtimes::DowntimeNotifications,
+            config::meta::downtimes::NotificationEvents,
+            config::meta::downtimes::NotificationEvent,
+            config::meta::downtimes::DowntimeNotificationLogEntry,
             config::meta::alerts::incidents::IncidentWithAlerts,
             config::meta::alerts::incidents::IncidentAlert,
             config::meta::alerts::incidents::IncidentStats,
@@ -447,6 +517,9 @@ use crate::{
             ingestion_common::RecordStatus,
             ingestion_common::StreamStatus,
             ingestion_common::IngestionResponse,
+            meta::ingest_rejections::RecentRejections,
+            meta::ingest_rejections::IngestRejection,
+            meta::ingest_rejections::RejectionReason,
             meta::loki::LokiPushResponse,
             meta::loki::LokiPushRequest,
             meta::loki::LokiStream,
@@ -458,6 +531,9 @@ use crate::{
             meta::saved_view::DeleteViewResponse,
             meta::saved_view::CreateViewResponse,
             meta::saved_view::UpdateViewRequest,
+            openobserve_api_management::request::query_history::QueryHistoryRequest,
+            openobserve_api_management::request::query_history::QueryHistoryStarRequest,
+            openobserve_api_management::request::query_history::QueryHistoryEntry,
             meta::user::UpdateUser,
             meta::user::UserRoleRequest,
             meta::user::PostUserRequest,
@@ -520,6 +596,24 @@ use crate::{
             config::meta::synthetics::SyntheticVariable,
             config::meta::synthetics::SyntheticListItem,
             config::meta::synthetics::SyntheticListResponse,
+            // RUM Product Analytics
+            openobserve_core::rum_pa::NamedEvent,
+            openobserve_core::rum_pa::Rule,
+            openobserve_core::rum_pa::ViewOp,
+            openobserve_core::rum_pa::SavedFunnel,
+            openobserve_core::rum_pa::FunnelDef,
+            openobserve_core::rum_pa::FunnelRef,
+            openobserve_core::rum_pa::CreateNamedEvent,
+            openobserve_core::rum_pa::UpdateNamedEvent,
+            openobserve_core::rum_pa::CreateFunnel,
+            openobserve_core::rum_pa::UpdateFunnel,
+            openobserve_core::rum_pa::NamedEventList,
+            openobserve_core::rum_pa::SavedFunnelList,
+            openobserve_core::rum_pa::FunnelRefList,
+            openobserve_core::rum_pa::NamedEventRef,
+            openobserve_core::rum_pa::NamedEventRefList,
+            openobserve_core::rum_pa::Current,
+            openobserve_core::rum_pa::RumPaErrorBody,
          ),
     ),
     modifiers(&SecurityAddon),
@@ -530,6 +624,7 @@ use crate::{
         (name = "Dashboards", description = "Dashboard operations"),
         (name = "Search", description = "Search/Query operations"),
         (name = "Saved Views", description = "Collection of saved search views for easy retrieval"),
+        (name = "Query History", description = "The caller's own query history"),
         (name = "Alerts", description = "Alerts retrieval & management operations"),
         (name = "Incidents", description = "Alert incident correlation & management operations"),
         (name = "AI", description = "AI agent chat analysis and SRE agent operations (enterprise)"),
@@ -538,6 +633,7 @@ use crate::{
         (name = "Streams", description = "Stream retrieval & management operations"),
         (name = "Users", description = "Users retrieval & management operations"),
         (name = "KV", description = "Key Value retrieval & management operations"),
+        (name = "Product Analytics", description = "RUM Product Analytics named events and saved funnels"),
         (name = "Metrics", description = "Metrics data ingestion operations"),
         (name = "Traces", description = "Traces data ingestion operations"),
         (name = "Profiles", description = "Profiles query and discovery operations"),
@@ -547,7 +643,9 @@ use crate::{
         (name = "Patterns", description = "Log pattern extraction operations (enterprise)"),
         (name = "Service Streams", description = "Multi-signal correlation across logs, traces, and metrics (enterprise)"),
         (name = "Synthetics", description = "Synthetic monitoring — uptime and browser checks (enterprise)"),
+        (name = "Downtimes", description = "Scheduled windows that keep evaluating alerts, anomaly detections, synthetics checks and SLOs but notify nobody (enterprise)"),
         (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
+        (name = "Alert Calibration", description = "Per-org alert calibration settings and on-demand runs (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -619,6 +717,9 @@ pub struct ApiDoc;
     openobserve_api_management::request::organization::password_policy::get_policy,
     openobserve_api_management::request::organization::password_policy::set_policy,
     openobserve_api_management::request::organization::password_policy::get_password_complexity,
+    openobserve_api_management::request::alert_calibration::config::get_alert_calibration_config,
+    openobserve_api_management::request::alert_calibration::config::update_alert_calibration_config,
+    openobserve_api_management::request::alert_calibration::digests::run_alert_calibration,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
@@ -848,6 +949,40 @@ mod tests {
     }
 
     #[test]
+    fn query_history_paths_are_rate_limited_and_hidden_from_mcp() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap();
+        for (path, method) in [
+            ("/api/{org_id}/query_history", "post"),
+            ("/api/{org_id}/query_history", "get"),
+            ("/api/{org_id}/query_history/{id}", "patch"),
+            ("/api/{org_id}/query_history/{id}", "delete"),
+        ] {
+            let op = paths
+                .get(path)
+                .and_then(|p| p.get(method))
+                .unwrap_or_else(|| panic!("{method} {path} is not documented"));
+            assert_eq!(op["x-o2-ratelimit"]["module"], "Query History");
+            assert_eq!(op["x-o2-mcp"]["enabled"], false, "{method} {path}");
+        }
+    }
+
+    #[test]
+    fn recent_rejections_path_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/ingest/recent_rejections"]["get"];
+        assert_eq!(op["operationId"], "GetRecentIngestRejections", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/RecentRejections"
+        );
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in ["RecentRejections", "IngestRejection", "RejectionReason"] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+    }
+
+    #[test]
     fn prompt_paths_are_absent_from_oss_openapi() {
         let api = ApiDoc::openapi();
         let prompt_paths = api
@@ -860,5 +995,99 @@ mod tests {
             prompt_paths.is_empty(),
             "OSS Prompt paths: {prompt_paths:?}"
         );
+    }
+
+    #[test]
+    fn rum_analytics_paths_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec["paths"].as_object().unwrap();
+        for (path, methods) in [
+            (
+                "/api/{org_id}/rum/analytics/named_events",
+                &["get", "post"][..],
+            ),
+            (
+                "/api/{org_id}/rum/analytics/named_events/{id}",
+                &["get", "put", "delete"][..],
+            ),
+            (
+                "/api/{org_id}/rum/analytics/named_events/{id}/funnels",
+                &["get"][..],
+            ),
+            ("/api/{org_id}/rum/analytics/funnels", &["get", "post"][..]),
+            (
+                "/api/{org_id}/rum/analytics/funnels/{id}",
+                &["get", "put", "delete"][..],
+            ),
+        ] {
+            for method in methods {
+                let op = &paths[path][*method];
+                assert!(op.is_object(), "{method} {path} missing");
+                assert_eq!(
+                    op["tags"],
+                    serde_json::json!(["Product Analytics"]),
+                    "{method} {path}"
+                );
+                for status in ["400", "500"] {
+                    assert!(
+                        op["responses"].get(status).is_some(),
+                        "{method} {path} {status}"
+                    );
+                }
+            }
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "NamedEvent",
+            "Rule",
+            "SavedFunnel",
+            "FunnelDef",
+            "CreateNamedEvent",
+            "UpdateNamedEvent",
+            "CreateFunnel",
+            "UpdateFunnel",
+            "RumPaErrorBody",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+        let tags: Vec<&str> = spec["tags"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|t| t["name"].as_str())
+            .collect();
+        assert!(tags.contains(&"Product Analytics"), "{tags:?}");
+        assert!(!tags.contains(&"RUM"), "{tags:?}");
+    }
+
+    #[test]
+    fn every_schema_ref_resolves() {
+        fn collect_refs<'a>(value: &'a serde_json::Value, refs: &mut Vec<&'a str>) {
+            match value {
+                serde_json::Value::Object(map) => {
+                    if let Some(r) = map.get("$ref").and_then(|r| r.as_str()) {
+                        refs.push(r);
+                    }
+                    map.values().for_each(|v| collect_refs(v, refs));
+                }
+                serde_json::Value::Array(items) => items.iter().for_each(|v| collect_refs(v, refs)),
+                _ => {}
+            }
+        }
+
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        let mut refs = Vec::new();
+        collect_refs(&spec, &mut refs);
+        let mut unresolved = refs
+            .into_iter()
+            .filter(|r| {
+                r.strip_prefix("#/components/schemas/")
+                    .is_some_and(|name| !schemas.contains_key(name))
+            })
+            .collect::<Vec<_>>();
+        unresolved.sort_unstable();
+        unresolved.dedup();
+        assert!(unresolved.is_empty(), "unresolved refs: {unresolved:?}");
     }
 }

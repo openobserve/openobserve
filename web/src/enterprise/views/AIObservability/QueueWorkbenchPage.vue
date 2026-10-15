@@ -119,23 +119,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   item.status === 'reviewed' ? 'text-status-success-text' : 'text-text-disabled'
                 "
               />
-              <span
-                v-if="item.inputPreview"
-                class="flex min-w-0 flex-1 flex-col text-left"
-                :title="item.inputPreview"
-              >
-                <span
-                  class="text-text-body truncate"
+              <span v-if="item.inputPreview" class="flex min-w-0 flex-1 flex-col text-left">
+                <OTruncatedText
+                  class="text-text-body"
                   :data-test="`ai-queue-workbench-nav-preview-${i}`"
-                  >{{ item.inputPreview }}</span
+                  >{{ item.inputPreview }}</OTruncatedText
                 >
-                <span class="text-text-secondary text-2xs truncate font-mono">{{
+                <OTruncatedText class="text-text-secondary text-2xs font-mono">{{
                   item.refId
-                }}</span>
+                }}</OTruncatedText>
               </span>
-              <span v-else class="min-w-0 flex-1 truncate text-left font-mono">{{
+              <OTruncatedText v-else class="flex-1 text-left font-mono">{{
                 item.refId
-              }}</span>
+              }}</OTruncatedText>
             </div>
           </OTab>
         </OTabs>
@@ -202,9 +198,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag variant="blue-soft" shape="rounded" class="shrink-0">{{
                     currentItem.refType
                   }}</OTag>
-                  <h2 class="text-text-heading min-w-0 flex-1 truncate text-lg font-semibold">
+                  <OTruncatedText
+                    as="h2"
+                    class="text-text-heading flex-1 text-lg font-semibold"
+                    :tooltip="false"
+                  >
                     {{ itemTitle }}
-                  </h2>
+                  </OTruncatedText>
                   <OButton
                     variant="outline"
                     size="sm"
@@ -220,41 +220,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="text-text-secondary flex flex-wrap items-center gap-x-2 font-mono text-xs"
                 >
-                  <span class="truncate">{{ currentItem.refId }}</span>
+                  <OTruncatedText>{{ currentItem.refId }}</OTruncatedText>
                   <span>·</span><span>{{ currentCase.workflow }}</span> <span>·</span
                   ><span>{{ currentCase.model }}</span>
-                </div>
-              </div>
-
-              <!-- System scores — how the automated evaluators graded this item,
-                   surfaced up front for reference. Compact chips that wrap and
-                   scroll, so any number of scores stays contained. -->
-              <div
-                v-if="currentCase.machineScores.length"
-                class="flex shrink-0 flex-col gap-1.5"
-                data-test="ai-queue-workbench-system-scores"
-              >
-                <span class="inline-flex items-center gap-2">
-                  <span class="text-text-heading text-sm font-bold">
-                    {{ t("aiObservability.queues.workbench.systemScores") }}
-                  </span>
-                  <span class="text-text-disabled text-sm font-normal">
-                    ({{ currentCase.machineScores.length }})
-                  </span>
-                  <span class="text-text-secondary text-2xs">
-                    {{ t("aiObservability.queues.workbench.systemScoresHint") }}
-                  </span>
-                </span>
-                <div class="flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1">
-                  <span
-                    v-for="ms in currentCase.machineScores"
-                    :key="ms.name"
-                    class="border-border-default bg-surface-subtle rounded-default flex shrink-0 items-center gap-1.5 border px-2 py-1"
-                  >
-                    <span class="text-text-secondary text-2xs font-mono">{{ ms.name }}</span>
-                    <span class="font-mono text-xs font-semibold">{{ ms.value }}</span>
-                    <OTooltip side="bottom" :content="ms.source" />
-                  </span>
                 </div>
               </div>
 
@@ -288,6 +256,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @toggle-fullscreen="toggleFullscreen(ioContainer)"
                 />
               </div>
+              <!-- System scores sit under the evidence: the reviewer reads input/output first, then compares with the evaluators. -->
+              <div
+                v-if="currentCase.machineScores.length"
+                class="flex shrink-0 flex-col gap-1.5"
+                data-test="ai-queue-workbench-system-scores"
+              >
+                <span class="inline-flex items-center gap-2">
+                  <span class="text-text-heading text-sm font-bold">
+                    {{ t("aiObservability.queues.workbench.systemScores") }}
+                  </span>
+                  <span class="text-text-disabled text-sm font-normal">
+                    ({{ currentCase.machineScores.length }})
+                  </span>
+                  <span class="text-text-secondary text-2xs">
+                    {{ t("aiObservability.queues.workbench.systemScoresHint") }}
+                  </span>
+                </span>
+                <div class="flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1">
+                  <!-- Wrapper mode: a slot-less OTooltip anchors to its previous sibling, which here is only the value text. -->
+                  <OTooltip
+                    v-for="ms in currentCase.machineScores"
+                    :key="ms.key"
+                    side="top"
+                    max-width="17.5rem"
+                    hoverable
+                    content-class="p-0!"
+                  >
+                    <span
+                      class="border-border-default bg-surface-subtle rounded-default flex shrink-0 cursor-help items-center gap-1.5 border px-2 py-1"
+                      :data-test="`ai-queue-workbench-system-score-${ms.label}`"
+                    >
+                      <span class="text-text-secondary text-2xs font-mono">{{ ms.label }}</span>
+                      <span class="font-mono text-xs font-semibold">{{ ms.value }}</span>
+                    </span>
+                    <template #content>
+                      <TraceScoreDetail :chip="ms" class="w-58 px-3 py-2.25" />
+                    </template>
+                  </OTooltip>
+                </div>
+              </div>
+
               <div
                 v-if="currentCase.retrievedContext"
                 ref="contextContainer"
@@ -697,6 +706,8 @@ import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import TraceScoreDetail from "@/enterprise/components/onlineEvals/TraceScoreDetail.vue";
+import type { TraceScoreChip } from "@/enterprise/components/onlineEvals/composables/useTraceScoreChips";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmQueuesService, {
@@ -714,6 +725,7 @@ import {
 } from "@/services/llm-queues.service.queries";
 import { useMutation } from "@tanstack/vue-query";
 import { toggleFullscreen as domToggleFullscreen } from "@/utils/dom";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineOptions({ name: "AIQueueWorkbenchPage" });
 
@@ -959,10 +971,13 @@ const currentCase = computed(() => ({
   input: formatContent(currentDetail.value?.content.input),
   output: formatContent(currentDetail.value?.content.output),
   retrievedContext: retrievedContext(),
-  machineScores: (currentDetail.value?.machineScores ?? []).map((score) => ({
-    name: score.name,
+  machineScores: (currentDetail.value?.machineScores ?? []).map((score): TraceScoreChip => ({
+    key: score.id || score.name,
+    label: score.name,
     value: displayScoreValue(score.value),
-    source: raw(score.sourceType.replaceAll("_", " ")),
+    description: score.sourceType.replaceAll("_", " ") || null,
+    reasoning: score.reasoning,
+    scoredAtMs: score.timestamp ? Math.floor(score.timestamp / 1000) : null,
   })),
   priorAnnotations: currentReviews.value.map((review) => {
     const reviewer = review.reviewer || "Unknown reviewer";

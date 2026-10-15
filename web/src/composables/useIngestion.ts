@@ -17,6 +17,79 @@ import { useStore } from "vuex";
 import { ref } from "vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 
+export type WebServer = "nginx" | "apache" | "iis";
+
+export interface WebServerGuide {
+  /** Display name, also the guide name on the status bar. */
+  label: string;
+  /** Comma-separated tail paths. */
+  logPaths: string;
+  configPath: string;
+  restartCommand: string;
+  /** Install command; undefined where Fluent Bit ships as an installer (Windows). */
+  installCommand?: string;
+  installDocUrl?: string;
+}
+
+export interface IngestionEndpoint {
+  host: string;
+  port: string;
+  tls: string;
+}
+
+const LINUX_FLUENT_BIT_INSTALL =
+  "curl https://raw.githubusercontent.com/fluent/fluent-bit/master/install.sh | sh";
+
+export const WEB_SERVER_GUIDES: Record<WebServer, WebServerGuide> = {
+  nginx: {
+    label: "nginx",
+    logPaths: "/var/log/nginx/access.log,/var/log/nginx/error.log",
+    configPath: "/etc/fluent-bit/fluent-bit.conf",
+    restartCommand: "sudo systemctl restart fluent-bit",
+    installCommand: LINUX_FLUENT_BIT_INSTALL,
+  },
+  apache: {
+    label: "Apache",
+    logPaths: "/var/log/apache2/*.log,/var/log/httpd/*_log",
+    configPath: "/etc/fluent-bit/fluent-bit.conf",
+    restartCommand: "sudo systemctl restart fluent-bit",
+    installCommand: LINUX_FLUENT_BIT_INSTALL,
+  },
+  iis: {
+    label: "IIS",
+    logPaths: "C:\\inetpub\\logs\\LogFiles\\W3SVC*\\*.log",
+    configPath: "C:\\Program Files\\fluent-bit\\conf\\fluent-bit.conf",
+    restartCommand: "Restart-Service fluent-bit",
+    installDocUrl: "https://docs.fluentbit.io/manual/installation/windows",
+  },
+};
+
+/** Fluent Bit config that tails the server's logs into the stream named after it; [EMAIL] and [PASSCODE] are filled by CredentialCodeBlock. */
+export function webServerFluentBitContent(
+  server: WebServer,
+  org: string,
+  endpoint: IngestionEndpoint,
+  timestampColumn = "_timestamp",
+): string {
+  return `[INPUT]
+    Name              tail
+    Path              ${WEB_SERVER_GUIDES[server].logPaths}
+    Tag               ${server}
+
+[OUTPUT]
+    Name              http
+    Match             ${server}
+    Host              ${endpoint.host}
+    Port              ${endpoint.port}
+    tls               ${endpoint.tls}
+    URI               /api/${org}/${server}/_json
+    Format            json
+    Json_date_key     ${timestampColumn}
+    Json_date_format  iso8601
+    HTTP_User         [EMAIL]
+    HTTP_Passwd       [PASSCODE]`;
+}
+
 const useIngestion = () => {
   const store = useStore();
 
@@ -132,8 +205,17 @@ Access Key: [BASIC_PASSCODE]`;
 OPENOBSERVE_ORG=${store.state.selectedOrganization.identifier}
 OPENOBSERVE_AUTH_TOKEN=Basic [BASIC_PASSCODE]`;
 
+  const webServerContent = (server: WebServer) =>
+    webServerFluentBitContent(
+      server,
+      store.state.selectedOrganization.identifier,
+      endpoint.value,
+      store.state.zoConfig?.timestamp_column || "_timestamp",
+    );
+
   return {
     endpoint,
+    webServerContent,
     databaseContent,
     databaseDocURLs,
     securityContent,

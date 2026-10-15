@@ -112,7 +112,6 @@ export const buildConditionPreview = (node: any): string => {
   return "";
 };
 
-// Preview truncated to `maxLength` (default 20, matching the pipeline node card).
 export const getTruncatedConditions = (conditionData: any, maxLength = 20): string => {
   const text = buildConditionPreview(conditionData);
   return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;

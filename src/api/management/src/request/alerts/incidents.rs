@@ -470,7 +470,7 @@ pub async fn trigger_incident_rca(
         return MetaHttpResponse::bad_request("RCA is not enabled");
     }
 
-    if o2_cfg.ai.agent_url.is_empty() {
+    if !o2_cfg.ai.has_agent_target() {
         return axum::response::Response::builder()
             .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
             .header(axum::http::header::CONTENT_TYPE, "application/json")
@@ -1223,6 +1223,7 @@ mod tests {
             updated_at: 2000,
             group_values: serde_json::Value::Object(Default::default()),
             key_type: config::meta::alerts::incidents::KeyType::default(),
+            muted_by_downtime_id: None,
         };
 
         let response = ListIncidentsResponse {

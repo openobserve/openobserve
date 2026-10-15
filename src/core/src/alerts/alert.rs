@@ -80,6 +80,7 @@ use crate::{
             custom::{VarValue, process_variable_replace},
             derive_channel_format,
             format::ChannelFormat,
+            modifiers::{PreparedTemplate, prepare_modifiers},
             platform::{self, platform_of},
             render,
             render::slack as slack_render,
@@ -95,6 +96,12 @@ use crate::{
 /// flap-damping window, and short enough that a milliseconds-for-seconds typo
 /// is refused rather than stored.
 pub const KEEP_FIRING_FOR_MAX_SECS: i64 = 24 * 60 * 60;
+
+/// Ceiling for `frequency`, `silence` and `tolerance_in_secs`, far below the overflow point.
+pub const SCHEDULE_FIELD_MAX_SECS: i64 = 365 * 24 * 60 * 60;
+
+/// `tz_offset` values `chrono::FixedOffset` can represent: strictly less than a day either way.
+pub const TZ_OFFSET_RANGE_MINUTES: std::ops::RangeInclusive<i32> = -1439..=1439;
 
 /// Errors that can occur when interacting with alerts.
 #[derive(Debug, thiserror::Error)]
@@ -119,8 +126,8 @@ pub enum AlertError {
     #[error("Alert name cannot contain '/'")]
     AlertNameContainsForwardSlash,
 
-    #[error("Alert destination or workflows is required")]
-    AlertDestinationMissing,
+    #[error("Alerts cannot be defined on the internal stream '{0}'")]
+    ProtectedStream(String),
 
     /// The warning/critical pair is invalid for the chosen operator.
     /// "Less severe" is direction-dependent — see `level::validate_thresholds`.
@@ -184,6 +191,8 @@ pub enum AlertError {
     #[error("Alert destination {dest} not found")]
     AlertDestinationNotFound { dest: String },
 
+    #[error("Cannot infer a referenced metrics stream for PromQL rule: {0}")]
+    PromRuleStreamMissing(String),
     #[error("Stream {stream_name} not found")]
     StreamNotFound { stream_name: String },
 
@@ -276,6 +285,9 @@ pub enum AlertError {
     )]
     AlertSourceOfSlos { slos: String },
 
+    #[error("{name} is a built-in alert: it can be switched off or edited, not deleted or renamed")]
+    BuiltinAlert { name: String },
+
     #[error("this alert is referenced by one or more composite alerts")]
     AlertReferencedByComposites {
         /// Captured while holding the organization graph lock. HTTP callers
@@ -305,6 +317,16 @@ pub enum AlertError {
     NegativePendingPeriod,
     #[error("Alert keep_firing_for must be between 0 and {KEEP_FIRING_FOR_MAX_SECS} seconds")]
     KeepFiringForOutOfRange,
+    #[error("Alert frequency must be between 1 and {SCHEDULE_FIELD_MAX_SECS} seconds")]
+    FrequencyOutOfRange,
+    #[error("Alert silence must be between 0 and {SCHEDULE_FIELD_MAX_SECS} seconds")]
+    SilenceOutOfRange,
+    #[error("Alert tolerance_in_secs must be between 0 and {SCHEDULE_FIELD_MAX_SECS} seconds")]
+    ToleranceOutOfRange,
+    #[error("Alert tz_offset must be strictly between -1440 and 1440 minutes")]
+    TzOffsetOutOfRange,
+    #[error("Alert cron schedule '{cron}' has no future occurrence")]
+    CronHasNoFutureOccurrence { cron: String },
     #[error("Realtime alerts cannot notify on recovery or keep firing")]
     RecoveryOnRealtimeAlert,
     #[error("recovery destinations were set without notify_on_recovery, so nothing would use them")]
@@ -338,6 +360,28 @@ pub enum AlertError {
     RecoveryNeedsRoutingKey { destination: String },
     #[error("Error in multi alert grouping: {0}")]
     MultiAlertGroupingError(String),
+}
+
+/// What a manual trigger did: sent, with its messages, or held by an active downtime.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ManualTrigger {
+    Sent {
+        success_message: String,
+        error_message: String,
+    },
+    Suppressed(config::meta::downtimes::ActiveDowntime),
+}
+
+impl ManualTrigger {
+    /// The message the trigger route answers with.
+    pub fn response_message(&self) -> String {
+        match self {
+            Self::Sent { .. } => "Alert triggered".to_string(),
+            Self::Suppressed(downtime) => {
+                format!("Alert suppressed by downtime {}", downtime.name)
+            }
+        }
+    }
 }
 
 pub async fn save(
@@ -407,6 +451,11 @@ pub(crate) async fn create_default_alerts_folder(org_id: &str) -> Result<Folder,
 // the size from this lint); boxing the error is not worth the churn here.
 #[allow(clippy::result_large_err)]
 fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
+    if alert.query_condition.promql_rule_mode && alert.stream_type != StreamType::Metrics {
+        return Err(AlertError::PromRuleStreamMissing(
+            "rule mode requires stream_type=metrics".into(),
+        ));
+    }
     config::meta::alerts::grouping::validate_multi_alert(
         &alert.query_condition,
         &alert.trigger_condition,
@@ -615,7 +664,23 @@ async fn prepare_alert(
         return Err(AlertError::AlertNameOfgaUnsupported);
     }
     alert.org_id = org_id.to_string();
+    alert.normalize_promql_rule_mode();
+    if alert.query_condition.query_type == QueryType::PromQL
+        && !alert.query_condition.promql_rule_mode
+        && alert.query_condition.promql_condition.is_none()
+    {
+        return Err(AlertError::PromqlMissingQuery);
+    }
+
     let stream_type = alert.stream_type;
+    let stream_name = if stream_name.is_empty() && alert.query_condition.promql_rule_mode {
+        super::prom_rule::infer_stream(org_id, &alert.query_condition)
+            .await
+            .map_err(|e| AlertError::PromRuleStreamMissing(e.to_string()))?
+    } else {
+        stream_name.to_string()
+    };
+    let stream_name = stream_name.as_str();
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
 
@@ -660,6 +725,7 @@ async fn prepare_alert(
                 std::cmp::max(60, get_config().limit.alert_schedule_interval);
         }
     }
+    check_schedule(old_alert.as_ref(), alert)?;
 
     // An SLO alert (§6b.6) runs no query and therefore has no stream. The
     // `stream_name` half of this check is skipped for it — note the two are
@@ -672,6 +738,13 @@ async fn prepare_alert(
     }
     if alert.name.contains('/') {
         return Err(AlertError::AlertNameContainsForwardSlash);
+    }
+    // A realtime alert sees every ingested row, so one on chat history would exfiltrate it.
+    // Case-insensitive, so no spelling of the chat stream slips through.
+    if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+        &alert.stream_name.trim().to_lowercase(),
+    ) {
+        return Err(AlertError::ProtectedStream(alert.stream_name.clone()));
     }
 
     if let Some(vrl) = alert.query_condition.vrl_function.as_ref() {
@@ -704,25 +777,6 @@ async fn prepare_alert(
         });
     }
 
-    // Naming an on-call team IS naming somewhere for this to go. Paging is
-    // documented as additive to destinations, but the check only knew about
-    // destinations and workflows — so an alert whose whole purpose was to wake
-    // the owning team could not be saved without also nominating a webhook it
-    // did not want.
-    #[cfg(feature = "enterprise")]
-    let destination_missing = alert.destinations.is_empty()
-        && alert.workflows.is_empty()
-        && alert
-            .oncall_team
-            .as_deref()
-            .is_none_or(|t| t.trim().is_empty());
-    #[cfg(not(feature = "enterprise"))]
-    let destination_missing = alert.destinations.is_empty();
-
-    // before saving alert check alert destination
-    if destination_missing {
-        return Err(AlertError::AlertDestinationMissing);
-    }
     for dest in alert.destinations.iter() {
         match db::alerts::destinations::get(org_id, dest).await {
             Ok(d) => {
@@ -795,6 +849,7 @@ async fn prepare_alert(
         if let Some(settings) = unwrap_stream_settings(&schema) {
             let max_query_range = settings.max_query_range;
             if max_query_range > 0
+                && !alert.query_condition.promql_rule_mode
                 && !alert.is_real_time
                 && alert.trigger_condition.period > max_query_range * 60
             {
@@ -1001,8 +1056,7 @@ async fn prepare_alert(
         }
         QueryType::PromQL
             if (alert.query_condition.promql.is_none()
-                || alert.query_condition.promql.as_ref().unwrap().is_empty()
-                || alert.query_condition.promql_condition.is_none()) =>
+                || alert.query_condition.promql.as_ref().unwrap().is_empty()) =>
         {
             return Err(AlertError::PromqlMissingQuery);
         }
@@ -1040,6 +1094,47 @@ async fn prepare_alert(
     })
 }
 
+/// Validates the schedule unless `stored` already holds it, so an enable toggle still saves.
+fn check_schedule(stored: Option<&Alert>, alert: &Alert) -> Result<(), AlertError> {
+    if stored.is_some_and(|stored| same_schedule(stored, alert)) {
+        return Ok(());
+    }
+    if !TZ_OFFSET_RANGE_MINUTES.contains(&alert.tz_offset) {
+        return Err(AlertError::TzOffsetOutOfRange);
+    }
+    let trigger = &alert.trigger_condition;
+    if trigger.frequency_type == FrequencyType::Cron {
+        let schedule = Schedule::from_str(&trigger.cron).map_err(AlertError::ParseCron)?;
+        if schedule.upcoming(Utc).next().is_none() {
+            return Err(AlertError::CronHasNoFutureOccurrence {
+                cron: trigger.cron.clone(),
+            });
+        }
+    } else if !(1..=SCHEDULE_FIELD_MAX_SECS).contains(&trigger.frequency) {
+        return Err(AlertError::FrequencyOutOfRange);
+    }
+    // `silence` is in minutes, unlike the other two fields
+    if !(0..=SCHEDULE_FIELD_MAX_SECS / 60).contains(&trigger.silence) {
+        return Err(AlertError::SilenceOutOfRange);
+    }
+    if let Some(tolerance) = trigger.tolerance_in_secs
+        && !(0..=SCHEDULE_FIELD_MAX_SECS).contains(&tolerance)
+    {
+        return Err(AlertError::ToleranceOutOfRange);
+    }
+    Ok(())
+}
+
+fn same_schedule(a: &Alert, b: &Alert) -> bool {
+    let (x, y) = (&a.trigger_condition, &b.trigger_condition);
+    a.tz_offset == b.tz_offset
+        && x.frequency_type == y.frequency_type
+        && x.frequency == y.frequency
+        && x.cron == y.cron
+        && x.silence == y.silence
+        && x.tolerance_in_secs == y.tolerance_in_secs
+}
+
 #[cfg(test)]
 mod prepare_alert_name_tests {
     use super::prepared_alert_name;
@@ -1063,6 +1158,53 @@ pub fn update_cron_expression(cron_exp: &str, now: u32) -> String {
         cron_exp = format!("{now} {rest}");
     }
     cron_exp
+}
+
+/// `zo_alert_runs_suppressed_total`: one per run a downtime kept silent.
+pub fn count_suppressed_run(org: &str, module: &str) {
+    config::metrics::ALERT_RUNS_SUPPRESSED_TOTAL
+        .with_label_values(&[org, module])
+        .inc();
+}
+
+/// A run a downtime kept silent: `Suppressed` with its downtime id, no delivery attempt, counted.
+pub fn record_suppressed_run(
+    data: &mut config::meta::self_reporting::usage::TriggerData,
+    module: &str,
+    downtime_id: String,
+) {
+    data.status = config::meta::self_reporting::usage::RunOutcome::Suppressed;
+    data.downtime_id = Some(downtime_id);
+    data.delivery_attempted = Some(false);
+    count_suppressed_run(&data.org, module);
+}
+
+/// Runs the checks [`create`] (given a folder) or [`update`] makes on a copy, writing nothing.
+pub async fn validate_save(
+    org_id: &str,
+    folder_id: Option<&str>,
+    alert: &Alert,
+    create: bool,
+    overwrite: bool,
+) -> Result<Alert, AlertError> {
+    if let Some(folder_id) = folder_id
+        && folder_id != DEFAULT_FOLDER
+        && !table::folders::exists(org_id, folder_id, FolderType::Alerts).await?
+    {
+        return Err(AlertError::CreateFolderNotFound);
+    }
+    let mut prepared = alert.clone();
+    // nothing is written here, so the SLO effect that follows a write is dropped unapplied
+    let _ = prepare_alert(
+        org_id,
+        &alert.stream_name,
+        &alert.name,
+        &mut prepared,
+        create,
+        overwrite,
+    )
+    .await?;
+    Ok(prepared)
 }
 
 /// Creates a new alert in the specified folder.
@@ -1216,6 +1358,9 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     #[cfg(feature = "enterprise")]
     if let Some(ref id) = alert.id {
         let (_, old_alert) = get_by_id(conn, org_id, id.to_owned()).await?;
+        if let Some(refusal) = builtin_change_refused(&old_alert, Some(&alert)) {
+            return Err(refusal);
+        }
         let old_workflows = old_alert.workflows;
 
         if old_workflows != alert.workflows {
@@ -1385,18 +1530,18 @@ pub async fn list_v2<C: ConnectionTrait>(
     let alerts = db::alerts::alert::list_with_folders(conn, params)
         .await?
         .into_iter()
-        .filter(|(f, a)| {
-            // Include the alert if all alerts are permitted.
-            is_all_permitted
-                // Include the alert if the alert is permitted with the old OpenFGA identifier.
-                || permissions.contains(&format!("alert:{}", a.name))
-                || permissions.contains(&format!("alert:{}/{}", f.folder_id, a.id.as_ref().unwrap()))
-                // Include the alert if the alert is permitted with the new OpenFGA identifier.
-                || a.id
-                    .is_some_and(|id| permissions.contains(&format!("alert:{id}")))
-        })
+        .filter(|(f, a)| is_all_permitted || is_alert_permitted(f, a, &permissions))
         .collect_vec();
     Ok(alerts)
+}
+
+/// Whether an individual grant in `permissions` covers `alert`, by its old or new OpenFGA id.
+pub(crate) fn is_alert_permitted(folder: &Folder, alert: &Alert, permissions: &[String]) -> bool {
+    permissions.contains(&format!("alert:{}", alert.name))
+        || alert.id.is_some_and(|id| {
+            permissions.contains(&format!("alert:{}/{id}", folder.folder_id))
+                || permissions.contains(&format!("alert:{id}"))
+        })
 }
 
 /// Deletes an alert by its KSUID primary key, unconditionally.
@@ -1463,6 +1608,12 @@ pub async fn delete_by_id_user<C: ConnectionTrait>(
 ) -> Result<(), AlertError> {
     let locker = lock_composite_graph(org_id).await?;
     let result = async {
+        #[cfg(feature = "enterprise")]
+        if let Some(refusal) =
+            builtin_change_refused(&get_by_id(conn, org_id, alert_id).await?.1, None)
+        {
+            return Err(refusal);
+        }
         ensure_alerts_not_referenced(conn, org_id, &[alert_id]).await?;
         let dependents =
             crate::slo::service::slos_sourced_from_alert(org_id, &alert_id.to_string())
@@ -1587,6 +1738,16 @@ async fn ensure_alerts_not_referenced<C: ConnectionTrait>(
     })
 }
 
+/// A built-in is found by its name, so a rename would remove it as surely as a delete.
+#[cfg(feature = "enterprise")]
+fn builtin_change_refused(old: &Alert, new: Option<&Alert>) -> Option<AlertError> {
+    let kept =
+        new.is_some_and(|new| new.name == old.name && crate::alerts::prebuilt::is_builtin(new));
+    (crate::alerts::prebuilt::is_builtin(old) && !kept).then(|| AlertError::BuiltinAlert {
+        name: old.name.clone(),
+    })
+}
+
 /// The refusal a delete owes the SLOs measuring from this alert, or `None` when
 /// nothing does.
 fn delete_blocked_by(dependents: &[config::meta::slo::Slo]) -> Option<AlertError> {
@@ -1706,6 +1867,26 @@ mod slo_source_guard_tests {
     }
 
     // ---- the delete guard ---------------------------------------------------
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_built_in_alert_can_be_edited_but_not_deleted_or_renamed() {
+        let mut builtin = Alert::default();
+        builtin.name = "o2_alert_evaluation_failures".to_string();
+        builtin.stream_type = config::meta::stream::StreamType::Logs;
+        builtin.stream_name = config::meta::self_reporting::usage::TRIGGERS_STREAM.to_string();
+        let mut edited = builtin.clone();
+        edited.enabled = true;
+        assert!(builtin_change_refused(&builtin, Some(&edited)).is_none());
+        assert!(builtin_change_refused(&builtin, None).is_some());
+        let mut renamed = builtin.clone();
+        renamed.name = "cpu_high".to_string();
+        assert!(builtin_change_refused(&builtin, Some(&renamed)).is_some());
+        assert!(builtin_change_refused(&renamed, None).is_none());
+        let mut swapped = builtin.clone();
+        swapped.name = "o2_scheduler_job_backlog".to_string();
+        assert!(builtin_change_refused(&builtin, Some(&swapped)).is_some());
+    }
 
     /// "Some SLO depends on this" is not something a user can act on, so the
     /// refusal names them.
@@ -2092,6 +2273,34 @@ pub fn manual_trigger_row(alert: &Alert) -> Map<String, Value> {
     row
 }
 
+/// Puts an incident notification failure, which the destination send never saw, before its errors.
+pub(crate) fn with_incident_notify_error(
+    error_message: String,
+    incident_error: Option<String>,
+) -> String {
+    match incident_error {
+        None => error_message,
+        Some(incident_error) if error_message.trim().is_empty() => incident_error,
+        Some(incident_error) => format!("{incident_error}; {error_message}"),
+    }
+}
+
+/// Whether a send tried any destination or workflow; an `Err` is a failed delivery, so it counts.
+pub(crate) fn send_attempted(result: &Result<NotificationOutcome, AlertError>) -> bool {
+    result.as_ref().map_or(true, |outcome| outcome.attempted)
+}
+
+/// Whether the alert names a destination, or (enterprise) a workflow or on-call team, to notify.
+pub(crate) fn has_delivery_target(alert: &Alert) -> bool {
+    !alert.destinations.is_empty()
+        || (cfg!(feature = "enterprise")
+            && (!alert.workflows.is_empty()
+                || alert
+                    .oncall_team
+                    .as_deref()
+                    .is_some_and(|team| !team.trim().is_empty())))
+}
+
 /// Triggers an alert.
 /// ExistingAlertRepeated is suppressed by design and notifies nobody, so treating it as
 /// "notified" would skip every destination and leave the trigger silent.
@@ -2112,16 +2321,20 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
-) -> Result<(String, String), AlertError> {
-    let Some((_, alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+) -> Result<ManualTrigger, AlertError> {
+    let Some((_folder, alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
         return Err(AlertError::AlertNotFound);
     };
     let now = Utc::now().timestamp_micros();
+    #[cfg(feature = "enterprise")]
+    if let Some(downtime) = suppressed_manual_trigger(&alert, &_folder.folder_id, now).await {
+        return Ok(ManualTrigger::Suppressed(downtime));
+    }
 
     // For creates_incident=true alerts the incident correlation path handles
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
-    let incident_notified = if alert.creates_incident
+    let (incident_notified, incident_notify_error) = if alert.creates_incident
         && o2_enterprise::enterprise::common::config::get_config()
             .incidents
             .enabled
@@ -2136,38 +2349,42 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             now,
             // Manual triggers evaluate nothing; no level to map.
             None,
+            None,
         )
         .await
         {
-            Ok(Some(outcome)) => {
+            Ok(Some(correlated)) => {
                 log::info!(
                     "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
                     alert.name,
-                    outcome.incident_id(),
-                    outcome.service_name(),
+                    correlated.outcome.incident_id(),
+                    correlated.outcome.service_name(),
                 );
-                incident_path_notified(&outcome)
+                (
+                    incident_path_notified(&correlated.outcome),
+                    correlated.notify_error,
+                )
             }
             Ok(None) => {
                 log::debug!(
                     "No incident correlation for manually triggered alert {org_id}/{}",
                     alert.name
                 );
-                false
+                (false, None)
             }
             Err(e) => {
                 log::error!(
                     "Error correlating manual trigger to incident, falling back to direct notification: {e}"
                 );
-                false
+                (false, None)
             }
         }
     } else {
-        false
+        (false, None)
     };
 
     #[cfg(not(feature = "enterprise"))]
-    let incident_notified = false;
+    let (incident_notified, incident_notify_error) = (false, None);
 
     let trace_id = config::ider::generate_trace_id();
     let trace_id = format!("trig_id_{trace_id}");
@@ -2201,9 +2418,12 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             None,
         )
         .await?;
-    let (success_message, err_message) = (outcome.success_message, outcome.error_message);
+    let error_message = with_incident_notify_error(outcome.error_message, incident_notify_error);
 
-    Ok((success_message, err_message))
+    Ok(ManualTrigger::Sent {
+        success_message: outcome.success_message,
+        error_message,
+    })
 }
 
 pub async fn trigger_by_name(
@@ -2211,19 +2431,26 @@ pub async fn trigger_by_name(
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<(String, String), AlertError> {
-    let alert = match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name).await {
-        Ok(Some(alert)) => alert,
-        _ => {
-            return Err(AlertError::AlertNotFound);
-        }
-    };
+) -> Result<ManualTrigger, AlertError> {
+    let (_folder, alert) =
+        match db::alerts::alert::get_by_name_with_folder(org_id, stream_type, stream_name, name)
+            .await
+        {
+            Ok(Some(found)) => found,
+            _ => {
+                return Err(AlertError::AlertNotFound);
+            }
+        };
     let now = Utc::now().timestamp_micros();
+    #[cfg(feature = "enterprise")]
+    if let Some(downtime) = suppressed_manual_trigger(&alert, &_folder.folder_id, now).await {
+        return Ok(ManualTrigger::Suppressed(downtime));
+    }
 
     // For creates_incident=true alerts the incident correlation path handles
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
-    let incident_notified = if alert.creates_incident
+    let (incident_notified, incident_notify_error) = if alert.creates_incident
         && o2_enterprise::enterprise::common::config::get_config()
             .incidents
             .enabled
@@ -2238,38 +2465,42 @@ pub async fn trigger_by_name(
             now,
             // Manual triggers evaluate nothing; no level to map.
             None,
+            None,
         )
         .await
         {
-            Ok(Some(outcome)) => {
+            Ok(Some(correlated)) => {
                 log::info!(
                     "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
                     alert.name,
-                    outcome.incident_id(),
-                    outcome.service_name(),
+                    correlated.outcome.incident_id(),
+                    correlated.outcome.service_name(),
                 );
-                incident_path_notified(&outcome)
+                (
+                    incident_path_notified(&correlated.outcome),
+                    correlated.notify_error,
+                )
             }
             Ok(None) => {
                 log::debug!(
                     "No incident correlation for manually triggered alert {org_id}/{}",
                     alert.name
                 );
-                false
+                (false, None)
             }
             Err(e) => {
                 log::error!(
                     "Error correlating manual trigger to incident, falling back to direct notification: {e}"
                 );
-                false
+                (false, None)
             }
         }
     } else {
-        false
+        (false, None)
     };
 
     #[cfg(not(feature = "enterprise"))]
-    let incident_notified = false;
+    let (incident_notified, incident_notify_error) = (false, None);
 
     let trace_id = config::ider::generate_trace_id();
     let trace_id = format!("trig_name_{trace_id}");
@@ -2296,9 +2527,42 @@ pub async fn trigger_by_name(
             None,
         )
         .await?;
-    let (success_message, err_message) = (outcome.success_message, outcome.error_message);
+    let error_message = with_incident_notify_error(outcome.error_message, incident_notify_error);
 
-    Ok((success_message, err_message))
+    Ok(ManualTrigger::Sent {
+        success_message: outcome.success_message,
+        error_message,
+    })
+}
+
+/// A manual trigger inside a window is suppressed like a scheduled run: no page, no un-mute.
+#[cfg(feature = "enterprise")]
+async fn suppressed_manual_trigger(
+    alert: &Alert,
+    folder_id: &str,
+    now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    let rows = [manual_trigger_row(alert)];
+    let downtime =
+        crate::alerts::scheduler::handlers::downtime_decision(alert, folder_id, Some(&rows), now)
+            .await?;
+    log::info!(
+        "Manual trigger of alert {}/{} suppressed by downtime {}",
+        alert.org_id,
+        alert.name,
+        downtime.id
+    );
+    crate::alerts::scheduler::handlers::correlate_muted_incident(
+        "manual_trigger",
+        alert,
+        &rows,
+        now,
+        None,
+        &downtime,
+    )
+    .await;
+    count_suppressed_run(&alert.org_id, "alerts");
+    Some(downtime)
 }
 
 /// Per-destination result of one notification attempt.
@@ -2314,6 +2578,8 @@ pub struct NotificationOutcome {
     /// Destination names that failed on this attempt, for any reason
     /// (fetch error, missing template, bad content spec, transport error).
     pub failed: Vec<String>,
+    /// False when no destination or workflow was dispatched, e.g. an alert wired to nothing.
+    pub attempted: bool,
     pub success_message: String,
     pub error_message: String,
 }
@@ -2424,6 +2690,12 @@ impl AlertExt for Alert {
         skip_destinations: &[String],
         episode_id: Option<String>,
     ) -> Result<NotificationOutcome, AlertError> {
+        // A deleted alert-level template must not fail a send that has nothing to dispatch.
+        if self.destinations.is_empty()
+            && (!cfg!(feature = "enterprise") || self.workflows.is_empty())
+        {
+            return Ok(NotificationOutcome::default());
+        }
         let mut outcome = NotificationOutcome::default();
         let mut err_message = "".to_string();
         let mut success_message = "".to_string();
@@ -2672,7 +2944,14 @@ impl AlertExt for Alert {
                     "alert_operator",
                     self.trigger_condition.operator.to_string().into(),
                 ),
-                ("alert_threshold", self.trigger_condition.threshold.into()),
+                (
+                    "alert_threshold",
+                    if self.query_condition.promql_rule_mode {
+                        Value::String(String::new())
+                    } else {
+                        self.trigger_condition.threshold.into()
+                    },
+                ),
                 (
                     "alert_count",
                     workflow_alert_count(self, rows.len(), actual_value),
@@ -2745,6 +3024,8 @@ impl AlertExt for Alert {
         // themselves all failed. T11's retry logic keys off this return
         // value, so the change is called out rather than left implicit.
         let attempted = self.destinations.len() - no_of_skipped;
+        outcome.attempted =
+            attempted > 0 || (cfg!(feature = "enterprise") && !self.workflows.is_empty());
         if attempted > 0 && no_of_error == attempted {
             Err(AlertError::SendNotificationError {
                 error_message: outcome.error_message,
@@ -3179,9 +3460,9 @@ pub(crate) async fn dispatch_test_message(
 
 async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
     // Block SSRF: validate the destination URL (including DNS resolution) before
-    // making any outbound request. The client is built through `build_safe_client`
+    // making any outbound request. The client is built through `build_safe_destination_client`
     // so that redirect targets and per-connect DNS resolution are re-validated.
-    if let Err(e) = SsrfGuard::validate_url_with_config_async(&endpoint.url).await {
+    if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(&endpoint.url).await {
         return Err(anyhow::anyhow!(
             "Destination URL blocked by SSRF guard: {e}"
         ));
@@ -3192,7 +3473,7 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     } else {
         reqwest::Client::builder()
     };
-    let client = common::utils::ssrf_guard::build_safe_client(builder)?;
+    let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
     let build_req = |body: String| {
         let mut req = match endpoint.method {
@@ -3246,6 +3527,7 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         }
     };
     let resp_status = resp.status();
+    let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
     let resp_body = resp.text().await?;
 
     log::debug!(
@@ -3299,14 +3581,9 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         log::error!(
             "Alert http notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
         );
-        return Err(anyhow::anyhow!(
-            "sent error status: {}, err: {}",
-            resp_status,
-            resp_body
-        ));
     }
 
-    Ok(format!("sent status: {resp_status}, body: {resp_body}"))
+    send_outcome(resp_status, &resp_body, hide_body)
 }
 
 /// Send a multipart/alternative email.
@@ -3400,7 +3677,7 @@ async fn send_discord_with_attachment(
     msg: String,
     png: std::sync::Arc<Vec<u8>>,
 ) -> Result<String, anyhow::Error> {
-    if let Err(e) = SsrfGuard::validate_url_with_config_async(&endpoint.url).await {
+    if let Err(e) = SsrfGuard::validate_destination_url_with_config_async(&endpoint.url).await {
         return Err(anyhow::anyhow!(
             "Destination URL blocked by SSRF guard: {e}"
         ));
@@ -3410,7 +3687,7 @@ async fn send_discord_with_attachment(
     } else {
         reqwest::Client::builder()
     };
-    let client = common::utils::ssrf_guard::build_safe_client(builder)?;
+    let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
 
     let form = reqwest::multipart::Form::new()
@@ -3424,18 +3701,28 @@ async fn send_discord_with_attachment(
 
     let resp = client.post(url).multipart(form).send().await?;
     let resp_status = resp.status();
+    let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
     let resp_body = resp.text().await?;
     if !resp_status.is_success() {
         log::error!(
             "Alert discord notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
         );
-        return Err(anyhow::anyhow!(
-            "sent error status: {}, err: {}",
-            resp_status,
-            resp_body
-        ));
     }
-    Ok(format!("sent status: {resp_status}, body: {resp_body}"))
+    send_outcome(resp_status, &resp_body, hide_body)
+}
+
+/// What the caller of a send sees; a peer only the operator allowlist admits shows its status only.
+fn send_outcome(
+    status: reqwest::StatusCode,
+    body: &str,
+    hide_body: bool,
+) -> Result<String, anyhow::Error> {
+    match (status.is_success(), hide_body) {
+        (true, false) => Ok(format!("sent status: {status}, body: {body}")),
+        (true, true) => Ok(format!("sent status: {status}")),
+        (false, false) => Err(anyhow::anyhow!("sent error status: {status}, err: {body}")),
+        (false, true) => Err(anyhow::anyhow!("sent error status: {status}")),
+    }
 }
 
 async fn send_sns_notification(
@@ -3472,7 +3759,49 @@ async fn send_sns_notification(
 
 fn process_row_template(
     org_name: &str,
-    tpl: &String,
+    tpl: &str,
+    alert: &Alert,
+    row_type: RowTemplateType,
+    rows: &[Map<String, Value>],
+) -> Vec<Value> {
+    let mut fields = std::collections::HashMap::<String, Vec<Value>>::new();
+    let templates = (0..rows.len())
+        .map(|index| {
+            prepare_modifiers(
+                tpl,
+                |field| {
+                    let placeholder = format!("{{{field}}}");
+                    let values = fields.entry(field.to_string()).or_insert_with(|| {
+                        process_row_templates_plain(
+                            org_name,
+                            &(0..rows.len())
+                                .map(|_| PreparedTemplate::plain(placeholder.clone()))
+                                .collect::<Vec<_>>(),
+                            alert,
+                            RowTemplateType::String,
+                            rows,
+                        )
+                    });
+                    let value = values[index].as_str()?;
+                    (value != placeholder).then(|| value.to_string())
+                },
+                |field| {
+                    rows[index].contains_key(field)
+                        || alert
+                            .context_attributes
+                            .as_ref()
+                            .is_some_and(|attrs| attrs.contains_key(field))
+                },
+                false,
+            )
+        })
+        .collect::<Vec<_>>();
+    process_row_templates_plain(org_name, &templates, alert, row_type, rows)
+}
+
+fn process_row_templates_plain(
+    org_name: &str,
+    templates: &[PreparedTemplate],
     alert: &Alert,
     row_type: RowTemplateType,
     rows: &[Map<String, Value>],
@@ -3488,8 +3817,8 @@ fn process_row_template(
     // For JSON row template type, try to parse the template as JSON
     let is_json_template = row_type == RowTemplateType::Json;
 
-    for row in rows.iter() {
-        let mut resp = tpl.to_string();
+    for (row, tpl) in rows.iter().zip(templates) {
+        let mut resp = tpl.template.clone();
         let mut alert_start_time = 0;
         let mut alert_end_time = 0;
         for (key, value) in row.iter() {
@@ -3560,7 +3889,11 @@ fn process_row_template(
             )
             .replace(
                 "{alert_threshold}",
-                &alert.trigger_condition.threshold.to_string(),
+                &if alert.query_condition.promql_rule_mode {
+                    String::new()
+                } else {
+                    alert.trigger_condition.threshold.to_string()
+                },
             )
             .replace("{alert_count}", &alert_count.to_string())
             .replace(
@@ -3572,7 +3905,15 @@ fn process_row_template(
                     .unwrap_or_default(),
             )
             .replace("{alert_start_time}", &alert_start_time_str)
-            .replace("{alert_end_time}", &alert_end_time_str);
+            .replace("{alert_end_time}", &alert_end_time_str)
+            .replace(
+                "{alert_start_time_millis}",
+                &epoch_millis_or_na(alert_start_time),
+            )
+            .replace(
+                "{alert_end_time_millis}",
+                &epoch_millis_or_na(alert_end_time),
+            );
 
         if let Some(contidion) = &alert.query_condition.promql_condition {
             resp = resp
@@ -3585,6 +3926,8 @@ fn process_row_template(
                 process_variable_replace(&mut resp, key, &VarValue::Str(value), false);
             }
         }
+
+        resp = tpl.finish(resp);
 
         // If this is a JSON row template, try to parse it as JSON
         if is_json_template {
@@ -3632,13 +3975,23 @@ fn workflow_alert_count(alert: &Alert, rows_len: usize, actual_value: Option<f64
     // `rows_len` caps at 100 and any Branch above it is a dead path.
     // Aggregation/PromQL payloads are groups/series; their length stands.
     let is_count_family = alert.query_condition.aggregation.is_none()
-        && alert.query_condition.promql_condition.is_none();
+        && alert.query_condition.promql_condition.is_none()
+        && !alert.query_condition.promql_rule_mode;
     match actual_value {
         Some(v) if is_count_family && v.is_finite() && v.fract() == 0.0 && v >= 0.0 => {
             Value::from(v as u64)
         }
         Some(v) if is_count_family && v.is_finite() => Value::from(v),
         _ => Value::from(rows_len),
+    }
+}
+
+/// Epoch milliseconds for a microsecond timestamp; "N/A" when unknown, like the formatted times.
+fn epoch_millis_or_na(micros: i64) -> String {
+    if micros > 0 {
+        (micros / 1000).to_string()
+    } else {
+        String::from("N/A")
     }
 }
 
@@ -3720,7 +4073,8 @@ async fn build_notification_context(
     // payload, so `rows.len()` would render 48,213 real matches as "100".
     // Aggregation/PromQL payloads are groups/series; their length stands.
     let is_count_family = alert.query_condition.aggregation.is_none()
-        && alert.query_condition.promql_condition.is_none();
+        && alert.query_condition.promql_condition.is_none()
+        && !alert.query_condition.promql_rule_mode;
     let alert_count = match actual_value {
         Some(v) if is_count_family => fmt_observed(v),
         _ => rows.len().to_string(),
@@ -3813,16 +4167,20 @@ async fn build_notification_context(
     };
     let alert_url = if alert.query_condition.query_type == QueryType::PromQL {
         if let Some(promql) = &alert.query_condition.promql {
-            let condition = alert.query_condition.promql_condition.as_ref().unwrap();
-            alert_query = format!(
-                "({}) {} {}",
-                promql,
-                match condition.operator {
-                    Operator::EqualTo => "==".to_string(),
-                    _ => condition.operator.to_string(),
-                },
-                to_float(&condition.value)
-            );
+            if alert.query_condition.promql_rule_mode {
+                alert_query = promql.clone();
+            } else {
+                let condition = alert.query_condition.promql_condition.as_ref().unwrap();
+                alert_query = format!(
+                    "({}) {} {}",
+                    promql,
+                    match condition.operator {
+                        Operator::EqualTo => "==".to_string(),
+                        _ => condition.operator.to_string(),
+                    },
+                    to_float(&condition.value)
+                );
+            }
         }
         // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
         format!(
@@ -3914,9 +4272,21 @@ async fn build_notification_context(
         alert_type: alert_type.to_string(),
         alert_period: alert.trigger_condition.period.to_string(),
         alert_operator: alert.trigger_condition.operator.to_string(),
-        alert_threshold: alert.trigger_condition.threshold.to_string(),
+        alert_threshold: if alert.query_condition.promql_rule_mode {
+            String::new()
+        } else {
+            alert.trigger_condition.threshold.to_string()
+        },
         alert_count,
-        alert_agg_value: format_agg_value(actual_value),
+        alert_agg_value: if alert.query_condition.promql_rule_mode {
+            rows.first()
+                .and_then(|r| r.get("value"))
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string()
+        } else {
+            format_agg_value(actual_value)
+        },
         alert_level: level.map(|l| l.to_string()).unwrap_or_default(),
         alert_status: if resolved {
             crate::alerts::notifications::STATUS_RESOLVED
@@ -3927,10 +4297,16 @@ async fn build_notification_context(
         episode_id,
         alert_priority: alert.priority.map(|p| p.to_string()).unwrap_or_default(),
         alert_tags: alert.tags.join(","),
-        alert_threshold_crit: fmt_observed(family_crit),
+        alert_threshold_crit: if alert.query_condition.promql_rule_mode {
+            String::new()
+        } else {
+            fmt_observed(family_crit)
+        },
         alert_threshold_warn: family_warn.map(fmt_observed).unwrap_or_default(),
         alert_start_time: alert_start_time_str,
         alert_end_time: alert_end_time_str,
+        alert_start_time_millis: epoch_millis_or_na(alert_start_time),
+        alert_end_time_millis: epoch_millis_or_na(alert_end_time),
         alert_url,
         alert_trigger_time: evaluation_timestamp,
         alert_trigger_time_str: evaluation_timestamp_str,
@@ -4533,17 +4909,95 @@ mod threshold_validation_tests {
 
 #[cfg(test)]
 mod send_path_tests {
-    use config::meta::destinations::{Template, TemplateKind};
+    use config::meta::destinations::{Endpoint, HTTPType, Template, TemplateKind};
 
     #[cfg(feature = "enterprise")]
     use super::incident_path_notified;
-    use super::{NotificationOutcome, all_workflows_failed, choose_template};
+    use super::{
+        Alert, AlertError, AlertExt, NotificationOutcome, all_workflows_failed, choose_template,
+        has_delivery_target, send_attempted, send_discord_with_attachment, send_http_notification,
+    };
+    use crate::{
+        alerts::notifications::platform::{Platform, send_resolve},
+        ssrf_test_support::{isolated, secret_server},
+    };
 
     #[test]
     fn skipped_incident_destinations_do_not_hide_total_workflow_failure() {
         assert!(all_workflows_failed(0, 1, 1));
         assert!(!all_workflows_failed(0, 1, 0));
         assert!(!all_workflows_failed(1, 1, 1));
+    }
+
+    #[test]
+    fn a_failed_send_counts_as_attempted_and_an_empty_one_does_not() {
+        let failed = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        assert!(send_attempted(&failed));
+        assert!(!send_attempted(&Ok(NotificationOutcome::default())));
+        let sent = Ok(NotificationOutcome {
+            attempted: true,
+            ..Default::default()
+        });
+        assert!(send_attempted(&sent));
+    }
+
+    #[test]
+    fn only_a_destination_workflow_or_on_call_team_is_a_delivery_target() {
+        let with = |set: fn(&mut Alert)| {
+            let mut alert = Alert::default();
+            set(&mut alert);
+            has_delivery_target(&alert)
+        };
+        let enterprise = cfg!(feature = "enterprise");
+        assert!(!with(|_| {}));
+        assert!(!with(|a| a.oncall_team = Some("  ".to_string())));
+        assert!(with(|a| a.destinations = vec!["slack".to_string()]));
+        assert_eq!(with(|a| a.workflows = vec!["wf".to_string()]), enterprise);
+        assert_eq!(
+            with(|a| a.oncall_team = Some("sre".to_string())),
+            enterprise
+        );
+    }
+
+    #[tokio::test]
+    async fn a_send_with_nothing_left_to_dispatch_attempts_nothing() {
+        let mut alert = Alert::default();
+        let unwired = alert
+            .send_notification("t", &[], 0, None, 0, None, None, None, &[], None)
+            .await
+            .expect("nothing to send is not an error");
+        assert!(!unwired.attempted);
+
+        alert.destinations = vec!["slack".to_string()];
+        let ledgered = alert
+            .send_notification(
+                "t",
+                &[],
+                0,
+                None,
+                0,
+                None,
+                None,
+                None,
+                &alert.destinations,
+                None,
+            )
+            .await
+            .expect("every destination already delivered is not an error");
+        assert!(!ledgered.attempted);
+    }
+
+    #[tokio::test]
+    async fn a_send_with_nowhere_to_go_ignores_a_deleted_alert_template() {
+        let mut alert = Alert::default();
+        alert.template = Some("deleted".to_string());
+        let outcome = alert
+            .send_notification("t", &[], 0, None, 0, None, None, None, &[], None)
+            .await
+            .expect("a template is only needed to render a send");
+        assert!(!outcome.attempted);
     }
 
     fn tpl(name: &str) -> Template {
@@ -4597,6 +5051,7 @@ mod send_path_tests {
         let outcome = NotificationOutcome {
             succeeded: vec!["slack".into()],
             failed: vec!["pagerduty".into()],
+            attempted: true,
             success_message: " destination slack sent;".into(),
             error_message: " Error sending notification for destination pagerduty err: boom;"
                 .into(),
@@ -4637,6 +5092,76 @@ mod send_path_tests {
         let outcome = NotificationOutcome::default();
         assert!(outcome.succeeded.is_empty());
         assert!(outcome.failed.is_empty());
+    }
+
+    fn endpoint(base: &str, path: &str) -> Endpoint {
+        Endpoint {
+            url: format!("{base}{path}"),
+            method: HTTPType::POST,
+            ..Default::default()
+        }
+    }
+
+    /// What the caller of each send path sees from a destination that answers `secret`.
+    async fn caller_sees(base: &str) -> Vec<Result<String, String>> {
+        let png = std::sync::Arc::new(vec![0u8; 8]);
+        let shown = |r: Result<String, anyhow::Error>| r.map_err(|e| e.to_string());
+        vec![
+            shown(send_http_notification(&endpoint(base, "/ok"), "{}".into()).await),
+            shown(send_http_notification(&endpoint(base, "/fail"), "{}".into()).await),
+            shown(
+                send_discord_with_attachment(&endpoint(base, "/ok"), "{}".into(), png.clone())
+                    .await,
+            ),
+            shown(send_discord_with_attachment(&endpoint(base, "/fail"), "{}".into(), png).await),
+            shown(send_resolve(Platform::PagerDuty, &endpoint(base, "/fail"), "ep-1").await),
+        ]
+    }
+
+    fn assert_sends_and_failures(seen: &[Result<String, String>]) {
+        let delivered: Vec<bool> = seen.iter().map(Result::is_ok).collect();
+        assert_eq!(delivered, [true, false, true, false, false], "{seen:?}");
+    }
+
+    #[test]
+    fn a_destination_only_the_allowlist_admits_shows_the_caller_its_status_only() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_destination_only_the_allowlist_admits_shows_the_caller_its_status_only"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let seen = caller_sees(&secret_server().await).await;
+                assert_sends_and_failures(&seen);
+                for shown in &seen {
+                    let (Ok(s) | Err(s)) = shown;
+                    assert!(s.contains("status") && !s.contains("secret"), "{s}");
+                }
+            },
+        );
+    }
+
+    #[test]
+    fn a_destination_the_strict_policy_admits_still_shows_its_body() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_destination_the_strict_policy_admits_still_shows_its_body"
+            ),
+            &[
+                ("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32"),
+                ("ZO_SSRF_ALLOW_LOOPBACK", "true"),
+            ],
+            || async {
+                let seen = caller_sees(&secret_server().await).await;
+                assert_sends_and_failures(&seen);
+                for shown in &seen {
+                    let (Ok(s) | Err(s)) = shown;
+                    assert!(s.contains("secret"), "{s}");
+                }
+            },
+        );
     }
 
     #[cfg(feature = "enterprise")]
@@ -4685,6 +5210,43 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn test_with_incident_notify_error() {
+        assert_eq!(
+            with_incident_notify_error("dest err".to_string(), None),
+            "dest err"
+        );
+        assert_eq!(
+            with_incident_notify_error(" ".to_string(), Some("slack: 500".to_string())),
+            "slack: 500"
+        );
+        assert_eq!(
+            with_incident_notify_error("wf err".to_string(), Some("slack: 500".to_string())),
+            "slack: 500; wf err"
+        );
+    }
+
+    #[tokio::test]
+    async fn no_alert_can_watch_the_chat_history_stream() {
+        let mut alert = Alert::default();
+        alert.name = "exfiltrate".into();
+        alert.is_real_time = true;
+        let err = prepare_alert("org", "_o2_ai_chat_events", "", &mut alert, true, false)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AlertError::ProtectedStream(ref s) if s == "_o2_ai_chat_events"));
+        let mut upper = Alert::default();
+        upper.name = "exfiltrate-upper".into();
+        let err = prepare_alert("org", " _O2_AI_CHAT_EVENTS", "", &mut upper, true, false)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AlertError::ProtectedStream(_)));
+        assert_eq!(
+            axum::response::Response::from(err).status(),
+            axum::http::StatusCode::BAD_REQUEST
+        );
+    }
 
     /// Calls the production predicate, not a copy of it: a resolve updates the record the firing
     /// opened, so the firing body must have somewhere to carry the correlation key.
@@ -5346,6 +5908,33 @@ mod tests {
     }
 
     #[test]
+    fn test_process_row_template_start_end_time_millis() {
+        let row_template = "{alert_start_time_millis}-{alert_end_time_millis}".to_string();
+        let mut with_window = Map::new();
+        with_window.insert(
+            "zo_sql_min_time".to_string(),
+            json!(1_785_578_400_123_456_i64),
+        );
+        with_window.insert(
+            "zo_sql_max_time".to_string(),
+            json!(1_785_579_000_000_000_i64),
+        );
+        let mut without_time = Map::new();
+        without_time.insert("name".to_string(), json!("Alice"));
+
+        let result = process_row_template(
+            "test_org",
+            &row_template,
+            &Alert::default(),
+            RowTemplateType::String,
+            &[with_window, without_time],
+        );
+
+        assert_eq!(result[0].as_str().unwrap(), "1785578400123-1785579000000");
+        assert_eq!(result[1].as_str().unwrap(), "N/A-N/A");
+    }
+
+    #[test]
     fn test_process_row_template_json_type_invalid_json_fallback() {
         let row_template = "This is not valid JSON: {name}".to_string();
         let mut row1 = Map::new();
@@ -5676,6 +6265,49 @@ mod tests {
         assert_eq!(arr.len(), 2);
         assert_eq!(arr[0]["user"], "Alice");
         assert_eq!(arr[1]["user"], "Bob");
+    }
+
+    #[tokio::test]
+    async fn test_process_dest_template_start_end_time_millis() {
+        let dest_tpl = r#"{"from": "{alert_start_time_millis}", "to": "{alert_end_time_millis}"}"#;
+        let mut row1 = Map::new();
+        row1.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            json!(1_785_578_400_123_456_i64),
+        );
+        let mut row2 = Map::new();
+        row2.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            json!(1_785_578_430_000_000_i64),
+        );
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+            episode_id: None,
+            resolved: false,
+        };
+
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &Alert::default(),
+            &[row1, row2],
+            &[],
+            options,
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+
+        // the end bound carries the one-minute pad of get_alert_start_end_time
+        assert_eq!(
+            result,
+            r#"{"from": "1785578400123", "to": "1785578490000"}"#
+        );
     }
 
     #[tokio::test]
@@ -6344,10 +6976,6 @@ mod tests {
         assert_eq!(
             AlertError::AlertNameMissing.to_string(),
             "Alert name is required"
-        );
-        assert_eq!(
-            AlertError::AlertDestinationMissing.to_string(),
-            "Alert destination or workflows is required"
         );
         assert_eq!(AlertError::AlertNotFound.to_string(), "Alert not found");
         assert_eq!(
@@ -7088,13 +7716,144 @@ mod tests {
 
         let out = process_row_template(
             "default",
-            &STREAM_TPL.to_string(),
+            STREAM_TPL,
             &alert,
             RowTemplateType::String,
             &[row],
         );
 
         assert_eq!(out[0].as_str().unwrap(), "Stream: default Type: metrics");
+    }
+
+    /// A forecast alert as the web form saves it: per series, `value` is days until 0.9.
+    fn forecast_alert_fixture() -> Alert {
+        let mut alert = Alert::default();
+        alert.name = "disk-full".into();
+        alert.org_id = "default".into();
+        alert.stream_name = "node_filesystem_avail_bytes".into();
+        alert.stream_type = config::meta::stream::StreamType::Metrics;
+        alert.query_condition.query_type = config::meta::alerts::QueryType::PromQL;
+        alert.query_condition.promql_condition = Some(config::meta::alerts::Condition {
+            column: "value".into(),
+            operator: config::meta::alerts::Operator::LessThanEquals,
+            value: json!(7),
+            ignore_case: false,
+        });
+        alert.query_condition.promql = Some(
+            "((disk_used) >= 0.9) * 0 or clamp_min(ceil((0.9 - (disk_used)) / (deriv((disk_used)[2d:15m]) > 0) / 8640 - 1e-6) / 10, 0) or ((disk_used) * 0 + 36500)".into(),
+        );
+        alert.query_condition.promql_multi_alert = true;
+        alert.trigger_condition.threshold = 1;
+        alert.trigger_condition.operator = config::meta::alerts::Operator::GreaterThanEquals;
+        alert.row_template = "reaches 0.9 in {value} days".into();
+        alert
+    }
+
+    fn forecast_row(device: &str, days: f64) -> Map<String, Value> {
+        let mut row = Map::new();
+        row.insert("device".to_string(), json!(device));
+        row.insert("_timestamp".to_string(), json!(1_700_000_000_000_000_i64));
+        row.insert("value".to_string(), json!(days));
+        row
+    }
+
+    fn firing_devices(rows: &[Map<String, Value>]) -> Vec<String> {
+        let classification = config::meta::alerts::grouping::classify_promql_series(
+            rows,
+            config::meta::alerts::Operator::LessThanEquals,
+            7.0,
+            None,
+            100,
+        );
+        let mut firing: Vec<String> = classification
+            .groups
+            .into_iter()
+            .filter(|group| group.level.is_some())
+            .map(|group| group.labels["device"].clone())
+            .collect();
+        firing.sort();
+        firing
+    }
+
+    #[tokio::test]
+    async fn a_forecast_alert_fires_per_series_and_says_when_it_crosses() {
+        let alert = forecast_alert_fixture();
+        // Rising, 6.96 days out, already past 0.9, and moving away.
+        let rows = vec![
+            forecast_row("a", 5.0),
+            forecast_row("b", 7.0),
+            forecast_row("c", 0.0),
+            forecast_row("d", 36500.0),
+        ];
+        assert_eq!(firing_devices(&rows), ["a", "b", "c"]);
+
+        // Next evaluation: a's trend reversed and c stopped reporting.
+        let next = vec![
+            forecast_row("a", 36500.0),
+            forecast_row("b", 7.0),
+            forecast_row("d", 36500.0),
+        ];
+        assert_eq!(firing_devices(&next), ["b"]);
+
+        let fired = &rows[..3];
+        let rows_tpl = process_row_template(
+            "default",
+            &alert.row_template,
+            &alert,
+            RowTemplateType::String,
+            fired,
+        );
+        let lines = [
+            "reaches 0.9 in 5 days",
+            "reaches 0.9 in 7 days",
+            "reaches 0.9 in 0 days",
+        ];
+        assert_eq!(rows_tpl, lines.map(|line| Value::String(line.into())));
+
+        let custom = process_dest_template(
+            "default",
+            "{rows}",
+            &alert,
+            fired,
+            &rows_tpl,
+            default_template_options(),
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+        for line in lines {
+            assert!(custom.contains(line), "{custom}");
+        }
+
+        let ctx = build_notification_context(
+            "default",
+            &alert,
+            fired,
+            &rows_tpl,
+            default_template_options(),
+            None,
+        )
+        .await;
+        let spec = crate::alerts::notifications::default_template::compiled_default_content();
+        let content = resolve_content(&spec, &ctx, ChannelFormat::Webhook.channel_family());
+        let Ok(RenderedMessage::Http { body }) = render(ChannelFormat::Webhook, &content, &ctx)
+        else {
+            panic!("expected a webhook body");
+        };
+        // The default template ignores the row template: each fired series is its labels and days.
+        let body: Value = serde_json::from_str(&body).unwrap();
+        let rows: Vec<(&str, f64)> = body["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| {
+                (
+                    row["device"].as_str().unwrap(),
+                    row["value"].as_f64().unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(rows, [("a", 5.0), ("b", 7.0), ("c", 0.0)]);
     }
 
     // ── The SLO alert-level collapse (§6b.3, D34) ───────────────────────────
@@ -7464,6 +8223,25 @@ mod tests {
     }
 
     #[test]
+    fn a_suppressed_manual_trigger_answers_with_the_downtime_name() {
+        let suppressed = ManualTrigger::Suppressed(config::meta::downtimes::ActiveDowntime {
+            id: "dt-1".to_string(),
+            name: "db upgrade".to_string(),
+            ends_at: 0,
+            incident_mode: Default::default(),
+        });
+        assert_eq!(
+            suppressed.response_message(),
+            "Alert suppressed by downtime db upgrade"
+        );
+        let sent = ManualTrigger::Sent {
+            success_message: String::new(),
+            error_message: String::new(),
+        };
+        assert_eq!(sent.response_message(), "Alert triggered");
+    }
+
+    #[test]
     fn manual_trigger_row_carries_stream_alert_and_manual_marker() {
         let alert = manual_alert("my_alert", vec![]);
         let row = manual_trigger_row(&alert);
@@ -7555,6 +8333,155 @@ mod tests {
     fn test_workflow_alert_count_falls_back_to_rows_len() {
         let alert = Alert::default();
         assert_eq!(workflow_alert_count(&alert, 25, None), json!(25u64));
+    }
+
+    #[test]
+    fn a_suppressed_run_is_recorded_with_its_downtime_and_counted() {
+        use config::meta::self_reporting::usage::{RunOutcome, TriggerData};
+
+        let org = "org_suppressed_run_record";
+        let counter =
+            || config::metrics::ALERT_RUNS_SUPPRESSED_TOTAL.with_label_values(&[org, "alerts"]);
+        let before = counter().get();
+        let mut data = TriggerData {
+            org: org.to_string(),
+            status: RunOutcome::Firing,
+            ..Default::default()
+        };
+        record_suppressed_run(&mut data, "alerts", "dt-1".to_string());
+        assert_eq!(data.status, RunOutcome::Suppressed);
+        assert_eq!(data.downtime_id.as_deref(), Some("dt-1"));
+        assert_eq!(data.delivery_attempted, Some(false));
+        assert_eq!(counter().get(), before + 1);
+    }
+
+    /// A new alert with no id reaches the schedule checks before any DB read.
+    async fn prepare_schedule(mutate: impl FnOnce(&mut Alert)) -> AlertError {
+        let mut alert = Alert::default();
+        mutate(&mut alert);
+        prepare_alert("default", "logs", "sched", &mut alert, true, false)
+            .await
+            .unwrap_err()
+    }
+
+    /// Every check before the schema lookup passed; the lookup itself needs a database.
+    fn reached_the_schema_lookup(err: &AlertError) -> bool {
+        matches!(
+            err,
+            AlertError::StreamNotFound { .. } | AlertError::InfraError(_)
+        )
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_saves_an_alert_with_nowhere_to_send() {
+        let err = prepare_schedule(|a| a.trigger_condition.frequency = 60).await;
+        assert!(reached_the_schema_lookup(&err), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_rejects_an_out_of_range_frequency() {
+        let err = prepare_schedule(|a| a.trigger_condition.frequency = i64::MAX).await;
+        assert!(matches!(err, AlertError::FrequencyOutOfRange), "{err:?}");
+        let err = prepare_schedule(|a| a.trigger_condition.frequency = -1).await;
+        assert!(matches!(err, AlertError::FrequencyOutOfRange), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_rejects_an_out_of_range_silence() {
+        let err = prepare_schedule(|a| a.trigger_condition.silence = i64::MAX).await;
+        assert!(matches!(err, AlertError::SilenceOutOfRange), "{err:?}");
+        let err = prepare_schedule(|a| a.trigger_condition.silence = -1).await;
+        assert!(matches!(err, AlertError::SilenceOutOfRange), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_rejects_an_out_of_range_tolerance() {
+        let err =
+            prepare_schedule(|a| a.trigger_condition.tolerance_in_secs = Some(i64::MAX)).await;
+        assert!(matches!(err, AlertError::ToleranceOutOfRange), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_rejects_a_full_day_tz_offset() {
+        for tz_offset in [1440, -1440, i32::MAX, i32::MIN] {
+            let err = prepare_schedule(|a| a.tz_offset = tz_offset).await;
+            assert!(
+                matches!(err, AlertError::TzOffsetOutOfRange),
+                "{tz_offset}: {err:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_rejects_a_cron_with_no_future_occurrence() {
+        let err = prepare_schedule(|a| {
+            a.trigger_condition.frequency_type = FrequencyType::Cron;
+            a.trigger_condition.cron = "0 0 0 1 1 * 2020".to_string();
+        })
+        .await;
+        assert!(
+            matches!(err, AlertError::CronHasNoFutureOccurrence { .. }),
+            "{err:?}"
+        );
+    }
+
+    fn legacy_alert_with_an_invalid_schedule() -> Alert {
+        let mut alert = Alert::default();
+        alert.trigger_condition.frequency = i64::MAX;
+        alert.trigger_condition.silence = i64::MAX;
+        alert.trigger_condition.tolerance_in_secs = Some(i64::MAX);
+        alert.tz_offset = 1440;
+        alert
+    }
+
+    #[test]
+    fn toggling_enabled_on_a_legacy_invalid_schedule_is_not_revalidated() {
+        let stored = legacy_alert_with_an_invalid_schedule();
+        let mut toggled = stored.clone();
+        toggled.enabled = !stored.enabled;
+        assert!(check_schedule(Some(&stored), &toggled).is_ok());
+
+        let mut stored = Alert::default();
+        stored.trigger_condition.frequency_type = FrequencyType::Cron;
+        stored.trigger_condition.cron = "0 0 0 1 1 * 2020".to_string();
+        let mut toggled = stored.clone();
+        toggled.enabled = !stored.enabled;
+        assert!(check_schedule(Some(&stored), &toggled).is_ok());
+    }
+
+    #[test]
+    fn editing_a_schedule_to_an_invalid_value_is_still_rejected() {
+        let mut stored = Alert::default();
+        stored.trigger_condition.frequency = 60;
+        let mut edited = stored.clone();
+        edited.tz_offset = 1440;
+        let err = check_schedule(Some(&stored), &edited).unwrap_err();
+        assert!(matches!(err, AlertError::TzOffsetOutOfRange), "{err:?}");
+
+        let stored = legacy_alert_with_an_invalid_schedule();
+        let mut edited = stored.clone();
+        edited.trigger_condition.frequency -= 1;
+        let err = check_schedule(Some(&stored), &edited).unwrap_err();
+        assert!(matches!(err, AlertError::TzOffsetOutOfRange), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_accepts_schedule_values_at_their_bounds() {
+        let err = prepare_schedule(|a| {
+            a.tz_offset = -1439;
+            a.trigger_condition.frequency = SCHEDULE_FIELD_MAX_SECS;
+            a.trigger_condition.silence = SCHEDULE_FIELD_MAX_SECS / 60;
+            a.trigger_condition.tolerance_in_secs = Some(SCHEDULE_FIELD_MAX_SECS);
+        })
+        .await;
+        assert!(reached_the_schema_lookup(&err), "{err:?}");
+        let err = prepare_schedule(|a| {
+            a.tz_offset = 1439;
+            a.trigger_condition.frequency_type = FrequencyType::Cron;
+            a.trigger_condition.cron = "0 0 * * * *".to_string();
+        })
+        .await;
+        assert!(reached_the_schema_lookup(&err), "{err:?}");
     }
 }
 
@@ -7817,4 +8744,277 @@ fn collapse_slo_evals(evals: &[crate::slo::evaluate::SloEvalResult]) -> SloColla
         return SloCollapse::Frozen;
     }
     SloCollapse::Healthy
+}
+
+#[cfg(test)]
+mod modifier_tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn row_numeric_modifiers_numbers_strings_and_precedence() {
+        let rows = vec![
+            serde_json::from_value(json!({
+                "ratio": 0.9123, "bytes": "1048576", "rate": 1234567,
+                "latency": "3661.9", "alert_count": 1200, "pipe|humanize": "literal",
+                "message": "abc\"def", "payload": "{ratio|humanizePercentage}"
+            }))
+            .unwrap(),
+            serde_json::from_value(json!({
+                "ratio": "0.5", "bytes": 1024, "rate": "2000", "latency": 0.25,
+                "message": "second"
+            }))
+            .unwrap(),
+        ];
+        let mut alert = Alert::default();
+        alert.context_attributes = Some([(String::from("rate"), String::from("10"))].into());
+        let tpl = r#"{"ratio":"{ratio|humanizePercentage}","bytes":"{bytes|humanize1024}","rate":"{rate|humanize}","latency":"{latency|humanizeDuration}","count":"{alert_count|humanize}","pipe":"{pipe|humanize}","message":"{message:4}","payload":"{payload}"}"#.to_string();
+        let rendered = process_row_template("default", &tpl, &alert, RowTemplateType::Json, &rows);
+        assert_eq!(
+            rendered[0],
+            json!({"ratio":"91.23%", "bytes":"1Mi", "rate":"1.235M", "latency":"1h 1m 1s", "count":"1.2k", "pipe":"literal", "message":"abc\"", "payload":"{ratio|humanizePercentage}"})
+        );
+        assert_eq!(rendered[1]["count"], "2");
+        assert_eq!(rendered[1]["ratio"], "50%");
+        assert_eq!(rendered[1]["bytes"], "1ki");
+        assert_eq!(rendered[1]["rate"], "2k");
+        assert_eq!(rendered[1]["latency"], "250ms");
+    }
+
+    #[test]
+    fn row_modifiers_fallback_special_values_and_injection() {
+        let rows = vec![serde_json::from_value(json!({"bad": "oops", "nan": "NaN", "inf": "+Inf", "negative_inf": "-Inf", "payload": "{alert_count|humanizePercentage}"})).unwrap()];
+        let tpl = "{bad|humanize} {missing|humanize} {nan|humanize} {inf|humanizeDuration} {negative_inf|humanizePercentage} {alert_count|unknown} {alert_count|humanize:2} {payload}".to_string();
+        let rendered = process_row_template(
+            "default",
+            &tpl,
+            &Alert::default(),
+            RowTemplateType::String,
+            &rows,
+        );
+        assert_eq!(rendered, vec![Value::String("{bad|humanize} {missing|humanize} NaN +Inf -Inf% {alert_count|unknown} {alert_count|humanize:2} {alert_count|humanizePercentage}".into())]);
+        let ctx = NotificationContext {
+            alert_count: "1".into(),
+            rows_tpl_val: rendered,
+            ..Default::default()
+        };
+        let embedded = apply_custom_template("{rows} {alert_count|humanizePercentage}", &ctx, true);
+        assert!(embedded.ends_with("{alert_count|humanizePercentage} 100%"));
+    }
+
+    #[test]
+    fn row_timestamp_and_size_modifiers() {
+        let rows = vec![serde_json::from_value(json!({"t":1700000000123456_i64,"seconds":"-0.1","bytes":1536,"payload":"{t|formatTimestampMicros}","host":"expanded"})).unwrap()];
+        let tpl = r#"{"timestamp":"{t|formatTimestampMicros}","seconds":"{seconds|formatTimestamp}","size":"{bytes|humanSize}","custom":"{t|formatTimestampMicros("{host} %Y%m%d%H%M%S%z \"quoted\"", "Asia/Shanghai")}","payload":"{payload}"}"#.to_string();
+        let output = process_row_template(
+            "default",
+            &tpl,
+            &Alert::default(),
+            RowTemplateType::Json,
+            &rows,
+        );
+        assert_eq!(
+            output[0],
+            json!({
+                "timestamp":"2023-11-14T22:13:20.123456Z", "seconds":"1969-12-31T23:59:59.900Z",
+                "size":"1.5 KiB", "custom":"{host} 20231115061320+0800 \"quoted\"", "payload":"{t|formatTimestampMicros}"
+            })
+        );
+        let bad = r#"{seconds|formatTimestamp("%Q")} {t|formatTimestampMicros("%Y", "+25:00")} {bytes|humanSize()}"#.to_string();
+        assert_eq!(
+            process_row_template(
+                "default",
+                &bad,
+                &Alert::default(),
+                RowTemplateType::String,
+                &rows
+            ),
+            vec![Value::String(bad)]
+        );
+    }
+
+    #[test]
+    fn row_rejects_lengths_and_preserves_literal_field_names() {
+        let rows = vec![
+            serde_json::from_value(
+                json!({"bytes":1536,"metric:2":"1536","literal:2|humanSize":"literal value"}),
+            )
+            .unwrap(),
+        ];
+        let tpl = "{bytes:2|humanSize} {metric:2|humanSize} {literal:2|humanSize} {literal:2|humanSize:4} {bytes|humanSize} {alert_count:1|humanize}";
+        assert_eq!(
+            process_row_template(
+                "default",
+                tpl,
+                &Alert::default(),
+                RowTemplateType::String,
+                &rows
+            ),
+            vec![Value::String(
+                "{bytes:2|humanSize} 1.5 KiB literal value lite 1.5 KiB {alert_count:1|humanize}"
+                    .into()
+            )]
+        );
+    }
+
+    #[test]
+    fn row_rejected_modifiers_preserve_exact_source() {
+        let rows =
+            vec![serde_json::from_value(json!({"t":0,"host":"expanded","bad":"NaN"})).unwrap()];
+        for tpl in [
+            r#"{t|formatTimestamp("{host} %Q")}"#,
+            r#"{t|formatTimestamp("{host} %Y", "invalid-zone")}"#,
+            r#"{missing|formatTimestamp("{host} %Y")}"#,
+            r#"{bad|formatTimestamp("{host} %Y")}"#,
+            r#"{t|formatTimestamp("{host} %Y",)}"#,
+            r#"{t|formatTimestamp({host})}"#,
+            r#"{t|unknown("{host}")}"#,
+        ] {
+            for row_type in [RowTemplateType::String, RowTemplateType::Json] {
+                assert_eq!(
+                    process_row_template("default", tpl, &Alert::default(), row_type, &rows),
+                    vec![Value::String(tpl.into())]
+                );
+            }
+        }
+        for (tpl, expected) in [
+            (
+                r#"{t|formatTimestamp("{host} %Q")} {host}"#,
+                r#"{t|formatTimestamp("{host} %Q")} expanded"#,
+            ),
+            (
+                r#"{t|formatTimestamp("{host} %Y)} {host} {t|formatTimestamp("%Y")}"#,
+                r#"{t|formatTimestamp("expanded %Y)} expanded 1970"#,
+            ),
+            (
+                "{t|formatTimestamp fired on {host} at {t}",
+                "{t|formatTimestamp fired on expanded at 0",
+            ),
+        ] {
+            assert_eq!(
+                process_row_template(
+                    "default",
+                    tpl,
+                    &Alert::default(),
+                    RowTemplateType::String,
+                    &rows
+                ),
+                vec![Value::String(expected.into())]
+            );
+        }
+    }
+
+    #[test]
+    fn row_json_pipes_and_links_preserve_placeholders() {
+        let rows = vec![serde_json::from_value(json!({"bytes":1536})).unwrap()];
+        for prefix in ["a|b", "<https://example.com|View>"] {
+            let tpl = format!(
+                r#"{{"text":"{prefix}","count":"{{alert_count}}","size":"{{bytes|humanSize}}","invalid":"{{bytes:2|humanSize}}","unknown":"{{bytes|unknown}}"}}"#
+            );
+            assert_eq!(
+                process_row_template(
+                    "default",
+                    &tpl,
+                    &Alert::default(),
+                    RowTemplateType::Json,
+                    &rows
+                ),
+                vec![
+                    json!({"text":prefix,"count":"1","size":"1.5 KiB","invalid":"{bytes:2|humanSize}","unknown":"{bytes|unknown}"})
+                ]
+            );
+        }
+    }
+
+    #[test]
+    fn row_nested_json_pipes_quotes_and_newlines() {
+        let rows = vec![serde_json::from_value(json!({"ratio":0.9123,"host":"web\"1"})).unwrap()];
+        let tpl = r#"{
+            "text": "a|b \"quoted\"",
+            "nested": { "link": "<https://example.com|View>",
+                "host": "{host}", "ratio": "{ratio|humanizePercentage}",
+                "fallback": "{missing|humanSize}" }
+        }"#;
+        assert_eq!(
+            process_row_template(
+                "default",
+                tpl,
+                &Alert::default(),
+                RowTemplateType::Json,
+                &rows
+            ),
+            vec![json!({
+                "text":"a|b \"quoted\"", "nested":{"link":"<https://example.com|View>","host":"web\"1","ratio":"91.23%","fallback":"{missing|humanSize}"}
+            })]
+        );
+    }
+}
+
+#[cfg(test)]
+mod rule_notification_tests {
+    use config::utils::json::json;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn rule_notifications_preserve_strings_and_render_empty_thresholds() {
+        let mut alert = Alert::default();
+        alert.query_condition.promql_rule_mode = true;
+        alert.query_condition.query_type = QueryType::PromQL;
+        alert.query_condition.promql_multi_alert = true;
+        alert.query_condition.promql = Some("rate(foo[5m]) > 4".into());
+        alert.stream_type = StreamType::Metrics;
+        alert.stream_name = "foo".into();
+        for value in ["NaN", "+Inf", "-Inf", "0.125"] {
+            let rows = vec![Map::from_iter([("value".into(), json!(value))])];
+            let options = || ProcessTemplateOptions {
+                rows_end_time: 0,
+                start_time: None,
+                evaluation_timestamp: 0,
+                is_email: false,
+                level: Some(config::meta::alerts::level::AlertLevel::Critical),
+                actual_value: Some(0.0),
+                episode_id: None,
+                resolved: false,
+            };
+            let context =
+                build_notification_context("org", &alert, &rows, &[], options(), None).await;
+            let url = if let Some((_, suffix)) = context.alert_url.split_once("/web/short/") {
+                let id = suffix.split('?').next().unwrap();
+                short_url::retrieve(&alert.org_id, id).await.unwrap()
+            } else {
+                context.alert_url
+            };
+            assert!(url.contains("/web/metrics?"));
+            let query = url
+                .split_once("&query=")
+                .unwrap()
+                .1
+                .split('&')
+                .next()
+                .unwrap();
+            assert_eq!(
+                base64::decode_url(&query.replace("%2B", "+")).unwrap(),
+                "rate(foo[5m]) > 4"
+            );
+            let result = process_dest_template("org", r#"{"value":"{value}","observed":"{alert_agg_value}","threshold":"{alert_threshold}"}"#,
+                &alert, &rows, &[], options(), &hashbrown::HashMap::new(), None).await;
+            let parsed: Value = serde_json::from_str(&result).unwrap();
+            assert_eq!(parsed["value"], value);
+            assert_eq!(parsed["observed"], value);
+            assert_eq!(parsed["threshold"], "");
+        }
+    }
+    #[tokio::test]
+    async fn rule_opt_out_missing_condition_keeps_operator_fallback_error() {
+        let mut alert = Alert::default();
+        alert.name = "ordinary-promql".into();
+        alert.query_condition.query_type = QueryType::PromQL;
+        alert.query_condition.promql = Some("foo > 4".into());
+        let error = prepare_alert("org", "foo", "ordinary-promql", &mut alert, true, false)
+            .await
+            .unwrap_err();
+        assert!(matches!(error, AlertError::PromqlMissingQuery));
+    }
 }

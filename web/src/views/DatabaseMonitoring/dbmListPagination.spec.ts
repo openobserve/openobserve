@@ -114,24 +114,12 @@ describe("the DBM list pages paginate", () => {
     expect(tag, `${page} still opts out of pagination`).not.toMatch(/pagination="none"/);
   });
 
-  /**
-   * The reader has to be able to reach the controls. OTable renders its bar
-   * only when `customPaginationBar` is unset — with it set, the caller's
-   * `#bottom` owns the footer and the built-in controls are suppressed
-   * entirely. Every one of these pages set it in order to paint a status strip,
-   * which is exactly how they ended up with no controls.
-   *
-   * OTable puts `#bottom` inside the pagination bar's `#actions` slot, so
-   * dropping this prop keeps each page's footer AND gains the controls; nothing
-   * has to move. A page that keeps the prop must therefore render the controls
-   * itself, which none of them do — so this is asserted as a flat prohibition.
-   */
-  it.each(PAGES)("%s lets OTable render the pagination controls", (page, dataTest) => {
-    const tag = tableTag(read(page), dataTest);
+  // `#pagination-bar` replaces OTable's built-in bar, and none of these pages draws page controls of its own.
+  it.each(PAGES)("%s lets OTable render the pagination controls", (page) => {
     expect(
-      tag,
-      `${page} keeps custom-pagination-bar, which suppresses the controls it just enabled`,
-    ).not.toMatch(/custom-pagination-bar/);
+      read(page),
+      `${page} takes over the pagination bar, which removes the controls it just enabled`,
+    ).not.toMatch(/#pagination-bar/);
   });
 });
 
@@ -186,27 +174,36 @@ describe("pagination never claims a capped read is complete", () => {
  * failure in the pagination suites above stays legible on its own.
  */
 describe("paginating the lists does not cost them their existing honesty", () => {
-  /**
-   * The footer content that predates pagination must survive the move into the
-   * `#actions` slot. Losing it would be a silent downgrade: Blocked's footer
-   * carries the conclusion the table cannot state, and Activity's and Table
-   * health's carry the only count line on the page.
-   */
+  // Table health is absent: a bare row count is the pager's to state, so that page has no footer note.
   const KEEPS_FOOTER: [string, string][] = [
     ["ActivityPage.vue", "countLine"],
-    ["TableHealthPage.vue", "countLine"],
     ["BlockedQueriesPage.vue", "footerLine"],
   ];
 
-  it.each(KEEPS_FOOTER)("%s keeps its existing footer content", (page, marker) => {
+  it.each(KEEPS_FOOTER)("%s keeps what its footer says beyond the pager", (page, marker) => {
     const source = read(page);
-    expect(source, `${page} must still render #bottom`).toContain("<template #bottom>");
-    const slot = source.slice(source.indexOf("<template #bottom>"));
+    const at = source.search(/<template[^>]*#footer-note>/);
+    expect(at, `${page} must still render #footer-note`).toBeGreaterThan(-1);
+    const slot = source.slice(at);
     expect(
       slot.slice(0, slot.indexOf("</template>")),
-      `${page} dropped ${marker} when pagination took over the footer`,
+      `${page} dropped ${marker} from the footer note`,
     ).toContain(marker);
   });
+
+  // A complete, unfiltered read is exactly the pager's own total, so the note exists only while it says more.
+  it.each(["ActivityPage.vue", "SamplesPage.vue"])(
+    "%s leaves a complete read to the pager",
+    (page) => {
+      const source = read(page);
+      expect(source, `${page} still words a line for a complete read`).not.toMatch(
+        /counts\.complete/,
+      );
+      expect(source, `${page} must render the note only while countLine has a value`).toMatch(
+        /<template v-if="countLine[^"]*" #footer-note>/,
+      );
+    },
+  );
 
   /**
    * `CAPPED` is a claim about the ENDPOINT. If a page's cap were removed — or

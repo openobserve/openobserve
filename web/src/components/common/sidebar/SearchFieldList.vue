@@ -25,9 +25,9 @@
             :data-test="`search-field-list-group-${row.group}-header`"
             @click="toggleGroup(row.group)"
           >
-            <div class="min-w-0 flex-1 truncate">
+            <OTruncatedText as="div" class="flex-1">
               {{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})
-            </div>
+            </OTruncatedText>
             <OButton
               v-if="(groupFieldCount[row.group] ?? 0) > 0"
               variant="ghost"
@@ -208,6 +208,7 @@ import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
@@ -216,6 +217,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { filterForParsing } from "@/composables/useLogs/freeTextSearch";
 
 const props = defineProps({
   fields: {
@@ -306,7 +308,10 @@ const extractColName = (col: any): string | null => {
   return null;
 };
 
-function walkFilters(query: string): {
+function walkFilters(
+  query: string,
+  fieldNames: ReadonlySet<string>,
+): {
   include: Record<string, string[]>;
   exclude: Record<string, string[]>;
 } {
@@ -315,7 +320,7 @@ function walkFilters(query: string): {
   if (!query?.trim()) return { include, exclude };
 
   try {
-    const parsed = fnParsedSQL(`select * from stream where ${query}`);
+    const parsed = fnParsedSQL(`select * from stream where ${filterForParsing(query, fieldNames)}`);
     if (!parsed?.where) return { include, exclude };
 
     const push = (target: Record<string, string[]>, field: string, value: string) => {
@@ -364,7 +369,12 @@ function walkFilters(query: string): {
   return { include, exclude };
 }
 
-const parsedFilters = computed(() => walkFilters((props as any).query));
+const parsedFilters = computed(() =>
+  walkFilters(
+    (props as any).query,
+    new Set<string>(((props as any).fields ?? []).map((field: any) => field?.name)),
+  ),
+);
 const activeIncludeFilterValues = computed(() => parsedFilters.value.include);
 const activeExcludeFilterValues = computed(() => parsedFilters.value.exclude);
 

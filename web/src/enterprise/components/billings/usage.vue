@@ -111,13 +111,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="lgUp ? undefined : tile.label"
         >
           <div class="flex items-center justify-between gap-2">
-            <div
-              class="text-text-secondary truncate text-(length:--text-xs) font-medium max-lg:hidden"
+            <OTruncatedText
+              as="div"
+              class="text-text-secondary text-(length:--text-xs) font-medium max-lg:hidden"
               data-test="billings-usage-tile-title"
-              :title="tile.label"
             >
               {{ tile.label }}
-            </div>
+            </OTruncatedText>
             <div
               class="bg-bg-gray rounded-default flex h-7 w-7 shrink-0 items-center justify-center"
             >
@@ -235,6 +235,7 @@ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
 import config from "@/aws-exports";
@@ -245,6 +246,7 @@ export default defineComponent({
     PanelSchemaRenderer,
     OSpinner,
     OEmptyState,
+    OTruncatedText,
     ConfirmDialog,
   },
   setup() {

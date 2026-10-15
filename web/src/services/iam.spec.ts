@@ -15,6 +15,8 @@ import {
   getResourcePermission,
 } from "./iam";
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 // Mock http service
 vi.mock("./http", () => ({
   default: vi.fn(() => ({
@@ -26,6 +28,7 @@ vi.mock("./http", () => ({
 }));
 
 import http from "./http";
+import analytics from "@/services/product_analytics";
 
 describe("IAM Service", () => {
   let mockHttp: any;
@@ -776,5 +779,30 @@ describe("IAM Service", () => {
       expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/roles`);
       expect(mockHttp.get).toHaveBeenCalledWith(`/api/${org}/resources`);
     });
+  });
+});
+
+describe("iam product analytics", () => {
+  beforeEach(() => {
+    vi.mocked(analytics.track).mockClear();
+  });
+
+  it("tracks after createGroup succeeds", async () => {
+    (http as any).mockImplementation(() => ({ post: vi.fn().mockResolvedValue({ data: {} }) }));
+    await createGroup("g1", "org1");
+    expect(analytics.track).toHaveBeenCalledWith("user_group_created");
+  });
+
+  it("does not track when createGroup fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({
+      post: vi.fn().mockRejectedValue(new Error("boom")),
+    }));
+    await expect(createGroup("g1", "org1")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+  it("does not track createRole, since MCP credential setup calls it too", async () => {
+    (http as any).mockImplementation(() => ({ post: vi.fn().mockResolvedValue({ data: {} }) }));
+    await createRole("r1", "org1");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

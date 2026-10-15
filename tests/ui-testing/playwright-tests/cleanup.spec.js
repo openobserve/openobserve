@@ -1,6 +1,7 @@
 const { test } = require('./utils/enhanced-baseFixtures.js');
 const PageManager = require('../pages/page-manager.js');
 const testLogger = require('./utils/test-logger.js');
+const { E2E_LOCATION_ID } = require('./utils/synthetics-helpers.js');
 
 test.describe("Pre-Test Cleanup", () => {
   /**
@@ -90,6 +91,20 @@ test.describe("Pre-Test Cleanup", () => {
     // them. Harmless on CI's throwaway server, but they pile up on a shared dev env.
     await pm.apiCleanup.cleanupStreams([/^e2e_14238_/], [], { streamType: 'metrics' });
 
+    // The logs coverage specs for #15086 each seed their own log stream, suffixed per run
+    // so parallel workers cannot collide — which also means nothing ever reuses them.
+    // logs-highlighting, logs-default-columns and logs-search-around-multistream.
+    await pm.apiCleanup.cleanupStreams(
+      [
+        /^e2e_hl_filters_/,
+        /^e2e_svc_cols_/,
+        /^e2e_svc_none_/,
+        /^e2e_sa_one_/,
+        /^e2e_sa_two_/,
+      ],
+      ['default'],
+    );
+
 
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
@@ -162,7 +177,10 @@ test.describe("Pre-Test Cleanup", () => {
         /^traces-pipeline-/,            // traces-pipeline-* (scheduled pipeline tests)
         /^condition-pipeline-/,         // condition-pipeline-* (scheduled pipeline tests)
         /^metrics-condition-pipeline-/,  // metrics-condition-pipeline-* (scheduled pipeline tests)
-        /^e2e_backfill_test_\d+$/       // e2e_backfill_test_<timestamp> (pipeline-backfill.spec.js)
+        /^e2e_backfill_test_\d+$/,      // e2e_backfill_test_<timestamp> (pipeline-backfill.spec.js)
+        /^fn_e2e_pl_/,                  // functions-import-export.spec.js (pipeline holding an imported function)
+        /^pl_bundle_/,                  // pipeline-function-bundling.spec.js (exported and re-imported pipelines)
+        /^ui_auto_pfb_/                 // pipeline-function-bundling-rbac.spec.js (enterprise shard)
       ]
     );
 
@@ -197,6 +215,19 @@ test.describe("Pre-Test Cleanup", () => {
       /^default_vrl_fn_/             // Default org VRL function tests
     ];
 
+    // Patterns from the function import/export specs
+    // (Functions/functions-import-export.spec.js and
+    //  RegressionSet/Pipelines/function-import-non-object-entry.spec.js)
+    const importExportFunctionPatterns = [
+      /^fn_e2e_/,                    // imported, round-tripped and renamed functions
+      /^fn_export_/,                 // single, bulk and narrow-viewport export fixtures
+      /^fn_clash_/,                  // seeded functions used to provoke a name clash
+      /^fn_regr_nonobj_/,            // non-object entry repaired by the inline fixers
+      /^fn_regr_reject_/,            // rejections that cannot be fixed inline (#15069)
+      /^fn_bundle_/,                 // pipeline-function-bundling.spec.js (bundled functions and their _N copies)
+      /^ui_auto_pfb_/                // pipeline-function-bundling-rbac.spec.js (enterprise shard)
+    ];
+
     // Patterns from Functions folder tests (row-expansion.spec.js)
     const rowExpansionPatterns = [
       /^vrl_row_expand_/,            // VRL row expansion tests
@@ -216,7 +247,8 @@ test.describe("Pre-Test Cleanup", () => {
     const defaultOrgPatterns = [
       ...sanityFunctionPatterns,
       ...jsFunctionPatterns,         // default_vrl_fn_* created in default org
-      ...rowExpansionPatterns        // vrl_* patterns created in default org
+      ...rowExpansionPatterns,       // vrl_* patterns created in default org
+      ...importExportFunctionPatterns // fn_* patterns from the import/export specs
     ];
     await pm.apiCleanup.cleanupFunctionsInOrg('default', defaultOrgPatterns);
 
@@ -437,12 +469,29 @@ test.describe("Pre-Test Cleanup", () => {
       screenshotDir
     );
 
+    // The shared location is named explicitly because per-worker cleanup never removes it
+    await pm.apiCleanup.cleanupSynthetics(['synth_e2e_'], { locationIds: [E2E_LOCATION_ID] });
+
     // Clean up model pricing test records (mp_* names and cloned built-in "(Copy)" org models)
     await pm.apiCleanup.cleanupModelPricingModels([
       'mp_',                                // all test models created by model-pricing.spec.js
       'E2E Pricing Verifier ',              // cost-verification models (Journeys 12/13)
       /^.+\s\(Copy\)$/                      // cloned built-in models (source=org, name ends with " (Copy)")
     ]);
+
+    // IAM leftovers from a CRASHED run: roles, groups, users and service accounts under
+    // the `ui_auto` prefix the IAM specs use.
+    //
+    // This is the ONLY place that sweeps them. Each IAM spec now deletes exactly what it
+    // created (makeTracker in IAM/iam-fixtures.js) rather than everything matching the
+    // prefix — doing the latter in every spec's beforeAll is what had them deleting each
+    // other's fixtures mid-test and flaking the ENT crosscheck gate. A sweep is still
+    // needed for artifacts an aborted run orphaned, but it belongs here, once, before
+    // anything else starts.
+    //
+    // Enterprise-only (rbac_enabled): on an OSS build /roles answers 4xx, so this skips
+    // quietly rather than failing the cleanup every other suite depends on.
+    await pm.apiCleanup.cleanupIamArtifacts('ui_auto');
 
     testLogger.info('Pre-test cleanup completed successfully');
   });

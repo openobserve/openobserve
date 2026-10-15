@@ -83,12 +83,12 @@
           <span class="text-2xs text-text-tertiary font-semibold">
             {{ t("aiObservability.experiments.detail.metaLabels.dataset") }}
           </span>
-          <span
-            class="text-text-secondary truncate text-xs"
+          <OTruncatedText
+            class="text-text-secondary text-xs"
             data-test="ai-experiment-detail-dataset"
           >
             {{ datasetLabel }}
-          </span>
+          </OTruncatedText>
         </div>
 
         <OSeparator vertical class="h-4" />
@@ -108,7 +108,9 @@
             <span class="text-2xs text-text-tertiary font-semibold">
               {{ t("aiObservability.experiments.detail.metaLabels.model") }}
             </span>
-            <span class="text-text-secondary truncate text-xs">{{ raw(taskModel) }}</span>
+            <OTruncatedText class="text-text-secondary text-xs">{{
+              raw(taskModel)
+            }}</OTruncatedText>
           </div>
         </template>
 
@@ -382,6 +384,7 @@ import {
   formatDuration,
 } from "@/enterprise/components/AIObservability/experimentRowContent";
 import { experimentScoreSummaryValue, openExperimentTrace } from "./experimentResults";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineOptions({ name: "AIExperimentDetailPage" });
 
@@ -740,7 +743,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     sortable: false,
     size: COL.name,
     minSize: 160,
-    meta: { align: "left" as const, flex: true, isName: true },
+    meta: { align: "left" as const, flex: true, isName: true, cellOverflowTooltip: false },
   },
   ...(isMultiTrial.value
     ? [
@@ -760,7 +763,7 @@ const columns = computed<OTableColumnDef[]>(() => [
           accessorKey: "output",
           sortable: false,
           size: 320,
-          meta: { align: "left" as const },
+          meta: { align: "left" as const, cellOverflowTooltip: false },
         },
       ]),
   ...scorerIds.value.map((id) => ({

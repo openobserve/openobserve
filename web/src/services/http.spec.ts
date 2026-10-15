@@ -46,10 +46,13 @@ vi.mock("@/utils/zincutils", () => ({
 
 vi.mock("axios");
 
+const { addUnauthorizedError } = vi.hoisted(() => ({ addUnauthorizedError: vi.fn() }));
+vi.mock("@/composables/useUnauthorizedErrorGrouper", () => ({ addUnauthorizedError }));
+
 import config from "../aws-exports";
 import store from "../stores";
 import axios from "axios";
-import { attemptTokenRefresh } from "./http";
+import http, { attemptTokenRefresh } from "./http";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -175,4 +178,94 @@ describe("attemptTokenRefresh", () => {
     expect(vi.mocked(store.dispatch)).toHaveBeenCalledWith("logout");
     expect(reloadMock).toHaveBeenCalled();
   });
+});
+
+describe("http 403 interceptor", () => {
+  /** Builds an instance and returns the rejection handler it registered. */
+  const errorHandler = () => {
+    let onError: (error: any) => Promise<unknown> = () => Promise.resolve();
+    vi.mocked(axios.create).mockReturnValue({
+      interceptors: {
+        response: {
+          use: (_ok: unknown, err: (error: any) => Promise<unknown>) => {
+            onError = err;
+          },
+        },
+      },
+    } as any);
+    http();
+    return onError;
+  };
+
+  const forbidden = (config: Record<string, unknown> = {}) => ({
+    response: { status: 403, data: {} },
+    request: { responseURL: "http://localhost:5080/api/v2/org/folders/alerts" },
+    config: { url: "/api/v2/org/folders/alerts", ...config },
+  });
+
+  beforeEach(() => {
+    (config as any).isEnterprise = "true";
+    (config as any).isCloud = "false";
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    (config as any).isEnterprise = "false";
+  });
+
+  it("adds a 403 to the Access Required toast", async () => {
+    const error = forbidden();
+    await expect(errorHandler()(error)).rejects.toBe(error);
+    expect(addUnauthorizedError).toHaveBeenCalledWith(
+      "http://localhost:5080/api/v2/org/folders/alerts",
+    );
+  });
+
+  it("leaves a 403 out of the toast when the request opts out, and still rejects", async () => {
+    const error = forbidden({ skipAccessToast: true });
+    await expect(errorHandler()(error)).rejects.toBe(error);
+    expect(addUnauthorizedError).not.toHaveBeenCalled();
+  });
+});
+
+describe("403 handling", () => {
+  let onRejected: (error: any) => Promise<any>;
+  const forbidden = (requestConfig: Record<string, unknown>) => ({
+    response: { status: 403, data: {} },
+    request: { responseURL: "http://localhost:5080/api/acme/x" },
+    config: { url: "/api/acme/x", ...requestConfig },
+  });
+
+  beforeEach(() => {
+    addUnauthorizedError.mockClear();
+    vi.mocked(axios.create).mockReturnValue({
+      interceptors: {
+        response: { use: (_ok: unknown, rejected: typeof onRejected) => (onRejected = rejected) },
+      },
+    } as any);
+    http();
+  });
+
+  afterEach(() => {
+    (config as any).isCloud = "false";
+    (config as any).isEnterprise = "false";
+  });
+
+  it.each([
+    ["enterprise", "isEnterprise"],
+    ["cloud", "isCloud"],
+  ])(
+    "on %s, toasts an unflagged 403 and stays silent on a silentForbidden one",
+    async (_, flag) => {
+      (config as any)[flag] = "true";
+
+      await expect(onRejected(forbidden({}))).rejects.toBeDefined();
+      expect(addUnauthorizedError).toHaveBeenCalledWith("http://localhost:5080/api/acme/x");
+
+      addUnauthorizedError.mockClear();
+      const silent = forbidden({ silentForbidden: true });
+      await expect(onRejected(silent)).rejects.toBe(silent);
+      expect(addUnauthorizedError).not.toHaveBeenCalled();
+    },
+  );
 });

@@ -64,8 +64,13 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 // default stream and the pre-discovery tests keep their single-call shape;
 // individual tests override with per-id locations.
 const mockResolveTraceLocationsBulk = vi.fn().mockResolvedValue({});
+const mockFallbackTracesStream = vi.fn().mockResolvedValue("default");
 vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
-  default: () => ({ resolveTraceLocationsBulk: mockResolveTraceLocationsBulk, cancel: vi.fn() }),
+  default: () => ({
+    resolveTraceLocationsBulk: mockResolveTraceLocationsBulk,
+    fallbackTracesStream: mockFallbackTracesStream,
+    cancel: vi.fn(),
+  }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -389,6 +394,38 @@ describe("PlayerTracesTab", () => {
       expect(traceDetails.exists()).toBe(true);
       expect(traceDetails.props("streamNameProp")).toBe("checkout_traces");
       expect(traceDetails.props("traceIdProp")).toBe(C1);
+    });
+
+    it("fetches nothing for an id found in no stream when the org has no default stream", async () => {
+      mockFallbackTracesStream.mockResolvedValueOnce(null);
+      setupSuccessfulMocks();
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="rum-player-traces-tab-empty"]').exists()).toBe(true);
+    });
+
+    it("keeps the found traces when another id is in no stream and the org has no default", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff"; // → qms_uat
+      const U1 = "01a038ddccc770b9bba3b2df20c12415"; // in no stream
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({ [P1]: { stream: "qms_uat" } });
+      mockFallbackTracesStream.mockResolvedValueOnce(null);
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: P1 }), createRumHit({ _trace_id: U1 })],
+        [createTraceMetadata({ trace_id: P1 })],
+      );
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const streamsQueried = mockFetchQueryDataWithHttpStream.mock.calls.map(
+        ([args]: any[]) => args.queryReq.stream_name,
+      );
+      expect(streamsQueried).toEqual(["qms_uat"]);
+      expect(wrapper.findAll('[data-test^="table-row-"]')).toHaveLength(1);
+      expect(wrapper.text()).toContain("GET /api/products");
     });
 
     it("bounds the metadata query by the indexed ranges instead of the session window", async () => {
@@ -928,6 +965,27 @@ describe("PlayerTracesTab", () => {
       expect(wrapper.find('[data-test="rum-player-traces-tab-table"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("/products");
     });
+
+    it("still lists ids found in no stream when the metadata fetch errors", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff";
+      const U1 = "01a038ddccc770b9bba3b2df20c12415";
+      wrapper.unmount();
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({ [P1]: { stream: "qms_uat" } });
+      mockFallbackTracesStream.mockResolvedValueOnce(null);
+      setupSuccessfulMocks([
+        createRumHit({ _trace_id: P1, _view_url: "https://example.com/orders" }),
+        createRumHit({ _trace_id: U1, _view_url: "https://example.com/audit" }),
+      ]);
+      mockFetchQueryDataWithHttpStream.mockImplementation((_queryReq: any, handlers: any) => {
+        handlers.error(null, new Error("Metadata fetch failed"));
+      });
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.findAll('[data-test^="table-row-"]')).toHaveLength(2);
+      expect(wrapper.text()).toContain("/audit");
+    });
   });
 
   // =========================================================================
@@ -1402,6 +1460,153 @@ describe("PlayerTracesTab", () => {
       // Assert: early return, no search issued, empty state shown.
       expect(mockSearch).not.toHaveBeenCalled();
       expect(wrapper.find('[data-test="rum-player-traces-tab-empty"]').exists()).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // Events-only sessions search `_rumdata` by server arrival, not device clock
+  // =========================================================================
+
+  describe("arrival-time window (rumWindowUs)", () => {
+    const START_MS = 1_700_000_000_000;
+    const END_MS = 1_700_000_100_000;
+    const DAY_US = 86_400_000_000;
+    const RUM_WINDOW = { start: START_MS * 1000 - DAY_US, end: END_MS * 1000 + DAY_US };
+    const PAD = 60_000_000;
+
+    function rumCalls(): any[] {
+      return mockSearch.mock.calls.filter(
+        (c: any[]) => c[1] === "RUM" && c[0].page_type === "logs",
+      );
+    }
+
+    async function remount(props: Record<string, any>, rumHits: any[], metaHits?: any[]) {
+      wrapper.unmount();
+      vi.clearAllMocks();
+      setupSuccessfulMocks(rumHits, metaHits);
+      wrapper = mountComponent({ props: { startTime: START_MS, endTime: END_MS, ...props } });
+      await flushPromises();
+    }
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("queries _rumdata from the prop start to at least the prop end", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(END_MS);
+      await remount({ rumWindowUs: RUM_WINDOW }, [createRumHit()]);
+
+      const query = rumCalls()[0][0].query.query;
+      expect(query.start_time).toBe(RUM_WINDOW.start);
+      expect(query.end_time).toBeGreaterThanOrEqual(RUM_WINDOW.end);
+      expect(query.sql).toContain("min(_timestamp) as _first_ts");
+      expect(query.sql).toContain("max(_timestamp) as _last_ts");
+    });
+
+    it("resolves stream locations, metadata and the row detail over the padded arrival window", async () => {
+      const first = START_MS * 1000 + 1_000_000;
+      const last = END_MS * 1000 + 5_000_000;
+      await remount(
+        { rumWindowUs: RUM_WINDOW },
+        [createRumHit({ _first_ts: first, _last_ts: last })],
+        [createTraceMetadata({ start_time: undefined, end_time: undefined })],
+      );
+
+      const bulk = mockResolveTraceLocationsBulk.mock.calls[0];
+      expect(bulk[1]).toBe(START_MS * 1000 - PAD);
+      expect(bulk[2]).toBe(last + PAD);
+
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      expect(queryReq.start_time).toBe(START_MS * 1000 - PAD);
+      expect(queryReq.end_time).toBe(last + PAD);
+
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await flushPromises();
+      const traceDetails = wrapper.findComponent({ name: "TraceDetails" });
+      expect(traceDetails.props("startTimeProp")).toBe(START_MS * 1000 - PAD);
+      expect(traceDetails.props("endTimeProp")).toBe(last + PAD);
+    });
+
+    it("keeps the device start when every row arrived 5 min after its device time", async () => {
+      const lag = 300_000_000;
+      await remount(
+        { rumWindowUs: RUM_WINDOW },
+        [createRumHit({ _first_ts: START_MS * 1000 + lag, _last_ts: END_MS * 1000 + lag })],
+        [createTraceMetadata({ start_time: undefined, end_time: undefined })],
+      );
+
+      const bulk = mockResolveTraceLocationsBulk.mock.calls[0];
+      expect(bulk[1]).toBe(START_MS * 1000 - PAD);
+      expect(bulk[2]).toBe(END_MS * 1000 + lag + PAD);
+
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      expect(queryReq.start_time).toBe(START_MS * 1000 - PAD);
+      expect(queryReq.end_time).toBe(END_MS * 1000 + lag + PAD);
+
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await flushPromises();
+      const traceDetails = wrapper.findComponent({ name: "TraceDetails" });
+      expect(traceDetails.props("startTimeProp")).toBe(START_MS * 1000 - PAD);
+      expect(traceDetails.props("endTimeProp")).toBe(END_MS * 1000 + lag + PAD);
+    });
+
+    it("spans both windows when the device clock runs hours ahead", async () => {
+      const H = 3_600_000_000;
+      await remount({ rumWindowUs: RUM_WINDOW }, [
+        createRumHit({ _first_ts: START_MS * 1000 - 3 * H, _last_ts: END_MS * 1000 - 3 * H }),
+      ]);
+
+      const bulk = mockResolveTraceLocationsBulk.mock.calls[0];
+      expect(bulk[1]).toBe(START_MS * 1000 - 3 * H - PAD);
+      expect(bulk[2]).toBe(END_MS * 1000);
+
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      expect(queryReq.start_time).toBe(START_MS * 1000 - 3 * H - PAD);
+      expect(queryReq.end_time).toBe(END_MS * 1000);
+    });
+
+    it("falls back to the device window when no hit carries a usable _first_ts", async () => {
+      await remount({ rumWindowUs: RUM_WINDOW }, [createRumHit({ _first_ts: null, _last_ts: "" })]);
+
+      const bulk = mockResolveTraceLocationsBulk.mock.calls[0];
+      expect(bulk[1]).toBe(START_MS * 1000);
+      expect(bulk[2]).toBe(END_MS * 1000);
+    });
+
+    it("keeps a trace that arrived 20 s after the last device-clock event inside the window", async () => {
+      const last = END_MS * 1000 + 20_000_000;
+      await remount({ rumWindowUs: RUM_WINDOW }, [
+        createRumHit({ _first_ts: START_MS * 1000, _last_ts: last }),
+      ]);
+
+      const bulk = mockResolveTraceLocationsBulk.mock.calls[0];
+      expect(bulk[2]).toBeGreaterThanOrEqual(last + PAD);
+    });
+
+    it("extends end_time to the current time on a later re-fetch", async () => {
+      const nowSpy = vi.spyOn(Date, "now").mockReturnValue(END_MS + DAY_US / 1000 + 1_000);
+      await remount({ rumWindowUs: RUM_WINDOW }, [createRumHit()]);
+      const firstEnd = rumCalls()[0][0].query.query.end_time;
+
+      nowSpy.mockReturnValue(END_MS + DAY_US / 1000 + 600_000);
+      await wrapper.setProps({ sessionId: "test-session-456" });
+      await flushPromises();
+
+      const secondEnd = rumCalls()[1][0].query.query.end_time;
+      expect(firstEnd).toBe((END_MS + DAY_US / 1000 + 1_000) * 1000);
+      expect(secondEnd).toBeGreaterThan(firstEnd);
+    });
+
+    it("leaves the query untouched without the prop", async () => {
+      await remount({}, [createRumHit({ _first_ts: START_MS * 1000, _last_ts: END_MS * 1000 })]);
+
+      const query = rumCalls()[0][0].query.query;
+      expect(query.sql).not.toContain("_first_ts");
+      expect(query.start_time).toBe(START_MS * 1000);
+      expect(query.end_time).toBe(END_MS * 1000);
+      const bulk = mockResolveTraceLocationsBulk.mock.calls[0];
+      expect(bulk[1]).toBe(START_MS * 1000);
+      expect(bulk[2]).toBe(END_MS * 1000);
     });
   });
 });

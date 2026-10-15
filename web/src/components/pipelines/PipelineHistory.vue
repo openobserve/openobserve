@@ -226,12 +226,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @action="(id) => id === 'clear-filters' && clearSearch()"
             />
           </template>
-
-          <template #bottom="{ totalRows }">
-            <div class="me-4 flex items-center py-2 text-xs font-normal max-md:hidden">
-              {{ totalRows }} {{ t("pipeline.header") }}
-            </div>
-          </template>
         </OTable>
       </div>
     </div>

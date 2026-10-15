@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type {
   BrowserStep,
@@ -48,6 +47,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { unboundPlaceholders } from "@/components/synthetics/variables/placeholders";
@@ -103,7 +103,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const store = useStore();
 
 /**
  * Apply an edit and keep the recorded wire step in sync.
@@ -161,16 +160,8 @@ const showTarget = computed(() => stepNeedsTarget(props.step));
  */
 const effectiveLocator = computed<StepLocator>(() => props.step.locator ?? { candidates: [] });
 
-// A computed so the wording follows the locale; `=== true` hides subtest on an unknown flag.
-const actionSelectOptions = computed(() =>
-  actionOptions(t).filter(
-    (o) =>
-      o.value !== "subtest" ||
-      // A row that already holds a reference keeps it: the server lets it save unchanged.
-      props.step.action === "subtest" ||
-      store?.state?.zoConfig?.synthetics_subtests_enabled === true,
-  ),
-);
+// A computed so the wording follows the locale.
+const actionSelectOptions = computed(() => actionOptions(t));
 
 const showValue = computed(() => VALUE_ACTIONS.includes(props.step.action));
 /** `upload` writes `files`, which the probe never substitutes, so its value field stays plain. */
@@ -612,9 +603,9 @@ const hasAdvancedChanges = computed(
           <span class="text-text-heading text-sm font-medium">
             {{ t("synthetics.journey.groupAdvancedLabel") }}
           </span>
-          <span class="text-text-secondary truncate text-xs">
+          <OTruncatedText class="text-text-secondary text-xs">
             {{ t("synthetics.journey.groupAdvancedCaption") }}
-          </span>
+          </OTruncatedText>
         </span>
       </template>
 
@@ -714,9 +705,9 @@ const hasAdvancedChanges = computed(
                       aria-hidden="true"
                     />
                   </OTooltip>
-                  <span class="text-text-body min-w-0 truncate font-mono text-xs">
+                  <OTruncatedText class="text-text-body font-mono text-xs">
                     {{ settleResponseLabel(response) }}
-                  </span>
+                  </OTruncatedText>
                 </div>
 
                 <p

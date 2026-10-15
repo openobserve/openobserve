@@ -26,7 +26,7 @@ use datafusion::{
         datatypes::DataType,
     },
     common::{downcast_value, internal_err, not_impl_err, plan_err},
-    error::Result,
+    error::{DataFusionError, Result},
     logical_expr::{
         Accumulator, AggregateUDFImpl, ColumnarValue, Signature, TypeSignature, Volatility,
         function::{AccumulatorArgs, StateFieldsArgs},
@@ -327,17 +327,41 @@ impl Accumulator for SummaryPercentileAccumulator {
             });
         }
 
-        // 1. sort the value array and merge the count array based on value array
-        let mut value_count = self.value.iter().zip(self.count.iter()).collect::<Vec<_>>();
-        value_count.sort_by(|a, b| a.0.partial_cmp(b.0).unwrap());
+        // 1. sort the value array (skipping NaN, which has no total order)
+        let mut value_count = self
+            .value
+            .iter()
+            .zip(self.count.iter())
+            .filter(|(value, _)| !value.is_nan())
+            .collect::<Vec<_>>();
+        value_count.sort_by(|a, b| a.0.total_cmp(b.0));
+
+        if value_count.is_empty() {
+            return Ok(match &self.return_type {
+                DataType::Int8 => ScalarValue::Int8(None),
+                DataType::Int16 => ScalarValue::Int16(None),
+                DataType::Int32 => ScalarValue::Int32(None),
+                DataType::Int64 => ScalarValue::Int64(None),
+                DataType::UInt8 => ScalarValue::UInt8(None),
+                DataType::UInt16 => ScalarValue::UInt16(None),
+                DataType::UInt32 => ScalarValue::UInt32(None),
+                DataType::UInt64 => ScalarValue::UInt64(None),
+                DataType::Float32 => ScalarValue::Float32(None),
+                DataType::Float64 => ScalarValue::Float64(None),
+                v => unreachable!("unexpected return type {:?}", v),
+            });
+        }
 
         // 2. calculate the prefix sum of the count array
         let mut prefix_sum: Vec<i64> = Vec::with_capacity(value_count.len());
-        for (i, (_value, count)) in value_count.iter().enumerate() {
-            prefix_sum.push(**count);
-            if i > 0 {
-                prefix_sum[i] += prefix_sum[i - 1];
-            }
+        let mut running_total: i64 = 0;
+        for (_value, count) in value_count.iter() {
+            running_total = running_total.checked_add(**count).ok_or_else(|| {
+                DataFusionError::Execution(
+                    "summary_percentile count prefix sum overflowed i64".to_string(),
+                )
+            })?;
+            prefix_sum.push(running_total);
         }
 
         // 3. calculate the result
@@ -345,7 +369,7 @@ impl Accumulator for SummaryPercentileAccumulator {
         let index = prefix_sum
             .iter()
             .position(|&v| v as f64 >= percentile_count)
-            .unwrap();
+            .unwrap_or(prefix_sum.len() - 1);
         let percentile_value = *value_count[index].0;
 
         Ok(match &self.return_type {
@@ -372,6 +396,11 @@ impl Accumulator for SummaryPercentileAccumulator {
         self.value.reserve(value.len());
         self.value.extend(value);
         let count = SummaryPercentileAccumulator::convert_to_int64(&values[1])?;
+        if count.iter().any(|c| *c < 0) {
+            return Err(DataFusionError::Execution(
+                "summary_percentile count must not be negative".to_string(),
+            ));
+        }
         self.count.reserve(count.len());
         self.count.extend(count);
         Ok(())
@@ -765,5 +794,34 @@ mod test {
     fn test_summary_percentile_name() {
         let sp = SummaryPercentile::new();
         assert_eq!(sp.name(), "summary_percentile");
+    }
+
+    #[test]
+    fn test_evaluate_skips_nan_instead_of_panicking() {
+        let mut acc = SummaryPercentileAccumulator::new(0.5, DataType::Float64);
+        let values: ArrayRef = Arc::new(Float64Array::from(vec![1.0, f64::NAN, 2.0]));
+        let counts: ArrayRef = Arc::new(Int64Array::from(vec![1, 1, 1]));
+        acc.update_batch(&[values, counts]).unwrap();
+
+        assert!(acc.evaluate().is_ok());
+    }
+
+    #[test]
+    fn test_update_batch_rejects_negative_count() {
+        let mut acc = SummaryPercentileAccumulator::new(0.5, DataType::Float64);
+        let values: ArrayRef = Arc::new(Float64Array::from(vec![1.0]));
+        let counts: ArrayRef = Arc::new(Int64Array::from(vec![-1]));
+
+        assert!(acc.update_batch(&[values, counts]).is_err());
+    }
+
+    #[test]
+    fn test_evaluate_does_not_panic_on_prefix_sum_overflow() {
+        let mut acc = SummaryPercentileAccumulator::new(0.5, DataType::Float64);
+        let values: ArrayRef = Arc::new(Float64Array::from(vec![1.0, 2.0]));
+        let counts: ArrayRef = Arc::new(Int64Array::from(vec![i64::MAX, i64::MAX]));
+        acc.update_batch(&[values, counts]).unwrap();
+
+        assert!(acc.evaluate().is_err());
     }
 }

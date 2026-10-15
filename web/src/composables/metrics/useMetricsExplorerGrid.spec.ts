@@ -107,6 +107,9 @@ const STREAMS = [
 /** Every in-flight streaming query, so a test can land or strand each one. */
 const inFlight: Array<{
   query: string;
+  start: number;
+  end: number;
+  queryType: string;
   complete: (result: any) => void;
 }> = [];
 
@@ -143,6 +146,9 @@ vi.mock("@/composables/useStreamingSearch", () => ({
     fetchQueryDataWithHttpStream: (payload: any, handlers: any) => {
       inFlight.push({
         query: payload.queryReq.query,
+        start: payload.queryReq.start_time,
+        end: payload.queryReq.end_time,
+        queryType: payload.queryReq.query_type,
         complete: (result: any) => {
           handlers.data({}, { type: "promql_response", content: { results: result } });
           handlers.complete();
@@ -153,11 +159,12 @@ vi.mock("@/composables/useStreamingSearch", () => ({
   }),
 }));
 
-vi.mock("@/composables/dashboard/promqlChunkProcessor", () => ({
-  createPromQLChunkProcessor: () => ({
+const { createPromQLChunkProcessor } = vi.hoisted(() => ({
+  createPromQLChunkProcessor: vi.fn((_options: { maxSeries: number }) => ({
     processChunk: (_acc: any, chunk: any) => chunk,
-  }),
+  })),
 }));
+vi.mock("@/composables/dashboard/promqlChunkProcessor", () => ({ createPromQLChunkProcessor }));
 
 // No IndexedDB in the test env; every card starts with nothing cached unless a
 // test sets `getPanelCacheMock` itself.
@@ -177,6 +184,20 @@ vi.mock("@/services/metrics", () => ({
   default: { labels: vi.fn(), labelValues: vi.fn(), metadata: vi.fn() },
 }));
 
+// Every queue the composable creates, so a test can spy on the grid's scheduler.
+const { createdQueues } = vi.hoisted(() => ({ createdQueues: [] as any[] }));
+vi.mock("./useMetricsPreviewQueue", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    createPreviewQueue: (...args: any[]) => {
+      const queue = actual.createPreviewQueue(...args);
+      createdQueues.push(queue);
+      return queue;
+    },
+  };
+});
+
 vi.mock("@/utils/zincutils", async (importOriginal) => ({
   ...(await importOriginal<any>()),
   generateTraceContext: () => ({ traceId: "trace-1", traceparent: "" }),
@@ -190,6 +211,7 @@ import useMetricsExplorerGrid, {
 import StreamService from "@/services/stream";
 import metricsService from "@/services/metrics";
 import i18nInstance from "@/locales";
+import { PRIORITY, isCancelled } from "./useMetricsPreviewQueue";
 const t = (i18nInstance.global as any).t;
 
 const SERIES = {
@@ -488,11 +510,32 @@ describe("useMetricsExplorerGrid", () => {
 
       await grid.addLabelFilter({ label: "code", value: "500", operator: "=" });
 
-      expect(grid.schemaLoaded.value).toBe(true); // we did stop trying...
+      expect(grid.schemaLoaded.value).toBe(false); // a failure is not a load: the next call retries...
       // ...but we do not claim a card is ineligible when we cannot know.
       // (Against the CARD count, not the stream count: the histogram base is a
       // metadata-only phantom and is suppressed, so it never becomes a card.)
       expect(grid.sortedCards.value).toHaveLength(grid.cards.value.length);
+    });
+
+    it("reports a failed load, and fetches again on the next call", async () => {
+      const grid = await setup();
+      const calls = (StreamService.nameList as any).mock.calls.length;
+      (StreamService.nameList as any).mockRejectedValueOnce(new Error("500"));
+      expect(await grid.ensureSchemas()).toBe(false);
+
+      (StreamService.nameList as any).mockResolvedValueOnce({
+        data: { list: STREAMS.map((x) => ({ ...x, schema: [{ name: "pod", type: "Utf8" }] })) },
+      });
+      expect(await grid.ensureSchemas()).toBe(true);
+      expect((StreamService.nameList as any).mock.calls.length).toBe(calls + 2);
+      expect(grid.schemaLoaded.value).toBe(true);
+    });
+
+    it("treats an empty stream list as a failed load too", async () => {
+      const grid = await setup();
+      (StreamService.nameList as any).mockResolvedValueOnce({ data: { list: [] } });
+      expect(await grid.ensureSchemas()).toBe(false);
+      expect(grid.schemaLoaded.value).toBe(false);
     });
 
     it("narrows the grid once membership IS known", async () => {
@@ -1398,6 +1441,33 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.sortedCards.value.map((c: any) => c.name)).not.toContain("lat_seconds_bucket");
     });
   });
+  describe("the detail view reads eligibility per filter", () => {
+    it("names the filters a card cannot apply, and exposes the predicate", async () => {
+      const grid = await setup();
+      (StreamService.nameList as any).mockResolvedValueOnce({
+        data: {
+          list: STREAMS.map((stream) =>
+            stream.name === "lat_seconds_bucket"
+              ? { ...stream, schema: [{ name: "le", type: "Utf8" }] }
+              : { ...stream, schema: [{ name: "pod", type: "Utf8" }] },
+          ),
+        },
+      });
+      const le = { label: "le", value: "0.5", operator: "=" };
+      const pod = { label: "pod", value: "a", operator: "=" };
+      await grid.addLabelFilter(le);
+      await grid.addLabelFilter(pod);
+
+      const card = cardNamed(grid, "lat_seconds_bucket");
+      expect(grid.inapplicableLabelFilters(card)).toEqual([pod]);
+      expect(grid.isLabelEligible(card)).toBe(false);
+
+      grid.removeLabelFilter(pod);
+      expect(grid.inapplicableLabelFilters(card)).toEqual([]);
+      expect(grid.isLabelEligible(card)).toBe(true);
+    });
+  });
+
   describe("an org switch must not deadlock the deferred loads", () => {
     it("does not strand schemaLoading at true forever", async () => {
       // `ensureSchemas` early-returns while `schemaLoading` is true, and its
@@ -1794,6 +1864,155 @@ describe("useMetricsExplorerGrid", () => {
       expect(keys).toHaveLength(3);
       expect(keys.every((k: string) => k.startsWith("exemplars|"))).toBe(true);
       grid.toggleExemplars(card);
+    });
+  });
+
+  describe("the metric detail view", () => {
+    it("runs a detail query at DIALOG priority on the card's own step, under its own owner", async () => {
+      const grid = await setup();
+      const queue = createdQueues.at(-1);
+      const run = vi.spyOn(queue, "run");
+      const card = cardNamed(grid, "http_requests_total");
+
+      const pending = grid.runDetailQuery("sum(up)", card, new AbortController().signal);
+      const call = run.mock.calls.at(-1)!;
+      // Same key the card and the ⚙ dialog would use: the step is the card's.
+      expect(call[0]).toContain("|sum(up)|");
+      expect(call[1]).toBe(PRIORITY.DIALOG);
+      const owner = call[3];
+      expect(owner).toBeTruthy();
+      expect(owner).not.toBe(card.name);
+
+      // The dialog's owner is a different one: closing one never aborts the other.
+      grid.runDialogQuery("sum(up)", card).catch(() => {});
+      expect(run.mock.calls.at(-1)![3]).not.toBe(owner);
+
+      pending.catch(() => {});
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
+    });
+
+    it("streams a detail query under the series cap unless the caller lifts it", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      const maxSeriesOf = () => createPromQLChunkProcessor.mock.calls.at(-1)![0].maxSeries;
+
+      grid.runDetailQuery("sum(capped)", card, new AbortController().signal).catch(() => {});
+      await flush();
+      expect(maxSeriesOf()).toBe(100);
+
+      grid
+        .runDetailQuery("sum(lifted)", card, new AbortController().signal, {
+          maxSeries: Infinity,
+        })
+        .catch(() => {});
+      await flush();
+      expect(maxSeriesOf()).toBe(Infinity);
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
+    });
+
+    it("cancels its own query by the key and owner it ran under when its signal aborts", async () => {
+      const grid = await setup();
+      const queue = createdQueues.at(-1);
+      const run = vi.spyOn(queue, "run");
+      const cancel = vi.spyOn(queue, "cancel");
+      const card = cardNamed(grid, "http_requests_total");
+      const controller = new AbortController();
+
+      const pending = grid.runDetailQuery("sum(up)", card, controller.signal);
+      const [key, , , owner] = run.mock.calls.at(-1)!;
+
+      controller.abort();
+      expect(cancel).toHaveBeenCalledWith(key, owner);
+      await expect(pending).rejects.toSatisfy(isCancelled);
+      inFlight.length = 0;
+    });
+
+    it("runs a shifted window as its own request, never joining the current window's", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      const { start_time, end_time } = grid.timeRange.value;
+      const DAY_US = 86_400_000_000;
+      const shifted = { start: start_time - DAY_US, end: end_time - DAY_US };
+
+      grid.runDetailQuery("sum(up)", card, new AbortController().signal).catch(() => {});
+      grid
+        .runDetailQuery("sum(up)", card, new AbortController().signal, { window: shifted })
+        .catch(() => {});
+      await flush();
+
+      const requests = inFlight.filter((q) => q.query === "sum(up)");
+      expect(requests.map((q) => [q.start, q.end])).toEqual([
+        [start_time, end_time],
+        [shifted.start, shifted.end],
+      ]);
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
+    });
+
+    it("runs an instant query at T as its own request, with start and end both T", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      const T = grid.timeRange.value.end_time;
+
+      grid.runDetailQuery("sum(up)", card, new AbortController().signal).catch(() => {});
+      grid
+        .runDetailQuery("sum(up)", card, new AbortController().signal, { instantAt: T })
+        .catch(() => {});
+      await flush();
+
+      const requests = inFlight.filter((q) => q.query === "sum(up)");
+      expect(requests.map((q) => [q.queryType, q.start, q.end])).toEqual([
+        ["range", grid.timeRange.value.start_time, T],
+        ["instant", T, T],
+      ]);
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
+    });
+
+    it("never starts a query whose signal already aborted", async () => {
+      const grid = await setup();
+      const controller = new AbortController();
+      controller.abort();
+      await expect(
+        grid.runDetailQuery("sum(up)", cardNamed(grid, "http_requests_total"), controller.signal),
+      ).rejects.toSatisfy(isCancelled);
+      expect(inFlight).toHaveLength(0);
+    });
+
+    it("shares one request between two charts of the same query, and one cancelling leaves the other", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      const outcomes: string[] = ["pending", "pending"];
+      const controllers = [new AbortController(), new AbortController()];
+      controllers.forEach((controller, i) =>
+        grid.runDetailQuery("sum(up)", card, controller.signal).then(
+          () => (outcomes[i] = "landed"),
+          (error: any) => (outcomes[i] = isCancelled(error) ? "cancelled" : "failed"),
+        ),
+      );
+      await flush();
+      expect(inFlight.filter((q) => q.query === "sum(up)")).toHaveLength(1);
+
+      // The later joiner: a shared owner would drop the first waiter, not this one.
+      controllers[1].abort();
+      await flush();
+      expect(outcomes).toEqual(["pending", "cancelled"]);
+
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
+      await flush();
+      expect(outcomes).toEqual(["landed", "cancelled"]);
+    });
+
+    it("exposes what the detail view ranks and filters with", async () => {
+      const grid = await setup();
+      await grid.ensureSchemas();
+
+      expect(grid.labelsByStream.value).toEqual(expect.any(Object));
+      expect(grid.prefixOf("http_requests_total")).toEqual(expect.any(String));
+      expect(grid.prefixAssignment.value.groupOf).toBeInstanceOf(Map);
+      // The family map: a histogram's members share one family.
+      expect(grid.familyOf("lat_seconds_bucket")).toBe(grid.familyOf("lat_seconds_count"));
+      expect(grid.familyOf("http_requests_total")).not.toBe(grid.familyOf("lat_seconds_bucket"));
+      // A concrete window for the breakdown query, sized like the card's own.
+      expect(grid.rateWindowFor(cardNamed(grid, "http_requests_total"))).toMatch(/^\d+[smh]/);
     });
   });
 });

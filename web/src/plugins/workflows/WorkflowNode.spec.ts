@@ -330,7 +330,7 @@ describe("WorkflowNode", () => {
       expect(wrapper.text()).toContain("level = 'error'");
     });
 
-    it("truncates a long condition preview at 28 chars", () => {
+    it("renders a long condition preview in full, cut by CSS within the card width", () => {
       const data = {
         node_type: "condition",
         conditions: {
@@ -346,8 +346,9 @@ describe("WorkflowNode", () => {
         },
       };
       wrapper = mountNode("c1", data);
-      expect(wrapper.text()).toContain("...");
-      expect(wrapper.find('[data-test="workflow-node-detail"]').text().length).toBe(31);
+      const detail = wrapper.find('[data-test="workflow-node-detail"]');
+      expect(detail.text()).toBe("a_very_long_column_name_here = 'a_very_long_value_here'");
+      expect(detail.classes()).toContain("max-w-46");
     });
 
     it("falls back to the type title for a not-yet-configured condition", () => {

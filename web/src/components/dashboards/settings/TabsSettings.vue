@@ -55,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-name="{ row }">
           <span
             v-if="row.tabId !== editTabId"
-            class="block overflow-hidden text-ellipsis whitespace-nowrap"
             data-test="dashboard-tab-settings-tab-name"
             :data-test-tab-name="row.name"
             >{{ row.name }}</span

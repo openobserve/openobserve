@@ -234,4 +234,13 @@ describe("LibraryRail", () => {
     await field(wrapper).setValue("kafka");
     expect(wrapper.emitted("update:search")).toEqual([["kafka"]]);
   });
+
+  it("cuts a long category name with a cut-only tooltip instead of an always-on title", () => {
+    const label = mountRail().find(
+      '[data-test="alert-library-rail-category-kafka"] [data-test="o-truncated-text"]',
+    );
+    expect(label.text()).toBe("Kafka");
+    expect(label.attributes("title")).toBeUndefined();
+    expect(label.attributes("data-o-tooltip-trigger")).toBe("overflow");
+  });
 });

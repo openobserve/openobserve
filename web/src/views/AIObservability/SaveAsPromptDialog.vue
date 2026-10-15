@@ -201,7 +201,7 @@ async function save(value: SaveAsPromptForm) {
   const contentFingerprint = fingerprint.value;
   saveError.value = undefined;
   try {
-    const discovered = await llmPromptsService.match(orgId, content);
+    const discovered = await llmPromptsService.match(orgId, content, folderId);
     if (currentGeneration !== generation || contentFingerprint !== fingerprint.value) return;
     matches.value = discovered;
     if (discovered.length && confirmedFingerprint.value !== contentFingerprint) {

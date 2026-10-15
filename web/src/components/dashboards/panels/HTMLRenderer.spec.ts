@@ -14,9 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import DOMPurify from "dompurify";
 import HTMLRenderer from "./HTMLRenderer.vue";
+import i18n from "@/locales";
+import { htmlPanelPurifier } from "@/utils/dashboard/htmlPanelSanitizer";
 
 // Mock external dependencies.
 // Mutable hoisted state so individual tests can drive the theme that
@@ -43,15 +45,7 @@ vi.mock("@/utils/dashboard/variables/variablesUtils", () => ({
 }));
 
 const addHookSpy = vi.spyOn(DOMPurify, "addHook");
-const sanitizeSpy = vi.spyOn(DOMPurify, "sanitize");
-
-const getAfterSanitizeAttributesHook = () => {
-  const hookCall = addHookSpy.mock.calls.find(
-    ([hookName]) => hookName === "afterSanitizeAttributes",
-  );
-
-  return hookCall ? hookCall[1] : undefined;
-};
+const sanitizeSpy = vi.spyOn(htmlPanelPurifier, "sanitize");
 
 describe("HTMLRenderer", () => {
   let wrapper: VueWrapper<any>;
@@ -60,7 +54,7 @@ describe("HTMLRenderer", () => {
     return mount(HTMLRenderer, {
       props,
       global: {
-        plugins: [],
+        plugins: [i18n],
       },
     });
   };
@@ -328,24 +322,6 @@ describe("HTMLRenderer", () => {
   });
 
   describe("Iframe Support", () => {
-    const createIframeNode = (attrs: Record<string, string>) => {
-      const attributes = new Map(Object.entries(attrs));
-
-      return {
-        nodeName: "IFRAME",
-        getAttribute: (name: string) => attributes.get(name) || null,
-        setAttribute: (name: string, value: string) => {
-          attributes.set(name, value);
-        },
-        removeAttribute: (name: string) => {
-          attributes.delete(name);
-        },
-        get attributes() {
-          return attributes;
-        },
-      };
-    };
-
     it("should allow iframe tags and attributes through sanitizer", async () => {
       wrapper = createWrapper({
         htmlContent: '<iframe src="https://example.com" allowfullscreen></iframe>',
@@ -355,7 +331,7 @@ describe("HTMLRenderer", () => {
         '<iframe src="https://example.com" allowfullscreen></iframe>',
         expect.objectContaining({
           ADD_TAGS: ["iframe", "style"],
-          ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "loading", "csp"],
+          ADD_ATTR: ["allowfullscreen", "frameborder", "loading", "csp"],
           FORCE_BODY: true,
         }),
       );
@@ -426,42 +402,134 @@ describe("HTMLRenderer", () => {
       // Was inline `style="min-height:100%"`; now the `min-h-full` utility.
       expect(wrapper.find('[data-test="html-renderer"]').classes()).toContain("min-h-full");
     });
+  });
 
-    it("should enforce iframe hook restrictions", () => {
-      wrapper = createWrapper({
-        htmlContent: '<iframe src="http://example.com" srcdoc="<p>X</p>"></iframe>',
+  describe("Style rewriting and iframe hardening", () => {
+    const CONTENT_PAYLOAD =
+      '<style>a{content:"\\3c/style\\3e\\3cimg src=x onerror=alert(1)\\3e"}</style><p>hi</p>';
+    const SELECTOR_PAYLOAD =
+      '<style>a[title="\\3c/style\\3e\\3cimg src=x onerror=alert(1)\\3e"]{color:red}</style>';
+
+    const cssUnescape = (text: string) =>
+      text.replace(/\\([0-9a-fA-F]{1,6})\s?/g, (_m, hex: string) =>
+        String.fromCodePoint(parseInt(hex, 16)),
+      );
+
+    // jsdom keeps string escapes on serialize, while Chromium decodes them; this mimics Chromium.
+    class ChromiumLikeSheet {
+      cssRules: { type: number; selectorText: string; body: string; cssText: string }[] = [];
+
+      replaceSync(text: string) {
+        const decoded = cssUnescape(text);
+        const open = decoded.indexOf("{");
+        const rule = {
+          type: CSSRule.STYLE_RULE,
+          selectorText: decoded.slice(0, open).trim(),
+          body: decoded.slice(open + 1, decoded.lastIndexOf("}")).trim(),
+          get cssText() {
+            return `${this.selectorText} { ${this.body} }`;
+          },
+        };
+        this.cssRules = [rule];
+      }
+    }
+
+    const expectNoMarkupEscape = (root: Element) => {
+      expect(root.querySelector("img")).toBeNull();
+      root.querySelectorAll("style").forEach((styleEl) => {
+        expect(styleEl.textContent ?? "").not.toMatch(/<\/style/i);
       });
+    };
 
-      const afterSanitizeAttributesHook = getAfterSanitizeAttributesHook();
-      expect(afterSanitizeAttributesHook).toBeTypeOf("function");
-
-      const node = createIframeNode({
-        src: "http://example.com",
-        srcdoc: "<p>X</p>",
-      });
-
-      afterSanitizeAttributesHook?.(node);
-
-      expect(node.getAttribute("srcdoc")).toBeNull();
-      expect(node.getAttribute("src")).toBeNull();
-      expect(node.getAttribute("sandbox")).toBe("allow-scripts allow-same-origin");
+    afterEach(() => {
+      vi.unstubAllGlobals();
     });
 
-    it("should preserve https iframe src", () => {
+    it("never lets a decoded CSS string close the style element", () => {
+      vi.stubGlobal("CSSStyleSheet", ChromiumLikeSheet);
+      wrapper = createWrapper({ panelId: "p1", htmlContent: CONTENT_PAYLOAD });
+
+      expectNoMarkupEscape(wrapper.find('[data-test="html-renderer"]').element);
+      expect(wrapper.find('[data-test="html-renderer"]').text()).toContain("hi");
+    });
+
+    it("never lets a decoded attribute selector close the style element", () => {
+      wrapper = createWrapper({ panelId: "p1", htmlContent: SELECTOR_PAYLOAD });
+
+      expectNoMarkupEscape(wrapper.find('[data-test="html-renderer"]').element);
+    });
+
+    it("does not register hooks on the shared DOMPurify instance", () => {
+      for (let i = 0; i < 3; i++) {
+        createWrapper({ htmlContent: '<iframe src="https://example.com"></iframe>' }).unmount();
+      }
+
+      expect(addHookSpy).not.toHaveBeenCalled();
+      const shared = DOMPurify.sanitize('<iframe src="https://example.com"></iframe>', {
+        ADD_TAGS: ["iframe"],
+      });
+      expect(shared).not.toContain("sandbox");
+    });
+
+    it("strips the allow attribute so an iframe cannot be delegated device permissions", () => {
       wrapper = createWrapper({
-        htmlContent: '<iframe src="https://example.com"></iframe>',
+        htmlContent: '<iframe src="https://example.com" allow="camera; microphone"></iframe>',
       });
 
-      const afterSanitizeAttributesHook = getAfterSanitizeAttributesHook();
+      const iframe = wrapper.find('[data-test="html-renderer"]').element.querySelector("iframe");
+      expect(iframe).not.toBeNull();
+      expect(iframe?.hasAttribute("allow")).toBe(false);
+    });
 
-      const node = createIframeNode({
-        src: "https://example.com",
+    it("sandboxes a cross-origin https iframe and keeps its src", () => {
+      wrapper = createWrapper({
+        htmlContent: '<iframe src="https://example.com/embed" allowfullscreen></iframe>',
       });
 
-      afterSanitizeAttributesHook?.(node);
+      const iframe = wrapper.find('[data-test="html-renderer"]').element.querySelector("iframe");
+      expect(iframe?.getAttribute("src")).toBe("https://example.com/embed");
+      expect(iframe?.getAttribute("sandbox")).toBe("allow-scripts allow-same-origin");
+      expect(iframe?.hasAttribute("allowfullscreen")).toBe(true);
+    });
 
-      expect(node.getAttribute("src")).toBe("https://example.com");
-      expect(node.getAttribute("sandbox")).toBe("allow-scripts allow-same-origin");
+    it("removes srcdoc from an iframe that has no src", () => {
+      wrapper = createWrapper({
+        htmlContent: '<iframe srcdoc="<p>X</p>"></iframe>',
+      });
+
+      const iframe = wrapper.find('[data-test="html-renderer"]').element.querySelector("iframe");
+      expect(iframe?.hasAttribute("srcdoc")).toBe(false);
+      expect(iframe?.getAttribute("sandbox")).toBe("allow-scripts allow-same-origin");
+    });
+
+    it("shows a notice in place of an iframe whose src is refused", async () => {
+      wrapper = createWrapper({
+        htmlContent:
+          `<p>before</p><iframe src="${window.location.origin}/web/logs"></iframe>` +
+          '<iframe src="http://example.com" srcdoc="<p>X</p>"></iframe><p>after</p>',
+      });
+      await flushPromises();
+
+      const content = wrapper.find('[data-test="html-renderer"]').element;
+      const notices = content.querySelectorAll('[data-test="html-renderer-blocked-embed"]');
+      expect(content.querySelector("iframe")).toBeNull();
+      expect(notices).toHaveLength(2);
+      expect(notices[0].textContent?.trim()).toBe(i18n.global.t("dashboard.htmlPanelEmbedBlocked"));
+      expect(content.textContent).toMatch(/before[\s\S]*after/);
+    });
+
+    it("shows no notice for an allowed embed and drops notices when the content changes", async () => {
+      wrapper = createWrapper({
+        htmlContent: `<iframe src="${window.location.origin}/web"></iframe>`,
+      });
+      await flushPromises();
+      expect(wrapper.findAll('[data-test="html-renderer-blocked-embed"]')).toHaveLength(1);
+
+      await wrapper.setProps({ htmlContent: '<iframe src="https://example.com/embed"></iframe>' });
+      await flushPromises();
+
+      expect(wrapper.findAll('[data-test="html-renderer-blocked-embed"]')).toHaveLength(0);
+      expect(wrapper.find("iframe").attributes("src")).toBe("https://example.com/embed");
     });
   });
 
@@ -559,7 +627,6 @@ describe("HTMLRenderer", () => {
       });
 
       expect(wrapper.vm.processedContent).toBeDefined();
-      expect(wrapper.vm.DOMPurify).toBeDefined();
       // Component now exposes useTheme()'s isDark instead of a raw store.
       expect(wrapper.vm.isDark).toBe(false);
     });

@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, watch, onMounted, computed, nextTick, reactive, onBeforeMount } from "vue";
+import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 import {
   cleanAggregationQuery,
@@ -55,6 +56,8 @@ import { cloneDeep } from "lodash-es";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import searchService from "@/services/search";
+import { promRulePreviewQuery } from "@/services/alerts.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { b64EncodeUnicode, smartDecodeVrlFunction } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -1088,6 +1091,7 @@ const evaluateAndSetStatus = (resultCount: number) => {
 const evaluatePromqlSeries = (dataSeries: any[]) => {
   if (writeRealTimeStatus()) return;
 
+  if (props.formData.query_condition?.promql_rule_mode) return;
   const promqlCondition = props.formData.query_condition?.promql_condition;
   const critical = finiteThreshold(promqlCondition?.value);
   const warning = finiteThreshold(props.formData.query_condition?.promql_warning_value);
@@ -1148,6 +1152,23 @@ const evaluatePromqlSeries = (dataSeries: any[]) => {
   const hasWarningBand = warning !== null;
 
   const criticalGate = evaluateCountGate(criticalCount);
+  const forecast = props.formData._ui?.forecast;
+  if (forecast) {
+    // The summary states nothing until the horizon is usable, and the verdict must not contradict it.
+    if (critical === null || !isForecastHorizonValid(critical)) {
+      evaluationStatus.value = null;
+      return;
+    }
+    evaluationStatus.value = {
+      wouldTrigger: criticalGate.passes,
+      reason: t("alerts.forecast.previewReason", {
+        count: criticalCount,
+        threshold: forecast.T,
+        horizon: t("alerts.forecast.dayCount", { n: critical }, critical),
+      }),
+    };
+    return;
+  }
   if (criticalGate.passes) {
     setEvaluationStatus({
       count: criticalCount,
@@ -1212,6 +1233,30 @@ const handleSeriesDataUpdate = (seriesData: any) => {
   }
 };
 
+let rulePreviewGeneration = 0;
+const refreshRulePreview = async (at: number) => {
+  const generation = ++rulePreviewGeneration;
+  const expression = props.query;
+  evaluationStatus.value = null;
+  try {
+    const count = await queryClient.fetchQuery(
+      promRulePreviewQuery(store.state.selectedOrganization.identifier, expression, at),
+    );
+    if (
+      generation !== rulePreviewGeneration ||
+      expression !== props.query ||
+      !props.formData.query_condition?.promql_rule_mode
+    )
+      return;
+    evaluationStatus.value = {
+      wouldTrigger: count > 0,
+      reason: t("alerts.promRulePreview", { count }),
+    };
+  } catch {
+    if (generation === rulePreviewGeneration) evaluationStatus.value = null;
+  }
+};
+
 const refreshData = () => {
   // Skip if there is no query to run (e.g. user switched to SQL/PromQL
   // without writing a query yet, or closed the editor with an empty query).
@@ -1228,6 +1273,9 @@ const refreshData = () => {
   const relativeTime = props.formData.trigger_condition.period;
 
   const endTime = new Date().getTime() * 1000;
+  if (props.selectedTab === "promql" && props.formData.query_condition?.promql_rule_mode)
+    void refreshRulePreview(endTime / 1_000_000);
+  else rulePreviewGeneration++;
 
   // Priority order for time range:
   // 1. Use env variable ZO_ALERT_PREVIEW_TIMERANGE_MINUTES if set and > 0
@@ -1271,6 +1319,12 @@ const refreshData = () => {
     props.selectedTab === "sql" ||
     (props.selectedTab === "custom" && props.isAggregationEnabled)
   ) {
+    // The editor can mount (and this watcher fire) before the user has
+    // picked a stream — result_schema 400s on a stream-less/invalid query,
+    // so wait until the form actually has one.
+    if (!props.formData.stream_name || !props.formData.stream_type) {
+      return;
+    }
     // Use result_schema API to get query structure
     fetchQuerySchema();
     return;
@@ -1294,8 +1348,10 @@ const refreshData = () => {
     // the legend renders as "{}". Name it after what the alert measures — the
     // same fallback AlertGroupChart uses. Consulted only when a series has no
     // name of its own to give: labels that identify it always win.
-    dashboardPanelData.data.queries[0].config.promql_legend_fallback =
-      props.formData.stream_name || t("alerts.preview");
+    const forecast = props.formData._ui?.forecast;
+    dashboardPanelData.data.queries[0].config.promql_legend_fallback = forecast
+      ? t("alerts.forecast.previewSeries", { threshold: forecast.T })
+      : props.formData.stream_name || t("alerts.preview");
     dashboardPanelData.data.queryType = "promql";
     dashboardPanelData.data.type = "line"; // Default chart type for PromQL time-series
 
@@ -1423,6 +1479,7 @@ watch(
     props.formData.trigger_condition?.threshold,
     props.formData.trigger_condition?.operator,
     props.formData.query_condition?.promql_condition?.value,
+    props.formData.query_condition?.promql_rule_mode,
     props.selectedTab,
     props.isUsingBackendSql,
   ],
@@ -1459,6 +1516,7 @@ watch(
 onMounted(() => {
   // Skip for PromQL to avoid duplicate API calls (watchers handle it)
   if (props.selectedTab === "promql") {
+    if (props.formData.query_condition?.promql_rule_mode) refreshDataOnce();
     return;
   }
   if (props.query) {

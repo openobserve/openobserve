@@ -308,21 +308,6 @@ impl SchedulerJobPuller {
                         "[SCHEDULER] [JobPuller-{trace_id}] Pulled {module:?}: {} jobs",
                         module_triggers.len()
                     );
-
-                    // [ENTERPRISE] Register batch for RCA cross-alert correlation
-                    // Only for Alert module
-                    // #[cfg(feature = "enterprise")]
-                    // if matches!(module, TriggerModule::Alert) && !module_triggers.is_empty() {
-                    //     log::debug!(
-                    //         "[SCHEDULER][JobPuller-{}] Registering RCA batch with {} alerts",
-                    //         trace_id,
-                    //         module_triggers.len()
-                    //     );
-                    //     o2_enterprise::enterprise::ai::rca::register_batch(
-                    //         &trace_id,
-                    //         module_triggers.len(),
-                    //     );
-                    // }
                 }
             }
 
@@ -332,8 +317,7 @@ impl SchedulerJobPuller {
             for trigger in triggers {
                 let job_id = trigger.id;
                 let job_key = trigger.module_key.clone();
-                let claim =
-                    (trigger.module == TriggerModule::CompositeAlert).then(|| trigger.clone());
+                let claim = trigger.module.completes_by_claim().then(|| trigger.clone());
                 let (tx, mut rx) = mpsc::channel::<()>(1);
                 let scheduled_job = ScheduledJob {
                     trace_id: trace_id.clone(),
@@ -382,12 +366,12 @@ impl SchedulerJobPuller {
                                 Ok(true) => {}
                                 Ok(false) => {
                                     log::warn!(
-                                        "[SCHEDULER][JobPuller-{trace_id_keep_alive}] composite claim for job[{job_id}] trigger[{job_key}] is stale; stopping keep_alive"
+                                        "[SCHEDULER][JobPuller-{trace_id_keep_alive}] claim for job[{job_id}] trigger[{job_key}] is stale; stopping keep_alive"
                                     );
                                     return;
                                 }
                                 Err(e) => log::error!(
-                                    "[SCHEDULER][JobPuller-{trace_id_keep_alive}] keep_alive for composite job[{job_id}] trigger[{job_key}] failed: {e}"
+                                    "[SCHEDULER][JobPuller-{trace_id_keep_alive}] keep_alive for claimed job[{job_id}] trigger[{job_key}] failed: {e}"
                                 ),
                             }
                         } else if let Err(e) =
@@ -703,6 +687,12 @@ fn resolve_module_configs(
             poll_interval_secs: pick_interval(cfg.limit.scheduler_query_reco_interval),
             lease_timeout_secs: None,
         },
+        ModuleSchedulerConfig {
+            module: TriggerModule::AlertCalibration,
+            concurrency: std::cmp::max(1, cfg.limit.cpu_num as i64),
+            poll_interval_secs: pick_interval(cfg.limit.scheduler_alert_calibration_interval),
+            lease_timeout_secs: None,
+        },
     ]
 }
 
@@ -944,20 +934,7 @@ mod tests {
         // never be pulled once per-module pullers are enabled.
         let cfg = config::Config::default();
         let configs = resolve_module_configs(&cfg, &make_config());
-        // Ten, and the list below is the authority: the count trailed the
-        // modules when `CompositeAlert` and `OncallEscalation` arrived from
-        // different branches, so it is asserted against the same number the
-        // loop walks rather than a literal somebody has to remember to bump.
-        let expected = 10;
-        assert_eq!(configs.len(), expected);
-        let modules: std::collections::HashSet<_> =
-            configs.iter().map(|c| c.module.clone()).collect();
-        assert_eq!(
-            modules.len(),
-            expected,
-            "duplicate module in resolved configs"
-        );
-        for m in [
+        let all = [
             TriggerModule::Alert,
             TriggerModule::CompositeAlert,
             TriggerModule::Report,
@@ -968,7 +945,17 @@ mod tests {
             TriggerModule::Slo,
             TriggerModule::SloBackfill,
             TriggerModule::OncallEscalation,
-        ] {
+            TriggerModule::AlertCalibration,
+        ];
+        assert_eq!(configs.len(), all.len());
+        let modules: std::collections::HashSet<_> =
+            configs.iter().map(|c| c.module.clone()).collect();
+        assert_eq!(
+            modules.len(),
+            all.len(),
+            "duplicate module in resolved configs"
+        );
+        for m in all {
             assert!(modules.contains(&m), "missing module {m:?}");
         }
     }
@@ -1052,6 +1039,26 @@ mod tests {
         assert_eq!(
             find_module(&configs, TriggerModule::SloBackfill).concurrency,
             2
+        );
+    }
+
+    #[test]
+    fn test_alert_calibration_lane_is_sized_by_the_cpu_count() {
+        let base = make_config(); // alert concurrency 3
+        let mut cfg = config::Config::default();
+        cfg.limit.cpu_num = 6;
+        let configs = resolve_module_configs(&cfg, &base);
+        assert_eq!(
+            find_module(&configs, TriggerModule::AlertCalibration).concurrency,
+            6
+        );
+
+        cfg.limit.cpu_num = 0;
+        let configs = resolve_module_configs(&cfg, &base);
+        assert_eq!(
+            find_module(&configs, TriggerModule::AlertCalibration).concurrency,
+            1,
+            "a lane with no workers would never pull"
         );
     }
 

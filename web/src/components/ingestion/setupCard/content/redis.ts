@@ -53,6 +53,7 @@ service:
 export default function redisCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
+      id: "redis",
       name: raw("Redis"),
       tagline: t("ingestion.setupCard.redisTagline"),
       logo: getImageURL("images/ingestion/redis.svg"),

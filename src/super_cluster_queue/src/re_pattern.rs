@@ -46,9 +46,11 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             };
             let actual_message: RePatternsMessage = serde_json::from_slice(&v)?;
             match actual_message {
-                RePatternsMessage::Delete { id } => {
-                    log::info!("[SUPER_CLUSTER:DB] deleting pattern with id {id}");
-                    infra::table::re_pattern::remove(&id).await?;
+                RePatternsMessage::Delete { org_id, id } => {
+                    log::info!(
+                        "[SUPER_CLUSTER:DB] deleting pattern with id {id} from org {org_id}"
+                    );
+                    infra::table::re_pattern::remove(&org_id, &id).await?;
                     let mgr = get_pattern_manager().await?;
                     mgr.remove_pattern(&id);
 

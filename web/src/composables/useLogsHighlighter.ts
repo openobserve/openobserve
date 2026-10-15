@@ -21,7 +21,7 @@
  */
 
 import type { TranslateFn } from "@/types/i18n";
-import { useTextHighlighter } from "@/composables/useTextHighlighter";
+import { useTextHighlighter, scopeHighlightQuery } from "@/composables/useTextHighlighter";
 import { getThemeColors } from "@/utils/logs/keyValueParser";
 import { escapeHtml } from "@/utils/html";
 import { ref, watch, onBeforeUnmount, getCurrentInstance } from "vue";
@@ -64,8 +64,13 @@ export function useLogsHighlighter(t: TranslateFn) {
     },
   );
 
-  const { processTextWithHighlights, extractKeywords, splitTextByKeywords, isFTSColumn } =
-    useTextHighlighter();
+  const {
+    processTextWithHighlights,
+    extractKeywords,
+    extractHighlightPatterns,
+    splitTextByKeywords,
+    isFTSColumn,
+  } = useTextHighlighter();
 
   /**
    * Process hits array in chunks to avoid blocking the main thread
@@ -93,6 +98,11 @@ export function useLogsHighlighter(t: TranslateFn) {
     if (!hits || hits.length === 0 || !columns || columns.length === 0) {
       return processedResults.value;
     }
+
+    // Scoping depends only on (query, column), so it runs once per column, not per cell
+    const columnQueries = columns.map((column) =>
+      column.id === "source" ? queryString : scopeHighlightQuery(queryString, column.id),
+    );
 
     // Split hits into chunks
     const chunks = [];
@@ -140,7 +150,8 @@ export function useLogsHighlighter(t: TranslateFn) {
             ),
             showBraces: columns[columnIndex].id === "source",
             showQuotes: columns[columnIndex].id === "source",
-            queryString,
+            // Field filters highlight only their own column; source scopes per key
+            queryString: columnQueries[columnIndex],
           });
 
           batchUpdates[cacheKey] = processedHtml;
@@ -421,7 +432,7 @@ export function useLogsHighlighter(t: TranslateFn) {
     if (!text || !queryString) return escapeHtml(text);
 
     const keywords = extractKeywords(queryString);
-    const parts = splitTextByKeywords(text, keywords);
+    const parts = splitTextByKeywords(text, keywords, extractHighlightPatterns(queryString));
 
     return parts
       .map((part) => {
@@ -492,7 +503,11 @@ export function useLogsHighlighter(t: TranslateFn) {
     showQuotes: boolean = false,
   ): string {
     const keywords = extractKeywords(queryString);
-    const highlightParts = splitTextByKeywords(text, keywords);
+    const highlightParts = splitTextByKeywords(
+      text,
+      keywords,
+      extractHighlightPatterns(queryString),
+    );
 
     let result = "";
 
@@ -578,7 +593,11 @@ export function useLogsHighlighter(t: TranslateFn) {
     }
 
     const entries = Object.entries(obj);
+    const allFieldsQuery = queryString;
     entries.forEach(([key, value], index) => {
+      // Field filters (str_match, re_match, ...) highlight only their own key
+      const queryString = scopeHighlightQuery(allFieldsQuery, key);
+
       // KEYS: Always colored, never highlighted
       let keyContent = "";
 

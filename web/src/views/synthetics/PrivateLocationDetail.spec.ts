@@ -132,9 +132,6 @@ const baseStubs = {
     props: ["preset", "size", "title"],
     inheritAttrs: true,
   },
-  BetaBadge: {
-    template: '<span data-test="beta-badge">BETA</span>',
-  },
   AgentSetupDrawer: {
     template: '<div data-test="synthetics-private-location-agent-setup-drawer" />',
     props: [
@@ -162,6 +159,9 @@ function mountPage() {
 
 describe("PrivateLocationDetail", () => {
   let wrapper: VueWrapper;
+  // The page title carries a cut-off tooltip of its own, so pick the one wrapping the status badge.
+  const statusBadgeTooltip = () =>
+    wrapper.findAll(".otooltip-stub").find((tip) => tip.find(".obadge-stub").exists());
 
   const defaultDetail = {
     data: {
@@ -196,11 +196,6 @@ describe("PrivateLocationDetail", () => {
     it("should render the page shell", () => {
       wrapper = mountPage();
       expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should render the Beta badge in the page title", () => {
-      wrapper = mountPage();
-      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
 
     it("should render the status badge when detail is loaded", async () => {
@@ -269,7 +264,7 @@ describe("PrivateLocationDetail", () => {
       wrapper = mountPage();
       await flushPromises();
 
-      const tooltip = wrapper.find(".otooltip-stub");
+      const tooltip = statusBadgeTooltip()!;
       expect(tooltip.text()).toBe("synthetics.privateLocations.status.unknown");
       expect(tooltip.attributes("data-content")).toBe(
         "synthetics.privateLocations.status.unknownHint",
@@ -302,7 +297,7 @@ describe("PrivateLocationDetail", () => {
       wrapper = mountPage();
       await flushPromises();
 
-      expect(wrapper.find(".otooltip-stub").exists()).toBe(false);
+      expect(statusBadgeTooltip()).toBeUndefined();
       expect(wrapper.find(".obadge-stub").text()).toBe(
         "synthetics.privateLocations.status.pending",
       );

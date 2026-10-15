@@ -74,8 +74,9 @@ const makeAnomalyDetectionConfigBase = (t: Translator) =>
     // Type-only (fixed OSelect options).
     retrain_interval_days: z.coerce.number(),
     // Sensitivity rules are mode-conditional (superRefine): each mode judges only its own fields.
-    sensitivity_mode: z.enum(["percentile", "budget"]),
-    threshold: z.coerce.number(),
+    sensitivity_mode: z.enum(["band", "budget"]),
+    // Blank (null or a cleared "") is Auto; raw so superRefine judges it, not coerced to 0.
+    band_width: z.union([z.string(), z.number(), z.null()]),
     budget_count: z.coerce.number(),
     budget_period: z.enum(["day", "week"]),
   });
@@ -116,6 +117,29 @@ export interface AnomalyStoredIntervals {
   window: AnomalyStoredInterval;
 }
 
+export type AnomalyBandGrouping = "weekend_hour" | "global";
+
+// The two retired groupings stay labelled: a row keeps its value until it retrains.
+export const ANOMALY_BAND_GROUPING_KEYS: Record<string, string> = {
+  weekend_hour: "alerts.anomaly.bandGroupingWeekendHour",
+  global: "alerts.anomaly.bandGroupingGlobal",
+  hour_of_week: "alerts.anomaly.bandGroupingHourOfWeek",
+  hour_of_day: "alerts.anomaly.bandGroupingHourOfDay",
+};
+
+/** The trainer fetches at least this many days of history, whatever the configured window. */
+export const ANOMALY_MIN_TRAINING_DAYS = 21;
+
+/** The grouping the trainer picks (absence.rs `slot_resolution_for`): weekday/weekend × hour, unless a bucket is coarser than 1h. */
+export const anomalyBandGrouping = (intervalSeconds: number | null): AnomalyBandGrouping =>
+  intervalSeconds !== null && intervalSeconds > 3600 ? "global" : "weekend_hour";
+
+/** Pre-training label key: the trainer groups by the data the stream returns, so the label names every outcome. */
+export const anomalyExpectedGroupingKey = (intervalSeconds: number | null): string =>
+  anomalyBandGrouping(intervalSeconds) === "global"
+    ? ANOMALY_BAND_GROUPING_KEYS.global
+    : "alerts.anomaly.bandGroupingWeekendHourIfData";
+
 /** A window narrower than one schedule gap plus one bucket deterministically skips buckets (spec §4.3). */
 export const lookBackWindowFloorSeconds = (
   scheduleValue: number,
@@ -148,6 +172,14 @@ export const formatAnomalySeconds = (secs: number): string => {
   }
   return parts.length ? parts.join(" ") : "0s";
 };
+
+const isBlankNumber = (v: unknown): boolean => v === "" || v === null || v === undefined;
+
+/** Balanced: the same k the trainer never goes below. */
+export const ANOMALY_BALANCED_BAND_WIDTH = 3;
+
+// Mirrors the server's band_width rule: finite and within [1, 10].
+const isBandWidth = (n: number): boolean => Number.isFinite(n) && n >= 1 && n <= 10;
 
 const sameInterval = (stored: AnomalyStoredInterval, value: unknown, unit: unknown): boolean =>
   Number(value) === stored.value && unit === stored.unit;
@@ -201,14 +233,12 @@ export const createAnomalyDetectionConfigSchema = (
       }
     }
 
-    if (value.sensitivity_mode === "percentile") {
-      // The server clamps to 50–99.9 then truncates with `as i32`, so 99 is the real ceiling.
-      const p = value.threshold;
-      if (!Number.isInteger(p) || p < 50 || p > 99) {
+    if (value.sensitivity_mode === "band") {
+      if (!isBlankNumber(value.band_width) && !isBandWidth(Number(value.band_width))) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["threshold"],
-          message: t("alerts.anomaly.sensitivityRange"),
+          path: ["band_width"],
+          message: t("alerts.anomaly.bandWidthRange"),
         });
       }
     } else if (!Number.isFinite(value.budget_count) || value.budget_count <= 0) {
@@ -272,11 +302,6 @@ export const anomalyNoticeBadgeKeys = (
         labelKey: "alerts.anomaly.noticeWindowSkip",
         tooltipKeys: ["alerts.anomaly.noticeSkipScored", "alerts.anomaly.noticeSkipAbsence"],
       };
-    case "hybrid_fallback":
-      return {
-        labelKey: "alerts.anomaly.noticeHybridFallback",
-        tooltipKeys: ["alerts.anomaly.noticeHybridFallbackTooltip"],
-      };
     case "retrain":
       return {
         labelKey: "alerts.anomaly.noticeRetrain",
@@ -291,6 +316,80 @@ export const anomalyNoticeBadgeKeys = (
 export const anomalyBudgetPerDay = (cfg: Record<string, any> | null | undefined): number | null => {
   const budget = Number(cfg?.alert_budget_per_day);
   return Number.isFinite(budget) && budget > 0 ? budget : null;
+};
+
+/** Band width to show on edit: a stored override, else null (Auto) — never the trained k, which saving would pin. */
+export const anomalyBandWidthPrefill = (
+  cfg: Record<string, any> | null | undefined,
+): number | null => {
+  if (anomalyBudgetPerDay(cfg) !== null) return null;
+  if (!isBlankNumber(cfg?.band_width) && Number.isFinite(Number(cfg?.band_width))) {
+    return Number(cfg?.band_width);
+  }
+  return null;
+};
+
+/** The trained k rounded for display, or null before training. */
+export const anomalyTrainedK = (cfg: Record<string, any> | null | undefined): number | null => {
+  const k = isBlankNumber(cfg?.band_k) ? NaN : Number(cfg?.band_k);
+  return Number.isFinite(k) ? Math.round(k * 100) / 100 : null;
+};
+
+export const ANOMALY_DIRECTION_KEYS: Record<string, string> = {
+  both: "alerts.anomaly.directionBoth",
+  above: "alerts.anomaly.directionAbove",
+  below: "alerts.anomaly.directionBelow",
+};
+
+/** Window share as the server applies it: blank buckets mean 1, blank fire 100%, blank recover = fire. */
+export const anomalyWindowShareEffective = (
+  cfg: Record<string, any> | null | undefined,
+): { buckets: number; fire: number; recover: number } => {
+  const fire = isBlankNumber(cfg?.alert_window_fire_pct) ? 100 : Number(cfg?.alert_window_fire_pct);
+  return {
+    buckets: isBlankNumber(cfg?.alert_window_buckets) ? 1 : Number(cfg?.alert_window_buckets),
+    fire,
+    recover: isBlankNumber(cfg?.alert_window_recover_pct)
+      ? fire
+      : Number(cfg?.alert_window_recover_pct),
+  };
+};
+
+/** Locale keys for the window-share inputs that break the server's rules; null where the value is valid. */
+export const anomalyWindowShareErrors = (
+  cfg: Record<string, any> | null | undefined,
+): { buckets: string | null; fire: string | null; recover: string | null } => {
+  const buckets = cfg?.alert_window_buckets;
+  const fireRaw = cfg?.alert_window_fire_pct;
+  const recoverRaw = cfg?.alert_window_recover_pct;
+  const bucketsOk =
+    isBlankNumber(buckets) || (Number.isInteger(Number(buckets)) && Number(buckets) >= 1);
+  const fire = isBlankNumber(fireRaw) ? 100 : Number(fireRaw);
+  const fireOk = Number.isFinite(fire) && fire > 0 && fire <= 100;
+  const interval = anomalyIntervalSeconds(
+    Number(cfg?.histogram_interval_value),
+    String(cfg?.histogram_interval_unit),
+  );
+  // Mirrors the server rule: N > 1 buckets × resolution must fit in 24h; one looks back nowhere.
+  const spanOk =
+    !bucketsOk ||
+    isBlankNumber(buckets) ||
+    Number(buckets) <= 1 ||
+    interval === null ||
+    Number(buckets) * interval <= 86400;
+  const recover = Number(recoverRaw);
+  const recoverOk =
+    isBlankNumber(recoverRaw) ||
+    (Number.isFinite(recover) && recover > 0 && recover <= (fireOk ? fire : 100));
+  return {
+    buckets: !bucketsOk
+      ? "alerts.anomaly.windowBucketsRange"
+      : spanOk
+        ? null
+        : "alerts.anomaly.windowBucketsSpan",
+    fire: fireOk ? null : "alerts.anomaly.windowFireRange",
+    recover: recoverOk ? null : "alerts.anomaly.windowRecoverRange",
+  };
 };
 
 /** A stored per-day budget below 1 is surfaced as alerts/week. */
@@ -332,9 +431,9 @@ export const anomalyDetectionConfigDefaults = (
   // 3h is the smallest round window meeting §4.3's recommendation (2×(1h+5m) + the absence allowance).
   detection_window_value: cfg?.detection_window_value ?? 3,
   detection_window_unit: cfg?.detection_window_unit ?? "h",
-  training_window_days: cfg?.training_window_days ?? 14,
+  training_window_days: cfg?.training_window_days ?? 28,
   retrain_interval_days: cfg?.retrain_interval_days ?? 7,
-  sensitivity_mode: anomalyBudgetPerDay(cfg) !== null ? "budget" : "percentile",
-  threshold: cfg?.threshold == null || cfg.threshold === "" ? 97 : Number(cfg.threshold),
+  sensitivity_mode: anomalyBudgetPerDay(cfg) !== null ? "budget" : "band",
+  band_width: isBlankNumber(cfg?.band_width) ? null : Number(cfg?.band_width),
   ...budgetFieldsFromPerDay(anomalyBudgetPerDay(cfg)),
 });

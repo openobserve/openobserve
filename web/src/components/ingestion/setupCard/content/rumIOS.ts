@@ -186,6 +186,7 @@ export default function rumIOSCard(subs: RumIOSCardSubs): RichCardContent {
 
   return {
     provider: {
+      id: "rumIOS",
       // Same title as the other platform cards by design — the platform switch
       // next to it already says which guide you are on, so the heading stays
       // stable across platforms instead of rewriting itself on every click.

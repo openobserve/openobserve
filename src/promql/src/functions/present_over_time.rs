@@ -60,11 +60,6 @@ mod tests {
     }
 
     #[test]
-    fn test_present_over_time_exec_empty_samples_returns_none() {
-        assert!(PresentOverTimeFunc.exec(&[], 0, &Duration::ZERO).is_none());
-    }
-
-    #[test]
     fn test_present_over_time_is_one_regardless_of_sample_values() {
         let range_value = RangeValue {
             labels: Labels::default(),

@@ -150,7 +150,7 @@ export const useRoleSummary = (deps: SummaryDeps) => {
     const loaded = new Map<string, string>(
       (node.entities ?? []).map((item: any) => [item.name, item.display_name ?? item.name]),
     );
-    // Dashboard, alert and report ids carry their folder as `folderId/id`; synthetics and workflow ids are plain, so only the folder's loaded items place them.
+    // Dashboard, alert and report ids carry their folder as `folderId/id`; synthetics, workflow and prompt ids are plain, so only the folder's loaded items place them.
     const inside = (heldItemsByResource.value.get(node.childName) ?? []).filter(
       (entity) => node.type === "Type" || entity.startsWith(prefix) || loaded.has(entity),
     );
@@ -158,6 +158,21 @@ export const useRoleSummary = (deps: SummaryDeps) => {
       const label = loaded.get(entity) ?? String(entityLabel(node.childName, entity));
       return label === entity && entity.startsWith(prefix) ? entity.slice(prefix.length) : label;
     });
+    return { count: inside.length, names };
+  };
+
+  // An All Modules row shows only the module-wide grant, so it reports every other grant the module holds: `logs:_all_` and `dashboard:f1/d1` both count.
+  const moduleInnerGrants = (node: any, nameLimit: number): { count: number; names: string[] } => {
+    const module = roleModules.value.find((candidate) => candidate.key === node?.name);
+    if (!module) return { count: 0, names: [] };
+    const inside = module.countedKeys.flatMap((resource) =>
+      heldGrants(resource)
+        .filter(([entity]) => resource !== module.key || !isWideEntity(entity))
+        .map(([entity]) => ({ resource, entity })),
+    );
+    const names = inside
+      .slice(0, nameLimit)
+      .map(({ resource, entity }) => String(entityLabel(resource, entity)));
     return { count: inside.length, names };
   };
 
@@ -258,6 +273,7 @@ export const useRoleSummary = (deps: SummaryDeps) => {
     knownTotal,
     heldGrants,
     innerGrants,
+    moduleInnerGrants,
     actionsOf,
     specificReach,
     moduleDescription,

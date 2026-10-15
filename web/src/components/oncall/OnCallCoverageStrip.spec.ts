@@ -14,12 +14,27 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import OnCallCoverageStrip from "@/components/oncall/OnCallCoverageStrip.vue";
 import i18n from "@/locales";
 import type { Rotation } from "@/ts/interfaces/oncall";
 import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+
+// Mutable per case, so the phone tests can switch while every other test stays desktop.
+const mockViewport = vi.hoisted(() => ({ mdUp: true, lgUp: true }));
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => !mockViewport.mdUp),
+      isTablet: computed(() => mockViewport.mdUp && !mockViewport.lgUp),
+      isDesktop: computed(() => mockViewport.lgUp),
+      mdUp: computed(() => mockViewport.mdUp),
+      lgUp: computed(() => mockViewport.lgUp),
+    }),
+  };
+});
 
 const stubs = {
   OScheduleTimeline: {
@@ -65,6 +80,11 @@ function render(rotations: Rotation[]) {
 }
 
 describe("OnCallCoverageStrip", () => {
+  afterEach(() => {
+    mockViewport.mdUp = true;
+    mockViewport.lgUp = true;
+  });
+
   /// A covered fortnight is ONE band, not 336 hourly slivers the browser has to
   /// lay out.
   it("merges an unbroken stretch of cover into a single band", () => {
@@ -152,6 +172,17 @@ describe("OnCallCoverageStrip", () => {
 
       expect(first.offset).toBeGreaterThan(0);
       expect(first.offset).toBeLessThan(dayShare);
+    });
+
+    /// A phone-width strip has room for about four date labels; the laptop's seven ran into each other.
+    it("thins the dates further on a phone", () => {
+      const laptop = axisOf(render([rotation(["ana@o2.ai"])]));
+      mockViewport.mdUp = false;
+      const phone = axisOf(render([rotation(["ana@o2.ai"])]));
+
+      expect(phone.length).toBeGreaterThan(1);
+      expect(phone.length).toBeLessThanOrEqual(4);
+      expect(phone.length).toBeLessThan(laptop.length);
     });
   });
 

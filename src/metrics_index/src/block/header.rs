@@ -18,7 +18,7 @@
 use std::{collections::HashSet, ops::Range, sync::Arc};
 
 use anyhow::{Context, Result, ensure};
-use arrow::datatypes::{DataType, Schema, SchemaRef};
+use arrow::datatypes::{Schema, SchemaRef};
 use config::meta::promql::index::MidxTrailer;
 use serde::{Deserialize, Serialize};
 
@@ -78,31 +78,28 @@ impl Header {
         let mut ranges = vec![self.directory_range()];
         ranges.extend(
             self.projection(labels)?
-                .0
                 .into_iter()
                 .map(|index| self.labels[index].column.range.clone()),
         );
         Ok(ranges)
     }
 
-    /// Stored label indices and names absent from the file, both deduplicated in request order.
-    pub(super) fn projection(&self, labels: &[String]) -> Result<(Vec<usize>, Vec<String>)> {
+    /// Stored label indices in request order; labels absent from the source need no column.
+    pub(super) fn projection(&self, labels: &[String]) -> Result<Vec<usize>> {
         let mut projection = Vec::new();
-        let mut missing: Vec<String> = Vec::new();
         for name in labels {
             if let Some(index) = self.labels.iter().position(|label| &label.name == name) {
                 if !projection.contains(&index) {
                     projection.push(index);
                 }
-            } else if !missing.contains(name) {
+            } else {
                 ensure!(
                     self.source_schema.field_with_name(name).is_err(),
                     "requested source field lacks identity label metadata"
                 );
-                missing.push(name.clone());
             }
         }
-        Ok((projection, missing))
+        Ok(projection)
     }
 
     fn validate(
@@ -138,10 +135,7 @@ impl Header {
             data.directory.len() == DIRECTORY_FIELDS,
             "invalid directory column count"
         );
-        let min_label_raw = blocks
-            .checked_mul(4)
-            .and_then(|n| n.checked_add(4))
-            .context("label size overflow")?;
+        let min_label_raw = blocks.checked_add(4).context("label size overflow")?;
         let blocks_end = trailer.blocks_end(file_size);
         let mut next = blocks_end;
         let mut labels = Vec::with_capacity(data.labels.len());
@@ -160,17 +154,14 @@ impl Header {
             next == trailer.directory_start(file_size),
             "MIDX label region length mismatch"
         );
+        let max_directory_raw = blocks.checked_mul(10).context("directory size overflow")?;
         let mut directory = Vec::with_capacity(DIRECTORY_FIELDS);
-        for (section, kind) in data.directory.into_iter().zip(DIRECTORY_TYPES) {
-            let width = match kind {
-                DataType::UInt32 => 4,
-                _ => 8,
-            };
-            let raw = blocks
-                .checked_mul(width)
-                .context("directory size overflow")?;
+        for section in data.directory {
             let column = Column::next(&mut next, section)?;
-            ensure!(column.raw == raw, "directory column row count mismatch");
+            ensure!(
+                (blocks..=max_directory_raw).contains(&column.raw),
+                "directory column size does not match its row count"
+            );
             directory.push(column);
         }
         ensure!(

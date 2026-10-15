@@ -22,6 +22,10 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
+import analytics from "@/services/product_analytics";
+import { addVariable, updateVariable } from "../../../utils/commons";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock external dependencies
 vi.mock("vue-i18n", () => ({
@@ -914,6 +918,56 @@ describe("AddSettingVariable", () => {
       expect(wrapper.vm.buildVariablePayload(baseQuery("abc")).query_data.max_record_size).toBe(
         null,
       );
+    });
+  });
+
+  describe("product analytics", () => {
+    it("tracks dashboard_variable_saved as new once addVariable resolves", async () => {
+      await wrapper.vm.saveData({ name: "v", type: "constant" });
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_variable_saved", {
+        type: "constant",
+        is_new: true,
+      });
+    });
+
+    it("does not track dashboard_variable_saved when addVariable rejects", async () => {
+      vi.mocked(addVariable).mockRejectedValueOnce(new Error("boom"));
+
+      await wrapper.vm.saveData({ name: "v", type: "constant" });
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("tracks dashboard_variable_saved as not new once updateVariable resolves", async () => {
+      const editWrapper = mount(AddSettingVariable, {
+        props: { variableName: "existingVar", dashboardVariablesList: [] },
+      });
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+
+      await editWrapper.vm.saveData({ name: "existingVar", type: "custom" });
+
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_variable_saved", {
+        type: "custom",
+        is_new: false,
+      });
+      editWrapper.unmount();
+    });
+
+    it("does not track dashboard_variable_saved when updateVariable rejects", async () => {
+      const editWrapper = mount(AddSettingVariable, {
+        props: { variableName: "existingVar", dashboardVariablesList: [] },
+      });
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+      vi.mocked(updateVariable).mockRejectedValueOnce(new Error("boom"));
+
+      await editWrapper.vm.saveData({ name: "existingVar", type: "custom" });
+
+      expect(analytics.track).not.toHaveBeenCalled();
+      editWrapper.unmount();
     });
   });
 

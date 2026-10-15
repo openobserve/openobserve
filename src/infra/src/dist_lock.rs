@@ -27,6 +27,13 @@ impl Locker {
             LockerStore::Nats(ref locker) => locker.key.clone(),
         }
     }
+
+    /// Turns `true` once the lock is found taken over by another holder or expired.
+    pub fn lost(&self) -> tokio::sync::watch::Receiver<bool> {
+        match self.0 {
+            LockerStore::Nats(ref locker) => locker.lost_signal(),
+        }
+    }
 }
 
 #[inline(always)]

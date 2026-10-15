@@ -63,7 +63,6 @@
             searchable
             label-position="inside"
             :disabled="dashboardPanelDataPageKey === 'logs'"
-            :title="currentStream ?? undefined"
             option-tooltip
             @search="onStreamSearch"
             @update:model-value="onStreamChange"
@@ -75,9 +74,8 @@
       <template #group-header="{ row }">
         <div
           class="-ms-page-edge px-page-edge bg-section-header-bg text-text-secondary flex h-7! w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-default items-center justify-between text-xs font-semibold select-none"
-          :title="row.groupName"
         >
-          <div class="min-w-0 flex-1">{{ row.groupName }}</div>
+          <OTruncatedText as="div" class="flex-1">{{ row.groupName }}</OTruncatedText>
         </div>
       </template>
 
@@ -405,6 +403,7 @@ import { useTheme } from "@/composables/useTheme";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
 import { applyPromqlSeed, metricsStreamsOf } from "@/utils/dashboard/promqlSeed";
+import { pickDashboardPanelStream } from "@/utils/streamPersist";
 import { isAutoSeededQuery } from "@/utils/metrics/metricPanelSeed";
 import { buildTypeFilterBuckets } from "@/utils/metrics/metricFamily";
 import { BADGE_LABEL_KEYS, getBadgeStyle } from "@/utils/metrics/metricPalette";
@@ -419,6 +418,7 @@ import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
 
 const props = defineProps<{
@@ -537,6 +537,16 @@ const currentQueryFields = () =>
 const STREAM_LIST_WITHOUT_STREAM = new Set(["metrics", "build"]);
 
 const isEditPanel = props.editMode;
+
+const defaultStreamFor = (streamType: string) => {
+  const streams = dashboardPanelData.meta.stream.streamResults ?? [];
+  if (dashboardPanelDataPageKey !== "dashboard" || isEditPanel) return streams[0]?.name;
+  return pickDashboardPanelStream(
+    store.state.selectedOrganization?.identifier,
+    streamType,
+    streams,
+  );
+};
 let initialStreamsLoaded = false;
 
 const loadStreamsListBasedOnType = async () => {
@@ -810,8 +820,9 @@ watch(
             dashboardPanelData.layout.currentQueryIndex
           ].fields.stream;
       } else {
-        dashboardPanelData.data.queries[currentIndex].fields.stream =
-          dashboardPanelData.meta.stream.streamResults[0]?.name;
+        dashboardPanelData.data.queries[currentIndex].fields.stream = defaultStreamFor(
+          dashboardPanelData.data.queries[currentIndex].fields.stream_type,
+        );
       }
     }
   },

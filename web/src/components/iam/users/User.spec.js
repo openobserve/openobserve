@@ -370,7 +370,7 @@ describe("User Component", () => {
             QTd: true,
             QTh: true,
             RouterLink: true,
-            MemberInvitation: true, // Add this stub
+            InviteMembersDialog: true,
           },
         },
       });
@@ -381,9 +381,9 @@ describe("User Component", () => {
       config.isCloud = "false";
     });
 
-    it("shows member invitation component in cloud mode", async () => {
-      const memberInvitation = wrapper.findComponent({ name: "MemberInvitation" });
-      expect(memberInvitation.exists()).toBe(true);
+    it("mounts the invite members dialog in cloud mode", async () => {
+      const inviteDialog = wrapper.findComponent({ name: "InviteMembersDialog" });
+      expect(inviteDialog.exists()).toBe(true);
     });
 
     it("shows correct UI elements in cloud mode", () => {

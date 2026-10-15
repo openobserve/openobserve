@@ -24,6 +24,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -209,7 +210,10 @@ function onToggleEnvironment(id: string) {
           </span>
           <div v-for="row in opensIn" :key="row.id" class="flex min-w-0 items-center gap-2 text-xs">
             <span class="text-text-body shrink-0">{{ row.name }}</span>
-            <span class="text-text-secondary truncate font-mono">{{ row.url }}</span>
+            <!-- The filled-in URL can hold secure variable values, so it never gets a hover reveal. -->
+            <OTruncatedText class="text-text-secondary font-mono" :tooltip="false">{{
+              row.url
+            }}</OTruncatedText>
           </div>
         </div>
       </OForm>
@@ -262,9 +266,10 @@ function onToggleEnvironment(id: string) {
               :data-test="`synthetics-journey-start-pill-env-${env.name}`"
               @update:model-value="onToggleEnvironment(env.id)"
             />
-            <span class="text-text-secondary truncate font-mono text-xs">
+            <!-- The filled-in URL can hold secure variable values, so it never gets a hover reveal. -->
+            <OTruncatedText class="text-text-secondary font-mono text-xs" :tooltip="false">
               {{ namedUrls.get(env.id) }}
-            </span>
+            </OTruncatedText>
           </div>
           <div
             v-for="id in lockedIds"

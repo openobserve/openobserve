@@ -20,6 +20,9 @@ use utoipa::ToSchema;
 use super::datetime_now;
 use crate::meta::alerts::default_align_time;
 
+/// Header carrying the shared secret between OpenObserve and the report server.
+pub const REPORT_SECRET_HEADER: &str = "x-o2-report-secret";
+
 #[derive(Serialize, Debug, Deserialize, Clone, ToSchema)]
 pub enum ReportDestination {
     #[serde(rename = "email")]
@@ -376,9 +379,26 @@ impl ReportListFilters {
     }
 }
 
+/// Percent-encodes both sides so a `&`, `#` or `"` in a variable can't break out of the URL.
+pub fn format_dashb_var(key: &str, value: &str) -> String {
+    format!(
+        "var-{}={}",
+        urlencoding::encode(key),
+        urlencoding::encode(value)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_format_dashb_var_encodes_special_characters() {
+        let encoded = format_dashb_var("k", "a&b#c\"d");
+        assert_eq!(encoded, "var-k=a%26b%23c%22d");
+        let decoded_value = urlencoding::decode(encoded.strip_prefix("var-k=").unwrap()).unwrap();
+        assert_eq!(decoded_value, "a&b#c\"d");
+    }
 
     #[test]
     fn test_recipients_backwards_compatibility() {

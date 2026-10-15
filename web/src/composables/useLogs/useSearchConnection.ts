@@ -29,6 +29,20 @@ import {
 } from "@/ts/interfaces/query";
 import { generateTraceContext } from "@/utils/zincutils";
 import { raw } from "@/types/i18n";
+import { setAutoRunTransport, useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import searchService from "@/services/search";
+import { failPendingPageNavigation, notePageRequest } from "@/composables/useLogs/logsRowNav";
+import type { PageRequest, PendingPageSelection } from "@/utils/pageCrossing";
+
+interface ReplacedSearchState {
+  lastSearchTraceId: string;
+  page?: { before: PageRequestNote; after: PageRequestNote };
+}
+
+interface PageRequestNote {
+  pageRequest: PageRequest | null;
+  pending: PendingPageSelection | null;
+}
 
 export const useSearchConnection = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
@@ -40,7 +54,27 @@ export const useSearchConnection = (t: TranslateFn) => {
 
   const { sendSearchMessageBasedOnRequestId, closeSocketBasedOnRequestId } = useSearchWebSocket();
 
-  const { fetchQueryDataWithHttpStream } = useStreamingSearch();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useStreamingSearch();
+
+  useLogsAutoRun();
+  setAutoRunTransport({
+    abortTrace: (traceId, orgId) =>
+      cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: orgId }),
+    serverCancel: (orgId, traceIds) => searchService.delete_running_queries(orgId, traceIds),
+  });
+
+  const replacedSearchState = new Map<string, ReplacedSearchState>();
+
+  const readPageRequestNote = (): PageRequestNote => ({
+    pageRequest: searchObj.data.resultGrid?.pageRequest ?? null,
+    pending: searchObj.meta.resultGrid?.navigation?.pendingPageSelection ?? null,
+  });
+
+  const notePagination = (traceId: string): ReplacedSearchState["page"] => {
+    const before = readPageRequestNote();
+    notePageRequest(searchObj, traceId);
+    return { before, after: readPageRequestNote() };
+  };
 
   const buildWebSocketPayload = (
     queryReq: SearchRequestPayload,
@@ -53,7 +87,10 @@ export const useSearchConnection = (t: TranslateFn) => {
     addTraceId(traceId);
 
     if (type === "search") {
+      const lastSearchTraceId = searchObj.data.lastSearchTraceId ?? "";
       searchObj.data.lastSearchTraceId = traceId;
+      const page = isPagination ? notePagination(traceId) : undefined;
+      replacedSearchState.set(traceId, { lastSearchTraceId, page });
     }
     if (type === "histogram") {
       searchObj.data.lastHistogramTraceId = traceId;
@@ -70,7 +107,6 @@ export const useSearchConnection = (t: TranslateFn) => {
       onData?: (payload: WebSocketSearchPayload, response: WebSocketSearchResponse) => void;
       onError?: (payload: WebSocketSearchPayload, error: WebSocketErrorResponse) => void;
       onComplete?: (payload: WebSocketSearchPayload, response: unknown) => void;
-      onReset?: (data: unknown, traceId?: string) => void;
     } = {
       queryReq,
       type,
@@ -84,7 +120,37 @@ export const useSearchConnection = (t: TranslateFn) => {
     return payload;
   };
 
+  // Restores only what still holds the rejected request's note, so a later request's state stays.
+  const releasePageRequest = (page: NonNullable<ReplacedSearchState["page"]>): void => {
+    const grid = searchObj.data.resultGrid;
+    if (grid && grid.pageRequest === page.after.pageRequest) {
+      grid.pageRequest = page.before.pageRequest;
+    }
+    const navigation = searchObj.meta.resultGrid?.navigation;
+    if (navigation && navigation.pendingPageSelection === page.after.pending) {
+      navigation.pendingPageSelection = page.before.pending;
+    }
+  };
+
+  const releaseRejectedPayload = (payload: any): void => {
+    removeTraceId(payload.traceId);
+    const replaced = replacedSearchState.get(payload.traceId);
+    if (replaced && searchObj.data.lastSearchTraceId === payload.traceId) {
+      searchObj.data.lastSearchTraceId = replaced.lastSearchTraceId;
+    }
+    if (replaced?.page) releasePageRequest(replaced.page);
+    replacedSearchState.delete(payload.traceId);
+  };
+
   const initializeSearchConnection = (payload: any): string | Promise<void> | null => {
+    if (!useLogsAutoRun().bindPayload(payload)) {
+      releaseRejectedPayload(payload);
+      if (payload.type === "histogram" || payload.type === "pageCount") {
+        searchObj.loadingHistogram = false;
+      }
+      return null;
+    }
+    replacedSearchState.delete(payload.traceId);
     payload.searchType = "ui";
     payload.pageType = searchObj.data.stream.streamType;
     return fetchQueryDataWithHttpStream(payload, {
@@ -96,9 +162,6 @@ export const useSearchConnection = (t: TranslateFn) => {
       },
       complete: (payload: any, response: any) => {
         if (payload.onComplete) payload.onComplete(payload, response);
-      },
-      reset: (data: any, traceId?: string) => {
-        if (payload.onReset) payload.onReset(data, traceId);
       },
     }) as Promise<void>;
   };
@@ -153,8 +216,9 @@ export const useSearchConnection = (t: TranslateFn) => {
       onData: (payload: WebSocketSearchPayload, response: any) => void;
       onError: (payload: any, error: any) => void;
       onComplete: (payload: any, response: any) => void;
-      onReset: (data: any, traceId?: string) => void;
     },
+    generationId?: number,
+    options: { reuseSchema?: boolean } = {},
   ) => {
     try {
       if (!queryReq) return;
@@ -200,11 +264,14 @@ export const useSearchConnection = (t: TranslateFn) => {
         searchObj.meta.clearCache,
       );
 
+      if (generationId !== null && generationId !== undefined)
+        (payload as { generationId?: number }).generationId = generationId;
+      if (options.reuseSchema) (payload as { reuseSchema?: boolean }).reuseSchema = true;
+
       // Add callbacks to payload
       payload.onData = callbacks.onData;
       payload.onError = callbacks.onError;
       payload.onComplete = callbacks.onComplete;
-      payload.onReset = callbacks.onReset;
 
       if (shouldGetPageCount(queryReq) && searchObj.meta.refreshInterval == 0) {
         queryReq.query.size = queryReq.query.size + 1;
@@ -219,6 +286,12 @@ export const useSearchConnection = (t: TranslateFn) => {
       const requestId = initializeSearchConnection(payload);
 
       if (!requestId) {
+        if (
+          generationId !== null &&
+          generationId !== undefined &&
+          !useLogsAutoRun().engine.isCurrent(generationId)
+        )
+          return;
         throw new Error(`Failed to initialize ${searchObj.communicationMethod} connection`);
       }
 
@@ -226,6 +299,7 @@ export const useSearchConnection = (t: TranslateFn) => {
     } catch (e: any) {
       console.error(`Error while getting data through ${searchObj.communicationMethod}`, e);
       searchObj.loading = false;
+      if (isPagination) failPendingPageNavigation(searchObj, { quiet: true });
       showErrorNotification(
         raw(
           notificationMsg.value || t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),

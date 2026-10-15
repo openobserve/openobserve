@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 // POST /{org_id}/reports  -- Create Report
 // GET /{org_id}/reports/{name} -- Get One Report
@@ -47,10 +48,12 @@ const reports = {
     return http().post(url, payload);
   },
   updateReport: (org_identifier: string, payload: any) => {
-    return http().put(
-      `/api/${org_identifier}/reports/${encodeURIComponent(payload.name)}`,
-      payload,
-    );
+    return http()
+      .put(`/api/${org_identifier}/reports/${encodeURIComponent(payload.name)}`, payload)
+      .then((res) => {
+        analytics.track("report_updated");
+        return res;
+      });
   },
   deleteReport: (org_identifier: string, reportName: string) => {
     return http().delete(`/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`);
@@ -74,7 +77,12 @@ const reports = {
   createReportV2: (org_identifier: string, payload: any, folder_id?: string) => {
     let url = `/api/v2/${org_identifier}/reports`;
     if (folder_id) url += `?folder=${encodeURIComponent(folder_id)}`;
-    return http().post(url, payload);
+    return http()
+      .post(url, payload)
+      .then((res) => {
+        analytics.track("report_created");
+        return res;
+      });
   },
   updateReportById: (
     org_identifier: string,
@@ -84,7 +92,12 @@ const reports = {
   ) => {
     let url = `/api/v2/${org_identifier}/reports/${report_id}`;
     if (new_folder_id) url += `?folder=${encodeURIComponent(new_folder_id)}`;
-    return http().put(url, payload);
+    return http()
+      .put(url, payload)
+      .then((res) => {
+        analytics.track("report_updated");
+        return res;
+      });
   },
   listByFolderId: (
     org_identifier: string,
@@ -102,16 +115,32 @@ const reports = {
     return http().get(`/api/v2/${org_identifier}/reports${query}`);
   },
   deleteReportById: (org_identifier: string, report_id: string) => {
-    return http().delete(`/api/v2/${org_identifier}/reports/${report_id}`);
+    return http()
+      .delete(`/api/v2/${org_identifier}/reports/${report_id}`)
+      .then((res) => {
+        analytics.track("report_deleted", { count: 1 });
+        return res;
+      });
   },
   bulkDeleteById: (org_identifier: string, data: { ids: string[] }) => {
-    return http().delete(`/api/v2/${org_identifier}/reports/bulk`, { data });
+    return http()
+      .delete(`/api/v2/${org_identifier}/reports/bulk`, { data })
+      .then((res) => {
+        const count = res.data?.successful?.length ?? 0;
+        if (count > 0) analytics.track("report_deleted", { count });
+        return res;
+      });
   },
   triggerReportById: (org_identifier: string, report_id: string) => {
     return http().put(`/api/v2/${org_identifier}/reports/${report_id}/trigger`);
   },
   toggleReportStateById: (org_identifier: string, report_id: string, state: boolean) => {
-    return http().patch(`/api/v2/${org_identifier}/reports/${report_id}/enable?value=${state}`);
+    return http()
+      .patch(`/api/v2/${org_identifier}/reports/${report_id}/enable?value=${state}`)
+      .then((res) => {
+        analytics.track(state ? "report_enabled" : "report_disabled", { count: 1 });
+        return res;
+      });
   },
 };
 

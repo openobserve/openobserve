@@ -26,6 +26,8 @@ vi.mock("./http", () => ({
   })),
 }));
 
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
+
 vi.mock("./stream", () => ({
   default: {},
 }));
@@ -38,6 +40,7 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 import http from "./http";
+import analytics from "./product_analytics";
 import { generateTraceContext } from "@/utils/zincutils";
 
 describe("Search Service", () => {
@@ -446,6 +449,31 @@ describe("Search Service", () => {
       });
     });
 
+    it("passes the abort signal to the request so a cancel stops it", async () => {
+      const controller = new AbortController();
+      await search.search_around({
+        org_identifier: "test-org",
+        index: "logs",
+        key: "key123",
+        size: "10",
+        query_context: "SELECT * FROM logs",
+        query_fn: "",
+        stream_type: "logs",
+        regions: "",
+        clusters: "",
+        is_multistream: false,
+        traceparent: "trace-123",
+        body: { filter: "test" },
+        signal: controller.signal,
+      });
+
+      expect(mockHttp.post).toHaveBeenCalledWith(
+        "/api/test-org/logs/_around?key=key123&size=10&sql=SELECT * FROM logs&type=logs",
+        { filter: "test" },
+        { signal: controller.signal },
+      );
+    });
+
     it("should use multistream endpoint when is_multistream is true", async () => {
       const params = {
         org_identifier: "test-org",
@@ -771,6 +799,32 @@ describe("Search Service", () => {
         "/api/test-org/traces/traces/trace%2Fid/details?start_time=10&end_time=20&hint_ts=15",
       );
     });
+
+    it("should encode the keyset cursor params", async () => {
+      await search.get_trace_details({
+        org_identifier: "test-org",
+        stream_name: "traces",
+        trace_id: "t1",
+        start_time: 10,
+        end_time: 20,
+        after_start_time: "1759000000123456789",
+        after_span_id: "a b&c",
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/test-org/traces/traces/t1/details?start_time=10&end_time=20&after_start_time=1759000000123456789&after_span_id=a+b%26c",
+      );
+    });
+
+    it("should omit absent params", async () => {
+      await search.get_trace_details({
+        org_identifier: "test-org",
+        stream_name: "traces",
+        trace_id: "t1",
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/test-org/traces/traces/t1/details");
+    });
   });
 
   describe("partition", () => {
@@ -1054,6 +1108,30 @@ describe("Search Service", () => {
       expect(http).toHaveBeenCalledWith({
         headers: { traceparent: "existing-trace" },
       });
+    });
+  });
+
+  describe("schedule_search product analytics", () => {
+    it("tracks search_job_created once the request resolves", async () => {
+      const response = { data: { code: 200 } };
+      mockHttp.post.mockResolvedValue(response);
+
+      await expect(
+        search.schedule_search({ org_identifier: "org", query: {}, page_type: "logs" }),
+      ).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("search_job_created", { stream_type: "logs" });
+    });
+
+    it("does not track search_job_created when the request rejects", async () => {
+      mockHttp.post.mockRejectedValue(new Error("boom"));
+
+      await expect(
+        search.schedule_search({ org_identifier: "org", query: {}, page_type: "logs" }),
+      ).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

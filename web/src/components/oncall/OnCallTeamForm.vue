@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              with it on the same row — a date and time mean nothing on their
              own, and this is the one place in create mode that asks for the
              zone at all. -->
-        <div class="flex gap-2" data-test="oncall-team-form-handover">
+        <div class="flex gap-2 max-md:flex-wrap" data-test="oncall-team-form-handover">
           <OFormDate
             class="min-w-0 flex-1"
             name="first_handover_date"
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="oncall-team-form-handover-time"
           />
           <OFormSelect
-            class="min-w-0 flex-1"
+            class="min-w-0 flex-1 max-md:basis-full"
             name="timezone"
             :label="t('oncall.timezone')"
             :options="timezoneOptions"

@@ -338,9 +338,7 @@ describe("PasswordPolicy", () => {
     expect(passwordPolicyService.updatePolicy).not.toHaveBeenCalled();
     const error = wrapper.find('[data-test="settings-password-policy-max-length-error"]');
     expect(error.exists()).toBe(true);
-    expect(error.text()).toBe(
-      "Maximum length must be at least the minimum length, or 0 for unbounded.",
-    );
+    expect(error.text()).toBe("Maximum length must be between the minimum length and 128.");
     expect(
       pair(wrapper, "length")
         .find('[data-test="settings-password-policy-max-length-error"]')
@@ -351,6 +349,25 @@ describe("PasswordPolicy", () => {
       false,
     );
     expect(field.find(".text-input-error-text").exists()).toBe(false);
+  });
+
+  it.each([
+    ["0", true],
+    ["14", true],
+    ["129", true],
+    ["15", false],
+    ["128", false],
+  ])("max length %s against min 15 shows the error: %s", async (value, hasError) => {
+    const wrapper = mountPage();
+    await flushPromises();
+
+    await editMinLength(wrapper, "15");
+    await editField(wrapper, "max-length", value);
+    await submit(wrapper);
+
+    expect(wrapper.find('[data-test="settings-password-policy-max-length-error"]').exists()).toBe(
+      hasError,
+    );
   });
 
   it("clears the footer once the values are valid again", async () => {

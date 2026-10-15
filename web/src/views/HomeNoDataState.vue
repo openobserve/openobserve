@@ -20,14 +20,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   covering logs, traces, metrics, and AI integrations.
 -->
 <template>
-  <OEmptyState illustration="wave-bars" size="hero" :hide-action="true">
-    <template #title>{{ t("home.noDataState.title") }}</template>
+  <OEmptyState v-bind="{ ...shell, ...rootTestAttrs }" :hide-action="true">
+    <template #title>
+      <span
+        v-if="alternativesOnly"
+        class="text-text-secondary text-sm font-normal"
+        data-test="home-no-data-another-way"
+        >{{ t("ingestion.firstDataPanel.anotherWay") }}</span
+      >
+      <template v-else-if="tab">{{
+        t("logs.noData.title", { product: raw("OpenObserve") })
+      }}</template>
+      <template v-else>{{ t("home.noDataState.title") }}</template>
+    </template>
 
-    <template #description>
-      <span v-html="description" />
+    <template v-if="!alternativesOnly" #description>
+      <span v-if="tab" data-test="home-no-data-description">{{ tabDescription }}</span>
+      <span v-else v-html="description" />
     </template>
 
     <template #actions>
+      <div v-if="$slots.status" class="flex basis-full justify-center">
+        <slot name="status" />
+      </div>
+
       <!-- Send Logs -->
       <EmptyStateIngestionCard
         icon="search"
@@ -84,11 +100,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("home.noDataState.or") }}
         </span>
         <EmptyStateIngestionChip
-          icon="hub"
           data-test="home-no-data-otel-btn"
           @click="go('ingestLogsFromOtel')"
-          >{{ raw("OpenTelemetry") }}</EmptyStateIngestionChip
         >
+          <img
+            :src="getImageURL('images/ingestion/otlp.svg')"
+            class="h-3.5 w-3.5 shrink-0 object-contain"
+            alt=""
+          />
+          {{ raw("OpenTelemetry") }}
+        </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           data-test="home-no-data-kubernetes-btn"
           @click="go('ingestFromKubernetes')"
@@ -129,6 +150,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("home.noDataState.profiles") }}
         </EmptyStateIngestionChip>
       </div>
+      <div v-if="tab" class="mt-2 flex justify-center">
+        <OButton
+          variant="ghost-primary"
+          size="sm-action"
+          data-test="home-no-data-all-sources-link"
+          @click="go('recommended')"
+        >
+          {{ t("home.noDataState.allSources") }}
+        </OButton>
+      </div>
     </template>
   </OEmptyState>
 </template>
@@ -138,15 +169,59 @@ import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import { getImageURL } from "@/utils/zincutils";
 import DOMPurify from "dompurify";
 
+const props = defineProps<{
+  /** The Home tab the onboarding block stands in for; unset keeps the flag-off Usage empty state. */
+  tab?: "overview" | "usage";
+  /** Under FirstDataPanel's card: only the cards and chips, under an "Or start another way" caption. */
+  alternativesOnly?: boolean;
+  /** The flag-off Overview, which names only what every edition's Overview shows. */
+  flagOff?: boolean;
+}>();
+
+defineSlots<{
+  /** A line between the description and the cards. */
+  status?(): unknown;
+}>();
+
 const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
+
+const shell = computed(() => {
+  if (props.alternativesOnly) return { size: "block" as const, backdrop: false };
+  return { size: "hero" as const, illustration: props.tab ? "connect" : "wave-bars" } as const;
+});
+// an unset data-test would also erase OEmptyState's own id on the flag-off page
+const rootTestAttrs = computed((): Record<string, string> => {
+  if (!props.tab) return {};
+  return {
+    "data-test": props.alternativesOnly ? "home-first-data-alternatives" : "home-first-data-hero",
+  };
+});
+// Cloud identifiers are random strings; a selection set from the URL carries no label, so the org list names it
+const orgName = computed<string>(() => {
+  const id: string = store.state.selectedOrganization?.identifier ?? "";
+  return (
+    store.state.selectedOrganization?.label ||
+    (store.state.organizations ?? []).find(
+      (o: { identifier?: string; name?: string }) => o?.identifier === id,
+    )?.name ||
+    id
+  );
+});
+const tabDescription = computed(() => {
+  const org = raw(orgName.value);
+  if (props.tab === "usage") return t("home.noDataState.descriptionUsage", { org });
+  if (props.flagOff) return t("home.noDataState.descriptionOverviewFlagOff", { org });
+  return t("home.noDataState.descriptionOverview", { org });
+});
 
 const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization?.identifier,

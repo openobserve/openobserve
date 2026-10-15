@@ -57,6 +57,7 @@ async function setupQueryAndSwitchToBuild(pm, page, query) {
     await pm.logsPage.enableSqlModeIfNeeded();
     await page.waitForLoadState('domcontentloaded');
     await pm.logsPage.setQueryEditorContent(query);
+    await pm.logsPage.waitForSearchQueryCommitted(query);
     await pm.logsPage.runQueryAndWaitForResults();
     await pm.logsPage.clickBuildToggle();
     await pm.logsPage.waitForBuildTabLoaded();

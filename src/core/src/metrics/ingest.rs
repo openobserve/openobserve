@@ -26,6 +26,7 @@ use config::{
     meta::{
         alerts::alert,
         pipeline::PipelineKind,
+        promql::VALUE_LABEL,
         self_reporting::usage::UsageType,
         stream::{StreamPartition, StreamType},
     },
@@ -497,6 +498,16 @@ fn record_evolves_schema(
     })
 }
 
+/// Whether the stream already stores `value` as `Float64`, the column a stale marker's NULL needs.
+pub(super) fn has_value_column(schema: Option<&SchemaCache>) -> bool {
+    schema.is_some_and(|schema| {
+        schema
+            .schema()
+            .field_with_name(VALUE_LABEL)
+            .is_ok_and(|field| field.data_type() == &DataType::Float64)
+    })
+}
+
 /// The fields of a stream's user-defined schema, if it has one.
 pub(super) fn defined_schema<'a>(
     user_defined_schema_map: &'a HashMap<String, Option<HashSet<String>>>,
@@ -574,6 +585,26 @@ mod tests {
             record.insert(format!("label_{i}"), json::json!("v"));
         }
         record
+    }
+
+    fn value_schema(value_type: Option<DataType>) -> SchemaCache {
+        use datafusion::arrow::datatypes::Field;
+        let mut fields = vec![Field::new(NAME_LABEL, DataType::Utf8, true)];
+        if let Some(value_type) = value_type {
+            fields.push(Field::new(VALUE_LABEL, value_type, true));
+        }
+        SchemaCache::new(Schema::new(fields))
+    }
+
+    #[test]
+    fn test_has_value_column_only_for_a_float64_value() {
+        assert!(has_value_column(Some(&value_schema(Some(
+            DataType::Float64
+        )))));
+        assert!(!has_value_column(Some(&value_schema(Some(DataType::Utf8)))));
+        // a stream created from metadata alone has no `value` field
+        assert!(!has_value_column(Some(&value_schema(None))));
+        assert!(!has_value_column(None));
     }
 
     #[test]

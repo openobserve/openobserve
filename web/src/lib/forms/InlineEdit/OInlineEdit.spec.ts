@@ -222,6 +222,27 @@ describe("OInlineEdit", () => {
       expect(onSubmit).toHaveBeenCalledTimes(1);
     });
 
+    it("should commit without submitting the owning form when submit-on-enter is off", async () => {
+      const onSubmit = vi.fn((event: Event) => event.preventDefault());
+      const Host = {
+        components: { OInlineEdit },
+        setup: () => ({ onSubmit }),
+        template: `
+          <form @submit="onSubmit">
+            <OInlineEdit model-value="Panel one" data-test="name" :submit-on-enter="false" />
+            <button type="submit">Save</button>
+          </form>`,
+      };
+      wrapper = mount(Host, { attachTo: document.body, global: { stubs: { OIcon: true } } });
+      await wrapper.find('[data-test="name-trigger"]').trigger("click");
+
+      await wrapper.find('[data-test="name-input"]').trigger("keydown.enter");
+      await flushPromises();
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="name-input"]').exists()).toBe(false);
+    });
+
     it("should submit nothing on Enter when the title has no form around it", async () => {
       wrapper = mountAttached();
       await wrapper.find('[data-test="name-trigger"]').trigger("click");

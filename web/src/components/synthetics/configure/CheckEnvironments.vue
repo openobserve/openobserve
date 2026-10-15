@@ -21,6 +21,7 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import type { BrowserCheck, SyntheticsEnvironment } from "@/types/synthetics";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import syntheticsService from "@/services/synthetics";
 import { MAX_CHECK_ENVIRONMENTS } from "@/constants/synthetics";
 import { namedEnvironments } from "@/components/synthetics/variables/scope";
@@ -98,9 +99,9 @@ function toggle(id: string) {
             :data-test="`synthetics-check-environments-checkbox-${env.name}`"
             @update:model-value="toggle(env.id)"
           />
-          <span v-if="env.description" class="text-text-secondary truncate text-xs">
+          <OTruncatedText v-if="env.description" class="text-text-secondary text-xs">
             {{ env.description }}
-          </span>
+          </OTruncatedText>
         </div>
 
         <div

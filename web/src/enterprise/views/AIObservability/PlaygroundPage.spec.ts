@@ -49,6 +49,9 @@ vi.mock("vuex", async () => {
 });
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...args: unknown[]) => toast(...args) }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
+import { PlaygroundRunError } from "@/services/llm-playground.service";
 // The real hash runs on the thread pool; under CI load it outlives flushPromises and leaves providers unloaded.
 vi.mock("@/utils/userOrgKey", () => ({
   computeUserOrgKey: (email: string, org: string) => Promise.resolve(`${email}:${org}`),
@@ -113,6 +116,7 @@ function vm(wrapper: Awaited<ReturnType<typeof mountPage>>) {
     results: import("./playgroundDraft").PlaygroundResults;
     onRunAll: (force?: boolean) => void;
     runVariant: (id: string, skipGate?: boolean) => void;
+    onRunVariant: (id: string) => Promise<void>;
     stopAll: () => void;
     addVariant: () => void;
     removeVariant: (id: string) => void;
@@ -258,7 +262,6 @@ describe("PlaygroundPage", () => {
   });
 
   it("records a failed run as a retryable error rather than an empty answer", async () => {
-    const { PlaygroundRunError } = await import("@/services/llm-playground.service");
     runPlayground.mockRejectedValue(new PlaygroundRunError("provider 429", true));
 
     const wrapper = await mountPage();
@@ -368,6 +371,40 @@ describe("PlaygroundPage", () => {
     await flushPromises();
 
     expect(runPlayground).toHaveBeenCalledTimes(2);
+  });
+
+  it("tracks one llm_playground_run_completed per Run All, counting the variants that finished", async () => {
+    const page = vm(await mountPage());
+    page.duplicate(page.draft.variants[0].id);
+    page.duplicate(page.draft.variants[0].id);
+    runPlayground
+      .mockResolvedValueOnce({ text: "a", toolCall: null, reasoningContent: null, usage: null })
+      .mockRejectedValueOnce(new PlaygroundRunError("provider 429", true));
+
+    page.onRunAll();
+    await flushPromises();
+
+    expect(runPlayground).toHaveBeenCalledTimes(3);
+    expect(analytics.track).toHaveBeenCalledTimes(1);
+    expect(analytics.track).toHaveBeenCalledWith("llm_playground_run_completed", { count: 2 });
+  });
+
+  it("does not track a Run All in which every variant failed", async () => {
+    const page = vm(await mountPage());
+    runPlayground.mockRejectedValue(new PlaygroundRunError("provider 429", true));
+
+    page.onRunAll();
+    await flushPromises();
+
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
+  it("tracks a single variant run with count 1", async () => {
+    const page = vm(await mountPage());
+
+    await page.onRunVariant(page.draft.variants[0].id);
+
+    expect(analytics.track).toHaveBeenCalledWith("llm_playground_run_completed", { count: 1 });
   });
 
   it("hands the variant's config to the experiment form", async () => {

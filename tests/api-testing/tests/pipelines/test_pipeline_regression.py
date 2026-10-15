@@ -1,8 +1,9 @@
 """Regression tests for closed pipeline bugs that had no automated coverage.
 
 Covers #7077 (caller-supplied pipeline id), #6755 (destination stream name
-length), #6579 (a pipeline outliving its source stream) and #7144 (a deleted
-realtime pipeline that kept routing until the ingester restarted).
+length), #6579 (a pipeline outliving its source stream), #7144 (a deleted
+realtime pipeline that kept routing until the ingester restarted) and #14972
+(a scheduled pipeline skipping records stamped on a window boundary).
 """
 from __future__ import annotations
 
@@ -271,3 +272,123 @@ def test_deleted_realtime_pipeline_stops_routing(client: OpenObserveClient, seed
             client.delete(f"streams/{destination}?type=logs")
         except Exception as e:
             logger.warning("destination stream cleanup failed: %s", e)
+
+
+# ----- #14972: a scheduled pipeline reads records stamped on a window boundary -----
+
+
+def _scheduled_payload(name: str, source_stream: str, destination_stream: str) -> dict[str, Any]:
+    """Scheduled pipeline copying each 1-minute window of source_stream to destination_stream."""
+    query_id = str(uuid.uuid4())
+    output_id = str(uuid.uuid4())
+    return {
+        "name": name,
+        "description": "",
+        "source": {"source_type": "scheduled"},
+        "nodes": [
+            {
+                "id": query_id,
+                "type": "input",
+                "data": {
+                    "node_type": "query",
+                    "stream_type": "logs",
+                    "org_id": ORG_ID,
+                    "query_condition": {
+                        "type": "sql",
+                        "conditions": None,
+                        "sql": f'SELECT * FROM "{source_stream}"',
+                        "promql": None,
+                        "promql_condition": None,
+                        "aggregation": None,
+                        "vrl_function": None,
+                        "search_event_type": "DerivedStream",
+                    },
+                    "trigger_condition": {
+                        "period": 1,
+                        "operator": "=",
+                        "threshold": 0,
+                        "frequency": 1,
+                        "cron": "",
+                        "frequency_type": "minutes",
+                        "silence": 0,
+                    },
+                },
+                "position": {"x": 100, "y": 100},
+                "io_type": "input",
+            },
+            {
+                "id": output_id,
+                "type": "output",
+                "data": {
+                    "node_type": "stream",
+                    "stream_name": destination_stream,
+                    "stream_type": "logs",
+                    "org_id": ORG_ID,
+                },
+                "position": {"x": 300, "y": 100},
+                "io_type": "output",
+            },
+        ],
+        "edges": [{"id": f"e-{query_id}-{output_id}", "source": query_id, "target": output_id}],
+        "org": ORG_ID,
+    }
+
+
+def _rows(client: OpenObserveClient, stream: str, start: int, end: int) -> list[tuple[int, str]]:
+    """(_timestamp, kind) of every row in [start, end), repeats kept; a missing stream reads as empty."""
+    resp = client.post(
+        "_search?type=logs&use_cache=false",
+        json={
+            "query": {
+                "sql": f'SELECT _timestamp, kind FROM "{stream}"',
+                "start_time": start,
+                "end_time": end,
+                "size": 100,
+            }
+        },
+    )
+    if resp.status_code != 200:
+        return []
+    return [(h["_timestamp"], h["kind"]) for h in resp.json().get("hits", [])]
+
+
+def test_scheduled_pipeline_reads_a_record_on_a_window_boundary(client: OpenObserveClient):
+    """A record stamped exactly where one run's window ends and the next begins used to be read by neither."""
+    name = unique_name("pyt_14972")
+    source = unique_name("pyt_14972_src").lower()
+    destination = f"{source}_out"
+    minute = 60_000_000
+
+    try:
+        # Saving a scheduled pipeline test-runs its query, which fails until the source stream exists.
+        seed = {"_timestamp": (int(time.time()) - 600) * 1_000_000, "kind": "seed"}
+        resp = client.post(f"{source}/_json", json=[seed])
+        assert resp.status_code == 200, f"ingest failed: {resp.status_code} {resp.text}"
+        resp = client.post("pipelines", json=_scheduled_payload(name, source, destination))
+        assert resp.status_code == 200, f"create failed: {resp.status_code} {resp.text}"
+
+        # Taken after the create returns, so the first run's window ends on this minute or earlier.
+        boundary = int(time.time()) // 60 * minute
+        mid = (boundary + 30_000_000, "mid")
+        expected = [(boundary, "boundary"), mid]
+        resp = client.post(f"{source}/_json", json=[{"_timestamp": ts, "kind": kind} for ts, kind in expected])
+        assert resp.status_code == 200, f"ingest failed: {resp.status_code} {resp.text}"
+
+        # Once the :30 record arrives, every run that could read the boundary record has run.
+        got: list[tuple[int, str]] = []
+        deadline = time.time() + 5 * 60
+        while time.time() < deadline and mid not in got:
+            time.sleep(5)
+            got = _rows(client, destination, boundary - minute, boundary + 2 * minute)
+        assert mid in got, f"the pipeline never delivered the :30 record into {destination}: {got}"
+
+        missing = [row for row in expected if row not in got]
+        assert not missing, f"records never reached {destination}: {missing}"
+        assert len(got) == len(set(got)), f"records reached {destination} more than once: {sorted(got)}"
+    finally:
+        _delete_pipeline_by_name(client, name)
+        for stream in (source, destination):
+            try:
+                client.delete(f"streams/{stream}?type=logs")
+            except Exception as e:
+                logger.warning("stream cleanup failed for %s: %s", stream, e)

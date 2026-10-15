@@ -9,8 +9,8 @@ export class RumIngestionPage {
         this.titleText = page.locator('[data-test="rum-web-setup-card"]');
         this.resetTokenButton = page.locator('[data-test="ingestion-reset-token-btn"]');
         // Code blocks: first = npm install command, second = SDK init config.
-        this.contentBlocks = page.locator('[data-test="ai-code"]');
-        this.copyButtons = page.locator('[data-test="ai-code-copy-btn"]');
+        this.contentBlocks = page.locator('[data-test="ingestion-setup-code-block"]');
+        this.copyButtons = page.locator('[data-test="ingestion-setup-code-block-copy-btn"]');
         // Variant toggles — install + init share the "pkg" group, so either step's toggle switches both; `.first()` disambiguates the 2 matches.
         this.variantCdnButton = page.locator('[data-test="ai-variant-cdn"]').first();
         this.variantNpmButton = page.locator('[data-test="ai-variant-npm"]').first();

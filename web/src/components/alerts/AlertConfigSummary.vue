@@ -70,6 +70,12 @@ import {
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 import { burnWindowLabel } from "@/utils/alerts/sloAlertPayload";
+import {
+  ANOMALY_BAND_GROUPING_KEYS,
+  ANOMALY_DIRECTION_KEYS,
+  anomalyTrainedK,
+  anomalyWindowShareEffective,
+} from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
 import { formatTimestampInTimezone } from "@/utils/date";
 
@@ -227,6 +233,16 @@ const anomalyFiltersText = computed(() => {
   return parts.length ? parts.join(" AND ") : EMPTY;
 });
 
+// band_width overrides the trained k live, so it is the k in force; unset is Auto.
+const anomalyBandWidth = (a: any): string => {
+  const set = isBlank(a?.band_width) ? NaN : Number(a.band_width);
+  if (Number.isFinite(set)) return `${Math.round(set * 100) / 100}σ`;
+  const trained = anomalyTrainedK(a);
+  return trained === null
+    ? t("alerts.anomaly.sensitivityAuto")
+    : t("alerts.anomaly.sensitivityAutoTrained", { k: trained });
+};
+
 const anomalyTimestamp = (us: unknown): string => {
   const n = Number(us);
   if (!Number.isFinite(n) || n <= 0) return EMPTY;
@@ -274,20 +290,15 @@ const anomalySourceFields = computed(() => {
       },
     );
   }
-  // Budget mode: the enforced cap is the sensitivity statement. Percentile
-  // mode: the stored value indexes TRAINING scores — never restated as a live
-  // anomaly rate, which was measured false.
+  // Budget mode: the enforced cap. Otherwise the band width in force.
   const budget = isBlank(a?.alert_budget_per_day) ? NaN : Number(a.alert_budget_per_day);
-  const percentile = isBlank(a?.threshold) ? NaN : Number(a.threshold);
   const roundBudget = (n: number) => Math.round(n * 1e6) / 1e6;
   const sensitivityValue =
     Number.isFinite(budget) && budget > 0
       ? budget < 1
         ? t("alerts.anomaly.summaryBudgetPerWeek", { count: roundBudget(budget * 7) })
         : t("alerts.anomaly.summaryBudgetPerDay", { count: roundBudget(budget) })
-      : Number.isFinite(percentile)
-        ? t("alerts.anomaly.summaryThresholdPercentile", { percentile })
-        : EMPTY;
+      : anomalyBandWidth(a);
   fields.push({
     key: "sensitivity",
     label: t("alerts.sensitivity"),
@@ -347,11 +358,30 @@ const anomalyScheduleFields = computed(() => {
           ? a.alert_destinations.join(", ")
           : EMPTY,
     },
+    {
+      key: "alert-direction",
+      label: t("alerts.anomaly.alertDirection"),
+      value: t((ANOMALY_DIRECTION_KEYS[a?.alert_direction] ?? ANOMALY_DIRECTION_KEYS.both) as any),
+    },
+    {
+      key: "window-share",
+      label: t("alerts.anomaly.windowShare"),
+      value: t("alerts.anomaly.windowShareCompact", anomalyWindowShareEffective(a)),
+    },
   ];
 });
 
+const anomalyTrainingSpan = (a: any): string => {
+  const start = anomalyTimestamp(a?.training_data_start_us);
+  const end = anomalyTimestamp(a?.training_data_end_us);
+  return start === EMPTY || end === EMPTY
+    ? EMPTY
+    : t("alerts.anomaly.trainingSpanValue", { start, end });
+};
+
 const anomalyModelFields = computed(() => {
   const a = props.alert;
+  const groupingKey = ANOMALY_BAND_GROUPING_KEYS[a?.band_grouping];
   const fields: SummaryField[] = [
     {
       key: "status",
@@ -364,6 +394,16 @@ const anomalyModelFields = computed(() => {
       key: "last-trained",
       label: t("alerts.anomaly.lastTrained"),
       value: anomalyTimestamp(a?.training_completed_at),
+    },
+    {
+      key: "training-span",
+      label: t("alerts.anomaly.trainingSpan"),
+      value: anomalyTrainingSpan(a),
+    },
+    {
+      key: "band-grouping",
+      label: t("alerts.anomaly.bandGrouping"),
+      value: groupingKey ? t(groupingKey as any) : EMPTY,
     },
     {
       key: "model-version",

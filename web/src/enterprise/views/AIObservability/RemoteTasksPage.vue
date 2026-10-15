@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="entityId"
         :loading="loading"
         :forbidden="forbidden"
-        :footer-title="t('aiObservability.remoteTasks.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
         :page-size="20"
@@ -105,11 +104,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-endpoint="{ row }">
-          <OTooltip side="bottom" :content="raw(row.endpoint)">
-            <span class="text-text-secondary line-clamp-1 font-mono text-xs">
-              {{ row.endpoint }}
-            </span>
-          </OTooltip>
+          <span class="text-text-secondary font-mono text-xs">
+            {{ row.endpoint }}
+          </span>
         </template>
 
         <template #cell-httpMethod="{ row }">

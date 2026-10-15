@@ -23,6 +23,7 @@ import { defineComponent, ref, computed, inject, onBeforeMount } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
+import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
 
 interface Column {
   alias: string;
@@ -130,18 +131,23 @@ export default defineComponent({
       } else {
         const seen = new Set<string>();
         const collected: any[] = [];
-        const addField = (col: any, isNumeric: boolean) => {
+        const addField = (col: any, isNumeric: boolean, customQuery: boolean) => {
           const key = String(col?.alias ?? "").toLowerCase();
           if (!key || seen.has(key)) return;
           seen.add(key);
-          collected.push({ ...col, isNumeric });
+          const label = getFieldLabel(col, dashboardPanelData.data.config, customQuery);
+          collected.push({ ...col, label, isNumeric });
         };
         const queries = dashboardPanelData.data.queries || [];
-        queries.forEach((q: any) => (q?.fields?.x || []).forEach((c: any) => addField(c, false)));
         queries.forEach((q: any) =>
-          (q?.fields?.breakdown || []).forEach((c: any) => addField(c, false)),
+          (q?.fields?.x || []).forEach((c: any) => addField(c, false, q.customQuery)),
         );
-        queries.forEach((q: any) => (q?.fields?.y || []).forEach((c: any) => addField(c, true)));
+        queries.forEach((q: any) =>
+          (q?.fields?.breakdown || []).forEach((c: any) => addField(c, false, q.customQuery)),
+        );
+        queries.forEach((q: any) =>
+          (q?.fields?.y || []).forEach((c: any) => addField(c, true, q.customQuery)),
+        );
         columns.value = collected;
       }
     };

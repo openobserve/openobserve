@@ -203,6 +203,7 @@ export default function rumReactNativeCard(
 
   return {
     provider: {
+      id: "rumReactNative",
       // Same title as the browser card by design — the platform switch sitting
       // next to it already says which guide you are on, so the heading stays
       // stable across platforms instead of rewriting itself on every click.

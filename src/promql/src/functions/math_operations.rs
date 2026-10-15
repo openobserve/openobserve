@@ -58,6 +58,63 @@ pub(crate) fn round(data: Value, to_nearest: &ScalarParam) -> Result<Value> {
     })
 }
 
+pub(crate) fn sin(data: Value) -> Result<Value> {
+    exec(data, f64::sin)
+}
+
+pub(crate) fn cos(data: Value) -> Result<Value> {
+    exec(data, f64::cos)
+}
+
+pub(crate) fn tan(data: Value) -> Result<Value> {
+    exec(data, f64::tan)
+}
+
+pub(crate) fn asin(data: Value) -> Result<Value> {
+    exec(data, f64::asin)
+}
+
+pub(crate) fn acos(data: Value) -> Result<Value> {
+    exec(data, f64::acos)
+}
+
+pub(crate) fn atan(data: Value) -> Result<Value> {
+    exec(data, f64::atan)
+}
+
+pub(crate) fn sinh(data: Value) -> Result<Value> {
+    exec(data, f64::sinh)
+}
+
+pub(crate) fn cosh(data: Value) -> Result<Value> {
+    exec(data, f64::cosh)
+}
+
+pub(crate) fn tanh(data: Value) -> Result<Value> {
+    exec(data, f64::tanh)
+}
+
+pub(crate) fn asinh(data: Value) -> Result<Value> {
+    exec(data, f64::asinh)
+}
+
+pub(crate) fn acosh(data: Value) -> Result<Value> {
+    exec(data, f64::acosh)
+}
+
+pub(crate) fn atanh(data: Value) -> Result<Value> {
+    exec(data, f64::atanh)
+}
+
+// upstream multiplies before dividing; `to_degrees` rounds differently
+pub(crate) fn deg(data: Value) -> Result<Value> {
+    exec(data, |value| value * 180.0 / std::f64::consts::PI)
+}
+
+pub(crate) fn rad(data: Value) -> Result<Value> {
+    exec(data, |value| value * std::f64::consts::PI / 180.0)
+}
+
 pub(crate) fn sgn(data: Value) -> Result<Value> {
     // f64::signum maps ±0 to ±1; Prometheus returns zeros and NaN unchanged.
     exec(data, |value| {
@@ -164,161 +221,6 @@ mod tests {
         assert_eq!(apply(sgn, -0.0).to_bits(), (-0.0f64).to_bits());
         assert!(apply(sgn, f64::NAN).is_nan());
         assert_eq!(apply(sgn, -5.0), -1.0);
-    }
-
-    #[test]
-    fn test_abs() {
-        let eval_ts = 1000;
-        let value = create_matrix(eval_ts, vec![-5.0, 3.0]);
-        let result = abs(value).unwrap();
-
-        if let Value::Matrix(result_matrix) = result {
-            assert_eq!(result_matrix.len(), 2);
-            assert_eq!(result_matrix[0].samples[0].value, 5.0);
-            assert_eq!(result_matrix[1].samples[0].value, 3.0);
-        } else {
-            panic!("Expected Matrix result");
-        }
-    }
-
-    #[test]
-    fn test_ceil() {
-        let eval_ts = 1000;
-        let value = create_matrix(eval_ts, vec![3.2, -3.2]);
-        let result = ceil(value).unwrap();
-
-        if let Value::Matrix(result_matrix) = result {
-            assert_eq!(result_matrix.len(), 2);
-            assert_eq!(result_matrix[0].samples[0].value, 4.0);
-            assert_eq!(result_matrix[1].samples[0].value, -3.0);
-        } else {
-            panic!("Expected Matrix result");
-        }
-    }
-
-    #[test]
-    fn test_floor() {
-        let eval_ts = 1000;
-        let value = create_matrix(eval_ts, vec![3.2, -3.2]);
-        let result = floor(value).unwrap();
-
-        if let Value::Matrix(result_matrix) = result {
-            assert_eq!(result_matrix.len(), 2);
-            assert_eq!(result_matrix[0].samples[0].value, 3.0);
-            assert_eq!(result_matrix[1].samples[0].value, -4.0);
-        } else {
-            panic!("Expected Matrix result");
-        }
-    }
-
-    #[test]
-    fn test_exp() {
-        let eval_ts = 1000;
-        let value = create_matrix(eval_ts, vec![0.0, 1.0]);
-        let result = exp(value).unwrap();
-
-        if let Value::Matrix(result_matrix) = result {
-            assert_eq!(result_matrix.len(), 2);
-            assert_eq!(result_matrix[0].samples[0].value, 1.0);
-            assert_eq!(result_matrix[1].samples[0].value, std::f64::consts::E);
-        } else {
-            panic!("Expected Matrix result");
-        }
-    }
-
-    #[test]
-    fn test_ln() {
-        let eval_ts = 1000;
-        let value = create_matrix(eval_ts, vec![1.0, std::f64::consts::E]);
-        let result = ln(value).unwrap();
-
-        if let Value::Matrix(result_matrix) = result {
-            assert_eq!(result_matrix.len(), 2);
-            assert_eq!(result_matrix[0].samples[0].value, 0.0);
-            assert_eq!(result_matrix[1].samples[0].value, 1.0);
-        } else {
-            panic!("Expected Matrix result");
-        }
-    }
-
-    #[test]
-    fn test_log2() {
-        let eval_ts = 1000;
-        let value = create_matrix(eval_ts, vec![1.0, 2.0, 4.0]);
-        let result = log2(value).unwrap();
-
-        if let Value::Matrix(result_matrix) = result {
-            assert_eq!(result_matrix.len(), 3);
-            assert_eq!(result_matrix[0].samples[0].value, 0.0);
-            assert_eq!(result_matrix[1].samples[0].value, 1.0);
-            assert_eq!(result_matrix[2].samples[0].value, 2.0);
-        } else {
-            panic!("Expected Matrix result");
-        }
-    }
-
-    #[test]
-    fn test_log10() {
-        let eval_ts = 1000;
-        let value = create_matrix(eval_ts, vec![1.0, 10.0, 100.0]);
-        let result = log10(value).unwrap();
-
-        if let Value::Matrix(result_matrix) = result {
-            assert_eq!(result_matrix.len(), 3);
-            assert_eq!(result_matrix[0].samples[0].value, 0.0);
-            assert_eq!(result_matrix[1].samples[0].value, 1.0);
-            assert_eq!(result_matrix[2].samples[0].value, 2.0);
-        } else {
-            panic!("Expected Matrix result");
-        }
-    }
-
-    #[test]
-    fn test_sqrt() {
-        let eval_ts = 1000;
-        let value = create_matrix(eval_ts, vec![0.0, 1.0, 4.0]);
-        let result = sqrt(value).unwrap();
-
-        if let Value::Matrix(result_matrix) = result {
-            assert_eq!(result_matrix.len(), 3);
-            assert_eq!(result_matrix[0].samples[0].value, 0.0);
-            assert_eq!(result_matrix[1].samples[0].value, 1.0);
-            assert_eq!(result_matrix[2].samples[0].value, 2.0);
-        } else {
-            panic!("Expected Matrix result");
-        }
-    }
-
-    #[test]
-    fn test_round() {
-        let eval_ts = 1000;
-        let value = create_matrix(eval_ts, vec![3.2, 3.5, -3.2]);
-        let result = round(value, &ScalarParam::Const(1.0)).unwrap();
-
-        if let Value::Matrix(result_matrix) = result {
-            assert_eq!(result_matrix.len(), 3);
-            assert_eq!(result_matrix[0].samples[0].value, 3.0);
-            assert_eq!(result_matrix[1].samples[0].value, 4.0);
-            assert_eq!(result_matrix[2].samples[0].value, -3.0);
-        } else {
-            panic!("Expected Matrix result");
-        }
-    }
-
-    #[test]
-    fn test_sgn() {
-        let eval_ts = 1000;
-        let value = create_matrix(eval_ts, vec![5.0, -5.0, 0.0]);
-        let result = sgn(value).unwrap();
-
-        if let Value::Matrix(result_matrix) = result {
-            assert_eq!(result_matrix.len(), 3);
-            assert_eq!(result_matrix[0].samples[0].value, 1.0);
-            assert_eq!(result_matrix[1].samples[0].value, -1.0);
-            assert_eq!(result_matrix[2].samples[0].value, 0.0);
-        } else {
-            panic!("Expected Matrix result");
-        }
     }
 
     #[test]

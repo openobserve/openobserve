@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="px-page-edge text-text-body flex h-full flex-col gap-0 overflow-y-auto pt-2.5 pb-2.5">
     <!-- Header: refresh + time picker -->
-    <div class="mb-4 flex justify-end">
+    <div v-if="pageState !== 'forbidden'" class="mb-4 flex justify-end">
       <div class="flex items-center gap-2">
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
@@ -120,10 +120,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="isIncidentsEnabled && isSectionPending('incidents')"
       section="incidents"
     />
+    <OverviewSectionError
+      v-else-if="showSectionError('incidents')"
+      section="incidents"
+      :title="t('overview.activeIncidents')"
+      @retry="() => loadAll(true)"
+    />
+
+    <!-- Locked: no license to unlock Incidents, shown instead of omitted so
+         the capability is discoverable from a build that can't enable it. -->
+    <section
+      v-else-if="!incidentsAccess.allowed"
+      class="mb-5"
+      data-test="overview-incidents-locked"
+    >
+      <div class="mb-2 flex items-center justify-between ps-1">
+        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
+          {{ t("overview.activeIncidents") }}
+        </div>
+      </div>
+      <div
+        class="border-border-default bg-surface-subtle rounded-default flex cursor-pointer items-center gap-3 border border-[0.0625em] px-4 py-5"
+        @click="openUpgradeDialog"
+      >
+        <OIcon name="lock" size="md" class="text-warning-600 shrink-0" />
+        <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
+      </div>
+    </section>
 
     <!-- SERVICES (enterprise only — needs service graph data) -->
     <section
-      v-if="isEnterpriseOrCloud && services.length > 0"
+      v-if="incidentsAccess.allowed && services.length > 0"
       class="mb-5"
       data-test="overview-services-section"
     >
@@ -190,10 +217,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openServicePanel(svc)"
           >
             <div class="mb-2 flex items-center justify-between">
-              <span
-                class="text-text-heading block min-w-0 flex-1 cursor-default overflow-hidden text-sm font-medium text-ellipsis whitespace-nowrap"
-                :title="svc.label ?? svc.id"
-                >{{ svc.label }}</span
+              <OTruncatedText
+                class="text-text-heading block flex-1 cursor-default text-sm font-medium"
+                >{{ svc.label }}</OTruncatedText
               >
               <span class="ms-1 inline-flex shrink-0 items-center">
                 <OButton
@@ -274,12 +300,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </section>
     <OverviewSkeleton
-      v-else-if="isEnterpriseOrCloud && isSectionPending('services')"
+      v-else-if="incidentsAccess.allowed && isSectionPending('services')"
       section="services"
     />
+    <OverviewSectionError
+      v-else-if="showSectionError('services')"
+      section="services"
+      :title="t('overview.services')"
+      @retry="() => loadAll(true)"
+    />
+
+    <!-- Locked: Services shares the Incidents license gate — same bundle, no
+         separate upsell story of its own. -->
+    <section v-else-if="!incidentsAccess.allowed" class="mb-5" data-test="overview-services-locked">
+      <div class="mb-2 flex items-center justify-between ps-1">
+        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
+          {{ t("overview.services") }}
+        </div>
+      </div>
+      <div
+        class="border-border-default bg-surface-subtle rounded-default flex cursor-pointer items-center gap-3 border border-[0.0625em] px-4 py-5"
+        @click="openUpgradeDialog"
+      >
+        <OIcon name="lock" size="md" class="text-warning-600 shrink-0" />
+        <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
+      </div>
+    </section>
 
     <!-- Service node side panel (latency / RED charts) -->
-    <template v-if="isEnterpriseOrCloud && selectedService">
+    <template v-if="incidentsAccess.allowed && selectedService">
       <div
         v-if="servicePanelVisible"
         class="fixed inset-0 z-99 bg-transparent"
@@ -346,6 +395,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </section>
     <OverviewSkeleton v-else-if="isSectionPending('anomalies')" section="anomalies" />
+    <OverviewSectionError
+      v-else-if="showSectionError('anomalies')"
+      section="anomalies"
+      :title="t('overview.activeAnomalies')"
+      @retry="() => loadAll(true)"
+    />
 
     <!-- RECENT EVENTS (alert firing feed) -->
     <section v-if="recentEvents.length > 0" class="mb-5" data-test="overview-recent-events-section">
@@ -370,11 +425,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-b-border-default text-compact hover:bg-table-row-hover-bg flex items-center gap-3 border-b border-b-[0.0625em] px-3.5 py-2 transition-[background] duration-150 last:border-b-0"
         >
           <OTag type="eventStatus" :value="ev.typeLabel" class="shrink-0" />
-          <span
-            class="text-text-heading max-w-[12.5em] min-w-[7.5em] overflow-hidden font-medium text-ellipsis whitespace-nowrap"
-            >{{ ev.service }}</span
-          >
-          <span class="text-text-secondary flex-1 truncate">{{ ev.description }}</span>
+          <OTruncatedText class="text-text-heading max-w-[12.5em] min-w-[7.5em] font-medium">{{
+            ev.service
+          }}</OTruncatedText>
+          <OTruncatedText class="text-text-secondary flex-1">{{ ev.description }}</OTruncatedText>
           <OTag
             v-if="ev.failCount > 1"
             type="countChip"
@@ -390,17 +444,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </section>
     <OverviewSkeleton v-else-if="isSectionPending('recentEvents')" section="recentEvents" />
+    <OverviewSectionError
+      v-else-if="showSectionError('recentEvents')"
+      section="recentEvents"
+      :title="t('overview.recentEvents')"
+      @retry="() => loadAll(true)"
+    />
+
+    <OEmptyState
+      v-if="pageState === 'forbidden'"
+      preset="no-access"
+      size="block"
+      data-test="overview-no-access-empty-state"
+    />
+    <OEmptyState
+      v-else-if="pageState === 'error'"
+      preset="load-error"
+      size="hero"
+      data-test="overview-load-error-empty-state"
+    >
+      <template #actions>
+        <EmptyStateActionCard
+          icon="refresh"
+          :label="t('emptyState.loadError.action')"
+          :sublabel="t('emptyState.loadError.actionDesc')"
+          data-test="overview-load-error-retry-card"
+          @click="() => loadAll(true)"
+        />
+      </template>
+    </OEmptyState>
+    <OEmptyState
+      v-else-if="pageState === 'not-monitored'"
+      illustration="alert"
+      size="hero"
+      :hide-action="true"
+      data-test="overview-not-monitored-empty-state"
+    >
+      <template #title>{{ t("overview.notMonitoredTitle") }}</template>
+      <template #description>{{ t("overview.notMonitoredDesc") }}</template>
+      <template #actions>
+        <EmptyStateActionCard
+          v-if="showAlertsCard"
+          icon="notifications"
+          :label="t('overview.notMonitoredAlert')"
+          :sublabel="t('overview.notMonitoredAlertDesc')"
+          data-test="overview-not-monitored-alert-card"
+          @click="goToAddAlert"
+        />
+        <EmptyStateActionCard
+          v-if="showAlertsCard && anomalyEnabled"
+          icon="auto-awesome"
+          :label="t('overview.notMonitoredAnomaly')"
+          :sublabel="t('overview.notMonitoredAnomalyDesc')"
+          data-test="overview-not-monitored-anomaly-card"
+          @click="goToAnomalies"
+        />
+        <EmptyStateActionCard
+          v-if="showLogsCard"
+          icon="search"
+          :label="t('overview.emptyActionLogs')"
+          :sublabel="t('overview.emptyActionLogsDesc')"
+          data-test="overview-not-monitored-logs-card"
+          @click="goToLogs"
+        />
+      </template>
+    </OEmptyState>
+
+    <HomeNoDataState v-else-if="pageState === 'no-data'" tab="overview" flag-off />
 
     <!-- Empty state — everything is healthy or no data yet -->
     <OEmptyState
-      v-if="!isLoading && !hasAnyData"
+      v-else-if="pageState === 'all-clear'"
       illustration="check"
       size="hero"
       :hide-action="true"
       data-test="overview-all-clear-empty-state"
     >
       <template #title>{{ t("overview.allClear") }}</template>
-      <template #description>{{ t("overview.allClearDesc") }}</template>
+      <template #description>{{
+        flagOn ? t("overview.allClearDescScoped") : t("overview.allClearDesc")
+      }}</template>
       <template #actions>
         <!-- View alerts -->
         <button
@@ -416,9 +539,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="notifications" size="md" />
           </span>
           <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span class="text-text-heading truncate text-(length:--text-sm) font-semibold">{{
+            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
               t("overview.emptyActionAlerts")
-            }}</span>
+            }}</OTruncatedText>
             <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
               t("overview.emptyActionAlertsDesc")
             }}</span>
@@ -443,9 +566,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="search" size="md" />
           </span>
           <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span class="text-text-heading truncate text-(length:--text-sm) font-semibold">{{
+            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
               t("overview.emptyActionLogs")
-            }}</span>
+            }}</OTruncatedText>
             <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
               t("overview.emptyActionLogsDesc")
             }}</span>
@@ -470,9 +593,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="account-tree" size="md" />
           </span>
           <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span class="text-text-heading truncate text-(length:--text-sm) font-semibold">{{
+            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
               t("overview.emptyActionTraces")
-            }}</span>
+            }}</OTruncatedText>
             <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
               t("overview.emptyActionTracesDesc")
             }}</span>
@@ -504,6 +627,10 @@ import { serviceTopologyQuery } from "@/services/service_graph.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { anomalyConfigsQuery } from "@/services/anomaly_detection.queries";
 import { anomalyHistoryQuery } from "@/services/anomaly_detection.queries";
+import { orgSummaryQuery } from "@/services/organizations.queries";
+import { STREAM_PROBE_PAGE, streamPageQuery, streamProbeQuery } from "@/services/stream.queries";
+import { readFirstDataRecord } from "@/composables/firstEvent/useFirstDataNotice";
+import { USER_DATA_STREAM_TYPES, userDataStreams } from "@/utils/internalStreams";
 import { ref, reactive, computed, defineAsyncComponent, onMounted, watch, nextTick } from "vue";
 
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -512,17 +639,22 @@ import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import anomalyService from "@/services/anomaly_detection";
-import config from "@/aws-exports";
 import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OverviewSkeleton from "./OverviewSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import OverviewSectionError from "./OverviewSectionError.vue";
+import HomeNoDataState from "./HomeNoDataState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -533,12 +665,16 @@ const store = useStore();
 const router = useRouter();
 
 // ── Feature flags ────────────────────────────────────────────────────────────
-const isEnterpriseOrCloud = computed(
-  () => config.isEnterprise === "true" || config.isCloud === "true",
-);
+// Services shares this same gate — it's the service-graph half of the same
+// enterprise/cloud bundle as Incidents, with no upsell story of its own.
+const incidentsAccess = useLockedAffordance("incidents");
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 const isIncidentsEnabled = computed(
-  () => isEnterpriseOrCloud.value && store.state.zoConfig?.incidents_enabled === true,
+  () => incidentsAccess.value.allowed && store.state.zoConfig?.incidents_enabled === true,
 );
+const flagOn = computed(() => store.state.zoConfig?.restricted_routes_on_empty_data === true);
+// a deployment with anomaly detection off answers 403 by design, which is no load failure
+const anomalyEnabled = computed(() => store.state.zoConfig?.anomaly_detection_enabled === true);
 
 // ── Date / time picker ───────────────────────────────────────────────────────
 const LS_TIME_KEY = "o2_overview_time";
@@ -639,6 +775,57 @@ const sectionState = reactive<Record<SectionKey, { loading: boolean; loaded: boo
 const isSectionPending = (key: SectionKey) =>
   sectionState[key].loading && !sectionState[key].loaded;
 
+// each loader keeps its empty-list fallback, so the error it swallowed is the only failure signal
+const sectionFailure = reactive<Record<SectionKey, unknown>>({
+  incidents: null,
+  services: null,
+  anomalies: null,
+  recentEvents: null,
+});
+const alertCount = ref<number | null>(null);
+const summaryFailed = ref(false);
+const anomalyConfigCount = ref<number | null>(null);
+// null keeps all clear: only answered lists prove an org empty, and only the flag-off page asks
+const noUserStreams = ref<boolean | null>(null);
+// a probe that failed for any reason but 403 leaves "no streams" unproven, so all clear may not show
+const streamProbeFailed = ref(false);
+
+const isForbidden = (err: unknown) => {
+  const e = err as { status?: number; response?: { status?: number } } | null;
+  return e?.status === 403 || e?.response?.status === 403;
+};
+const attemptedSections = computed<SectionKey[]>(() => {
+  const keys: SectionKey[] = ["recentEvents"];
+  if (anomalyEnabled.value) keys.push("anomalies");
+  if (isIncidentsEnabled.value) keys.push("incidents");
+  if (incidentsAccess.value.allowed) keys.push("services");
+  return keys;
+});
+const isFailed = (key: SectionKey) =>
+  !!sectionFailure[key] && attemptedSections.value.includes(key);
+const allFailed = computed(() => attemptedSections.value.every(isFailed));
+
+type PageState =
+  "content" | "partial" | "forbidden" | "error" | "not-monitored" | "no-data" | "all-clear";
+const pageState = computed<PageState>(() => {
+  if (isLoading.value || hasAnyData.value) return "content";
+  if (allFailed.value) {
+    const allForbidden = attemptedSections.value.every((k) => isForbidden(sectionFailure[k]));
+    return flagOn.value && allForbidden ? "forbidden" : "error";
+  }
+  if (attemptedSections.value.some(isFailed)) return "partial";
+  if (!flagOn.value && streamProbeFailed.value) return "error";
+  if (!flagOn.value && noUserStreams.value === true) return "no-data";
+  // without the summary the page cannot tell all clear from nothing watched, so neither may show
+  if (flagOn.value && summaryFailed.value) return "error";
+  if (flagOn.value && alertCount.value === 0 && (anomalyConfigCount.value ?? 0) === 0) {
+    return "not-monitored";
+  }
+  return "all-clear";
+});
+const showSectionError = (key: SectionKey) =>
+  isFailed(key) && pageState.value !== "error" && pageState.value !== "forbidden";
+
 /* Wraps a loader with its section's state. The loaders swallow their own errors,
    and `finally` also covers the early `return` in the enterprise-gated ones, so
    a section can never be left stuck pending. */
@@ -694,13 +881,86 @@ const loadAll = async (force = false) => {
     runSection("anomalies", () => loadAnomalies(force)),
     runSection("incidents", () => loadIncidents(force)),
     runSection("services", () => loadServiceGraph(force)),
+    loadAlertCount(force),
   ]);
+  await loadUserStreams(force);
   isLoading.value = false;
-  lastFetched.value = new Date();
+  // the refresh button keeps the last good run, so a fresh dot never sits beside the error
+  if (!allFailed.value && pageState.value !== "error") lastFetched.value = new Date();
+};
+
+// only the flag-on page tells "nothing is watched" apart from "all clear"
+const loadAlertCount = async (force = false) => {
+  if (!flagOn.value) return;
+  summaryFailed.value = false;
+  try {
+    const options = orgSummaryQuery(orgId.value);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const summary: any = await queryClient.fetchQuery(options);
+    alertCount.value = (summary?.alerts?.num_realtime ?? 0) + (summary?.alerts?.num_scheduled ?? 0);
+  } catch {
+    alertCount.value = null;
+    summaryFailed.value = true;
+  }
+};
+
+// the flag-off first-data notice already probed each type at load, so its cached answers serve; null means unknown
+const typeHasUserStream = async (org: string, type: string, reread: boolean) => {
+  const probe = streamProbeQuery(org, type);
+  const cached = reread ? undefined : queryClient.getQueryData(probe.queryKey);
+  const head = cached ?? (await queryClient.fetchQuery(probe));
+  if (head.total === 0) return false;
+  if (userDataStreams(head.list).length > 0) return true;
+  const options = streamPageQuery(org, type, { offset: 0, limit: STREAM_PROBE_PAGE });
+  if (reread) {
+    await queryClient.invalidateQueries({
+      queryKey: options.queryKey,
+      exact: true,
+      refetchType: "none",
+    });
+  }
+  const page = await queryClient.fetchQuery(options);
+  if (userDataStreams(page.list).length > 0) return true;
+  return page.list.length >= head.total ? false : null;
+};
+
+// Refresh and Retry re-read only while the hero waits or a probe failed; an org the notice saw data in asks nothing
+const loadUserStreams = async (force = false) => {
+  const org = orgId.value;
+  const reread = force && (noUserStreams.value === true || streamProbeFailed.value);
+  streamProbeFailed.value = false;
+  if (!org || flagOn.value || hasAnyData.value || attemptedSections.value.some(isFailed)) {
+    noUserStreams.value = null;
+    return;
+  }
+  if (readFirstDataRecord(org)?.hadData) {
+    noUserStreams.value = false;
+    return;
+  }
+  let failed = false;
+  const found = await Promise.all(
+    USER_DATA_STREAM_TYPES.map((type) =>
+      typeHasUserStream(org, type, reread).catch((err: unknown) => {
+        failed ||= !isForbidden(err);
+        return null;
+      }),
+    ),
+  );
+  if (org !== orgId.value) return;
+  streamProbeFailed.value = failed && !found.includes(true);
+  if (found.includes(true)) noUserStreams.value = false;
+  else noUserStreams.value = found.includes(null) ? null : true;
 };
 
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
 const loadAnomalies = async (force = false) => {
+  sectionFailure.anomalies = null;
   try {
     const org = orgId.value;
     const { startTime, endTime } = timeRange.value;
@@ -724,6 +984,7 @@ const loadAnomalies = async (force = false) => {
     // Fire list first; only fetch history if configs exist
     try {
       const configs: any[] = await readConfigs(org);
+      anomalyConfigCount.value = configs.length;
       if (!configs.length) {
         anomalies.value = [];
         return;
@@ -739,6 +1000,7 @@ const loadAnomalies = async (force = false) => {
     } catch {
       // Bulk endpoint not available — fall back to per-config requests
       const configs: any[] = await readConfigs(org);
+      anomalyConfigCount.value = configs.length;
       if (!configs.length) {
         anomalies.value = [];
         return;
@@ -794,13 +1056,16 @@ const loadAnomalies = async (force = false) => {
       .slice(0, 3);
 
     anomalies.value = result;
-  } catch {
+  } catch (err) {
     anomalies.value = [];
+    anomalyConfigCount.value = null;
+    sectionFailure.anomalies = err;
   }
 };
 
 // Alert trigger history feeds recentEvents only
 const loadHistoryAndSplit = async (force = false) => {
+  sectionFailure.recentEvents = null;
   try {
     // Exact bounds: `alertHistoryQuery` rounds only its key, so the newest minutes still reach the server.
     const historyOptions = alertHistoryQuery(orgId.value, {
@@ -867,13 +1132,15 @@ const loadHistoryAndSplit = async (force = false) => {
     recentEvents.value = [...firingHits, ...Array.from(failedMap.values())]
       .sort((a, b) => (b.rawTs ?? 0) - (a.rawTs ?? 0))
       .slice(0, 5);
-  } catch {
+  } catch (err) {
     recentEvents.value = [];
+    sectionFailure.recentEvents = err;
   }
 };
 
 const loadIncidents = async (force = false) => {
   if (!isIncidentsEnabled.value) return;
+  sectionFailure.incidents = null;
   try {
     const incidentOptions = incidentsQuery(orgId.value, "open", 4, 0);
     if (force) {
@@ -886,14 +1153,16 @@ const loadIncidents = async (force = false) => {
     const res: any = await queryClient.fetchQuery(incidentOptions);
     incidents.value = res?.incidents ?? [];
     incidentsTotal.value = res?.total ?? incidents.value.length;
-  } catch {
+  } catch (err) {
     incidents.value = [];
     incidentsTotal.value = 0;
+    sectionFailure.incidents = err;
   }
 };
 
 const loadServiceGraph = async (force = false) => {
-  if (!isEnterpriseOrCloud.value) return;
+  if (!incidentsAccess.value.allowed) return;
+  sectionFailure.services = null;
   try {
     graphStream.value = "all";
 
@@ -954,8 +1223,9 @@ const loadServiceGraph = async (force = false) => {
       .slice(0, 12);
     await nextTick();
     onSvcScroll();
-  } catch {
+  } catch (err) {
     services.value = [];
+    sectionFailure.services = err;
   }
 };
 
@@ -1088,6 +1358,10 @@ const showTracesCard = computed(() => router.hasRoute("traces"));
 
 const goToAlertList = () => {
   router.push({ name: "alertList", query: { org_identifier: orgId.value } });
+};
+
+const goToAddAlert = () => {
+  router.push({ name: "addAlert", query: { org_identifier: orgId.value } });
 };
 
 const goToIncidentList = () => {
