@@ -1405,8 +1405,9 @@ export default defineComponent({
         const state = valueRefills.get(editor) ?? { seq: 0, refilled: null };
         const seq = state.seq;
         valueRefills.set(editor, state);
+        const range = config.valuesTimeRange();
         void fetched.then(() => {
-          const key = `${snapshot.line}:${snapshot.column}:${snapshot.prefix}`;
+          const key = `${snapshot.line}:${snapshot.column}:${snapshot.prefix}:${range?.startTime}-${range?.endTime}`;
           if (state.seq !== seq || state.refilled === key || config.mode() === "off") return;
           if (isValueAnswerStale(snapshot, config.editor(), config.escapeCount())) return;
           state.refilled = key;
@@ -1436,6 +1437,8 @@ export default defineComponent({
         const refills = valueRefills.get(config.editor() ?? {});
         if (refills) refills.seq++;
         if (outcome === "loading") refillWhenLoaded(config, snapshot, fetched);
+        // An answered lookup ends the refill guard, since the next slow one may ask about another stream or range.
+        else if (refills) refills.refilled = null;
         const stale =
           token?.isCancellationRequested ||
           isValueAnswerStale(snapshot, config.editor(), config.escapeCount());
