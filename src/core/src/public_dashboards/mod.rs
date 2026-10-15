@@ -122,6 +122,7 @@ impl Engine for SearchEngine {
         }))
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn run_panels(
         &self,
         cap: &Capture,
@@ -130,8 +131,9 @@ impl Engine for SearchEngine {
         now: i64,
         family: &TraceFamily,
         flight: &Flight,
+        probe: &AuthorizerProbe,
     ) -> Run {
-        run_panels(self, cap, range, range_key, now, family, flight).await
+        run_panels(self, cap, range, range_key, now, family, flight, probe).await
     }
 
     async fn is_member(&self, org: &str, user: &str) -> Result<bool, anyhow::Error> {
@@ -152,8 +154,9 @@ impl Engine for SearchEngine {
         org: &str,
         user: &str,
         panel: &ManifestPanel,
+        probe: &AuthorizerProbe,
     ) -> Result<bool, anyhow::Error> {
-        authorize_manifest(org, user, panel).await
+        authorize_manifest(org, user, panel, probe).await
     }
 
     #[cfg_attr(not(feature = "cloud"), allow(unused_variables))]
@@ -179,6 +182,7 @@ trait PanelSearch: Send + Sync {
         query_type: &str,
         text: &str,
         target: (StreamType, &str),
+        probe: &AuthorizerProbe,
     ) -> Result<Vec<(StreamType, String)>, NotAvailableReason>;
     #[allow(clippy::too_many_arguments)]
     async fn sql(
@@ -211,8 +215,9 @@ impl PanelSearch for SearchEngine {
         query_type: &str,
         text: &str,
         target: (StreamType, &str),
+        probe: &AuthorizerProbe,
     ) -> Result<Vec<(StreamType, String)>, NotAvailableReason> {
-        authorize_query(org, user, query_type, text, target).await
+        authorize_query(org, user, query_type, text, target, probe).await
     }
 
     async fn sql(
@@ -328,9 +333,31 @@ impl LinkValues {
     }
 }
 
+/// One authorizer health answer per build or deadline check, asked only when a check denies.
+#[derive(Default)]
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+pub struct AuthorizerProbe(tokio::sync::OnceCell<Result<(), String>>);
+
+impl AuthorizerProbe {
+    /// Whether the authorizer answers for `user_id`; asked once, then remembered.
+    #[cfg(feature = "enterprise")]
+    async fn answers(&self, org: &str, user_id: &str) -> Result<(), anyhow::Error> {
+        self.0
+            .get_or_init(|| async {
+                authorizer_answers(org, user_id)
+                    .await
+                    .map_err(|e| e.to_string())
+            })
+            .await
+            .clone()
+            .map_err(anyhow::Error::msg)
+    }
+}
+
 /// One build's fixed inputs for its searches.
 struct Ctx<'a> {
     search: &'a dyn PanelSearch,
+    probe: &'a AuthorizerProbe,
     link: &'a PublicDashboard,
     dash: &'a Dashboard,
     identity: String,
@@ -717,13 +744,15 @@ pub async fn set_org_settings(
 ) -> Result<OrgPublicDashboardSettings, anyhow::Error> {
     validate_settings(&body).map_err(Invalid)?;
     let db = get_orm_client_rw().await;
-    // In Cloud an org admin writes only the switch; the plan sync owns the link limit.
     #[cfg(feature = "cloud")]
-    if !db::user::is_root_user(user_id) {
-        let stored = pd_table::get_settings(db, org)
-            .await?
-            .and_then(|s| s.max_links);
-        check_plan_owned_max_links(stored, body.max_links)?;
+    if writes_switch_only(db::user::is_root_user(user_id), body.max_links) {
+        let stored = pd_table::get_settings(db, org).await?;
+        check_plan_owned_max_links(stored.as_ref().and_then(|s| s.max_links), body.max_links)?;
+        if stored.is_none() {
+            // A switch-only row has no limit and would read as the paid one, so write the plan
+            // first.
+            o2_enterprise::enterprise::cloud::billings::sync_public_dashboard_links(org).await;
+        }
         let row =
             pd_table::set_settings_enabled(db, org, body.enabled, user_id, now_micros()).await?;
         return Ok(OrgPublicDashboardSettings {
@@ -738,6 +767,12 @@ pub async fn set_org_settings(
         enabled: row.enabled,
         max_links: row.max_links,
     })
+}
+
+/// In Cloud the plan owns the limit: only root sending a limit writes it, everyone else the switch.
+#[cfg(feature = "cloud")]
+fn writes_switch_only(is_root: bool, max_links: Option<i32>) -> bool {
+    !is_root || max_links.is_none()
 }
 
 /// In Cloud the plan sync owns max_links: an org admin may echo or omit it, not change it.
@@ -922,6 +957,7 @@ pub fn time_ranges(link: &PublicDashboard) -> TimeRangePolicy {
 }
 
 /// Runs every panel of the captured dashboard for one window (design 5.4 steps 3 to 6).
+#[allow(clippy::too_many_arguments)]
 async fn run_panels(
     search: &dyn PanelSearch,
     cap: &Capture,
@@ -930,6 +966,7 @@ async fn run_panels(
     now: i64,
     family: &TraceFamily,
     flight: &Flight,
+    probe: &AuthorizerProbe,
 ) -> Run {
     let Some(dash) = cap.dashboard.as_ref() else {
         return Run::default();
@@ -938,6 +975,7 @@ async fn run_panels(
     let (start, end) = materialize::window(range, now);
     let ctx = Ctx {
         search,
+        probe,
         link,
         dash,
         identity: public_dashboard_identity(&link.org_id),
@@ -1012,6 +1050,7 @@ pub async fn authorize_query(
     query_type: &str,
     text: &str,
     target: (StreamType, &str),
+    probe: &AuthorizerProbe,
 ) -> Result<Vec<(StreamType, String)>, NotAvailableReason> {
     #[cfg(feature = "enterprise")]
     {
@@ -1025,7 +1064,7 @@ pub async fn authorize_query(
                 .await
                 .is_some();
         if cipher_denied || !streams_allowed(org, user_id, typed.iter()).await {
-            return Err(match authorizer_answers(org, user_id).await {
+            return Err(match probe.answers(org, user_id).await {
                 Ok(()) => NotAvailableReason::Unauthorized,
                 Err(e) => {
                     log::warn!("public dashboard authorizer did not answer: {e}");
@@ -1045,6 +1084,7 @@ pub async fn authorize_manifest(
     org: &str,
     user_id: &str,
     panel: &ManifestPanel,
+    probe: &AuthorizerProbe,
 ) -> Result<bool, anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -1059,7 +1099,7 @@ pub async fn authorize_manifest(
                 .await
                 .is_empty();
         if denied {
-            authorizer_answers(org, user_id).await?;
+            probe.answers(org, user_id).await?;
             return Ok(false);
         }
     }
@@ -1401,6 +1441,7 @@ async fn run_sql_panel(
                 "sql",
                 &base,
                 target,
+                ctx.probe,
             )
             .await
         {
@@ -1511,6 +1552,7 @@ async fn run_promql_panel(
                 "promql",
                 expr,
                 target,
+                ctx.probe,
             )
             .await
         {
@@ -1669,7 +1711,10 @@ async fn fill_defaults(ctx: &Ctx<'_>, frozen: BTreeMap<String, serde_json::Value
             continue;
         }
         let q = &pending.query;
-        let sources = typed_sources("sql", &q.sql, (q.stream_type, q.stream.as_str()));
+        // An unparseable values query proves no stream, so its dependents are never restored.
+        let sources: Vec<(StreamType, String)> = query_streams("sql", &q.sql, q.stream_type)
+            .map(|v| v.into_iter().map(|(s, t)| (t, s)).collect())
+            .unwrap_or_default();
         out.deps.insert(
             key.clone(),
             ValuesDependency {
@@ -1686,6 +1731,7 @@ async fn fill_defaults(ctx: &Ctx<'_>, frozen: BTreeMap<String, serde_json::Value
                 "sql",
                 &q.sql,
                 target,
+                ctx.probe,
             )
             .await
         {
@@ -1999,6 +2045,7 @@ async fn authorizer_answers(org: &str, user_id: &str) -> Result<(), anyhow::Erro
 }
 
 /// The typed streams a query reads; one that does not parse falls back to the panel's stream.
+#[cfg(any(not(feature = "enterprise"), test))]
 fn typed_sources(
     query_type: &str,
     text: &str,
@@ -2492,8 +2539,11 @@ mod tests {
         dash: &'a Dashboard,
         family: &'a TraceFamily,
     ) -> Ctx<'a> {
+        static PROBE: std::sync::LazyLock<AuthorizerProbe> =
+            std::sync::LazyLock::new(Default::default);
         Ctx {
             search,
+            probe: &PROBE,
             link,
             dash,
             identity: public_dashboard_identity(&link.org_id),
@@ -2977,6 +3027,16 @@ mod tests {
 
     #[cfg(feature = "cloud")]
     #[test]
+    fn in_cloud_only_root_sending_a_limit_writes_it() {
+        assert!(!writes_switch_only(true, Some(20)));
+        // A root kill switch without a limit keeps the plan's limit.
+        assert!(writes_switch_only(true, None));
+        assert!(writes_switch_only(false, None));
+        assert!(writes_switch_only(false, Some(3)));
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
     fn in_cloud_an_org_admin_cannot_change_the_plan_link_limit() {
         // The switch alone, with the limit echoed or left out, is allowed.
         assert!(check_plan_owned_max_links(Some(3), Some(3)).is_ok());
@@ -2996,6 +3056,8 @@ mod tests {
         series: usize,
         partial: bool,
         calls: AtomicUsize,
+        /// Refuses each query whose text contains the pattern, with this reason.
+        refuse: Option<(NotAvailableReason, &'static str)>,
     }
 
     #[async_trait]
@@ -3008,8 +3070,12 @@ mod tests {
             query_type: &str,
             text: &str,
             target: (StreamType, &str),
+            _probe: &AuthorizerProbe,
         ) -> Result<Vec<(StreamType, String)>, NotAvailableReason> {
-            Ok(typed_sources(query_type, text, target))
+            match self.refuse {
+                Some((reason, pattern)) if text.contains(pattern) => Err(reason),
+                _ => Ok(typed_sources(query_type, text, target)),
+            }
         }
 
         async fn sql(
@@ -3367,6 +3433,75 @@ mod tests {
             ("authz_check.rs", include_str!("authz_check.rs")),
         ] {
             assert!(!src.contains("get_orm_client_ro"), "{file}");
+        }
+    }
+
+    #[tokio::test]
+    async fn gate02_an_unanswered_authorizer_fails_the_build_and_a_denial_withholds() {
+        let cases = [
+            (NotAvailableReason::BuildError, Class::Transient),
+            (NotAvailableReason::Unauthorized, Class::Denied),
+        ];
+        for (reason, class) in cases {
+            let sql = FakeSearch {
+                hits: 1,
+                refuse: Some((reason, "FROM \"s\"")),
+                ..Default::default()
+            };
+            let panel = typed_panel("p", "line", "sql", "SELECT * FROM \"s\"", None);
+            let run = run_one(&sql, panel).await;
+            assert_eq!(run.class, class, "sql {reason:?}");
+            assert_eq!(
+                sql.calls.load(Ordering::SeqCst),
+                0,
+                "a refused query never runs"
+            );
+            let promql = FakeSearch {
+                series: 1,
+                refuse: Some((reason, "up")),
+                ..Default::default()
+            };
+            let run = run_one(&promql, typed_panel("p", "line", "promql", "up", None)).await;
+            assert_eq!(run.class, class, "promql {reason:?}");
+            assert_eq!(run.result.data.len(), 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn gate02_a_values_query_the_authorizer_did_not_answer_fails_its_panels_not_withholds() {
+        let cases = [
+            (NotAvailableReason::BuildError, Class::Transient),
+            (NotAvailableReason::Unauthorized, Class::Denied),
+        ];
+        for (reason, class) in cases {
+            let (link, mut dash, family) = ctx_parts();
+            let v8 = dash.v8.as_mut().unwrap();
+            v8.tabs[0].panels = vec![typed_panel(
+                "p",
+                "table",
+                "sql",
+                "SELECT * FROM \"s\" WHERE svc = '$svc'",
+                None,
+            )];
+            v8.variables = Some(
+                serde_json::from_value(
+                    json!({ "list": [{ "type": "query_values", "name": "svc", "label": "Svc",
+                    "query_data": { "stream_type": "logs", "stream": "s", "field": "svc" } }] }),
+                )
+                .unwrap(),
+            );
+            let search = FakeSearch {
+                hits: 1,
+                refuse: Some((reason, "zo_sql_key")),
+                ..Default::default()
+            };
+            let ctx = ctx_with(&search, &link, &dash, &family);
+            let values = fill_defaults(&ctx, BTreeMap::new()).await;
+            let vars = QueryVars::new(&dash, values.values.clone(), None);
+            let tab = &dash.v8.as_ref().unwrap().tabs[0];
+            let run = run_panel(&ctx, &vars, &BTreeMap::new(), &values, tab, &tab.panels[0]).await;
+            assert_eq!(run.class, class, "{reason:?}");
+            assert_eq!(search.calls.load(Ordering::SeqCst), 0, "{reason:?}");
         }
     }
 }

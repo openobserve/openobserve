@@ -42,7 +42,7 @@ use dashmap::DashMap;
 use infra::table::entity::public_dashboards::Model as PublicDashboard;
 
 use super::{
-    authz_check,
+    AuthorizerProbe, authz_check,
     flight::{Built, Failure, Flight, Flights, Kind, Outcome, Start, TraceFamily, Wait, drain_by},
     intent, mask,
     store::{
@@ -96,6 +96,7 @@ pub trait Engine: Send + Sync {
     /// The link, its dashboard and its org settings, from the primary.
     async fn capture(&self, link_id: &str) -> Result<Option<Capture>, anyhow::Error>;
     /// Runs every panel of the captured dashboard for one range under the build's trace family.
+    #[allow(clippy::too_many_arguments)]
     async fn run_panels(
         &self,
         cap: &Capture,
@@ -104,6 +105,7 @@ pub trait Engine: Send + Sync {
         now: i64,
         family: &TraceFamily,
         flight: &Flight,
+        probe: &AuthorizerProbe,
     ) -> Run;
     /// Whether the publisher is still an org member, from the primary.
     async fn is_member(&self, org: &str, user: &str) -> Result<bool, anyhow::Error>;
@@ -114,6 +116,7 @@ pub trait Engine: Send + Sync {
         org: &str,
         user: &str,
         panel: &ManifestPanel,
+        probe: &AuthorizerProbe,
     ) -> Result<bool, anyhow::Error>;
     /// Cloud: false when the org's trial has expired.
     async fn trial_ok(&self, org: &str) -> bool;
@@ -547,13 +550,14 @@ pub async fn build(
     let family = TraceFamily::default();
     let deadline = tokio::time::Instant::now()
         + Duration::from_secs(u64::from(get_config().public_dashboards.build_timeout_secs));
+    let probe = AuthorizerProbe::default();
     let run = drain_by(
         &family,
         deadline,
-        engine.run_panels(&cap, &range, &range.key(), now, &family, &flight),
+        engine.run_panels(&cap, &range, &range.key(), now, &family, &flight, &probe),
     )
     .await;
-    let retainable = retainable(engine, &cap, prior.as_ref(), &run).await;
+    let retainable = retainable(engine, &cap, prior.as_ref(), &run, &probe).await;
     let build_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
     let jitter = rand::random_range(0.0..=0.2);
     let assembled = assemble(
@@ -609,6 +613,11 @@ pub async fn range_status(link: &PublicDashboard, with_sources: bool) -> Vec<Ran
         out.push(status);
     }
     out
+}
+
+/// Evicts the file of a range the link no longer offers, on the read that asks for it.
+pub async fn evict_removed_range(link: &PublicDashboard, range_key: &str) {
+    store::evict_if_indexed(&store::key(&link.org_id, &link.id, range_key)).await;
 }
 
 /// Whether the captured rows still allow serving this range (design 5.4 step 2).
@@ -749,6 +758,7 @@ async fn retainable(
     cap: &Capture,
     prior: Option<&Prior>,
     run: &Run,
+    probe: &AuthorizerProbe,
 ) -> BTreeSet<String> {
     let mut out = BTreeSet::new();
     let Some(prior) = prior else {
@@ -762,7 +772,7 @@ async fn retainable(
             continue;
         }
         if let Ok(true) = engine
-            .authorize(&cap.link.org_id, &cap.link.published_by, m)
+            .authorize(&cap.link.org_id, &cap.link.published_by, m, probe)
             .await
         {
             out.insert(p.id.clone());
@@ -1170,6 +1180,7 @@ mod tests {
             }))
         }
 
+        #[allow(clippy::too_many_arguments)]
         async fn run_panels(
             &self,
             cap: &Capture,
@@ -1178,6 +1189,7 @@ mod tests {
             now: i64,
             _family: &TraceFamily,
             _flight: &Flight,
+            _probe: &AuthorizerProbe,
         ) -> Run {
             let n = self.builds.fetch_add(1, Ordering::SeqCst) + 1;
             let delay = self.delay_ms.load(Ordering::SeqCst);
@@ -1239,6 +1251,7 @@ mod tests {
             _org: &str,
             _user: &str,
             panel: &ManifestPanel,
+            _probe: &AuthorizerProbe,
         ) -> Result<bool, anyhow::Error> {
             self.authz_calls.fetch_add(1, Ordering::SeqCst);
             if self.authz_down.load(Ordering::SeqCst) {
@@ -2170,23 +2183,37 @@ mod tests {
         let flights = flights(8, 1);
         let now = now_micros();
         let first = data(&read_at(engine, flights, &link, &dash, rel(DAY_SECS), now).await).clone();
-        // The range leaves the link and comes back with a new rev.
+        assert_eq!(build_no(&first, "p1"), 1);
+        let key = store::key(&link.org_id, &link.id, "r86400");
+        // The range leaves the link; a read asks for it and the handler evicts before its 404.
         link.time_ranges = Some(json!([{ "type": "relative", "secs": 3600 }]).to_string());
         link.rev += 1;
+        assert!(
+            !super::super::time_ranges(&link)
+                .ranges
+                .contains(&rel(DAY_SECS))
+        );
+        evict_removed_range(&link, "r86400").await;
+        assert!(
+            store::read_header(&key).await.is_none(),
+            "the removed range's file is gone"
+        );
+        // The range comes back: the next read is a cold build with none of the old data.
         link.time_ranges = Some(both.to_string());
         link.rev += 1;
         *engine.link.lock().unwrap() = link.clone();
-        let stale =
-            data(&read_at(engine, flights, &link, &dash, rel(DAY_SECS), now + MIN).await).clone();
-        assert_eq!(stale.stale_reason, Some(StaleReason::Link));
-        assert!(stale.refreshing);
-        assert_ne!(stale.rev, first.rev);
-        settle(flights).await;
-        let fresh =
-            data(&read_at(engine, flights, &link, &dash, rel(DAY_SECS), now + MIN).await).clone();
-        assert_eq!(build_no(&fresh, "p1"), 2);
-        assert_eq!(fresh.link_rev, link.rev);
-        assert_ne!(fresh.rev, stale.rev);
+        let served = read_at(engine, flights, &link, &dash, rel(DAY_SECS), now + MIN).await;
+        let Served::Data {
+            response, outcome, ..
+        } = &served
+        else {
+            panic!("expected data, got {served:?}");
+        };
+        assert_eq!(*outcome, "cold_miss");
+        assert!(!response.stale && !response.refreshing);
+        assert_eq!(build_no(response, "p1"), 2);
+        assert_eq!(response.link_rev, link.rev);
+        assert_ne!(response.rev, first.rev);
     }
 
     #[tokio::test]
