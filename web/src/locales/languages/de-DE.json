@@ -6786,7 +6786,9 @@
       "panelMoveFailed": "Panel-Verschiebung fehlgeschlagen",
       "failedToFetchReports": "Berichte konnten nicht abgerufen werden",
       "failedToUpdateJson": "Dashboard-JSON konnte nicht aktualisiert werden: Speichermethode nicht verfügbar",
-      "failedToSaveChanges": "Dashboard-Änderungen konnten nicht gespeichert werden"
+      "failedToSaveChanges": "Dashboard-Änderungen konnten nicht gespeichert werden",
+      "autoRunDescription": "Führt Abfragen beim Öffnen und bei Filter-/Zeitänderungen aus",
+      "autoRunScope": "Gilt für alle Dashboards, Logs und Traces"
     },
     "dynamicFunctionPopUp": {
       "property": "Eigenschaft",
@@ -7240,7 +7242,9 @@
       "markerAria": "Exemplar {value} um {time}"
     },
     "showExemplarsLabel": "Exemplare anzeigen",
-    "showExemplarsHelp": "Zeichnet Trace-Stichproben in diesem Diagramm für alle, die das Dashboard öffnen. Betrachter können sie weiterhin über die Panel-Kopfzeile ausblenden."
+    "showExemplarsHelp": "Zeichnet Trace-Stichproben in diesem Diagramm für alle, die das Dashboard öffnen. Betrachter können sie weiterhin über die Panel-Kopfzeile ausblenden.",
+    "refreshToApplyTimeRange": "Aktualisieren, um den Zeitbereich anzuwenden",
+    "refreshToApplyTimeRangeAndVariables": "Aktualisieren, um den Zeitbereich und Variablenänderungen anzuwenden"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7867,7 +7871,7 @@
       "inviteSent": "Einladung erfolgreich gesendet",
       "inviteSameOrg": "Eine Organisation kann sich nicht selbst einladen",
       "childHeadline": "Abrechnung verwaltet von",
-      "childHeroSub": "Ihre Nutzung wird dieser Organisation in Rechnung gestellt. Planänderungen und Rechnungen werden von der Mutterorganisation bearbeitet — hier gibt es nichts zu verwalten.",
+      "childHeroSub": "Ihre Nutzung wird dieser Organisation in Rechnung gestellt. Planänderungen und Rechnungen werden von der übergeordneten Organisation verwaltet.",
       "invitesPanelHint": "Diese Organisationen haben Sie eingeladen, ihrer Abrechnungsgruppe beizutreten. Wenn du zustimmst, wird ihnen die Nutzung dieser Organisation in Rechnung gestellt.",
       "inviteTabPrompt": "Laden Sie eine andere Organisation ein, Ihrer Abrechnungsgruppe beizutreten. Ihre Nutzung wird dieser Organisation in Rechnung gestellt.",
       "emptyTitle": "Fakturierungsgruppe starten",
@@ -7887,7 +7891,15 @@
       "currentOrgTitle": "Aktuelle Organisation",
       "memberOrgsTitle": "Mitgliedsorganisationen",
       "searchMemberOrg": "Organisation suchen",
-      "noMemberMatch": "Keine passenden Organisationen"
+      "noMemberMatch": "Keine passenden Organisationen",
+      "remove": "Entfernen",
+      "removeTitle": "{name} aus Ihrer Abrechnungsgruppe entfernen?",
+      "removeBody": "Diese Organisation wird zu einer kostenlosen Organisation und bezahlt ihre eigene Nutzung. Es gelten die Limits des kostenlosen Plans. Ihre Benutzer, Daten und bisherige Nutzung sind nicht betroffen.",
+      "removed": "Organisation aus der Abrechnungsgruppe entfernt",
+      "leave": "Abrechnungsgruppe verlassen",
+      "leaveTitle": "Die Abrechnungsgruppe von {name} verlassen?",
+      "leaveBody": "Diese Organisation wird zu einer kostenlosen Organisation und bezahlt ihre eigene Nutzung. Es gelten die Limits des kostenlosen Plans. Ihre Benutzer, Daten und bisherige Nutzung sind nicht betroffen.",
+      "left": "Abrechnungsgruppe verlassen"
     },
     "azureMarketplace": {
       "noTokenFound": "Kein Marketplace-Token gefunden.",

@@ -6786,7 +6786,9 @@
       "panelMoveFailed": "Falha ao mover o painel",
       "failedToFetchReports": "Falha ao buscar relatórios",
       "failedToUpdateJson": "Falha ao atualizar o JSON do dashboard: método de salvamento não disponível",
-      "failedToSaveChanges": "Falha ao salvar alterações no dashboard"
+      "failedToSaveChanges": "Falha ao salvar alterações no dashboard",
+      "autoRunDescription": "Executa consultas ao abrir e em alterações de filtro/tempo",
+      "autoRunScope": "Aplica-se a todos os painéis, Registros e Rastros"
     },
     "dynamicFunctionPopUp": {
       "property": "Propriedade",
@@ -7240,7 +7242,9 @@
       "markerAria": "Exemplar {value} em {time}"
     },
     "showExemplarsLabel": "Mostrar exemplares",
-    "showExemplarsHelp": "Desenha amostras de rastros neste gráfico para todos que abrirem o painel. Os visualizadores ainda podem ocultá-las no cabeçalho do painel."
+    "showExemplarsHelp": "Desenha amostras de rastros neste gráfico para todos que abrirem o painel. Os visualizadores ainda podem ocultá-las no cabeçalho do painel.",
+    "refreshToApplyTimeRange": "Atualize para aplicar o intervalo de tempo",
+    "refreshToApplyTimeRangeAndVariables": "Atualize para aplicar o intervalo de tempo e as alterações de variáveis"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7867,7 +7871,7 @@
       "inviteSent": "Convite enviado com sucesso",
       "inviteSameOrg": "Uma organização não pode se convidar",
       "childHeadline": "Faturamento gerenciado por",
-      "childHeroSub": "Seu uso é cobrado dessa organização. As mudanças no plano e as faturas são gerenciadas pela organização-mãe — não há nada para gerenciar aqui.",
+      "childHeroSub": "Seu uso é cobrado nesta organização. Alterações de plano e faturas são tratadas pela organização pai.",
       "invitesPanelHint": "Essas organizações convidaram você para participar do grupo de cobrança. Se você aceitar, o uso dessa organização será cobrado deles.",
       "inviteTabPrompt": "Convide outra organização para participar do seu grupo de cobrança. Seu uso será cobrado dessa organização.",
       "emptyTitle": "Iniciar grupo de cobrança",
@@ -7887,7 +7891,15 @@
       "currentOrgTitle": "Organização Atual",
       "memberOrgsTitle": "Organizações Membros",
       "searchMemberOrg": "Pesquisar Organização",
-      "noMemberMatch": "Nenhuma Organização Correspondente"
+      "noMemberMatch": "Nenhuma Organização Correspondente",
+      "remove": "Remover",
+      "removeTitle": "Remover {name} do seu grupo de faturamento?",
+      "removeBody": "Esta organização passa a ser uma organização gratuita e paga pelo próprio uso. Aplicam-se os limites do plano gratuito. Seus usuários, dados e uso anterior não são afetados.",
+      "removed": "Organização removida do grupo de faturamento",
+      "leave": "Sair do grupo de faturamento",
+      "leaveTitle": "Sair do grupo de faturamento de {name}?",
+      "leaveBody": "Esta organização passa a ser uma organização gratuita e paga pelo próprio uso. Aplicam-se os limites do plano gratuito. Seus usuários, dados e uso anterior não são afetados.",
+      "left": "Saiu do grupo de faturamento"
     },
     "azureMarketplace": {
       "noTokenFound": "Nenhum Token de Marketplace Encontrado",
