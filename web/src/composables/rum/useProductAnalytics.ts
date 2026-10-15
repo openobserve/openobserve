@@ -154,6 +154,8 @@ const scopeError = ref<string | null>(null);
 const invalidParams = ref<string[]>([]);
 const lastSubTab = ref<AnalyticsSubTab>("overview");
 const funnel = ref<FunnelDef>(defaultFunnel());
+// Compare to the previous period lives in the link only, never in a saved funnel.
+const funnelCompare = ref(false);
 const paths = ref<PathsDef>(defaultPaths());
 const retention = ref<RetentionDef>(defaultRetention());
 const trendSeries = ref<StepRef[]>([]);
@@ -236,6 +238,7 @@ export function resetProductAnalytics(): void {
   invalidParams.value = [];
   lastSubTab.value = "overview";
   funnel.value = defaultFunnel();
+  funnelCompare.value = false;
   paths.value = defaultPaths();
   retention.value = defaultRetention();
   trendSeries.value = [];
@@ -415,6 +418,7 @@ export default function useProductAnalytics() {
     retention.value = defaultRetention();
     if (!keepFunnel) {
       funnel.value = defaultFunnel();
+      funnelCompare.value = firstString(q.fc) === "prev";
       if (q.funnel !== undefined) {
         const def = parseFunnelDef(decodeDef(firstString(q.funnel)));
         if (def) funnel.value = def;
@@ -465,6 +469,7 @@ export default function useProductAnalytics() {
     const sf = openedFunnel.value?.id ?? pendingSavedId.value;
     if (routeName !== PA_ROUTES.funnels) {
       if (funnel.value.steps.length) q.funnel = encodeDef(funnelParam(funnel.value));
+      if (funnelCompare.value) q.fc = "prev";
       if (sf) q.sf = sf;
     }
     const p = paths.value;
@@ -1085,6 +1090,7 @@ export default function useProductAnalytics() {
     invalidParams,
     lastSubTab,
     funnel,
+    funnelCompare,
     paths,
     retention,
     trendSeries,

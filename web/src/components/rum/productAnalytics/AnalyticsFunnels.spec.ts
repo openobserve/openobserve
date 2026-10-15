@@ -2203,4 +2203,191 @@ describe("AnalyticsFunnels", () => {
       expect(panels[0].queries[0].query).not.toContain("env IN");
     });
   });
+
+  describe("compare to the previous period (P1-11)", () => {
+    const isFunnel = (sql: string) => /FROM (ps|pu) LIMIT 1|SELECT dim, /.test(sql);
+    type Call = { sql: string; start_time: number; end_time: number };
+    const calls = (): Call[] =>
+      vi.mocked(searchService.search).mock.calls.map((c) => c[0].query.query as Call);
+    const prevCalls = () => {
+      const cur = useProductAnalytics().range.value!;
+      return calls().filter((q) => isFunnel(q.sql) && q.end_time === cur.startUs);
+    };
+
+    // The previous window answers with its own numbers; everything else goes to the shared routes.
+    const answerPrevious = (prev: (sql: string) => Hit[] | Promise<Hit[]>) => {
+      const base = vi.mocked(searchService.search).getMockImplementation()!;
+      vi.mocked(searchService.search).mockImplementation((async (args: {
+        query: { query: Call };
+      }) => {
+        const q = args.query.query;
+        const cur = useProductAnalytics().range.value;
+        if (cur && q.end_time === cur.startUs && isFunnel(q.sql)) {
+          return { data: { hits: await prev(q.sql) } };
+        }
+        return base(args as never);
+      }) as never);
+    };
+
+    const prevHit = (counts: number[]) => (sql: string) => {
+      const n = (sql.match(/AS m\d+/g) ?? []).length;
+      return [
+        Object.fromEntries(
+          counts.slice(0, n).flatMap((c, i) => [
+            [`c${i + 1}`, c],
+            [`seen${i + 1}`, c],
+          ]),
+        ),
+      ];
+    };
+
+    const turnOn = async () => {
+      await wrapper!.find('[data-test="rum-analytics-funnel-compare-switch-btn"]').trigger("click");
+      await settle();
+    };
+
+    const threeSteps = [
+      ["p", "/a"],
+      ["c", "b"],
+      ["p", "/c"],
+    ];
+
+    it("runs the same funnel over the window before and never changes this period's numbers", async () => {
+      answerPrevious(prevHit([100, 60, 30]));
+      await mountFunnels();
+      await setSteps(threeSteps);
+      const before = {
+        counts: [0, 1, 2].map((i) => text(`rum-analytics-funnel-step-${i}-count`)),
+        overall: text("rum-analytics-funnel-overall"),
+        funnelRuns: calls().filter((q) => isFunnel(q.sql)).length,
+      };
+      const current = calls()
+        .filter((q) => isFunnel(q.sql))
+        .at(-1)!;
+      await turnOn();
+      expect(router.currentRoute.value.query.fc).toBe("prev");
+      expect(calls().filter((q) => isFunnel(q.sql))).toHaveLength(before.funnelRuns + 1);
+      const prev = prevCalls();
+      expect(prev).toHaveLength(1);
+      expect(prev[0].sql).toBe(current.sql);
+      expect(prev[0].start_time).toBe(current.start_time - (current.end_time - current.start_time));
+      expect([0, 1, 2].map((i) => text(`rum-analytics-funnel-step-${i}-count`))).toEqual(
+        before.counts,
+      );
+      expect(text("rum-analytics-funnel-overall")).toContain(before.overall.split(" ")[0]);
+      expect(text("rum-analytics-funnel-overall")).toContain("20.0%");
+      expect(text("rum-analytics-funnel-step-1-prev-count")).toBe("vs 60");
+      expect(text("rum-analytics-funnel-step-1-prev-rate")).toBe("60.0%");
+      expect(text("rum-analytics-funnel-step-1-change")).toContain("▼ 20.0 pts");
+      expect(text("rum-analytics-funnel-step-0-change")).toBe("—");
+      expect(text("rum-analytics-funnel-overall-change")).toContain("vs 30.0% in");
+      await turnOn();
+      expect(router.currentRoute.value.query.fc).toBeUndefined();
+      expect([0, 1, 2].map((i) => text(`rum-analytics-funnel-step-${i}-count`))).toEqual(
+        before.counts,
+      );
+      expect(calls().filter((q) => isFunnel(q.sql))).toHaveLength(before.funnelRuns + 1);
+    });
+
+    it("splits the step-to-step column under a group header and labels drop-offs with both periods", async () => {
+      answerPrevious(prevHit([100, 60, 30]));
+      await mountFunnels({ fc: "prev" });
+      await setSteps(threeSteps);
+      const header = wrapper!.find('[data-test="rum-analytics-funnel-steps-header"]');
+      expect(header.findAll("[data-test^=rum-analytics-funnel-col-]").map((c) => c.text())).toEqual(
+        [
+          "Conversion from previous step",
+          "Step",
+          "Sessions",
+          "This period",
+          "Previous period",
+          "Change (pts)",
+          "Time from step 1",
+          "Conversion from step 1",
+        ],
+      );
+      expect(
+        wrapper!
+          .find('[data-test="rum-analytics-funnel-col-change"] [aria-label]')
+          .attributes("aria-label"),
+      ).toBe("Change in percentage points");
+      expect(text("rum-analytics-funnel-dropoff-0")).toBe(
+        "60.0% dropped (120) vs 40.0% (40) previous period",
+      );
+      expect(text("rum-analytics-funnel-compare-legend")).toContain(
+        "Bars: share of step-1 sessions.",
+      );
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-bar-previous"]').exists()).toBe(true);
+    });
+
+    it("an empty previous period says so in words and shows dashes, not 0% or 100%", async () => {
+      answerPrevious(prevHit([0, 0, 0]));
+      await mountFunnels({ fc: "prev" });
+      await setSteps(threeSteps);
+      expect(text("rum-analytics-funnel-compare-empty")).toMatch(
+        /^No sessions in .+ to compare with$/,
+      );
+      expect(text("rum-analytics-funnel-step-1-prev-rate")).toBe("—");
+      expect(text("rum-analytics-funnel-step-1-change")).toBe("—");
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-step-1-prev-count"]').exists()).toBe(
+        false,
+      );
+      expect(text("rum-analytics-funnel-dropoff-0")).toBe("120 dropped (60.0%)");
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-overall-change"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("a failed previous run blanks only the compare cells", async () => {
+      answerPrevious(() =>
+        Promise.reject(Object.assign(new Error("boom"), { response: { status: 500 } })),
+      );
+      await mountFunnels({ fc: "prev" });
+      await setSteps(threeSteps);
+      expect(text("rum-analytics-funnel-step-1-count")).toBe("80");
+      expect(text("rum-analytics-funnel-step-1-prev-rate")).toBe("—");
+      expect(text("rum-analytics-funnel-step-1-change")).toBe("—");
+      expect(text("rum-analytics-funnel-dropoff-0")).toBe("120 dropped (60.0%)");
+    });
+
+    it("is offered only up to 31 days and stays on across a range change", async () => {
+      answerPrevious(prevHit([100, 60, 30]));
+      await mountFunnels({ fc: "prev", period: "60d" });
+      await setSteps(threeSteps);
+      const btn = wrapper!.find('[data-test="rum-analytics-funnel-compare-switch-btn"]');
+      expect(btn.attributes("disabled")).toBeDefined();
+      expect(prevCalls()).toHaveLength(0);
+      useProductAnalytics().setScope({
+        datetime: { valueType: "relative", relativeTimePeriod: "7d", startTime: 0, endTime: 0 },
+      });
+      await settle();
+      expect(useProductAnalytics().funnelCompare.value).toBe(true);
+      expect(prevCalls()).toHaveLength(1);
+      expect(text("rum-analytics-funnel-compare-vs")).toMatch(/^vs /);
+    });
+
+    it("with a breakdown, compares each value's overall conversion in its own columns", async () => {
+      answerPrevious(() => [
+        { dim: "Chrome", c1: 100, c2: 50 },
+        { dim: "Safari", c1: 10, c2: 5 },
+      ]);
+      await mountFunnels({ fc: "prev" });
+      await setSteps([
+        ["p", "/a"],
+        ["c", "b"],
+      ]);
+      useProductAnalytics().funnel.value = {
+        ...useProductAnalytics().funnel.value,
+        breakdown: "browser",
+      };
+      await settle();
+      expect(prevCalls().at(-1)!.sql).toMatch(/SELECT dim, /);
+      const table = wrapper!.find('[data-test="rum-analytics-funnel-breakdown"]');
+      expect(table.text()).toContain("Previous period");
+      expect(table.text()).toContain("Change (pts)");
+      expect(text("rum-analytics-funnel-breakdown-row-0-prev")).toBe("50.0%");
+      expect(text("rum-analytics-funnel-breakdown-row-1-prev")).toBe("—");
+      expect(table.text()).toContain("Safari");
+    });
+  });
 });

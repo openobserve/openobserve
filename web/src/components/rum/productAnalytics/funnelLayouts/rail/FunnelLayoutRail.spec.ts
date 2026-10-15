@@ -423,7 +423,24 @@ describe("FunnelLayoutRail", () => {
       await w.vm.$nextTick();
       expect(separatorOf(w).attributes("aria-valuemax")).toBe("480");
       await w.setProps({ hideTime: false });
-      expect(separatorOf(w).attributes("aria-valuemax")).toBe("406");
+      expect(separatorOf(w).attributes("aria-valuemax")).toBe("382");
+    });
+
+    it("gives the table its compare columns before the rail grows", async () => {
+      observeWidth(1318);
+      const w = mountRail({ hideTime: true });
+      await w.vm.$nextTick();
+      await w.setProps({
+        compare: {
+          status: "loading",
+          data: null,
+          range: "12–15 Oct",
+          prevRange: "8–11 Oct",
+          rangeExact: "",
+          prevRangeExact: "",
+        },
+      });
+      expect(separatorOf(w).attributes("aria-valuemax")).toBe("318");
     });
   });
 });

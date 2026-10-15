@@ -19,6 +19,7 @@ import type { AppFilterCounts } from "@/composables/rum/useAppFilterCounts";
 import type { I18nText } from "@/types/i18n";
 import type { FilterValuesState } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
 import type { FunnelResult, NamedEvent } from "@/utils/rum/productAnalyticsModel";
+import type { FunnelCompareView } from "@/utils/rum/funnelCompare";
 import type { FunnelDef, SampleRatio, StepRef } from "@/utils/rum/productAnalyticsQueries";
 
 export interface FunnelLayoutSetting {
@@ -50,6 +51,7 @@ export interface FunnelLayoutProps {
   filterFieldTypes?: Readonly<Record<string, string>>;
   filterValues: FilterValuesState;
   failed?: boolean;
+  compare?: FunnelCompareView | null;
 }
 
 export interface FunnelLayoutEmits {
