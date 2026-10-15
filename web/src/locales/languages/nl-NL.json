@@ -7770,7 +7770,7 @@
       "inviteSent": "Uitnodiging succesvol verzonden",
       "inviteSameOrg": "Een organisatie kan zichzelf niet uitnodigen",
       "childHeadline": "Facturering beheerd door",
-      "childHeroSub": "Je verbruik wordt aan deze organisatie gefactureerd. Planwijzigingen en facturen worden afgehandeld door de moederorganisatie — hier hoeft u niets te beheren.",
+      "childHeroSub": "Je verbruik wordt gefactureerd aan deze organisatie. Planwijzigingen en facturen worden afgehandeld door de moederorganisatie.",
       "invitesPanelHint": "Deze organisaties hebben je uitgenodigd om lid te worden van hun factureringsgroep. Als u akkoord gaat, wordt het verbruik van deze organisatie aan hen gefactureerd.",
       "inviteTabPrompt": "Nodig een andere organisatie uit om lid te worden van je factureringsgroep. Het gebruik ervan wordt aan deze organisatie gefactureerd.",
       "emptyTitle": "Factureringsgroep starten",
@@ -7790,7 +7790,15 @@
       "currentOrgTitle": "Huidige Organisatie",
       "memberOrgsTitle": "Lidorganisaties",
       "searchMemberOrg": "Organisatie zoeken",
-      "noMemberMatch": "Geen overeenkomende organisaties"
+      "noMemberMatch": "Geen overeenkomende organisaties",
+      "remove": "Verwijderen",
+      "removeTitle": "{name} uit je facturatiegroep verwijderen?",
+      "removeBody": "Deze organisatie wordt een gratis organisatie en betaalt voor zijn eigen verbruik. De limieten van het gratis plan zijn van toepassing. De gebruikers, gegevens en het eerdere verbruik blijven ongewijzigd.",
+      "removed": "Organisatie verwijderd uit facturatiegroep",
+      "leave": "Facturatiegroep verlaten",
+      "leaveTitle": "De facturatiegroep van {name} verlaten?",
+      "leaveBody": "Deze organisatie wordt een gratis organisatie en betaalt voor zijn eigen verbruik. De limieten van het gratis plan zijn van toepassing. Je gebruikers, gegevens en het eerdere verbruik blijven ongewijzigd.",
+      "left": "Facturatiegroep verlaten"
     },
     "azureMarketplace": {
       "noTokenFound": "Geen Marketplace-token gevonden",

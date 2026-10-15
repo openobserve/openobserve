@@ -7770,7 +7770,7 @@
       "inviteSent": "Invitation envoyée avec succès",
       "inviteSameOrg": "Une organisation ne peut pas s'inviter",
       "childHeadline": "Facturation gérée par",
-      "childHeroSub": "Votre utilisation est facturée à cette organisation. Les modifications de plan et les factures sont gérées par l'organisation mère. Il n'y a rien à gérer ici.",
+      "childHeroSub": "Votre utilisation est facturée à cette organisation. Les changements de plan et les factures sont gérés par l'organisation parente.",
       "invitesPanelHint": "Ces organisations vous ont invité à rejoindre leur groupe de facturation. Si vous acceptez, l'utilisation de cette organisation lui sera facturée.",
       "inviteTabPrompt": "Invitez une autre organisation à rejoindre votre groupe de facturation. Leur utilisation sera facturée à cette organisation.",
       "emptyTitle": "Démarrer le groupe de facturation",
@@ -7790,7 +7790,15 @@
       "currentOrgTitle": "Organisation Actuelle",
       "memberOrgsTitle": "Organisations membres",
       "searchMemberOrg": "Rechercher une organisation",
-      "noMemberMatch": "Aucune organisation correspondante"
+      "noMemberMatch": "Aucune organisation correspondante",
+      "remove": "Supprimer",
+      "removeTitle": "Supprimer {name} de votre groupe de facturation ?",
+      "removeBody": "Cette organisation devient une organisation gratuite et paie pour sa propre utilisation. Les limites du plan gratuit s'appliquent. Ses utilisateurs, ses données et son utilisation passée ne sont pas affectés.",
+      "removed": "Organisation supprimée du groupe de facturation",
+      "leave": "Quitter le groupe de facturation",
+      "leaveTitle": "Quitter le groupe de facturation de {name} ?",
+      "leaveBody": "Cette organisation devient une organisation gratuite et paie pour sa propre utilisation. Les limites du plan gratuit s'appliquent. Vos utilisateurs, vos données et votre utilisation passée ne sont pas affectés.",
+      "left": "Groupe de facturation quitté"
     },
     "azureMarketplace": {
       "noTokenFound": "Aucun jeton Marketplace trouvé",

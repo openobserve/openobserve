@@ -7770,7 +7770,7 @@
       "inviteSent": "Đã gửi lời mời thành công",
       "inviteSameOrg": "Một tổ chức không thể tự mời chính mình",
       "childHeadline": "Thanh toán được quản lý bởi",
-      "childHeroSub": "Mức sử dụng của bạn được tính cho tổ chức này. Thay đổi gói và hóa đơn được xử lý bởi tổ chức mẹ — không có gì phải quản lý ở đây.",
+      "childHeroSub": "Mức sử dụng của bạn được tính phí cho tổ chức này. Các thay đổi gói và hóa đơn do tổ chức cấp trên xử lý.",
       "invitesPanelHint": "Các tổ chức này đã mời bạn tham gia nhóm thanh toán của họ. Nếu bạn chấp nhận, mức sử dụng của tổ chức này sẽ được tính cho họ.",
       "inviteTabPrompt": "Mời một tổ chức khác tham gia nhóm thanh toán của bạn. Mức sử dụng của họ sẽ được tính cho tổ chức này.",
       "emptyTitle": "Bắt đầu nhóm thanh toán",
@@ -7790,7 +7790,15 @@
       "currentOrgTitle": "Tổ chức hiện tại",
       "memberOrgsTitle": "Các tổ chức thành viên",
       "searchMemberOrg": "Tìm kiếm tổ chức",
-      "noMemberMatch": "Không có tổ chức phù hợp"
+      "noMemberMatch": "Không có tổ chức phù hợp",
+      "remove": "Gỡ bỏ",
+      "removeTitle": "Gỡ bỏ {name} khỏi nhóm thanh toán của bạn?",
+      "removeBody": "Tổ chức này trở thành tổ chức miễn phí và tự chi trả cho mức sử dụng của mình. Các giới hạn của gói miễn phí sẽ được áp dụng. Người dùng, dữ liệu và mức sử dụng trước đây của tổ chức không bị ảnh hưởng.",
+      "removed": "Đã gỡ tổ chức khỏi nhóm thanh toán",
+      "leave": "Rời nhóm thanh toán",
+      "leaveTitle": "Rời khỏi nhóm thanh toán của {name}?",
+      "leaveBody": "Tổ chức này trở thành tổ chức miễn phí và tự chi trả cho mức sử dụng của mình. Các giới hạn của gói miễn phí sẽ được áp dụng. Người dùng, dữ liệu và mức sử dụng trước đây của bạn không bị ảnh hưởng.",
+      "left": "Đã rời nhóm thanh toán"
     },
     "azureMarketplace": {
       "noTokenFound": "Không tìm thấy mã thông báo Marketplace",
