@@ -2081,6 +2081,9 @@
         "window1d": "Within 1 day",
         "window7d": "Within 7 days",
         "noBreakdown": "No breakdown",
+        "breakdownLabel": "Breakdown",
+        "breakdownNone": "None",
+        "clearSteps": "Clear steps",
         "dims": {
           "browser": "Browser",
           "os": "OS",

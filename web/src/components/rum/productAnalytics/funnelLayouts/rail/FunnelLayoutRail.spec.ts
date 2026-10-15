@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mount, type DOMWrapper, type VueWrapper } from "@vue/test-utils";
+import { mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import type { FunnelResult } from "@/utils/rum/productAnalyticsModel";
 import type { FunnelDef, StepRef } from "@/utils/rum/productAnalyticsQueries";
@@ -127,17 +127,12 @@ describe("FunnelLayoutRail", () => {
       def: { ...DEF, steps: [DEF.steps[0], { kind: "e", key: "gone-id" }] },
       deletedNames: { "gone-id": "Old checkout" },
     });
-    expect(w.find('[data-test="rum-analytics-funnel-rail-step-1"]').text()).toContain(
-      "Old checkout",
-    );
+    expect(w.find('[data-test="rum-analytics-funnel-step-1"]').text()).toContain("Old checkout");
   });
 
-  it("shows the rail sections beside the steps table", () => {
+  it("shows the rail sections beside the steps table, with no step list in the rail", () => {
     const w = mountRail();
-    const steps = w.find('[data-test="rum-analytics-funnel-rail-steps"]').text();
-    expect(steps).toContain("/web");
-    expect(steps).toContain("errored");
-    expect(w.find('[data-test="rum-analytics-funnel-rail-step-1"]').text()).not.toContain("where");
+    expect(w.find("aside").text()).not.toContain("/web");
     expect(w.find('[data-test="rum-analytics-funnel-exclusions"]').text()).toContain(
       "Exclusion steps",
     );
@@ -151,12 +146,12 @@ describe("FunnelLayoutRail", () => {
     expect(w.find('[data-test="rum-analytics-funnel-steps-table"]').exists()).toBe(true);
   });
 
-  it("a page step's filter button expands its conditions in place and emits update:def", async () => {
+  it("a page step's filter button opens its conditions and emits update:def", async () => {
     const w = mountRail();
     expect(w.find('[data-test="rum-analytics-funnel-step-0-filters-popover"]').exists()).toBe(
       false,
     );
-    await w.find('[data-test="rum-analytics-funnel-rail-step-0-filters"]').trigger("click");
+    await w.find('[data-test="rum-analytics-funnel-step-0-filters"]').trigger("click");
     const popover = w.find('[data-test="rum-analytics-funnel-step-0-filters-popover"]');
     expect(popover.text()).toMatch(/time on page/i);
     popover.findAllComponents({ name: "OCheckbox" }).at(0)!.vm.$emit("update:modelValue", true);
@@ -166,24 +161,16 @@ describe("FunnelLayoutRail", () => {
   });
 
   it("a click step has no condition editor", () => {
-    expect(
-      mountRail().find('[data-test="rum-analytics-funnel-rail-step-1-filters"]').exists(),
-    ).toBe(false);
+    expect(mountRail().find('[data-test="rum-analytics-funnel-step-1-filters"]').exists()).toBe(
+      false,
+    );
   });
 
-  it("the table leaves step edits to the rail", () => {
+  it("table rows drag by their handle, and a drop reorders the funnel", async () => {
     const w = mountRail();
-    expect(w.find('[data-test="rum-analytics-funnel-step-1-remove"]').exists()).toBe(false);
-    expect(w.find('[data-test="rum-analytics-funnel-step-0-filters"]').exists()).toBe(false);
-    expect(
-      w.find('[data-test="rum-analytics-funnel-steps-table"] .funnel-drag-handle').exists(),
-    ).toBe(false);
-  });
-
-  it("rail steps drag by the handle over their number, and a drop reorders the funnel", async () => {
-    const w = mountRail();
-    const handle = w.find('[data-test="rum-analytics-funnel-rail-step-0-drag"]');
-    expect(handle.classes()).toContain("funnel-drag-handle");
+    expect(w.find('[data-test="rum-analytics-funnel-step-0"] .funnel-drag-handle').exists()).toBe(
+      true,
+    );
     w.findComponent(draggableStub).vm.$emit("update:modelValue", [DEF.steps[1], DEF.steps[0]]);
     await w.vm.$nextTick();
     const def = w.emitted("update:def")!.at(-1)![0] as FunnelDef;
@@ -191,7 +178,7 @@ describe("FunnelLayoutRail", () => {
     expect(def.x).toEqual([]);
   });
 
-  it("puts the card beside the rail, with the page's header, notices and footer in it", () => {
+  it("puts the card beside the rail, with the page's header, actions, notices and footer in it", () => {
     const base = mountRail();
     const props = base.props() as never;
     base.unmount();
@@ -199,6 +186,7 @@ describe("FunnelLayoutRail", () => {
       props,
       slots: {
         header: "<div data-test='h' />",
+        actions: "<div data-test='a' />",
         notices: "<div data-test='n' />",
         footer: "<div data-test='f' />",
       },
@@ -208,7 +196,26 @@ describe("FunnelLayoutRail", () => {
       },
     });
     const card = wrapper.find('[data-test="rum-analytics-funnel-card"]');
-    for (const id of ["h", "n", "f"]) expect(card.find(`[data-test="${id}"]`).exists()).toBe(true);
+    for (const id of ["h", "a", "n", "f"])
+      expect(card.find(`[data-test="${id}"]`).exists()).toBe(true);
+    const toolbar = card.find('[data-test="rum-analytics-funnel-toolbar"]');
+    const ids = toolbar
+      .findAll("[data-test]")
+      .map((e) => e.attributes("data-test"))
+      .filter((id) =>
+        [
+          "rum-analytics-funnel-rail-collapse-btn",
+          "h",
+          "rum-analytics-funnel-add-step-btn",
+          "a",
+        ].includes(id!),
+      );
+    expect(ids).toEqual([
+      "rum-analytics-funnel-rail-collapse-btn",
+      "h",
+      "rum-analytics-funnel-add-step-btn",
+      "a",
+    ]);
     expect(wrapper.find("aside").find('[data-test="rum-analytics-funnel-card"]').exists()).toBe(
       false,
     );
@@ -216,15 +223,17 @@ describe("FunnelLayoutRail", () => {
 
   it("a failed panel keeps the rail but drops the steps table", () => {
     const w = mountRail({ failed: true });
-    expect(w.find('[data-test="rum-analytics-funnel-rail-steps"]').exists()).toBe(true);
+    expect(w.find('[data-test="rum-analytics-funnel-exclusions"]').exists()).toBe(true);
     expect(w.find('[data-test="rum-analytics-funnel-steps-table"]').exists()).toBe(false);
   });
 
-  it("the Steps + opens the add-step box", async () => {
+  it("the toolbar Add step opens the add-step box, and an added step closes it", async () => {
     const w = mountRail();
-    expect(w.find('[data-test="rum-analytics-funnel-rail-add-step"]').exists()).toBe(false);
-    await w.find('[data-test="rum-analytics-funnel-rail-add-step-btn"]').trigger("click");
-    expect(w.find('[data-test="rum-analytics-funnel-rail-add-step"]').exists()).toBe(true);
+    expect(w.find('[data-test="rum-analytics-funnel-add-step"]').exists()).toBe(false);
+    await w.find('[data-test="rum-analytics-funnel-add-step-btn"]').trigger("click");
+    expect(w.find('[data-test="rum-analytics-funnel-add-step"]').exists()).toBe(true);
+    await w.setProps({ def: { ...DEF, steps: [...DEF.steps, { kind: "p", key: "/done" }] } });
+    expect(w.find('[data-test="rum-analytics-funnel-add-step"]').exists()).toBe(false);
   });
 
   it("the app filters switch turns hidden traffic off as well as on", async () => {
@@ -237,9 +246,9 @@ describe("FunnelLayoutRail", () => {
     expect(w.emitted("hide-hidden")).toHaveLength(1);
   });
 
-  it("a step removed from the rail reaches the rail's owner as update:def", async () => {
+  it("a step removed from the table reaches the rail's owner as update:def", async () => {
     const w = mountRail();
-    await w.find('[data-test="rum-analytics-funnel-rail-step-1-remove"]').trigger("click");
+    await w.find('[data-test="rum-analytics-funnel-step-1-remove"]').trigger("click");
     const def = w.emitted("update:def")!.at(-1)![0] as FunnelDef;
     expect(def.steps).toHaveLength(1);
     expect(def.x).toEqual([]);
@@ -261,25 +270,23 @@ describe("FunnelLayoutRail", () => {
     expect(next).not.toHaveProperty("f");
   });
 
-  it("shows a step's view conditions in the rail step card", () => {
+  it("shows a step's view conditions in its table row", () => {
     const vc = [{ t: "ref", op: "eq", values: ["google.com"] }];
     const def = {
       ...DEF,
       steps: [{ kind: "p", key: "/web", f: { vc } }, DEF.steps[1]],
     } as FunnelDef;
-    expect(
-      mountRail({ def }).find('[data-test="rum-analytics-funnel-rail-step-0"]').text(),
-    ).toContain("from google.com");
+    expect(mountRail({ def }).find('[data-test="rum-analytics-funnel-step-0"]').text()).toContain(
+      "from google.com",
+    );
   });
 
   describe("collapsible side panel", () => {
-    const RAIL = '[data-test="rum-analytics-funnel-layout-rail"]';
     const SECTIONS = '[data-test="rum-analytics-funnel-rail-sections"]';
-    const STRIP = '[data-test="rum-analytics-funnel-rail-collapsed"]';
+    const PANEL = ".o-splitter__before";
+    const SEPARATOR = '[role="separator"]';
     const TOGGLE = '[data-test="rum-analytics-funnel-rail-collapse-btn"]';
-    const EXPANDED_GRID = "lg:grid-cols-[22rem_minmax(0,1fr)]";
-    const COLLAPSED_GRID = "lg:grid-cols-[auto_minmax(0,1fr)]";
-    const toggleIn = (w: VueWrapper | DOMWrapper<Element>) => {
+    const toggleIn = (w: VueWrapper) => {
       const toggle = w.find(TOGGLE);
       expect(toggle.exists()).toBe(true);
       return toggle;
@@ -293,80 +300,42 @@ describe("FunnelLayoutRail", () => {
       localStorage.removeItem(COLLAPSED_KEY);
     });
 
-    it("mounts expanded by default", () => {
+    it("mounts expanded by default, with the toggle in the card toolbar", () => {
       const w = mountRail();
       expect(toggleIn(w).attributes("aria-expanded")).toBe("true");
       expect(toggleIn(w).attributes("aria-label")).toBe("Collapse side panel");
-      expect(toggleIn(w).element.closest('[class~="max-lg:hidden"]')).not.toBeNull();
-      expect(w.find(STRIP).exists()).toBe(false);
-      const sections = w.find(SECTIONS);
-      expect(sections.exists()).toBe(true);
-      expect(sections.classes()).not.toContain("lg:hidden");
+      expect(toggleIn(w).classes()).toContain("max-lg:hidden");
+      expect(w.find('[data-test="rum-analytics-funnel-toolbar"]').find(TOGGLE).exists()).toBe(true);
+      expect(w.find(PANEL).classes()).not.toContain("lg:hidden");
     });
 
-    it("clicking the toggle collapses the panel to a strip and remembers it", async () => {
+    it("clicking the toggle hides the panel and remembers it", async () => {
       const w = mountRail();
       await toggleIn(w).trigger("click");
-      expect(w.find(SECTIONS).classes()).toContain("lg:hidden");
-      const strip = w.find(STRIP);
-      expect(strip.exists()).toBe(true);
-      expect(toggleIn(strip).attributes("aria-expanded")).toBe("false");
+      expect(w.find(PANEL).classes()).toContain("lg:hidden");
+      expect(toggleIn(w).attributes("aria-expanded")).toBe("false");
+      expect(toggleIn(w).attributes("aria-label")).toBe("Expand side panel");
       expect(localStorage.getItem(COLLAPSED_KEY)).toBe("1");
-      const grid = w.find(RAIL).classes();
-      expect(grid).toContain(COLLAPSED_GRID);
-      expect(grid).not.toContain(EXPANDED_GRID);
+      expect(w.find(SEPARATOR).classes()).toContain("hidden");
     });
 
     it("clicking the toggle again expands the panel and remembers that too", async () => {
       const w = mountRail();
       await toggleIn(w).trigger("click");
-      await toggleIn(w.find(STRIP)).trigger("click");
-      expect(w.find(STRIP).exists()).toBe(false);
-      expect(w.find(SECTIONS).classes()).not.toContain("lg:hidden");
+      await toggleIn(w).trigger("click");
+      expect(w.find(PANEL).classes()).not.toContain("lg:hidden");
       expect(toggleIn(w).attributes("aria-expanded")).toBe("true");
       expect(localStorage.getItem(COLLAPSED_KEY)).toBe("0");
-      const grid = w.find(RAIL).classes();
-      expect(grid).toContain(EXPANDED_GRID);
-      expect(grid).not.toContain(COLLAPSED_GRID);
+      expect(w.find(SEPARATOR).classes()).not.toContain("hidden");
+      expect(w.find(SECTIONS).exists()).toBe(true);
     });
 
     it("mounts collapsed when the panel was collapsed last time", () => {
       localStorage.setItem(COLLAPSED_KEY, "1");
       const w = mountRail();
-      expect(w.find(STRIP).exists()).toBe(true);
-      expect(toggleIn(w.find(STRIP)).attributes("aria-expanded")).toBe("false");
-      expect(toggleIn(w.find(STRIP)).attributes("aria-label")).toBe("Expand side panel");
-      expect(w.find(STRIP).classes()).toContain("max-lg:hidden");
-      expect(w.find(SECTIONS).classes()).toContain("lg:hidden");
-    });
-
-    it("keeps keyboard focus on the toggle across a collapse and an expand", async () => {
-      const w = mountRail();
-      await toggleIn(w).trigger("click");
-      expect(document.activeElement).toBe(toggleIn(w.find(STRIP)).element);
-      await toggleIn(w.find(STRIP)).trigger("click");
-      expect(document.activeElement).toBe(toggleIn(w).element);
-    });
-
-    it("keeps the steps table card while collapsed", () => {
-      localStorage.setItem(COLLAPSED_KEY, "1");
-      const w = mountRail();
-      expect(w.find(STRIP).exists()).toBe(true);
-      expect(w.find('[data-test="rum-analytics-funnel-card"]').exists()).toBe(true);
+      expect(toggleIn(w).attributes("aria-expanded")).toBe("false");
+      expect(w.find(PANEL).classes()).toContain("lg:hidden");
       expect(w.find('[data-test="rum-analytics-funnel-steps-table"]').exists()).toBe(true);
-    });
-
-    it("keeps the add-step box and an open step editor across a collapse", async () => {
-      const w = mountRail();
-      await w.find('[data-test="rum-analytics-funnel-rail-add-step-btn"]').trigger("click");
-      await w.find('[data-test="rum-analytics-funnel-rail-step-0-filters"]').trigger("click");
-      const filters = '[data-test="rum-analytics-funnel-rail-step-0-filters"]';
-      expect(w.find('[data-test="rum-analytics-funnel-rail-add-step"]').exists()).toBe(true);
-      expect(w.find(filters).attributes("aria-expanded")).toBe("true");
-      await toggleIn(w).trigger("click");
-      expect(w.find(SECTIONS).classes()).toContain("lg:hidden");
-      expect(w.find('[data-test="rum-analytics-funnel-rail-add-step"]').exists()).toBe(true);
-      expect(w.find(filters).attributes("aria-expanded")).toBe("true");
     });
 
     it("mounts expanded when localStorage throws", () => {
@@ -376,8 +345,7 @@ describe("FunnelLayoutRail", () => {
       try {
         const w = mountRail();
         expect(toggleIn(w).attributes("aria-expanded")).toBe("true");
-        expect(w.find(STRIP).exists()).toBe(false);
-        expect(w.find(SECTIONS).classes()).not.toContain("lg:hidden");
+        expect(w.find(PANEL).classes()).not.toContain("lg:hidden");
       } finally {
         getItem.mockRestore();
       }
@@ -390,16 +358,76 @@ describe("FunnelLayoutRail", () => {
       try {
         const w = mountRail();
         await toggleIn(w).trigger("click");
-        expect(w.find(STRIP).exists()).toBe(true);
-        expect(w.find(SECTIONS).classes()).toContain("lg:hidden");
+        expect(w.find(PANEL).classes()).toContain("lg:hidden");
       } finally {
         setItem.mockRestore();
       }
     });
   });
+
+  describe("resizable side panel", () => {
+    const WIDTH_KEY = "o2.rum.analytics.funnelRailWidth";
+    const separatorOf = (w: VueWrapper) => w.find('[role="separator"]');
+    const RealObserver = globalThis.ResizeObserver;
+    const observeWidth = (width: number) => {
+      globalThis.ResizeObserver = class {
+        constructor(private cb: ResizeObserverCallback) {}
+        observe() {
+          this.cb([{ contentRect: { width } } as ResizeObserverEntry], this as never);
+        }
+        disconnect() {}
+        unobserve() {}
+      } as never;
+    };
+
+    beforeEach(() => localStorage.removeItem(WIDTH_KEY));
+    afterEach(() => {
+      localStorage.removeItem(WIDTH_KEY);
+      globalThis.ResizeObserver = RealObserver;
+    });
+
+    it("starts at 22rem and lets the rail move between 17rem and 30rem", () => {
+      const sep = separatorOf(mountRail());
+      expect(sep.attributes("aria-valuenow")).toBe("352");
+      expect(sep.attributes("aria-valuemin")).toBe("272");
+      expect(sep.attributes("aria-valuemax")).toBe("480");
+    });
+
+    it("remembers a dragged width", async () => {
+      const w = mountRail();
+      w.findComponent({ name: "OSplitter" }).vm.$emit("update:modelValue", 400);
+      await w.vm.$nextTick();
+      expect(localStorage.getItem(WIDTH_KEY)).toBe("400");
+      expect(separatorOf(w).attributes("aria-valuenow")).toBe("400");
+    });
+
+    it("clamps a remembered width into the limits", () => {
+      localStorage.setItem(WIDTH_KEY, "900");
+      expect(separatorOf(mountRail()).attributes("aria-valuenow")).toBe("480");
+      wrapper?.unmount();
+      localStorage.setItem(WIDTH_KEY, "100");
+      expect(separatorOf(mountRail()).attributes("aria-valuenow")).toBe("272");
+    });
+
+    it("keeps the table's floor, so a narrow frame pins the rail at its minimum", async () => {
+      observeWidth(1158);
+      const w = mountRail();
+      await w.vm.$nextTick();
+      expect(separatorOf(w).attributes("aria-valuemax")).toBe("272");
+      expect(separatorOf(w).attributes("aria-valuenow")).toBe("272");
+    });
+
+    it("gives the rail more room when the table has no time column", async () => {
+      observeWidth(1318);
+      const w = mountRail({ hideTime: true });
+      await w.vm.$nextTick();
+      expect(separatorOf(w).attributes("aria-valuemax")).toBe("480");
+      await w.setProps({ hideTime: false });
+      expect(separatorOf(w).attributes("aria-valuemax")).toBe("406");
+    });
+  });
 });
 
-// Ported from the removed inline layout: the exclusion and step-option parts are shared, the rail is now their only host.
 describe("FunnelLayoutRail: exclusion steps and step options", () => {
   let wrapper: VueWrapper | null = null;
   const OK = { status: "ok", rows: [], error: null } as never;
@@ -583,16 +611,16 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
         ],
       ),
     );
-    await w.find('[data-test="rum-analytics-funnel-rail-step-0-filters"]').trigger("click");
+    await w.find('[data-test="rum-analytics-funnel-step-0-filters"]').trigger("click");
     const page = w.find('[data-test="rum-analytics-funnel-step-0-filters-popover"]').text();
     expect(page).toMatch(/time on page/i);
     expect(page).toMatch(/frustrat/i);
-    expect(w.find('[data-test="rum-analytics-funnel-rail-step-1-filters"]').exists()).toBe(false);
+    expect(w.find('[data-test="rum-analytics-funnel-step-1-filters"]').exists()).toBe(false);
   });
 
   it("choosing the frustrated filter on a page step emits a def whose step carries it", async () => {
     const w = mountLayout(defWith([], steps.slice(0, 2)));
-    await w.find('[data-test="rum-analytics-funnel-rail-step-0-filters"]').trigger("click");
+    await w.find('[data-test="rum-analytics-funnel-step-0-filters"]').trigger("click");
     w.findAllComponents({ name: "OCheckbox" })
       .find((c) => c.attributes("data-test") === "rum-analytics-funnel-step-0-filter-frustrated")!
       .vm.$emit("update:modelValue", true);

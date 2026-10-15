@@ -65,6 +65,7 @@ export interface FunnelLayoutEmits {
 /** A layout places the page's card header, its notices and its footer, so it decides where the card sits. */
 export interface FunnelLayoutSlots {
   header?: () => unknown;
+  actions?: () => unknown;
   notices?: () => unknown;
   footer?: () => unknown;
 }
