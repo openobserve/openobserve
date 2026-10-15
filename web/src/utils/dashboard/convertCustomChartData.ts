@@ -23,6 +23,10 @@ import dompurifyUrl from "dompurify/dist/purify.min.js?url";
 
 export const panelIdToBeRefreshed = ref<string | null>(null);
 
+// import.meta.url is this chunk's URL, so relative ?url paths resolve to the correct assets directory.
+const sandboxEchartsUrl = new URL(echartsUrl, import.meta.url).href;
+const sandboxDompurifyUrl = new URL(dompurifyUrl, import.meta.url).href;
+
 /**
  * Converts SQL data into a format suitable for rendering a chart.
  *
@@ -66,19 +70,6 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
       cspViolationBlocked: gt("dashboard.utils.cspViolationBlocked"),
     });
 
-    // In production Vite resolves ?url imports via import.meta.url (always absolute).
-    // new URL() is a defensive no-op for absolute inputs; the try-catch handles
-    // environments where window.location.origin is not a valid base (e.g. jsdom).
-    const toAbsoluteUrl = (url: string) => {
-      try {
-        return new URL(url, window.location.origin).href;
-      } catch {
-        return url;
-      }
-    };
-    const absoluteEchartsUrl = toAbsoluteUrl(echartsUrl);
-    const absoluteDompurifyUrl = toAbsoluteUrl(dompurifyUrl);
-
     const scriptContent = `
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'none';
@@ -88,8 +79,8 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     connect-src 'none';
   ">
 
-  <script src="${absoluteEchartsUrl}" nonce="${nonce}"></script>
-  <script src="${absoluteDompurifyUrl}" nonce="${nonce}"></script>
+  <script src="${sandboxEchartsUrl}" nonce="${nonce}"></script>
+  <script src="${sandboxDompurifyUrl}" nonce="${nonce}"></script>
   <script nonce="${nonce}">
     const i18nMessages = ${sandboxMessages};
     let securityPolicyError = false;
