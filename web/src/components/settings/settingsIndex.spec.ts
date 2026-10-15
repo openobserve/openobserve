@@ -394,6 +394,13 @@ describe("SettingsIndex.vue", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.isConstrainedSection).toBe(false);
     });
+
+    // The page renders its own OPageLayout header and tables, like Correlation Settings.
+    it("should be false for orgDomainMapping section", () => {
+      mockRouter.currentRoute.value.name = "orgDomainMapping";
+      wrapper = createWrapper();
+      expect(wrapper.vm.isConstrainedSection).toBe(false);
+    });
   });
 
   describe("password policy section", () => {

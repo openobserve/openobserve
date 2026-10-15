@@ -125,7 +125,6 @@ export default defineComponent({
       "organization",
       "license",
       "domain_management",
-      "org_domain_mapping",
       "password_policy",
     ]);
     const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
