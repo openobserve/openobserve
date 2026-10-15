@@ -49,10 +49,10 @@ def o2ai_requests(o2ai: O2aiMock, suffix: str) -> list[dict[str, Any]]:  # noqa:
 
 
 def click(client: OpenObserveClient, inst: dict[str, Any], team: str, user: str, *, channel: str,
-          message_ts: str, thread_ts: str | None, action: dict[str, Any]) -> None:
+          message_ts: str, thread_ts: str | None, action: dict[str, Any], ephemeral: bool = False) -> None:
     """A ``block_actions`` payload as Slack posts it (form ``payload=``), signed."""
     container: dict[str, Any] = {"type": "message", "message_ts": message_ts, "channel_id": channel,
-                                 "is_ephemeral": False}
+                                 "is_ephemeral": ephemeral}
     message: dict[str, Any] = {"type": "message", "ts": message_ts, "user": "U0BOT", "bot_id": "B0BOT"}
     if thread_ts:
         container["thread_ts"] = thread_ts
@@ -119,7 +119,16 @@ def test_thumbs_down_reason_reaches_o2ais_feedback_comment(
     assert "o2_retry" in thanks[-1]["blocks"], "Try again offered"
 
 
-def test_approve_runs_confirm_once_and_the_message_reads_approved(
+def card_edits(mock: SlackMock, message_ts: str, words: str) -> list[dict[str, str]]:
+    return [c["form"] for c in mock.calls("chat.update")
+            if c["form"].get("ts") == message_ts and words in c["form"].get("blocks", "")]
+
+
+def card_head(form: dict[str, str]) -> str:
+    return json.loads(form["blocks"])[0]["text"]["text"]
+
+
+def test_approve_runs_confirm_once_and_the_card_says_what_was_deleted(
     client: OpenObserveClient, slack_org: str, ready: SlackMock, o2ai: O2aiMock,  # noqa: F811
 ) -> None:
     team, inst, _ = setup_team(client, slack_org, ready, "U0ANN")
@@ -140,10 +149,10 @@ def test_approve_runs_confirm_once_and_the_message_reads_approved(
     session = turns_for(o2ai, tag)[0]["headers"]["x-o2-assistant-session-id"]
     assert confirms[0]["path"].endswith(f"/confirm/{session}")
     assert confirms[0]["body"]["approved"] is True
-    edited = wait_until(lambda: [c["form"] for c in ready.calls("chat.update")
-                                 if c["form"].get("ts") == message_ts and "Approved by" in c["form"].get("blocks", "")],
-                        "the Approved edit")
-    assert "<@U0ANN>" in edited[-1]["blocks"]
+    edited = wait_until(lambda: card_edits(ready, message_ts, "Approved by"), "the Approved edit")
+    head = card_head(edited[-1])
+    assert head.startswith("✓ Approved by <@U0ANN>"), head
+    assert head.endswith(' · Deleted dashboard "Checkout"'), "never a bare Approved: " + head
     wait_until(lambda: [a for a in answers_in(ready, ts) if "Hello! How" in a["blocks"]],
                "the turn's answer after the approval")
 
@@ -151,6 +160,27 @@ def test_approve_runs_confirm_once_and_the_message_reads_approved(
     wait_until(lambda: [e for e in ephemerals(ready, "U0ANN") if "already answered" in e.get("text", "")],
                "the second click's note")
     assert len(o2ai_requests(o2ai, "/confirm")) == 1, "confirm runs once"
+
+
+def test_a_delete_o2_refuses_after_the_approval_says_so_on_the_card(
+    client: OpenObserveClient, slack_org: str, ready: SlackMock, o2ai: O2aiMock,  # noqa: F811
+) -> None:
+    team, inst, _ = setup_team(client, slack_org, ready, "U0ANN")
+    tag = uniq()
+    o2ai.script({"confirm": "o2_delete", "delete_status": 403, "match": tag})
+    body, ts, _ = event(inst, team, "U0ANN", f"<@U0BOT> delete the checkout dashboard {tag}")
+    send(client, inst, body)
+    post = approval_post(ready, ts)
+    wait_until(lambda: answers_in(ready, ts), "the turn's answer: o2-ai answers deletes after the turn")
+    approve = element(json.loads(post["form"]["blocks"]), "o2_approve")
+    message_ts = post["response"]["ts"]
+    assert card_edits(ready, message_ts, "") == [], "a delete stays answerable after its turn"
+    click(client, inst, team, "U0ANN", channel=CHANNEL, message_ts=message_ts, thread_ts=ts, action=approve)
+    edited = wait_until(lambda: card_edits(ready, message_ts, "Approved by"), "the outcome on the card")
+    head = card_head(edited[-1])
+    assert head.startswith("⚠️ Approved by <@U0ANN>"), head
+    assert head.endswith(', but it did not succeed · dashboard "Checkout" not deleted '
+                         "(OpenObserve refused: 403 Unauthorized Access)"), head
 
 
 def test_org_cli_approval_needs_admin_when_openfga_is_off(
@@ -173,6 +203,9 @@ def test_org_cli_approval_needs_admin_when_openfga_is_off(
     assert slack_org in note[-1]["text"]
     assert o2ai_requests(o2ai, "/confirm") == []
     wait_until(lambda: answers_in(ready, ts), "the turn to end once the approval timed out", timeout=30)
+    ended = wait_until(lambda: card_edits(ready, post["response"]["ts"], "before it was approved"),
+                       "the card closed with its turn")
+    assert "o2_approve" not in ended[-1]["blocks"]
 
 
 def test_reask_in_answers_again_in_the_thread_in_the_picked_org(

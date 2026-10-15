@@ -20,12 +20,18 @@ Control endpoints (JSON):
 - ``POST /_mock/script``        queue answers for the next streamed turns, one per turn, in order:
   ``{"responses": [{"error": "session_not_found" | "turn_in_progress" | "session_owner_unavailable"},
   {"in_band": "restore_required" | "stale_epoch" | "turn_in_progress"}, {"turn": "partial"},
-  {"status": 503, "body": {...}}, {"confirm": "cli" | "o2_delete" | "permission", "wait_secs"?: 30}]}``;
+  {"status": 503, "body": {...}}, {"confirm": "cli" | "o2_delete" | "permission", "wait_secs"?: 30,
+  "delete_status"?: 403}]}``;
   ``{"default_turn": "plain"}`` changes the turn served when the queue is empty; ``"hold_secs"`` on a
   turn keeps its stream open before ``complete``. A ``confirm`` turn streams o2-ai's own
-  ``confirmation_required`` frame (``o2ai_confirmations.json``), waits for ``POST /confirm/<session>``
-  (or ``wait_secs``), then the ``plain`` turn. An answer with ``"match": "<text>"`` is only served to a
-  turn whose question contains that text, so other tests' background turns never take it
+  ``confirmation_required`` frame (``o2ai_confirmations.json``); a ``cli`` or ``permission`` one then
+  pauses until ``POST /confirm/<session>`` (or ``wait_secs``, after which o2-ai drops it, as its
+  timeout denies), and an ``o2_delete`` one does not pause, since o2-ai answers deletes after the turn;
+  then the ``plain`` turn. ``/confirm`` answers as o2-ai's ``confirm_action`` does: its per-kind body,
+  a delete's per-resource ``results`` (``delete_status`` other than 200 makes O2 refuse the delete),
+  and 404 ``No pending confirmation`` once the confirmation was answered or dropped. An answer with
+  ``"match": "<text>"`` is only served to a turn whose question contains that text, so other tests'
+  background turns never take it
 - ``GET  /_mock/frames``        the recorded frames file
 
 o2-ai paths: ``POST /o2_agent/<agent>/query/stream`` (SSE), ``POST /o2_agent/<agent>/query``
@@ -47,6 +53,9 @@ log = logging.getLogger("o2ai-mock")
 
 FRAMES_FILE = Path(__file__).with_name("o2ai_frames.json")
 CONFIRMATIONS_FILE = Path(__file__).with_name("o2ai_confirmations.json")
+
+# What O2 answered o2-ai's delete with, per status, as o2-ai's perform_resource_delete reports it.
+DELETE_DETAIL = {200: "", 403: "Unauthorized Access", 404: "Not Found"}
 
 ERRORS: dict[str, tuple[int, dict[str, Any]]] = {
     "session_not_found": (404, {"detail": {"code": "session_not_found", "session_id": "",
@@ -74,6 +83,8 @@ class State:
             self.queue: list[dict[str, Any]] = []
             self.default_turn = "chart"
             self.confirmed: dict[str, threading.Event] = {}
+            self.pending: dict[str, dict[str, Any]] = {}
+            self.resolved: set[str] = set()
 
     def record(self, method: str, path: str, headers: dict[str, str], body: Any) -> dict[str, Any]:
         entry = {"method": method, "path": path, "headers": headers, "body": body, "at": time.time()}
@@ -90,6 +101,28 @@ class State:
         with self.lock:
             return self.confirmed.setdefault(session_id.lower(), threading.Event())
 
+    def hold(self, session_id: str, kind: str, delete_status: int) -> None:
+        with self.lock:
+            self.pending[session_id.lower()] = {"kind": kind, "delete_status": delete_status}
+
+    def drop(self, session_id: str) -> None:
+        """o2-ai's confirmation timeout denies and forgets it."""
+        with self.lock:
+            if self.pending.pop(session_id.lower(), None) is not None:
+                self.resolved.add(session_id.lower())
+
+    def answer_confirmation(self, session_id: str, approved: bool) -> tuple[int, dict[str, Any]]:
+        key = session_id.lower()
+        with self.lock:
+            pending = self.pending.pop(key, None)
+            if pending is None:
+                if key in self.resolved:
+                    return 404, {"detail": f"No pending confirmation for session {session_id}"}
+                # Answered before its turn asked: the turn then finds it already confirmed.
+                return 200, {}
+            self.resolved.add(key)
+        return 200, confirm_reply(pending, approved, self.confirmations)
+
     def next_answer(self, query: str = "") -> dict[str, Any]:
         with self.lock:
             for i, answer in enumerate(self.queue):
@@ -99,6 +132,24 @@ class State:
 
 
 STATE = State()
+
+
+def confirm_reply(pending: dict[str, Any], approved: bool, confirmations: dict[str, Any]) -> dict[str, Any]:
+    """o2-ai's ``confirm_action`` return values (src/server/app.py), per kind."""
+    kind = pending["kind"]
+    if kind == "cli":
+        return {"approved": approved, "kind": "cli_confirmation"}
+    if kind == "permission":
+        return {"approved": approved, "replied": True, "kind": "opencode_permission"}
+    if not approved:
+        return {"approved": False, "deleted": False, "count": 0}
+    status = pending["delete_status"]
+    results = [{"resource": item["name"], "resource_type": item["resource_type"], "deleted": status < 300,
+                "status_code": status, "detail": DELETE_DETAIL.get(status, "error")}
+               for item in confirmations[kind]["args"]["items"]]
+    deleted = sum(1 for r in results if r["deleted"])
+    return {"approved": True, "deleted": deleted == len(results), "count": deleted, "total": len(results),
+            "results": results}
 
 
 def error_answer(name: str, session_id: str) -> tuple[int, dict[str, Any]]:
@@ -142,12 +193,15 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(f"data: {json.dumps(frame)}\n\n".encode())
         self.wfile.flush()
 
-    def _confirm_turn(self, kind: str, wait_secs: float, session_id: str) -> None:
-        """o2-ai pauses the turn on the confirmation until ``POST /confirm/<session>`` answers it."""
+    def _confirm_turn(self, answer: dict[str, Any], session_id: str) -> None:
+        """o2-ai pauses a CLI or permission turn until ``POST /confirm/<session>``; a delete waits for no one."""
+        kind = answer["confirm"]
         done = STATE.confirm_event(session_id)
+        STATE.hold(session_id, kind, answer.get("delete_status", 200))
         self._sse_head()
         self._sse_frame(STATE.confirmations[kind])
-        done.wait(wait_secs)
+        if kind != "o2_delete" and not done.wait(answer.get("wait_secs", 30)):
+            STATE.drop(session_id)
         for frame in STATE.frames["turns"]["plain"]:
             self._sse_frame(frame)
         self.close_connection = True
@@ -174,7 +228,7 @@ class Handler(BaseHTTPRequestHandler):
         elif "in_band" in answer:
             self._sse([STATE.frames["in_band_errors"][answer["in_band"]]])
         elif "confirm" in answer:
-            self._confirm_turn(answer["confirm"], answer.get("wait_secs", 30), session_id)
+            self._confirm_turn(answer, session_id)
         else:
             self._sse(STATE.frames["turns"][answer["turn"]], answer.get("hold_secs", 0), entry)
 
@@ -219,8 +273,11 @@ class Handler(BaseHTTPRequestHandler):
         if method == "POST" and path.endswith("/query/stream"):
             self._stream_turn(body, entry)
         elif method == "POST" and "/confirm/" in path:
-            STATE.confirm_event(path.rsplit("/", 1)[-1]).set()
-            self._json(200, {"status": "ok"})
+            session_id = path.rsplit("/", 1)[-1]
+            approved = isinstance(body, dict) and bool(body.get("approved"))
+            status, reply = STATE.answer_confirmation(session_id, approved)
+            STATE.confirm_event(session_id).set()
+            self._json(status, reply)
         elif method == "POST" and path.endswith("/query"):
             self._query()
         else:
