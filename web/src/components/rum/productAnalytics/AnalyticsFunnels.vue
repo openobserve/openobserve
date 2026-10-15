@@ -186,6 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter-values="filterValues"
         :failed="funnelFailed"
         :compare="compareView"
+        :trend="trend.shown.value"
         @update:def="applyDef"
         @filter-values="loadFilterValues"
         @dropoff="openDropoff"
@@ -273,6 +274,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #actions>
           <OToggleGroup
+            :model-value="pa.funnelView.value"
+            type="single"
+            :label="t('rum.analytics.funnel.view')"
+            label-position="left"
+            mobile-dropdown
+            data-test="rum-analytics-funnel-view"
+            @update:model-value="setView"
+          >
+            <OToggleGroupItem value="steps" size="xs" data-test="rum-analytics-funnel-view-steps">{{
+              t("rum.analytics.funnel.viewSteps")
+            }}</OToggleGroupItem>
+            <OToggleGroupItem
+              value="trend"
+              size="xs"
+              :disabled="def.steps.length < 2"
+              data-test="rum-analytics-funnel-view-trend"
+              >{{ t("rum.analytics.funnel.viewTrend") }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+          <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
+          <OToggleGroup
             :model-value="def.unit"
             type="single"
             :label="t('rum.analytics.funnel.countBy')"
@@ -330,6 +352,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
           <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
+          <template v-if="trend.shown.value">
+            <span class="flex items-center gap-2" data-test="rum-analytics-funnel-trend-pair">
+              <label
+                for="rum-analytics-funnel-trend-pair"
+                class="text-text-secondary text-xs font-semibold"
+                >{{ t("rum.analytics.funnel.trendPair") }}</label
+              >
+              <OSelect
+                id="rum-analytics-funnel-trend-pair"
+                :model-value="trend.pairValue.value"
+                :options="trend.pairOptions.value"
+                size="xs"
+                width="sm"
+                data-test="rum-analytics-funnel-trend-pair-select"
+                @update:model-value="trend.setPair"
+              />
+            </span>
+            <span class="flex items-center gap-2" data-test="rum-analytics-funnel-trend-interval">
+              <label
+                for="rum-analytics-funnel-trend-interval"
+                class="text-text-secondary text-xs font-semibold"
+                >{{ t("rum.analytics.funnel.trendInterval") }}</label
+              >
+              <OSelect
+                id="rum-analytics-funnel-trend-interval"
+                :model-value="pa.funnelInterval.value"
+                :options="trend.intervalOptions.value"
+                size="xs"
+                width="xs"
+                data-test="rum-analytics-funnel-trend-interval-select"
+                @update:model-value="trend.setInterval"
+              />
+            </span>
+            <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
+          </template>
           <span class="flex items-center gap-2" data-test="rum-analytics-funnel-compare">
             <span>
               <OSwitch
@@ -441,6 +498,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OEmptyState>
           </template>
         </template>
+        <template #trend>
+          <FunnelTrend
+            :state="trend.state.value"
+            :series="trend.series.value"
+            :periods="trend.periods.value"
+            :issue="trend.issue.value"
+            :breakdown="trend.breakdown.value"
+            :pair="trend.pair.value"
+            :pair-label="trend.pairLabel.value"
+            :dim-label="dimLabel"
+            :previous="trend.previous.value"
+            :timezone="timezone"
+            :range="trend.rangeText.value"
+            :unit-noun="unitNoun"
+            :data-start-us="pa.dataStartUs.value"
+            :today="!usersMode || def.window === 'session'"
+            @retry="runTrend(true)"
+          />
+        </template>
         <template #footer>
           <span
             v-if="!funnelFailed && def.x?.length"
@@ -448,7 +524,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rum-analytics-funnel-exclusions-caption"
             >{{ exclusionsCaption }}</span
           >
-          <template v-if="def.breakdown && breakdown && funnelPanel.status === 'ok'">
+          <template
+            v-if="!trend.shown.value && def.breakdown && breakdown && funnelPanel.status === 'ok'"
+          >
             <span class="text-text-secondary px-4 text-xs">{{
               t("rum.analytics.funnel.breakdownTimeHidden")
             }}</span>
@@ -522,6 +600,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
 import FunnelBreakdown from "@/components/rum/productAnalytics/FunnelBreakdown.vue";
+import FunnelTrend from "@/components/rum/productAnalytics/FunnelTrend.vue";
 import KeySequence from "@/components/rum/productAnalytics/KeySequence.vue";
 import DropoffDrawer from "@/components/rum/productAnalytics/DropoffDrawer.vue";
 import NamedEventsNotice from "@/components/rum/productAnalytics/NamedEventsNotice.vue";
@@ -542,6 +621,7 @@ import useFunnelDraft, {
 } from "@/composables/rum/useFunnelDraft";
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
 import useAppFilterCounts from "@/composables/rum/useAppFilterCounts";
+import useFunnelTrend from "@/composables/rum/useFunnelTrend";
 import FunnelLayoutRail from "@/components/rum/productAnalytics/funnelLayouts/rail/FunnelLayoutRail.vue";
 import type { FunnelLayoutSetting } from "@/components/rum/productAnalytics/funnelLayouts/types";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
@@ -577,7 +657,11 @@ import {
   type FunnelWindow,
   type StepRef,
 } from "@/utils/rum/productAnalyticsQueries";
-import { buildFunnelPanel, stepLabel } from "@/utils/rum/productAnalyticsPanels";
+import {
+  buildFunnelPanel,
+  buildFunnelTrendPanel,
+  stepLabel,
+} from "@/utils/rum/productAnalyticsPanels";
 import {
   compareAllowed,
   compareBreakdown,
@@ -797,6 +881,19 @@ const breakdownCompareState = computed<BreakdownCompareState | null>(() => {
   };
 });
 
+const trend = useFunnelTrend({
+  pa,
+  runner,
+  t,
+  def,
+  usersMode,
+  identitySql,
+  events,
+  timezone,
+  funnelKey: computed(() => funnelKey.value),
+  compareActive,
+});
+
 const filterFields = computed(() => [
   ...FILTER_FIELDS.filter((f) => pa.schema.value[f]),
   ...Object.keys(pa.schema.value).filter(isFilterColumn).sort(),
@@ -917,9 +1014,12 @@ const funnelFailed = computed(
   () => funnelPanel.value.status === "error" || funnelPanel.value.status === "forbidden",
 );
 const partial = computed(() => funnelPanel.value.status === "ok" && !!funnelPanel.value.partial);
-const alertReady = computed(() => def.value.steps.length > 1 && !!result.value && !partial.value);
+const alertReady = computed(
+  () => def.value.steps.length > 1 && !!result.value && !partial.value && !trend.shown.value,
+);
 const alertTip = computed<I18nText>(() => {
   if (def.value.steps.length < 2) return t("rum.analytics.funnel.alertNeedsRun");
+  if (trend.shown.value) return t("rum.analytics.funnel.alertTrend");
   if (partial.value) return t("rum.analytics.funnel.alertPartial");
   if (!result.value) {
     return funnelPanel.value.status === "error" || funnelPanel.value.status === "forbidden"
@@ -973,13 +1073,19 @@ watch(
 
 // A saved funnel's name is the panel's default title; the panel stays a snapshot.
 const dashboardPanel = () => {
-  const panel = buildFunnelPanel(
-    storedFunnelScope(pa.scope.value),
-    def.value,
-    events.value,
-    t,
-    namedEvents.deletedNames.value,
-  );
+  const scope = storedFunnelScope(pa.scope.value);
+  const deleted = namedEvents.deletedNames.value;
+  const panel = trend.shown.value
+    ? buildFunnelTrendPanel(
+        scope,
+        def.value,
+        trend.pair.value,
+        trend.interval.value ?? "day",
+        events.value,
+        t,
+        deleted,
+      )
+    : buildFunnelPanel(scope, def.value, events.value, t, deleted);
   return pa.openedFunnel.value ? { ...panel, title: pa.openedFunnel.value.name } : panel;
 };
 
@@ -1056,6 +1162,7 @@ const hold = (status: "idle" | "loading") => {
   runner.hold("funnel", status);
   runner.hold("funnel-prev", "idle");
   runner.hold("next", "idle");
+  trend.hold();
 };
 
 const compute = async (force = false) => {
@@ -1100,6 +1207,8 @@ const compute = async (force = false) => {
   );
   // Enqueued after the current run, so the table on screen never waits behind a compare-only scan.
   runPrevious(d, key, cur);
+  trend.tick();
+  void trend.run(d, force);
   const res = await current;
   if (res.status !== "ok" || key !== lastKey) return;
   runSuggestions(d, key, cur, opts);
@@ -1136,6 +1245,17 @@ const rerunPrevious = () => {
 
 const setCompare = (on: boolean) => {
   pa.funnelCompare.value = on;
+};
+
+const setView = (v: unknown) => {
+  if (v === "steps" || v === "trend") pa.funnelView.value = v;
+};
+
+// Only a funnel already run for the one on screen gets a trend run of its own.
+const runTrend = (force = false) => {
+  const key = funnelKey.value;
+  if (key !== lastKey || funnelPanel.value.key !== key) return;
+  void trend.run(effectiveDef.value, force);
 };
 
 const runSuggestions = (
@@ -1280,6 +1400,23 @@ watch(
     if (!active) return;
     void pa.syncUrl(router);
     rerunPrevious();
+    runTrend();
+  },
+);
+
+watch(
+  () => [pa.funnelView.value, pa.funnelPair.value, pa.funnelInterval.value],
+  () => {
+    if (active) void pa.syncUrl(router);
+  },
+  { deep: true },
+);
+
+// Any change to what the trend buckets (view, pair, interval, zone, first-data day) reruns only the trend.
+watch(
+  () => [trend.shown.value, trend.key.value],
+  () => {
+    if (active) runTrend();
   },
 );
 
@@ -1326,6 +1463,7 @@ onActivated(() => {
   void compute(cutShort || refreshMissed).then(() => {
     // A full compute already restarted the previous run, which then no longer reads aborted.
     if (prevCut && prevPanel.value.status === "aborted") rerunPrevious();
+    runTrend();
   });
   refreshMissed = false;
 });

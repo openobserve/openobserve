@@ -2417,4 +2417,91 @@ describe("AnalyticsFunnels", () => {
       expect(safari).toBe("Safari———50.0%—");
     });
   });
+
+  describe("conversion over time, Steps | Trend (P0-9)", () => {
+    type Call = { sql: string; start_time: number; end_time: number };
+    const calls = (): Call[] =>
+      vi.mocked(searchService.search).mock.calls.map((c) => c[0].query.query as Call);
+    const trendCalls = () => calls().filter((q) => / AS bk, | AS gd, /.test(q.sql));
+    const fourSteps = [
+      ["p", "/a"],
+      ["c", "b"],
+      ["p", "/c"],
+      ["c", "d"],
+    ];
+
+    beforeEach(() => {
+      routes.unshift([/ AS bk, | AS gd, /, () => [{ bk: 1, ca: 20, cb: 5 }]]);
+    });
+
+    it("Steps view and page load never run the trend query", async () => {
+      await mountFunnels();
+      await setSteps(fourSteps);
+      expect(trendCalls()).toHaveLength(0);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-trend"]').exists()).toBe(false);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-trend-pair"]').exists()).toBe(false);
+    });
+
+    it("Trend runs once, writes fv=trend, holds Alert me back, and Steps comes back without a rerun", async () => {
+      await mountFunnels();
+      await setSteps(fourSteps);
+      const stepsRuns = funnelSqls().length;
+      await wrapper!.find('[data-test="rum-analytics-funnel-view-trend"]').trigger("click");
+      await settle();
+      expect(router.currentRoute.value.query.fv).toBe("trend");
+      expect(trendCalls()).toHaveLength(1);
+      expect(trendCalls()[0].sql).toContain("MIN(CASE WHEN m1 = 1 THEN ts END) AS entry_ts");
+      expect(funnelSqls()).toHaveLength(stepsRuns);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-trend-table"]').text()).toContain(
+        "Entered step 1",
+      );
+      expect(
+        wrapper!.find('[data-test="rum-analytics-funnel-alert-btn"]').attributes("disabled"),
+      ).toBeDefined();
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-steps-table"]').exists()).toBe(false);
+      await wrapper!.find('[data-test="rum-analytics-funnel-view-steps"]').trigger("click");
+      await settle();
+      expect(router.currentRoute.value.query.fv).toBeUndefined();
+      expect(trendCalls()).toHaveLength(1);
+      expect(funnelSqls()).toHaveLength(stepsRuns);
+      expect(wrapper!.find('[data-test="rum-analytics-funnel-steps-table"]').exists()).toBe(true);
+    });
+
+    it("a pair from the link picks its own reach columns; a pair the funnel cannot hold falls back", async () => {
+      await mountFunnels({ fv: "trend", fp: "2-3" });
+      await setSteps(fourSteps);
+      expect(trendCalls().at(-1)!.sql).toMatch(
+        /SUM\(r2\) AS ca, SUM\(r3\) AS cb FROM ps WHERE r2 = 1/,
+      );
+      expect(text("rum-analytics-funnel-trend-pair")).toContain("Step 2 → Step 3");
+      useProductAnalytics().funnelPair.value = { a: 3, b: 9 };
+      await settle();
+      expect(trendCalls().at(-1)!.sql).toMatch(/SUM\(r1\) AS ca, SUM\(r4\) AS cb/);
+    });
+
+    it("with compare on, runs the trend again over the window before", async () => {
+      await mountFunnels({ fv: "trend", fc: "prev" });
+      await setSteps(fourSteps);
+      const cur = useProductAnalytics().range.value!;
+      const prev = trendCalls().filter((q) => q.end_time === cur.startUs);
+      expect(prev).toHaveLength(1);
+      expect(prev[0].start_time).toBe(cur.startUs - (cur.endUs - cur.startUs));
+      expect(
+        wrapper!.find('[data-test="rum-analytics-funnel-trend-table"] thead').text(),
+      ).toContain("Previous period, same day");
+    });
+
+    it("Add to dashboard from Trend adds a line panel bucketed by histogram", async () => {
+      await mountFunnels({ fv: "trend" });
+      await setSteps(fourSteps);
+      await wrapper!.find('[data-test="rum-analytics-funnel-add-dashboard-btn"]').trigger("click");
+      await flushPromises();
+      const panels = wrapper!.findComponent({ name: "AddToDashboard" }).props("panels") as {
+        type: string;
+        queries: { query: string }[];
+      }[];
+      expect(panels[0].type).toBe("line");
+      expect(panels[0].queries[0].query).toContain("histogram(entry_ts, '1 day')");
+    });
+  });
 });

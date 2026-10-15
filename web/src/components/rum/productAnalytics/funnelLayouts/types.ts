@@ -52,6 +52,8 @@ export interface FunnelLayoutProps {
   filterValues: FilterValuesState;
   failed?: boolean;
   compare?: FunnelCompareView | null;
+  /** The card shows the `trend` slot in place of the steps table. */
+  trend?: boolean;
 }
 
 export interface FunnelLayoutEmits {
@@ -69,5 +71,6 @@ export interface FunnelLayoutSlots {
   header?: () => unknown;
   actions?: () => unknown;
   notices?: () => unknown;
+  trend?: () => unknown;
   footer?: () => unknown;
 }
