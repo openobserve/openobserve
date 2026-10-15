@@ -189,9 +189,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="xs"
           :disabled="!datasetTarget"
+          focusable-unavailable
           data-test="quality-score-pane-add-to-dataset"
           @click="openDataset"
         >
+          <template #unavailable-reason>{{ datasetBlockedReason }}</template>
           {{ t("onlineEvals.quality.pane.addToDataset") }}
           <OTooltip v-if="datasetBlockedReason" :content="datasetBlockedReason" />
         </OButton>

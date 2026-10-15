@@ -265,10 +265,15 @@ describe("QualityScorePane", () => {
       score: score({ targetScope: "session", sessionId: "sess-1", targetId: "sess-1" }),
     });
     const button = wrapper.find('[data-test="quality-score-pane-add-to-dataset"]');
-    expect(button.attributes("disabled")).toBeDefined();
-    expect(button.findComponent({ name: "OTooltip" }).props("content")).toBe(
-      "Datasets take a single trace or span. Open the session to add one of its traces.",
-    );
+    const reason =
+      "Datasets take a single trace or span. Open the session to add one of its traces.";
+    // Focusable while unavailable, so keyboard and screen reader users reach the reason.
+    expect(button.attributes("disabled")).toBeUndefined();
+    expect(button.attributes("aria-disabled")).toBe("true");
+    const describedBy = button.attributes("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    expect(wrapper.find(`[id="${describedBy}"]`).text()).toBe(reason);
+    expect(button.findComponent({ name: "OTooltip" }).props("content")).toBe(reason);
     await button.trigger("click");
     expect(wrapper.findComponent(DrawerStub).exists()).toBe(false);
   });
@@ -276,7 +281,7 @@ describe("QualityScorePane", () => {
   it("disables Add to dataset when the score has no source stream", async () => {
     const wrapper = mountPane({ score: score({ sourceStream: null }) });
     const button = wrapper.find('[data-test="quality-score-pane-add-to-dataset"]');
-    expect(button.attributes("disabled")).toBeDefined();
+    expect(button.attributes("aria-disabled")).toBe("true");
     expect(button.findComponent({ name: "OTooltip" }).props("content")).toBe(
       "This score has no source stream to add from.",
     );
