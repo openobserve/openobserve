@@ -38,9 +38,13 @@ def link_ids(admin: OpenObserveClient, org: str, installation_id: str) -> list[s
 
 
 def matches(admin: OpenObserveClient, org: str, installation_id: str) -> list[dict[str, Any]]:
-    resp = admin.get(f"slack/installations/{installation_id}/links/matches", org=org)
-    assert resp.status_code == 200, resp.text
-    return resp.json()["members"]
+    """The workspace scan runs in the background; poll until it has finished."""
+    def scanned() -> dict[str, Any] | None:
+        resp = admin.get(f"slack/installations/{installation_id}/links/matches", org=org)
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        return None if body["refreshing"] else body
+    return wait_until(scanned, "the users.list scan")["members"]
 
 
 def test_org_b_admin_never_reaches_links_of_org_a_members(client: OpenObserveClient, ready: SlackMock) -> None:

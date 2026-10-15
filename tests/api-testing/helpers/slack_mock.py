@@ -105,6 +105,7 @@ def default_team(team_id: str = DEFAULT_TEAM, team_name: str = DEFAULT_TEAM_NAME
             member("U0DANA", team_id, "dana", "dana@acme.test"),
             member("U0LEE", team_id, "lee", "lee@acme.test"),
             member("U0GUEST", team_id, "guest", "guest@vendor.test", is_restricted=True),
+            member(DEFAULT_USER, team_id, "admin", None),
             {**member("U0BOT", team_id, "o2bot", None), "is_bot": True},
         ],
     }
@@ -351,7 +352,10 @@ def m_apps_uninstall(st: MockState, form: dict[str, str], bearer: str | None) ->
 def m_apps_connections_open(_st: MockState, _form: dict[str, str], bearer: str | None) -> dict[str, Any]:
     if not bearer or not bearer.startswith("xapp-"):
         raise SlackError("invalid_auth")
-    return {"url": "wss://wss-primary.slack.com/link/?ticket=mock-ticket&app_id=A0MOCK"}
+    # Slack's app-level tokens read xapp-1-<app id>-…, and the socket URL names that app.
+    parts = bearer.split("-")
+    app = f"&app_id={parts[2]}" if len(parts) > 2 and parts[2].startswith("A") else ""
+    return {"url": f"wss://wss-primary.slack.com/link/?ticket=mock-ticket{app}"}
 
 
 def page(items: list[dict[str, Any]], form: dict[str, str]) -> tuple[list[dict[str, Any]], str]:

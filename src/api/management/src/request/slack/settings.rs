@@ -46,7 +46,7 @@ use super::{caller, parse, respond};
         ("installation_id" = String, Path, description = "Slack installation id"),
     ),
     responses(
-        (status = 200, description = "LinkingView `{\"enabled\", \"source\", \"domains\", \"counts\"}`", content_type = "application/json", body = Object),
+        (status = 200, description = "LinkingView `{\"enabled\", \"source\", \"domains\", \"counts\"}` (this organization's mapped domains only) plus `\"other_org_domains\"`, `\"truncated\"` and `\"refreshing\"` (the workspace scan runs in the background)", content_type = "application/json", body = Object),
         (status = 403, description = "Not an admin, or the OSS build", content_type = "application/json", body = ()),
         (status = 404, description = "Slack is not enabled for this organization, or unknown installation", content_type = "application/json", body = ()),
     ),
@@ -87,7 +87,7 @@ pub async fn get_linking(
     ),
     request_body(content = Object, description = "`{\"enabled\", \"domains\"?}`", content_type = "application/json"),
     responses(
-        (status = 200, description = "LinkingView", content_type = "application/json", body = Object),
+        (status = 200, description = "LinkingView plus `\"other_org_domains\"`, `\"truncated\"`, `\"refreshing\"`", content_type = "application/json", body = Object),
         (status = 400, description = "Public email domain, or domains while they come from the domain mapping", content_type = "application/json", body = ()),
         (status = 403, description = "Not an admin of every connected organization, or the OSS build", content_type = "application/json", body = ()),
         (status = 404, description = "Slack is not enabled for this organization, or unknown installation", content_type = "application/json", body = ()),
@@ -134,7 +134,7 @@ pub async fn put_linking(
         CursorQuery,
     ),
     responses(
-        (status = 200, description = "`{\"members\": [{\"slack_user_id\", \"name\", \"email\", \"o2_user\"}], \"next_cursor\"}`", content_type = "application/json", body = Object),
+        (status = 200, description = "`{\"members\": [{\"slack_user_id\", \"name\", \"email\", \"o2_user\"}], \"next_cursor\", \"truncated\", \"refreshing\"}` from the last background scan", content_type = "application/json", body = Object),
         (status = 403, description = "Not an admin, or the OSS build", content_type = "application/json", body = ()),
         (status = 404, description = "Slack is not enabled for this organization, or unknown installation", content_type = "application/json", body = ()),
     ),

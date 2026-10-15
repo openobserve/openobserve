@@ -25,7 +25,7 @@ from urllib.parse import parse_qs, urljoin, urlparse
 import pytest
 import requests
 
-from helpers.slack_mock import member, mock_code
+from helpers.slack_mock import DEFAULT_USER, member, mock_code
 from support.client import OpenObserveClient
 
 PASSWORD = "Complexpass#123"
@@ -201,7 +201,7 @@ def connect_with_proof(client: OpenObserveClient, org: str, installation_id: str
     started = client.post(f"slack/installations/{installation_id}/connection/start", json={"purpose": "connect"}, org=org)
     assert started.status_code == 200, started.text
     url = started.json()["url"]
-    code = mock_code(nonce=query_param(url, "nonce"), team_id=team_id, user_id="U0DANA")
+    code = mock_code(nonce=query_param(url, "nonce"), team_id=team_id, user_id=DEFAULT_USER)
     return client.post("slack/connection/confirm", json={"oidc_code": code, "oidc_state": query_param(url, "state")}, org=org)
 
 
@@ -264,7 +264,9 @@ def new_team(mock: SlackMock, *members: dict[str, Any]) -> str:
     """A fresh mock workspace, so link-request limits and links never carry over between tests."""
     team_id = "T0L" + uuid.uuid4().hex[:8].upper()
     mock.add_team(team_id, f"Acme {team_id[-4:]}", members=[
-        *({**m, "team_id": team_id} for m in members), {**member("U0BOT", team_id, "o2bot", None), "is_bot": True},
+        *({**m, "team_id": team_id} for m in members),
+        member(DEFAULT_USER, team_id, "admin", None),
+        {**member("U0BOT", team_id, "o2bot", None), "is_bot": True},
     ])
     return team_id
 

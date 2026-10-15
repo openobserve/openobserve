@@ -118,6 +118,9 @@ def test_credentials_from_another_app_are_refused_and_a_valid_update_keeps_the_i
     )
     assert wrong_app.status_code == 409, wrong_app.text
 
+    other_token = client.put(path, json={"app_token": "xapp-1-A0OTHER-1-mock"}, org=slack_org)
+    assert other_token.status_code == 409, other_token.text
+
     valid = client.put(path, json={"app_token": "xapp-1-mock-new", "signing_secret": "s-2"}, org=slack_org)
     assert valid.status_code == 200, valid.text
     assert valid.json()["id"] == installation_id
