@@ -23,10 +23,12 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
 import { makeAddSettingVariableSchema } from "./AddSettingVariable.schema";
 
-const { labelValues, streamMock, routeQuery } = vi.hoisted(() => ({
+const { labelValues, streamMock, routeQuery, echoOnMount, liveText } = vi.hoisted(() => ({
   labelValues: vi.fn(),
   streamMock: vi.fn(),
   routeQuery: { value: {} as Record<string, unknown> },
+  echoOnMount: { value: null as string | null },
+  liveText: { value: null as string | null },
 }));
 
 vi.mock("@/services/metrics", () => ({ default: { labelValues, labels: vi.fn() } }));
@@ -41,8 +43,16 @@ vi.mock("@/components/QueryEditor.vue", () => ({
   default: {
     name: "UnifiedQueryEditor",
     props: ["query", "languages", "defaultLanguage"],
-    emits: ["update:query", "run-query"],
+    emits: ["update:query", "run-query", "user-edit"],
     template: '<textarea data-test="query-editor-stub" :value="query"></textarea>',
+    mounted(this: any) {
+      if (echoOnMount.value !== null) this.$emit("update:query", echoOnMount.value);
+    },
+    methods: {
+      getValue(this: any) {
+        return liveText.value ?? this.query;
+      },
+    },
   },
 }));
 
@@ -52,8 +62,6 @@ const store = createStore({
   state: { theme: "light", selectedOrganization: { identifier: "org" } },
 });
 
-const streamTypeOptions = ["logs", "metrics"].map((value) => ({ label: value, value }));
-
 const mountEditor = (queryData: Record<string, unknown>, variablesList: any[] = []) => {
   const Harness = defineComponent({
     components: { OForm, QueryVariableEditor },
@@ -61,9 +69,13 @@ const mountEditor = (queryData: Record<string, unknown>, variablesList: any[] = 
       const form = useOForm<any>({
         defaultValues: {
           name: "namespace",
-          type: "query",
+          type: "query_values",
           query_data: {
             stream_type: "logs",
+            stream: "",
+            field: "",
+            filter: [],
+            custom_query: true,
             query_type: "sql",
             query: "",
             value_field: "",
@@ -75,14 +87,11 @@ const mountEditor = (queryData: Record<string, unknown>, variablesList: any[] = 
         schema: makeAddSettingVariableSchema(i18n.global.t),
         onSubmit: vi.fn(),
       });
-      return { form, variablesList, streamTypeOptions };
+      return { form, variablesList };
     },
     template: `
       <OForm :form="form" id="qv-form">
-        <QueryVariableEditor
-          :dashboard-variables-list="variablesList"
-          :stream-type-options="streamTypeOptions"
-        />
+        <QueryVariableEditor :dashboard-variables-list="variablesList" />
       </OForm>
     `,
   });
@@ -116,6 +125,44 @@ describe("QueryVariableEditor", () => {
     labelValues.mockReset();
     streamMock.mockReset();
     routeQuery.value = { period: "1h", "var-cluster": "prod" };
+    echoOnMount.value = null;
+    liveText.value = null;
+  });
+
+  it("previews the text just typed even before the editor commits it", async () => {
+    labelValues.mockResolvedValue({ data: { status: "success", data: ["api"] } });
+    const wrapper = mountEditor({ stream_type: "metrics", query_type: "promql", query: "" });
+    await flushPromises();
+    const editor = wrapper.findComponent({ name: "UnifiedQueryEditor" });
+    liveText.value = "label_values(up, job)";
+    editor.vm.$emit("user-edit");
+    await runPreview(wrapper);
+    expect(labelValues).toHaveBeenCalledWith(
+      expect.objectContaining({ label: "job", match: "up" }),
+    );
+    expect(formOf(wrapper).state.values.query_data.query).toBe("label_values(up, job)");
+    wrapper.unmount();
+  });
+
+  it("keeps a prefilled query when the editor echoes an empty model while mounting", async () => {
+    echoOnMount.value = "";
+    const wrapper = mountEditor({ query: 'SELECT DISTINCT "host" FROM "default"' });
+    await flushPromises();
+    expect(formOf(wrapper).state.values.query_data.query).toBe(
+      'SELECT DISTINCT "host" FROM "default"',
+    );
+    wrapper.unmount();
+  });
+
+  it("lets the user clear the query once they have typed in it", async () => {
+    const wrapper = mountEditor({ query: "SELECT 1" });
+    await flushPromises();
+    const editor = wrapper.findComponent({ name: "UnifiedQueryEditor" });
+    editor.vm.$emit("user-edit");
+    editor.vm.$emit("update:query", "");
+    await flushPromises();
+    expect(formOf(wrapper).state.values.query_data.query).toBe("");
+    wrapper.unmount();
   });
 
   it("writes the edited query into the form", async () => {
@@ -201,6 +248,23 @@ describe("QueryVariableEditor", () => {
     await flushPromises();
     await runPreview(wrapper);
     expect(wrapper.find('[data-test="dashboard-variable-query-preview-empty"]').exists()).toBe(
+      true,
+    );
+    wrapper.unmount();
+  });
+
+  it("clears the preview when the form switches the query language", async () => {
+    streamRespondsWith([]);
+    const wrapper = mountEditor({ stream_type: "metrics", query: "SELECT v FROM t" });
+    await flushPromises();
+    await runPreview(wrapper);
+    expect(wrapper.find('[data-test="dashboard-variable-query-preview-empty"]').exists()).toBe(
+      true,
+    );
+    formOf(wrapper).setFieldValue("query_data.query_type", "promql");
+    await flushPromises();
+    expect(wrapper.find('[data-test="dashboard-variable-query-preview-idle"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="dashboard-variable-query-functions-trigger"]').exists()).toBe(
       true,
     );
     wrapper.unmount();

@@ -16,34 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col gap-4" data-test="dashboard-variable-query-editor">
-    <div class="flex items-start gap-x-4 max-md:flex-col max-md:gap-y-2">
-      <OFormToggleGroup
-        name="query_data.query_type"
-        :label="t('dashboard.queryVariable.language')"
-        data-test="dashboard-variable-query-language"
-        @update:model-value="onLanguageChange"
-      >
-        <OToggleGroupItem value="sql" size="sm" data-test="dashboard-variable-query-language-sql">{{
-          raw("SQL")
-        }}</OToggleGroupItem>
-        <OToggleGroupItem
-          value="promql"
-          size="sm"
-          data-test="dashboard-variable-query-language-promql"
-          >{{ raw("PromQL") }}</OToggleGroupItem
-        >
-      </OFormToggleGroup>
-      <OFormSelect
-        v-if="language === 'sql'"
-        name="query_data.stream_type"
-        :label="t('dashboard.selectStreamType')"
-        :options="streamTypeOptions"
-        :searchable="false"
-        class="flex-1"
-        data-test="dashboard-variable-query-stream-type"
-      />
-    </div>
-
     <div class="flex flex-col gap-1">
       <div class="flex items-center justify-between gap-2">
         <OText variant="label">{{ t("dashboard.queryVariable.query") }}</OText>
@@ -100,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <UnifiedQueryEditor
+              :ref="(el: any) => (queryEditorRef = el)"
               :key="`${language}-${editorKey}`"
               :languages="[language]"
               :default-language="language"
@@ -111,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test-prefix="dashboard-variable-query"
               data-test="dashboard-variable-query-input"
               @update:query="onQueryUpdate(field, $event)"
+              @user-edit="onUserEdit"
               @run-query="runPreview"
             />
           </div>
@@ -137,7 +111,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           icon-left="play-arrow"
           :loading="preview.state === 'loading'"
-          :disabled="!queryText.trim()"
           data-test="dashboard-variable-query-run-preview"
           @click="runPreview"
           >{{ t("dashboard.queryVariable.runPreview") }}</OButton
@@ -269,11 +242,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, inject, onUnmounted, reactive, ref, shallowRef, watch } from "vue";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -285,8 +258,6 @@ import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import useHttpStreaming from "@/composables/useStreamingSearch";
@@ -321,7 +292,6 @@ interface PreviewState {
 
 const props = defineProps<{
   dashboardVariablesList?: any[];
-  streamTypeOptions: { label: I18nText; value: string }[];
 }>();
 
 const { t } = useI18nTyped();
@@ -349,6 +319,9 @@ const preview = reactive<PreviewState>({
   error: "",
 });
 let previewRun = 0;
+const queryEditorRef = shallowRef<{ getValue?: () => string | undefined } | null>(null);
+// A freshly mounted editor can echo an empty model before the user types; that echo must not wipe a prefilled query.
+let userEdited = false;
 let activeTraceId: string | null = null;
 
 const promFunctions = computed(() => [
@@ -478,7 +451,16 @@ const clearColumnFields = () => {
   setField("query_data.label_field", "");
 };
 
+// The editor commits typed text after a debounce, so a click right after typing reads the editor itself.
+const syncTypedQuery = () => {
+  const live = queryEditorRef.value?.getValue?.();
+  if (typeof live !== "string" || !userEdited) return;
+  const text = live.trim();
+  if (text !== queryText.value) setField("query_data.query", text);
+};
+
 const runPreview = async () => {
+  syncTypedQuery();
   if (!queryText.value.trim()) return;
   const run = ++previewRun;
   const maxRecords = getQueryVariableMaxRecords({ query_data: queryData.value });
@@ -524,19 +506,26 @@ const resetPreview = () => {
   preview.capped = false;
 };
 
-const onLanguageChange = () => {
+watch(language, () => {
+  userEdited = false;
   resetPreview();
-  if (!queryData.value?.stream_type) setField("query_data.stream_type", "logs");
+});
+
+const onUserEdit = () => {
+  userEdited = true;
 };
 
 const onQueryUpdate = (field: any, value: string) => {
-  if (value === (field.state.value ?? "")) return;
+  const current = field.state.value ?? "";
+  if (value === current) return;
+  if (!userEdited && !(value ?? "").trim() && current.trim()) return;
   field.handleChange(value);
 };
 
 const insertExample = (example: string) => {
   setField("query_data.query", example);
   editorKey.value++;
+  userEdited = false;
   functionsOpen.value = false;
   resetPreview();
 };
@@ -568,16 +557,10 @@ const previewRows = computed(() =>
   preview.rows.map((row, index) => ({ ...row, __previewRow: String(index) })),
 );
 
-onMounted(() => {
-  if (language.value === "sql" && !queryData.value?.stream_type) {
-    setField("query_data.stream_type", "logs");
-  }
-});
-
 onUnmounted(() => {
   previewRun++;
   cancelActiveStream();
 });
 
-defineExpose({ runPreview, preview });
+defineExpose({ runPreview, preview, syncTypedQuery });
 </script>

@@ -23,50 +23,111 @@ const issuesFor = (value: Record<string, unknown>) => {
   return result.success ? [] : result.error.issues.map((issue) => issue.path.join("."));
 };
 
-describe("AddSettingVariable schema — query type", () => {
-  it("requires a query", () => {
-    expect(issuesFor({ name: "svc", type: "query", query_data: { query: "  " } })).toEqual([
-      "query_data.query",
+const autoSql = { stream_type: "logs", stream: "default", field: "host" };
+
+describe("AddSettingVariable schema — query_values modes", () => {
+  it("asks an auto variable for stream type, stream and field, never for a query", () => {
+    expect(issuesFor({ name: "svc", type: "query_values", query_data: {} })).toEqual([
+      "query_data.stream_type",
+      "query_data.stream",
+      "query_data.field",
     ]);
+    expect(issuesFor({ name: "svc", type: "query_values", query_data: autoSql })).toEqual([]);
   });
 
-  it("reports the query-required message", () => {
-    const result = schema.safeParse({ name: "svc", type: "query" });
-    expect(result.success).toBe(false);
-    expect(result.error?.issues[0].message).toBe("dashboard.queryVariable.queryRequired");
-  });
-
-  it("does not require a stream or field", () => {
+  it("asks a custom variable for a query and stream type, not for stream or field", () => {
     expect(
       issuesFor({
         name: "svc",
-        type: "query",
-        query_data: { query_type: "promql", query: "label_values(job)", stream: "", field: "" },
+        type: "query_values",
+        query_data: { custom_query: true, stream_type: "logs", query: "  " },
+      }),
+    ).toEqual(["query_data.query"]);
+    expect(
+      issuesFor({
+        name: "svc",
+        type: "query_values",
+        query_data: {
+          custom_query: true,
+          stream_type: "metrics",
+          query_type: "promql",
+          query: "label_values(job)",
+        },
       }),
     ).toEqual([]);
   });
 
-  it("keeps the query fields and defaults the language to SQL", () => {
+  it("reports the query-required message", () => {
+    const result = schema.safeParse({
+      name: "svc",
+      type: "query_values",
+      query_data: { custom_query: true, stream_type: "logs" },
+    });
+    expect(result.error?.issues[0].message).toBe("dashboard.queryVariable.queryRequired");
+  });
+
+  it("ignores half-filled filter rows while the variable is custom", () => {
+    expect(
+      issuesFor({
+        name: "svc",
+        type: "query_values",
+        query_data: {
+          custom_query: true,
+          stream_type: "logs",
+          query: "SELECT 1",
+          filter: [{ name: "", operator: "", value: "" }],
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it("only accepts operators an auto PromQL variable can turn into label matchers", () => {
+    const promql = (operator: string) =>
+      issuesFor({
+        name: "svc",
+        type: "query_values",
+        query_data: {
+          stream_type: "metrics",
+          stream: "up",
+          field: "job",
+          query_type: "promql",
+          filter: [{ name: "env", operator, value: "prod" }],
+        },
+      });
+    expect(promql("=")).toEqual([]);
+    expect(promql("re_match")).toEqual([]);
+    expect(promql(">")).toEqual(["query_data.filter.0.operator"]);
+    expect(promql("str_match")).toEqual(["query_data.filter.0.operator"]);
+    expect(
+      issuesFor({
+        name: "svc",
+        type: "query_values",
+        query_data: { ...autoSql, filter: [{ name: "env", operator: ">", value: "1" }] },
+      }),
+    ).toEqual([]);
+  });
+
+  it("defaults to auto SQL and keeps the custom fields it is given", () => {
+    expect(
+      schema.parse({ name: "svc", type: "query_values", query_data: autoSql }).query_data,
+    ).toMatchObject({ custom_query: false, query_type: "sql" });
     const result = schema.parse({
       name: "svc",
-      type: "query",
-      query_data: { query: "SELECT a FROM t", value_field: "a", label_field: null },
+      type: "query_values",
+      query_data: {
+        custom_query: true,
+        stream_type: "logs",
+        query: "SELECT a FROM t",
+        value_field: "a",
+        label_field: null,
+      },
     });
     expect(result.query_data).toMatchObject({
+      custom_query: true,
       query_type: "sql",
       query: "SELECT a FROM t",
       value_field: "a",
       label_field: null,
     });
-  });
-
-  it("does not ask a query_values variable for a query", () => {
-    expect(
-      issuesFor({
-        name: "svc",
-        type: "query_values",
-        query_data: { stream_type: "logs", stream: "s", field: "f" },
-      }),
-    ).toEqual([]);
   });
 });
