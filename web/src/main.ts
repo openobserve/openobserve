@@ -250,6 +250,7 @@ function showNewVersionNotification() {
         window.location.reload();
       },
     },
+    position: "top-center",
   });
 }
 
