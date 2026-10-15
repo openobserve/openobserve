@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { CUSTOM_VALUE, SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
-import { escapeSingleQuotes } from "@/utils/zincutils";
+import { escapeSingleQuotes, splitQuotedString } from "@/utils/zincutils";
 import {
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
@@ -22,9 +22,6 @@ import {
 } from "./variablesUtils";
 
 export type QueryVariableLanguage = "sql" | "promql";
-
-/** Variable types whose options are loaded from the API, gate panels and cascade to children. */
-export const QUERY_BACKED_VARIABLE_TYPES: readonly string[] = ["query_values", "query"];
 
 export const DEFAULT_QUERY_VARIABLE_MAX_RECORDS = 10;
 
@@ -45,6 +42,36 @@ export interface SqlRowsOptionsResult extends QueryVariableOptionsResult {
   columns: string[];
 }
 
+/** Filter operators an auto PromQL variable can turn into label matchers. */
+export const PROMQL_FILTER_OPERATORS: readonly string[] = [
+  "=",
+  "!=",
+  "re_match",
+  "re_not_match",
+  "IN",
+  "NOT IN",
+  "Is Null",
+  "Is Not Null",
+];
+
+export interface QueryVariableData {
+  stream_type?: string;
+  stream?: string;
+  field?: string;
+  max_record_size?: unknown;
+  filter?: { name?: string; operator?: string; value?: string }[];
+  query_type?: string;
+  custom_query?: boolean;
+  query?: string;
+  value_field?: string | null;
+  label_field?: string | null;
+}
+
+interface VariableLike {
+  type?: string;
+  query_data?: QueryVariableData | null;
+}
+
 export interface QueryVariableContextEntry {
   name: string;
   type?: string;
@@ -56,6 +83,7 @@ export interface QueryVariableContextEntry {
 
 export interface QueryVariableSelectionConfig {
   type?: string;
+  query_data?: QueryVariableData | null;
   value?: any;
   multiSelect?: boolean;
   options?: { value?: unknown }[];
@@ -80,11 +108,14 @@ const PROM_FUNCTION_REGEX = /^([a-z_]+)\s*\(([\s\S]*)\)$/;
 const OPENING = "([{";
 const CLOSING = ")]}";
 
-export const isQueryBackedVariable = (variable?: { type?: string } | null): boolean =>
-  !!variable && QUERY_BACKED_VARIABLE_TYPES.includes(variable.type ?? "");
+/** A query_values variable whose options come from its hand-written query. */
+export const isCustomQueryVariable = (variable?: VariableLike | null): boolean =>
+  variable?.type === "query_values" && variable.query_data?.custom_query === true;
 
-export const isQueryVariable = (variable?: { type?: string } | null): boolean =>
-  variable?.type === "query";
+/** True when options load through the SQL/PromQL query loader rather than the field values stream. */
+export const usesQueryVariableLoader = (variable?: VariableLike | null): boolean =>
+  isCustomQueryVariable(variable) ||
+  (variable?.type === "query_values" && variable.query_data?.query_type === "promql");
 
 export const getQueryVariableLanguage = (variable?: {
   query_data?: { query_type?: string } | null;
@@ -96,6 +127,128 @@ export const getQueryVariableMaxRecords = (variable?: {
   const size = Number(variable?.query_data?.max_record_size);
   return Number.isFinite(size) && size > 0 ? Math.floor(size) : DEFAULT_QUERY_VARIABLE_MAX_RECORDS;
 };
+
+const promString = (value: string): string =>
+  `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+
+const promAlternatives = (value: string): string =>
+  (splitQuotedString(value) ?? [])
+    .map((item: string) => item.replace(/^['"]|['"]$/g, ""))
+    .join("|");
+
+const promMatcher = (filter: { name?: string; operator?: string; value?: string }): string => {
+  const name = (filter.name ?? "").trim();
+  const value = String(filter.value ?? "");
+  // A $variable may expand to several values joined by "|", which only a regex matcher accepts.
+  const hasVariable = /\$|\{\{/.test(value);
+  switch (filter.operator) {
+    case "!=":
+      return `${name}${hasVariable ? "!~" : "!="}${promString(value)}`;
+    case "re_match":
+      return `${name}=~${promString(value)}`;
+    case "re_not_match":
+      return `${name}!~${promString(value)}`;
+    case "IN":
+      return `${name}=~${promString(promAlternatives(value))}`;
+    case "NOT IN":
+      return `${name}!~${promString(promAlternatives(value))}`;
+    case "Is Null":
+      return `${name}=""`;
+    case "Is Not Null":
+      return `${name}!=""`;
+    default:
+      return `${name}${hasVariable ? "=~" : "="}${promString(value)}`;
+  }
+};
+
+const SINGLE_PLACEHOLDER =
+  /^'?(?:\$\{\s*([a-zA-Z0-9_-]+)\s*\}|\$([a-zA-Z0-9_-]+)|\{\{\s*([a-zA-Z0-9_-]+)\s*\}\})'?$/;
+
+/** Turns `= $var` / `!= $var` into IN / NOT IN when `$var` currently holds a list, since `= 'a', 'b'` is invalid SQL. */
+export const expandMultiValueFilter = <T extends { operator?: string; value?: string }>(
+  filter: T,
+  valueOf: (name: string) => unknown,
+): T => {
+  if (filter.operator !== "=" && filter.operator !== "!=") return filter;
+  const match = SINGLE_PLACEHOLDER.exec(String(filter.value ?? "").trim());
+  const name = match && (match[1] ?? match[2] ?? match[3]);
+  if (!name || !Array.isArray(valueOf(name))) return filter;
+  return { ...filter, operator: filter.operator === "=" ? "IN" : "NOT IN" };
+};
+
+/** The `label_values(metric{matchers}, label)` query an auto PromQL variable runs. */
+export const buildAutoPromqlQuery = (queryData?: QueryVariableData | null): string => {
+  const matchers = (queryData?.filter ?? [])
+    .filter(
+      (filter) =>
+        (filter?.name ?? "").trim() && PROMQL_FILTER_OPERATORS.includes(filter.operator ?? ""),
+    )
+    .map(promMatcher);
+  const selector = `${queryData?.stream ?? ""}${matchers.length ? `{${matchers.join(",")}}` : ""}`;
+  return `label_values(${selector}, ${queryData?.field ?? ""})`;
+};
+
+const sqlString = (value: unknown): string => {
+  const text = String(value ?? "");
+  const unquoted =
+    text.length > 1 && text.startsWith("'") && text.endsWith("'") ? text.slice(1, -1) : text;
+  return `'${escapeSingleQuotes(unquoted)}'`;
+};
+
+const SQL_FILTER_FUNCTIONS: Record<string, string> = {
+  str_match: "str_match",
+  Contains: "str_match",
+  str_match_ignore_case: "str_match_ignore_case",
+  re_match: "re_match",
+  re_not_match: "re_not_match",
+};
+
+const SQL_COMPARISONS = ["=", "!=", "<>", "<", ">", "<=", ">="];
+
+// Mirrors addLabelToSQlQuery's operator handling, without waiting for the lazily loaded SQL parser.
+const sqlCondition = (filter: { name?: string; operator?: string; value?: string }): string => {
+  const column = `"${(filter.name ?? "").trim()}"`;
+  const operator = filter.operator ?? "";
+  const value = filter.value ?? "";
+  if (operator === "match_all") return `match_all(${sqlString(value)})`;
+  if (SQL_FILTER_FUNCTIONS[operator])
+    return `${SQL_FILTER_FUNCTIONS[operator]}(${column}, ${sqlString(value)})`;
+  switch (operator) {
+    case "Not Contains":
+      return `${column} NOT LIKE ${sqlString(`%${value}%`)}`;
+    case "Starts With":
+      return `${column} LIKE ${sqlString(`${value}%`)}`;
+    case "Ends With":
+      return `${column} LIKE ${sqlString(`%${value}`)}`;
+    case "Is Null":
+      return `${column} IS NULL`;
+    case "Is Not Null":
+      return `${column} IS NOT NULL`;
+    case "IN":
+    case "NOT IN": {
+      const items = (splitQuotedString(value) ?? []).map(sqlString).join(", ");
+      return `${column} ${operator} (${items})`;
+    }
+    default:
+      return SQL_COMPARISONS.includes(operator) ? `${column} ${operator} ${sqlString(value)}` : "";
+  }
+};
+
+/** The SQL an auto variable stands for, used to prefill the custom editor. */
+export const buildAutoSqlQuery = (queryData?: QueryVariableData | null): string => {
+  const base = `SELECT DISTINCT "${queryData?.field ?? ""}" FROM "${queryData?.stream ?? ""}"`;
+  const conditions = (queryData?.filter ?? [])
+    .filter((filter) => (filter?.name ?? "").trim() || filter?.operator === "match_all")
+    .map(sqlCondition)
+    .filter(Boolean);
+  return conditions.length ? `${base} WHERE ${conditions.join(" AND ")}` : base;
+};
+
+/** The query text a loader-backed variable runs, before parent values are substituted. */
+export const getQueryVariableQuery = (variable?: VariableLike | null): string =>
+  isCustomQueryVariable(variable)
+    ? (variable?.query_data?.query ?? "")
+    : buildAutoPromqlQuery(variable?.query_data);
 
 const holdsAll = (variable?: QueryVariableSelectionConfig | null): boolean =>
   Array.isArray(variable?.value)
@@ -123,7 +276,8 @@ const hasNoListedValues = (variable: QueryVariableSelectionConfig): boolean =>
 export const getQueryVariableAllValues = (
   variable?: QueryVariableSelectionConfig | null,
 ): string[] | undefined => {
-  if (!isQueryVariable(variable) || !variable?.multiSelect || !holdsAll(variable)) return undefined;
+  if (!isCustomQueryVariable(variable) || !variable?.multiSelect || !holdsAll(variable))
+    return undefined;
   const values = listedOptionValues(variable);
   if (values.length) return values;
   return hasNoListedValues(variable) ? [QUERY_VARIABLE_NO_VALUES] : undefined;
@@ -133,7 +287,7 @@ export const getQueryVariableAllValues = (
 export const resolveQueryVariableValue = (variable: QueryVariableSelectionConfig): any => {
   const allValues = getQueryVariableAllValues(variable);
   if (allValues) return allValues;
-  if (!isQueryVariable(variable) || !hasNoListedValues(variable)) return variable?.value;
+  if (!isCustomQueryVariable(variable) || !hasNoListedValues(variable)) return variable?.value;
   if (holdsAll(variable) || isEmptySelection(variable.value)) {
     return variable.multiSelect ? [QUERY_VARIABLE_NO_VALUES] : QUERY_VARIABLE_NO_VALUES;
   }
@@ -149,7 +303,7 @@ export const isExplicitQuerySelection = (value: unknown): boolean =>
 export const isQueryVariableAllPending = (
   variable?: QueryVariableSelectionConfig | null,
 ): boolean =>
-  isQueryVariable(variable) &&
+  isCustomQueryVariable(variable) &&
   !!variable?.multiSelect &&
   holdsAll(variable) &&
   variable?.isVariablePartialLoaded === false;

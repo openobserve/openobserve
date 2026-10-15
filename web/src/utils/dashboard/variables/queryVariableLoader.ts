@@ -35,6 +35,8 @@ type StreamHandlers = {
 export type FetchQueryDataWithHttpStream = (payload: any, handlers: StreamHandlers) => unknown;
 
 const METRIC_SCAN_LIMIT = 200;
+const MICROS_THRESHOLD = 1e14;
+const MILLIS_THRESHOLD = 1e11;
 const METRIC_SCAN_BATCH = 8;
 
 export interface SqlVariableQueryRequest {
@@ -168,6 +170,13 @@ const promValues = (response: any): unknown[] => {
 
 type PromRange = { org_identifier: string; start_time: number; end_time: number };
 
+/** Prometheus HTTP API times are unix seconds; dashboards hand over microseconds, tests milliseconds. */
+export const toPromSeconds = (time: number): number => {
+  if (time > MICROS_THRESHOLD) return Math.floor(time / 1e6);
+  if (time > MILLIS_THRESHOLD) return Math.floor(time / 1e3);
+  return Math.floor(time);
+};
+
 // The backend answers label values only for one metric, so an unscoped lookup unions them across metrics.
 const labelValuesAcrossMetrics = async (
   range: PromRange,
@@ -214,8 +223,8 @@ const loadPromValues = async (params: QueryVariableLoadParams): Promise<unknown[
   if (!parsed) throw new Error(gt("dashboard.queryVariable.unsupportedPromql"));
   const range: PromRange = {
     org_identifier: params.orgId,
-    start_time: params.startTime,
-    end_time: params.endTime,
+    start_time: toPromSeconds(params.startTime),
+    end_time: toPromSeconds(params.endTime),
   };
 
   switch (parsed.kind) {
@@ -237,7 +246,7 @@ const loadPromValues = async (params: QueryVariableLoadParams): Promise<unknown[
       const response = await searchService.metrics_query({
         org_identifier: params.orgId,
         query: encodeURIComponent(parsed.expr),
-        end_time: params.endTime,
+        end_time: range.end_time,
       });
       const body = response?.data;
       if (body?.status && body.status !== "success") {

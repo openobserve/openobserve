@@ -1,5 +1,5 @@
 import { gt } from "@/types/i18n";
-import { isQueryBackedVariable } from "./queryVariableUtils";
+import { isCustomQueryVariable } from "./queryVariableUtils";
 
 /**
  * Extract variable names from a string
@@ -53,30 +53,32 @@ export const buildVariablesDependencyGraph = (
   // Populate the graph
   for (let item of variables) {
     let name = item.name;
-    if (isQueryBackedVariable(item)) {
+    if (item.type == "query_values") {
       // Use a Set to collect all unique dependencies from stream, field, and filters
       const allDependencies = new Set<string>();
+      const isCustom = isCustomQueryVariable(item);
 
-      if (item.query_data?.query) {
-        extractVariableNames(item.query_data.query, variablesNameList).forEach((dep: string) =>
-          allDependencies.add(dep),
+      // A custom query reads only its own text; stream/field/filters are inactive auto settings.
+      if (isCustom) {
+        extractVariableNames(item.query_data?.query ?? "", variablesNameList).forEach(
+          (dep: string) => allDependencies.add(dep),
         );
       }
 
       // 1. Check stream field for variable references
-      if (item.query_data?.stream) {
+      if (item.query_data?.stream && !isCustom) {
         const streamDeps = extractVariableNames(item.query_data.stream, variablesNameList);
         streamDeps.forEach((dep: string) => allDependencies.add(dep));
       }
 
       // 2. Check field field for variable references
-      if (item.query_data?.field) {
+      if (item.query_data?.field && !isCustom) {
         const fieldDeps = extractVariableNames(item.query_data.field, variablesNameList);
         fieldDeps.forEach((dep: string) => allDependencies.add(dep));
       }
 
       // 3. Check filter values for variable references (existing logic)
-      for (let filter of item?.query_data?.filter ?? []) {
+      for (let filter of isCustom ? [] : (item?.query_data?.filter ?? [])) {
         const filterDeps = extractVariableNames(filter.value, variablesNameList);
         filterDeps.forEach((dep: string) => allDependencies.add(dep));
       }
@@ -89,7 +91,7 @@ export const buildVariablesDependencyGraph = (
       // 5. Set parent variables (convert Set to Array)
       graph[name].parentVariables = Array.from(allDependencies);
     } else {
-      // no dependencies for variables that are not loaded from a query
+      // no dependencies for non query_values variables
       graph[item.name] = {
         parentVariables: [],
         childVariables: [],
@@ -200,6 +202,7 @@ interface VariableRuntimeState {
     stream?: string;
     field?: string;
     query?: string;
+    custom_query?: boolean;
     filter?: Array<{
       filter?: string;
       value?: string;
@@ -348,28 +351,31 @@ export const buildScopedDependencyGraph = (
       variable.panelId,
     );
 
-    if (isQueryBackedVariable(variable)) {
+    if (variable.type === "query_values") {
       // Use a Set to collect all unique parent variable names
       const allParentNames = new Set<string>();
+      const isCustom = isCustomQueryVariable(variable);
 
-      if (variable.query_data?.query) {
-        extractVariableNames(variable.query_data.query).forEach((name) => allParentNames.add(name));
+      if (isCustom) {
+        extractVariableNames(variable.query_data?.query ?? "").forEach((name) =>
+          allParentNames.add(name),
+        );
       }
 
       // 1. Check stream field for variable references
-      if (variable.query_data?.stream) {
+      if (variable.query_data?.stream && !isCustom) {
         const streamParents = extractVariableNames(variable.query_data.stream);
         streamParents.forEach((name) => allParentNames.add(name));
       }
 
       // 2. Check field field for variable references
-      if (variable.query_data?.field) {
+      if (variable.query_data?.field && !isCustom) {
         const fieldParents = extractVariableNames(variable.query_data.field);
         fieldParents.forEach((name) => allParentNames.add(name));
       }
 
       // 3. Check filter values for variable references (existing logic)
-      const filters = variable.query_data?.filter || [];
+      const filters = isCustom ? [] : variable.query_data?.filter || [];
       filters.forEach((filter) => {
         const filterString = filter.filter || filter.value || "";
         const filterParents = extractVariableNames(filterString);

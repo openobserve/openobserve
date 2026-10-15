@@ -30,8 +30,10 @@ import {
   loadQueryVariableValues,
   QueryVariableCancelledError,
   runSqlVariableQueryOnStream,
+  toPromSeconds,
   type QueryVariableLoadParams,
 } from "./queryVariableLoader";
+import { buildAutoPromqlQuery, substituteQueryVariables } from "./queryVariableUtils";
 
 const baseParams = (overrides: Partial<QueryVariableLoadParams>): QueryVariableLoadParams => ({
   query: "",
@@ -67,6 +69,49 @@ describe("loadQueryVariableValues — PromQL", () => {
       { label: "api", value: "api" },
       { label: "web", value: "web" },
     ]);
+  });
+
+  it("sends Prometheus unix seconds whatever unit the caller passes", async () => {
+    expect(toPromSeconds(1_792_062_830_486_000)).toBe(1_792_062_830);
+    expect(toPromSeconds(1_792_062_830_486)).toBe(1_792_062_830);
+    expect(toPromSeconds(1_792_062_830)).toBe(1_792_062_830);
+
+    labelValues.mockResolvedValue(promOk(["api"]));
+    metricsQuery.mockResolvedValue({ data: { status: "success", data: { result: [] } } });
+    const dashboardRange = { startTime: 1_792_059_230_486_000, endTime: 1_792_062_830_486_000 };
+    await loadQueryVariableValues(
+      baseParams({ query: "label_values(up, job)", ...dashboardRange }),
+    );
+    expect(labelValues).toHaveBeenCalledWith(
+      expect.objectContaining({ start_time: 1_792_059_230, end_time: 1_792_062_830 }),
+    );
+    await loadQueryVariableValues(baseParams({ query: "query_result(up)", ...dashboardRange }));
+    expect(metricsQuery).toHaveBeenCalledWith(expect.objectContaining({ end_time: 1_792_062_830 }));
+  });
+
+  it("runs an auto PromQL variable as one scoped label lookup with its filters as matchers", async () => {
+    labelValues.mockResolvedValue(promOk(["api", "web"]));
+    const query = substituteQueryVariables(
+      buildAutoPromqlQuery({
+        stream: "http_requests_total",
+        field: "job",
+        filter: [
+          { name: "env", operator: "=", value: "$env" },
+          { name: "code", operator: "!=", value: "500" },
+        ],
+      }),
+      [{ name: "env", value: ["prod", "stage"], multiSelect: true, isVariablePartialLoaded: true }],
+      "promql",
+    );
+    const result = await loadQueryVariableValues(baseParams({ query }));
+    expect(labelValues).toHaveBeenCalledTimes(1);
+    expect(labelValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        label: "job",
+        match: 'http_requests_total{env=~"prod|stage",code!="500"}',
+      }),
+    );
+    expect(result.options.map((o) => o.value)).toEqual(["api", "web"]);
   });
 
   it("label_values(label) unions the label across metrics when the backend needs a metric", async () => {

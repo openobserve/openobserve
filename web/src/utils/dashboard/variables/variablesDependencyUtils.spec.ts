@@ -877,12 +877,51 @@ describe("Variables Dependency Utils", () => {
     });
   });
 
-  describe("query variables", () => {
+  describe("custom query variables", () => {
     const queryVar = (name: string, query: string) => ({
       name,
-      type: "query",
+      type: "query_values",
       scope: "global" as const,
-      query_data: { query_type: "sql", query },
+      query_data: { custom_query: true, query_type: "sql", query },
+    });
+
+    it("reads only the custom query, not the inactive auto stream, field and filters", () => {
+      const graph = buildVariablesDependencyGraph([
+        { name: "region", type: "custom", query_data: undefined },
+        { name: "env", type: "custom", query_data: undefined },
+        {
+          name: "service",
+          type: "query_values",
+          query_data: {
+            custom_query: true,
+            query: "SELECT service FROM logs WHERE region = '$region'",
+            stream: "$env",
+            field: "f",
+            filter: [{ name: "x", operator: "=", value: "$env" }],
+          },
+        },
+      ]);
+      expect(graph.service.parentVariables).toEqual(["region"]);
+      expect(graph.env.childVariables).toEqual([]);
+    });
+
+    it("keeps reading stream, field and filters once switched back to auto", () => {
+      const graph = buildVariablesDependencyGraph([
+        { name: "region", type: "custom", query_data: undefined },
+        { name: "env", type: "custom", query_data: undefined },
+        {
+          name: "service",
+          type: "query_values",
+          query_data: {
+            custom_query: false,
+            query: "SELECT service FROM logs WHERE region = '$region'",
+            stream: "s",
+            field: "f",
+            filter: [{ name: "x", operator: "=", value: "$env" }],
+          },
+        },
+      ]);
+      expect(graph.service.parentVariables).toEqual(["env"]);
     });
 
     it("finds parents referenced in the raw query", () => {
@@ -924,10 +963,14 @@ describe("Variables Dependency Utils", () => {
           { name: "cluster", type: "custom", scope: "global" },
           {
             name: "pod",
-            type: "query",
+            type: "query_values",
             scope: "tabs",
             tabId: "t1",
-            query_data: { query: 'label_values(up{cluster="$cluster"}, pod)' },
+            query_data: {
+              custom_query: true,
+              query: 'label_values(up{cluster="$cluster"}, pod)',
+              filter: [{ value: "$ignored" }],
+            },
           },
         ],
         {},
