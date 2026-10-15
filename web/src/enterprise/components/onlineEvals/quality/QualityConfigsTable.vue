@@ -99,31 +99,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span v-if="index">·</span>
                       <span>{{ part }}</span>
                     </template>
-                    <!-- Failed judge runs explain missing scores, so they show only when there are some. -->
-                    <template v-if="(failedRuns ?? 0) > 0">
-                      <span>·</span>
-                      <span class="text-status-error-text" data-test="quality-tile-failed-runs">{{
-                        t(
-                          "onlineEvals.quality.tiles.failedRuns",
-                          { count: failedRuns },
-                          failedRuns!,
-                        )
-                      }}</span>
-                      <span>·</span>
-                      <OButton
-                        variant="ghost-primary"
-                        size="chip"
-                        data-test="quality-tile-eval-jobs"
-                        @click.stop="openEvalJobs"
-                      >
-                        {{ t("onlineEvals.quality.tiles.evalJobs") }}
-                      </OButton>
-                    </template>
                   </div>
                 </template>
               </OStatCard>
             </OTooltip>
           </OStatStrip>
+          <!-- Failed judge runs explain missing scores, so they show only when there are some; outside the tile, which is itself a button. -->
+          <div
+            v-if="(failedRuns ?? 0) > 0"
+            class="flex flex-wrap items-center gap-x-1.5 pt-1.5 text-xs"
+            data-test="quality-failed-runs"
+          >
+            <span class="text-status-error-text" data-test="quality-tile-failed-runs">{{
+              t("onlineEvals.quality.tiles.failedRuns", { count: failedRuns }, failedRuns!)
+            }}</span>
+            <span class="text-text-secondary">·</span>
+            <OButton
+              variant="ghost-primary"
+              size="chip"
+              data-test="quality-tile-eval-jobs"
+              @click="openEvalJobs"
+            >
+              {{ t("onlineEvals.quality.tiles.evalJobs") }}
+            </OButton>
+          </div>
         </div>
       </template>
 

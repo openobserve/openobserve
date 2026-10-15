@@ -245,20 +245,20 @@ describe("QualityConfigsTable", () => {
     expect(noteOf(onlyThreshold)).toBe("1 has no threshold");
   });
 
-  it("adds failed runs and the Eval Jobs link only when runs failed", () => {
+  it("adds failed runs and the Eval Jobs link only when runs failed, outside the tile button", () => {
     const failing = mountTable({ failedRuns: 12 });
-    expect(noteOf(failing)).toBe(
-      "1 got no scores · 3 have no threshold · 12 failed runs · Eval Jobs",
-    );
-    expect(failing.find('[data-test="quality-tile-failed-runs"]').classes()).toContain(
+    expect(noteOf(failing)).toBe("1 got no scores · 3 have no threshold");
+    const line = failing.find('[data-test="quality-failed-runs"]');
+    expect(line.text().replace(/\s*·\s*/g, " · ")).toBe("12 failed runs · Eval Jobs");
+    expect(line.find('[data-test="quality-tile-failed-runs"]').classes()).toContain(
       "text-status-error-text",
     );
+    const link = line.find('[data-test="quality-tile-eval-jobs"]').element;
+    expect(link.parentElement?.closest("button")).toBeNull();
     for (const failedRuns of [0, null]) {
-      const note = mountTable({ failedRuns }).find(
-        '[data-test="quality-tile-without-result-note"]',
-      );
-      expect(note.text()).not.toContain("failed");
-      expect(note.find('[data-test="quality-tile-eval-jobs"]').exists()).toBe(false);
+      const table = mountTable({ failedRuns });
+      expect(table.find('[data-test="quality-failed-runs"]').exists()).toBe(false);
+      expect(table.find('[data-test="quality-tile-eval-jobs"]').exists()).toBe(false);
     }
   });
 
