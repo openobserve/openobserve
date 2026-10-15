@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, ref } from "vue";
 import * as vueRouter from "vue-router";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -192,11 +192,11 @@ const MoveAcrossFoldersStub = {
   `,
 };
 
-function mountComponent() {
+function mountComponent(query: Record<string, string> = {}) {
   const mockRouter = {
     push: vi.fn(),
     replace: vi.fn(),
-    currentRoute: { value: { query: {} } },
+    currentRoute: ref<{ query: Record<string, string> }>({ query }),
   };
   vi.mocked(vueRouter.useRouter).mockReturnValue(mockRouter as any);
 
@@ -858,7 +858,6 @@ describe("ReportList", () => {
 describe("ReportList view state persistence", () => {
   let wrapper: VueWrapper;
   const defaults = {
-    activeTab: "shared",
     filterQuery: "",
     searchQuery: "",
     searchAcrossFolders: false,
@@ -884,16 +883,15 @@ describe("ReportList view state persistence", () => {
     vi.clearAllMocks();
   });
 
-  it("seeds tab, filter, sort and paging from the saved view", async () => {
+  it("takes the tab from the route and seeds filter, sort and paging from the saved view", async () => {
     Object.assign(useListViewState("reports", defaults), {
-      activeTab: "cached",
       filterQuery: "daily",
       sortBy: "name",
       sortOrder: "desc",
       pageSize: 50,
       currentPage: 2,
     });
-    wrapper = mountComponent().wrapper;
+    wrapper = mountComponent({ tab: "cached" }).wrapper;
     await flushPromises();
 
     const vm = wrapper.vm as any;
@@ -924,11 +922,12 @@ describe("ReportList view state persistence", () => {
 
   it("resets the page when the tab changes", async () => {
     Object.assign(useListViewState("reports", defaults), { currentPage: 3 });
-    wrapper = mountComponent().wrapper;
+    const mounted = mountComponent();
+    wrapper = mounted.wrapper;
     await flushPromises();
     const vm = wrapper.vm as any;
 
-    vm.activeTab = "cached";
+    mounted.mockRouter.currentRoute.value = { query: { tab: "cached" } };
     await flushPromises();
 
     expect(vm.currentPage).toBe(1);
