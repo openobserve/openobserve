@@ -503,7 +503,7 @@ test.describe(
         await pm.dashboardPanelConfigs.openConfigPanel();
         await pm.dashboardDrilldown.addDrilldownByURL(
           "Mustache URL Drilldown",
-          "https://openobserve.ai?filter={{variablename}}"
+          "https://www.google.com/?filter={{variablename}}"
         );
 
         await expect(
@@ -526,7 +526,7 @@ test.describe(
         await pm.dashboardDrilldown.drilldownMenuFirstItem.click();
 
         // Wait for navigation — the URL should contain "controller" not "{{variablename}}"
-        await page.waitForURL(/openobserve\.ai/, { timeout: 15000 });
+        await page.waitForURL(/google\.com/, { timeout: 15000 });
         const navigatedUrl = page.url();
 
         expect(navigatedUrl).toContain("filter=controller");

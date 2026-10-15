@@ -7,7 +7,17 @@ export async function waitForDateTimeButtonToBeEnabled(page) {
     await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', { timeout: 15000 });
 }
 
-// The panel editor's picker has no Apply of its own; with Auto Run off its range waits for the panel's Apply.
+const WAITING_REFRESH_BUTTONS = [
+  '[data-test="dashboard-viewpanel-refresh-data-btn"][data-o2-variant="warning"]',
+  '[data-test="dashboard-panel-refresh-panel-btn"][data-o2-variant="ghost-warning"]',
+  '[data-test="dashboard-refresh-btn"][data-o2-variant="warning"]',
+];
+
+/**
+ * Applies the range just picked in the open date-time picker, with or without Auto Run.
+ * A picker that still has Apply gets it clicked. Otherwise the picker is closed (which applies with
+ * Auto Run on), then the panel editor's Apply runs it, or on a dashboard the Refresh it marked yellow.
+ */
 export async function applyPickedDateTime(page) {
   const pickerApply = page.locator('[data-test="date-time-apply-btn"]');
   if (await pickerApply.count()) {
@@ -16,9 +26,20 @@ export async function applyPickedDateTime(page) {
   }
   await page.keyboard.press("Escape");
   await page.locator("#date-time-menu").first().waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+
   const panelApply = page.locator('[data-test="dashboard-apply"]').first();
-  if (!(await panelApply.count())) return;
-  await panelApply.click({ timeout: 10000 }).catch(() => panelApply.evaluate((el) => el.click()));
+  if (await panelApply.count()) {
+    await panelApply.click({ timeout: 10000 }).catch(() => panelApply.evaluate((el) => el.click()));
+    return;
+  }
+
+  for (const selector of WAITING_REFRESH_BUTTONS) {
+    const refreshBtn = page.locator(selector).first();
+    if (await refreshBtn.isVisible().catch(() => false)) {
+      await refreshBtn.evaluate((el) => el.click());
+      return;
+    }
+  }
 }
 
 export default class DateTimeHelper {

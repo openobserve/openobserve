@@ -21,7 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @mouseenter="showPopupsAndOverlays"
   >
     <div class="relative h-full" ref="chartPanelRef" :class="chartPanelClass">
-      <div v-if="!errorDetail?.message" :style="{ height: chartPanelHeight, width: '100%' }">
+      <div
+        v-if="!errorDetail?.message && !isAwaitingFirstLoad"
+        :style="{ height: chartPanelHeight, width: '100%' }"
+      >
         <MapsRenderer
           v-if="panelSchema.type == 'maps'"
           :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
@@ -158,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState
         v-if="
           noData &&
+          !isAwaitingFirstLoad &&
           !errorDetail?.message &&
           panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps' &&
@@ -342,6 +346,7 @@ import ExemplarCard from "@/components/dashboards/exemplars/ExemplarCard.vue";
 import ExemplarMarkerList from "@/components/dashboards/exemplars/ExemplarMarkerList.vue";
 import type { ExemplarMarker, InjectedExemplars, TraceVerdict } from "@/ts/interfaces/exemplars";
 import { detectChunkingDirection } from "@/utils/dashboard/chunkingDirection";
+import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -571,6 +576,8 @@ export default defineComponent({
     "updated:vrlFunctionFieldList",
     "loading-state-change",
     "limit-number-of-series-warning-message-update",
+    "series-limit-update",
+    "panel-diagnostics-update",
     "sparkline-warning-update",
     "is-partial-data-update",
     "series-data-update",
@@ -635,6 +642,7 @@ export default defineComponent({
     const annotationPopupRef: any = ref(null);
 
     const limitNumberOfSeriesWarningMessage: any = ref("");
+    const seriesLimit = ref<SeriesLimitInfo | null>(null);
 
     const chartPanelStyle = ref({
       height: "100%",
@@ -779,6 +787,8 @@ export default defineComponent({
       searchRequestTraceIds,
       loadingProgressPercentage,
       isPartialData,
+      panelDiagnostics,
+      isFirstLoadSettled,
       reloadAnnotations,
     } = usePanelDataLoader(
       panelSchema,
@@ -801,6 +811,13 @@ export default defineComponent({
       regionClusterParams,
       allowAnnotationsAPI,
       injectedPromqlData,
+    );
+
+    // Html and markdown render without a query, so they never wait on one.
+    const isAwaitingFirstLoad = computed(
+      () =>
+        isFirstLoadSettled?.value === false &&
+        !["html", "markdown"].includes(panelSchema.value?.type),
     );
 
     const {
@@ -1274,6 +1291,8 @@ export default defineComponent({
     // Conversions can resolve out of order; only the most recently started may land.
     let conversionGeneration = 0;
     const convertPanelDataCommon = async (applyOverlay = false) => {
+      // Converting the empty pre-load buffer would publish an empty result to the header and curated tiles.
+      if (isAwaitingFirstLoad.value) return;
       // Preserve the previously rendered chart during a reload. While loading,
       // if the new data buffer has no rows yet but a chart is already rendered,
       // skip conversion so non-streaming callers (the panelSchema deep watcher,
@@ -1416,6 +1435,7 @@ export default defineComponent({
 
           limitNumberOfSeriesWarningMessage.value =
             panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
+          seriesLimit.value = panelData.value?.extras?.seriesLimit ?? null;
 
           errorDetail.value = {
             message: "",
@@ -1759,6 +1779,18 @@ export default defineComponent({
         );
       },
       { deep: true },
+    );
+
+    watch(seriesLimit, (value) => {
+      emit("series-limit-update", value);
+    });
+
+    watch(
+      () => panelDiagnostics?.value,
+      (value) => {
+        emit("panel-diagnostics-update", value ?? null);
+      },
+      { immediate: true },
     );
 
     watch(lastTriggeredAt, () => {
@@ -2176,6 +2208,7 @@ export default defineComponent({
       errorDetail,
       panelData,
       noData,
+      isAwaitingFirstLoad,
       chartRendererData,
       metadata,
       tableRendererRef,

@@ -40,9 +40,11 @@ export default class DashboardPanel {
     this.layoutEditBtn = page.locator('[data-test="dashboard-edit-btn"]');
     this.layoutEditSaveBtn = page.locator('[data-test="dashboard-edit-save-btn"]');
     this.panelHeight = page.locator(
-      '[data-test="panel-layout-settings-height-input"]'
+      '[data-test="panel-layout-settings-height-input-field"]'
     );
-    this.saveLayout = page.locator('[data-test="panel-layout-settings-save"]');
+    this.saveLayout = page.locator(
+      '[data-test="panel-layout-settings-drawer"] [data-test="o-dialog-primary-btn"]'
+    );
     this.cancelLayout = page.locator(
       '[data-test="panel-layout-settings-cancel"]'
     );

@@ -134,6 +134,7 @@ const WorkflowFoldersPage = require("./workflowsPages/workflowFoldersPage.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
+import { LogsToolbarPinsPage } from "./logsPages/logsToolbarPinsPage.js";
 import { SearchHistoryPage } from "./logsPages/searchHistoryPage.js";
 import UnflattenedPage from "./logsPages/unflattened.js";
 
@@ -237,6 +238,7 @@ class PageManager {
 
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
+    this.logsToolbarPinsPage = new LogsToolbarPinsPage(page);
     this.searchHistoryPage = new SearchHistoryPage(page);
     this.streamsPage = new StreamsPage(page);
     this.alertTemplatesPage = new AlertTemplatesPage(page);
