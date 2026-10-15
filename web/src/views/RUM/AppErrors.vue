@@ -37,7 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 errorEditorHeight,
               ]"
               v-model:query="errorTrackingState.data.editorValue"
-              :debounce-time="300"
+              :debounce-time="100"
+              :filter-mode="true"
               :keywords="effectiveKeywords"
               :suggestions="effectiveSuggestions"
               :field-value-resolver="resolveFieldValues"
@@ -392,14 +393,18 @@ const {
   resolveFieldValues,
 } = useSqlSuggestions();
 
+// Set as soon as the page mounts, so a value lookup on the first keystroke is not left without a stream.
+const syncSuggestStreamContext = () => {
+  autoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
+  autoCompleteData.value.streamType = "logs";
+  autoCompleteData.value.streamName = errorTrackingState.data.stream.errorStream;
+};
 const updateAutoComplete = (value: string) => {
   _sqlOnQueryChange();
   autoCompleteData.value.query = value;
   autoCompleteData.value.cursorIndex = errorQueryEditorRef.value?.getCursorIndex?.();
   autoCompleteData.value.popup.open = errorQueryEditorRef.value?.triggerAutoComplete;
-  autoCompleteData.value.org = store.state.selectedOrganization.identifier;
-  autoCompleteData.value.streamType = "logs";
-  autoCompleteData.value.streamName = errorTrackingState.data.stream.errorStream;
+  syncSuggestStreamContext();
   getSuggestions();
 };
 
@@ -446,6 +451,11 @@ watch(lastQueryError, async (err) => {
   });
 });
 const store = useStore();
+watch(
+  () => [store.state.selectedOrganization?.identifier, errorTrackingState.data.stream.errorStream],
+  syncSuggestStreamContext,
+  { immediate: true },
+);
 const isLoading: Ref<true[]> = ref([]);
 const isMounted = ref(false);
 const { getStream } = useStreams(t);
