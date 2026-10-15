@@ -688,6 +688,7 @@ fn composite_list_item(
         last_triggered_at,
         last_satisfied_at,
         is_real_time: false,
+        is_builtin: false,
         last_trained_at: None,
         status: None,
         last_error: None,

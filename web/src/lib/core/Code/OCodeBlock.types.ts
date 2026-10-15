@@ -10,15 +10,14 @@ import type { I18nText } from "@/types/i18n";
 export type CodeBlockChrome = "terminal" | "editor";
 
 export interface CodeBlockProps {
-  /** Raw code to display and copy. Copy always uses this, never the masked or
-   *  highlighted variant. */
+  /** Raw code to display and copy; the Copy button always copies this. */
   code: string;
   /** Fence language (e.g. "bash", "python"). Auto-detected when omitted. */
   lang?: string;
   /**
    * Masked variant of `code` (e.g. a command with a secret hidden). When set,
-   * the block shows it by default and exposes a Reveal/Hide toggle; copy still
-   * copies the real `code`.
+   * the block shows it by default and exposes a Reveal/Hide toggle; the Copy
+   * button still copies the real `code`, a text selection copies what is shown.
    */
   codeMasked?: string;
   /**
@@ -64,8 +63,6 @@ export interface CodeBlockProps {
    * "ai-code-copy-btn" / "ai-code-reveal-btn". Default: "code-block".
    */
   dataTest?: string;
-  /** First click on an unfocused block copies `code` and focuses it; Enter copies again. */
-  copyOnClick?: boolean;
   /** Name of the credential inside `code`, shown as a toolbar link and in the copy toast. */
   tokenName?: string;
 }

@@ -15,12 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OBanner
+  <AnnouncementBar
     v-for="banner in banners"
     :key="banner.id"
-    bar
-    :variant="bannerVariant(banner)"
-    :icon="bannerIcon(banner)"
+    :variant="banner.variant"
+    :text-size="banner.text_size"
+    :colors="banner.colors"
+    :icon="banner.icon"
+    :mode="isDark ? 'dark' : 'light'"
+    :message="banner.message"
     :data-test="`announcement-banner-${banner.variant}`"
   >
     <div
@@ -37,7 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`announcement-banner-countdown-${banner.id}`"
       />
     </div>
-    <template v-else>{{ banner.message }}</template>
 
     <template v-if="banner.counts?.length" #footer>
       <div class="flex flex-wrap gap-1" :data-test="`announcement-banner-counts-${banner.id}`">
@@ -51,34 +53,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <template v-if="banner.cta || banner.dismissible" #actions>
+    <template v-if="banner.ctas.length || banner.dismissible" #actions>
       <div class="flex flex-wrap items-center gap-3">
-        <OButton
-          v-if="banner.cta && isInApp(banner.cta.url)"
-          variant="banner-dismiss"
-          size="sm"
-          :data-test="`announcement-banner-cta-${banner.id}`"
-          @click="openInApp(banner.cta.url)"
-        >
-          {{ banner.cta.text }}
-        </OButton>
-        <OButton
-          v-else-if="banner.cta"
-          as="a"
-          :href="banner.cta.url"
-          target="_blank"
-          rel="noopener noreferrer"
-          variant="banner-dismiss"
-          size="sm"
-          :data-test="`announcement-banner-cta-${banner.id}`"
-        >
-          {{ banner.cta.text }}
-        </OButton>
+        <template v-for="(cta, position) in banner.ctas" :key="position">
+          <OButton
+            v-if="isInApp(cta.url)"
+            variant="banner-dismiss"
+            size="sm"
+            class="text-[length:inherit]!"
+            :data-test="`announcement-banner-cta-${banner.id}-${position}`"
+            @click="openInApp(cta.url)"
+          >
+            {{ cta.text }}
+          </OButton>
+          <OButton
+            v-else
+            as="a"
+            :href="cta.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="banner-dismiss"
+            size="sm"
+            class="text-[length:inherit]!"
+            :data-test="`announcement-banner-cta-${banner.id}-${position}`"
+          >
+            {{ cta.text }}
+          </OButton>
+        </template>
 
         <OButton
           v-if="banner.dismissible"
           variant="banner-dismiss"
           size="sm"
+          class="text-[length:inherit]!"
           :aria-label="t('announcements.dismissAriaLabel')"
           :data-test="`announcement-banner-dismiss-${banner.id}`"
           @click="dismiss(banner.id)"
@@ -87,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </template>
-  </OBanner>
+  </AnnouncementBar>
 </template>
 
 <script setup lang="ts">
@@ -96,18 +103,20 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import { useAnnouncementBanners, type Banner } from "@/composables/useAnnouncementBanners";
+import { useTheme } from "@/composables/useTheme";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { bannerRowCount, countChipLabel } from "@/utils/downtimes/banner";
 import DowntimeCountdown from "@/components/alerts/downtimes/DowntimeCountdown.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useI18nTyped } from "@/types/i18n";
+import AnnouncementBar from "./AnnouncementBar.vue";
 
 const IN_APP_PREFIX = "/web/";
 
 const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
+const { isDark } = useTheme();
 const { banners, dismiss, start, serverNowMs } = useAnnouncementBanners();
 
 // Generated per org and per window by the announcements endpoint (D19).
@@ -125,33 +134,6 @@ const openInApp = (url: string) => {
       org_identifier: store.state.selectedOrganization?.identifier,
     },
   });
-};
-
-/** Our severities are operator-facing; OBanner's variants are visual. */
-const bannerVariant = (banner: Banner) => {
-  switch (banner.variant) {
-    case "critical":
-      return "error";
-    case "warning":
-      return "warning";
-    case "info":
-      return "info";
-    default:
-      return "default";
-  }
-};
-
-const bannerIcon = (banner: Banner) => {
-  switch (banner.variant) {
-    case "critical":
-      return "error";
-    case "warning":
-      return "warning";
-    case "promo":
-      return "campaign";
-    default:
-      return "info";
-  }
 };
 
 onMounted(start);

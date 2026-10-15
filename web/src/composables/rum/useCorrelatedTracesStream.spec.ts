@@ -309,6 +309,25 @@ describe("useCorrelatedTracesStream", () => {
     });
   });
 
+  describe("fallbackTracesStream", () => {
+    it("is default when the org has a default traces stream", async () => {
+      const { fallbackTracesStream } = useCorrelatedTracesStream(t);
+      expect(await fallbackTracesStream()).toBe("default");
+    });
+
+    it("is null when every traces stream of the org is named", async () => {
+      mockGetStreams.mockResolvedValue({ list: [{ name: "qms_uat" }, { name: "qms_dev" }] });
+      const { fallbackTracesStream } = useCorrelatedTracesStream(t);
+      expect(await fallbackTracesStream()).toBeNull();
+    });
+
+    it("stays default when the stream list cannot be loaded", async () => {
+      mockGetStreams.mockRejectedValue(new Error("boom"));
+      const { fallbackTracesStream } = useCorrelatedTracesStream(t);
+      expect(await fallbackTracesStream()).toBe("default");
+    });
+  });
+
   describe("traces/time_range lookup", () => {
     it("resolves from the index without probing, and seeds knownStreams", async () => {
       mockGetTraceTimeRanges.mockResolvedValue(

@@ -120,8 +120,8 @@ pub async fn update(id: &str, new_pattern: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn remove(pattern_id: &str) -> Result<(), errors::Error> {
-    infra::table::re_pattern::remove(pattern_id).await?;
+pub async fn remove(org_id: &str, pattern_id: &str) -> Result<(), errors::Error> {
+    infra::table::re_pattern::remove(org_id, pattern_id).await?;
 
     // trigger watch event by putting value to cluster coordinator
     let cluster_coordinator = get_coordinator().await;
@@ -138,7 +138,10 @@ pub async fn remove(pattern_id: &str) -> Result<(), errors::Error> {
     {
         let config = o2_enterprise::enterprise::common::config::get_config();
         if config.super_cluster.enabled {
-            match o2_enterprise::enterprise::super_cluster::queue::pattern_delete(pattern_id).await
+            match o2_enterprise::enterprise::super_cluster::queue::pattern_delete(
+                org_id, pattern_id,
+            )
+            .await
             {
                 Ok(_) => {
                     log::info!(

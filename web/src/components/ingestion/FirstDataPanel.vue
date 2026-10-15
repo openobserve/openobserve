@@ -24,7 +24,6 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import config from "@/aws-exports";
@@ -458,7 +457,6 @@ const StatusLine = defineComponent({
             chrome="terminal"
             wrap
             inset
-            copy-on-click
             data-test="first-data-panel-code-block"
             @copy="({ partial }) => trackCopy(partial)"
             @token-click="onTokenClick"
@@ -473,9 +471,6 @@ const StatusLine = defineComponent({
               :waiting-label="waitingLabel"
               @detected="onDetected"
             />
-            <OText v-if="command" variant="meta">{{
-              t("ingestion.firstDataPanel.clickToCopy")
-            }}</OText>
             <span class="flex-1" />
             <OButton
               variant="ghost-primary"

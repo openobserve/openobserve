@@ -249,7 +249,7 @@ export default defineComponent({
       emit("delete:queries");
     };
 
-    const getAllUserQueries = (event: any, row: any) => {
+    const getAllUserQueries = (row: any) => {
       emit("filter:queries", row);
     };
 

@@ -150,7 +150,16 @@ pub async fn search(
     } else {
         // 1. get max records stream
         let start_ts = std::time::Instant::now();
-        let plan = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
+        let plan = match get_max_file_list(
+            &trace_id,
+            org_id,
+            &query.query,
+            start,
+            end,
+            query.query_exemplars,
+        )
+        .await
+        {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
@@ -299,7 +308,16 @@ pub async fn data(
         return Ok(());
     }
     // 1. get max records stream
-    let plan = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
+    let plan = match get_max_file_list(
+        &trace_id,
+        org_id,
+        &query.query,
+        start,
+        end,
+        query.query_exemplars,
+    )
+    .await
+    {
         Ok(v) => v,
         Err(e) => {
             log::error!(
@@ -440,12 +458,20 @@ async fn get_max_file_list(
     query: &str,
     start: i64,
     end: i64,
+    query_exemplars: bool,
 ) -> Result<GroupPlan> {
     // 1. get metrics name
     let ast = promql::parse(query).map_err(DataFusionError::Execution)?;
     let mut visitor = name_visitor::MetricNameVisitor::default();
     walk_expr(&mut visitor, &ast).map_err(|e| DataFusionError::Execution(e.to_string()))?;
-    let metrics_name = visitor.into_names();
+    let mut metrics_name = visitor.into_names();
+    if query_exemplars {
+        let mut mapped = std::collections::HashSet::with_capacity(metrics_name.len());
+        for name in &metrics_name {
+            mapped.insert(promql::utils::exemplars_stream_for(org_id, name).await);
+        }
+        metrics_name = mapped;
+    }
     let window = selector_window(&ast);
 
     // 2. get max records stream
