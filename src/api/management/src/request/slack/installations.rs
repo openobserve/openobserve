@@ -28,9 +28,9 @@ use o2_enterprise::enterprise::slack as ent;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 
-use super::ManifestQuery;
 #[cfg(not(feature = "enterprise"))]
 use super::not_supported;
+use super::{JsonOrEmpty, ManifestQuery};
 #[cfg(feature = "enterprise")]
 use super::{caller, parse, parse_query, parse_value, respond, respond_with};
 
@@ -435,9 +435,10 @@ pub async fn list_installations(
         ("org_id" = String, Path, description = "Organization name"),
         ("installation_id" = String, Path, description = "Slack installation id"),
     ),
-    request_body(content = Object, description = "`{\"channel_id\"?}`", content_type = "application/json"),
+    request_body(content = Object, description = "`{\"channel_id\"?}`; no body at all means `{}`", content_type = "application/json"),
     responses(
         (status = 200, description = "`{\"checks\", \"test_post\"}`", content_type = "application/json", body = Object),
+        (status = 400, description = "A body that is not JSON", content_type = "application/json", body = ()),
         (status = 403, description = "Not an admin, or the OSS build", content_type = "application/json", body = ()),
         (status = 404, description = "Slack is not enabled for this organization, or unknown installation", content_type = "application/json", body = ()),
     ),
@@ -449,11 +450,11 @@ pub async fn list_installations(
 pub async fn test_installation(
     Path((org_id, installation_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    body: Result<Json<serde_json::Value>, JsonRejection>,
+    body: Result<JsonOrEmpty, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let req = match parse(&org_id, body) {
+        let req = match parse(&org_id, body.map(|JsonOrEmpty(value)| Json(value))) {
             Ok(req) => req,
             Err(response) => return response,
         };
@@ -661,7 +662,7 @@ pub async fn disconnect(
         ("installation_id" = String, Path, description = "Slack installation id"),
     ),
     responses(
-        (status = 200, description = "`{\"revoked\", \"affected\": {\"orgs\", \"destinations\", \"links_revoked\"}, \"delete_app_url\"}`", content_type = "application/json", body = Object),
+        (status = 200, description = "`{\"revoked\", \"affected\": {\"orgs\", \"destinations\", \"links_revoked\"}, \"delete_app_url\", \"app_deleted\"?, \"app_delete_error\"?}`; Start over sets `app_deleted: false` and the reason when Slack kept the app", content_type = "application/json", body = Object),
         (status = 403, description = "Not an admin of every connected organization, or the OSS build", content_type = "application/json", body = ()),
         (status = 404, description = "Slack is not enabled for this organization, or unknown installation", content_type = "application/json", body = ()),
         (status = 409, description = "Cloud: webhook-only destinations in other organizations still use the app", content_type = "application/json", body = ()),
@@ -715,7 +716,7 @@ mod tests {
             install_url(one(), user()).await,
             update_credentials(one(), user(), body()).await,
             list_installations(org(), user()).await,
-            test_installation(one(), user(), body()).await,
+            test_installation(one(), user(), Ok(JsonOrEmpty(serde_json::json!({})))).await,
             connection_start(one(), user(), body()).await,
             connection_confirm(org(), user(), body()).await,
             connect(one(), user(), body()).await,
