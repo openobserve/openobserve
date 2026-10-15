@@ -92,6 +92,7 @@ pub async fn check_work_group(
 
 /// Enterprise version: Uses workgroup concurrency control with waiting
 #[cfg(feature = "enterprise")]
+#[allow(clippy::too_many_arguments)]
 #[tracing::instrument(
     name = "service:search:work_group:check",
     skip_all,
@@ -101,66 +102,28 @@ pub async fn check_work_group(
     trace_id: &str,
     org_id: &str,
     user_id: Option<&str>,
+    search_type: Option<SearchEventType>,
     timeout: u64,
     work_group: WorkGroup,
     stop_watch: &mut TookWatcher,
     caller: &str,
 ) -> Result<DeferredLock> {
-    let cfg = get_config();
     let work_group_str = work_group.to_string();
-    // Get distributed lock temporarily (for queue coordination)
     let locker_key = format!("/search/cluster_queue/{work_group_str}");
-    let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
-        None
-    } else {
-        infra::dist_lock::lock_with_trace_id(trace_id, &locker_key, timeout)
-            .await
-            .map_err(|e| {
-                metrics::QUERY_PENDING_NUMS
-                    .with_label_values(&[org_id])
-                    .dec();
-                Error::Message(e.to_string())
-            })?
-    };
 
-    // Check all three concurrency levels (global, org, user) in a single query
+    // Check all three concurrency levels (global, org, user) and add to the workgroup queue
     work_group_checking(
         trace_id,
         stop_watch,
         org_id,
         timeout,
-        &locker,
+        &locker_key,
         &work_group,
         user_id,
+        search_type,
         caller,
     )
     .await?;
-
-    // Add to workgroup queue
-    if let Err(e) = work_group.process(trace_id, Some(org_id), user_id).await {
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[org_id])
-            .dec();
-        if let Err(unlock_err) = infra::dist_lock::unlock_with_trace_id(trace_id, &locker).await {
-            log::error!(
-                "[trace_id {trace_id}] {caller}->search: failed to unlock after process error: {unlock_err:?}"
-            );
-        }
-        return Err(Error::Message(e.to_string()));
-    }
-
-    // Release distributed lock (workgroup queue now owns the concurrency control)
-    if let Err(e) = infra::dist_lock::unlock_with_trace_id(trace_id, &locker).await {
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[org_id])
-            .dec();
-        if let Err(done_err) = work_group.done(trace_id, Some(org_id), user_id).await {
-            log::error!(
-                "[trace_id {trace_id}] {caller}->search: failed to mark work group as done after unlock error: {done_err:?}"
-            );
-        }
-        return Err(e);
-    }
 
     let took_wait = stop_watch.record_split("queue_wait").as_millis() as usize;
     log::info!("[trace_id {trace_id}] {caller}->search: wait in queue took: {took_wait} ms");
@@ -198,6 +161,8 @@ pub async fn check_work_group(
     })
 }
 
+/// Waits for a slot and admits the search into the work group queue. The admission lock is held
+/// only while one attempt checks and inserts, never while waiting.
 #[cfg(feature = "enterprise")]
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(name = "service:search:work_group:checking", skip_all, fields(user_id = user_id))]
@@ -206,9 +171,10 @@ pub async fn work_group_checking(
     stop_watch: &mut TookWatcher,
     org_id: &str,
     timeout: u64,
-    locker: &Option<dist_lock::Locker>,
+    locker_key: &str,
     work_group: &WorkGroup,
     user_id: Option<&str>,
+    search_type: Option<SearchEventType>,
     caller: &str,
 ) -> Result<()> {
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
@@ -219,7 +185,6 @@ pub async fn work_group_checking(
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[org_id])
             .dec();
-        dist_lock::unlock_with_trace_id(trace_id, locker).await?;
         log::warn!(
             "[trace_id {trace_id}] search->cluster: request canceled, missing work-group registration: {err}"
         );
@@ -227,52 +192,56 @@ pub async fn work_group_checking(
             "[trace_id {trace_id}] search->cluster: request canceled, missing work-group registration: {err}"
         ))));
     }
-    tokio::select! {
-        res = work_group_need_wait(trace_id, stop_watch, org_id, timeout, work_group, user_id, caller) => {
-            match res {
-                Ok(_) => {
-                    return Ok(());
-                },
-                Err(e) => {
-                    metrics::QUERY_PENDING_NUMS
-                        .with_label_values(&[org_id])
-                        .dec();
-                    dist_lock::unlock_with_trace_id(trace_id, locker).await?;
-                    return Err(e);
-                }
-            }
-        }
-        _ = abort_receiver => {
-            metrics::QUERY_PENDING_NUMS
-                .with_label_values(&[org_id])
-                .dec();
-            dist_lock::unlock_with_trace_id(trace_id, locker).await?;
-            log::warn!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled");
-            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled"))));
-        }
+    let waited = std::sync::atomic::AtomicBool::new(false);
+    // Boxed: the nested admission future otherwise overflows the layout depth of its callers.
+    let res = Box::pin(wait_for_slot(
+        trace_id,
+        org_id,
+        stop_watch,
+        timeout,
+        abort_receiver,
+        caller,
+        |lock_secs| {
+            try_admit(
+                trace_id,
+                locker_key,
+                lock_secs,
+                work_group,
+                org_id,
+                user_id,
+                search_type,
+                &waited,
+            )
+        },
+    ))
+    .await;
+    if res.is_err() {
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[org_id])
+            .dec();
     }
+    res
 }
 
-/// Enterprise: Wait for workgroup slot to become available
+/// Polls `attempt` until it admits, the timeout passes or the search is canceled. `attempt` gets
+/// the seconds left and returns whether it admitted; nothing is held between attempts.
 #[cfg(feature = "enterprise")]
-#[tracing::instrument(
-    name = "service:search:work_group:need_wait",
-    skip_all,
-    fields(caller = caller, user_id = user_id)
-)]
-async fn work_group_need_wait(
+async fn wait_for_slot<F, Fut>(
     trace_id: &str,
-    stop_watch: &mut TookWatcher,
     org_id: &str,
+    stop_watch: &TookWatcher,
     timeout: u64,
-    work_group: &WorkGroup,
-    user_id: Option<&str>,
+    mut abort_receiver: tokio::sync::oneshot::Receiver<()>,
     caller: &str,
-) -> Result<()> {
-    let mut log_wait = false;
+    mut attempt: F,
+) -> Result<()>
+where
+    F: FnMut(u64) -> Fut,
+    Fut: std::future::Future<Output = Result<bool>>,
+{
     loop {
-        // Check timeout - use total_millis() to check total time from start
-        if stop_watch.total_millis() >= timeout * 1000 {
+        let elapsed = stop_watch.total_millis();
+        if elapsed >= timeout * 1000 {
             metrics::QUERY_TIMEOUT_NUMS
                 .with_label_values(&[org_id])
                 .inc();
@@ -280,40 +249,83 @@ async fn work_group_need_wait(
                 "[trace_id {trace_id}] {caller}->search: request timeout in queue"
             )));
         }
-
-        match work_group.need_wait(Some(org_id), user_id).await {
-            Ok((true, status)) => {
-                // Need to wait - concurrency limit reached
-                if !log_wait {
-                    log::info!(
-                        "[trace_id {trace_id}] user: {user_id:?} is waiting in work_group {work_group:?}[org:{}/{}, user:{}/{}]",
-                        status.org_current,
-                        status.org_limit,
-                        status.user_current,
-                        status.user_limit
-                    );
-                    log_wait = true;
-                }
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-            }
-            Ok((false, status)) => {
-                // Got approval - slot available
-                if log_wait {
-                    log::info!(
-                        "[trace_id {trace_id}] user: {user_id:?} get approved in work_group {work_group:?}[org:{}/{}, user:{}/{}]",
-                        status.org_current,
-                        status.org_limit,
-                        status.user_current,
-                        status.user_limit
-                    );
-                }
-                return Ok(());
-            }
-            Err(e) => {
-                return Err(Error::Message(e.to_string()));
+        if attempt((timeout * 1000 - elapsed).div_ceil(1000)).await? {
+            return Ok(());
+        }
+        tokio::select! {
+            _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {}
+            _ = &mut abort_receiver => {
+                log::warn!("[trace_id {trace_id}] search->cluster: waiting in queue was canceled");
+                return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
+                    "[trace_id {trace_id}] search->cluster: waiting in queue was canceled"
+                ))));
             }
         }
     }
+}
+
+/// One admission attempt: take the admission lock, check every cap, insert when free, release.
+#[cfg(feature = "enterprise")]
+#[allow(clippy::too_many_arguments)]
+async fn try_admit(
+    trace_id: &str,
+    locker_key: &str,
+    lock_secs: u64,
+    work_group: &WorkGroup,
+    org_id: &str,
+    user_id: Option<&str>,
+    search_type: Option<SearchEventType>,
+    waited: &std::sync::atomic::AtomicBool,
+) -> Result<bool> {
+    use std::sync::atomic::Ordering;
+
+    let cfg = get_config();
+    let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
+        None
+    } else {
+        dist_lock::lock_with_trace_id(trace_id, locker_key, lock_secs)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?
+    };
+
+    let admitted = match work_group
+        .need_wait(Some(org_id), user_id, search_type)
+        .await
+    {
+        Ok((true, status)) => {
+            if !waited.swap(true, Ordering::Relaxed) {
+                log::info!(
+                    "[trace_id {trace_id}] user: {user_id:?} is waiting in work_group {work_group:?}: {status:?}"
+                );
+            }
+            Ok(false)
+        }
+        Ok((false, status)) => {
+            if waited.load(Ordering::Relaxed) {
+                log::info!(
+                    "[trace_id {trace_id}] user: {user_id:?} get approved in work_group {work_group:?}: {status:?}"
+                );
+            }
+            work_group
+                .process(trace_id, Some(org_id), user_id, search_type)
+                .await
+                .map(|_| true)
+                .map_err(|e| Error::Message(e.to_string()))
+        }
+        Err(e) => Err(Error::Message(e.to_string())),
+    };
+
+    if let Err(e) = dist_lock::unlock_with_trace_id(trace_id, &locker).await {
+        if matches!(admitted, Ok(true))
+            && let Err(done_err) = work_group.done(trace_id, Some(org_id), user_id).await
+        {
+            log::error!(
+                "[trace_id {trace_id}] search: failed to mark work group as done after unlock error: {done_err:?}"
+            );
+        }
+        return Err(e);
+    }
+    admitted
 }
 
 /// Acquire work group lock with automatic work group prediction (enterprise)
@@ -352,12 +364,11 @@ pub async fn acquire_work_group_lock(
     nodes: &[Node],
     file_id_list_vec: &[&FileId],
 ) -> Result<DeferredLock> {
-    let is_background_task = req
+    let search_type = req
         .search_event_type
         .as_ref()
-        .and_then(|st| SearchEventType::try_from(st.as_str()).ok())
-        .map(|st| st.is_background())
-        .unwrap_or(false);
+        .and_then(|st| SearchEventType::try_from(st.as_str()).ok());
+    let is_background_task = search_type.is_some_and(|st| st.is_background());
 
     let work_group = o2_enterprise::enterprise::search::work_group::predict(
         nodes,
@@ -375,10 +386,155 @@ pub async fn acquire_work_group_lock(
         trace_id,
         &req.org_id,
         user_id,
+        search_type,
         req.timeout as u64,
         work_group,
         stop_watch,
         caller,
     )
     .await
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod tests {
+    use std::{
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Duration,
+    };
+
+    use tokio::sync::{Mutex, oneshot};
+
+    use super::*;
+
+    /// A stand-in for one work group: the admission lock (`None` when the queue is off) and the
+    /// number of admitted searches against a cap.
+    #[derive(Clone)]
+    struct Group {
+        lock: Option<Arc<Mutex<()>>>,
+        admitted: Arc<AtomicUsize>,
+        cap: usize,
+    }
+
+    impl Group {
+        fn new(queue_enabled: bool, cap: usize) -> Self {
+            Self {
+                lock: queue_enabled.then(|| Arc::new(Mutex::new(()))),
+                admitted: Arc::new(AtomicUsize::new(0)),
+                cap,
+            }
+        }
+
+        /// The shape of `try_admit`: lock, count, yield, insert when free, unlock.
+        async fn attempt(&self) -> Result<bool> {
+            let _guard = match &self.lock {
+                Some(lock) => Some(lock.lock().await),
+                None => None,
+            };
+            let free = self.admitted.load(Ordering::SeqCst) < self.cap;
+            // Lets a concurrent attempt run between the count and the insert.
+            tokio::task::yield_now().await;
+            if free {
+                self.admitted.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok(free)
+        }
+
+        async fn wait(&self, timeout: u64, abort: oneshot::Receiver<()>) -> Result<()> {
+            let watch = TookWatcher::new();
+            wait_for_slot("t", "o", &watch, timeout, abort, "test", |_| self.attempt()).await
+        }
+    }
+
+    #[tokio::test]
+    async fn waiting_does_not_hold_the_admission_lock() {
+        let group = Group::new(true, 1);
+        group.admitted.store(1, Ordering::SeqCst);
+        let (_abort, rx) = oneshot::channel();
+        let waiter = {
+            let group = group.clone();
+            tokio::spawn(async move { group.wait(10, rx).await })
+        };
+        tokio::time::sleep(Duration::from_millis(350)).await;
+        assert!(
+            !waiter.is_finished(),
+            "the cap is full, so the search waits"
+        );
+
+        // Another admission into the same group takes the lock while the first one waits.
+        let lock = group.lock.clone().unwrap();
+        for _ in 0..5 {
+            let guard = tokio::time::timeout(Duration::from_millis(50), lock.lock())
+                .await
+                .expect("the waiting search must not hold the admission lock");
+            drop(guard);
+            tokio::time::sleep(Duration::from_millis(30)).await;
+        }
+
+        // A finished search frees the slot and the waiter is admitted on its next recheck.
+        group.admitted.fetch_sub(1, Ordering::SeqCst);
+        tokio::time::timeout(Duration::from_secs(2), waiter)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(group.admitted.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn the_wait_keeps_its_timeout_and_cancellation() {
+        for queue_enabled in [true, false] {
+            let group = Group::new(queue_enabled, 0);
+            let (_abort, rx) = oneshot::channel();
+            let started = std::time::Instant::now();
+            let err = group.wait(1, rx).await.unwrap_err();
+            assert!(
+                err.to_string().contains("request timeout in queue"),
+                "{err}"
+            );
+            assert!(started.elapsed() >= Duration::from_secs(1));
+
+            let (abort, rx) = oneshot::channel();
+            let waiter = {
+                let group = group.clone();
+                tokio::spawn(async move { group.wait(10, rx).await })
+            };
+            tokio::time::sleep(Duration::from_millis(150)).await;
+            abort.send(()).unwrap();
+            let err = tokio::time::timeout(Duration::from_secs(1), waiter)
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap_err();
+            assert!(
+                err.to_string().contains("waiting in queue was canceled"),
+                "{err}"
+            );
+            if let Some(lock) = &group.lock {
+                assert!(
+                    lock.try_lock().is_ok(),
+                    "a canceled wait leaves the lock free"
+                );
+            }
+        }
+    }
+
+    /// With the queue on, the lock spans each check and insert, so concurrent admissions on one
+    /// cluster stop at the cap. With the queue off, count then insert overshoots: best effort.
+    #[tokio::test]
+    async fn concurrent_admissions_against_a_cap_with_the_queue_on_and_off() {
+        for (queue_enabled, expected) in [(true, 4), (false, 5)] {
+            let group = Group::new(queue_enabled, 4);
+            group.admitted.store(3, Ordering::SeqCst);
+            let attempts = [group.attempt(), group.attempt()];
+            let admitted = futures::future::join_all(attempts).await;
+            assert_eq!(
+                group.admitted.load(Ordering::SeqCst),
+                expected,
+                "queue_enabled={queue_enabled}: {admitted:?}"
+            );
+        }
+    }
 }
