@@ -130,8 +130,7 @@ pub fn extract_path_without_query(path: &str) -> &str {
     &path[..query_start]
 }
 
-/// The slug segment of an anonymous public dashboard route, whatever its syntax; the router routes
-/// by it alone, so every range of a link lands on the querier that owns the link.
+/// The slug of an anonymous public dashboard route, whatever its syntax; the router keys on it.
 pub fn public_dashboard_slug(path: &str) -> Option<&str> {
     let rest =
         extract_path_without_query(remove_base_uri(path)).strip_prefix(PUBLIC_DASHBOARDS_PREFIX)?;

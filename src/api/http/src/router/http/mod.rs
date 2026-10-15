@@ -41,6 +41,7 @@ use futures::StreamExt;
 use hashbrown::HashMap;
 use http_body_util::{BodyExt, Limited};
 use infra::cluster;
+use openobserve_api_management::request::public_dashboards;
 
 mod hec;
 
@@ -99,16 +100,23 @@ enum QuerierPayload {
 
 /// Main dispatch handler for all routes
 pub async fn dispatch(req: Request) -> Response {
-    let start = std::time::Instant::now();
-    let cfg = get_config();
     let path = req
         .uri()
         .path_and_query()
         .map(|x| x.as_str())
         .unwrap_or("")
         .to_string();
-
     let public_slug = public_dashboard_slug(&path).map(str::to_string);
+    if public_slug.is_none() {
+        return route(req, path, None).await;
+    }
+    // The router's own 404, 502 and 503 answer the anonymous viewer too.
+    public_dashboards::public::with_headers(route(req, path, public_slug).await)
+}
+
+async fn route(req: Request, path: String, public_slug: Option<String>) -> Response {
+    let start = std::time::Instant::now();
+    let cfg = get_config();
     if public_slug
         .as_deref()
         .is_some_and(|slug| !is_public_dashboard_slug(slug))
@@ -390,8 +398,7 @@ async fn proxy_with_body_routing(
     .await
 }
 
-/// Proxies to the querier the routing key hashes to (for its caches), failing over to the other
-/// online queriers, which only costs a cache miss.
+/// Proxies to the querier the key hashes to, failing over to the other online queriers.
 async fn proxy_by_key(
     path: String,
     nodes: Vec<Node>,
@@ -1022,6 +1029,14 @@ mod tests {
         assert!(max_attempts(2) <= 2);
     }
 
+    fn assert_public_headers(resp: &Response) {
+        let h = resp.headers();
+        assert_eq!(h[header::CACHE_CONTROL], "no-store");
+        assert_eq!(h[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
+        assert_eq!(h["x-robots-tag"], "noindex, nofollow");
+        assert_eq!(h[header::REFERRER_POLICY], "no-referrer");
+    }
+
     #[tokio::test]
     async fn a_malformed_public_dashboard_slug_is_404_without_proxying() {
         for path in [
@@ -1030,11 +1045,9 @@ mod tests {
             "/api/public_dashboards/..%2F..%2Fetc%2Fpasswd/data",
         ] {
             let req = Request::builder().uri(path).body(Body::empty()).unwrap();
-            assert_eq!(
-                dispatch(req).await.status(),
-                StatusCode::NOT_FOUND,
-                "{path}"
-            );
+            let resp = dispatch(req).await;
+            assert_eq!(resp.status(), StatusCode::NOT_FOUND, "{path}");
+            assert_public_headers(&resp);
         }
     }
 
@@ -1046,11 +1059,9 @@ mod tests {
             "/api/public_dashboards/k8Zt2mR7aB3cD4eF5gH6Qx/data?range=r3600",
         ] {
             let req = Request::builder().uri(path).body(Body::empty()).unwrap();
-            assert_eq!(
-                dispatch(req).await.status(),
-                StatusCode::SERVICE_UNAVAILABLE,
-                "{path}"
-            );
+            let resp = dispatch(req).await;
+            assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE, "{path}");
+            assert_public_headers(&resp);
         }
     }
 
