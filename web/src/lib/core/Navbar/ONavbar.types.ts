@@ -128,6 +128,8 @@ export interface NavGateContext {
   databaseMonitoring: boolean;
   /** `/config` `downtimes_enabled` (enterprise `O2_DOWNTIMES_ENABLED`). */
   downtimesEnabled: boolean;
+  /** `/config` `alert_calibration_enabled` (enterprise `O2_ALERT_CALIBRATION_ENABLED`). */
+  alertCalibrationEnabled: boolean;
   /** Raw `custom_hide_menus` entries (split on ",") — matches how pages test it. */
   hiddenMenus: Set<string>;
 }
