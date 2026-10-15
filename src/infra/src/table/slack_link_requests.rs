@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::slack::SlackLinkRequest;
+use config::{meta::slack::SlackLinkRequest, utils::time::now_micros};
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, EntityTrait, Iterable, PaginatorTrait, QueryFilter,
     Select, Set,
@@ -22,7 +22,7 @@ use sea_orm::{
 
 use super::{
     entity::slack_link_requests::{ActiveModel, Column, Entity, Model},
-    slack_shared::{db_err, open, seal, secrets_key},
+    slack_shared::{db_err, open, seal, secrets_key, with_region},
 };
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
@@ -69,6 +69,19 @@ pub async fn delete_finished_before(at: i64) -> Result<u64, Error> {
     delete_finished_before_with(get_orm_client_rw().await, at).await
 }
 
+/// `mark_redeemed` that also stamps `origin_region`, the form every v1 write goes through.
+pub async fn mark_redeemed_in_region(id: &str, at: i64, origin_region: &str) -> Result<(), Error> {
+    mark_redeemed_in_region_with(get_orm_client_rw().await, id, at, origin_region).await
+}
+
+pub async fn mark_discarded_in_region(id: &str, at: i64, origin_region: &str) -> Result<(), Error> {
+    mark_discarded_in_region_with(get_orm_client_rw().await, id, at, origin_region).await
+}
+
+pub async fn clear_nonce_in_region(id: &str, at: i64, origin_region: &str) -> Result<(), Error> {
+    clear_nonce_in_region_with(get_orm_client_rw().await, id, at, origin_region).await
+}
+
 pub async fn put_with<C: ConnectionTrait>(conn: &C, row: &SlackLinkRequest) -> Result<(), Error> {
     let key = secrets_key(row.question.is_some()).await?;
     put_keyed(conn, row, key.as_deref()).await
@@ -104,13 +117,7 @@ pub async fn mark_redeemed_with<C: ConnectionTrait>(
     id: &str,
     at: i64,
 ) -> Result<(), Error> {
-    Entity::update_many()
-        .col_expr(Column::RedeemedAt, Expr::value(at))
-        .col_expr(Column::UpdatedAt, Expr::value(at))
-        .filter(Column::Id.eq(id))
-        .exec(conn)
-        .await?;
-    Ok(())
+    mark_redeemed_columns(conn, id, at, None).await
 }
 
 pub async fn mark_discarded_with<C: ConnectionTrait>(
@@ -118,23 +125,38 @@ pub async fn mark_discarded_with<C: ConnectionTrait>(
     id: &str,
     at: i64,
 ) -> Result<(), Error> {
-    Entity::update_many()
-        .col_expr(Column::DiscardedAt, Expr::value(at))
-        .col_expr(Column::QuestionEnc, Expr::value(Option::<String>::None))
-        .col_expr(Column::UpdatedAt, Expr::value(at))
-        .filter(Column::Id.eq(id))
-        .exec(conn)
-        .await?;
-    Ok(())
+    mark_discarded_columns(conn, id, at, None).await
 }
 
 pub async fn clear_nonce_with<C: ConnectionTrait>(conn: &C, id: &str) -> Result<(), Error> {
-    Entity::update_many()
-        .col_expr(Column::OidcNonce, Expr::value(Option::<String>::None))
-        .filter(Column::Id.eq(id))
-        .exec(conn)
-        .await?;
-    Ok(())
+    clear_nonce_columns(conn, id, now_micros(), None).await
+}
+
+pub async fn mark_redeemed_in_region_with<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    at: i64,
+    origin_region: &str,
+) -> Result<(), Error> {
+    mark_redeemed_columns(conn, id, at, Some(origin_region)).await
+}
+
+pub async fn mark_discarded_in_region_with<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    at: i64,
+    origin_region: &str,
+) -> Result<(), Error> {
+    mark_discarded_columns(conn, id, at, Some(origin_region)).await
+}
+
+pub async fn clear_nonce_in_region_with<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    at: i64,
+    origin_region: &str,
+) -> Result<(), Error> {
+    clear_nonce_columns(conn, id, at, Some(origin_region)).await
 }
 
 pub async fn delete_finished_before_with<C: ConnectionTrait>(
@@ -155,6 +177,55 @@ pub async fn delete_finished_before_with<C: ConnectionTrait>(
 
 fn live() -> Select<Entity> {
     Entity::find().filter(Column::DeletedAt.is_null())
+}
+
+async fn mark_redeemed_columns<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    at: i64,
+    origin_region: Option<&str>,
+) -> Result<(), Error> {
+    let update = Entity::update_many()
+        .col_expr(Column::RedeemedAt, Expr::value(at))
+        .col_expr(Column::UpdatedAt, Expr::value(at));
+    with_region(update, Column::OriginRegion, origin_region)
+        .filter(Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
+async fn mark_discarded_columns<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    at: i64,
+    origin_region: Option<&str>,
+) -> Result<(), Error> {
+    let update = Entity::update_many()
+        .col_expr(Column::DiscardedAt, Expr::value(at))
+        .col_expr(Column::QuestionEnc, Expr::value(Option::<String>::None))
+        .col_expr(Column::UpdatedAt, Expr::value(at));
+    with_region(update, Column::OriginRegion, origin_region)
+        .filter(Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
+async fn clear_nonce_columns<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    at: i64,
+    origin_region: Option<&str>,
+) -> Result<(), Error> {
+    let update = Entity::update_many()
+        .col_expr(Column::OidcNonce, Expr::value(Option::<String>::None))
+        .col_expr(Column::UpdatedAt, Expr::value(at));
+    with_region(update, Column::OriginRegion, origin_region)
+        .filter(Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
 async fn put_keyed<C: ConnectionTrait>(
@@ -350,13 +421,19 @@ mod tests {
             .unwrap();
 
         mark_redeemed_with(&db, "r1", 400).await.unwrap();
+        let before = config::utils::time::now_micros();
         clear_nonce_with(&db, "r1").await.unwrap();
         let r1 = from_model(stored_model(&db, "r1").await, Some(&KEY)).unwrap();
+        assert!(
+            (before..=config::utils::time::now_micros()).contains(&r1.updated_at),
+            "clear_nonce stamps updated_at with now: {}",
+            r1.updated_at
+        );
         assert!(
             r1 == SlackLinkRequest {
                 redeemed_at: Some(400),
                 oidc_nonce: None,
-                updated_at: 400,
+                updated_at: r1.updated_at,
                 ..request("r1", "U1", 100)
             }
         );
@@ -371,6 +448,58 @@ mod tests {
                 updated_at: 500,
                 ..request("r2", "U1", 100)
             }
+        );
+    }
+
+    #[tokio::test]
+    async fn region_aware_marks_and_nonce_clearing_write_both_replication_columns() {
+        let db = db().await;
+        for id in ["r1", "r2", "r3"] {
+            put_keyed(&db, &request(id, "U1", 100), Some(&KEY))
+                .await
+                .unwrap();
+        }
+        mark_redeemed_in_region_with(&db, "r1", 400, "eu-west")
+            .await
+            .unwrap();
+        mark_discarded_in_region_with(&db, "r2", 500, "eu-west")
+            .await
+            .unwrap();
+        clear_nonce_in_region_with(&db, "r3", 600, "eu-west")
+            .await
+            .unwrap();
+        let read = |id: &'static str| {
+            let db = &db;
+            async move { from_model(stored_model(db, id).await, Some(&KEY)).unwrap() }
+        };
+        assert!(
+            read("r1").await
+                == SlackLinkRequest {
+                    redeemed_at: Some(400),
+                    updated_at: 400,
+                    origin_region: "eu-west".to_string(),
+                    ..request("r1", "U1", 100)
+                }
+        );
+        assert_eq!(stored_question(&db, "r2").await, None);
+        assert!(
+            read("r2").await
+                == SlackLinkRequest {
+                    discarded_at: Some(500),
+                    question: None,
+                    updated_at: 500,
+                    origin_region: "eu-west".to_string(),
+                    ..request("r2", "U1", 100)
+                }
+        );
+        assert!(
+            read("r3").await
+                == SlackLinkRequest {
+                    oidc_nonce: None,
+                    updated_at: 600,
+                    origin_region: "eu-west".to_string(),
+                    ..request("r3", "U1", 100)
+                }
         );
     }
 
