@@ -17,6 +17,10 @@ use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier, SearchInfo, SuperClus
 
 use crate::meta::{search::default_use_cache, stream::StreamType};
 
+tokio::task_local! {
+    static REJECT_NONFINITE_FLOATS: ();
+}
+
 #[derive(Debug, Clone)]
 pub struct Request {
     pub trace_id: String,
@@ -39,6 +43,8 @@ pub struct Request {
     /// request because the query is planned again in spawned tasks, where
     /// that task-local is gone. Never derived from client input.
     pub chat_history_reader: bool,
+    /// Set only inside [`reject_nonfinite_floats`]; the leader then fails on NaN/infinite floats.
+    reject_nonfinite_floats: bool,
 }
 
 impl Default for Request {
@@ -59,6 +65,7 @@ impl Default for Request {
             overwrite_cache: false,
             histogram_interval: 0,
             chat_history_reader: false,
+            reject_nonfinite_floats: false,
         }
     }
 }
@@ -92,6 +99,7 @@ impl Request {
             overwrite_cache,
             histogram_interval,
             chat_history_reader: false,
+            reject_nonfinite_floats: false,
         }
     }
 
@@ -117,6 +125,15 @@ impl Request {
     pub fn mark_chat_history_reader(&mut self) {
         self.chat_history_reader = crate::meta::self_reporting::ai_chat::is_chat_history_reader();
     }
+
+    /// Carries a [`reject_nonfinite_floats`] scope onto the request before it leaves the task.
+    pub fn mark_nonfinite_float_rejection(&mut self) {
+        self.reject_nonfinite_floats = REJECT_NONFINITE_FLOATS.try_with(|_| ()).is_ok();
+    }
+
+    pub fn rejects_nonfinite_floats(&self) -> bool {
+        self.reject_nonfinite_floats
+    }
 }
 
 impl From<FlightSearchRequest> for Request {
@@ -138,6 +155,7 @@ impl From<FlightSearchRequest> for Request {
             histogram_interval: req.search_info.histogram_interval,
             // Never carried across nodes.
             chat_history_reader: false,
+            reject_nonfinite_floats: false,
         }
     }
 }
@@ -182,6 +200,11 @@ impl From<FlightSearchRequest> for cluster_rpc::FlightSearchRequest {
             super_cluster_info: Some(request.super_cluster_info),
         }
     }
+}
+
+/// Runs `fut` so the searches it starts fail on NaN or infinite float cells instead of nulls.
+pub async fn reject_nonfinite_floats<F: std::future::Future>(fut: F) -> F::Output {
+    REJECT_NONFINITE_FLOATS.scope((), fut).await
 }
 
 #[cfg(test)]
@@ -330,5 +353,20 @@ mod tests {
             restored.search_info.start_time,
             original.search_info.start_time
         );
+    }
+
+    #[tokio::test]
+    async fn the_nonfinite_rejection_mark_needs_its_scope() {
+        let mut outside = Request::default();
+        outside.mark_nonfinite_float_rejection();
+        assert!(!outside.rejects_nonfinite_floats());
+        let inside = reject_nonfinite_floats(async {
+            let mut req = Request::default();
+            req.mark_nonfinite_float_rejection();
+            req
+        })
+        .await;
+        assert!(inside.rejects_nonfinite_floats());
+        assert!(inside.clone().rejects_nonfinite_floats());
     }
 }

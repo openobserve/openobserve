@@ -55,6 +55,7 @@ pub async fn search(
     // execution
     let use_query_fn = query.uses_zo_fn;
     let query_fn = query.query_fn.clone();
+    let reject_nonfinite = req.rejects_nonfinite_floats();
     let ret = search_inner(
         req,
         query,
@@ -72,6 +73,12 @@ pub async fn search(
             return Err(e);
         }
     };
+
+    if reject_nonfinite && let Some(column) = super::nonfinite_float_column(&merge_batches) {
+        let msg =
+            format!("column '{column}' holds a NaN or infinite value, which JSON turns into null");
+        return Err(Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(msg)));
+    }
 
     // final result
     let mut result = search::Response::new(sql.offset, sql.limit);

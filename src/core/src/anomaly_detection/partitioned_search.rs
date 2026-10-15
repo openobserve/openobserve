@@ -413,9 +413,16 @@ impl SliceSearch for EngineSearch<'_> {
     }
 
     async fn search(&self, trace_id: &str, req: &Request) -> Result<Response> {
-        search_service::search(trace_id, self.org_id, self.stream_type, None, req)
-            .await
-            .map_err(|e| anyhow::anyhow!("{e}"))
+        // JSON output turns NaN and infinity into null, which would read as an omitted SQL NULL.
+        search_service::search_rejecting_nonfinite(
+            trace_id,
+            self.org_id,
+            self.stream_type,
+            None,
+            req,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))
     }
 }
 
@@ -845,11 +852,15 @@ mod tests {
     use std::{
         collections::VecDeque,
         sync::{
-            Mutex,
+            Arc, Mutex,
             atomic::{AtomicUsize, Ordering},
         },
     };
 
+    use datafusion::arrow::{
+        array::{ArrayRef, Float64Array, TimestampMicrosecondArray},
+        record_batch::RecordBatch,
+    };
     use o2_enterprise::enterprise::anomaly_detection::{
         query_builder::build_training_query,
         types::{AnomalyConfig, DetectionFunction, Filter, QueryMode, Status},
@@ -868,6 +879,111 @@ mod tests {
         interval_secs: 300,
         interval_us: FIVE_MIN_US,
     };
+
+    const WINDOW: (i64, i64) = (T0, T0 + 3 * FIVE_MIN_US);
+    const SQL: &str = "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \
+                       default GROUP BY time_bucket ORDER BY time_bucket";
+
+    #[derive(Default)]
+    struct ScriptedSearch {
+        plan: Option<std::result::Result<SearchPartitionResponse, String>>,
+        responses: Mutex<VecDeque<std::result::Result<Response, String>>>,
+        searched: Mutex<Vec<(String, i64, i64, i64)>>,
+        planned: AtomicUsize,
+        gate: Option<tokio::sync::Notify>,
+    }
+
+    impl ScriptedSearch {
+        fn new(
+            plan: Option<SearchPartitionResponse>,
+            responses: Vec<std::result::Result<Response, String>>,
+        ) -> Self {
+            Self {
+                plan: plan.map(Ok),
+                responses: Mutex::new(responses.into()),
+                ..Default::default()
+            }
+        }
+
+        fn searched(&self) -> Vec<(String, i64, i64, i64)> {
+            self.searched.lock().unwrap().clone()
+        }
+    }
+
+    impl SliceSearch for ScriptedSearch {
+        async fn plan(
+            &self,
+            _trace_id: &str,
+            req: &SearchPartitionRequest,
+        ) -> Result<SearchPartitionResponse> {
+            assert_eq!(req.histogram_interval, 300);
+            assert!(!req.streaming_output);
+            self.planned.fetch_add(1, Ordering::SeqCst);
+            match self.plan.clone() {
+                Some(Ok(plan)) => Ok(plan),
+                Some(Err(e)) => Err(anyhow::anyhow!(e)),
+                None => panic!("planner called on the single-call path"),
+            }
+        }
+
+        async fn search(&self, trace_id: &str, req: &Request) -> Result<Response> {
+            assert_eq!(req.query.query_type, "table");
+            let call = (
+                trace_id.to_string(),
+                req.query.start_time,
+                req.query.end_time,
+                req.query.size,
+            );
+            let first = {
+                let mut searched = self.searched.lock().unwrap();
+                searched.push(call);
+                searched.len() == 1
+            };
+            if first && let Some(gate) = &self.gate {
+                gate.notified().await;
+            }
+            let next = self.responses.lock().unwrap().pop_front();
+            next.expect("unscripted search")
+                .map_err(|e| anyhow::anyhow!(e))
+        }
+    }
+
+    /// Leader output for one slice: the nonfinite scan, then the real JSON and table conversion.
+    struct ArrowSearch {
+        plan: Option<SearchPartitionResponse>,
+        batches: Mutex<VecDeque<RecordBatch>>,
+        searched: AtomicUsize,
+    }
+
+    impl SliceSearch for ArrowSearch {
+        async fn plan(
+            &self,
+            _trace_id: &str,
+            _req: &SearchPartitionRequest,
+        ) -> Result<SearchPartitionResponse> {
+            Ok(self
+                .plan
+                .clone()
+                .expect("planner called on the single-call path"))
+        }
+
+        async fn search(&self, _trace_id: &str, req: &Request) -> Result<Response> {
+            assert_eq!(req.query.query_type, "table");
+            self.searched.fetch_add(1, Ordering::SeqCst);
+            let batch = self
+                .batches
+                .lock()
+                .unwrap()
+                .pop_front()
+                .expect("unscripted search");
+            if let Some(column) =
+                search_service::cluster::nonfinite_float_column(std::slice::from_ref(&batch))
+            {
+                anyhow::bail!("column '{column}' holds a NaN or infinite value");
+            }
+            Ok(table_response(&batch))
+        }
+    }
 
     fn builder_config(
         function: DetectionFunction,
@@ -1536,74 +1652,6 @@ mod tests {
         assert!(series.finish(2).is_err());
     }
 
-    #[derive(Default)]
-    struct ScriptedSearch {
-        plan: Option<std::result::Result<SearchPartitionResponse, String>>,
-        responses: Mutex<VecDeque<std::result::Result<Response, String>>>,
-        searched: Mutex<Vec<(String, i64, i64, i64)>>,
-        planned: AtomicUsize,
-        gate: Option<tokio::sync::Notify>,
-    }
-
-    impl ScriptedSearch {
-        fn new(
-            plan: Option<SearchPartitionResponse>,
-            responses: Vec<std::result::Result<Response, String>>,
-        ) -> Self {
-            Self {
-                plan: plan.map(Ok),
-                responses: Mutex::new(responses.into()),
-                ..Default::default()
-            }
-        }
-
-        fn searched(&self) -> Vec<(String, i64, i64, i64)> {
-            self.searched.lock().unwrap().clone()
-        }
-    }
-
-    impl SliceSearch for ScriptedSearch {
-        async fn plan(
-            &self,
-            _trace_id: &str,
-            req: &SearchPartitionRequest,
-        ) -> Result<SearchPartitionResponse> {
-            assert_eq!(req.histogram_interval, 300);
-            assert!(!req.streaming_output);
-            self.planned.fetch_add(1, Ordering::SeqCst);
-            match self.plan.clone() {
-                Some(Ok(plan)) => Ok(plan),
-                Some(Err(e)) => Err(anyhow::anyhow!(e)),
-                None => panic!("planner called on the single-call path"),
-            }
-        }
-
-        async fn search(&self, trace_id: &str, req: &Request) -> Result<Response> {
-            assert_eq!(req.query.query_type, "table");
-            let call = (
-                trace_id.to_string(),
-                req.query.start_time,
-                req.query.end_time,
-                req.query.size,
-            );
-            let first = {
-                let mut searched = self.searched.lock().unwrap();
-                searched.push(call);
-                searched.len() == 1
-            };
-            if first && let Some(gate) = &self.gate {
-                gate.notified().await;
-            }
-            let next = self.responses.lock().unwrap().pop_front();
-            next.expect("unscripted search")
-                .map_err(|e| anyhow::anyhow!(e))
-        }
-    }
-
-    const WINDOW: (i64, i64) = (T0, T0 + 3 * FIVE_MIN_US);
-    const SQL: &str = "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \
-                       default GROUP BY time_bucket ORDER BY time_bucket";
-
     fn three_slices() -> SearchPartitionResponse {
         plan(vec![
             [T0 + 2 * FIVE_MIN_US, WINDOW.1],
@@ -1783,5 +1831,106 @@ mod tests {
             engine.searched(),
             vec![("trace".to_string(), WINDOW.0, WINDOW.1, 5)]
         );
+    }
+
+    fn table_response(batch: &RecordBatch) -> Response {
+        let rows = config::utils::arrow::record_batches_to_json_rows(&[batch]).unwrap();
+        let (columns, hits) = search_service::cluster::handle_table_response(
+            batch.schema(),
+            rows.into_iter().map(serde_json::Value::Object).collect(),
+        );
+        Response {
+            columns,
+            hits,
+            ..Default::default()
+        }
+    }
+
+    fn arrow_rows(rows: &[(i64, Option<f64>)]) -> RecordBatch {
+        let buckets = TimestampMicrosecondArray::from(rows.iter().map(|r| r.0).collect::<Vec<_>>());
+        let values = Float64Array::from(rows.iter().map(|r| r.1).collect::<Vec<_>>());
+        RecordBatch::try_from_iter(vec![
+            (BUCKET_COLUMN, Arc::new(buckets) as ArrayRef),
+            (VALUE_COLUMN, Arc::new(values) as ArrayRef),
+        ])
+        .unwrap()
+    }
+
+    fn arrow_engine(
+        plan: Option<SearchPartitionResponse>,
+        slices: Vec<RecordBatch>,
+    ) -> ArrowSearch {
+        ArrowSearch {
+            plan,
+            batches: Mutex::new(slices.into()),
+            searched: AtomicUsize::new(0),
+        }
+    }
+
+    #[test]
+    fn json_output_alone_cannot_tell_a_nonfinite_value_from_null() {
+        let batch = arrow_rows(&[
+            (T0, Some(2.0)),
+            (T0 + FIVE_MIN_US, None),
+            (T0 + 2 * FIVE_MIN_US, Some(f64::INFINITY)),
+        ]);
+        let resp = table_response(&batch);
+        assert!(
+            resp.hits[1][1].is_null() && resp.hits[2][1].is_null(),
+            "{:?}",
+            resp.hits
+        );
+        let mut series = SeriesAccumulator::default();
+        series
+            .add_slice(&resp, [WINDOW.0, WINDOW.1], FIVE_MIN_US, 5)
+            .unwrap();
+        assert_eq!(series.omitted_nulls, 2);
+    }
+
+    #[tokio::test]
+    async fn nonfinite_aggregates_fail_and_real_nulls_are_omitted_in_both_modes() {
+        let finite_and_null = || {
+            vec![
+                arrow_rows(&[(T0, Some(2.0))]),
+                arrow_rows(&[(T0 + FIVE_MIN_US, None)]),
+                arrow_rows(&[(T0 + 2 * FIVE_MIN_US, Some(3.5))]),
+            ]
+        };
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut sliced = finite_and_null();
+            sliced[2] = arrow_rows(&[(T0 + 2 * FIVE_MIN_US, Some(bad))]);
+            let engine = arrow_engine(Some(three_slices()), sliced);
+            let err = run_arrow(&engine, true).await.unwrap_err().to_string();
+            assert!(err.contains("'value'") && err.contains("trace-2"), "{err}");
+            assert_eq!(engine.searched.load(Ordering::SeqCst), 3);
+
+            let whole = arrow_rows(&[
+                (T0, Some(2.0)),
+                (T0 + FIVE_MIN_US, None),
+                (T0 + 2 * FIVE_MIN_US, Some(bad)),
+            ]);
+            let engine = arrow_engine(None, vec![whole]);
+            let err = run_arrow(&engine, false).await.unwrap_err().to_string();
+            assert!(err.contains("'value'"), "{err}");
+        }
+
+        let engine = arrow_engine(Some(three_slices()), finite_and_null());
+        let on = run_arrow(&engine, true).await.unwrap();
+        let whole = arrow_rows(&[
+            (T0, Some(2.0)),
+            (T0 + FIVE_MIN_US, None),
+            (T0 + 2 * FIVE_MIN_US, Some(3.5)),
+        ]);
+        let engine = arrow_engine(None, vec![whole]);
+        let off = run_arrow(&engine, false).await.unwrap();
+        for points in [on, off] {
+            let got: Vec<_> = points.iter().map(|p| (p.timestamp_us, p.value)).collect();
+            assert_eq!(got, vec![(T0, 2.0), (T0 + 2 * FIVE_MIN_US, 3.5)]);
+        }
+    }
+
+    async fn run_arrow(engine: &ArrowSearch, partitioned: bool) -> Result<Vec<QueryDataPoint>> {
+        let run = SupportedRun::new("a1", "trace", WINDOW, GRID_5M)?;
+        run.execute(engine, SQL, partitioned).await
     }
 }

@@ -173,6 +173,7 @@ pub async fn search(
     request.set_use_cache(in_req.use_cache);
     // Before the query is planned again in spawned tasks (cluster::http).
     request.mark_chat_history_reader();
+    request.mark_nonfinite_float_rejection();
     let meta = Sql::new_from_req(&request, &query).await?;
 
     #[cfg(feature = "enterprise")]
@@ -327,6 +328,24 @@ pub async fn search(
             Err(e)
         }
     }
+}
+
+/// [`search`] that fails on a NaN or infinite float cell instead of returning it as JSON null.
+pub async fn search_rejecting_nonfinite(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    user_id: Option<String>,
+    in_req: &search::Request,
+) -> Result<search::Response, Error> {
+    config::datafusion::request::reject_nonfinite_floats(search(
+        trace_id,
+        org_id,
+        stream_type,
+        user_id,
+        in_req,
+    ))
+    .await
 }
 
 /// Returns Error if the first query is failed, otherwise returns the partial results.

@@ -235,11 +235,9 @@ mod tests {
     fn test_get_remote_node_keeps_raw_start_time_for_histogram() {
         // the scan window must match the requested range exactly; widening it
         // to a bucket boundary makes bucket sums exceed count(*) (#13946)
-        let req = Request {
-            time_range: Some((1_700_000_017_000_000, 1_700_000_900_000_000)),
-            histogram_interval: 30,
-            ..Default::default()
-        };
+        let mut req = Request::default();
+        req.time_range = Some((1_700_000_017_000_000, 1_700_000_900_000_000));
+        req.histogram_interval = 30;
         let nodes = RemoteScanNodes::new(
             req,
             vec![],
