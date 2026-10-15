@@ -20,6 +20,8 @@ import requests
 from support.client import OpenObserveClient
 
 from .slack_helpers import MOCK_TEAM, SlackMock, self_hosted_install
+from .test_bridge import O2aiMock, o2ai  # noqa: F401
+from .test_bridge_slack import answers_in, ask, event, send, setup_team, turns_for
 
 pytestmark = [pytest.mark.enterprise]
 
@@ -213,11 +215,27 @@ def test_a_command_and_a_click_are_acked_as_slack_expects(client: OpenObserveCli
     assert resp.content == b""
 
 
-@pytest.mark.skip(reason="needs commit 11 bridge: the turn runner and the o2-ai mock record the answer order")
-def test_parallel_threads(client: OpenObserveClient, installed_http: dict[str, Any]) -> None:
+def test_parallel_threads(client: OpenObserveClient, slack_org: str, ready: SlackMock, o2ai: O2aiMock) -> None:  # noqa: F811
     """AC-8.5: one thread runs in order with no 409, two threads in parallel (asserted on the o2-ai mock's log)."""
-    secret = f"signing-{installed_http['app_id']}"
-    thread = f"{time.time():.6f}"
-    for event_id, ts in [("EvA1", thread), ("EvA2", thread), ("EvB1", f"{time.time() + 1:.6f}")]:
-        body = mention(installed_http["app_id"], event_id + uuid.uuid4().hex[:6], thread_ts=ts)
-        assert slack_post(client, "events", body, secret).status_code == 200
+    team, inst, _ = setup_team(client, slack_org, ready, "U0PAT")
+    tag = uuid.uuid4().hex[:8]
+    ask(client, inst, team, ready, "U0PAT", "<@U0BOT> warm up")
+    o2ai.script(*[{"turn": "chart", "hold_secs": 3, "match": tag}] * 3)
+    thread_a, thread_b = f"{time.time():.6f}", f"{time.time() + 1:.6f}"
+    a1, _, _ = event(inst, team, "U0PAT", f"<@U0BOT> first in A {tag}", ts=thread_a)
+    a2, _, _ = event(inst, team, "U0PAT", f"<@U0BOT> second in A {tag}", thread_ts=thread_a)
+    b1, _, _ = event(inst, team, "U0PAT", f"<@U0BOT> first in B {tag}", ts=thread_b)
+    for body in (a1, a2, b1):
+        send(client, inst, body)
+    wait_for(lambda: len(answers_in(ready, thread_a)) >= 2 and answers_in(ready, thread_b), "three answers",
+             timeout=40)
+    turns = turns_for(o2ai, tag)
+    assert len(turns) == 3, "no turn was refused or retried"
+    by_query = {t["body"]["query"]: t for t in turns}
+    first_a, second_a, first_b = (by_query[f"{q} {tag}"] for q in ("first in A", "second in A", "first in B"))
+    session = "x-o2-assistant-session-id"
+    assert first_a["headers"][session] == second_a["headers"][session]
+    assert first_b["headers"][session] != first_a["headers"][session]
+    assert abs(second_a["at"] - first_a["at"]) >= 2.5, "one question of a thread waits for the other"
+    earliest_a = min(first_a["at"], second_a["at"])
+    assert abs(first_b["at"] - earliest_a) < 2.0, "another thread does not wait behind it"
