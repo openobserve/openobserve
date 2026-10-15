@@ -237,18 +237,34 @@ export function usePanelAlertCreation({
 
     const executedQueryOf = (index: number) =>
       executedPanelQuery(metadata.value?.queries, index) || queries[index]?.query;
+    // A series clicked on a multi-query panel ties its value to that series' own query.
+    const pickedSeriesQuery = offerChoice && clicked !== undefined && visible.includes(clicked);
     // Only a SQL threshold needs the y-axis column; PromQL compares the series value.
     const yAxisColumnOf = (index: number) => {
       if (queryType !== "sql") return null;
-      // The clicked series names a column of its own query only; any other pick resolves its own.
-      return !offerChoice || index === clicked
-        ? sqlYAxisColumnOf(
-            queries[index],
-            executedQueryOf(index),
-            contextMenuData.value?.seriesName,
-          )
-        : ownYAxisColumnOf(queries[index], executedQueryOf(index));
+      if (!offerChoice) {
+        return sqlYAxisColumnOf(
+          queries[index],
+          executedQueryOf(index),
+          contextMenuData.value?.seriesName,
+        );
+      }
+      // Right-click events carry no series name, so a query falls back to its own SQL alias.
+      return (
+        (index === clicked
+          ? sqlYAxisColumnOf(
+              queries[index],
+              executedQueryOf(index),
+              contextMenuData.value?.seriesName,
+            )
+          : null) ?? ownYAxisColumnOf(queries[index], executedQueryOf(index))
+      );
     };
+    // The clicked value is on that series' scale, so another query gets the form's own default.
+    const thresholdFor = (index: number) =>
+      pickedSeriesQuery && index !== clicked
+        ? {}
+        : { threshold: selection.threshold, condition: selection.condition as "above" | "below" };
 
     // The menu already chose the threshold, so the dialog is only for which query, which stream, or why not.
     const queryChoices = offerChoice
@@ -264,8 +280,7 @@ export function usePanelAlertCreation({
         queryIndex: index,
         queryChoices,
         timeRange: selectedTimeObj.value,
-        threshold: selection.threshold,
-        condition: selection.condition as "above" | "below",
+        ...thresholdFor(index),
         yAxisColumn: yAxisColumnOf(index),
         executedQuery: executedQueryOf(index),
         metadataQueries: metadata.value?.queries,

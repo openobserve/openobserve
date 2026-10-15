@@ -681,6 +681,21 @@ describe("ChartRenderer", () => {
         expect(vi.mocked(mockChart.convertToPixel).mock.calls.length).toBeLessThan(250);
       });
 
+      it("finds a time-axis line past the bare nulls a merged x-axis leaves, without bridging them", async () => {
+        const echarts = await import("echarts/core");
+        const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
+        const data = [[1000, 1], [2000, 9], null, null, null, null, null, null, [9000, 9]];
+        vi.mocked(mockChart.getOption).mockReturnValue({ series: [{ type: "line", data }] });
+        vi.mocked(mockChart.convertFromPixel).mockReturnValue([1500, 5]);
+        vi.mocked(mockChart.convertToPixel).mockImplementation(
+          (_finder: unknown, value: number[]) => [value[0] / 10, value[1] * 10],
+        );
+        await wrapper.setProps({ findLineOnContextMenu: true });
+
+        expect(await rightClick(150, 50)).toMatchObject({ seriesIndex: 0, dataIndex: 0 });
+        expect(await rightClick(550, 90)).not.toHaveProperty("seriesIndex");
+      });
+
       it("emits only the cursor reading by default, and never looks for the line", async () => {
         const mockChart = await twoLines();
         vi.mocked(mockChart.convertToPixel).mockClear();

@@ -170,7 +170,7 @@ describe("usePanelActions", () => {
       expect(alertCreationDialog.value?.prefill.warnings.map((w) => w.key)).toContain("noStream");
     });
 
-    it("moves a SQL series' threshold onto the chosen query's own y-axis column", () => {
+    it("leaves another query's threshold to the form when a series was clicked", () => {
       closeAlertCreationDialog();
       const args = makeBase();
       args.panelSchema.value.queries.push({
@@ -190,15 +190,50 @@ describe("usePanelActions", () => {
 
       rebuildAlertPrefill({ queryIndex: 1 });
       expect(alertCreationDialog.value?.prefill.sql).toBe('select count(*) as "warns" from logs');
+      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toBeUndefined();
+
+      rebuildAlertPrefill({ queryIndex: 0 });
+      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving?.value).toBe(10);
+      closeAlertCreationDialog();
+    });
+
+    it("keeps the clicked query's threshold on its own SQL alias when the event names no series", () => {
+      closeAlertCreationDialog();
+      const args = makeBase();
+      args.panelSchema.value.queries[0] = {
+        query: 'select histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" from logs',
+        fields: { stream: "logs", stream_type: "logs" },
+      } as any;
+      args.metadata.value = { queries: [] };
+      args.panelSchema.value.queries.push({ ...args.panelSchema.value.queries[0] });
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({ condition: "above", threshold: 4.42, panelQueryIndex: 0 });
+
+      expect(alertCreationDialog.value?.prefill.queryIndex).toBe(0);
       expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toEqual({
-        column: "warns",
+        column: "y_axis_1",
         operator: ">=",
-        value: 10,
+        value: 4.42,
       });
       closeAlertCreationDialog();
     });
 
-    it("puts the threshold on a picked raw-SQL query's own column, not the clicked series'", () => {
+    it("drops the threshold of a single raw-SQL query with no y-axis fields, as main does", () => {
+      const args = makeBase();
+      args.panelSchema.value.queries[0] = {
+        query: 'select histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" from logs',
+        fields: { stream: "logs", stream_type: "logs" },
+      } as any;
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({ condition: "above", threshold: 4.42, panelQueryIndex: 0 });
+
+      expect(args.router.push).toHaveBeenCalledTimes(1);
+      expect(readAlertPrefill()?.meta?.sqlHaving).toBeUndefined();
+    });
+
+    it("puts an empty-area threshold on a picked raw-SQL query's own column", () => {
       closeAlertCreationDialog();
       const args = makeBase();
       args.panelSchema.value.queries.push(
@@ -211,7 +246,8 @@ describe("usePanelActions", () => {
       const api = usePanelAlertCreation(args as any);
       args.contextMenuData.value = { seriesName: "errors" };
 
-      api.handleCreateAlert({ condition: "above", threshold: 10, panelQueryIndex: 0 });
+      // An empty-area click ties the value to no series, so it rides to whichever query is picked.
+      api.handleCreateAlert({ condition: "above", threshold: 10 });
       rebuildAlertPrefill({ queryIndex: 1 });
       expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toEqual({
         column: "p50",
@@ -343,7 +379,7 @@ describe("usePanelActions", () => {
       expect(prefill?.promqlCondition).toEqual({ column: "value", operator: ">=", value: 5 });
     });
 
-    it("carries the right-clicked threshold into whichever query is chosen", () => {
+    it("does not carry a clicked series' value to a query on another scale", () => {
       const args = makePromql();
       const api = usePanelAlertCreation(args as any);
 
@@ -353,7 +389,14 @@ describe("usePanelActions", () => {
       const prefill = alertCreationDialog.value?.prefill;
       expect(prefill?.queryIndex).toBe(0);
       expect(prefill?.promql).toBe("avg(disk_used)");
-      expect(prefill?.promqlCondition).toEqual({ column: "value", operator: "<=", value: 3 });
+      expect(prefill?.promqlCondition).toBeUndefined();
+
+      rebuildAlertPrefill({ queryIndex: 1 });
+      expect(alertCreationDialog.value?.prefill.promqlCondition).toEqual({
+        column: "value",
+        operator: "<=",
+        value: 3,
+      });
     });
 
     it("alerts a shifted series on its parent's current-period query", () => {

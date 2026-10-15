@@ -169,6 +169,12 @@ const datumValue = (datum: unknown, dataIndex: number): (string | number)[] => {
   return [dataIndex, (inner ?? datum) as string | number];
 };
 
+/** A datum the line does not draw: missing, or with no y. */
+const isGap = (datum: unknown): boolean => {
+  const y = datum === null || datum === undefined ? null : datumValue(datum, 0)[1];
+  return y === null || y === undefined || y === "";
+};
+
 export default defineComponent({
   name: "ChartRenderer",
   emits: [
@@ -430,19 +436,23 @@ export default defineComponent({
             ? (pixel as PixelPoint)
             : null;
         };
+        // A merged x-axis leaves bare nulls whose x is unknown, so only drawn points are searched.
+        const drawn = data.flatMap((datum: unknown, dataIndex: number) =>
+          isGap(datum) ? [] : [dataIndex],
+        );
         const nearby = indexesNearX(
-          data.length,
+          drawn.length,
           cursor[0],
-          (dataIndex) => pixelOf([datumValue(data[dataIndex], dataIndex)[0], 0])?.[0] ?? NaN,
+          (position) => pixelOf(datumValue(data[drawn[position]], drawn[position]))?.[0] ?? NaN,
         );
         if (!nearby) return [];
+        const first = drawn[nearby[0]];
         const points: (PixelPoint | null)[] = [];
-        for (let dataIndex = nearby[0]; dataIndex <= nearby[1]; dataIndex++) {
-          const value = datumValue(data[dataIndex], dataIndex);
-          const empty = value[1] === null || value[1] === undefined || value[1] === "";
-          points.push(empty ? null : pixelOf(value));
+        for (let dataIndex = first; dataIndex <= drawn[nearby[1]]; dataIndex++) {
+          const datum = data[dataIndex];
+          points.push(isGap(datum) ? null : pixelOf(datumValue(datum, dataIndex)));
         }
-        return [{ seriesIndex, offset: nearby[0], points }];
+        return [{ seriesIndex, offset: first, points }];
       });
     };
 
