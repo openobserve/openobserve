@@ -611,6 +611,17 @@ describe("usePanelDataLoader", () => {
       expect(loader.data.value).toEqual(injected.value.data);
       expect(loader.resultMetaData.value).toEqual(injected.value.resultMetaData);
       expect(loader.errorDetail.value).toEqual({ message: "withheld", code: "" });
+      expect(loader.isPartialData.value).toBe(false);
+
+      // A server-partial entry gets the panel's partial chip, never the interrupted-load state.
+      injected.value = {
+        ...injected.value,
+        resultMetaData: [[{ histogram_interval: 30, is_partial: true }]],
+        serverPartial: true,
+      } as typeof injected.value;
+      await loader.loadData();
+      expect(loader.resultMetaData.value).toEqual(injected.value.resultMetaData);
+      expect(loader.isPartialData.value).toBe(false);
     });
 
     it("should handle invalid timestamps", () => {
