@@ -592,6 +592,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         cloud::start_trial_quota_jobs();
     }
 
+    // Routers serve the inbound /api/slack/* routes, whose audit and lookups need the hooks.
+    #[cfg(feature = "enterprise")]
+    slack_hooks::register();
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
@@ -1118,7 +1122,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::start_eval_task_consumers();
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::start_eval_scheduler();
         o2_enterprise::enterprise::llm_evaluations::experiments::runner::start();
-        slack_hooks::init().await;
+        o2_enterprise::enterprise::slack::boot().await;
 
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
             |org_id, sql, start, end, cfg_id, stream_type| {
@@ -1618,6 +1622,31 @@ mod tests {
         assert_eq!(
             anomaly_claim_transition(false, true),
             AnomalyClaimTransition::Stop
+        );
+    }
+
+    #[test]
+    fn slack_hooks_register_before_the_router_return_and_boot_after_it() {
+        let source = include_str!("mod.rs");
+        let init = source
+            .split("pub async fn init()")
+            .nth(1)
+            .and_then(|rest| rest.split("mod tests {").next())
+            .expect("init() body");
+        let at = |needle: &str| {
+            init.find(needle)
+                .unwrap_or_else(|| panic!("`{needle}` not found in init()"))
+        };
+        let register = at("slack_hooks::register();");
+        let router_return = at("if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role()");
+        let boot = at("slack::boot().await;");
+        assert!(
+            register < router_return,
+            "routers serve /api/slack/* and must have the hooks"
+        );
+        assert!(
+            router_return < boot,
+            "Slack tasks start only on the roles that ran them before"
         );
     }
 
