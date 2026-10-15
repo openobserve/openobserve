@@ -7,7 +7,7 @@ import pytest
 
 from support.client import OpenObserveClient
 
-from .slack_helpers import SlackMock, slack_config
+from .slack_helpers import SlackMock, harness_skip, slack_config
 
 
 @pytest.fixture(scope="session")
@@ -23,7 +23,7 @@ def slack_state(client: OpenObserveClient, slack_org: str) -> dict:
 @pytest.fixture(scope="session")
 def enterprise_build(slack_state: dict) -> str:
     if slack_state["build_type"] == "opensource":
-        pytest.skip("the Slack app needs an enterprise build")
+        harness_skip("the Slack app needs an enterprise build")
     return slack_state["build_type"]
 
 
@@ -52,6 +52,6 @@ def cloud_build(enterprise_build: str) -> None:
 def mock() -> SlackMock:
     m = SlackMock()
     if not m.reachable():
-        pytest.skip(f"Slack mock not reachable at {m.base_url}; run helpers/slack_mock.py")
+        harness_skip(f"Slack mock not reachable at {m.base_url}; run helpers/slack_mock.py")
     m.reset()
     return m

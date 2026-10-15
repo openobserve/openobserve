@@ -1,5 +1,5 @@
 {
- "_comment": "o2-ai SSE frames recorded by running o2-ai's process_opencode_event and build_completion_event (branch agent-slack-answer-fields, A3) on its recorded fixtures (tests/fixtures/opencode_replay_session.json, searchsql_recorded_outputs.json, already anonymized). In-band error frames are o2-ai app.py's own payloads. Re-record with ~/o2-slack-build-p1/run/p11/record_o2ai_frames.py.",
+ "_comment": "o2-ai SSE frames recorded by running o2-ai's process_opencode_event and build_completion_event (A3 answer fields) on its recorded fixtures (tests/fixtures/opencode_replay_session.json for the part shapes, searchsql_recorded_outputs.json for each call's SQL and response, already anonymized); every call is paired with its own case and the recording session's window. In-band error frames are o2-ai app.py's own payloads. Re-record with tests/api-testing/helpers/recorders/record_o2ai_frames.py.",
  "turns": {
   "chart": [
    {
@@ -11,12 +11,12 @@
      "type": "logs",
      "request_body": {
       "query": {
-       "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5",
-       "start_time": 1784530385630000,
-       "end_time": 1784533985630000
+       "sql": "SELECT histogram(_timestamp, '1 minute') AS x_axis_1, count(_timestamp) AS y_axis_1 FROM \"app_query_metrics\" GROUP BY x_axis_1 ORDER BY x_axis_1",
+       "start_time": 1791969480000000,
+       "end_time": 1791973140000000
       }
      },
-     "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5"
+     "sql": "SELECT histogram(_timestamp, '1 minute') AS x_axis_1, count(_timestamp) AS y_axis_1 FROM \"app_query_metrics\" GROUP BY x_axis_1 ORDER BY x_axis_1"
     },
     "call_id": "c1"
    },
@@ -285,9 +285,9 @@
      "type": "logs",
      "request_body": {
       "query": {
-       "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5",
-       "start_time": 1784530385630000,
-       "end_time": 1784533985630000
+       "sql": "SELECT histogram(_timestamp, '1 minute') AS x_axis_1, count(_timestamp) AS y_axis_1 FROM \"app_query_metrics\" GROUP BY x_axis_1 ORDER BY x_axis_1",
+       "start_time": 1791969480000000,
+       "end_time": 1791973140000000
       }
      }
     },
@@ -578,8 +578,8 @@
     },
     "is_partial": null,
     "searched_range": {
-     "start_us": 1784530385630000,
-     "end_us": 1784533985630000
+     "start_us": 1791969480000000,
+     "end_us": 1791973140000000
     },
     "confidence": "high",
     "trace_id": "trace-1"
@@ -595,12 +595,12 @@
      "type": "logs",
      "request_body": {
       "query": {
-       "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5",
-       "start_time": 1784530385630000,
-       "end_time": 1784533985630000
+       "sql": "SELECT \"user\", count(_timestamp) AS cnt FROM \"app_query_metrics\" GROUP BY \"user\" ORDER BY cnt DESC",
+       "start_time": 1791969480000000,
+       "end_time": 1791973140000000
       }
      },
-     "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5"
+     "sql": "SELECT \"user\", count(_timestamp) AS cnt FROM \"app_query_metrics\" GROUP BY \"user\" ORDER BY cnt DESC"
     },
     "call_id": "c1"
    },
@@ -616,9 +616,9 @@
      "type": "logs",
      "request_body": {
       "query": {
-       "sql": "SELECT _timestamp, level, message FROM app_logs ORDER BY _timestamp DESC LIMIT 5",
-       "start_time": 1784530385630000,
-       "end_time": 1784533985630000
+       "sql": "SELECT \"user\", count(_timestamp) AS cnt FROM \"app_query_metrics\" GROUP BY \"user\" ORDER BY cnt DESC",
+       "start_time": 1791969480000000,
+       "end_time": 1791973140000000
       }
      }
     },
@@ -626,18 +626,18 @@
    },
    {
     "type": "message_delta",
-    "content": "The top query ran 12 times.\n\nConfidence: medium"
+    "content": "svc-api ran the most queries (28,736).\n\nConfidence: medium"
    },
    {
     "type": "complete",
     "history": [
      {
       "role": "user",
-      "content": "which query ran most?"
+      "content": "which user ran the most queries?"
      },
      {
       "role": "assistant",
-      "content": "The top query ran 12 times.\n\nConfidence: medium"
+      "content": "svc-api ran the most queries (28,736).\n\nConfidence: medium"
      }
     ],
     "compacted": false,
@@ -656,8 +656,8 @@
     "chart_series": null,
     "is_partial": true,
     "searched_range": {
-     "start_us": 1784530385630000,
-     "end_us": 1784533985630000
+     "start_us": 1791969480000000,
+     "end_us": 1791973140000000
     },
     "confidence": "medium",
     "trace_id": "trace-1"

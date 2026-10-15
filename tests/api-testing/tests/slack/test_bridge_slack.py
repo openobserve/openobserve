@@ -177,8 +177,12 @@ def test_a_colleagues_mention_is_seeded_and_only_the_askers_reply_skips_the_ment
 
     body, _, _ = event(inst, team, "U0BEN", f"what about eu? {tag}", thread_ts=thread, kind="message")
     send(client, inst, body)
-    time.sleep(3)
-    assert len(turns_for(o2ai, tag)) == 3, "a colleague's reply without a mention is not answered"
+    # The thread runs in order, so Ann's next reply being answered means Ben's was already passed over.
+    ask(client, inst, team, ready, "U0ANN", f"and apac? {tag}", thread_ts=thread, kind="message")
+    queries = [t["body"]["query"] for t in turns_for(o2ai, tag)]
+    assert f"what about eu? {tag}" not in queries, "a colleague's reply without a mention is not answered"
+    assert len(queries) == 4, queries
+    assert queries[-1] == f"and apac? {tag}", queries
 
 
 def test_a_question_for_an_org_outside_the_allowlist_gets_a_private_refusal(

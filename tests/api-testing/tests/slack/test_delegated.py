@@ -25,6 +25,7 @@ from support.client import OpenObserveClient
 from .slack_helpers import (
     SlackMock,
     add_to_org,
+    harness_skip,
     connect_with_proof,
     http_install,
     make_org,
@@ -52,7 +53,7 @@ def signing_key() -> bytes:
         return base64.b64decode(override)
     master = os.environ.get("O2_MASTER_ENCRYPTION_KEY", "")
     if not master:
-        pytest.skip("set O2_MASTER_ENCRYPTION_KEY (or ZO_DELEGATION_SIGNING_KEY) to the server's value")
+        harness_skip("set O2_MASTER_ENCRYPTION_KEY (or ZO_DELEGATION_SIGNING_KEY) to the server's value")
     prk = hmac.new(b"\0" * 32, base64.b64decode(master), hashlib.sha256).digest()
     return hmac.new(prk, b"o2-slack-delegation-v1\x01", hashlib.sha256).digest()
 

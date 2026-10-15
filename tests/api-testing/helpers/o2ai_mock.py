@@ -14,8 +14,9 @@ Run it standalone::
 Control endpoints (JSON):
 
 - ``GET  /_mock/health``        liveness
-- ``GET  /_mock/requests``      every recorded request: method, path, headers, body, at
-- ``POST /_mock/reset``         forget requests and scripts; the default turn is ``chart`` again
+- ``GET  /_mock/requests``      every recorded request: method, path, headers, body, at, and for a
+  streamed turn ``last_frame_at`` (just before its last frame is written)
+- ``POST /_mock/reset``         forget requests, scripts and confirmations; the default turn is ``chart``
 - ``POST /_mock/script``        queue answers for the next streamed turns, one per turn, in order:
   ``{"responses": [{"error": "session_not_found" | "turn_in_progress" | "session_owner_unavailable"},
   {"in_band": "restore_required" | "stale_epoch" | "turn_in_progress"}, {"turn": "partial"},
@@ -65,7 +66,6 @@ class State:
         self.lock = threading.Lock()
         self.frames = json.loads(FRAMES_FILE.read_text())
         self.confirmations = json.loads(CONFIRMATIONS_FILE.read_text())
-        self.confirmed: dict[str, threading.Event] = {}
         self.reset()
 
     def reset(self) -> None:
@@ -73,15 +73,22 @@ class State:
             self.requests: list[dict[str, Any]] = []
             self.queue: list[dict[str, Any]] = []
             self.default_turn = "chart"
+            self.confirmed: dict[str, threading.Event] = {}
 
-    def record(self, method: str, path: str, headers: dict[str, str], body: Any) -> None:
+    def record(self, method: str, path: str, headers: dict[str, str], body: Any) -> dict[str, Any]:
+        entry = {"method": method, "path": path, "headers": headers, "body": body, "at": time.time()}
         with self.lock:
-            self.requests.append({"method": method, "path": path, "headers": headers,
-                                  "body": body, "at": time.time()})
+            self.requests.append(entry)
+        return entry
+
+    def stamp(self, entry: dict[str, Any], key: str) -> None:
+        with self.lock:
+            entry[key] = time.time()
 
     def confirm_event(self, session_id: str) -> threading.Event:
+        """Session ids are UUIDs; O2 lower-cases them, so the header and the path must agree in any case."""
         with self.lock:
-            return self.confirmed.setdefault(session_id, threading.Event())
+            return self.confirmed.setdefault(session_id.lower(), threading.Event())
 
     def next_answer(self, query: str = "") -> dict[str, Any]:
         with self.lock:
@@ -145,16 +152,19 @@ class Handler(BaseHTTPRequestHandler):
             self._sse_frame(frame)
         self.close_connection = True
 
-    def _sse(self, frames: list[dict[str, Any]], hold_secs: float = 0) -> None:
+    def _sse(self, frames: list[dict[str, Any]], hold_secs: float = 0, entry: dict[str, Any] | None = None) -> None:
         self._sse_head()
         for i, frame in enumerate(frames):
-            if hold_secs and i == len(frames) - 1:
-                time.sleep(hold_secs)
+            if i == len(frames) - 1:
+                if hold_secs:
+                    time.sleep(hold_secs)
+                if entry is not None:
+                    STATE.stamp(entry, "last_frame_at")
             self.wfile.write(f"data: {json.dumps(frame)}\n\n".encode())
             self.wfile.flush()
         self.close_connection = True
 
-    def _stream_turn(self, body: Any) -> None:
+    def _stream_turn(self, body: Any, entry: dict[str, Any]) -> None:
         answer = STATE.next_answer(str((body or {}).get("query", "")) if isinstance(body, dict) else "")
         session_id = self.headers.get("x-o2-assistant-session-id", "")
         if "error" in answer:
@@ -166,7 +176,7 @@ class Handler(BaseHTTPRequestHandler):
         elif "confirm" in answer:
             self._confirm_turn(answer["confirm"], answer.get("wait_secs", 30), session_id)
         else:
-            self._sse(STATE.frames["turns"][answer["turn"]], answer.get("hold_secs", 0))
+            self._sse(STATE.frames["turns"][answer["turn"]], answer.get("hold_secs", 0), entry)
 
     def _query(self) -> None:
         answer = STATE.next_answer()
@@ -174,7 +184,9 @@ class Handler(BaseHTTPRequestHandler):
             self._json(*error_answer(answer["error"], self.headers.get("x-o2-assistant-session-id", "")))
             return
         complete = STATE.frames["turns"][answer.get("turn", STATE.default_turn)][-1]
-        self._json(200, {"response": complete["history"][-1]["content"], "history": complete["history"]})
+        # o2-ai's QueryResponse (src/server/models.py), filled from the recorded complete frame.
+        self._json(200, {"response": complete["history"][-1]["content"], "history": complete["history"],
+                         "compacted": complete["compacted"], "usage": complete["usage"]})
 
     def _control(self, method: str, body: Any) -> bool:
         if self.path == "/_mock/health":
@@ -202,12 +214,12 @@ class Handler(BaseHTTPRequestHandler):
             if not self._control(method, body):
                 self._json(404, {"error": "unknown control path"})
             return
-        STATE.record(method, self.path, {k.lower(): v for k, v in self.headers.items()}, body)
+        entry = STATE.record(method, self.path, {k.lower(): v for k, v in self.headers.items()}, body)
         path = self.path.split("?", 1)[0]
         if method == "POST" and path.endswith("/query/stream"):
-            self._stream_turn(body)
+            self._stream_turn(body, entry)
         elif method == "POST" and "/confirm/" in path:
-            STATE.confirm_event(path.rsplit("/", 1)[-1].lower()).set()
+            STATE.confirm_event(path.rsplit("/", 1)[-1]).set()
             self._json(200, {"status": "ok"})
         elif method == "POST" and path.endswith("/query"):
             self._query()
