@@ -227,6 +227,28 @@ describe("AnalyticsFunnels", () => {
             template: "<div><slot /></div>",
           },
           ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+          OPopover: {
+            props: ["open"],
+            emits: ["update:open"],
+            data: () => ({ inner: false }),
+            computed: {
+              shown(this: { open?: boolean; inner: boolean }) {
+                return this.open ?? this.inner;
+              },
+            },
+            methods: {
+              flip(this: {
+                shown: boolean;
+                inner: boolean;
+                $emit: (e: string, v: boolean) => void;
+              }) {
+                this.inner = !this.shown;
+                this.$emit("update:open", this.inner);
+              },
+            },
+            template:
+              '<div><div @click="flip"><slot name="trigger" /></div><slot v-if="shown" /></div>',
+          },
           ODropdownItem: {
             emits: ["select"],
             template: "<button @click=\"$emit('select')\"><slot /></button>",
@@ -251,10 +273,10 @@ describe("AnalyticsFunnels", () => {
 
   const text = (dt: string) => wrapper!.find(`[data-test="${dt}"]`).text();
 
-  // The rail shows suggestions and the step picker only once its Steps "+" has been clicked.
+  // Suggestions and the step picker render only once the toolbar Add step has been clicked.
   const openAddStep = async () => {
-    if (wrapper!.find('[data-test="rum-analytics-funnel-rail-add-step"]').exists()) return;
-    await wrapper!.find('[data-test="rum-analytics-funnel-rail-add-step-btn"]').trigger("click");
+    if (wrapper!.find('[data-test="rum-analytics-funnel-add-step"]').exists()) return;
+    await wrapper!.find('[data-test="rum-analytics-funnel-add-step-btn"]').trigger("click");
     await settle();
   };
 
@@ -1026,10 +1048,12 @@ describe("AnalyticsFunnels", () => {
       ["p", "/a"],
       ["c", "b"],
     ]);
+    expect(wrapper!.find('[data-test="rum-analytics-funnel-add-step-btn"]').text()).toBe(
+      "Add step",
+    );
     for (const dt of [
-      "rum-analytics-funnel-rail-add-step-btn",
-      "rum-analytics-funnel-rail-step-0-filters",
-      "rum-analytics-funnel-rail-step-0-remove",
+      "rum-analytics-funnel-step-0-filters",
+      "rum-analytics-funnel-step-0-remove",
     ]) {
       expect(wrapper!.find(`[data-test="${dt}"]`).attributes("aria-label"), dt).toBeTruthy();
     }

@@ -212,99 +212,107 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @edit-app-filters="emit('open-exclusions')"
       >
         <template #header>
-          <div class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-2">
-            <span
-              class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2"
-              data-test="rum-analytics-funnel-overall"
-            >
-              <span class="text-text-heading text-sm font-semibold">{{
-                t("rum.analytics.funnel.overall")
+          <span
+            class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 max-md:basis-full"
+            data-test="rum-analytics-funnel-overall"
+          >
+            <span class="text-text-heading text-sm font-semibold">{{
+              t("rum.analytics.funnel.overall")
+            }}</span>
+            <template v-if="result && funnelPanel.status === 'ok'">
+              <span class="text-text-heading text-xl font-semibold tabular-nums">{{
+                pct(overallRate)
               }}</span>
-              <template v-if="result && funnelPanel.status === 'ok'">
-                <span class="text-text-heading text-xl font-semibold tabular-nums">{{
-                  pct(overallRate)
-                }}</span>
-                <span class="text-text-secondary text-xs">{{
-                  t("rum.analytics.funnel.overallOf", {
-                    last: formatCount(lastUnits, 1),
-                    first: formatCount(firstUnits, 1),
-                    unit: unitNoun,
+              <span class="text-text-secondary text-xs">{{
+                t("rum.analytics.funnel.overallOf", {
+                  last: formatCount(lastUnits, 1),
+                  first: formatCount(firstUnits, 1),
+                  unit: unitNoun,
+                })
+              }}</span>
+              <span
+                v-if="!def.breakdown && def.steps.length > 1 && lastUnits > 0"
+                class="text-text-secondary text-xs"
+                data-test="rum-analytics-funnel-overall-time"
+                >{{
+                  t("rum.analytics.funnel.overallTime", {
+                    median: raw(formatDuration(result.steps[result.steps.length - 1].medianMs)),
+                    p90: raw(formatDuration(result.steps[result.steps.length - 1].p90Ms)),
                   })
-                }}</span>
-                <span
-                  v-if="!def.breakdown && def.steps.length > 1 && lastUnits > 0"
-                  class="text-text-secondary text-xs"
-                  data-test="rum-analytics-funnel-overall-time"
-                  >{{
-                    t("rum.analytics.funnel.overallTime", {
-                      median: raw(formatDuration(result.steps[result.steps.length - 1].medianMs)),
-                      p90: raw(formatDuration(result.steps[result.steps.length - 1].p90Ms)),
-                    })
-                  }}</span
-                >
-                <WhyEnteredPopover
-                  v-if="!usersMode && def.steps.length > 1"
-                  :count="firstUnits"
-                  :app="pa.state.app"
-                  :step1="firstLabel"
-                  :state="whyState"
-                  :lines="why"
-                  :estimated="funnelPanel.sampled > 1"
-                  @open="onWhyOpen"
-                  @retry="loadWhy(true)"
-                />
-              </template>
-            </span>
-            <OToggleGroup
-              :model-value="def.unit"
-              type="single"
-              :label="t('rum.analytics.funnel.countBy')"
-              label-position="left"
-              data-test="rum-analytics-funnel-count-by"
-              @update:model-value="onUnit"
+                }}</span
+              >
+              <WhyEnteredPopover
+                v-if="!usersMode && def.steps.length > 1"
+                :count="firstUnits"
+                :app="pa.state.app"
+                :step1="firstLabel"
+                :state="whyState"
+                :lines="why"
+                :estimated="funnelPanel.sampled > 1"
+                @open="onWhyOpen"
+                @retry="loadWhy(true)"
+              />
+            </template>
+          </span>
+        </template>
+        <template #actions>
+          <OToggleGroup
+            :model-value="def.unit"
+            type="single"
+            :label="t('rum.analytics.funnel.countBy')"
+            label-position="left"
+            data-test="rum-analytics-funnel-count-by"
+            @update:model-value="onUnit"
+          >
+            <OToggleGroupItem
+              value="sessions"
+              size="xs"
+              data-test="rum-analytics-funnel-count-by-sessions"
+              >{{ t("rum.analytics.funnel.sessions") }}</OToggleGroupItem
             >
-              <OToggleGroupItem
-                value="sessions"
-                size="xs"
-                data-test="rum-analytics-funnel-count-by-sessions"
-                >{{ t("rum.analytics.funnel.sessions") }}</OToggleGroupItem
-              >
-              <OToggleGroupItem
-                value="users"
-                size="xs"
-                :disabled="!identitySql"
-                :tooltip="usersTooltip"
-                data-test="rum-analytics-funnel-count-by-users"
-                >{{ pa.usersUnit.value.label }}</OToggleGroupItem
-              >
-            </OToggleGroup>
-            <OSelect
-              v-if="usersMode"
-              :model-value="def.window"
-              :options="windowOptions"
-              size="sm"
-              width="sm"
-              data-test="rum-analytics-funnel-window-select"
-              @update:model-value="(v) => update({ window: v as FunnelWindow })"
-            />
-            <OTag
-              v-else
-              :label="t('rum.analytics.funnel.windowSession')"
-              variant="default-outline"
-              size="sm"
-              data-test="rum-analytics-funnel-window-fixed"
-            />
-            <OSelect
-              :model-value="def.breakdown ?? 'none'"
-              :options="breakdownOptions"
-              size="sm"
-              width="sm"
-              data-test="rum-analytics-funnel-breakdown-select"
-              @update:model-value="
-                (v) => update({ breakdown: v === 'none' ? null : (v as BreakdownDim) })
-              "
-            />
-          </div>
+            <OToggleGroupItem
+              value="users"
+              size="xs"
+              :disabled="!identitySql"
+              :tooltip="usersTooltip"
+              data-test="rum-analytics-funnel-count-by-users"
+              >{{ pa.usersUnit.value.label }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+          <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
+          <OSelect
+            v-if="usersMode"
+            :model-value="def.window"
+            :options="windowOptions"
+            size="xs"
+            width="sm"
+            data-test="rum-analytics-funnel-window-select"
+            @update:model-value="(v) => update({ window: v as FunnelWindow })"
+          />
+          <OTag
+            v-else
+            :label="t('rum.analytics.funnel.windowSession')"
+            variant="default-outline"
+            size="sm"
+            data-test="rum-analytics-funnel-window-fixed"
+          />
+          <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
+          <label
+            for="rum-analytics-funnel-breakdown"
+            class="text-text-secondary text-xs font-semibold"
+            >{{ t("rum.analytics.funnel.breakdownLabel") }}</label
+          >
+          <OSelect
+            id="rum-analytics-funnel-breakdown"
+            :model-value="def.breakdown ?? 'none'"
+            :options="breakdownOptions"
+            size="xs"
+            width="xs"
+            data-test="rum-analytics-funnel-breakdown-select"
+            @update:model-value="
+              (v) => update({ breakdown: v === 'none' ? null : (v as BreakdownDim) })
+            "
+          />
         </template>
         <template #notices>
           <span
@@ -612,7 +620,7 @@ const dimLabels = computed<Record<BreakdownDim, I18nText>>(() => ({
 }));
 
 const breakdownOptions = computed(() => [
-  { label: t("rum.analytics.funnel.noBreakdown"), value: "none" },
+  { label: t("rum.analytics.funnel.breakdownNone"), value: "none" },
   ...(Object.keys(DIMENSIONS) as BreakdownDim[])
     .filter((d) => (d === "app" ? !!pa.scope.value.apps?.length : pa.schema.value[DIMENSIONS[d]]))
     .map((d) => ({ label: dimLabels.value[d], value: d })),
