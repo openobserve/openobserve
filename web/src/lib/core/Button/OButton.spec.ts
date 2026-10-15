@@ -35,6 +35,13 @@ describe("OButton", () => {
     expect(classes).toContain("h-auto!");
   });
 
+  it("cell variant dims when unavailable but focusable, like the other variants", () => {
+    const classes = mount(OButton, {
+      props: { variant: "cell", disabled: true, focusableUnavailable: true },
+    }).classes();
+    expect(classes).toContain("opacity-60");
+  });
+
   it('defaults to type="button"', () => {
     const wrapper = mount(OButton);
     expect(wrapper.attributes("type")).toBe("button");

@@ -315,6 +315,7 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "outline-primary": "opacity-50",
   dashed: "opacity-50",
   "pricing-chip": "opacity-60",
+  cell: "opacity-60",
 };
 
 const unavailableClasses = computed(() => {
