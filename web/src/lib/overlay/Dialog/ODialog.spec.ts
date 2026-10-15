@@ -294,6 +294,21 @@ describe("ODialog", () => {
       wrapper.unmount();
     });
 
+    it("should ignore a keydown with no key, as browser autofill dispatches", () => {
+      const uncaught = vi.fn((e: ErrorEvent) => e.preventDefault());
+      window.addEventListener("error", uncaught);
+      const wrapper = mount(ODialog, {
+        attachTo: document.body,
+        props: { open: true, title: "Test", primaryButtonLabel: "OK" },
+      });
+      const btn = wrapper.find('[data-test="o-dialog-primary-btn"]');
+      btn.element.dispatchEvent(new Event("keydown", { bubbles: true, cancelable: true }));
+
+      window.removeEventListener("error", uncaught);
+      expect(uncaught).not.toHaveBeenCalled();
+      wrapper.unmount();
+    });
+
     it("should let a printable key typed inside an input propagate", () => {
       const wrapper = mount(ODialog, {
         attachTo: document.body,

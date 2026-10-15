@@ -103,7 +103,7 @@ pub(crate) async fn build_for_stream(
         return Ok(false);
     }
     let index_fields: HashSet<String> =
-        infra::schema::get_stream_setting_index_fields(&stream_settings)
+        infra::schema::get_stream_setting_index_fields(&stream_settings, stream_type)
             .into_iter()
             .collect();
     // Global default bloom fields apply to every stream, so drop the ones this stream never had.

@@ -414,6 +414,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </template>
 
+        <OBanner
+          v-if="hasUnsavedConflict"
+          variant="warning"
+          icon="warning"
+          dense
+          inline-actions
+          class="mx-page-edge mt-2 shrink-0"
+          data-test="dashboard-unsaved-conflict-banner"
+        >
+          {{
+            saveConflictState.myChange
+              ? t("dashboard.saveConflict.notSavedChange", { change: saveConflictState.myChange })
+              : t("dashboard.saveConflict.notSaved")
+          }}
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              data-test="dashboard-unsaved-conflict-resolve"
+              @click="resolveSaveConflict"
+            >
+              {{ t("dashboard.saveConflict.resolve") }}
+            </OButton>
+          </template>
+        </OBanner>
+
         <RenderDashboardCharts
           :frame="false"
           :class="store.state.printMode ? '' : 'min-h-0 flex-1'"
@@ -556,6 +582,12 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import useNotifications from "@/composables/useNotifications";
+import {
+  onDashboardConflictResolved,
+  useDashboardSaveConflict,
+  useDashboardSaveConflictDialog,
+} from "@/composables/dashboard/useDashboardSaveConflict";
+import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import { DASHBOARD_FRESH_PANEL_TIME } from "@/composables/dashboard/dashboardFreshPanelTime";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import reports from "@/services/reports";
@@ -569,6 +601,7 @@ import {
 } from "@/composables/dashboard/dashboardFreshOnOpen";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -622,6 +655,7 @@ export default defineComponent({
   name: "ViewDashboard",
   emits: ["onDeletePanel", "sendToAiChat"],
   components: {
+    OBanner,
     OPageLayout,
     DateTimePickerDashboard,
     ShareButton,
@@ -653,11 +687,8 @@ export default defineComponent({
       data: {},
     });
     const showScheduledReportsDialog = ref(false);
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
 
     // Variables manager will be initialized by RenderDashboardCharts
     // and we'll receive a reference to it via the @variablesManagerReady event
@@ -1171,6 +1202,17 @@ export default defineComponent({
       if (!isSavingLayout.value) layoutDraft.redo();
     };
 
+    // The page keeps my unsaved edit on screen, so it must say it is not saved until the conflict is resolved.
+    const hasUnsavedConflict = computed(
+      () =>
+        !!dashboardSaveConflictState.unresolvedDashboardId &&
+        dashboardSaveConflictState.unresolvedDashboardId === String(route.query.dashboard),
+    );
+    const { reopen: reopenSaveConflict, reload: reloadSaveConflict } =
+      useDashboardSaveConflictDialog();
+    // Set when the edit-mode Save lost a conflict, so Discard can resolve that conflict too.
+    let layoutSaveConflicted = false;
+
     const saveLayout = async () => {
       if (!layoutDraft.isDirty.value || isSavingLayout.value) return;
       isSavingLayout.value = true;
@@ -1178,6 +1220,7 @@ export default defineComponent({
         // saveDashboardData owns the toast and the 409 path; a failed save keeps the draft.
         const saved = await renderDashboardChartsRef.value?.saveDashboardData?.execute?.();
         if (saved) layoutDraft.finish();
+        else if (hasUnsavedConflict.value) layoutSaveConflicted = true;
       } finally {
         isSavingLayout.value = false;
       }
@@ -1205,6 +1248,9 @@ export default defineComponent({
       if (!isEditingLayout.value || isSavingLayout.value) return;
       if (layoutDraft.isDirty.value && !(await confirmDiscard("exit"))) return;
       layoutDraft.discard();
+      // Discarding the layout that lost a save conflict is the conflict's Reload: show the latest and drop the not-saved banner.
+      if (layoutSaveConflicted && hasUnsavedConflict.value) await reloadSaveConflict();
+      layoutSaveConflicted = false;
     };
 
     // Esc belongs to an open dialog or menu first; the layout only hears it when nothing else would.
@@ -1922,7 +1968,30 @@ export default defineComponent({
       { deep: true },
     );
 
+    // Resolve only reopens the dialog: no save is attempted, and the dialog re-reads the working copy, so an edit-mode draft that moved on is what Overwrite saves.
+    const resolveSaveConflict = () => reopenSaveConflict();
+
+    onDashboardConflictResolved((dashboardId, outcome) => {
+      if (dashboardId !== route.query.dashboard) return;
+      layoutSaveConflicted = false;
+      // Overwrite saved my layout, so edit mode ends as after a normal save; Reload drops the draft and its undo history.
+      if (isEditingLayout.value) {
+        if (outcome === "overwritten") layoutDraft.finish();
+        else layoutDraft.discard();
+      }
+      loadDashboard();
+    });
+
+    // Read before the save helpers edit the cached dashboard in place.
+    const panelTitleOf = (panelId: any) =>
+      (currentDashboardData.data as any)?.tabs
+        ?.flatMap((tab: any) => tab?.panels ?? [])
+        .find((panel: any) => panel?.id === panelId)?.title ?? String(panelId);
+
     const onDeletePanel = async (panelId: any) => {
+      const change = t("dashboard.saveConflict.change.deletedPanel", {
+        name: panelTitleOf(panelId),
+      });
       try {
         await deletePanel(
           store,
@@ -1937,13 +2006,12 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.viewDashboard.panelDeletionFailed"),
-            t,
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: route.query.dashboard as string,
+            folderId: (route.query.folder as string) ?? "default",
+            change,
+          });
         } else {
           showErrorNotification(
             error?.message ?? t("dashboard.viewDashboard.panelDeletionFailed"),
@@ -1957,6 +2025,7 @@ export default defineComponent({
 
     // move single panel to another tab
     const onMovePanel = async (panelId: any, newTabId: any) => {
+      const change = t("dashboard.saveConflict.change.movedPanel", { name: panelTitleOf(panelId) });
       try {
         await movePanelToAnotherTab(
           store,
@@ -1972,13 +2041,12 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.viewDashboard.panelMoveFailed"),
-            t,
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: route.query.dashboard as string,
+            folderId: (route.query.folder as string) ?? "default",
+            change,
+          });
         } else {
           showErrorNotification(error?.message ?? t("dashboard.viewDashboard.panelMoveFailed"), {
             timeout: 2000,
@@ -2183,7 +2251,11 @@ export default defineComponent({
 
         // Save changes using existing renderDashboardChartsRef
         if (renderDashboardChartsRef?.value?.saveDashboardData?.execute) {
-          await renderDashboardChartsRef.value.saveDashboardData.execute();
+          const saved = await renderDashboardChartsRef.value.saveDashboardData.execute(
+            t("dashboard.saveConflict.change.editedJson"),
+          );
+          // A conflict opened the dialog with my JSON; reloading here would replace it on screen with the latest.
+          if (!saved) return;
 
           // Reload the dashboard to reflect changes
           await loadDashboard();
@@ -2292,6 +2364,9 @@ export default defineComponent({
       variablesData,
       variablesDataUpdated,
       showDashboardSettingsDialog,
+      hasUnsavedConflict,
+      resolveSaveConflict,
+      saveConflictState: dashboardSaveConflictState,
       openSettingsDialog,
       loadDashboard,
       refreshPanelRequest,

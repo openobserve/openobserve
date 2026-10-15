@@ -207,7 +207,6 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps, t: TranslateFn) {
 
     // Validate that we have log streams
     if (!props.logStreams || props.logStreams.length === 0) {
-      console.error("[useCorrelatedLogs] No log streams available");
       error.value = t("traces.noLogStreamForCorrelation");
       return;
     }

@@ -23,6 +23,7 @@ import {
 import useSuggestions from "@/composables/useSuggestions";
 import { parsePromQlQuery } from "@/utils/query/promQLUtils";
 import { UNAUTHORIZED_MESSAGE_KEY, isAuthError } from "@/utils/authErrors";
+import { aiCreditsNotice } from "@/utils/aiCredits";
 import analytics from "@/services/product_analytics";
 
 /**
@@ -34,6 +35,8 @@ export function useNLQuery(t: TranslateFn) {
   const { promptForConsent } = usePaidOverageConsent();
   const isGenerating = ref(false);
   const streamingResponse = ref(""); // Real-time streaming response for user engagement
+  // Why the server refused the request (no AI credits, consent declined); the editor shows it.
+  const refusalNotice = ref("");
 
   /**
    * Extracts function names from autocomplete suggestions dynamically
@@ -404,6 +407,7 @@ export function useNLQuery(t: TranslateFn) {
 
     isGenerating.value = true;
     streamingResponse.value = ""; // Reset streaming response
+    refusalNotice.value = "";
 
     try {
       // Get page context (stream, time range, filters, etc.)
@@ -454,8 +458,8 @@ export function useNLQuery(t: TranslateFn) {
         return null;
       }
 
+      let errorBody: unknown = null;
       if (!response.ok) {
-        let errorBody: unknown = null;
         try {
           errorBody = await response.json();
         } catch {
@@ -473,7 +477,8 @@ export function useNLQuery(t: TranslateFn) {
           const currentOrgId = currentContext?.organization_identifier || orgId;
           if (!accepted || abortSignal?.aborted || currentOrgId !== orgId) {
             if (!accepted && !abortSignal?.aborted && currentOrgId === orgId) {
-              streamingResponse.value = t("paidUsage.declinedNotice");
+              refusalNotice.value = t("paidUsage.declinedNotice");
+              streamingResponse.value = refusalNotice.value;
             }
             return null;
           }
@@ -485,7 +490,12 @@ export function useNLQuery(t: TranslateFn) {
 
       if (!response.ok) {
         console.error("[NL2Q] AI assistant returned error:", response.status);
-        if (response.status === 403) {
+        if (response.status === 402) {
+          // A consent retry returns a fresh, unread body; the first one was read above.
+          const body = response.bodyUsed ? errorBody : await response.json().catch(() => null);
+          refusalNotice.value = aiCreditsNotice(body, t);
+          streamingResponse.value = refusalNotice.value;
+        } else if (response.status === 403) {
           streamingResponse.value = t(UNAUTHORIZED_MESSAGE_KEY);
         }
         return null;
@@ -753,5 +763,6 @@ export function useNLQuery(t: TranslateFn) {
     transformToSQL,
     isGenerating,
     streamingResponse, // Expose streaming response for real-time display
+    refusalNotice,
   };
 }

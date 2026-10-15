@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { CancelledError } from "@tanstack/vue-query";
 import useStreams from "@/composables/useStreams";
 import StreamService from "@/services/stream";
 import { queryClient } from "@/composables/query/queryClient";
@@ -234,6 +235,18 @@ describe("useStreams Composable", () => {
 
       expect(StreamService.nameList).not.toHaveBeenCalled();
       expect(result.list).toEqual([{ name: "from-query" }]);
+    });
+
+    it("rejects with the CancelledError itself when the fetch is cancelled", async () => {
+      queryClient.clear();
+      mockStore.state.streams.logs = null;
+      vi.mocked(StreamService.nameList).mockReturnValueOnce(new Promise(() => {}) as any);
+
+      const pending = streamsInstance.getStreams("logs", false, false);
+      await vi.waitFor(() => expect(StreamService.nameList).toHaveBeenCalled());
+      await queryClient.cancelQueries();
+
+      await expect(pending).rejects.toBeInstanceOf(CancelledError);
     });
 
     it("should force fetch streams when force parameter is true", async () => {
