@@ -115,7 +115,8 @@
       "dashboard-print-layout.spec.js",
       "dashboard-layout-edit-mode.spec.js",
       "dashboardPagination.spec.js",
-      "dashboard-refresh-button.spec.js"
+      "dashboard-refresh-button.spec.js",
+      "panelNotices.spec.js"
     ],
     "disabled": [
       {
