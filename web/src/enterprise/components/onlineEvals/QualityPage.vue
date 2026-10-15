@@ -111,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <QualityConfigsTable
         v-else
         v-model:tile-filter="tileFilter"
+        v-model:search="search"
         :rows="visibleRows"
         :tiles="tiles"
         :failed-runs="failedRuns"
@@ -187,6 +188,8 @@ const { listQuery, failedRunsQuery, failedRuns, rows, visibleRows, tiles, tileFi
     evaluatorAgents: toRef(props, "evaluatorAgents"),
     enabled: toRef(props, "enabled"),
   });
+// The table unmounts while a config is open, so the page keeps its search, as it keeps the tile filter.
+const search = ref("");
 
 // The detail view lives in the URL, so a reload or a shared link opens the same view.
 const configId = computed(() => (typeof route.query.config === "string" ? route.query.config : ""));

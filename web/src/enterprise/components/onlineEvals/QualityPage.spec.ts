@@ -45,8 +45,8 @@ import QualityPage from "./QualityPage.vue";
 
 const TableStub = defineComponent({
   name: "QualityConfigsTable",
-  props: ["rows", "tiles", "failedRuns"],
-  emits: ["open"],
+  props: ["rows", "tiles", "failedRuns", "search"],
+  emits: ["open", "update:search"],
   template: `<div data-test="table-stub">{{ rows.length }} rows</div>`,
 });
 const DetailStub = defineComponent({
@@ -132,6 +132,19 @@ describe("QualityPage", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="table-stub"]').text()).toBe("2 rows");
     expect(wrapper.find('[data-test="detail-stub"]').exists()).toBe(false);
+  });
+
+  it("keeps the config search across a visit to a config's detail", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+    wrapper.findComponent(TableStub).vm.$emit("update:search", "tox");
+    await flushPromises();
+    route.query = { tab: "quality", config: "tox" };
+    await flushPromises();
+    expect(wrapper.findComponent(TableStub).exists()).toBe(false);
+    route.query = { tab: "quality" };
+    await flushPromises();
+    expect(wrapper.findComponent(TableStub).props("search")).toBe("tox");
   });
 
   it("shows the detail of the entity id, scope and filter in the URL", async () => {
