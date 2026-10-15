@@ -38,7 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="(row: QualityRow) => emit('open', row, 'all')"
     >
       <template #subheader>
+        <!-- Counts from an empty list would read "0 of 0 … every config gives a result" next to an error or an empty org. -->
         <div
+          v-if="loading || tiles.total > 0"
           class="px-page-edge border-table-row-divider border-b py-1.5"
           data-test="quality-tiles"
         >
@@ -63,10 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("onlineEvals.quality.tiles.ofTotal", { total: tiles.total })
                   }}</span>
                 </template>
-                <template #chart>
-                  <span class="text-text-secondary text-xs">{{
-                    t("onlineEvals.quality.tiles.attentionNote")
-                  }}</span>
+                <template v-if="tiles.attention > 0 && tileFilter !== 'attention'" #chart>
+                  <span
+                    class="text-text-secondary text-xs"
+                    data-test="quality-tile-attention-note"
+                    >{{ t("onlineEvals.quality.tiles.attentionNote") }}</span
+                  >
                 </template>
               </OStatCard>
             </OTooltip>

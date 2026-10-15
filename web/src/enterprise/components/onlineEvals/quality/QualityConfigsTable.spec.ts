@@ -310,6 +310,38 @@ describe("QualityConfigsTable", () => {
     expect(open).not.toHaveBeenCalled();
   });
 
+  it("hides the tiles when a load failed or there are no configs, but shows them while loading", () => {
+    const none = {
+      ...TILES,
+      total: 0,
+      attention: 0,
+      withoutResult: 0,
+      noScores: 0,
+      noThreshold: 0,
+    };
+    for (const props of [{ loadError: true }, { forbidden: true }, {}]) {
+      const table = mountTable({ rows: [], tiles: none, ...props });
+      expect(table.find('[data-test="quality-tiles"]').exists()).toBe(false);
+      expect(table.text()).not.toContain("Every config gives a result");
+    }
+    expect(
+      mountTable({ rows: [], tiles: none, loading: true })
+        .find('[data-test="quality-tiles"]')
+        .exists(),
+    ).toBe(true);
+  });
+
+  it("offers Show them only when there is something to show and the tile is not already on", () => {
+    const note = '[data-test="quality-tile-attention-note"]';
+    expect(mountTable().find(note).text()).toBe("Show them");
+    expect(mountTable({ tileFilter: "attention" }).find(note).exists()).toBe(false);
+    expect(
+      mountTable({ tiles: { ...TILES, attention: 0 } })
+        .find(note)
+        .exists(),
+    ).toBe(false);
+  });
+
   it("matches the search on name and description", async () => {
     const wrapper = mountTable();
     await wrapper.find('[data-test="quality-configs-search"] input').setValue("instructions");
