@@ -947,26 +947,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Incident Analysis Tab Content -->
               <IncidentRCAAnalysis
                 v-if="activeTab === 'incidentAnalysis'"
-                :has-existing-rca="hasExistingRca"
-                :rca-loading="rcaLoading"
-                :rca-stream-content="rcaStreamContent"
+                :rca="rcaSummary"
+                :report-run="rcaReportRun"
+                :viewed-run="rcaViewedRun"
+                :history="rcaHistory"
+                :stale="rcaStale"
+                :error="rcaError"
                 :formatted-rca-content="formattedRcaContent"
-                :rca-error="rcaError"
-                :rca-cancelling="rcaCancelling"
-                :analysis-elapsed-label="analysisElapsedLabel"
-                :analysis-is-stale="analysisIsStale"
-                :rca-history="rcaHistory"
-                :viewing-archived-index="viewingArchivedIndex"
-                :analyzed-at="rcaAnalyzedAt"
+                :report-loading="rcaReportLoading"
+                :triggering="rcaTriggering"
+                :cancelling="rcaCancelling"
+                :is-dark-mode="isDarkMode"
+                @trigger-rca="triggerRca"
                 @cancel-rca="cancelRca"
-                @view-report="viewReport"
+                @view-run="viewRcaRun"
                 @copy-report="copyReport"
                 @download-report="downloadReport"
-                :is-dark-mode="isDarkMode"
-                :analysis-in-flight="analysisInFlight"
-                :analyze-credit-cost="aiCreditCosts?.incident"
-                :reanalyze-credit-cost="aiCreditCosts?.incident_reanalysis"
-                @trigger-rca="triggerRca"
               />
 
               <!-- Service Graph Tab Content -->
@@ -1511,7 +1507,6 @@ import incidentsService, {
   IncidentWithAlerts,
   IncidentAlert,
   IncidentCorrelatedStreams,
-  ArchivedRcaReport,
 } from "@/services/incidents";
 import { oncallTeamsQuery, responsesForIncidentQuery } from "@/services/oncall.queries";
 import type { OnCallResponse } from "@/ts/interfaces/oncall";
@@ -1548,13 +1543,8 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import {
-  isPaidOverageConsentError,
-  usePaidOverageConsent,
-} from "@/composables/usePaidOverageConsent";
-import BillingService, { type AiCreditCounts } from "@/services/billings";
-import { aiCreditsAction, aiCreditsNotice, isAiCreditsExhausted } from "@/utils/aiCredits";
-import config from "@/aws-exports";
+import { useRcaTrigger } from "@/composables/useRcaTrigger";
+import { useIncidentRca } from "@/composables/useIncidentRca";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1588,8 +1578,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const { confirm } = useConfirmDialog();
-    const { promptForConsent } = usePaidOverageConsent();
-    const consentLifecycle = new AbortController();
+    const { requestRca } = useRcaTrigger();
 
     const incidentOrgId = useOrgId();
     const updateIncidentStatus = useMutation(() =>
@@ -1712,8 +1701,6 @@ export default defineComponent({
 
     // Title editing
     const isEditingTitle = ref(false);
-    const rcaLoading = ref(false);
-    const rcaStreamContent = ref("");
 
     // Tab management
     const activeTab = ref("overview");
@@ -1769,11 +1756,6 @@ export default defineComponent({
       Array<{ id: string; display: string; group?: string; fields: string[] }>
     >([]);
 
-    // Computed to check if analysis already exists
-    const hasExistingRca = computed(() => {
-      return !!incidentDetails.value?.topology_context?.suggested_root_cause;
-    });
-
     // Create a lookup map for semantic group ID to display name
     const semanticGroupDisplayMap = computed(() => {
       const map = new Map<string, string>();
@@ -1801,169 +1783,27 @@ export default defineComponent({
       return resp ? buildChipDimensionsFromFilters(resp, semanticGroups.value) : {};
     });
 
-    // True when a background AI analysis run has started but not yet completed.
-    const analysisInFlight = ref(false);
-    // Epoch micros of the AIAnalysisBegin that is currently in flight, so the panel can
-    // show elapsed time and flag a run that has outlived the server's staleness window.
-    const analysisStartedAt = ref<number | null>(null);
-    // Last terminal failure, surfaced persistently in the panel instead of a transient toast.
-    const rcaError = ref<{ reason: string; details: string; remedy?: "plans" | "contact" } | null>(
-      null,
-    );
-    const rcaCancelling = ref(false);
+    // Run state, history and report text come from the detail's `rca` (01 RR-35).
+    const {
+      summary: rcaSummary,
+      stale: rcaStale,
+      currentError: rcaError,
+      reportRun: rcaReportRun,
+      history: rcaHistory,
+      viewedRun: rcaViewedRun,
+      reportText: rcaReportText,
+      reportLoading: rcaReportLoading,
+      triggering: rcaTriggering,
+      cancelling: rcaCancelling,
+      reload: reloadRca,
+      viewRun: viewRcaRun,
+      trigger: triggerRca,
+      cancel: cancelRca,
+    } = useIncidentRca(incidentOrgId, incidentDetails);
 
-    // Superseded reports (newest first) and which one is being viewed.
-    // null index = the current report.
-    const rcaHistory = ref<ArchivedRcaReport[]>([]);
-    const viewingArchivedIndex = ref<number | null>(null);
-    // Epoch micros of the last ai_analysis_complete, powering "Analyzed X ago".
-    const rcaAnalyzedAt = ref<number | null>(null);
-
-    const loadRcaHistory = async (incidentId: string) => {
-      try {
-        const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.getRcaHistory(org, incidentId);
-        rcaHistory.value = response.data?.previous || [];
-      } catch (error) {
-        // History is supplementary — a failure here must not block the report itself.
-        console.error("Failed to load RCA history:", error);
-        rcaHistory.value = [];
-      }
-    };
-
-    const viewReport = (index: number | null) => {
-      viewingArchivedIndex.value = index;
-    };
-
-    // Mirrors the backend stale threshold (reanalysis_cooldown_minutes * 2, default 30*2).
-    // A begin older than this is ignored server-side, so the run is almost certainly dead.
-    const RCA_STALE_AFTER_MS = 60 * 60 * 1000;
-
-    // Ticks while an analysis is in flight so the elapsed-time label stays live.
-    const nowTick = ref(Date.now());
-    let nowTickTimer: ReturnType<typeof setInterval> | null = null;
-
-    const analysisElapsedMs = computed(() => {
-      if (!analysisStartedAt.value) return null;
-      // Event timestamps are microseconds since epoch.
-      return nowTick.value - analysisStartedAt.value / 1000;
-    });
-
-    const analysisIsStale = computed(() => {
-      const elapsed = analysisElapsedMs.value;
-      return elapsed !== null && elapsed > RCA_STALE_AFTER_MS;
-    });
-
-    const analysisElapsedLabel = computed(() => {
-      const elapsed = analysisElapsedMs.value;
-      if (elapsed === null || elapsed < 0) return "";
-      const totalSeconds = Math.floor(elapsed / 1000);
-      if (totalSeconds < 60) return `${totalSeconds}s`;
-      const minutes = Math.floor(totalSeconds / 60);
-      if (minutes < 60) return `${minutes}m`;
-      const hours = Math.floor(minutes / 60);
-      return `${hours}h ${minutes % 60}m`;
-    });
-
-    const checkAnalysisInFlight = async (incidentId: string) => {
-      try {
-        const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.getEvents(org, incidentId);
-        const events: any[] = response.data?.events || [];
-
-        // Walk the log once, tracking the latest begin and the latest terminal event.
-        // Cancelled is terminal alongside complete/failed — it clears the in-flight guard
-        // on the server, so the UI must agree or it would show a phantom running state.
-        let lastBegin = -1;
-        let lastTerminal = -1;
-        let lastTerminalEvent: any = null;
-        let lastComplete = -1;
-        for (const ev of events) {
-          if (ev.type === "ai_analysis_begin") lastBegin = ev.timestamp;
-          if (ev.type === "ai_analysis_complete") lastComplete = ev.timestamp;
-          if (
-            ev.type === "ai_analysis_complete" ||
-            ev.type === "ai_analysis_failed" ||
-            ev.type === "ai_analysis_cancelled"
-          ) {
-            lastTerminal = ev.timestamp;
-            lastTerminalEvent = ev;
-          }
-        }
-        const nowInFlight = lastBegin > lastTerminal;
-
-        // When the report was produced, for the "Analyzed X ago" label.
-        rcaAnalyzedAt.value = lastComplete > 0 ? lastComplete : null;
-
-        analysisStartedAt.value = nowInFlight ? lastBegin : null;
-
-        // Keep the failure visible until the next run starts. Only the most recent
-        // terminal event matters: a later success or cancel clears a older failure.
-        // A refused run (no AI credits, consent declined) writes no event, so its
-        // remedy banner stays until a run starts or the user retries.
-        const refused = rcaError.value?.remedy ? rcaError.value : null;
-        rcaError.value = nowInFlight
-          ? null
-          : (refused ??
-            (lastTerminalEvent?.type === "ai_analysis_failed"
-              ? {
-                  reason: lastTerminalEvent.data?.reason || t("alerts.incidents.rcaFailed"),
-                  details: lastTerminalEvent.data?.error_details || "",
-                }
-              : null));
-
-        // Transition: banner was showing and analysis just finished — reload to pick up
-        // the new report. Skipped when the run failed, since there is nothing new to fetch.
-        if (analysisInFlight.value && !nowInFlight) {
-          analysisInFlight.value = false;
-          if (lastTerminalEvent?.type === "ai_analysis_complete") {
-            await loadDetails(incidentId);
-          }
-          timelineRefreshTrigger.value++;
-        } else {
-          analysisInFlight.value = nowInFlight;
-        }
-      } catch (error) {
-        // A failed events fetch says nothing about the run — leave the last known
-        // in-flight state alone rather than silently claiming "never analyzed".
-        console.error("Failed to check analysis state:", error);
-      }
-    };
-
-    // Poll while an analysis is in flight so the panel resolves on its own.
-    // Stops as soon as nothing is running to avoid a background request loop.
-    let inFlightPollTimer: ReturnType<typeof setInterval> | null = null;
-
-    const stopInFlightPolling = () => {
-      if (inFlightPollTimer) {
-        clearInterval(inFlightPollTimer);
-        inFlightPollTimer = null;
-      }
-      if (nowTickTimer) {
-        clearInterval(nowTickTimer);
-        nowTickTimer = null;
-      }
-    };
-
-    const startInFlightPolling = () => {
-      if (inFlightPollTimer) return;
-      nowTick.value = Date.now();
-      nowTickTimer = setInterval(() => {
-        nowTick.value = Date.now();
-      }, 1000);
-      inFlightPollTimer = setInterval(() => {
-        const id = incidentDetails.value?.id;
-        if (!id) {
-          stopInFlightPolling();
-          return;
-        }
-        checkAnalysisInFlight(id);
-      }, 10000);
-    };
-
-    watch(analysisInFlight, (running) => {
-      if (running) startInFlightPolling();
-      else stopInFlightPolling();
+    // A run that starts or ends adds an AI event to the Activity timeline.
+    watch([() => rcaSummary.value?.run_id, () => rcaSummary.value?.state], () => {
+      timelineRefreshTrigger.value++;
     });
 
     // Dark mode via the single sanctioned JS seam
@@ -2346,9 +2186,9 @@ export default defineComponent({
       ) {
         fetchCorrelatedStreams();
       }
-      // Switching to the Analysis tab re-checks in-flight state without polling
-      if (newTab === "incidentAnalysis" && incidentDetails.value?.id) {
-        checkAnalysisInFlight(incidentDetails.value.id);
+      // Switching to the Analysis tab re-reads the run state
+      if (newTab === "incidentAnalysis") {
+        void reloadRca();
       }
     });
 
@@ -2367,9 +2207,7 @@ export default defineComponent({
         group_values: incidentDetails.value.group_values,
         topology_context: incidentDetails.value.topology_context,
         triggers: triggers.value,
-        rca_analysis: hasExistingRca.value
-          ? incidentDetails.value?.topology_context?.suggested_root_cause
-          : rcaStreamContent.value,
+        rca_analysis: rcaReportText.value,
       };
     });
 
@@ -2429,30 +2267,15 @@ export default defineComponent({
       return [];
     });
 
-    // The raw markdown currently on screen — streaming chunks, an archived report
-    // the user selected, or the current report. Copy/download operate on this.
-    const activeRcaMarkdown = computed(() => {
-      if (rcaLoading.value && rcaStreamContent.value) return rcaStreamContent.value;
-
-      const archivedIndex = viewingArchivedIndex.value;
-      if (archivedIndex !== null) {
-        return rcaHistory.value[archivedIndex]?.content || "";
-      }
-
-      return hasExistingRca.value
-        ? incidentDetails.value?.topology_context?.suggested_root_cause || ""
-        : "";
-    });
-
     const formattedRcaContent = computed(() =>
-      activeRcaMarkdown.value ? renderRcaReport(activeRcaMarkdown.value) : "",
+      rcaReportText.value ? renderRcaReport(rcaReportText.value) : "",
     );
 
     // h2 sections are top-level TOC entries, h3 nest under the h2 above them.
     const tableOfContents = computed<TocItem[]>(() => {
       const toc: TocItem[] = [];
       let parent: TocItem | null = null;
-      for (const { id, text, level } of extractRcaToc(activeRcaMarkdown.value)) {
+      for (const { id, text, level } of extractRcaToc(rcaReportText.value)) {
         const item: TocItem = { id, text, level: level - 1, children: [], expanded: true };
         if (level === 3 && parent) {
           parent.children.push(item);
@@ -2641,8 +2464,6 @@ export default defineComponent({
       // Reset correlation state when loading new incident
       correlationData.value = null;
       correlationError.value = null;
-      // A refused run's banner writes no event, so only this can stop it carrying over.
-      if (incidentDetails.value?.id !== incidentId) rcaError.value = null;
 
       try {
         const org = store.state.selectedOrganization.identifier;
@@ -2668,12 +2489,6 @@ export default defineComponent({
           console.warn("Failed to load semantic groups:", semanticError);
           semanticGroups.value = [];
         }
-
-        // Check if a background AI analysis is already running
-        await checkAnalysisInFlight(incidentId);
-
-        // Load superseded reports so the version picker is populated
-        await loadRcaHistory(incidentId);
       } catch (error) {
         console.error("Failed to load incident details:", error);
         toast({
@@ -2693,6 +2508,15 @@ export default defineComponent({
           // Load incident from URL route parameter
           // Validate incident ID format (e.g., UUID validation)
           if (incidentIdFromUrl.trim().length > 0) {
+            // `?tab=incidentAnalysis` opens the page on the Analysis tab (the list's AI analysis cell).
+            // The key is consumed once: dropping it keeps a later reload on the tab the user chose.
+            const { tab, ...restQuery } = router.currentRoute.value.query;
+            if (tab !== undefined) {
+              if (tab === "incidentAnalysis") {
+                activeTab.value = "incidentAnalysis";
+              }
+              void router.replace({ query: restQuery });
+            }
             loadDetails(incidentIdFromUrl);
           } else {
             console.warn("Invalid incident ID in URL");
@@ -2727,12 +2551,6 @@ export default defineComponent({
     onUnmounted(() => {
       contextRegistry.setActive("");
       contextRegistry.unregister("incidents");
-      // Stop the poll/tick timers and drop any pending manual run so it cannot
-      // resolve against an unmounted component.
-      stopInFlightPolling();
-      rcaAbortController?.abort();
-      rcaAbortController = null;
-      consentLifecycle.abort();
     });
 
     const close = () => {
@@ -2740,25 +2558,12 @@ export default defineComponent({
       correlationData.value = null;
       correlationError.value = null;
 
-      // Drop RCA state too, so reopening another incident never shows the previous
-      // incident's error or spinner before the event log is re-read.
-      stopInFlightPolling();
-      rcaAbortController?.abort();
-      rcaAbortController = null;
-      rcaLoading.value = false;
-      rcaStreamContent.value = "";
-      rcaError.value = null;
-      analysisInFlight.value = false;
-      analysisStartedAt.value = null;
-      rcaHistory.value = [];
-      viewingArchivedIndex.value = null;
-      rcaAnalyzedAt.value = null;
-
       // Clear incident context when explicitly closing
       contextRegistry.setActive("");
       contextRegistry.unregister("incidents");
 
-      // Navigate back to incident list, carrying over this route's own query (e.g. page) instead of dropping it.
+      // Navigate back to incident list, carrying over this route's own query (e.g. page)
+      // instead of dropping it. `tab` never reaches here: the load consumes it.
       router.push({
         name: "incidentList",
         query: {
@@ -2768,32 +2573,60 @@ export default defineComponent({
       });
     };
 
-    // Handle ESC key to close incident detail
-    const handleEscapeKey = (event: KeyboardEvent) => {
+    // Esc leaves the page only when nothing else on it owns the key (01 RR-48): no
+    // text field has focus and no dialog, menu, listbox or popover is open. Leaving
+    // never cancels a run. Overlays close themselves on Esc, so whether one was open
+    // is read in the capture phase, before their own handlers run.
+    const OPEN_OVERLAY_SELECTOR = [
+      '[role="dialog"]',
+      '[role="alertdialog"]',
+      '[role="menu"]',
+      '[role="listbox"]',
+    ]
+      .map((selector) => `${selector}:not([data-state="closed"]):not([hidden])`)
+      .join(", ");
+    const TEXT_FIELD_SELECTOR =
+      'textarea, select, input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"])';
+
+    const escapeOwnedElsewhere = () => {
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLElement &&
+        (active.isContentEditable || active.matches(TEXT_FIELD_SELECTOR))
+      ) {
+        return true;
+      }
+      return document.querySelector(OPEN_OVERLAY_SELECTOR) !== null;
+    };
+
+    let escapeCapturedAsOwned = false;
+
+    const captureEscapeKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" || event.key === "Esc") {
-        // Don't close if user is editing title
-        if (isEditingTitle.value) {
-          return;
-        }
-        close();
+        escapeCapturedAsOwned = escapeOwnedElsewhere();
       }
     };
 
-    // Credit costs label the analysis actions; without them the actions simply show no cost.
-    const aiCreditCosts = ref<AiCreditCounts | null>(null);
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" && event.key !== "Esc") return;
+      const owned =
+        escapeCapturedAsOwned ||
+        event.defaultPrevented ||
+        isEditingTitle.value ||
+        escapeOwnedElsewhere();
+      escapeCapturedAsOwned = false;
+      if (!owned) close();
+    };
 
     // Add keyboard event listener on mount
     onMounted(() => {
+      window.addEventListener("keydown", captureEscapeKey, true);
       window.addEventListener("keydown", handleEscapeKey);
-      if (config.isCloud === "true") {
-        BillingService.get_ai_usage(store.state.selectedOrganization.identifier)
-          .then((res) => (aiCreditCosts.value = res.data.costs))
-          .catch(() => {});
-      }
     });
 
-    // Remove keyboard event listener on unmount
+    // Remove keyboard event listeners on unmount
     onBeforeUnmount(() => {
+      window.removeEventListener("keydown", captureEscapeKey, true);
       window.removeEventListener("keydown", handleEscapeKey);
     });
 
@@ -2828,9 +2661,9 @@ export default defineComponent({
           timelineRefreshTrigger.value++;
         }
 
-        // Reopening may trigger a background RCA reanalysis — check immediately
-        if (newStatus === "open" && incidentDetails.value?.id) {
-          await checkAnalysisInFlight(incidentDetails.value.id);
+        // Reopening may start an automatic run — re-read the run state now
+        if (newStatus === "open") {
+          await reloadRca();
         }
       } catch (error) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
@@ -3053,55 +2886,6 @@ export default defineComponent({
       }
     };
 
-    const requestRcaWithConsent = async (
-      org: string,
-      incidentId: string,
-      params: { reanalysis?: boolean; build_on_previous?: boolean },
-      signal?: AbortSignal,
-    ) => {
-      try {
-        return await incidentsService.triggerRca(org, incidentId, params, { signal });
-      } catch (error: unknown) {
-        const status = isAxiosError(error) ? (error.response?.status ?? 0) : 0;
-        const body: unknown = isAxiosError(error) ? error.response?.data : null;
-        if (!isPaidOverageConsentError(status, body)) throw error;
-
-        // A denied request never started on the server. Stop optimistic loading
-        // and polling while the user decides whether to authorize paid usage.
-        const wasLoading = rcaLoading.value;
-        rcaLoading.value = false;
-        analysisStartedAt.value = null;
-        if (!analysisInFlight.value) stopInFlightPolling();
-
-        const consentSignal = signal ?? consentLifecycle.signal;
-        const accepted = await promptForConsent(org, "ai_credits", body.consent, consentSignal);
-        const drawerStillActive =
-          !consentSignal.aborted &&
-          store.state.selectedOrganization.identifier === org &&
-          incidentDetails.value?.id === incidentId;
-        if (!accepted || !drawerStillActive) {
-          if (!accepted && drawerStillActive) {
-            // Persist it with the way out: Plans is where paid usage is turned on.
-            rcaError.value = {
-              reason: t("paidUsage.declinedNotice"),
-              details: "",
-              remedy: "plans",
-            };
-          }
-          return null;
-        }
-
-        // The replacement request is the run itself, so it gets the running state back.
-        if (wasLoading) {
-          rcaLoading.value = true;
-          analysisStartedAt.value = Date.now() * 1000;
-          startInFlightPolling();
-        }
-        // Exactly one guarded replacement request. A second denial propagates.
-        return incidentsService.triggerRca(org, incidentId, params, { signal });
-      }
-    };
-
     // Handle severity change from dropdown
     const handleSeverityChange = async (newSeverity: "P1" | "P2" | "P3" | "P4") => {
       if (!incidentDetails.value || updating.value) return;
@@ -3130,54 +2914,51 @@ export default defineComponent({
 
         // Handle reanalysis prompt based on in-flight state
         if ("analysis_in_flight" in data) {
-          analysisInFlight.value = !!data.analysis_in_flight;
           if (data.analysis_in_flight) {
             toast({
               variant: "info",
               message: t("toastMessages.alerts.aiAnalysisIsAlreadyRunningFor"),
             });
+            await reloadRca();
           } else {
             const ok = await confirm({
               title: t("alerts.incidents.rerunAnalysisTitle"),
-              message: aiCreditCosts.value
-                ? t(
-                    "alerts.incidents.rerunAnalysisMessageWithCost",
-                    { cost: aiCreditCosts.value.incident_reanalysis },
-                    aiCreditCosts.value.incident_reanalysis,
-                  )
-                : t("alerts.incidents.rerunAnalysisMessage"),
+              message: t("alerts.incidents.rerunAnalysisMessage"),
               confirmLabel: t("alerts.incidents.rerunAnalysisConfirmLabel"),
               cancelLabel: t("alerts.incidents.rerunAnalysisCancelLabel"),
               persistent: false,
             });
             if (ok) {
               try {
-                const response = await requestRcaWithConsent(org, incidentId, {
-                  reanalysis: true,
-                });
-                if (!response) return;
+                const result = await requestRca(
+                  org,
+                  incidentId,
+                  { reanalysis: true },
+                  {
+                    isStillActive: () =>
+                      store.state.selectedOrganization.identifier === org &&
+                      incidentDetails.value?.id === incidentId,
+                  },
+                );
+                if (result.status === "declined") return;
+                if (result.status === "unavailable") {
+                  toast({ variant: "error", message: result.message });
+                  return;
+                }
                 toast({
                   variant: "success",
                   message: t("toastMessages.alerts.aiReanalysisStarted"),
                 });
-                await loadDetails(incidentId);
+                await reloadRca();
               } catch (error: unknown) {
                 const responseData: unknown = isAxiosError(error) ? error.response?.data : null;
-                const message = isAiCreditsExhausted(responseData)
-                  ? aiCreditsNotice(responseData, t)
-                  : responseData &&
-                      typeof responseData === "object" &&
-                      "message" in responseData &&
-                      typeof responseData.message === "string"
+                const message =
+                  responseData &&
+                  typeof responseData === "object" &&
+                  "message" in responseData &&
+                  typeof responseData.message === "string"
                     ? raw(responseData.message)
                     : t("alerts.incidents.reanalysisStartFailed");
-                if (isAiCreditsExhausted(responseData)) {
-                  rcaError.value = {
-                    reason: message,
-                    details: "",
-                    remedy: aiCreditsAction(responseData),
-                  };
-                }
                 toast({ variant: "error", message });
               }
             }
@@ -3283,12 +3064,8 @@ export default defineComponent({
       };
     };
 
-    // Aborts the client side of a manual run so closing the drawer or hitting Cancel
-    // stops the pending request instead of letting it resolve against a dead component.
-    let rcaAbortController: AbortController | null = null;
-
     const copyReport = async () => {
-      const content = activeRcaMarkdown.value;
+      const content = rcaReportText.value;
       if (!content) return;
 
       try {
@@ -3301,7 +3078,7 @@ export default defineComponent({
     };
 
     const downloadReport = () => {
-      const content = activeRcaMarkdown.value;
+      const content = rcaReportText.value;
       if (!content || !incidentDetails.value) return;
 
       const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
@@ -3313,113 +3090,6 @@ export default defineComponent({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-    };
-
-    const triggerRca = async (options: { buildOnPrevious?: boolean } = {}) => {
-      if (!incidentDetails.value) return;
-
-      const incidentId = incidentDetails.value.id;
-      const org = store.state.selectedOrganization.identifier;
-
-      rcaLoading.value = true;
-      rcaStreamContent.value = "";
-      // Clear the previous failure so a retry doesn't show a stale error beside the spinner.
-      rcaError.value = null;
-      // A re-run always produces a new current report — drop back from any archived view.
-      viewingArchivedIndex.value = null;
-      analysisStartedAt.value = Date.now() * 1000;
-      startInFlightPolling();
-
-      rcaAbortController = new AbortController();
-
-      try {
-        const response = await requestRcaWithConsent(
-          org,
-          incidentId,
-          // Fresh analysis unless the user explicitly asked to build on the previous one.
-          { build_on_previous: options.buildOnPrevious === true },
-          rcaAbortController.signal,
-        );
-        if (!response) return;
-
-        // Set the RCA content immediately
-        rcaStreamContent.value = response.data.rca_content;
-
-        toast({
-          variant: "success",
-          message: t("alerts.incidents.rcaCompleted"),
-        });
-
-        // Reload incident to get the saved RCA in topology context, and pick up the
-        // report this run just superseded.
-        await loadDetails(incidentId);
-        await loadRcaHistory(incidentId);
-      } catch (error: any) {
-        rcaStreamContent.value = "";
-
-        // A cancel is a deliberate user action, not a failure — handled by cancelRca.
-        if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
-          return;
-        }
-
-        console.error("Failed to trigger RCA:", error);
-        const responseData = error?.response?.data;
-        const message = isAiCreditsExhausted(responseData)
-          ? aiCreditsNotice(responseData, t)
-          : responseData?.message || error?.message || t("alerts.incidents.rcaFailedGeneric");
-        // Persist the failure in the panel; the toast alone disappears.
-        rcaError.value = {
-          reason: message,
-          details: "",
-          remedy: isAiCreditsExhausted(responseData) ? aiCreditsAction(responseData) : undefined,
-        };
-        toast({ variant: "error", message });
-        // Surface the failure event in the Activity timeline too.
-        timelineRefreshTrigger.value++;
-      } finally {
-        rcaLoading.value = false;
-        rcaAbortController = null;
-        analysisStartedAt.value = null;
-        if (!analysisInFlight.value) stopInFlightPolling();
-      }
-    };
-
-    const cancelRca = async () => {
-      if (!incidentDetails.value || rcaCancelling.value) return;
-
-      const incidentId = incidentDetails.value.id;
-      const org = store.state.selectedOrganization.identifier;
-
-      rcaCancelling.value = true;
-
-      // Drop the client request first so the UI frees up immediately, regardless of
-      // how long the server takes to acknowledge.
-      rcaAbortController?.abort();
-
-      try {
-        await incidentsService.cancelRca(org, incidentId);
-
-        analysisInFlight.value = false;
-        analysisStartedAt.value = null;
-        rcaError.value = null;
-        stopInFlightPolling();
-
-        toast({ variant: "info", message: t("alerts.incidents.rcaCancelled") });
-        timelineRefreshTrigger.value++;
-      } catch (error: any) {
-        console.error("Failed to cancel RCA:", error);
-        toast({
-          variant: "error",
-          message:
-            error?.response?.data?.message ||
-            error?.message ||
-            t("alerts.incidents.rcaCancelFailed"),
-        });
-        // Resync from the event log — the run may have finished while we were cancelling.
-        await checkAnalysisInFlight(incidentId);
-      } finally {
-        rcaCancelling.value = false;
-      }
     };
 
     // Humanize key_type for display
@@ -3437,7 +3107,6 @@ export default defineComponent({
     };
 
     return {
-      aiCreditCosts,
       mutedBannerText,
       openMutingDowntime,
       raw,
@@ -3455,21 +3124,21 @@ export default defineComponent({
       alerts,
       selectedAlertIndex,
       isSelectedComposite,
-      rcaLoading,
+      rcaSummary,
+      rcaStale,
       rcaError,
-      rcaCancelling,
-      analysisElapsedLabel,
-      analysisIsStale,
-      cancelRca,
+      rcaReportRun,
       rcaHistory,
-      viewingArchivedIndex,
-      rcaAnalyzedAt,
-      viewReport,
+      rcaViewedRun,
+      rcaReportText,
+      rcaReportLoading,
+      rcaTriggering,
+      rcaCancelling,
+      reloadRca,
+      viewRcaRun,
+      cancelRca,
       copyReport,
       downloadReport,
-      rcaStreamContent,
-      hasExistingRca,
-      analysisInFlight,
       isDarkMode,
       activeTab,
       timelineRefreshTrigger,
@@ -3530,7 +3199,6 @@ export default defineComponent({
       copyToClipboard,
       copiedField,
       calculateDuration,
-      checkAnalysisInFlight,
       updateSeverity: handleSeverityChange,
     };
   },

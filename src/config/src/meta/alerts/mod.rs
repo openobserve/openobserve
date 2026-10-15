@@ -41,6 +41,7 @@ pub mod incidents;
 pub mod level;
 pub mod priority;
 pub mod prom_rule;
+pub mod rca_runs;
 pub mod recovery;
 pub mod state;
 pub mod state_level;

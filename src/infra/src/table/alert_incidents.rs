@@ -70,6 +70,14 @@ fn new_incident(
         created_at: Set(now),
         updated_at: Set(now),
         muted_by_downtime_id: Set(muted_by_downtime_id),
+        rca_run_id: Set(None),
+        rca_state: Set(None),
+        rca_started_at: Set(None),
+        rca_updated_at: Set(None),
+        rca_outcome: Set(None),
+        rca_confidence: Set(None),
+        rca_summary: Set(None),
+        rca_off_reason: Set(None),
     }
 }
 
@@ -428,6 +436,28 @@ pub async fn replace_muted_by_downtime_id_with<C: ConnectionTrait>(
     Ok(res.rows_affected == 1)
 }
 
+/// Records why automatic analysis runs never start for this incident (RR-45).
+///
+/// Writes only `rca_off_reason`; the incident creator calls it once, after routing.
+/// It leaves `updated_at` alone, so the write does not reorder the list.
+pub async fn set_rca_off_reason(
+    org_id: &str,
+    id: &str,
+    reason: Option<&str>,
+) -> Result<(), errors::Error> {
+    alert_incidents::Entity::update_many()
+        .col_expr(
+            alert_incidents::Column::RcaOffReason,
+            Expr::value(reason.map(str::to_string)),
+        )
+        .filter(alert_incidents::Column::Id.eq(id))
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .exec(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(())
+}
+
 /// Update incident title
 pub async fn update_title(
     org_id: &str,
@@ -494,7 +524,8 @@ pub async fn list_with<C: ConnectionTrait>(
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
     let mut query = alert_incidents::Entity::find()
         .select_only()
-        // Select all columns EXCEPT topology_context for performance
+        // Select all columns EXCEPT topology_context for performance; the run summary
+        // columns are the list's AI analysis cell (RR-28, no join).
         .column(alert_incidents::Column::Id)
         .column(alert_incidents::Column::OrgId)
         .column(alert_incidents::Column::Status)
@@ -510,6 +541,14 @@ pub async fn list_with<C: ConnectionTrait>(
         .column(alert_incidents::Column::CreatedAt)
         .column(alert_incidents::Column::UpdatedAt)
         .column(alert_incidents::Column::MutedByDowntimeId)
+        .column(alert_incidents::Column::RcaRunId)
+        .column(alert_incidents::Column::RcaState)
+        .column(alert_incidents::Column::RcaStartedAt)
+        .column(alert_incidents::Column::RcaUpdatedAt)
+        .column(alert_incidents::Column::RcaOutcome)
+        .column(alert_incidents::Column::RcaConfidence)
+        .column(alert_incidents::Column::RcaSummary)
+        .column(alert_incidents::Column::RcaOffReason)
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .order_by_desc(alert_incidents::Column::LastAlertAt);
 
@@ -1278,6 +1317,52 @@ mod tests {
         assert_eq!(rows[0].muted_by_downtime_id.as_deref(), Some("dt-1"));
     }
 
+    /// RR-28: the list selects the run summary columns (no join, no `topology_context`).
+    #[tokio::test]
+    async fn the_list_carries_the_run_summary_columns() {
+        let db = incidents_db().await;
+        let incident = muted_incident(&db, "dt-1").await;
+        alert_incidents::Entity::update_many()
+            .col_expr(alert_incidents::Column::RcaRunId, Expr::value("run-1"))
+            .col_expr(alert_incidents::Column::RcaState, Expr::value("completed"))
+            .col_expr(alert_incidents::Column::RcaStartedAt, Expr::value(10_i64))
+            .col_expr(alert_incidents::Column::RcaUpdatedAt, Expr::value(20_i64))
+            .col_expr(
+                alert_incidents::Column::RcaOutcome,
+                Expr::value("root_cause"),
+            )
+            .col_expr(alert_incidents::Column::RcaConfidence, Expr::value("high"))
+            .col_expr(
+                alert_incidents::Column::RcaSummary,
+                Expr::value(serde_json::json!({"steps": 3})),
+            )
+            .col_expr(alert_incidents::Column::RcaOffReason, Expr::value("l0_off"))
+            .col_expr(
+                alert_incidents::Column::TopologyContext,
+                Expr::value(serde_json::json!({"nodes": []})),
+            )
+            .filter(alert_incidents::Column::Id.eq(incident.id.as_str()))
+            .exec(&db)
+            .await
+            .unwrap();
+        let rows = list_with(&db, "acme", None, 50, 0).await.unwrap();
+        let row = &rows[0];
+        assert_eq!(row.rca_run_id.as_deref(), Some("run-1"));
+        assert_eq!(row.rca_state.as_deref(), Some("completed"));
+        assert_eq!(
+            (row.rca_started_at, row.rca_updated_at),
+            (Some(10), Some(20))
+        );
+        assert_eq!(row.rca_outcome.as_deref(), Some("root_cause"));
+        assert_eq!(row.rca_confidence.as_deref(), Some("high"));
+        assert_eq!(row.rca_summary, Some(serde_json::json!({"steps": 3})));
+        assert_eq!(row.rca_off_reason.as_deref(), Some("l0_off"));
+        assert_eq!(
+            row.topology_context, None,
+            "the list skips topology_context"
+        );
+    }
+
     #[test]
     fn test_ksuid_generation() {
         let id = svix_ksuid::Ksuid::new(None, None).to_string();
@@ -1317,8 +1402,6 @@ mod tests {
             nodes: vec![node1, node2],
             edges: vec![edge],
             related_incident_ids: vec![],
-            suggested_root_cause: Some("# RCA Analysis\n\nTest markdown".to_string()),
-            previous_analyses: vec![],
         };
 
         // Serialize to JSON
@@ -1329,12 +1412,6 @@ mod tests {
         assert_eq!(json["nodes"][1]["service_name"], "database");
         assert_eq!(json["edges"][0]["from_node_index"], 0);
         assert_eq!(json["edges"][0]["edge_type"], "service_dependency");
-        assert!(
-            json["suggested_root_cause"]
-                .as_str()
-                .unwrap()
-                .contains("RCA Analysis")
-        );
     }
 
     #[tokio::test]
@@ -1359,7 +1436,7 @@ mod tests {
                 }
             ],
             "related_incident_ids": [],
-            "suggested_root_cause": "# Root Cause\n\nDatabase connection pool exhausted"
+            "suggested_root_cause": "# Root Cause\n\nlegacy key read before the backfill removed it"
         });
 
         // Deserialize
@@ -1370,12 +1447,6 @@ mod tests {
         assert_eq!(topology.edges.len(), 1);
         assert_eq!(topology.nodes[0].alert_id, "alert_1");
         assert_eq!(topology.nodes[0].alert_count, 2);
-        assert!(
-            topology
-                .suggested_root_cause
-                .unwrap()
-                .contains("Database connection")
-        );
     }
 
     #[tokio::test]
@@ -1392,7 +1463,6 @@ mod tests {
 
         assert!(topology.nodes.is_empty());
         assert!(topology.edges.is_empty());
-        assert_eq!(topology.suggested_root_cause, None);
     }
 
     #[tokio::test]

@@ -682,7 +682,7 @@ pub async fn correlate_alert_to_incident(
     };
 
     // Find or create incident
-    let outcome = find_or_create_incident(
+    let correlation = find_or_create_incident(
         &alert.org_id,
         &group_values,
         key_type,
@@ -694,7 +694,11 @@ pub async fn correlate_alert_to_incident(
         downtime.map(|d| d.id.as_str()),
     )
     .await?;
+    let outcome = correlation.outcome;
 
+    // The on-call record routing opened, whose team decides L0 for the incident (RR-45).
+    #[cfg(feature = "enterprise")]
+    let mut routed_origin: Option<config::meta::oncall::Response> = None;
     // Only on creation: an alert joining an existing incident must not open a second record.
     #[cfg(feature = "enterprise")]
     if let IncidentCorrelationOutcome::NewIncidentCreated {
@@ -775,12 +779,27 @@ pub async fn correlate_alert_to_incident(
                         alert.org_id
                     );
                 }
+                routed_origin = Some(origin);
             }
             Ok(None) => {}
             Err(e) => log::error!(
                 "[incidents] on-call paging failed for {}/{incident_id}: {e}",
                 alert.org_id
             ),
+        }
+    }
+
+    // The analysis starts once routing has decided L0 for the incident (RR-45).
+    // A creation decides `rca_off_reason`; an un-mute decides it only when the
+    // incident was never routed, and otherwise keeps the stored decision.
+    #[cfg(feature = "enterprise")]
+    if let IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. } = &outcome
+        && downtime.is_none()
+    {
+        if correlation.created {
+            start_new_incident_rca(&alert.org_id, incident_id, routed_origin.as_ref()).await;
+        } else {
+            start_unmuted_incident_rca(&alert.org_id, incident_id, routed_origin.as_ref()).await;
         }
     }
 
@@ -903,7 +922,8 @@ pub async fn correlate_external_event(
     let triggered_at = external.last_seen_at;
 
     // Find or create incident.
-    let outcome = find_or_create_incident(
+    // An un-mute starts the same way; `rca_off_reason` stays as creation stored it.
+    let Correlation { outcome, .. } = find_or_create_incident(
         org_id,
         &group_values,
         key_type,
@@ -915,6 +935,17 @@ pub async fn correlate_external_event(
         None,
     )
     .await?;
+
+    // No on-call routing on this path, so nothing decides L0 and the run starts (D3).
+    #[cfg(feature = "enterprise")]
+    if let IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. } = &outcome {
+        start_automatic_rca(
+            org_id,
+            incident_id,
+            config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+        )
+        .await;
+    }
 
     // Send incident notification unless the outcome is a repeated alert (suppressed
     // by design). External events always carry a single occurrence, so there is no
@@ -1233,95 +1264,6 @@ fn spawn_topology_enrichment(
     });
 }
 
-/// Starts the first RCA of an incident: at creation, or when a downtime mute is lifted.
-#[cfg(feature = "enterprise")]
-async fn spawn_initial_rca(org_id: &str, incident_id: &str) {
-    if !rca_will_run(org_id, incident_id).await {
-        return;
-    }
-    #[cfg(feature = "cloud")]
-    let usage_permit = {
-        let usage_context = crate::trial_quota::AiUsageContext {
-            user_email: "system@openobserve.ai".to_string(),
-            incident_id: Some(incident_id.to_string()),
-            ..Default::default()
-        };
-        match crate::trial_quota::authorize_ai_usage(
-            org_id,
-            crate::trial_quota::TrialQuotaFeature::NewIncident,
-            &usage_context,
-        )
-        .await
-        {
-            Ok(permit) => Some(permit),
-            Err(error) => {
-                log::info!(
-                    "[INCIDENTS::RCA] New incident {incident_id} retained without RCA: {error}"
-                );
-                // §6: no verdict is coming, so nothing may go on holding a page for one.
-                o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-                    org_id,
-                    incident_id,
-                )
-                .await;
-                None
-            }
-        }
-    };
-    #[cfg(not(feature = "cloud"))]
-    let usage_permit = None;
-
-    if cfg!(feature = "cloud") && usage_permit.is_none() {
-        return;
-    }
-    if let Err(e) = crate::incidents::append_event(
-        org_id,
-        incident_id,
-        config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-    )
-    .await
-    {
-        log::error!(
-            "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {org_id}/{incident_id}: {e}"
-        );
-    }
-
-    let org_id_rca = org_id.to_string();
-    let incident_id_rca = incident_id.to_string();
-    let handle = tokio::spawn(async move {
-        if let Err(e) = trigger_rca_for_incident(
-            org_id_rca.clone(),
-            incident_id_rca.clone(),
-            false,
-            true,
-            "system@openobserve.ai".to_string(),
-            // First analysis for this incident — there is nothing to build on.
-            false,
-            usage_permit,
-        )
-        .await
-        {
-            log::debug!(
-                "[INCIDENTS::RCA] Immediate trigger failed for incident {incident_id_rca}: {e}"
-            );
-
-            emit_analysis_failure(
-                &org_id_rca,
-                &incident_id_rca,
-                config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident,
-                "Background spawn failed",
-                Some(&e),
-            )
-            .await;
-        }
-        unregister_rca_task(&org_id_rca, &incident_id_rca);
-    });
-    register_rca_task(org_id, incident_id, handle.abort_handle());
-}
-
-#[cfg(not(feature = "enterprise"))]
-async fn spawn_initial_rca(_org_id: &str, _incident_id: &str) {}
-
 /// Runs the incident-created workflows; an error must not block the incident flow.
 async fn trigger_created_workflows(org_id: &str, incident_id: &str) {
     if let Err(e) =
@@ -1419,14 +1361,15 @@ async fn retarget_mute(org_id: &str, incident_id: &str, from: &str, to: &str) {
     }
 }
 
-/// An un-muted incident runs as a fresh one: workflows, RCA, then the page and "opened".
+/// An un-muted incident runs as a fresh one: workflows, then the page and "opened".
+/// The analysis starts after on-call routing (RR-45), in the correlation caller,
+/// which keeps any L0 decision already made for the incident.
 async fn reopened_after_mute(
     org_id: &str,
     incident_id: String,
     service_name: &str,
 ) -> IncidentCorrelationOutcome {
     trigger_created_workflows(org_id, &incident_id).await;
-    spawn_initial_rca(org_id, &incident_id).await;
     IncidentCorrelationOutcome::NewIncidentCreated {
         incident_id,
         service_name: service_name.to_string(),
@@ -1584,9 +1527,7 @@ async fn create_new_incident(
         triggered_at,
     );
 
-    if muted_by.is_none() {
-        spawn_initial_rca(org_id, &incident.id).await;
-    }
+    // The analysis starts after on-call routing (RR-45), in the correlation caller.
 
     Ok(IncidentCorrelationOutcome::NewIncidentCreated {
         incident_id: incident.id,
@@ -1670,6 +1611,25 @@ fn firing_is_muted(
     muted_by.is_some() || (incident.muted_by_downtime_id.is_some() && !reopened)
 }
 
+/// What correlation did. An un-muted incident surfaces as `NewIncidentCreated`
+/// too; `created` tells a true creation, which always decides `rca_off_reason`,
+/// from an un-mute, which keeps any decision already made (RR-45).
+struct Correlation {
+    outcome: IncidentCorrelationOutcome,
+    #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+    created: bool,
+}
+
+impl Correlation {
+    /// An incident that already existed, un-muted or not.
+    fn existing(outcome: IncidentCorrelationOutcome) -> Self {
+        Self {
+            outcome,
+            created: false,
+        }
+    }
+}
+
 /// Find an existing open incident or create a new one
 #[allow(clippy::too_many_arguments)]
 async fn find_or_create_incident(
@@ -1682,7 +1642,7 @@ async fn find_or_create_incident(
     service_name: &str,
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
     muted_by: Option<&str>,
-) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
+) -> Result<Correlation, anyhow::Error> {
     use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
 
     // STEP 1: AlertId exact match - check for existing incident with same alert_id
@@ -1747,29 +1707,35 @@ async fn find_or_create_incident(
             );
             if reopened {
                 // Recomputed from the un-muting firing, so "opened" carries the right level.
-                return Ok(escalate_then_reopen(
-                    org_id,
-                    &incident.id,
-                    escalate_severity(org_id, &incident, subject, eval_level),
-                    reopened_after_mute(org_id, incident.id.clone(), service_name),
-                )
-                .await);
+                return Ok(Correlation::existing(
+                    escalate_then_reopen(
+                        org_id,
+                        &incident.id,
+                        escalate_severity(org_id, &incident, subject, eval_level),
+                        reopened_after_mute(org_id, incident.id.clone(), service_name),
+                    )
+                    .await,
+                ));
             }
 
             // A muted firing must not raise the severity silently; the un-muting firing does it.
             if !firing_is_muted(muted_by, &incident, reopened)
                 && escalate_severity(org_id, &incident, subject, eval_level).await?
             {
-                return Ok(IncidentCorrelationOutcome::SeverityEscalated {
-                    incident_id: incident.id,
-                    service_name: service_name.to_string(),
-                });
+                return Ok(Correlation::existing(
+                    IncidentCorrelationOutcome::SeverityEscalated {
+                        incident_id: incident.id,
+                        service_name: service_name.to_string(),
+                    },
+                ));
             }
 
-            return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
-                incident_id: incident.id,
-                service_name: service_name.to_string(),
-            });
+            return Ok(Correlation::existing(
+                IncidentCorrelationOutcome::ExistingAlertRepeated {
+                    incident_id: incident.id,
+                    service_name: service_name.to_string(),
+                },
+            ));
         }
     }
 
@@ -1925,119 +1891,46 @@ async fn find_or_create_incident(
                 triggered_at,
             );
             if reopened {
-                return Ok(escalate_then_reopen(
-                    org_id,
-                    &existing.id,
-                    escalate_severity(org_id, &existing, subject, eval_level),
-                    reopened_after_mute(org_id, existing.id.clone(), service_name),
-                )
-                .await);
+                return Ok(Correlation::existing(
+                    escalate_then_reopen(
+                        org_id,
+                        &existing.id,
+                        escalate_severity(org_id, &existing, subject, eval_level),
+                        reopened_after_mute(org_id, existing.id.clone(), service_name),
+                    )
+                    .await,
+                ));
             }
 
             if is_new_alert_type {
+                // A new alert type changes the picture: a fresh automatic run (RR-7).
                 #[cfg(feature = "enterprise")]
                 if muted_by.is_none() {
-                    let org_id_rca = org_id.to_string();
-                    let incident_id_rca = existing.id.clone();
-                    let cooldown = o2_enterprise::enterprise::common::config::get_config()
-                        .incidents
-                        .reanalysis_cooldown_minutes;
-                    let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
-                        .await
-                        .unwrap_or_default();
-                    if !is_analysis_in_flight(&events, cooldown * 2)
-                        && rca_will_run(&org_id_rca, &incident_id_rca).await
-                    {
-                        #[cfg(feature = "cloud")]
-                        let usage_permit = {
-                            let usage_context = crate::trial_quota::AiUsageContext {
-                                user_email: "system@openobserve.ai".to_string(),
-                                incident_id: Some(incident_id_rca.clone()),
-                                ..Default::default()
-                            };
-                            match crate::trial_quota::authorize_ai_usage(
-                                &org_id_rca,
-                                crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-                                &usage_context,
-                            )
-                            .await
-                            {
-                                Ok(permit) => Some(permit),
-                                Err(error) => {
-                                    log::info!(
-                                        "[INCIDENTS::RCA] Skipping new-alert reanalysis for {incident_id_rca}: {error}"
-                                    );
-                                    // §6: no verdict is coming, so nothing may go on holding a page
-                                    // for one.
-                                    o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-                                        &org_id_rca,
-                                        &incident_id_rca,
-                                    )
-                                    .await;
-                                    None
-                                }
-                            }
-                        };
-                        #[cfg(not(feature = "cloud"))]
-                        let usage_permit = None;
-
-                        if !cfg!(feature = "cloud") || usage_permit.is_some() {
-                            let _ = crate::incidents::append_event(
-                                &org_id_rca,
-                                &incident_id_rca,
-                                config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-                            )
-                            .await;
-                            let handle = tokio::spawn(async move {
-                                if let Err(e) = trigger_rca_for_incident(
-                                    org_id_rca.clone(),
-                                    incident_id_rca.clone(),
-                                    true,
-                                    true,
-                                    "system@openobserve.ai".to_string(),
-                                    // Fresh analysis: a new alert type changes the picture,
-                                    // so the agent should reassess rather than extend.
-                                    false,
-                                    usage_permit,
-                                )
-                                .await
-                                {
-                                    log::debug!(
-                                        "[INCIDENTS::RCA] Reanalysis trigger failed for {incident_id_rca}: {e}"
-                                    );
-
-                                    emit_analysis_failure(
-                                        &org_id_rca,
-                                        &incident_id_rca,
-                                        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis,
-                                        "Reanalysis trigger failed",
-                                        Some(&e),
-                                    ).await;
-                                }
-                                unregister_rca_task(&org_id_rca, &incident_id_rca);
-                            });
-                            register_rca_task(org_id, &existing.id, handle.abort_handle());
-                        }
-                    } else {
-                        log::debug!(
-                            "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping NewAlertTypeJoined trigger"
-                        );
-                    }
+                    start_automatic_rca(
+                        org_id,
+                        &existing.id,
+                        config::meta::alerts::rca_runs::RunTrigger::AutoNewAlertType,
+                    )
+                    .await;
                 }
-                return Ok(IncidentCorrelationOutcome::NewAlertTypeJoined {
-                    incident_id: existing.id,
-                    service_name: service_name.to_string(),
-                });
+                return Ok(Correlation::existing(
+                    IncidentCorrelationOutcome::NewAlertTypeJoined {
+                        incident_id: existing.id,
+                        service_name: service_name.to_string(),
+                    },
+                ));
             } else {
-                return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
-                    incident_id: existing.id,
-                    service_name: service_name.to_string(),
-                });
+                return Ok(Correlation::existing(
+                    IncidentCorrelationOutcome::ExistingAlertRepeated {
+                        incident_id: existing.id,
+                        service_name: service_name.to_string(),
+                    },
+                ));
             }
         }
     }
 
-    create_new_incident(
+    let outcome = create_new_incident(
         org_id,
         group_values,
         key_type,
@@ -2048,7 +1941,11 @@ async fn find_or_create_incident(
         eval_level,
         muted_by,
     )
-    .await
+    .await?;
+    Ok(Correlation {
+        outcome,
+        created: true,
+    })
 }
 
 /// Get incident with its alerts for detail view
@@ -2066,8 +1963,21 @@ pub async fn get_incident_with_alerts(
     // Store org_id before moving incident
     let incident_org_id = incident.org_id.clone();
 
+    // The run summary plus the current run, the report run and the history (RR-29).
+    // Without the runs the detail still carries the summary.
+    let rca = match super::rca_runs::rca_detail(org_id, &incident).await {
+        Ok(rca) => Some(rca),
+        Err(e) => {
+            log::warn!("[incidents] Failed to read RCA runs for {org_id}/{incident_id}: {e}");
+            None
+        }
+    };
+
     // Convert to config types
     let mut incident_data = model_to_incident(incident).await?;
+    if let Some(rca) = rca {
+        incident_data.rca = rca;
+    }
 
     // Fix alert_count from actual triggers (source of truth)
     // This heals any inconsistencies from race conditions or historical bugs
@@ -2433,475 +2343,500 @@ async fn dependency_edge_type_v1(org_id: &str, from: &str, to: &str) -> EdgeType
     }
 }
 
-/// Trigger RCA for a single incident immediately after creation
-///
-/// Called asynchronously via tokio::spawn to avoid blocking incident creation.
-/// Reuses AiAgentClient configuration from enterprise crate.
-///
-/// # Arguments
-/// * `org_id` - Organization ID
-/// * `incident_id` - Incident ID
-///
-/// # Returns
-/// * `Ok(())` if RCA successfully triggered and saved
-/// * `Err(_)` if configuration invalid, agent unavailable, or analysis failed
-///
-/// # Note
-/// Errors are logged but not propagated to caller.
-///
-/// Abort handles for in-flight RCA runs, keyed by `{org_id}/{incident_id}`.
-///
-/// Registered when a run is spawned and removed when it settles. A cancel request
-/// looks the incident up here and aborts the task; if the entry is missing (another
-/// node owns the run, or the process restarted) the caller still writes the terminal
-/// `AIAnalysisCancelled` event so the in-flight guard is released.
+/// What a cancel did: the run it ended and whether this node aborted its task.
 #[cfg(feature = "enterprise")]
-static RCA_ABORT_HANDLES: std::sync::LazyLock<dashmap::DashMap<String, tokio::task::AbortHandle>> =
-    std::sync::LazyLock::new(dashmap::DashMap::new);
-
-#[cfg(feature = "enterprise")]
-fn rca_task_key(org_id: &str, incident_id: &str) -> String {
-    format!("{org_id}/{incident_id}")
+#[derive(Debug, Clone, PartialEq)]
+pub struct CancelOutcome {
+    pub run_id: String,
+    pub aborted_local_task: bool,
 }
 
-/// Track a spawned RCA task so it can be cancelled later.
-#[cfg(feature = "enterprise")]
-pub fn register_rca_task(org_id: &str, incident_id: &str, handle: tokio::task::AbortHandle) {
-    RCA_ABORT_HANDLES.insert(rca_task_key(org_id, incident_id), handle);
-}
-
-/// Stop tracking a run once it has settled. Safe to call when nothing is registered.
-#[cfg(feature = "enterprise")]
-pub fn unregister_rca_task(org_id: &str, incident_id: &str) {
-    RCA_ABORT_HANDLES.remove(&rca_task_key(org_id, incident_id));
-}
-
-/// Cancel the in-flight RCA run for an incident.
+/// Cancel the incident's live run (RR-19..21).
 ///
-/// Aborts the local task when this node owns it, then records the terminal
-/// `AIAnalysisCancelled` event. The event is written even when no local handle exists,
-/// so a run stranded by a restart can be cleared without waiting for the stale window.
-///
-/// Re-checks in-flight state here, after the abort handle has been atomically removed,
-/// rather than trusting a check made by the caller. The caller's check is separated from
-/// this call by an await, during which a fresh analysis can start — cancelling then would
-/// abort the wrong run. Returns `Ok(None)` when nothing was in flight.
-///
-/// Returns `Ok(Some(true))` if a local task was actually aborted.
+/// The run ends `cancelled` first; only the winner of that write aborts the local
+/// task, so a cancel can never abort a newer run. A stale run can be cancelled.
+/// Returns `Ok(None)` when no live run holds the incident.
 #[cfg(feature = "enterprise")]
 pub async fn cancel_rca_for_incident(
     org_id: &str,
     incident_id: &str,
-    user_id: Option<String>,
-    stale_threshold_minutes: u64,
-) -> Result<Option<bool>, anyhow::Error> {
-    let aborted = match RCA_ABORT_HANDLES.remove(&rca_task_key(org_id, incident_id)) {
-        Some((_, handle)) => {
-            handle.abort();
-            true
-        }
-        None => false,
-    };
+    user_id: &str,
+) -> Result<Option<CancelOutcome>, anyhow::Error> {
+    use std::str::FromStr;
 
-    // Authoritative check: no local handle means the run may be on another node, or may
-    // never have existed. Consult the event log before writing a terminal event, so a
-    // cancel for an already-settled run doesn't leave a spurious event behind.
-    if !aborted {
-        let events = infra::table::incident_events::get(org_id, incident_id).await?;
-        if !is_analysis_in_flight(&events, stale_threshold_minutes) {
-            return Ok(None);
-        }
+    use config::meta::alerts::rca_runs::RunState;
+
+    // The primary: a cancel right after a start must see that run (RR-19).
+    let Some(incident) = infra::table::alert_incidents::get_rw(org_id, incident_id).await? else {
+        return Ok(None);
+    };
+    let Some(run_id) = incident.rca_run_id else {
+        return Ok(None);
+    };
+    let live = incident
+        .rca_state
+        .as_deref()
+        .and_then(|s| RunState::from_str(s).ok())
+        .is_some_and(|state| state.is_live());
+    if !live {
+        return Ok(None);
     }
 
-    infra::table::incident_events::append(
+    let cancelled = super::rca_runs::update_run(
         org_id,
-        incident_id,
-        config::meta::alerts::incidents::IncidentEvent::ai_analysis_cancelled(user_id),
+        &run_id,
+        super::rca_runs::RunPatch {
+            state: Some(RunState::Cancelled),
+            cancelled_by: Some(user_id.to_string()),
+            event: Some(
+                config::meta::alerts::incidents::IncidentEvent::ai_analysis_cancelled(Some(
+                    user_id.to_string(),
+                )),
+            ),
+            ..Default::default()
+        },
     )
     .await?;
-
-    log::info!("[INCIDENTS::RCA] Cancelled analysis for {incident_id} (local_task={aborted})");
-
-    Ok(Some(aborted))
-}
-
-/// Returns true if an analysis is currently in-flight (started but not yet completed).
-///
-/// An in-flight analysis is detected by finding an `AIAnalysisBegin` event with no
-/// subsequent `AIAnalysisComplete`. Begins older than `stale_threshold_minutes` are
-/// treated as stale (the run died) and do not block new runs.
-#[cfg(feature = "enterprise")]
-pub fn is_analysis_in_flight(
-    events: &[config::meta::alerts::incidents::IncidentEvent],
-    stale_threshold_minutes: u64,
-) -> bool {
-    use config::meta::alerts::incidents::IncidentEventType;
-
-    let stale_cutoff =
-        chrono::Utc::now().timestamp_micros() - (stale_threshold_minutes as i64 * 60 * 1_000_000);
-
-    // Walk backwards: find the last terminal event (Complete, Failed OR Cancelled), then
-    // check if a non-stale AIAnalysisBegin comes after it. AIAnalysisFailed is
-    // also terminal — leaving it out would keep the in-flight lock held until
-    // stale_threshold expires after every failed RCA, blocking manual retries.
-    // AIAnalysisCancelled is terminal for the same reason: an explicit cancel must
-    // free the guard immediately so the user can retry straight away.
-    let last_terminal_pos = events.iter().rposition(|e| {
-        matches!(
-            e.event_type,
-            IncidentEventType::AIAnalysisComplete
-                | IncidentEventType::AIAnalysisFailed { .. }
-                | IncidentEventType::AIAnalysisCancelled { .. }
-        )
-    });
-
-    let search_from = last_terminal_pos.map(|p| p + 1).unwrap_or(0);
-
-    events[search_from..].iter().any(|e| {
-        matches!(e.event_type, IncidentEventType::AIAnalysisBegin) && e.timestamp > stale_cutoff
-    })
-}
-
-/// Returns true if enough time has passed since the last completed analysis.
-///
-/// If no analysis has ever completed, returns `true` (proceed freely).
-#[cfg(feature = "enterprise")]
-fn cooldown_elapsed(
-    events: &[config::meta::alerts::incidents::IncidentEvent],
-    cooldown_minutes: u64,
-) -> bool {
-    use config::meta::alerts::incidents::IncidentEventType;
-
-    let cooldown_micros = cooldown_minutes as i64 * 60 * 1_000_000;
-    let now = chrono::Utc::now().timestamp_micros();
-
-    let last_complete = events
-        .iter()
-        .rposition(|e| matches!(e.event_type, IncidentEventType::AIAnalysisComplete))
-        .map(|pos| events[pos].timestamp);
-
-    match last_complete {
-        None => true, // never analyzed (or all prior runs failed) — proceed
-        Some(ts) => now - ts >= cooldown_micros,
+    if !cancelled {
+        return Ok(None);
     }
+
+    let aborted_local_task = super::rca_runs::abort_local_rca_task(&run_id);
+    // §6: no verdict is coming, so nothing may go on holding a page for one.
+    o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(org_id, incident_id)
+        .await;
+    log::info!(
+        "[INCIDENTS::RCA] Cancelled run {run_id} for {incident_id} (local_task={aborted_local_task})"
+    );
+    Ok(Some(CancelOutcome {
+        run_id,
+        aborted_local_task,
+    }))
 }
 
-/// Emit an AI analysis failure event for the specified incident
-#[cfg(feature = "enterprise")]
-async fn emit_analysis_failure(
-    org_id: &str,
-    incident_id: &str,
-    trigger_type: config::meta::alerts::incidents::AnalysisTriggerType,
-    reason: &str,
-    error: Option<&anyhow::Error>,
-) {
-    use config::meta::alerts::incidents::IncidentEvent;
-
-    let error_details = error.map(|e| format!("{:#}", e).chars().take(500).collect::<String>());
-
-    if let Err(e) = crate::incidents::append_event(
-        org_id,
-        incident_id,
-        IncidentEvent::ai_analysis_failed(reason, trigger_type, error_details),
-    )
-    .await
-    {
-        log::error!(
-            "[INCIDENTS::RCA] Failed to emit AIAnalysisFailed event for {org_id}/{incident_id}: {e}"
-        );
-    }
-}
-
-/// Whether `trigger_rca_for_incident` would reach the agent for this incident. Callers check this
-/// before authorizing AI usage so a run the trigger would skip is never charged. When it returns
-/// false no verdict is coming, so any triage hold is released here.
+/// Whether the deployment can run an analysis at all. Callers check this before
+/// authorizing AI usage so a run that cannot happen is never charged. When it
+/// returns false no verdict is coming, so any triage hold is released here.
 #[cfg(feature = "enterprise")]
 pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
     use o2_enterprise::enterprise::{alerts::rca_service, common::config::get_config};
 
     let cfg = get_config();
-    let will_run = cfg.incidents.enabled
-        && cfg.incidents.rca_enabled
-        && cfg.ai.has_agent_target()
-        && !rca_service::l0_off_for_incident(org_id, incident_id).await;
+    let will_run = cfg.incidents.enabled && cfg.incidents.rca_enabled && cfg.ai.has_agent_target();
     if !will_run {
         rca_service::skip_analysis_for_incident(org_id, incident_id).await;
     }
     will_run
 }
 
+/// The user that automatic runs act and are metered as.
+#[cfg(feature = "enterprise")]
+const SYSTEM_USER_EMAIL: &str = "system@openobserve.ai";
+
+/// The one start path of automatic runs (RR-7, RR-39, RR-45).
+///
+/// Deployment checks, the incident's `rca_off_reason`, the Cloud precheck, then
+/// `start_run`; only a started run spawns the agent call, which meters usage
+/// right before it calls the agent.
+#[cfg(feature = "enterprise")]
+async fn start_automatic_rca(
+    org_id: &str,
+    incident_id: &str,
+    trigger: config::meta::alerts::rca_runs::RunTrigger,
+) {
+    use config::meta::alerts::rca_runs::{RunMode, RunTrigger};
+    use o2_enterprise::enterprise::alerts::rca_service;
+
+    use super::rca_runs::{RunSubject, StartOutcome, StartRun};
+
+    if !rca_will_run(org_id, incident_id).await {
+        return;
+    }
+    match infra::table::alert_incidents::get(org_id, incident_id).await {
+        Ok(Some(incident)) if incident.rca_off_reason.is_some() => {
+            log::debug!(
+                "[INCIDENTS::RCA] Automatic analysis is off for {incident_id}, skipping {}",
+                trigger.as_str()
+            );
+            rca_service::skip_analysis_for_incident(org_id, incident_id).await;
+            return;
+        }
+        Ok(_) => {}
+        Err(e) => {
+            log::error!("[INCIDENTS::RCA] Could not read incident {org_id}/{incident_id}: {e}");
+            rca_service::skip_analysis_for_incident(org_id, incident_id).await;
+            return;
+        }
+    }
+
+    // A refusal starts nothing and charges nothing; the meter runs after the start.
+    #[cfg(feature = "cloud")]
+    let usage_feature = if trigger == RunTrigger::AutoNewIncident {
+        crate::trial_quota::TrialQuotaFeature::NewIncident
+    } else {
+        crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis
+    };
+    #[cfg(feature = "cloud")]
+    if let Err(error) =
+        crate::trial_quota::precheck_ai_usage(org_id, usage_feature, SYSTEM_USER_EMAIL).await
+    {
+        log::info!(
+            "[INCIDENTS::RCA] Incident {incident_id} retained without {} analysis: {error}",
+            trigger.as_str()
+        );
+        // §6: no verdict is coming, so nothing may go on holding a page for one.
+        rca_service::skip_analysis_for_incident(org_id, incident_id).await;
+        return;
+    }
+
+    let outcome = super::rca_runs::start_run(StartRun {
+        org_id: org_id.to_string(),
+        subject: RunSubject::Incident(incident_id.to_string()),
+        trigger,
+        mode: RunMode::Fresh,
+        started_by: "system".to_string(),
+        guidance: None,
+        skip_cooldown: trigger == RunTrigger::AutoNewIncident,
+    })
+    .await;
+    let run_id = match outcome {
+        Ok(StartOutcome::Started { run_id }) => run_id,
+        Ok(StartOutcome::InFlight) => {
+            log::debug!(
+                "[INCIDENTS::RCA] Analysis already in-flight for {incident_id}, skipping {} trigger",
+                trigger.as_str()
+            );
+            return;
+        }
+        Ok(StartOutcome::CoolingDown) => {
+            log::debug!(
+                "[INCIDENTS::RCA] Cooldown not elapsed for {incident_id}, skipping {} trigger",
+                trigger.as_str()
+            );
+            rca_service::skip_analysis_for_incident(org_id, incident_id).await;
+            return;
+        }
+        Err(e) => {
+            log::error!("[INCIDENTS::RCA] Could not start a run for {org_id}/{incident_id}: {e}");
+            rca_service::skip_analysis_for_incident(org_id, incident_id).await;
+            return;
+        }
+    };
+
+    let org_id_rca = org_id.to_string();
+    let incident_id_rca = incident_id.to_string();
+    let run_id_rca = run_id.clone();
+    let handle = tokio::spawn(async move {
+        if let Err(e) = trigger_rca_for_incident(
+            org_id_rca.clone(),
+            incident_id_rca.clone(),
+            run_id_rca.clone(),
+            trigger,
+            SYSTEM_USER_EMAIL.to_string(),
+            // Automatic runs stand on their own.
+            false,
+            // Metered inside, right before the agent call.
+            None,
+        )
+        .await
+        {
+            log::debug!(
+                "[INCIDENTS::RCA] {} run {run_id_rca} failed for {incident_id_rca}: {e}",
+                trigger.as_str()
+            );
+            // A run the trigger already ended ignores this second write (RR-15).
+            if let Err(err) = super::rca_runs::fail_run(
+                &org_id_rca,
+                &run_id_rca,
+                trigger,
+                super::rca_runs::ERROR_SERVICE_CALL_FAILED,
+                super::rca_runs::SERVICE_CALL_FAILED_REASON,
+                Some(format!("{e:#}")),
+            )
+            .await
+            {
+                log::error!("[INCIDENTS::RCA] Could not end run {run_id_rca} as failed: {err}");
+            }
+        }
+        super::rca_runs::unregister_rca_task(&run_id_rca);
+    });
+    super::rca_runs::register_rca_task(&run_id, handle.abort_handle());
+}
+
+/// A new incident's first analysis, decided after on-call routing (RR-45).
+///
+/// When the routed record's team has L0 off at its priority the incident stores
+/// `rca_off_reason = "l0_off"` and no automatic run ever starts; otherwise (no
+/// record, on-call off, routing skipped or failed) the run starts.
+#[cfg(feature = "enterprise")]
+async fn start_new_incident_rca(
+    org_id: &str,
+    incident_id: &str,
+    routed: Option<&config::meta::oncall::Response>,
+) {
+    if let Some(record) = routed
+        && l0_off_for_record(org_id, record).await
+    {
+        if let Err(e) =
+            infra::table::alert_incidents::set_rca_off_reason(org_id, incident_id, Some("l0_off"))
+                .await
+        {
+            log::error!(
+                "[INCIDENTS::RCA] Could not record that L0 is off for {org_id}/{incident_id}: {e}"
+            );
+        }
+        // §6: no verdict is coming, so nothing may go on holding a page for one.
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            org_id,
+            incident_id,
+        )
+        .await;
+        return;
+    }
+    start_automatic_rca(
+        org_id,
+        incident_id,
+        config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+    )
+    .await;
+}
+
+/// An un-muted incident's analysis (RR-45).
+///
+/// An incident muted since creation has never been routed, so its first routing
+/// decides L0 exactly as a creation does. One that already has a run or a stored
+/// `rca_off_reason` keeps that decision.
+#[cfg(feature = "enterprise")]
+async fn start_unmuted_incident_rca(
+    org_id: &str,
+    incident_id: &str,
+    routed: Option<&config::meta::oncall::Response>,
+) {
+    // The primary: the un-mute just committed, and a replica may not show it yet.
+    let undecided = match infra::table::alert_incidents::get_rw(org_id, incident_id).await {
+        Ok(Some(incident)) => incident.rca_run_id.is_none() && incident.rca_off_reason.is_none(),
+        Ok(None) => false,
+        Err(e) => {
+            log::error!("[INCIDENTS::RCA] Could not read incident {org_id}/{incident_id}: {e}");
+            false
+        }
+    };
+    if undecided {
+        start_new_incident_rca(org_id, incident_id, routed).await;
+    } else {
+        start_automatic_rca(
+            org_id,
+            incident_id,
+            config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+        )
+        .await;
+    }
+}
+
+/// Whether the record's team has switched L0 off at the record's priority.
+#[cfg(feature = "enterprise")]
+async fn l0_off_for_record(org_id: &str, record: &config::meta::oncall::Response) -> bool {
+    let Some(team_id) = record.team_id.as_deref() else {
+        return false;
+    };
+    let Some(priority) = config::meta::alerts::priority::AlertPriority::from_i32(record.priority)
+    else {
+        return false;
+    };
+    match infra::table::oncall_policies::get_or_create_cached(org_id, team_id).await {
+        Ok(policy) => policy.l0.mode_for(priority) == config::meta::oncall::L0Mode::Off,
+        Err(e) => {
+            log::warn!("[INCIDENTS::RCA] Could not read the L0 policy of team {team_id}: {e}");
+            false
+        }
+    }
+}
+
+/// Execute a started run: the agent call and its terminal write.
+///
+/// Every return ends the run (RR-13): a guard that no longer holds fails it with
+/// its code, the agent result completes it, and an agent error fails it (RR-14).
 #[cfg(feature = "enterprise")]
 pub async fn trigger_rca_for_incident(
     org_id: String,
     incident_id: String,
-    reanalysis: bool,
-    // When `true`, the caller has already:
-    //  - verified RCA is enabled and the agent URL is set
-    //  - checked cooldown / in-flight guards
-    //  - emitted `AIAnalysisBegin` synchronously (same DB context as `init`)
-    // The function skips those steps and goes straight to the agent call.
-    begin_already_emitted: bool,
+    run_id: String,
+    trigger: config::meta::alerts::rca_runs::RunTrigger,
     // Email of the user who triggered the analysis, used for AI usage tracking.
     // For automated/system-initiated calls, use "system@openobserve.ai".
-    user_email: String,
-    // When true, the previous report is sent to the agent so it extends that analysis.
-    // Automatic triggers pass false so each run stands on its own.
+    #[cfg_attr(not(feature = "cloud"), allow(unused_variables))] user_email: String,
+    // When true, the newest completed report is sent so the agent extends it (RR-27).
     build_on_previous: bool,
-    // A caller that emits Begin before spawning must authorize synchronously and
-    // pass this one-shot proof so the spawned task cannot meter twice.
+    // A permit the caller already holds; `None` meters right before the agent
+    // call, after every guard, so the spawned task cannot meter twice.
     #[cfg_attr(not(feature = "cloud"), allow(unused_variables))] usage_permit: Option<
         crate::AiUsagePermit,
     >,
 ) -> Result<(), anyhow::Error> {
     use o2_enterprise::enterprise::{
-        ai::client::get_agent_client, common::config::get_config as get_o2_config,
+        ai::client::get_agent_client, alerts::rca_service,
+        common::config::get_config as get_o2_config,
+    };
+
+    use super::rca_runs::{
+        AGENT_NOT_CONFIGURED_REASON, AGENT_UNAVAILABLE_REASON, CREDENTIALS_REASON,
+        ERROR_AGENT_NOT_CONFIGURED, ERROR_AGENT_UNAVAILABLE, ERROR_CREDENTIALS, ERROR_L0_OFF,
+        ERROR_RCA_DISABLED, ERROR_SERVICE_CALL_FAILED, L0_OFF_REASON, RCA_DISABLED_REASON,
+        SERVICE_CALL_FAILED_REASON, complete_incident_run, fail_run, newest_completed_report,
+    };
+
+    // Ends the run as failed and releases any triage hold: no verdict is coming (§6).
+    let end_failed = async |code: &str, reason: &str, details: Option<String>| {
+        if let Err(e) = fail_run(&org_id, &run_id, trigger, code, reason, details).await {
+            log::error!("[INCIDENTS::RCA] Could not end run {run_id} as failed: {e}");
+        }
+        rca_service::skip_analysis_for_incident(&org_id, &incident_id).await;
     };
 
     let config = get_o2_config();
 
-    // Check if RCA is enabled and configured
     if !config.incidents.enabled || !config.incidents.rca_enabled {
-        log::debug!("[INCIDENTS::RCA] RCA not enabled, skipping immediate trigger");
-        // §6: no verdict is coming, so nothing may go on holding a page for
-        // one. Every guard below reaches this same state.
-        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-            &org_id,
-            &incident_id,
-        )
-        .await;
-        return Ok(()); // Not an error - just not configured
+        log::debug!("[INCIDENTS::RCA] RCA not enabled, ending run {run_id}");
+        end_failed(ERROR_RCA_DISABLED, RCA_DISABLED_REASON, None).await;
+        return Ok(());
     }
 
     if !config.ai.has_agent_target() {
-        log::debug!("[INCIDENTS::RCA] RCA agent URL not set, skipping immediate trigger");
-        // §6: no verdict is coming, so nothing may go on holding a page for
-        // one. Every guard below reaches this same state.
-        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-            &org_id,
-            &incident_id,
+        log::debug!("[INCIDENTS::RCA] RCA agent URL not set, ending run {run_id}");
+        end_failed(
+            ERROR_AGENT_NOT_CONFIGURED,
+            AGENT_NOT_CONFIGURED_REASON,
+            None,
         )
         .await;
         return Ok(());
     }
 
-    // I20: the run must be refused here — before the billable agent call below — or `Off` only
-    // stops the ladder from waiting while the agent still runs and still bills.
-    if o2_enterprise::enterprise::alerts::rca_service::l0_off_for_incident(&org_id, &incident_id)
-        .await
-    {
-        log::debug!("[INCIDENTS::RCA] L0 is off for {incident_id}'s priority, skipping trigger");
-        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-            &org_id,
-            &incident_id,
-        )
-        .await;
+    // I20: the run must be refused before the billable agent call. User-started
+    // runs never consult L0 (D2, RR-45).
+    if !trigger.is_user_started() && rca_service::l0_off_for_incident(&org_id, &incident_id).await {
+        log::debug!("[INCIDENTS::RCA] L0 is off for {incident_id}'s priority, ending run {run_id}");
+        end_failed(ERROR_L0_OFF, L0_OFF_REASON, None).await;
         return Ok(());
     }
-
-    // When the caller already emitted Begin synchronously, skip the guards and Begin emission
-    // to avoid a DB race where the spawned task can't yet see the freshly-init'd events row.
-    if !begin_already_emitted {
-        let cooldown = config.incidents.reanalysis_cooldown_minutes;
-        // Use 2× cooldown as the stale-begin threshold
-        let stale_threshold = cooldown * 2;
-
-        let events = infra::table::incident_events::get(&org_id, &incident_id)
-            .await
-            .unwrap_or_default();
-
-        // In-flight guard: always enforced, even for user-initiated reanalysis
-        if is_analysis_in_flight(&events, stale_threshold) {
-            log::debug!("[INCIDENTS::RCA] Analysis already in-flight for {incident_id}, skipping");
-            // §6: no verdict is coming, so nothing may go on holding a page for
-            // one. Every guard below reaches this same state.
-            o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-                &org_id,
-                &incident_id,
-            )
-            .await;
-            return Ok(());
-        }
-
-        // Cooldown gate: skip for user-initiated reanalysis (reanalysis=true bypasses it)
-        if !reanalysis && !cooldown_elapsed(&events, cooldown) {
-            log::debug!("[INCIDENTS::RCA] Cooldown not elapsed for {incident_id}, skipping");
-            // §6: no verdict is coming, so nothing may go on holding a page for
-            // one. Every guard below reaches this same state.
-            o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-                &org_id,
-                &incident_id,
-            )
-            .await;
-            return Ok(());
-        }
-    }
-
-    // Get incident from database
-    let incident = match infra::table::alert_incidents::get(&org_id, &incident_id).await? {
-        Some(inc) => inc,
-        None => {
-            log::warn!("[INCIDENTS::RCA] Incident {org_id}/{incident_id} not found");
-            return Err(anyhow::anyhow!("Incident not found"));
-        }
-    };
 
     log::info!(
-        "[INCIDENTS::RCA] Triggering RCA for incident {incident_id} (reanalysis={reanalysis})"
+        "[INCIDENTS::RCA] Running RCA {run_id} for incident {incident_id} (trigger={})",
+        trigger.as_str()
     );
 
-    #[cfg(feature = "cloud")]
-    let usage_permit = match usage_permit {
-        Some(permit) => permit,
-        None => {
-            let feature = if reanalysis {
-                crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis
-            } else {
-                crate::trial_quota::TrialQuotaFeature::NewIncident
-            };
-            let usage_context = crate::trial_quota::AiUsageContext {
-                user_email: user_email.clone(),
-                incident_id: Some(incident_id.clone()),
-                ..Default::default()
-            };
-            crate::trial_quota::authorize_ai_usage(&org_id, feature, &usage_context)
-                .await
-                .map_err(|error| anyhow::anyhow!(error))?
+    let (email, token) = match crate::organization::get_sre_agent_credentials(&org_id).await {
+        Ok(credentials) => credentials,
+        Err(e) => {
+            end_failed(
+                ERROR_CREDENTIALS,
+                CREDENTIALS_REASON,
+                Some(format!("{e:#}")),
+            )
+            .await;
+            return Err(e);
         }
     };
-    #[cfg(feature = "cloud")]
-    debug_assert_eq!(
-        usage_permit.feature(),
-        if reanalysis {
-            crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis
-        } else {
-            crate::trial_quota::TrialQuotaFeature::NewIncident
-        }
-    );
-
-    // Emit AIAnalysisBegin only when the caller hasn't already done so
-    if !begin_already_emitted
-        && let Err(e) = crate::incidents::append_event(
-            &org_id,
-            &incident_id,
-            config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-        )
-        .await
-    {
-        log::error!(
-            "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {org_id}/{incident_id}: {e}"
-        );
-    }
-
-    // Authorization and metering happen before Begin, either synchronously in
-    // the caller or directly above. No quota work occurs after the lifecycle starts.
-
-    // Create RCA agent client with SA credentials
-    let (email, token) = crate::organization::get_sre_agent_credentials(&org_id).await?;
     let auth_header = crate::auth::build_basic_auth_header(&email, &token);
 
-    let client =
-        get_agent_client().ok_or_else(|| anyhow::anyhow!("RCA agent client not initialized"))?;
+    let Some(client) = get_agent_client() else {
+        end_failed(
+            ERROR_AGENT_NOT_CONFIGURED,
+            AGENT_NOT_CONFIGURED_REASON,
+            None,
+        )
+        .await;
+        return Err(anyhow::anyhow!("RCA agent client not initialized"));
+    };
 
-    // Quick health check
     if let Err(e) = client.health(&auth_header).await {
-        log::debug!("[INCIDENTS::RCA] Agent health check failed for immediate trigger: {e}");
-        // §6: no verdict is coming, so nothing may go on holding a page for
-        // one. Every guard below reaches this same state.
-        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-            &org_id,
-            &incident_id,
+        log::debug!("[INCIDENTS::RCA] Agent health check failed for run {run_id}: {e}");
+        end_failed(
+            ERROR_AGENT_UNAVAILABLE,
+            AGENT_UNAVAILABLE_REASON,
+            Some(format!("{e:#}")),
         )
         .await;
         return Err(anyhow::anyhow!("RCA agent not available: {}", e));
     }
 
-    // Analyze incident
-    // `build_on_previous` opts into continuity: the prior report is sent so the
-    // agent extends it rather than starting over. Extracted via typed
-    // `IncidentTopology` (same deserialization path used by `save_rca_result`)
-    // so field renames are caught at compile time.
-    let previous_analysis: Option<String> = if build_on_previous {
-        incident
-            .topology_context
-            .as_ref()
-            .and_then(|v| serde_json::from_value::<IncidentTopology>(v.clone()).ok())
-            .and_then(|t| t.suggested_root_cause)
-            .filter(|s| !s.is_empty())
+    // RR-27: "Build on previous" extends the newest completed report.
+    let previous_analysis = if build_on_previous {
+        newest_completed_report(&org_id, &incident_id)
+            .await
+            .unwrap_or_else(|e| {
+                log::warn!(
+                    "[INCIDENTS::RCA] Could not read the previous report of {incident_id}: {e}"
+                );
+                None
+            })
     } else {
         None
     };
     // §7/C1: the single builder, so this and the manual endpoint cannot tell
     // the agent different things about the same incident.
-    let context = o2_enterprise::enterprise::alerts::rca_service::build_incident_context(
-        &org_id,
-        &incident_id,
-        previous_analysis,
-    )
-    .await;
+    let context =
+        rca_service::build_incident_context(&org_id, &incident_id, previous_analysis).await;
+    // Metered only now that every guard has held and the agent is about to be
+    // called (RR-39): a run that ends on a guard never charges.
+    #[cfg(feature = "cloud")]
+    {
+        use config::meta::alerts::rca_runs::RunTrigger;
+
+        let feature = match trigger {
+            RunTrigger::AutoNewIncident | RunTrigger::Manual => {
+                crate::trial_quota::TrialQuotaFeature::NewIncident
+            }
+            _ => crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+        };
+        let usage_permit = match usage_permit {
+            Some(permit) => permit,
+            None => {
+                let usage_context = crate::trial_quota::AiUsageContext {
+                    user_email: user_email.clone(),
+                    incident_id: Some(incident_id.clone()),
+                    ..Default::default()
+                };
+                match crate::trial_quota::authorize_ai_usage(&org_id, feature, &usage_context).await
+                {
+                    Ok(permit) => permit,
+                    Err(error) => {
+                        log::info!(
+                            "[INCIDENTS::RCA] Run {run_id} for {incident_id} ended without analysis: {error}"
+                        );
+                        end_failed(
+                            super::rca_runs::ERROR_USAGE_DENIED,
+                            super::rca_runs::USAGE_DENIED_REASON,
+                            Some(error.to_string()),
+                        )
+                        .await;
+                        return Ok(());
+                    }
+                }
+            }
+        };
+        debug_assert_eq!(usage_permit.feature(), feature);
+    }
+
     match client.analyze_incident(context, &auth_header).await {
         Ok(rca_result) => {
             log::info!(
-                "[INCIDENTS::RCA] RCA completed for {incident_id}: {} chars",
+                "[INCIDENTS::RCA] RCA {run_id} completed for {incident_id}: {} chars",
                 rca_result.len()
             );
-
-            // §2.2: the report and the verdict are read once, by the single
-            // writer. Writing `topology_context` here instead is what left the
-            // autonomous run — the one that IS L0 acting — with an answer no
-            // ladder could ever see.
-            if let Err(e) = o2_enterprise::enterprise::alerts::rca_service::save_rca_result(
-                &org_id,
-                &incident_id,
-                &rca_result,
-            )
-            .await
-            {
-                log::error!(
-                    "[INCIDENTS::RCA] Failed to save RCA result for {org_id}/{incident_id}: {e}"
-                );
-                return Err(e);
-            }
-
-            // Emit AIAnalysisComplete on success
-            if let Err(e) = crate::incidents::append_event(
-                &org_id,
-                &incident_id,
-                config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
-            )
-            .await
-            {
-                log::error!(
-                    "[INCIDENTS::RCA] Failed to emit AIAnalysisComplete for {org_id}/{incident_id}: {e}"
-                );
-            }
-
-            // Authorization and usage reporting completed before AIAnalysisBegin.
-
+            // Empty content ends the run `no_report` (RR-18); delivery to the
+            // on-call path follows only a committed completion (RR-12).
+            complete_incident_run(&org_id, &incident_id, &run_id, &rca_result).await?;
             Ok(())
         }
         Err(e) => {
-            log::warn!("[INCIDENTS::RCA] RCA failed for {org_id}/{incident_id}: {e}");
-
-            // Determine trigger type based on function context
-            let trigger_type = if reanalysis {
-                if user_email == "system@openobserve.ai" {
-                    config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis
-                } else {
-                    config::meta::alerts::incidents::AnalysisTriggerType::Manual
-                }
-            } else {
-                config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident
-            };
-
-            emit_analysis_failure(
-                &org_id,
-                &incident_id,
-                trigger_type,
-                "RCA service call failed",
-                Some(&e),
+            log::warn!("[INCIDENTS::RCA] RCA {run_id} failed for {org_id}/{incident_id}: {e}");
+            end_failed(
+                ERROR_SERVICE_CALL_FAILED,
+                SERVICE_CALL_FAILED_REASON,
+                Some(format!("{e:#}")),
             )
             .await;
-
             Err(e)
         }
     }
@@ -2966,6 +2901,14 @@ fn model_to_incident_with_topology(
     db_model: infra::table::entity::alert_incidents::Model,
     topology_context: Option<IncidentTopology>,
 ) -> Incident {
+    // The run summary columns only; the detail view adds the runs (RR-28, RR-29).
+    let rca = infra::table::rca_runs::summary_from_incident(
+        &db_model,
+        config::utils::time::now_micros(),
+        o2_enterprise::enterprise::common::config::get_config()
+            .incidents
+            .rca_timeout_secs,
+    );
     Incident {
         id: db_model.id,
         org_id: db_model.org_id,
@@ -2985,6 +2928,8 @@ fn model_to_incident_with_topology(
         key_type: config::meta::alerts::incidents::KeyType::from_stored(&db_model.key_type),
         topology_context,
         muted_by_downtime_id: db_model.muted_by_downtime_id,
+        rca,
+        rca_off_reason: db_model.rca_off_reason,
     }
 }
 
@@ -3083,96 +3028,15 @@ pub async fn update_status_as(
         log::error!("[Incidents] Failed to record status event: org_id: {org_id}, error: {e}");
     }
 
-    // Trigger RCA reanalysis when incident is reopened — context is fresh,
-    // cooldown is bypassed, but in-flight guard still applies.
+    // A reopened incident gets a fresh automatic run (RR-7).
     #[cfg(feature = "enterprise")]
     if status == "open" && !muted {
-        let org_id_rca = org_id.to_string();
-        let incident_id_rca = incident_id.to_string();
-        let cooldown = o2_enterprise::enterprise::common::config::get_config()
-            .incidents
-            .reanalysis_cooldown_minutes;
-        let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
-            .await
-            .unwrap_or_default();
-        if !is_analysis_in_flight(&events, cooldown * 2)
-            && rca_will_run(&org_id_rca, &incident_id_rca).await
-        {
-            #[cfg(feature = "cloud")]
-            let usage_permit = {
-                let usage_context = crate::trial_quota::AiUsageContext {
-                    user_email: "system@openobserve.ai".to_string(),
-                    incident_id: Some(incident_id_rca.clone()),
-                    ..Default::default()
-                };
-                match crate::trial_quota::authorize_ai_usage(
-                    &org_id_rca,
-                    crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-                    &usage_context,
-                )
-                .await
-                {
-                    Ok(permit) => Some(permit),
-                    Err(error) => {
-                        log::info!(
-                            "[INCIDENTS::RCA] Reopened incident {incident_id_rca} retained without reanalysis: {error}"
-                        );
-                        // §6: no verdict is coming, so nothing may go on holding a page for one.
-                        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-                            &org_id_rca,
-                            &incident_id_rca,
-                        )
-                        .await;
-                        None
-                    }
-                }
-            };
-            #[cfg(not(feature = "cloud"))]
-            let usage_permit = None;
-
-            if !cfg!(feature = "cloud") || usage_permit.is_some() {
-                // Emit Begin synchronously so the frontend sees it on the next poll.
-                let _ = crate::incidents::append_event(
-                    &org_id_rca,
-                    &incident_id_rca,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-                )
-                .await;
-                let handle = tokio::spawn(async move {
-                    if let Err(e) = trigger_rca_for_incident(
-                        org_id_rca.clone(),
-                        incident_id_rca.clone(),
-                        true,
-                        true,
-                        "system@openobserve.ai".to_string(),
-                        // Reopened incidents get a fresh read of the current state.
-                        false,
-                        usage_permit,
-                    )
-                    .await
-                    {
-                        log::debug!(
-                            "[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}"
-                        );
-
-                        emit_analysis_failure(
-                            &org_id_rca,
-                            &incident_id_rca,
-                            config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReopened,
-                            "Reanalysis after reopen failed",
-                            Some(&e),
-                        )
-                        .await;
-                    }
-                    unregister_rca_task(&org_id_rca, &incident_id_rca);
-                });
-                register_rca_task(org_id, incident_id, handle.abort_handle());
-            }
-        } else {
-            log::debug!(
-                "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping Reopened trigger"
-            );
-        }
+        start_automatic_rca(
+            org_id,
+            incident_id,
+            config::meta::alerts::rca_runs::RunTrigger::AutoReopen,
+        )
+        .await;
     }
 
     #[cfg(feature = "enterprise")]
@@ -3397,69 +3261,6 @@ mod tests {
     }
 
     #[test]
-    fn test_cooldown_elapsed_no_events_returns_true() {
-        assert!(cooldown_elapsed(&[], 5));
-    }
-
-    #[test]
-    fn test_cooldown_elapsed_no_ai_complete_event_returns_true() {
-        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
-        let events = vec![IncidentEvent {
-            timestamp: chrono::Utc::now().timestamp_micros(),
-            event_type: IncidentEventType::Created,
-        }];
-        assert!(cooldown_elapsed(&events, 5));
-    }
-
-    #[test]
-    fn test_cooldown_elapsed_recent_ai_complete_returns_false() {
-        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
-        // Timestamp = now - 30 seconds; cooldown = 5 minutes → not elapsed
-        let recent_ts = chrono::Utc::now().timestamp_micros() - 30 * 1_000_000;
-        let events = vec![IncidentEvent {
-            timestamp: recent_ts,
-            event_type: IncidentEventType::AIAnalysisComplete,
-        }];
-        assert!(!cooldown_elapsed(&events, 5));
-    }
-
-    #[test]
-    fn test_cooldown_elapsed_old_ai_complete_returns_true() {
-        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
-        // Timestamp = epoch (very old); cooldown = 1 minute → elapsed
-        let events = vec![IncidentEvent {
-            timestamp: 1_000_000, // 1 second after epoch
-            event_type: IncidentEventType::AIAnalysisComplete,
-        }];
-        assert!(cooldown_elapsed(&events, 1));
-    }
-
-    #[test]
-    fn test_cooldown_elapsed_uses_last_ai_complete() {
-        use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
-        // Two AIAnalysisComplete events: old one and recent one
-        // Should use the last (most recent) one → not elapsed
-        let old_ts = 1_000_000i64;
-        let recent_ts = chrono::Utc::now().timestamp_micros() - 30 * 1_000_000;
-        let events = vec![
-            IncidentEvent {
-                timestamp: old_ts,
-                event_type: IncidentEventType::AIAnalysisComplete,
-            },
-            IncidentEvent {
-                timestamp: chrono::Utc::now().timestamp_micros(),
-                event_type: IncidentEventType::Created,
-            },
-            IncidentEvent {
-                timestamp: recent_ts,
-                event_type: IncidentEventType::AIAnalysisComplete,
-            },
-        ];
-        // last AIAnalysisComplete is at recent_ts (30 seconds ago), cooldown = 5 minutes
-        assert!(!cooldown_elapsed(&events, 5));
-    }
-
-    #[test]
     fn test_merge_correlation_results_sd_wins_over_semantic() {
         use config::meta::alerts::incidents::KeyType;
         let sd = ServiceDiscoveryResult {
@@ -3586,6 +3387,14 @@ mod tests {
             created_at: 1,
             updated_at: 1,
             muted_by_downtime_id: muted_by.map(str::to_string),
+            rca_run_id: None,
+            rca_state: None,
+            rca_started_at: None,
+            rca_updated_at: None,
+            rca_outcome: None,
+            rca_confidence: None,
+            rca_summary: None,
+            rca_off_reason: None,
         }
     }
 
@@ -3837,5 +3646,196 @@ mod tests {
                 if incident_id == "inc-1"
         ));
         assert_eq!(paged, 1, "the delayed opened message goes out once");
+    }
+
+    /// RR-13: a run whose RCA setting went off after the start ends `failed`, not `running`.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_run_started_while_rca_is_off_ends_rca_disabled() {
+        use config::meta::alerts::rca_runs::{RunState, RunTrigger};
+
+        use crate::alerts::rca_runs::tests::{db, failures, new_incident, start, stored, timeline};
+
+        let cfg = o2_enterprise::enterprise::common::config::get_config();
+        assert!(
+            !(cfg.incidents.enabled && cfg.incidents.rca_enabled),
+            "the test relies on the default: RCA off"
+        );
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+
+        trigger_rca_for_incident(
+            org.clone(),
+            inc.clone(),
+            run_id.clone(),
+            RunTrigger::Manual,
+            "a.rao@acme.io".to_string(),
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Failed);
+        assert_eq!(run.error.unwrap().code, "rca_disabled");
+        assert_eq!(failures(&timeline(&org, &inc).await).len(), 1);
+    }
+
+    /// RR-19, RR-20: a stale live run can be cancelled; the user is recorded, and a run
+    /// whose task this node does not hold is still ended.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_stale_run_on_another_node_is_cancelled_by_the_user() {
+        use config::meta::alerts::{
+            incidents::IncidentEventType,
+            rca_runs::{RunState, RunTrigger},
+        };
+
+        use crate::alerts::rca_runs::tests::{
+            age, db, incident_row, new_incident, start, stored, timeline,
+        };
+
+        let _db = db().await;
+        let timeout = o2_enterprise::enterprise::common::config::get_config()
+            .incidents
+            .rca_timeout_secs;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        age(&org, &inc, &run_id, timeout as i64 + 121).await;
+
+        let outcome = cancel_rca_for_incident(&org, &inc, "a.rao@acme.io")
+            .await
+            .unwrap()
+            .expect("a stale running run is cancellable");
+
+        assert_eq!(
+            outcome,
+            CancelOutcome {
+                run_id: run_id.clone(),
+                aborted_local_task: false,
+            }
+        );
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Cancelled);
+        assert_eq!(run.cancelled_by.as_deref(), Some("a.rao@acme.io"));
+        let row = incident_row(&org, &inc).await;
+        assert_eq!(row.rca_state.as_deref(), Some("cancelled"));
+        assert_eq!(
+            row.rca_summary.unwrap()["cancelled_by"].as_str(),
+            Some("a.rao@acme.io")
+        );
+        let cancels: Vec<_> = timeline(&org, &inc)
+            .await
+            .into_iter()
+            .filter_map(|e| match e {
+                IncidentEventType::AIAnalysisCancelled { user_id } => Some(user_id),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(cancels, [Some("a.rao@acme.io".to_string())]);
+    }
+
+    /// RR-20: the node that holds the run's task aborts it after the cancel commits.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_cancel_aborts_the_task_this_node_holds() {
+        use config::meta::alerts::rca_runs::RunTrigger;
+
+        use crate::alerts::rca_runs::{
+            register_rca_task,
+            tests::{db, new_incident, start},
+        };
+
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        let task = tokio::spawn(std::future::pending::<()>());
+        register_rca_task(&run_id, task.abort_handle());
+
+        let outcome = cancel_rca_for_incident(&org, &inc, "a.rao@acme.io")
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(outcome.aborted_local_task);
+        assert!(task.await.unwrap_err().is_cancelled());
+    }
+
+    /// RR-19: with no live run there is nothing to cancel.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_cancel_of_an_ended_or_absent_run_returns_none() {
+        use config::meta::alerts::rca_runs::{RunState, RunTrigger};
+
+        use crate::alerts::rca_runs::{
+            complete_incident_run,
+            tests::{db, new_incident, start, stored},
+        };
+
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        assert_eq!(
+            cancel_rca_for_incident(&org, &inc, "a.rao@acme.io")
+                .await
+                .unwrap(),
+            None
+        );
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        assert!(
+            complete_incident_run(&org, &inc, &run_id, "report")
+                .await
+                .unwrap()
+        );
+
+        assert_eq!(
+            cancel_rca_for_incident(&org, &inc, "a.rao@acme.io")
+                .await
+                .unwrap(),
+            None
+        );
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Completed);
+        assert_eq!(run.cancelled_by, None);
+    }
+
+    /// RR-28: each listed incident carries its run summary, or `rca: null` when never analyzed.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_list_carries_each_incidents_run_summary() {
+        use config::meta::alerts::rca_runs::{RunState, RunTrigger};
+
+        use crate::alerts::rca_runs::tests::{add_incident, db, new_incident, start};
+
+        let _db = db().await;
+        let (org, analyzed) = new_incident(None).await;
+        let run_id = start(&org, &analyzed, RunTrigger::AutoNewIncident).await;
+        let never = add_incident(&org, None).await;
+
+        let (incidents, total) = list_incidents(&org, None, 50, 0).await.unwrap();
+
+        assert_eq!(total, 2);
+        let by_id = |id: &str| incidents.iter().find(|i| i.id == id).unwrap();
+        let rca = by_id(&analyzed).rca.as_ref().unwrap();
+        assert_eq!(rca.run_id, run_id);
+        assert_eq!(rca.state, RunState::Running);
+        assert!(!rca.stale);
+        assert!(rca.detail.is_none(), "the list adds no join");
+        assert!(by_id(&never).rca.is_none());
+
+        let json = serde_json::to_value(&incidents).unwrap();
+        let json_of = |id: &str| {
+            json.as_array()
+                .unwrap()
+                .iter()
+                .find(|i| i["id"] == id)
+                .unwrap()
+                .clone()
+        };
+        assert_eq!(json_of(&analyzed)["rca"]["state"], "running");
+        assert!(json_of(&analyzed)["rca"].get("current_run").is_none());
+        assert!(json_of(&never)["rca"].is_null());
+        assert!(json_of(&never).as_object().unwrap().contains_key("rca"));
     }
 }

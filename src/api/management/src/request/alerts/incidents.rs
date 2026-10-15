@@ -249,15 +249,29 @@ pub async fn update_incident(
             .await
             {
                 Ok(incident) => {
-                    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-                    let cooldown = get_o2_config().incidents.reanalysis_cooldown_minutes;
-                    let events = infra::table::incident_events::get(&org_id, &incident_id)
-                        .await
-                        .unwrap_or_default();
-                    let in_flight = openobserve_core::alerts::incidents::is_analysis_in_flight(
-                        &events,
-                        cooldown * 2,
-                    );
+                    // A live run blocks a new one (RR-9, RR-10); read from the run summary.
+                    let in_flight =
+                        match infra::table::alert_incidents::get(&org_id, &incident_id).await {
+                            Ok(Some(row)) => row
+                                .rca_state
+                                .as_deref()
+                                .and_then(|s| {
+                                    s.parse::<config::meta::alerts::rca_runs::RunState>().ok()
+                                })
+                                .is_some_and(|state| {
+                                    config::meta::alerts::rca_runs::is_live_blocking(
+                                        state,
+                                        row.rca_updated_at
+                                            .or(row.rca_started_at)
+                                            .unwrap_or_default(),
+                                        config::utils::time::now_micros(),
+                                        o2_enterprise::enterprise::common::config::get_config()
+                                            .incidents
+                                            .rca_timeout_secs,
+                                    )
+                                }),
+                            _ => false,
+                        };
                     MetaHttpResponse::json(UpdateSeverityResponse {
                         incident,
                         analysis_in_flight: in_flight,
@@ -391,6 +405,8 @@ pub struct UpdateSeverityResponse {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct RcaResponse {
     pub rca_content: String,
+    /// The run that produced the report
+    pub run_id: String,
 }
 
 /// Response for cancelling an in-flight RCA analysis
@@ -398,17 +414,26 @@ pub struct RcaResponse {
 pub struct CancelRcaResponse {
     pub message: String,
     /// Whether an in-process task handle was found and aborted on this node. False when the
-    /// analysis is running on another node — the cancellation event is still recorded.
+    /// analysis is running on another node — the run is still ended `cancelled`.
     pub aborted_local_task: bool,
+    /// The cancelled run
+    pub run_id: String,
 }
 
-/// Response listing an incident's current and superseded RCA reports
-#[derive(Debug, Serialize, ToSchema)]
-pub struct RcaHistoryResponse {
-    /// The active report, if one has been generated
-    pub current: Option<String>,
-    /// Superseded reports, newest first
-    pub previous: Vec<config::meta::alerts::incidents::ArchivedRcaReport>,
+/// Default page size of the incident's run list.
+pub const RCA_RUNS_DEFAULT_LIMIT: u64 = 25;
+/// Largest page size of the incident's run list.
+pub const RCA_RUNS_MAX_LIMIT: u64 = 100;
+
+/// Query parameters for listing an incident's analysis runs
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+pub struct ListRcaRunsQuery {
+    /// Page size (default 25, max 100)
+    #[serde(default)]
+    pub limit: Option<u64>,
+    /// Return runs older than this run id (the last run of the previous page)
+    #[serde(default)]
+    pub before: Option<String>,
 }
 
 /// Query parameters for RCA trigger
@@ -417,7 +442,7 @@ pub struct TriggerRcaQuery {
     /// Use streaming response (default: false)
     #[serde(default)]
     pub stream: bool,
-    /// Treat this as a user-initiated reanalysis — bypasses cooldown (default: false)
+    /// Run the analysis in the background and answer 202 with the run id (default: false)
     #[serde(default)]
     pub reanalysis: bool,
     /// Feed the previous report to the agent so it builds on it instead of starting
@@ -444,6 +469,8 @@ pub struct TriggerRcaQuery {
     ),
     responses(
         (status = 200, description = "RCA analysis completed or SSE stream", content_type = "application/json", body = RcaResponse),
+        (status = 202, description = "Analysis started in the background (reanalysis=true); body {message, run_id}", content_type = "application/json", body = Object),
+        (status = 400, description = "RCA not enabled, or an analysis is already in progress", content_type = "application/json", body = ()),
         (status = 402, description = "AI credits exhausted", content_type = "application/json", body = ()),
         (status = 412, description = "Paid usage requires organization consent", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
@@ -459,9 +486,11 @@ pub async fn trigger_incident_rca(
     Headers(user_email): Headers<UserEmail>,
     Query(query): Query<TriggerRcaQuery>,
 ) -> Response {
+    use config::meta::alerts::rca_runs::{RunMode, RunTrigger};
     use o2_enterprise::enterprise::{
         alerts::rca_service, common::config::get_config as get_o2_config,
     };
+    use openobserve_core::alerts::rca_runs;
 
     let o2_cfg = get_o2_config();
 
@@ -480,17 +509,7 @@ pub async fn trigger_incident_rca(
             .unwrap();
     }
 
-    // In-flight guard. Keep the events to distinguish a first analysis from
-    // a rerun when a caller omits the explicit reanalysis flag.
-    let cooldown = o2_cfg.incidents.reanalysis_cooldown_minutes;
-    let events = infra::table::incident_events::get(&org_id, &incident_id)
-        .await
-        .unwrap_or_default();
-    if openobserve_core::alerts::incidents::is_analysis_in_flight(&events, cooldown * 2) {
-        return MetaHttpResponse::bad_request("Analysis already in progress");
-    }
-
-    // Validate the incident before consuming quota or starting the lifecycle. Existence check
+    // Validate the incident before consuming quota or starting a run. Existence check
     // only: the builder below re-derives the context, so read the one row rather than hydrating
     // every alert on the incident.
     match infra::table::alert_incidents::get(&org_id, &incident_id).await {
@@ -499,255 +518,304 @@ pub async fn trigger_incident_rca(
         Err(e) => return MetaHttpResponse::internal_error(e),
     }
 
-    // A reanalysis runs through the shared trigger, which skips it when the team's L0 is off;
-    // refuse it before authorization so the skipped run is never charged.
-    if query.reanalysis
-        && !openobserve_core::alerts::incidents::rca_will_run(&org_id, &incident_id).await
-    {
-        return MetaHttpResponse::bad_request("AI SRE is turned off for this incident's priority");
-    }
+    // A first analysis is `manual`; once a run has completed, any further one is a
+    // `reanalyze` (RR-7). The Cloud usage feature follows the same predicate.
+    let has_completed_run =
+        match infra::table::rca_runs::newest_completed_for_incident(&org_id, &incident_id).await {
+            Ok(run) => run.is_some(),
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        };
+    let trigger = if has_completed_run {
+        RunTrigger::Reanalyze
+    } else {
+        RunTrigger::Manual
+    };
 
+    // Cloud: refuse a request that cannot be paid for, without metering it. Usage is
+    // metered only right before the agent is called, so a refused start or an earlier
+    // failure never costs a credit (precheck → start → authorize, as `chat_stream` does).
     #[cfg(feature = "cloud")]
-    let usage_permit = {
-        let is_reanalysis = query.reanalysis
-            || events.iter().any(|event| {
-                matches!(
-                    event.event_type,
-                    config::meta::alerts::incidents::IncidentEventType::AIAnalysisComplete
-                )
-            });
-        let feature = if is_reanalysis {
+    let (usage_feature, usage_context) = {
+        let feature = if has_completed_run {
             openobserve_core::trial_quota::TrialQuotaFeature::IncidentReAnalysis
         } else {
             openobserve_core::trial_quota::TrialQuotaFeature::NewIncident
         };
+        if let Err(error) =
+            openobserve_core::trial_quota::precheck_ai_usage(&org_id, feature, &user_email.user_id)
+                .await
+        {
+            return crate::request::ai::chat::ai_authorization_error_response(error);
+        }
         let usage_context = openobserve_core::trial_quota::AiUsageContext {
             user_email: user_email.user_id.clone(),
             incident_id: Some(incident_id.clone()),
             ..Default::default()
         };
-        match openobserve_core::trial_quota::authorize_ai_usage(&org_id, feature, &usage_context)
-            .await
-        {
-            Ok(permit) => Some(permit),
-            Err(error) => {
-                return crate::request::ai::chat::ai_authorization_error_response(error);
-            }
+        (feature, usage_context)
+    };
+
+    // Start the run. The start transaction is the in-flight guard (RR-5, RR-9) and
+    // appends the Begin event; user-started runs skip the cooldown (RR-8).
+    let run_id = match rca_runs::start_run(rca_runs::StartRun {
+        org_id: org_id.clone(),
+        subject: rca_runs::RunSubject::Incident(incident_id.clone()),
+        trigger,
+        mode: if query.build_on_previous {
+            RunMode::BuildOnPrevious
+        } else {
+            RunMode::Fresh
+        },
+        started_by: user_email.user_id.clone(),
+        guidance: None,
+        skip_cooldown: true,
+    })
+    .await
+    {
+        Ok(rca_runs::StartOutcome::Started { run_id }) => run_id,
+        Ok(rca_runs::StartOutcome::InFlight) | Ok(rca_runs::StartOutcome::CoolingDown) => {
+            return MetaHttpResponse::bad_request("Analysis already in progress");
+        }
+        Err(e) => {
+            return MetaHttpResponse::internal_error(format!("Failed to start analysis: {e}"));
         }
     };
-    #[cfg(not(feature = "cloud"))]
-    let usage_permit = None;
 
-    // Authorization succeeded. Every error below must terminate the lifecycle.
-    let _ = openobserve_core::incidents::append_event(
-        &org_id,
-        &incident_id,
-        config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-    )
-    .await;
-
-    // Build RCA context. Each run is a fresh analysis unless the caller explicitly opts
-    // into continuity — chaining every run compounds the report (and the agent's context)
-    // and carries any early mistake forward with no way to shake it off.
-    let previous_analysis = if query.build_on_previous {
-        infra::table::alert_incidents::get_topology(&org_id, &incident_id)
-            .await
-            .ok()
-            .flatten()
-            .and_then(|t| t.suggested_root_cause)
-            .filter(|s| !s.is_empty())
-    } else {
-        None
-    };
-    // The single builder both this endpoint and the autonomous path call, so the two can no
-    // longer disagree about severity or past_causes (C1).
-    let context =
-        rca_service::build_incident_context(&org_id, &incident_id, previous_analysis).await;
-
-    // Create RCA agent client with SA credentials
-    let (email, token) =
-        match openobserve_core::organization::get_sre_agent_credentials(&org_id).await {
-            Ok(creds) => creds,
-            Err(e) => {
-                let _ = openobserve_core::incidents::append_event(
-                    &org_id,
-                    &incident_id,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                        "Credentials failed",
-                        config::meta::alerts::incidents::AnalysisTriggerType::Manual,
-                        Some(format!("{:#}", e)),
-                    ),
-                )
-                .await;
-                return MetaHttpResponse::internal_error(format!(
-                    "Failed to get SRE agent credentials: {e}"
-                ));
+    // The run is started, so the rest runs in its own task: a client that disconnects
+    // drops only this wait, and the task still ends the run (RR-13).
+    let task = tokio::spawn(async move {
+        // Every error below must end the run, so it never stays `running`; a run that
+        // ended delivers no verdict, so it frees the page it held (RR-13).
+        let fail = |code: &'static str, reason: &'static str, details: Option<String>| {
+            let org_id = org_id.clone();
+            let incident_id = incident_id.clone();
+            let run_id = run_id.clone();
+            async move {
+                match rca_runs::fail_run(&org_id, &run_id, trigger, code, reason, details).await {
+                    Ok(true) => {
+                        rca_service::skip_analysis_for_incident(&org_id, &incident_id).await
+                    }
+                    Ok(false) => {}
+                    Err(e) => {
+                        log::error!("[INCIDENTS::RCA] Failed to end run {run_id} as failed: {e}")
+                    }
+                }
             }
         };
-    let auth_header = openobserve_core::auth::build_basic_auth_header(&email, &token);
-    let client = match o2_enterprise::enterprise::ai::client::get_agent_client() {
-        Some(c) => c,
-        None => {
-            // Emit failure event instead of misleading Complete event
-            let _ = openobserve_core::incidents::append_event(
-                &org_id,
-                &incident_id,
-                config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                    "Agent not configured",
-                    config::meta::alerts::incidents::AnalysisTriggerType::Manual,
+
+        // Each run is a fresh analysis unless the caller explicitly opts into continuity;
+        // "Build on previous" reads the newest completed run's report (RR-27).
+        let previous_analysis = if query.build_on_previous {
+            rca_runs::newest_completed_report(&org_id, &incident_id)
+                .await
+                .ok()
+                .flatten()
+        } else {
+            None
+        };
+        // The single builder both this endpoint and the autonomous path call, so the two can
+        // no longer disagree about severity or past_causes (C1).
+        let context =
+            rca_service::build_incident_context(&org_id, &incident_id, previous_analysis).await;
+
+        // Create RCA agent client with SA credentials
+        let (email, token) =
+            match openobserve_core::organization::get_sre_agent_credentials(&org_id).await {
+                Ok(creds) => creds,
+                Err(e) => {
+                    fail(
+                        rca_runs::ERROR_CREDENTIALS,
+                        rca_runs::CREDENTIALS_REASON,
+                        Some(format!("{e:#}")),
+                    )
+                    .await;
+                    return MetaHttpResponse::internal_error(format!(
+                        "Failed to get SRE agent credentials: {e}"
+                    ));
+                }
+            };
+        let auth_header = openobserve_core::auth::build_basic_auth_header(&email, &token);
+        let client = match o2_enterprise::enterprise::ai::client::get_agent_client() {
+            Some(c) => c,
+            None => {
+                fail(
+                    rca_runs::ERROR_AGENT_NOT_CONFIGURED,
+                    rca_runs::AGENT_NOT_CONFIGURED_REASON,
                     None,
-                ),
+                )
+                .await;
+                return MetaHttpResponse::internal_error("RCA agent client not initialized");
+            }
+        };
+
+        // Check agent health
+        if let Err(e) = client.health(&auth_header).await {
+            fail(
+                rca_runs::ERROR_AGENT_UNAVAILABLE,
+                rca_runs::AGENT_UNAVAILABLE_REASON,
+                Some(format!("{e:#}")),
             )
             .await;
-            return MetaHttpResponse::internal_error("RCA agent client not initialized");
+            return axum::response::Response::builder()
+                .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
+                .header(axum::http::header::CONTENT_TYPE, "application/json")
+                .body(axum::body::Body::from(
+                    serde_json::json!({"error": format!("RCA agent not available: {e}")})
+                        .to_string(),
+                ))
+                .unwrap();
         }
-    };
 
-    // Check agent health
-    if let Err(e) = client.health(&auth_header).await {
-        // Emit failure event instead of misleading Complete event
-        let _ = openobserve_core::incidents::append_event(
-            &org_id,
-            &incident_id,
-            config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                "Agent unavailable",
-                config::meta::alerts::incidents::AnalysisTriggerType::Manual,
-                Some(format!("{:#}", e)),
-            ),
-        )
-        .await;
-
-        return axum::response::Response::builder()
-            .status(axum::http::StatusCode::SERVICE_UNAVAILABLE)
-            .header(axum::http::header::CONTENT_TYPE, "application/json")
-            .body(axum::body::Body::from(
-                serde_json::json!({"error": format!("RCA agent not available: {e}")}).to_string(),
-            ))
-            .unwrap();
-    }
-
-    // User-initiated reanalysis: fire-and-forget — spawn agent in background, return 202
-    // immediately. Begin was already emitted above; the spawn passes begin_already_emitted=true
-    // to skip duplicate emission and the in-flight/cooldown guards.
-    if query.reanalysis {
-        let org_id_bg = org_id.clone();
-        let incident_id_bg = incident_id.clone();
-        let user_email_bg = user_email.user_id.clone();
-        let build_on_previous = query.build_on_previous;
-        let handle = tokio::spawn(async move {
-            if let Err(e) = openobserve_core::alerts::incidents::trigger_rca_for_incident(
-                org_id_bg.clone(),
-                incident_id_bg.clone(),
-                true,
-                true,
-                user_email_bg,
-                build_on_previous,
-                usage_permit,
-            )
-            .await
-            {
-                log::warn!(
-                    "[INCIDENTS::RCA] Background reanalysis failed for {incident_id_bg}: {e}"
-                );
-
-                // Emit failure event for manual reanalysis background task
-                if let Err(emit_err) = openobserve_core::incidents::append_event(
-                    &org_id_bg,
-                    &incident_id_bg,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                        "Manual reanalysis background task failed",
-                        config::meta::alerts::incidents::AnalysisTriggerType::Manual,
-                        Some(format!("{:#}", e)),
-                    ),
+        // User-initiated reanalysis: fire-and-forget — spawn the agent in the background and
+        // return 202 with the run id immediately.
+        if query.reanalysis {
+            let org_id_bg = org_id.clone();
+            let incident_id_bg = incident_id.clone();
+            let run_id_bg = run_id.clone();
+            let user_email_bg = user_email.user_id.clone();
+            let build_on_previous = query.build_on_previous;
+            let handle = tokio::spawn(async move {
+                if let Err(e) = openobserve_core::alerts::incidents::trigger_rca_for_incident(
+                    org_id_bg.clone(),
+                    incident_id_bg.clone(),
+                    run_id_bg.clone(),
+                    trigger,
+                    user_email_bg,
+                    build_on_previous,
+                    // The spawned run meters its own usage right before it calls the agent.
+                    None,
                 )
                 .await
                 {
-                    log::error!(
-                        "[INCIDENTS::RCA] Failed to emit AIAnalysisFailed event for {incident_id_bg}: {emit_err}"
+                    log::warn!(
+                        "[INCIDENTS::RCA] Background reanalysis failed for {incident_id_bg}: {e}"
                     );
+                    if let Err(fail_err) = rca_runs::fail_run(
+                        &org_id_bg,
+                        &run_id_bg,
+                        trigger,
+                        rca_runs::ERROR_SERVICE_CALL_FAILED,
+                        rca_runs::SERVICE_CALL_FAILED_REASON,
+                        Some(format!("{e:#}")),
+                    )
+                    .await
+                    {
+                        log::error!(
+                            "[INCIDENTS::RCA] Failed to end run {run_id_bg} as failed: {fail_err}"
+                        );
+                    }
                 }
-            }
-            openobserve_core::alerts::incidents::unregister_rca_task(&org_id_bg, &incident_id_bg);
-        });
-        openobserve_core::alerts::incidents::register_rca_task(
+                rca_runs::unregister_rca_task(&run_id_bg);
+            });
+            rca_runs::register_rca_task(&run_id, handle.abort_handle());
+
+            return axum::response::Response::builder()
+                .status(axum::http::StatusCode::ACCEPTED)
+                .header(axum::http::header::CONTENT_TYPE, "application/json")
+                .body(axum::body::Body::from(
+                    serde_json::json!({"message": "Analysis started", "run_id": run_id})
+                        .to_string(),
+                ))
+                .unwrap();
+        }
+
+        // Meter usage only now, right before the agent is called: a run refused or failed
+        // before this point never costs a credit.
+        #[cfg(feature = "cloud")]
+        if let Err(error) = openobserve_core::trial_quota::authorize_ai_usage(
             &org_id,
-            &incident_id,
-            handle.abort_handle(),
-        );
-
-        return axum::response::Response::builder()
-            .status(axum::http::StatusCode::ACCEPTED)
-            .header(axum::http::header::CONTENT_TYPE, "application/json")
-            .body(axum::body::Body::from(
-                serde_json::json!({"message": "Analysis started"}).to_string(),
-            ))
-            .unwrap();
-    }
-
-    // Choose streaming or non-streaming based on query parameter
-    if query.stream {
-        // AIAnalysisComplete is emitted inside the stream closure (rca_service.rs)
-        // after the stream is fully drained, not here.
-        let stream = match rca_service::analyze_incident_stream(
-            (*client).clone(),
-            context,
-            auth_header.clone(),
-            openobserve_core::incidents::append_event_send,
+            usage_feature,
+            &usage_context,
         )
         .await
         {
-            Ok(s) => s,
-            Err(e) => {
-                let _ = openobserve_core::incidents::append_event(
-                    &org_id,
-                    &incident_id,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                        "Stream start failed",
-                        config::meta::alerts::incidents::AnalysisTriggerType::Manual,
-                        Some(format!("{:#}", e)),
-                    ),
-                )
-                .await;
-                return MetaHttpResponse::internal_error(format!(
-                    "Failed to start RCA stream: {e}"
-                ));
-            }
-        };
+            fail(
+                rca_runs::ERROR_USAGE_DENIED,
+                rca_runs::USAGE_DENIED_REASON,
+                Some(error.to_string()),
+            )
+            .await;
+            return crate::request::ai::chat::ai_authorization_error_response(error);
+        }
 
-        axum::response::Response::builder()
-            .status(axum::http::StatusCode::OK)
-            .header(axum::http::header::CONTENT_TYPE, "text/event-stream")
-            .body(axum::body::Body::from_stream(stream))
-            .unwrap()
-    } else {
-        // Perform RCA analysis (non-streaming)
-        let rca_content =
-            match rca_service::analyze_incident((*client).clone(), context, &auth_header).await {
-                Ok(content) => content,
+        // Choose streaming or non-streaming based on query parameter
+        if query.stream {
+            // The run ends once the stream is fully drained (RR-46).
+            let (org_id_end, incident_id_end, run_id_end) =
+                (org_id.clone(), incident_id.clone(), run_id.clone());
+            let stream = match rca_service::analyze_incident_stream(
+                (*client).clone(),
+                context,
+                auth_header.clone(),
+                move |end| {
+                    rca_runs::finish_incident_stream(
+                        org_id_end,
+                        incident_id_end,
+                        run_id_end,
+                        trigger,
+                        end,
+                    )
+                },
+            )
+            .await
+            {
+                Ok(s) => s,
                 Err(e) => {
-                    let _ = openobserve_core::incidents::append_event(
-                        &org_id,
-                        &incident_id,
-                        config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                            "Service call failed",
-                            config::meta::alerts::incidents::AnalysisTriggerType::Manual,
-                            Some(format!("{:#}", e)),
-                        ),
+                    fail(
+                        rca_runs::ERROR_STREAM_START_FAILED,
+                        rca_runs::STREAM_START_FAILED_REASON,
+                        Some(format!("{e:#}")),
                     )
                     .await;
-                    return MetaHttpResponse::internal_error(format!("Failed to perform RCA: {e}"));
+                    return MetaHttpResponse::internal_error(format!(
+                        "Failed to start RCA stream: {e}"
+                    ));
                 }
             };
 
-        // Emit AIAnalysisComplete on success
-        let _ = openobserve_core::incidents::append_event(
-            &org_id,
-            &incident_id,
-            config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
-        )
-        .await;
+            axum::response::Response::builder()
+                .status(axum::http::StatusCode::OK)
+                .header(axum::http::header::CONTENT_TYPE, "text/event-stream")
+                .body(axum::body::Body::from_stream(stream))
+                .unwrap()
+        } else {
+            // Perform RCA analysis (non-streaming)
+            let rca_content =
+                match rca_service::analyze_incident((*client).clone(), context, &auth_header).await
+                {
+                    Ok(content) => content,
+                    Err(e) => {
+                        fail(
+                            rca_runs::ERROR_SERVICE_CALL_FAILED,
+                            rca_runs::SERVICE_CALL_FAILED_REASON,
+                            Some(format!("{e:#}")),
+                        )
+                        .await;
+                        return MetaHttpResponse::internal_error(format!(
+                            "Failed to perform RCA: {e}"
+                        ));
+                    }
+                };
 
-        MetaHttpResponse::json(RcaResponse { rca_content })
+            // A result that could not be saved has already ended the run `save_failed` and
+            // freed its page (RR-13); never answer 200 for it.
+            if let Err(e) =
+                rca_runs::complete_incident_run(&org_id, &incident_id, &run_id, &rca_content).await
+            {
+                return MetaHttpResponse::internal_error(format!(
+                    "Failed to save the analysis result: {e}"
+                ));
+            }
+
+            MetaHttpResponse::json(RcaResponse {
+                rca_content,
+                run_id,
+            })
+        }
+    });
+    match task.await {
+        Ok(response) => response,
+        Err(e) => MetaHttpResponse::internal_error(format!("The analysis task failed: {e}")),
     }
 }
 
@@ -780,73 +848,118 @@ pub async fn cancel_incident_rca(
     Path((org_id, incident_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-
-    let cooldown = get_o2_config().incidents.reanalysis_cooldown_minutes;
-
-    // The in-flight check lives inside cancel_rca_for_incident, after the abort handle is
-    // atomically removed — checking here first would leave a window in which a new
-    // analysis could start and be cancelled in place of the one the user targeted.
+    // The live-run check lives inside cancel_rca_for_incident, in the same compare-and-set
+    // that ends the run, so a run started meanwhile is never cancelled in its place (RR-19).
     match openobserve_core::alerts::incidents::cancel_rca_for_incident(
         &org_id,
         &incident_id,
-        Some(user_email.user_id.clone()),
-        cooldown * 2,
+        &user_email.user_id,
     )
     .await
     {
         // Nothing running — report it rather than writing a spurious terminal event.
         Ok(None) => MetaHttpResponse::bad_request("No analysis is currently in progress"),
-        Ok(Some(aborted)) => MetaHttpResponse::json(CancelRcaResponse {
+        Ok(Some(outcome)) => MetaHttpResponse::json(CancelRcaResponse {
             message: "Analysis cancelled".to_string(),
-            aborted_local_task: aborted,
+            aborted_local_task: outcome.aborted_local_task,
+            run_id: outcome.run_id,
         }),
         Err(e) => MetaHttpResponse::internal_error(format!("Failed to cancel analysis: {e}")),
     }
 }
 
 #[cfg(feature = "enterprise")]
-/// GetIncidentRcaHistory
+/// ListIncidentRcaRuns
 #[utoipa::path(
     get,
-    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/history",
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs",
     context_path = "/api",
     tag = "Incidents",
-    operation_id = "GetIncidentRcaHistory",
-    summary = "List RCA reports for an incident",
-    description = "Returns the current root cause analysis report plus any superseded reports retained for this incident, newest first.",
+    operation_id = "ListIncidentRcaRuns",
+    summary = "List the analysis runs of an incident",
+    description = "Returns the incident's analysis runs, newest first, without report text. Page with `before` set to the last run id of the previous page.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("incident_id" = String, Path, description = "Incident ID"),
+        ListRcaRunsQuery,
     ),
     responses(
-        (status = 200, description = "RCA report history", content_type = "application/json", body = RcaHistoryResponse),
+        (status = 200, description = "Analysis runs", content_type = "application/json", body = config::meta::alerts::rca_runs::ListRcaRunsResponse),
+        (status = 404, description = "Incident not found", content_type = "application/json", body = ()),
         (status = 500, description = "Internal error", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "List past incident RCA reports", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "List past incident RCA runs", "category": "alerts"}))
     )
 )]
-pub async fn get_incident_rca_history(
+pub async fn list_incident_rca_runs(
     Path((org_id, incident_id)): Path<(String, String)>,
+    Query(query): Query<ListRcaRunsQuery>,
 ) -> Response {
-    let topology = match infra::table::alert_incidents::get_topology(&org_id, &incident_id).await {
-        Ok(Some(t)) => t,
-        Ok(None) => {
-            return MetaHttpResponse::json(RcaHistoryResponse {
-                current: None,
-                previous: vec![],
-            });
-        }
+    match infra::table::alert_incidents::get(&org_id, &incident_id).await {
+        Ok(Some(_)) => {}
+        Ok(None) => return MetaHttpResponse::not_found("Incident not found"),
         Err(e) => return MetaHttpResponse::internal_error(e),
-    };
+    }
+    let limit = query
+        .limit
+        .unwrap_or(RCA_RUNS_DEFAULT_LIMIT)
+        .clamp(1, RCA_RUNS_MAX_LIMIT);
+    match infra::table::rca_runs::list_for_incident(
+        &org_id,
+        &incident_id,
+        limit,
+        query.before.as_deref(),
+    )
+    .await
+    {
+        Ok((runs, has_more)) => {
+            MetaHttpResponse::json(config::meta::alerts::rca_runs::ListRcaRunsResponse {
+                runs: runs.iter().map(infra::table::rca_runs::to_item).collect(),
+                has_more,
+            })
+        }
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
 
-    MetaHttpResponse::json(RcaHistoryResponse {
-        current: topology.suggested_root_cause,
-        previous: topology.previous_analyses,
-    })
+#[cfg(feature = "enterprise")]
+/// GetIncidentRcaRun
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentRcaRun",
+    summary = "Get one analysis run of an incident",
+    description = "Returns one analysis run of the incident, including its report and error.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID"),
+    ),
+    responses(
+        (status = 200, description = "Analysis run", content_type = "application/json", body = config::meta::alerts::rca_runs::RcaRun),
+        (status = 404, description = "Run not found", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+    )
+)]
+pub async fn get_incident_rca_run(
+    Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
+) -> Response {
+    match infra::table::rca_runs::get(&org_id, &run_id).await {
+        Ok(Some(run)) if run.incident_id.as_deref() == Some(incident_id.as_str()) => {
+            MetaHttpResponse::json(infra::table::rca_runs::to_run(run))
+        }
+        Ok(_) => MetaHttpResponse::not_found("Run not found"),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
 }
 
 /// Get incident events timeline
@@ -1134,30 +1247,57 @@ pub async fn cancel_incident_rca(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,
-    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/history",
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs",
     context_path = "/api",
     tag = "Incidents",
-    operation_id = "GetIncidentRcaHistory",
-    summary = "List RCA reports for an incident",
-    description = "Returns the current root cause analysis report plus any superseded reports. This endpoint is only available with enterprise features enabled.",
+    operation_id = "ListIncidentRcaRuns",
+    summary = "List the analysis runs of an incident",
+    description = "Returns the incident's analysis runs, newest first. This endpoint is only available with enterprise features enabled.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("incident_id" = String, Path, description = "Incident ID"),
+        ListRcaRunsQuery,
     ),
     responses(
-        (status = 200, description = "RCA report history (always empty without enterprise features)", content_type = "application/json", body = RcaHistoryResponse),
+        (status = 403, description = "Not supported without enterprise features", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "List past incident RCA reports", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "List past incident RCA runs", "category": "alerts"}))
     )
 )]
-pub async fn get_incident_rca_history(_path: Path<(String, String)>) -> Response {
-    MetaHttpResponse::json(RcaHistoryResponse {
-        current: None,
-        previous: vec![],
-    })
+pub async fn list_incident_rca_runs(
+    _path: Path<(String, String)>,
+    _query: Query<ListRcaRunsQuery>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentRcaRun",
+    summary = "Get one analysis run of an incident",
+    description = "Returns one analysis run of the incident. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID"),
+    ),
+    responses(
+        (status = 403, description = "Not supported without enterprise features", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+    )
+)]
+pub async fn get_incident_rca_run(_path: Path<(String, String, String)>) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
 }
 
 #[cfg(test)]
@@ -1224,6 +1364,8 @@ mod tests {
             group_values: serde_json::Value::Object(Default::default()),
             key_type: config::meta::alerts::incidents::KeyType::default(),
             muted_by_downtime_id: None,
+            rca: None,
+            rca_off_reason: None,
         };
 
         let response = ListIncidentsResponse {
@@ -1356,5 +1498,115 @@ mod tests {
         assert_eq!(IncidentStatus::Open, IncidentStatus::Open);
         assert_ne!(IncidentStatus::Open, IncidentStatus::Acknowledged);
         assert_ne!(IncidentStatus::Acknowledged, IncidentStatus::Resolved);
+    }
+
+    /// RR-31: the inline trigger answer names the run that produced the report.
+    #[test]
+    fn test_rca_response_carries_the_run_id() {
+        let json = serde_json::to_value(RcaResponse {
+            rca_content: "## Root cause".to_string(),
+            run_id: "2abc".to_string(),
+        })
+        .unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({"rca_content": "## Root cause", "run_id": "2abc"})
+        );
+    }
+
+    /// RR-20, RR-31: the cancel answer names the run and says whether this node aborted it.
+    #[test]
+    fn test_cancel_rca_response_shape() {
+        let json = serde_json::to_value(CancelRcaResponse {
+            message: "Analysis cancelled".to_string(),
+            aborted_local_task: false,
+            run_id: "2abc".to_string(),
+        })
+        .unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "message": "Analysis cancelled",
+                "aborted_local_task": false,
+                "run_id": "2abc"
+            })
+        );
+    }
+
+    /// RR-30: the run list pages with `limit` and `before`, and its items carry no report.
+    #[test]
+    fn test_list_rca_runs_query_and_response_shape() {
+        use config::meta::alerts::rca_runs::{
+            ListRcaRunsResponse, RcaRunItem, RunMode, RunState, RunSubjectType, RunTrigger,
+        };
+
+        let empty: ListRcaRunsQuery = serde_json::from_str("{}").unwrap();
+        assert_eq!((empty.limit, empty.before), (None, None));
+        let page: ListRcaRunsQuery =
+            serde_json::from_str(r#"{"limit": 10, "before": "2abc"}"#).unwrap();
+        assert_eq!(
+            (page.limit, page.before.as_deref()),
+            (Some(10), Some("2abc"))
+        );
+        const { assert!(RCA_RUNS_DEFAULT_LIMIT <= RCA_RUNS_MAX_LIMIT) };
+
+        let json = serde_json::to_value(ListRcaRunsResponse {
+            runs: vec![RcaRunItem {
+                run_id: "2abc".to_string(),
+                subject_type: RunSubjectType::Incident,
+                trigger: RunTrigger::Reanalyze,
+                mode: RunMode::BuildOnPrevious,
+                started_by: "a.rao@acme.io".to_string(),
+                state: RunState::Cancelled,
+                started_at: 1,
+                ended_at: Some(2),
+                outcome: None,
+                confidence: None,
+                cancelled_by: Some("a.rao@acme.io".to_string()),
+                error_reason: None,
+            }],
+            has_more: true,
+        })
+        .unwrap();
+        assert_eq!(json["has_more"], true);
+        let run = &json["runs"][0];
+        assert_eq!(run["run_id"], "2abc");
+        assert_eq!(run["subject_type"], "incident");
+        assert_eq!(run["trigger"], "reanalyze");
+        assert_eq!(run["mode"], "build_on_previous");
+        assert_eq!(run["state"], "cancelled");
+        assert_eq!(run["cancelled_by"], "a.rao@acme.io");
+        assert!(run.get("report").is_none());
+    }
+
+    /// RR-28: an incident that was never analyzed serializes `rca: null`.
+    #[test]
+    fn test_never_analyzed_incident_serializes_rca_null() {
+        let incident = config::meta::alerts::incidents::Incident {
+            id: "inc".to_string(),
+            org_id: "default".to_string(),
+            status: config::meta::alerts::incidents::IncidentStatus::Open,
+            severity: config::meta::alerts::incidents::IncidentSeverity::P2,
+            topology_context: None,
+            first_alert_at: 1,
+            last_alert_at: 1,
+            resolved_at: None,
+            alert_count: 1,
+            title: None,
+            assigned_to: None,
+            acknowledged_by: None,
+            acknowledged_at: None,
+            created_at: 1,
+            updated_at: 1,
+            group_values: serde_json::json!({}),
+            key_type: config::meta::alerts::incidents::KeyType::default(),
+            muted_by_downtime_id: None,
+            rca: None,
+            rca_off_reason: Some("l0_off".to_string()),
+        };
+        let json = serde_json::to_value(&incident).unwrap();
+        assert!(json.as_object().unwrap().contains_key("rca"));
+        assert!(json["rca"].is_null());
+        assert_eq!(json["rca_off_reason"], "l0_off");
     }
 }

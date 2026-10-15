@@ -2189,10 +2189,13 @@ async fn trigger_rca_for_alert_firing(
     alert: &config::meta::alerts::alert::Alert,
     opened: Vec<o2_enterprise::enterprise::oncall::escalation::PagedGroup>,
 ) {
+    use config::meta::alerts::rca_runs::{RunMode, RunTrigger};
     use o2_enterprise::enterprise::{
         ai::client::get_agent_client, common::config::get_config as get_o2_config,
         oncall::escalation,
     };
+
+    use crate::alerts::rca_runs;
 
     let cfg = get_o2_config();
     // Must agree with the condition `analysis_at_start` used to mark these records `Pending`.
@@ -2225,10 +2228,74 @@ async fn trigger_rca_for_alert_firing(
             return;
         };
 
+        // The agent fetches the alert by this; a record's `{source}#{firing}` is not one.
+        let subject_id = alert_id.unwrap_or_else(|| representative.response.subject.subject_id());
+        let subjects: Vec<config::meta::oncall::SubjectRef> =
+            pending.iter().map(|p| p.response.subject.clone()).collect();
+
+        // RR-37: one `alert` run per firing; every exit below ends it.
+        let run_id = match rca_runs::start_run(rca_runs::StartRun {
+            org_id: org_id.clone(),
+            subject: rca_runs::RunSubject::Alert {
+                alert_id: subject_id.clone(),
+                incident_id: None,
+            },
+            trigger: RunTrigger::OncallPage,
+            mode: RunMode::Fresh,
+            started_by: "system".to_string(),
+            guidance: None,
+            skip_cooldown: true,
+        })
+        .await
+        {
+            Ok(rca_runs::StartOutcome::Started { run_id }) => run_id,
+            Ok(outcome) => {
+                log::debug!(
+                    "[SCHEDULER trace_id {trace_id}] alert RCA run not started for {org_id}/{alert_name}: {outcome:?}"
+                );
+                release_alert_firing_hold(&org_id, &opened).await;
+                return;
+            }
+            Err(e) => {
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] could not record alert RCA run for {org_id}/{alert_name}: {e}"
+                );
+                release_alert_firing_hold(&org_id, &opened).await;
+                return;
+            }
+        };
+        let fail = |code: &'static str, reason: &'static str, details: Option<String>| {
+            let org_id = org_id.clone();
+            let run_id = run_id.clone();
+            let trace_id = trace_id.clone();
+            async move {
+                if let Err(e) = rca_runs::fail_run(
+                    &org_id,
+                    &run_id,
+                    RunTrigger::OncallPage,
+                    code,
+                    reason,
+                    details,
+                )
+                .await
+                {
+                    log::error!(
+                        "[SCHEDULER trace_id {trace_id}] could not fail alert RCA run {run_id}: {e}"
+                    );
+                }
+            }
+        };
+
         let (email, token) = match crate::organization::get_sre_agent_credentials(&org_id).await {
             Ok(c) => c,
             Err(e) => {
                 log::warn!("[SCHEDULER trace_id {trace_id}] no RCA credentials for {org_id}: {e}");
+                fail(
+                    rca_runs::ERROR_CREDENTIALS,
+                    rca_runs::CREDENTIALS_REASON,
+                    Some(e.to_string()),
+                )
+                .await;
                 release_alert_firing_hold(&org_id, &opened).await;
                 return;
             }
@@ -2237,12 +2304,24 @@ async fn trigger_rca_for_alert_firing(
 
         let Some(client) = get_agent_client() else {
             log::warn!("[SCHEDULER trace_id {trace_id}] RCA agent client not initialized");
+            fail(
+                rca_runs::ERROR_AGENT_NOT_CONFIGURED,
+                rca_runs::AGENT_NOT_CONFIGURED_REASON,
+                None,
+            )
+            .await;
             release_alert_firing_hold(&org_id, &opened).await;
             return;
         };
 
         if let Err(e) = client.health(&auth_header).await {
             log::debug!("[SCHEDULER trace_id {trace_id}] agent health check failed: {e}");
+            fail(
+                rca_runs::ERROR_AGENT_UNAVAILABLE,
+                rca_runs::AGENT_UNAVAILABLE_REASON,
+                Some(e.to_string()),
+            )
+            .await;
             release_alert_firing_hold(&org_id, &opened).await;
             return;
         }
@@ -2258,8 +2337,7 @@ async fn trigger_rca_for_alert_firing(
         // §2.2: one context for the whole firing — every record it opened reads the same answer.
         let context = config::meta::oncall::RcaContext {
             subject_type: config::meta::oncall::SubjectType::Alert,
-            // The agent fetches the alert by this; a record's `{source}#{firing}` is not one.
-            subject_id: alert_id.unwrap_or_else(|| representative.response.subject.subject_id()),
+            subject_id,
             // Omitted, never null — the agent routes on `"incident_id" in context`.
             incident_id: None,
             org_id: org_id.clone(),
@@ -2274,23 +2352,41 @@ async fn trigger_rca_for_alert_firing(
             stream: Some(stream_name),
             dimensions,
         };
-        let subjects: Vec<config::meta::oncall::SubjectRef> =
-            pending.iter().map(|p| p.response.subject.clone()).collect();
 
         match client.analyze_incident(context, &auth_header).await {
-            Ok(content) if !content.is_empty() => {
-                o2_enterprise::enterprise::alerts::rca_service::save_rca_result_for_records(
-                    &org_id, &subjects, &content, None,
-                )
-                .await;
+            Ok(content) if !content.trim().is_empty() => {
+                // RR-38: the run is completed first; delivery runs inside only when it won.
+                // A lost compare-and-set (`Ok(false)`) delivers and releases nothing.
+                if let Err(e) =
+                    rca_runs::complete_alert_run(&org_id, &run_id, &subjects, &content, None).await
+                {
+                    log::error!(
+                        "[SCHEDULER trace_id {trace_id}] could not complete alert RCA run {run_id}: {e}"
+                    );
+                    // RR-13: the save failed, so the run must not stay `running` holding pages.
+                    fail(
+                        rca_runs::ERROR_SAVE_FAILED,
+                        rca_runs::SAVE_FAILED_REASON,
+                        Some(format!("{e:#}")),
+                    )
+                    .await;
+                    release_analysis_without_verdict(&org_id, &subjects).await;
+                }
             }
             Ok(_) => {
+                fail(rca_runs::ERROR_NO_REPORT, rca_runs::NO_REPORT_REASON, None).await;
                 release_analysis_without_verdict(&org_id, &subjects).await;
             }
             Err(e) => {
                 log::warn!(
                     "[SCHEDULER trace_id {trace_id}] RCA call failed for {org_id}/{alert_name}: {e}"
                 );
+                fail(
+                    rca_runs::ERROR_SERVICE_CALL_FAILED,
+                    rca_runs::SERVICE_CALL_FAILED_REASON,
+                    Some(e.to_string()),
+                )
+                .await;
                 release_analysis_without_verdict(&org_id, &subjects).await;
             }
         }

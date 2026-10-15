@@ -30,6 +30,7 @@ describe("incidents service", () => {
     get: vi.fn(),
     post: vi.fn(),
     patch: vi.fn(),
+    delete: vi.fn(),
   };
 
   beforeEach(() => {
@@ -152,9 +153,7 @@ describe("incidents service", () => {
 
   describe("triggerRca", () => {
     it("should call http.post with correct URL", () => {
-      mockHttp.post.mockResolvedValue({
-        data: { rca_content: "Analysis result" },
-      });
+      mockHttp.post.mockResolvedValue({ data: { message: "started", run_id: "run-1" } });
 
       incidents.triggerRca("test-org", "incident-123");
 
@@ -162,9 +161,68 @@ describe("incidents service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/v2/test-org/alerts/incidents/incident-123/rca",
         null,
-        { params: {} },
+        { params: {}, signal: undefined },
       );
     });
+
+    it("should pass reanalysis params and the abort signal", () => {
+      mockHttp.post.mockResolvedValue({ data: { run_id: "run-1" } });
+      const controller = new AbortController();
+
+      incidents.triggerRca(
+        "test-org",
+        "incident-123",
+        { reanalysis: true },
+        { signal: controller.signal },
+      );
+
+      expect(mockHttp.post).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/incident-123/rca",
+        null,
+        { params: { reanalysis: true }, signal: controller.signal },
+      );
+    });
+  });
+
+  describe("listRcaRuns", () => {
+    it("should call GET …/rca/runs with paging params", () => {
+      mockHttp.get.mockResolvedValue({ data: { runs: [], has_more: false } });
+
+      incidents.listRcaRuns("test-org", "incident-123", { limit: 20, before: "run-9" });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/incident-123/rca/runs",
+        { params: { limit: 20, before: "run-9" } },
+      );
+    });
+  });
+
+  describe("getRcaRun", () => {
+    it("should call GET …/rca/runs/{run_id}", () => {
+      mockHttp.get.mockResolvedValue({ data: { run_id: "run-1" } });
+
+      incidents.getRcaRun("test-org", "incident-123", "run-1");
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/incident-123/rca/runs/run-1",
+      );
+    });
+  });
+
+  describe("cancelRca", () => {
+    it("should call DELETE …/rca", () => {
+      mockHttp.delete.mockResolvedValue({ data: { run_id: "run-1" } });
+
+      incidents.cancelRca("test-org", "incident-123");
+
+      expect(mockHttp.delete).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/incident-123/rca",
+      );
+    });
+  });
+
+  it("no longer exposes getRcaHistory", () => {
+    expect("getRcaHistory" in incidents).toBe(false);
   });
 
   describe("getCorrelatedStreams", () => {
