@@ -6,7 +6,7 @@ import { gt, raw, type I18nText } from "@/types/i18n";
 
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { dataTypeOf, valueOf } from "./evalEntity";
-import { formatNumber } from "./qualityFormat";
+import { formatExact } from "./qualityFormat";
 
 export function escapeSqlString(s: string): string {
   return s.replace(/'/g, "''");
@@ -33,7 +33,8 @@ export function thresholdForConfig(config: ScoreConfig): { label: I18nText } {
   if (type === "numeric") {
     if (ht.value === undefined || ht.value === null || !ht.direction) return { label: raw("") };
     const value = Number(ht.value);
-    const shown = Number.isFinite(value) ? formatNumber(value) : String(ht.value);
+    // Exact, never rounded: a rounded rule would contradict the scores it classifies.
+    const shown = Number.isFinite(value) ? formatExact(value) : String(ht.value);
     return { label: raw(`${ht.direction === "gte" ? "≥" : "≤"} ${shown}`) };
   }
 
