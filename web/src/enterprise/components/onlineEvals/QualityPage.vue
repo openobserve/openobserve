@@ -102,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enabled="enabled"
         :initial-page="restoredPage"
         :initial-score-id="restoredScoreId"
+        :initial-filter="restoredFilter"
         @back="closeConfig"
         @update:only="(value) => updateQuery({ only: value === 'all' ? undefined : value })"
         @status="(status) => (detailStatus = status)"
@@ -145,7 +146,10 @@ import { thresholdForConfig } from "./utils/scoreThreshold";
 import { parseTabFromRoute } from "./utils/routeSync";
 import {
   QUALITY_SCOPES,
+  chartFilterFromQuery,
+  chartFilterToQuery,
   scoreConfigLink,
+  type QualityChartFilter,
   type QualityOnly,
   type QualityRow,
   type QualityScope,
@@ -279,11 +283,20 @@ const restoredPage = computed(() => {
 const restoredScoreId = computed(() =>
   typeof route.query.score === "string" && route.query.score ? route.query.score : null,
 );
+// The chart filter travels with them: a page and score restored without it point into the wrong list.
+const restoredFilter = computed(() => chartFilterFromQuery(route.query));
 
-function updatePosition(position: { page: number; scoreId: string | null }) {
+function updatePosition(position: {
+  page: number;
+  scoreId: string | null;
+  filter: QualityChartFilter | null;
+}) {
   updateQuery({
     page: position.page > 0 ? String(position.page + 1) : undefined,
     score: position.scoreId ?? undefined,
+    bucket: undefined,
+    value: undefined,
+    ...chartFilterToQuery(position.filter),
   });
 }
 
@@ -295,6 +308,8 @@ function openConfig(row: QualityRow, onlyValue: QualityOnly) {
       only: onlyValue === "all" ? undefined : onlyValue,
       page: undefined,
       score: undefined,
+      bucket: undefined,
+      value: undefined,
     },
     true,
   );
@@ -323,6 +338,8 @@ function closeConfig() {
     only: undefined,
     page: undefined,
     score: undefined,
+    bucket: undefined,
+    value: undefined,
   });
 }
 

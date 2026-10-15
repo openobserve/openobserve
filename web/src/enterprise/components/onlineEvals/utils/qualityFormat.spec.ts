@@ -11,8 +11,10 @@ import {
   DEFAULT_QUALITY_RANGE,
   agentParamsFor,
   bucketLabel,
+  chartFilterFromQuery,
   chartFilterLabel,
   chartFilterParams,
+  chartFilterToQuery,
   contentSpan,
   distributionDataType,
   trendKind,
@@ -495,5 +497,26 @@ describe("the span a score's full text comes from", () => {
   it("finds nothing without LLM input or output", () => {
     expect(contentSpan(base, [span("plain", 1, { gen_ai_input_messages: "  " })])).toBeUndefined();
     expect(contentSpan(base, [])).toBeUndefined();
+  });
+});
+
+describe("chart filter in the URL", () => {
+  it("writes a bucket range and a value, and reads them back", () => {
+    for (const filter of [
+      { kind: "bucket", from: 3, to: 5 } as const,
+      { kind: "value", value: "medium" } as const,
+    ]) {
+      expect(chartFilterFromQuery(chartFilterToQuery(filter))).toEqual(filter);
+    }
+    expect(chartFilterToQuery({ kind: "bucket", from: 2, to: 2 })).toEqual({ bucket: "2-2" });
+    expect(chartFilterToQuery(null)).toEqual({});
+  });
+
+  it("restores no filter from a missing or malformed value", () => {
+    expect(chartFilterFromQuery({})).toBeNull();
+    expect(chartFilterFromQuery({ bucket: "5-3" })).toBeNull();
+    expect(chartFilterFromQuery({ bucket: "x" })).toBeNull();
+    expect(chartFilterFromQuery({ value: "" })).toBeNull();
+    expect(chartFilterFromQuery({ value: ["a", "b"] })).toBeNull();
   });
 });

@@ -288,6 +288,7 @@ import {
   formatScoreValue,
   nextChartFilter,
   trendKind,
+  type QualityChartFilter,
   type QualityOnly,
   type QualityRow,
   type QualityScope,
@@ -312,14 +313,19 @@ const props = defineProps<{
   initialPage: number;
   /** Score to reselect when it is on that page, from the URL. */
   initialScoreId: string | null;
+  /** Chart filter the page and score belong to, from the URL. */
+  initialFilter?: QualityChartFilter | null;
 }>();
 
 const emit = defineEmits<{
   (e: "back"): void;
   (e: "update:only", only: QualityOnly): void;
   (e: "status", status: { updatedAt: number; fetching: boolean }): void;
-  /** The page and selected score, for the URL. */
-  (e: "position", position: { page: number; scoreId: string | null }): void;
+  /** The chart filter, page and selected score, for the URL. */
+  (
+    e: "position",
+    position: { page: number; scoreId: string | null; filter: QualityChartFilter | null },
+  ): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -350,7 +356,11 @@ const {
   dateWindow: toRef(props, "dateWindow"),
   agentParams: toRef(props, "agentParams"),
   enabled: toRef(props, "enabled"),
-  initial: { page: props.initialPage, scoreId: props.initialScoreId },
+  initial: {
+    page: props.initialPage,
+    scoreId: props.initialScoreId,
+    filter: props.initialFilter ?? null,
+  },
 });
 
 // Without a list row, the Score Config list, then the distribution itself, says what the config is.
@@ -412,9 +422,9 @@ watch(selected, async (score) => {
 
 // Reported once the page has loaded, so a page still loading never clears the score in the URL.
 watch(
-  () => [page.value, selected.value?.id ?? null, listLoading.value] as const,
-  ([currentPage, scoreId, loading]) => {
-    if (!loading) emit("position", { page: currentPage, scoreId });
+  () => [page.value, selected.value?.id ?? null, listLoading.value, filter.value] as const,
+  ([currentPage, scoreId, loading, chartFilter]) => {
+    if (!loading) emit("position", { page: currentPage, scoreId, filter: chartFilter });
   },
   { immediate: true },
 );
