@@ -36,11 +36,11 @@ export function useQualityDetail(opts: {
   dateWindow: Ref<DateWindow>;
   agentParams: Ref<QualityAgentParams>;
   enabled: Ref<boolean>;
-  /** Page and score to reopen, read from the URL once. */
-  initial?: { page: number; scoreId: string | null };
+  /** Chart filter, page and score to reopen, read from the URL once. */
+  initial?: { page: number; scoreId: string | null; filter?: QualityChartFilter | null };
 }) {
   const orgId = useOrgId();
-  const filter = ref<QualityChartFilter | null>(null);
+  const filter = ref<QualityChartFilter | null>(opts.initial?.filter ?? null);
   /** Zero-based page of the score list. */
   const page = ref(opts.initial?.page ?? 0);
   /** Selected score; when it is not on the page, `selectedIndex` picks the row. */

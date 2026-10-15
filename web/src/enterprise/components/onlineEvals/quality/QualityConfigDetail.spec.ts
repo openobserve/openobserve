@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import store from "@/test/unit/helpers/store";
 import { withQueryClient } from "@/test/unit/helpers/queryClient";
 import type { QualityScorePage, ScoreConfig } from "@/services/online-evals.service";
-import type { QualityRow } from "../utils/qualityFormat";
+import type { QualityChartFilter, QualityRow } from "../utils/qualityFormat";
 
 const { scores } = vi.hoisted(() => ({ scores: vi.fn() }));
 
@@ -122,6 +122,7 @@ function mountDetail(
     config?: ScoreConfig | null;
     initialPage?: number;
     initialScoreId?: string | null;
+    initialFilter?: QualityChartFilter | null;
     realTable?: boolean;
   } = {},
 ) {
@@ -138,6 +139,7 @@ function mountDetail(
       enabled: true,
       initialPage: extra.initialPage ?? 0,
       initialScoreId: extra.initialScoreId ?? null,
+      initialFilter: extra.initialFilter ?? null,
     },
     global: {
       plugins: [store, withQueryClient()],
@@ -392,9 +394,29 @@ describe("QualityConfigDetail", () => {
     scores.mockResolvedValue({ ...PAGE, list: [score("s1"), score("s2"), score("s3")], total: 3 });
     const wrapper = mountDetail();
     await flushPromises();
-    expect(wrapper.emitted("position")?.at(-1)).toEqual([{ page: 0, scoreId: "s1" }]);
+    expect(wrapper.emitted("position")?.at(-1)).toEqual([
+      { page: 0, scoreId: "s1", filter: null },
+    ]);
     await wrapper.find('[data-test="score-s3"]').trigger("click");
-    expect(wrapper.emitted("position")?.at(-1)).toEqual([{ page: 0, scoreId: "s3" }]);
+    expect(wrapper.emitted("position")?.at(-1)).toEqual([
+      { page: 0, scoreId: "s3", filter: null },
+    ]);
+  });
+
+  it("reopens the chart filter with its page and score, so Back lands in the same list", async () => {
+    scores.mockImplementation((_org, _id, params) =>
+      Promise.resolve({
+        ...PAGE,
+        list: [score(`s${params.from}`), score(`s${params.from + 1}`)],
+        total: 12,
+      }),
+    );
+    const filter: QualityChartFilter = { kind: "value", value: "medium" };
+    const wrapper = mountDetail({}, { initialPage: 1, initialScoreId: "s11", initialFilter: filter });
+    await flushPromises();
+    expect(scores.mock.calls[0][2]).toMatchObject({ from: 10, value: "medium" });
+    expect(wrapper.find('[data-test="pane-stub"]').text()).toBe("s11");
+    expect(wrapper.emitted("position")?.at(-1)).toEqual([{ page: 1, scoreId: "s11", filter }]);
   });
 
   it("reopens the page and the score it is given", async () => {
