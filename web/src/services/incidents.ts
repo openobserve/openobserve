@@ -49,13 +49,149 @@ export interface Incident {
   updated_at: number;
   /** Set while a downtime mutes the incident; cleared by the first firing after the window. */
   muted_by_downtime_id?: string | null;
+  /** Summary of the latest RCA run, or null when the incident has none. */
+  rca: RcaSummary | null;
+  /** Why no automatic run started for this incident (e.g. "l0_off"), or null. */
+  rca_off_reason?: string | null;
+}
+
+export type RcaRunState = "running" | "waiting_input" | "completed" | "failed" | "cancelled";
+
+export type RcaTrigger =
+  | "auto_new_incident"
+  | "auto_new_alert_type"
+  | "auto_reopen"
+  | "manual"
+  | "reanalyze"
+  | "oncall_page"
+  | "resume"
+  | "legacy";
+
+export type RcaRunMode = "fresh" | "build_on_previous";
+
+export type RcaRunSubjectType = "incident" | "alert";
+
+/** The finished result shown while a newer run is live, failed or cancelled. */
+export interface RcaPreviousResult {
+  run_id: string;
+  outcome: string | null;
+  confidence: string | null;
+  /** Microseconds since epoch. */
+  ended_at: number;
+}
+
+/** The `rca_summary` fields stored on the incident row. */
+export interface RcaSummaryFields {
+  stage: string | null;
+  stage_index: number | null;
+  stage_count: number;
+  steps: number;
+  tool_calls: number;
+  steered_by: string[];
+  unblocked_by: string | null;
+  /** The error reason of a failed run, or the blocked detail. */
+  detail: string | null;
+  deadline_at: number | null;
+  /** Display name of the user who cancelled the run. */
+  cancelled_by?: string | null;
+  previous: RcaPreviousResult | null;
+}
+
+/** Run summary of an incident's latest run. Times are microseconds since epoch. */
+export interface RcaSummary {
+  run_id: string;
+  state: RcaRunState;
+  /** Computed by the server: a running run with no update past the stale threshold. */
+  stale: boolean;
+  started_at: number;
+  updated_at: number;
+  outcome: string | null;
+  confidence: string | null;
+  summary: RcaSummaryFields;
+  /** Detail endpoint only: the newest run, without its report. */
+  current_run?: RcaRun | null;
+  /** Detail endpoint only: the newest completed run, without its report. */
+  report_run?: RcaRunItem | null;
+  /** Detail endpoint only: runs newest first. */
+  history?: RcaRunItem[];
+}
+
+export interface RcaRunItem {
+  run_id: string;
+  subject_type: RcaRunSubjectType;
+  trigger: RcaTrigger;
+  mode: RcaRunMode;
+  started_by: string;
+  state: RcaRunState;
+  started_at: number;
+  ended_at: number | null;
+  outcome: string | null;
+  confidence: string | null;
+  cancelled_by: string | null;
+  error_reason: string | null;
+}
+
+export interface RcaRunError {
+  code: string;
+  reason: string;
+  details: string | null;
+  trigger_type: string | null;
+}
+
+export interface RcaRunStats {
+  steps?: number;
+  tool_calls?: number;
+  duration_ms?: number;
+  tokens?: unknown;
+  credits?: number;
+  steered?: number;
+}
+
+export interface RcaRun {
+  run_id: string;
+  subject_type: RcaRunSubjectType;
+  subject_id: string;
+  incident_id: string | null;
+  trigger: RcaTrigger;
+  mode: RcaRunMode;
+  started_by: string;
+  guidance: string | null;
+  state: RcaRunState;
+  started_at: number;
+  updated_at: number;
+  ended_at: number | null;
+  cancelled_by: string | null;
+  outcome: string | null;
+  confidence: string | null;
+  report: string | null;
+  result: unknown;
+  error: RcaRunError | null;
+  session_id: string | null;
+  stats: RcaRunStats | null;
+}
+
+export interface ListRcaRunsResponse {
+  runs: RcaRunItem[];
+  has_more: boolean;
+}
+
+/** POST …/rca: 202 `{message, run_id}` (spawned) or 200 `{rca_content, run_id}` (inline). */
+export interface TriggerRcaResponse {
+  message?: string;
+  rca_content?: string;
+  run_id: string;
+}
+
+export interface CancelRcaResponse {
+  message: string;
+  aborted_local_task: boolean;
+  run_id: string;
 }
 
 export interface IncidentTopology {
   nodes: AlertNode[];
   edges: AlertEdge[];
   related_incident_ids: string[];
-  suggested_root_cause?: string;
 }
 
 export interface AlertNode {
@@ -116,20 +252,6 @@ export interface UpdateSeverityResponse extends Incident {
 export interface ListIncidentsResponse {
   incidents: Incident[];
   total: number;
-}
-
-/** A superseded RCA report retained for an incident. */
-export interface ArchivedRcaReport {
-  content: string;
-  /** Microseconds since epoch. */
-  archived_at: number;
-}
-
-export interface RcaHistoryResponse {
-  /** The report currently shown on the incident, or null if none has run. */
-  current: string | null;
-  /** Superseded reports, newest first. */
-  previous: ArchivedRcaReport[];
 }
 
 export interface IncidentStats {
@@ -250,7 +372,7 @@ const incidents = {
     config: { signal?: AbortSignal } = {},
   ) => {
     return http()
-      .post<{ rca_content: string }>(
+      .post<TriggerRcaResponse>(
         `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca`,
         null,
         { params, signal: config.signal },
@@ -264,24 +386,36 @@ const incidents = {
   },
 
   /**
-   * Fetch the current RCA report plus any superseded reports retained for this
-   * incident, newest first. Loaded on demand so the incident list stays light.
+   * List the RCA runs of an incident, newest first. `before` is a run id for paging.
    */
-  getRcaHistory: (org_identifier: string, incident_id: string) => {
-    return http().get<RcaHistoryResponse>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/history`,
+  listRcaRuns: (
+    org_identifier: string,
+    incident_id: string,
+    params: { limit?: number; before?: string } = {},
+  ) => {
+    return http().get<ListRcaRunsResponse>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs`,
+      { params },
     );
   },
 
   /**
-   * Cancel the in-flight RCA analysis for an incident.
+   * Get one RCA run of an incident, including its report.
+   */
+  getRcaRun: (org_identifier: string, incident_id: string, run_id: string) => {
+    return http().get<RcaRun>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}`,
+    );
+  },
+
+  /**
+   * Cancel the live RCA run of an incident.
    *
-   * Aborts the server-side run when the handling node owns it, and always records a
-   * terminal cancellation event so the in-flight guard is released immediately —
-   * this is what unblocks a retry after a run was stranded by a restart.
+   * Aborts the server-side task when the handling node owns it, and always ends the
+   * run as cancelled so a new run can start, stale or not.
    */
   cancelRca: (org_identifier: string, incident_id: string) => {
-    return http().delete<{ message: string; aborted_local_task: boolean }>(
+    return http().delete<CancelRcaResponse>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca`,
     );
   },

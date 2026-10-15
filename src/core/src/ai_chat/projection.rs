@@ -15,11 +15,12 @@
 
 //! Port of o2-ai's `project_events`; model names are not redacted (unknown here).
 
-use std::{collections::HashMap, sync::LazyLock};
+use std::collections::HashMap;
 
 use config::utils::json::{Map, Value, json};
 use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
-use regex::{NoExpand, Regex};
+
+use crate::redact::redact_internal_details;
 
 const PLACEHOLDER_TITLE_PREFIXES: [&str; 2] = ["New session - ", "Child session - "];
 const INJECTED_KEY: &str = "o2_injected";
@@ -115,35 +116,6 @@ const PERMISSION_REJECTION_MARKERS: [&str; 5] = [
     "rejected the permission",
     "not allowed to access",
 ];
-
-// Order matters: paths collapse before the bare-word runtime rule rewrites them.
-static INTERNAL_PATTERNS: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|| {
-    [
-        (r"/data/opencode-workspaces[\w./-]*", "[internal path]"),
-        (r"/home/appuser[\w./-]*", "[internal path]"),
-        (r"~?/\.config/opencode[\w./-]*", "[internal path]"),
-        (r"\bnats://[\w.:@-]+", "[internal endpoint]"),
-        (
-            r"\bhttps?://(?:127\.0\.0\.1|localhost|0\.0\.0\.0)(?::\d+)?[\w./-]*",
-            "[internal endpoint]",
-        ),
-        (
-            r"(?i)\b(?:the\s+)?opencode(?:\s+(?:runtime|server|agent))?\b",
-            "the agent runtime",
-        ),
-        (r"(?i)\bbubblewrap\b", "the sandbox"),
-        (r"(?i)\bbwrap\b", "the sandbox"),
-        (r"(?i)\bappuser\b", "the service account"),
-        (r"(?i)\bDataFusion\b", "the query engine"),
-        (
-            r"\b(?:arrow_schema|sqlparser|datafusion)::[\w:]+",
-            "the query engine",
-        ),
-    ]
-    .into_iter()
-    .map(|(pattern, replacement)| (Regex::new(pattern).expect("valid pattern"), replacement))
-    .collect()
-});
 
 /// A tool call as the live mapper remembers it until its result arrives.
 #[derive(Clone)]
@@ -1225,19 +1197,6 @@ fn extract_error_message(error: &Value) -> String {
     }
 }
 
-/// Scrub internal-architecture details (runtime, paths, endpoints) from outbound text.
-fn redact_internal_details(text: &str) -> String {
-    let mut text = text.to_string();
-    for (pattern, replacement) in INTERNAL_PATTERNS.iter() {
-        if pattern.is_match(&text) {
-            text = pattern
-                .replace_all(&text, NoExpand(replacement))
-                .into_owned();
-        }
-    }
-    text
-}
-
 /// Char index up to which streamed text can be emitted without splitting a redacted term.
 fn stream_split(text: &[char]) -> usize {
     let mut cut = text.len();
@@ -1581,10 +1540,6 @@ mod tests {
         assert_eq!(
             strip_mcp_prefix("o2_correlate_streams"),
             "correlate_streams"
-        );
-        assert_eq!(
-            redact_internal_details("the opencode server at /home/appuser/x"),
-            "the agent runtime at [internal path]"
         );
     }
 }

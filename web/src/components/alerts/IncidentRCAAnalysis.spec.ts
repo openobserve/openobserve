@@ -13,83 +13,113 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, afterEach } from "vitest";
-import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+
+const { toastMock } = vi.hoisted(() => ({ toastMock: vi.fn() }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
+
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
 import i18n from "@/locales";
+import type { RcaRun, RcaRunItem, RcaSummary } from "@/services/incidents";
+import { formatTimestamp } from "@/utils/date";
 
-// ==================== TEST DATA FACTORIES ====================
+// ==================== FIXTURES ====================
 
-/**
- * Creates mock props for IncidentRCAAnalysis
- */
-function createMockProps(overrides = {}) {
+const T0 = 1_760_000_000_000_000; // microseconds
+
+function runItem(overrides: Partial<RcaRunItem> = {}): RcaRunItem {
   return {
-    hasExistingRca: false,
-    rcaLoading: false,
-    rcaStreamContent: "",
-    formattedRcaContent: "",
-    isDarkMode: false,
+    run_id: "run-1",
+    subject_type: "incident",
+    trigger: "auto_new_incident",
+    mode: "fresh",
+    started_by: "system",
+    state: "completed",
+    started_at: T0,
+    ended_at: T0 + 60_000_000,
+    outcome: null,
+    confidence: null,
+    cancelled_by: null,
+    error_reason: null,
     ...overrides,
   };
 }
 
-/**
- * Creates mock RCA content (formatted HTML)
- */
-function createMockRcaContent(overrides = {}) {
-  const defaults = {
-    simple: "<p>Root cause: High CPU usage due to memory leak</p>",
-    detailed: `
-      <h2>Root Cause Analysis</h2>
-      <h3>Primary Cause</h3>
-      <p>Memory leak in payment processing service</p>
-      <h3>Contributing Factors</h3>
-      <ul>
-        <li>Increased traffic volume</li>
-        <li>Database connection pooling issues</li>
-      </ul>
-    `,
-    streaming: "<p>Analyzing incident...</p><p>Checking service dependencies...</p>",
+function currentRun(overrides: Partial<RcaRun> = {}): RcaRun {
+  return {
+    run_id: "run-2",
+    subject_type: "incident",
+    subject_id: "inc-1",
+    incident_id: "inc-1",
+    trigger: "reanalyze",
+    mode: "fresh",
+    started_by: "a.rao@acme.io",
+    guidance: null,
+    state: "running",
+    started_at: T0 + 120_000_000,
+    updated_at: T0 + 120_000_000,
+    ended_at: null,
+    cancelled_by: null,
+    outcome: null,
+    confidence: null,
+    report: null,
+    result: null,
+    error: null,
+    session_id: null,
+    stats: null,
+    ...overrides,
   };
-  return { ...defaults, ...overrides };
 }
 
-// ==================== HELPER FUNCTIONS ====================
-
-/**
- * Finds an element by data-test attribute
- */
-function findByTestId(wrapper: VueWrapper, testId: string) {
-  return wrapper.find(`[data-test="${testId}"]`);
+function summary(overrides: Partial<RcaSummary> = {}): RcaSummary {
+  return {
+    run_id: "run-2",
+    state: "running",
+    stale: false,
+    started_at: T0 + 120_000_000,
+    updated_at: T0 + 120_000_000,
+    outcome: null,
+    confidence: null,
+    summary: {
+      stage: null,
+      stage_index: null,
+      stage_count: 0,
+      steps: 0,
+      tool_calls: 0,
+      steered_by: [],
+      unblocked_by: null,
+      detail: null,
+      deadline_at: null,
+      cancelled_by: null,
+      previous: null,
+    },
+    ...overrides,
+  };
 }
 
-/**
- * Checks if an element exists by data-test id
- */
-function existsByTestId(wrapper: VueWrapper, testId: string): boolean {
-  return findByTestId(wrapper, testId).exists();
-}
+const REPORT_HTML = "<p>Root cause: memory leak in payment service</p>";
 
-/**
- * Clicks the trigger RCA button
- */
-async function clickTriggerButton(wrapper: VueWrapper) {
-  const button = findByTestId(wrapper, "trigger-rca-btn");
-  await button.trigger("click");
-  await flushPromises();
-}
+// ODropdown renders its menu only when open; the stubs render every item so the
+// menu contents can be asserted and selected directly.
+const stubs = {
+  ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
+  ODropdownItem: {
+    props: { disabled: { type: Boolean, default: false } },
+    emits: ["select"],
+    template:
+      "<div role='menuitem' :data-disabled='disabled' @click=\"!disabled && $emit('select')\"><slot /></div>",
+  },
+};
 
-/**
- * Mounts the component with default test setup
- */
-function mountComponent(props = {}) {
-  const defaultProps = createMockProps(props);
+function mountPanel(props: Record<string, unknown> = {}) {
   return mount(IncidentRCAAnalysis, {
-    props: defaultProps,
-    global: { plugins: [i18n] },
+    props: { isDarkMode: false, ...props },
+    global: { plugins: [i18n], stubs },
   });
 }
+
+const byTest = (wrapper: VueWrapper, id: string) => wrapper.find(`[data-test="${id}"]`);
 
 // ==================== TESTS ====================
 
@@ -98,624 +128,233 @@ describe("IncidentRCAAnalysis", () => {
 
   afterEach(() => {
     wrapper?.unmount();
+    toastMock.mockClear();
   });
 
-  describe("Component Rendering", () => {
-    it("should render the component", () => {
-      wrapper = mountComponent();
-      expect(wrapper.exists()).toBe(true);
-      expect(existsByTestId(wrapper, "rca-analysis-container")).toBe(true);
-    });
+  describe("No run yet", () => {
+    it("offers the first run and emits a fresh trigger", async () => {
+      wrapper = mountPanel();
 
-    it("should render in light mode by default", () => {
-      wrapper = mountComponent({ isDarkMode: false });
-      expect(wrapper.exists()).toBe(true);
-    });
+      expect(byTest(wrapper, "rca-existing-container").exists()).toBe(false);
+      await byTest(wrapper, "trigger-rca-btn").trigger("click");
 
-    it("should render in dark mode when enabled", () => {
-      wrapper = mountComponent({ isDarkMode: true });
-      expect(wrapper.exists()).toBe(true);
+      expect(wrapper.emitted("trigger-rca")).toEqual([[{ buildOnPrevious: false }]]);
     });
   });
 
-  describe("Trigger Button State", () => {
-    it("should show trigger button when no analysis and not loading", () => {
-      wrapper = mountComponent({
-        hasExistingRca: false,
-        rcaLoading: false,
-      });
+  describe("Live run", () => {
+    it("first run shows the analyzing banner with Cancel and no trigger button", async () => {
+      wrapper = mountPanel({ rca: summary({ current_run: currentRun() }) });
 
-      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(true);
-      expect(existsByTestId(wrapper, "trigger-rca-btn")).toBe(true);
+      expect(byTest(wrapper, "rca-inflight-container").exists()).toBe(true);
+      expect(byTest(wrapper, "trigger-rca-btn").exists()).toBe(false);
+      await byTest(wrapper, "rca-cancel-btn").trigger("click");
+      expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
     });
 
-    it("should display correct button text", () => {
-      wrapper = mountComponent({
-        hasExistingRca: false,
-        rcaLoading: false,
+    it("a re-run names its mode and keeps the earlier report readable below", () => {
+      wrapper = mountPanel({
+        rca: summary({ current_run: currentRun({ mode: "build_on_previous" }) }),
+        reportRun: runItem(),
+        formattedRcaContent: REPORT_HTML,
       });
 
-      const button = findByTestId(wrapper, "trigger-rca-btn");
-      expect(button.text()).toBe("Analyze Incident");
+      expect(byTest(wrapper, "rca-inflight-message").text()).toBe(
+        "Building on the previous report…",
+      );
+      expect(byTest(wrapper, "rca-existing-content").html()).toContain("memory leak");
     });
 
-    it("should not show trigger button when loading", () => {
-      wrapper = mountComponent({
-        hasExistingRca: false,
-        rcaLoading: true,
+    it("the earlier-report note names the run actually shown (a picked earlier run)", () => {
+      const reportRun = runItem({ run_id: "run-5", started_at: T0 });
+      const viewedRun = runItem({ run_id: "run-2", started_at: T0 - 3 * 3_600_000_000 });
+      wrapper = mountPanel({
+        rca: summary({ state: "failed", current_run: currentRun({ state: "failed" }) }),
+        error: { code: "x", reason: "Agent unavailable", details: null, trigger_type: null },
+        reportRun,
+        viewedRun,
+        history: [reportRun, viewedRun],
+        formattedRcaContent: REPORT_HTML,
       });
 
-      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(false);
-      expect(existsByTestId(wrapper, "trigger-rca-btn")).toBe(false);
+      const note = byTest(wrapper, "rca-earlier-report-note").text();
+      expect(note).toBe(
+        `The report below is from the ${formatTimestamp(viewedRun.started_at, "HH:mm")} run.`,
+      );
+      expect(note).not.toContain(formatTimestamp(reportRun.started_at, "HH:mm"));
     });
 
-    it("should not show trigger button when analysis exists", () => {
-      wrapper = mountComponent({
-        hasExistingRca: true,
-        rcaLoading: false,
-      });
+    it("disables Cancel while the cancel is in flight", () => {
+      wrapper = mountPanel({ rca: summary(), cancelling: true });
 
-      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(false);
-      expect(existsByTestId(wrapper, "trigger-rca-btn")).toBe(false);
+      expect(byTest(wrapper, "rca-cancel-btn").attributes("disabled")).toBeDefined();
     });
 
-    it("should emit trigger-rca when button is clicked", async () => {
-      wrapper = mountComponent({
-        hasExistingRca: false,
-        rcaLoading: false,
-      });
+    it("server stale flag shows the stale banner, still cancellable", async () => {
+      wrapper = mountPanel({ rca: summary({ stale: true }), stale: true });
 
-      await clickTriggerButton(wrapper);
-
-      expect(wrapper.emitted("trigger-rca")).toBeTruthy();
-      expect(wrapper.emitted("trigger-rca")?.length).toBe(1);
-    });
-
-    it("should disable button when loading", () => {
-      wrapper = mountComponent({
-        hasExistingRca: false,
-        rcaLoading: true,
-      });
-
-      // Button shouldn't be visible during loading
-      expect(existsByTestId(wrapper, "trigger-rca-btn")).toBe(false);
+      expect(byTest(wrapper, "rca-stale-banner").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-inflight-container").exists()).toBe(false);
+      await byTest(wrapper, "rca-cancel-btn").trigger("click");
+      expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
     });
   });
 
-  describe("Loading State", () => {
-    it("should show in-flight banner when rcaLoading is true", () => {
-      wrapper = mountComponent({ rcaLoading: true });
-
-      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
+  describe("RR-47: failed latest run with an earlier completed run", () => {
+    const failedProps = () => ({
+      rca: summary({
+        state: "failed",
+        current_run: currentRun({ state: "failed", ended_at: T0 + 180_000_000 }),
+      }),
+      error: {
+        code: "agent_unavailable",
+        reason: "Agent unavailable",
+        details: "connect ECONNREFUSED 10.0.0.4:8080",
+        trigger_type: null,
+      },
+      reportRun: runItem(),
+      formattedRcaContent: REPORT_HTML,
     });
 
-    it("should display loading text in the in-flight banner", () => {
-      wrapper = mountComponent({ rcaLoading: true });
+    it("shows the reason as heading, details collapsed behind Show details, no toast", async () => {
+      wrapper = mountPanel(failedProps());
 
-      const container = findByTestId(wrapper, "rca-inflight-container");
-      expect(container.text()).toContain("AI SRE Agent is analyzing this incident");
+      expect(byTest(wrapper, "rca-error-banner").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-error-reason").text()).toBe("Agent unavailable");
+      expect(byTest(wrapper, "rca-error-details").exists()).toBe(false);
+      const toggle = byTest(wrapper, "rca-error-details-toggle");
+      expect(toggle.text()).toBe("Show details");
+      expect(toggle.attributes("aria-expanded")).toBe("false");
+
+      await toggle.trigger("click");
+
+      expect(byTest(wrapper, "rca-error-details").text()).toContain("ECONNREFUSED");
+      expect(byTest(wrapper, "rca-existing-content").html()).toContain("memory leak");
+      expect(toastMock).not.toHaveBeenCalled();
     });
 
-    it("should show streaming content while loading", () => {
-      const streamContent = createMockRcaContent().streaming;
-      wrapper = mountComponent({
-        rcaLoading: true,
-        rcaStreamContent: "Analyzing...",
-        formattedRcaContent: streamContent,
-      });
+    it("Retry offers both modes with the failed run's mode first", async () => {
+      wrapper = mountPanel(failedProps());
 
-      expect(existsByTestId(wrapper, "rca-stream-content")).toBe(true);
-      const content = findByTestId(wrapper, "rca-stream-content");
-      expect(content.html()).toContain("Analyzing incident");
+      const items = wrapper
+        .findAll('[data-test^="rca-retry-"]')
+        .map((w) => w.attributes("data-test"));
+      expect(items).toEqual(["rca-retry-btn", "rca-retry-fresh", "rca-retry-build"]);
+      await byTest(wrapper, "rca-retry-build").trigger("click");
+      expect(wrapper.emitted("trigger-rca")).toEqual([[{ buildOnPrevious: true }]]);
     });
 
-    it("should not show streaming content when rcaStreamContent is empty", () => {
-      wrapper = mountComponent({
-        rcaLoading: true,
-        rcaStreamContent: "",
-      });
+    it("without an earlier report offers a plain Retry", async () => {
+      wrapper = mountPanel({ ...failedProps(), reportRun: null, formattedRcaContent: "" });
 
-      expect(existsByTestId(wrapper, "rca-stream-content")).toBe(false);
-    });
-
-    it("should render in-flight container in dark mode", () => {
-      wrapper = mountComponent({
-        rcaLoading: true,
-        isDarkMode: true,
-      });
-
-      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
-    });
-
-    it("should render in-flight container in light mode", () => {
-      wrapper = mountComponent({
-        rcaLoading: true,
-        isDarkMode: false,
-      });
-
-      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
+      expect(byTest(wrapper, "rca-retry-fresh").exists()).toBe(false);
+      await byTest(wrapper, "rca-retry-btn").trigger("click");
+      expect(wrapper.emitted("trigger-rca")).toEqual([[{ buildOnPrevious: false }]]);
     });
   });
 
-  describe("Existing Analysis Display", () => {
-    it("should show existing analysis when hasExistingRca is true", () => {
-      const rcaContent = createMockRcaContent().simple;
-      wrapper = mountComponent({
-        hasExistingRca: true,
-        formattedRcaContent: rcaContent,
+  describe("Cancelled latest run", () => {
+    it("names who cancelled it", () => {
+      wrapper = mountPanel({
+        rca: summary({
+          state: "cancelled",
+          current_run: currentRun({
+            state: "cancelled",
+            cancelled_by: "a.rao@acme.io",
+            ended_at: T0 + 180_000_000,
+          }),
+        }),
       });
 
-      expect(existsByTestId(wrapper, "rca-existing-container")).toBe(true);
-      expect(existsByTestId(wrapper, "rca-existing-content")).toBe(true);
-    });
-
-    it("should display formatted RCA content", () => {
-      const rcaContent = createMockRcaContent().simple;
-      wrapper = mountComponent({
-        hasExistingRca: true,
-        formattedRcaContent: rcaContent,
-      });
-
-      const content = findByTestId(wrapper, "rca-existing-content");
-      expect(content.html()).toContain("Root cause: High CPU usage");
-    });
-
-    it("should render detailed HTML content correctly", () => {
-      const rcaContent = createMockRcaContent().detailed;
-      wrapper = mountComponent({
-        hasExistingRca: true,
-        formattedRcaContent: rcaContent,
-      });
-
-      const content = findByTestId(wrapper, "rca-existing-content");
-      expect(content.html()).toContain("Root Cause Analysis");
-      expect(content.html()).toContain("Memory leak");
-      expect(content.html()).toContain("<ul>");
-    });
-
-    // The previous report stays mounted while a reanalysis runs so the panel does not
-    // blank out for the duration of the request; the in-flight banner sits above it.
-    it("should keep showing existing analysis while a reanalysis is loading", () => {
-      wrapper = mountComponent({
-        hasExistingRca: true,
-        rcaLoading: true,
-      });
-
-      expect(existsByTestId(wrapper, "rca-existing-container")).toBe(true);
-      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
-    });
-
-    it("should show streaming content instead of the existing report once chunks arrive", () => {
-      wrapper = mountComponent({
-        hasExistingRca: true,
-        rcaLoading: true,
-        rcaStreamContent: "partial",
-        formattedRcaContent: "<p>partial</p>",
-      });
-
-      expect(existsByTestId(wrapper, "rca-stream-container")).toBe(true);
-      expect(existsByTestId(wrapper, "rca-existing-container")).toBe(false);
-    });
-
-    it("should render existing container in dark mode", () => {
-      const rcaContent = createMockRcaContent().simple;
-      wrapper = mountComponent({
-        hasExistingRca: true,
-        formattedRcaContent: rcaContent,
-        isDarkMode: true,
-      });
-
-      expect(existsByTestId(wrapper, "rca-existing-container")).toBe(true);
-    });
-
-    it("should render existing container in light mode", () => {
-      const rcaContent = createMockRcaContent().simple;
-      wrapper = mountComponent({
-        hasExistingRca: true,
-        formattedRcaContent: rcaContent,
-        isDarkMode: false,
-      });
-
-      expect(existsByTestId(wrapper, "rca-existing-container")).toBe(true);
+      expect(byTest(wrapper, "rca-cancelled-message").text()).toMatch(
+        /^Cancelled by a\.rao at \d{2}:\d{2}:\d{2} UTC after 1m\.$/,
+      );
     });
   });
 
-  describe("Empty State", () => {
-    it("should show trigger button (not an empty-state element) when no analysis and not loading", () => {
-      wrapper = mountComponent({
-        hasExistingRca: false,
-        rcaLoading: false,
+  describe("Report", () => {
+    it("renders the report and emits copy and download", async () => {
+      wrapper = mountPanel({
+        rca: summary({ state: "completed" }),
+        reportRun: runItem(),
+        formattedRcaContent: REPORT_HTML,
       });
 
-      // Empty state text is gone; the trigger button section takes its place
-      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(true);
-      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(false);
+      expect(byTest(wrapper, "rca-existing-content").html()).toContain("memory leak");
+      await byTest(wrapper, "rca-copy-btn").trigger("click");
+      await byTest(wrapper, "rca-download-btn").trigger("click");
+      expect(wrapper.emitted("copy-report")).toHaveLength(1);
+      expect(wrapper.emitted("download-report")).toHaveLength(1);
     });
 
-    it("should not show trigger button when loading", () => {
-      wrapper = mountComponent({
-        hasExistingRca: false,
-        rcaLoading: true,
-      });
+    it("shows a loading line while the report text loads", () => {
+      wrapper = mountPanel({ reportRun: runItem(), reportLoading: true });
 
-      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(false);
+      expect(byTest(wrapper, "rca-report-loading").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-existing-container").exists()).toBe(false);
     });
 
-    it("should not show trigger button when analysis exists", () => {
-      wrapper = mountComponent({
-        hasExistingRca: true,
-        rcaLoading: false,
+    it("Re-analyze offers fresh and build-on-previous", async () => {
+      wrapper = mountPanel({
+        rca: summary({ state: "completed" }),
+        reportRun: runItem(),
+        formattedRcaContent: REPORT_HTML,
       });
 
-      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(false);
-    });
-
-    it("should show in-flight banner instead of trigger button when analysisInFlight", () => {
-      wrapper = mountComponent({
-        hasExistingRca: false,
-        rcaLoading: false,
-        analysisInFlight: true,
-      });
-
-      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(false);
-      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
+      await byTest(wrapper, "rca-reanalyze-fresh").trigger("click");
+      await byTest(wrapper, "rca-reanalyze-build").trigger("click");
+      expect(wrapper.emitted("trigger-rca")).toEqual([
+        [{ buildOnPrevious: false }],
+        [{ buildOnPrevious: true }],
+      ]);
     });
   });
 
-  describe("State Transitions", () => {
-    it("should transition from trigger button to in-flight banner when loading starts", async () => {
-      wrapper = mountComponent({
-        hasExistingRca: false,
-        rcaLoading: false,
-      });
+  describe("RR-36: run history", () => {
+    const history = [
+      runItem({ run_id: "run-5", trigger: "reanalyze", started_by: "a.rao@acme.io" }),
+      runItem({ run_id: "run-4", trigger: "manual", started_by: "j.doe@acme.io", state: "failed" }),
+      runItem({ run_id: "run-3", trigger: "auto_reopen", state: "cancelled" }),
+      runItem({ run_id: "run-2", trigger: "oncall_page" }),
+      runItem({ run_id: "run-1", trigger: "legacy", started_by: "" }),
+    ];
 
-      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(true);
+    it("hides the picker with a single run", () => {
+      wrapper = mountPanel({ reportRun: history[0], history: [history[0]] });
 
-      await wrapper.setProps({ rcaLoading: true });
+      expect(byTest(wrapper, "rca-history-btn").exists()).toBe(false);
+    });
+
+    it("labels each item by its trigger and marks failed and cancelled runs", () => {
+      wrapper = mountPanel({ reportRun: history[0], history, formattedRcaContent: REPORT_HTML });
+
+      const labels = wrapper.findAll('[data-test="rca-history-item-label"]').map((w) => w.text());
+      expect(labels).toEqual([
+        "Re-analyze by a.rao",
+        "Analysis by j.doe",
+        "Auto on reopen",
+        "On-call page",
+        "Earlier report",
+      ]);
+      expect(byTest(wrapper, "rca-history-item-1").text()).toContain("Failed");
+      expect(byTest(wrapper, "rca-history-item-2").text()).toContain("Cancelled");
+      // Only completed runs other than the displayed one open.
+      expect(byTest(wrapper, "rca-history-item-0").attributes("data-disabled")).toBe("true");
+      expect(byTest(wrapper, "rca-history-item-1").attributes("data-disabled")).toBe("true");
+      expect(byTest(wrapper, "rca-history-item-3").attributes("data-disabled")).toBe("false");
+    });
+
+    it("picking an earlier run emits its id; the archived banner goes back", async () => {
+      wrapper = mountPanel({ reportRun: history[0], history, formattedRcaContent: REPORT_HTML });
+
+      await byTest(wrapper, "rca-history-item-3").trigger("click");
+      expect(wrapper.emitted("view-run")).toEqual([["run-2"]]);
+
+      await wrapper.setProps({ viewedRun: history[3] });
       await flushPromises();
-
-      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(false);
-      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
-    });
-
-    it("should transition from loading to existing analysis", async () => {
-      const rcaContent = createMockRcaContent().simple;
-      wrapper = mountComponent({
-        hasExistingRca: false,
-        rcaLoading: true,
-      });
-
-      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
-
-      await wrapper.setProps({
-        rcaLoading: false,
-        hasExistingRca: true,
-        formattedRcaContent: rcaContent,
-      });
-      await flushPromises();
-
-      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(false);
-      expect(existsByTestId(wrapper, "rca-existing-container")).toBe(true);
-    });
-
-    it("should show trigger button after loading completes without existing RCA", async () => {
-      wrapper = mountComponent({
-        hasExistingRca: false,
-        rcaLoading: true,
-      });
-
-      await wrapper.setProps({
-        rcaLoading: false,
-        hasExistingRca: false,
-      });
-      await flushPromises();
-
-      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(true);
-    });
-  });
-
-  describe("Edge Cases", () => {
-    it("should handle very long RCA content", () => {
-      const longContent = "<p>" + "A".repeat(10000) + "</p>";
-      wrapper = mountComponent({
-        hasExistingRca: true,
-        formattedRcaContent: longContent,
-      });
-
-      const content = findByTestId(wrapper, "rca-existing-content");
-      expect(content.exists()).toBe(true);
-    });
-
-    it("should handle RCA content with special characters", () => {
-      const specialContent = "<p>Error: <script>alert('test')</script></p>";
-      wrapper = mountComponent({
-        hasExistingRca: true,
-        formattedRcaContent: specialContent,
-      });
-
-      const content = findByTestId(wrapper, "rca-existing-content");
-      expect(content.html()).toContain("Error:");
-    });
-
-    it("should handle empty formattedRcaContent with hasExistingRca true", () => {
-      wrapper = mountComponent({
-        hasExistingRca: true,
-        formattedRcaContent: "",
-      });
-
-      expect(existsByTestId(wrapper, "rca-existing-container")).toBe(true);
-      const content = findByTestId(wrapper, "rca-existing-content");
-      expect(content.html()).toBeTruthy();
-    });
-
-    it("should handle rapid prop changes", async () => {
-      wrapper = mountComponent();
-
-      await wrapper.setProps({ rcaLoading: true });
-      await flushPromises();
-
-      await wrapper.setProps({ rcaLoading: false, hasExistingRca: true });
-      await flushPromises();
-
-      await wrapper.setProps({ hasExistingRca: false });
-      await flushPromises();
-
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle multiple button clicks", async () => {
-      wrapper = mountComponent({
-        hasExistingRca: false,
-        rcaLoading: false,
-      });
-
-      await clickTriggerButton(wrapper);
-      await clickTriggerButton(wrapper);
-      await clickTriggerButton(wrapper);
-
-      expect(wrapper.emitted("trigger-rca")?.length).toBe(3);
-    });
-  });
-
-  describe("Theme Switching", () => {
-    it("should keep the semantic in-flight banner surface when switching from light to dark mode", async () => {
-      wrapper = mountComponent({
-        hasExistingRca: false,
-        rcaLoading: true,
-        isDarkMode: false,
-      });
-
-      // The in-flight state is an OBanner variant="info", whose surface token flips
-      // with the theme on its own — the class must stay put across the mode switch.
-      const bannerBefore = findByTestId(wrapper, "rca-inflight-container");
-      expect(bannerBefore.classes()).toContain("bg-banner-info-bg");
-
-      await wrapper.setProps({ isDarkMode: true });
-      await flushPromises();
-
-      const bannerAfter = findByTestId(wrapper, "rca-inflight-container");
-      expect(bannerAfter.classes()).toContain("bg-banner-info-bg");
-    });
-
-    it("should apply the semantic in-flight banner surface during loading in dark mode", () => {
-      wrapper = mountComponent({
-        rcaLoading: true,
-        isDarkMode: true,
-      });
-
-      const container = findByTestId(wrapper, "rca-inflight-container");
-      expect(container.classes()).toContain("bg-banner-info-bg");
-    });
-  });
-
-  describe("Integration Scenarios", () => {
-    it("should handle complete analysis workflow", async () => {
-      // Start with empty state
-      wrapper = mountComponent();
-      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(true);
-
-      // Trigger analysis
-      await clickTriggerButton(wrapper);
-      expect(wrapper.emitted("trigger-rca")).toBeTruthy();
-
-      // Simulate loading state
-      await wrapper.setProps({ rcaLoading: true, rcaStreamContent: "Analyzing..." });
-      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
-
-      // Complete analysis
-      const finalContent = createMockRcaContent().detailed;
-      await wrapper.setProps({
-        rcaLoading: false,
-        hasExistingRca: true,
-        formattedRcaContent: finalContent,
-      });
-
-      expect(existsByTestId(wrapper, "rca-existing-container")).toBe(true);
-      expect(findByTestId(wrapper, "rca-existing-content").html()).toContain("Root Cause Analysis");
-    });
-  });
-
-  describe("Credit cost", () => {
-    it("uses the singular for one credit and the plural otherwise", () => {
-      wrapper = mountComponent({ analyzeCreditCost: 1 });
-      expect(findByTestId(wrapper, "rca-credit-cost").text()).toBe("Uses 1 AI credit");
-
-      wrapper.unmount();
-      wrapper = mountComponent({ analyzeCreditCost: 50 });
-      expect(findByTestId(wrapper, "rca-credit-cost").text()).toBe("Uses 50 AI credits");
-    });
-  });
-
-  describe("Failure State", () => {
-    const failure = { reason: "Agent unavailable", details: "connection refused" };
-
-    it("should show the failure banner with reason and details when a run failed", () => {
-      wrapper = mountComponent({ rcaError: failure });
-
-      expect(existsByTestId(wrapper, "rca-error-banner")).toBe(true);
-      expect(findByTestId(wrapper, "rca-error-reason").text()).toContain("Agent unavailable");
-      expect(findByTestId(wrapper, "rca-error-details").text()).toContain("connection refused");
-    });
-
-    it("should offer retry instead of the bare trigger button after a failure", async () => {
-      wrapper = mountComponent({ rcaError: failure });
-
-      // The generic trigger section is replaced by an explicit retry affordance.
-      expect(existsByTestId(wrapper, "rca-trigger-section")).toBe(false);
-
-      await findByTestId(wrapper, "rca-retry-btn").trigger("click");
-      expect(wrapper.emitted("trigger-rca")).toBeTruthy();
-    });
-
-    it("should lead with Plans when AI credits blocked the run", () => {
-      wrapper = mountComponent({ rcaError: { ...failure, remedy: "plans" } });
-
-      expect(existsByTestId(wrapper, "rca-plans-btn")).toBe(true);
-      expect(existsByTestId(wrapper, "rca-error-details")).toBe(false);
-    });
-
-    it("should announce both failure banners to screen readers", () => {
-      wrapper = mountComponent({ rcaError: failure });
-      expect(findByTestId(wrapper, "rca-error-banner").attributes("role")).toBe("alert");
-
-      wrapper.unmount();
-      wrapper = mountComponent({ rcaError: { ...failure, remedy: "plans" } });
-      expect(findByTestId(wrapper, "rca-error-banner").attributes("role")).toBe("alert");
-    });
-
-    it("should keep an existing report visible alongside a failed reanalysis", () => {
-      wrapper = mountComponent({
-        rcaError: failure,
-        hasExistingRca: true,
-        formattedRcaContent: createMockRcaContent().simple,
-      });
-
-      expect(existsByTestId(wrapper, "rca-error-banner")).toBe(true);
-      expect(existsByTestId(wrapper, "rca-existing-container")).toBe(true);
-    });
-
-    it("should hide the failure banner once a new run starts", () => {
-      wrapper = mountComponent({ rcaError: failure, rcaLoading: true });
-
-      expect(existsByTestId(wrapper, "rca-error-banner")).toBe(false);
-      expect(existsByTestId(wrapper, "rca-inflight-container")).toBe(true);
-    });
-  });
-
-  describe("Cancel", () => {
-    it("should emit cancel-rca when cancelling a background run", async () => {
-      wrapper = mountComponent({ analysisInFlight: true });
-
-      await findByTestId(wrapper, "rca-cancel-btn").trigger("click");
-      expect(wrapper.emitted("cancel-rca")).toBeTruthy();
-    });
-
-    it("should emit cancel-rca when cancelling a user-triggered run", async () => {
-      wrapper = mountComponent({ rcaLoading: true });
-
-      await findByTestId(wrapper, "rca-cancel-btn").trigger("click");
-      expect(wrapper.emitted("cancel-rca")).toBeTruthy();
-    });
-
-    it("should disable the cancel button while the cancel is in flight", () => {
-      wrapper = mountComponent({ analysisInFlight: true, rcaCancelling: true });
-
-      expect(findByTestId(wrapper, "rca-cancel-btn").attributes("disabled")).toBeDefined();
-    });
-  });
-
-  describe("Report Toolbar", () => {
-    const withReport = (overrides = {}) =>
-      mountComponent({
-        hasExistingRca: true,
-        formattedRcaContent: createMockRcaContent().simple,
-        ...overrides,
-      });
-
-    it("should not render the toolbar before any report exists", () => {
-      wrapper = mountComponent();
-      expect(existsByTestId(wrapper, "rca-toolbar")).toBe(false);
-    });
-
-    it("should show when the report was produced", () => {
-      // 5 minutes ago, in epoch microseconds.
-      const fiveMinAgo = (Date.now() - 5 * 60 * 1000) * 1000;
-      wrapper = withReport({ analyzedAt: fiveMinAgo });
-
-      expect(findByTestId(wrapper, "rca-analyzed-ago").text()).toContain("5m");
-    });
-
-    it("should emit copy-report and download-report", async () => {
-      wrapper = withReport();
-
-      await findByTestId(wrapper, "rca-copy-btn").trigger("click");
-      await findByTestId(wrapper, "rca-download-btn").trigger("click");
-
-      expect(wrapper.emitted("copy-report")).toBeTruthy();
-      expect(wrapper.emitted("download-report")).toBeTruthy();
-    });
-
-    it("should hide the history picker when there are no earlier reports", () => {
-      wrapper = withReport();
-      expect(existsByTestId(wrapper, "rca-history-btn")).toBe(false);
-    });
-
-    it("should show the history picker once earlier reports exist", () => {
-      wrapper = withReport({
-        rcaHistory: [{ content: "older", archived_at: 1_700_000_000_000_000 }],
-      });
-
-      expect(existsByTestId(wrapper, "rca-history-btn")).toBe(true);
-    });
-
-    it("should flag when an archived report is being viewed and offer a way back", async () => {
-      wrapper = withReport({
-        rcaHistory: [{ content: "older", archived_at: 1_700_000_000_000_000 }],
-        viewingArchivedIndex: 0,
-      });
-
-      expect(existsByTestId(wrapper, "rca-archived-banner")).toBe(true);
-
-      await findByTestId(wrapper, "rca-back-to-current-btn").trigger("click");
-      expect(wrapper.emitted("view-report")?.[0]).toEqual([null]);
-    });
-
-    it("should not flag the current report as archived", () => {
-      wrapper = withReport({
-        rcaHistory: [{ content: "older", archived_at: 1_700_000_000_000_000 }],
-        viewingArchivedIndex: null,
-      });
-
-      expect(existsByTestId(wrapper, "rca-archived-banner")).toBe(false);
-    });
-
-    it("should hide the re-analyze control while a run is in progress", () => {
-      wrapper = withReport({ analysisInFlight: true });
-      expect(existsByTestId(wrapper, "rca-reanalyze-btn")).toBe(false);
-    });
-  });
-
-  describe("Elapsed Time and Staleness", () => {
-    it("should show the elapsed label while running", () => {
-      wrapper = mountComponent({
-        analysisInFlight: true,
-        analysisElapsedLabel: "4m",
-      });
-
-      expect(findByTestId(wrapper, "rca-elapsed").text()).toContain("4m");
-    });
-
-    it("should warn and stay cancellable when a run outlives the stale window", () => {
-      wrapper = mountComponent({
-        analysisInFlight: true,
-        analysisElapsedLabel: "1h 5m",
-        analysisIsStale: true,
-      });
-
-      const banner = findByTestId(wrapper, "rca-inflight-container");
-      // Stale runs switch to the warning surface rather than the neutral info one.
-      expect(banner.classes()).toContain("bg-banner-warning-bg");
-      expect(existsByTestId(wrapper, "rca-cancel-btn")).toBe(true);
+      expect(byTest(wrapper, "rca-archived-banner").exists()).toBe(true);
+      await byTest(wrapper, "rca-back-to-current-btn").trigger("click");
+      expect(wrapper.emitted("view-run")?.[1]).toEqual([null]);
     });
   });
 });

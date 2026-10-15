@@ -224,7 +224,9 @@ mod m20261012_000001_create_alert_calibration_configs;
 mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
 mod m20261015_000001_reports_add_last_run_columns;
+mod m20261016_000001_create_rca_runs;
 mod m20261016_000001_create_rum_pa_app_settings;
+mod m20261016_000002_backfill_rca_runs;
 mod m20261018_000001_create_slack_tables;
 mod m20261020_000001_create_eval_job_states_tables;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
@@ -592,6 +594,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261016_000001_create_rum_pa_app_settings::Migration),
             Box::new(m20261020_000001_create_eval_job_states_tables::Migration),
             Box::new(m20261018_000001_create_slack_tables::Migration),
+            Box::new(m20261016_000001_create_rca_runs::Migration),
+            Box::new(m20261016_000002_backfill_rca_runs::Migration),
         ]
     }
 }
@@ -663,6 +667,8 @@ mod tests {
         (110, "m20261016_000001_create_rum_pa_app_settings"),
         (111, "m20261020_000001_create_eval_job_states_tables"),
         (112, "m20261018_000001_create_slack_tables"),
+        (113, "m20261016_000001_create_rca_runs"),
+        (114, "m20261016_000002_backfill_rca_runs"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -796,6 +802,18 @@ mod tests {
             (
                 "m20260923_000001_create_ai_chat_sessions",
                 "m20261007_000001_create_ai_chat_turns",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261016_000001_create_rca_runs",
+            ),
+            (
+                "m20260214_000001_create_incident_events_table",
+                "m20261016_000002_backfill_rca_runs",
+            ),
+            (
+                "m20261016_000001_create_rca_runs",
+                "m20261016_000002_backfill_rca_runs",
             ),
         ] {
             assert!(
