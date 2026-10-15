@@ -261,7 +261,10 @@ export function chartFilterToQuery(filter: QualityChartFilter | null): {
     : { value: filter.value };
 }
 
-/** The chart filter from URL values; a malformed value restores no filter. */
+/** The backend always splits a numeric range into this many buckets. */
+const NUMERIC_BUCKETS = 10;
+
+/** The chart filter from URL values; a malformed or out-of-range value restores no filter. */
 export function chartFilterFromQuery(query: {
   bucket?: unknown;
   value?: unknown;
@@ -270,7 +273,7 @@ export function chartFilterFromQuery(query: {
     const match = /^(\d+)-(\d+)$/.exec(query.bucket);
     if (!match) return null;
     const [from, to] = [Number(match[1]), Number(match[2])];
-    return from <= to ? { kind: "bucket", from, to } : null;
+    return from <= to && to < NUMERIC_BUCKETS ? { kind: "bucket", from, to } : null;
   }
   return typeof query.value === "string" && query.value
     ? { kind: "value", value: query.value }

@@ -554,6 +554,8 @@ describe("chart filter in the URL", () => {
   it("restores no filter from a missing or malformed value", () => {
     expect(chartFilterFromQuery({})).toBeNull();
     expect(chartFilterFromQuery({ bucket: "5-3" })).toBeNull();
+    expect(chartFilterFromQuery({ bucket: "3-12" })).toBeNull();
+    expect(chartFilterFromQuery({ bucket: "9-9" })).toEqual({ kind: "bucket", from: 9, to: 9 });
     expect(chartFilterFromQuery({ bucket: "x" })).toBeNull();
     expect(chartFilterFromQuery({ value: "" })).toBeNull();
     expect(chartFilterFromQuery({ value: ["a", "b"] })).toBeNull();
