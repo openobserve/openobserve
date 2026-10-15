@@ -27,7 +27,8 @@ import { subtractRelativeTime } from "@/utils/date";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
 import commonService from "../services/common";
-import type { TranslateFn } from "@/types/i18n";
+import { gt, type TranslateFn } from "@/types/i18n";
+import { findPanelById } from "./dashboard/findPanel";
 import type { Ref } from "vue";
 
 let moment: any;
@@ -494,11 +495,10 @@ export const updatePanel = async (
   // call the update dashboard function
   const currentDashboard = await getDashboard(store, dashboardId, folderId);
 
-  // find tab from tabId
-  const tab = getTabDataFromTabId(currentDashboard, tabId);
-
-  const panelIndex = tab.panels.findIndex((panel: any) => panel.id == panelData.id);
-  tab.panels[panelIndex] = panelData;
+  // A teammate may have moved the panel to another tab since the editor opened.
+  const found = findPanelById(currentDashboard, panelData.id, tabId);
+  if (!found) throw new Error(gt("panelDraft.panelMissingOnSave"));
+  found.tab.panels[found.index] = panelData;
   return await updateDashboard(
     store,
     store.state.selectedOrganization.identifier,
@@ -817,12 +817,7 @@ export const getPanel = async (
 ) => {
   const currentDashboard = await getDashboard(store, dashboardId, folderId);
 
-  // find tab from tabId
-  const tab = getTabDataFromTabId(currentDashboard, tabId);
-
-  const paneldata = tab?.panels?.find((it: any) => it?.id == panelId);
-
-  return paneldata;
+  return findPanelById(currentDashboard, panelId, tabId)?.panel;
 };
 
 export const getPanelId = () => {
