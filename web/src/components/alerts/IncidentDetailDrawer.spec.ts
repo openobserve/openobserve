@@ -85,8 +85,11 @@ vi.mock("@/services/service_streams", () => ({
   buildChipDimensionsFromFilters: vi.fn(() => ({})),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import analytics from "@/services/product_analytics";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
 import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
 import incidentsService, {
@@ -505,6 +508,124 @@ describe("IncidentDetailDrawer.vue", () => {
       await wrapper.vm.acknowledgeIncident();
 
       expect(incidentsService.updateStatus).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Status change chips (handleStatusChange) match the header buttons", () => {
+    beforeEach(async () => {
+      wrapper = await createWrapper({}, {}, "1");
+      await nextTick();
+      await flushPromises();
+      mockConfirm.mockClear();
+      mockConfirm.mockResolvedValue(true);
+      (incidentsService.updateStatus as any).mockClear();
+    });
+
+    it("asks the same confirm before acknowledging", async () => {
+      await wrapper.vm.handleStatusChange("acknowledged");
+
+      expect(mockConfirm).toHaveBeenCalledTimes(1);
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "acknowledged");
+    });
+
+    it("does not acknowledge when the confirm is declined", async () => {
+      mockConfirm.mockResolvedValueOnce(false);
+
+      await wrapper.vm.handleStatusChange("acknowledged");
+
+      expect(incidentsService.updateStatus).not.toHaveBeenCalled();
+    });
+
+    it("records who acknowledged it from the response", async () => {
+      (incidentsService.updateStatus as any).mockResolvedValue({
+        data: {
+          status: "acknowledged",
+          acknowledged_by: "alice@example.com",
+          acknowledged_at: 1700000001000000,
+        },
+      });
+
+      await wrapper.vm.handleStatusChange("acknowledged");
+
+      expect(wrapper.vm.incidentDetails.status).toBe("acknowledged");
+      expect(wrapper.vm.incidentDetails.acknowledged_by).toBe("alice@example.com");
+      expect(wrapper.vm.incidentDetails.acknowledged_at).toBe(1700000001000000);
+      expect(wrapper.vm.editableStatus).toBe("acknowledged");
+    });
+
+    it("emits status-updated like the header buttons", async () => {
+      (incidentsService.updateStatus as any).mockResolvedValue({ data: { status: "resolved" } });
+
+      await wrapper.vm.handleStatusChange("resolved");
+
+      expect(mockConfirm).not.toHaveBeenCalled();
+      expect(wrapper.emitted("status-updated")).toBeTruthy();
+    });
+
+    it("re-checks the analysis after a reopen", async () => {
+      wrapper.vm.incidentDetails.status = "resolved";
+      (incidentsService.updateStatus as any).mockResolvedValue({ data: { status: "open" } });
+      (incidentsService.getEvents as any).mockClear();
+
+      await wrapper.vm.handleStatusChange("open");
+      await flushPromises();
+
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "open");
+      expect(incidentsService.getEvents).toHaveBeenCalledWith("default", "1");
+    });
+
+    it("ignores a change while another update is in flight", async () => {
+      wrapper.vm.updating = true;
+
+      await wrapper.vm.handleStatusChange("resolved");
+
+      expect(incidentsService.updateStatus).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("incident_view_summary", () => {
+    const viewSummaries = () =>
+      (analytics.track as any).mock.calls.filter(
+        ([name]: [string]) => name === "incident_view_summary",
+      );
+
+    beforeEach(async () => {
+      (analytics.track as any).mockClear();
+      mockConfirm.mockResolvedValue(true);
+      wrapper = await createWrapper({}, {}, "1");
+      await nextTick();
+      await flushPromises();
+    });
+
+    it("sends one summary on close, with only the first action", async () => {
+      await wrapper.vm.acknowledgeIncident();
+      (incidentsService.updateStatus as any).mockResolvedValue({ data: { status: "resolved" } });
+      await wrapper.vm.resolveIncident();
+      wrapper.vm.close();
+      wrapper.vm.close();
+
+      expect(viewSummaries()).toHaveLength(1);
+      expect(viewSummaries()[0][1]).toMatchObject({
+        incident_id: "1",
+        severity: "P1",
+        first_action: "ack",
+      });
+    });
+
+    it("counts a posted comment as the first action", async () => {
+      wrapper.vm.recordCommentPosted();
+      await wrapper.vm.acknowledgeIncident();
+      wrapper.vm.close();
+
+      expect(viewSummaries()[0][1]).toMatchObject({ first_action: "comment" });
+    });
+
+    it("sends the summary when the drawer unmounts on a route leave", () => {
+      wrapper.unmount();
+      wrapper = undefined as any;
+
+      expect(viewSummaries()).toHaveLength(1);
+      expect(viewSummaries()[0][1]).toMatchObject({ first_action: "none" });
     });
   });
 
@@ -1848,6 +1969,167 @@ describe("IncidentDetailDrawer.vue", () => {
       wrapper = await createWrapper({}, {}, "1");
       await flushPromises();
       expect(wrapper.find('[data-test="incident-oncall-panel"]').exists()).toBe(false);
+    });
+
+    /// Acking, resolving or reopening the incident moves its page server-side.
+    it("rereads the page after every status action", async () => {
+      wrapper = await withRecords([record()]);
+      const reads = () => (oncallService.listResponsesForIncident as any).mock.calls.length;
+      const before = reads();
+      (oncallService.listResponsesForIncident as any).mockResolvedValue({
+        data: [record({ state: "acknowledged", acked_by: "alice@example.com" })],
+      });
+      (incidentsService.updateStatus as any).mockResolvedValue({
+        data: { status: "acknowledged", acknowledged_by: "alice@example.com" },
+      });
+      await wrapper.vm.handleStatusChange("acknowledged");
+      await flushPromises();
+      expect(reads()).toBe(before + 1);
+      expect(wrapper.find('[data-test="incident-oncall-panel"]').text()).not.toContain(
+        "Not acknowledged",
+      );
+
+      (incidentsService.updateStatus as any).mockResolvedValue({ data: { status: "resolved" } });
+      await wrapper.vm.resolveIncident();
+      await flushPromises();
+      expect(reads()).toBe(before + 2);
+    });
+  });
+
+  describe("back to open asks first", () => {
+    beforeEach(async () => {
+      wrapper = await createWrapper({}, {}, "1");
+      await nextTick();
+      await flushPromises();
+      mockConfirm.mockClear();
+      mockConfirm.mockResolvedValue(true);
+      (incidentsService.updateStatus as any).mockClear();
+      (incidentsService.updateStatus as any).mockResolvedValue({ data: { status: "open" } });
+    });
+
+    it("confirms the header Reopen before reopening", async () => {
+      wrapper.vm.incidentDetails.status = "resolved";
+      await wrapper.vm.reopenIncident();
+      expect(mockConfirm).toHaveBeenCalledTimes(1);
+      expect(mockConfirm.mock.calls[0][0].title).toBe("Reopen incident?");
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "open");
+    });
+
+    it("asks the same confirm for the Open chip on an acknowledged incident", async () => {
+      wrapper.vm.incidentDetails.status = "acknowledged";
+      wrapper.vm.editableStatus = "acknowledged";
+      await wrapper.vm.handleStatusChange("open");
+      expect(mockConfirm).toHaveBeenCalledTimes(1);
+      expect(mockConfirm.mock.calls[0][0].title).toBe("Reopen incident?");
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "open");
+    });
+
+    it("leaves the incident alone when the confirm is declined", async () => {
+      wrapper.vm.incidentDetails.status = "acknowledged";
+      mockConfirm.mockResolvedValueOnce(false);
+      await wrapper.vm.handleStatusChange("open");
+      expect(incidentsService.updateStatus).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Alert Details panel", () => {
+    beforeEach(async () => {
+      wrapper = await createWrapper({}, {}, "1");
+      await nextTick();
+      await flushPromises();
+      wrapper.vm.activeTab = "alertTriggers";
+      await nextTick();
+    });
+
+    const show = async (alert: Record<string, unknown>) => {
+      wrapper.vm.alerts = [{ name: "a", stream_type: "logs", stream_name: "s", ...alert }];
+      wrapper.vm.selectedAlertIndex = 0;
+      await nextTick();
+      const text = (id: string) => wrapper.find(`[data-test="incident-alert-${id}"]`);
+      return text;
+    };
+
+    it("reads period and silence as minutes and frequency as seconds, with 0 as 0", async () => {
+      const field = await show({
+        query_condition: { type: "custom" },
+        trigger_condition: { operator: ">=", threshold: 0, period: 10, frequency: 120, silence: 0 },
+      });
+      expect(field("period").text()).toBe("10 min");
+      expect(field("frequency").text()).toBe("2 min");
+      expect(field("silence").text()).toBe("0 min");
+      expect(field("threshold").text()).toBe(">= 0");
+    });
+
+    it("shows a cron frequency as the expression", async () => {
+      const field = await show({
+        query_condition: { type: "custom" },
+        trigger_condition: { frequency_type: "cron", cron: "0 */5 * * * *", period: 5 },
+      });
+      expect(field("frequency").text()).toBe("0 */5 * * * *");
+    });
+
+    it("shows a SQL alert's query as its condition, with no synthetic threshold", async () => {
+      const field = await show({
+        query_condition: {
+          type: "sql",
+          sql: "SELECT service, count(*) AS c FROM app_logs GROUP BY service HAVING c >= 10",
+        },
+        trigger_condition: { operator: ">=", threshold: 1, period: 1, frequency: 60, silence: 0 },
+      });
+      expect(field("threshold").exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Threshold");
+      expect(wrapper.text()).toContain("HAVING c >= 10");
+      expect(field("period").text()).toBe("1 min");
+    });
+
+    it("shows a builder aggregation's condition, not the synthetic row gate", async () => {
+      const field = await show({
+        query_condition: {
+          type: "custom",
+          aggregation: {
+            function: "count",
+            having: { column: "*", operator: ">=", value: 10 },
+            group_by: ["service"],
+          },
+        },
+        trigger_condition: { operator: ">=", threshold: 1, period: 1, frequency: 60, silence: 0 },
+      });
+      expect(field("threshold").text()).toBe("count(*) >= 10");
+      expect(field("group-by").exists()).toBe(false);
+    });
+
+    it("shows a multi-alert's per-group threshold and group-by", async () => {
+      const field = await show({
+        query_condition: {
+          type: "custom",
+          aggregation: {
+            function: "count",
+            having: { column: "*", operator: ">=", value: 10 },
+            group_by: ["service", "region"],
+            multi_alert: true,
+          },
+        },
+        trigger_condition: { operator: ">=", threshold: 1, period: 1, frequency: 60, silence: 0 },
+      });
+      expect(wrapper.text()).toContain("Per-group threshold");
+      expect(field("threshold").text()).toBe("count(*) >= 10");
+      expect(field("group-by").text()).toBe("service, region");
+    });
+  });
+
+  describe("390 px layout", () => {
+    it("stacks the Overview and Alert Triggers panes instead of squeezing them", async () => {
+      wrapper = await createWrapper({}, {}, "1");
+      await nextTick();
+      await flushPromises();
+      expect(wrapper.find('[data-test="incident-overview-content"]').classes()).toContain(
+        "max-md:overflow-y-auto",
+      );
+      wrapper.vm.activeTab = "alertTriggers";
+      await nextTick();
+      const triggers = wrapper.find('[data-test="incident-triggers-content"]');
+      expect(triggers.classes()).toContain("max-md:flex-col");
+      expect(triggers.classes()).toContain("max-md:overflow-y-auto");
     });
   });
 });

@@ -293,6 +293,26 @@ describe("OnCallResponseDetail", () => {
     service.resolvedSchedule.mockResolvedValue({ data: [] } as any);
   });
 
+  it("renders a page with no team as not routed, without asking for a null team", async () => {
+    const wrapper = await renderWith({ team_id: null });
+
+    expect(wrapper.find('[data-test="oncall-response-no-team"]').text()).toBe(
+      "Not routed to a team",
+    );
+    expect(wrapper.find('[data-test="oncall-response-team-link"]').exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OnCallAboutPage" }).props("teamId")).toBeNull();
+    for (const read of [
+      service.getTeam,
+      service.listMembers,
+      service.whoIsOnCall,
+      service.getPolicy,
+      service.teamReachability,
+      service.resolvedSchedule,
+    ]) {
+      expect(read).not.toHaveBeenCalled();
+    }
+  });
+
   /// "Why did this page me" was answerable only by scrolling the timeline.
   it("shows the routing decision on the overview", async () => {
     service.getResponse.mockResolvedValue({
@@ -1162,6 +1182,27 @@ describe("OnCallResponseDetail", () => {
 
     expect(resolve.label).toBe("Open for");
     expect(resolve.value).not.toBe("—");
+  });
+
+  it("stops the unacknowledged clock when a page is resolved without an ack", async () => {
+    const wrapper = await renderWith({
+      state: "resolved",
+      closed_at: 1_700_000_000_000_000 + 2 * HOUR_MICROS,
+    });
+    const ack = wrapper
+      .findComponent({ name: "OStatStrip" })
+      .props("items")
+      .find((s: any) => s.key === "ack");
+
+    expect(ack.label).toBe("Unacknowledged for");
+    expect(ack.value).toBe("2h");
+  });
+
+  it("renders the on-call card of an unrouted page instead of a skeleton", async () => {
+    const wrapper = await renderWith({ team_id: null });
+
+    // The stub does not declare `loading`, so it arrives as an attribute.
+    expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).vm.$attrs.loading).toBe(false);
   });
 
   /// Once it is answered the reading freezes into the metric it was always

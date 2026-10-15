@@ -68,6 +68,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 if let Err(e) = auto_resolve_stale_incidents().await {
                     log::error!("[INCIDENTS::JOB] Auto-resolve failed: {e}");
                 }
+                record_open_incident_sizes().await;
             },
             sleep_after
         );
@@ -119,6 +120,17 @@ async fn auto_resolve_stale_incidents() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+/// Recomputes the open-incident size gauge after each sweep; a failed read leaves the last values.
+#[cfg(feature = "enterprise")]
+async fn record_open_incident_sizes() {
+    match infra::table::alert_incidents::open_alert_count_histogram().await {
+        Ok(rows) => config::metrics::incidents::set_open_by_alert_count(
+            &config::metrics::incidents::open_by_alert_count(rows),
+        ),
+        Err(e) => log::warn!("[INCIDENTS::JOB] Open incident size gauge not updated: {e}"),
+    }
 }
 
 /// Each region sweeps its own table, so nothing is sent to other regions.

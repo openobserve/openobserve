@@ -20,7 +20,7 @@
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, RelationTrait, Set, TransactionTrait,
-    sea_query::{Expr, JoinType, LockType},
+    sea_query::{Expr, JoinType, LockType, OnConflict},
 };
 use svix_ksuid::KsuidLike;
 
@@ -143,6 +143,48 @@ pub async fn create_with_mute(
     .insert(client)
     .await
     .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// [`create_with_mute`] under the id the originating region minted; `false` when it already exists.
+#[allow(clippy::too_many_arguments)]
+pub async fn create_with_id(
+    id: &str,
+    org_id: &str,
+    severity: &str,
+    group_values: serde_json::Value,
+    key_type: &str,
+    first_alert_at: i64,
+    title: Option<String>,
+    muted_by_downtime_id: Option<String>,
+) -> Result<bool, errors::Error> {
+    let mut incident = new_incident(
+        org_id,
+        severity,
+        group_values,
+        key_type,
+        first_alert_at,
+        title,
+        muted_by_downtime_id,
+    );
+    incident.id = Set(id.to_string());
+    create_row_if_absent(get_orm_client_rw().await, incident).await
+}
+
+/// Inserts `incident` unless its id is taken, so a redelivered create is a no-op.
+async fn create_row_if_absent<C: ConnectionTrait>(
+    conn: &C,
+    incident: alert_incidents::ActiveModel,
+) -> Result<bool, errors::Error> {
+    let inserted = alert_incidents::Entity::insert(incident)
+        .on_conflict(
+            OnConflict::column(alert_incidents::Column::Id)
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec_without_returning(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(inserted == 1)
 }
 
 /// Opens an incident and points an on-call record at it, in one transaction.
@@ -319,6 +361,10 @@ pub async fn update_status_with<C: ConnectionTrait>(
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
+    if incident.status == status {
+        return Ok(incident);
+    }
+    let reopened = incident.status == "resolved" && status == "open";
 
     let mut active: alert_incidents::ActiveModel = incident.into();
     active.status = Set(status.to_string());
@@ -328,6 +374,15 @@ pub async fn update_status_with<C: ConnectionTrait>(
         active.resolved_at = Set(Some(now));
         // A manual reopen must run as a live incident, not stay muted forever.
         active.muted_by_downtime_id = Set(None);
+    }
+    // Back to open means unowned again; only a reopen needs a fresh clock against the stale sweep.
+    if status == "open" {
+        active.acknowledged_by = Set(None);
+        active.acknowledged_at = Set(None);
+        active.resolved_at = Set(None);
+    }
+    if reopened {
+        active.last_alert_at = Set(now);
     }
 
     active
@@ -507,6 +562,8 @@ pub async fn list_with<C: ConnectionTrait>(
         .column(alert_incidents::Column::AlertCount)
         .column(alert_incidents::Column::Title)
         .column(alert_incidents::Column::AssignedTo)
+        .column(alert_incidents::Column::AcknowledgedBy)
+        .column(alert_incidents::Column::AcknowledgedAt)
         .column(alert_incidents::Column::CreatedAt)
         .column(alert_incidents::Column::UpdatedAt)
         .column(alert_incidents::Column::MutedByDowntimeId)
@@ -900,53 +957,35 @@ pub async fn update_incident_metadata(
     Ok(())
 }
 
-/// Find open incidents with optional filters (general-purpose function)
-///
-/// A flexible function for finding open incidents with various filters.
-/// Used for both hierarchical upgrade matching and RCA processing.
-///
-/// # Parameters
-/// - `org_id`: Organization ID (REQUIRED for multi-tenancy security)
-/// - `created_after`: Optional timestamp filter - only incidents created after this time (for
-///   time-window queries)
-/// - `limit`: Optional result limit (None = return all, Some(n) = limit to n results)
-///
-/// # Returns
-/// Open (non-resolved) incidents ordered by most recent first (by created_at)
-///
-/// # Examples
-/// ```
-/// // Hierarchical upgrade: Find incidents created in last 5 minutes
-/// let threshold = now - (5 * 60 * 1_000_000);
-/// let candidates = find_open_incidents_filtered(org_id, Some(threshold), Some(100)).await?;
-///
-/// // RCA: Get all open incidents for an org
-/// let all_open = find_open_incidents_filtered(org_id, None, None).await?;
-/// ```
+/// Open incidents with an alert at or after `active_since`, most recently active first.
 pub async fn find_open_incidents_filtered(
     org_id: &str,
-    created_after: Option<i64>,
+    active_since: Option<i64>,
     limit: Option<u64>,
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
-    let client = get_orm_client_ro().await;
+    find_open_incidents_filtered_with(get_orm_client_ro().await, org_id, active_since, limit).await
+}
 
+/// [find_open_incidents_filtered] on a given connection.
+pub async fn find_open_incidents_filtered_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    active_since: Option<i64>,
+    limit: Option<u64>,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
     let mut query = alert_incidents::Entity::find()
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .filter(alert_incidents::Column::Status.ne("resolved"))
+        .order_by_desc(alert_incidents::Column::LastAlertAt)
         .order_by_desc(alert_incidents::Column::CreatedAt);
-
-    // Apply time filter if provided (for hierarchical upgrade time window)
-    if let Some(threshold) = created_after {
-        query = query.filter(alert_incidents::Column::CreatedAt.gte(threshold));
+    if let Some(threshold) = active_since {
+        query = query.filter(alert_incidents::Column::LastAlertAt.gte(threshold));
     }
-
-    // Apply limit if provided (for performance)
     if let Some(lim) = limit {
         query = query.limit(lim);
     }
-
     query
-        .all(client)
+        .all(conn)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
@@ -1057,6 +1096,33 @@ pub async fn auto_resolve_stale_with<C: ConnectionTrait>(
 
     let count = resolved_ids.len() as u64;
     Ok((count, resolved_ids))
+}
+
+/// `(org_id, alert_count, incidents)` over every open incident, for the size gauge.
+pub async fn open_alert_count_histogram() -> Result<Vec<(String, i64, i64)>, errors::Error> {
+    open_alert_count_histogram_with(get_orm_client_ro().await).await
+}
+
+/// [open_alert_count_histogram] on a given connection.
+pub async fn open_alert_count_histogram_with<C: ConnectionTrait>(
+    conn: &C,
+) -> Result<Vec<(String, i64, i64)>, errors::Error> {
+    let rows: Vec<(String, i32, i64)> = alert_incidents::Entity::find()
+        .select_only()
+        .column(alert_incidents::Column::OrgId)
+        .column(alert_incidents::Column::AlertCount)
+        .column_as(alert_incidents::Column::Id.count(), "incidents")
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .group_by(alert_incidents::Column::OrgId)
+        .group_by(alert_incidents::Column::AlertCount)
+        .into_tuple()
+        .all(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(rows
+        .into_iter()
+        .map(|(org_id, alert_count, incidents)| (org_id, i64::from(alert_count), incidents))
+        .collect())
 }
 
 /// Deletes all alert incidents belonging to the given org.
@@ -1266,6 +1332,259 @@ mod tests {
                 .await
                 .is_err()
         );
+    }
+
+    #[tokio::test]
+    async fn a_reopen_clears_the_acknowledgement_and_the_resolve_time() {
+        let db = incidents_db().await;
+        let mut row = new_incident(
+            "acme",
+            "P2",
+            serde_json::json!({}),
+            "AlertId",
+            1,
+            None,
+            None,
+        );
+        row.status = Set("acknowledged".to_string());
+        row.acknowledged_by = Set(Some("alice@example.com".to_string()));
+        row.acknowledged_at = Set(Some(5));
+        let incident = row.insert(&db).await.unwrap();
+
+        let resolved = update_status_with(&db, "acme", &incident.id, "resolved")
+            .await
+            .unwrap();
+        assert!(resolved.resolved_at.is_some());
+        assert_eq!(
+            resolved.acknowledged_by.as_deref(),
+            Some("alice@example.com")
+        );
+
+        let reopened = update_status_with(&db, "acme", &incident.id, "open")
+            .await
+            .unwrap();
+        assert_eq!(reopened.status, "open");
+        assert_eq!(reopened.acknowledged_by, None);
+        assert_eq!(reopened.acknowledged_at, None);
+        assert_eq!(reopened.resolved_at, None);
+    }
+
+    #[tokio::test]
+    async fn a_reopened_incident_survives_the_next_stale_sweep() {
+        let db = incidents_db().await;
+        let old = 1_000;
+        let mut row = new_incident(
+            "acme",
+            "P2",
+            serde_json::json!({}),
+            "AlertId",
+            old,
+            None,
+            None,
+        );
+        row.status = Set("resolved".to_string());
+        row.resolved_at = Set(Some(old + 1));
+        let incident = row.insert(&db).await.unwrap();
+
+        let reopened = update_status_with(&db, "acme", &incident.id, "open")
+            .await
+            .unwrap();
+        assert!(reopened.last_alert_at > old);
+
+        let now = chrono::Utc::now().timestamp_micros();
+        let (count, resolved) = auto_resolve_stale_with(&db, old + 10, now).await.unwrap();
+        assert_eq!(count, 0, "{resolved:?}");
+        let row = alert_incidents::Entity::find_by_id(incident.id.clone())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.status, "open");
+    }
+
+    #[tokio::test]
+    async fn only_a_reopen_moves_last_alert_at_and_a_same_status_write_changes_nothing() {
+        let db = incidents_db().await;
+        let mut row = new_incident(
+            "acme",
+            "P2",
+            serde_json::json!({}),
+            "AlertId",
+            1_000,
+            None,
+            None,
+        );
+        row.status = Set("acknowledged".to_string());
+        row.acknowledged_by = Set(Some("alice@example.com".to_string()));
+        let incident = row.insert(&db).await.unwrap();
+
+        let unacked = update_status_with(&db, "acme", &incident.id, "open")
+            .await
+            .unwrap();
+        assert_eq!(unacked.status, "open");
+        assert_eq!(unacked.acknowledged_by, None);
+        assert_eq!(
+            unacked.last_alert_at, 1_000,
+            "an un-acknowledge is not a new alert"
+        );
+
+        let same = update_status_with(&db, "acme", &incident.id, "open")
+            .await
+            .unwrap();
+        assert_eq!(
+            same, unacked,
+            "an open-to-open write changes nothing, updated_at included"
+        );
+
+        update_status_with(&db, "acme", &incident.id, "resolved")
+            .await
+            .unwrap();
+        let reopened = update_status_with(&db, "acme", &incident.id, "open")
+            .await
+            .unwrap();
+        assert!(
+            reopened.last_alert_at > 1_000,
+            "a reopen restarts the stale clock"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_create_under_a_taken_id_is_an_idempotent_success() {
+        let db = incidents_db().await;
+        let with_id = |title: &str| {
+            let mut row = new_incident(
+                "acme",
+                "P2",
+                serde_json::json!({"service": "payments"}),
+                "Secondary",
+                1,
+                Some(title.to_string()),
+                None,
+            );
+            row.id = Set("inc-from-region-a".to_string());
+            row
+        };
+        assert!(create_row_if_absent(&db, with_id("first")).await.unwrap());
+        assert!(!create_row_if_absent(&db, with_id("second")).await.unwrap());
+        let rows = alert_incidents::Entity::find().all(&db).await.unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].id, "inc-from-region-a");
+        assert_eq!(rows[0].title.as_deref(), Some("first"));
+    }
+
+    #[tokio::test]
+    async fn the_candidate_query_honours_active_since_and_the_limit() {
+        let db = incidents_db().await;
+        for (last_alert_at, status) in [(100, "open"), (200, "acknowledged"), (300, "open")] {
+            let mut row = new_incident(
+                "acme",
+                "P2",
+                serde_json::json!({}),
+                "Secondary",
+                1,
+                None,
+                None,
+            );
+            row.last_alert_at = Set(last_alert_at);
+            row.status = Set(status.to_string());
+            row.insert(&db).await.unwrap();
+        }
+        let mut resolved = new_incident(
+            "acme",
+            "P2",
+            serde_json::json!({}),
+            "Secondary",
+            1,
+            None,
+            None,
+        );
+        resolved.last_alert_at = Set(400);
+        resolved.status = Set("resolved".to_string());
+        resolved.insert(&db).await.unwrap();
+        let mut other_org = new_incident(
+            "other",
+            "P2",
+            serde_json::json!({}),
+            "Secondary",
+            1,
+            None,
+            None,
+        );
+        other_org.last_alert_at = Set(500);
+        other_org.insert(&db).await.unwrap();
+
+        let active = |rows: Vec<alert_incidents::Model>| {
+            rows.into_iter()
+                .map(|r| r.last_alert_at)
+                .collect::<Vec<_>>()
+        };
+        let all = find_open_incidents_filtered_with(&db, "acme", None, None)
+            .await
+            .unwrap();
+        assert_eq!(active(all), vec![300, 200, 100]);
+        let recent = find_open_incidents_filtered_with(&db, "acme", Some(200), None)
+            .await
+            .unwrap();
+        assert_eq!(active(recent), vec![300, 200], "the bound is inclusive");
+        let capped = find_open_incidents_filtered_with(&db, "acme", Some(0), Some(1))
+            .await
+            .unwrap();
+        assert_eq!(
+            active(capped),
+            vec![300],
+            "the cap keeps the most recently active"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_alert_count_histogram_counts_open_incidents_per_org_and_size() {
+        let db = incidents_db().await;
+        for (org, count, status) in [
+            ("acme", 3, "open"),
+            ("acme", 3, "acknowledged"),
+            ("acme", 1, "open"),
+            ("acme", 9, "resolved"),
+            ("other", 3, "open"),
+        ] {
+            let mut row = new_incident(org, "P2", serde_json::json!({}), "AlertId", 1, None, None);
+            row.alert_count = Set(count);
+            row.status = Set(status.to_string());
+            row.insert(&db).await.unwrap();
+        }
+        let mut rows = open_alert_count_histogram_with(&db).await.unwrap();
+        rows.sort();
+        assert_eq!(
+            rows,
+            vec![
+                ("acme".to_string(), 1, 1),
+                ("acme".to_string(), 3, 2),
+                ("other".to_string(), 3, 1),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn the_list_carries_who_acknowledged_the_incident() {
+        let db = incidents_db().await;
+        let mut row = new_incident(
+            "acme",
+            "P2",
+            serde_json::json!({}),
+            "AlertId",
+            1,
+            None,
+            None,
+        );
+        row.status = Set("acknowledged".to_string());
+        row.acknowledged_by = Set(Some("alice@example.com".to_string()));
+        row.acknowledged_at = Set(Some(42));
+        row.insert(&db).await.unwrap();
+        let rows = list_with(&db, "acme", None, 50, 0).await.unwrap();
+        assert_eq!(
+            rows[0].acknowledged_by.as_deref(),
+            Some("alice@example.com")
+        );
+        assert_eq!(rows[0].acknowledged_at, Some(42));
     }
 
     #[tokio::test]

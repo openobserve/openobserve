@@ -22,6 +22,7 @@
  * trusting either.
  */
 
+import type { Translator } from "@/utils/alerts/alertValidation";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
 const EMPTY = "—";
@@ -73,6 +74,36 @@ export function alertWarningConditionText(alert: any): string {
 export function alertPeriodMinutes(alert: any): number | null {
   const period = Number(alert?.trigger_condition?.period);
   return Number.isFinite(period) && period > 0 ? period : null;
+}
+
+/** Renders a whole-minutes duration with its unit, hours on a whole multiple of 60; 0 is "0 min". */
+export function formatMinutesDuration(minutes: number | null | undefined, t: Translator): string {
+  if (minutes == null || Number.isNaN(minutes)) return EMPTY;
+  if (minutes > 0 && minutes < 1) {
+    return t("common.secShort", { count: Math.round(minutes * 60) });
+  }
+  if (minutes >= 60 && minutes % 60 === 0) {
+    return t("common.hrShort", { count: minutes / 60 });
+  }
+  return t("common.minShort", { count: minutes });
+}
+
+/** What the rule fires on: the aggregation or PromQL comparison, else the trigger's row gate. */
+export function alertThresholdText(alert: any): string {
+  const qc = queryConditionOf(alert);
+  // A count gate on an aggregation is plumbing; the user's threshold lives on `having`.
+  if (qc?.aggregation || qc?.type === "promql") return alertConditionText(alert);
+  const tc = alert?.trigger_condition;
+  if (isBlank(tc?.threshold)) return EMPTY;
+  return `${tc.operator || ""} ${tc.threshold}`.trim();
+}
+
+/** The columns a per-group alert splits on; `[]` for a PromQL per-series alert, `null` when not per-group. */
+export function alertGroupBy(alert: any): string[] | null {
+  const qc = queryConditionOf(alert);
+  if (qc?.type === "promql") return qc.promql_multi_alert ? [] : null;
+  if (!qc?.aggregation?.multi_alert) return null;
+  return (qc.aggregation.group_by ?? []).filter((col: string) => !!col);
 }
 
 type QueryMode = "custom" | "sql" | "promql";

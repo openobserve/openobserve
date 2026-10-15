@@ -25,12 +25,16 @@
       >
         <template #team>
           <router-link
+            v-if="response.team_id"
             class="text-accent min-w-0 hover:underline"
             :to="teamRoute"
             data-test="oncall-response-team-link"
           >
             <OTruncatedText class="block">{{ raw(teamName) }}</OTruncatedText>
           </router-link>
+          <span v-else class="min-w-0" data-test="oncall-response-no-team">{{
+            t("oncall.notRoutedToTeam")
+          }}</span>
         </template>
         <template #firing>
           <span class="shrink-0" data-test="oncall-response-firing">
@@ -1017,11 +1021,12 @@ const ackLabel = computed(() => {
   return r?.acked_at || !openMicros ? t("oncall.timeToAck") : t("oncall.statUnackedFor");
 });
 
+// A page closed without an ack was unacknowledged until it closed, not until now.
 const ackValue = computed(() => {
   const r = response.value;
-  const openMicros = r ? nowMicros.value - r.opened_at : null;
   if (r?.acked_at) return timeToAck.value;
-  return openMicros ? formatMicrosDuration(openMicros) : ABSENT;
+  const unackedMicros = r ? (r.closed_at ?? nowMicros.value) - r.opened_at : null;
+  return unackedMicros ? formatMicrosDuration(unackedMicros) : ABSENT;
 });
 
 const resolveLabel = computed(() => {
@@ -1214,6 +1219,11 @@ async function refreshPage() {
 async function fetchTeamName() {
   const r = response.value;
   if (!r) return;
+  // A page nobody was routed to has no team to look up, and asking for one fetches `/teams/null`.
+  if (!r.team_id) {
+    teamName.value = t("oncall.notRoutedToTeam");
+    return;
+  }
   teamName.value = r.team_id;
   try {
     const team = await read<OnCallTeam | null>(oncallTeamQuery(orgId.value, r.team_id), false);
@@ -1332,7 +1342,9 @@ async function fetchHandoffTargets() {
   const r = response.value;
   if (!r) return;
   try {
-    const members = await read<OnCallTeamMember[]>(teamMembersQuery(orgId.value, r.team_id), false);
+    const members = r.team_id
+      ? await read<OnCallTeamMember[]>(teamMembersQuery(orgId.value, r.team_id), false)
+      : [];
     memberOptions.value = members.map((m) => ({
       label: raw(m.user_email),
       value: m.user_email,
@@ -1435,6 +1447,14 @@ async function fetchDeliveries() {
 async function fetchTeamContext() {
   const r = response.value;
   if (!r) return;
+  if (!r.team_id) {
+    onCallPositions.value = [];
+    policy.value = null;
+    smtpConfigured.value = null;
+    // The caller flipped the card to its skeleton; with no team there is nothing left to wait for.
+    onCallPositionsLoading.value = false;
+    return;
+  }
   onCallPositionsLoading.value = true;
   try {
     const [slots, policyRes, reach] = await Promise.allSettled([
@@ -1467,7 +1487,7 @@ async function fetchHandover() {
   // Who inherits the pager next is advice for a page somebody still has to
   // carry. On a closed one it is a fact about next week's rota that nobody
   // opened this record to read.
-  if (r.closed_at) return;
+  if (r.closed_at || !r.team_id) return;
   const from = nowMicros.value;
   const to = from + 7 * 24 * 60 * 60 * 1_000_000;
   try {
@@ -1544,7 +1564,7 @@ async function escalateNow() {
 /// The two rail links out. Both land on the tab that answers the question the
 /// reader had when they clicked, rather than on the team's front page.
 function openReachability() {
-  if (!response.value) return;
+  if (!response.value?.team_id) return;
   router.push({
     name: "onCallTeamDetail",
     params: { teamId: response.value.team_id, tab: "members" },

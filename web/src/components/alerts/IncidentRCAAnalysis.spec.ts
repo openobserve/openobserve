@@ -546,6 +546,21 @@ describe("IncidentRCAAnalysis", () => {
       expect(findByTestId(wrapper, "rca-error-details").text()).toContain("connection refused");
     });
 
+    it("should paint the failure with the soft error status tokens, at full text contrast", () => {
+      wrapper = mountComponent({ rcaError: failure, isDarkMode: false });
+
+      const banner = findByTestId(wrapper, "rca-error-banner");
+      expect(banner.classes()).toContain("bg-banner-error-soft-bg");
+      expect(banner.classes()).toContain("text-banner-error-soft-text");
+      for (const id of ["rca-error-reason", "rca-error-details"]) {
+        expect(
+          findByTestId(wrapper, id)
+            .classes()
+            .some((c: string) => c.startsWith("opacity-")),
+        ).toBe(false);
+      }
+    });
+
     it("should offer retry instead of the bare trigger button after a failure", async () => {
       wrapper = mountComponent({ rcaError: failure });
 

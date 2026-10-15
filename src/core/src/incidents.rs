@@ -242,16 +242,11 @@ pub async fn append_event(
     Ok(())
 }
 
-// this fn is basically a wrapper over the above with types changed
-// the ent streaming analyze fn needs to go through it and the types
-// make it so that we cannot have params which are &refs , hence
-// a thin wrapper which takes params by ownership and calls the above.
-// if found a better way remove this completely.
-pub async fn append_event_send(
+/// [append_event] as the plain `fn` pointer an enterprise RCA run reports through.
+pub fn append_event_send(
     org_id: String,
     incident_id: String,
     event: IncidentEvent,
-) -> Result<(), anyhow::Error> {
-    append_event(&org_id, &incident_id, event).await?;
-    Ok(())
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), anyhow::Error>> + Send>> {
+    Box::pin(async move { append_event(&org_id, &incident_id, event).await })
 }

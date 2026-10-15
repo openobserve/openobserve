@@ -21,18 +21,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OBanner
       v-if="rcaError && !isRunning"
       data-test="rca-error-banner"
-      variant="error"
+      variant="error-soft"
       icon="error-outline"
       class="mb-2 flex-shrink-0"
     >
       <p class="mb-0 font-medium">{{ t("alerts.incidents.rcaFailed") }}</p>
-      <p data-test="rca-error-reason" class="mt-0.5 mb-0 text-xs opacity-90">
+      <p data-test="rca-error-reason" class="mt-0.5 mb-0 text-xs">
         {{ rcaError.reason }}
       </p>
       <p
         v-if="rcaError.details"
         data-test="rca-error-details"
-        class="mt-1 mb-0 text-xs break-words opacity-70"
+        class="mt-1 mb-0 text-xs break-words"
       >
         {{ rcaError.details }}
       </p>

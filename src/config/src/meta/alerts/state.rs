@@ -117,10 +117,13 @@ pub struct AlertState {
     pub episode_id: Option<String>,
     #[serde(default)]
     pub episode_opened_at: Option<i64>,
-    /// The incident that owned firing delivery, so a resolve goes back to
-    /// whoever sent the trigger. `None` = the alert path owns it.
-    #[serde(default)]
-    pub episode_incident_id: Option<String>,
+    /// The incidents that owned firing delivery; empty means the alert path owns the resolve.
+    #[serde(
+        flatten,
+        serialize_with = "super::recovery::serialize_episode_incident_keys",
+        deserialize_with = "super::recovery::deserialize_episode_incident_keys"
+    )]
+    pub episode_incident_id: super::recovery::EpisodeIncidents,
     /// When the condition first cleared, while `keep_firing_for` holds the
     /// episode open. `None` = not in the hold.
     #[serde(default)]
@@ -149,7 +152,7 @@ impl AlertState {
             last_notified_level: None,
             episode_id: None,
             episode_opened_at: None,
-            episode_incident_id: None,
+            episode_incident_id: Default::default(),
             recovering_since: None,
         }
     }
@@ -423,7 +426,9 @@ pub fn apply_outcome(
         last_notified_level: prev.and_then(|p| p.last_notified_level),
         episode_id: prev.and_then(|p| p.episode_id.clone()),
         episode_opened_at: prev.and_then(|p| p.episode_opened_at),
-        episode_incident_id: prev.and_then(|p| p.episode_incident_id.clone()),
+        episode_incident_id: prev
+            .map(|p| p.episode_incident_id.clone())
+            .unwrap_or_default(),
         recovering_since: prev.and_then(|p| p.recovering_since),
     };
 
@@ -474,7 +479,7 @@ mod tests {
             last_notified_level: None,
             episode_id: None,
             episode_opened_at: None,
-            episode_incident_id: None,
+            episode_incident_id: Default::default(),
             recovering_since: None,
         }
     }
@@ -738,7 +743,7 @@ mod tests {
             last_notified_level: None,
             episode_id: None,
             episode_opened_at: None,
-            episode_incident_id: None,
+            episode_incident_id: Default::default(),
             recovering_since: None,
         };
         let update = apply_outcome(
@@ -785,7 +790,7 @@ mod tests {
                 last_notified_level: Some(AlertLevel::Warning),
                 episode_id: None,
                 episode_opened_at: None,
-                episode_incident_id: None,
+                episode_incident_id: Default::default(),
                 recovering_since: None,
             }),
             transition: Some(StateTransition {

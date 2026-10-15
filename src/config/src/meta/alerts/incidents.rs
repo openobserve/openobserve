@@ -119,7 +119,8 @@ impl TryFrom<&str> for CorrelationReason {
             "service_discovery" => Ok(Self::ServiceDiscovery),
             "primary_match" => Ok(Self::PrimaryMatch),
             "secondary_match" => Ok(Self::SecondaryMatch),
-            "alert_id" => Ok(Self::AlertId),
+            "alert_id" | "alert_id_fallback" => Ok(Self::AlertId),
+            "semantic_extraction" => Ok(Self::SecondaryMatch),
             unmatched => Err(format!("'{unmatched}' is not a valid CorrelationReason")),
         }
     }
@@ -211,11 +212,9 @@ impl DimensionRelationship {
         if existing_dims.is_empty() && new_dims.is_empty() {
             return Self::Equal;
         }
-        if new_dims.is_empty() {
+        // An empty side is an alert-id incident or firing; only its own alert may join it.
+        if new_dims.is_empty() || existing_dims.is_empty() {
             return Self::PartialOverlap;
-        }
-        if existing_dims.is_empty() {
-            return Self::NewIsSuperset;
         }
 
         for (key, existing_value) in existing_dims {
@@ -245,6 +244,90 @@ impl DimensionRelationship {
         }
 
         Self::PartialOverlap
+    }
+}
+
+/// The time bounds an open incident must meet to take a new firing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CorrelationWindows {
+    /// How far back the incident's last alert may be, in microseconds.
+    pub correlation_micros: i64,
+    /// How far back a superset firing may still upgrade the incident's creation, in microseconds.
+    pub upgrade_micros: i64,
+    /// `false` is the kill switch back to the windowless, first-match rules.
+    pub strict: bool,
+}
+
+impl CorrelationWindows {
+    pub fn from_minutes(correlation_minutes: u64, upgrade_minutes: u64) -> Self {
+        let to_micros = |m: u64| {
+            i64::try_from(m)
+                .unwrap_or(i64::MAX)
+                .saturating_mul(60_000_000)
+        };
+        Self {
+            correlation_micros: to_micros(correlation_minutes),
+            upgrade_micros: to_micros(upgrade_minutes),
+            strict: true,
+        }
+    }
+
+    pub fn with_strict(self, strict: bool) -> Self {
+        Self { strict, ..self }
+    }
+
+    /// The earliest `last_alert_at` a candidate can have for a firing at `triggered_at`.
+    pub fn active_since(&self, triggered_at: i64) -> Option<i64> {
+        self.strict
+            .then(|| triggered_at.saturating_sub(self.correlation_micros))
+    }
+
+    /// [`DimensionRelationship::check`], except non-strict lets an empty incident take any firing.
+    pub fn relationship(
+        &self,
+        existing_dims: &HashMap<String, String>,
+        new_dims: &HashMap<String, String>,
+    ) -> DimensionRelationship {
+        if !self.strict && existing_dims.is_empty() && !new_dims.is_empty() {
+            return DimensionRelationship::NewIsSuperset;
+        }
+        DimensionRelationship::check(existing_dims, new_dims)
+    }
+
+    /// Lower ranks win (Equal, then Subset, then Superset); `None` when the incident cannot join.
+    pub fn candidate_rank(
+        &self,
+        relationship: DimensionRelationship,
+        last_alert_at: i64,
+        created_at: i64,
+        triggered_at: i64,
+    ) -> Option<u8> {
+        let joinable = matches!(
+            relationship,
+            DimensionRelationship::Equal
+                | DimensionRelationship::NewIsSubset
+                | DimensionRelationship::NewIsSuperset
+        );
+        // Non-strict joins the first compatible incident, so every joinable one ranks the same.
+        if !self.strict {
+            return joinable.then_some(0);
+        }
+        if self
+            .active_since(triggered_at)
+            .is_some_and(|since| last_alert_at < since)
+        {
+            return None;
+        }
+        match relationship {
+            DimensionRelationship::Equal => Some(0),
+            DimensionRelationship::NewIsSubset => Some(1),
+            DimensionRelationship::NewIsSuperset
+                if created_at >= triggered_at.saturating_sub(self.upgrade_micros) =>
+            {
+                Some(2)
+            }
+            _ => None,
+        }
     }
 }
 
@@ -435,75 +518,6 @@ pub struct IncidentWithAlerts {
     pub composite_alerts: Vec<CompositeAlertSummary>,
 }
 
-/// Organization-level incident correlation configuration
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct IncidentCorrelationConfig {
-    /// Enable incident correlation for this org
-    #[serde(default)]
-    pub enabled: bool,
-
-    /// Time window for correlating alerts to same incident (minutes)
-    #[serde(default = "default_time_window")]
-    pub time_window_minutes: u64,
-
-    /// Minimum alerts to create an incident
-    #[serde(default = "default_min_alerts")]
-    pub min_alerts_for_incident: u32,
-
-    /// When to send notifications
-    #[serde(default)]
-    pub notification_strategy: NotificationStrategy,
-
-    /// Enable Service Graph topology enrichment
-    #[serde(default = "default_true")]
-    pub use_service_graph: bool,
-
-    /// Enable root cause inference
-    #[serde(default = "default_true")]
-    pub root_cause_detection: bool,
-
-    /// Auto-resolve after N minutes of no new alerts (None = use global default, 0 = disabled)
-    #[serde(default)]
-    pub auto_resolve_after_minutes: Option<i64>,
-
-    /// Time window for hierarchical incident upgrade (minutes)
-    #[serde(default = "default_upgrade_window")]
-    pub upgrade_window_minutes: u64,
-
-    /// Default severity for new incidents
-    #[serde(default)]
-    pub default_severity: IncidentSeverity,
-}
-
-impl Default for IncidentCorrelationConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            time_window_minutes: default_time_window(),
-            min_alerts_for_incident: default_min_alerts(),
-            notification_strategy: NotificationStrategy::default(),
-            use_service_graph: true,
-            root_cause_detection: true,
-            auto_resolve_after_minutes: None,
-            upgrade_window_minutes: default_upgrade_window(),
-            default_severity: IncidentSeverity::default(),
-        }
-    }
-}
-
-/// Notification strategy for incidents
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum NotificationStrategy {
-    /// Only notify when a new incident is created
-    #[default]
-    NewIncidentOnly,
-    /// Notify on all updates (new alerts added, status changes)
-    AllUpdates,
-    /// No notifications
-    None,
-}
-
 /// Outcome of correlating an alert to an incident.
 ///
 /// Used by the scheduler to decide whether and how to send a notification
@@ -555,22 +569,6 @@ impl IncidentCorrelationOutcome {
             | Self::SeverityEscalated { service_name, .. } => service_name,
         }
     }
-}
-
-fn default_time_window() -> u64 {
-    60
-}
-
-fn default_min_alerts() -> u32 {
-    1
-}
-
-fn default_upgrade_window() -> u64 {
-    30
-}
-
-fn default_true() -> bool {
-    true
 }
 
 /// Whether an incident's member alert is an OpenObserve alert or an
@@ -1273,16 +1271,6 @@ mod tests {
     }
 
     #[test]
-    fn test_default_config() {
-        let config = IncidentCorrelationConfig::default();
-        assert!(!config.enabled);
-        assert_eq!(config.time_window_minutes, 60);
-        assert_eq!(config.min_alerts_for_incident, 1);
-        assert!(config.use_service_graph);
-        assert!(config.root_cause_detection);
-    }
-
-    #[test]
     fn test_incident_status_from_str_case_insensitive() {
         assert_eq!(
             "OPEN".parse::<IncidentStatus>().unwrap(),
@@ -1622,8 +1610,8 @@ mod tests {
         let new = HashMap::from([("namespace".to_string(), "prod".to_string())]);
 
         let rel = DimensionRelationship::check(&existing, &new);
-        // New has more keys, all existing keys (0) match -> Superset
-        assert_eq!(rel, DimensionRelationship::NewIsSuperset);
+        // An alert-id incident is never a superset target for some other alert's firing.
+        assert_eq!(rel, DimensionRelationship::PartialOverlap);
     }
 
     #[test]
@@ -1792,6 +1780,157 @@ mod tests {
             CorrelationReason::PrimaryMatch
         );
         assert!(CorrelationReason::try_from("bad_value").is_err());
+    }
+
+    #[test]
+    fn test_correlation_reason_reads_legacy_aliases() {
+        assert_eq!(
+            CorrelationReason::try_from("alert_id_fallback").unwrap(),
+            CorrelationReason::AlertId
+        );
+        assert_eq!(
+            CorrelationReason::try_from("semantic_extraction").unwrap(),
+            CorrelationReason::SecondaryMatch
+        );
+        assert_eq!(
+            CorrelationReason::try_from("secondary_match").unwrap(),
+            CorrelationReason::SecondaryMatch
+        );
+    }
+
+    #[test]
+    fn test_dimension_relationship_empty_existing_non_empty_new_is_partial_overlap() {
+        let existing = HashMap::new();
+        let new = HashMap::from([
+            ("namespace".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "us-east".to_string()),
+        ]);
+        assert_eq!(
+            DimensionRelationship::check(&existing, &new),
+            DimensionRelationship::PartialOverlap
+        );
+        assert_eq!(
+            DimensionRelationship::check(&new, &existing),
+            DimensionRelationship::PartialOverlap
+        );
+    }
+
+    #[test]
+    fn test_dimension_relationship_superset_with_extra_key_still_superset() {
+        let existing = HashMap::from([("namespace".to_string(), "prod".to_string())]);
+        let new = HashMap::from([
+            ("namespace".to_string(), "prod".to_string()),
+            ("cluster".to_string(), "us-east".to_string()),
+            ("service".to_string(), "api".to_string()),
+        ]);
+        assert_eq!(
+            DimensionRelationship::check(&existing, &new),
+            DimensionRelationship::NewIsSuperset
+        );
+    }
+
+    const MIN: i64 = 60_000_000;
+
+    #[test]
+    fn test_correlation_windows_from_minutes() {
+        let w = CorrelationWindows::from_minutes(60, 30);
+        assert_eq!(w.correlation_micros, 60 * MIN);
+        assert_eq!(w.upgrade_micros, 30 * MIN);
+        assert_eq!(w.active_since(100 * MIN), Some(40 * MIN));
+        assert!(w.strict);
+        let huge = CorrelationWindows::from_minutes(u64::MAX, u64::MAX);
+        assert_eq!(
+            huge.correlation_micros,
+            i64::MAX,
+            "saturates instead of wrapping"
+        );
+        assert_eq!(huge.active_since(i64::MIN), Some(i64::MIN));
+    }
+
+    #[test]
+    fn test_candidate_rank_prefers_equal_then_subset_then_superset() {
+        let w = CorrelationWindows::from_minutes(60, 30);
+        let now = 1_000 * MIN;
+        let rank = |rel| w.candidate_rank(rel, now - MIN, now - MIN, now);
+        assert_eq!(rank(DimensionRelationship::Equal), Some(0));
+        assert_eq!(rank(DimensionRelationship::NewIsSubset), Some(1));
+        assert_eq!(rank(DimensionRelationship::NewIsSuperset), Some(2));
+        assert_eq!(rank(DimensionRelationship::PartialOverlap), None);
+        assert_eq!(rank(DimensionRelationship::Incompatible), None);
+    }
+
+    #[test]
+    fn test_candidate_rank_rejects_incidents_quiet_past_the_correlation_window() {
+        let w = CorrelationWindows::from_minutes(60, 30);
+        let now = 1_000 * MIN;
+        assert_eq!(
+            w.candidate_rank(DimensionRelationship::Equal, now - 60 * MIN, 0, now),
+            Some(0),
+            "the window boundary is inclusive"
+        );
+        assert_eq!(
+            w.candidate_rank(DimensionRelationship::Equal, now - 61 * MIN, 0, now),
+            None
+        );
+    }
+
+    #[test]
+    fn test_strict_correlation_off_restores_the_windowless_first_match_rules() {
+        let now = 1_000 * MIN;
+        let empty = HashMap::new();
+        let firing = HashMap::from([("namespace".to_string(), "prod".to_string())]);
+        let strict = CorrelationWindows::from_minutes(60, 30);
+        let lenient = strict.with_strict(false);
+
+        assert_eq!(
+            strict.relationship(&empty, &firing),
+            DimensionRelationship::PartialOverlap
+        );
+        assert_eq!(
+            lenient.relationship(&empty, &firing),
+            DimensionRelationship::NewIsSuperset,
+            "off: an alert-id incident takes any dimensioned firing, as before"
+        );
+        assert_eq!(
+            lenient.relationship(&firing, &empty),
+            DimensionRelationship::PartialOverlap
+        );
+
+        assert_eq!(lenient.active_since(now), None, "off: no candidate window");
+        let stale_old = |w: &CorrelationWindows, rel| w.candidate_rank(rel, 0, 0, now);
+        assert_eq!(stale_old(&strict, DimensionRelationship::Equal), None);
+        assert_eq!(
+            stale_old(&strict, DimensionRelationship::NewIsSuperset),
+            None
+        );
+        for rel in [
+            DimensionRelationship::Equal,
+            DimensionRelationship::NewIsSubset,
+            DimensionRelationship::NewIsSuperset,
+        ] {
+            assert_eq!(stale_old(&lenient, rel), Some(0), "{rel:?}");
+        }
+        assert_eq!(
+            stale_old(&lenient, DimensionRelationship::Incompatible),
+            None
+        );
+    }
+
+    #[test]
+    fn test_candidate_rank_superset_needs_a_recent_incident() {
+        let w = CorrelationWindows::from_minutes(60, 30);
+        let now = 1_000 * MIN;
+        let superset = DimensionRelationship::NewIsSuperset;
+        assert_eq!(
+            w.candidate_rank(superset, now, now - 30 * MIN, now),
+            Some(2)
+        );
+        assert_eq!(w.candidate_rank(superset, now, now - 31 * MIN, now), None);
+        assert_eq!(
+            w.candidate_rank(DimensionRelationship::Equal, now, now - 31 * MIN, now),
+            Some(0),
+            "only an upgrade is bound by the upgrade window"
+        );
     }
 
     // ── KeyType ───────────────────────────────────────────────────────────────
@@ -2121,26 +2260,6 @@ mod tests {
             service_name: "service-z".to_string(),
         };
         assert_eq!(repeated.service_name(), "service-z");
-    }
-
-    #[test]
-    fn test_default_time_window() {
-        assert_eq!(default_time_window(), 60);
-    }
-
-    #[test]
-    fn test_default_min_alerts() {
-        assert_eq!(default_min_alerts(), 1);
-    }
-
-    #[test]
-    fn test_default_upgrade_window() {
-        assert_eq!(default_upgrade_window(), 30);
-    }
-
-    #[test]
-    fn test_default_true() {
-        assert!(default_true());
     }
 
     #[test]

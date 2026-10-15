@@ -684,30 +684,23 @@ pub async fn trigger_incident_rca(
             .unwrap();
     }
 
-    // Choose streaming or non-streaming based on query parameter
+    // The run owns its terminal event and cancel handle, so a departed client cannot strand it.
+    let hooks = rca_service::RcaRunHooks {
+        append_event: openobserve_core::incidents::append_event_send,
+        register: openobserve_core::alerts::incidents::register_rca_task,
+        unregister: openobserve_core::alerts::incidents::unregister_rca_task,
+    };
     if query.stream {
-        // AIAnalysisComplete is emitted inside the stream closure (rca_service.rs)
-        // after the stream is fully drained, not here.
         let stream = match rca_service::analyze_incident_stream(
             (*client).clone(),
             context,
             auth_header.clone(),
-            openobserve_core::incidents::append_event_send,
+            hooks,
         )
         .await
         {
             Ok(s) => s,
             Err(e) => {
-                let _ = openobserve_core::incidents::append_event(
-                    &org_id,
-                    &incident_id,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                        "Stream start failed",
-                        config::meta::alerts::incidents::AnalysisTriggerType::Manual,
-                        Some(format!("{:#}", e)),
-                    ),
-                )
-                .await;
                 return MetaHttpResponse::internal_error(format!(
                     "Failed to start RCA stream: {e}"
                 ));
@@ -720,34 +713,10 @@ pub async fn trigger_incident_rca(
             .body(axum::body::Body::from_stream(stream))
             .unwrap()
     } else {
-        // Perform RCA analysis (non-streaming)
-        let rca_content =
-            match rca_service::analyze_incident((*client).clone(), context, &auth_header).await {
-                Ok(content) => content,
-                Err(e) => {
-                    let _ = openobserve_core::incidents::append_event(
-                        &org_id,
-                        &incident_id,
-                        config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                            "Service call failed",
-                            config::meta::alerts::incidents::AnalysisTriggerType::Manual,
-                            Some(format!("{:#}", e)),
-                        ),
-                    )
-                    .await;
-                    return MetaHttpResponse::internal_error(format!("Failed to perform RCA: {e}"));
-                }
-            };
-
-        // Emit AIAnalysisComplete on success
-        let _ = openobserve_core::incidents::append_event(
-            &org_id,
-            &incident_id,
-            config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
-        )
-        .await;
-
-        MetaHttpResponse::json(RcaResponse { rca_content })
+        match rca_service::analyze_incident((*client).clone(), context, &auth_header, hooks).await {
+            Ok(rca_content) => MetaHttpResponse::json(RcaResponse { rca_content }),
+            Err(e) => MetaHttpResponse::internal_error(format!("Failed to perform RCA: {e}")),
+        }
     }
 }
 

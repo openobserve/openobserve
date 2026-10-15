@@ -182,7 +182,7 @@ fn clear_run_oncall<'a>(
 fn recovery_route(alert: &Alert, event: &RecoveryEvent, muted: bool) -> RecoveryRoute {
     RecoveryRoute {
         oncall: !muted,
-        destinations: !muted && alert.notify_on_recovery && event.incident_id.is_none(),
+        destinations: !muted && alert.notify_on_recovery && event.incident_ids.is_empty(),
     }
 }
 
@@ -307,7 +307,7 @@ mod tests {
     fn delivered() -> EpisodeInput {
         EpisodeInput {
             delivered: true,
-            incident_id: None,
+            incident_ids: Default::default(),
             keep_firing_for_secs: 0,
             episode_id: None,
         }
@@ -472,7 +472,7 @@ mod tests {
             alert_id: "a1".into(),
             group_key: String::new(),
             episode_id: "ep_1".into(),
-            incident_id: None,
+            incident_ids: Default::default(),
             opened_at: at(5),
             recovered_at: at(20),
             emitted_at: at(40),

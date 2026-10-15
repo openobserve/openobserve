@@ -74,11 +74,6 @@ pub enum MultiAlertError {
     /// `having.operator` has no severity direction, so neither a warning band
     /// nor the severity-ordered fetch can be defined over it.
     OperatorNotOrderable,
-    /// `creates_incident` is a third delivery route (§5.5 MN-11) whose
-    /// per-group identity is unspecified in v1; the combination is rejected
-    /// rather than silently collapsing groups into one incident or bypassing
-    /// correlation.
-    IncidentsUnsupported,
     /// Multi-window comparison flattens one result set per time range, so a
     /// single group key arrives once per range — there is no coherent "same
     /// group last week" to hold one state row, and dispatch would page the
@@ -113,10 +108,6 @@ impl std::fmt::Display for MultiAlertError {
             Self::OperatorNotOrderable => f.write_str(
                 "per-group alerting needs an ordered comparison (>, >=, <, <=); `=` and `!=` have \
                  no severity direction",
-            ),
-            Self::IncidentsUnsupported => f.write_str(
-                "per-group alerting cannot yet be combined with incident creation; turn off \
-                 creates_incident or per-group alerting",
             ),
             Self::MultiTimeRangeUnsupported => f.write_str(
                 "per-group alerting cannot be combined with multi-window comparison; remove the \
@@ -178,7 +169,6 @@ pub fn maintains_group_state(query: &super::QueryCondition) -> bool {
 pub fn validate_multi_alert(
     query: &super::QueryCondition,
     tc: &TriggerCondition,
-    creates_incident: bool,
 ) -> Result<(), MultiAlertError> {
     // Takes the whole `QueryCondition` rather than the aggregation alone
     // because two of the rules are about what surrounds it: an alert with no
@@ -214,20 +204,12 @@ pub fn validate_multi_alert(
     // `promql_condition.operator` supplies the direction. Everything the two
     // families share is checked for both.
     if query.query_type == super::QueryType::PromQL {
-        return validate_promql_multi_alert(query, tc, creates_incident);
+        return validate_promql_multi_alert(query, tc);
     }
 
     let Some(agg) = query.aggregation.as_ref() else {
         return Ok(());
     };
-
-    // MN-11: incident correlation is a third delivery route whose per-group
-    // identity v1 does not define. Rejecting beats the two silent
-    // alternatives — one incident for every group (un-does per-group paging),
-    // or bypassing correlation (makes `creates_incident` a lie).
-    if creates_incident {
-        return Err(MultiAlertError::IncidentsUnsupported);
-    }
 
     // Multi-window flattens one result set per range, so a group key arrives
     // once per range: one state row cannot represent "this group, this week"
@@ -275,7 +257,7 @@ pub fn validate_multi_alert(
 
 /// The PromQL half of [`validate_multi_alert`].
 ///
-/// Shares MN-11, the multi-window rule and the M-10 count gates with the
+/// Shares the multi-window rule and the M-10 count gates with the
 /// aggregation path — they are properties of per-group dispatch, not of how
 /// groups are derived. What differs is the direction check: it reads
 /// `promql_condition.operator` rather than `having.operator`, and there is no
@@ -283,11 +265,7 @@ pub fn validate_multi_alert(
 fn validate_promql_multi_alert(
     query: &super::QueryCondition,
     tc: &TriggerCondition,
-    creates_incident: bool,
 ) -> Result<(), MultiAlertError> {
-    if creates_incident {
-        return Err(MultiAlertError::IncidentsUnsupported);
-    }
     if query
         .multi_time_range
         .as_ref()
@@ -983,6 +961,32 @@ pub struct GroupPlan {
     pub evicted: Vec<String>,
 }
 
+impl GroupPlan {
+    /// The rollup row's episode, decided by `firing` since a run with no rows keeps the old level.
+    pub fn apply_episode(
+        &mut self,
+        firing: bool,
+        input: &super::recovery::EpisodeInput,
+        at: i64,
+        new_episode_id: impl FnOnce() -> String,
+    ) -> Option<super::recovery::ClosedEpisode> {
+        let rollup = self
+            .updates
+            .iter_mut()
+            .filter_map(|update| update.state.as_mut())
+            .find(|state| state.group_key == ROLLUP_GROUP_KEY)?;
+        super::recovery::apply_episode(rollup, firing, input, at, new_episode_id)
+    }
+
+    /// The rollup row as this plan writes it.
+    pub fn rollup(&self) -> Option<&AlertState> {
+        self.updates
+            .iter()
+            .filter_map(|update| update.state.as_ref())
+            .find(|state| state.group_key == ROLLUP_GROUP_KEY)
+    }
+}
+
 /// Group rows to delete when an alert turns `multi_alert` **off** (M-9/D26).
 ///
 /// Every non-rollup row, deleted outright with **no transitions**. Opting out
@@ -1579,7 +1583,7 @@ mod tests {
             last_notified_level: None,
             episode_id: None,
             episode_opened_at: None,
-            episode_incident_id: None,
+            episode_incident_id: Default::default(),
             recovering_since: None,
         }
     }
@@ -1606,7 +1610,7 @@ mod tests {
             last_notified_level: None,
             episode_id: None,
             episode_opened_at: None,
-            episode_incident_id: None,
+            episode_incident_id: Default::default(),
             recovering_since: None,
         }
     }
@@ -2218,6 +2222,105 @@ mod tests {
         assert!(update_for(&updates, ROLLUP_GROUP_KEY).is_some());
         assert!(update_for(&updates, &group_key(&labels(&[("host", "a")]))).is_some());
         assert!(update_for(&updates, &group_key(&labels(&[("host", "b")]))).is_some());
+    }
+
+    #[test]
+    fn test_grouped_recovery_hands_every_group_incident_to_the_recovery() {
+        use crate::meta::alerts::recovery::{EpisodeIncidents, EpisodeInput};
+
+        let c = tc(Operator::GreaterThan, 100, None);
+        let firing = classify_groups(
+            vec![
+                GroupObservation::new(labels(&[("service", "checkout")]), 150.0),
+                GroupObservation::new(labels(&[("service", "inventory")]), 150.0),
+            ],
+            &c,
+            500,
+        );
+        let delivered = EpisodeInput {
+            delivered: true,
+            incident_ids: EpisodeIncidents::new([
+                "inc_checkout".to_string(),
+                "inc_inventory".to_string(),
+            ]),
+            keep_firing_for_secs: 0,
+            episode_id: None,
+        };
+        let mut plan = plan_group_updates("alert-1", &firing, &HashMap::new(), 100, 0);
+        assert!(
+            plan.apply_episode(firing.firing_observed > 0, &delivered, 100, || "ep_1"
+                .into())
+                .is_none()
+        );
+        let rollup = plan.rollup().expect("the rollup row is planned").clone();
+        assert_eq!(rollup.episode_id.as_deref(), Some("ep_1"));
+        assert_eq!(rollup.episode_incident_id, delivered.incident_ids);
+
+        let prev = HashMap::from([(ROLLUP_GROUP_KEY.to_string(), rollup)]);
+        let healthy = classify_groups(
+            vec![
+                GroupObservation::new(labels(&[("service", "checkout")]), 10.0),
+                GroupObservation::new(labels(&[("service", "inventory")]), 10.0),
+            ],
+            &c,
+            500,
+        );
+        let mut plan = plan_group_updates("alert-1", &healthy, &prev, 200, 0);
+        let closed = plan
+            .apply_episode(
+                healthy.firing_observed > 0,
+                &EpisodeInput::undelivered(0),
+                200,
+                || "x".into(),
+            )
+            .expect("the recovered rollup closes the episode");
+        assert_eq!(closed.episode_id, "ep_1");
+        assert_eq!(
+            closed.incident_ids, delivered.incident_ids,
+            "every group incident resolves"
+        );
+        assert!(plan.rollup().unwrap().episode_id.is_none());
+    }
+
+    #[test]
+    fn test_an_evaluation_with_no_rows_recovers_every_group_incident() {
+        use crate::meta::alerts::recovery::{EpisodeIncidents, EpisodeInput};
+
+        let c = tc(Operator::GreaterThan, 100, None);
+        let firing = classify_groups(
+            vec![
+                GroupObservation::new(labels(&[("service", "checkout")]), 150.0),
+                GroupObservation::new(labels(&[("service", "inventory")]), 150.0),
+            ],
+            &c,
+            500,
+        );
+        let delivered = EpisodeInput {
+            delivered: true,
+            incident_ids: EpisodeIncidents::new(["inc_a".to_string(), "inc_b".to_string()]),
+            keep_firing_for_secs: 0,
+            episode_id: None,
+        };
+        let mut plan = plan_group_updates("alert-1", &firing, &HashMap::new(), 100, 0);
+        plan.apply_episode(true, &delivered, 100, || "ep_1".into());
+        let prev = HashMap::from([(ROLLUP_GROUP_KEY.to_string(), plan.rollup().unwrap().clone())]);
+
+        // A multi-alert's query returns only breaching groups, so recovery arrives as no rows.
+        let empty = classify_groups(Vec::new(), &c, 500);
+        let mut plan = plan_group_updates("alert-1", &empty, &prev, 200, 0);
+        assert!(
+            plan.rollup().unwrap().level.is_some_and(|l| l.is_firing()),
+            "the carried-forward rollup level cannot decide the episode"
+        );
+        let closed = plan
+            .apply_episode(
+                empty.firing_observed > 0,
+                &EpisodeInput::undelivered(0),
+                200,
+                || "x".into(),
+            )
+            .expect("no breaching group closes the episode");
+        assert_eq!(closed.incident_ids, delivered.incident_ids);
     }
 
     #[test]
@@ -3071,7 +3174,7 @@ mod tests {
     #[test]
     fn test_a_valid_promql_multi_alert_is_accepted() {
         let q = promql_qc(Operator::GreaterThan, true);
-        assert!(validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, None), false).is_ok());
+        assert!(validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, None)).is_ok());
     }
 
     /// The old code returned `Ok` the instant `aggregation` was `None`, so a
@@ -3082,22 +3185,17 @@ mod tests {
         let q = promql_qc(Operator::GreaterThan, true);
         let any_group = tc(Operator::GreaterThanEquals, 1, None);
 
+        assert_eq!(validate_multi_alert(&q, &any_group), Ok(()));
         assert_eq!(
-            validate_multi_alert(&q, &any_group, true).unwrap_err(),
-            MultiAlertError::IncidentsUnsupported,
-        );
-        assert_eq!(
-            validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 5, None), false).unwrap_err(),
+            validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 5, None)).unwrap_err(),
             MultiAlertError::CountGateNotAnyGroup,
         );
         assert_eq!(
-            validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, Some(3)), false)
-                .unwrap_err(),
+            validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, Some(3))).unwrap_err(),
             MultiAlertError::WarningCountGateNotAnyGroup,
         );
         assert_eq!(
-            validate_multi_alert(&promql_qc(Operator::EqualTo, true), &any_group, false)
-                .unwrap_err(),
+            validate_multi_alert(&promql_qc(Operator::EqualTo, true), &any_group).unwrap_err(),
             MultiAlertError::OperatorNotOrderable,
         );
     }
@@ -3107,7 +3205,7 @@ mod tests {
         let mut q = promql_qc(Operator::GreaterThan, true);
         q.promql_condition = None;
         assert_eq!(
-            validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, None), false).unwrap_err(),
+            validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, None)).unwrap_err(),
             MultiAlertError::PromqlConditionMissing,
         );
     }
@@ -3119,7 +3217,7 @@ mod tests {
             offset: "1w".to_string(),
         }]);
         assert_eq!(
-            validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, None), false).unwrap_err(),
+            validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, None)).unwrap_err(),
             MultiAlertError::MultiTimeRangeUnsupported,
         );
     }
@@ -3130,7 +3228,7 @@ mod tests {
     #[test]
     fn test_a_promql_alert_that_did_not_opt_in_is_left_alone() {
         let q = promql_qc(Operator::EqualTo, false);
-        assert!(validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 9, None), true).is_ok());
+        assert!(validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 9, None)).is_ok());
     }
 
     /// A PromQL alert has no `group_by`, and must not be rejected for it — the
@@ -3140,7 +3238,7 @@ mod tests {
     fn test_promql_multi_alert_is_not_rejected_for_having_no_group_by() {
         let q = promql_qc(Operator::GreaterThan, true);
         assert!(q.aggregation.is_none());
-        assert!(validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, None), false).is_ok());
+        assert!(validate_multi_alert(&q, &tc(Operator::GreaterThanEquals, 1, None)).is_ok());
     }
 
     // ── PromQL series classification (M-11) ─────────────────────────────────
@@ -3451,18 +3549,18 @@ mod tests {
         let a = agg_cfg(Some(&["host"]), Operator::GreaterThan, true);
 
         assert_eq!(
-            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, None), false),
+            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, None)),
             Ok(())
         );
         // `> 0` is the same statement as `>= 1`; a UI that normalises one way
         // must not make an otherwise-valid alert unsavable.
         assert_eq!(
-            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThan, 0, None), false),
+            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThan, 0, None)),
             Ok(())
         );
         // An explicit warning gate that also means "any group".
         assert_eq!(
-            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, Some(1)), false),
+            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, Some(1))),
             Ok(())
         );
     }
@@ -3474,7 +3572,7 @@ mod tests {
         // visibly in the UI doing nothing at all.
         let a = agg_cfg(Some(&["host"]), Operator::GreaterThan, true);
         assert_eq!(
-            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 3, None), false),
+            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 3, None)),
             Err(MultiAlertError::CountGateNotAnyGroup)
         );
     }
@@ -3488,7 +3586,7 @@ mod tests {
         // M-2: one Warning group is legacy-Ok but most-severe-Warning.
         let a = agg_cfg(Some(&["host"]), Operator::GreaterThan, true);
         assert_eq!(
-            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, Some(3)), false),
+            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, Some(3))),
             Err(MultiAlertError::WarningCountGateNotAnyGroup)
         );
     }
@@ -3500,7 +3598,7 @@ mod tests {
         // alert would go permanently green exactly when it should fire.
         let a = agg_cfg(Some(&["host"]), Operator::GreaterThan, true);
         assert_eq!(
-            validate_multi_alert(&qc(&a), &tc(Operator::LessThan, 3, None), false),
+            validate_multi_alert(&qc(&a), &tc(Operator::LessThan, 3, None)),
             Err(MultiAlertError::CountGateNotAnyGroup)
         );
     }
@@ -3514,7 +3612,7 @@ mod tests {
         for op in [Operator::EqualTo, Operator::NotEqualTo] {
             let a = agg_cfg(Some(&["host"]), op, true);
             assert_eq!(
-                validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, None), false),
+                validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, None)),
                 Err(MultiAlertError::OperatorNotOrderable),
                 "{op:?} has no worst-first ordering"
             );
@@ -3527,7 +3625,7 @@ mod tests {
         // raw payloads — hiding a control is not enforcing a rule.
         let a = agg_cfg(None, Operator::GreaterThan, true);
         assert_eq!(
-            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, None), false),
+            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, None)),
             Err(MultiAlertError::NotGrouped)
         );
     }
@@ -3540,38 +3638,8 @@ mod tests {
         // to group by.
         let a = agg_cfg(Some(&[]), Operator::GreaterThan, true);
         assert_eq!(
-            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, None), false),
+            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, None)),
             Err(MultiAlertError::NotGrouped)
-        );
-    }
-
-    #[test]
-    fn test_opting_in_with_creates_incident_is_rejected() {
-        // §5.5 MN-11. Incident correlation is a third delivery route with no
-        // per-group identity specified in v1. Accepting the combination forces
-        // one of two silent lies: every group collapsed into one incident
-        // (un-does per-group paging), or correlation bypassed entirely
-        // (creates_incident stops meaning anything).
-        let a = agg_cfg(Some(&["host"]), Operator::GreaterThan, true);
-        assert_eq!(
-            validate_multi_alert(&qc(&a), &tc(Operator::GreaterThanEquals, 1, None), true),
-            Err(MultiAlertError::IncidentsUnsupported)
-        );
-        // Incidents without multi stay untouched — this guard is multi-only.
-        let simple = agg_cfg(Some(&["host"]), Operator::GreaterThan, false);
-        assert_eq!(
-            validate_multi_alert(
-                &qc(&simple),
-                &tc(Operator::GreaterThanEquals, 3, None),
-                true
-            ),
-            Ok(())
-        );
-        assert!(
-            MultiAlertError::IncidentsUnsupported
-                .to_string()
-                .contains("creates_incident"),
-            "the rejection must name the field to change"
         );
     }
 
@@ -3588,7 +3656,7 @@ mod tests {
         }]);
 
         assert_eq!(
-            validate_multi_alert(&query, &tc(Operator::GreaterThanEquals, 1, None), false),
+            validate_multi_alert(&query, &tc(Operator::GreaterThanEquals, 1, None)),
             Err(MultiAlertError::MultiTimeRangeUnsupported)
         );
 
@@ -3596,7 +3664,7 @@ mod tests {
         let mut empty = qc(&a);
         empty.multi_time_range = Some(vec![]);
         assert_eq!(
-            validate_multi_alert(&empty, &tc(Operator::GreaterThanEquals, 1, None), false),
+            validate_multi_alert(&empty, &tc(Operator::GreaterThanEquals, 1, None)),
             Ok(())
         );
     }
@@ -3608,7 +3676,7 @@ mod tests {
         // inventing a rule.
         let query = crate::meta::alerts::QueryCondition::default();
         assert_eq!(
-            validate_multi_alert(&query, &tc(Operator::GreaterThanEquals, 5, None), true),
+            validate_multi_alert(&query, &tc(Operator::GreaterThanEquals, 5, None)),
             Ok(())
         );
     }
@@ -3623,17 +3691,13 @@ mod tests {
         // feature was never supposed to touch.
         let legacy = agg_cfg(Some(&["host"]), Operator::EqualTo, false);
         assert_eq!(
-            validate_multi_alert(&qc(&legacy), &tc(Operator::LessThan, 5, Some(9)), false),
+            validate_multi_alert(&qc(&legacy), &tc(Operator::LessThan, 5, Some(9))),
             Ok(())
         );
 
         let ungrouped = agg_cfg(None, Operator::EqualTo, false);
         assert_eq!(
-            validate_multi_alert(
-                &qc(&ungrouped),
-                &tc(Operator::GreaterThanEquals, 7, None),
-                false
-            ),
+            validate_multi_alert(&qc(&ungrouped), &tc(Operator::GreaterThanEquals, 7, None)),
             Ok(())
         );
     }
@@ -3701,7 +3765,7 @@ mod tests {
             agg.warning_value = warning;
 
             for gate in &gates {
-                validate_multi_alert(&qc(&agg), gate, false)
+                validate_multi_alert(&qc(&agg), gate)
                     .expect("fixture must be a shape M-10 actually permits");
 
                 for values in &value_sets {
@@ -3767,7 +3831,7 @@ mod tests {
         let gate = tc(Operator::GreaterThanEquals, 1, Some(3));
 
         assert_eq!(
-            validate_multi_alert(&qc(&agg), &gate, false),
+            validate_multi_alert(&qc(&agg), &gate),
             Err(MultiAlertError::WarningCountGateNotAnyGroup),
             "fixture must be a shape M-10 rejects"
         );
@@ -4535,20 +4599,20 @@ mod tests {
             promql_multi_alert: true,
             ..Default::default()
         };
-        assert!(validate_multi_alert(&query, &tc, false).is_ok());
+        assert!(validate_multi_alert(&query, &tc).is_ok());
         query.promql_multi_alert = false;
-        assert!(validate_multi_alert(&query, &tc, false).is_ok());
+        assert!(validate_multi_alert(&query, &tc).is_ok());
         query.multi_time_range = Some(vec![crate::meta::alerts::CompareHistoricData {
             offset: "1w".into(),
         }]);
         assert_eq!(
-            validate_multi_alert(&query, &tc, false),
+            validate_multi_alert(&query, &tc),
             Err(MultiAlertError::MultiTimeRangeUnsupported)
         );
         query.multi_time_range = None;
         query.query_type = crate::meta::alerts::QueryType::SQL;
         assert_eq!(
-            validate_multi_alert(&query, &tc, false),
+            validate_multi_alert(&query, &tc),
             Err(MultiAlertError::RuleModeNeedsPromql)
         );
         query.query_type = crate::meta::alerts::QueryType::PromQL;
@@ -4560,19 +4624,19 @@ mod tests {
             ignore_case: false,
         });
         assert_eq!(
-            validate_multi_alert(&query, &tc, false),
+            validate_multi_alert(&query, &tc),
             Err(MultiAlertError::RuleModeThresholdConflict)
         );
         query.promql_condition = None;
         query.promql_warning_value = Some(2.0);
         assert_eq!(
-            validate_multi_alert(&query, &tc, false),
+            validate_multi_alert(&query, &tc),
             Err(MultiAlertError::RuleModeThresholdConflict)
         );
         query.promql_warning_value = None;
         query.promql_rule_mode = false;
         assert_eq!(
-            validate_multi_alert(&query, &tc, false),
+            validate_multi_alert(&query, &tc),
             Err(MultiAlertError::PromqlConditionMissing)
         );
     }

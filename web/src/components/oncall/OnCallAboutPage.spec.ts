@@ -58,6 +58,13 @@ describe("OnCallAboutPage", () => {
   /// which is not where somebody asks it. A sentence with no recognisable "routed
   /// to <id>" opening (and no separate id to fall back to) prints verbatim
   /// rather than a half-parsed guess.
+  it("says a page with no team was not routed, with no link to a null team", () => {
+    const wrapper = render({ teamId: null, teamName: "" });
+
+    expect(wrapper.find('[data-test="oncall-about-no-team"]').text()).toBe("Not routed to a team");
+    expect(wrapper.find('[data-test="oncall-about-team-link"]').exists()).toBe(false);
+  });
+
   it("states why this team was picked", () => {
     const wrapper = render({ routingReason: "matched ownership rule namespace = envoy" });
     expect(wrapper.find('[data-test="oncall-about-routing-reason"]').text()).toBe(

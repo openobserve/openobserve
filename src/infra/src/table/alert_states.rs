@@ -24,6 +24,7 @@ use config::meta::{
         dispatch::DeliveryEpisode,
         grouping::GroupPlan,
         level::AlertLevel,
+        recovery::EpisodeIncidents,
         state::{AlertState, EvalLedgerWrite, ROLLUP_GROUP_KEY, StateTransition, StateUpdate},
     },
     self_reporting::usage::RunOutcome,
@@ -65,7 +66,7 @@ impl From<alert_states::Model> for AlertState {
             last_notified_level: m.last_notified_level.and_then(AlertLevel::from_i32),
             episode_id: m.episode_id,
             episode_opened_at: m.episode_opened_at,
-            episode_incident_id: m.episode_incident_id,
+            episode_incident_id: EpisodeIncidents::from_stored(m.episode_incident_id.as_deref()),
             recovering_since: m.recovering_since,
         }
     }
@@ -665,7 +666,7 @@ where
         last_notified_level: Set(state.last_notified_level.map(|l| l.to_i32())),
         episode_id: Set(state.episode_id.clone()),
         episode_opened_at: Set(state.episode_opened_at),
-        episode_incident_id: Set(state.episode_incident_id.clone()),
+        episode_incident_id: Set(state.episode_incident_id.to_stored()),
         recovering_since: Set(state.recovering_since),
         last_downtime_id: sea_orm::ActiveValue::NotSet,
     };
@@ -993,7 +994,7 @@ mod tests {
             last_notified_level: None,
             episode_id: None,
             episode_opened_at: None,
-            episode_incident_id: None,
+            episode_incident_id: Default::default(),
             recovering_since: None,
             last_downtime_id: None,
         }
@@ -1870,7 +1871,7 @@ mod tests {
         if let Some(state) = opened.state.as_mut() {
             state.episode_id = Some("ep_1".to_string());
             state.episode_opened_at = Some(1_000);
-            state.episode_incident_id = Some("inc_1".to_string());
+            state.episode_incident_id = Some("inc_1".to_string()).into();
         }
         persist_with(&db, &opened, None).await.unwrap();
 
@@ -1887,7 +1888,7 @@ mod tests {
         if let Some(state) = still_firing.state.as_mut() {
             state.episode_id = Some("ep_1".to_string());
             state.episode_opened_at = Some(1_000);
-            state.episode_incident_id = Some("inc_1".to_string());
+            state.episode_incident_id = Some("inc_1".to_string()).into();
         }
         persist_with(&db, &still_firing, None).await.unwrap();
         let stored = get_with(&db, "alert-1", ROLLUP_GROUP_KEY).await.unwrap();
@@ -1897,12 +1898,27 @@ mod tests {
             "the UPDATE half keeps the episode"
         );
 
+        // Two correlated groups store both incidents on the one row.
+        let mut two_groups = update_at(ROLLUP_GROUP_KEY, 2_500);
+        if let Some(state) = two_groups.state.as_mut() {
+            state.episode_id = Some("ep_1".to_string());
+            state.episode_opened_at = Some(1_000);
+            state.episode_incident_id =
+                EpisodeIncidents::new(["inc_1".to_string(), "inc_2".to_string()]);
+        }
+        persist_with(&db, &two_groups, None).await.unwrap();
+        let stored = get_with(&db, "alert-1", ROLLUP_GROUP_KEY).await.unwrap();
+        assert_eq!(
+            stored.map(|s| s.episode_incident_id.ids().to_vec()),
+            Some(vec!["inc_1".to_string(), "inc_2".to_string()])
+        );
+
         // The recovery clears it, on the same conflict path.
         let mut recovered = update_at(ROLLUP_GROUP_KEY, 3_000);
         if let Some(state) = recovered.state.as_mut() {
             state.episode_id = None;
             state.episode_opened_at = None;
-            state.episode_incident_id = None;
+            state.episode_incident_id = Default::default();
             state.recovering_since = None;
         }
         persist_with(&db, &recovered, None).await.unwrap();
@@ -1916,7 +1932,7 @@ mod tests {
             "a cleared episode must reach the database, or the recovery repeats for ever"
         );
         assert!(stored.episode_opened_at.is_none());
-        assert!(stored.episode_incident_id.is_none());
+        assert!(stored.episode_incident_id.is_empty());
     }
     #[tokio::test]
     async fn rule_value_transition_is_stored_as_text() {

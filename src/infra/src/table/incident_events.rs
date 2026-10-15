@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::alerts::incidents::IncidentEvent;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, QueryFilter,
+    QuerySelect, Set, TransactionTrait,
+    sea_query::{LockType, OnConflict},
+};
 
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
@@ -307,34 +311,14 @@ pub async fn append_with<C: TransactionTrait>(
     event: IncidentEvent,
 ) -> Result<(), sea_orm::DbErr> {
     let txn = db.begin().await?;
+    let model = lock_row(&txn, org_id, incident_id).await?;
+    let mut events = decode_events(org_id, incident_id, &model.events);
+    events.push(event);
+    let events_json = encode_events(&events)?;
 
-    let row = incident_events::Entity::find()
-        .filter(incident_events::Column::OrgId.eq(org_id))
-        .filter(incident_events::Column::IncidentId.eq(incident_id))
-        .one(&txn)
-        .await?;
-
-    match row {
-        Some(model) => {
-            let mut events = decode_events(org_id, incident_id, &model.events);
-            events.push(event);
-            let events_json = encode_events(&events)?;
-
-            let mut active: incident_events::ActiveModel = model.into();
-            active.events = Set(events_json);
-            active.update(&txn).await?;
-        }
-        None => {
-            // Row doesn't exist yet (incident created before events table)
-            let events_json = encode_events(&[event])?;
-            let model = incident_events::ActiveModel {
-                org_id: Set(org_id.to_string()),
-                incident_id: Set(incident_id.to_string()),
-                events: Set(events_json),
-            };
-            model.insert(&txn).await?;
-        }
-    }
+    let mut active: incident_events::ActiveModel = model.into();
+    active.events = Set(events_json);
+    active.update(&txn).await?;
 
     txn.commit().await?;
     Ok(())
@@ -351,56 +335,54 @@ pub async fn record_alert(
     alert_name: &str,
     triggered_at: i64,
 ) -> Result<(), sea_orm::DbErr> {
-    let db = get_orm_client_rw().await;
+    record_alert_with(
+        get_orm_client_rw().await,
+        org_id,
+        incident_id,
+        alert_id,
+        alert_name,
+        triggered_at,
+    )
+    .await
+}
 
+/// [record_alert] on a given connection.
+pub async fn record_alert_with<C: TransactionTrait>(
+    db: &C,
+    org_id: &str,
+    incident_id: &str,
+    alert_id: &str,
+    alert_name: &str,
+    triggered_at: i64,
+) -> Result<(), sea_orm::DbErr> {
     let txn = db.begin().await?;
+    let model = lock_row(&txn, org_id, incident_id).await?;
+    let mut events = decode_events(org_id, incident_id, &model.events);
 
-    let row = incident_events::Entity::find()
-        .filter(incident_events::Column::OrgId.eq(org_id))
-        .filter(incident_events::Column::IncidentId.eq(incident_id))
-        .one(&txn)
-        .await?;
-
-    match row {
-        Some(model) => {
-            let mut events = decode_events(org_id, incident_id, &model.events);
-
-            // Scan backwards through the trailing block of Alert events.
-            // If a matching alert_id is found within that block, increment it.
-            // Stop (and append) as soon as a non-Alert event is encountered.
-            let compacted = 'scan: {
-                for event in events.iter_mut().rev() {
-                    if !event.is_alert() {
-                        break 'scan false;
-                    }
-                    if event.is_alert_for(alert_id) {
-                        event.increment_alert(alert_id, triggered_at);
-                        break 'scan true;
-                    }
-                }
-                false
-            };
-
-            if !compacted {
-                events.push(IncidentEvent::alert(alert_id, alert_name, triggered_at));
+    // Scan backwards through the trailing block of Alert events.
+    // If a matching alert_id is found within that block, increment it.
+    // Stop (and append) as soon as a non-Alert event is encountered.
+    let compacted = 'scan: {
+        for event in events.iter_mut().rev() {
+            if !event.is_alert() {
+                break 'scan false;
             }
-            let events_json = encode_events(&events)?;
+            if event.is_alert_for(alert_id) {
+                event.increment_alert(alert_id, triggered_at);
+                break 'scan true;
+            }
+        }
+        false
+    };
 
-            let mut active: incident_events::ActiveModel = model.into();
-            active.events = Set(events_json);
-            active.update(&txn).await?;
-        }
-        None => {
-            // Row doesn't exist yet
-            let events = vec![IncidentEvent::alert(alert_id, alert_name, triggered_at)];
-            let model = incident_events::ActiveModel {
-                org_id: Set(org_id.to_string()),
-                incident_id: Set(incident_id.to_string()),
-                events: Set(encode_events(&events)?),
-            };
-            model.insert(&txn).await?;
-        }
+    if !compacted {
+        events.push(IncidentEvent::alert(alert_id, alert_name, triggered_at));
     }
+    let events_json = encode_events(&events)?;
+
+    let mut active: incident_events::ActiveModel = model.into();
+    active.events = Set(events_json);
+    active.update(&txn).await?;
 
     txn.commit().await?;
     Ok(())
@@ -416,6 +398,48 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), sea_orm::DbErr> {
         .exec(db)
         .await?;
     Ok(())
+}
+
+/// The timeline row, locked until `txn` ends, so two writers cannot each drop the other's event.
+async fn lock_row<C: ConnectionTrait>(
+    txn: &C,
+    org_id: &str,
+    incident_id: &str,
+) -> Result<incident_events::Model, sea_orm::DbErr> {
+    // SQLite has no FOR UPDATE; its single writer already serialises these transactions.
+    let locks = txn.get_database_backend() != DatabaseBackend::Sqlite;
+    let find = || {
+        let query = incident_events::Entity::find()
+            .filter(incident_events::Column::OrgId.eq(org_id))
+            .filter(incident_events::Column::IncidentId.eq(incident_id));
+        if locks {
+            query.lock(LockType::Update)
+        } else {
+            query
+        }
+    };
+    if let Some(row) = find().one(txn).await? {
+        return Ok(row);
+    }
+    // A missing row has nothing to lock, so both writers insert and then lock the one that won.
+    incident_events::Entity::insert(incident_events::ActiveModel {
+        org_id: Set(org_id.to_string()),
+        incident_id: Set(incident_id.to_string()),
+        events: Set(serde_json::json!([])),
+    })
+    .on_conflict(
+        OnConflict::columns([
+            incident_events::Column::OrgId,
+            incident_events::Column::IncidentId,
+        ])
+        .do_nothing()
+        .to_owned(),
+    )
+    .exec_without_returning(txn)
+    .await?;
+    find().one(txn).await?.ok_or_else(|| {
+        sea_orm::DbErr::RecordNotFound(format!("incident events for {org_id}/{incident_id}"))
+    })
 }
 
 #[cfg(test)]
@@ -575,5 +599,57 @@ mod tests {
                 .any(|e| matches!(e.event_type, IncidentEventType::Unknown(_))),
             "reconstructed events must decode as known types"
         );
+    }
+
+    async fn events_db() -> sea_orm::DatabaseConnection {
+        use sea_orm::{Database, Schema};
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(incident_events::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        db
+    }
+
+    async fn stored(db: &sea_orm::DatabaseConnection) -> Vec<IncidentEvent> {
+        let row = incident_events::Entity::find()
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap();
+        decode_events("acme", "inc-1", &row.events)
+    }
+
+    #[tokio::test]
+    async fn an_append_to_a_missing_row_creates_it_with_the_event() {
+        let db = events_db().await;
+        append_with(&db, "acme", "inc-1", IncidentEvent::comment("u", "first"))
+            .await
+            .unwrap();
+        append_with(&db, "acme", "inc-1", IncidentEvent::comment("u", "second"))
+            .await
+            .unwrap();
+        let events = stored(&db).await;
+        assert_eq!(events.len(), 2);
+        assert!(matches!(
+            &events[1].event_type,
+            IncidentEventType::Comment { comment, .. } if comment == "second"
+        ));
+    }
+
+    #[tokio::test]
+    async fn record_alert_creates_a_missing_row_then_compacts_repeats() {
+        let db = events_db().await;
+        record_alert_with(&db, "acme", "inc-1", "a1", "cpu", 10)
+            .await
+            .unwrap();
+        record_alert_with(&db, "acme", "inc-1", "a1", "cpu", 20)
+            .await
+            .unwrap();
+        let events = stored(&db).await;
+        assert_eq!(events.len(), 1);
+        assert!(matches!(
+            events[0].event_type,
+            IncidentEventType::Alert { count: 2, .. }
+        ));
     }
 }
