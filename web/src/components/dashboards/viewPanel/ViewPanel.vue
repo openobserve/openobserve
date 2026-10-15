@@ -75,10 +75,11 @@
           </OButton>
           <OButton
             v-else
-            :variant="showApplyHint ? 'warning' : 'outline'"
+            :variant="showApplyHint ? 'pending' : 'outline'"
             size="icon-sm"
             @click="refreshData"
             :disabled="disable"
+            :aria-label="refreshTooltip"
             data-test="dashboard-viewpanel-refresh-data-btn"
             :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
           >
@@ -87,7 +88,7 @@
           <ODropdown v-if="isAutoRunAvailable" align="end" side="bottom">
             <template #trigger>
               <OButton
-                :variant="showApplyHint ? 'warning' : 'outline'"
+                :variant="showApplyHint ? 'pending' : 'outline'"
                 size="icon-sm"
                 class="w-5!"
                 :disabled="disable"

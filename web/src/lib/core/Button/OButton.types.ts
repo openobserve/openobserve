@@ -40,6 +40,8 @@ export type ButtonVariant =
   | "on-dark-ghost"
   // Solid warning (yellow) background — use to draw attention to a required action
   | "warning"
+  // Pale amber tint — a stale result the user has not re-run yet (Apply / Run query / Refresh)
+  | "pending"
   // Destination preview buttons — brand-colored CTAs inside alert destination preview cards
   | "preview-slack"
   | "preview-teams"
