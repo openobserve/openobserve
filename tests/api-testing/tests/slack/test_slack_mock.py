@@ -2,10 +2,14 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import json
 import re
 import threading
 from collections.abc import Generator
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -101,3 +105,43 @@ def test_the_socket_url_app_id_is_a_hash_like_live_slack(api: str) -> None:
     query = parse_qs(urlparse(url).query)
     assert set(query) == {"ticket", "app_id"}
     assert re.fullmatch(r"[0-9a-f]{64}", query["app_id"][0]), url
+
+
+def test_apps_uninstall_sends_tokens_revoked_then_app_uninstalled_before_it_answers(api: str) -> None:
+    received: list[tuple[dict[str, str], bytes]] = []
+
+    class Receiver(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802
+            received.append((dict(self.headers), self.rfile.read(int(self.headers["Content-Length"]))))
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *_args: Any) -> None:
+            pass
+
+    receiver = ThreadingHTTPServer(("127.0.0.1", 0), Receiver)
+    threading.Thread(target=receiver.serve_forever, daemon=True).start()
+    try:
+        requests.post(f"{api}/_mock/reset", json={}, timeout=5).raise_for_status()
+        url = f"http://127.0.0.1:{receiver.server_address[1]}/api/slack/events"
+        manifest = json.dumps({"settings": {"event_subscriptions": {"request_url": url}}})
+        rotated = slack(api, "tooling.tokens.rotate", refresh_token="xoxe-1-uninstall")
+        app = slack(api, "apps.manifest.create", bearer=rotated["token"], manifest=manifest)
+        creds = app["credentials"]
+        bot = slack(api, "oauth.v2.access", client_id=creds["client_id"], client_secret=creds["client_secret"],
+                    code=mock_code(team_id="T0ACME"), redirect_uri="r")
+        requests.post(f"{api}/_mock/uninstall_events", json={"settle": 0}, timeout=5).raise_for_status()
+        slack(api, "apps.uninstall", bearer=bot["access_token"], client_id=creds["client_id"],
+              client_secret=creds["client_secret"])
+        assert [json.loads(body)["event"]["type"] for _, body in received] == ["tokens_revoked", "app_uninstalled"]
+        headers, body = received[0]
+        event = json.loads(body)
+        assert (event["api_app_id"], event["team_id"]) == (app["app_id"], "T0ACME")
+        assert event["event"]["tokens"] == {"oauth": [], "bot": ["U0BOT"]}
+        base = b"v0:" + headers["X-Slack-Request-Timestamp"].encode() + b":" + body
+        mac = hmac.new(creds["signing_secret"].encode(), base, hashlib.sha256).hexdigest()
+        assert headers["X-Slack-Signature"] == "v0=" + mac
+        assert slack(api, "auth.test", bearer=bot["access_token"])["error"] == "token_revoked"
+    finally:
+        requests.post(f"{api}/_mock/reset", json={}, timeout=5).raise_for_status()
+        receiver.shutdown()
