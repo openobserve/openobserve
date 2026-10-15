@@ -191,6 +191,33 @@ export function chartFilterParams(
   return { value: filter.value };
 }
 
+/** The chart filter as URL values, so Back and a shared link reopen it with its page: "3-5" for a bucket range, else the exact value. */
+export function chartFilterToQuery(filter: QualityChartFilter | null): {
+  bucket?: string;
+  value?: string;
+} {
+  if (!filter) return {};
+  return filter.kind === "bucket"
+    ? { bucket: `${filter.from}-${filter.to}` }
+    : { value: filter.value };
+}
+
+/** The chart filter from URL values; a malformed value restores no filter. */
+export function chartFilterFromQuery(query: {
+  bucket?: unknown;
+  value?: unknown;
+}): QualityChartFilter | null {
+  if (typeof query.bucket === "string") {
+    const match = /^(\d+)-(\d+)$/.exec(query.bucket);
+    if (!match) return null;
+    const [from, to] = [Number(match[1]), Number(match[2])];
+    return from <= to ? { kind: "bucket", from, to } : null;
+  }
+  return typeof query.value === "string" && query.value
+    ? { kind: "value", value: query.value }
+    : null;
+}
+
 /** Whether a bar is inside the active filter, so the chart can dim the rest. */
 export function bucketSelected(
   filter: QualityChartFilter | null,
