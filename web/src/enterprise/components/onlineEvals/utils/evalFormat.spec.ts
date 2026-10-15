@@ -10,7 +10,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import { gt } from "@/types/i18n";
+import { gt, type TranslateFn } from "@/types/i18n";
 
 import {
   defaultOutputSchema,
@@ -20,6 +20,7 @@ import {
   formatTemplateVariable,
   parseJson,
   parseOptionalJson,
+  relativeTime,
   showError,
   splitCsv,
   statusClass,
@@ -173,6 +174,28 @@ describe("formatDate", () => {
     expect(typeof out).toBe("string");
     expect(out.length).toBeGreaterThan(0);
     expect(out).not.toBe("Never");
+  });
+});
+
+describe("relativeTime", () => {
+  // Echo the key and named args; TranslateFn's overloads can't be inferred
+  // from a single arrow, so the stub is cast through unknown.
+  const t = ((key: string, named?: Record<string, unknown>) =>
+    `${key}:${JSON.stringify(named)}`) as unknown as TranslateFn;
+
+  it("picks the largest whole unit", () => {
+    const now = Date.now();
+    expect(relativeTime(now - 5_000, t)).toBe('refreshButton.secondsAgo:{"sec":5}');
+    expect(relativeTime(now - 3 * 60_000, t)).toBe('refreshButton.minutesAgo:{"min":3}');
+    expect(relativeTime(now - 2 * 3_600_000, t)).toBe('refreshButton.hoursAgo:{"h":2}');
+    expect(relativeTime(now - 3 * 86_400_000, t)).toBe(
+      'onlineEvals.quality.overview.relativeTime.daysAgo:{"day":3}',
+    );
+  });
+
+  it("returns an em dash for future or invalid times", () => {
+    expect(relativeTime(Date.now() + 60_000, t)).toBe("—");
+    expect(relativeTime(Number.NaN, t)).toBe("—");
   });
 });
 

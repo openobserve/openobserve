@@ -16610,8 +16610,26 @@
         "stream": "Stream",
         "targetScope": "Scope",
         "scorers": "Scorers",
+        "health": "Health",
+        "lastError": "Last error",
         "created": "Created",
         "actions": "Actions"
+      },
+      "health": {
+        "healthy": "Healthy",
+        "waitingForCredentials": "Waiting for credentials",
+        "noRecentRuns": "No recent runs",
+        "summary": "{errors} of {runs} runs failed in the last 15 minutes"
+      },
+      "errorKinds": {
+        "providerAuth": "Provider auth",
+        "rateLimited": "Rate limited",
+        "timeout": "Timeout",
+        "provider5xx": "Provider error",
+        "parseError": "Unparseable output",
+        "mappingError": "Mapping error",
+        "scorerMissing": "Scorer missing",
+        "executionError": "Execution error"
       },
       "empty": {
         "title": "No Eval Jobs Yet"

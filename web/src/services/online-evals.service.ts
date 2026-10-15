@@ -254,6 +254,33 @@ export interface ManualEvalJobResult {
   tasksCreated: number;
 }
 
+export type EvalJobHealthState =
+  | "healthy"
+  | "degraded"
+  | "waiting_for_credentials"
+  | "no_recent_runs";
+
+export interface EvalJobLastError {
+  /** e.g. provider_auth, rate_limited, timeout, provider_5xx, parse_error,
+   *  mapping_error, scorer_missing, execution_error */
+  kind: string;
+  message: string;
+  /** Microseconds since epoch. */
+  at: number;
+}
+
+/** Read-time health overlay for one job; never changes the job's status. */
+export interface EvalJobHealth {
+  jobId: string;
+  health: EvalJobHealthState;
+  recentRuns: number;
+  recentErrors: number;
+  scores24h: number;
+  /** Microseconds since epoch. */
+  lastSuccessAt?: number | null;
+  lastError?: EvalJobLastError | null;
+}
+
 const unwrapList = <T>(response: any, key = "list"): T[] => {
   const data = response?.data;
   if (Array.isArray(data)) return data;
@@ -381,6 +408,12 @@ const onlineEvalsService = {
       payload: ManualEvalJobPayload,
     ): Promise<ManualEvalJobResult> =>
       (await http().post(`/api/${orgId}/eval_jobs/${jobId}/manual_eval`, payload)).data,
+    /** Health for up to 500 jobs in one request; jobs the caller cannot see are omitted. */
+    health: async (orgId: string, jobIds: string[]): Promise<EvalJobHealth[]> =>
+      unwrapList<EvalJobHealth>(
+        await http().post(`/api/${orgId}/eval_jobs/health`, { jobIds }),
+        "items",
+      ),
   },
 };
 

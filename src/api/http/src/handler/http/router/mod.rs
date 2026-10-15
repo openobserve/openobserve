@@ -1559,8 +1559,9 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/playground/snapshots/{snapshot_id}", get(playground::get_playground_snapshot))
 
                 // Online Eval Jobs (Online Eval Phase 2)
-                // NOTE: /activate, /pause, /resume, /archive must precede /{job_id}
+                // NOTE: /health, /activate, /pause, /resume, /archive must precede /{job_id}
                 .route("/{org_id}/eval_jobs", get(eval_jobs::list_eval_jobs).post(eval_jobs::create_eval_job))
+                .route("/{org_id}/eval_jobs/health", post(eval_jobs::get_eval_jobs_health))
                 .route("/{org_id}/eval_jobs/{job_id}/activate", post(eval_jobs::activate_eval_job))
                 .route("/{org_id}/eval_jobs/{job_id}/pause", post(eval_jobs::pause_eval_job))
                 .route("/{org_id}/eval_jobs/{job_id}/resume", post(eval_jobs::resume_eval_job))

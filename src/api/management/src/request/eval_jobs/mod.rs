@@ -18,15 +18,19 @@ use axum::{
     response::Response,
 };
 #[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::llm_evaluations::eval_jobs::health::{self, JobHealthError};
+#[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use openobserve_core::auth::UserEmail;
+use openobserve_core::auth::{UserEmail, is_ofga_object_visible};
 #[cfg(test)]
 use openobserve_core::llm_evaluations::eval_jobs::EvalJobError;
 use openobserve_core::llm_evaluations::eval_jobs::{
     self, ManualEvalJobRequestBody, ManualEvalJobResponseBody,
 };
 
+#[cfg(feature = "enterprise")]
+use crate::models::eval_jobs::{EvalJobsHealthRequestBody, EvalJobsHealthResponseBody};
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     models::eval_jobs::{
@@ -84,6 +88,60 @@ pub async fn list_eval_jobs(
             MetaHttpResponse::json(body)
         }
         Err(err) => err.into(),
+    }
+}
+
+/// GetEvalJobsHealth
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/eval_jobs/health",
+    context_path = "/api",
+    tag = "EvalJobs",
+    operation_id = "GetEvalJobsHealth",
+    summary = "Get health of online eval jobs",
+    description = "Reports health for a batch of online eval jobs (at most 500) from their scorer spans in `_evaluator`: \
+                   the error ratio over the last 15 minutes, and the last error and last success over the last 24 hours. \
+                   Health is read-only and never changes a job's status. Jobs the caller cannot see are omitted.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = inline(EvalJobsHealthRequestBody), description = "Job ids to report on"),
+    responses(
+        (status = 200, body = inline(EvalJobsHealthResponseBody)),
+        (status = 400, description = "Bad Request", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "list"})),
+    ),
+)]
+pub async fn get_eval_jobs_health(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    axum::Json(body): axum::Json<EvalJobsHealthRequestBody>,
+) -> Response {
+    let permitted_objects = match openobserve_api_common::auth::validator::list_objects_for_user(
+        &org_id,
+        &user_email.user_id,
+        "GET",
+        "eval_job",
+    )
+    .await
+    {
+        Ok(list) => list,
+        Err(e) => return MetaHttpResponse::forbidden(e.to_string()),
+    };
+    let job_ids: Vec<String> = body
+        .job_ids
+        .into_iter()
+        .filter(|id| is_ofga_object_visible(&org_id, "eval_job", id, permitted_objects.as_deref()))
+        .collect();
+
+    match health::get(&org_id, &job_ids).await {
+        Ok(items) => MetaHttpResponse::json(EvalJobsHealthResponseBody {
+            items: items.into_iter().map(Into::into).collect(),
+        }),
+        Err(err @ JobHealthError::TooManyJobs(_)) => MetaHttpResponse::bad_request(err),
+        Err(err) => MetaHttpResponse::internal_error(err),
     }
 }
 

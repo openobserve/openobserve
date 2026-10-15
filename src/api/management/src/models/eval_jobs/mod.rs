@@ -18,6 +18,7 @@ use infra::table::online_eval_jobs::{
     JobInputMapping, SamplingMode, SessionEvalConfig, SpanSelector, SpanSelectorBindings,
     TargetScope, TraceEvalConfig,
 };
+use o2_enterprise::enterprise::llm_evaluations::eval_jobs::health::{JobHealth, JobHealthState};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -110,6 +111,74 @@ pub struct EvalJobStatusActionResponseBody {
     pub status: String,
     pub pipeline_id: Option<String>,
     pub updated_at: i64,
+}
+
+/// HTTP request body for reading the health of a batch of eval jobs.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EvalJobsHealthRequestBody {
+    /// Ids of the jobs to report on, at most 500.
+    pub job_ids: Vec<String>,
+}
+
+/// HTTP response body for eval job health, one item per visible requested job.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EvalJobsHealthResponseBody {
+    pub items: Vec<EvalJobHealthBody>,
+}
+
+/// Health of one eval job, computed from its `_evaluator` scorer spans.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EvalJobHealthBody {
+    pub job_id: String,
+    /// `healthy`, `degraded` (more than 20% of at least 5 runs in the last 15
+    /// minutes failed), `waiting_for_credentials` (the newest outcome is a
+    /// `provider_auth` error) or `no_recent_runs` (nothing in the last 15
+    /// minutes).
+    #[schema(value_type = String)]
+    pub health: JobHealthState,
+    /// Scorer runs in the last 15 minutes.
+    pub recent_runs: u64,
+    /// Failed scorer runs in the last 15 minutes.
+    pub recent_errors: u64,
+    /// Successful scorer runs in the last 24 hours.
+    pub scores_24h: u64,
+    /// Newest successful scorer run in the last 24 hours, in microseconds.
+    pub last_success_at: Option<i64>,
+    /// Newest failed scorer run in the last 24 hours.
+    pub last_error: Option<EvalJobLastErrorBody>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EvalJobLastErrorBody {
+    /// Error kind, e.g. `provider_auth`, `rate_limited`, `timeout`,
+    /// `provider_5xx`, `parse_error`, `mapping_error`, `scorer_missing`,
+    /// `execution_error`.
+    pub kind: String,
+    pub message: String,
+    /// When the error happened, in microseconds.
+    pub at: i64,
+}
+
+impl From<JobHealth> for EvalJobHealthBody {
+    fn from(value: JobHealth) -> Self {
+        Self {
+            job_id: value.job_id,
+            health: value.health,
+            recent_runs: value.recent_runs,
+            recent_errors: value.recent_errors,
+            scores_24h: value.scores_24h,
+            last_success_at: value.last_success_at,
+            last_error: value.last_error.map(|error| EvalJobLastErrorBody {
+                kind: error.kind,
+                message: error.message,
+                at: error.at,
+            }),
+        }
+    }
 }
 
 impl TryFrom<EvalJobRequestBody> for infra::table::online_eval_jobs::OnlineEvalJob {
