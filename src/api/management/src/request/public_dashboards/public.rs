@@ -895,4 +895,39 @@ mod tests {
         assert_eq!(stale.status(), StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(stale.headers()[header::RETRY_AFTER], "60");
     }
+
+    #[tokio::test]
+    async fn a_read_of_a_removed_range_answers_404_and_evicts_its_file() {
+        let slug = "Rm8Zt2mR7aB3cD4eF5gH6Q";
+        let live = Model {
+            id: config::ider::uuid(),
+            slug: slug.into(),
+            time_ranges: Some(r#"[{"type":"relative","secs":3600}]"#.into()),
+            default_range_key: Some("r3600".into()),
+            ..link()
+        };
+        let primary = sqlite().await;
+        table::insert_capped(&primary, &live, 50, 10, false)
+            .await
+            .unwrap();
+        // The file of a range the link offered before an edit removed it.
+        let key = store::key(&live.org_id, &live.id, "r86400");
+        infra::cache::file_data::disk::public_dashboards_replace(
+            &key,
+            store::next_incarnation(),
+            bytes::Bytes::from_static(b"from before the edit"),
+        )
+        .await
+        .unwrap();
+        let resp = serve_data_on(&primary, slug, Some("r86400"), None).await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        assert!(
+            infra::cache::file_data::disk::get(&key, None)
+                .await
+                .is_none()
+        );
+        assert!(store::read_header(&key).await.is_none());
+        let resp = serve_data_on(&primary, slug, Some("../r60"), None).await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
 }

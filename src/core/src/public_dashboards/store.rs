@@ -150,6 +150,9 @@ pub struct ManifestPanel {
     pub values_dependencies: Vec<ValuesDependency>,
     pub built_at: Option<i64>,
     pub outcome: PanelOutcome,
+    /// One of the panel's queries did not parse, so its streams can never be proven.
+    #[serde(default)]
+    pub unparsed: bool,
 }
 
 /// The private block: each panel's provenance and every values query a variable came from.
@@ -325,7 +328,9 @@ pub async fn write_raw(
 /// Evicts an indexed file, or any while the startup scan runs, since reads serve unscanned files.
 pub async fn evict_if_indexed(key: &str) {
     let loading = !disk::LOADING_FROM_DISK_DONE.load(Ordering::Relaxed);
-    if loading || disk::public_dashboards_indexed(key).await {
+    // During the scan a stat stands in for the index, so a missing file takes no write lock.
+    let on_disk = || disk::get_file_path(key).is_some_and(|p| std::path::Path::new(&p).exists());
+    if (loading && on_disk()) || disk::public_dashboards_indexed(key).await {
         evict(key).await;
     }
 }
@@ -479,5 +484,18 @@ mod tests {
         assert!(!disk::public_dashboards_indexed(&key).await);
         evict_if_indexed(&key).await;
         assert!(!std::path::Path::new(&path).exists());
+    }
+
+    #[tokio::test]
+    async fn during_the_scan_a_key_with_no_file_is_left_alone() {
+        assert!(
+            !disk::LOADING_FROM_DISK_DONE.load(Ordering::Relaxed),
+            "no scan in tests"
+        );
+        let key = key("o", &config::ider::uuid(), "r60");
+        let path = disk::get_file_path(&key).unwrap();
+        evict_if_indexed(&key).await;
+        assert!(!std::path::Path::new(&path).exists());
+        assert!(!disk::public_dashboards_indexed(&key).await);
     }
 }
