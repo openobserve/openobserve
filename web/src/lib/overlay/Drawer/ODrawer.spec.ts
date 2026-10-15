@@ -275,6 +275,24 @@ describe("ODrawer", () => {
       expect(document.activeElement).toBe(panel.element);
       wrapper.unmount();
     });
+
+    it("focuses without scrolling so a contained portal target is not dragged sideways", async () => {
+      const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
+      const wrapper = mount(ODrawer, {
+        attachTo: document.body,
+        props: { open: true, title: "Contained" },
+        slots: { default: '<button autofocus data-testid="autofocus-close">Close</button>' },
+      });
+      const panel = findDrawerPanel(wrapper);
+      focusSpy.mockClear();
+
+      await panel.vm.$emit("openAutoFocus", new Event("openAutoFocus", { cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve));
+
+      expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true });
+      focusSpy.mockRestore();
+      wrapper.unmount();
+    });
   });
 
   describe("Escape key behaviour", () => {

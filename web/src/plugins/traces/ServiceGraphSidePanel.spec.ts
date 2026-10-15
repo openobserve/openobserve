@@ -181,6 +181,7 @@ const ODrawerStub = {
     "open",
     "width",
     "seamless",
+    "modal",
     "portalTarget",
     "title",
     "subTitle",
