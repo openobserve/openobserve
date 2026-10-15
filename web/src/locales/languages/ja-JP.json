@@ -1773,6 +1773,7 @@
     "span": "スパン",
     "spans": "スパン",
     "errorTraces": "エラートレース",
+    "slowTraceFilter": "低速 (≥ {seconds} 秒)",
     "failedToFetchTraces": "トレースデータの取得に失敗しました。もう一度お試しください。",
     "seekToMoment": "セッションの今この瞬間を探して",
     "route": "ルート",

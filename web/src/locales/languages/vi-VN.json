@@ -1773,6 +1773,7 @@
     "span": "span",
     "spans": "span",
     "errorTraces": "trace lỗi",
+    "slowTraceFilter": "Chậm (≥ {seconds} giây)",
     "failedToFetchTraces": "Không thể tải dữ liệu trace. Vui lòng thử lại.",
     "seekToMoment": "Chuyển đến thời điểm này trong phiên",
     "route": "Tuyến",

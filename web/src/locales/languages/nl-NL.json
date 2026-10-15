@@ -1773,6 +1773,7 @@
     "span": "span",
     "spans": "spans",
     "errorTraces": "fouttraces",
+    "slowTraceFilter": "Traag (≥ {seconds} s)",
     "failedToFetchTraces": "Kan tracedata niet ophalen. Probeer het opnieuw.",
     "seekToMoment": "Streef naar dit moment in de sessie",
     "route": "Route",
