@@ -1695,6 +1695,17 @@ describe("AnalyticsFunnels", () => {
       expect(banner.filter((t) => after.has(t))).toEqual([]);
     }, 30_000);
 
+    it("an unchanged stale funnel can be saved to refresh its sql, while an unchanged fresh one cannot", async () => {
+      const save = () => wrapper!.find('[data-test="rum-analytics-funnel-save-btn"]');
+      await openedSavedText({ rulesHash: CURRENT_HASH, currentRulesHash: CURRENT_HASH });
+      expect(save().attributes("disabled")).toBeDefined();
+      await openedSavedText({ rulesHash: "aaaaaaaaaaaaaaaa", currentRulesHash: CURRENT_HASH });
+      expect(save().attributes("disabled")).toBeUndefined();
+      await save().trigger("click");
+      await settle();
+      expect(api.bodies("updateFunnel").at(-1)).toMatchObject({ rules_hash: CURRENT_HASH });
+    }, 30_000);
+
     it("P7-R11: Save is disabled when the app's settings failed to load", async () => {
       svc.getAppSettings = vi.fn(async () => {
         throw { response: { status: 503, data: {} } };
@@ -1868,9 +1879,9 @@ describe("AnalyticsFunnels", () => {
       );
     });
 
-    const NOTE = "Uses this app's exclusions as of now; re-create it after they change";
+    const NOTE = "Uses this app's app filters as of now; re-create it after they change";
 
-    it("P7-R17: Alert me hands the alert form a note that it keeps this app's exclusions as of creation", async () => {
+    it("P7-R17: Alert me hands the alert form a note that it keeps this app's app filters as of creation", async () => {
       alertCreationDialog.value = null;
       await mountFunnels();
       await setSteps([
@@ -1886,7 +1897,7 @@ describe("AnalyticsFunnels", () => {
       alertCreationDialog.value = null;
     });
 
-    it("P7-R17: Add to dashboard carries a note that the panel keeps this app's exclusions as of creation", async () => {
+    it("P7-R17: Add to dashboard carries a note that the panel keeps this app's app filters as of creation", async () => {
       await mountFunnels();
       await setSteps([
         ["p", "/a"],
@@ -1918,7 +1929,6 @@ describe("AnalyticsFunnels", () => {
       await settle();
       expect(at("rum-analytics-funnel-app-filters-builtin").text()).toBe("Built-in bot rule 90");
       expect(at("rum-analytics-funnel-app-filters-rules").text()).toBe("Saved rules 60");
-      expect(at("rum-analytics-funnel-included-banner").exists()).toBe(false);
     });
 
     it("the rail section says nothing is hidden when the app filters removed nothing", async () => {
@@ -1936,7 +1946,7 @@ describe("AnalyticsFunnels", () => {
       expect(at("rum-analytics-funnel-app-filters-builtin").exists()).toBe(false);
     });
 
-    it("Include hidden traffic sets includeExcluded and xall, and the banner names the count", async () => {
+    it("Include hidden sessions sets includeExcluded and xall", async () => {
       filtered();
       await mountFunnels();
       await setSteps([
@@ -1947,12 +1957,9 @@ describe("AnalyticsFunnels", () => {
       await settle();
       expect(useProductAnalytics().state.includeExcluded).toBe(true);
       expect(router.currentRoute.value.query.xall).toBe("1");
-      expect(at("rum-analytics-funnel-included-banner").text()).toContain(
-        "Including 150 sessions hidden by app filters in this view only. Synthetic tests stay excluded.",
-      );
     });
 
-    it("Hide hidden traffic clears includeExcluded and drops xall from the URL", async () => {
+    it("turning the rail switch off clears includeExcluded and drops xall from the URL", async () => {
       filtered();
       await mountFunnels({ xall: "1" });
       await setSteps([
@@ -1960,11 +1967,10 @@ describe("AnalyticsFunnels", () => {
         ["p", "/b"],
       ]);
       expect(router.currentRoute.value.query.xall).toBe("1");
-      await at("rum-analytics-funnel-hide-hidden-btn").trigger("click");
+      wrapper!.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", false);
       await settle();
       expect(useProductAnalytics().state.includeExcluded).toBe(false);
       expect(router.currentRoute.value.query.xall).toBeUndefined();
-      expect(at("rum-analytics-funnel-included-banner").exists()).toBe(false);
     });
 
     it("Edit app filters asks the page to open the drawer", async () => {
@@ -1978,7 +1984,7 @@ describe("AnalyticsFunnels", () => {
       expect(wrapper!.emitted("open-exclusions")).toHaveLength(1);
     });
 
-    it("while hidden traffic is included, synthetic sessions stay listed even when the rule count fails, and Retry fills it in", async () => {
+    it("while hidden sessions are included, synthetic sessions stay listed even when the rule count fails", async () => {
       const { performanceState } = usePerformance();
       performanceState.data.streams._rumdata.schema.session_type = { name: "session_type" };
       let fail = true;
@@ -2003,15 +2009,7 @@ describe("AnalyticsFunnels", () => {
       expect(at("rum-analytics-funnel-app-filters-synthetic").text()).toBe(
         "Synthetic tests 7 · always excluded",
       );
-      expect(at("rum-analytics-funnel-included-banner").text()).toContain(
-        "Including sessions hidden by app filters in this view only.",
-      );
-      fail = false;
-      await at("rum-analytics-funnel-hidden-count-retry-btn").trigger("click");
-      await settle();
-      expect(at("rum-analytics-funnel-included-banner").text()).toContain("Including 150 sessions");
-      expect(at("rum-analytics-funnel-hidden-count-retry-btn").exists()).toBe(false);
-      expect(at("rum-analytics-funnel-app-filters-synthetic").exists()).toBe(true);
+      expect(fail).toBe(true);
     });
 
     it("an exclusion's removed count comes from its xr column", async () => {

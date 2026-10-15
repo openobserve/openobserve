@@ -90,31 +90,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-analytics-funnel-users-fallback"
       />
       <OBanner
-        v-if="pa.state.includeExcluded"
-        variant="warning"
-        dense
-        :content="includedBanner"
-        data-test="rum-analytics-funnel-included-banner"
-      >
-        <template #actions>
-          <OButton
-            v-if="appFilters.hiddenFailed.value"
-            variant="ghost"
-            size="sm"
-            data-test="rum-analytics-funnel-hidden-count-retry-btn"
-            @click="appFilters.retryHidden()"
-            >{{ t("common.retry") }}</OButton
-          >
-          <OButton
-            variant="ghost"
-            size="sm"
-            data-test="rum-analytics-funnel-hide-hidden-btn"
-            @click="appFilters.setIncludeHidden(router, false)"
-            >{{ t("rum.analytics.appFilters.hideHidden") }}</OButton
-          >
-        </template>
-      </OBanner>
-      <OBanner
         v-if="pa.savedFunnelMissing.value"
         variant="warning"
         dense
@@ -497,6 +472,7 @@ import useFunnelQuickStarts from "@/composables/rum/useFunnelQuickStarts";
 import useSavedFunnels from "@/composables/rum/useSavedFunnels";
 import useFunnelDraft, {
   editedInSession,
+  funnelStale,
   trackSessionEdits,
 } from "@/composables/rum/useFunnelDraft";
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
@@ -654,10 +630,7 @@ const builtinOnlyApps = computed(() =>
 );
 
 // A NULL stored hash is a funnel saved before hashes existed, so it counts as changed.
-const stale = computed(() => {
-  const f = pa.openedFunnel.value;
-  return !!f && f.currentRulesHash !== undefined && f.rulesHash !== f.currentRulesHash;
-});
+const stale = computed(() => funnelStale(pa.openedFunnel.value));
 
 const needsNewer = computed(
   () => linkProblem.value === "unreadable" || pa.invalidParams.value.includes("funnel"),
@@ -739,13 +712,6 @@ const why = computed<WhyLines | null>(() => {
     atStep1: (def.value.x ?? []).map((x) => x.b === undefined && x.a === 1),
     hasFilters: !!def.value.f?.length,
   });
-});
-
-const includedBanner = computed<I18nText>(() => {
-  const n = appFilters.hiddenTotal.value;
-  return n === null
-    ? t("rum.analytics.appFilters.includedBannerPending")
-    : t("rum.analytics.appFilters.includedBanner", { count: addCommasToNumber(n) }, n);
 });
 
 const layoutSettings = computed<FunnelLayoutSetting[]>(() => [

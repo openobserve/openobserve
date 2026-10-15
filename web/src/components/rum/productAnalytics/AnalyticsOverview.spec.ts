@@ -944,7 +944,7 @@ describe("pa gap fixes (Overview exclusions)", () => {
       data: appSettings({ sessions: [STAFF_RULE] }),
     }));
     await mountOverview();
-    expect(text()).toMatch(/12,335 sessions excluded by the built-in bot rule and 1 rule/);
+    expect(text()).toMatch(/12,335 sessions hidden by the built-in bot rule and 1 rule/);
     expect(button("Include them")).toBeDefined();
   });
 
@@ -970,38 +970,38 @@ describe("pa gap fixes (Overview exclusions)", () => {
     withRoutes([], { ...SUMMARY, total_sessions: 200, builtin_kept_sessions: 200 });
     await mountOverview();
     expect(wrapper!.find('[data-test="rum-analytics-kpi-sessions"]').text()).toContain("200");
-    expect(text()).not.toMatch(/sessions? excluded by/);
+    expect(text()).not.toMatch(/sessions? hidden by/);
     expect(button("Include them")).toBeUndefined();
   });
 
-  it("P7-R7: the Pages per session tooltip says it counts every page view, including ignored pages", async () => {
+  it("P7-R7: the Pages per session tooltip says it counts every page view, including hidden pages", async () => {
     await mountOverview();
     expect(textsIn("rum-analytics-kpi-pages-per-session")).toContain(
-      "Counts every page view, including ignored pages",
+      "Counts every page view, including hidden pages",
     );
   });
 
-  it("P7-R8: a bot-like user agent over 20% of sessions shows the banner with Exclude <family> and Review exclusions", async () => {
+  it("P7-R8: a bot-like user agent over 20% of sessions shows the banner with Hide <family> and Review app filters", async () => {
     withRoutes([[UA_RE, [{ ua: "PingdomBot", dev: "Other", sessions: 500 }]]]);
     await mountOverview();
     expect(uaSqls()).toHaveLength(1);
     expect(uaSqls()[0]).toMatch(/LIMIT 15/);
-    expect(button("Exclude PingdomBot")).toBeDefined();
-    expect(button("Review exclusions")).toBeDefined();
+    expect(button("Hide PingdomBot")).toBeDefined();
+    expect(button("Review app filters")).toBeDefined();
   });
 
   it("P6-R11: a real browser family is never suggested, however many sessions it holds", async () => {
     withRoutes([[UA_RE, [{ ua: "Chrome", dev: "Other", sessions: 1500 }]]]);
     await mountOverview();
     expect(uaSqls()).toHaveLength(1);
-    expect(text()).not.toContain("Exclude Chrome");
-    expect(button("Review exclusions")).toBeUndefined();
+    expect(text()).not.toContain("Hide Chrome");
+    expect(button("Review app filters")).toBeUndefined();
   });
 
   it("P6-R11: the bot-like family match is case-insensitive", async () => {
     withRoutes([[UA_RE, [{ ua: "SiteCHECKer", dev: "Other", sessions: 500 }]]]);
     await mountOverview();
-    expect(button("Exclude SiteCHECKer")).toBeDefined();
+    expect(button("Hide SiteCHECKer")).toBeDefined();
   });
 
   it.each([
@@ -1022,7 +1022,7 @@ describe("pa gap fixes (Overview exclusions)", () => {
     withRoutes([[UA_RE, [{ ua: "PingdomBot", dev: "BotDevice", sessions: 500 }]]]);
     await mountOverview();
     expect(uaSqls()).toHaveLength(1);
-    expect(text()).not.toContain("Exclude PingdomBot");
+    expect(text()).not.toContain("Hide PingdomBot");
   });
 
   it("P6-R11: a regex rule does not count as covering, so the family is still suggested", async () => {
@@ -1033,7 +1033,7 @@ describe("pa gap fixes (Overview exclusions)", () => {
     }));
     withRoutes([[UA_RE, [{ ua: "PingdomBot", dev: "Other", sessions: 500 }]]]);
     await mountOverview();
-    expect(button("Exclude PingdomBot")).toBeDefined();
+    expect(button("Hide PingdomBot")).toBeDefined();
   });
 
   it("P6-R11: while the built-in rule is off, its labels are never suggested", async () => {
@@ -1051,16 +1051,16 @@ describe("pa gap fixes (Overview exclusions)", () => {
     ]);
     await mountOverview();
     expect(uaSqls()).toHaveLength(1);
-    expect(text()).not.toContain("Exclude HeadlessChrome");
-    expect(text()).not.toContain("Exclude Spider");
-    expect(button("Review exclusions")).toBeUndefined();
+    expect(text()).not.toContain("Hide HeadlessChrome");
+    expect(text()).not.toContain("Hide Spider");
+    expect(button("Review app filters")).toBeUndefined();
   });
 
   it("P6-R11: a bot-like family at or under 20% of the remaining sessions fires no banner", async () => {
     withRoutes([[UA_RE, [{ ua: "PingdomBot", dev: "Other", sessions: 300 }]]]);
     await mountOverview();
     expect(uaSqls()).toHaveLength(1);
-    expect(button("Review exclusions")).toBeUndefined();
+    expect(button("Review app filters")).toBeUndefined();
   });
 
   it("P6-R11: an identity value over 20% of identified sessions fires the banner", async () => {
@@ -1069,7 +1069,7 @@ describe("pa gap fixes (Overview exclusions)", () => {
       [/total_s/, [{ u: "staff@x.com", s: 40, total_s: 150, n_values: 50 }]],
     ]);
     await mountOverview();
-    expect(button("Review exclusions")).toBeDefined();
+    expect(button("Review app filters")).toBeDefined();
   });
 
   it("P6-R11: an identity value at or under 20% of identified sessions fires no banner", async () => {
@@ -1078,7 +1078,7 @@ describe("pa gap fixes (Overview exclusions)", () => {
       [/total_s/, [{ u: "staff@x.com", s: 25, total_s: 150, n_values: 50 }]],
     ]);
     await mountOverview();
-    expect(button("Review exclusions")).toBeUndefined();
+    expect(button("Review app filters")).toBeUndefined();
   });
 
   it("P7-R9: shows the Unnamed clicks by page card from the unnamed clicks query", async () => {

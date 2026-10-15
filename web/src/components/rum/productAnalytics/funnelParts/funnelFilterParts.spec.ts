@@ -132,7 +132,6 @@ describe("SessionFieldPicker", () => {
     await row0.find('[role="checkbox"], input[type="checkbox"]').trigger("click");
     expect(apply().attributes("disabled")).toBeUndefined();
     expect(w.find(dt("rum-analytics-funnel-field-picker-count")).text()).toBe("1 selected");
-    expect(w.find(dt("rum-analytics-funnel-field-picker-picked-India")).exists()).toBe(true);
     await apply().trigger("click");
     expect(w.emitted("apply")).toEqual([
       [{ field: "geo_info_country", op: "in", values: ["India"] }],
@@ -145,7 +144,8 @@ describe("SessionFieldPicker", () => {
     expect(w.find(dt("rum-analytics-funnel-field-picker-value-0")).text()).toContain("Brazil");
     expect(w.find(dt("rum-analytics-funnel-field-picker-value-1")).exists()).toBe(false);
     await typeValue(w, "Peru");
-    expect(w.find(dt("rum-analytics-funnel-field-picker-picked-Peru")).exists()).toBe(true);
+    expect(w.find(dt("rum-analytics-funnel-field-picker-value-0")).text()).toContain("Peru");
+    expect(w.find(dt("rum-analytics-funnel-field-picker-count")).text()).toBe("1 selected");
     await w.find(dt("rum-analytics-funnel-field-picker-clear")).trigger("click");
     expect(w.find(dt("rum-analytics-funnel-field-picker-count")).text()).toBe("0 selected");
   });
@@ -175,7 +175,9 @@ describe("SessionFieldPicker", () => {
       lockField: true,
     });
     expect(w.findComponent({ name: "OSelect" }).props("modelValue")).toBe("notSuffix");
-    expect(w.find(dt("rum-analytics-funnel-field-picker-picked-@qa.io")).exists()).toBe(true);
+    const row0 = w.find(dt("rum-analytics-funnel-field-picker-value-0"));
+    expect(row0.text()).toContain("@qa.io");
+    expect(row0.find('[role="checkbox"][data-state="checked"], input:checked').exists()).toBe(true);
     expect(w.find(dt("rum-analytics-funnel-field-picker-back")).exists()).toBe(false);
   });
 
