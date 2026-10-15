@@ -6689,7 +6689,9 @@
       "panelMoveFailed": "Spostamento pannello fallito",
       "failedToFetchReports": "Impossibile recuperare i rapporti",
       "failedToUpdateJson": "Impossibile aggiornare il JSON del dashboard: metodo di salvataggio non disponibile",
-      "failedToSaveChanges": "Impossibile salvare le modifiche al dashboard"
+      "failedToSaveChanges": "Impossibile salvare le modifiche al dashboard",
+      "autoRunDescription": "Esegue le query all'apertura e quando cambiano filtri o intervallo di tempo",
+      "autoRunScope": "Si applica a tutte le dashboard, Log e Tracce"
     },
     "dynamicFunctionPopUp": {
       "property": "Proprietà",
@@ -7143,7 +7145,9 @@
       "markerAria": "Esemplare {value} a {time}"
     },
     "showExemplarsLabel": "Mostra esemplari",
-    "showExemplarsHelp": "Disegna campioni di traccia su questo grafico per tutti coloro che aprono la dashboard. I visualizzatori possono comunque nasconderli dall'intestazione del pannello."
+    "showExemplarsHelp": "Disegna campioni di traccia su questo grafico per tutti coloro che aprono la dashboard. I visualizzatori possono comunque nasconderli dall'intestazione del pannello.",
+    "refreshToApplyTimeRange": "Aggiorna per applicare l'intervallo di tempo",
+    "refreshToApplyTimeRangeAndVariables": "Aggiorna per applicare l'intervallo di tempo e le modifiche alle variabili"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7770,7 +7774,7 @@
       "inviteSent": "Invito inviato con successo",
       "inviteSameOrg": "Un'organizzazione non può invitare se stessa",
       "childHeadline": "Fatturazione gestita da",
-      "childHeroSub": "L'utilizzo viene fatturato a questa organizzazione. Le modifiche al piano e le fatture sono gestite dall'organizzazione madre, non c'è nulla da gestire qui.",
+      "childHeroSub": "L'utilizzo viene fatturato a questa organizzazione. Le modifiche al piano e le fatture sono gestite dall'organizzazione padre.",
       "invitesPanelHint": "Queste organizzazioni ti hanno invitato a far parte del loro gruppo di fatturazione. Se accetti, l'utilizzo da parte di questa organizzazione verrà fatturato a loro.",
       "inviteTabPrompt": "Invita un'altra organizzazione a unirsi al tuo gruppo di fatturazione. Il loro utilizzo verrà fatturato a questa organizzazione.",
       "emptyTitle": "Avvia gruppo di fatturazione",
@@ -7790,7 +7794,15 @@
       "currentOrgTitle": "Organizzazione Attuale",
       "memberOrgsTitle": "Organizzazioni membro",
       "searchMemberOrg": "Cerca organizzazione",
-      "noMemberMatch": "Nessuna organizzazione corrispondente"
+      "noMemberMatch": "Nessuna organizzazione corrispondente",
+      "remove": "Rimuovi",
+      "removeTitle": "Rimuovere {name} dal tuo gruppo di fatturazione?",
+      "removeBody": "Questa organizzazione diventa un'organizzazione gratuita e paga per il proprio utilizzo. Si applicano i limiti del piano gratuito. I suoi utenti, i dati e l'utilizzo passato non sono interessati.",
+      "removed": "Organizzazione rimossa dal gruppo di fatturazione",
+      "leave": "Abbandona gruppo di fatturazione",
+      "leaveTitle": "Abbandonare il gruppo di fatturazione di {name}?",
+      "leaveBody": "Questa organizzazione diventa un'organizzazione gratuita e paga per il proprio utilizzo. Si applicano i limiti del piano gratuito. I tuoi utenti, i dati e l'utilizzo passato non sono interessati.",
+      "left": "Gruppo di fatturazione abbandonato"
     },
     "azureMarketplace": {
       "noTokenFound": "Nessun token di Marketplace trovato",

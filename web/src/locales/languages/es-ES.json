@@ -6689,7 +6689,9 @@
       "panelMoveFailed": "Error al mover el panel",
       "failedToFetchReports": "Error al obtener los reportes",
       "failedToUpdateJson": "Error al actualizar el JSON del dashboard: método de guardado no disponible",
-      "failedToSaveChanges": "Error al guardar los cambios del dashboard"
+      "failedToSaveChanges": "Error al guardar los cambios del dashboard",
+      "autoRunDescription": "Ejecuta las consultas al abrir y ante cambios de filtro o tiempo",
+      "autoRunScope": "Se aplica a todos los dashboards, Logs y Trazas"
     },
     "dynamicFunctionPopUp": {
       "property": "Propiedad",
@@ -7143,7 +7145,9 @@
       "markerAria": "Ejemplar {value} a las {time}"
     },
     "showExemplarsLabel": "Mostrar ejemplares",
-    "showExemplarsHelp": "Dibuja muestras de trazas en este gráfico para todos los que abran el dashboard. Los visores aún pueden ocultarlas desde el encabezado del panel."
+    "showExemplarsHelp": "Dibuja muestras de trazas en este gráfico para todos los que abran el dashboard. Los visores aún pueden ocultarlas desde el encabezado del panel.",
+    "refreshToApplyTimeRange": "Actualiza para aplicar el rango de tiempo",
+    "refreshToApplyTimeRangeAndVariables": "Actualiza para aplicar el rango de tiempo y los cambios de variables"
   },
   "panel": {
     "addPivotShort": "+P",
@@ -7770,7 +7774,7 @@
       "inviteSent": "La invitación se envió correctamente",
       "inviteSameOrg": "Una organización no puede invitarse a sí misma",
       "childHeadline": "Facturación gestionada por",
-      "childHeroSub": "Su uso se factura a esta organización. Los cambios de plan y las facturas son gestionados por la organización matriz; aquí no hay nada que gestionar.",
+      "childHeroSub": "Tu uso se factura a esta organización. Los cambios de plan y las facturas los gestiona la organización principal.",
       "invitesPanelHint": "Estas organizaciones lo han invitado a unirse a su grupo de facturación. Si aceptas, se les facturará el uso de esta organización.",
       "inviteTabPrompt": "Invita a otra organización a unirse a tu grupo de facturación. Su uso se facturará a esta organización.",
       "emptyTitle": "Iniciar grupo de facturación",
@@ -7790,7 +7794,15 @@
       "currentOrgTitle": "Organización Actual",
       "memberOrgsTitle": "Organizaciones miembro",
       "searchMemberOrg": "Buscar organización",
-      "noMemberMatch": "No hay organizaciones coincidentes"
+      "noMemberMatch": "No hay organizaciones coincidentes",
+      "remove": "Quitar",
+      "removeTitle": "¿Quitar a {name} de tu grupo de facturación?",
+      "removeBody": "Esta organización pasa a ser una organización gratuita y paga por su propio uso. Se aplican los límites del plan gratuito. Sus usuarios, sus datos y su uso anterior no se ven afectados.",
+      "removed": "Organización quitada del grupo de facturación",
+      "leave": "Salir del grupo de facturación",
+      "leaveTitle": "¿Salir del grupo de facturación de {name}?",
+      "leaveBody": "Esta organización pasa a ser una organización gratuita y paga por su propio uso. Se aplican los límites del plan gratuito. Tus usuarios, tus datos y tu uso anterior no se ven afectados.",
+      "left": "Has salido del grupo de facturación"
     },
     "azureMarketplace": {
       "noTokenFound": "No se encontró ningún token de Marketplace",

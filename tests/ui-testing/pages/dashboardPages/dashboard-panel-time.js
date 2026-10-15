@@ -95,9 +95,9 @@ export default class DashboardPanelTime {
     await this.page.locator(`[data-test="date-time-relative-${timeRange}-btn"]`).click();
   }
 
-  /** Click the date-time Apply button (page-level) */
+  /** Apply the range picked in the open date-time picker (Apply, or close + Refresh on dashboards) */
   async clickDateTimeApplyBtn() {
-    await this.page.locator('[data-test="date-time-apply-btn"]').click();
+    await applyPickedDateTime(this.page);
   }
 
   /** Click the panel discard button (swallows errors; does not accept the dialog) */
@@ -345,7 +345,7 @@ export default class DashboardPanelTime {
    * Change panel time in view mode (relative)
    * @param {string} panelId - Panel ID
    * @param {string} timeRange - e.g., "15-m", "1-h", "7-d"
-   * @param {boolean} clickApply - Whether to click Apply button (default: true)
+   * @param {boolean} clickApply - Whether to apply the pick (default: true); see applyPickedDateTime
    * @param {number} [_attempt=1] - Internal recursion counter. Do NOT pass from call sites.
    */
   async changePanelTimeInView(panelId, timeRange, clickApply = true, _attempt = 1) {
@@ -356,9 +356,11 @@ export default class DashboardPanelTime {
     await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
 
     // Wait for all panel data API responses to complete BEFORE clicking the time
-    // option. This lets the panelsInitializing guard (500 ms timer) expire and
-    // reduces re-render churn around the Reka UI portal.
+    // option, which reduces re-render churn around the Reka UI portal.
     await this._waitForAllPanelsIdle();
+
+    // Captured before the pick: with Auto Run on the pick applies, and moves the URL, at once.
+    const urlBefore = this.page.url();
 
     // Page-level locators survive portal re-mounts; only one datetime menu can be
     // open at a time (Reka UI unmounts when closed), so these are unambiguous.
@@ -371,44 +373,20 @@ export default class DashboardPanelTime {
     await timeOptionLocator.click({ force: true, timeout: 15000 });
 
     if (clickApply) {
-      // The time option selection itself may trigger a live-preview re-render or a
-      // new panel data request. Wait for those to settle so the Apply button is
-      // stable and the panelsInitializing guard (500 ms timer in
-      // RenderDashboardCharts) has had time to expire before we commit the change.
+      // With Auto Run on the pick already started a panel reload; let it settle first.
       await this._waitForAllPanelsIdle();
 
-      // If the menu closed unexpectedly during the wait (a background re-render
-      // unmounted the portal), retry rather than hanging waiting for Apply.
-      const menuVisible = await this.dateTimeMenu.isVisible().catch(() => false);
-      if (!menuVisible) {
-        if (_attempt < 4) {
-          await this._waitForAllPanelsIdle();
-          return this.changePanelTimeInView(panelId, timeRange, clickApply, _attempt + 1);
-        }
-        throw new Error(
-          `changePanelTimeInView: date-time menu did not stay open for panel "${panelId}" after ${_attempt} attempts`
-        );
-      }
-
-      const applyBtn = this.page.locator('[data-test="date-time-apply-btn"]').first();
-      await applyBtn.waitFor({ state: "visible", timeout: 10000 });
-
-      const urlBefore = this.page.url();
-
       try {
-        // No force:true — panels are idle so the button is stable and actionable.
-        // Explicit 10 s timeout: fail fast if the button detaches mid-click (another
-        // re-render) rather than hanging until the 45 s CI action-timeout.
-        await applyBtn.click({ timeout: 10000 });
+        // Panel pickers have no Apply: with Auto Run on the preset already applied; with it
+        // off the pick waits and the panel's own yellow refresh icon applies it.
+        await applyPickedDateTime(this.page);
 
         // Wait for the dialog to close, then for the resulting panel data request
         // (triggered by the new time range) to complete.
         await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 });
         await this._waitForAllPanelsIdle();
 
-        // Detect whether onPanelTimeApply was blocked by the panelsInitializing guard.
-        // The guard is a 500 ms timer that re-arms whenever initializePanelTimes()
-        // runs. If the URL hasn't changed the apply was a no-op — retry.
+        // An unchanged URL means the pick never reached the panel (a swallowed click) — retry.
         const urlAfter = this.page.url();
         if (urlAfter === urlBefore && _attempt < 4) {
           await this._waitForAllPanelsIdle();
@@ -530,6 +508,7 @@ export default class DashboardPanelTime {
     await timeOptionBtn.waitFor({ state: "visible", timeout: 5000 });
     await timeOptionBtn.click();
 
+    // Apply the pick: the dashboard picker has no Apply button
     await applyPickedDateTime(this.page);
 
     // Wait for dialog to close and network to settle
@@ -630,8 +609,8 @@ export default class DashboardPanelTime {
   }
 
   /**
-   * Open global time picker and select a relative time WITHOUT clicking Apply
-   * Useful for testing that changes aren't applied without clicking Apply
+   * Open global time picker and select a relative time WITHOUT applying it
+   * On the Add/Edit panel page it waits for Apply; on a dashboard with Auto Run on a preset applies at once
    * @param {string} timeRange - e.g., "6-d", "1-w", "15-m"
    */
   async selectGlobalTimeWithoutApply(timeRange) {
@@ -651,7 +630,7 @@ export default class DashboardPanelTime {
   }
 
   /**
-   * Click the Apply button in an open date time picker
+   * Apply the range picked in an open date time picker (Apply, or close + Refresh on dashboards)
    */
   async clickDateTimeApply() {
     await applyPickedDateTime(this.page);
@@ -709,7 +688,7 @@ export default class DashboardPanelTime {
   }
 
   /**
-   * Change time in view panel mode (click picker, select relative time, click apply)
+   * Change time in view panel mode (click picker, select relative time, apply it)
    * @param {string} timeRange - e.g., "6-d", "1-w"
    */
   async changeViewPanelDateTime(timeRange) {
@@ -717,16 +696,15 @@ export default class DashboardPanelTime {
     await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
     const timeOptionBtn = this.timeRangeBtn(timeRange);
     await timeOptionBtn.waitFor({ state: "visible", timeout: 5000 });
-    await timeOptionBtn.click();
-    const applyBtn = this.dateTimeMenu.locator('[data-test="date-time-apply-btn"]');
 
-    // Set up the response waiter BEFORE clicking Apply, so we don't miss the triggered query
+    // Set up the response waiter BEFORE the pick, which applies at once with Auto Run on
     const queryDone = this.page.waitForResponse(
       r => r.url().includes('/_search') || r.url().includes('/query'),
       { timeout: 15000 }
     ).catch(() => {});
 
-    await applyBtn.click();
+    await timeOptionBtn.click();
+    await applyPickedDateTime(this.page);
     await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 });
     // Wait for the re-query response triggered by the time change
     await queryDone;
