@@ -122,17 +122,11 @@
   --color-button-warning-border: var(--color-warning-400);
   --color-button-warning-focus-ring: var(--color-focus-ring-warning);
 
-  /* Button — pending (stale result: solid amber in both themes, never the theme accent) */
-  --color-button-pending-bg: var(--color-amber-500);
-  --color-button-pending-hover-bg: var(--color-amber-600);
-  /* Halfway to amber-700: on amber-700 itself the label drops to 3.94:1 */
-  --color-button-pending-active-bg: color-mix(
-    in srgb,
-    var(--color-amber-600) 50%,
-    var(--color-amber-700)
-  );
+  /* Button — pending (stale result: solid amber, never the theme accent) */
+  --color-button-pending-bg: var(--color-amber-400);
+  --color-button-pending-hover-bg: var(--color-amber-500);
+  --color-button-pending-active-bg: var(--color-amber-600);
   --color-button-pending-text: var(--color-grey-950);
-  --color-button-pending-divider: var(--color-amber-600);
   --color-button-pending-focus-ring: var(--color-focus-ring-warning);
 
   /* Button — destructive */
@@ -1430,7 +1424,6 @@
   --color-button-pending-hover-bg: var(--color-button-pending-hover-bg);
   --color-button-pending-active-bg: var(--color-button-pending-active-bg);
   --color-button-pending-text: var(--color-button-pending-text);
-  --color-button-pending-divider: var(--color-button-pending-divider);
   --color-button-pending-focus-ring: var(--color-button-pending-focus-ring);
 
   /* Button — destructive */

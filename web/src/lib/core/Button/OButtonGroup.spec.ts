@@ -86,13 +86,13 @@ describe("OButtonGroup", () => {
     }
     expect(wrapper.classes()).toContain("[&>*:not(:first-child)]:border-s-0");
     expect(wrapper.classes()).toContain(
-      "[&>[data-o2-variant=pending]:not(:last-child)]:border-e-button-pending-divider",
+      "[&>[data-o2-variant=pending]:not(:last-child)]:border-e-button-pending-hover-bg",
     );
   });
 
   it("drops the pending divider when the group is not divided", () => {
     const wrapper = mount(OButtonGroup, { props: { divided: false } });
-    expect(wrapper.classes().join(" ")).not.toContain("button-pending-divider");
+    expect(wrapper.classes().join(" ")).not.toContain("button-pending-hover-bg");
   });
 
   // --- Attrs passthrough ---

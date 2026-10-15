@@ -1138,7 +1138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   showRunQueryPending
                     ? ''
                     : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
-                  showRunQueryPending ? 'border-e-button-pending-divider!' : '',
+                  showRunQueryPending ? 'border-e-button-pending-hover-bg!' : '',
                 ]"
                 @click="handleRunQueryFn()"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
