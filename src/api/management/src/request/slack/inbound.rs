@@ -24,6 +24,13 @@ use axum::{
 /// Larger bodies get 413 from the per-route `DefaultBodyLimit` before the handler runs.
 pub const MAX_BODY_BYTES: usize = 1_048_576;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Kind {
+    Event,
+    Command,
+    Interaction,
+}
+
 /// `POST /api/slack/events`: Events API, including `url_verification`.
 pub async fn events(headers: HeaderMap, body: Bytes) -> Response {
     receive(Kind::Event, &headers, &body).await
@@ -37,13 +44,6 @@ pub async fn commands(headers: HeaderMap, body: Bytes) -> Response {
 /// `POST /api/slack/interactions`: buttons, menus and modal submits.
 pub async fn interactions(headers: HeaderMap, body: Bytes) -> Response {
     receive(Kind::Interaction, &headers, &body).await
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Kind {
-    Event,
-    Command,
-    Interaction,
 }
 
 #[cfg(feature = "enterprise")]

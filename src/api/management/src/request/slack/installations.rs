@@ -17,7 +17,10 @@
 
 use axum::{
     Json,
-    extract::{Path, Query},
+    extract::{
+        Path, Query,
+        rejection::{JsonRejection, QueryRejection},
+    },
     response::Response,
 };
 #[cfg(feature = "enterprise")]
@@ -29,7 +32,7 @@ use super::ManifestQuery;
 #[cfg(not(feature = "enterprise"))]
 use super::not_supported;
 #[cfg(feature = "enterprise")]
-use super::{caller, parse, respond, respond_with};
+use super::{caller, parse, parse_query, parse_value, respond, respond_with};
 
 /// SlackInstallStart
 #[utoipa::path(
@@ -57,7 +60,7 @@ use super::{caller, parse, respond, respond_with};
 pub async fn install_start(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<serde_json::Value>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -102,7 +105,7 @@ pub async fn install_start(
 pub async fn install_exchange(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<serde_json::Value>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -180,7 +183,7 @@ pub async fn prerequisites(
 pub async fn connectivity(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<serde_json::Value>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -221,13 +224,17 @@ pub async fn connectivity(
 )]
 pub async fn manifest(
     Path(org_id): Path<String>,
-    Query(query): Query<ManifestQuery>,
+    query: Result<Query<ManifestQuery>, QueryRejection>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        let query = match parse_query(&org_id, query) {
+            Ok(query) => query,
+            Err(response) => return response,
+        };
         let q: ent::manifest::ManifestQuery =
-            match parse(&org_id, serde_json::to_value(&query).unwrap_or_default()) {
+            match parse_value(&org_id, serde_json::to_value(&query).unwrap_or_default()) {
                 Ok(q) => q,
                 Err(response) => return response,
             };
@@ -268,7 +275,7 @@ pub async fn manifest(
 pub async fn create_installation(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<serde_json::Value>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -360,7 +367,7 @@ pub async fn install_url(
 pub async fn update_credentials(
     Path((org_id, installation_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<serde_json::Value>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -442,7 +449,7 @@ pub async fn list_installations(
 pub async fn test_installation(
     Path((org_id, installation_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<serde_json::Value>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -489,7 +496,7 @@ pub async fn test_installation(
 pub async fn connection_start(
     Path((org_id, installation_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<serde_json::Value>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -534,7 +541,7 @@ pub async fn connection_start(
 pub async fn connection_confirm(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<serde_json::Value>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -580,7 +587,7 @@ pub async fn connection_confirm(
 pub async fn connect(
     Path((org_id, installation_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<serde_json::Value>,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -697,13 +704,13 @@ mod tests {
                 user_id: "root@example.com".to_string(),
             })
         };
-        let body = || Json(serde_json::json!({}));
+        let body = || Ok(Json(serde_json::json!({})));
         let responses = vec![
             install_start(org(), user(), body()).await,
             install_exchange(org(), user(), body()).await,
             prerequisites(org(), user()).await,
             connectivity(org(), user(), body()).await,
-            manifest(org(), Query(ManifestQuery::default()), user()).await,
+            manifest(org(), Ok(Query(ManifestQuery::default())), user()).await,
             create_installation(org(), user(), body()).await,
             install_url(one(), user()).await,
             update_credentials(one(), user(), body()).await,

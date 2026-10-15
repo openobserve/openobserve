@@ -21,7 +21,14 @@ pub mod links;
 pub mod settings;
 
 #[cfg(feature = "enterprise")]
-use axum::{Json, response::IntoResponse};
+use axum::{
+    Json,
+    extract::{
+        Query,
+        rejection::{JsonRejection, QueryRejection},
+    },
+    response::IntoResponse,
+};
 use axum::{http::StatusCode, response::Response};
 use serde::{Deserialize, Serialize};
 use utoipa::IntoParams;
@@ -106,18 +113,38 @@ fn error_with_detail(
     response
 }
 
-/// A body that does not fit still answers 404 while Slack is off for the org, like every route.
+/// A body the extractor refused or that does not fit still answers 404 while Slack is off.
 #[cfg(feature = "enterprise")]
 fn parse<T: serde::de::DeserializeOwned>(
     org_id: &str,
+    body: Result<Json<serde_json::Value>, JsonRejection>,
+) -> Result<T, Response> {
+    let Json(value) = body.map_err(|e| invalid(org_id, e.body_text()))?;
+    parse_value(org_id, value)
+}
+
+#[cfg(feature = "enterprise")]
+fn parse_value<T: serde::de::DeserializeOwned>(
+    org_id: &str,
     value: serde_json::Value,
 ) -> Result<T, Response> {
-    serde_json::from_value(value).map_err(|e| {
-        match o2_enterprise::enterprise::slack::authz::require_enabled(org_id) {
-            Err(disabled) => slack_error(disabled),
-            Ok(()) => error_response(400, &format!("Invalid request: {e}")),
-        }
-    })
+    serde_json::from_value(value).map_err(|e| invalid(org_id, e))
+}
+
+/// A query the extractor refused gets the same 404-while-off rule and O2 body as a bad body.
+#[cfg(feature = "enterprise")]
+fn parse_query<T>(org_id: &str, query: Result<Query<T>, QueryRejection>) -> Result<T, Response> {
+    query
+        .map(|Query(q)| q)
+        .map_err(|e| invalid(org_id, e.body_text()))
+}
+
+#[cfg(feature = "enterprise")]
+fn invalid(org_id: &str, detail: impl std::fmt::Display) -> Response {
+    match o2_enterprise::enterprise::slack::authz::require_enabled(org_id) {
+        Err(disabled) => slack_error(disabled),
+        Ok(()) => error_response(400, &format!("Invalid request: {detail}")),
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -193,11 +220,49 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_bad_body_answers_404_while_slack_is_off() {
-        let response = parse::<o2_enterprise::enterprise::slack::install::ConnectRequest>(
+        let response = parse_value::<o2_enterprise::enterprise::slack::install::ConnectRequest>(
             "default",
             serde_json::json!({"ticket": 1}),
         )
         .unwrap_err();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(body(response).await["message"], "Slack is not enabled");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_body_or_query_the_extractor_refuses_answers_404_while_slack_is_off() {
+        use axum::extract::{FromRequest, FromRequestParts};
+        for (content_type, raw) in [("application/json", "{not json"), ("text/plain", "{}")] {
+            let req = axum::http::Request::builder()
+                .method("POST")
+                .header(axum::http::header::CONTENT_TYPE, content_type)
+                .body(axum::body::Body::from(raw))
+                .unwrap();
+            let rejected = Json::<serde_json::Value>::from_request(req, &()).await;
+            assert!(rejected.is_err(), "{content_type} {raw}");
+            let response = parse::<o2_enterprise::enterprise::slack::install::ConnectRequest>(
+                "default", rejected,
+            )
+            .unwrap_err();
+            assert_eq!(
+                response.status(),
+                StatusCode::NOT_FOUND,
+                "{content_type} {raw}"
+            );
+            assert_eq!(
+                body(response).await,
+                serde_json::json!({"code": 404, "message": "Slack is not enabled"})
+            );
+        }
+        let (mut parts, _) = axum::http::Request::builder()
+            .uri("/default/slack/manifest?channel_history=maybe")
+            .body(())
+            .unwrap()
+            .into_parts();
+        let rejected = Query::<ManifestQuery>::from_request_parts(&mut parts, &()).await;
+        assert!(rejected.is_err());
+        let response = parse_query("default", rejected).unwrap_err();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         assert_eq!(body(response).await["message"], "Slack is not enabled");
     }
