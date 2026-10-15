@@ -611,11 +611,6 @@ describe("usePanelDataLoader", () => {
       expect(loader.data.value).toEqual(injected.value.data);
       expect(loader.resultMetaData.value).toEqual(injected.value.resultMetaData);
       expect(loader.errorDetail.value).toEqual({ message: "withheld", code: "" });
-      expect(loader.isPartialData.value).toBe(false);
-
-      injected.value = { ...injected.value, isPartialData: true } as typeof injected.value;
-      await loader.loadData();
-      expect(loader.isPartialData.value).toBe(true);
     });
 
     it("should handle invalid timestamps", () => {

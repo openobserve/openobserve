@@ -1655,6 +1655,16 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("public dashboard route", () => {
+    it("serves the anonymous viewer outside the layout and marks it public", () => {
+      const { parentRoutes, homeChildRoutes } = useRoutes();
+      const route = findRoute(parentRoutes, "publicDashboard");
+      expect(route.path).toBe("/public/dashboards/:slug");
+      expect(route.meta.public).toBe(true);
+      expect(homeChildRoutes.some((r: any) => r.name === "publicDashboard")).toBe(false);
+    });
+  });
+
   describe("AI shared chat routes", () => {
     it("serves org shares inside the main layout with the token as a prop", () => {
       const { homeChildRoutes } = useRoutes();
@@ -2203,9 +2213,17 @@ describe("useRoutes (router.ts)", () => {
   // 23. Edge cases
   // =========================================================================
   describe("Edge Cases", () => {
-    it("should have exactly 6 parentRoutes", () => {
+    it("should have exactly these 7 parentRoutes, the anonymous public pages included", () => {
       const { parentRoutes } = useRoutes();
-      expect(parentRoutes).toHaveLength(6);
+      expect(parentRoutes.map((r: any) => r.path)).toEqual([
+        "/login",
+        "/signup",
+        "/logout",
+        "/cb",
+        "/ai/public/:token",
+        "/slack/oauth/callback",
+        "/public/dashboards/:slug",
+      ]);
     });
 
     it("should have unique paths in parentRoutes", () => {

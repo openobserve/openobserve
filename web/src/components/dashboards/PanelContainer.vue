@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :error="errorData"
           :maxQueryRangeWarning="maxQueryRangeWarning"
           :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-          v-bind="noticeProps"
+          v-bind="panelNoticeProps"
           :sparklineWarning="sparklineWarning"
           :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
           :isPartialData="isPartialData"
@@ -827,7 +827,16 @@ export default defineComponent({
     const canEditFromNotice = computed(
       () => !props.viewOnly && !props.simplifiedPanelView && !isLayoutEditing.value,
     );
-    const canRefreshFromNotice = computed(() => !props.simplifiedPanelView);
+    // An injected result (the public viewer) has no query to re-run, so its notices offer no Refresh.
+    const canRefreshFromNotice = computed(
+      () => !props.simplifiedPanelView && !props.injectedPanelData,
+    );
+    // The public viewer's server marks a panel partial itself; it reads as the server's Partial notice.
+    const injectedPartial = computed(() => !!props.injectedPanelData?.serverPartial);
+    const panelNoticeProps = computed(() => ({
+      ...noticeProps.value,
+      serverPartial: noticeProps.value.serverPartial || injectedPartial.value,
+    }));
     const canInspectFromNotice = computed(
       () => !props.simplifiedPanelView && (metaData.value?.queries?.length ?? 0) > 0,
     );
@@ -845,6 +854,7 @@ export default defineComponent({
         !!limitNumberOfSeriesWarningMessage.value ||
         !!seriesLimit.value ||
         !!panelDiagnostics.value?.serverPartial ||
+        injectedPartial.value ||
         !!panelDiagnostics.value?.functionErrors?.length ||
         (isPartialData.value && !isPanelLoading.value),
     );
@@ -1306,6 +1316,7 @@ export default defineComponent({
       handleSeriesLimitUpdate,
       canEditFromNotice,
       canRefreshFromNotice,
+      panelNoticeProps,
       canInspectFromNotice,
     };
   },

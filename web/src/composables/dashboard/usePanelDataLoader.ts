@@ -437,7 +437,7 @@ export const usePanelDataLoader = (
         log("loadData: rendering injected PromQL data");
         state.loading = false;
         state.isOperationCancelled = false;
-        state.isPartialData = !!injectedPromqlData.value.isPartialData;
+        state.isPartialData = false;
         state.data = markRaw(injectedPromqlData.value.data ?? []);
         state.metadata = injectedPromqlData.value.metadata ?? { queries: [] };
         state.resultMetaData = injectedPromqlData.value.resultMetaData ?? [];
