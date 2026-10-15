@@ -15,17 +15,15 @@
 
 import { computed, ref, type Ref } from "vue";
 import { useQuery } from "@tanstack/vue-query";
-import { useStore } from "vuex";
 import { useOrgId } from "@/composables/query/useOrgId";
 import type {
   QualityAgentParams,
   QualityConfigSummary,
   ScoreConfig,
 } from "@/services/online-evals.service";
-import { qualityFailedRunsQuery, qualityListQuery } from "@/services/online-evals.service.queries";
+import { qualityListQuery } from "@/services/online-evals.service.queries";
 import { entityId, valueOf } from "../utils/evalEntity";
-import { evaluatorAgentWhere, type QualityRow } from "../utils/qualityFormat";
-import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
+import type { QualityRow } from "../utils/qualityFormat";
 import { thresholdForConfig } from "../utils/scoreThreshold";
 
 /** Absolute time window in microseconds. */
@@ -86,11 +84,8 @@ export function useQualityList(opts: {
   scoreConfigs: Ref<ScoreConfig[]>;
   dateWindow: Ref<DateWindow>;
   agentParams: Ref<QualityAgentParams>;
-  /** Agents the cascade selects; null while every level is "All". */
-  evaluatorAgents: Ref<GenAiAgentListItem[] | null>;
   enabled: Ref<boolean>;
 }) {
-  const store = useStore();
   const orgId = useOrgId();
   const enabled = computed(() => !!orgId.value && opts.enabled.value);
 
@@ -105,28 +100,6 @@ export function useQualityList(opts: {
     ),
   );
 
-  // `_evaluator` has no env or version, so the count follows the ids of the agents the levels select; none selected, no count.
-  const countable = computed(() => opts.evaluatorAgents.value?.length !== 0);
-  const agentWhere = computed(() =>
-    opts.evaluatorAgents.value ? evaluatorAgentWhere(opts.evaluatorAgents.value) : null,
-  );
-
-  const failedRunsQuery = useQuery(() =>
-    Object.assign(
-      qualityFailedRunsQuery(orgId.value, {
-        startTime: opts.dateWindow.value.startUs,
-        endTime: opts.dateWindow.value.endUs,
-        agentWhere: agentWhere.value,
-        base64: !!store.state.zoConfig?.sql_base64_enabled,
-      }),
-      { enabled: enabled.value && countable.value },
-    ),
-  );
-  /** Failed evaluator runs; null while unknown or when no agent matches the selection. */
-  const failedRuns = computed(() =>
-    countable.value && !failedRunsQuery.error.value ? (failedRunsQuery.data.value ?? null) : null,
-  );
-
   const rows = computed(() => joinQualityRows(listQuery.data.value ?? [], opts.scoreConfigs.value));
   const tiles = computed(() => qualityTiles(rows.value));
   const tileFilter = ref<QualityTileFilter | null>(null);
@@ -138,8 +111,6 @@ export function useQualityList(opts: {
 
   return {
     listQuery,
-    failedRunsQuery,
-    failedRuns,
     rows,
     visibleRows,
     tiles,

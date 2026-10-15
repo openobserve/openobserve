@@ -272,23 +272,6 @@ describe("quality APIs", () => {
     });
     expect(result).toBe(page);
   });
-
-  it("quality.failedRuns counts error and timeout runs on _evaluator with the agent filter", async () => {
-    mockPost.mockResolvedValue({ data: { hits: [{ failed_runs: 12 }] } });
-    const count = await onlineEvalsService.quality.failedRuns("acme", {
-      startTime: 10,
-      endTime: 20,
-      agentWhere: "attributes_target_agent_id = 'a1'",
-      base64: false,
-    });
-    expect(count).toBe(12);
-    const [url, body] = mockPost.mock.calls[0];
-    expect(url).toContain("/api/acme/_search?type=traces");
-    expect(body.query).toMatchObject({ start_time: 10, end_time: 20, size: 1 });
-    expect(body.query.sql).toBe(
-      `SELECT COUNT(*) AS failed_runs FROM "_evaluator" WHERE (attributes_status IN ('error', 'timeout')) AND (attributes_target_agent_id = 'a1')`,
-    );
-  });
 });
 
 describe("jobs.create analytics", () => {

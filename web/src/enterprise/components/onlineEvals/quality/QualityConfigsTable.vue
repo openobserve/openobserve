@@ -109,29 +109,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OStatCard>
             </OTooltip>
           </OStatStrip>
-          <!-- Failed judge runs explain missing scores, so they show only when there are some; outside the tile, which is itself a button. -->
-          <div
-            v-if="(failedRuns ?? 0) > 0"
-            class="flex flex-wrap items-center gap-x-1.5 pt-1.5 text-xs"
-            data-test="quality-failed-runs"
-          >
-            <span class="text-status-error-text" data-test="quality-tile-failed-runs">{{
-              t(
-                "onlineEvals.quality.tiles.failedRuns",
-                { count: formatCount(failedRuns!) },
-                failedRuns!,
-              )
-            }}</span>
-            <span class="text-text-secondary">·</span>
-            <OButton
-              variant="ghost-primary"
-              size="chip"
-              data-test="quality-tile-eval-jobs"
-              @click="openEvalJobs"
-            >
-              {{ t("onlineEvals.quality.tiles.evalJobs") }}
-            </OButton>
-          </div>
         </div>
       </template>
 
@@ -283,8 +260,6 @@ import {
 const props = defineProps<{
   rows: QualityRow[];
   tiles: ReturnType<typeof qualityTiles>;
-  /** Failed evaluator runs in the window; null while unknown. */
-  failedRuns: number | null;
   /** The tile filtering the table, if any; one at a time. */
   tileFilter: QualityTileFilter | null;
   loading: boolean;
@@ -401,12 +376,6 @@ const orgId = useOrgId();
 function openConfig(row: QualityRow) {
   router
     .push(scoreConfigLink(String(route.name), orgId.value, row.configId, "view"))
-    .catch(() => {});
-}
-
-function openEvalJobs() {
-  router
-    .push({ name: String(route.name), query: { org_identifier: orgId.value, tab: "jobs" } })
     .catch(() => {});
 }
 

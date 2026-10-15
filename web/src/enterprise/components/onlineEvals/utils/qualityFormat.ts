@@ -30,7 +30,6 @@ import type {
 } from "@/services/online-evals.service";
 import { ALL_AGENTS_VALUE } from "@/plugins/traces/llmAgentFilter";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
-import { buildEvaluatorAgentFilterWhere } from "./agentFilterSql";
 
 /** A list row joined with the Score Config fields the API does not return. */
 export interface QualityRow extends QualityConfigSummary {
@@ -348,15 +347,6 @@ export function agentParamsFor(
   if (ids.size === 1 && id) params.agent_id = id;
   else params.agent_name = name;
   return params;
-}
-
-/** `_evaluator` filter for the selected agents, one OR'd clause per agent id (or name without one). */
-export function evaluatorAgentWhere(
-  agents: Pick<GenAiAgentListItem, "id" | "name">[],
-): string | null {
-  const clauses = new Set(agents.map((agent) => buildEvaluatorAgentFilterWhere(agent) ?? ""));
-  clauses.delete("");
-  return clauses.size ? [...clauses].map((clause) => `(${clause})`).join(" OR ") : null;
 }
 
 /** The data type a distribution implies when the config is unknown: numeric buckets carry edges, boolean keys are booleans. */

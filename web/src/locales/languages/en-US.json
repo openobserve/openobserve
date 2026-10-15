@@ -14936,9 +14936,7 @@
         "withoutResultTooltip": "Configs with no scores in this time range, or without a healthy threshold. Click to show them.",
         "noScores": "{count} got no scores | {count} got no scores",
         "noThreshold": "{count} has no threshold | {count} have no threshold",
-        "allGiveResult": "Every config gives a result",
-        "failedRuns": "{count} failed run | {count} failed runs",
-        "evalJobs": "Eval Jobs"
+        "allGiveResult": "Every config gives a result"
       },
       "table": {
         "searchPlaceholder": "Filter configs…",

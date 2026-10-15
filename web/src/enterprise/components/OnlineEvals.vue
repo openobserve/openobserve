@@ -141,7 +141,6 @@ the Free Software Foundation, either version 3 of the License, or
         :configs-loading="isLoading"
         :date-window="qualityDateWindow"
         :agent-params="qualityAgentParams"
-        :evaluator-agents="qualityEvaluatorAgents"
         :enabled="qualityScopeReady"
         @status="(status) => (qualityStatus = status)"
       >
@@ -449,7 +448,6 @@ import {
   agentParamsFor,
   qualityRangeFromQuery,
   qualityRangeQuery,
-  selectedAgents,
 } from "./onlineEvals/utils/qualityFormat";
 import { ALL_AGENTS_VALUE } from "@/plugins/traces/llmAgentFilter";
 import { resolveAiDateWindow, type AiDateState } from "@/enterprise/composables/useAiDateRange";
@@ -794,15 +792,6 @@ watch(
   () => {
     if (qualityScopeReady.value) syncQualityUrl();
   },
-);
-
-const qualityEvaluatorAgents = computed(() =>
-  selectedAgents(
-    qualityAgents.value,
-    qualitySelectedEnv.value,
-    qualitySelectedAgentName.value,
-    qualitySelectedVersion.value,
-  ),
 );
 
 // Refresh moves a relative range to now and forces every read on the Quality view.

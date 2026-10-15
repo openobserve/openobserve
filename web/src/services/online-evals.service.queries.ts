@@ -75,18 +75,6 @@ export const qualityScoresQuery = (org: string, entityId: string, params: Qualit
     staleTime: MEDIUM_STALE_TIME,
   });
 
-export const qualityFailedRunsQuery = (
-  org: string,
-  params: { startTime: number; endTime: number; agentWhere: string | null; base64: boolean },
-) => {
-  const { start, end } = quantizeRange(params.startTime, params.endTime);
-  return queryOptions({
-    queryKey: onlineEvalKeys.qualityFailedRuns(org, start, end, params.agentWhere),
-    queryFn: (): Promise<number> => onlineEvalsService.quality.failedRuns(org, params),
-    staleTime: MEDIUM_STALE_TIME,
-  });
-};
-
 // ── Writes ──────────────────────────────────────────────────────────────────
 //
 // Every write drops the whole onlineEvals scope: the four lists share entity

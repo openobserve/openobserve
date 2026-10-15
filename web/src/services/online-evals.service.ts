@@ -6,9 +6,7 @@
 // (at your option) any later version.
 
 import http from "@/services/http";
-import { b64EncodeUnicode } from "@/utils/formatters";
 import analytics from "./product_analytics";
-import search from "./search";
 
 export type EvalJobStatus = "draft" | "active" | "paused" | "degraded" | "archived";
 export type EvalTargetScope = "span" | "trace" | "session";
@@ -480,32 +478,6 @@ const onlineEvalsService = {
           params: qualityQuery(params),
         })
       ).data,
-    /** Evaluator runs that ended in error or timeout, counted on `_evaluator`. */
-    failedRuns: async (
-      orgId: string,
-      params: { startTime: number; endTime: number; agentWhere: string | null; base64: boolean },
-    ): Promise<number> => {
-      const where = ["attributes_status IN ('error', 'timeout')", params.agentWhere]
-        .filter(Boolean)
-        .map((clause) => `(${clause})`)
-        .join(" AND ");
-      const sql = `SELECT COUNT(*) AS failed_runs FROM "_evaluator" WHERE ${where}`;
-      const response = await search.search({
-        org_identifier: orgId,
-        query: {
-          query: {
-            sql: params.base64 ? b64EncodeUnicode(sql) : sql,
-            start_time: Math.floor(params.startTime),
-            end_time: Math.floor(params.endTime),
-            from: 0,
-            size: 1,
-          },
-          ...(params.base64 ? { encoding: "base64" } : {}),
-        },
-        page_type: "traces",
-      });
-      return Number(response?.data?.hits?.[0]?.failed_runs ?? 0);
-    },
   },
 
   jobs: {
