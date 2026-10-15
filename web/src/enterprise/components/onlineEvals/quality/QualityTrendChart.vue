@@ -34,6 +34,9 @@ import {
 } from "@/utils/dashboard/colorPalette";
 import type { QualityTimelineBucket } from "@/services/online-evals.service";
 import {
+  formatCount,
+  formatExact,
+  formatFixed,
   scoreAxisBounds,
   trendBuckets,
   trendPoints,
@@ -83,7 +86,7 @@ function bucketTime(bucket: QualityTimelineBucket): string {
 
 function shownValue(value: number): string {
   if (props.kind === "healthyRate" || props.kind === "trueRate") return `${value.toFixed(1)}%`;
-  return props.kind === "count" ? String(value) : value.toFixed(2);
+  return props.kind === "count" ? formatCount(value) : formatFixed(value);
 }
 
 function seriesFor(name: string, data: [number, number | null][], color: string, extra = {}) {
@@ -125,7 +128,7 @@ const options = computed(() => {
     if (props.threshold) {
       const sign = {
         direction: props.threshold.direction === "gte" ? "≥" : "≤",
-        value: props.threshold.value,
+        value: formatExact(props.threshold.value),
       };
       // Its own series, so the threshold gets a legend entry next to Avg and p95.
       series.push({
@@ -189,7 +192,9 @@ const options = computed(() => {
           .join("&nbsp;&nbsp;&nbsp;");
         const when = escapeHtml(bucketTime(bucket));
         if (props.kind === "count") return `${when}<br/>${values}`;
-        const count = t("onlineEvals.quality.detail.chartTooltipCount", { count: bucket.count });
+        const count = t("onlineEvals.quality.detail.chartTooltipCount", {
+          count: formatCount(bucket.count),
+        });
         return `${when} · ${escapeHtml(count)}<br/>${values}`;
       },
     },
