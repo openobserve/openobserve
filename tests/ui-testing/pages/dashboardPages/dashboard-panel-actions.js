@@ -2,6 +2,7 @@
 // Methods : AddPanelName, SavePanel, ApplyDashboardBtn, AddNextPanel, GetTableRowCount, VerifyChartRenders
 
 import { SELECTORS, visibleOnly } from "./dashboard-selectors.js";
+import { settlePanelLeave } from "./panel-leave-dialog.js";
 
 export default class DashboardactionPage {
   constructor(page) {
@@ -236,8 +237,9 @@ export default class DashboardactionPage {
    * incomplete/invalid config (which cannot pass save validation) or when the
    * test does not need to persist the panel. Discarding an edited panel fires
    * a native window.confirm — Playwright auto-dismisses dialogs by default,
-   * which would cancel the navigation and leave the page on add_panel — so
-   * accept it for the duration of the discard.
+   * which would cancel the navigation — so accept it. A new panel with edits
+   * opens the in-app "Leave panel editor?" dialog instead, answered with
+   * "Discard changes" so no browser draft lingers.
    * (Same handling as dashboard-multi-sql.js discardPanel; this is the
    * generic home for it since discard is not a multi-SQL-specific action.)
    */
@@ -248,10 +250,7 @@ export default class DashboardactionPage {
     try {
       await discardBtn.waitFor({ state: "visible", timeout: 15000 });
       await discardBtn.click();
-      // Discard navigates to the dashboard view page (/dashboards/view).
-      await this.page.waitForURL((url) => !url.pathname.includes("add_panel"), {
-        timeout: 30000,
-      });
+      await settlePanelLeave(this.page);
     } finally {
       this.page.off("dialog", dialogHandler);
     }

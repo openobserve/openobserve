@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import { applyPickedDateTime } from "./dashboard-time.js";
+import { settlePanelLeave } from "./panel-leave-dialog.js";
 
 /**
  * Page Object for Panel Time Range operations
@@ -670,13 +671,14 @@ export default class DashboardPanelTime {
   }
 
   /**
-   * Discard panel changes (click discard button and accept confirmation dialog)
+   * Discard panel changes: an edited panel answers the native confirm, a new one the in-app leave dialog
    */
   async discardPanelChanges() {
     this.page.once("dialog", async (dialog) => {
       await dialog.accept();
     });
     await this.panelDiscardBtn.click().catch(() => {});
+    await settlePanelLeave(this.page, { timeout: 10000 }).catch(() => {});
     await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
   }
 

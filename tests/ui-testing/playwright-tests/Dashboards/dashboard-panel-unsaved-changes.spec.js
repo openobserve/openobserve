@@ -7,6 +7,10 @@
  * snapshots a baseline on the user's FIRST pointer/key event and compares
  * against it on leave, so pre-input mutations and reverted edits do not warn.
  *
+ * A NEW panel's edits are kept as one browser draft per dashboard instead: its
+ * Discard opens the in-app "Leave panel editor?" dialog, other ways out keep
+ * the draft silently, and Add Panel offers it back.
+ *
  * Each test owns its dashboard and deletes it in afterEach.
  */
 
@@ -14,6 +18,7 @@ const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures
 const testLogger = require("../utils/test-logger.js");
 const { safeWaitForNetworkIdle } = require("../utils/wait-helpers.js");
 import PageManager from "../../pages/page-manager.js";
+import { settlePanelLeave } from "../../pages/dashboardPages/panel-leave-dialog.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import {
   waitForDashboardPage,
@@ -106,6 +111,33 @@ async function expectDiscardPrompts(page, pm) {
     watcher.dispose();
   }
   return watcher.messages;
+}
+
+const DRAFT_PROMPT = '[data-test="dashboard-panel-draft-prompt"]';
+
+/** Build a new panel without saving it, ending in the editor with edits. */
+async function startNewPanelWithEdits(page, pm, panelName) {
+  await addSimplePanel(pm, panelName, { save: false });
+  await page.waitForURL((url) => url.pathname.includes("add_panel"), { timeout: 30000 });
+}
+
+/** Leave the editor through Discard → "Keep as draft", asserting no native dialog fired. */
+async function keepNewPanelAsDraft(page, pm) {
+  const watcher = captureDialogs(page);
+  try {
+    await pm.dashboardPanelActions.getPanelDiscardBtn().click();
+    expect(await settlePanelLeave(page, { choice: "keep" })).toBe(true);
+  } finally {
+    watcher.dispose();
+  }
+  expect(watcher.messages, "a new panel asks in-app, never natively").toEqual([]);
+}
+
+/** Open Add Panel from the dashboard view and wait for the editor to settle. */
+async function openAddPanel(page, pm) {
+  await pm.dashboardCreate.addPanel();
+  await page.waitForURL((url) => url.pathname.includes("add_panel"), { timeout: 30000 });
+  await waitForEditorSettled(page, pm);
 }
 
 /** Return to the dashboard list and delete the test dashboard. */
@@ -300,6 +332,90 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
 
       await pm.dashboardPanelActions.discardPanel();
       testLogger.info("Drilldown tooltip copy verified");
+    }
+  );
+
+  test(
+    "a new panel kept as a draft is offered by Add Panel and saves after Continue",
+    { tag: ["@dashboard-panel-unsaved-changes", "@all", "@dashboards", "@P0"] },
+    async ({ page }) => {
+      dashboardName = `Dashboard_Unsaved_${uniqueSuffix()}`;
+      await setupTestDashboard(page, pm, dashboardName);
+      const panelName = pm.dashboardPanelActions.generateUniquePanelName("draft");
+
+      await startNewPanelWithEdits(page, pm, panelName);
+      await keepNewPanelAsDraft(page, pm);
+
+      await openAddPanel(page, pm);
+      await expect(page.locator(DRAFT_PROMPT)).toContainText("You have an unsaved panel from", {
+        timeout: 15000,
+      });
+      await page.locator('[data-test="dashboard-panel-draft-continue"]').click();
+      await expect(page.locator(DRAFT_PROMPT)).toHaveCount(0);
+      await expect(page).toHaveURL(/draftId=/);
+
+      await pm.dashboardPanelActions.savePanel();
+      await page.waitForURL((url) => !url.pathname.includes("add_panel"), { timeout: 30000 });
+      await expect(pm.dashboardPanelActions.getEditPanelDropdown(panelName)).toBeVisible({
+        timeout: 30000,
+      });
+
+      // Saving cleared the draft, so the next Add Panel starts clean.
+      await openAddPanel(page, pm);
+      await expect(page.locator(DRAFT_PROMPT)).toHaveCount(0);
+      await expectDiscardWithoutPrompt(page, pm);
+      testLogger.info("Draft kept, continued and saved", { panelName });
+    }
+  );
+
+  test(
+    "Start new deletes the kept draft",
+    { tag: ["@dashboard-panel-unsaved-changes", "@all", "@dashboards", "@P1"] },
+    async ({ page }) => {
+      dashboardName = `Dashboard_Unsaved_${uniqueSuffix()}`;
+      await setupTestDashboard(page, pm, dashboardName);
+      const panelName = pm.dashboardPanelActions.generateUniquePanelName("draft");
+
+      await startNewPanelWithEdits(page, pm, panelName);
+      await keepNewPanelAsDraft(page, pm);
+
+      await openAddPanel(page, pm);
+      await page.locator('[data-test="dashboard-panel-draft-start-new"]').click();
+      await expect(page.locator(DRAFT_PROMPT)).toHaveCount(0);
+      await expectDiscardWithoutPrompt(page, pm);
+
+      await openAddPanel(page, pm);
+      await expect(page.locator(DRAFT_PROMPT)).toHaveCount(0);
+      await expectDiscardWithoutPrompt(page, pm);
+      testLogger.info("Start new removed the draft");
+    }
+  );
+
+  test(
+    "browser Back from a new panel keeps the draft without asking",
+    { tag: ["@dashboard-panel-unsaved-changes", "@all", "@dashboards", "@P1"] },
+    async ({ page }) => {
+      dashboardName = `Dashboard_Unsaved_${uniqueSuffix()}`;
+      await setupTestDashboard(page, pm, dashboardName);
+      const panelName = pm.dashboardPanelActions.generateUniquePanelName("draft");
+
+      await startNewPanelWithEdits(page, pm, panelName);
+      // Past the autosave debounce, so the draft does not depend on the leave-time write alone.
+      await expect(page).toHaveURL(/draftId=/, { timeout: 15000 });
+
+      const watcher = captureDialogs(page);
+      try {
+        await page.goBack();
+        await page.waitForURL((url) => !url.pathname.includes("add_panel"), { timeout: 30000 });
+      } finally {
+        watcher.dispose();
+      }
+      expect(watcher.messages, "leaving a new panel never raises a native confirm").toEqual([]);
+
+      await openAddPanel(page, pm);
+      await expect(page.locator(DRAFT_PROMPT)).toBeVisible({ timeout: 15000 });
+      await page.locator('[data-test="dashboard-panel-draft-start-new"]').click();
+      testLogger.info("Browser Back kept the draft");
     }
   );
 });
