@@ -1,6 +1,0 @@
-web/src/lib/overlay/Drawer/ODrawer.spec.ts
-web/src/lib/overlay/Drawer/ODrawer.vue
-web/src/plugins/traces/ServiceGraphNodeSidePanel.spec.ts
-web/src/plugins/traces/ServiceGraphNodeSidePanel.vue
-web/src/plugins/traces/ServiceGraphSidePanel.spec.ts
-web/src/plugins/traces/ServicesCatalog.spec.ts
