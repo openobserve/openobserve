@@ -63,6 +63,7 @@ const sqlPanel = (
   sql: string,
   x: AxisField,
   y: AxisField[],
+  config: Record<string, unknown> = {},
 ): Record<string, unknown> => ({
   version: 2,
   id,
@@ -80,6 +81,7 @@ const sqlPanel = (
     base_map: { type: "osm" },
     map_view: { zoom: 1, lat: 0, lng: 0 },
     mark_line: [],
+    ...config,
   },
   queryType: "sql",
   queries: [
@@ -190,5 +192,7 @@ export function buildFunnelTrendPanel(
     sql,
     axis("x_axis_1", t("rum.analytics.trends.time")),
     [axis("y_axis_1", t("rum.analytics.funnel.trendAxis"))],
+    // The SQL rounds to one decimal, and an interval with no entrants is a gap, not a slope.
+    { decimals: 1, connect_nulls: false },
   );
 }
