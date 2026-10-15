@@ -97,7 +97,12 @@ async fn reconcile(org_id: &str, prefetched: Option<Vec<serde_json::Value>>) -> 
     let detectors: Vec<_> = configs.iter().filter_map(managed_detector).collect();
     let widened: Vec<_> = detectors
         .iter()
-        .filter_map(|d| Some((d.id.clone(), red_insights::widened_window(d)?)))
+        .filter_map(|d| {
+            Some((
+                d.id.clone(),
+                red_insights::widened_window(d.detection_window_seconds)?,
+            ))
+        })
         .collect();
     retire_removed_streams(org_id, &detectors, &mut reads).await;
     let existing = red_insights::on_read_streams(detectors, &reads);
@@ -203,7 +208,11 @@ async fn widen_window(org_id: &str, anomaly_id: &str, detection_window_seconds: 
         detection_window_seconds: Some(detection_window_seconds),
         ..Default::default()
     };
-    if let Err(e) = anomaly_detection::update_config(org_id, anomaly_id, req).await {
+    // Judged on the row being written, so a user edit made since the listing wins.
+    let widened = anomaly_detection::update_config_if(org_id, anomaly_id, req, |stored| {
+        red_insights::widened_window(stored.detection_window_seconds).is_some()
+    });
+    if let Err(e) = widened.await {
         log::error!("[RED insights] org {org_id}: failed to widen the window of {anomaly_id}: {e}");
     }
 }

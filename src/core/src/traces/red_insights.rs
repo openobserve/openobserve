@@ -353,9 +353,8 @@ pub fn template(
 }
 
 /// Any window but the legacy one is user-set and kept.
-pub fn widened_window(d: &ManagedDetector) -> Option<i64> {
-    (d.detection_window_seconds == LEGACY_DETECTION_WINDOW_SECONDS)
-        .then_some(DETECTION_WINDOW_SECONDS)
+pub fn widened_window(stored_window_seconds: i64) -> Option<i64> {
+    (stored_window_seconds == LEGACY_DETECTION_WINDOW_SECONDS).then_some(DETECTION_WINDOW_SECONDS)
 }
 
 /// Recovers `(service, signal, current)` from the tag and the SQL, never the editable name.
@@ -1270,20 +1269,12 @@ mod tests {
 
     #[test]
     fn widened_window_replaces_only_the_legacy_window() {
-        let legacy = ManagedDetector {
-            detection_window_seconds: LEGACY_DETECTION_WINDOW_SECONDS,
-            ..det("a", "svc", RedSignal::Rate, true)
-        };
-        assert_eq!(widened_window(&legacy), Some(DETECTION_WINDOW_SECONDS));
         assert_eq!(
-            widened_window(&det("b", "svc", RedSignal::Rate, true)),
-            None
+            widened_window(LEGACY_DETECTION_WINDOW_SECONDS),
+            Some(DETECTION_WINDOW_SECONDS)
         );
-        let user_set = ManagedDetector {
-            detection_window_seconds: 1_800,
-            ..det("c", "svc", RedSignal::Rate, true)
-        };
-        assert_eq!(widened_window(&user_set), None);
+        assert_eq!(widened_window(DETECTION_WINDOW_SECONDS), None);
+        assert_eq!(widened_window(7_200), None);
         let created = template("default", "svc", RedSignal::Rate, &ALL_COLS).unwrap();
         assert_eq!(created.detection_window_seconds, DETECTION_WINDOW_SECONDS);
     }
