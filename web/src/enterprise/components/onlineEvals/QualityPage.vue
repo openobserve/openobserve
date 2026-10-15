@@ -114,7 +114,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:search="search"
         :rows="visibleRows"
         :tiles="tiles"
-        :failed-runs="failedRuns"
         :loading="listQuery.isPending.value || configsLoading"
         :forbidden="listStatus === 403"
         :load-error="!!listQuery.error.value && listStatus !== 403"
@@ -140,7 +139,6 @@ import type {
   QualityAgentParams,
   ScoreConfig,
 } from "@/services/online-evals.service";
-import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { useQualityList, type DateWindow } from "./composables/useQualityList";
 import { dataTypeOf, entityId } from "./utils/evalEntity";
 import { thresholdForConfig } from "./utils/scoreThreshold";
@@ -164,8 +162,6 @@ const props = defineProps<{
   configsLoading: boolean;
   dateWindow: DateWindow;
   agentParams: QualityAgentParams;
-  /** Agents the cascade selects; null while every level is "All". */
-  evaluatorAgents: GenAiAgentListItem[] | null;
   /** False until the agent list first loads, so a deep-linked agent is applied before the first request. */
   enabled: boolean;
 }>();
@@ -180,14 +176,12 @@ const route = useRoute();
 const router = useRouter();
 const orgId = useOrgId();
 
-const { listQuery, failedRunsQuery, failedRuns, rows, visibleRows, tiles, tileFilter, listStatus } =
-  useQualityList({
-    scoreConfigs: toRef(props, "scoreConfigs"),
-    dateWindow: toRef(props, "dateWindow"),
-    agentParams: toRef(props, "agentParams"),
-    evaluatorAgents: toRef(props, "evaluatorAgents"),
-    enabled: toRef(props, "enabled"),
-  });
+const { listQuery, rows, visibleRows, tiles, tileFilter, listStatus } = useQualityList({
+  scoreConfigs: toRef(props, "scoreConfigs"),
+  dateWindow: toRef(props, "dateWindow"),
+  agentParams: toRef(props, "agentParams"),
+  enabled: toRef(props, "enabled"),
+});
 // The table unmounts while a config is open, so the page keeps its search, as it keeps the tile filter.
 const search = ref("");
 
@@ -358,15 +352,12 @@ watch(configId, (id) => {
 
 watch(
   () => {
-    const times = [listQuery.dataUpdatedAt.value, failedRunsQuery.dataUpdatedAt.value];
+    const times = [listQuery.dataUpdatedAt.value];
     if (configId.value && detailStatus.value) times.push(detailStatus.value.updatedAt);
     const loaded = times.filter((time) => time > 0);
     return {
       updatedAt: loaded.length ? Math.min(...loaded) : null,
-      fetching:
-        listQuery.isFetching.value ||
-        failedRunsQuery.isFetching.value ||
-        (!!configId.value && !!detailStatus.value?.fetching),
+      fetching: listQuery.isFetching.value || (!!configId.value && !!detailStatus.value?.fetching),
     };
   },
   (status) => emit("status", status),

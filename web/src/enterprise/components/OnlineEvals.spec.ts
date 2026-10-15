@@ -19,7 +19,6 @@ const { START, END, DAY, mocks, route, replace, picker } = await vi.hoisted(asyn
     mocks: {
       list: vi.fn(),
       scores: vi.fn(),
-      failedRuns: vi.fn(),
       listAgents: vi.fn(),
     },
     route: reactive({ name: "aiEvaluations", query: {} as Record<string, string> }),
@@ -39,7 +38,7 @@ vi.mock("@/services/online-evals.service", async (importOriginal) => {
       scoreConfigs: { ...actual.default.scoreConfigs, list: empty },
       scorers: { ...actual.default.scorers, list: empty },
       jobs: { ...actual.default.jobs, list: empty },
-      quality: { list: mocks.list, scores: mocks.scores, failedRuns: mocks.failedRuns },
+      quality: { list: mocks.list, scores: mocks.scores },
     },
   };
 });
@@ -187,7 +186,6 @@ function resetMocks() {
   picker.window = { startTime: START, endTime: END };
   replace.mockClear();
   mocks.list.mockReset().mockResolvedValue([]);
-  mocks.failedRuns.mockReset().mockResolvedValue(0);
   mocks.listAgents.mockReset().mockResolvedValue({ agents: [] });
   mocks.scores.mockReset().mockImplementation((_org, _id, params) =>
     Promise.resolve({
@@ -299,7 +297,6 @@ describe("OnlineEvals Quality round trip through a link", () => {
     await flushPromises();
     expect(restored.find('[data-test="pane-stub"]').text()).toBe("s11");
     expect(mocks.list).not.toHaveBeenCalled();
-    expect(mocks.failedRuns).not.toHaveBeenCalled();
     expect(mocks.scores).not.toHaveBeenCalled();
     expect(mocks.listAgents).not.toHaveBeenCalled();
   });
@@ -317,7 +314,6 @@ describe("OnlineEvals Quality Refresh", () => {
     await flushPromises();
 
     expect(mocks.list).toHaveBeenCalledTimes(1);
-    expect(mocks.failedRuns).toHaveBeenCalledTimes(1);
     expect(mocks.listAgents).toHaveBeenCalledTimes(1);
     expect(scoreCalls()).toEqual([expect.objectContaining({ from: 10, start_time: START })]);
     expect(cachedPage(0).every((query) => query.state.isInvalidated)).toBe(true);
@@ -349,7 +345,6 @@ describe("OnlineEvals Quality Refresh", () => {
       "default",
       expect.objectContaining({ start_time: START + 120_000_000 }),
     );
-    expect(mocks.failedRuns).toHaveBeenCalledTimes(1);
     expect(scoreCalls()).toEqual([
       expect.objectContaining({ from: 10, start_time: START + 120_000_000 }),
     ]);

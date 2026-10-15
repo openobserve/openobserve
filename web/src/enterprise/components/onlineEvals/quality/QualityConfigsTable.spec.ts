@@ -114,7 +114,6 @@ function mountTable(props: Partial<InstanceType<typeof QualityConfigsTable>["$pr
     props: {
       rows: ROWS,
       tiles: TILES,
-      failedRuns: 0,
       tileFilter: null,
       loading: false,
       forbidden: false,
@@ -255,21 +254,10 @@ describe("QualityConfigsTable", () => {
     expect(noteOf(onlyThreshold)).toBe("1 has no threshold");
   });
 
-  it("adds failed runs and the Eval Jobs link only when runs failed, outside the tile button", () => {
-    const failing = mountTable({ failedRuns: 12 });
-    expect(noteOf(failing)).toBe("1 got no scores · 3 have no threshold");
-    const line = failing.find('[data-test="quality-failed-runs"]');
-    expect(line.text().replace(/\s*·\s*/g, " · ")).toBe("12 failed runs · Eval Jobs");
-    expect(line.find('[data-test="quality-tile-failed-runs"]').classes()).toContain(
-      "text-status-error-text",
-    );
-    const link = line.find('[data-test="quality-tile-eval-jobs"]').element;
-    expect(link.parentElement?.closest("button")).toBeNull();
-    for (const failedRuns of [0, null]) {
-      const table = mountTable({ failedRuns });
-      expect(table.find('[data-test="quality-failed-runs"]').exists()).toBe(false);
-      expect(table.find('[data-test="quality-tile-eval-jobs"]').exists()).toBe(false);
-    }
+  it("shows no failed-runs line or Eval Jobs link", () => {
+    const wrapper = mountTable();
+    expect(wrapper.text()).not.toContain("failed run");
+    expect(wrapper.text()).not.toContain("Eval Jobs");
   });
 
   it("switches from one tile to the other, one highlighted at a time, with no chip", async () => {
@@ -291,7 +279,7 @@ describe("QualityConfigsTable", () => {
   });
 
   it("reads 0 of 16 and says every config gives a result, still clickable like the first tile", async () => {
-    const wrapper = mountTable({ tiles: ALL_GIVE_A_RESULT, failedRuns: 0 });
+    const wrapper = mountTable({ tiles: ALL_GIVE_A_RESULT });
     const tile = wrapper.find('[data-test="quality-tile-without-result"]');
     expect(tile.text()).toMatch(/0\s*of 16/);
     expect(noteOf(tile)).toBe("Every config gives a result");
@@ -301,21 +289,16 @@ describe("QualityConfigsTable", () => {
     expect(wrapper.emitted("update:tileFilter")).toEqual([["withoutResult"]]);
   });
 
-  it("opens the Score Config and the Eval Jobs tab in the same tab", async () => {
+  it("opens the Score Config in the same tab", async () => {
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     push.mockClear();
-    const wrapper = mountTable({ failedRuns: 12 });
+    const wrapper = mountTable();
     await wrapper.find('[data-test="quality-configs-config-link-hal"]').trigger("click");
     expect(push).toHaveBeenLastCalledWith({
       name: "aiEvaluations",
       query: { org_identifier: "default", tab: "scoreConfigs", action: "view", id: "hal" },
     });
     expect(wrapper.emitted("open")).toBeUndefined();
-    await wrapper.find('[data-test="quality-tile-eval-jobs"]').trigger("click");
-    expect(push).toHaveBeenLastCalledWith({
-      name: "aiEvaluations",
-      query: { org_identifier: "default", tab: "jobs" },
-    });
     expect(wrapper.emitted("update:tileFilter")).toBeUndefined();
     expect(open).not.toHaveBeenCalled();
   });
