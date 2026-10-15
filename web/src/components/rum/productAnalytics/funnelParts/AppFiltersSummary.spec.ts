@@ -37,7 +37,7 @@ describe("AppFiltersSummary", () => {
     expect(at("builtin").text()).toBe("Built-in bot rule 1,200");
     expect(at("rules").text()).toBe("Saved rules 30");
     expect(at("synthetic").text()).toBe("Synthetic tests 4 · always excluded");
-    expect(at("include").text()).toBe("Include hidden traffic (this view only)");
+    expect(at("include").text()).toBe("Include hidden sessions (this view only)");
     expect(at("edit").text()).toBe("Edit app filters");
   });
 
