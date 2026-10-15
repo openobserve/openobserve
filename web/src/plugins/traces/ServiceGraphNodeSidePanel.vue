@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="visible"
     :width="60"
     :seamless="true"
+    :modal="false"
     :portal-target="containerEl"
     :title="selectedNode?.name || selectedNode?.label || selectedNode?.id"
     data-test="service-graph-side-panel"

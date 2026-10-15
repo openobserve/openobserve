@@ -1469,7 +1469,7 @@ mod tests {
         body["message"].as_str().unwrap_or_default().to_string()
     }
 
-    #[cfg(feature = "enterprise")]
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     fn two_tabs(first: &str, second: &str) -> serde_json::Value {
         json!({
             "title": "d",
@@ -1486,7 +1486,7 @@ mod tests {
         })
     }
 
-    #[cfg(feature = "enterprise")]
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     fn rendering(tab: &str) -> Vec<RenderingReport> {
         vec![RenderingReport {
             tab: Some(tab.to_string()),

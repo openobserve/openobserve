@@ -749,7 +749,7 @@ async fn delete_synthetic_under_lock(
         .map_err(anyhow::Error::new)?;
 
     // Drain any queued checks before deleting.
-    synthetics_jobs::drain_check(conn, id)
+    synthetics_jobs::drain_check(conn, org_id, id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     synthetics_checks::delete(conn, org_id, id)
@@ -784,7 +784,7 @@ async fn delete_each_parents_first(
     let (first, last): (Vec<&String>, Vec<&String>) =
         ids.iter().partition(|id| parents.contains_key(*id));
     for id in first.into_iter().chain(last) {
-        synthetics_jobs::drain_check(conn, id)
+        synthetics_jobs::drain_check(conn, org_id, id)
             .await
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
         if synthetics_checks::delete(conn, org_id, id)
