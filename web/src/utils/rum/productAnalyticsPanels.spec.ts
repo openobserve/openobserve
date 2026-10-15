@@ -142,6 +142,10 @@ describe("buildFunnelPanel (AC-53)", () => {
     };
     expect(p.type).toBe("line");
     expect(p.title).toBe("Conversion over time: Saved → buy");
+    expect((p as unknown as { config: Record<string, unknown> }).config).toMatchObject({
+      decimals: 1,
+      connect_nulls: false,
+    });
     expect(p.queries[0].query).toBe(
       funnelTrendPanelSql(scope, three, { a: 2, b: 3 }, "1 week", { events, sample: 1 }),
     );

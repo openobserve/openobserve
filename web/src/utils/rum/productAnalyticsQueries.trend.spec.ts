@@ -56,8 +56,22 @@ const full: FunnelPair = { a: 1, b: 4 };
 
 const ctesOf = (sql: string) => sql.slice(0, sql.lastIndexOf("\n"));
 // Removes only what the trend adds, so the rest must equal the steps query's CTEs.
+// The step-1 gate CTE reads one source; dropping it points its reader back at that source.
+const withoutGate = (sql: string) => {
+  const m =
+    /,\nxe AS \(SELECT \*, MIN\(CASE WHEN m1 = 1 THEN t END\) OVER \(PARTITION BY [^)]*\)?\) AS t1w FROM (\w+)\)/.exec(
+      sql,
+    );
+  if (!m) return sql;
+  return sql
+    .replace(m[0], "")
+    .split("FROM xe ")
+    .join(`FROM ${m[1]} `)
+    .split(" AND t >= t1w")
+    .join("");
+};
 const withoutEntry = (sql: string, a: number) =>
-  ctesOf(sql)
+  withoutGate(ctesOf(sql))
     .split(",\ntb AS (")[0]
     .split(", MIN(_timestamp) AS ts")
     .join("")
@@ -84,12 +98,34 @@ describe("funnelTrendSql (P0-9)", () => {
 
   it("Users in the same session enter at their earliest session that reached step a", () => {
     const sql = funnelTrendSql(s, id, def({ unit: "users" }), bounds, { a: 2, b: 4 }, opts);
-    expect(sql).toContain("MIN(CASE WHEN m2 = 1 THEN ts END) AS entry_ts");
+    expect(sql).toContain("MIN(CASE WHEN m2 = 1 AND t >= t1w THEN ts END) AS entry_ts");
     expect(sql).toContain("MIN(CASE WHEN r2 = 1 THEN entry_ts END) AS entry_ts");
     expect(sql.split("\n").at(-1)).toMatch(
       /SUM\(r2\) AS ca, SUM\(r4\) AS cb FROM pu WHERE anon = 0 AND r2 = 1 GROUP BY bk/,
     );
     expect(sql).toMatchSnapshot();
+  });
+
+  it("a later step a counts only from the unit's first step 1 on, across the user's window", () => {
+    const sql = funnelTrendSql(
+      s,
+      id,
+      def({ unit: "users", window: "7d" }),
+      bounds,
+      { a: 2, b: 3 },
+      opts,
+    );
+    expect(sql).toContain(
+      "xe AS (SELECT *, MIN(CASE WHEN m1 = 1 THEN t END) OVER (PARTITION BY COALESCE(uid, 's:' || sid)) AS t1w FROM x2)",
+    );
+    expect(sql).toContain(
+      "MIN(CASE WHEN m2 = 1 AND t >= t1w THEN ts END) AS entry_ts FROM xe GROUP BY",
+    );
+    const sessions = funnelTrendSql(s, null, def(), bounds, { a: 2, b: 3 }, opts);
+    expect(sessions).toContain(
+      "xe AS (SELECT *, MIN(CASE WHEN m1 = 1 THEN t END) OVER (PARTITION BY sid) AS t1w FROM x1)",
+    );
+    expect(funnelTrendSql(s, null, def(), bounds, full, opts)).not.toContain("t1w");
   });
 
   it("Users within 7 days carry the entry time through x2 into su and pu", () => {
@@ -105,14 +141,14 @@ describe("funnelTrendSql (P0-9)", () => {
     expect(sql).toContain("DENSE_RANK() OVER (ORDER BY un, tot DESC, dim) AS rk");
     expect(sql).toContain("CASE WHEN un = 0 AND rk <= 5 THEN dim END AS gd");
     expect(sql.split("\n").at(-1)).toBe(
-      "SELECT gd AS dim, MIN(un) AS un, bk, SUM(ca) AS ca, SUM(cb) AS cb FROM tg GROUP BY gd, bk ORDER BY bk, gd LIMIT 18",
+      "SELECT gd AS dim, MIN(un) AS un, MAX(tot) AS tot, bk, SUM(ca) AS ca, SUM(cb) AS cb FROM tg GROUP BY gd, bk ORDER BY bk, gd LIMIT 18",
     );
     expect(sql).toMatchSnapshot();
   });
 
   it("a pair other than step 1 → the last step reads its own reach columns", () => {
     const sql = funnelTrendSql(s, null, def(), bounds, { a: 2, b: 3 }, opts);
-    expect(sql).toContain("MIN(CASE WHEN m2 = 1 THEN ts END) AS entry_ts");
+    expect(sql).toContain("MIN(CASE WHEN m2 = 1 AND t >= t1w THEN ts END) AS entry_ts");
     expect(sql.split("\n").at(-1)).toMatch(/SUM\(r2\) AS ca, SUM\(r3\) AS cb FROM ps WHERE r2 = 1/);
     expect(sql).toMatchSnapshot();
   });
