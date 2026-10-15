@@ -75,6 +75,7 @@ import {
   type UaSuggestionRow,
 } from "@/utils/rum/productAnalyticsModel";
 import { PA_ROUTES, type AnalyticsSubTab } from "@/utils/rum/productAnalyticsRoutes";
+import { previousWindow } from "@/utils/rum/funnelCompare";
 
 export type { AnalyticsScopeState } from "@/utils/rum/productAnalyticsModel";
 export type { AnalyticsSubTab } from "@/utils/rum/productAnalyticsRoutes";
@@ -644,7 +645,7 @@ export default function useProductAnalytics() {
   };
 
   const runSummary = async (cur: UsRange, key: string, stale: () => boolean) => {
-    const prev = { startUs: cur.startUs - (cur.endUs - cur.startUs), endUs: cur.endUs };
+    const prev = { startUs: previousWindow(cur).startUs, endUs: cur.endUs };
     const [sum, tops] = await Promise.all([
       search.run<Record<string, number>>(
         "scope-summary",
@@ -970,7 +971,7 @@ export default function useProductAnalytics() {
 
   const readEntryExit = async (key: string): Promise<Record<string, unknown>[]> => {
     const cur = resolveRange();
-    const prev = { startUs: cur.startUs - (cur.endUs - cur.startUs), endUs: cur.endUs };
+    const prev = { startUs: previousWindow(cur).startUs, endUs: cur.endUs };
     const res = await search.run<Record<string, unknown>>(
       "scope-entry-exit",
       {

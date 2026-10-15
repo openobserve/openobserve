@@ -16,6 +16,8 @@
 import { formatInTimeZone } from "date-fns-tz";
 import {
   BREAKDOWN_TOP,
+  hitCounts,
+  isNamedDim,
   type BreakdownRow,
   type FunnelResult,
 } from "@/utils/rum/productAnalyticsModel";
@@ -175,32 +177,38 @@ export function compareFunnel(cur: FunnelResult, prev: FunnelResult): FunnelComp
 /** Lines the previous run's per-value rows up with this period's folded rows; only overall conversion is compared. */
 export function compareBreakdown(
   cur: { rows: BreakdownRow[]; total: number[] },
+  curHits: Record<string, unknown>[],
   prevHits: Record<string, unknown>[],
   steps: number,
 ): { rows: ComparedBreakdownRow[]; total: PrevSide | null } {
-  const named = new Set(cur.rows.flatMap((r) => (r.value === null ? [] : [r.value])));
+  const head = new Set(cur.rows.flatMap((r) => (r.value === null ? [] : [r.value])));
+  const seenNow = new Set(curHits.filter(isNamedDim).map((h) => String(h.dim)));
+  const restRow = cur.rows.find((r) => r.value === null);
   const byValue = new Map<string, Record<string, unknown>[]>();
+  const intoRest: Record<string, unknown>[] = [];
+  const prevOnly: Record<string, unknown>[] = [];
   for (const h of prevHits) {
-    if (!isNamed(h) || !named.has(String(h.dim))) continue;
-    byValue.set(String(h.dim), [...(byValue.get(String(h.dim)) ?? []), h]);
+    const dim = String(h.dim);
+    if (isNamedDim(h) && head.has(dim)) byValue.set(dim, [...(byValue.get(dim) ?? []), h]);
+    // A value folded into this period's Other is compared there; an unnamed one goes to this period's null row.
+    else if (isNamedDim(h) ? seenNow.has(dim) : !!restRow) intoRest.push(h);
+    else prevOnly.push(h);
   }
-  const rest = prevHits.filter((h) => !isNamed(h) || !named.has(String(h.dim)));
   const rows: ComparedBreakdownRow[] = cur.rows.map((r) => {
-    const hits = r.value === null ? rest : (byValue.get(r.value) ?? []);
+    const hits = r.value === null ? intoRest : (byValue.get(r.value) ?? []);
     return {
       ...r,
       prev: prevSide(r.counts, hits.length ? sumCounts(hits, steps) : null),
       prevOnly: false,
     };
   });
-  // Without an Other row here, a value seen only last period gets a row of its own.
-  if (rest.length && !cur.rows.some((r) => r.value === null)) {
-    const extra = rest.filter(isNamed).sort((a, b) => num(b.c1) - num(a.c1));
-    const head = extra.slice(0, Math.max(0, BREAKDOWN_TOP - cur.rows.length));
-    const tail = rest.filter((h) => !head.includes(h));
-    rows.push(...head.map((h) => prevOnlyRow([h], steps, String(h.dim))));
-    if (tail.length) rows.push(prevOnlyRow(tail, steps, null));
-  }
+  const named = prevOnly.filter(isNamedDim).sort((a, b) => hitCounts(b, 1)[0] - hitCounts(a, 1)[0]);
+  const own = named.slice(0, BREAKDOWN_TOP);
+  rows.push(...own.map((h) => prevOnlyRow([h], steps, String(h.dim))));
+  const overflow = named.slice(BREAKDOWN_TOP);
+  if (overflow.length) rows.push(prevOnlyRow(overflow, steps, null));
+  const unnamed = prevOnly.filter((h) => !isNamedDim(h));
+  if (unnamed.length) rows.push(prevOnlyRow(unnamed, steps, null));
   return { rows, total: prevSide(cur.total, sumCounts(prevHits, steps)) };
 }
 
@@ -226,20 +234,9 @@ export function formatWindowExact(w: UsWindow, tz: string): string {
   return `${fmt(w.startUs, tz, "d MMM yyyy, HH:mm")} – ${fmt(w.endUs, tz, "d MMM yyyy, HH:mm")}`;
 }
 
-const num = (v: unknown): number => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-};
-
-const countsOf = (h: Record<string, unknown>, steps: number): number[] =>
-  Array.from({ length: steps }, (_, i) => num(h[`c${i + 1}`]));
-
-const isNamed = (h: Record<string, unknown>): boolean =>
-  h.dim !== null && h.dim !== undefined && h.dim !== "";
-
 const sumCounts = (hits: Record<string, unknown>[], steps: number): number[] =>
   hits.reduce<number[]>(
-    (acc, h) => acc.map((v, i) => v + countsOf(h, steps)[i]),
+    (acc, h) => acc.map((v, i) => v + hitCounts(h, steps)[i]),
     Array(steps).fill(0),
   );
 
@@ -262,7 +259,7 @@ const prevOnlyRow = (
   value: string | null,
 ): ComparedBreakdownRow => {
   const zeros: number[] = Array(steps).fill(0);
-  const notSet = value === null && hits.every((h) => !isNamed(h));
+  const notSet = value === null && hits.every((h) => !isNamedDim(h));
   return {
     value,
     label: value ?? "",
