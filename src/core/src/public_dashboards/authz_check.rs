@@ -157,7 +157,8 @@ pub async fn recheck(
                 | PanelOutcome::Truncated
         );
         // A dependency without streams came from an unparseable values query: nothing to prove.
-        let provable = (!panel.sources.is_empty() || !panel.values_dependencies.is_empty())
+        let provable = !panel.unparsed
+            && (!panel.sources.is_empty() || !panel.values_dependencies.is_empty())
             && panel
                 .values_dependencies
                 .iter()

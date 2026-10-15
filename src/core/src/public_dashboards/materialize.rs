@@ -617,7 +617,21 @@ pub async fn range_status(link: &PublicDashboard, with_sources: bool) -> Vec<Ran
 
 /// Evicts the file of a range the link no longer offers, on the read that asks for it.
 pub async fn evict_removed_range(link: &PublicDashboard, range_key: &str) {
-    store::evict_if_indexed(&store::key(&link.org_id, &link.id, range_key)).await;
+    if is_range_key(range_key) {
+        store::evict_if_indexed(&store::key(&link.org_id, &link.id, range_key)).await;
+    }
+}
+
+/// `r{secs}` or `a{start}-{end}`, the only keys a range is stored under.
+pub fn is_range_key(key: &str) -> bool {
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    match key.split_at_checked(1) {
+        Some(("r", secs)) => digits(secs),
+        Some(("a", span)) => span
+            .split_once('-')
+            .is_some_and(|(a, b)| digits(a) && digits(b)),
+        _ => false,
+    }
 }
 
 /// Whether the captured rows still allow serving this range (design 5.4 step 2).
@@ -2270,5 +2284,62 @@ mod tests {
         assert!(etag_matches("W/\"abc\"", "abc"));
         assert!(etag_matches("\"x\", \"abc\"", "abc"));
         assert!(!etag_matches("\"abd\"", "abc"));
+    }
+
+    #[tokio::test]
+    async fn gate11_a_panel_with_an_unparseable_query_is_never_restored_by_the_deadline() {
+        let link = link(json!([{ "type": "relative", "secs": 3600 }]));
+        let dash = dashboard(&[("p1", "s1")]);
+        let engine = fake(&link, &dash);
+        for (unparsed, restored) in [(true, false), (false, true)] {
+            let mut manifest = Manifest::default();
+            // The other query of the panel proved a stream; one query still did not parse.
+            manifest.panels.insert(
+                "p1".into(),
+                ManifestPanel {
+                    sources: vec![(StreamType::Logs, "s1".into())],
+                    outcome: PanelOutcome::Withheld,
+                    unparsed,
+                    ..Default::default()
+                },
+            );
+            let stored = Stored {
+                header: Header {
+                    built_at: Some(1),
+                    withheld_panels: vec![WithheldPanel {
+                        panel_id: "p1".into(),
+                        reason: NotAvailableReason::Unauthorized,
+                    }],
+                    ..Default::default()
+                },
+                manifest,
+                body_zst: bytes::Bytes::new(),
+            };
+            let header = authz_check::recheck(engine, &link, &stored, 100)
+                .await
+                .unwrap();
+            assert_eq!(
+                header.withheld_panels.is_empty(),
+                restored,
+                "unparsed {unparsed}"
+            );
+            assert_eq!(
+                header.next_retry_at == Some(100),
+                restored,
+                "unparsed {unparsed}"
+            );
+        }
+    }
+
+    #[test]
+    fn only_the_two_stored_range_key_forms_are_evicted() {
+        for key in ["r3600", "a10-20", "a0-1"] {
+            assert!(is_range_key(key), "{key}");
+        }
+        for key in [
+            "", "r", "r-1", "r36x", "a10", "a-20", "a10-", "x3600", "../r60", "r60/..",
+        ] {
+            assert!(!is_range_key(key), "{key}");
+        }
     }
 }

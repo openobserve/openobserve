@@ -743,11 +743,17 @@ pub async fn set_org_settings(
     let db = get_orm_client_rw().await;
     #[cfg(feature = "cloud")]
     if writes_switch_only(db::user::is_root_user(user_id), body.max_links) {
+        use o2_enterprise::enterprise::cloud::billings::{
+            plan_owns_limit, sync_public_dashboard_links,
+        };
         let stored = pd_table::get_settings(db, org).await?;
         check_plan_owned_max_links(stored.as_ref().and_then(|s| s.max_links), body.max_links)?;
-        if stored.is_none() {
-            // A switch-only row would read as the paid limit, so the plan limit is written first.
-            o2_enterprise::enterprise::cloud::billings::sync_public_dashboard_links(org).await;
+        // The switch write takes over the row, so a plan-owned limit is synced first.
+        if stored
+            .as_ref()
+            .is_none_or(|s| plan_owns_limit(&s.updated_by, s.max_links))
+        {
+            sync_public_dashboard_links(org).await;
         }
         let row =
             pd_table::set_settings_enabled(db, org, body.enabled, user_id, now_micros()).await?;
@@ -1967,10 +1973,11 @@ fn record_sources(
     target: (StreamType, &str),
 ) {
     // An unparseable query proves no stream, so the deadline never restores its panel.
-    if let Ok(streams) = query_streams(query_type, text, target.0) {
-        manifest
+    match query_streams(query_type, text, target.0) {
+        Ok(streams) => manifest
             .sources
-            .extend(streams.into_iter().map(|(s, t)| (t, s)));
+            .extend(streams.into_iter().map(|(s, t)| (t, s))),
+        Err(_) => manifest.unparsed = true,
     }
     manifest
         .sources
