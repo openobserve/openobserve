@@ -105,7 +105,7 @@ const public_dashboards_admin = {
   status: (org: string, dashboardId: string, linkId: string) =>
     http().get<PublicLinkStatusReport>(`${linksPath(org, dashboardId)}/${linkId}/status`, silent),
   statusBatch: (org: string, ids: string[]) =>
-    http().get(`/api/${org}/public_dashboards/status`, {
+    http().get<{ list: PublicLinkStatusReport[] }>(`/api/${org}/public_dashboards/status`, {
       ...silent,
       params: { ids: ids.join(",") },
     }),

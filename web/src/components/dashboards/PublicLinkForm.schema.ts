@@ -27,8 +27,9 @@ export const REFRESH_SECONDS = [
   60, 300, 900, 1800, 3600, 7200, 21600, 86400, 172800, 604800, 1209600, 2592000,
 ];
 export const DEFAULT_REFRESH_SECS = 300;
-// The server's floors: the operator minimum by default, and at most 288 refreshes per window.
-const MIN_REFRESH_SECS = 60;
+/** The operator minimum when the server does not report one (ZO_PUBLIC_DASHBOARD_MIN_REFRESH_SECS default). */
+export const DEFAULT_MIN_REFRESH_SECS = 60;
+// A window refreshes at most this many times, as on the server.
 const REFRESHES_PER_WINDOW = 288;
 
 export const MAX_RANGES = 10;
@@ -89,8 +90,12 @@ export function pickerPeriod(secs: number): string {
 }
 
 /** How often the server refreshes a relative range: ceil_to_minute(max(selected, window ÷ 288, minimum)). */
-export function effectiveRefreshSecs(selected: number, windowSecs: number): number {
-  const floor = Math.max(selected, windowSecs / REFRESHES_PER_WINDOW, MIN_REFRESH_SECS);
+export function effectiveRefreshSecs(
+  selected: number,
+  windowSecs: number,
+  minSecs: number = DEFAULT_MIN_REFRESH_SECS,
+): number {
+  const floor = Math.max(selected, windowSecs / REFRESHES_PER_WINDOW, minSecs);
   return Math.ceil(floor / 60) * 60;
 }
 
@@ -98,10 +103,11 @@ export function effectiveRefreshSecs(selected: number, windowSecs: number): numb
 export function slowerRanges(
   ranges: PublicLinkRange[],
   selected: number,
+  minSecs: number = DEFAULT_MIN_REFRESH_SECS,
 ): Array<{ range: PublicLinkRange; secs: number }> {
   return sortRanges(ranges).flatMap((range) => {
     if (range.type !== "relative") return [];
-    const secs = effectiveRefreshSecs(selected, range.secs);
+    const secs = effectiveRefreshSecs(selected, range.secs, minSecs);
     return secs > selected ? [{ range, secs }] : [];
   });
 }

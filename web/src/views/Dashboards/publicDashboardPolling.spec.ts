@@ -31,12 +31,11 @@ import {
 const DAY_MS = 86_400_000;
 const T0 = Date.UTC(2026, 9, 15, 12, 0, 0);
 
-const quiet: PollOutcome = { kind: "body", refreshing: false, hintMs: null, dueAtMs: null };
+const quiet: PollOutcome = { kind: "body", refreshing: false, hintMs: null };
 const refreshing = (hintMs: number | null): PollOutcome => ({
   kind: "body",
   refreshing: true,
   hintMs,
-  dueAtMs: null,
 });
 
 /** A poller fed from a script of outcomes; the last one repeats. */
@@ -88,18 +87,9 @@ describe("viewer polling (design 4.7)", () => {
       poller.stop();
     });
 
-    it("reads just after a server due time that comes before the lifecycle check", async () => {
-      const { check, poller } = setup([{ ...quiet, dueAtMs: T0 + 20_000 }, quiet]);
-      poller.start();
-      await vi.advanceTimersByTimeAsync(20_999);
-      expect(check).toHaveBeenCalledTimes(1);
-      await vi.advanceTimersByTimeAsync(1);
-      expect(check).toHaveBeenCalledTimes(2);
-      poller.stop();
-    });
-
-    it("keeps a 30-day refresh interval on the 60 s lifecycle check", async () => {
-      const { check, poller } = setup([{ ...quiet, dueAtMs: T0 + 30 * DAY_MS }]);
+    it("has only the lifecycle cadence for a quiet body, whatever the refresh interval", async () => {
+      // A 30-day interval and a 1-minute one read alike: nothing is aimed at fresh_until.
+      const { check, poller } = setup([quiet]);
       poller.start();
       await vi.advanceTimersByTimeAsync(10 * LIFECYCLE_MS);
       expect(check).toHaveBeenCalledTimes(11);
@@ -203,14 +193,14 @@ describe("viewer polling (design 4.7)", () => {
   });
 
   describe("refresh polling", () => {
-    it("polls at the server's hint with up to 20% added, until refreshing is false", async () => {
+    it("polls at the server's hint as given, until refreshing is false", async () => {
+      // The server jitters its own hint, so the client adds none.
       const { check, poller } = setup(
-        [refreshing(5_000), refreshing(5_000), refreshing(5_000), quiet],
+        [refreshing(5_500), refreshing(5_500), refreshing(5_500), quiet],
         () => 0.5,
       );
       poller.start();
       await vi.advanceTimersByTimeAsync(0);
-      // 5 s plus 10% (half of the 20% jitter) between polls.
       await vi.advanceTimersByTimeAsync(5_499);
       expect(check).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(1);
@@ -224,6 +214,18 @@ describe("viewer polling (design 4.7)", () => {
       expect(check).toHaveBeenCalledTimes(4);
       await vi.advanceTimersByTimeAsync(1);
       expect(check).toHaveBeenCalledTimes(5);
+      poller.stop();
+    });
+
+    it("still checks the lifecycle within 60 s when a slow build hints 300 s", async () => {
+      const { check, poller } = setup([refreshing(300_000)], () => 0);
+      poller.start();
+      await vi.advanceTimersByTimeAsync(LIFECYCLE_MS - 1);
+      expect(check).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(check).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(LIFECYCLE_MS);
+      expect(check).toHaveBeenCalledTimes(3);
       poller.stop();
     });
 
@@ -326,16 +328,110 @@ describe("viewer polling (design 4.7)", () => {
       expect(retryAfterMs({}, serverAhead, T0)).toBeNull();
     });
 
-    it("aims at a server due time an hour ahead of the local clock without reading early or late", async () => {
+    it("waits out an HTTP-date Retry-After read on a server clock an hour ahead", async () => {
       const offset = clockOffsetMs(headers, T0);
-      const dueAtMs = toLocalMs((T0 + serverAhead + 20_000) * 1000, offset);
-      const { check, poller } = setup([{ ...quiet, dueAtMs }, quiet]);
+      const at = new Date(T0 + serverAhead + 90_000).toUTCString();
+      const wait = retryAfterMs({ "retry-after": at }, offset, T0);
+      const { check, poller } = setup([{ kind: "wait", retryAfterMs: wait, client: true }, quiet]);
       poller.start();
-      await vi.advanceTimersByTimeAsync(20_999);
+      await vi.advanceTimersByTimeAsync(89_999);
       expect(check).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(1);
       expect(check).toHaveBeenCalledTimes(2);
       poller.stop();
+    });
+  });
+
+  describe("many viewers through a slow refresh (gate 13)", () => {
+    const SLUG_LIMIT_PER_MIN = 1200;
+    const INTERVAL_MS = 300_000;
+    const BUILD_MS = 60_000;
+    const RUN_MS = 20 * 60_000;
+
+    // A repeatable random stream, so a failure replays the same run.
+    const seeded = (seed: number) => () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
+    };
+
+    /** One link and range on its owning querier: a 300 s interval, a 60 s build, rev covering refreshing. */
+    const fakeServer = (random: () => number) => {
+      let builtAt = Date.now();
+      let buildEndsAt: number | null = null;
+      let incarnation = 1;
+      const bodies: number[] = [];
+      let notModified = 0;
+      const rev = () => `${incarnation}:${buildEndsAt !== null}`;
+      return {
+        bodies,
+        notModified: () => notModified,
+        read(clientRev: string | null) {
+          const now = Date.now();
+          if (buildEndsAt !== null && now >= buildEndsAt) {
+            builtAt = buildEndsAt;
+            buildEndsAt = null;
+            incarnation += 1;
+          }
+          if (buildEndsAt === null && now >= builtAt + INTERVAL_MS) buildEndsAt = now + BUILD_MS;
+          const refreshing = buildEndsAt !== null;
+          // max(3 s, remaining build time) with the server's 20% jitter.
+          const retryAfter = refreshing
+            ? Math.ceil(Math.max(3, (buildEndsAt! - now) / 1000) * (1 + 0.2 * random()))
+            : null;
+          if (clientRev === rev()) {
+            notModified += 1;
+            return { status: 304, rev: clientRev, refreshing, retryAfter };
+          }
+          bodies.push(now);
+          return { status: 200, rev: rev(), refreshing, retryAfter };
+        },
+      };
+    };
+
+    const maxPerMinute = (times: number[]) => {
+      const sorted = [...times].sort((a, b) => a - b);
+      let max = 0;
+      for (let lo = 0, hi = 0; hi < sorted.length; hi++) {
+        while (sorted[hi] - sorted[lo] >= 60_000) lo++;
+        max = Math.max(max, hi - lo + 1);
+      }
+      return max;
+    };
+
+    it.each([50, 200])("%i visible browsers stay under the slug limit", async (viewers) => {
+      const random = seeded(viewers);
+      const server = fakeServer(random);
+      const gaps: number[] = [];
+      const pollers = Array.from({ length: viewers }, () => {
+        let rev: string | null = null;
+        let lastHintMs: number | null = null;
+        let lastReadAt: number | null = null;
+        return createPoller({
+          isHidden: () => false,
+          random,
+          check: async () => {
+            const now = Date.now();
+            if (lastReadAt !== null) gaps.push(now - lastReadAt);
+            lastReadAt = now;
+            const res = server.read(rev);
+            rev = res.rev;
+            const sent = res.retryAfter === null ? null : res.retryAfter * 1000;
+            lastHintMs = sent ?? (res.status === 304 && res.refreshing ? lastHintMs : null);
+            return { kind: "body", refreshing: res.refreshing, hintMs: lastHintMs };
+          },
+        });
+      });
+      pollers.forEach((p) => p.start());
+      await vi.advanceTimersByTimeAsync(RUN_MS);
+      pollers.forEach((p) => p.stop());
+
+      // Every viewer saw at least three refreshes, and 304s were most of the traffic.
+      expect(server.bodies.length).toBeGreaterThanOrEqual(viewers * 3);
+      expect(server.notModified()).toBeGreaterThan(server.bodies.length);
+      expect(maxPerMinute(server.bodies)).toBeLessThan(SLUG_LIMIT_PER_MIN);
+      expect(Math.max(...gaps)).toBeLessThanOrEqual(LIFECYCLE_MS);
     });
   });
 });

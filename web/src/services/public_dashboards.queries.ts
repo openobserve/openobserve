@@ -53,12 +53,7 @@ export const publicLinksStatusBatchQuery = (org: string, ids: string[]) =>
   queryOptions({
     queryKey: publicLinkKeys.statusBatch(org, ids),
     queryFn: async (): Promise<Record<string, PublicLinkStatusReport>> => {
-      const data = (await admin.statusBatch(org, ids.slice(0, STATUS_BATCH_MAX))).data;
-      const list: PublicLinkStatusReport[] = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.list)
-          ? data.list
-          : Object.values(data ?? {});
+      const list = (await admin.statusBatch(org, ids.slice(0, STATUS_BATCH_MAX))).data?.list ?? [];
       return Object.fromEntries(list.map((report) => [report.link_id, report]));
     },
     staleTime: LIVE_STALE_TIME,

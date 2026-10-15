@@ -297,25 +297,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-toolbar"
               data-test="dashboard-share-btn"
             />
-            <OButton
+            <span
               v-if="!isFullscreen && store.state.zoConfig?.public_dashboards_enabled"
               v-show="store.state.printMode !== true"
-              variant="outline"
-              size="icon-toolbar"
-              data-test="dashboard-publish-public-btn"
-              icon-left="public"
-              @click="showPublicLinksPanel = true"
+              class="inline-flex items-center gap-1"
+              data-test="dashboard-publish-public"
             >
-              <!-- An icon-only toolbar button has no room for the chip, so it rides in the tooltip. -->
-              <OTooltip>
-                <template #content>
-                  <span class="inline-flex items-center gap-1.5">
-                    {{ t("dashboard.publicDashboard.shareTooltip") }}
-                    <BetaBadge size="xs" />
-                  </span>
-                </template>
-              </OTooltip>
-            </OButton>
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                data-test="dashboard-publish-public-btn"
+                icon-left="public"
+                :aria-label="t('dashboard.publicDashboard.shareTooltip')"
+                @click="showPublicLinksPanel = true"
+              >
+                <OTooltip :content="t('dashboard.publicDashboard.shareTooltip')" />
+              </OButton>
+              <BetaBadge size="xs" class="max-md:hidden" />
+            </span>
             <PublicLinksPanel
               v-if="
                 currentDashboardData.data?.dashboardId &&

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach, onTestFinished } from "vitest";
 import { shallowMount, flushPromises } from "@vue/test-utils";
 import { inject } from "vue";
 import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
@@ -1841,6 +1841,24 @@ describe("ViewDashboard", () => {
 
       expect(analytics.track).not.toHaveBeenCalled();
     });
+  });
+
+  it("shows a visible Beta chip beside the publish button while public links are on", async () => {
+    const zoConfig = global.mockStoreState.zoConfig;
+    global.mockStoreState.zoConfig = { ...zoConfig, public_dashboards_enabled: true };
+    onTestFinished(() => {
+      global.mockStoreState.zoConfig = zoConfig;
+    });
+    wrapper = createWrapper({
+      global: {
+        plugins: [i18n, store],
+        stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+      },
+    });
+    await flushPromises();
+    const publish = wrapper.find('[data-test="dashboard-publish-public"]');
+    expect(publish.find('[data-test="dashboard-publish-public-btn"]').exists()).toBe(true);
+    expect(publish.findComponent({ name: "BetaBadge" }).exists()).toBe(true);
   });
 
   it("hands the live variables manager to the template, so public links seed from it", async () => {

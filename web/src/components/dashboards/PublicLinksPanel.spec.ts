@@ -912,19 +912,50 @@ describe("PublicLinksPanel", () => {
       expect(has(w, `dashboards-public-links-panel-refresh-floor-r${30 * DAY}`)).toBe(false);
     });
 
+    it("applies the operator minimum the server reports to the hint", async () => {
+      const zo = store.state.zoConfig;
+      store.state.zoConfig = { ...zo, public_dashboard_min_refresh_secs: 600 };
+      try {
+        vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+        const w = build({ variablesConfig: undefined });
+        await flushPromises();
+        expect(
+          w.find('[data-test="dashboards-public-links-panel-refresh-floor-r3600"]').text(),
+        ).toBe("Past 1 hour refreshes every 10m, its minimum for a window that long.");
+      } finally {
+        store.state.zoConfig = zo;
+      }
+    });
+
+    it("promises the default range's effective interval in the created view", async () => {
+      const monthDefault = {
+        ...threeRanges,
+        default: { type: "relative" as const, secs: 30 * DAY },
+      };
+      const w = await createLink(
+        async () => ({ data: { link_id: "l1", access_count: 0, ranges: [] } }),
+        link({ time_range: monthDefault, refresh_secs: 300 }),
+      );
+      expect(w.find('[data-test="dashboards-public-links-panel-created-build-note"]').text()).toBe(
+        "Opening the public page builds the first result. Viewers after that share it for 150 minutes.",
+      );
+    });
+
     it("marks a link needing attention from the batch status, with its reason", async () => {
       vi.mocked(admin.list).mockResolvedValue({
         data: { list: [link(), link({ id: "l2", name: "Quiet", last_accessed_at: null })] },
       } as never);
       vi.mocked(admin.statusBatch).mockResolvedValue({
-        data: [
-          {
-            link_id: "l1",
-            access_count: 4,
-            last_accessed_at: 1,
-            ranges: [rangeStatus("r3600", { state: "needs_attention", last_error: "timeout" })],
-          },
-        ],
+        data: {
+          list: [
+            {
+              link_id: "l1",
+              access_count: 4,
+              last_accessed_at: 1,
+              ranges: [rangeStatus("r3600", { state: "needs_attention", last_error: "timeout" })],
+            },
+          ],
+        },
       } as never);
       const w = build();
       await flushPromises();

@@ -57,7 +57,14 @@ import PublicLinksTable from "./PublicLinksTable.vue";
 // Render every slot the view uses, since the real table virtualises rows away in jsdom.
 const OTableStub = {
   name: "OTable",
-  props: ["data", "columns", "forbidden", "loading"],
+  props: ["data", "columns", "forbidden", "loading", "pageSize"],
+  // Like the real table's exposed TanStack instance: the rows of its first page of 20.
+  computed: {
+    table() {
+      const rows = (this as unknown as { data: PublicLink[] }).data.slice(0, 20);
+      return { getRowModel: () => ({ rows: rows.map((original) => ({ original })) }) };
+    },
+  },
   template: `<div>
     <slot name="subheader" /><slot name="toolbar" /><slot name="toolbar-trailing" />
     <div v-if="forbidden" data-test="table-forbidden" />
@@ -180,7 +187,7 @@ describe("PublicLinksTable", () => {
     vi.clearAllMocks();
     queryClient.clear();
     vi.mocked(admin.listOrg).mockResolvedValue({ data: { list: LINKS } } as never);
-    vi.mocked(admin.statusBatch).mockResolvedValue({ data: STATUS } as never);
+    vi.mocked(admin.statusBatch).mockResolvedValue({ data: { list: STATUS } } as never);
   });
 
   it("opens on all links with their name, dashboard, folder and status", async () => {
@@ -466,6 +473,18 @@ describe("PublicLinksTable", () => {
     await flushPromises();
     expect(admin.listOrg).toHaveBeenCalledTimes(2);
     expect(admin.statusBatch).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks the batch status only for the links on the table's current page", async () => {
+    const many = Array.from({ length: 25 }, (_, i) => link({ id: `m${i}` }));
+    vi.mocked(admin.listOrg).mockResolvedValue({ data: { list: many } } as never);
+    const w = build();
+    await flushPromises();
+    expect(admin.statusBatch).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(admin.statusBatch).mock.calls[0][1]).toEqual(
+      many.slice(0, 20).map((l) => l.id),
+    );
+    expect(rows(w)).toHaveLength(25);
   });
 
   it("omits needs attention and its tile when the batch status call fails", async () => {
