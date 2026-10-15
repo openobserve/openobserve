@@ -24,9 +24,9 @@ import {
   formatCount,
   formatEdge,
   formatExact,
-  formatFixed,
   formatNumber,
   formatPercent,
+  formatScore,
   formatScoreValue,
   healthSortValue,
   nextChartFilter,
@@ -128,6 +128,11 @@ describe("typical score", () => {
     const value = typicalScore(row({ average: 0.55, range: { min: 0, max: 1 } }), gt);
     expect(value).toEqual({ value: "0.55", sub: "average, 0 to 1" });
     expect(typicalSortValue(row({ average: 0.55 }))).toBe(0.55);
+  });
+
+  it("keeps up to 4 decimals of an average, so a narrow range does not round onto its rule", () => {
+    const value = typicalScore(row({ average: 0.0195, range: { min: 0, max: 0.05 } }), gt);
+    expect(value?.value).toBe("0.0195");
   });
 
   it("shows the most common value for categorical and boolean configs", () => {
@@ -561,9 +566,9 @@ describe("numbers by size", () => {
     expect(formatNumber(0)).toBe("0");
     expect(formatNumber(-0.5)).toBe("-0.5");
     expect(formatNumber(0.000324)).toBe("0.00032");
-    expect(formatFixed(462_522_542.5)).toBe("462,522,542.50");
-    expect(formatFixed(0.7)).toBe("0.70");
-    expect(formatFixed(0.000324)).toBe("0.00032");
+    expect(formatScore(462_522_542.5)).toBe("462,522,542.50");
+    expect(formatScore(0.7)).toBe("0.70");
+    expect(formatScore(0.000324)).toBe("0.00032");
     expect(formatScoreValue(0.0003, "numeric")).not.toBe(formatScoreValue(0.0007, "numeric"));
     expect(formatCount(150_000)).toBe("150,000");
   });
@@ -651,6 +656,6 @@ describe("precision that matches the data", () => {
 
   it("never prints exponent notation for tiny values", () => {
     expect(formatNumber(1e-9)).not.toContain("e");
-    expect(formatFixed(2.5e-7)).not.toContain("e");
+    expect(formatScore(2.5e-7)).not.toContain("e");
   });
 });

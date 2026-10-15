@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :subtitle="
             isNumeric && average != null
-              ? t('onlineEvals.quality.detail.averageValue', { value: formatFixed(average) })
+              ? t('onlineEvals.quality.detail.averageValue', { value: formatScore(average) })
               : undefined
           "
           data-test="quality-detail-distribution"
@@ -288,7 +288,7 @@ import {
   chartFilterLabel,
   distributionDataType,
   formatCount,
-  formatFixed,
+  formatScore,
   formatScoreValue,
   nextChartFilter,
   trendKind,

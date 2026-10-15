@@ -37,7 +37,7 @@ import {
   formatAxis,
   formatCount,
   formatExact,
-  formatFixed,
+  formatScore,
   scoreAxisBounds,
   trendBuckets,
   trendPoints,
@@ -87,7 +87,7 @@ function bucketTime(bucket: QualityTimelineBucket): string {
 
 function shownValue(value: number): string {
   if (props.kind === "healthyRate" || props.kind === "trueRate") return `${value.toFixed(1)}%`;
-  return props.kind === "count" ? formatCount(value) : formatFixed(value);
+  return props.kind === "count" ? formatCount(value) : formatScore(value);
 }
 
 function seriesFor(name: string, data: [number, number | null][], color: string, extra = {}) {
