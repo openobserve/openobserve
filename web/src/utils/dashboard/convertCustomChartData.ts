@@ -66,10 +66,18 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
       cspViolationBlocked: gt("dashboard.utils.cspViolationBlocked"),
     });
 
-    // ?url imports are relative under the production base:"./", so resolve against the
-    // origin to get an absolute path that works from inside srcdoc (no <base> tag).
-    const absoluteEchartsUrl = new URL(echartsUrl, window.location.origin).href;
-    const absoluteDompurifyUrl = new URL(dompurifyUrl, window.location.origin).href;
+    // In production Vite resolves ?url imports via import.meta.url (always absolute).
+    // new URL() is a defensive no-op for absolute inputs; the try-catch handles
+    // environments where window.location.origin is not a valid base (e.g. jsdom).
+    const toAbsoluteUrl = (url: string) => {
+      try {
+        return new URL(url, window.location.origin).href;
+      } catch {
+        return url;
+      }
+    };
+    const absoluteEchartsUrl = toAbsoluteUrl(echartsUrl);
+    const absoluteDompurifyUrl = toAbsoluteUrl(dompurifyUrl);
 
     const scriptContent = `
   <meta http-equiv="Content-Security-Policy" content="

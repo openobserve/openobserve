@@ -221,7 +221,7 @@ describe("convertCustomChartData", () => {
       expect(result).toEqual({ title: { text: "Test" } });
     });
 
-    it("should load echarts and dompurify via origin-absolute URLs (not relative paths)", async () => {
+    it("should load echarts and dompurify from npm packages, not the deleted static assets", async () => {
       const acorn = await import("acorn");
       const walk = await import("acorn-walk");
 
@@ -245,12 +245,10 @@ describe("convertCustomChartData", () => {
 
       runJavaScriptCode(panelSchema, []);
 
-      // The srcdoc must contain origin-absolute URLs so the srcdoc iframe can load
-      // the scripts regardless of the page route. Under the production base:"./",
-      // ?url imports are relative; new URL(url, origin) makes them absolute.
-      const origin = window.location.origin;
-      expect(mockIframe.srcdoc).toMatch(new RegExp(`<script src="${origin}[^"]*echarts`));
-      expect(mockIframe.srcdoc).toMatch(new RegExp(`<script src="${origin}[^"]*purify`));
+      // Verify the srcdoc loads scripts from the npm packages (Vite ?url imports),
+      // not from the deleted static files under /src/assets/dashboard/.
+      expect(mockIframe.srcdoc).toMatch(/<script src="[^"]*echarts/);
+      expect(mockIframe.srcdoc).toMatch(/<script src="[^"]*purify/);
       expect(mockIframe.srcdoc).not.toContain("/src/assets/dashboard/");
     });
 
