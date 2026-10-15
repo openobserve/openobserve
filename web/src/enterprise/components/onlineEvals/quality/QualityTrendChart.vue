@@ -33,7 +33,12 @@ import {
   colorToRgba,
 } from "@/utils/dashboard/colorPalette";
 import type { QualityTimelineBucket } from "@/services/online-evals.service";
-import { trendBuckets, trendPoints, type QualityTrendKind } from "../utils/qualityFormat";
+import {
+  scoreAxisBounds,
+  trendBuckets,
+  trendPoints,
+  type QualityTrendKind,
+} from "../utils/qualityFormat";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -197,7 +202,7 @@ const options = computed(() => {
     yAxis: {
       type: "value",
       ...(props.kind === "score"
-        ? { min: props.range?.min ?? "dataMin", max: props.range?.max ?? "dataMax" }
+        ? scoreAxisBounds(props.range, plotted.value)
         : rate
           ? { min: 0, max: 100 }
           : { min: 0, minInterval: 1 }),

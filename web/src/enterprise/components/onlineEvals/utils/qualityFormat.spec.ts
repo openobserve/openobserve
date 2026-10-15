@@ -26,6 +26,7 @@ import {
   qualityRangeFromQuery,
   qualityRangeQuery,
   scopeMixText,
+  scoreAxisBounds,
   selectedAgents,
   statusRank,
   summarizeDistribution,
@@ -179,6 +180,13 @@ describe("summaries", () => {
     expect(bucketLabel(numericBuckets[3])).toBe("0.3–0.4");
     expect(bucketLabel({ key: false, count: 1, unhealthy: 0 })).toBe("false");
   });
+
+  it("labels the edge bars open-ended, since they also hold the values outside the range", () => {
+    expect(bucketLabel(numericBuckets[0], { first: true })).toBe("< 0.1");
+    expect(bucketLabel(numericBuckets[9], { last: true })).toBe("≥ 0.9");
+    expect(bucketLabel(numericBuckets[0], { first: true, last: true })).toBe("0–0.1");
+    expect(bucketLabel({ key: "low", count: 1, unhealthy: 0 }, { first: true })).toBe("low");
+  });
 });
 
 describe("trend", () => {
@@ -219,6 +227,19 @@ describe("trend", () => {
     expect(trendPoints(timeline, "trueRate").map(([, value]) => value)).toEqual([75, 0]);
     expect(trendPoints(timeline, "count").map(([, value]) => value)).toEqual([4, 2]);
   });
+
+  it("widens the score axis to values outside the range, so no line is clipped", () => {
+    const timeline = [
+      bucket(0, { count: 3, average: -2, p95: 0.5 }),
+      bucket(1, { count: 3, average: 4, p95: 7.5 }),
+    ];
+    expect(scoreAxisBounds({ min: 1, max: 5 }, timeline)).toEqual({ min: -2, max: 7.5 });
+    expect(scoreAxisBounds({ min: 0, max: 1 }, [bucket(0, { count: 1, average: 0.4 })])).toEqual({
+      min: 0,
+      max: 1,
+    });
+    expect(scoreAxisBounds(null, timeline)).toEqual({ min: "dataMin", max: "dataMax" });
+  });
 });
 
 describe("chart click to API params", () => {
@@ -228,6 +249,15 @@ describe("chart click to API params", () => {
     filter = nextChartFilter(filter, numericBuckets[6], true);
     expect(chartFilterParams(filter)).toEqual({ bucket_from: 3, bucket_to: 6 });
     expect(chartFilterLabel(filter!, numericBuckets, gt)).toBe("0.3 to 0.7");
+    expect(chartFilterLabel({ kind: "bucket", from: 0, to: 2 }, numericBuckets, gt)).toBe(
+      "Below 0.3",
+    );
+    expect(chartFilterLabel({ kind: "bucket", from: 8, to: 9 }, numericBuckets, gt)).toBe(
+      "0.8 or more",
+    );
+    expect(chartFilterLabel({ kind: "bucket", from: 0, to: 9 }, numericBuckets, gt)).toBe(
+      "Any value",
+    );
     filter = nextChartFilter(filter, numericBuckets[5], false);
     expect(chartFilterParams(filter)).toEqual({ bucket_from: 5, bucket_to: 5 });
     expect(nextChartFilter(filter, numericBuckets[5], false)).toBeNull();

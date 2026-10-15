@@ -47,6 +47,11 @@ const { t } = useI18nTyped();
 const store = useStore();
 
 const classified = computed(() => props.buckets.some((bucket) => bucket.unhealthy != null));
+const labels = computed(() =>
+  props.buckets.map((bucket, index, all) =>
+    bucketLabel(bucket, { first: index === 0, last: index === all.length - 1 }),
+  ),
+);
 
 const options = computed(() => {
   // Read the theme so token colors re-resolve when it flips.
@@ -97,7 +102,8 @@ const options = computed(() => {
       trigger: "axis",
       axisPointer: { type: "shadow" },
       formatter: (params: any[]) => {
-        const bucket = props.buckets[params?.[0]?.dataIndex];
+        const index = params?.[0]?.dataIndex;
+        const bucket = props.buckets[index];
         if (!bucket) return "";
         const detail = classified.value
           ? t("onlineEvals.quality.detail.chartTooltip", {
@@ -105,12 +111,12 @@ const options = computed(() => {
               unhealthy: bucket.unhealthy ?? 0,
             })
           : t("onlineEvals.quality.detail.chartTooltipCount", { count: bucket.count });
-        return `${escapeHtml(bucketLabel(bucket))}<br/>${escapeHtml(detail)}`;
+        return `${escapeHtml(labels.value[index])}<br/>${escapeHtml(detail)}`;
       },
     },
     xAxis: {
       type: "category",
-      data: props.buckets.map(bucketLabel),
+      data: labels.value,
       axisLabel: { color: text, fontSize: 10 },
       axisLine: { lineStyle: { color: grid } },
     },
