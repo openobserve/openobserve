@@ -44,6 +44,12 @@ const stubs = {
     emits: ["update:modelValue"],
     template: `<div><slot /></div>`,
   },
+  OSelect: {
+    name: "OSelect",
+    props: ["modelValue", "options"],
+    emits: ["update:modelValue"],
+    template: `<div data-test="query-select-stub" />`,
+  },
   OToggleGroupItem: {
     name: "OToggleGroupItem",
     props: ["value"],
@@ -230,6 +236,87 @@ describe("CreateAlertFromSourceDialog", () => {
         .vm.$emit("update:modelValue", "exclude");
 
       expect(wrapper.emitted("rebuild")).toBeUndefined();
+    });
+  });
+
+  describe("query choice", () => {
+    const twoQueries = (queryIndex = 0) =>
+      prefill({
+        source: "panel",
+        queryType: "promql",
+        sql: undefined,
+        promql: queryIndex ? "sum(rate(io_ops[1m]))" : "avg(disk_used)",
+        queryIndex,
+        queryChoices: [
+          { index: 0, query: "avg(disk_used)" },
+          { index: 1, tabName: "IO", query: "sum(rate(io_ops[1m]))" },
+        ],
+      });
+
+    it("offers a query select when the panel has two queries", () => {
+      wrapper = mountDialog(twoQueries());
+      const select = wrapper.findComponent({ name: "OSelect" });
+      expect(select.exists()).toBe(true);
+      expect(select.props("modelValue")).toBe(0);
+      expect(select.props("options").map((o: any) => [o.value, String(o.label)])).toEqual([
+        [0, "A: avg(disk_used)"],
+        [1, "IO: sum(rate(io_ops[1m]))"],
+      ]);
+    });
+
+    it("names a query by its legend, else its formula letter", () => {
+      wrapper = mountDialog(
+        prefill({
+          queryType: "promql",
+          sql: undefined,
+          promql: "sum(rate(requests[5m]))",
+          queryIndex: 0,
+          queryChoices: [
+            { index: 0, legend: "requests", ref: "A", query: "sum(rate(requests[5m]))" },
+            { index: 1, ref: "C", query: "sum(rate(errors[5m]))" },
+          ],
+        }),
+      );
+      const labels = wrapper
+        .findComponent({ name: "OSelect" })
+        .props("options")
+        .map((o: any) => String(o.label));
+      expect(labels).toEqual(["requests: sum(rate(requests[5m]))", "C: sum(rate(errors[5m]))"]);
+    });
+
+    it("cuts a long expression short in its option label", () => {
+      const long = `sum by (instance) (rate(${"a".repeat(80)}[5m]))`;
+      wrapper = mountDialog(
+        prefill({
+          queryType: "promql",
+          sql: undefined,
+          promql: long,
+          queryIndex: 0,
+          queryChoices: [
+            { index: 0, query: long },
+            { index: 1, query: "avg(disk_used)" },
+          ],
+        }),
+      );
+      const label = String(wrapper.findComponent({ name: "OSelect" }).props("options")[0].label);
+      expect(label.startsWith("A: sum by (instance) (rate(aaa")).toBe(true);
+      expect(label.endsWith("…")).toBe(true);
+      expect(label.length).toBeLessThan(long.length);
+    });
+
+    it("rebuilds the prefill for the chosen query", async () => {
+      wrapper = mountDialog(twoQueries());
+      await wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", 1);
+
+      expect(wrapper.emitted("rebuild")![0][0]).toEqual({ queryIndex: 1 });
+
+      await wrapper.setProps({ prefill: twoQueries(1) });
+      expect(wrapper.findComponent({ name: "OSelect" }).props("modelValue")).toBe(1);
+    });
+
+    it("has no query select for a single query", () => {
+      wrapper = mountDialog(prefill());
+      expect(wrapper.findComponent({ name: "OSelect" }).exists()).toBe(false);
     });
   });
 

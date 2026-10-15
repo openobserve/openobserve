@@ -24,7 +24,9 @@ pub mod context;
 pub mod custom;
 pub mod default_template;
 pub mod format;
+pub(crate) mod modifiers;
 pub mod org_default;
+pub mod platform;
 pub mod preview;
 pub mod render;
 pub mod resolve;
@@ -37,3 +39,8 @@ pub use preview::{PreviewError, PreviewRequest, PreviewResponse, preview};
 pub use render::{RenderError, RenderedMessage, render, severity_color};
 pub use resolve::{RenderedContent, UNMATCHED_MARKER, resolve_content};
 pub use test_send::{TEST_MARKER, TestSendError, build_test_message, check_rate_limit, test_send};
+
+/// `{alert_status}` while the condition holds.
+pub const STATUS_FIRING: &str = "firing";
+/// `{alert_status}` once the episode has recovered.
+pub const STATUS_RESOLVED: &str = "resolved";

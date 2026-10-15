@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import apiKeys from "./api_keys";
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 // Mock http service
 vi.mock("./http", () => ({
   default: vi.fn(() => ({
@@ -12,6 +14,7 @@ vi.mock("./http", () => ({
 }));
 
 import http from "./http";
+import analytics from "@/services/product_analytics";
 
 describe("API Keys Service", () => {
   let mockHttp: any;
@@ -521,5 +524,36 @@ describe("API Keys Service", () => {
       expect(mockHttp.post).toHaveBeenCalledTimes(4); // 3 RUM creates + 1 user token create
       expect(mockHttp.put).toHaveBeenCalledTimes(3); // 3 RUM updates
     });
+  });
+});
+
+describe("api_keys product analytics", () => {
+  beforeEach(() => {
+    vi.mocked(analytics.track).mockClear();
+  });
+
+  it("tracks after createRUMToken succeeds", async () => {
+    (http as any).mockImplementation(() => ({ post: vi.fn().mockResolvedValue({ data: {} }) }));
+    await apiKeys.createRUMToken("org1");
+    expect(analytics.track).toHaveBeenCalledWith("rum_token_created");
+  });
+
+  it("does not track when createRUMToken fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({
+      post: vi.fn().mockRejectedValue(new Error("boom")),
+    }));
+    await expect(apiKeys.createRUMToken("org1")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+  it("tracks after updateRUMToken succeeds", async () => {
+    (http as any).mockImplementation(() => ({ put: vi.fn().mockResolvedValue({ data: {} }) }));
+    await apiKeys.updateRUMToken("org1", "id1");
+    expect(analytics.track).toHaveBeenCalledWith("rum_token_regenerated");
+  });
+
+  it("does not track when updateRUMToken fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({ put: vi.fn().mockRejectedValue(new Error("boom")) }));
+    await expect(apiKeys.updateRUMToken("org1", "id1")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

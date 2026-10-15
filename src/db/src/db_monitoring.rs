@@ -21,7 +21,10 @@
 //! only itself, never the whole fleet. Value format is shared with the sibling:
 //! either `"<offset>"` or `"<offset>;<node_uuid>"` (node = job lock holder).
 
-use infra::errors::{DbError, Error};
+use infra::{
+    dist_lock,
+    errors::{DbError, Error},
+};
 
 use crate as db;
 
@@ -114,12 +117,7 @@ pub async fn set_offset(
 /// N, and the second `put` merely overwrites the first's identical offset while
 /// both sets of records are already in the stream.
 ///
-/// This is NOT atomic against the meta store — there is no CAS primitive
-/// underneath, so this re-reads and then writes. It closes the wide window
-/// (a whole window's three searches, seconds to minutes, between the read and
-/// the write) rather than the instruction-level one, which is the difference
-/// between "duplicates whenever two nodes tick together" and "duplicates only
-/// if two writes interleave inside the same few milliseconds".
+/// No CAS primitive underneath, so the re-read and the write share one `dist_lock`.
 pub async fn compare_and_set_offset(
     org_id: &str,
     stream_name: &str,
@@ -127,12 +125,21 @@ pub async fn compare_and_set_offset(
     offset: i64,
     node: Option<&str>,
 ) -> Result<bool, anyhow::Error> {
-    let (current_offset, current_node) = get_offset(org_id, stream_name).await?;
-    if current_offset != expected.0 || current_node != expected.1 {
-        return Ok(false);
-    }
-    set_offset(org_id, stream_name, offset, node).await?;
-    Ok(true)
+    let locker = dist_lock::lock(&mk_key(org_id, stream_name), 0).await?;
+    let ret = match get_offset(org_id, stream_name).await {
+        Ok((current_offset, current_node))
+            if current_offset != expected.0 || current_node != expected.1 =>
+        {
+            Ok(false)
+        }
+        // A failed put leaves the window's rows in place and re-runs it: an accepted duplicate.
+        Ok(_) => set_offset(org_id, stream_name, offset, node)
+            .await
+            .map(|_| true),
+        Err(e) => Err(e),
+    };
+    dist_lock::unlock(&locker).await?;
+    ret
 }
 
 #[cfg(test)]
@@ -151,6 +158,22 @@ mod tests {
             mk_key("org2", "traces_a"),
             "/db_monitoring/offsets/org2/traces_a"
         );
+    }
+
+    /// There is no CAS primitive underneath, so the re-read and the put must share one lock.
+    #[test]
+    fn compare_and_set_offset_holds_the_dist_lock() {
+        let src = include_str!("db_monitoring.rs");
+        let start = src
+            .find("pub async fn compare_and_set_offset(")
+            .expect("compare_and_set_offset");
+        let body = src[start..].split("\n}\n").next().expect("body");
+        let body = &body[body.find('{').expect("fn body")..];
+        let lock = body.find("dist_lock::lock(").expect("must take dist_lock");
+        let read = body.find("get_offset(").expect("must re-read");
+        let write = body.find("set_offset(").expect("must write");
+        let unlock = body.rfind("dist_lock::unlock(").expect("must unlock");
+        assert!(lock < read && read < write && write < unlock);
     }
 
     #[test]

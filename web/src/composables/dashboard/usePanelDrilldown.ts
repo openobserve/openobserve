@@ -18,6 +18,7 @@ import type { TranslateFn } from "@/types/i18n";
 import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
+import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
 import {
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
@@ -31,6 +32,7 @@ import {
   SQL_PARSE_MAX_DEPTH,
   stripWherePredicate,
 } from "@/utils/query/sqlComplexity";
+import { EXEMPLAR_SERIES_ID } from "@/utils/dashboard/exemplars/applyExemplarSeries";
 
 export function usePanelDrilldown({
   panelSchema,
@@ -55,6 +57,7 @@ export function usePanelDrilldown({
   isCursorOverPanel,
   showErrorNotification,
   t,
+  onExemplarClick,
 }: {
   panelSchema: any;
   variablesData: any;
@@ -79,6 +82,7 @@ export function usePanelDrilldown({
   isCursorOverPanel: any;
   showErrorNotification: any;
   t: TranslateFn;
+  onExemplarClick?: (params: any) => void | Promise<void>;
 }) {
   // Cross-linking: store cross-links from result_schema response
   const crossLinksData: any = ref({ stream_links: [], org_links: [] });
@@ -512,6 +516,11 @@ export function usePanelDrilldown({
   };
 
   const onChartClick = async (params: any, ...args: any) => {
+    // An exemplar marker opens its trace, never the drilldown menu or an annotation.
+    if (params?.seriesId === EXEMPLAR_SERIES_ID) {
+      await onExemplarClick?.(params);
+      return;
+    }
     // Check if we have both drilldown and annotation at the same point
     const hasAnnotation =
       params?.componentType === "markLine" || params?.componentType === "markArea";
@@ -813,7 +822,8 @@ export function usePanelDrilldown({
                 ...(query.fields.z || []),
               ];
               panelFields.forEach((field: any) => {
-                fields[field.label] = drilldownParams[1][0][field.alias];
+                fields[getFieldLabel(field, panelSchema.value.config, query.customQuery)] =
+                  drilldownParams[1][0][field.alias];
                 fields[field.alias] = drilldownParams[1][0][field.alias];
               });
             });
@@ -937,7 +947,8 @@ export function usePanelDrilldown({
           const panelFields: any = [...query.fields.x, ...query.fields.y, ...query.fields.z];
           panelFields.forEach((field: any) => {
             // we have label and alias, use both in dynamic values
-            fields[field.label] = drilldownParams[1][0][field.alias];
+            fields[getFieldLabel(field, panelSchema.value.config, query.customQuery)] =
+              drilldownParams[1][0][field.alias];
             fields[field.alias] = drilldownParams[1][0][field.alias];
           });
         });

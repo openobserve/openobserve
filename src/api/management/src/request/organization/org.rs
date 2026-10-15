@@ -120,6 +120,22 @@ pub async fn organizations(
         }
     };
 
+    // Batch-resolve each org's admin/owner (one query for the whole list) so
+    // the frontend can disambiguate two orgs that share a display name, e.g.
+    // two orgs both named "default" — one the user's own, one they were
+    // invited into. Best-effort: an org without a resolvable admin just gets
+    // empty owner fields rather than failing the whole response.
+    let org_ids: Vec<String> = all_orgs.iter().map(|o| o.identifier.clone()).collect();
+    // `or_insert` keeps the first (lowest-email, per the query's order_by) admin per org.
+    let admin_by_org: HashMap<String, (String, String)> =
+        match infra::table::org_users::get_admins_for_orgs(&org_ids).await {
+            Ok(admins) => admins.into_iter().fold(HashMap::new(), |mut map, a| {
+                map.entry(a.org_id).or_insert((a.email, a.first_name));
+                map
+            }),
+            Err(_) => HashMap::new(),
+        };
+
     for org in all_orgs {
         // Hide blocked orgs (pending_deletion or deleting) from the regular org
         // list (switcher) so a soft-deleted org feels gone. _meta admins inspect
@@ -137,6 +153,34 @@ pub async fn organizations(
             .unwrap_or_default();
         #[cfg(not(feature = "cloud"))]
         let org_subscription = 0;
+        let (owner_email, owner_first_name) = admin_by_org
+            .get(&org.identifier)
+            .cloned()
+            .unwrap_or_default();
+        // Gate owner PII behind the same permission /{org_id}/users itself requires.
+        #[cfg(feature = "enterprise")]
+        let (owner_email, owner_first_name) = {
+            use o2_openfga::config::get_config as get_openfga_config;
+            if is_root_user
+                || !get_openfga_config().enabled
+                || check_permissions(
+                    &org.identifier,
+                    &org.identifier,
+                    user_id,
+                    "users",
+                    "GET",
+                    None,
+                    true,
+                    false,
+                    false,
+                )
+                .await
+            {
+                (owner_email, owner_first_name)
+            } else {
+                (String::new(), String::new())
+            }
+        };
         let org = OrgDetails {
             id,
             identifier: org.identifier.clone(),
@@ -147,6 +191,8 @@ pub async fn organizations(
             org_type: org.org_type,
             user_obj: user_detail.clone(),
             plan: org_subscription,
+            owner_email,
+            owner_first_name,
         };
         if !org_names.contains(&org.identifier) {
             org_names.insert(org.identifier.clone());
@@ -716,6 +762,162 @@ pub async fn set_quota_usage_limit(
     match set_pool_limit(&org_id, &req.org_id, pool, req.limit).await {
         Ok(usage) => MetaHttpResponse::json(usage),
         Err(response) => response,
+    }
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PaidOverageUpdateRequest {
+    pub enabled: bool,
+}
+
+#[cfg(feature = "cloud")]
+fn paid_overage_pool(
+    feature: &str,
+) -> Result<openobserve_core::trial_quota::TrialQuotaPool, Response> {
+    use openobserve_core::trial_quota::TrialQuotaPool;
+
+    let Some(pool) = TrialQuotaPool::from_key(feature) else {
+        return Err(MetaHttpResponse::bad_request(unknown_quota_pool_message(
+            feature,
+        )));
+    };
+    if pool != TrialQuotaPool::AiCredits {
+        return Err(MetaHttpResponse::bad_request(format!(
+            "paid overage is not supported for quota feature '{feature}'"
+        )));
+    }
+    Ok(pool)
+}
+
+#[cfg(feature = "cloud")]
+fn paid_overage_unavailable(error: impl std::fmt::Display) -> Response {
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(MetaHttpResponse::error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            error.to_string(),
+        )),
+    )
+        .into_response()
+}
+
+/// GetPaidOverageStatus
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    get,
+    path = "/{org_id}/quota/{feature}/paid_overage",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "GetPaidOverageStatus",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization identifier"),
+        ("feature" = String, Path, description = "Cumulative quota feature; currently ai_credits"),
+    ),
+    responses(
+        (status = 200, description = "Cumulative paid-overage state", body = openobserve_core::trial_quota::PaidOverageStatus),
+        (status = 400, description = "Unknown or unsupported quota feature"),
+        (status = 503, description = "Billing or quota state unavailable"),
+    ),
+)]
+pub async fn get_paid_overage_status(
+    Path((org_id, feature)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    let pool = match paid_overage_pool(&feature) {
+        Ok(pool) => pool,
+        Err(response) => return response,
+    };
+    match openobserve_core::trial_quota::get_paid_overage_status(&org_id, pool, &user_email.user_id)
+        .await
+    {
+        Ok(status) => MetaHttpResponse::json(status),
+        Err(error) => paid_overage_unavailable(error),
+    }
+}
+
+/// SetPaidOverageStatus
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    put,
+    path = "/{org_id}/quota/{feature}/paid_overage",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "SetPaidOverageStatus",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization identifier"),
+        ("feature" = String, Path, description = "Cumulative quota feature; currently ai_credits"),
+    ),
+    request_body(content = PaidOverageUpdateRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Updated cumulative paid-overage state", body = openobserve_core::trial_quota::PaidOverageStatus),
+        (status = 400, description = "Unknown or unsupported quota feature"),
+        (status = 403, description = "Only organization administrators may change consent"),
+        (status = 409, description = "Organization is not eligible for paid overage"),
+        (status = 503, description = "Billing or quota state unavailable"),
+    ),
+)]
+pub async fn set_paid_overage_status(
+    Path((org_id, feature)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(request): Json<PaidOverageUpdateRequest>,
+) -> Response {
+    use config::meta::user::UserRole;
+    use openobserve_core::trial_quota::PaidOverageBillingStatus;
+
+    let pool = match paid_overage_pool(&feature) {
+        Ok(pool) => pool,
+        Err(response) => return response,
+    };
+    let is_admin = is_root_user(&user_email.user_id)
+        || matches!(
+            openobserve_core::users::get_user(Some(&org_id), &user_email.user_id).await,
+            Some(user) if matches!(user.role, UserRole::Admin | UserRole::Root)
+        );
+    if !is_admin {
+        return MetaHttpResponse::forbidden(
+            "Only organization administrators can change paid usage consent",
+        );
+    }
+
+    let current = match openobserve_core::trial_quota::get_paid_overage_status(
+        &org_id,
+        pool,
+        &user_email.user_id,
+    )
+    .await
+    {
+        Ok(status) => status,
+        Err(error) => return paid_overage_unavailable(error),
+    };
+    if request.enabled && current.billing_status != PaidOverageBillingStatus::Eligible {
+        return (
+            StatusCode::CONFLICT,
+            Json(MetaHttpResponse::error(
+                StatusCode::CONFLICT,
+                "organization is not eligible for paid overage",
+            )),
+        )
+            .into_response();
+    }
+    // One cumulative flag: the pool owns its backing rows, the API never names them.
+    if let Err(error) = openobserve_core::trial_quota::set_paid_overage_enabled_for_pool(
+        &org_id,
+        pool,
+        request.enabled,
+    )
+    .await
+    {
+        return paid_overage_unavailable(error);
+    }
+    match openobserve_core::trial_quota::get_paid_overage_status(&org_id, pool, &user_email.user_id)
+        .await
+    {
+        Ok(status) => MetaHttpResponse::json(status),
+        Err(error) => paid_overage_unavailable(error),
     }
 }
 
@@ -1591,7 +1793,7 @@ mod tests {
     use openobserve_core::trial_quota::TrialQuotaPool;
 
     #[cfg(feature = "cloud")]
-    use super::unknown_quota_pool_message;
+    use super::*;
 
     /// The route accepts every key in `ALL_POOLS`, so a hand-written list leaves an admin who
     /// typos the pool they want reading a 400 that never names it.
@@ -1612,5 +1814,50 @@ mod tests {
                 "the message lists a key the route would itself reject",
             );
         }
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn paid_overage_api_only_accepts_the_cumulative_ai_feature() {
+        assert_eq!(
+            paid_overage_pool("ai_credits").unwrap(),
+            TrialQuotaPool::AiCredits
+        );
+        assert_eq!(
+            paid_overage_pool("synthetics_browser_steps")
+                .unwrap_err()
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            paid_overage_pool("ai_chat").unwrap_err().status(),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn paid_overage_update_payload_rejects_extra_fields() {
+        assert!(
+            serde_json::from_value::<PaidOverageUpdateRequest>(
+                serde_json::json!({"enabled": true, "feature": "ai_chat"})
+            )
+            .is_err()
+        );
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn non_admin_cannot_change_paid_overage() {
+        let response = set_paid_overage_status(
+            Path(("missing-org".to_string(), "ai_credits".to_string())),
+            Headers(UserEmail {
+                user_id: "not-an-admin@example.invalid".to_string(),
+            }),
+            Json(PaidOverageUpdateRequest { enabled: true }),
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
 }

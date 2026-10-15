@@ -24,24 +24,21 @@ pub struct ExtremaAccumulator<const IS_MAX: bool> {
 
 impl<const IS_MAX: bool> ExtremaAccumulator<IS_MAX> {
     pub(super) fn new(slots: usize) -> Self {
-        let initial = if IS_MAX {
-            f64::NEG_INFINITY
-        } else {
-            f64::INFINITY
-        };
         Self {
-            values: vec![initial; slots],
+            values: vec![f64::NAN; slots],
             present: vec![false; slots],
         }
     }
 
     fn push(&mut self, slot: usize, value: f64) {
-        // Strict comparisons preserve the first signed zero and ignore NaN values.
-        let replace = if IS_MAX {
-            value > self.values[slot]
-        } else {
-            value < self.values[slot]
-        };
+        // Strict comparisons keep the first signed zero; NaN survives only if every value is NaN.
+        let current = self.values[slot];
+        let replace = current.is_nan()
+            || if IS_MAX {
+                value > current
+            } else {
+                value < current
+            };
         if replace {
             self.values[slot] = value;
         }
@@ -79,18 +76,5 @@ impl<const IS_MAX: bool> Accumulate for ExtremaAccumulator<IS_MAX> {
             .map(|(slot, (value, _))| Sample::new(timestamps[slot], value))
             .collect();
         group_series(group_labels, samples)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_min_and_max_have_distinct_accumulator_types() {
-        assert_ne!(
-            std::any::TypeId::of::<ExtremaAccumulator<false>>(),
-            std::any::TypeId::of::<ExtremaAccumulator<true>>(),
-        );
     }
 }

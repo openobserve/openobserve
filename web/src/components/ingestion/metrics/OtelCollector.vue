@@ -2,31 +2,33 @@
   <IngestionContent>
     <div class="flex flex-col gap-2">
       <div class="text-base font-semibold">{{ t("ingestion.hostMetricsReceiver") }}</div>
-      <ContentCopy :content="raw(getHostMetricsConfig)" />
+      <CredentialCodeBlock slug="metrics-otel-host-metrics" :content="getHostMetricsConfig" />
       <div class="text-text-secondary text-xs">
         {{ t("ingestion.hostMetricsReceiverNote", { attr: raw("host.name") }) }}
       </div>
     </div>
     <div class="flex flex-col gap-2">
       <div class="text-base font-semibold">{{ t("ingestion.otlpHttp") }}</div>
-      <ContentCopy :content="raw(getOtelHttpConfig)" />
+      <CredentialCodeBlock slug="metrics-otel-http" :content="getOtelHttpConfig" />
     </div>
-    <div class="flex flex-col gap-2" v-if="config.isCloud == 'false'">
+    <div class="flex flex-col gap-2" v-if="showOtlpGrpc">
       <div class="text-base font-semibold">{{ t("ingestion.otlpGrpc") }}</div>
-      <ContentCopy :content="raw(getOtelGrpcConfig)" />
+      <CredentialCodeBlock slug="metrics-otel-grpc" :content="getOtelGrpcConfig" />
     </div>
   </IngestionContent>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import ContentCopy from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
-import config from "@/aws-exports";
 import { raw, useI18nTyped } from "@/types/i18n";
+import useOtlpGrpcVisibility from "@/composables/useOtlpGrpcVisibility";
+import { getOtelCollectorGrpcYaml } from "@/utils/otelCollectorConfig";
 
 const { t } = useI18nTyped();
+const { isPrimaryCloud, showOtlpGrpc } = useOtlpGrpcVisibility();
 
 const props = defineProps({
   currOrgIdentifier: {
@@ -81,22 +83,13 @@ service:
       exporters: [otlphttp/openobserve]`;
 });
 
-const getOtelGrpcConfig = computed(() => {
-  return `exporters:
-  otlp/openobserve:
-      endpoint: ${endpoint.value.host}:5081
-      headers:
-        Authorization: "Basic [BASIC_PASSCODE]"
-        organization: ${props.currOrgIdentifier}
-        stream-name: default
-      tls:
-        insecure: true
-
-service:
-  telemetry:
-    logs:
-      level: warn`;
-});
+const getOtelGrpcConfig = computed(() =>
+  getOtelCollectorGrpcYaml({
+    orgIdentifier: props.currOrgIdentifier,
+    selfHostedHost: endpoint.value.host,
+    isPrimaryCloud: isPrimaryCloud.value,
+  }),
+);
 
 const getOtelHttpConfig = computed(() => {
   return `exporters:

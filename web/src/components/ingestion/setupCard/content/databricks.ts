@@ -38,6 +38,7 @@ requests.post(url, headers=headers, json=records)`;
 export default function databricksCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
+      id: "databricks",
       name: raw("Databricks"),
       tagline: t("ingestion.setupCard.taglineDatabricks"),
       logo: getImageURL("images/ingestion/databricks.svg"),

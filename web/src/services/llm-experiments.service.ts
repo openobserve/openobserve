@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "@/services/http";
+import analytics from "./product_analytics";
 
 export interface ExperimentScorerRef {
   id: string;
@@ -37,6 +38,19 @@ export type ExperimentTask =
       providerId: string;
       model?: string | null;
       params?: Record<string, unknown> | null;
+    }
+  | {
+      type: "prompt_ref";
+      /** Stable logical Prompt entity ID, never the physical version row ID. */
+      id: string;
+      version: number;
+      providerId: string;
+      paramsOverrides?: {
+        model?: string | null;
+        params?: Record<string, unknown> | null;
+        tools?: unknown;
+        responseFormat?: unknown;
+      } | null;
     }
   | {
       type: "remote";
@@ -64,6 +78,8 @@ export interface ExperimentCreatePayload {
   trialCount: number;
   metadata?: Record<string, unknown> | null;
   idempotencyKey?: string | null;
+  /** Required once the preview's cost estimate is over the warning threshold. */
+  confirmCostEstimate?: boolean;
 }
 
 /**
@@ -104,7 +120,24 @@ export interface ExperimentPreview {
   slotCount: number;
   pinnedScorers: PinnedExperimentScorer[];
   applicability?: ExperimentApplicability;
+  costEstimate?: ExperimentCostEstimate | null;
   sampleSlots: ExperimentSlot[];
+}
+
+/** An order-of-magnitude estimate of what the platform pays to run the experiment. */
+export interface ExperimentCostEstimate {
+  /** null when nothing could be priced. */
+  estimatedCost: number | null;
+  /** false for Remote/SDK tasks: the total is scoring cost only. */
+  taskCostEstimated: boolean;
+  /** Some dimension had no price, or the task side was left out (Remote/SDK). */
+  incomplete: boolean;
+  /** Some model in the run has no price, so the total is a lower bound. */
+  hasUnpricedModel: boolean;
+  /** USD amount above which a create needs confirmation; 0 switches it off. */
+  warningThreshold: number;
+  /** The estimate is above the threshold, so the create must send `confirmCostEstimate`. */
+  confirmationRequired: boolean;
 }
 
 export interface ExperimentScorerApplicability {
@@ -151,6 +184,12 @@ export interface LlmExperiment extends ExperimentCreatePayload {
   isBaseline: boolean;
   createdBy: string;
   createdAt: number;
+  /** Stable managed Prompt evidence. Present only for PromptRef runs. */
+  promptId?: string | null;
+  promptName?: string | null;
+  promptVersion?: number | null;
+  /** Present for both PromptRef and content-matched InlinePrompt runs. */
+  promptContentHash?: string | null;
   /**
    * Present only when fetched with `includeSummary` (list) or via `get()`
    * (always summarized). Lets the browse table read cost/progress/scores
@@ -501,6 +540,28 @@ function value<T>(input: any, camel: string, snake: string, fallback: T): T {
   return (input?.[camel] ?? input?.[snake] ?? fallback) as T;
 }
 
+function normalizeCostEstimate(input: any): ExperimentCostEstimate | null {
+  if (!input) return null;
+  const cost = value<number | null>(input, "estimatedCost", "estimated_cost", null);
+  const taskCostEstimated = Boolean(
+    value(input, "taskCostEstimated", "task_cost_estimated", false),
+  );
+  // One entry per priced call site; a null cost means that model has no price.
+  const dimensions = value<any[] | null>(input, "dimensions", "dimensions", null);
+  return {
+    estimatedCost: cost === null ? null : Number(cost),
+    taskCostEstimated,
+    incomplete: Boolean(input.incomplete),
+    hasUnpricedModel: Array.isArray(dimensions)
+      ? dimensions.some((d) => value(d, "estimatedCost", "estimated_cost", null) === null)
+      : Boolean(input.incomplete) && taskCostEstimated,
+    warningThreshold: Number(value(input, "warningThreshold", "warning_threshold", 0)),
+    confirmationRequired: Boolean(
+      value(input, "confirmationRequired", "confirmation_required", false),
+    ),
+  };
+}
+
 function normalizePreview(input: any): ExperimentPreview {
   const applicability = value<any>(input, "applicability", "applicability", {});
   return {
@@ -555,6 +616,7 @@ function normalizePreview(input: any): ExperimentPreview {
         ),
       })),
     },
+    costEstimate: normalizeCostEstimate(value(input, "costEstimate", "cost_estimate", null)),
     sampleSlots: value<any[]>(input, "sampleSlots", "sample_slots", []).map((slot) => ({
       rowId: value(slot, "rowId", "row_id", ""),
       logicalId: value(slot, "logicalId", "logical_id", ""),
@@ -612,6 +674,10 @@ function normalizeExperiment(input: any): LlmExperiment {
     isBaseline: value<boolean>(input, "isBaseline", "is_baseline", false) === true,
     createdBy: value(input, "createdBy", "created_by", ""),
     createdAt: Number(value(input, "createdAt", "created_at", 0)),
+    promptId: value(input, "promptId", "prompt_id", null),
+    promptName: value(input, "promptName", "prompt_name", null),
+    promptVersion: numberOrNull(value(input, "promptVersion", "prompt_version", null)),
+    promptContentHash: value(input, "promptContentHash", "prompt_content_hash", null),
     scoringStatus: value(input, "scoringStatus", "scoring_status", undefined),
     executionProgress: hasSummaryField(input, "executionProgress", "execution_progress")
       ? normalizeProgress(value<any>(input, "executionProgress", "execution_progress", {}))
@@ -995,11 +1061,20 @@ const llmExperimentsService = {
    */
   async list(
     orgId: string,
-    options: { includeSummary?: boolean; datasetId?: string } = {},
+    options: {
+      includeSummary?: boolean;
+      datasetId?: string;
+      promptId?: string;
+      promptVersion?: number;
+      contentHash?: string;
+    } = {},
   ): Promise<LlmExperiment[]> {
     const params = {
       ...(options.includeSummary ? { includeSummary: true } : {}),
       ...(options.datasetId ? { datasetId: options.datasetId } : {}),
+      ...(options.promptId ? { promptId: options.promptId } : {}),
+      ...(options.promptVersion == null ? {} : { promptVersion: options.promptVersion }),
+      ...(options.contentHash ? { contentHash: options.contentHash } : {}),
     };
     const response = await http().get(base(orgId), {
       params: Object.keys(params).length ? params : undefined,
@@ -1021,6 +1096,8 @@ const llmExperimentsService = {
 
   async create(orgId: string, payload: ExperimentCreatePayload): Promise<CreateExperimentResult> {
     const response = await http().post(base(orgId), payload);
+    // An idempotent replay returns the existing experiment with created=false.
+    if (response.data?.created === true) analytics.track("llm_experiment_created");
     return {
       experiment: normalizeExperiment(response.data?.experiment),
       preview: normalizePreview(response.data?.preview),

@@ -18,11 +18,8 @@ import type { TranslateFn } from "@/types/i18n";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import { SearchRequestPayload } from "@/ts/interfaces/query";
-import { convertDateToTimestamp } from "@/utils/date";
 
 export const useSearchHistogramManager = (t: TranslateFn) => {
-  let histogramResults: any = [];
-
   const {
     fnParsedSQL,
     isDistinctQuery,
@@ -54,13 +51,14 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
       onData: (payload: any, response: any) => void;
       onError: (payload: any, error: any) => void;
       onComplete: (payload: any, response: any) => void;
-      onReset: (data: any, traceId?: string) => void;
     },
     meta?: {
       clear_cache?: Boolean;
+      generationId?: number;
     },
   ) => {
     const parsedSQL: any = fnParsedSQL();
+    const generationId = meta?.generationId;
 
     if (searchObj.data.stream.selectedStream.length > 1) {
       const errMsg = t("search.histogramUnavailableForQueries");
@@ -89,8 +87,6 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
 
         await generateHistogramSkeleton();
 
-        histogramResults = [];
-
         const payload = buildWebSocketPayload(
           searchObj.data.histogramQuery,
           false,
@@ -103,7 +99,6 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
           payload.onData = callbacks.onData;
           payload.onError = callbacks.onError;
           payload.onComplete = callbacks.onComplete;
-          payload.onReset = callbacks.onReset;
         }
 
         payload.queryReq.query.sql = searchObj.data.histogramQuery.query.sql.replace(
@@ -115,6 +110,8 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
           isHistogramOnly: searchObj.meta.histogramDirtyFlag,
           is_ui_histogram: true,
         };
+        if (generationId !== null && generationId !== undefined)
+          payload.generationId = generationId;
 
         initializeSearchConnection(payload);
 
@@ -137,6 +134,7 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
             buildWebSocketPayload,
             initializeSearchConnection,
             callbacks,
+            generationId,
           );
           searchObjDebug["pagecountEndTime"] = performance.now();
         }, 0);
@@ -157,110 +155,11 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
             buildWebSocketPayload,
             initializeSearchConnection,
             callbacks,
+            generationId,
           );
           searchObjDebug["pagecountEndTime"] = performance.now();
         }, 0);
       }
-    }
-  };
-
-  const handleHistogramResponse = (
-    queryReq: SearchRequestPayload,
-    traceId: string,
-    response: any,
-    meta?: any,
-    refreshPagination?: Function,
-  ) => {
-    searchObjDebug["histogramProcessingStartTime"] = performance.now();
-
-    searchObj.loading = false;
-
-    if (searchObj.data.queryResults.aggs == null) {
-      searchObj.data.queryResults.aggs = [];
-    }
-
-    if (searchObj.data.queryResults.aggs.length == 0 && response.content.results.hits.length > 0) {
-      generateHistogramFillData(response);
-    }
-
-    searchObj.data.queryResults.aggs.push(...response.content.results.hits);
-    searchObj.data.queryResults.scan_size += response.content.results.scan_size;
-    searchObj.data.queryResults.took += response.content.results.took;
-    searchObj.data.queryResults.result_cache_ratio += response.content.results.result_cache_ratio;
-
-    if (response.content.results.histogram_breakdown_field) {
-      searchObj.data.queryResults.histogram_breakdown_field =
-        response.content.results.histogram_breakdown_field;
-    }
-
-    (async () => {
-      try {
-        // generateHistogramData would need to be passed in or imported
-        // generateHistogramData();
-        if (!meta?.isHistogramOnly && refreshPagination) refreshPagination(true);
-      } catch (error) {
-        console.error("Error processing histogram data:", error);
-        searchObj.loadingHistogram = false;
-      }
-    })();
-
-    searchObjDebug["histogramProcessingEndTime"] = performance.now();
-    searchObjDebug["histogramEndTime"] = performance.now();
-  };
-
-  const generateHistogramFillData = (response: any) => {
-    let date = new Date();
-
-    const startDateTime = searchObj.data.customDownloadQueryObj.query.start_time / 1000;
-
-    const endDateTime = searchObj.data.customDownloadQueryObj.query.end_time / 1000;
-
-    const nowString = response.content.results.hits[0].zo_sql_key;
-    const now = new Date(nowString);
-
-    const day = String(now.getDate()).padStart(2, "0");
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const year = now.getFullYear();
-
-    const dateToBePassed = `${day}-${month}-${year}`;
-    const hours = String(now.getHours()).padStart(2, "0");
-    let minutes = String(now.getMinutes()).padStart(2, "0");
-    if ((searchObj.data.histogramInterval ?? 0) / 1000 <= 9999) {
-      minutes = String(now.getMinutes() + 1).padStart(2, "0");
-    }
-
-    const time = `${hours}:${minutes}`;
-
-    const currentTimeToBePassed = convertDateToTimestamp(dateToBePassed, time, "UTC");
-
-    if (!searchObj.data.histogramInterval) {
-      console.error("Error processing histogram data:", "histogramInterval is not set");
-      searchObj.loadingHistogram = false;
-      return;
-    }
-
-    for (
-      let currentTime: any = currentTimeToBePassed.timestamp / 1000;
-      currentTime < endDateTime;
-      currentTime += searchObj.data.histogramInterval / 1000
-    ) {
-      date = new Date(currentTime);
-      histogramResults.push({
-        zo_sql_key: date.toISOString().slice(0, 19),
-        zo_sql_num: 0,
-      });
-    }
-
-    for (
-      let currentTime: any = currentTimeToBePassed.timestamp / 1000;
-      currentTime > startDateTime;
-      currentTime -= searchObj.data.histogramInterval / 1000
-    ) {
-      date = new Date(currentTime);
-      histogramResults.push({
-        zo_sql_key: date.toISOString().slice(0, 19),
-        zo_sql_num: 0,
-      });
     }
   };
 
@@ -272,8 +171,8 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
       onData: (payload: any, response: any) => void;
       onError: (payload: any, error: any) => void;
       onComplete: (payload: any, response: any) => void;
-      onReset: (data: any, traceId?: string) => void;
     },
+    generationId?: number,
   ) => {
     if (searchObj.data.queryResults.total > queryReq.query.from + queryReq.query.size) {
       return;
@@ -296,12 +195,12 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
     }
 
     const payload = buildWebSocketPayload(queryReq, false, "pageCount");
+    if (generationId !== null && generationId !== undefined) payload.generationId = generationId;
 
     if (callbacks) {
       payload.onData = callbacks.onData;
       payload.onError = callbacks.onError;
       payload.onComplete = callbacks.onComplete;
-      payload.onReset = callbacks.onReset;
     }
 
     searchObj.loadingHistogram = true;
@@ -322,23 +221,12 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
       : true;
   };
 
-  const resetHistogramResults = () => {
-    histogramResults = [];
-  };
-
-  const getHistogramResults = () => {
-    return histogramResults;
-  };
-
   return {
     shouldShowHistogram,
     processHistogramRequest,
-    handleHistogramResponse,
     isHistogramDataMissing,
     shouldGetPageCount,
     getPageCountThroughSocket,
-    resetHistogramResults,
-    getHistogramResults,
   };
 };
 

@@ -63,6 +63,8 @@ export interface LLMData {
   userId: string | null;
   sessionId: string | null;
   promptName: string | null;
+  promptVersion: number | null;
+  promptLabel: string | null;
   inputPreview: string;
   evaluation: EvaluationScores | null;
 }
@@ -474,6 +476,9 @@ export function extractLLMData(span: any): LLMData | null {
   const usage = parseUsageDetails(span);
   const cost = parseCostDetails(span);
   const evaluation = parseEvaluationScores(span);
+  const parsedPromptVersion = Number(span.gen_ai_prompt_version);
+  const promptVersion =
+    Number.isInteger(parsedPromptVersion) && parsedPromptVersion > 0 ? parsedPromptVersion : null;
 
   return {
     provider: span.gen_ai_system || span.gen_ai_provider_name || "unknown",
@@ -487,6 +492,8 @@ export function extractLLMData(span: any): LLMData | null {
     userId: span.user_id || null,
     sessionId: span.gen_ai_conversation_id || span.session_id || null,
     promptName: span.gen_ai_prompt_name || null,
+    promptVersion,
+    promptLabel: span.gen_ai_prompt_label || null,
     inputPreview: truncateLLMContent(span.gen_ai_input_messages, 100),
     evaluation,
   };

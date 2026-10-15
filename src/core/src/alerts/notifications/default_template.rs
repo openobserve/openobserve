@@ -43,7 +43,7 @@ pub fn compiled_default_content() -> ContentSpec {
     ContentSpec {
         title: "[{alert_level}] {alert_name} on {stream_name}".into(),
         title_overrides: Default::default(),
-        body: "**{alert_name}** fired for stream **{stream_name}**.\n\n{alert_description}".into(),
+        body: "**{alert_name}** is {alert_status} for stream **{stream_name}**.\n\n{alert_description}".into(),
         fields: vec![
             ContentField {
                 label: "Threshold".into(),
@@ -80,6 +80,7 @@ pub fn compiled_default_content() -> ContentSpec {
 pub fn is_reserved_template_name(name: &str) -> bool {
     config::prebuilt_loader::is_prebuilt_template_name(name)
         || name == DEFAULT_CONTENT_TEMPLATE_NAME
+        || crate::alerts::templates::is_downtime_template_name(name)
 }
 
 /// Create-if-missing (and overwrite under the same `should_apply_prebuilt`
@@ -124,7 +125,7 @@ pub(crate) async fn ensure_default_content_template(
         }
         Err(e) => {
             log::error!(
-                "[TEMPLATES] Error checking system template '{DEFAULT_CONTENT_TEMPLATE_NAME}': {e}"
+                "[TEMPLATES] Error checking system template '{DEFAULT_CONTENT_TEMPLATE_NAME}' in {DEFAULT_ORG}: {e}"
             );
         }
     }

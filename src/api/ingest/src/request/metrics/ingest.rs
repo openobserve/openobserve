@@ -19,19 +19,25 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
-use config::axum::middlewares::{
-    HEADER_O2_PROCESS_TIME, get_process_time, insert_process_time_header,
-};
 #[cfg(feature = "cloud")]
 use config::meta::stream::StreamType;
+use config::{
+    axum::middlewares::{HEADER_O2_PROCESS_TIME, get_process_time, insert_process_time_header},
+    meta::otlp::OtlpRequestType,
+};
 use ingestion_common::IngestUser;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "cloud")]
 use openobserve_core::ingestion::check_ingestion_allowed;
 
+#[cfg(feature = "cloud")]
+use crate::common::meta::otlp::otlp_rejection_response;
 use crate::{
-    common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
+    common::meta::{
+        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
+        otlp::otlp_error_response,
+    },
     service::metrics,
 };
 
@@ -73,7 +79,7 @@ pub async fn json(
 
     #[cfg(feature = "cloud")]
     if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
-        return MetaHttpResponse::too_many_requests(e);
+        return crate::request::ingestion_not_allowed_response(e);
     }
 
     let mut resp = match metrics::json::ingest(&org_id, None, body, user).await {
@@ -113,10 +119,14 @@ pub async fn json(
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
-    request_body(content = String, description = "ExportMetricsServiceRequest", content_type = "application/x-protobuf"),
+    request_body(description = "ExportMetricsServiceRequest", content(("application/x-protobuf"), (Object = "application/json"))),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
-        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+        (status = 200, description = "ExportMetricsServiceResponse", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 206, description = "ExportMetricsServiceResponse with a partial success (JSON requests only)", content((Object = "application/json"))),
+        (status = 400, description = "google.rpc.Status: invalid body, unsupported Content-Type, or write rejected (e.g. columns limit)", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 429, description = "google.rpc.Status: trial period expired", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 500, description = "google.rpc.Status: internal write error", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 503, description = "google.rpc.Status: ingester overloaded or unavailable, or ingestion not allowed (cloud)", content(("application/x-protobuf"), (Object = "application/json"))),
     )
 )]
 pub async fn otlp_metrics_write(
@@ -130,28 +140,37 @@ pub async fn otlp_metrics_write(
 
     let user = IngestUser::from_user_email(&user_email.user_id);
 
-    #[cfg(feature = "cloud")]
-    if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
-        return MetaHttpResponse::too_many_requests(e);
-    }
-
     let content_type = headers
         .get("Content-Type")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
 
+    #[cfg(feature = "cloud")]
+    if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Metrics, None).await {
+        let req_type = if content_type.eq(CONTENT_TYPE_PROTO) {
+            OtlpRequestType::HttpProtobuf
+        } else {
+            OtlpRequestType::HttpJson
+        };
+        let status = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            StatusCode::TOO_MANY_REQUESTS
+        } else {
+            StatusCode::SERVICE_UNAVAILABLE
+        };
+        return otlp_rejection_response(req_type, status, e.to_string());
+    }
+
     let resp = if content_type.eq(CONTENT_TYPE_PROTO) {
-        match metrics::otlp::otlp_proto(&org_id, body, user).await {
-            Ok(v) => v,
-            Err(e) => MetaHttpResponse::internal_error(e),
-        }
+        metrics::otlp::otlp_proto(&org_id, body, user).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
-        match metrics::otlp::otlp_json(&org_id, body, user).await {
-            Ok(v) => v,
-            Err(e) => MetaHttpResponse::internal_error(e),
-        }
+        metrics::otlp::otlp_json(&org_id, body, user).await
     } else {
-        MetaHttpResponse::bad_request("Bad Request")
+        otlp_error_response(
+            OtlpRequestType::HttpJson,
+            StatusCode::BAD_REQUEST,
+            3, // INVALID_ARGUMENT
+            "Bad Request: Content-Type must be application/json or application/x-protobuf",
+        )
     };
 
     if process_time > 0 {
@@ -163,5 +182,62 @@ pub async fn otlp_metrics_write(
         Response::from_parts(parts, body)
     } else {
         resp
+    }
+}
+
+// cloud builds run check_ingestion_allowed first, which needs a live org
+#[cfg(all(test, not(feature = "cloud")))]
+mod tests {
+    use axum::http::header::CONTENT_TYPE;
+    use config::utils::json;
+
+    use super::*;
+
+    async fn call_otlp_metrics_write(
+        content_type: &str,
+        body: &'static [u8],
+    ) -> (StatusCode, HeaderMap, json::Value) {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, content_type.parse().unwrap());
+        let resp = otlp_metrics_write(
+            Path("default".to_string()),
+            Headers(UserEmail {
+                user_id: "a@a.com".to_string(),
+            }),
+            headers,
+            Bytes::from_static(body),
+        )
+        .await;
+        let status = resp.status();
+        let resp_headers = resp.headers().clone();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, resp_headers, json::from_slice(&body).unwrap())
+    }
+
+    #[tokio::test]
+    async fn test_otlp_metrics_invalid_json_is_rpc_status() {
+        let (status, headers, body) =
+            call_otlp_metrics_write(CONTENT_TYPE_JSON, b"{not json").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(headers[CONTENT_TYPE], CONTENT_TYPE_JSON);
+        assert_eq!(body["code"], 3);
+        assert!(
+            body["message"]
+                .as_str()
+                .unwrap()
+                .starts_with("Invalid json:")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_otlp_metrics_unsupported_content_type_is_rpc_status() {
+        let (status, headers, body) = call_otlp_metrics_write("text/plain", b"hello").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(headers[CONTENT_TYPE], CONTENT_TYPE_JSON);
+        assert_eq!(body["code"], 3);
+        let message = body["message"].as_str().unwrap();
+        assert!(message.contains(CONTENT_TYPE_JSON) && message.contains(CONTENT_TYPE_PROTO));
     }
 }

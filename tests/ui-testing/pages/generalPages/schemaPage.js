@@ -86,6 +86,7 @@ class SchemaPage {
 
         // Per-row action buttons on the LogStream OTable (cell-actions template)
         this.logStreamSchemaBtnFirst = page.locator('[data-test="log-stream-schema-btn"]').first();
+        this.logStreamNameCells = page.locator('[data-test^="log-stream-name-cell-"]');
         this.logStreamExploreBtnFirst = page.locator('[data-test="log-stream-explore-btn"]').first();
 
         // Field row expanders on the log search index list (FieldRow templates)
@@ -271,6 +272,12 @@ class SchemaPage {
         await this.streamsSearchStreamInputField.click();
         await this.streamsSearchStreamInputField.fill(streamName);
         await this.page.waitForLoadState('domcontentloaded');
+        // The list refetches 300 ms after typing and swaps its rows for a skeleton, which swallows an earlier row click.
+        const needle = streamName.toLowerCase();
+        await expect.poll(async () => {
+            const names = await this.logStreamNameCells.evaluateAll((cells) => cells.map((cell) => cell.getAttribute('data-test')));
+            return names.length > 0 && names.every((name) => name.toLowerCase().includes(needle));
+        }, { timeout: 15000 }).toBe(true);
     }
 
     // Open stream details
@@ -916,6 +923,20 @@ class SchemaPage {
         const streamsPageVisible = await this.streamsSearchStreamInputField.isVisible();
         expect(streamsPageVisible).toBe(true);
         return streamsPageVisible;
+    }
+
+    /**
+     * Assert the stream's schema editor actually rendered: the schema ODrawer is
+     * open, its title is shown, and the field-mapping table (the stream's field
+     * list) is visible. This is the real, environment-independent outcome of
+     * opening a stream's schema detail — the add-field / delete-field controls
+     * are gated behind isSchemaUDSEnabled (User-Defined Schema, enterprise/config)
+     * so they are NOT a reliable cross-environment signal.
+     */
+    async verifySchemaEditorLoaded() {
+        await expect(this.schemaDrawer).toBeVisible({ timeout: 30000 });
+        await expect(this.schemaTitleText).toBeVisible({ timeout: 15000 });
+        await expect(this.schemaLogStreamFieldMappingTable.first()).toBeVisible({ timeout: 15000 });
     }
 }
 

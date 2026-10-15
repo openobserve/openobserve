@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import ViewPanel from "./ViewPanel.vue";
+import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 
 // Mock vue-router
 const mockRoute = {
@@ -164,7 +165,8 @@ vi.mock("@/composables/dashboard/useCancelQuery", () => ({
 }));
 
 // Mock date utilities
-vi.mock("@/utils/date", () => ({
+vi.mock("@/utils/date", async (importOriginal) => ({
+  ...((await importOriginal()) as any),
   parseDuration: vi.fn((duration: string) => {
     if (duration === "30s") return 30;
     if (duration === "1m") return 60;
@@ -184,6 +186,8 @@ vi.mock("lodash-es", () => ({
   isEqual: vi.fn((a, b) => JSON.stringify(a) === JSON.stringify(b)),
 }));
 
+const pickerSetSavedDate = vi.fn();
+
 describe("ViewPanel", () => {
   let wrapper: VueWrapper<any>;
   let mockGetDashboard: any;
@@ -202,7 +206,7 @@ describe("ViewPanel", () => {
     searchType: "logs",
   };
 
-  const createWrapper = (props = {}) => {
+  const createWrapper = (props = {}, extraStubs: Record<string, unknown> = {}) => {
     return mount(ViewPanel, {
       props: {
         ...defaultProps,
@@ -215,9 +219,13 @@ describe("ViewPanel", () => {
         },
         stubs: {
           DateTimePickerDashboard: {
+            name: "DateTimePickerDashboard",
             template: '<div data-test="date-time-picker-dashboard"><slot /></div>',
+            props: ["modelValue", "autoApplyDashboard", "disable"],
+            emits: ["update:modelValue", "show", "hide", "timezone-change"],
             methods: {
               refresh: vi.fn(),
+              setSavedDate: pickerSetSavedDate,
               getConsumableDateTime: () => ({
                 startTime: "2023-01-01T00:00:00Z",
                 endTime: "2023-01-02T00:00:00Z",
@@ -349,6 +357,7 @@ describe("ViewPanel", () => {
             props: ["panelData", "open"],
             emits: ["update:open"],
           },
+          ...extraStubs,
         },
       },
     });
@@ -395,6 +404,68 @@ describe("ViewPanel", () => {
     if (wrapper) {
       wrapper.unmount();
     }
+  });
+
+  describe("notice chips with the real PanelErrorButtons", () => {
+    const VRL_ERROR = "error[E203]: syntax error";
+    it("feeds the renderer's diagnostics into the chips and drops VRL errors from the range warning", async () => {
+      wrapper = createWrapper({}, { PanelErrorButtons });
+      await flushPromises();
+      wrapper.vm.handleResultMetadataUpdate([[{ function_error: [VRL_ERROR] }]]);
+      wrapper.vm.handlePanelDiagnosticsUpdate({
+        queries: [],
+        serverPartial: false,
+        rowsCapped: false,
+        partialReasons: [],
+        functionErrors: [VRL_ERROR],
+      });
+      wrapper.vm.handleSeriesLimitUpdate({ shown: 100, total: 342, cap: 100 });
+      await flushPromises();
+
+      const buttons = wrapper.findComponent(PanelErrorButtons);
+      expect(buttons.exists()).toBe(true);
+      expect(buttons.props("functionErrors")).toEqual([VRL_ERROR]);
+      expect(buttons.props("seriesLimit")).toEqual({ shown: 100, total: 342, cap: 100 });
+      expect(buttons.props("canEdit")).toBe(true);
+      expect(buttons.props("canRefresh")).toBe(true);
+      expect(buttons.props("canInspect")).toBe(false);
+      expect(wrapper.vm.maxQueryRangeWarning).toBe("");
+      expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-notice-chip-function-error"]').exists()).toBe(true);
+    });
+
+    it("closes the view and opens the editor on the fix for Edit function and Use Top N", async () => {
+      wrapper = createWrapper({}, { PanelErrorButtons });
+      await flushPromises();
+      const buttons = wrapper.findComponent(PanelErrorButtons);
+
+      buttons.vm.$emit("edit-panel", "edit-function");
+      expect(wrapper.emitted("closePanel")).toHaveLength(1);
+      expect(mockRouter.push).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          path: "/dashboards/add_panel",
+          query: expect.objectContaining({ panelId: "test-panel-id", focus: "vrl" }),
+        }),
+      );
+
+      buttons.vm.$emit("edit-panel", "use-top-n");
+      expect(mockRouter.push).toHaveBeenLastCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ focus: "top-n" }) }),
+      );
+    });
+
+    it("hides the editor actions in a view-only embedding", async () => {
+      wrapper = createWrapper({ viewOnly: true }, { PanelErrorButtons });
+      await flushPromises();
+      expect(wrapper.findComponent(PanelErrorButtons).props("canEdit")).toBe(false);
+    });
+
+    it("refreshes the view from a notice's Refresh", async () => {
+      wrapper = createWrapper({}, { PanelErrorButtons });
+      await flushPromises();
+      const listener = wrapper.findComponent(PanelErrorButtons).vm.$.vnode.props?.onRefreshPanel;
+      expect(listener).toBe(wrapper.vm.refreshData);
+    });
   });
 
   describe("Component Initialization", () => {
@@ -1034,21 +1105,258 @@ describe("ViewPanel", () => {
     it("should refresh data when not disabled", () => {
       wrapper = createWrapper();
       wrapper.vm.disable = false;
+      const appliedBefore = wrapper.vm.selectedDate;
 
-      const refreshSpy = vi.spyOn(wrapper.vm.dateTimePickerRef, "refresh");
       wrapper.vm.refreshData();
 
-      expect(refreshSpy).toHaveBeenCalled();
+      expect(wrapper.vm.selectedDate).not.toBe(appliedBefore);
+      expect(wrapper.vm.selectedDate).toEqual(appliedBefore);
     });
 
     it("should not refresh data when disabled", () => {
       wrapper = createWrapper();
       wrapper.vm.disable = true;
+      const appliedBefore = wrapper.vm.selectedDate;
 
-      const refreshSpy = vi.spyOn(wrapper.vm.dateTimePickerRef, "refresh");
       wrapper.vm.refreshData();
 
-      expect(refreshSpy).not.toHaveBeenCalled();
+      expect(wrapper.vm.selectedDate).toBe(appliedBefore);
+    });
+  });
+
+  describe("time range without Apply", () => {
+    const MINUTE = 60 * 1_000_000;
+    const relative = (period: string) => ({
+      valueType: "relative",
+      relativeTimePeriod: period,
+      startTime: 1,
+      endTime: 2,
+    });
+    const setAutoRun = (on: boolean) => {
+      mockStore.state.zoConfig = { ...mockStore.state.zoConfig, auto_query_enabled: on };
+      localStorage.setItem("oo_toggle_auto_run", String(on));
+    };
+    const picker = () => wrapper.findComponent({ name: "DateTimePickerDashboard" });
+    const pick = async (value: any) => {
+      picker().vm.$emit("update:modelValue", value);
+      await flushPromises();
+    };
+    const refreshTooltip = () =>
+      wrapper
+        .findComponent('[data-test="dashboard-viewpanel-refresh-data-btn"]')
+        .findComponent({ name: "OTooltip" })
+        .props("content");
+    const chartSpan = () => {
+      const time = wrapper.vm.dashboardPanelData.meta.dateTime;
+      return time.end_time.getTime() - time.start_time.getTime();
+    };
+    const mountOnRange = async () => {
+      wrapper = createWrapper({ selectedDateForViewPanel: relative("15m") });
+      await flushPromises();
+      await pick(relative("15m"));
+    };
+
+    afterEach(() => {
+      localStorage.removeItem("oo_toggle_auto_run");
+      mockStore.state.zoConfig = { ...mockStore.state.zoConfig, auto_query_enabled: false };
+    });
+
+    it("uses the picker without an Apply button", async () => {
+      await mountOnRange();
+
+      expect(picker().props("autoApplyDashboard")).toBe(true);
+      expect(chartSpan()).toBe(15 * MINUTE);
+    });
+
+    it("keeps a picked range waiting with Auto Run off and turns Refresh yellow", async () => {
+      setAutoRun(false);
+      await mountOnRange();
+
+      await pick(relative("1h"));
+
+      expect(picker().props("modelValue").relativeTimePeriod).toBe("1h");
+      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
+      expect(chartSpan()).toBe(15 * MINUTE);
+      expect(wrapper.vm.showApplyHint).toBe(true);
+      expect(refreshTooltip()).toBe("dashboard.refreshToApplyTimeRange");
+    });
+
+    it("applies the waiting range on Refresh", async () => {
+      setAutoRun(false);
+      await mountOnRange();
+      await pick(relative("1h"));
+
+      wrapper.vm.disable = false;
+      wrapper.vm.refreshData();
+      await flushPromises();
+
+      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
+      expect(chartSpan()).toBe(60 * MINUTE);
+      expect(wrapper.vm.showApplyHint).toBe(false);
+    });
+
+    it("names both when variables are waiting too", async () => {
+      setAutoRun(false);
+      await mountOnRange();
+      wrapper.vm.isVariablesChanged = true;
+
+      await pick(relative("1h"));
+
+      expect(refreshTooltip()).toBe("dashboard.refreshToApplyTimeRangeAndVariables");
+    });
+
+    it("loads variables on the applied range when the picker closes", async () => {
+      setAutoRun(false);
+      await mountOnRange();
+      picker().vm.$emit("show");
+      await pick(relative("1h"));
+
+      picker().vm.$emit("hide");
+      await flushPromises();
+
+      const time = wrapper.vm.dateTimeForVariables;
+      expect(time.end_time.getTime() - time.start_time.getTime()).toBe(15 * MINUTE);
+    });
+
+    it("puts the picker back on the applied range when it closes on a broken range", async () => {
+      setAutoRun(false);
+      await mountOnRange();
+      pickerSetSavedDate.mockClear();
+      picker().vm.$emit("show");
+      await pick({ valueType: "absolute", startTime: 300 * MINUTE, endTime: 200 * MINUTE });
+
+      picker().vm.$emit("hide");
+      await flushPromises();
+
+      expect(pickerSetSavedDate).toHaveBeenCalledWith({
+        type: "relative",
+        relativeTimePeriod: "15m",
+      });
+      expect(picker().props("modelValue").relativeTimePeriod).toBe("15m");
+      expect(wrapper.vm.showApplyHint).toBe(false);
+      expect(chartSpan()).toBe(15 * MINUTE);
+    });
+
+    it("applies a preset at once with Auto Run on", async () => {
+      setAutoRun(true);
+      await mountOnRange();
+
+      await pick(relative("1h"));
+
+      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
+      expect(chartSpan()).toBe(60 * MINUTE);
+      expect(wrapper.vm.showApplyHint).toBe(false);
+    });
+  });
+
+  describe("Refresh apply state and Auto Run", () => {
+    const setAutoQuery = (enabled: boolean) => {
+      mockStore.state.zoConfig = { ...mockStore.state.zoConfig, auto_query_enabled: enabled };
+    };
+
+    const changeAppliedVariables = async () => {
+      mockCheckIfVariablesAreLoaded.mockReturnValue(true);
+      wrapper.vm.variablesDataUpdated({ values: [{ name: "a", value: "1" }] });
+      await flushPromises();
+      wrapper.vm.variablesDataUpdated({ values: [{ name: "a", value: "2" }] });
+      await flushPromises();
+    };
+
+    afterEach(() => {
+      localStorage.removeItem("oo_toggle_auto_run");
+      setAutoQuery(false);
+    });
+
+    it("Refresh is not amber when nothing has changed", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.variablesDataUpdated({ isVariablesLoading: false, values: [] });
+      await flushPromises();
+
+      expect(wrapper.vm.isVariablesChanged).toBe(false);
+      expect(wrapper.vm.showApplyHint).toBe(false);
+    });
+
+    it("Refresh turns amber on an unapplied change and clears after Refresh", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      await changeAppliedVariables();
+      expect(wrapper.vm.showApplyHint).toBe(true);
+
+      wrapper.vm.disable = false;
+      wrapper.vm.refreshData();
+      await flushPromises();
+      expect(wrapper.vm.showApplyHint).toBe(false);
+    });
+
+    it("hides the Auto Run menu when the server flag is off", async () => {
+      setAutoQuery(false);
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="dashboard-viewpanel-refresh-options-btn"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("offers the Auto Run menu and never shows amber while Auto Run is on", async () => {
+      setAutoQuery(true);
+      wrapper = createWrapper();
+      await flushPromises();
+      await changeAppliedVariables();
+
+      expect(wrapper.find('[data-test="dashboard-viewpanel-refresh-options-btn"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.vm.isAutoRunOn).toBe(true);
+      expect(wrapper.vm.showApplyHint).toBe(false);
+    });
+
+    it("uses the dashboard Auto Run copy for the Refresh tooltip while Auto Run is on", async () => {
+      setAutoQuery(true);
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const tooltip = wrapper
+        .findComponent('[data-test="dashboard-viewpanel-refresh-data-btn"]')
+        .findComponent({ name: "OTooltip" })
+        .props("content");
+      expect(tooltip).toBe("dashboard.viewDashboard.autoRunDescription");
+    });
+
+    it("describes Auto Run in its menu item like the dashboard toolbar, in both states", async () => {
+      setAutoQuery(true);
+      wrapper = createWrapper(
+        {},
+        {
+          ODropdown: { template: '<span><slot name="trigger" /><slot /></span>' },
+          ODropdownItem: { template: '<span><slot name="icon-left" /><slot /></span>' },
+        },
+      );
+      await flushPromises();
+      const toggle = () => wrapper.find('[data-test="dashboard-viewpanel-auto-run-toggle-btn"]');
+      const lines = () =>
+        toggle()
+          .findAll("div")
+          .map((line: any) => line.text());
+
+      expect(lines()).toEqual([
+        "search.turnOffLiveMode",
+        "dashboard.viewDashboard.autoRunDescription",
+        "dashboard.viewDashboard.autoRunScope",
+      ]);
+      expect(toggle().find('[data-test="dashboard-viewpanel-auto-run-scope"]').classes()).toEqual(
+        expect.arrayContaining(["text-text-secondary", "text-xs"]),
+      );
+
+      wrapper.vm.toggleAutoRun();
+      await flushPromises();
+
+      expect(lines()).toEqual([
+        "search.turnOnLiveMode",
+        "dashboard.viewDashboard.autoRunDescription",
+        "dashboard.viewDashboard.autoRunScope",
+      ]);
     });
   });
 

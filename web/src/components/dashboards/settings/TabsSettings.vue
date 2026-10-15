@@ -55,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-name="{ row }">
           <span
             v-if="row.tabId !== editTabId"
-            class="block overflow-hidden text-ellipsis whitespace-nowrap"
             data-test="dashboard-tab-settings-tab-name"
             :data-test-tab-name="row.name"
             >{{ row.name }}</span
@@ -195,6 +194,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 
 export default defineComponent({
   name: "TabsSettings",
@@ -230,11 +230,8 @@ export default defineComponent({
         route.query.folder ?? "default",
       );
     };
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
     // Attach SortableJS to OTable's rendered <tbody> so rows can be dragged
     // to reorder. Re-runnable: tears down any prior instance first.
     const initSortable = async () => {
@@ -325,6 +322,10 @@ export default defineComponent({
       data: {},
     });
 
+    const tabNameOf = (tabId: any) =>
+      currentDashboardData.data?.tabs?.find((tab: any) => tab.tabId === tabId)?.name ??
+      String(tabId ?? "");
+
     const handleDragEnd = async () => {
       try {
         await updateDashboard(
@@ -339,16 +340,17 @@ export default defineComponent({
 
         showPositiveNotification(t("dashboard.tabsSettings.dashboardUpdated"));
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.tabsSettings.tabReorderFailed"),
-            t,
-          );
-        } else {
-          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"));
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: currentDashboardData.data.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            mine: currentDashboardData.data,
+            change: t("dashboard.saveConflict.change.reorderedTabs"),
+            onResolved: getDashboardData,
+          });
+          return;
         }
+        showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"));
         emit("refresh");
         await getDashboardData();
       }
@@ -362,6 +364,8 @@ export default defineComponent({
     };
 
     const saveEdit = async () => {
+      // editTab renames the cached tab in place, so read the old name before it runs.
+      const previousName = tabNameOf(editTabObj.data.tabId);
       try {
         if (editTabId.value) {
           // only allowed to edit name
@@ -382,16 +386,26 @@ export default defineComponent({
           editTabObj.data = {};
         }
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.tabsSettings.tabUpdationFailed"),
-            t,
-          );
-        } else {
-          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"));
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: currentDashboardData.data.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            change: t("dashboard.saveConflict.change.renamedTab", {
+              from: previousName,
+              to: editTabObj.data.name,
+            }),
+            onResolved: async () => {
+              cancelEdit();
+              await getDashboardData();
+            },
+          });
+          // The rename is already in the working copy, so show it as unsaved instead of keeping the editor open.
+          cancelEdit();
+          await getDashboardData();
+          emit("refresh");
+          return;
         }
+        showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"));
 
         emit("refresh");
         await getDashboardData();
@@ -416,6 +430,8 @@ export default defineComponent({
     };
 
     const confirmDelete = async (moveTabId: any) => {
+      // deleteTab removes the tab from the cached dashboard, so read its name first.
+      const deletedName = tabNameOf(tabIdToBeDeleted.value);
       try {
         await deleteTab(
           store,
@@ -433,13 +449,19 @@ export default defineComponent({
 
         showPositiveNotification(t("dashboard.tabsSettings.tabDeleted"));
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.tabsSettings.tabDeletionFailed"),
-            t,
-          );
+        if (saveConflict.isConflict(error)) {
+          deletePopupVisible.value = false;
+          void saveConflict.openConflict({
+            dashboardId: currentDashboardData.data.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            change: t("dashboard.saveConflict.change.deletedTab", {
+              name: deletedName,
+            }),
+            onResolved: async () => {
+              tabIdToBeDeleted.value = null;
+              await getDashboardData();
+            },
+          });
         } else {
           showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabDeletionFailed"), {
             timeout: 2000,

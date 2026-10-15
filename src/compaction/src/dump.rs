@@ -288,7 +288,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
 
         let cache = SchemaCache::new(FILE_LIST_SCHEMA.as_ref().to_owned());
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
-        w.insert(dump_stream_key, cache);
+        infra::schema::insert_latest(&mut w, dump_stream_key, cache);
     }
 
     // calculate stats from files before they are moved
@@ -444,24 +444,16 @@ pub async fn delete_by_time_range(
     }
 
     // Create deleted items for file_list_deleted table
-    let mut del_items: Vec<_> = files_to_delete
-        .iter()
-        .map(|f| FileListDeleted {
-            id: 0,
-            account: f.account.to_string(),
-            file: format!("files/{}/{}/{}", f.stream, f.date, f.file),
-            index_file: false,
-            flattened: false,
-        })
-        .collect();
+    let mut del_items: Vec<_> = files_to_delete.iter().map(deleted_data_file).collect();
 
     // we also need to delete the dump files
     del_items.extend(dump_files.iter().map(|f| FileListDeleted {
         id: 0,
         account: f.account.to_string(),
         file: f.key.clone(),
-        index_file: false,
-        flattened: false,
+        index_file: f.meta.index_size > 0,
+        mindex_file: f.meta.mindex_size > 0,
+        flattened: f.meta.flattened,
     }));
 
     // create deleted items for file_list table
@@ -537,6 +529,17 @@ pub async fn delete_by_time_range(
     }
 
     Ok(())
+}
+
+fn deleted_data_file(file: &FileRecord) -> FileListDeleted {
+    FileListDeleted {
+        id: 0,
+        account: file.account.to_string(),
+        file: format!("files/{}/{}/{}", file.stream, file.date, file.file),
+        index_file: file.index_size > 0,
+        mindex_file: file.mindex_size > 0,
+        flattened: file.flattened,
+    }
 }
 
 // Generate a new dump file and upload to storage
@@ -1563,6 +1566,10 @@ mod tests {
         assert_eq!(r.mindex_size, original.mindex_size);
         assert_eq!(r.bloom_ver, original.bloom_ver);
         assert_eq!(r.updated_at, original.updated_at);
+        let deleted = deleted_data_file(r);
+        assert!(deleted.index_file);
+        assert!(deleted.mindex_file);
+        assert!(deleted.flattened);
     }
 
     #[test]

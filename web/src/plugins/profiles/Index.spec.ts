@@ -1,6 +1,6 @@
-import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { nextTick } from "vue";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { nextTick, reactive } from "vue";
 import Profiles from "@/plugins/profiles/Index.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   meta: vi.fn(),
   series: vi.fn(),
   merge: vi.fn(),
+  tagValues: vi.fn(),
   getConsumableRelativeTime: vi.fn(() => {
     const end = mocks.nowMs;
     return {
@@ -26,12 +27,20 @@ vi.mock("@/services/stream", () => ({
   },
 }));
 
-vi.mock("@/services/profiles", () => ({
+vi.mock("@/services/profiles", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/services/profiles")>()),
   default: {
     meta: mocks.meta,
     series: mocks.series,
     merge: mocks.merge,
+    tagValues: mocks.tagValues,
   },
+}));
+
+const route = reactive({ name: "profiles", query: {} as Record<string, string> });
+
+vi.mock("vue-router", () => ({
+  useRoute: () => route,
 }));
 
 vi.mock("@/utils/date", () => ({
@@ -49,7 +58,7 @@ const profileMetaResponse = {
     data_sources: ["collector-a"],
     services: ["service-a"],
     profile_types: [{ type: "cpu", unit: "nanoseconds" }],
-    label_names: ["service.name"],
+    label_names: ["k8s_pod_name", "process_name"],
     took: 1,
   },
 };
@@ -68,19 +77,26 @@ const mergeResponse = {
   data: {
     unit: "nanoseconds",
     profile_type: "cpu",
-    total: 10,
-    merged_total: 10,
+    total: 30,
+    merged_total: 30,
     truncated: false,
     root: {
       name: "root",
-      self: 10,
-      total: 10,
+      self: 0,
+      total: 30,
       children: [],
     },
-    top: [{ name: "root", self: 10, total: 10 }],
+    top: [
+      { name: "fn-a", self: 10, total: 20 },
+      { name: "fn-b", self: 5, total: 30 },
+      { name: "fn-c", self: 15, total: 15 },
+    ],
     took: 1,
   },
 };
+
+// The route is shared module state, so a page left mounted would re-seed on another test's route change.
+enableAutoUnmount(afterEach);
 
 describe("Profiles page", () => {
   const orgIdentifier = store.state.selectedOrganization.identifier as string;
@@ -94,6 +110,21 @@ describe("Profiles page", () => {
     },
     OContent: {
       template: "<div><slot /></div>",
+    },
+    OIcon: true,
+    OTag: {
+      template: "<div><slot /><slot name='trailing' /></div>",
+    },
+    OTooltip: true,
+    OEmptyState: {
+      template: '<div data-test="profiles-no-results">No Profiles found</div>',
+    },
+    OSpinner: true,
+    OSearchInput: {
+      template:
+        '<input :value="modelValue" :data-test="$attrs[\'data-test\']" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+      props: ["modelValue", "placeholder"],
+      emits: ["update:modelValue"],
     },
     OSelect: {
       template:
@@ -122,6 +153,7 @@ describe("Profiles page", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    route.query = {};
     mocks.nowMs = 1_700_000_000_000;
     mocks.getConsumableRelativeTime.mockImplementation(() => {
       const end = mocks.nowMs;
@@ -134,6 +166,9 @@ describe("Profiles page", () => {
     mocks.meta.mockResolvedValue(profileMetaResponse);
     mocks.series.mockResolvedValue(seriesResponse);
     mocks.merge.mockResolvedValue(mergeFor("fn-a"));
+    mocks.tagValues.mockResolvedValue({
+      data: { tag: "k8s_pod_name", values: ["pod-a", "pod-b"], took: 1 },
+    });
   });
 
   it("shows an explicit stream selector and loads the first stream by default", async () => {
@@ -253,5 +288,406 @@ describe("Profiles page", () => {
     ).toBe("profiles-a");
     expect(wrapper.text()).toContain("fn-a");
     expect(wrapper.text()).not.toContain("fn-b");
+  });
+
+  it("loads tag values and applies a filter to the next query", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mountPage();
+    await flushPromises();
+    await nextTick();
+
+    await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
+    await flushPromises();
+    await nextTick();
+
+    expect(mocks.tagValues).toHaveBeenCalledWith(
+      orgIdentifier,
+      "profiles-a",
+      expect.objectContaining({ tag: "k8s_pod_name" }),
+    );
+
+    await wrapper.find('[data-test="profiles-tag-value-select"] select').setValue("pod-a");
+    await wrapper.find('[data-test="profiles-add-filter"]').trigger("click");
+    await flushPromises();
+    await nextTick();
+
+    expect(wrapper.find('[data-test="profiles-applied-filters"]').exists()).toBe(true);
+    const lastSeriesPayload = mocks.series.mock.calls[mocks.series.mock.calls.length - 1][2];
+    expect(lastSeriesPayload.filters).toEqual([{ key: "k8s_pod_name", op: "=", value: "pod-a" }]);
+  });
+
+  it("reloads tag values when the service or profile type changes", async () => {
+    mocks.meta.mockResolvedValue({
+      data: {
+        ...profileMetaResponse.data,
+        services: ["service-a", "service-b"],
+        profile_types: [
+          { type: "cpu", unit: "nanoseconds" },
+          { type: "heap", unit: "bytes" },
+        ],
+      },
+    });
+    const wrapper = mountPage();
+    await flushPromises();
+    await nextTick();
+
+    await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
+    await flushPromises();
+    await nextTick();
+    mocks.tagValues.mockClear();
+
+    await wrapper.find('[data-test="profiles-service-select"] select').setValue("service-b");
+    await flushPromises();
+    await nextTick();
+
+    expect(mocks.tagValues).toHaveBeenCalledWith(
+      orgIdentifier,
+      "profiles-a",
+      expect.objectContaining({ service_name: "service-b", tag: "k8s_pod_name" }),
+    );
+
+    mocks.tagValues.mockClear();
+    await wrapper.find('[data-test="profiles-type-select"] select').setValue("heap\u0000bytes");
+    await flushPromises();
+    await nextTick();
+
+    expect(mocks.tagValues).toHaveBeenCalledWith(
+      orgIdentifier,
+      "profiles-a",
+      expect.objectContaining({
+        profile_type: "heap",
+        profile_unit: "bytes",
+        tag: "k8s_pod_name",
+      }),
+    );
+  });
+
+  it("drops tag values that arrive after the draft tag is cleared", async () => {
+    let resolveTag:
+      ((value: { data: { tag: string; values: string[]; took: number } }) => void) | undefined;
+    mocks.tagValues.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveTag = resolve;
+        }),
+    );
+
+    const wrapper = mountPage();
+    await flushPromises();
+    await nextTick();
+
+    await wrapper.find('[data-test="profiles-tag-key-select"] select').setValue("k8s_pod_name");
+    await nextTick();
+
+    await wrapper.find('[data-test="profiles-stream-select"] select').setValue("profiles-b");
+    await flushPromises();
+    await nextTick();
+
+    resolveTag?.({ data: { tag: "k8s_pod_name", values: ["stale-pod"], took: 1 } });
+    await flushPromises();
+    await nextTick();
+
+    expect(wrapper.find('[data-test="profiles-tag-value-select"]').text()).not.toContain(
+      "stale-pod",
+    );
+  });
+
+  it("sorts the top table by Self when the column header is clicked", async () => {
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mountPage();
+    await flushPromises();
+    await nextTick();
+
+    await wrapper.find('[data-test="profiles-view-top"]').trigger("click");
+    await nextTick();
+
+    const namesBefore = wrapper
+      .findAll("tbody tr")
+      .map((row) => row.find("td").text())
+      .filter(Boolean);
+    expect(namesBefore[0]).toBe("fn-b");
+
+    await wrapper.find('[data-test="profiles-sort-self"]').trigger("click");
+    await nextTick();
+
+    const namesAfter = wrapper
+      .findAll("tbody tr")
+      .map((row) => row.find("td").text())
+      .filter(Boolean);
+    expect(namesAfter[0]).toBe("fn-c");
+  });
+
+  describe("seeded from the route", () => {
+    const FROM = 1_700_000_000_000_000;
+    const TO = 1_700_000_120_000_000;
+    const seedQuery = {
+      stream: "profiles-b",
+      from: String(FROM),
+      to: String(TO),
+      service_name: "service-b",
+      profile_type: "cpu",
+      profile_unit: "nanoseconds",
+      filters: "trace_id=t%2C1,span_id=s1",
+      view: "flame",
+    };
+    const seededFilters = [
+      { key: "trace_id", op: "=", value: "t,1" },
+      { key: "span_id", op: "=", value: "s1" },
+    ];
+    // Like the real picker, it re-emits its model on mount.
+    const emittingPicker = {
+      props: ["modelValue"],
+      emits: ["update:modelValue"],
+      mounted(this: { modelValue: object; $emit: (e: string, v: object) => void }) {
+        this.$emit("update:modelValue", { ...this.modelValue });
+      },
+      template: "<div />",
+    };
+
+    const mountSeeded = () =>
+      mount(Profiles, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: { ...pageStubs, DateTimePickerDashboard: emittingPicker },
+        },
+      });
+
+    const deferred = <T>() => {
+      let resolve!: (value: T) => void;
+      const promise = new Promise<T>((r) => (resolve = r));
+      return { promise, resolve };
+    };
+
+    beforeEach(() => {
+      route.query = { ...seedQuery };
+      mocks.meta.mockResolvedValue({
+        data: {
+          ...profileMetaResponse.data,
+          services: ["service-a", "service-b"],
+          profile_types: [
+            { type: "alloc_space", unit: "bytes" },
+            { type: "cpu", unit: "nanoseconds" },
+          ],
+        },
+      });
+    });
+
+    it("seeds stream, service, type, filters and the flame view through the org watcher's initPage", async () => {
+      const wrapper = mountSeeded();
+      await flushPromises();
+
+      expect(
+        (wrapper.find('[data-test="profiles-stream-select"] select').element as HTMLSelectElement)
+          .value,
+      ).toBe("profiles-b");
+      expect(mocks.merge).toHaveBeenCalledWith(
+        orgIdentifier,
+        "profiles-b",
+        expect.objectContaining({
+          start_time: FROM,
+          end_time: TO,
+          service_name: "service-b",
+          profile_type: "cpu",
+          profile_unit: "nanoseconds",
+          filters: seededFilters,
+        }),
+      );
+      expect(wrapper.find('[data-test="profiles-filter-chip-trace_id"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="profiles-filter-chip-span_id"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="profiles-view-flame"]').attributes("variant")).toBe(
+        "primary",
+      );
+    });
+
+    it("loads metadata for the seeded window", async () => {
+      mountSeeded();
+      await flushPromises();
+      expect(mocks.meta).toHaveBeenCalledWith(orgIdentifier, "profiles-b", {
+        start_time: FROM,
+        end_time: TO,
+      });
+    });
+
+    it("loads metadata once and queries once, even with delayed responses", async () => {
+      const names = deferred<typeof streamResponse>();
+      const meta = deferred<unknown>();
+      mocks.nameList.mockReturnValueOnce(names.promise);
+      mocks.meta.mockReturnValueOnce(meta.promise);
+      const wrapper = mountSeeded();
+      await flushPromises();
+      names.resolve(streamResponse);
+      await flushPromises();
+      meta.resolve({
+        data: {
+          ...profileMetaResponse.data,
+          services: ["service-a", "service-b"],
+          profile_types: [{ type: "cpu", unit: "nanoseconds" }],
+        },
+      });
+      await flushPromises();
+
+      expect(mocks.meta).toHaveBeenCalledTimes(1);
+      expect(mocks.series).toHaveBeenCalledTimes(1);
+      expect(mocks.merge).toHaveBeenCalledTimes(1);
+      expect(wrapper.find('[data-test="profiles-filter-chip-trace_id"]').exists()).toBe(true);
+    });
+
+    it("re-seeds when the route query changes", async () => {
+      mountSeeded();
+      await flushPromises();
+      mocks.merge.mockClear();
+
+      route.query = { ...seedQuery, stream: "profiles-a", filters: "trace_id=t2,span_id=s2" };
+      await flushPromises();
+
+      expect(mocks.merge).toHaveBeenCalledTimes(1);
+      expect(mocks.merge).toHaveBeenCalledWith(
+        orgIdentifier,
+        "profiles-a",
+        expect.objectContaining({
+          filters: [
+            { key: "trace_id", op: "=", value: "t2" },
+            { key: "span_id", op: "=", value: "s2" },
+          ],
+        }),
+      );
+    });
+
+    it("applies only the latest seed when the route changes while an earlier seed is loading", async () => {
+      const names = deferred<typeof streamResponse>();
+      mocks.nameList.mockReturnValueOnce(names.promise);
+      mountSeeded();
+      await flushPromises();
+
+      route.query = { ...seedQuery, stream: "profiles-a", filters: "trace_id=t2,span_id=s2" };
+      await flushPromises();
+      names.resolve(streamResponse);
+      await flushPromises();
+
+      expect(mocks.series).toHaveBeenCalledTimes(1);
+      expect(mocks.merge).toHaveBeenCalledTimes(1);
+      expect(mocks.merge).toHaveBeenCalledWith(
+        orgIdentifier,
+        "profiles-a",
+        expect.objectContaining({
+          filters: [
+            { key: "trace_id", op: "=", value: "t2" },
+            { key: "span_id", op: "=", value: "s2" },
+          ],
+        }),
+      );
+    });
+
+    it("returns to the default stream and 15-minute window when the seed is dropped", async () => {
+      const wrapper = mountSeeded();
+      await flushPromises();
+      mocks.meta.mockClear();
+      mocks.merge.mockClear();
+
+      route.query = {};
+      await flushPromises();
+
+      const window = {
+        start_time: (mocks.nowMs - 15 * 60 * 1000) * 1000,
+        end_time: mocks.nowMs * 1000,
+      };
+      expect(
+        (wrapper.find('[data-test="profiles-stream-select"] select').element as HTMLSelectElement)
+          .value,
+      ).toBe("profiles-a");
+      expect(mocks.meta).toHaveBeenCalledTimes(1);
+      expect(mocks.meta).toHaveBeenCalledWith(orgIdentifier, "profiles-a", window);
+      expect(mocks.merge).toHaveBeenCalledTimes(1);
+      expect(mocks.merge).toHaveBeenCalledWith(
+        orgIdentifier,
+        "profiles-a",
+        expect.objectContaining({ ...window, filters: [] }),
+      );
+    });
+
+    it("keeps the default first stream, 15-minute window and top view without params", async () => {
+      route.query = {};
+      const wrapper = mountSeeded();
+      await flushPromises();
+
+      expect(mocks.meta.mock.calls[0][1]).toBe("profiles-a");
+      expect(mocks.meta.mock.calls[0][2]).toEqual({
+        start_time: (mocks.nowMs - 15 * 60 * 1000) * 1000,
+        end_time: mocks.nowMs * 1000,
+      });
+      expect(wrapper.find('[data-test="profiles-applied-filters"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="profiles-view-top"]').attributes("variant")).toBe("primary");
+    });
+  });
+
+  describe("superseded by an org switch", () => {
+    const originalOrg = { ...store.state.selectedOrganization };
+    const otherOrg = { ...originalOrg, id: 160, identifier: "other-org" };
+
+    const deferred = <T>() => {
+      let resolve!: (value: T) => void;
+      const promise = new Promise<T>((r) => (resolve = r));
+      return { promise, resolve };
+    };
+
+    const selectedStreamValue = (wrapper: ReturnType<typeof mountPage>) =>
+      (wrapper.find('[data-test="profiles-stream-select"] select').element as HTMLSelectElement)
+        .value;
+
+    afterEach(() => {
+      store.dispatch("setSelectedOrganization", originalOrg);
+    });
+
+    it("drops the older org's merge when it lands after the switch", async () => {
+      const oldMerge = deferred<ReturnType<typeof mergeFor>>();
+      mocks.merge.mockReturnValue(oldMerge.promise);
+      const wrapper = mountPage();
+      await flushPromises();
+      expect(mocks.merge).toHaveBeenCalledWith(orgIdentifier, "profiles-a", expect.anything());
+
+      const newNames = deferred<typeof streamResponse>();
+      mocks.nameList.mockReturnValueOnce(newNames.promise);
+      store.dispatch("setSelectedOrganization", otherOrg);
+      await flushPromises();
+      oldMerge.resolve(mergeFor("fn-old-org"));
+      await flushPromises();
+
+      expect(wrapper.text()).not.toContain("fn-old-org");
+
+      mocks.merge.mockResolvedValue(mergeFor("fn-new-org"));
+      newNames.resolve(streamResponse);
+      await flushPromises();
+
+      expect(mocks.merge).toHaveBeenLastCalledWith("other-org", "profiles-a", expect.anything());
+      expect(wrapper.text()).toContain("fn-new-org");
+      expect(wrapper.text()).not.toContain("fn-old-org");
+    });
+
+    it("keeps the newer org's stream when the older stream list resolves last", async () => {
+      const oldNames = deferred<typeof streamResponse>();
+      mocks.nameList.mockReturnValueOnce(oldNames.promise);
+      const wrapper = mountPage();
+      await flushPromises();
+
+      mocks.nameList.mockResolvedValueOnce({ data: { list: [{ name: "profiles-c" }] } });
+      store.dispatch("setSelectedOrganization", otherOrg);
+      await flushPromises();
+      expect(selectedStreamValue(wrapper)).toBe("profiles-c");
+
+      oldNames.resolve(streamResponse);
+      await flushPromises();
+
+      expect(selectedStreamValue(wrapper)).toBe("profiles-c");
+      expect(wrapper.find('[data-test="profiles-stream-select"]').text()).not.toContain(
+        "profiles-a",
+      );
+      expect(new Set(mocks.meta.mock.calls.map((call) => call[1]))).toEqual(
+        new Set(["profiles-c"]),
+      );
+      expect(new Set(mocks.merge.mock.calls.map((call) => `${call[0]}/${call[1]}`))).toEqual(
+        new Set(["other-org/profiles-c"]),
+      );
+    });
   });
 });

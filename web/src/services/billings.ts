@@ -14,6 +14,24 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
+
+export interface AiUsage {
+  credits_used: number;
+  credits_limit: number;
+  credits_remaining: number;
+  mode: string;
+  requires_additional_credits: boolean;
+  payer_org_id?: string | null;
+  costs: AiCreditCounts;
+  used_by_feature?: AiCreditCounts | null;
+}
+
+export interface AiCreditCounts {
+  chat: number;
+  incident: number;
+  incident_reanalysis: number;
+}
 
 const billings = {
   get_quota_threshold: (org_identifier: string) => {
@@ -32,7 +50,12 @@ const billings = {
     return http().get(`/api/${org_identifier}/billings/list_paymentsource`);
   },
   resume_subscription: (org_identifier: string) => {
-    return http().get(`/api/${org_identifier}/billings/resume_subscription`);
+    return http()
+      .get(`/api/${org_identifier}/billings/resume_subscription`)
+      .then((res) => {
+        analytics.track("billing_plan_subscribed");
+        return res;
+      });
   },
   get_hosted_url: (org_identifier: string, plan_name: string) => {
     return http().get(`/api/${org_identifier}/billings/hosted_subscription_url?plan=${plan_name}`);
@@ -65,7 +88,7 @@ const billings = {
     return http().post(`/api/${org_identifier}/billings/new_user_attribution`, payload);
   },
   get_ai_usage: (org_identifier: string) => {
-    return http().get(`/api/${org_identifier}/ai/usage`);
+    return http().get<AiUsage>(`/api/${org_identifier}/ai/usage`);
   },
   list_billing_group_members: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/billing_group/members`);
@@ -87,6 +110,10 @@ const billings = {
   reject_billing_group_invite: (org_identifier: string, token: string) => {
     return http().delete(`/api/${org_identifier}/billing_group/invites/${token}/reject`);
   },
+  remove_billing_group_member: (org_identifier: string, member_org_id: string) =>
+    http().delete(`/api/${org_identifier}/billing_group/members/${member_org_id}`),
+  leave_billing_group: (org_identifier: string) =>
+    http().delete(`/api/${org_identifier}/billing_group/membership`),
 };
 
 export default billings;

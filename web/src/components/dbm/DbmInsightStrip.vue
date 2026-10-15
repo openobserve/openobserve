@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="ranked.length"
-    class="border-border-subtle bg-surface-base px-page-edge flex min-h-[2.125rem] items-stretch overflow-x-auto border-b"
+    class="border-border-subtle bg-surface-base px-page-edge flex min-h-8.5 items-stretch overflow-x-auto border-b"
     data-test="dbm-queries-insight-strip"
   >
     <button

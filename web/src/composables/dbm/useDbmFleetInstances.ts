@@ -45,29 +45,18 @@
  *
  * ## One request per (org, window), shared by every tab
  *
- * Module-scoped cache, exactly like `useDbmTabCounts`: the six DBM views are
- * separate routes rendering the same strip, so a per-page fetch would issue
- * the same read six times to answer one question. The key is the org plus the
- * window the reader CHOSE (not the resolved timestamps, which move every
- * render and could never hit).
+ * The six DBM views are separate routes rendering the same strip, so a
+ * per-page fetch would issue the same read six times to answer one question.
+ * The cache entry is what collapses them; its key buckets the window, because
+ * every page re-pins its anchor to the microsecond on load and an unbucketed
+ * key could never hit.
  */
 
-import { ref, type Ref } from "vue";
+import { getCurrentScope, onScopeDispose, ref, type Ref } from "vue";
 
-import dbMonitoringService, { type DbmInstanceHit } from "@/services/db_monitoring";
-
-/** Resolved identities, newest read wins. */
-const settled = new Map<string, DbmInstanceHit[]>();
-const inFlight = new Map<string, Promise<DbmInstanceHit[]>>();
-
-/** Drop everything. For tests, so one cannot seed the next. */
-export const clearDbmFleetInstances = () => {
-  settled.clear();
-  inFlight.clear();
-};
-
-export const dbmFleetKey = (org: string, startTime?: number, endTime?: number): string =>
-  `${org}|${startTime ?? ""}|${endTime ?? ""}`;
+import { queryClient } from "@/composables/query/queryClient";
+import { type DbmInstanceHit } from "@/services/db_monitoring";
+import { dbmInstancesQuery } from "@/services/db_monitoring.queries";
 
 export interface DbmFleetRequest {
   org: string;
@@ -76,45 +65,54 @@ export interface DbmFleetRequest {
 }
 
 /**
- * Fetch the fleet for one window, joining an in-flight read for the same key
- * rather than issuing a second.
+ * Fetch the fleet for one window. Identical keys share one in-flight request,
+ * so the six DBM routes still cost a single read between them.
  *
  * A FAILED read resolves to an empty list and is NOT cached: an empty picker
  * and a failed one look identical to the reader, so the next tab must get a
- * fresh attempt rather than inherit a failure as though it were an answer.
+ * fresh attempt rather than inherit a failure as though it were an answer. The
+ * caller has no error surface — the picker falls back to the rows-derived list.
  */
-export const loadDbmFleetInstances = (req: DbmFleetRequest): Promise<DbmInstanceHit[]> => {
-  const key = dbmFleetKey(req.org, req.startTime, req.endTime);
-  const held = settled.get(key);
-  if (held) return Promise.resolve(held);
-  const existing = inFlight.get(key);
-  if (existing) return existing;
-
-  const request = dbMonitoringService
-    .getInstances(req.org, { startTime: req.startTime, endTime: req.endTime })
-    .then((res) => {
-      const hits = res?.data?.hits ?? [];
-      settled.set(key, hits);
-      return hits;
-    })
-    .catch(() => [] as DbmInstanceHit[])
-    .finally(() => {
-      if (inFlight.get(key) === request) inFlight.delete(key);
-    });
-  inFlight.set(key, request);
-  return request;
-};
+export const loadDbmFleetInstances = (req: DbmFleetRequest): Promise<DbmInstanceHit[]> =>
+  queryClient
+    .fetchQuery(dbmInstancesQuery(req.org, req.startTime, req.endTime))
+    .catch(() => [] as DbmInstanceHit[]);
 
 export interface DbmFleetInstancesReturn {
   hits: Ref<DbmInstanceHit[]>;
   load: (req: DbmFleetRequest) => Promise<void>;
 }
 
+// Every mounted picker, so a page's Refresh can reach a read it does not own.
+const mounted = new Set<() => void>();
+
+/// What the DBM Refresh button calls: every mounted picker re-reads its fleet from the server.
+export const refreshDbmFleet = (): void => {
+  for (const rerun of mounted) rerun();
+};
+
 export function useDbmFleetInstances(): DbmFleetInstancesReturn {
   const hits = ref<DbmInstanceHit[]>([]);
-  const load = async (req: DbmFleetRequest): Promise<void> => {
+  let lastRequest: DbmFleetRequest | null = null;
+  const load = async (req: DbmFleetRequest, force = false): Promise<void> => {
     if (!req.org) return;
+    lastRequest = req;
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: dbmInstancesQuery(req.org, req.startTime, req.endTime).queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
     hits.value = await loadDbmFleetInstances(req);
   };
+  const rerun = () => {
+    if (lastRequest) void load(lastRequest, true);
+  };
+  // Only inside a scope, so an entry is guaranteed to leave the set when its page unmounts.
+  if (getCurrentScope()) {
+    mounted.add(rerun);
+    onScopeDispose(() => mounted.delete(rerun));
+  }
   return { hits, load };
 }

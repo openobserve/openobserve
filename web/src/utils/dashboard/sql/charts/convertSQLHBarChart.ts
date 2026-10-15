@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { calculateWidthText } from "../../chartDimensionUtils";
+import { getAxisLabel } from "../../fieldLabel";
 import { largestLabel } from "../shared/contextBuilder";
 import { type SQLContext } from "../shared/types";
 
@@ -66,7 +67,7 @@ export function applyHBarChart(ctx: SQLContext): void {
 
     options.xAxis.name =
       panelSchema.queries[0]?.fields?.y?.length >= 1
-        ? panelSchema.queries[0]?.fields?.y[0]?.label
+        ? getAxisLabel(panelSchema.queries[0].fields.y[0], panelSchema.config)
         : "";
     // For h-bar, xAxis is the bottom axis after swap
     // Apply dynamic nameGap calculation if rotation is configured

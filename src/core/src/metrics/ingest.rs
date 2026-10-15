@@ -26,6 +26,7 @@ use config::{
     meta::{
         alerts::alert,
         pipeline::PipelineKind,
+        promql::VALUE_LABEL,
         self_reporting::usage::UsageType,
         stream::{StreamPartition, StreamType},
     },
@@ -102,7 +103,7 @@ pub(super) async fn run_pipelines<T: Clone>(
             let message = format!(
                 "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG"
             );
-            log::error!("{message}");
+            log::error!("{message}, org_id: {org_id}");
             failures.push(PipelineFailure::MissingInputs { message });
             continue;
         };
@@ -119,7 +120,7 @@ pub(super) async fn run_pipelines<T: Clone>(
                     let message = format!(
                         "[Ingestion]: Stream {stream_name} pipeline batch processing failed: {e}"
                     );
-                    log::error!("{message}");
+                    log::error!("{message}, org_id: {org_id}");
                     failures.push(PipelineFailure::Batch {
                         stream_name: stream_name.clone(),
                         records: records.len(),
@@ -257,11 +258,15 @@ pub(super) async fn apply_redaction<T>(
                 stream_name,
                 &mut rows,
             ) {
-                log::error!("[METRICS] error applying SDR patterns for stream {stream_name}: {e}");
+                log::error!(
+                    "[METRICS] error applying SDR patterns for stream {org_id}/{stream_name}: {e}"
+                );
             }
         }
         Err(e) => {
-            log::error!("[METRICS] failed to get pattern manager for SDR redaction: {e}");
+            log::error!(
+                "[METRICS] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
+            );
             crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
                 org_id,
                 StreamType::Metrics,
@@ -383,7 +388,7 @@ pub(super) async fn write_streams(
             &stream_name,
             None,
         ) {
-            log::warn!("stream [{stream_name}] is being deleted");
+            log::warn!("stream [{org_id}/{stream_name}] is being deleted");
             continue;
         }
         timings.deletion_check_micros += t.elapsed().as_micros();
@@ -493,6 +498,16 @@ fn record_evolves_schema(
     })
 }
 
+/// Whether the stream already stores `value` as `Float64`, the column a stale marker's NULL needs.
+pub(super) fn has_value_column(schema: Option<&SchemaCache>) -> bool {
+    schema.is_some_and(|schema| {
+        schema
+            .schema()
+            .field_with_name(VALUE_LABEL)
+            .is_ok_and(|field| field.data_type() == &DataType::Float64)
+    })
+}
+
 /// The fields of a stream's user-defined schema, if it has one.
 pub(super) fn defined_schema<'a>(
     user_defined_schema_map: &'a HashMap<String, Option<HashSet<String>>>,
@@ -570,6 +585,26 @@ mod tests {
             record.insert(format!("label_{i}"), json::json!("v"));
         }
         record
+    }
+
+    fn value_schema(value_type: Option<DataType>) -> SchemaCache {
+        use datafusion::arrow::datatypes::Field;
+        let mut fields = vec![Field::new(NAME_LABEL, DataType::Utf8, true)];
+        if let Some(value_type) = value_type {
+            fields.push(Field::new(VALUE_LABEL, value_type, true));
+        }
+        SchemaCache::new(Schema::new(fields))
+    }
+
+    #[test]
+    fn test_has_value_column_only_for_a_float64_value() {
+        assert!(has_value_column(Some(&value_schema(Some(
+            DataType::Float64
+        )))));
+        assert!(!has_value_column(Some(&value_schema(Some(DataType::Utf8)))));
+        // a stream created from metadata alone has no `value` field
+        assert!(!has_value_column(Some(&value_schema(None))));
+        assert!(!has_value_column(None));
     }
 
     #[test]

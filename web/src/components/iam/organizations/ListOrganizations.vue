@@ -45,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
-          :footer-title="t('organization.header')"
           sorting="client"
           filter-mode="client"
           :default-columns="false"
@@ -197,7 +196,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -432,7 +431,7 @@ export default defineComponent({
 
       if (evt) {
         let button_txt = evt.target.innerText;
-        segment.track("Button Click", {
+        analytics.track("Button Click", {
           button: button_txt,
           user_org: store.state.selectedOrganization.identifier,
           user_id: store.state.userInfo.email,
@@ -464,7 +463,7 @@ export default defineComponent({
       };
       showJoinOrganizationDialog.value = true;
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Invite Member",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,

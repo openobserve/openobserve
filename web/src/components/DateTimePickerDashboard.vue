@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     :default-relative-time="modelValue.relativeTimePeriod"
     @on:date-change="updateDateTime"
+    @on:timezone-change="onTimezoneChange"
     :initialTimezone="initialTimezone"
     :disable="disable"
     :hide-relative-timezone="hideRelativeTimezone"
@@ -89,7 +90,7 @@ export default defineComponent({
       type: String as PropType<ButtonVariant>,
     },
   },
-  emits: ["update:modelValue", "hide", "show"],
+  emits: ["update:modelValue", "hide", "show", "timezone-change"],
 
   setup(props, { emit }) {
     const dateTimePicker: any = ref(null);
@@ -120,12 +121,21 @@ export default defineComponent({
       return dateTimePicker.value.getConsumableDateTime();
     };
 
+    // The picker reads its v-model only on mount; this moves an already-mounted one.
+    const setSavedDate = (dateObj: any) => {
+      dateTimePicker.value.setSavedDate(dateObj);
+    };
+
     const onHide = () => {
       emit("hide");
     };
 
     const onShow = () => {
       emit("show");
+    };
+
+    const onTimezoneChange = () => {
+      emit("timezone-change");
     };
 
     // Clean up resources on unmount to prevent memory leaks
@@ -145,8 +155,10 @@ export default defineComponent({
       dateTimePicker,
       setCustomDate,
       getConsumableDateTime,
+      setSavedDate,
       onShow,
       onHide,
+      onTimezoneChange,
     };
   },
 });

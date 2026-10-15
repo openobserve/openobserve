@@ -1,6 +1,8 @@
 // Dashboard actions page
 // Methods : AddPanelName, SavePanel, ApplyDashboardBtn, AddNextPanel, GetTableRowCount, VerifyChartRenders
 
+import { SELECTORS, visibleOnly } from "./dashboard-selectors.js";
+
 export default class DashboardactionPage {
   constructor(page) {
     this.page = page;
@@ -14,6 +16,35 @@ export default class DashboardactionPage {
     this.panelSaveBtn = page.locator('[data-test="dashboard-panel-save"]');
     this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
     this.addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
+    this.layoutEditBtn = page.locator('[data-test="dashboard-edit-btn"]');
+    this.layoutEditSaveBtn = page.locator('[data-test="dashboard-edit-save-btn"]');
+    this.layoutEditDiscardBtn = page.locator('[data-test="dashboard-edit-discard-btn"]');
+    this.layoutEditUndoBtn = page.locator('[data-test="dashboard-edit-undo-btn"]');
+    this.layoutEditRedoBtn = page.locator('[data-test="dashboard-edit-redo-btn"]');
+    this.layoutEditChangesCount = page.locator('[data-test="dashboard-edit-changes-count"]');
+    this.layoutEditBadge = page.locator('[data-test="dashboard-edit-badge"]');
+    this.layoutDiscardDialog = page.locator('[data-test="dashboard-edit-discard-dialog"]');
+    this.layoutDiscardConfirmBtn = page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
+    this.layoutDiscardCancelBtn = page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-secondary-btn"]'
+    );
+    this.layoutSettingsHeightInput = page.locator('[data-test="panel-layout-settings-height-input-field"]');
+    this.layoutSettingsApplyBtn = page.locator(
+      '[data-test="panel-layout-settings-drawer"] [data-test="o-dialog-primary-btn"]'
+    );
+    this.panelDragGrip = page.locator('[data-test="dashboard-panel-drag"]');
+    this.lockedGrid = page.locator(".grid-stack.grid-stack-static");
+    this.editingGrid = page.locator(".grid-stack.layout-editing");
+    this.panelMenuEditPanel = page.locator('[data-test="dashboard-edit-panel"]');
+    this.panelMenuEditLayout = page.locator('[data-test="dashboard-edit-layout"]');
+    this.panelMenuDuplicate = page.locator('[data-test="dashboard-duplicate-panel"]');
+    this.panelMenuDelete = page.locator('[data-test="dashboard-delete-panel"]');
+    this.shareBtn = page.locator('[data-test="dashboard-share-btn"]');
+    this.settingsBtn = page.locator('[data-test="dashboard-setting-btn"]');
+    this.addTabBtn = page.locator('[data-test="dashboard-tab-add-btn"]');
+    this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
     this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
@@ -181,6 +212,22 @@ export default class DashboardactionPage {
     return this.panelSaveBtn;
   }
 
+  // Raw discard-button locator for callers that must own the confirm dialog
+  // themselves (discardPanel() installs its own auto-accepting handler).
+  getPanelDiscardBtn() {
+    return this.discardPanelBtn;
+  }
+
+  getPanelBar() {
+    return this.panelBar;
+  }
+
+  // Scoped to the rendered layout branch: PanelEditor.vue mounts the field list
+  // twice, so the bare data-test matches 2 nodes.
+  getFieldListSearchInput() {
+    return this.page.locator(visibleOnly(SELECTORS.FIELD_LIST_SEARCH)).first();
+  }
+
   // Save panel button
   async savePanel() {
     await this.panelSaveBtn.waitFor({ state: "visible" });
@@ -199,6 +246,11 @@ export default class DashboardactionPage {
       this.errorToast.waitFor({ state: "visible", timeout: 20000 }),
       this.panelNameError.waitFor({ state: "visible", timeout: 20000 }),
     ]).catch(() => {});
+  }
+
+  async getErrorToastText() {
+    await this.errorToast.first().waitFor({ state: "visible", timeout: 20000 });
+    return (await this.errorToast.first().innerText()).replace(/\s+/g, " ").trim();
   }
 
   /**
@@ -301,10 +353,91 @@ export default class DashboardactionPage {
     const actionTestId = actionDataTestIds[action];
     if (!actionTestId) throw new Error(`Unknown action: ${action}`);
 
+    // The panel menu offers "Edit layout" only in layout edit mode, and only that item there.
+    if (action === "Layout") await this.enterLayoutEdit();
+
     await this.page
       .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
       .click();
     await this.page.locator(`[data-test="${actionTestId}"]`).click();
+  }
+
+  async enterLayoutEdit() {
+    await this.layoutEditBtn.waitFor({ state: "visible" });
+    await this.layoutEditBtn.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "visible" });
+  }
+
+  async saveLayoutEdit() {
+    await this.layoutEditSaveBtn.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
+  }
+
+  async discardLayoutEdit() {
+    await this.layoutEditDiscardBtn.click();
+    const confirm = this.page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
+    await Promise.race([
+      confirm.waitFor({ state: "visible" }),
+      this.layoutEditSaveBtn.waitFor({ state: "hidden" }),
+    ]).catch(() => {});
+    if (await confirm.isVisible()) await confirm.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
+  }
+
+  getTabRenameBtn(tabId) {
+    return this.page.locator(`[data-test="dashboard-tab-${tabId}-rename-btn"]`);
+  }
+
+  async openPanelMenu(panelName) {
+    const dropdown = this.getEditPanelDropdown(panelName);
+    await dropdown.waitFor({ state: "visible", timeout: 30000 });
+    await dropdown.click();
+  }
+
+  async closePanelMenu() {
+    await this.page.keyboard.press("Escape");
+  }
+
+  // Already in layout edit mode: the dialog's Apply only adds a draft step, it never saves.
+  async applyPanelHeight(panelName, height) {
+    await this.openPanelMenu(panelName);
+    await this.panelMenuEditLayout.click();
+    await this.layoutSettingsHeightInput.waitFor({ state: "visible" });
+    await this.layoutSettingsHeightInput.fill(String(height));
+    await this.layoutSettingsApplyBtn.click();
+    await this.layoutSettingsHeightInput.waitFor({ state: "hidden" });
+  }
+
+  async undoLayoutEdit() {
+    await this.layoutEditUndoBtn.click();
+  }
+
+  async redoLayoutEdit() {
+    await this.layoutEditRedoBtn.click();
+  }
+
+  async requestLayoutDiscard() {
+    await this.layoutEditDiscardBtn.click();
+  }
+
+  async confirmLayoutDiscard() {
+    await this.layoutDiscardConfirmBtn.click();
+    await this.layoutDiscardDialog.waitFor({ state: "hidden" });
+  }
+
+  async cancelLayoutDiscard() {
+    await this.layoutDiscardCancelBtn.click();
+    await this.layoutDiscardDialog.waitFor({ state: "hidden" });
+  }
+
+  async clickDashboardBack() {
+    await this.dashboardBackBtn.click();
+  }
+
+  async pressLayoutShortcut(combo) {
+    await this.page.keyboard.press(combo);
   }
 
   /**
@@ -445,8 +578,8 @@ export default class DashboardactionPage {
     const noDataVisible = await this.noDataElement.isVisible().catch(() => false);
     expect(noDataVisible).toBe(false);
 
-    // 2. Canvas has non-background pixels
-    const hasData = await this.page.evaluate(() => {
+    // 2. Canvas has non-background pixels; polled because a mounted canvas can still be awaiting its query.
+    const scanCanvases = () => this.page.evaluate(() => {
       const canvases = document.querySelectorAll("canvas");
       for (const canvas of canvases) {
         if (canvas.width < 10 || canvas.height < 10) continue;
@@ -470,7 +603,7 @@ export default class DashboardactionPage {
       }
       return false;
     });
-    expect(hasData).toBe(true);
+    await expect.poll(scanCanvases, { timeout: 15000 }).toBe(true);
   }
 
   /**
@@ -491,6 +624,47 @@ export default class DashboardactionPage {
     // any subsequent search/filter operates on already-loaded data.
     await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     await this.page.waitForTimeout(1000);
+  }
+
+  // Legend is canvas-painted, so read series names via `_vnode` (`__vueParentComponent` is dev-only).
+  async getChartSeriesNames(scopeSelector = '[data-test="chart-renderer"]') {
+    return this.page.evaluate((scopeSel) => {
+      const scopes = Array.from(document.querySelectorAll(scopeSel));
+      const names = new Set();
+      const visited = new Set();
+      const walk = (node, depth) => {
+        if (!node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
+        visited.add(node);
+        const comp = node.component;
+        if (comp) {
+          const state = comp.setupState || {};
+          let chart = null;
+          try {
+            chart = "chart" in state ? state.chart : null;
+          } catch {
+            chart = null;
+          }
+          const host = state.chartRef;
+          if (
+            chart &&
+            typeof chart.getOption === "function" &&
+            host instanceof Element &&
+            scopes.some((scope) => scope.contains(host))
+          ) {
+            try {
+              for (const s of chart.getOption()?.series ?? []) if (s?.name) names.add(String(s.name));
+            } catch {
+              // A disposed instance throws; it draws nothing anyway.
+            }
+          }
+          walk(comp.subTree, depth + 1);
+        }
+        if (node.suspense) walk(node.suspense.activeBranch, depth + 1);
+        if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
+      };
+      walk(document.querySelector("#app")?._vnode, 0);
+      return [...names];
+    }, scopeSelector);
   }
 
   /**

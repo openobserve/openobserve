@@ -56,8 +56,7 @@ pub enum MergeMode {
     /// into size-split `hash-merged-v1-*` files in the same order, without `.midx`; the
     /// hour-end merge takes them once more.
     MetricsHashMerged,
-    /// Metrics index stream, closed hour: the whole hour merges into
-    /// size-split `indexed-v1-*` files in the same order.
+    /// Closed-hour metrics merge emits hash/time ordered `indexed-v1-*` files.
     MetricsIndexed,
     /// Metrics downsampling (enterprise): aggregate every series by the rule's
     /// step, size-split output files. Only for a closed hour, which is merged

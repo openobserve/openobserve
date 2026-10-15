@@ -39,6 +39,7 @@ const variantFillClasses: Record<NonNullable<ProgressBarProps["variant"]>, strin
   success: "bg-progress-bar-success",
   warning: "bg-progress-bar-warning",
   danger: "bg-progress-bar-danger",
+  neutral: "bg-progress-bar-neutral",
 };
 
 /**

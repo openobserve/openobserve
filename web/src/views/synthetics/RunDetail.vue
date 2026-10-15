@@ -41,21 +41,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header v-if="!drawerMode">
       <OPageHeader
         class=""
+        :title="raw(displayMonitorName)"
+        title-data-test="synthetics-run-detail-title"
         :subtitle="raw(currentRun.timestamp)"
         :back="{
           label: t('synthetics.results.monitors'),
-          to: backTo,
+          onClick: goBack,
           dataTest: 'synthetics-run-detail-back-btn',
         }"
       >
-        <template #title>
-          <span class="inline-flex min-w-0 items-center gap-2">
-            <span data-test="synthetics-run-detail-title" class="truncate">{{
-              displayMonitorName
-            }}</span>
-            <BetaBadge />
-          </span>
-        </template>
         <template #title-trail>
           <OBadge
             :variant="statusBadgeVariant"
@@ -65,14 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ statusLabel }}
           </OBadge>
-          <!--
-            `truncate` belongs on the text, NOT on the badge. OBadge's root is
-            `inline-flex`, and `text-overflow: ellipsis` never reaches a flex
-            ITEM — so the class on the root hard-cut the URL at max-w with no
-            ellipsis and no way to read the rest. The inner span is the block box
-            that can actually ellipsise, and the tooltip makes the full URL
-            recoverable at any width.
-          -->
           <OBadge
             v-if="currentRun.url"
             variant="default"
@@ -81,8 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="max-w-xs min-w-0"
             data-test="synthetics-run-detail-url-badge"
           >
-            <span class="block min-w-0 truncate">{{ currentRun.url }}</span>
-            <OTooltip side="bottom" :content="raw(currentRun.url)" :max-width="'32rem'" />
+            <OTruncatedText class="block">{{ currentRun.url }}</OTruncatedText>
           </OBadge>
           <div class="ms-1 flex">
             <OButton
@@ -157,12 +142,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="shrink-0"
                   :class="chip.colorClass ? chip.colorClass : ''"
                 />
-                <span
-                  class="truncate text-sm leading-none"
+                <OTruncatedText
+                  class="text-sm leading-none"
                   :class="chip.colorClass || 'text-text-body'"
                 >
                   {{ chip.value }}
-                </span>
+                </OTruncatedText>
               </div>
             </div>
 
@@ -304,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- ══ Split: Replay Player (left) + Steps Timeline (right) ══ -->
-              <div v-else-if="steps.length > 0" class="flex min-h-0 flex-1 items-start">
+              <div v-else-if="steps.length > 0 || startRow" class="flex min-h-0 flex-1 items-start">
                 <!-- ── Left: Session Replay Player ── -->
                 <OCard v-if="currentRun.hasReplay" class="w-[30%] min-w-[30rem] gap-0 p-0">
                   <OCardSection role="header" class="gap-2">
@@ -337,6 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- JourneySteps in results mode -->
                     <JourneySteps
                       :data="steps"
+                      :start-row="startRow"
                       mode="results"
                       :total-duration-ms="totalDurationMs"
                       action-key="action"
@@ -458,9 +444,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >
                                 {{ t("synthetics.runDetail.detailUrl") }}
                               </dt>
-                              <dd class="text-text-secondary truncate">
+                              <OTruncatedText as="dd" class="text-text-secondary">
                                 {{ row.url || currentRun.url }}
-                              </dd>
+                              </OTruncatedText>
                               <dt
                                 class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
                               >
@@ -612,6 +598,7 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { computed, nextTick, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useRoute } from "vue-router";
+import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import { useStore } from "vuex";
 import syntheticsService from "@/services/synthetics";
 import { timestampToTimezoneDate } from "@/utils/timezone";
@@ -625,8 +612,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import StepEvidence from "@/components/synthetics/StepEvidence.vue";
 import StepPageActivity from "@/components/synthetics/results/StepPageActivity.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
@@ -652,6 +638,7 @@ import type {
   SyntheticRunDetail,
   RecordedStep,
 } from "@/composables/synthetics/syntheticResultsSchema";
+import { START_LOAD_STEP_ID } from "@/constants/synthetics";
 import awsSvgUrl from "@/assets/images/ingestion/aws.svg";
 import gcpSvgUrl from "@/assets/images/ingestion/gcp.svg";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
@@ -740,20 +727,28 @@ const executionIdParam = computed(() =>
 // Passed to per-check API calls so RBAC can resolve folder-scoped grants.
 const folderId = computed(() => String(route.query.folder ?? ""));
 
-/**
- * Back to this run's monitor, keeping the params the results page needs.
- *
- * Previously only `params.id` was carried, so the results page it returned to
- * had no org, no folder (breaking its own RBAC-scoped fetch and its Trigger Run)
- * and no `?name=`, leaving the header untitled.
- */
-const backTo = computed(() =>
-  syntheticsResultsRoute(
+// Time range, environment and the run to reopen travel with the fallback so the results page lands where the user left it.
+const backTo = computed(() => {
+  const extra: Record<string, string> = {};
+  for (const key of ["period", "from", "to", "env"]) {
+    const v = route.query[key];
+    if (typeof v === "string" && v) extra[key] = v;
+  }
+  if (runIdParam.value && executionIdParam.value) {
+    extra.run = runIdParam.value;
+    extra.exec = executionIdParam.value;
+  }
+  return syntheticsResultsRoute(
     { orgIdentifier: store.state.selectedOrganization?.identifier, folderId: folderId.value },
     monitorId.value,
-    { name: displayMonitorName.value },
-  ),
-);
+    { name: displayMonitorName.value, extra },
+  );
+});
+
+const goBack = useListBackNavigation({
+  isListPath: (path) => /\/synthetics\/[^/]+\/results$/.test(path),
+  fallback: () => backTo.value,
+});
 
 // ── Composable ─────────────────────────────────────────────────────────────
 const synthetics = useSyntheticResults(t);
@@ -902,6 +897,38 @@ function buildSteps(
   });
 }
 
+/** Row 0 in the steps' own shape, so the table renders it with the same slots; never in `steps`. */
+function buildStartRow(
+  detail: SyntheticRunDetail,
+  attempt: AttemptView | null,
+  eventsByStep: Map<string, EvidenceEvent[]>,
+): StepRow | null {
+  const load = attempt?.startLoad ?? detail.startLoad;
+  if (!load) return null;
+  const isFail = load.status === "fail";
+  const failureDetail = attempt ? attempt.failureDetail : detail.failureDetail;
+  return {
+    id: 0,
+    stepId: START_LOAD_STEP_ID,
+    action: "navigate",
+    name: t("synthetics.runDetail.startLoadLabel", { url: load.url }),
+    detail: load.url,
+    url: load.url,
+    duration: load.duration_ms,
+    offsetMs: 0,
+    status: isFail ? "fail" : "pass",
+    icon: actionIcon("navigate"),
+    statusIcon: isFail ? "cancel" : "check-circle",
+    durStr: fmtDur(load.duration_ms),
+    durColor: "",
+    error: load.error,
+    screenshotKey: attempt?.screenshotKeys.get(START_LOAD_STEP_ID) ?? load.screenshot_key,
+    evidence: stepOwnDetail(load, failureDetail),
+    appEvidence: detail.evidenceByStep.find((e) => e.stepId === START_LOAD_STEP_ID) ?? null,
+    bundleEvents: eventsByStep.get(START_LOAD_STEP_ID) ?? [],
+  };
+}
+
 function capitalizeEngine(engine: string): string {
   if (!engine) return engine;
   return engine.charAt(0).toUpperCase() + engine.slice(1);
@@ -1025,6 +1052,14 @@ const evidenceKey = computed(
  *  later edit to the check cannot relabel this run's history. */
 const evidenceStepDefs = computed(() => {
   const m = new Map<string, { name: string; selector: string | null }>();
+  const load = synthetics.runDetail.value?.startLoad;
+  // Initial-load events are attributed to `_start`, which names no recorded step.
+  if (load) {
+    m.set(START_LOAD_STEP_ID, {
+      name: t("synthetics.runDetail.startLoadLabel", { url: load.url }),
+      selector: null,
+    });
+  }
   for (const rs of synthetics.runDetail.value?.recordedSteps ?? []) {
     m.set(rs.id, { name: rs.name || rs.id, selector: rs.selector });
   }
@@ -1087,9 +1122,12 @@ function toDisplayRun(detail: SyntheticRunDetail | null): DisplayRun {
           errorReason: detail.error || "",
           errorStack: detail.error || "",
           errorSource: detail.errorSource,
-          failedStepLabel: detail.failedStep
-            ? t("synthetics.runDetail.failedAtStep", { step: detail.failedStep })
-            : undefined,
+          failedStepLabel:
+            detail.failedStep === START_LOAD_STEP_ID
+              ? t("synthetics.runDetail.failedAtStartLoad")
+              : detail.failedStep
+                ? t("synthetics.runDetail.failedAtStep", { step: detail.failedStep })
+                : undefined,
           failedStepId: 1,
         }
       : {}),
@@ -1320,6 +1358,12 @@ const steps = computed<StepRow[]>(() => {
   return [];
 });
 
+const startRow = computed<StepRow | null>(() => {
+  const detail = synthetics.runDetail.value;
+  if (!detail) return null;
+  return buildStartRow(detail, currentAttempt.value, evidence.eventsByStep.value);
+});
+
 /**
  * Options for the evidence step select, sourced from `steps` — the EXECUTED
  * steps this attempt actually ran — not from `evidenceStepDefs`
@@ -1410,11 +1454,14 @@ const statusChip = computed(() => {
   }
   if (currentRun.value.status === "fail") {
     const stepNum = failedStepInfo.value?.step?.id;
+    const atStartLoad = synthetics.runDetail.value?.failedStep === START_LOAD_STEP_ID;
     return {
       label: t("synthetics.results.status"),
       value: stepNum
         ? t("synthetics.runDetail.failedAtStep", { step: stepNum })
-        : t("synthetics.results.failed"),
+        : atStartLoad
+          ? t("synthetics.runDetail.failedAtStartLoad")
+          : t("synthetics.results.failed"),
       icon: "cancel",
       colorClass: "text-status-error-text",
     };

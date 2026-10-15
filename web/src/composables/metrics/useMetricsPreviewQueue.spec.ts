@@ -97,6 +97,30 @@ describe("preview queue", () => {
     expect(order).toEqual(["blocker", "dialog", "prefetch"]);
   });
 
+  it("reprioritize moves a queued prefetch ahead of other queued work", async () => {
+    const queue = createPreviewQueue(1);
+    const order: string[] = [];
+    const first = deferred();
+
+    const blocker = queue.run("blocker", PRIORITY.VISIBLE, async () => {
+      await first.promise;
+      order.push("blocker");
+    });
+    const other = queue.run("other", PRIORITY.VISIBLE, async () => {
+      order.push("other");
+    });
+    const scrolledIn = queue.run("scrolled-in", PRIORITY.PREFETCH, async () => {
+      order.push("scrolled-in");
+    });
+    queue.reprioritize("scrolled-in", PRIORITY.DIALOG);
+    queue.reprioritize("missing", PRIORITY.DIALOG);
+
+    first.resolve(null);
+    await Promise.all([blocker, other, scrolledIn]);
+
+    expect(order).toEqual(["blocker", "scrolled-in", "other"]);
+  });
+
   it("serves a repeat key from cache without re-requesting", async () => {
     const queue = createPreviewQueue();
     const fn = vi.fn().mockResolvedValue("value");

@@ -242,9 +242,9 @@ describe("buildAnomalyPreviewSql", () => {
     expect(result).toBe("");
   });
 
-  // ── count (no seasonality) ────────────────────────────────────────────────
+  // ── count ─────────────────────────────────────────────────────────────────
 
-  it("generates SQL with count(*) and no seasonality for short training window", () => {
+  it("generates SQL with count(*) grouped by the time bucket alone", () => {
     const result = buildAnomalyPreviewSql({
       query_mode: "filters",
       stream_name: "logs",
@@ -254,14 +254,13 @@ describe("buildAnomalyPreviewSql", () => {
     });
     expect(result).toContain("count(*) AS value");
     expect(result).toContain("histogram(_timestamp, '5m') AS time_bucket");
-    expect(result).toContain("date_part('hour'");
-    expect(result).not.toContain("dow");
     expect(result).toContain("FROM logs");
-    expect(result).toContain("GROUP BY time_bucket, hour");
+    expect(result).toContain("GROUP BY time_bucket\n");
     expect(result).toContain("ORDER BY time_bucket");
   });
 
-  it("generates SQL with seasonality (hour + dow) for training window >= 7 days", () => {
+  // The backend training query no longer selects hour/dow, so neither may the preview.
+  it("adds no seasonality columns at any training window", () => {
     const result = buildAnomalyPreviewSql({
       query_mode: "filters",
       stream_name: "logs",
@@ -270,8 +269,9 @@ describe("buildAnomalyPreviewSql", () => {
       histogram_interval: "10m",
     });
     expect(result).toContain("count(*) AS value");
-    expect(result).toContain("dow");
-    expect(result).toContain("GROUP BY time_bucket, hour, dow");
+    expect(result).not.toContain("date_part");
+    expect(result).not.toContain("dow");
+    expect(result).toContain("GROUP BY time_bucket\n");
   });
 
   // ── Default function when none provided ──────────────────────────────────

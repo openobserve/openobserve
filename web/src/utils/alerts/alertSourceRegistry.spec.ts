@@ -1,3 +1,4 @@
+import i18n from "@/locales";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { ALERT_SOURCES, DEFAULT_ALERT_SOURCE, getAlertSource } from "./alertSourceRegistry";
 
@@ -35,5 +36,12 @@ describe("alertSourceRegistry", () => {
       expect(definition.toastKey).toMatch(/^alerts\.prefill\.sources\./);
       expect(definition.icon).toBeTruthy();
     }
+  });
+
+  it("names the Metrics Explorer in an Explorer alert's toast", () => {
+    expect(getAlertSource("explorer").toastKey).toBe("alerts.prefill.sources.explorer.toast");
+    expect(i18n.global.t(getAlertSource("explorer").toastKey)).toBe(
+      "Query imported from the Metrics Explorer",
+    );
   });
 });

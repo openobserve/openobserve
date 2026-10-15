@@ -55,10 +55,8 @@ describe("SloAlertForm.schema — identity and delivery", () => {
     expect(paths(burnRate({ name: "bad/name" }))).toContain("name");
   });
 
-  // Either channel satisfies the server, so this is a rule about the PAIR.
-  it("requires a destination or a workflow, not both", () => {
-    expect(paths(burnRate({ destinations: [], workflows: [] }))).toContain("destinations");
-    expect(paths(burnRate({ destinations: [], workflows: ["wf"] }))).toEqual([]);
+  it("accepts an alert with no destination and no workflow", () => {
+    expect(paths(burnRate({ destinations: [], workflows: [] }))).toEqual([]);
   });
 });
 

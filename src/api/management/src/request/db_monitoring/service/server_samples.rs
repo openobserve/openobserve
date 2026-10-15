@@ -18,13 +18,6 @@
 
 use super::{super::models::*, *};
 
-/// The stream the demo tailer routes the raw database-log remainder to — the
-/// sibling of [`DEFAULT_SERVER_STREAM`], and where `KIND_STATEMENT` rows land
-/// (the collector's routing sends only deadlock/explain lines to
-/// `_o2_dbm_server`; everything else in the tailed log, statement durations
-/// included, goes here).
-const DEFAULT_SERVER_LOGS_STREAM: &str = "dbm_server_logs";
-
 /// The per-execution duration columns, in COALESCE order: the statement-log
 /// duration first — on any row carrying both (impossible today: the kinds are
 /// disjoint) the plainer measurement wins.
@@ -243,9 +236,9 @@ pub(crate) async fn read_server_samples_body(
     // design (statement lines on the raw-log sibling, auto_explain on the
     // events stream — see the module note), and defaulting to either alone
     // would silently lose the other producer's rows.
-    let candidates: Vec<&str> = match q.stream.as_deref().filter(|s| !s.is_empty()) {
+    let candidates: Vec<&str> = match validate_server_stream(q.stream.as_deref())? {
         Some(s) => vec![s],
-        None => vec![DEFAULT_SERVER_STREAM, DEFAULT_SERVER_LOGS_STREAM],
+        None => DBM_SERVER_STREAMS.to_vec(),
     };
     // Permission before range parsing; Logs, not Traces — see
     // `get_dbm_server_queries`. On the default pair a stream the caller

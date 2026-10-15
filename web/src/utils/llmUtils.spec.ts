@@ -622,13 +622,17 @@ describe("extractLLMData", () => {
     expect(result.sessionId).toBe("session-456");
   });
 
-  it("captures promptName", () => {
+  it("captures structured prompt attribution", () => {
     const span = {
       gen_ai_system: "openai",
       gen_ai_prompt_name: "my-prompt",
+      gen_ai_prompt_version: 3,
+      gen_ai_prompt_label: "production",
     };
     const result = extractLLMData(span)!;
     expect(result.promptName).toBe("my-prompt");
+    expect(result.promptVersion).toBe(3);
+    expect(result.promptLabel).toBe("production");
   });
 
   it("includes evaluation data when present", () => {

@@ -354,7 +354,9 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OnCallShiftRuleFields from "./OnCallShiftRuleFields.vue";
 import OnCallUpcomingList from "./OnCallUpcomingList.vue";
-import oncallService from "@/services/oncall";
+import { queryClient } from "@/composables/query/queryClient";
+import { setTeamScheduleMutation, unavailabilityQuery } from "@/services/oncall.queries";
+import { useMutation } from "@tanstack/vue-query";
 import type {
   OnCallSchedule,
   OnCallTeamMember,
@@ -371,6 +373,7 @@ import {
 } from "@/ts/interfaces/oncall";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import {
   formatMinuteOfDay,
   fromZonedInputValue,
@@ -518,12 +521,9 @@ watch(editing, async (isOpen) => {
   if (!isOpen) return;
   try {
     const now = Date.now() * 1000;
-    const res = await oncallService.listUnavailability({
-      org_identifier: orgId.value,
-      from: now,
-      to: now + ABSENCE_HORIZON_DAYS * 86_400_000_000,
-    });
-    editorAbsences.value = res.data ?? [];
+    editorAbsences.value = await queryClient.fetchQuery(
+      unavailabilityQuery(orgId.value, undefined, now, now + ABSENCE_HORIZON_DAYS * 86_400_000_000),
+    );
   } catch {
     editorAbsences.value = [];
   }
@@ -570,6 +570,8 @@ function removeRotation(rotation: Rotation) {
 const nowMicros = ref(Date.now() * 1000);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+
+const scheduleWrite = useMutation(() => setTeamScheduleMutation(orgId.value, props.teamId));
 
 /// A rotation with no rules, or a rule with nobody in it, stores nothing — so
 /// Save stays out of reach until both are answered.
@@ -908,10 +910,10 @@ async function save() {
   const rotations = draft.value;
   saving.value = true;
   try {
-    await oncallService.setSchedule({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-      data: { timezone: props.timezone, rotations },
+    await scheduleWrite.mutateAsync({ timezone: props.timezone, rotations });
+    analytics.track("oncall_schedule_saved", {
+      source: "editor",
+      rotation_count: rotations.length,
     });
     toast({ variant: "success", message: t("oncall.scheduleSaved") });
     // Stored, so no longer new — the close watcher would otherwise read this
@@ -922,6 +924,7 @@ async function save() {
     // object nothing reads, so every further keystroke went nowhere.
     editing.value = false;
     active.value = null;
+    // The parent's schedule is a ref: invalidation expires it, it never repaints it.
     emit("saved");
   } catch (err: any) {
     toast({

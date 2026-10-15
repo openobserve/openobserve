@@ -27,6 +27,13 @@ impl Locker {
             LockerStore::Nats(ref locker) => locker.key.clone(),
         }
     }
+
+    /// Turns `true` once the lock is found taken over by another holder or expired.
+    pub fn lost(&self) -> tokio::sync::watch::Receiver<bool> {
+        match self.0 {
+            LockerStore::Nats(ref locker) => locker.lost_signal(),
+        }
+    }
 }
 
 #[inline(always)]
@@ -63,7 +70,7 @@ pub async fn unlock_with_trace_id(trace_id: &str, locker: &Option<Locker>) -> Re
     }
 }
 
-/// lock key in nats, wait_ttl is 0 means wait forever
+/// lock key in nats, wait_ttl is 0 means the nats `lock_wait_timeout` default, not forever
 #[inline(always)]
 pub async fn lock(key: &str, wait_ttl: u64) -> Result<Option<Locker>> {
     let cfg = config::get_config();

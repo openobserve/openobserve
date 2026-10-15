@@ -17,15 +17,21 @@
 
 #![recursion_limit = "256"]
 
+#[cfg(feature = "enterprise")]
+pub mod ai_chat;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
 pub mod auth;
 pub mod authz;
+#[cfg(any(feature = "enterprise", test))]
+pub mod background_access;
 pub mod bootstrap;
 pub mod cache;
 pub mod dashboards;
 pub mod db_monitoring;
+#[cfg(feature = "enterprise")]
+pub mod downtimes;
 use ::common;
 use ::db;
 pub mod error_suggest;
@@ -44,16 +50,19 @@ pub mod logs;
 pub mod metrics;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
+pub mod onboarding;
 pub mod org_cleanup;
 #[cfg(feature = "cloud")]
 pub mod org_usage;
 pub mod organization;
 pub mod pipeline;
 pub mod profiles;
+pub mod prompts;
 #[cfg(feature = "enterprise")]
 pub mod providers;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
+pub mod rum_pa;
 use search_service as search;
 #[cfg(feature = "profiling")]
 pub mod self_profiles;
@@ -62,6 +71,8 @@ pub mod service;
 pub mod session;
 pub mod short_url;
 pub mod slo;
+#[cfg(test)]
+mod ssrf_test_support;
 pub mod status_pages;
 pub mod stream;
 pub mod stream_utils;
@@ -73,3 +84,10 @@ pub mod trial_quota;
 pub mod users;
 #[cfg(feature = "enterprise")]
 pub mod workflows;
+
+/// One authorized AI operation, or `()` in builds without the quota module, so
+/// the RCA signature keeps one shape instead of being cfg-gated at every caller.
+#[cfg(feature = "cloud")]
+pub type AiUsagePermit = trial_quota::AiUsagePermit;
+#[cfg(not(feature = "cloud"))]
+pub type AiUsagePermit = ();

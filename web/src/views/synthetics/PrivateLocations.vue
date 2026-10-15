@@ -17,19 +17,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
     <OTable
+      ref="oTableRef"
       :data="filteredLocations"
       :columns="columns"
       row-key="id"
       :loading="loading"
       pagination="client"
-      :page-size="20"
+      :page-size="pageSize"
       :page-size-options="[10, 20, 50]"
+      :current-page="currentPage"
+      :sort-by="sortBy"
+      :sort-order="sortOrder"
       :show-global-filter="false"
       :persist-columns="true"
       table-id="synthetics-private-locations-table"
       :enable-column-resize="true"
       data-test="synthetics-private-locations-table"
       @row-click="openDetail"
+      @update:current-page="currentPage = $event"
+      @update:page-size="pageSize = $event"
+      @update:sort-by="sortBy = $event"
+      @update:sort-order="sortOrder = $event"
     >
       <template #toolbar>
         <div class="flex min-w-0 flex-1 items-center gap-2">
@@ -76,26 +84,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Label + pool subtext -->
       <template #cell-name="{ row }">
         <div class="flex min-w-0 flex-col">
-          <span class="truncate font-medium">{{ (row as any).label }}</span>
-          <span class="text-text-muted truncate text-xs">{{ (row as any).pool }}</span>
+          <OTruncatedText class="font-medium">{{ (row as any).label }}</OTruncatedText>
+          <OTruncatedText class="text-text-muted text-xs">{{ (row as any).pool }}</OTruncatedText>
         </div>
       </template>
 
       <!-- Agents: live/total count (a location is a pool of interchangeable
            agents). Names/health are on the detail page; shown here on hover. -->
       <template #cell-agents="{ row }">
-        <div class="flex min-w-0 flex-col" :title="agentSubtext(row as any) || ''">
+        <div class="flex min-w-0 flex-col">
           <!-- 0/0 would read as "no agents installed"; this region simply has
                no count to give. -->
-          <span v-if="liveStatus(row as SyntheticLocation) === 'unknown'" class="text-text-muted"
+          <span
+            v-if="liveStatus(row as SyntheticLocation) === 'unknown'"
+            class="text-text-muted"
+            :title="agentSubtext(row as any) || ''"
             >—</span
           >
-          <span v-else class="truncate"
+          <span v-else class="truncate" :title="agentSubtext(row as any) || ''"
             >{{ (row as any).live_agents ?? 0
             }}<span class="text-text-muted">/{{ (row as any).agents_total ?? 0 }}</span></span
           >
-          <span v-if="(row as any).version" class="text-text-muted truncate text-xs"
-            >{{ t("synthetics.versionPrefix") }}{{ (row as any).version }}</span
+          <OTruncatedText v-if="(row as any).version" class="text-text-muted text-xs"
+            >{{ t("synthetics.versionPrefix") }}{{ (row as any).version }}</OTruncatedText
           >
         </div>
       </template>
@@ -213,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -224,12 +235,14 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { SyntheticLocation } from "@/types/synthetics";
 import { formatTimeAgoUs } from "@/utils/synthetics/format";
 import { locationLiveStatus as liveStatus } from "@/utils/synthetics/locationLiveStatus";
+import { useListViewState } from "@/composables/useListViewState";
 import { syntheticsPrivateLocationRoute } from "@/utils/synthetics/routes";
 
 const props = defineProps<{
@@ -245,7 +258,43 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
-const search = ref("");
+const savedView = useListViewState("synthetics-private-locations", {
+  search: "",
+  currentPage: 1,
+  pageSize: 20,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const search = ref(savedView.search);
+const currentPage = ref(savedView.currentPage);
+const pageSize = ref(savedView.pageSize);
+const sortBy = ref(savedView.sortBy);
+const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+const oTableRef = ref<any>(null);
+
+watch(search, () => {
+  currentPage.value = 1;
+});
+watch([search, currentPage, pageSize, sortBy, sortOrder], () => {
+  Object.assign(savedView, {
+    search: search.value,
+    currentPage: currentPage.value,
+    pageSize: pageSize.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
+// Locations arrive after mount and TanStack resets to page 0 on its own deferred queue; setTimeout(0) runs after it so the restored page wins.
+let pageRestored = false;
+watch(
+  () => [props.loading, props.locations.length] as const,
+  ([isLoading, count]) => {
+    if (pageRestored || isLoading || count === 0) return;
+    pageRestored = true;
+    setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+  },
+  { immediate: true },
+);
 
 const filteredLocations = computed(() => {
   const q = search.value.trim().toLowerCase();

@@ -255,6 +255,7 @@ import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "../../../utils/commons";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
+import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -630,7 +631,9 @@ export default defineComponent({
             ...variableListName,
           ];
           panelFields.forEach((field) => {
-            const displayName = field.label || field.alias;
+            const displayName =
+              getFieldLabel(field, dashboardPanelData.data.config, query.customQuery) ||
+              field.alias;
             selectedValues.push({
               label: displayName,
               value: '${row.field["' + displayName + '"]}',

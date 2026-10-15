@@ -84,6 +84,7 @@ const OPageHeaderStub = {
   props: ["title", "back"],
   template: `<div class="page-header">
     <button class="back-btn" @click="back && back.onClick && back.onClick()" />
+    <slot name="actions-overflow" />
     <slot name="actions" />
   </div>`,
 };

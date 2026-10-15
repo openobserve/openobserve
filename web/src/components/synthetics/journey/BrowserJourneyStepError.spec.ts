@@ -29,7 +29,11 @@ const i18n = createI18n({
 
 const test = (name: string) => `[data-test="${name}"]`;
 
-function render(result: Partial<StepReplayResult> = {}, stepNumber?: number) {
+function render(
+  result: Partial<StepReplayResult> = {},
+  stepNumber?: number,
+  extra: Record<string, unknown> = {},
+) {
   const full: StepReplayResult = {
     stepId: "s3",
     stepName: "Click sign in",
@@ -39,7 +43,7 @@ function render(result: Partial<StepReplayResult> = {}, stepNumber?: number) {
     ...result,
   };
   return mount(BrowserJourneyStepError, {
-    props: { result: full, stepNumber },
+    props: { result: full, stepNumber, ...extra },
     global: { plugins: [i18n] },
   });
 }
@@ -120,5 +124,30 @@ describe("BrowserJourneyStepError", () => {
     const wrapper = render({}, 3);
     await wrapper.find(test("synthetics-journey-error-retry-btn")).trigger("click");
     expect(wrapper.emitted("retry-replay")).toBeTruthy();
+  });
+
+  // Only a folded child result has its fix in another test, so only then is Open offered.
+  it('renders Open "<child>" beside Re-run when childName is given and emits open-child', async () => {
+    const wrapper = render({}, 2, { childName: "Login (shared)" });
+    const open = wrapper.find(test("synthetics-journey-error-open-child-btn"));
+    expect(open.exists()).toBe(true);
+    expect(open.text()).toBe('Open "Login (shared)"');
+    const retry = wrapper.find(test("synthetics-journey-error-retry-btn"));
+    expect(retry.exists()).toBe(true);
+    expect(open.element.parentElement).toBe(retry.element.parentElement);
+    expect(
+      retry.element.compareDocumentPosition(open.element) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "Open follows Re-run in the button row",
+    ).toBeTruthy();
+
+    await open.trigger("click");
+    expect(wrapper.emitted("open-child")).toHaveLength(1);
+    expect(wrapper.emitted("retry-replay")).toBeFalsy();
+  });
+
+  it("renders no Open button without childName", () => {
+    const wrapper = render({}, 2);
+    expect(wrapper.find(test("synthetics-journey-error-open-child-btn")).exists()).toBe(false);
+    expect(wrapper.find(test("synthetics-journey-error-retry-btn")).exists()).toBe(true);
   });
 });

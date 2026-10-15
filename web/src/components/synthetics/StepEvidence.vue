@@ -67,6 +67,7 @@ import type {
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const props = defineProps<{
   detail: FailureDetail;
@@ -216,7 +217,7 @@ const noFallback = computed(() => candidates.value.length === 1);
               outcomeLabel(c.outcome)
             }}</OBadge>
             <span class="text-text-secondary shrink-0">{{ c.kind }}</span>
-            <span class="text-text-body min-w-0 flex-1 truncate font-mono">{{ c.value }}</span>
+            <OTruncatedText class="text-text-body flex-1 font-mono">{{ c.value }}</OTruncatedText>
           </li>
         </ul>
       </div>
@@ -256,7 +257,7 @@ const noFallback = computed(() => candidates.value.length === 1);
             <OBadge :variant="s.status === 'fired' ? 'success' : 'error'" size="sm">
               {{ s.status }}
             </OBadge>
-            <span class="text-text-body min-w-0 flex-1 truncate font-mono">{{ s.signal }}</span>
+            <OTruncatedText class="text-text-body flex-1 font-mono">{{ s.signal }}</OTruncatedText>
             <span class="text-text-secondary shrink-0">{{ fmtMs(s.waitedMs) }}</span>
           </li>
         </ul>
@@ -293,7 +294,7 @@ const noFallback = computed(() => candidates.value.length === 1);
           >
             <OBadge variant="error" size="sm">{{ r.status }}</OBadge>
             <span class="text-text-secondary shrink-0">{{ r.method }}</span>
-            <span class="text-text-body min-w-0 flex-1 truncate font-mono">{{ r.url }}</span>
+            <OTruncatedText class="text-text-body flex-1 font-mono">{{ r.url }}</OTruncatedText>
             <span v-if="r.count > 1" class="text-text-secondary shrink-0">x{{ r.count }}</span>
           </li>
         </ul>

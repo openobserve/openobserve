@@ -9,9 +9,9 @@
     <template #subtitle>
       <div class="flex min-w-0 items-center gap-2">
         <OTag type="streamType" :value="activeStreamType" />
-        <span v-if="activeStreamName" class="min-w-0 truncate leading-normal">{{
+        <OTruncatedText v-if="activeStreamName" class="leading-normal">{{
           activeStreamName
-        }}</span>
+        }}</OTruncatedText>
       </div>
     </template>
     <template #actions>
@@ -39,12 +39,16 @@
         </div>
       </div>
       <div class="[&_#date-time-button]:h-9!">
+        <!-- Without its shift arrows on phones the picker fits beside the title. -->
         <DateTime
           data-test-name="search-history-date-time"
           ref="searchDateTimeRef"
           auto-apply
           menu-align="end"
-          :default-type="searchObj.data.datetime.type"
+          :hide-range-shift="isMobile"
+          :default-type="restoredDate.valueType || searchObj.data.datetime.type"
+          :default-relative-time="restoredDate.relativeTimePeriod || '15m'"
+          :default-absolute-time="restoredDate.absolute"
           @on:date-change="updateDateTime"
         />
       </div>
@@ -77,6 +81,7 @@
     </div>
     <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
       <OTable
+        ref="oTableRef"
         :frame="false"
         :data="dataToBeLoaded"
         :columns="columnsToBeRendered"
@@ -86,7 +91,14 @@
         pagination="client"
         :page-size="pageSize"
         :page-size-options="pageSizeOptions"
+        :current-page="currentPage"
+        @update:current-page="currentPage = $event"
+        @update:page-size="pageSize = $event"
         sorting="client"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
+        @update:sort-by="sortBy = $event"
+        @update:sort-order="sortOrder = $event"
         expansion="single"
         :expand-on-row-click="true"
         v-model:expanded-ids="expandedIds"
@@ -177,7 +189,7 @@
               </div>
               <div class="flex items-start justify-center">
                 <div
-                  class="border-border-default border-s-sql-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
+                  class="border-border-default border-s-sql-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                 >
                   <!-- Monaco-colorized SQL (sanitized in colorizeRow), same
                            as the dashboard Query Inspector. Falls back to plain
@@ -223,7 +235,7 @@
 
               <div class="flex items-start justify-center">
                 <div
-                  class="border-border-default border-s-function-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
+                  class="border-border-default border-s-function-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                 >
                   <pre
                     v-if="colorizedFunction[row.uuid]"
@@ -260,13 +272,8 @@
           </div>
         </template>
 
-        <template #bottom>
-          <div class="flex h-12 w-full items-center justify-between">
-            <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
-              {{ resultTotal }} {{ t("search_history.results") }}
-            </div>
-            <div class="ms-auto me-2">{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></div>
-          </div>
+        <template v-if="dataToBeLoaded.length > 0" #footer-note>
+          <span>{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></span>
         </template>
       </OTable>
     </div>
@@ -298,7 +305,16 @@
 </template>
 <script lang="ts">
 //@ts-nocheck
-import { ref, onMounted, computed, onUnmounted, defineAsyncComponent, defineComponent } from "vue";
+import {
+  ref,
+  onMounted,
+  computed,
+  onUnmounted,
+  defineAsyncComponent,
+  defineComponent,
+  watch,
+} from "vue";
+import { useListViewState } from "@/composables/useListViewState";
 import { timestampToTimezoneDate, b64EncodeUnicode, getUUID } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -308,6 +324,7 @@ import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useI18nTyped } from "@/types/i18n";
 import AppTabs from "@/components/common/AppTabs.vue";
 
@@ -319,8 +336,9 @@ import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -342,6 +360,7 @@ export default defineComponent({
     OIcon,
     OTag,
     OTooltip,
+    OTruncatedText,
     OTable,
     OTimeCell,
     OPageLayout,
@@ -363,16 +382,40 @@ export default defineComponent({
     const route = useRoute();
     const store = useStore();
     const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const searchDateTimeRef = ref(null);
     const wrapText = ref(true);
     const { searchObj } = searchState();
     const dataToBeLoaded: any = ref([]);
-    const dateTimeToBeSent = ref({
-      valueType: "relative",
-      relativeTimePeriod: "15m",
+    const viewState = useListViewState("searchHistory", {
+      valueType: "",
+      relativeTimePeriod: "",
       startTime: 0,
       endTime: 0,
+      pageSize: 100,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
     });
+    const restoredDate = {
+      valueType: viewState.valueType,
+      relativeTimePeriod: viewState.relativeTimePeriod,
+      absolute:
+        viewState.valueType === "absolute"
+          ? { startTime: viewState.startTime, endTime: viewState.endTime }
+          : null,
+    };
+    const dateTimeToBeSent = ref({
+      valueType: viewState.valueType || "relative",
+      relativeTimePeriod: viewState.relativeTimePeriod || "15m",
+      startTime: viewState.startTime,
+      endTime: viewState.endTime,
+    });
+    const oTableRef: any = ref(null);
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+    let pendingPageRestore = true;
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
@@ -416,9 +459,7 @@ export default defineComponent({
 
     onUnmounted(() => {});
 
-    const resultTotal = ref<number>(0);
-
-    const pageSize = ref(100);
+    const pageSize = ref(viewState.pageSize);
     const pageSizeOptions = [5, 10, 20, 50, 100];
 
     // Columns are a fixed schema (not derived from the response), so they can be
@@ -496,9 +537,6 @@ export default defineComponent({
         );
         const limitedHits = response.data.hits;
         const filteredHits = limitedHits.filter((hit) => hit.event === "Search");
-        if (filteredHits.length > 0) {
-          resultTotal.value = filteredHits.length;
-        }
         columnsToBeRendered.value = generateColumns();
         filteredHits.forEach((hit: any) => {
           //adding uuid to each which will be used to track the expanded "row"
@@ -535,6 +573,11 @@ export default defineComponent({
         });
         dataToBeLoaded.value = filteredHits;
         isLoading.value = false;
+        if (pendingPageRestore) {
+          pendingPageRestore = false;
+          // Macrotask so the restored page wins over the table's own reset on data change.
+          setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+        }
       } catch (error: any) {
         forbidden.value = error?.response?.status === 403;
         // The grouped access toast already reports a 403; a second red toast adds nothing.
@@ -563,6 +606,10 @@ export default defineComponent({
 
     const updateDateTime = async (value: any) => {
       dateTimeToBeSent.value = value;
+      viewState.valueType = value.valueType;
+      viewState.relativeTimePeriod = value.relativeTimePeriod ?? "";
+      viewState.startTime = value.startTime;
+      viewState.endTime = value.endTime;
       searchDateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
       // Auto-run on a genuine user time change (consistent with the rest of the
       // app). Skip programmatic emits — the setAbsoluteTime() call above re-emits
@@ -734,6 +781,14 @@ export default defineComponent({
         return filtered;
       }, {});
     }
+    watch([pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
     useShortcuts([
       {
         id: "searchHistoryRefresh",
@@ -742,16 +797,12 @@ export default defineComponent({
         },
       },
     ]);
-    // Own page: claim the keyboard scope and load history on mount, then hand the
-    // scope back to the logs page on leave.
     onMounted(() => {
-      getManager()?.setScope("search-history");
       fetchSearchHistory();
     });
-    onUnmounted(() => {
-      getManager()?.setScope("logs");
-    });
+
     return {
+      isMobile,
       searchObj,
       activeStreamType,
       activeStreamName,
@@ -776,9 +827,13 @@ export default defineComponent({
       copyToClipboard,
       formatTime,
       delayMessage,
-      resultTotal,
       pageSize,
       pageSizeOptions,
+      currentPage,
+      sortBy,
+      sortOrder,
+      oTableRef,
+      restoredDate,
       activeTab,
       tabs,
       moreDetailsToDisplay,
@@ -789,14 +844,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-/* keep(generated-content): Monaco's colorize() injects .mtkN token spans via
-   v-html, so these can't be template utilities. Every colour but .mtk1 comes
-   from Monaco's own global stylesheet; .mtk1 is its default-text token, which
-   we point back at the block's own colour so the query inherits our theme
-   instead of Monaco's. Mirrors dashboards/QueryInspector.vue. */
-.o2-colorized-query :deep(.mtk1) {
-  color: inherit;
-}
-</style>

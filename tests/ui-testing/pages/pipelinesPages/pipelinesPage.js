@@ -232,8 +232,8 @@ export class PipelinesPage {
         this.addEnrichmentTableButton = page.locator('[data-test="enrichment-tables-add-btn"]');
         // Enrichment tables list — OInput search field (auto-derived `-field` data-test)
         this.enrichmentSearchField = page.locator('[data-test="enrichment-tables-search-input-field"]');
-        // Add / Update Enrichment Table form root
-        this.addEnrichmentTablePage = page.locator('[data-test="add-enrichment-table-page"]');
+        // Add / Update Enrichment Table form dialog
+        this.addEnrichmentTablePage = page.locator('[data-test="add-enrichment-table-dialog"]');
         // Enrichment table tab locator (data-test prefix; the tab is rendered by
         // OToggleGroup under the Functions section).
         this.enrichmentTableTabLocator = page.locator('[data-test="pipeline-section-tab-enrichmentTables"]');
@@ -1091,8 +1091,8 @@ export class PipelinesPage {
         // click. The OButton in the AppPageHeader #actions slot can detach
         // mid-render while the list hydrates (documented add-btn detach race),
         // so re-resolve the locator and tolerate a transient detach. Short-circuit
-        // if a prior attempt already opened the form (the Add button is v-if'd
-        // out once the form mounts, so re-asserting its visibility would loop).
+        // if a prior attempt already opened the form (the dialog overlay blocks
+        // the Add button once it opens, so re-clicking it would loop).
         await listPage.waitFor({ state: 'visible', timeout: 20000 });
         await expect(async () => {
             if (await this.addEnrichmentTablePage.isVisible().catch(() => false)) return;
@@ -1174,6 +1174,22 @@ export class PipelinesPage {
     async navigateToEnrichmentTableTab() {
         await openNavFlyoutChild(this.page, 'pipeline');
         await this.page.locator(this.enrichmentTableTab).click();
+    }
+
+    /**
+     * Open Settings -> Pipeline Destinations and wait for the named row.
+     *
+     * Pipeline destinations live on their own tab — `destinationsQuery(org, "pipeline")` —
+     * so the alert destinations page never lists them and cannot reach this row. That
+     * list also has no search box, so the row is awaited directly rather than filtered.
+     */
+    async openPipelineDestinationsAt(name) {
+        await this.settingsMenu.click();
+        await this.pipelineDestinationsTab.click();
+        await expect(this.destinationListAddBtn).toBeVisible({ timeout: 30000 });
+        await this.page
+            .locator(`[data-test="alert-destination-list-${name}-delete-destination"]`)
+            .waitFor({ state: 'visible', timeout: 30000 });
     }
 
     async deleteDestination(randomNodeName) {
@@ -4381,6 +4397,46 @@ export class PipelinesPage {
         await this.runQueryButton.waitFor({ state: 'visible', timeout: 5000 });
         await expect(this.runQueryButton).toBeEnabled({ timeout: 3000 });
         testLogger.info('✅ Run Query button is enabled as expected');
+    }
+
+    /** Open the delete dialog for an output node without confirming it. */
+    async openOutputStreamNodeDeleteDialog(index = 0) {
+        await this.pipelineNodeOutputStreamNode.nth(index).hover();
+        await this.pipelineNodeOutputDeleteBtn.nth(index).click();
+        await this.page.locator('[data-test="confirm-dialog"]').waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    /** The warning only fires for a destination that mirrors the source stream. */
+    getDefaultDestinationWarning() {
+        return this.page
+            .locator('[data-test="confirm-dialog"]')
+            .getByText(/default destination node/i);
+    }
+
+    async expectDefaultDestinationWarningVisible() {
+        await expect(this.getDefaultDestinationWarning()).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectDefaultDestinationWarningAbsent() {
+        await expect(this.getDefaultDestinationWarning()).toHaveCount(0);
+    }
+
+    async cancelConfirmDialog() {
+        await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]').click();
+        await this.page.locator('[data-test="confirm-dialog"]').waitFor({ state: 'hidden', timeout: 10000 });
+    }
+
+    async countOutputStreamNodes() {
+        return await this.pipelineNodeOutputStreamNode.count();
+    }
+
+    /**
+     * Saving the source node adds the mirroring destination asynchronously, so a
+     * plain count races the render -- it won on a fast machine and lost under CI load.
+     */
+    async expectOutputStreamNodePresent() {
+        await expect(this.pipelineNodeOutputStreamNode.first())
+            .toBeVisible({ timeout: 30000 });
     }
 
 }

@@ -24,6 +24,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { getUUID } from "@/utils/uuid";
@@ -44,8 +45,14 @@ const props = defineProps<{
   checkId?: string;
   /** The check as last loaded or saved; promote acts on the stored copy. */
   saved?: BrowserCheck | null;
+  /** Referenced checks' steps by id; absent means none loaded, so a subtest counts no usage yet. */
+  childJourneys?: Map<string, { steps: BrowserStep[] }>;
 }>();
-const emit = defineEmits<{ "update:check": [value: BrowserCheck]; promoted: [name: string] }>();
+const emit = defineEmits<{
+  "update:check": [value: BrowserCheck];
+  promoted: [name: string];
+  close: [];
+}>();
 
 const { t } = useI18nTyped();
 
@@ -60,11 +67,20 @@ function stepUsesToken(step: BrowserStep, token: string): boolean {
   );
 }
 
+/** A subtest step's usage lives on the referenced check's steps, not the reference row. */
+function stepsToScan(): BrowserStep[] {
+  return props.check.journey.flatMap((step) =>
+    step.action === "subtest"
+      ? (props.childJourneys?.get(step.subtest?.id ?? "")?.steps ?? [])
+      : [step],
+  );
+}
+
 function usageCount(name: string): number {
   const trimmed = name.trim();
   if (!trimmed) return 0;
   const token = `{{${trimmed}}}`;
-  return props.check.journey.filter((step) => stepUsesToken(step, token)).length;
+  return stepsToScan().filter((step) => stepUsesToken(step, token)).length;
 }
 
 const usageCounts = computed(() => variables.value.map((v) => usageCount(v.name)));
@@ -347,6 +363,17 @@ function onPromoted(name: string) {
             data-test="synthetics-check-variables-panel-hint-icon"
           />
         </OTooltip>
+        <OButton
+          variant="ghost"
+          size="icon-xs-sq"
+          icon-left="close"
+          class="ms-auto"
+          :aria-label="t('synthetics.variablesPanel.closePanel')"
+          data-test="synthetics-check-variables-panel-close-btn"
+          @click="emit('close')"
+        >
+          <OTooltip :content="t('synthetics.variablesPanel.closePanel')" side="bottom" />
+        </OButton>
       </div>
     </div>
 
@@ -359,9 +386,9 @@ function onPromoted(name: string) {
         role="status"
         data-test="synthetics-check-variables-panel-undo-row"
       >
-        <span class="text-text-secondary min-w-0 flex-1 truncate text-xs">{{
+        <OTruncatedText class="text-text-secondary flex-1 text-xs">{{
           t("synthetics.variablesPanel.removed", { name: lastRemoved.variable.name })
-        }}</span>
+        }}</OTruncatedText>
         <OButton
           variant="ghost-primary"
           size="xs"

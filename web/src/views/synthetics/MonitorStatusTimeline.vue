@@ -61,13 +61,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex shrink-0 flex-col gap-0.5"
           data-test="synthetics-timeline-lane-labels"
         >
-          <span
+          <OTruncatedText
             v-for="lane in lanes"
             :key="lane.label"
-            class="text-3xs text-text-secondary h-3 max-w-24 truncate pe-1 text-right font-mono leading-3"
+            class="text-3xs text-text-secondary h-3 max-w-24 pe-1 text-right font-mono leading-3"
           >
             {{ lane.label }}
-          </span>
+          </OTruncatedText>
         </div>
         <div
           ref="scrollRef"
@@ -197,6 +197,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
 import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
 import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";

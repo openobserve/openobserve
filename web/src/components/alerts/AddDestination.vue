@@ -363,6 +363,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('alert_destinations.skip_tls_verify')"
               />
             </div>
+
+            <!-- Test Result Display -->
+            <DestinationTestResult
+              v-if="isCustomWebhook && lastTestResult"
+              :result="lastTestResult"
+              :is-loading="isTestInProgress"
+              data-test="custom-test-result"
+              @retry="handleTestDestination"
+            />
           </template>
           <template v-if="typeVal === 'email' && (!isAlerts || dtVal === 'custom')">
             <!-- Recipients are organization users, picked from the list rather
@@ -402,8 +411,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="border-border-default flex w-full flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
       >
-        <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
-        <div v-if="showPrebuiltFinalActions" class="flex flex-wrap items-center gap-2">
+        <!-- Left side: Test and Preview buttons (prebuilt and custom Web Hook alert destinations) -->
+        <div
+          v-if="showPrebuiltFinalActions || isCustomWebhook"
+          class="flex flex-wrap items-center gap-2"
+        >
           <OButton
             data-test="destination-preview-button"
             variant="outline"
@@ -472,7 +484,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </OPageLayout>
 </template>
 <script lang="ts" setup>
-import destinationService from "@/services/alert_destination";
 import { saveDestinationMutation } from "@/services/alert_destination.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
@@ -641,6 +652,12 @@ const typeVal = form.useStore((s: any) => s.values.type as string);
 const apiHeaders = form.useStore(
   (s: any) => (s.values.apiHeaders ?? []) as { key: string; value: string }[],
 );
+const urlVal = form.useStore((state: { values: AddDestinationForm }) => state.values.url);
+const methodVal = form.useStore((state: { values: AddDestinationForm }) => state.values.method);
+const templateVal = form.useStore((state: { values: AddDestinationForm }) => state.values.template);
+const skipTlsVerifyVal = form.useStore(
+  (state: { values: AddDestinationForm }) => state.values.skip_tls_verify,
+);
 const slackSetupMethod = form.useStore(
   (state: { values: AddDestinationForm }) => state.values.slack_setup_method,
 );
@@ -673,6 +690,8 @@ const {
   createDestination,
   updateDestination,
   generatePreview,
+  renderTemplateBody,
+  testCustomDestination,
   isTestInProgress,
   lastTestResult,
   clearTestResult,
@@ -688,10 +707,12 @@ const destinationSearchQuery = ref("");
 const showPreviewModal = ref(false);
 const previewContent = ref("");
 
+// A test result is stale once anything it was sent with changes; an in-flight
+// test is discarded too.
 watch(
-  prebuiltCredentials,
+  [prebuiltCredentials, typeVal, urlVal, methodVal, templateVal, skipTlsVerifyVal, apiHeaders],
   () => {
-    if (lastTestResult.value) clearTestResult();
+    if (lastTestResult.value || isTestInProgress.value) clearTestResult();
   },
   { deep: true },
 );
@@ -728,6 +749,9 @@ const showPrebuiltFinalActions = computed(
     props.isAlerts &&
     (isPrebuiltDestination.value || (isUpdatingDestination.value && dtVal.value !== "custom")) &&
     showPrebuiltAdvancedSettings.value,
+);
+const isCustomWebhook = computed(
+  () => props.isAlerts && dtVal.value === "custom" && typeVal.value === "http",
 );
 const handleSlackFlowChange = (): void => {
   clearTestResult();
@@ -858,22 +882,10 @@ watch(
   { deep: true },
 );
 
-const setupDestinationData = async () => {
+const setupDestinationData = () => {
   originalSlackWebhookUrl.value = "";
   if (props.destination) {
     isUpdatingDestination.value = true;
-    const requestedName = props.destination.name;
-    let destination = props.destination;
-    try {
-      const response = await destinationService.get_by_name({
-        org_identifier: orgId.value,
-        destination_name: requestedName,
-      });
-      if (props.destination?.name !== requestedName) return;
-      destination = response?.data ?? props.destination;
-    } catch {
-      destination = props.destination;
-    }
     // Resolve the destination_type discriminator FIRST; setDestType only records
     // the choice, which rides into the single form.reset(record) below.
     let destType = "";
@@ -881,17 +893,17 @@ const setupDestinationData = async () => {
       destType = v;
     };
 
-    const destHeaders: Record<string, any> = destination.headers || {};
+    const destHeaders: Record<string, any> = props.destination.headers || {};
 
     // Set destination_type for prebuilt destinations in edit mode
     // Parse metadata if it's a string
     let parsedMetadata: any = null;
-    if (destination.metadata) {
+    if (props.destination.metadata) {
       try {
         parsedMetadata =
-          typeof destination.metadata === "string"
-            ? JSON.parse(destination.metadata)
-            : destination.metadata;
+          typeof props.destination.metadata === "string"
+            ? JSON.parse(props.destination.metadata)
+            : props.destination.metadata;
       } catch (e) {
         console.error("Failed to parse destination metadata:", e);
       }
@@ -903,17 +915,21 @@ const setupDestinationData = async () => {
     }
     // Priority 2: Check if template starts with 'system-prebuilt-' AND destination structure matches
     // (Must have emails array for email, or specific prebuilt URL patterns for HTTP)
-    else if (destination.template?.startsWith("system-prebuilt-")) {
-      const templateType = destination.template.replace("system-prebuilt-", "");
+    else if (props.destination.template?.startsWith("system-prebuilt-")) {
+      const templateType = props.destination.template.replace("system-prebuilt-", "");
       // Only treat as prebuilt if structure matches the type
-      if (templateType === "email" && destination.type === "email" && destination.emails) {
+      if (
+        templateType === "email" &&
+        props.destination.type === "email" &&
+        props.destination.emails
+      ) {
         setDestType("email");
-      } else if (destination.type === "http" && destination.url) {
+      } else if (props.destination.type === "http" && props.destination.url) {
         // Use URL-only detection here — detectPrebuiltType also checks the template
         // name, which would always match since we're already inside the
         // system-prebuilt-* branch. A custom destination can have any template,
         // so the URL is the only reliable signal at this point.
-        const urlType = detectPrebuiltTypeFromUrl(destination.url);
+        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
         if (urlType && isPrebuiltType(urlType)) {
           setDestType(urlType);
         } else {
@@ -927,10 +943,10 @@ const setupDestinationData = async () => {
     // Priority 3: Check if template starts with 'prebuilt_' (user templates)
     // Also verify the URL matches the prebuilt type to avoid misclassifying custom
     // destinations that happen to use a template with a prebuilt_ prefix.
-    else if (destination.template?.startsWith("prebuilt_")) {
-      const extractedType = destination.template.replace("prebuilt_", "");
-      if (isPrebuiltType(extractedType) && destination.url) {
-        const urlType = detectPrebuiltTypeFromUrl(destination.url);
+    else if (props.destination.template?.startsWith("prebuilt_")) {
+      const extractedType = props.destination.template.replace("prebuilt_", "");
+      if (isPrebuiltType(extractedType) && props.destination.url) {
+        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
         setDestType(urlType === extractedType ? extractedType : "custom");
       } else {
         setDestType(isPrebuiltType(extractedType) ? extractedType : "custom");
@@ -938,19 +954,19 @@ const setupDestinationData = async () => {
     }
     // Priority 4: Check if template includes 'prebuilt' (legacy format)
     // Also verify the URL matches the prebuilt type (same guard as Priority 3).
-    else if (destination.template?.includes("prebuilt")) {
-      const parts = destination.template.split("-");
+    else if (props.destination.template?.includes("prebuilt")) {
+      const parts = props.destination.template.split("-");
       const extractedType = parts[parts.length - 1];
-      if (isPrebuiltType(extractedType) && destination.url) {
-        const urlType = detectPrebuiltTypeFromUrl(destination.url);
+      if (isPrebuiltType(extractedType) && props.destination.url) {
+        const urlType = detectPrebuiltTypeFromUrl(props.destination.url);
         setDestType(urlType === extractedType ? extractedType : "custom");
       } else {
         setDestType(isPrebuiltType(extractedType) ? extractedType : "custom");
       }
     }
     // Priority 5: Fallback to URL-based detection (for destinations without metadata)
-    else if (destination.url) {
-      const detectedType = detectPrebuiltType(destination);
+    else if (props.destination.url) {
+      const detectedType = detectPrebuiltType(props.destination);
       if (detectedType) {
         setDestType(detectedType);
       } else {
@@ -985,13 +1001,13 @@ const setupDestinationData = async () => {
     const record: AddDestinationForm = {
       ...addDestinationDefaults(),
       destination_type: destType,
-      name: destination.name,
-      url: destination.url ?? "",
-      method: destination.method ?? "post",
-      skip_tls_verify: destination.skip_tls_verify ?? false,
-      template: destination.template ?? "",
-      emails: destination?.emails ?? [],
-      type: destination.type || "http",
+      name: props.destination.name,
+      url: props.destination.url ?? "",
+      method: props.destination.method ?? "post",
+      skip_tls_verify: props.destination.skip_tls_verify ?? false,
+      template: props.destination.template ?? "",
+      emails: props.destination?.emails ?? [],
+      type: props.destination.type || "http",
       slack_setup_method: hasSavedSlackOAuthMetadata
         ? "oauth"
         : hasSavedSlackManifestMetadata
@@ -1011,9 +1027,14 @@ const setupDestinationData = async () => {
     };
 
     // Only CUSTOM headers reach the UI array; system/prebuilt ones stay implicit.
-    // When there are none, the default apiHeaders row is kept.
+    // When there are none, the default apiHeaders row is kept. Custom and
+    // pipeline destinations show every header: save rebuilds headers from the
+    // rows alone, so a hidden row would be deleted.
     if (Object.keys(destHeaders).length) {
-      const systemHeaders = ["Content-Type", "Authorization", "X-Routing-Key"];
+      const systemHeaders =
+        props.isAlerts && destType && destType !== "custom"
+          ? ["Content-Type", "Authorization", "X-Routing-Key"]
+          : [];
       const customHeadersOnly = Object.entries(destHeaders).filter(
         ([key]) => !systemHeaders.includes(key),
       );
@@ -1026,12 +1047,12 @@ const setupDestinationData = async () => {
     }
 
     // Only override the default when the saved destination carries one.
-    if (destination.output_format) {
-      record.output_format = destination.output_format;
+    if (props.destination.output_format) {
+      record.output_format = props.destination.output_format;
     }
 
     if (destType === "slack") {
-      originalSlackWebhookUrl.value = (destination.url ?? "").trim();
+      originalSlackWebhookUrl.value = (props.destination.url ?? "").trim();
     }
 
     // Template name is stored/displayed as-is (e.g. "prebuilt_slack") — the
@@ -1203,8 +1224,19 @@ const selectDestinationType = (type: string) => {
   }
 };
 
-// Handle prebuilt destination test
+// Handle prebuilt and custom Web Hook destination tests
 const handleTestDestination = async () => {
+  if (isCustomWebhook.value) {
+    // testCustomDestination reports every failure through lastTestResult.
+    await testCustomDestination({
+      url: urlVal.value,
+      method: methodVal.value,
+      headers: headersFromRows(apiHeaders.value),
+      skipTlsVerify: skipTlsVerifyVal.value,
+      template: templateVal.value,
+    });
+    return;
+  }
   if (!isPrebuiltDestination.value) return;
 
   try {
@@ -1216,14 +1248,21 @@ const handleTestDestination = async () => {
 
 // Show template preview
 const showPreview = async () => {
-  if (!isPrebuiltDestination.value) return;
+  const customTemplate = isCustomWebhook.value ? templateVal.value : undefined;
+  if (isCustomWebhook.value && !customTemplate) {
+    toast({ variant: "error", message: t("alerts.validation.templateRequired") });
+    return;
+  }
+  if (!isPrebuiltDestination.value && !customTemplate) return;
 
   try {
     // Clear previous content
     previewContent.value = "";
 
     // Fetch and generate preview
-    const preview = await generatePreview(dtVal.value, prebuiltCredentials.value);
+    const preview = customTemplate
+      ? await renderTemplateBody(customTemplate)
+      : await generatePreview(dtVal.value, prebuiltCredentials.value);
     previewContent.value = preview;
 
     // Only show modal after content is ready
@@ -1275,10 +1314,7 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
       (value.credentials ?? {}) as Record<string, unknown>,
     );
     // Build custom headers object from the api-headers array-field
-    const customHeaders: Headers = {};
-    (value.apiHeaders || []).forEach((header) => {
-      if (header.key && header.value) customHeaders[header.key] = header.value;
-    });
+    const customHeaders = headersFromRows(value.apiHeaders || []);
 
     const selectedTemplate = (value.template || "").trim();
     const templateOverride = isUpdatingDestination.value
@@ -1322,6 +1358,15 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
   }
 }
 
+// Header rows → request headers. A row without both a key and a value is skipped.
+function headersFromRows(rows: { key: string; value: string }[]): Headers {
+  const headers: Headers = {};
+  rows.forEach((header) => {
+    if (header.key && header.value) headers[header.key] = header.value;
+  });
+  return headers;
+}
+
 // The custom/pipeline save path (dispatched from saveDestination for non-prebuilt
 // types). OForm calls the submit only once the schema (incl. the type-keyed
 // superRefine) passes — the schema, not a manual guard, gates the save. `value`
@@ -1333,10 +1378,7 @@ function saveCustomDestination(value: AddDestinationForm) {
     message: t("common.pleaseWait"),
     timeout: 0,
   });
-  const headers: Headers = {};
-  (value.apiHeaders || []).forEach((header) => {
-    if (header.key && header.value) headers[header.key] = header.value;
-  });
+  const headers = headersFromRows(value.apiHeaders || []);
 
   const payload: Partial<DestinationPayload> = {
     url: value.url,

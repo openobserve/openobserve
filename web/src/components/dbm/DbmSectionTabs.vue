@@ -274,10 +274,7 @@ const overlapBadge = (
     };
   }
   if (vantage === "client") {
-    return {
-      vantageLabel: t("dbm.list.overlap.clientObserved"),
-      hint: t("dbm.page.tabs.samplesHintClient"),
-    };
+    return { hint: t("dbm.page.tabs.samplesHintClient") };
   }
   // No vantage travelled with the count, so nothing about its source can be
   // claimed. The hint says what the tab is FOR and asserts no population.
@@ -288,7 +285,6 @@ const overlapBadge = (
 const queriesVantageLabel = computed<I18nText | undefined>(() => {
   const vantage = countVantage(props.queryCount);
   if (vantage === "server") return t("dbm.list.overlap.serverCounted");
-  if (vantage === "client") return t("dbm.list.overlap.clientObserved");
   return undefined;
 });
 

@@ -89,22 +89,19 @@ describe("DbmScopeFilters", () => {
     });
   });
 
-  /**
-   * The insight chip is deliberately NOT a dimension chip: it says the table was
-   * narrowed by a finding, not by an axis the user picked, so it keeps the amber
-   * and stays out of the dimension colour vocabulary.
-   */
+  // A finding narrowed the table, not an axis the user picked, so the chip keeps the amber.
   describe("the insight chip stays distinct from the dimension chips", () => {
-    it("is not rendered as an ODimensionChip", () => {
+    it("is amber rather than a dimension colour", () => {
       const wrapper = mountFilters([filter()], {
         dimension: raw("insight"),
         label: raw("Newly expensive"),
       });
-      expect(wrapper.findAllComponents(ODimensionChip)).toHaveLength(1);
-      const chip = wrapper.find('[data-test="dbm-queries-scope-chip-insight"]');
-      expect(chip.exists()).toBe(true);
-      expect(chip.html()).toContain("bg-badge-warning-soft-bg");
-      expect(chip.text()).toContain("Newly expensive");
+      const insight = wrapper
+        .findAllComponents(ODimensionChip)
+        .find((chip) => chip.attributes("data-test") === "dbm-queries-scope-chip-insight");
+      expect(insight?.props("variant")).toBe("warning-soft");
+      expect(insight?.html()).toContain("bg-badge-warning-soft-bg");
+      expect(insight?.text()).toContain("Newly expensive");
     });
 
     it("emits clearInsight when removed", async () => {

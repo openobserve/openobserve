@@ -41,16 +41,7 @@ pub async fn process_expired_batches() {
                 );
 
                 for batch in batches {
-                    if let Err(e) = openobserve_core::alerts::grouping::send_grouped_notification(
-                        &trace_id, batch,
-                    )
-                    .await
-                    {
-                        log::error!(
-                            "[alert_grouping_worker] Error sending grouped notification trace_id {trace_id} : {} ",
-                            e
-                        );
-                    }
+                    openobserve_core::alerts::grouping::flush_batch(&trace_id, batch).await;
                 }
             }
         }

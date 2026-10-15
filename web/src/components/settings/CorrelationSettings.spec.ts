@@ -18,6 +18,9 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import CorrelationSettings from "./CorrelationSettings.vue";
+import { queryClient } from "@/composables/query/queryClient";
+import serviceStreamsService from "@/services/service_streams";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: {}, query: {} }),
@@ -251,6 +254,36 @@ describe("CorrelationSettings", () => {
       wrapper.vm.activeTab = "discovery";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe("test-org");
+    });
+  });
+
+  // The groups are cached, and dimension analytics is computed from them, so a save expires the whole scope.
+  describe("saving field aliases", () => {
+    const scope = { queryKey: serviceStreamKeys.all("test-org") };
+
+    it("expires the service-correlation cache after a successful save", async () => {
+      const spy = vi.spyOn(queryClient, "invalidateQueries");
+      wrapper = mountComponent();
+      await flushPromises();
+      (wrapper.vm as any).draftSemanticGroups = [{ display: "Host", group: "", fields: ["host"] }];
+      await (wrapper.vm as any).saveSemanticGroups();
+
+      expect(spy).toHaveBeenCalledWith(scope);
+      spy.mockRestore();
+    });
+
+    it("leaves the cache alone when the save fails", async () => {
+      vi.mocked(serviceStreamsService.updateSemanticGroups).mockRejectedValueOnce(
+        new Error("boom"),
+      );
+      const spy = vi.spyOn(queryClient, "invalidateQueries");
+      wrapper = mountComponent();
+      await flushPromises();
+      (wrapper.vm as any).draftSemanticGroups = [{ display: "Host", group: "", fields: ["host"] }];
+      await (wrapper.vm as any).saveSemanticGroups();
+
+      expect(spy).not.toHaveBeenCalledWith(scope);
+      spy.mockRestore();
     });
   });
 });

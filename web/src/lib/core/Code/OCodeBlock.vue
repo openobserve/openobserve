@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   OCodeBlock — a syntax-highlighted block of code with a copy button, optional
   secret masking (Reveal/Hide), optional window chrome (terminal / editor), and
-  a slot for extra toolbar actions. Copy always copies the raw `code` prop, never
-  the highlighted markup or the masked variant.
+  a slot for extra toolbar actions. The Copy button copies the raw `code` prop;
+  a text selection copies only what is shown, so a masked token stays masked.
 
   For inline / simple code chips without highlighting, use OCode.
 -->
@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, type CSSProperties } from "vue";
 import hljs from "highlight.js";
 import { copyToClipboard } from "@/utils/clipboard";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -46,10 +47,16 @@ const { t } = useI18nTyped();
  */
 const CODE_LINE_HEIGHT = 1.55;
 
+const CODE_INSET = "0.75rem";
+
+const MASK_CHAR = "\u2022";
+
 const props = withDefaults(defineProps<CodeBlockProps>(), {
   wrap: false,
   copyable: true,
   lineNumbers: false,
+  padded: false,
+  inset: false,
   dataTest: "code-block",
 });
 
@@ -70,8 +77,12 @@ const preStyle = computed(() => {
     "--code-line-height": String(CODE_LINE_HEIGHT),
   };
 
+  if (props.inset) style.padding = CODE_INSET;
+
   if (props.maxLines) {
-    style.maxHeight = `calc(${props.maxLines} * ${CODE_LINE_HEIGHT}em)`;
+    // The inset sits inside the capped box, so it is added on top of the line budget.
+    const inset = props.inset ? ` + 2 * ${CODE_INSET}` : "";
+    style.maxHeight = `calc(${props.maxLines} * ${CODE_LINE_HEIGHT}em${inset})`;
     style.overflowY = "auto";
   }
 
@@ -125,12 +136,35 @@ const lineNumberText = computed(() => {
   return Array.from({ length: lines }, (_, i) => String(i + 1)).join("\n");
 });
 
+const copySuccessMessage = computed(() =>
+  props.tokenName
+    ? t("components.codeBlock.copiedWithToken", { name: props.tokenName })
+    : (props.copyMessage ?? t("common.copySuccess")),
+);
+
 const onCopy = () => {
   copyToClipboard(props.code, t, {
-    successMessage: props.copyMessage ?? t("common.copySuccess"),
+    successMessage: copySuccessMessage.value,
     errorMessage: t("common.copyContentError"),
+  }).then((copied) => {
+    if (copied) emit("copy", { partial: false });
   });
-  emit("copy");
+};
+
+const codeEl = ref<HTMLElement | null>(null);
+const onNativeCopy = () => {
+  const root = codeEl.value;
+  const selection = window.getSelection();
+  if (!root || !selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+  const range = selection.getRangeAt(0);
+  const inside = root.contains(range.startContainer) && root.contains(range.endContainer);
+  if (!inside) return;
+  // a selection over the hidden token pastes as dots, so it is not a usable copy of the command
+  if (props.codeMasked && !revealed.value && selection.toString().includes(MASK_CHAR)) {
+    toast({ variant: "warning", message: t("components.codeBlock.maskedSelectionWarning") });
+    return;
+  }
+  emit("copy", { partial: true });
 };
 </script>
 
@@ -152,7 +186,7 @@ const onCopy = () => {
           <i class="bg-warning block size-2.5 rounded-full" />
           <i class="bg-status-positive block size-2.5 rounded-full" />
         </span>
-        <span class="o2-code-lang text-2xs font-mono tracking-wider uppercase opacity-55">{{
+        <span class="o2-code-lang text-2xs font-mono opacity-55">{{
           t("components.codeBlock.terminal")
         }}</span>
       </span>
@@ -165,10 +199,21 @@ const onCopy = () => {
           filename || lang || t("common.plainText")
         }}</span>
       </span>
-      <span v-else class="o2-code-lang text-2xs font-mono tracking-wider uppercase opacity-55">{{
+      <span v-else class="o2-code-lang text-2xs font-mono opacity-55">{{
         lang || t("common.plainText")
       }}</span>
       <div class="flex items-center gap-1">
+        <OButton
+          v-if="tokenName"
+          :data-test="`${dataTest}-token-link`"
+          variant="ghost-primary"
+          size="xs"
+          icon-left="key"
+          @click="emit('token-click')"
+        >
+          {{ t("components.codeBlock.tokenLink", { name: tokenName }) }}
+          <OTooltip :content="t('components.codeBlock.tokenLinkTooltip')" side="top" />
+        </OButton>
         <OButton
           v-if="codeMasked"
           :data-test="`${dataTest}-reveal-btn`"
@@ -202,14 +247,20 @@ const onCopy = () => {
          <pre>, so a newline here would indent the first line of code. -->
     <pre
       class="o2-code-pre"
-      :class="[wrap ? 'o2-code-pre--wrap' : '', showLineNumbers ? 'o2-code-pre--numbered' : '']"
+      :class="[
+        wrap ? 'o2-code-pre--wrap' : '',
+        showLineNumbers ? 'o2-code-pre--numbered' : '',
+        padded ? 'px-3 py-2' : '',
+      ]"
       :style="preStyle"
+      :data-test="`${dataTest}-pre`"
+      @copy="onNativeCopy"
     ><span
       v-if="showLineNumbers"
       class="o2-code-gutter bg-syntax-bg text-syntax-comment sticky left-0 tabular-nums select-none"
       aria-hidden="true"
       :data-test="`${dataTest}-line-numbers`"
-    >{{ lineNumberText }}</span><code class="hljs text-syntax-text!" v-html="highlighted"></code></pre>
+    >{{ lineNumberText }}</span><code ref="codeEl" class="hljs text-syntax-text!" v-html="highlighted"></code></pre>
   </div>
 </template>
 

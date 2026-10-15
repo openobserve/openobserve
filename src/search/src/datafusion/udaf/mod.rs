@@ -17,6 +17,7 @@ use arrow_schema::DataType;
 
 pub mod approx_topk;
 pub mod approx_topk_distinct;
+pub mod sequence;
 pub mod summary_percentile;
 
 pub static NUMERICS: &[DataType] = &[

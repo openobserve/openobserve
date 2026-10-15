@@ -58,6 +58,7 @@
 import { computed } from "vue";
 import type { PropType } from "vue";
 import { useI18nTyped } from "@/types/i18n";
+import { isFilterableLogField } from "@/utils/logs/streamNameColumn";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
@@ -112,8 +113,7 @@ const sendToAiChat = (value: any) => {
   emit("sendToAiChat", value);
 };
 
-const isStreamField = computed(() => {
-  const field: any = props.selectedStreamFields?.find((item: any) => item.name === props.column.id);
-  return field?.isSchemaField ?? false;
-});
+const isStreamField = computed(() =>
+  isFilterableLogField(props.column.id, props.selectedStreamFields),
+);
 </script>

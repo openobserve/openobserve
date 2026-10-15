@@ -3,6 +3,9 @@ import { mount, flushPromises } from "@vue/test-utils";
 import AddDashboardFromGitHub from "./AddDashboardFromGitHub.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock dashboards service
 vi.mock("@/services/dashboards", async (importOriginal) => {
@@ -1155,6 +1158,62 @@ describe("AddDashboardFromGitHub Component", () => {
       expect(wrapper.vm.replaceConfirm).toBeNull();
       expect(dashboardsService.delete).not.toHaveBeenCalled();
       expect(dashboardsService.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("product analytics", () => {
+    const runImport = async (jsonFiles = ["dash.json"]) => {
+      vi.mocked(dashboardsService.list).mockResolvedValue({ data: { dashboards: [] } } as any);
+      (store.state as any).githubDashboardGallery = {
+        dashboards: [],
+        lastFetched: null,
+        cacheExpiry: 300000,
+        dashboardJsonCache: Object.fromEntries(
+          jsonFiles.map((f) => [`aws_ec2/${f}`, { title: `AWS EC2 ${f}` }]),
+        ),
+      };
+      wrapper = createWrapper({ modelValue: true });
+      await flushPromises();
+      wrapper.vm.selectedDashboards = [
+        {
+          name: "aws_ec2",
+          displayName: "AWS EC2",
+          folderPath: "aws_ec2",
+          jsonFiles,
+        },
+      ];
+      wrapper.vm.selectedFolderObj = "default";
+      wrapper.vm.showFolderSelection = true;
+      await wrapper.vm.$nextTick();
+      await wrapper.findComponent({ name: "ODialog" }).vm.$emit("click:primary");
+      await flushPromises();
+    };
+
+    const importedCalls = () =>
+      vi.mocked(analytics.track).mock.calls.filter((c) => c[0] === "dashboard_imported");
+
+    it("tracks one dashboard_imported with the number of dashboards installed", async () => {
+      vi.mocked(dashboardsService.create)
+        .mockResolvedValueOnce({ data: {} } as any)
+        .mockRejectedValueOnce(new Error("boom"))
+        .mockResolvedValueOnce({ data: {} } as any);
+
+      await runImport(["a.json", "b.json", "c.json"]);
+
+      expect(dashboardsService.create).toHaveBeenCalledTimes(3);
+      expect(importedCalls()).toEqual([["dashboard_imported", { source: "library", count: 2 }]]);
+      expect(
+        vi.mocked(analytics.track).mock.calls.filter((c) => c[0] === "dashboard_created"),
+      ).toHaveLength(2);
+    });
+
+    it("does not track dashboard_imported when every create rejects", async () => {
+      vi.mocked(dashboardsService.create).mockRejectedValue(new Error("boom"));
+
+      await runImport();
+
+      expect(dashboardsService.create).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

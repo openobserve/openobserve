@@ -9,6 +9,7 @@ Reference for O2's text, selection, and choice form controls under `@/lib/forms/
 - [Input family](#input-family) — OInput, OTextarea, OFormInput, OFormTextarea
 - [Select family](#select-family) — OSelect, OSelectItem, OSelectGroup, OFormSelect
 - [Combobox family](#combobox-family) — OCombobox, OFormCombobox
+- [TemplateInput family](#templateinput-family) — OTemplateInput, OTemplateTextarea
 - [SearchInput](#searchinput) — OSearchInput
 - [Checkbox family](#checkbox-family) — OCheckbox, OCheckboxGroup, OFormCheckbox, OFormCheckboxGroup
 - [Radio family](#radio-family) — ORadio, ORadioGroup, OFormRadioGroup
@@ -200,7 +201,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 
 **Import:** `@/lib/forms/Combobox/OCombobox.vue`
 **Use when:** A **typeahead text input with a suggestion dropdown** where the bound value is the **typed string** (free entry allowed) and picking a suggestion fills/transforms the text. Supports a `searchRegex` to extract a needle from the input and a `valueReplaceFn` to transform the chosen option before emit. This is the O2 replacement for `CommonAutoComplete`.
-**Don't use for:** Selecting from a fixed set where only listed values are valid (use `OSelect` — it emits the option's value, not free text, and supports multiple/groups/chips). Difference from `OSelect`: **OCombobox's model is the input string and free text is allowed**; **OSelect's model is a chosen option value from the list** and there is no free-text value (its `searchable`/`creatable` still commit list values or explicit created entries).
+**Don't use for:** Selecting from a fixed set where only listed values are valid (use `OSelect` — it emits the option's value, not free text, and supports multiple/groups/chips); a text field that stays a plain field until the user types `{{`, where the pick splices a `{{NAME}}` token at the caret instead of replacing the text (use `OTemplateInput` / `OTemplateTextarea`). Difference from `OSelect`: **OCombobox's model is the input string and free text is allowed**; **OSelect's model is a chosen option value from the list** and there is no free-text value (its `searchable`/`creatable` still commit list values or explicit created entries).
 **Key props:** `modelValue` (`string` — the text in the input), `items` (`ComboboxOption[]` = `{ label, value }`, default `[]`), `placeholder`, `label`, `searchRegex` (regex string; first non-undefined capture group becomes the search needle; whole input if omitted), `valueReplaceFn` (`(option) => string`, default `option => option.value`), `disabled` (default `false`), `required`, `size` (`"sm"` | `"md"` default), `error` (default `false`), `errorMessage`, `helpText`, `debounce` (ms, default `0`), `labelPosition` (`"inside"` | `"outside"` default), `id`, `name`.
 **Slots:** `label` (replaces `label` prop), `tooltip` (info icon next to label)
 **Emits:** `update:modelValue` (`string`), `select` (`string` — fired when an option is chosen)
@@ -232,6 +233,63 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 ```
 
 **Family:** Form wrapper for `OCombobox`.
+
+---
+
+## TemplateInput family
+
+### OTemplateInput
+
+**Import:** `@/lib/forms/TemplateInput/OTemplateInput.vue`
+**Use when:** A single-line text or URL field whose value may hold `{{NAME}}` template tokens that are substituted later (a Synthetics starting URL or step value, an alert template). Wraps `OInput` unchanged; typing `{{` opens a portalled, virtualised list of `suggestions` filtered case-insensitively by what follows the braces, and Enter / Tab / a row click splice `{{NAME}}` (stored spelling) over the open token at the caret. ArrowUp/ArrowDown move with wrap, Escape and blur close, moving the caret away closes. With `values` set, the value of the closed token under the caret peeks above the field after 300 ms. Without `suggestions` it behaves as a plain `OInput`.
+**Don't use for:** Typeahead where the pick replaces the whole text and the list opens on focus (use `OCombobox`); a plain field with no template tokens (use `OInput`); multi-line prompt text (use `OTemplateTextarea`); `debounce`, `mask`, `modelModifiers`, `revealable`, or any `type` other than `"text"` / `"url"` — those desynchronise the caret from the emitted text and are omitted from the props type.
+**Key props:** `modelValue` (`string`), `suggestions` (`TemplateSuggestion[]` = `{ name }` plus any caller fields, display order preserved; absent or empty = plain field), `values` (`Record<string, string>`; present turns the peek on), `type` (`"text"` default | `"url"`), plus every other `OInput` prop re-bound by name (`label`, `placeholder`, `helpText`, `errorMessage`, `error`, `prefix`, `suffix`, `clearable`, `readonly`, `disabled`, `required`, `autofocus`, `maxlength`, `size`, `width`, `labelPosition`, `id`, `name`, `autocomplete`). `$attrs` (`data-test`, `class`, undeclared listeners such as `@clear` / `@paste`) land on the field root, never on the wrapper.
+**Slots:** `icon-left`, `icon-right`, `prefix`, `suffix`, `tooltip`, `append` (forwarded to `OInput`); `suggestion` (scoped, `{ suggestion, active }`, generic over the suggestion type — default renders `{{name}}` in mono).
+**Emits:** `update:modelValue` (`string`), `select` (`string` — the inserted name), `focus`, `blur`, `keydown`
+**data-test:** the consumer's id on the field root, `-field` on the native input, `-suggest` on the popover content, `-suggest-item-{name}` per row (name as stored), `-peek` on the peek. Rows render in a portal — query `document.body`.
+**Example:**
+
+```vue
+<OTemplateInput
+  v-model="url"
+  type="url"
+  label="Starting URL"
+  data-test="synthetics-create-url-input"
+  :suggestions="variableSuggestions"
+  @blur="validateUrl"
+>
+  <template #prefix><OIcon name="link" size="sm" /></template>
+  <template #suggestion="{ suggestion, active }">
+    <VariableSuggestionRow :suggestion="suggestion" :active="active" />
+  </template>
+</OTemplateInput>
+```
+
+**Family:** Sibling `OTemplateTextarea` (multi-line). Shared sub-components `OTemplateOverlay` (peek box + list) and `OTemplateSuggestList`, plus the composable `useTemplateSuggest` (exports `CLOSED_TOKEN_RE`, `OPEN_TOKEN_RE`, `tokenAtCaret`, `tokenFor`), are internal to the family. Headless.
+
+### OTemplateTextarea
+
+**Import:** `@/lib/forms/TemplateInput/OTemplateTextarea.vue`
+**Use when:** A multi-line field with the same `{{` suggestion list and optional peek as `OTemplateInput` — an LLM prompt message with declared variables. Wraps `OTextarea` unchanged (`autogrow`, `maxRows`, `fill` all work).
+**Don't use for:** Single-line values (use `OTemplateInput`); free text with no template tokens (use `OTextarea`); JSON or code where an unrelated `{{` would open the list.
+**Key props:** `modelValue` (`string`), `suggestions`, `values` (as `OTemplateInput`), plus every `OTextarea` prop re-bound by name (`label`, `placeholder`, `helpText`, `errorMessage`, `error`, `rows`, `autogrow`, `maxRows`, `readonly`, `disabled`, `required`, `autofocus`, `maxlength`, `size`, `width`, `fill`, `id`, `name`, `autocomplete`).
+**Slots:** `tooltip`, `append` (forwarded to `OTextarea`); `suggestion` (scoped, `{ suggestion, active }`).
+**Emits:** `update:modelValue` (`string`), `select` (`string`), `focus`, `blur`, `keydown`
+**Example:**
+
+```vue
+<OTemplateTextarea
+  v-model="message.content"
+  :rows="1"
+  :max-rows="5"
+  autogrow
+  :suggestions="promptVariables"
+  :values="variableValues"
+  :data-test="`ai-playground-message-input-${message.id}`"
+/>
+```
+
+**Family:** Sibling `OTemplateInput` (single-line). Headless.
 
 ---
 

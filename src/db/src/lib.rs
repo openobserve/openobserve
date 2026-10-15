@@ -29,6 +29,7 @@ pub mod compact;
 pub mod dashboards;
 pub mod db_monitoring;
 pub mod distinct_values;
+pub mod downtimes;
 pub mod enrichment_table;
 pub mod file_list;
 pub mod folders;
@@ -49,6 +50,7 @@ pub mod org_users;
 pub mod organization;
 pub mod password_policy;
 pub mod pipeline_errors;
+pub mod prompt_settings;
 #[cfg(feature = "vectorscan")]
 pub mod re_pattern;
 pub mod saved_view;

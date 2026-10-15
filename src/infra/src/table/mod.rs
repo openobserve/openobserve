@@ -14,10 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use migration::Migrator;
-use sea_orm_migration::MigratorTrait;
+use sea_orm::DatabaseConnection;
+use sea_orm_migration::{MigratorTrait, SchemaManager};
 
 use crate::{db::get_orm_client_ddl, dist_lock};
 
+pub mod ai_chat_sessions;
+pub mod ai_chat_shares;
+pub mod ai_chat_turns;
+pub mod alert_calibration;
 pub mod alert_composites;
 pub mod alert_eval_intervals;
 pub mod alert_incidents;
@@ -32,6 +37,8 @@ mod composite_alerts_contract_tests;
 pub mod dashboards;
 pub mod destinations;
 pub mod distinct_values;
+pub mod downtime_notifications;
+pub mod downtimes;
 pub mod enrichment_table_urls;
 pub mod enrichment_tables;
 pub mod entity;
@@ -42,6 +49,7 @@ pub mod gen_ai_agents;
 pub mod incident_events;
 pub mod incident_integrations;
 pub mod kv_store;
+pub mod llm_prompts;
 pub mod llm_secrets;
 mod migration;
 pub mod model_pricing;
@@ -49,6 +57,7 @@ pub mod oncall_deliveries;
 pub mod oncall_overrides;
 pub mod oncall_ownership;
 pub mod oncall_policies;
+pub mod oncall_response_reports;
 pub mod oncall_responses;
 pub mod oncall_routing_config;
 pub mod oncall_schedules;
@@ -63,10 +72,12 @@ pub mod org_storage_providers;
 pub mod org_users;
 pub mod organizations;
 pub mod providers;
+pub mod query_history;
 pub mod ratelimit;
 pub mod re_pattern;
 pub mod re_pattern_stream_map;
 pub mod reports;
+pub mod rum_pa;
 pub mod score_configs;
 pub mod scorers;
 pub mod search_job;
@@ -87,6 +98,7 @@ pub mod synthetics_environments;
 pub mod synthetics_jobs;
 pub mod synthetics_locations;
 pub mod synthetics_probe_tokens;
+pub mod synthetics_refs;
 pub mod synthetics_runs;
 pub mod synthetics_variables;
 pub mod system_prompts;
@@ -110,6 +122,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
 pub async fn migrate() -> Result<(), anyhow::Error> {
     let locker = dist_lock::lock("/database/migration", 0).await?;
     let client = get_orm_client_ddl().await;
+    // read the history under the same lock the migrations write it under
+    check_migration_history(client).await?;
     // This is a hack to fix the failing alerts migration
     // For postgres, we need to run the migration that populates the alerts table first.
     // Otherwise, the `m20250109_092400_recreate_tables_with_ksuids` migration will fail.
@@ -139,6 +153,27 @@ async fn get_alerts_populate_migration_index() -> Result<u32, anyhow::Error> {
     Ok(index)
 }
 
+/// Refuses to run every migration again on a database whose migration history is gone.
+async fn check_migration_history(client: &DatabaseConnection) -> Result<(), anyhow::Error> {
+    let manager = SchemaManager::new(client);
+    // the first migration creates folders, so only a database that has run the chain has it
+    if !manager.has_table("folders").await? {
+        return Ok(());
+    }
+    // checked first because reading the history creates its table when it is missing
+    if manager.has_table("seaql_migrations").await?
+        && !Migrator::get_applied_migrations(client).await?.is_empty()
+    {
+        return Ok(());
+    }
+    Err(anyhow::anyhow!(
+        "the migration history in seaql_migrations is empty or missing, but this database \
+         already has tables created by migrations; running every migration again would fail or \
+         rebuild tables that hold data, so the upgrade stops here. Restore the seaql_migrations \
+         rows, for example from a backup, and start again"
+    ))
+}
+
 pub async fn down(steps: Option<u32>) -> Result<(), anyhow::Error> {
     let client = get_orm_client_ddl().await;
     Migrator::down(client, steps).await?;
@@ -162,4 +197,47 @@ macro_rules! orm_err {
             $crate::errors::DbError::SeaORMError($e.to_string()),
         ))
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{ConnectionTrait, Database};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_check_migration_history_allows_a_fresh_database() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        check_migration_history(&db).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_check_migration_history_allows_a_recorded_history() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        Migrator::up(&db, Some(1)).await.unwrap();
+        check_migration_history(&db).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_check_migration_history_refuses_tables_without_history() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        Migrator::up(&db, Some(1)).await.unwrap();
+        db.execute_unprepared("DELETE FROM seaql_migrations")
+            .await
+            .unwrap();
+        let err = check_migration_history(&db).await.unwrap_err();
+        assert!(err.to_string().contains("seaql_migrations"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn test_check_migration_history_refuses_a_dropped_history_without_writing() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        Migrator::up(&db, Some(1)).await.unwrap();
+        db.execute_unprepared("DROP TABLE seaql_migrations")
+            .await
+            .unwrap();
+        check_migration_history(&db).await.unwrap_err();
+        let manager = SchemaManager::new(&db);
+        assert!(!manager.has_table("seaql_migrations").await.unwrap());
+    }
 }

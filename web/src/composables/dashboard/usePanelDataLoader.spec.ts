@@ -1,6 +1,12 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { onMounted, ref } from "vue";
+import { createApp, onMounted, ref } from "vue";
+import { flushPromises } from "@vue/test-utils";
 import { usePanelDataLoader } from "./usePanelDataLoader";
+import { DASHBOARD_FRESH_PANEL_TIME } from "./dashboardFreshPanelTime";
+import queryService from "../../services/search";
+import config from "@/aws-exports";
+
+const RealAbortController = globalThis.AbortController;
 
 /**
  * Lets the NEXT usePanelDataLoader() install its visibility observer.
@@ -165,10 +171,12 @@ vi.mock("./useAnnotations", () => ({
 
 // Enhanced HTTP Streaming mocking
 let shouldStreamingThrow = false;
+let streamOverride: ((payload: any, callbacks: any) => any) | null = null;
 
 vi.mock("../useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: vi.fn().mockImplementation((payload, callbacks) => {
+      if (streamOverride) return streamOverride(payload, callbacks);
       if (shouldStreamingThrow) {
         callbacks?.error?.(payload, { message: "Streaming error" });
         return "error-stream-id";
@@ -265,6 +273,7 @@ const resetAllMocks = () => {
 
   // Reset streaming mocks
   shouldStreamingThrow = false;
+  streamOverride = null;
 
   // Reset cache mocks
   mockCacheData = null;
@@ -1503,6 +1512,243 @@ describe("usePanelDataLoader", () => {
     });
   });
 
+  describe("superseded runs", () => {
+    const supersedeRun = async (edition: { isEnterprise: string; isCloud: string }) => {
+      const original = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
+      Object.assign(config, edition);
+      const streams: any[] = [];
+      streamOverride = (payload, callbacks) => {
+        streams.push({ payload, callbacks });
+        return "held-stream";
+      };
+      try {
+        const loader = usePanelDataLoader(
+          createMockPanelSchema(),
+          createMockSelectedTimeObj({
+            start_time: new Date(Date.now() - 3600000),
+            end_time: new Date(),
+          }),
+          createMockVariablesData(),
+          ref(null),
+          ref(true),
+          ref("dashboards"),
+          ref("test-dashboard"),
+          ref("test-folder"),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(false),
+        );
+        await loader.loadData();
+        const traceId = streams[0].payload.traceId;
+        expect(loader.searchRequestTraceIds.value).toContain(traceId);
+        vi.mocked(queryService.delete_running_queries).mockClear();
+        await loader.loadData();
+        return { streams, traceId };
+      } finally {
+        Object.assign(config, original);
+      }
+    };
+
+    it("cancels the superseded run's search on the server before starting the next", async () => {
+      const { streams, traceId } = await supersedeRun({ isEnterprise: "true", isCloud: "false" });
+
+      expect(queryService.delete_running_queries).toHaveBeenCalledWith("test-org", [traceId]);
+      expect(streams).toHaveLength(2);
+    });
+
+    it("skips the server-side cancel on OSS, which has no query manager route", async () => {
+      const { streams } = await supersedeRun({ isEnterprise: "false", isCloud: "false" });
+
+      expect(queryService.delete_running_queries).not.toHaveBeenCalled();
+      expect(streams).toHaveLength(2);
+    });
+
+    it("a stream completing while the rerun is debounced writes nothing", async () => {
+      const streams: any[] = [];
+      streamOverride = (payload, callbacks) => {
+        streams.push({ payload, callbacks });
+        return "held-stream";
+      };
+      const loader = usePanelDataLoader(
+        createMockPanelSchema(),
+        createMockSelectedTimeObj({
+          start_time: new Date(Date.now() - 3600000),
+          end_time: new Date(),
+        }),
+        createMockVariablesData(),
+        ref(null),
+        ref(true),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(false),
+      );
+      await loader.loadData();
+      expect(streams).toHaveLength(1);
+      const cacheWritesBefore = cacheOperationCount;
+
+      const rerun = loader.loadData();
+      const [{ payload, callbacks }] = streams;
+      callbacks.data(payload, {
+        type: "search_response_hits",
+        content: { results: { hits: [{ value: "stale" }] } },
+      });
+      callbacks.data(payload, { type: "end" });
+      await callbacks.complete(payload, { type: "end" });
+
+      expect(JSON.stringify(loader.data.value)).not.toContain("stale");
+      expect(loader.loading.value).toBe(true);
+      expect(cacheOperationCount).toBe(cacheWritesBefore);
+      await rerun;
+    });
+  });
+
+  describe("first load waiting on a multi-select child variable", () => {
+    it("sends one query when the child resolves to ALL, not one per watcher", async () => {
+      global.AbortController = RealAbortController;
+      const streams: any[] = [];
+      streamOverride = (payload) => {
+        streams.push(payload);
+        return `stream-${streams.length}`;
+      };
+      const ctr = {
+        name: "ctr",
+        type: "query_values",
+        multiSelect: true,
+        value: [],
+        isVariablePartialLoaded: false,
+      };
+      const variablesData = createMockVariablesData({ values: [ctr] });
+      const loader = usePanelDataLoader(
+        createMockPanelSchema({
+          queryConfig: { query: "SELECT * FROM t WHERE c IN ($ctr)" },
+        }),
+        createMockSelectedTimeObj({
+          start_time: new Date(Date.now() - 3600000),
+          end_time: new Date(),
+        }),
+        variablesData,
+        ref(null),
+        ref(true),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(false),
+      );
+
+      // The mount run waits for ctr, which has never loaded.
+      const mountRun = loader.loadData();
+      await flushPromises();
+      expect(streams).toHaveLength(0);
+
+      variablesData.value = {
+        isVariablesLoading: false,
+        values: [{ ...ctr, value: ["_o2_all_"], isVariablePartialLoaded: true }],
+      };
+      await flushPromises();
+      await mountRun;
+      await flushPromises();
+
+      expect(streams).toHaveLength(1);
+    });
+  });
+
+  describe("a reload triggered by a variable change", () => {
+    const MINUTE = 60_000;
+    const queriedEndMs = (payload: any) => {
+      const end = Number(JSON.stringify(payload).match(/"end_time":(\d+)/)?.[1]);
+      return end > 1e14 ? end / 1000 : end;
+    };
+
+    const loadThenChangeVariable = async (provideResolver?: (app: any) => void) => {
+      global.AbortController = RealAbortController;
+      const streams: any[] = [];
+      streamOverride = (payload) => {
+        streams.push(payload);
+        return `stream-${streams.length}`;
+      };
+      const handedEnd = new Date(Date.now() - 45 * MINUTE);
+      const env = { name: "env", type: "custom", value: "prod", isVariablePartialLoaded: true };
+      const variablesData = createMockVariablesData({ values: [env] });
+      const app = createApp({});
+      provideResolver?.(app);
+      const loader = app.runWithContext(() =>
+        usePanelDataLoader(
+          createMockPanelSchema({ queryConfig: { query: "SELECT * FROM t WHERE e = '$env'" } }),
+          ref({ start_time: new Date(handedEnd.getTime() - 15 * MINUTE), end_time: handedEnd }),
+          variablesData,
+          ref(null),
+          ref(true),
+          ref("dashboards"),
+          ref("test-dashboard"),
+          ref("test-folder"),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(false),
+        ),
+      );
+
+      await loader.loadData();
+      await flushPromises();
+      variablesData.value = {
+        isVariablesLoading: false,
+        values: [{ ...env, value: "dev" }],
+      };
+      await flushPromises();
+      await flushPromises();
+      return { streams, handedEnd };
+    };
+
+    it("queries the window the dashboard resolves now, not the one handed at the last refresh", async () => {
+      const freshEnd = new Date();
+      const resolveFreshPanelTime = vi.fn(() => ({
+        start_time: new Date(freshEnd.getTime() - 15 * MINUTE),
+        end_time: freshEnd,
+      }));
+
+      const { streams, handedEnd } = await loadThenChangeVariable((app) =>
+        app.provide(DASHBOARD_FRESH_PANEL_TIME, resolveFreshPanelTime),
+      );
+
+      expect(streams).toHaveLength(2);
+      expect(queriedEndMs(streams[0])).toBe(handedEnd.getTime());
+      expect(resolveFreshPanelTime).toHaveBeenCalledWith("test-panel");
+      expect(queriedEndMs(streams[1])).toBe(freshEnd.getTime());
+    });
+
+    it("keeps the handed window when the dashboard resolves none", async () => {
+      const { streams, handedEnd } = await loadThenChangeVariable((app) =>
+        app.provide(DASHBOARD_FRESH_PANEL_TIME, () => undefined),
+      );
+
+      expect(streams).toHaveLength(2);
+      expect(queriedEndMs(streams[1])).toBe(handedEnd.getTime());
+    });
+
+    it("keeps the handed window outside a dashboard", async () => {
+      const { streams, handedEnd } = await loadThenChangeVariable();
+
+      expect(streams).toHaveLength(2);
+      expect(queriedEndMs(streams[1])).toBe(handedEnd.getTime());
+    });
+  });
+
   // ==== CACHE FUNCTIONALITY COVERAGE ====
   describe("Cache Functionality", () => {
     describe("restoreFromCache", () => {
@@ -1559,6 +1805,75 @@ describe("usePanelDataLoader", () => {
         await loader.loadData();
 
         expect(loader.data.value).toBeDefined();
+      });
+
+      it("restores the server diagnostics with the cached result, so a first view shows its notices", async () => {
+        const panelSchema = createMockPanelSchema({
+          queryConfig: { vrlFunctionQuery: ".parsed = parse_json!(.log)" },
+        });
+        const functionError = "error[E203]: syntax error";
+        mockCacheData = {
+          key: {
+            panelSchema: panelSchema.value,
+            variablesData: [],
+            forceLoad: false,
+            dashboardId: "test-dashboard",
+            folderId: "test-folder",
+          },
+          value: {
+            data: [[{ x: 1 }, { x: 2 }]],
+            loading: false,
+            errorDetail: { message: "", code: "" },
+            metadata: { queries: [{ panelQueryIndex: 0 }] },
+            annotations: [],
+            resultMetaData: [
+              [
+                { took: 10, scan_size: 5, scan_records: 100, function_error: [functionError] },
+                {
+                  took: 5,
+                  is_partial: true,
+                  function_error: ["Warn: results are capped to meet default limit"],
+                },
+              ],
+            ],
+            lastTriggeredAt: Date.now(),
+            isPartialData: false,
+            isOperationCancelled: false,
+          },
+          cacheTimeRange: { start_time: Date.now() - 3600000, end_time: Date.now() },
+        };
+
+        allowPanelToBecomeVisible();
+
+        const loader = usePanelDataLoader(
+          panelSchema,
+          createMockSelectedTimeObj(),
+          createMockVariablesData(),
+          ref({ offsetWidth: 1000 }),
+          ref(false),
+          ref("dashboards"),
+          ref("test-dashboard"),
+          ref("test-folder"),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(false),
+        );
+
+        await loader.loadData();
+
+        expect(loader.panelDiagnostics.value.functionErrors).toEqual([functionError]);
+        expect(loader.panelDiagnostics.value.rowsCapped).toBe(true);
+        expect(loader.panelDiagnostics.value.serverPartial).toBe(true);
+        expect(loader.panelDiagnostics.value.queries[0]).toMatchObject({
+          took: 15,
+          scanSizeMb: 5,
+          scanRecords: 100,
+          rowsReturned: 2,
+        });
+        expect(loader.isPartialData.value).toBe(false);
       });
 
       it("should handle cache with different time ranges", async () => {

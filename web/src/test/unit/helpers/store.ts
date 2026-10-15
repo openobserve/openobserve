@@ -97,6 +97,8 @@ const store = createStore({
       // written against. The specs that cover the OSS shape set it to false
       // themselves.
       synthetics_private_locations_enabled: true,
+      // The server's configurable step cap; specs covering an override set it themselves.
+      synthetics_browser_max_steps: 50,
       sql_mode: false,
       sql_reserved_keywords: [
         "all",
@@ -185,11 +187,6 @@ const store = createStore({
       allReportsListByFolderId: {},
       allAlertsListByFolderId: {},
       allAlertsListByNames: {},
-    },
-    alertListFilters: {
-      searchQuery: "",
-      filterQuery: "",
-      searchAcrossFolders: false,
     },
     githubDashboardGallery: {
       dashboards: [] as any[],
@@ -374,9 +371,6 @@ const store = createStore({
     },
     clearPendingShortURL() {
       // Mock mutation for tests - clears pending short URL state
-    },
-    setAlertListFilters(state, payload) {
-      state.alertListFilters = { ...state.alertListFilters, ...payload };
     },
     setAlertLibraryManifest(state, payload) {
       state.alertLibrary.manifest = payload;

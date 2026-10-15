@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 use config::{
     meta::{alerts::alert as meta_alerts, folder as meta_folders, triggers::Trigger},
@@ -52,6 +52,14 @@ pub struct ListAlertsResponseBodyItem {
     pub description: Option<String>,
     /// Discriminator: "scheduled" | "realtime" | "slo" | "anomaly_detection" | "composite"
     pub alert_type: String,
+    /// The stream this alert watches. Absent for `composite` alerts (which
+    /// watch children, not a stream) and for an `anomaly_detection` config
+    /// that predates stream selection.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_name: Option<String>,
+    /// Paired with `stream_name` — present and absent together.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_type: Option<String>,
     pub condition: Option<QueryCondition>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trigger_condition: Option<TriggerCondition>,
@@ -160,6 +168,12 @@ pub struct ListAlertsResponseBodyItem {
     // name or a KSUID through the summary.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expression_summary: Option<String>,
+    /// The downtime muting this row now, for the Muted chip. Enterprise only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_downtime: Option<config::meta::downtimes::ActiveDowntime>,
+    /// Anomaly rows only: the identity the anomaly scheduler matches downtimes on.
+    #[serde(skip)]
+    pub downtime_dimensions: HashMap<String, String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -401,6 +415,9 @@ pub struct AlertGroupTransitionItem {
     /// a group that vanished has no reading, and rendering 0 would be a lie.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// PromQL sample text preserves NaN and infinities; absent outside rule-mode transitions.
+    pub rule_value: Option<String>,
 }
 
 /// HTTP response body for `ListAlertGroupTransitions`.
@@ -459,6 +476,11 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
         } else {
             "scheduled".to_string()
         };
+        // Every scheduled/realtime/slo alert is saved against a real stream —
+        // an empty `stream_name` only happens pre-save, never on a stored
+        // alert — but treat it as "no stream" defensively rather than send a
+        // stream_name/stream_type pair where one half is a lie.
+        let has_stream = !alert.stream_name.is_empty();
         Ok(Self {
             alert_id: alert.id.ok_or(())?,
             folder_id: folder.folder_id,
@@ -467,6 +489,8 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             owner: alert.owner,
             description: Some(alert.description).filter(|d| !d.is_empty()),
             alert_type,
+            stream_name: has_stream.then_some(alert.stream_name),
+            stream_type: has_stream.then(|| alert.stream_type.to_string()),
             condition: Some(alert.query_condition.into()),
             trigger_condition: Some(alert.trigger_condition.into()),
             enabled: alert.enabled,
@@ -498,6 +522,8 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             child_count: None,
             referenced_by_composite_count: None,
             expression_summary: None,
+            active_downtime: None,
+            downtime_dimensions: HashMap::new(),
         })
     }
 }
@@ -554,12 +580,25 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         .unwrap_or("")
         .to_string();
 
+    let stream_name = v
+        .get("stream_name")
+        .and_then(|s| s.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from);
+    let stream_type = v
+        .get("stream_type")
+        .and_then(|s| s.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from);
+
     Some(ListAlertsResponseBodyItem {
         alert_id,
         folder_id,
         folder_name,
         name: v.get("name")?.as_str()?.to_string(),
         owner: v.get("owner").and_then(|o| o.as_str()).map(String::from),
+        stream_name,
+        stream_type,
         description: v
             .get("description")
             .and_then(|d| d.as_str())
@@ -618,6 +657,135 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         child_count: None,
         referenced_by_composite_count: None,
         expression_summary: None,
+        active_downtime: None,
+        downtime_dimensions: HashMap::new(),
+    })
+}
+
+/// The anomaly configs as list items, each with the identity its scheduler mutes it by.
+#[cfg(feature = "enterprise")]
+pub async fn anomaly_list_items(
+    org: &str,
+    configs: &[serde_json::Value],
+) -> Vec<ListAlertsResponseBodyItem> {
+    // Only a downtime row turns the identity into a chip, so skip the SQL parsing without one.
+    let groups = if o2_enterprise::enterprise::common::config::get_config()
+        .downtimes
+        .enabled
+        && !db::downtimes::list_cached(org).is_empty()
+    {
+        Some(db::system_settings::get_semantic_field_groups(org).await)
+    } else {
+        None
+    };
+    configs
+        .iter()
+        .filter_map(|v| {
+            let mut item = anomaly_config_to_list_item(v)?;
+            if let Some(groups) = &groups {
+                item.downtime_dimensions = anomaly_downtime_dimensions(v, &item.tags, groups);
+            }
+            Some(item)
+        })
+        .collect()
+}
+
+/// The Muted chip, from the cache or from the downtime the last firing recorded.
+#[cfg(feature = "enterprise")]
+pub async fn fill_active_downtimes(org: &str, list: &mut [ListAlertsResponseBodyItem]) {
+    if list.is_empty()
+        || !o2_enterprise::enterprise::common::config::get_config()
+            .downtimes
+            .enabled
+    {
+        return;
+    }
+    // No downtime rows, no chip: neither branch below can yield one, so skip the state query.
+    let rows = db::downtimes::list_cached(org);
+    if rows.is_empty() {
+        return;
+    }
+    let now = config::utils::time::now_micros();
+    let ids: Vec<String> = list.iter().map(|item| item.alert_id.to_string()).collect();
+    let recorded = infra::table::alert_states::last_downtime_ids(&ids)
+        .await
+        .unwrap_or_default();
+    for item in list.iter_mut() {
+        item.active_downtime = list_item_downtime(org, item, now).or_else(|| {
+            recorded
+                .get(&item.alert_id.to_string())
+                .and_then(|id| still_active(&rows, id, now))
+        });
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn fill_active_downtimes(_org: &str, _list: &mut [ListAlertsResponseBodyItem]) {}
+
+#[cfg(feature = "enterprise")]
+fn list_item_downtime(
+    org: &str,
+    item: &ListAlertsResponseBodyItem,
+    now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    use openobserve_core::alerts::downtimes::{active_for_alert, active_for_anomaly};
+
+    let id = item.alert_id.to_string();
+    let dims = list_item_dimensions(item);
+    match item.alert_type.as_str() {
+        "anomaly_detection" => active_for_anomaly(org, &id, &item.folder_id, &dims, now),
+        _ => active_for_alert(org, &id, &item.folder_id, &dims, now),
+    }
+}
+
+/// The identity a list row is matched on, the one its own scheduler matches.
+#[cfg(feature = "enterprise")]
+fn list_item_dimensions(item: &ListAlertsResponseBodyItem) -> HashMap<String, String> {
+    use o2_enterprise::enterprise::downtimes::scope::composite_dimensions;
+
+    match item.alert_type.as_str() {
+        "anomaly_detection" => item.downtime_dimensions.clone(),
+        "composite" => composite_dimensions(&item.tags),
+        _ => HashMap::new(),
+    }
+}
+
+/// The `anomaly_dimensions` of a config row, read from the keys the anomaly scheduler reads.
+#[cfg(feature = "enterprise")]
+fn anomaly_downtime_dimensions(
+    v: &serde_json::Value,
+    tags: &[String],
+    semantic_groups: &[config::meta::correlation::FieldAlias],
+) -> HashMap<String, String> {
+    use openobserve_core::alerts::downtimes::{anomaly_filters, anomaly_sql};
+
+    let query_mode = v
+        .get("query_mode")
+        .and_then(|m| m.as_str())
+        .unwrap_or_default();
+    o2_enterprise::enterprise::downtimes::scope::anomaly_dimensions(
+        anomaly_sql(query_mode, v.get("custom_sql").and_then(|s| s.as_str())),
+        anomaly_filters(query_mode, v.get("filters")),
+        tags,
+        semantic_groups,
+    )
+}
+
+#[cfg(feature = "enterprise")]
+fn still_active(
+    rows: &[config::meta::downtimes::Downtime],
+    downtime_id: &str,
+    now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    let row = rows
+        .iter()
+        .find(|row| row.id == downtime_id && row.cancelled_at.is_none())?;
+    let window = o2_enterprise::enterprise::downtimes::schedule::window_at(&row.schedule, now)?;
+    Some(config::meta::downtimes::ActiveDowntime {
+        id: row.id.clone(),
+        name: row.name.clone(),
+        ends_at: window.end,
+        incident_mode: Default::default(),
     })
 }
 
@@ -682,6 +850,8 @@ mod tests {
             owner: None,
             description: None,
             alert_type: "anomaly_detection".to_string(),
+            stream_name: None,
+            stream_type: None,
             condition: None,
             trigger_condition: None,
             enabled: false,
@@ -708,6 +878,8 @@ mod tests {
             child_count: None,
             referenced_by_composite_count: None,
             expression_summary: None,
+            active_downtime: None,
+            downtime_dimensions: HashMap::new(),
         };
         let json = serde_json::to_value(&item).unwrap();
         let obj = json.as_object().unwrap();
@@ -1137,5 +1309,54 @@ mod anomaly_priority_tag_tests {
         .unwrap();
         assert_eq!(item.level, None);
         assert_eq!(item.level_since, None);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_anomaly_on_a_service_in_its_sql_shows_the_chip_of_that_service() {
+        use config::meta::{
+            correlation::FieldAlias,
+            downtimes::{Downtime, TargetModule},
+        };
+        use o2_enterprise::enterprise::downtimes::scope::{TargetItem, matches, target_for};
+
+        let groups = [FieldAlias {
+            id: "service".to_string(),
+            display: "Service".to_string(),
+            group: None,
+            fields: vec!["service".to_string()],
+            is_workload_type: false,
+        }];
+        let v = cfg(serde_json::json!({
+            "query_mode": "custom_sql",
+            "custom_sql": "SELECT count(*) AS c FROM \"logs\" WHERE service = 'payments'",
+        }));
+        let mut item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert!(item.tags.is_empty());
+        item.downtime_dimensions = anomaly_downtime_dimensions(&v, &item.tags, &groups);
+
+        let downtime: Downtime = serde_json::from_value(serde_json::json!({
+            "id": "dt-1", "org": "default", "name": "payments maintenance",
+            "condition": { "type": "pair", "key": "service", "operator": "=", "value": "payments" },
+            "targets": [{ "module": "anomaly_detections", "folders": { "kind": "all" } }],
+            "schedule": {
+                "repeat": "none", "starts_at": 0, "timezone": "UTC", "duration_secs": 60
+            },
+            "created_by": "lin", "created_at": 0, "updated_by": "lin", "updated_at": 0
+        }))
+        .unwrap();
+        let target = target_for(&downtime.targets, TargetModule::AnomalyDetections).unwrap();
+        let id = item.alert_id.to_string();
+        let dims = list_item_dimensions(&item);
+        let row = TargetItem {
+            id: &id,
+            folder_id: &item.folder_id,
+            dimensions: &dims,
+            tags: &[],
+        };
+        assert!(
+            matches(target, downtime.condition.as_ref(), &row),
+            "{dims:?}"
+        );
     }
 }

@@ -18,6 +18,7 @@
 // hatch. Heavy children (OTable, drawers, the graph preview) are stubbed.
 
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 const { mockRouter, mockRoute, mockToast, mockHydrate, mockGetFolders } = vi.hoisted(() => ({
   mockRouter: {
@@ -112,7 +113,6 @@ const OTableStub = {
         </span>
         <slot name="cell-actions" :row="row" />
       </template>
-      <slot name="bottom" />
     </div>
   `,
 };
@@ -259,6 +259,7 @@ describe("WorkflowsList", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
     mockRouter.currentRoute.value = { name: "workflows", query: {} } as any;
     mockRoute.query = {};
     listWorkflows.mockResolvedValue({
@@ -663,16 +664,6 @@ describe("WorkflowsList", () => {
         name: "createWorkflow",
         query: { org_identifier: "default", folder: "default" },
       });
-    });
-
-    it("reports the filtered total in the footer", async () => {
-      wrapper = mountList();
-      await flushPromises();
-      expect(wrapper.find(".o2-table-footer-title").text()).toContain("2");
-
-      await search(wrapper).setValue("workflow-1");
-      await nextTick();
-      expect(wrapper.find(".o2-table-footer-title").text()).toContain("1");
     });
   });
 
@@ -1140,6 +1131,33 @@ describe("WorkflowsList", () => {
       // Pending only: the refresh button's age interval would make runAllTimers loop forever.
       vi.runOnlyPendingTimers();
       expect(restorePage).toHaveBeenCalledWith(3);
+    });
+  });
+
+  describe("view state restore", () => {
+    it("restores search, tab, page size and sort", () => {
+      useListViewState("workflows", {
+        filterQuery: "nightly",
+        tab: "all",
+        pageSize: 50,
+        sortBy: "name",
+        sortOrder: "desc",
+      });
+      wrapper = mountList();
+      expect(wrapper.vm.filterQuery).toBe("nightly");
+      expect(wrapper.vm.pageSize).toBe(50);
+      expect(wrapper.vm.sortBy).toBe("name");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+    });
+
+    it("saves changes to the view state", async () => {
+      wrapper = mountList();
+      wrapper.vm.filterQuery = "abc";
+      wrapper.vm.pageSize = 100;
+      await wrapper.vm.$nextTick();
+      const saved: any = useListViewState("workflows", {});
+      expect(saved.filterQuery).toBe("abc");
+      expect(saved.pageSize).toBe(100);
     });
   });
 });

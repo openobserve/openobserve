@@ -53,13 +53,30 @@ describe("DbmOverlapValue", () => {
     expect(wrapper.get('[data-test="dbm-overlap-qualifier"]').text()).toBe("exec time");
   });
 
-  it("says a fallback figure is client-observed rather than passing it off as the database's", () => {
+  it("marks a fallback figure with the app-source glyph instead of a text label", () => {
     const wrapper = mountValue({
       value: "94.4s",
       source: "client",
       qualifierKey: "clientObserved",
     });
-    expect(wrapper.get('[data-test="dbm-overlap-qualifier"]').text()).toBe("client-observed");
+    const marker = wrapper.get('[data-test="dbm-app-source-marker"]');
+    expect(marker.attributes("role")).toBe("img");
+    expect(marker.attributes("aria-label")).toBe("Measured from your application's traces");
+    expect(wrapper.find('[data-test="dbm-overlap-qualifier"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toMatch(/client-observed/i);
+    expect(wrapper.text()).toContain("94.4s");
+  });
+
+  it("drops the glyph where the host says every row is app-sourced", () => {
+    const wrapper = mountValue({
+      value: "94.4s",
+      source: "client",
+      qualifierKey: "clientObserved",
+      withMarker: false,
+    });
+    expect(wrapper.text()).toContain("94.4s");
+    expect(wrapper.find('[data-test="dbm-app-source-marker"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="dbm-overlap-qualifier"]').exists()).toBe(false);
   });
 
   it("counts are marked as counted by the engine, across every client", () => {

@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ formatPercent(share, 0) }}
         </span>
       </span>
-      <span v-if="showsShare || qualifier" class="flex items-center gap-1.5">
+      <span v-if="showsShare || qualifier || fromApp" class="flex items-center gap-1.5">
         <OProgressBar
           v-if="showsShare"
           :value="share"
@@ -71,8 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="xs"
           class="w-14"
         />
+        <DbmAppSourceMarker v-if="fromApp" />
         <span
-          v-if="qualifier"
+          v-else-if="qualifier"
           class="text-text-secondary text-3xs"
           data-test="dbm-overlap-qualifier"
         >
@@ -87,12 +88,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import DbmAppSourceMarker from "@/components/dbm/DbmAppSourceMarker.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { SparklinePoint, SparklineTone } from "@/lib/data/Sparkline/OSparkline.types";
 import { useI18nTyped } from "@/types/i18n";
 import { formatNs, formatPercent } from "@/utils/dbm/format";
+import { APP_SOURCE_QUALIFIER } from "@/utils/dbm/overlapMetrics";
 
 const props = withDefaults(
   defineProps<{
@@ -108,8 +111,8 @@ const props = withDefaults(
     critical?: boolean;
     /**
      * The `dbm.list.overlap.*` key naming WHICH measurement `totalTimeNs` is,
-     * when this duration came from the database's own counters. Absent on a
-     * purely client-observed cell that has no engine distinction to draw.
+     * when this duration came from the database's own counters, or
+     * `clientObserved` for one from the application's traces (shown as a marker).
      */
     qualifierKey?: string | null;
     /** Which vantage supplied `totalTimeNs` — the share is only valid on `client`. */
@@ -137,15 +140,18 @@ const { t } = useI18nTyped();
  */
 const showsShare = computed(() => props.source !== "server");
 
+// An app-sourced duration carries the marker, not a text qualifier.
+const fromApp = computed(() => props.qualifierKey === APP_SOURCE_QUALIFIER);
+
 const qualifier = computed(() =>
-  props.qualifierKey === null
+  props.qualifierKey === null || fromApp.value
     ? null
     : t(`dbm.list.overlap.${props.qualifierKey}` as "dbm.list.overlap.serverWait"),
 );
 
 /** The long form, matching the detail page's sentence for the same number. */
 const qualifierTitle = computed(() =>
-  props.qualifierKey === null
+  props.qualifierKey === null || fromApp.value
     ? undefined
     : t(`dbm.detail.overlap.${props.qualifierKey}` as "dbm.detail.overlap.serverWait", {
         engine: props.engine ?? "",

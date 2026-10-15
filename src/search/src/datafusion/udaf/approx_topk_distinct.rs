@@ -38,6 +38,8 @@ use datafusion::{
 use hashbrown::HashMap;
 
 const APPROX_TOPK_DISTINCT: &str = "approx_topk_distinct";
+// Bounds k/cap so pre-allocation can't request an allocation large enough to abort the process.
+const MAX_TOPK_LIMIT: usize = 100_000;
 
 /// Approximate TopK UDAF that returns the top K elements by distinct count of another field.
 ///
@@ -194,6 +196,11 @@ fn validate_k_parameter(expr: &Arc<dyn PhysicalExpr>) -> Result<usize> {
                     "k parameter for 'APPROX_TOPK_DISTINCT' must be positive, got {value}"
                 );
             }
+            if value as usize > MAX_TOPK_LIMIT {
+                return plan_err!(
+                    "k parameter for 'APPROX_TOPK_DISTINCT' must not exceed {MAX_TOPK_LIMIT}, got {value}"
+                );
+            }
             value as usize
         }
         ColumnarValue::Scalar(other) => {
@@ -219,6 +226,11 @@ fn validate_cap_parameter(expr: &Arc<dyn PhysicalExpr>) -> Result<usize> {
             if value <= 0 {
                 return plan_err!(
                     "cap parameter for 'APPROX_TOPK_DISTINCT' must be positive, got {value}"
+                );
+            }
+            if value as usize > MAX_TOPK_LIMIT {
+                return plan_err!(
+                    "cap parameter for 'APPROX_TOPK_DISTINCT' must not exceed {MAX_TOPK_LIMIT}, got {value}"
                 );
             }
             value as usize
@@ -262,10 +274,10 @@ impl std::fmt::Debug for ApproxTopKDistinctAccumulator {
 impl ApproxTopKDistinctAccumulator {
     fn new(k: usize, max_candidates: Option<usize>) -> Self {
         // Cap at least k*4 for safety
-        let default_max = (k * 4).max(1000);
+        let default_max = k.saturating_mul(4).max(1000);
         let max_candidates = max_candidates.unwrap_or(default_max);
         Self {
-            candidates: HashMap::with_capacity(max_candidates),
+            candidates: HashMap::with_capacity(max_candidates.min(1024)),
             k,
             max_candidates,
             min_count_threshold: 0,
@@ -670,6 +682,24 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].num_columns(), 1);
         assert_eq!(results[0].num_rows(), 1);
+    }
+
+    #[test]
+    fn test_validate_k_parameter_rejects_huge_value() {
+        let expr: Arc<dyn PhysicalExpr> =
+            Arc::new(datafusion::physical_expr::expressions::Literal::new(
+                ScalarValue::Int64(Some(2_500_000_000_000_000)),
+            ));
+        assert!(validate_k_parameter(&expr).is_err());
+    }
+
+    #[test]
+    fn test_validate_cap_parameter_rejects_huge_value() {
+        let expr: Arc<dyn PhysicalExpr> =
+            Arc::new(datafusion::physical_expr::expressions::Literal::new(
+                ScalarValue::Int64(Some(2_500_000_000_000_000)),
+            ));
+        assert!(validate_cap_parameter(&expr).is_err());
     }
 
     #[tokio::test]

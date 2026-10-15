@@ -18,3 +18,20 @@ pub mod logs;
 pub mod metrics;
 pub mod profiles;
 pub mod rum;
+
+/// An expired trial is the only quota answer; no other refusal should read as a quota problem.
+#[cfg(feature = "cloud")]
+pub(crate) fn ingestion_not_allowed_response(e: infra::errors::Error) -> axum::response::Response {
+    use axum::{http::StatusCode, response::IntoResponse};
+
+    let status = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+        StatusCode::TOO_MANY_REQUESTS
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
+    (
+        status,
+        axum::Json(crate::common::meta::http::HttpResponse::error(status, e)),
+    )
+        .into_response()
+}

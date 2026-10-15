@@ -35,7 +35,7 @@ const MAX_SHARDS: usize = 256;
 // Auto budget when ZO_METRICS_LABEL_CACHE_MAX_SIZE is 0: 5% of total memory,
 // clamped to [100 MB, 1 GiB] (a typical series costs ~1KB per label set).
 const AUTO_MEM_PERCENT: usize = 5;
-const AUTO_MIN_BYTES: usize = 100 * 1024 * 1024;
+const AUTO_MIN_BYTES: usize = 8 * 1024 * 1024;
 const AUTO_MAX_BYTES: usize = 1024 * 1024 * 1024;
 // Fixed per-entry overhead: key + LRU node bookkeeping + Arc header.
 const ENTRY_OVERHEAD: usize = 96;

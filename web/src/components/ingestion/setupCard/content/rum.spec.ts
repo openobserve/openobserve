@@ -285,6 +285,13 @@ describe("rumCard builder", () => {
       const cdn = install.variants!.find((v) => v.id === "cdn")!;
       expect(cdn.code.raw).toContain("O2_LOGS");
     });
+
+    it("cdn async loader sets crossOrigin so cross-origin dynamic imports (recorder/profiler chunks) can resolve", () => {
+      const card = buildCard();
+      const install = card.steps.find((s) => s.id === "install")!;
+      const cdn = install.variants!.find((v) => v.id === "cdn")!;
+      expect(cdn.code.raw).toContain("d.crossOrigin = 'anonymous'");
+    });
   });
 
   // ── NPM init variant ─────────────────────────────────────────────────────────

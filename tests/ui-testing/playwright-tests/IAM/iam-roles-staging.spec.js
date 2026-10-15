@@ -1,0 +1,267 @@
+// IAM → Edit Role · staged changes, undo, save (S-01 .. S-12)
+//
+// Plan: .claude/commands/nvpworkflow/iam-roles-redesign-tests.md
+//
+// #14682 introduced a staged-change model: a tick does not write, it queues, and
+// the queue is reviewable and undoable before Save. None of that existed in the
+// old tree, so none of it has ever been exercised. The failure that matters most
+// is S-11 — losing a user's staged work when the save fails.
+//
+// ENTERPRISE ONLY, and needs a build carrying openobserve#14682.
+
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const PageManager = require('../../pages/page-manager.js');
+const testLogger = require('../utils/test-logger.js');
+const {
+    ns, req, listRoles, createRole, setRolePerms, getPerms, makeTracker, uniq, org, rbacEnabled,
+} = require('./iam-fixtures.js');
+
+// This file's own namespace. Every artifact it creates lives under it, and its
+// sweeps delete only it: the eleven IAM specs run in parallel and, through a
+// shared `ui_auto` prefix, used to delete each other's fixtures mid-test.
+const NS = ns('stg');
+
+// What this spec made, so teardown deletes exactly that — never a prefix sweep,
+// which is what had the IAM specs deleting each other's fixtures mid-test.
+const made = makeTracker();
+
+const obj = (resource) => `${resource}:_all_${org()}`;
+
+test.describe('IAM · Edit Role · staged changes', { tag: '@enterprise' }, () => {
+    // Serial, NOT parallel. every test in this file creates roles under one namespace and afterAll sweeps that
+    // namespace, and beforeAll/afterAll run once PER WORKER — not per file. Under
+    // `fullyParallel: true` this file's tests spread across workers, so each worker runs
+    // its own sweep and they delete each other's roles mid-test: measured as
+    // "teardown left roles behind: <this file's own prefix>". Serial pins the file to one
+    // worker, so there is exactly one setup and one teardown.
+    test.describe.configure({ mode: 'serial' });
+
+    let pm;
+
+    const openFresh = async (page, tag, seed = []) => {
+        const name = `${NS}_st_${tag}_${uniq()}`;
+        made.role(name);
+        await createRole(page, name);
+        if (seed.length) await setRolePerms(page, name, seed);
+        await pm.rolesPage.gotoRoles();
+        await pm.rolesPage.openRole(name);
+        await pm.rolesPage.waitForGrantsSettled(seed.length);
+        return name;
+    };
+
+    test.beforeAll(async ({ browser }) => {
+        const page = await browser.newPage();
+        try { /* nothing to sweep: teardown deletes exactly what each test made */ } finally { await page.close(); }
+    });
+
+    test.afterAll(async ({ browser }) => {
+        const page = await browser.newPage();
+        try {
+            const removed = (await made.cleanup(page)).roles;
+            testLogger.info(`teardown removed ${removed.length} roles`);
+            const left = await made.survivors(page);
+            if (left.length) throw new Error(`teardown left its own artifacts behind: ${left}`);
+        } finally { await page.close(); }
+    });
+
+    test.beforeEach(async ({ page }) => {
+        await navigateToBase(page);
+        pm = new PageManager(page);
+        // Capability is decided by the API, not by how fast a tab paints.
+        test.skip(!(await rbacEnabled(page)), 'RBAC is off (OSS build)');
+        await page.locator('[data-test="menu-link-\\/iam-item"]').click();
+        await pm.rolesPage.rolesTab.waitFor({ state: 'visible', timeout: 30000 });
+    });
+
+    test('S-01 · ticking a grant marks the module unsaved and counts the change', {
+        tag: ['@iam', '@iamRolesStaging', '@P1', '@all']
+    }, async ({ page }) => {
+        await openFresh(page, 'mark');
+        await pm.rolesPage.openModule('function');
+        await pm.rolesPage.grantScope('function', 'AllowList');
+
+        await expect(pm.rolesPage.paneAdded).toBeVisible({ timeout: 10000 });
+        await expect(pm.rolesPage.railUnsaved('function').first()).toBeVisible();
+        await expect(pm.rolesPage.unsavedCount).toContainText('1');
+    });
+
+    test('S-02 · unticking a saved grant marks it as a pending removal', {
+        tag: ['@iam', '@iamRolesStaging', '@P1', '@all']
+    }, async ({ page }) => {
+        await openFresh(page, 'rm', [{ object: obj('function'), permission: 'AllowList' }]);
+        await pm.rolesPage.openModule('function');
+        await pm.rolesPage.revokeScope('function', 'AllowList');
+
+        await expect(pm.rolesPage.paneRemoved).toBeVisible({ timeout: 10000 });
+        await expect(pm.rolesPage.unsavedCount).toContainText('1');
+    });
+
+    test('S-03 · the drawer lists every staged change across modules', {
+        tag: ['@iam', '@iamRolesStaging', '@P1', '@all']
+    }, async ({ page }) => {
+        await openFresh(page, 'drawer');
+        await pm.rolesPage.openModule('function');
+        await pm.rolesPage.grantScope('function', 'AllowList');
+        await pm.rolesPage.openModule('pipeline');
+        await pm.rolesPage.grantScope('pipeline', 'AllowGet');
+
+        await pm.rolesPage.openDrawer();
+        // One entry per changed resource — staging in two modules must not collapse
+        // into one line, or a user cannot see what they are about to write.
+        await expect(pm.rolesPage.drawerUndoButtons()).toHaveCount(2);
+    });
+
+    test('S-04 · undoing one change reverts exactly that one', {
+        tag: ['@iam', '@iamRolesStaging', '@P1', '@all']
+    }, async ({ page }) => {
+        await openFresh(page, 'undo1');
+        await pm.rolesPage.openModule('function');
+        await pm.rolesPage.grantScope('function', 'AllowList');
+        await pm.rolesPage.openModule('pipeline');
+        await pm.rolesPage.grantScope('pipeline', 'AllowGet');
+
+        await pm.rolesPage.openDrawer();
+        await expect(pm.rolesPage.drawerUndoButtons()).toHaveCount(2);
+        await pm.rolesPage.drawerUndoButtons().first().click();
+
+        await expect(pm.rolesPage.drawerUndoButtons()).toHaveCount(1);
+        await expect(pm.rolesPage.unsavedCount).toContainText('1');
+    });
+
+    // The drawer closes once nothing is left to review (useRoleSummary), so there is no empty state to wait for.
+    test('S-05 · undoing every change closes the drawer and drops Review Changes', {
+        tag: ['@iam', '@iamRolesStaging', '@P1', '@all']
+    }, async ({ page }) => {
+        const name = await openFresh(page, 'undoall');
+        await pm.rolesPage.openModule('function');
+        await pm.rolesPage.grantScope('function', 'AllowList');
+        await pm.rolesPage.grantScope('function', 'AllowGet');
+
+        await pm.rolesPage.openDrawer();
+        while ((await pm.rolesPage.drawerUndoButtons().count()) > 0) {
+            await pm.rolesPage.drawerUndoButtons().first().click();
+            await page.waitForTimeout(300);
+        }
+        await expect(pm.rolesPage.drawer).toBeHidden({ timeout: 10000 });
+        await expect(pm.rolesPage.reviewChangesButton).toBeHidden();
+
+        // And nothing may reach the API afterwards.
+        const payload = await pm.rolesPage.saveAndCapture({ expectRequest: false });
+        if (payload) expect(payload.add).toEqual([]);
+        expect(await getPerms(page, name)).toEqual([]);
+    });
+
+    test('S-06 · Cancel discards staged changes', {
+        tag: ['@iam', '@iamRolesStaging', '@P1', '@all']
+    }, async ({ page }) => {
+        const name = await openFresh(page, 'cancel');
+        await pm.rolesPage.openModule('function');
+        await pm.rolesPage.grantScope('function', 'AllowList');
+
+        await pm.rolesPage.cancelButton.click();
+        // A leave guard may stand in the way; discarding is the point of the test.
+        const confirm = page.locator('[data-test="confirm-dialog"]');
+        if (await confirm.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await confirm.locator('[data-test="o-dialog-primary-btn"]').click();
+        }
+        await page.waitForTimeout(2000);
+        expect(await getPerms(page, name)).toEqual([]);
+    });
+
+    test('S-07 · staged changes survive switching modules', {
+        tag: ['@iam', '@iamRolesStaging', '@P1', '@all']
+    }, async ({ page }) => {
+        await openFresh(page, 'switch');
+        await pm.rolesPage.openModule('function');
+        await pm.rolesPage.grantScope('function', 'AllowList');
+
+        await pm.rolesPage.openModule('pipeline');
+        await pm.rolesPage.openSummary();
+        await pm.rolesPage.openModule('function');
+
+        // Navigating away and back must not quietly drop the queued edit.
+        await expect(pm.rolesPage.unsavedCount).toContainText('1');
+        expect(await pm.rolesPage.isChecked(pm.rolesPage.scopeCheckbox('function', 'AllowList'))).toBe(true);
+    });
+
+    test('S-08 · saving clears the staged state and stores the grant', {
+        tag: ['@iam', '@iamRolesStaging', '@P0', '@all']
+    }, async ({ page }) => {
+        const name = await openFresh(page, 'save');
+        await pm.rolesPage.openModule('function');
+        await pm.rolesPage.grantScope('function', 'AllowList');
+        await pm.rolesPage.save();
+
+        await expect
+            .poll(async () => (await getPerms(page, name)).length, { timeout: 15000 })
+            .toBe(1);
+        await expect(pm.rolesPage.paneAdded).toHaveCount(0);
+    });
+
+    test('S-09 · a saved role reloads with the same grants', {
+        tag: ['@iam', '@iamRolesStaging', '@P0', '@all']
+    }, async ({ page }) => {
+        const name = await openFresh(page, 'reload');
+        await pm.rolesPage.openModule('function');
+        await pm.rolesPage.grantScope('function', 'AllowAll');
+        await pm.rolesPage.save();
+
+        await pm.rolesPage.gotoRoles();
+        await pm.rolesPage.openRole(name);
+        await pm.rolesPage.waitForGrantsSettled(1);
+        await pm.rolesPage.openModule('function');
+        expect(await pm.rolesPage.isChecked(pm.rolesPage.scopeCheckbox('function', 'AllowAll'))).toBe(true);
+    });
+
+    test('S-10 · a mixed add-and-remove batch sends both lists correctly', {
+        tag: ['@iam', '@iamRolesStaging', '@P0', '@all']
+    }, async ({ page }) => {
+        const name = await openFresh(page, 'mixed', [
+            { object: obj('function'), permission: 'AllowList' },
+        ]);
+        await pm.rolesPage.openModule('function');
+        await pm.rolesPage.revokeScope('function', 'AllowList');
+        await pm.rolesPage.grantScope('function', 'AllowGet');
+
+        const payload = await pm.rolesPage.saveAndCapture();
+        expect(payload, 'save fired no PUT').toBeTruthy();
+        expect(payload.add).toEqual([{ object: obj('function'), permission: 'AllowGet' }]);
+        expect(payload.remove).toEqual([{ object: obj('function'), permission: 'AllowList' }]);
+
+        await expect
+            .poll(async () => await getPerms(page, name), { timeout: 15000 })
+            .toEqual([{ object: obj('function'), permission: 'AllowGet' }]);
+    });
+
+    test('S-11 · a failed save surfaces an error AND keeps the staged work', {
+        tag: ['@iam', '@iamRolesStaging', '@P0', '@all']
+    }, async ({ page }) => {
+        await openFresh(page, 'fail');
+        await pm.rolesPage.openModule('function');
+        await pm.rolesPage.grantScope('function', 'AllowList');
+        await expect(pm.rolesPage.unsavedCount).toContainText('1');
+
+        // OpenFGA really does 500 on some writes, so this is the live failure mode —
+        // not a hypothetical. Losing the user's queued edits here is the worst outcome
+        // the staged model can produce.
+        await page.route('**/api/*/roles/*', (route) =>
+            route.request().method() === 'PUT'
+                ? route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"boom"}' })
+                : route.continue(),
+        );
+        await pm.rolesPage.saveButton.click();
+        await page.waitForTimeout(3000);
+
+        await expect(pm.rolesPage.unsavedCount).toContainText('1');
+        expect(await pm.rolesPage.isChecked(pm.rolesPage.scopeCheckbox('function', 'AllowList'))).toBe(true);
+        await page.unroute('**/api/*/roles/*');
+    });
+
+    // A clean role has nothing to review, so the affordance is not offered at all.
+    test('S-12 · a clean role offers no Review Changes', {
+        tag: ['@iam', '@iamRolesStaging', '@P2', '@all']
+    }, async ({ page }) => {
+        await openFresh(page, 'clean');
+        await expect(pm.rolesPage.reviewChangesButton).toBeHidden();
+    });
+});

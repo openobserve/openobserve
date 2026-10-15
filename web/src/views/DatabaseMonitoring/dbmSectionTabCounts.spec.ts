@@ -451,6 +451,25 @@ describe("the active tab still overrides its own badge", () => {
  *
  * Read off the source, for the reason dbmRequestGuard.spec.ts gives.
  */
+describe("each page publishes only its own tab's badge", () => {
+  // Top queries once published `databaseCount` (distinct instances in its rows), overwriting Overview's database count from every tab.
+  const OWN_KEYS: Record<string, string[]> = {
+    "DatabasesPage.vue": ["databaseCount"],
+    "QueriesPage.vue": ["queryCount"],
+    "SamplesPage.vue": ["sampleCallsCount"],
+    "ActivityPage.vue": ["activityCount"],
+    "DeadlocksPage.vue": ["deadlockCount"],
+    "BlockedQueriesPage.vue": ["blockedCount"],
+    "TableHealthPage.vue": ["tableHealthCount"],
+  };
+
+  it.each(Object.keys(OWN_KEYS))("%s publishes no sibling tab's count", (page) => {
+    const block = read(page).split("ownCounts: [")[1]?.split("\n  ],")[0] ?? "";
+    const keys = [...block.matchAll(/key: "(\w+)"/g)].map((match) => match[1]);
+    expect(keys).toEqual(OWN_KEYS[page]);
+  });
+});
+
 describe("no page re-fetches the badges the shell already owns", () => {
   /** Which endpoint each page is legitimately allowed to read for ITS OWN table. */
   const OWN_READ: Record<string, string[]> = {
@@ -511,9 +530,8 @@ describe("no page re-fetches the badges the shell already owns", () => {
    * page must show is that its refresh button is wired to THAT handler, and
    * the composable must show the force itself.
    *
-   * The button itself is now the shared `DbmRefreshButton`, which emits
-   * `refresh`; a page that still hand-rolls the OButton binds `@click`. Either
-   * spelling satisfies the requirement — that the handler is reached.
+   * The button is the library `ORefreshButton`, whose `click` carries the
+   * MouseEvent, so pages call `onRefresh()` rather than passing the handler.
    */
   it.each(Object.keys(OWN_READ))("%s wires its refresh button to the shared handler", (page) => {
     const source = read(page);
@@ -521,7 +539,7 @@ describe("no page re-fetches the badges the shell already owns", () => {
     expect(
       source,
       `${page} never binds onRefresh, so its refresh button leaves the badges stale`,
-    ).toMatch(/@(?:click|refresh)="onRefresh"/);
+    ).toMatch(/@click="onRefresh\(\)"/);
   });
 
   it("the shared refresh handler forces the badge cache", () => {

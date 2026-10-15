@@ -17,7 +17,10 @@ use std::collections::{HashMap, HashSet, hash_map::Entry};
 
 use config::meta::promql::{
     NAME_LABEL,
-    value::{Labels, LabelsExt, RangeValue, Sample, Value},
+    value::{
+        Labels, LabelsExt, RangeValue, Sample, Value, signature_with_labels,
+        signature_without_labels,
+    },
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{BinaryExpr, VectorMatchCardinality, token};
@@ -26,7 +29,7 @@ use rayon::prelude::*;
 use crate::binary::scalar_binary_operations;
 
 // DROP_METRIC_BIN_OP if the operation is one of these, drop the metric __name__
-pub const DROP_METRIC_BIN_OP: [u8; 7] = [
+pub const DROP_METRIC_BIN_OP: [token::TokenId; 7] = [
     token::T_ADD,
     token::T_SUB,
     token::T_DIV,
@@ -178,12 +181,11 @@ fn vector_or(expr: &BinaryExpr, left: Vec<RangeValue>, right: Vec<RangeValue>) -
     if right.is_empty() {
         return Ok(Value::Matrix(left));
     }
-    // Add all right-hand side elements which have not been added from the left-hand
-    // side.
-    let unmatched = filter_set_series(right, &left, false);
+    let unmatched = filter_set_series(right, &left, false, match_signature(expr));
     let mut output = left;
     output.extend(unmatched);
-    Ok(Value::Matrix(output))
+    // equal labels imply an equal signature, so left and right fragments never share a step
+    Ok(Value::Matrix(merge_same_labelset(output)?))
 }
 
 /// matrix1 unless matrix2 results in a matrix consisting of the elements of
@@ -202,7 +204,12 @@ fn vector_unless(
     if left.is_empty() || right.is_empty() {
         return Ok(Value::Matrix(left));
     }
-    Ok(Value::Matrix(filter_set_series(left, &right, false)))
+    Ok(Value::Matrix(filter_set_series(
+        left,
+        &right,
+        false,
+        match_signature(expr),
+    )))
 }
 
 /// matrix1 and matrix2 results in a matrix consisting of the elements of
@@ -217,14 +224,12 @@ fn vector_and(expr: &BinaryExpr, left: Vec<RangeValue>, right: Vec<RangeValue>) 
     if left.is_empty() || right.is_empty() {
         return Ok(Value::Matrix(vec![]));
     }
-    let output = filter_set_series(left, &right, true)
-        .into_par_iter()
-        .map(|mut range| {
-            range.labels = range.labels.without_metric_name();
-            range
-        })
-        .collect();
-    Ok(Value::Matrix(output))
+    Ok(Value::Matrix(filter_set_series(
+        left,
+        &right,
+        true,
+        match_signature(expr),
+    )))
 }
 
 fn validate_set_matching(expr: &BinaryExpr) -> Result<()> {
@@ -236,19 +241,58 @@ fn validate_set_matching(expr: &BinaryExpr) -> Result<()> {
     Ok(())
 }
 
+/// Keeps `input` samples whose step matches (`keep_matches`) or misses an `other` sample.
 fn filter_set_series(
     input: Vec<RangeValue>,
     other: &[RangeValue],
     keep_matches: bool,
+    signature: impl Fn(&Labels) -> u64 + Sync,
 ) -> Vec<RangeValue> {
-    let signatures: HashSet<u64> = other
-        .par_iter()
-        .map(|series| series.labels.signature())
-        .collect();
+    let mut other_steps: HashMap<u64, HashSet<i64>> = HashMap::with_capacity(other.len());
+    for range in other {
+        other_steps
+            .entry(signature(&range.labels))
+            .or_default()
+            .extend(range.samples.iter().map(|sample| sample.timestamp));
+    }
     input
         .into_par_iter()
-        .filter(|series| signatures.contains(&series.labels.signature()) == keep_matches)
+        .filter_map(|mut range| {
+            let steps = other_steps.get(&signature(&range.labels));
+            range.samples.retain(|sample| {
+                steps.is_some_and(|steps| steps.contains(&sample.timestamp)) == keep_matches
+            });
+            (!range.samples.is_empty()).then_some(range)
+        })
         .collect()
+}
+
+/// Signature of the labels `on`/`ignoring` compare; without `on`, `__name__` is never compared.
+fn match_signature(expr: &BinaryExpr) -> impl Fn(&Labels) -> u64 + Sync + '_ {
+    let on = expr.is_matching_on();
+    let mut names: Vec<&str> = expr
+        .modifier
+        .as_ref()
+        .and_then(|modifier| modifier.matching.as_ref())
+        .map(|matching| {
+            matching
+                .labels()
+                .labels
+                .iter()
+                .map(String::as_str)
+                .collect()
+        })
+        .unwrap_or_default();
+    if !on {
+        names.push(NAME_LABEL);
+    }
+    move |labels: &Labels| {
+        if on {
+            signature_with_labels(labels, &names)
+        } else {
+            signature_without_labels(labels, &names)
+        }
+    }
 }
 
 fn vector_arithmetic_operators(
@@ -256,23 +300,13 @@ fn vector_arithmetic_operators(
     left: Vec<RangeValue>,
     right: Vec<RangeValue>,
 ) -> Result<Value> {
-    let is_matching_on = expr.is_matching_on();
     let matching_labels: Vec<String> = expr
         .modifier
         .as_ref()
         .and_then(|modifier| modifier.matching.as_ref())
         .map(|matching| matching.labels().labels.clone())
         .unwrap_or_default();
-    let mut excluded_labels = matching_labels.clone();
-    excluded_labels.push(NAME_LABEL.to_string());
-
-    let match_signature = |labels: &Labels| {
-        if is_matching_on {
-            labels.keep(&matching_labels).signature()
-        } else {
-            labels.delete(&excluded_labels).signature()
-        }
-    };
+    let match_signature = match_signature(expr);
 
     let card = expr.modifier.as_ref().map(|modifier| &modifier.card);
     // group_right makes the lhs the "one" side, so the rhs series drive the output
@@ -566,18 +600,9 @@ pub fn vector_bin_op(
 mod tests {
     use std::sync::Arc;
 
-    use config::meta::promql::value::{Label, Sample, signature};
+    use config::meta::promql::value::{Label, Sample};
 
     use super::*;
-
-    // Helper function to create test data for matrix operations
-    fn create_test_matrix_data() -> Vec<RangeValue> {
-        vec![
-            create_test_range_value(vec![1.0], vec![("instance", "localhost"), ("job", "node")]),
-            create_test_range_value(vec![2.0], vec![("instance", "localhost"), ("job", "node")]),
-            create_test_range_value(vec![3.0], vec![("instance", "remote"), ("job", "api")]),
-        ]
-    }
 
     fn create_test_range_value(values: Vec<f64>, labels: Vec<(&str, &str)>) -> RangeValue {
         let labels = labels
@@ -597,353 +622,6 @@ mod tests {
             samples,
             exemplars: None,
             time_window: None,
-        }
-    }
-
-    // Simple tests that don't require complex BinaryExpr construction
-    #[test]
-    fn test_range_value_creation() {
-        let range = create_test_range_value(vec![42.0], vec![("instance", "localhost")]);
-        assert_eq!(range.samples[0].value, 42.0);
-        assert_eq!(range.samples[0].timestamp, 1640995200000000i64);
-        assert_eq!(range.labels.len(), 1);
-        assert_eq!(range.labels[0].name, "instance");
-        assert_eq!(range.labels[0].value, "localhost");
-    }
-
-    #[test]
-    fn test_range_value_with_multiple_labels() {
-        let range = create_test_range_value(
-            vec![100.0],
-            vec![("env", "prod"), ("region", "us-west"), ("service", "api")],
-        );
-        assert_eq!(range.samples[0].value, 100.0);
-        assert_eq!(range.labels.len(), 3);
-
-        let label_names: Vec<&str> = range.labels.iter().map(|l| l.name.as_str()).collect();
-        assert!(label_names.contains(&"env"));
-        assert!(label_names.contains(&"region"));
-        assert!(label_names.contains(&"service"));
-    }
-
-    #[test]
-    fn test_range_value_empty_labels() {
-        let range = create_test_range_value(vec![0.0], vec![]);
-        assert_eq!(range.samples[0].value, 0.0);
-        assert!(range.labels.is_empty());
-    }
-
-    #[test]
-    fn test_range_value_numeric_values() {
-        let test_cases = [
-            (0.0, "zero"),
-            (1.0, "positive integer"),
-            (-1.0, "negative integer"),
-            (1.234, "positive float"),
-            (-1.234, "negative float"),
-            (f64::MAX, "max value"),
-            (f64::MIN, "min value"),
-        ];
-
-        for (value, description) in test_cases {
-            let range = create_test_range_value(vec![value], vec![("test", description)]);
-            assert_eq!(range.samples[0].value, value, "Failed for: {description}");
-        }
-    }
-
-    #[test]
-    fn test_range_value_timestamp_consistency() {
-        let range1 = create_test_range_value(vec![1.0], vec![("a", "1")]);
-        let range2 = create_test_range_value(vec![2.0], vec![("b", "2")]);
-
-        // Both should have the same starting timestamp
-        assert_eq!(range1.samples[0].timestamp, range2.samples[0].timestamp);
-        assert_eq!(range1.samples[0].timestamp, 1640995200000000i64);
-    }
-
-    #[test]
-    fn test_label_creation() {
-        let labels = vec![
-            ("cpu", "0"),
-            ("mode", "idle"),
-            ("instance", "localhost:9100"),
-        ];
-        let range = create_test_range_value(vec![75.5], labels.clone());
-
-        for (i, (expected_name, expected_value)) in labels.iter().enumerate() {
-            assert_eq!(range.labels[i].name, *expected_name);
-            assert_eq!(range.labels[i].value, *expected_value);
-        }
-    }
-
-    #[test]
-    fn test_label_modification() {
-        let mut labels = vec![
-            Arc::new(Label::new("env", "prod")),
-            Arc::new(Label::new("region", "us-west")),
-            Arc::new(Label::new("service", "api")),
-        ];
-
-        // Test label modification
-        labels[0] = Arc::new(Label::new("env", "staging"));
-        assert_eq!(labels[0].value, "staging");
-
-        // Test label filtering (simulate what vector operations do)
-        let filtered_labels: Vec<Arc<Label>> = labels
-            .into_iter()
-            .filter(|label| label.name != "env")
-            .collect();
-
-        assert_eq!(filtered_labels.len(), 2);
-        assert_eq!(filtered_labels[0].name, "region");
-        assert_eq!(filtered_labels[1].name, "service");
-    }
-
-    #[test]
-    fn test_matrix_operations_parallel_processing() {
-        // Test that we can process matrices in parallel (simulating what the actual functions do)
-        let matrix = vec![
-            create_test_range_value(vec![1.0], vec![("a", "1")]),
-            create_test_range_value(vec![2.0], vec![("a", "2")]),
-            create_test_range_value(vec![3.0], vec![("a", "3")]),
-            create_test_range_value(vec![4.0], vec![("a", "4")]),
-            create_test_range_value(vec![5.0], vec![("a", "5")]),
-        ];
-
-        // Simulate parallel processing by mapping over the matrix
-        let processed: Vec<f64> = matrix
-            .par_iter()
-            .map(|range| range.samples[0].value * 2.0)
-            .collect();
-
-        assert_eq!(processed.len(), 5);
-        assert_eq!(processed[0], 2.0);
-        assert_eq!(processed[1], 4.0);
-        assert_eq!(processed[2], 6.0);
-        assert_eq!(processed[3], 8.0);
-        assert_eq!(processed[4], 10.0);
-    }
-
-    #[test]
-    fn test_matrix_operations_error_scenarios() {
-        // Test scenarios that could lead to errors in matrix operations
-
-        // Test with very large numbers
-        let large_matrix = [
-            create_test_range_value(vec![f64::MAX], vec![("a", "1")]),
-            create_test_range_value(vec![f64::MIN], vec![("a", "2")]),
-        ];
-
-        assert!(large_matrix[0].samples[0].value.is_finite());
-        assert!(large_matrix[1].samples[0].value.is_finite());
-
-        // Test with NaN values
-        let nan_matrix = [create_test_range_value(vec![f64::NAN], vec![("a", "1")])];
-
-        // Should handle NaN gracefully
-        assert!(nan_matrix[0].samples[0].value.is_nan());
-    }
-
-    #[test]
-    fn test_matrix_operations_data_structures() {
-        // Test RangeValue creation and properties
-        let value =
-            create_test_range_value(vec![42.0], vec![("label1", "value1"), ("label2", "value2")]);
-        assert_eq!(value.samples[0].value, 42.0);
-        assert_eq!(value.labels.len(), 2);
-        assert_eq!(value.labels[0].name, "label1");
-        assert_eq!(value.labels[0].value, "value1");
-        assert_eq!(value.labels[1].name, "label2");
-        assert_eq!(value.labels[1].value, "value2");
-    }
-
-    #[test]
-    fn test_matrix_operations_timestamp_consistency() {
-        let timestamp = 1640995200000000i64;
-        let value = create_test_range_value(vec![10.0], vec![("test", "value")]);
-        assert_eq!(value.samples[0].timestamp, timestamp);
-    }
-
-    #[test]
-    fn test_matrix_operations_label_handling() {
-        let value = create_test_range_value(vec![5.0], vec![("a", "1"), ("b", "2"), ("c", "3")]);
-        assert_eq!(value.labels.len(), 3);
-
-        // Test label ordering and values
-        let labels = &value.labels;
-        assert_eq!(labels[0].name, "a");
-        assert_eq!(labels[0].value, "1");
-        assert_eq!(labels[1].name, "b");
-        assert_eq!(labels[1].value, "2");
-        assert_eq!(labels[2].name, "c");
-        assert_eq!(labels[2].value, "3");
-    }
-
-    #[test]
-    fn test_matrix_operations_empty_labels() {
-        let value = create_test_range_value(vec![0.0], vec![]);
-        assert_eq!(value.labels.len(), 0);
-        assert_eq!(value.samples[0].value, 0.0);
-    }
-
-    #[test]
-    fn test_matrix_operations_negative_values() {
-        let value = create_test_range_value(vec![-15.5], vec![("negative", "test")]);
-        assert_eq!(value.samples[0].value, -15.5);
-        assert_eq!(value.labels.len(), 1);
-        assert_eq!(value.labels[0].name, "negative");
-        assert_eq!(value.labels[0].value, "test");
-    }
-
-    #[test]
-    fn test_matrix_operations_large_numbers() {
-        let value = create_test_range_value(vec![1e15], vec![("large", "number")]);
-        assert_eq!(value.samples[0].value, 1e15);
-        assert_eq!(value.labels.len(), 1);
-    }
-
-    #[test]
-    fn test_matrix_operations_special_floats() {
-        let value = create_test_range_value(vec![f64::INFINITY], vec![("inf", "test")]);
-        assert!(value.samples[0].value.is_infinite());
-        assert!(value.samples[0].value.is_sign_positive());
-
-        let value = create_test_range_value(vec![f64::NEG_INFINITY], vec![("neg_inf", "test")]);
-        assert!(value.samples[0].value.is_infinite());
-        assert!(value.samples[0].value.is_sign_negative());
-
-        let value = create_test_range_value(vec![f64::NAN], vec![("nan", "test")]);
-        assert!(value.samples[0].value.is_nan());
-    }
-
-    #[test]
-    fn test_matrix_operations_unicode_labels() {
-        let value = create_test_range_value(
-            vec![1.0],
-            vec![("🚀", "🚀"), ("测试", "测试"), ("🎉", "🎉")],
-        );
-        assert_eq!(value.labels.len(), 3);
-        assert_eq!(value.labels[0].name, "🚀");
-        assert_eq!(value.labels[0].value, "🚀");
-        assert_eq!(value.labels[1].name, "测试");
-        assert_eq!(value.labels[1].value, "测试");
-        assert_eq!(value.labels[2].name, "🎉");
-        assert_eq!(value.labels[2].value, "🎉");
-    }
-
-    #[test]
-    fn test_matrix_operations_long_labels() {
-        let long_name = "a".repeat(1000);
-        let long_value = "b".repeat(1000);
-        let value = create_test_range_value(vec![1.0], vec![(&long_name, &long_value)]);
-        assert_eq!(value.labels.len(), 1);
-        assert_eq!(value.labels[0].name, long_name);
-        assert_eq!(value.labels[0].value, long_value);
-    }
-
-    #[test]
-    fn test_matrix_operations_duplicate_labels() {
-        let value = create_test_range_value(vec![1.0], vec![("a", "1"), ("a", "2"), ("a", "3")]);
-        assert_eq!(value.labels.len(), 3);
-        // All labels should be preserved even if names are duplicate
-        assert_eq!(value.labels[0].name, "a");
-        assert_eq!(value.labels[0].value, "1");
-        assert_eq!(value.labels[1].name, "a");
-        assert_eq!(value.labels[1].value, "2");
-        assert_eq!(value.labels[2].name, "a");
-        assert_eq!(value.labels[2].value, "3");
-    }
-
-    #[test]
-    fn test_matrix_operations_edge_case_values() {
-        let value = create_test_range_value(vec![f64::EPSILON], vec![("epsilon", "test")]);
-        assert_eq!(value.samples[0].value, f64::EPSILON);
-
-        let value =
-            create_test_range_value(vec![f64::MIN_POSITIVE], vec![("min_positive", "test")]);
-        assert_eq!(value.samples[0].value, f64::MIN_POSITIVE);
-
-        let value = create_test_range_value(vec![f64::MAX], vec![("max", "test")]);
-        assert_eq!(value.samples[0].value, f64::MAX);
-    }
-
-    #[test]
-    fn test_matrix_operations_matrix_data() {
-        let matrix_data = create_test_matrix_data();
-        assert_eq!(matrix_data.len(), 3);
-
-        // Test first element
-        assert_eq!(matrix_data[0].samples[0].value, 1.0);
-        assert_eq!(matrix_data[0].labels.len(), 2);
-        assert_eq!(matrix_data[0].labels[0].name, "instance");
-        assert_eq!(matrix_data[0].labels[0].value, "localhost");
-
-        // Test second element
-        assert_eq!(matrix_data[1].samples[0].value, 2.0);
-        assert_eq!(matrix_data[1].labels.len(), 2);
-
-        // Test third element
-        assert_eq!(matrix_data[2].samples[0].value, 3.0);
-        assert_eq!(matrix_data[2].labels.len(), 2);
-        assert_eq!(matrix_data[2].labels[0].name, "instance");
-        assert_eq!(matrix_data[2].labels[0].value, "remote");
-    }
-
-    #[test]
-    fn test_matrix_operations_label_signatures() {
-        let value1 = create_test_range_value(vec![1.0], vec![("a", "1"), ("b", "2")]);
-        let value2 = create_test_range_value(vec![2.0], vec![("a", "1"), ("b", "2")]);
-        let value3 = create_test_range_value(vec![3.0], vec![("a", "1"), ("b", "3")]);
-
-        // value1 and value2 should have the same signature (same labels)
-        let sig1 = signature(&value1.labels);
-        let sig2 = signature(&value2.labels);
-        let sig3 = signature(&value3.labels);
-
-        assert_eq!(sig1, sig2);
-        assert_ne!(sig1, sig3);
-        assert_ne!(sig2, sig3);
-    }
-
-    #[test]
-    fn test_matrix_operations_empty_matrix() {
-        let empty_matrix: Vec<RangeValue> = vec![];
-        assert_eq!(empty_matrix.len(), 0);
-
-        // Test that we can create an empty matrix and it doesn't panic
-        let empty_matrix_with_capacity: Vec<RangeValue> = Vec::with_capacity(100);
-        assert_eq!(empty_matrix_with_capacity.len(), 0);
-        assert_eq!(empty_matrix_with_capacity.capacity(), 100);
-    }
-
-    #[test]
-    fn test_matrix_operations_single_element() {
-        let single_element = [create_test_range_value(
-            vec![42.0],
-            vec![("single", "test")],
-        )];
-        assert_eq!(single_element.len(), 1);
-        assert_eq!(single_element[0].samples[0].value, 42.0);
-        assert_eq!(single_element[0].labels.len(), 1);
-        assert_eq!(single_element[0].labels[0].name, "single");
-        assert_eq!(single_element[0].labels[0].value, "test");
-    }
-
-    #[test]
-    fn test_matrix_operations_multiple_samples() {
-        // Test RangeValue with multiple samples
-        let value =
-            create_test_range_value(vec![1.0, 2.0, 3.0, 4.0, 5.0], vec![("metric", "test")]);
-        assert_eq!(value.samples.len(), 5);
-        assert_eq!(value.samples[0].value, 1.0);
-        assert_eq!(value.samples[1].value, 2.0);
-        assert_eq!(value.samples[2].value, 3.0);
-        assert_eq!(value.samples[3].value, 4.0);
-        assert_eq!(value.samples[4].value, 5.0);
-
-        // Check timestamps are incrementing
-        for i in 1..value.samples.len() {
-            assert!(value.samples[i].timestamp > value.samples[i - 1].timestamp);
         }
     }
 
@@ -1372,5 +1050,108 @@ mod tests {
         );
         assert_eq!(sample_pairs(&result[0]), vec![(1, 5.0), (3, 10.0)]);
         assert_eq!(sample_pairs(&result[1]), vec![(2, 5.0)]);
+    }
+
+    #[test]
+    fn test_and_keeps_metric_name_and_ignores_it_when_matching() {
+        let left = vec![range_at(
+            &[(1, 1.0)],
+            vec![("__name__", "up"), ("job", "api")],
+        )];
+        let right = vec![range_at(
+            &[(1, 2.0)],
+            vec![("__name__", "ready"), ("job", "api")],
+        )];
+        let result = eval_bin_op("up and ready", left, right);
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            label_pairs(&result[0]),
+            pairs(&[("__name__", "up"), ("job", "api")])
+        );
+        assert_eq!(sample_pairs(&result[0]), vec![(1, 1.0)]);
+    }
+
+    #[test]
+    fn test_set_operators_honor_on_and_ignoring() {
+        let left = || {
+            vec![
+                range_at(&[(1, 1.0)], vec![("instance", "a"), ("job", "api")]),
+                range_at(&[(1, 2.0)], vec![("instance", "b"), ("job", "db")]),
+            ]
+        };
+        let right = || {
+            vec![range_at(
+                &[(1, 9.0)],
+                vec![("instance", "x"), ("job", "api")],
+            )]
+        };
+        for (query, expected) in [
+            ("a and b", vec![]),
+            (
+                "a and on (job) b",
+                vec![pairs(&[("instance", "a"), ("job", "api")])],
+            ),
+            (
+                "a and ignoring (instance) b",
+                vec![pairs(&[("instance", "a"), ("job", "api")])],
+            ),
+            (
+                "a unless on (job) b",
+                vec![pairs(&[("instance", "b"), ("job", "db")])],
+            ),
+            (
+                "a or on (job) b",
+                vec![
+                    pairs(&[("instance", "a"), ("job", "api")]),
+                    pairs(&[("instance", "b"), ("job", "db")]),
+                ],
+            ),
+            (
+                "a or b",
+                vec![
+                    pairs(&[("instance", "a"), ("job", "api")]),
+                    pairs(&[("instance", "b"), ("job", "db")]),
+                    pairs(&[("instance", "x"), ("job", "api")]),
+                ],
+            ),
+        ] {
+            let mut labels: Vec<_> = eval_bin_op(query, left(), right())
+                .iter()
+                .map(label_pairs)
+                .collect();
+            labels.sort();
+            assert_eq!(labels, expected, "{query}");
+        }
+    }
+
+    #[test]
+    fn test_set_operators_match_per_step() {
+        let left = || {
+            vec![range_at(
+                &[(1, 1.0), (2, 2.0), (3, 3.0)],
+                vec![("job", "api")],
+            )]
+        };
+        let right = || vec![range_at(&[(2, 20.0), (4, 40.0)], vec![("job", "api")])];
+        let samples = |query| {
+            let mut result = eval_bin_op(query, left(), right());
+            result.sort_by_key(|range| range.samples[0].timestamp);
+            result.iter().flat_map(sample_pairs).collect::<Vec<_>>()
+        };
+        assert_eq!(samples("a and b"), vec![(2, 2.0)]);
+        assert_eq!(samples("a unless b"), vec![(1, 1.0), (3, 3.0)]);
+        assert_eq!(
+            samples("a or b"),
+            vec![(1, 1.0), (2, 2.0), (3, 3.0), (4, 40.0)]
+        );
+    }
+
+    #[test]
+    fn test_or_merges_fragments_with_the_same_labels() {
+        let left = vec![range_at(&[(1, 1.0)], vec![])];
+        let right = vec![range_at(&[(1, 2.0), (2, 2.0)], vec![])];
+        let result = eval_bin_op("a or b", left, right);
+        assert_eq!(result.len(), 1);
+        assert_eq!(sample_pairs(&result[0]), vec![(1, 1.0), (2, 2.0)]);
     }
 }

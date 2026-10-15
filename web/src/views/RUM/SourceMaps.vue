@@ -18,8 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="source-maps-container bg-card-glass-bg flex h-full flex-col overflow-hidden">
     <!-- Filters Section -->
     <div class="px-page-edge bg-surface-base py-3">
-      <div class="flex items-end justify-between">
-        <div class="flex items-end gap-4">
+      <!-- Below lg the filters and actions share one wrapping row (filters two-up on phones) instead of running off the edge. -->
+      <div class="flex items-end justify-between max-lg:flex-wrap max-lg:gap-2">
+        <div class="flex items-end gap-4 max-lg:contents">
           <!-- Version Filter -->
           <OSelect
             v-model="filters.version"
@@ -29,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchable
             creatable
             style="width: 12.5rem"
-            class="o2-custom-select-dashboard"
+            class="o2-custom-select-dashboard max-md:basis-[calc(50%-0.25rem)]"
           />
 
           <!-- Service Filter -->
@@ -41,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchable
             creatable
             style="width: 12.5rem"
-            class="o2-custom-select-dashboard"
+            class="o2-custom-select-dashboard max-md:basis-[calc(50%-0.25rem)]"
           />
 
           <!-- Environment Filter -->
@@ -53,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchable
             creatable
             style="width: 12.5rem"
-            class="o2-custom-select-dashboard"
+            class="o2-custom-select-dashboard max-md:basis-[calc(50%-0.25rem)]"
           />
 
           <!-- Apply Button -->
@@ -63,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Columns + Refresh + Upload Buttons -->
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 max-lg:ms-auto">
           <OTableColumnToggle
             :columns="columns"
             :column-visibility="columnVisibility"
@@ -96,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="source-maps-list min-h-0 flex-1">
       <!-- Source Maps Table (OTable handles loading skeleton) -->
       <OTable
+        ref="oTableRef"
         :data="groupedSourceMaps"
         :columns="columns"
         :column-visibility="columnVisibility"
@@ -105,8 +107,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         pagination="client"
         :page-size="selectedPerPage"
         :page-size-options="perPageOptionsList"
+        :current-page="currentPage"
+        @update:current-page="currentPage = $event"
+        @update:page-size="selectedPerPage = $event"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
+        @update:sort-by="sortBy = $event"
+        @update:sort-order="sortOrder = $event"
         :show-global-filter="false"
-        :footer-title="t('rum.sourceMaps')"
         expansion="single"
         expand-on-row-click
         v-model:expanded-ids="expandedIds"
@@ -196,7 +204,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // would silently drop it from the cache and bring back the refetch-on-return.
 defineOptions({ name: "SourceMaps" });
 
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
+import { useListViewState } from "@/composables/useListViewState";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -239,11 +248,15 @@ const filteredServiceOptions = ref<string[]>([]);
 const filteredEnvironmentOptions = ref<string[]>([]);
 
 // Filters
-const filters = ref<{
-  version?: string;
-  service?: string;
-  environment?: string;
-}>({});
+type SourceMapFilters = { version?: string; service?: string; environment?: string };
+const viewState = useListViewState("rumSourceMaps", {
+  filters: {} as SourceMapFilters,
+  pageSize: 20,
+  currentPage: 1,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const filters = ref<SourceMapFilters>({ ...viewState.filters });
 
 // Fetch filter values from API
 const fetchFilterValues = async () => {
@@ -338,7 +351,22 @@ const columns = computed<OTableColumnDef[]>(() => [
 ]);
 
 // Pagination
-const selectedPerPage = ref<number>(20);
+const selectedPerPage = ref<number>(viewState.pageSize);
+const currentPage = ref(viewState.currentPage);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+const oTableRef = ref<any>(null);
+watch([filters, selectedPerPage, currentPage, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filters: { ...filters.value },
+    pageSize: selectedPerPage.value,
+    currentPage: currentPage.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
+watch(filters, () => (currentPage.value = 1), { deep: true });
+let pageRestored = false;
 
 const perPageOptionsList = [20, 50, 100, 250];
 
@@ -370,6 +398,11 @@ const fetchSourceMaps = async () => {
     groupedSourceMaps.value = [];
   } finally {
     isLoading.value = false;
+    if (!pageRestored) {
+      pageRestored = true;
+      // Macrotask so the restored page wins over the table's own reset on data change.
+      setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+    }
   }
 };
 

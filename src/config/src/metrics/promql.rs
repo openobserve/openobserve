@@ -16,7 +16,7 @@
 use std::sync::LazyLock;
 
 use prometheus::{
-    Gauge, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGaugeVec, Opts,
+    Gauge, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, Opts,
     core::{Collector, Desc},
     proto::MetricFamily,
 };
@@ -31,12 +31,14 @@ pub struct IndexBlocksCacheMetrics {
     pub used: Gauge,
     pub evictions: IntCounter,
     pub hits: IntCounter,
+    pub misses: IntCounter,
+    pub partial_hits: IntCounter,
 }
 
 impl Default for IndexBlocksCacheMetrics {
     fn default() -> Self {
         let options = |suffix: &str, help: &str| {
-            Opts::new(format!("metrics_index_blocks_cache_{suffix}"), help)
+            Opts::new(format!("metrics_blocks_cache_{suffix}"), help)
                 .namespace(NAMESPACE)
                 .const_labels(create_const_labels())
         };
@@ -53,7 +55,17 @@ impl Default for IndexBlocksCacheMetrics {
             .expect("Metric created"),
             hits: IntCounter::with_opts(options(
                 "hits_total",
-                "Successful block metadata cache key lookups before file binding validation.",
+                "Successful enabled block metadata cache key lookups before file binding validation, including partial hits; disabled-cache lookups excluded.",
+            ))
+            .expect("Metric created"),
+            misses: IntCounter::with_opts(options(
+                "misses_total",
+                "Absent keys in initial enabled block metadata cache lookups; disabled-cache lookups excluded.",
+            ))
+            .expect("Metric created"),
+            partial_hits: IntCounter::with_opts(options(
+                "partial_hits_total",
+                "Initial enabled block metadata cache key hits missing requested label columns, a subset of hits; disabled-cache lookups excluded.",
             ))
             .expect("Metric created"),
         }
@@ -62,17 +74,29 @@ impl Default for IndexBlocksCacheMetrics {
 
 impl Collector for IndexBlocksCacheMetrics {
     fn desc(&self) -> Vec<&Desc> {
-        [&self.used as &dyn Collector, &self.evictions, &self.hits]
-            .into_iter()
-            .flat_map(Collector::desc)
-            .collect()
+        [
+            &self.used as &dyn Collector,
+            &self.evictions,
+            &self.hits,
+            &self.misses,
+            &self.partial_hits,
+        ]
+        .into_iter()
+        .flat_map(Collector::desc)
+        .collect()
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
-        [&self.used as &dyn Collector, &self.evictions, &self.hits]
-            .into_iter()
-            .flat_map(Collector::collect)
-            .collect()
+        [
+            &self.used as &dyn Collector,
+            &self.evictions,
+            &self.hits,
+            &self.misses,
+            &self.partial_hits,
+        ]
+        .into_iter()
+        .flat_map(Collector::collect)
+        .collect()
     }
 }
 
@@ -119,59 +143,6 @@ pub static LABEL_CACHE_MISS_COUNT: LazyLock<IntCounterVec> = LazyLock::new(|| {
     .expect("Metric created")
 });
 
-// metrics for metrics index selection cache
-pub static INDEX_SELECTION_CACHE_MEMORY_USAGE: LazyLock<IntGaugeVec> = LazyLock::new(|| {
-    IntGaugeVec::new(
-        Opts::new(
-            "metrics_index_selection_cache_memory_usage",
-            "Total memory usage (bytes) of metrics index selection cache",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
-pub static INDEX_SELECTION_CACHE_GC_TOTAL: LazyLock<IntCounterVec> = LazyLock::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "metrics_index_selection_cache_gc_total",
-            "Total number of GC of metrics index selection cache",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
-pub static INDEX_SELECTION_CACHE_REQUESTS_TOTAL: LazyLock<IntCounterVec> = LazyLock::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "metrics_index_selection_cache_requests_total",
-            "Total number of search of metrics index selection cache",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
-pub static INDEX_SELECTION_CACHE_HITS_TOTAL: LazyLock<IntCounterVec> = LazyLock::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "metrics_index_selection_cache_hits_total",
-            "Total number of hit of metrics index selection cache",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
 pub(crate) fn register(registry: &prometheus::Registry) {
     // metrics for metrics index blocks cache
     registry
@@ -190,20 +161,6 @@ pub(crate) fn register(registry: &prometheus::Registry) {
     registry
         .register(Box::new(LABEL_CACHE_MISS_COUNT.clone()))
         .expect("Metric registered");
-
-    // metrics for metrics index selection cache
-    registry
-        .register(Box::new(INDEX_SELECTION_CACHE_MEMORY_USAGE.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(INDEX_SELECTION_CACHE_GC_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(INDEX_SELECTION_CACHE_REQUESTS_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(INDEX_SELECTION_CACHE_HITS_TOTAL.clone()))
-        .expect("Metric registered");
 }
 
 #[cfg(test)]
@@ -211,22 +168,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn exactly_three_zero_families_exist_before_lookup() {
+    fn exactly_five_zero_families_exist_before_lookup() {
         let registry = prometheus::Registry::new();
         registry
             .register(Box::new(IndexBlocksCacheMetrics::default()))
             .unwrap();
         let families = registry.gather();
-        assert_eq!(families.len(), 3);
+        assert_eq!(families.len(), 5);
         assert_eq!(
             families
                 .iter()
                 .map(|family| family.name())
                 .collect::<Vec<_>>(),
             vec![
-                "zo_metrics_index_blocks_cache_evictions_total",
-                "zo_metrics_index_blocks_cache_hits_total",
-                "zo_metrics_index_blocks_cache_used_bytes",
+                "zo_metrics_blocks_cache_evictions_total",
+                "zo_metrics_blocks_cache_hits_total",
+                "zo_metrics_blocks_cache_misses_total",
+                "zo_metrics_blocks_cache_partial_hits_total",
+                "zo_metrics_blocks_cache_used_bytes",
             ]
         );
         for family in families {

@@ -935,6 +935,9 @@ impl From<SecretPurpose> for RemoteTaskSecretPurposeBody {
         match value {
             SecretPurpose::Auth => Self::Auth,
             SecretPurpose::Signing => Self::Signing,
+            SecretPurpose::SigningToken => {
+                unreachable!("Prompt webhook secrets are not Remote Task secrets")
+            }
         }
     }
 }

@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                   />
                 </button>
-                <span class="truncate font-semibold">{{ row.service_name }}</span>
+                <OTruncatedText class="font-semibold">{{ row.service_name }}</OTruncatedText>
               </div>
             </template>
             <template #cell-workload="{ row }">
@@ -309,21 +309,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <!-- Bottom -->
-            <template #bottom>
-              <div class="flex h-9 w-full items-center justify-between">
-                <div class="w-[15.625rem] text-xs font-normal max-md:hidden">
-                  {{
-                    t("settings.correlation.serviceCountSingular", {
-                      count: filteredGroupCount,
-                    })
-                  }}
-                  {{
-                    t("settings.correlation.instancesCount", {
-                      count: totalInstances,
-                    })
-                  }}
-                </div>
-              </div>
+            <template v-if="filteredGroupCount > 0" #footer-note>
+              <span class="max-md:hidden">
+                {{
+                  t("settings.correlation.serviceCountSingular", {
+                    count: filteredGroupCount,
+                  })
+                }}
+                {{
+                  t("settings.correlation.instancesCount", {
+                    count: totalInstances,
+                  })
+                }}
+              </span>
             </template>
           </OTable>
         </div>
@@ -494,10 +492,13 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import serviceStreamsService from "@/services/service_streams";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -847,6 +848,8 @@ const doResetServices = async () => {
     }
 
     const response = await serviceStreamsService.resetServices(orgId);
+    // The reset deletes the rows the cached services list and analytics are built from.
+    void queryClient.invalidateQueries({ queryKey: serviceStreamKeys.all(orgId) });
     const { deleted_count } = response.data;
 
     toast({

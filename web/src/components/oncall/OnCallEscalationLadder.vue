@@ -431,13 +431,25 @@ const l0 = computed(() => {
 /// invariant and the P4/P5 rule are already applied, so nothing here consults
 /// `policy.l0` — one place decides what a priority's mode is.
 const l0ModeLabel = computed<I18nText>(() => {
-  switch (l0.value?.mode) {
+  const mode = l0.value?.mode;
+  switch (mode) {
+    case undefined:
+    case "parallel":
+      return t("oncall.ladderL0Parallel");
     case "gate":
       return t("oncall.ladderL0Gate");
     case "only":
       return t("oncall.ladderL0Only");
-    default:
-      return t("oncall.ladderL0Parallel");
+    // `l0` is already `null` (so this component never renders) whenever the
+    // server resolves `off` — `available: false` draws no L0 step at all.
+    // Handled here anyway so a fifth mode cannot silently fall through as
+    // "parallel".
+    case "off":
+      return t("oncall.ladderL0Off");
+    default: {
+      const neverMode: never = mode;
+      return neverMode;
+    }
   }
 });
 

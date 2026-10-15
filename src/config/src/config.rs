@@ -38,9 +38,10 @@ use sha256::digest;
 use crate::{
     meta::{
         cluster,
+        meta_store::MetaStore,
         stream::{QueryPartitionStrategy, StreamType},
     },
-    utils::sysinfo,
+    utils::{str::redact_dsn, sysinfo},
 };
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
@@ -86,7 +87,25 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 87: add input_preview to llm_annotation_queue_items.
 // 88: add iam password policy tables.
 // 89: add level_half_width_seconds to anomaly_detection_config.
-pub const DB_SCHEMA_VERSION: u64 = 89;
+// 90: create the Prompt registry, webhook outbox, and Experiment attribution columns.
+// 91: add firing-episode columns for alert recovery.
+// 92: add recovery_destinations to alerts.
+// 93: create oncall_response_reports.
+// 94: create synthetics_refs.
+// 95: add band settings to anomaly_detection_config.
+// 96: create rum_pa_named_events, rum_pa_funnels and rum_pa_tombstones.
+// 97: create query_history.
+// 98: key alert_dedup_state by (org_id, fingerprint).
+// 99: add name to rum_pa_tombstones.
+// 100: rule mode and raw transition values require new columns.
+// 101: create downtimes; muted_by_downtime_id, last_downtime_id, slo_backfill_jobs kind/attempts.
+// 102: create downtime_notifications.
+// 103: create alert_calibration_configs.
+// 104: create ai_chat_sessions (server-side AI chat persistence).
+// 105: create ai_chat_shares and add fork columns to ai_chat_sessions.
+// 106: create ai_chat_turns and add replica_purged_at to ai_chat_sessions.
+// 107: add redact_tools to ai_chat_shares.
+pub const DB_SCHEMA_VERSION: u64 = 107;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -205,8 +224,14 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-const _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS: [&str; 3] =
-    ["trace_id", "service_name", "operation_name"];
+const _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS: [&str; 6] = [
+    "trace_id",
+    "service_name",
+    "operation_name",
+    "_o2_trace_id",
+    "view_id",
+    "action_id",
+];
 pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let cfg = get_config();
     let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {
@@ -384,6 +409,12 @@ pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
         .collect()
 });
 
+/// `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES` as a set; `check_compact_config` validated it.
+pub static COMPACT_DYNAMIC_MERGE_STREAM_TYPES: Lazy<HashSet<StreamType>> = Lazy::new(|| {
+    parse_dynamic_merge_stream_types(&get_config().compact.dynamic_merge_stream_types)
+        .expect("validated at startup")
+});
+
 pub static NATS_KV_WATCH_MODULES: Lazy<HashSet<String>> = Lazy::new(|| {
     get_config()
         .nats
@@ -402,6 +433,10 @@ pub static NATS_KV_WATCH_MODULES: Lazy<HashSet<String>> = Lazy::new(|| {
 
 pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
+static STORED_GRPC_TOKEN: Lazy<ArcSwap<String>> = Lazy::new(Default::default);
+static STORED_EXT_AUTH_SALT: Lazy<ArcSwap<String>> = Lazy::new(Default::default);
+/// Installs older than the stored salt hash with this value: rotating it breaks their logins.
+pub const LEGACY_EXT_AUTH_SALT: &str = "openobserve";
 
 pub fn get_config() -> Arc<Config> {
     CONFIG.load().clone()
@@ -443,6 +478,10 @@ pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
     (
         "ZO_SYNTHETICS_ENABLED",
         SyntheticsReloadClass::RestartRequired,
+    ),
+    (
+        "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
+        SyntheticsReloadClass::Hot,
     ),
     ("ZO_SYNTHETICS_LAMBDA_BROWSER", SyntheticsReloadClass::Hot),
     ("ZO_SYNTHETICS_LAMBDA_NET", SyntheticsReloadClass::Hot),
@@ -502,6 +541,7 @@ pub(crate) fn synthetics_restart_required_changes(
     // compiling here until someone decides whether a reload can carry it.
     let Synthetics {
         enabled,
+        subtests_replication_grace_secs: _,
         status_page_rebuild_interval,
         status_page_domain_verify_interval,
         status_page_public_rpm,
@@ -549,6 +589,39 @@ pub fn get_instance_id() -> String {
         Some(id) => id.clone(),
         None => "".to_string(),
     }
+}
+
+/// Caches the internal gRPC token stored in the meta db; empty means none is stored.
+pub fn cache_stored_grpc_token(token: &str) {
+    STORED_GRPC_TOKEN.store(Arc::new(token.to_owned()));
+}
+
+pub fn get_stored_grpc_token() -> String {
+    STORED_GRPC_TOKEN.load().to_string()
+}
+
+/// Caches the ext auth salt stored in the meta db; empty means none is stored.
+pub fn cache_stored_ext_auth_salt(salt: &str) {
+    STORED_EXT_AUTH_SALT.store(Arc::new(salt.to_owned()));
+}
+
+pub fn get_stored_ext_auth_salt() -> String {
+    STORED_EXT_AUTH_SALT.load().to_string()
+}
+
+pub fn get_ext_auth_salt() -> String {
+    select_ext_auth_salt(
+        &get_config().auth.ext_auth_salt,
+        &get_stored_ext_auth_salt(),
+    )
+}
+
+fn select_ext_auth_salt(env_salt: &str, stored_salt: &str) -> String {
+    [env_salt, stored_salt]
+        .into_iter()
+        .find(|s| !s.is_empty())
+        .unwrap_or(LEGACY_EXT_AUTH_SALT)
+        .to_string()
 }
 
 pub fn calculate_config_file_hash(path: &PathBuf) -> Result<String, anyhow::Error> {
@@ -984,6 +1057,40 @@ pub struct Config {
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
     pub self_profiles: SelfProfiles,
+    pub public_ai_chat: PublicAiChat,
+}
+
+/// Unauthenticated read-only links to shared AI chats.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct PublicAiChat {
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_ENABLED",
+        default = false,
+        help = "Allow AI chats to be shared through public links. Off by default; the public route only exists when this is true."
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_RPM",
+        default = 60,
+        help = "Per-IP requests-per-minute limit on the public shared-chat route (0 disables)."
+    )]
+    pub rpm: u64,
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_MAX_EXPIRY_DAYS",
+        default = 90,
+        help = "Longest expiry, in days, a public AI chat link may have; public links must expire (0 means 90)."
+    )]
+    pub max_expiry_days: u64,
+}
+
+impl PublicAiChat {
+    /// Longest expiry of a public link in days: `max_expiry_days`, 90 when unset, at most 365.
+    pub fn expiry_limit_days(&self) -> u64 {
+        match self.max_expiry_days {
+            0 => 90,
+            days => days.min(365),
+        }
+    }
 }
 
 /// Background self CPU/memory profile ingest into `_meta.self_profiles`.
@@ -1081,6 +1188,13 @@ pub struct Synthetics {
         help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
     )]
     pub enabled: bool,
+    /// Super-cluster only: how long a parent may reference a child that has not replicated yet.
+    #[env_config(
+        name = "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
+        default = 300,
+        help = "Super-cluster only. Seconds after a parent's last change during which a missing subtest is reported as pending replication, not as missing."
+    )]
+    pub subtests_replication_grace_secs: u64,
     /// Seconds between status-page snapshot rebuild ticks.
     #[env_config(
         name = "ZO_STATUS_PAGE_REBUILD_INTERVAL",
@@ -1374,6 +1488,8 @@ pub struct ReportServer {
     pub addr: String,
     #[env_config(name = "ZO_REPORT_SERVER_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
+    #[env_config(name = "ZO_REPORT_SERVER_SECRET", default = "")]
+    pub secret: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -1446,7 +1562,8 @@ pub struct Auth {
     pub cookie_same_site_lax: bool,
     #[env_config(name = "ZO_COOKIE_SECURE_ONLY", default = false)]
     pub cookie_secure_only: bool,
-    #[env_config(name = "ZO_EXT_AUTH_SALT", default = "openobserve")]
+    /// Empty: a new install generates one and stores it in the meta db.
+    #[env_config(name = "ZO_EXT_AUTH_SALT", default = "")]
     pub ext_auth_salt: String,
     #[env_config(
         name = "ZO_ALERT_CHART_SIGNING_KEY",
@@ -1696,12 +1813,6 @@ pub struct Search {
     )]
     pub feature_pushdown_filter_enabled: bool,
     #[env_config(
-        name = "ZO_FEATURE_METRICS_PUSHDOWN_FILTER_ENABLED",
-        default = false,
-        help = "Enable pushdown filter for metrics queries"
-    )]
-    pub feature_metrics_pushdown_filter_enabled: bool,
-    #[env_config(
         name = "ZO_FEATURE_METRICS_FUSED_AGG_ENABLED",
         default = true,
         help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output"
@@ -1714,17 +1825,11 @@ pub struct Search {
     )]
     pub feature_metrics_streaming_agg_enabled: bool,
     #[env_config(
-        name = "ZO_METRICS_INDEX_SELECTION_CACHE_ENABLED",
-        default = false,
-        help = "Cache the row ranges a PromQL query selected from each `.midx` metrics index, keyed by file and matchers, so a repeated query skips decoding and evaluating the index."
+        name = "ZO_METRICS_BLOCKS_CACHE_MAX_SIZE",
+        default = 0,
+        help = "Maximum parsed metrics block metadata cache size in MB; zero uses 5% of node memory clamped to 128-4096 MB, a nonzero value below 10 disables the cache, and 10 or more sets an explicit limit."
     )]
-    pub metrics_index_selection_cache_enabled: bool,
-    #[env_config(
-        name = "ZO_METRICS_INDEX_SELECTION_CACHE_MAX_SIZE",
-        default = 256,
-        help = "Maximum memory size in MB of the metrics index selection cache."
-    )]
-    pub metrics_index_selection_cache_max_size: usize,
+    pub metrics_blocks_cache_max_size: usize,
     #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
@@ -1875,6 +1980,12 @@ pub struct Common {
     // This will completely skip ssrf checks, not just localhost
     #[env_config(name = "ZO_SKIP_SSRF_CHECKS", default = false)]
     pub skip_ssrf_checks: bool,
+    /// Comma-separated CIDRs that only send-only destinations may reach; changes need a restart.
+    #[env_config(name = "ZO_SSRF_ALLOWED_CIDRS", default = "")]
+    pub ssrf_allowed_cidrs: String,
+    /// Comma-separated hostnames only send-only destinations may resolve privately; needs restart.
+    #[env_config(name = "ZO_SSRF_ALLOWED_HOSTS", default = "")]
+    pub ssrf_allowed_hosts: String,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
     pub base_uri: String,
     #[env_config(name = "ZO_DATA_DIR", default = "./data/openobserve/")]
@@ -1964,12 +2075,6 @@ pub struct Common {
         help = "Enable shared memtable across multiple organizations"
     )]
     pub feature_shared_memtable_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_WAL_PACK_ENABLED",
-        default = true,
-        help = "Persist metrics memtables into packed wal files (one file per rotation instead of one file per stream)"
-    )]
-    pub feature_wal_pack_enabled: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -2254,6 +2359,12 @@ pub struct Common {
     #[env_config(name = "ZO_SWAGGER_ENABLED", default = true)]
     pub swagger_enabled: bool,
     #[env_config(
+        name = "ZO_MCP_ENABLED",
+        default = true,
+        help = "Enable the MCP server. When false the tool registry is not built at boot (it derives ~200 tools with their JSON schemas from the OpenAPI spec) and the MCP endpoints report it as disabled."
+    )]
+    pub mcp_enabled: bool,
+    #[env_config(
         name = "ZO_REGEX_PATTERNS_SOURCE_URL",
         default = "https://raw.githubusercontent.com/openobserve/sdr_patterns/main/regex.json",
         help = "URL for built-in regex patterns JSON source. Can be customized to use different pattern libraries."
@@ -2265,6 +2376,12 @@ pub struct Common {
         help = "Allow AUTHORING the Detect (count-only) redaction policy on this node. It gates writes made here only; it does NOT stop a Detect association authored elsewhere from replicating to this node, which honours it as count-only either way. On a build that predates Detect the association stops redacting instead of being applied as Redact, so the field is left unredacted until that build is upgraded."
     )]
     pub sdr_detect_policy_enabled: bool,
+    #[env_config(
+        name = "ZO_SDR_FAIL_CLOSED",
+        default = false,
+        help = "Refuse rather than keep unredacted data when sensitive-data redaction cannot run. Logs and traces ingestion is rejected with 503 while the pattern manager is unavailable or a stream's ingestion pattern failed to build, and a search on a stream with search-time patterns errors when its redaction step cannot run. Off by default: data is stored and returned unredacted and the evidence row records a fail-open."
+    )]
+    pub sdr_fail_closed: bool,
     #[env_config(
         name = "ZO_SDR_EVIDENCE_HEARTBEAT_INTERVAL",
         default = 300,
@@ -2311,12 +2428,6 @@ pub struct Common {
     pub min_auto_refresh_interval: u32,
     #[env_config(name = "ZO_ADDITIONAL_REPORTING_ORGS", default = "")]
     pub additional_reporting_orgs: String,
-    #[env_config(
-        name = "ZO_USAGE_REPORT_TO_OWN_ORG",
-        default = true,
-        help = "Report alert/report triggers to the originating organization in addition to _meta org"
-    )]
-    pub usage_report_to_own_org: bool,
     #[env_config(
         name = "ZO_USE_STREAM_SETTINGS_FOR_PARTITIONS_ENABLED",
         default = false,
@@ -2379,6 +2490,12 @@ pub struct Common {
         help = "Show the Profiles module in the UI. Early-stage feature, hidden by default; ingestion and APIs stay available regardless"
     )]
     pub profiling_enabled: bool,
+    #[env_config(
+        name = "ZO_EXPERIMENTAL",
+        default = false,
+        help = "Show experimental features in the UI. Hidden by default"
+    )]
+    pub experimental: bool,
 }
 
 impl Common {
@@ -2397,6 +2514,12 @@ pub struct Limit {
     pub disk_free: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
+    #[env_config(
+        name = "ZO_FIREHOSE_DECOMPRESSED_LIMIT",
+        default = 0,
+        help = "Bytes the gzip records of one Kinesis Firehose request may inflate to; 0 means 640 MiB"
+    )]
+    pub firehose_decompressed_limit: usize,
     #[env_config(name = "ZO_JS_FUNCTION_MAX_EXECUTION_TIME_SECS", default = 5)]
     // 0 falls back to default
     pub js_function_max_execution_time_secs: u64,
@@ -2622,6 +2745,18 @@ pub struct Limit {
         help = "How long the alert availability ledger (alert_eval_intervals) is kept, in days. This is the history every alert-based SLO measures against, so it must cover the longest SLO window (90 days) plus backfill headroom; lowering it below that silently freezes those SLOs for want of coverage. 0 or less disables the reaper."
     )]
     pub alert_eval_ledger_retention_days: i64,
+    #[env_config(
+        name = "ZO_QUERY_HISTORY_ENABLED",
+        default = true,
+        help = "Records the queries users run in their query history. When false nothing is stored and the history lists empty; existing entries are kept until deleted or reaped."
+    )]
+    pub query_history_enabled: bool,
+    #[env_config(
+        name = "ZO_QUERY_HISTORY_RETENTION_DAYS",
+        default = 14,
+        help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less keeps every entry forever; it does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
+    )]
+    pub query_history_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(
@@ -2773,6 +2908,12 @@ pub struct Limit {
         help = "Poll cadence in seconds for the query-recommendation puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
     )]
     pub scheduler_query_reco_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_ALERT_CALIBRATION_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the alert calibration puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_alert_calibration_interval: i64,
     #[env_config(name = "ZO_SEARCH_JOB_WORKS", default = 1)]
     pub search_job_workers: i64,
     #[env_config(name = "ZO_SEARCH_JOB_SCHEDULE_INTERVAL", default = 10)] // seconds
@@ -2945,12 +3086,6 @@ pub struct Limit {
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
-    #[env_config(
-        name = "ZO_METRICS_INDEX_ENABLED",
-        default = false,
-        help = "Enable experimental metrics indexing and sample blocks for newly written metrics data."
-    )]
-    pub metrics_index_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
     #[env_config(
@@ -2981,6 +3116,12 @@ pub struct Compact {
     pub extended_data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_STREAMS", default = "")] // use comma to split
     pub old_data_streams: String,
+    #[env_config(
+        name = "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES",
+        default = "",
+        help = "Comma-separated stream types (logs, metrics, traces) whose closed days the compactor merges across hours when the day holds many more files than its size needs. The stream setting `dynamic_merge` overrides it per stream. Empty disables the feature. Queries on an enabled stream select files with a daily max_ts bound; after removing a type here, set ZO_<TYPE>_QUERY_RETENTION=daily so already merged days are still found."
+    )]
+    pub dynamic_merge_stream_types: String,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
@@ -3046,7 +3187,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_COMPACT_TANTIVY_BUILDER_THREAD_NUM",
         default = 2,
-        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. less than or equal to 1 disables (single-threaded)"
+        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. Minimum 2"
     )]
     pub tantivy_builder_thread_num: usize,
 }
@@ -3159,7 +3300,7 @@ pub struct Log {
     pub local_time_format: String,
 }
 
-#[derive(Serialize, Debug, EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Nats {
     #[env_config(name = "ZO_NATS_ADDR", default = "localhost:4222")]
     pub addr: String,
@@ -3227,6 +3368,49 @@ pub struct Nats {
         default = ""
     )]
     pub kv_watch_modules: String,
+}
+
+impl std::fmt::Debug for Nats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            addr,
+            prefix,
+            user,
+            replicas,
+            history,
+            deliver_policy,
+            connect_timeout,
+            lock_wait_timeout,
+            subscription_capacity,
+            queue_max_age,
+            event_max_age,
+            lock_max_age,
+            queue_max_size,
+            event_storage,
+            v211_support,
+            kv_watch_modules,
+            password: _,
+        } = self;
+        f.debug_struct("Nats")
+            .field("addr", addr)
+            .field("prefix", prefix)
+            .field("user", user)
+            .field("password", &"[REDACTED]")
+            .field("replicas", replicas)
+            .field("history", history)
+            .field("deliver_policy", deliver_policy)
+            .field("connect_timeout", connect_timeout)
+            .field("lock_wait_timeout", lock_wait_timeout)
+            .field("subscription_capacity", subscription_capacity)
+            .field("queue_max_age", queue_max_age)
+            .field("event_max_age", event_max_age)
+            .field("lock_max_age", lock_max_age)
+            .field("queue_max_size", queue_max_size)
+            .field("event_storage", event_storage)
+            .field("v211_support", v211_support)
+            .field("kv_watch_modules", kv_watch_modules)
+            .finish()
+    }
 }
 
 #[derive(Serialize, Debug, Default, EnvConfig)]
@@ -3320,6 +3504,12 @@ pub struct Prometheus {
     /// Safety valve, not a layout knob: past this many `le` labels a sample is downscaled.
     #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 512)]
     pub native_histogram_max_buckets: usize,
+    #[env_config(
+        name = "ZO_METRICS_STALENESS_MARKERS_ENABLED",
+        default = true,
+        help = "Store Prometheus staleness markers and end a series at its marker in PromQL. Off drops markers on ingest and ignores stored ones on read. Upgrade every node with this off before turning it on."
+    )]
+    pub staleness_markers_enabled: bool,
 }
 
 #[derive(Serialize, Debug, EnvConfig, Default)]
@@ -3696,6 +3886,10 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.http_worker_max_blocking == 0 {
         cfg.limit.http_worker_max_blocking = 256;
     }
+    // A Firehose HTTP request is at most 64 MiB and CloudWatch gzip inflates about 10x
+    if cfg.limit.firehose_decompressed_limit == 0 {
+        cfg.limit.firehose_decompressed_limit = 640 * 1024 * 1024;
+    }
     if cfg.limit.grpc_runtime_worker_num == 0 {
         cfg.limit.grpc_runtime_worker_num = cpu_num;
     }
@@ -3930,50 +4124,8 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check queue store
     check_queue_store_config(cfg)?;
 
-    // format metadata storage
-    if cfg.common.meta_store.is_empty() {
-        if cfg.common.local_mode {
-            cfg.common.meta_store = "sqlite".to_string();
-        } else {
-            cfg.common.meta_store = "nats".to_string();
-        }
-    }
-    cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
-    if !cfg.common.local_mode && !cfg.common.meta_store.starts_with("postgres") {
-        return Err(anyhow::anyhow!(
-            "Meta store only supports postgres in cluster mode."
-        ));
-    }
-    if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
-        let c = &cfg.common;
-        if c.meta_postgres_host.is_empty()
-            || c.meta_postgres_user.is_empty()
-            || c.meta_postgres_password.is_empty()
-            || c.meta_postgres_dbname.is_empty()
-        {
-            return Err(anyhow::anyhow!(
-                "Meta store is PostgreSQL, you must set either ZO_META_POSTGRES_DSN or all of \
-                 ZO_META_POSTGRES_HOST, ZO_META_POSTGRES_USER, ZO_META_POSTGRES_PASSWORD, \
-                 ZO_META_POSTGRES_DBNAME"
-            ));
-        }
-        // Compose the DSN from the individual vars. User, password and dbname are
-        // percent-encoded so credentials with special characters survive the round
-        // trip — sqlx percent-decodes them again when it parses the DSN.
-        let dsn = format!(
-            "postgres://{}:{}@{}:{}/{}",
-            urlencoding::encode(&c.meta_postgres_user),
-            urlencoding::encode(&c.meta_postgres_password),
-            c.meta_postgres_host,
-            c.meta_postgres_port,
-            urlencoding::encode(&c.meta_postgres_dbname),
-        );
-        cfg.common.meta_postgres_dsn = dsn;
-    }
-
-    if cfg.common.meta_store.starts_with("mysql") {
-        return Err(anyhow::anyhow!("We don't support MySQL anymore."));
-    }
+    check_cluster_coordinator_config(cfg)?;
+    check_meta_store_config(cfg)?;
 
     // check meta partition mode
     if cfg.common.meta_partition_mode != "manual" {
@@ -4090,6 +4242,73 @@ fn check_queue_store_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
                 cfg.common.memory_queue_max_size
             )
         })?;
+    Ok(())
+}
+
+fn check_cluster_coordinator_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.common.cluster_coordinator.is_empty() {
+        cfg.common.cluster_coordinator = "nats".to_string();
+    }
+    // local mode never reads the coordinator, so a stale value there must not block startup
+    if cfg.common.local_mode {
+        return Ok(());
+    }
+    // any other value makes node registration return Ok without ever joining the cluster
+    if !cfg.common.cluster_coordinator.eq_ignore_ascii_case("nats") {
+        return Err(anyhow::anyhow!(
+            "ZO_CLUSTER_COORDINATOR={} is not supported, cluster mode only supports nats.",
+            redact_dsn(&cfg.common.cluster_coordinator)
+        ));
+    }
+    cfg.common.cluster_coordinator = "nats".to_string();
+    Ok(())
+}
+
+fn check_meta_store_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    // format metadata storage
+    if cfg.common.meta_store.is_empty() {
+        if cfg.common.local_mode {
+            cfg.common.meta_store = "sqlite".to_string();
+        } else {
+            cfg.common.meta_store = "nats".to_string();
+        }
+    }
+    cfg.common
+        .meta_store
+        .parse::<MetaStore>()
+        .map_err(|e| anyhow::anyhow!("ZO_META_STORE: {e}"))?;
+    cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
+    if !cfg.common.local_mode && !cfg.common.meta_store.starts_with("postgres") {
+        return Err(anyhow::anyhow!(
+            "Meta store only supports postgres in cluster mode."
+        ));
+    }
+    if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
+        let c = &cfg.common;
+        if c.meta_postgres_host.is_empty()
+            || c.meta_postgres_user.is_empty()
+            || c.meta_postgres_password.is_empty()
+            || c.meta_postgres_dbname.is_empty()
+        {
+            return Err(anyhow::anyhow!(
+                "Meta store is PostgreSQL, you must set either ZO_META_POSTGRES_DSN or all of \
+                 ZO_META_POSTGRES_HOST, ZO_META_POSTGRES_USER, ZO_META_POSTGRES_PASSWORD, \
+                 ZO_META_POSTGRES_DBNAME"
+            ));
+        }
+        // Compose the DSN from the individual vars. User, password and dbname are
+        // percent-encoded so credentials with special characters survive the round
+        // trip — sqlx percent-decodes them again when it parses the DSN.
+        let dsn = format!(
+            "postgres://{}:{}@{}:{}/{}",
+            urlencoding::encode(&c.meta_postgres_user),
+            urlencoding::encode(&c.meta_postgres_password),
+            c.meta_postgres_host,
+            c.meta_postgres_port,
+            urlencoding::encode(&c.meta_postgres_dbname),
+        );
+        cfg.common.meta_postgres_dsn = dsn;
+    }
     Ok(())
 }
 
@@ -4279,18 +4498,18 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.search.inverted_index_footer_cache_max_size == 0 {
         cfg.search.inverted_index_footer_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(8, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.search.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
     if cfg.search.bloom_footer_cache_max_size == 0 {
-        // 1% of total mem, clamped to [32, 256] MB. Bloom footers are an
+        // 1% of total mem, clamped to [4, 256] MB. Bloom footers are an
         // order of magnitude smaller than tantivy footers (footer payload
         // ≈ 24 B per file × 3 fields + per-field header ≈ 7.5 KB per
         // `.bf`), so the cache holds 4-32 K entries at this size.
         cfg.search.bloom_footer_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(4, 256)
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.search.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
@@ -4298,7 +4517,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.limit.datafusion_file_stat_cache_max_size == 0 {
         cfg.limit.datafusion_file_stat_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(8, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.limit.datafusion_file_stat_cache_max_size *= SIZE_IN_MB as usize;
@@ -4317,7 +4536,19 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.metrics_result_cache_max_size =
             cfg.limit.metrics_result_cache_max_size.max(32) * (SIZE_IN_MB as usize);
     }
+    cfg.search.metrics_blocks_cache_max_size = metrics_blocks_cache_size_mb(
+        cfg.search.metrics_blocks_cache_max_size,
+        cfg.limit.mem_total,
+    );
     Ok(())
+}
+
+fn metrics_blocks_cache_size_mb(configured: usize, mem_total: usize) -> usize {
+    match configured {
+        0 => (mem_total / SIZE_IN_MB as usize / 20).clamp(128, 4096),
+        1..=9 => 0,
+        size => size,
+    }
 }
 
 /// Strip the Windows extended-length prefix (`\\?\`) from a canonicalized path
@@ -4490,6 +4721,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             "Data retention is not allowed to be less than 3 days."
         ));
     }
+    parse_dynamic_merge_stream_types(&cfg.compact.dynamic_merge_stream_types)?;
     if cfg.compact.interval < 1 {
         cfg.compact.interval = 10;
     }
@@ -4533,11 +4765,33 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
     }
+    if cfg.compact.tantivy_builder_thread_num < 2 {
+        cfg.compact.tantivy_builder_thread_num = 2;
+    }
     if !cfg.compact.fast_mode && cfg.common.local_mode {
         cfg.compact.fast_mode = true;
     }
 
     Ok(())
+}
+
+/// Parses `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES`; only logs, metrics and traces are merged by day.
+fn parse_dynamic_merge_stream_types(list: &str) -> Result<HashSet<StreamType>, anyhow::Error> {
+    list.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            let stream_type = StreamType::from(s);
+            stream_type
+                .support_dynamic_merge()
+                .then_some(stream_type)
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES accepts logs, metrics, traces; got {s}"
+                    )
+                })
+        })
+        .collect()
 }
 
 fn check_sns_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
@@ -4821,6 +5075,33 @@ mod tests {
         let _ = super::Config::init().expect("a default failed to parse");
     }
 
+    #[test]
+    fn nats_debug_redacts_password() {
+        let nats = super::Nats {
+            addr: "nats:4222".to_string(),
+            user: "nats-user".to_string(),
+            password: "NATS-PASSWORD-VALUE".to_string(),
+            ..Default::default()
+        };
+        let printed = format!("{nats:?}");
+        assert!(!printed.contains("NATS-PASSWORD-VALUE"), "{printed}");
+        assert!(printed.contains("nats:4222"));
+    }
+
+    #[test]
+    fn metrics_blocks_cache_auto_budget_preserves_explicit_limits() {
+        let gib = 1024 * 1024 * 1024;
+        assert_eq!(metrics_blocks_cache_size_mb(0, 2 * gib), 128);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 4 * gib), 204);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 48 * gib), 2457);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 80 * gib), 4096);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 128 * gib), 4096);
+        assert_eq!(metrics_blocks_cache_size_mb(1, 48 * gib), 0);
+        assert_eq!(metrics_blocks_cache_size_mb(9, 48 * gib), 0);
+        assert_eq!(metrics_blocks_cache_size_mb(10, 48 * gib), 10);
+        assert_eq!(metrics_blocks_cache_size_mb(2048, 48 * gib), 2048);
+    }
+
     use super::*;
 
     /// A coherent starting point, so each ceiling test changes exactly the one
@@ -4928,6 +5209,7 @@ mod tests {
     /// `synthetics_restart_required_changes`.
     const ALL_SYNTHETICS_ENV_VARS: &[&str] = &[
         "ZO_SYNTHETICS_ENABLED",
+        "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
         "ZO_SYNTHETICS_LAMBDA_BROWSER",
         "ZO_SYNTHETICS_LAMBDA_NET",
         "ZO_SYNTHETICS_API_ENDPOINT",
@@ -4961,8 +5243,8 @@ mod tests {
     fn synthetics_reload_classification_is_pinned() {
         assert_eq!(
             SYNTHETICS_RELOAD_CLASSES.len(),
-            15,
-            "Synthetics has 15 keys; every one needs a reload class"
+            16,
+            "Synthetics has 16 keys; every one needs a reload class"
         );
 
         let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
@@ -4999,6 +5281,7 @@ mod tests {
                 "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
                 "ZO_SYNTHETICS_RECORDER_EXTENSION_URL",
                 "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
+                "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
             ]
         );
 
@@ -5041,6 +5324,7 @@ mod tests {
     /// extra key cannot hide in the fields a subset forgot to touch.
     fn mutate_every_synthetics_field(cfg: &mut Synthetics) {
         cfg.enabled = !cfg.enabled;
+        cfg.subtests_replication_grace_secs += 1;
         cfg.lambda_browser.push_str("-changed");
         cfg.lambda_net.push_str("-changed");
         cfg.api_endpoint = "https://example.invalid".to_string();
@@ -5256,30 +5540,6 @@ mod tests {
 
         cfg.route.dispatch_strategy = RouteDispatchStrategy::Other;
         assert!(check_route_config(&cfg).is_err());
-    }
-
-    #[test]
-    fn test_usage_report_to_own_org_field_exists() {
-        // Test that usage_report_to_own_org field exists and is accessible
-        let cfg = Config::init().unwrap();
-        // Verify the field is accessible as a boolean
-        let _value: bool = cfg.common.usage_report_to_own_org;
-        // Test passes if we can access the field without error
-    }
-
-    #[test]
-    fn test_usage_report_to_own_org_env_override() {
-        // Test that environment variable can override the default
-        unsafe {
-            std::env::set_var("ZO_USAGE_REPORT_TO_OWN_ORG", "false");
-        }
-        let cfg = Config::init().unwrap();
-        // Note: This test may fail if the config is already loaded
-        // In that case, we just verify the field exists
-        let _ = cfg.common.usage_report_to_own_org;
-        unsafe {
-            std::env::remove_var("ZO_USAGE_REPORT_TO_OWN_ORG");
-        }
     }
 
     #[test]
@@ -5840,6 +6100,70 @@ mod tests {
         assert_eq!(cfg.common.memory_queue_max_size, 32 * 1024 * 1024);
     }
 
+    fn meta_store_cfg(local_mode: bool, meta_store: &str) -> Config {
+        let mut cfg = Config::default();
+        cfg.common.local_mode = local_mode;
+        cfg.common.meta_store = meta_store.to_string();
+        cfg.common.meta_postgres_dsn = "postgres://o2:secret@db:5432/o2".to_string();
+        cfg
+    }
+
+    #[test]
+    fn test_check_meta_store_config_accepts_supported_stores() {
+        let mut cfg = meta_store_cfg(true, "");
+        check_meta_store_config(&mut cfg).unwrap();
+        assert_eq!(cfg.common.meta_store, "sqlite");
+
+        let mut cfg = meta_store_cfg(false, "PostgreSQL");
+        check_meta_store_config(&mut cfg).unwrap();
+        assert_eq!(cfg.common.meta_store, "postgresql");
+    }
+
+    #[test]
+    fn test_check_meta_store_config_rejects_what_used_to_fall_back_to_sqlite() {
+        for (local_mode, value) in [(true, "mongodb"), (true, "postgre"), (false, "postgresx")] {
+            let mut cfg = meta_store_cfg(local_mode, value);
+            let err = check_meta_store_config(&mut cfg).unwrap_err().to_string();
+            assert!(err.starts_with("ZO_META_STORE: invalid value"), "{err}");
+            assert!(err.contains(value), "{err}");
+        }
+        let mut cfg = meta_store_cfg(false, "postgres://o2:secret@db:5432/o2");
+        let err = check_meta_store_config(&mut cfg).unwrap_err().to_string();
+        assert!(
+            !err.contains("secret"),
+            "a DSN password reached the error: {err}"
+        );
+        let mut cfg = meta_store_cfg(true, "mysql");
+        let err = check_meta_store_config(&mut cfg).unwrap_err().to_string();
+        assert!(err.contains("no longer supported"), "{err}");
+    }
+
+    #[test]
+    fn test_check_cluster_coordinator_config_requires_nats_in_cluster_mode() {
+        for value in ["", "nats", "NATS"] {
+            let mut cfg = Config::default();
+            cfg.common.cluster_coordinator = value.to_string();
+            check_cluster_coordinator_config(&mut cfg).unwrap();
+            assert_eq!(cfg.common.cluster_coordinator, "nats");
+        }
+        for value in ["etcd", "sqlite", "nats://o2:secret@nats:4222"] {
+            let mut cfg = Config::default();
+            cfg.common.cluster_coordinator = value.to_string();
+            let err = check_cluster_coordinator_config(&mut cfg)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("only supports nats"), "{err}");
+            assert!(
+                !err.contains("secret"),
+                "a DSN password reached the error: {err}"
+            );
+        }
+        let mut cfg = Config::default();
+        cfg.common.local_mode = true;
+        cfg.common.cluster_coordinator = "etcd".to_string();
+        check_cluster_coordinator_config(&mut cfg).unwrap();
+    }
+
     #[test]
     #[allow(deprecated)]
     fn test_check_compact_config_defaults() {
@@ -5965,6 +6289,19 @@ mod tests {
         cfg.limit.batch_size = 4096; // within range
         check_limit_config(&mut cfg).unwrap();
         assert_eq!(cfg.limit.batch_size, 4096);
+    }
+
+    #[test]
+    fn test_check_limit_config_firehose_decompressed_limit() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.req_payload_limit = 200;
+        cfg.limit.firehose_decompressed_limit = 0;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.firehose_decompressed_limit, 640 * 1024 * 1024);
+
+        cfg.limit.firehose_decompressed_limit = 300;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.firehose_decompressed_limit, 300);
     }
 
     #[test]
@@ -6174,5 +6511,24 @@ mod tests {
         let p = std::path::Path::new(r"C:\data\openobserve");
         let result = deverbatim(p);
         assert_eq!(result, r"C:\data\openobserve");
+    }
+
+    #[test]
+    fn dynamic_merge_stream_types_accept_only_merged_types() {
+        let set = super::parse_dynamic_merge_stream_types(" logs, Metrics ,,traces ").unwrap();
+        assert_eq!(set.len(), 3);
+        assert!(
+            super::parse_dynamic_merge_stream_types("")
+                .unwrap()
+                .is_empty()
+        );
+        assert!(super::parse_dynamic_merge_stream_types("logs,index").is_err());
+    }
+
+    #[test]
+    fn test_select_ext_auth_salt_prefers_env_then_stored_then_legacy() {
+        assert_eq!(select_ext_auth_salt("env", "stored"), "env");
+        assert_eq!(select_ext_auth_salt("", "stored"), "stored");
+        assert_eq!(select_ext_auth_salt("", ""), LEGACY_EXT_AUTH_SALT);
     }
 }

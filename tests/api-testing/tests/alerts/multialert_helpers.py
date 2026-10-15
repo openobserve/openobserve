@@ -145,6 +145,9 @@ class AlertsClient:
         r = self._v2("GET", f"alerts/{alert_id}?folder=default")
         return r.json() if r.status_code == 200 else None
 
+    def update_alert(self, alert_id: str, payload: dict) -> requests.Response:
+        return self._v2("PUT", f"alerts/{alert_id}?folder=default", json=payload)
+
     def get_alert_detail(self, alert_id: str) -> dict:
         """GET v2 /alerts/{id} (no folder qs) — the round-trip type contract read."""
         return self._v2("GET", f"alerts/{alert_id}").json()
@@ -217,6 +220,20 @@ class AlertsClient:
     def ingest(self, stream: str, rows: list[dict]) -> requests.Response:
         """Ingest rows into a stream (creates it on first write)."""
         return self._v1("POST", f"{stream}/_json", json=rows)
+
+    def notifications_for(self, alert_name: str) -> int:
+        """Rows the dogfood destination delivered for `alert_name` (0 until the sink stream exists)."""
+        r = self._c.search.sql(
+            f"SELECT COUNT(*) AS count FROM \"{SINK}\" WHERE str_match(text, '{alert_name}')",
+            minutes=30, org=self.org, raise_for_status=False,
+        )
+        hits = r.json().get("hits", []) if r.status_code == 200 else []
+        return int(hits[0].get("count", 0)) if hits else 0
+
+    def history_for(self, alert_id: str) -> list[dict]:
+        """Alert-history rows for one alert, newest first ([] until the triggers stream exists)."""
+        r = self._v2("GET", f"alerts/history?alert_id={alert_id}&size=50&sort_by=timestamp&sort_order=desc")
+        return (r.json().get("hits") or []) if r.status_code == 200 else []
 
     # -- scheduler-outcome polling ------------------------------------------
     def wait_for_alert_outcome(self, name: str, timeout_s: float = 60, poll_s: float = 5) -> dict | None:

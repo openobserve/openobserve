@@ -14,8 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::utils::json;
+use hashbrown::HashSet;
 use sea_orm::{
-    ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
+    ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    TransactionTrait,
 };
 use sea_orm_migration::prelude::*;
 use svix_ksuid::KsuidLike;
@@ -27,6 +29,16 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let txn = manager.get_connection().begin().await?;
+        // a re-run finds templates that are already in the table
+        let copied: HashSet<(String, String)> = template::Entity::find()
+            .select_only()
+            .column(template::Column::Org)
+            .column(template::Column::Name)
+            .into_tuple()
+            .all(&txn)
+            .await?
+            .into_iter()
+            .collect();
 
         // Migrate pages of 100 records at a time to avoid loading too many
         // records into memory.
@@ -38,6 +50,8 @@ impl MigrationTrait for Migration {
         while let Some(metas) = meta_pages.fetch_and_next().await? {
             let new_temp_results: Result<Vec<_>, DbErr> = metas
                 .into_iter()
+                // template change events are written to meta with an empty value
+                .filter(|meta| !meta.value.is_empty())
                 .map(|meta| {
                     let old_temp: meta_templates::Template =
                         json::from_str(&meta.value).map_err(|e| DbErr::Migration(e.to_string()))?;
@@ -51,7 +65,8 @@ impl MigrationTrait for Migration {
                     if matches!(
                         old_temp.template_type,
                         meta_templates::DestinationType::RemotePipeline
-                    ) {
+                    ) || copied.contains(&(meta.key1.clone(), old_temp.name.clone()))
+                    {
                         Ok(None)
                     } else {
                         Ok(Some(template::ActiveModel {
@@ -66,12 +81,15 @@ impl MigrationTrait for Migration {
                     }
                 })
                 .filter_map(|result| match result {
-                    Ok(None) => None, // templates shouldn't have RemotePipeline type. dropped
+                    Ok(None) => None, // RemotePipeline and already copied templates are dropped
                     Ok(Some(temp)) => Some(Ok(temp)),
                     Err(e) => Some(Err(e)),
                 })
                 .collect();
             let new_temps = new_temp_results?;
+            if new_temps.is_empty() {
+                continue;
+            }
             template::Entity::insert_many(new_temps).exec(&txn).await?;
         }
 
@@ -196,7 +214,10 @@ fn ksuid_from_hash(template: &meta_templates::Template, org_id: &str) -> svix_ks
 
 #[cfg(test)]
 mod tests {
+    use sea_orm::{ConnectionTrait, Database, DatabaseConnection};
+
     use super::*;
+    use crate::table::migration::m20250125_115400_create_templates_table as create_templates;
 
     fn make_template(name: &str) -> meta_templates::Template {
         meta_templates::Template {
@@ -237,5 +258,67 @@ mod tests {
     fn test_destination_type_default_is_http() {
         let dt = meta_templates::DestinationType::default();
         assert_eq!(dt, meta_templates::DestinationType::Http);
+    }
+
+    async fn db_with(statements: &[&str]) -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        create_templates::Migration
+            .up(&SchemaManager::new(&db))
+            .await
+            .unwrap();
+        db.execute_unprepared(
+            "CREATE TABLE meta (id INTEGER PRIMARY KEY AUTOINCREMENT, module TEXT NOT NULL, \
+             key1 TEXT NOT NULL, key2 TEXT NOT NULL, start_dt BIGINT NOT NULL, \
+             value TEXT NOT NULL)",
+        )
+        .await
+        .unwrap();
+        for sql in statements {
+            db.execute_unprepared(sql).await.unwrap();
+        }
+        db
+    }
+
+    #[tokio::test]
+    async fn test_up_skips_change_events_and_copied_templates() {
+        let db = db_with(&[
+            r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES
+               ('templates', 'default', 'prebuilt_slack', 0, ''),
+               ('templates', 'default', 'copied', 0, '{"name":"copied","body":"b"}'),
+               ('templates', 'default', 'new', 0, '{"name":"new","body":"b"}')"#,
+            "INSERT INTO templates VALUES ('earlier', 'default', 'copied', 0, 'http', 'b', NULL)",
+        ])
+        .await;
+
+        Migration
+            .up(&SchemaManager::new(&db))
+            .await
+            .expect("empty change events and copied templates must be skipped");
+        let rows: Vec<(String, String)> = template::Entity::find()
+            .select_only()
+            .column(template::Column::Name)
+            .column(template::Column::Id)
+            .order_by_asc(template::Column::Name)
+            .into_tuple()
+            .all(&db)
+            .await
+            .unwrap();
+        let names: Vec<&str> = rows.iter().map(|(name, _)| name.as_str()).collect();
+        assert_eq!(names, ["copied", "new"]);
+        assert_eq!(rows[0].1, "earlier");
+    }
+
+    #[tokio::test]
+    async fn test_up_reruns_with_only_change_events() {
+        let db = db_with(&[r#"INSERT INTO meta (module, key1, key2, start_dt, value)
+                              VALUES ('templates', 'default', 'prebuilt_slack', 0, '')"#])
+        .await;
+        let manager = SchemaManager::new(&db);
+        Migration.up(&manager).await.unwrap();
+        Migration
+            .up(&manager)
+            .await
+            .expect("a page with nothing to copy must not fail");
+        assert_eq!(template::Entity::find().count(&db).await.unwrap(), 0);
     }
 }

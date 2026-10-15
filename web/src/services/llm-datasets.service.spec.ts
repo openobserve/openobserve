@@ -22,6 +22,8 @@ const { mockGet, mockPost, mockPut, mockDelete } = vi.hoisted(() => ({
   mockDelete: vi.fn(),
 }));
 
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
+
 vi.mock("@/services/http", () => ({
   default: () => ({
     get: mockGet,
@@ -32,6 +34,7 @@ vi.mock("@/services/http", () => ({
 }));
 
 import llmDatasetsService from "./llm-datasets.service";
+import analytics from "./product_analytics";
 
 beforeEach(() => {
   mockGet.mockReset();
@@ -370,5 +373,21 @@ describe("llmDatasetsService dataset writes", () => {
       description: null,
       tags: [],
     });
+  });
+});
+
+describe("create() analytics", () => {
+  beforeEach(() => vi.mocked(analytics.track).mockClear());
+
+  it("tracks llm_dataset_created once the server confirms", async () => {
+    mockPost.mockResolvedValue({ data: { id: "dataset-1", name: "d" } });
+    await llmDatasetsService.create("acme", { name: "d" });
+    expect(analytics.track).toHaveBeenCalledWith("llm_dataset_created");
+  });
+
+  it("does not track when the create is rejected", async () => {
+    mockPost.mockRejectedValue(new Error("boom"));
+    await expect(llmDatasetsService.create("acme", { name: "d" })).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

@@ -258,6 +258,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="rowTemplatePlaceholder"
               :rows="4"
             />
+            <span
+              v-if="isForecastMode"
+              class="text-text-secondary mt-1 block text-xs"
+              data-test="add-alert-row-forecast-hint"
+              >{{ t("alerts.forecast.rowTemplateHint") }}</span
+            >
           </div>
         </div>
       </div>
@@ -295,7 +301,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import AlertSettingsHelpDrawer from "@/components/alerts/AlertSettingsHelpDrawer.vue";
-import oncallService from "@/services/oncall";
+import { queryClient } from "@/composables/query/queryClient";
+import { oncallTeamsQuery } from "@/services/oncall.queries";
 import type { OnCallTeam } from "@/ts/interfaces/oncall";
 
 export interface Variable {
@@ -403,6 +410,7 @@ export default defineComponent({
     const templateValue = form.useStore((s: any) => (s.values?.template ?? "") as string);
     const descriptionValue = form.useStore((s: any) => (s.values?.description ?? "") as string);
     const rowTemplateValue = form.useStore((s: any) => (s.values?.row_template ?? "") as string);
+    const isForecastMode = form.useStore((s: any) => !!s.values?._ui?.forecast);
     const rowTemplateTypeValue = form.useStore(
       (s: any) => (s.values?.row_template_type ?? "String") as string,
     );
@@ -422,10 +430,9 @@ export default defineComponent({
     onMounted(async () => {
       if (!oncallEnabled.value) return;
       try {
-        const res = await oncallService.listTeams({
-          org_identifier: store.state.selectedOrganization.identifier,
-        });
-        oncallTeams.value = res.data ?? [];
+        oncallTeams.value = await queryClient.fetchQuery(
+          oncallTeamsQuery(store.state.selectedOrganization.identifier),
+        );
       } catch {
         oncallTeams.value = [];
       }
@@ -506,6 +513,7 @@ export default defineComponent({
       templateValue,
       descriptionValue,
       rowTemplateValue,
+      isForecastMode,
       rowTemplateTypeValue,
       formattedTemplates,
       rowTemplatePlaceholder,

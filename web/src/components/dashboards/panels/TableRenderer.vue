@@ -34,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :wrap="wrapCells"
       :pagination="showPagination ? 'client' : 'none'"
       :page-size="effectivePageSize"
-      :custom-pagination-bar="showPagination"
       :horizontal-scroll="true"
       :row-height="22"
       :virtual-scroll="virtualizeRows"
@@ -131,12 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Pagination footer: forward parent's #bottom slot or show default pagination controls -->
-      <template #bottom="scope">
+      <template #pagination-bar="scope">
         <slot name="bottom" v-bind="scope">
-          <!-- This #bottom IS the pager (the built-in bar is suppressed via
-               :custom-pagination-bar), so it carries its own separator + padding.
-               With pagination off it still renders — TablePaginationControls then
-               shows the row count alone, so it drops the bar chrome. -->
+          <!-- This replaces OTable's built-in bar, so it carries its own separator and padding; with pagination off it shows the row count alone and drops that chrome. -->
           <div
             class="flex w-full items-center"
             :class="showPagination ? 'border-border-default min-h-10 border-t px-3 py-1' : 'pe-2'"
@@ -753,6 +749,21 @@ export default defineComponent({
     height: 100% !important;
     max-height: none !important;
     overflow: hidden !important;
+  }
+}
+
+/* Layered to outrank the global print reset in base-elements.css, which sets every .h-full to height:auto and every scroll area to overflow:visible. */
+@layer base {
+  @media print {
+    /* Keep the table panel at its grid-cell height; grown ancestors push the footer past the cell's clip. */
+    :global(.grid-stack-item-content:has([data-test="dashboard-table-renderer-wrapper"]) .h-full) {
+      height: 100% !important;
+    }
+
+    /* Rows cannot scroll on paper; clip them above the footer instead of painting over it. */
+    .table-wrapper :deep([data-test="o2-table-scroll-container"]) {
+      overflow: clip !important;
+    }
   }
 }
 </style>

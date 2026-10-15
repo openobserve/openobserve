@@ -46,6 +46,15 @@ pub struct NotificationContext {
     pub alert_count: String,
     pub alert_agg_value: String,
     pub alert_level: String,
+    /// `firing` or `resolved`. What lets one template answer both states, and
+    /// what tells the PagerDuty renderer which `event_action` to send.
+    pub alert_status: String,
+    /// The firing episode this notification belongs to — PagerDuty's
+    /// `dedup_key`, so a resolve matches the trigger that opened the incident.
+    /// `Some` only when the alert opted into recovery notifications; without a
+    /// resolve to pair with, a dedup key would silently change how repeated
+    /// firings collapse.
+    pub episode_id: Option<String>,
     pub alert_priority: String,
     pub alert_tags: String,
     pub alert_threshold_crit: String,
@@ -53,6 +62,9 @@ pub struct NotificationContext {
     /// Formatted local time; "N/A" when unknown.
     pub alert_start_time: String,
     pub alert_end_time: String,
+    /// The same window bounds in epoch milliseconds; "N/A" when unknown.
+    pub alert_start_time_millis: String,
+    pub alert_end_time_millis: String,
     /// Already shortened; falls back to the long URL when shortening fails.
     pub alert_url: String,
     /// Stateless signed chart-render URL (the URL carries the chart data;

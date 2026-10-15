@@ -14,15 +14,16 @@ export class IngestionConfigPage {
         this.recommendedTabsContainerSelector = '[data-test="data-sources-recommended-tabs"]';
         this.recommendedTabsContainer = page.locator(this.recommendedTabsContainerSelector);
 
-        // Configuration content selectors. Legacy integrations render CopyContent
-        // (rum-* selectors); migrated data sources (e.g. Postgres, SQL Server)
+        // Configuration content selectors. Legacy integrations render CredentialCodeBlock
+        // (ingestion-<slug>-code-block prefix); migrated data sources (e.g. Postgres, SQL Server)
         // render the rich DataSourceSetupCard with OCodeBlock copy buttons. A page
         // only ever renders one of the two, so the combined selectors are safe.
+        this.legacyCodeBlockPre = page.locator('[data-test^="ingestion-"][data-test$="-code-block-pre"]');
         this.copyButton = page
-          .locator('[data-test="rum-copy-btn"], [data-test="ai-code-copy-btn"]')
+          .locator('[data-test^="ingestion-"][data-test$="-code-block-copy-btn"]')
           .first();
         this.contentText = page
-          .locator('[data-test="rum-content-text"], [data-test="data-source-setup-card"]')
+          .locator('[data-test^="ingestion-"][data-test$="-code-block-pre"], [data-test="data-source-setup-card"]')
           .first();
 
         // Notification selector — OToast variant=success carries the data-test we target.
@@ -42,8 +43,21 @@ export class IngestionConfigPage {
         // Recommended Kubernetes tab marker (default tab on Recommended page)
         this.recommendedKubernetesTab = page.locator('[data-test="ingestion-recommended-tab-ingestFromKubernetes"]');
 
+        // Recommended → GPU (DCGM Exporter) setup card
+        this.recommendedGpuTab = page.locator('[data-test="ingestion-recommended-tab-ingestFromGpu"]');
+        this.gpuExporterSwitch = page.locator('[data-test="gpu-setup-exporter-group"]');
+        this.gpuExporterDcgm = page.locator('[data-test="gpu-setup-exporter-dcgm"]');
+
         // Count of integration route tabs in Recommended view (scoped to its container)
         this.recommendedRouteTabs = page.locator('[data-test="data-sources-recommended-tabs"] [data-test^="ingestion-recommended-tab-"]');
+
+        // Org passcode access-control selectors (feature: ingestion-passcode-forbidden).
+        // Normal surfaces render when the 200 path applies; the *-forbidden banners
+        // render only when GET /{org}/passcode returns 403 (enterprise-only UI state).
+        this.dataSourceSetupCard = page.locator('[data-test="data-source-setup-card"]');
+        this.dataSourceSetupCardForbidden = page.locator('[data-test="data-source-setup-card-passcode-forbidden"]');
+        this.copyContentForbidden = page.locator('[data-test^="ingestion-"][data-test$="-code-block-passcode-forbidden"]');
+        this.rumContentText = this.legacyCodeBlockPre.first();
     }
 
     // ==================== Navigation ====================
@@ -63,6 +77,34 @@ export class IngestionConfigPage {
     async navigateToIntegration(integrationPath, orgId) {
         await this.page.goto(`${process.env.ZO_BASE_URL}/web${integrationPath}?org_identifier=${orgId}`);
         await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+    }
+
+    async navigateToIngestion(orgId) {
+        await this.page.goto(`${process.env.ZO_BASE_URL}/web/ingestion?org_identifier=${orgId}`);
+        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+    }
+
+    // ==================== GPU (DCGM Exporter) ====================
+
+    async openGpuFromRecommended(orgId) {
+        await this.navigateToRecommended(orgId);
+        await expect(this.recommendedGpuTab).toBeVisible({ timeout: 10000 });
+        await this.recommendedGpuTab.click();
+        await this.page.waitForURL(/\/ingestion\/recommended\/gpu/, { timeout: 10000 });
+    }
+
+    async expectDcgmExporterSelected() {
+        await expect(this.gpuExporterSwitch).toBeVisible({ timeout: 10000 });
+        await expect(this.gpuExporterDcgm).toHaveAttribute('data-state', 'on');
+    }
+
+    /** Picks a platform on a card step's variant toggle (steps in one group follow it). */
+    async selectStepVariant(stepId, variantId) {
+        await this.page.locator(`[data-test="ai-step-${stepId}"] [data-test="ai-variant-${variantId}"]`).click();
+    }
+
+    async getStepCode(stepId) {
+        return await this.page.locator(`[data-test="ai-step-${stepId}"] [data-test="ingestion-setup-code-block"]`).first().textContent();
     }
 
     // ==================== Tab Interactions ====================
@@ -91,6 +133,75 @@ export class IngestionConfigPage {
 
     async verifyContentVisible() {
         await expect(this.contentText).toBeVisible();
+    }
+
+    codeBlock(slug) {
+        const prefix = `ingestion-${slug}-code-block`;
+        return {
+            root: this.page.locator(`[data-test="${prefix}"]`),
+            pre: this.page.locator(`[data-test="${prefix}-pre"]`),
+            tokenLink: this.page.locator(`[data-test="${prefix}-token-link"]`),
+            revealBtn: this.page.locator(`[data-test="${prefix}-reveal-btn"]`),
+            copyBtn: this.page.locator(`[data-test="${prefix}-copy-btn"]`),
+        };
+    }
+
+    async expectCodeBlockVisible(slug, timeout = 15000) {
+        await expect(this.codeBlock(slug).pre).toBeVisible({ timeout });
+    }
+
+    async getCodeBlockText(slug) {
+        return (await this.codeBlock(slug).pre.textContent()) ?? '';
+    }
+
+    async clickCodeBlock(slug) {
+        await this.codeBlock(slug).pre.click();
+    }
+
+    async getTokenLinkText(slug) {
+        return ((await this.codeBlock(slug).tokenLink.textContent()) ?? '').trim();
+    }
+
+    async clickTokenLink(slug) {
+        await this.codeBlock(slug).tokenLink.click();
+    }
+
+    async expectTokenPickerOpen(timeout = 5000) {
+        await expect(this.page.locator('[data-test="ingestion-token-select-option"]').first()).toBeVisible({ timeout });
+    }
+
+    async chooseToken(name) {
+        await this.page.locator('[data-test="ingestion-token-select-option"]').filter({ hasText: name }).first().click();
+    }
+
+    async readClipboard() {
+        return await this.page.evaluate(() => navigator.clipboard.readText());
+    }
+
+    async expectToastText(text, timeout = 5000) {
+        await expect(this.successToastMessage.filter({ hasText: text }).first()).toBeVisible({ timeout });
+    }
+
+    // ==================== Org Passcode Access-Control Assertions ====================
+
+    async expectDataSourceSetupCardForbiddenVisible(timeout = 15000) {
+        await expect(this.dataSourceSetupCardForbidden).toBeVisible({ timeout });
+    }
+
+    async expectDataSourceSetupCardHidden() {
+        await expect(this.dataSourceSetupCard).toBeHidden();
+    }
+
+    async expectCopyContentForbiddenHidden() {
+        await expect(this.copyContentForbidden).toBeHidden();
+    }
+
+    async expectRumContentTextVisible(timeout = 15000) {
+        await expect(this.rumContentText).toBeVisible({ timeout });
+    }
+
+    async getRumContentText() {
+        return await this.rumContentText.textContent();
     }
 
     async verifyNotificationVisible(expectedText = null, timeout = 5000) {

@@ -45,6 +45,22 @@ pub(crate) fn folder_type_into_i16(folder_type: FolderType) -> i16 {
         FolderType::Reports => 2,
         FolderType::Synthetics => 3,
         FolderType::Workflows => 4,
+        FolderType::Prompts => 5,
+        FolderType::Downtimes => 6,
+    }
+}
+
+/// The inverse of [folder_type_into_i16].
+pub fn folder_type_from_i16(value: i16) -> Option<FolderType> {
+    match value {
+        0 => Some(FolderType::Dashboards),
+        1 => Some(FolderType::Alerts),
+        2 => Some(FolderType::Reports),
+        3 => Some(FolderType::Synthetics),
+        4 => Some(FolderType::Workflows),
+        5 => Some(FolderType::Prompts),
+        6 => Some(FolderType::Downtimes),
+        _ => None,
     }
 }
 
@@ -156,7 +172,16 @@ pub async fn get_or_create(
     folder: Folder,
     folder_type: FolderType,
 ) -> Result<(Ksuid, Folder, bool), errors::Error> {
-    let client = get_orm_client_rw().await;
+    get_or_create_with(get_orm_client_rw().await, org_id, folder, folder_type).await
+}
+
+/// [`get_or_create`] on a given connection.
+pub async fn get_or_create_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    folder: Folder,
+    folder_type: FolderType,
+) -> Result<(Ksuid, Folder, bool), errors::Error> {
     let folder_id = folder.folder_id.clone();
 
     if let Some(model) = get_model(client, org_id, &folder_id, folder_type).await? {
@@ -220,6 +245,19 @@ pub async fn get_pk_by_name(
         .map(|m| m.id))
 }
 
+/// Resolves a public folder ID to the physical `folders.id` within the
+/// caller's connection or transaction.
+pub async fn get_pk<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    folder_id: &str,
+    folder_type: FolderType,
+) -> Result<Option<String>, sea_orm::DbErr> {
+    Ok(get_model(db, org_id, folder_id, folder_type)
+        .await?
+        .map(|model| model.id))
+}
+
 /// Returns the folder name (`folder_id` column) for the given primary-key `id`.
 ///
 /// Used to translate the stored PK back to the user-visible name when building
@@ -230,6 +268,34 @@ pub async fn get_name_by_pk(pk: &str) -> Result<Option<String>, errors::Error> {
         .one(client)
         .await?
         .map(|m| m.folder_id))
+}
+/// Resolves a physical folder primary key to its public folder ID through the
+/// caller's connection or transaction.
+pub async fn get_public_id_by_pk<C: ConnectionTrait>(
+    db: &C,
+    pk: &str,
+) -> Result<Option<String>, sea_orm::DbErr> {
+    Ok(Entity::find_by_id(pk)
+        .one(db)
+        .await?
+        .map(|model| model.folder_id))
+}
+
+/// Maps each primary-key `id` to its public `folder_id`; unknown keys are absent.
+pub async fn get_public_ids_by_pks<C: ConnectionTrait>(
+    db: &C,
+    pks: &[String],
+) -> Result<std::collections::HashMap<String, String>, sea_orm::DbErr> {
+    if pks.is_empty() {
+        return Ok(Default::default());
+    }
+    Ok(Entity::find()
+        .filter(Column::Id.is_in(pks))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|model| (model.id, model.folder_id))
+        .collect())
 }
 
 /// Returns `(folder name, display name)` for the given primary-key `id`.
@@ -247,7 +313,7 @@ pub async fn get_name_and_display_name_by_pk(
 }
 
 /// Gets a folder ORM entity by its `folder_id`.
-pub(crate) async fn get_model<C: ConnectionTrait>(
+pub async fn get_model<C: ConnectionTrait>(
     db: &C,
     org_id: &str,
     folder_id: &str,
@@ -320,6 +386,25 @@ mod tests {
         assert_eq!(folder_type_into_i16(FolderType::Dashboards), 0);
         assert_eq!(folder_type_into_i16(FolderType::Alerts), 1);
         assert_eq!(folder_type_into_i16(FolderType::Reports), 2);
+        assert_eq!(folder_type_into_i16(FolderType::Prompts), 5);
+        assert_eq!(folder_type_into_i16(FolderType::Downtimes), 6);
+    }
+
+    #[test]
+    fn every_folder_type_round_trips_through_its_stored_number() {
+        for folder_type in [
+            FolderType::Dashboards,
+            FolderType::Alerts,
+            FolderType::Reports,
+            FolderType::Synthetics,
+            FolderType::Workflows,
+            FolderType::Prompts,
+            FolderType::Downtimes,
+        ] {
+            let n = folder_type_into_i16(folder_type);
+            assert_eq!(folder_type_from_i16(n), Some(folder_type));
+        }
+        assert_eq!(folder_type_from_i16(7), None);
     }
 
     #[test]

@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import useIngestion from "@/composables/useIngestion";
+import useIngestion, {
+  WEB_SERVER_GUIDES,
+  webServerFluentBitContent,
+} from "@/composables/useIngestion";
 
 // Mock the utility functions
 vi.mock("@/utils/zincutils", () => ({
@@ -597,9 +600,10 @@ describe("useIngestion Composable Comprehensive Coverage", () => {
         "othersContent",
         "othersDocURLs",
         "aiContent",
+        "webServerContent",
       ];
 
-      expect(Object.keys(result)).toHaveLength(18);
+      expect(Object.keys(result)).toHaveLength(19);
       expectedProperties.forEach((prop) => {
         expect(result).toHaveProperty(prop);
       });
@@ -625,6 +629,49 @@ describe("useIngestion Composable Comprehensive Coverage", () => {
       expect(typeof result.languagesDocURLs).toBe("object");
       expect(typeof result.othersContent).toBe("string");
       expect(typeof result.othersDocURLs).toBe("object");
+    });
+  });
+
+  describe("web server Fluent Bit config", () => {
+    const endpoint = { host: "api.openobserve.ai", port: "443", tls: "On" };
+
+    it.each(["nginx", "apache", "iis"] as const)(
+      "tails %s logs into the stream named after the server, with the org endpoint and credential placeholders",
+      (server) => {
+        const content = webServerFluentBitContent(server, "acme-prod", endpoint);
+        expect(content).toContain("[INPUT]\n    Name              tail");
+        expect(content).toContain(`Path              ${WEB_SERVER_GUIDES[server].logPaths}`);
+        expect(content).toContain(`Match             ${server}`);
+        expect(content).toContain("Host              api.openobserve.ai");
+        expect(content).toContain("Port              443");
+        expect(content).toContain("tls               On");
+        expect(content).toContain(`URI               /api/acme-prod/${server}/_json`);
+        expect(content).toContain("Json_date_key     _timestamp");
+        expect(content).toContain("HTTP_User         [EMAIL]");
+        expect(content).toContain("HTTP_Passwd       [PASSCODE]");
+        expect(content).not.toContain("Access Key");
+      },
+    );
+
+    it("uses the configured timestamp column", () => {
+      expect(webServerFluentBitContent("nginx", "o", endpoint, "@ts")).toContain(
+        "Json_date_key     @ts",
+      );
+    });
+
+    it("builds the page content from the store org and the resolved endpoint", () => {
+      const content = useIngestion().webServerContent("nginx");
+      expect(content).toContain("URI               /api/test_org_123/nginx/_json");
+      expect(content).toContain("Host              localhost");
+      expect(content).toContain("Port              5080");
+    });
+
+    it("gives Linux servers an install command and IIS the Windows installer docs", () => {
+      expect(WEB_SERVER_GUIDES.nginx.installCommand).toMatch(/fluent-bit.*install\.sh \| sh$/);
+      expect(WEB_SERVER_GUIDES.apache.installCommand).toBe(WEB_SERVER_GUIDES.nginx.installCommand);
+      expect(WEB_SERVER_GUIDES.iis.installCommand).toBeUndefined();
+      expect(WEB_SERVER_GUIDES.iis.installDocUrl).toMatch(/^https:\/\/docs\.fluentbit\.io\//);
+      expect(WEB_SERVER_GUIDES.iis.logPaths).toBe("C:\\inetpub\\logs\\LogFiles\\W3SVC*\\*.log");
     });
   });
 });

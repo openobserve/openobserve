@@ -18,6 +18,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallMyDeliveries from "@/components/oncall/OnCallMyDeliveries.vue";
 import i18n from "@/locales";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import type { MyDelivery } from "@/ts/interfaces/oncall";
@@ -34,8 +35,8 @@ const service = vi.mocked(oncallService);
 const stubs = {
   OTable: {
     name: "OTable",
-    props: ["data", "columns"],
-    emits: ["row-click"],
+    props: ["data", "columns", "currentPage", "pageSize"],
+    emits: ["row-click", "update:currentPage", "update:pageSize"],
     template: `<div>
       <div v-for="(row, i) in (data || [])" :key="i" data-test="row" @click="$emit('row-click', row)">
         <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" />
@@ -103,6 +104,7 @@ function render(props: Record<string, unknown> = {}) {
 describe("OnCallMyDeliveries", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
     service.myDeliveries.mockResolvedValue({
       data: { total: 0, unread: 0, deliveries: [] },
     } as any);
@@ -198,6 +200,49 @@ describe("OnCallMyDeliveries", () => {
     expect(service.myDeliveries.mock.calls.at(-1)![0]).toMatchObject({ unread_only: true });
   });
 
+  /// Unticking answers from the cache at once, so the slower "unread only"
+  /// answer lands last and must not narrow an inbox the reader just widened.
+  it("ignores a slower answer for a filter the reader has already left", async () => {
+    const wrapper = render();
+    await flushPromises();
+    let answerUnread: (value: unknown) => void = () => {};
+    service.myDeliveries.mockImplementationOnce(
+      () => new Promise((resolve) => (answerUnread = resolve)),
+    );
+    const toggle = wrapper.find('[data-test="oncall-my-deliveries-unread-toggle"]');
+
+    await toggle.trigger("click");
+    await flushPromises();
+    await toggle.trigger("click");
+    await flushPromises();
+    answerUnread({
+      data: {
+        total: 2,
+        unread: 2,
+        deliveries: [delivery({ read: false }), delivery({ read: false })],
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(0);
+  });
+
+  /// A refresh that fails must not empty the inbox and zero the badge.
+  it("keeps the inbox on screen when a refresh fails", async () => {
+    service.myDeliveries.mockResolvedValue({
+      data: { total: 1, unread: 1, deliveries: [delivery({ read: false })] },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+    service.myDeliveries.mockRejectedValueOnce(new Error("boom"));
+
+    await (wrapper.vm as any).refresh();
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-test="row"]')).toHaveLength(1);
+    expect(wrapper.emitted("unread")?.at(-1)).toEqual([1]);
+  });
+
   describe("marking read", () => {
     it("clears the whole inbox in one call", async () => {
       service.myDeliveries.mockResolvedValue({
@@ -252,6 +297,36 @@ describe("OnCallMyDeliveries", () => {
     });
   });
 
+  /// Both halves belong to one flow, because the second only means anything
+  /// given the first: once a revisit is served from cache, the re-read after a
+  /// write is the one that can silently be served from it too, leaving the rows
+  /// showing the state they had before the mark.
+  it("serves a revisit from cache, and still re-reads after a write", async () => {
+    service.myDeliveries.mockResolvedValue({
+      data: { total: 1, unread: 4, deliveries: [delivery({ read: false })] },
+    } as any);
+    service.markDeliveriesRead.mockResolvedValue({ data: { updated: 1, unread: 2 } } as any);
+
+    const first = render();
+    await flushPromises();
+    expect(service.myDeliveries).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    const wrapper = render();
+    await flushPromises();
+    expect(service.myDeliveries).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('[data-test="oncall-my-deliveries-unread"]').text()).toContain("4");
+
+    await wrapper.find('[data-test="oncall-my-delivery-toggle-ev_88"]').trigger("click");
+    await flushPromises();
+
+    expect(service.markDeliveriesRead).toHaveBeenCalledTimes(1);
+    // The write expired this scope, so the re-read reaches the server.
+    expect(service.myDeliveries).toHaveBeenCalledTimes(2);
+    // 2 is only on the write's own response — the re-read still answers 4.
+    expect(wrapper.emitted("unread")?.some((e) => e[0] === 2)).toBe(true);
+  });
+
   it("opens the page a row was sent for", async () => {
     service.myDeliveries.mockResolvedValue({
       data: { total: 1, unread: 0, deliveries: [delivery()] },
@@ -277,5 +352,53 @@ describe("OnCallMyDeliveries", () => {
     await wrapper.find('[data-test="oncall-my-deliveries-unread-toggle"]').trigger("click");
     await flushPromises();
     expect(wrapper.text()).toContain("Nothing unread");
+  });
+
+  /// A phone's action column is one icon wide, so the label goes screen-reader-only there rather than being clipped.
+  it("keeps the row action named when a phone shows only its icon", async () => {
+    service.myDeliveries.mockResolvedValue({
+      data: { total: 1, unread: 1, deliveries: [delivery({ read: false })] },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    const button = wrapper.find('[data-test="oncall-my-delivery-toggle-ev_88"]');
+    expect(button.find(".max-md\\:sr-only").text()).toBe("Mark read");
+  });
+
+  describe("list view state", () => {
+    const defaults = { unreadOnly: false, currentPage: 1, pageSize: 20 };
+    const rows = {
+      data: { total: 1, unread: 1, deliveries: [delivery({ event_id: "ev_1" })] },
+    } as any;
+
+    it("restores page, page size and the unread-only read", async () => {
+      Object.assign(useListViewState("oncall-my-deliveries", defaults), {
+        unreadOnly: true,
+        currentPage: 2,
+        pageSize: 50,
+      });
+      service.myDeliveries.mockResolvedValue(rows);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(service.myDeliveries).toHaveBeenCalledWith(
+        expect.objectContaining({ unread_only: true }),
+      );
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("currentPage")).toBe(2);
+      expect(table.props("pageSize")).toBe(50);
+    });
+
+    it("saves page changes", async () => {
+      service.myDeliveries.mockResolvedValue(rows);
+      const wrapper = render();
+      await flushPromises();
+      wrapper.findComponent({ name: "OTable" }).vm.$emit("update:currentPage", 3);
+      await flushPromises();
+
+      const saved = useListViewState("oncall-my-deliveries", defaults) as Record<string, unknown>;
+      expect(saved.currentPage).toBe(3);
+    });
   });
 });

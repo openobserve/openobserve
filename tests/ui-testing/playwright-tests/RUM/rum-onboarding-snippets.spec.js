@@ -4,6 +4,7 @@
  * Verifies the Frontend Monitoring onboarding page renders correct, copy-ready
  * instrumentation snippets for BOTH integration paths (NPM install + SDK init),
  * with the real org identifier / ingestion site / insecureHTTP flag injected.
+ * CDN path: O2_RUM/O2_LOGS loader globals, versioned bundle URLs, crossOrigin='anonymous' script tags.
  *
  * Prerequisites:
  *   - OpenObserve build on ZO_BASE_URL (default http://localhost:5080); the
@@ -37,7 +38,7 @@ test.describe('RUM Onboarding Snippets', () => {
   test('shows the NPM install command for both browser packages', {
     tag: ['@rum', '@rumOnboarding', '@P1'],
   }, async () => {
-    await pm.rumIngestionPage.expectNpmSnippetContains(
+    await pm.rumIngestionPage.expectInstallSnippetContains(
       'npm i @openobserve/browser-rum @openobserve/browser-logs',
     );
   });
@@ -65,5 +66,44 @@ test.describe('RUM Onboarding Snippets', () => {
   }, async () => {
     // Two copy buttons: npm command + init config.
     await pm.rumIngestionPage.expectCopyControlsPresent(2);
+  });
+
+  test('CDN variant shows O2 globals, versioned bundle URLs and anonymous crossOrigin', {
+    tag: ['@rum', '@rumOnboarding', '@P0'],
+  }, async () => {
+    await pm.rumIngestionPage.switchToCdnVariant();
+    await pm.rumIngestionPage.expectInstallSnippetContains('O2_RUM');
+    await pm.rumIngestionPage.expectInstallSnippetContains('O2_LOGS');
+    await pm.rumIngestionPage.expectInstallSnippetContains(
+      /https:\/\/browsersdk\.openobserve\.ai\/\d+\.\d+\.\d+\/openobserve-rum\.js/,
+    );
+    await pm.rumIngestionPage.expectInstallSnippetContains(
+      /https:\/\/browsersdk\.openobserve\.ai\/\d+\.\d+\.\d+\/openobserve-logs\.js/,
+    );
+    // #14863: without crossOrigin the bundle's dynamic import() of replay/profiler chunks cannot resolve, so replay never records.
+    await pm.rumIngestionPage.expectInstallSnippetContains("d.crossOrigin = 'anonymous'");
+    await pm.rumIngestionPage.expectInitSnippetContains('O2_RUM.onReady');
+    await pm.rumIngestionPage.expectInitSnippetContains('O2_LOGS.onReady');
+  });
+
+  test('CDN variant contains no OO_RUM / OO_LOGS / 0.3.4 anywhere', {
+    tag: ['@rum', '@rumOnboarding', '@P1'],
+  }, async () => {
+    await pm.rumIngestionPage.switchToCdnVariant();
+    await pm.rumIngestionPage.expectCardDoesNotContain('OO_RUM');
+    await pm.rumIngestionPage.expectCardDoesNotContain('OO_LOGS');
+    // 0.3.4 is the last pre-rename SDK that still exposed OO_* globals.
+    await pm.rumIngestionPage.expectCardDoesNotContain('0.3.4');
+  });
+
+  test('switching back to NPM restores the default install command', {
+    tag: ['@rum', '@rumOnboarding', '@P2'],
+  }, async () => {
+    await pm.rumIngestionPage.switchToCdnVariant();
+    await pm.rumIngestionPage.switchToNpmVariant();
+    await pm.rumIngestionPage.expectInstallSnippetContains(
+      'npm i @openobserve/browser-rum @openobserve/browser-logs',
+    );
+    await pm.rumIngestionPage.expectInitSnippetContains('openobserveRum.init');
   });
 });

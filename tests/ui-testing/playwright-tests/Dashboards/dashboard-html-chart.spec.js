@@ -42,6 +42,11 @@ const XSS_HTML_SNIPPET = `<!DOCTYPE html>
   </body>
 </html>`;
 
+// Chromium's CSSOM decodes these escapes to a literal "</style>" when the panel CSS is rewritten.
+const CSS_REWRITE_HTML_SNIPPET = `<style>a{content:"\\3c/style\\3e\\3cimg src=x onerror=window.__o2HtmlPanelSentinel=1\\3e"}</style>
+<style>a[title="\\3c/style\\3e\\3cimg src=x onerror=window.__o2HtmlPanelSentinel=1\\3e"]{color:red}</style>
+<h1 data-test>CSS Rewrite Test</h1>`;
+
 const UNDEFINED_VARIABLE_HTML_SNIPPET = `<!DOCTYPE html>
 <html>
   <body>
@@ -192,6 +197,43 @@ test.describe("HTML chart dashboard", () => {
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
+  test("Should not let rewritten panel CSS break out of its style element.", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+    const dashboardName = generateDashboardName();
+    const sentinel = () => page.evaluate(() => window.__o2HtmlPanelSentinel);
+
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectChartType("html");
+
+    await pm.chartTypeSelector.fillHtmlEditor(CSS_REWRITE_HTML_SNIPPET);
+
+    await expect(
+      pm.chartTypeSelector.getHtmlHeading("CSS Rewrite Test")
+    ).toBeVisible();
+    await expect(page.locator("img[onerror]")).toHaveCount(0);
+
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
+
+    await expect(
+      pm.chartTypeSelector.getHtmlHeading("CSS Rewrite Test")
+    ).toBeVisible();
+    await expect(page.locator("img[onerror]")).toHaveCount(0);
+    // an injected image fails to load asynchronously, so give onerror time to fire
+    await page.waitForTimeout(1000);
+    expect(await sentinel()).toBeUndefined();
+
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+  });
+
   test("Should keep undefined dashboard variable placeholder unchanged in HTML chart.", async ({
     page,
   }) => {

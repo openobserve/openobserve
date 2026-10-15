@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import Recommended from "./Recommended.vue";
 import i18n from "@/locales";
 import { createStore } from "vuex";
@@ -274,5 +274,101 @@ describe("Recommended", () => {
 
     const cardContainer = wrapper.find(".bg-card-glass-bg");
     expect(cardContainer.exists()).toBe(true);
+  });
+});
+
+describe("Recommended: Get started pick", () => {
+  const ORG = "org123";
+  const guides = [
+    "recommended",
+    "ingestFromKubernetes",
+    "ingestFromWindows",
+    "ingestFromLinux",
+    "ingestFromMacOS",
+    "ingestFromGpu",
+    "AWSConfig",
+    "GCPConfig",
+    "AzureConfig",
+    "ingestFromTraces",
+    "frontendMonitoring",
+    "recommendedMcp",
+    "nginx",
+    "curl",
+  ];
+
+  const mountRail = async () => {
+    const store = createStore({
+      state: {
+        selectedOrganization: { identifier: ORG },
+        userInfo: { email: "test@example.com" },
+        zoConfig: { ai_enabled: false },
+      },
+    });
+    const router = createRouter({
+      history: createWebHistory(),
+      routes: guides.map((name) => ({
+        path: `/${name}`,
+        name,
+        component: { template: "<div />" },
+      })),
+    });
+    await router.push("/ingestFromLinux");
+    await router.isReady();
+    const wrapper = mount(Recommended, {
+      global: { plugins: [i18n, store, router], stubs: { "router-view": true } },
+    });
+    await flushPromises();
+    return wrapper;
+  };
+
+  const railNames = (wrapper: ReturnType<typeof mount>) =>
+    wrapper
+      .findAll('[data-test^="ingestion-recommended-"]')
+      .map((el) => el.attributes("data-test"))
+      .filter((id) => id !== "ingestion-recommended-tab-" && !id?.endsWith("-group"));
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("renders today's rail, with no groups, when there is no pick", async () => {
+    const wrapper = await mountRail();
+    expect(wrapper.find('[data-test="ingestion-recommended-pick-group"]').exists()).toBe(false);
+    expect(
+      wrapper.find('[data-test="ingestion-recommended-tab-ingestFromKubernetes"]').exists(),
+    ).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("pins a recommended pick under Your pick and drops it from the list below", async () => {
+    localStorage.setItem(`o2.onboarding.firstSource.${ORG}`, "kubernetes");
+    const wrapper = await mountRail();
+    expect(wrapper.find('[data-test="ingestion-recommended-pick-group"]').text()).toBe("Your pick");
+    expect(wrapper.find('[data-test="ingestion-recommended-rest-group"]').text()).toBe(
+      "Recommended",
+    );
+    const ids = railNames(wrapper);
+    expect(ids[0]).toBe("ingestion-recommended-pick-tab-ingestFromKubernetes");
+    expect(ids).not.toContain("ingestion-recommended-tab-ingestFromKubernetes");
+    expect(ids).toContain("ingestion-recommended-tab-ingestFromLinux");
+    wrapper.unmount();
+  });
+
+  it("pins a pick from another category, linking across to its guide", async () => {
+    localStorage.setItem(`o2.onboarding.firstSource.${ORG}`, "webserver");
+    const wrapper = await mountRail();
+    const pin = wrapper.find('[data-test="ingestion-recommended-pick-tab-nginx"]');
+    expect(pin.exists()).toBe(true);
+    expect(pin.text()).toContain("Web server logs");
+    expect(railNames(wrapper)).toContain("ingestion-recommended-tab-ingestFromKubernetes");
+    wrapper.unmount();
+  });
+
+  it("pins nothing for Not sure yet or a pick stored for another org", async () => {
+    localStorage.setItem(`o2.onboarding.firstSource.${ORG}`, "unsure");
+    localStorage.setItem("o2.onboarding.firstSource.other", "kubernetes");
+    const wrapper = await mountRail();
+    expect(wrapper.find('[data-test="ingestion-recommended-pick-group"]').exists()).toBe(false);
+    wrapper.unmount();
   });
 });

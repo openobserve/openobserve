@@ -63,6 +63,11 @@ impl From<cloud_billings::CustomerBilling> for ListSubscriptionResponseBody {
 pub struct NewUserAttribution {
     pub from: String,
     pub company: String,
+    /// Data source picked in the Get started dialog, absent when none was picked.
+    #[serde(default)]
+    pub first_source: Option<String>,
+    #[serde(default)]
+    pub skipped: bool,
 }
 
 #[cfg(test)]

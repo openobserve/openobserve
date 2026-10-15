@@ -1989,6 +1989,11 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
+        // The dialog now pre-fills stream type/name from the alert being cloned,
+        // so submitting right away would succeed instead of failing validation.
+        // Switching the stream type to a different one resets the stream name
+        // back to blank, which is what still triggers the toast.
+        await this.selectCloneStreamType('metrics');
         await this.page.locator(this.locators.cloneSubmitButton).click();
         // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
         // visible message div) — scope to the visible `o-toast-message` data-test to avoid
@@ -1996,10 +2001,10 @@ export class AlertsPage {
         await expect(
             this.page
                 .locator('[data-test="o-toast-message"]')
-                .filter({ hasText: 'Please select stream type' })
+                .filter({ hasText: 'Please select stream name' })
                 .first()
         ).toBeVisible({ timeout: 5000 });
-        testLogger.info('Clone validation working - stream type required');
+        testLogger.info('Clone validation working - stream name required');
 
         // Error toasts (including any lingering ones from earlier validation steps) have
         // a 30-second auto-dismiss paused in headless mode — dismiss ALL of them now so
@@ -4877,6 +4882,11 @@ export class AlertsPage {
     /** Alert list table rows */
     getAlertTableRows() {
         return this.page.locator("table tbody tr");
+    }
+
+    /** More-options kebab button inside a specific alert list row */
+    getAlertRowMoreOptions(rowLocator) {
+        return rowLocator.locator('[data-test*="-more-options"]').first();
     }
 
     /** Context/kebab menu "Delete" option by exact text */

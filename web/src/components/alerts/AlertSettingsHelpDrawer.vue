@@ -223,6 +223,8 @@ const builtInVars: { name: string; desc: I18nText }[] = [
   { name: "stream_name", desc: t("alerts.alertSettings.builtInVars.streamName") },
   { name: "alert_name", desc: t("alerts.alertSettings.builtInVars.alertName") },
   { name: "alert_type", desc: t("alerts.alertSettings.builtInVars.alertType") },
+  { name: "alert_status", desc: t("alerts.alertSettings.builtInVars.alertStatus") },
+  { name: "episode_id", desc: t("alerts.alertSettings.builtInVars.episodeId") },
   { name: "alert_period", desc: t("alerts.alertSettings.builtInVars.alertPeriod") },
   { name: "alert_operator", desc: t("alerts.alertSettings.builtInVars.alertOperator") },
   { name: "alert_threshold", desc: t("alerts.alertSettings.builtInVars.alertThreshold") },
@@ -240,6 +242,14 @@ const builtInVars: { name: string; desc: I18nText }[] = [
     desc: t("alerts.alertSettings.builtInVars.alertStartTime"),
   },
   { name: "alert_end_time", desc: t("alerts.alertSettings.builtInVars.alertEndTime") },
+  {
+    name: "alert_start_time_millis",
+    desc: t("alerts.alertSettings.builtInVars.alertStartTimeMillis"),
+  },
+  {
+    name: "alert_end_time_millis",
+    desc: t("alerts.alertSettings.builtInVars.alertEndTimeMillis"),
+  },
   { name: "alert_url", desc: t("alerts.alertSettings.builtInVars.alertUrl") },
   {
     name: "alert_trigger_time",

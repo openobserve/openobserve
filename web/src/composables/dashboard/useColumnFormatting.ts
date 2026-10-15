@@ -17,8 +17,15 @@
 // `ColumnOverrideUI` shape and (de)serializes to/from the persisted
 // `config.override_config` array on load/save.
 
-import { useI18nTyped, type I18nText, type TranslateFn } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText, type TranslateFn } from "@/types/i18n";
 import { OVERRIDE_CONFIG_TYPES } from "@/utils/dashboard/tableConfigUtils";
+import {
+  NUMBER_LOCALE_TAGS,
+  getNumberLocale,
+  localeFromUnit,
+  toLocaleUnit,
+  toSupportedNumberLocale,
+} from "@/locales/numberFormat";
 
 // null means "not set" → renderer falls back to the panel-level default.
 export interface ConditionalRuleUI {
@@ -47,6 +54,15 @@ export interface ColumnOverrideUI {
   autoColor: boolean; // unique-value coloring
   conditions: ConditionalRuleUI[];
 }
+
+// A type alias, not an interface: OSelect's options are an index-signature type an interface can't satisfy.
+export type UnitOption = {
+  label: I18nText;
+  value?: string | null;
+  // OSelect nesting: the pinned locales are listed under the Other Locale row.
+  expandable?: boolean;
+  parentValue?: string;
+};
 
 export const TEXT_SWATCHES = [
   "#b91c1c",
@@ -176,13 +192,19 @@ export const serializeOverrides = (cols: ColumnOverrideUI[]): any[] =>
     .map((c) => serializeColumnOverride(c))
     .filter((entry) => entry != null);
 
-/** Canonical unit dropdown options shared by panel config and the dialog. */
-export const getUnitOptions = (
-  t: TranslateFn,
-): Array<{ label: I18nText; value: string | null }> => [
+// Nesting key of the Other Locale row; never saved as a unit.
+const OTHER_LOCALE_KEY = "other-locale";
+
+/**
+ * Canonical unit dropdown options shared by panel config and the dialog. Pass the
+ * current unit so a pinned locale outside the offered list stays selectable.
+ */
+export const getUnitOptions = (t: TranslateFn, currentUnit?: string | null): UnitOption[] => [
   { label: t("dashboard.default"), value: null },
   { label: t("dashboard.numbers"), value: "numbers" },
   { label: t("dashboard.localeFormat"), value: "locale" },
+  { label: t("dashboard.otherLocale"), value: OTHER_LOCALE_KEY, expandable: true },
+  ...getPinnedLocaleOptions(currentUnit),
   { label: t("dashboard.bytes"), value: "bytes" },
   { label: t("dashboard.kilobytes"), value: "kilobytes" },
   { label: t("dashboard.megabytes"), value: "megabytes" },
@@ -201,11 +223,38 @@ export const getUnitOptions = (
   { label: t("dashboard.custom"), value: "custom" },
 ];
 
+const localeDisplayName = (names: Intl.DisplayNames, tag: string): string => {
+  try {
+    // baseName drops Unicode extensions such as the Arabic UI's `-u-nu-latn`.
+    const { language, region, baseName } = new Intl.Locale(tag);
+    const name = names.of(language) ?? language;
+    const code = baseName.replaceAll("-", "_");
+    return region ? `${name} - ${region} (${code})` : `${name} (${code})`;
+  } catch {
+    return tag;
+  }
+};
+
+/** Locale Format pinned to each offered locale, labelled like "English - US (en_US)" in the viewer's language and sorted. */
+const getPinnedLocaleOptions = (currentUnit?: string | null): UnitOption[] => {
+  const current = toSupportedNumberLocale(localeFromUnit(currentUnit));
+  const tags = current ? [...new Set([...NUMBER_LOCALE_TAGS, current])] : NUMBER_LOCALE_TAGS;
+  const names = new Intl.DisplayNames([getNumberLocale()], { type: "language" });
+
+  return tags
+    .map((tag) => toSupportedNumberLocale(tag))
+    .filter((tag): tag is string => tag !== null)
+    .map((tag) => ({
+      label: raw(localeDisplayName(names, tag)),
+      value: toLocaleUnit(tag),
+      parentValue: OTHER_LOCALE_KEY,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+};
+
 /** i18n-bound option lists for the formatting controls. */
 export const useColumnFormattingOptions = () => {
   const { t } = useI18nTyped();
-
-  const unitOptions = getUnitOptions(t);
 
   const fieldTypeOptions = [
     { value: "auto", label: t("dashboard.auto") },
@@ -231,7 +280,6 @@ export const useColumnFormattingOptions = () => {
   ];
 
   return {
-    unitOptions,
     fieldTypeOptions,
     alignOptions,
     conditionOperators,

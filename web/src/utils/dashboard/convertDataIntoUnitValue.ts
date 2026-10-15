@@ -1,4 +1,4 @@
-import { getNumberLocale } from "@/locales/numberFormat";
+import { localeFromUnit, resolveNumberLocale } from "@/locales/numberFormat";
 
 const units: any = {
   bytes: [
@@ -101,6 +101,7 @@ export const getUnitValue = (
   customUnit: string,
   decimals: number = 2,
 ) => {
+  const pinnedLocale = localeFromUnit(unit);
   // console.time("getUnitValue:");
   let formattedValue;
   if (
@@ -143,7 +144,7 @@ export const getUnitValue = (
     return { value: value === "" ? "-" : value, unit: "" };
   }
 
-  switch (unit) {
+  switch (pinnedLocale === null ? unit : "locale") {
     case "numbers":
     case "bytes":
     case "seconds":
@@ -158,6 +159,13 @@ export const getUnitValue = (
       // while the value is smaller than the divisor
       while (unitIndex > 0 && absValue < units[unit][unitIndex].divisor) {
         unitIndex--;
+      }
+      // zero has nothing to scale, so it stays in the panel's own unit (divisor 1)
+      if (absValue === 0) {
+        const ownUnit = units[unit].findIndex((entry: { divisor: number }) => entry.divisor === 1);
+        if (ownUnit !== -1) {
+          unitIndex = ownUnit;
+        }
       }
 
       // calculate the final value: sign * absValue / divisor
@@ -178,7 +186,7 @@ export const getUnitValue = (
       const num = Number(value);
       if (Number.isNaN(num)) return { value: value, unit: "" };
       return {
-        value: new Intl.NumberFormat(getNumberLocale(), {
+        value: new Intl.NumberFormat(resolveNumberLocale(pinnedLocale), {
           minimumFractionDigits: decimals,
           maximumFractionDigits: decimals,
         }).format(num),

@@ -33,7 +33,9 @@ use datafusion::{
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
     },
 };
+use datafusion_proto::protobuf::PhysicalPlanNode;
 use hashbrown::HashMap;
+use prost::Message;
 use proto::cluster_rpc::{self, KvItem};
 
 use crate::{
@@ -179,7 +181,15 @@ impl PhysicalOptimizerRule for RemoteScanRule {
 
         // if single node and can optimize, add remote scan to top
         if self.single_node_optimizer_enable && is_single_node_optimize(&plan) {
-            return remote_scan_to_top_if_needed(plan, self.remote_scan_nodes.clone());
+            let whole =
+                remote_scan_to_top_if_needed(Arc::clone(&plan), self.remote_scan_nodes.clone())?;
+            if follower_can_decode(&whole) {
+                return Ok(whole);
+            }
+            log::info!(
+                "[trace_id {}] RemoteScanRule: plan too deep to send whole, splitting it like a cluster plan",
+                self.remote_scan_nodes.req.trace_id
+            );
         }
 
         // if not single node, rewrite physical plan to add remote scan
@@ -430,6 +440,12 @@ fn is_single_node_optimize(plan: &Arc<dyn ExecutionPlan>) -> bool {
     empty_exec_count <= 1 && config::cluster::LOCAL_NODE.is_single_node()
 }
 
+// prost caps decode nesting at a fixed depth, so the follower rejects any deeper plan.
+fn follower_can_decode(plan: &Arc<dyn ExecutionPlan>) -> bool {
+    plan.downcast_ref::<RemoteScanExec>()
+        .is_none_or(|scan| PhysicalPlanNode::decode(scan.encoded_plan()).is_ok())
+}
+
 pub fn remote_scan_to_top_if_needed(
     plan: Arc<dyn ExecutionPlan>,
     remote_scan_nodes: Arc<RemoteScanNodes>,
@@ -517,11 +533,18 @@ impl<'n> TreeNodeVisitor<'n> for NewEmptyExecCountVisitor {
 mod tests {
     use datafusion::{
         arrow::datatypes::{DataType, Field, Schema},
+        execution::{SessionStateBuilder, runtime_env::RuntimeEnvBuilder},
         physical_optimizer::PhysicalOptimizerRule,
         physical_plan::{empty::EmptyExec, expressions::col},
+        prelude::{SessionConfig, SessionContext},
     };
+    use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 
     use super::*;
+    use crate::datafusion::{
+        distributed_plan::codec::get_physical_extension_codec,
+        table_provider::empty_table::NewEmptyTable,
+    };
 
     #[test]
     fn test_remote_scan_rule_name() {
@@ -858,5 +881,96 @@ mod tests {
             );
         }
         Ok(())
+    }
+
+    fn window_chain_sql(stages: usize) -> String {
+        let key = (0..20).fold("name".to_string(), |x, _| {
+            format!("regexp_replace({x}, 'a', 'b')")
+        });
+        let mut ctes = vec![format!(
+            "c1 AS (SELECT name, {key} AS k, _timestamp AS t, _timestamp AS a1 FROM t)"
+        )];
+        for i in 2..=stages {
+            let p = i - 1;
+            ctes.push(format!(
+                "c{i} AS (SELECT *, MAX(a{p}) OVER (PARTITION BY k ORDER BY t RANGE BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS a{i} FROM c{p})"
+            ));
+        }
+        format!(
+            "WITH {} SELECT k, a{stages} FROM c{stages}",
+            ctes.join(", ")
+        )
+    }
+
+    async fn single_node_plan(sql: &str) -> (SessionContext, Arc<dyn ExecutionPlan>) {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+        let mut file_id_lists = HashMap::new();
+        file_id_lists.insert(TableReference::from("t"), vec![]);
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(4))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_physical_optimizer_rule(Arc::new(RemoteScanRule::new_test(file_id_lists, true)))
+            .with_default_features()
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let table = NewEmptyTable::new("t", schema).with_partitions(4);
+        ctx.register_table("t", Arc::new(table)).unwrap();
+        let logical = ctx.state().create_logical_plan(sql).await.unwrap();
+        let plan = ctx.state().create_physical_plan(&logical).await.unwrap();
+        (ctx, plan)
+    }
+
+    fn decode_every_remote_scan(ctx: &SessionContext, plan: &Arc<dyn ExecutionPlan>) -> usize {
+        let mut sent = vec![];
+        plan.apply(|node| {
+            if let Some(scan) = node.downcast_ref::<RemoteScanExec>() {
+                sent.push(scan.encoded_plan().to_vec());
+            }
+            Ok(TreeNodeRecursion::Continue)
+        })
+        .unwrap();
+        let codec = get_physical_extension_codec();
+        for bytes in &sent {
+            physical_plan_from_bytes_with_extension_codec(bytes, &ctx.task_ctx(), &codec)
+                .expect("the follower must decode the plan it is sent");
+        }
+        sent.len()
+    }
+
+    // Server planning runs on 16 MiB threads; this plan overflows the 2 MiB test thread.
+    fn on_server_stack(test: impl Future<Output = ()> + Send + 'static) {
+        std::thread::Builder::new()
+            .stack_size(16 * 1024 * 1024)
+            .spawn(move || {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(test)
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn test_single_node_keeps_whole_plan_in_one_remote_scan_when_it_decodes() {
+        on_server_stack(async {
+            let (ctx, plan) = single_node_plan(&window_chain_sql(3)).await;
+            assert_eq!(plan.name(), "RemoteScanExec");
+            assert_eq!(decode_every_remote_scan(&ctx, &plan), 1);
+        });
+    }
+
+    #[test]
+    fn test_single_node_splits_plan_too_deep_for_the_follower_to_decode() {
+        on_server_stack(async {
+            let (ctx, plan) = single_node_plan(&window_chain_sql(30)).await;
+            assert!(decode_every_remote_scan(&ctx, &plan) >= 1);
+            assert_ne!(plan.name(), "RemoteScanExec");
+        });
     }
 }

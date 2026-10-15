@@ -26,6 +26,9 @@ dependencies = [
     "ruff>=0.1.8",
     "tink>=1.10.0",
     "protobuf",
+    # OTLP/gRPC ingest tests: ExportXxxServiceRequest over a real gRPC channel
+    "grpcio",
+    "opentelemetry-proto",
     # query-agent oracle: regenerates queries/*.json via DuckDB before CI runs
     "duckdb>=1.0",
     # Phase 5: schemathesis runs OpenAPI-spec-driven fuzz tests in its own
@@ -59,6 +62,7 @@ pythonpath = ["."]
 markers = [
     "order: mark test to run in a specific order",
     "framework: self-tests for the support/ framework (Phase 2)",
+    "enterprise: needs an enterprise build with the feature flag on (on-call). Run with -m enterprise.",
 ]
 
 [tool.ruff]

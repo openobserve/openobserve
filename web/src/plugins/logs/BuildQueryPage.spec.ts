@@ -18,6 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { reactive, nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 import BuildQueryPage from "./BuildQueryPage.vue";
+import { searchState } from "@/composables/useLogs/searchState";
 
 // Mock vuex store
 const mockStore = {
@@ -156,6 +157,21 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
 
 // Mock useNotifications composable
 const mockShowErrorNotification = vi.fn();
+const persistReasonMock = vi.hoisted(() => ({ value: null as string | null }));
+const openPanelRunMock = vi.hoisted(() => vi.fn(() => 1));
+const markPanelDispatchedMock = vi.hoisted(() => vi.fn());
+const endPanelRunMock = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/useLogs/logsAutoRun", () => ({
+  setAutoRunTransport: vi.fn(),
+  useLogsAutoRun: () => ({
+    persistReason: () => persistReasonMock.value,
+    openPanelRun: openPanelRunMock,
+    markPanelDispatched: markPanelDispatchedMock,
+    hasPanelRun: () => true,
+    endPanelRun: endPanelRunMock,
+  }),
+}));
+
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
     showErrorNotification: mockShowErrorNotification,
@@ -164,7 +180,8 @@ vi.mock("@/composables/useNotifications", () => ({
 }));
 
 // Mock sqlUtils
-vi.mock("@/utils/query/sqlUtils", () => ({
+vi.mock("@/utils/query/sqlUtils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/query/sqlUtils")>()),
   parseWhereClauseToFilter: vi.fn().mockResolvedValue([]),
 }));
 
@@ -257,6 +274,26 @@ function createWrapper(props = {}) {
     },
   });
 }
+
+describe("BuildQueryPage parser recovery", () => {
+  it("renders a soft error with a readable outline Retry action", async () => {
+    const parser = vi
+      .spyOn(await import("@/utils/query/sqlUtils"), "parseWhereClauseToFilterChecked")
+      .mockRejectedValueOnce(new Error("parser unavailable"));
+    const wrapper = createWrapper({ whereClause: "code = 503", isSqlMode: false });
+    await flushPromises();
+    const banner = wrapper.get('[data-test="logs-build-parser-error"]');
+    expect(banner.attributes("role")).toBe("alert");
+    expect(banner.classes()).toContain("bg-banner-error-soft-bg");
+    expect(banner.classes()).toContain("text-banner-error-soft-text");
+    expect(banner.get('[data-test="logs-build-parser-retry"]').attributes("data-o2-variant")).toBe(
+      "outline",
+    );
+    expect(parser).toHaveBeenCalled();
+    wrapper.unmount();
+    vi.restoreAllMocks();
+  });
+});
 
 describe("BuildQueryPage Component", () => {
   let wrapper: any;
@@ -524,6 +561,43 @@ describe("BuildQueryPage Component", () => {
   });
 
   describe("Add to Dashboard Dialog", () => {
+    afterEach(() => {
+      persistReasonMock.value = null;
+    });
+
+    it("G1: is refused with the reason until the Build panel's run completes", async () => {
+      persistReasonMock.value = "Run the query first: this action saves or shares what you ran";
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.onAddToDashboard();
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
+      expect(mockShowErrorNotification).toHaveBeenCalledWith(
+        "Run the query first: this action saves or shares what you ran",
+      );
+    });
+
+    it("opens its own panel generation for Build's own runs, not for a Run that passed one", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      openPanelRunMock.mockClear();
+      await wrapper.vm.runQuery(false, 7);
+      expect(openPanelRunMock).not.toHaveBeenCalled();
+      await wrapper.vm.runQuery(false);
+      expect(openPanelRunMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("marks the panel run dispatched right after the editor copies its config (F2)", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      const order: string[] = [];
+      wrapper.vm.panelEditorRef = { runQuery: vi.fn(() => order.push("run")) };
+      markPanelDispatchedMock.mockImplementation((id: number) => order.push(`mark:${id}`));
+      openPanelRunMock.mockReturnValueOnce(11);
+      await wrapper.vm.runQuery(false, 7);
+      await wrapper.vm.runQuery(false);
+      expect(order).toEqual(["run", "mark:7", "run", "mark:11"]);
+    });
+
     it("should not show AddToDashboard drawer initially", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -887,5 +961,221 @@ describe("BuildQueryPage Component - Integration Tests", () => {
     const emitted = wrapper.emitted("queryGenerated");
     expect(emitted).toBeTruthy();
     expect(emitted![emitted!.length - 1]).toEqual([generatedQuery]);
+  });
+});
+
+describe("BuildQueryPage - text search WHERE (AC6.6)", () => {
+  let wrapper: any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDashboardPanelData.data.queries[0].fields.filter = [] as any;
+  });
+
+  afterEach(() => wrapper?.unmount());
+
+  const notice = () => wrapper.find('[data-test="logs-build-free-text-notice"]');
+  const initialized = () => vi.waitFor(() => expect(wrapper.emitted("initialized")).toBeTruthy());
+
+  it("keeps rendered match_all units as builder conditions and runs", async () => {
+    wrapper = createWrapper({
+      isSqlMode: false,
+      selectedStream: "fts_a",
+      whereClause: "match_all('timeout') AND match_all('error')",
+      freeTextFilter: true,
+    });
+    await initialized();
+    await flushPromises();
+
+    expect(notice().exists()).toBe(false);
+    const filter: any = mockDashboardPanelData.data.queries[0].fields.filter;
+    expect(filter.conditions.map((c: any) => [c.operator, c.value])).toEqual([
+      ["match_all", "timeout"],
+      ["match_all", "error"],
+    ]);
+    expect(mockMakeAutoSQLQuery).toHaveBeenCalled();
+  });
+
+  it("shows the notice and never runs unfiltered when the builder drops a text node", async () => {
+    wrapper = createWrapper({
+      isSqlMode: false,
+      selectedStream: "fts_a",
+      whereClause: "NOT match_all('timeout')",
+      freeTextFilter: true,
+    });
+    await initialized();
+    await flushPromises();
+
+    expect(notice().exists()).toBe(true);
+    expect(notice().text()).toContain("search.freeTextBuildNotice");
+    expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
+    expect(wrapper.emitted("initialized")).toBeTruthy();
+  });
+
+  it("refuses Run after the notice: no panel run opens and the editor never queries", async () => {
+    wrapper = createWrapper({
+      isSqlMode: false,
+      selectedStream: "fts_a",
+      whereClause: "NOT match_all('timeout')",
+      freeTextFilter: true,
+    });
+    await initialized();
+    await flushPromises();
+    expect(notice().exists()).toBe(true);
+    const editor = { runQuery: vi.fn() };
+    wrapper.vm.panelEditorRef = editor;
+
+    await wrapper.vm.runQuery(false, 7);
+    await wrapper.vm.runQuery();
+
+    expect(wrapper.vm.runBlocked).toBe(true);
+    expect(editor.runQuery).not.toHaveBeenCalled();
+    expect(openPanelRunMock).not.toHaveBeenCalled();
+    expect(markPanelDispatchedMock).not.toHaveBeenCalled();
+    expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
+  });
+
+  it("keeps the notice when the search bar text is rewritten while the page initialises", async () => {
+    mockUpdateGroupedFields.mockImplementationOnce(async () => {
+      await Promise.resolve();
+      await wrapper.setProps({ whereClause: "", freeTextFilter: false });
+    });
+    wrapper = createWrapper({
+      isSqlMode: false,
+      selectedStream: "fts_a",
+      whereClause: "NOT match_all('timeout')",
+      freeTextFilter: true,
+    });
+    await initialized();
+    await flushPromises();
+
+    expect(notice().exists()).toBe(true);
+    expect(wrapper.vm.runBlocked).toBe(true);
+    expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
+  });
+
+  it("never forwards the editor's unfiltered builder query over a held text search", async () => {
+    const interim = 'SELECT histogram(_timestamp) as "x_axis_1" FROM "fts_a" GROUP BY x_axis_1';
+    wrapper = createWrapper({
+      isSqlMode: false,
+      selectedStream: "fts_a",
+      whereClause: "NOT match_all('timeout')",
+      freeTextFilter: true,
+    });
+    wrapper.vm.onQueryGenerated(interim);
+    await initialized();
+    await flushPromises();
+    wrapper.vm.onQueryGenerated(interim);
+
+    expect(notice().exists()).toBe(true);
+    expect(wrapper.emitted("queryGenerated")).toBeUndefined();
+  });
+
+  it("refuses Run until the search bar's filter is in the builder, then runs it filtered", async () => {
+    let release!: () => void;
+    mockUpdateGroupedFields.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (release = resolve)),
+    );
+    wrapper = createWrapper({
+      isSqlMode: false,
+      selectedStream: "fts_a",
+      whereClause: "match_all('timeout')",
+      freeTextFilter: true,
+    });
+    await flushPromises();
+    const editor = { runQuery: vi.fn() };
+    wrapper.vm.panelEditorRef = editor;
+
+    expect(wrapper.vm.runBlocked).toBe(true);
+    expect(await wrapper.vm.runQuery(false, 7)).toBe(false);
+    expect(await wrapper.vm.runQuery(true)).toBe(false);
+    expect(editor.runQuery).not.toHaveBeenCalled();
+    expect(openPanelRunMock).not.toHaveBeenCalled();
+    expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
+
+    release();
+    await initialized();
+    await vi.waitFor(() => expect(editor.runQuery).toHaveBeenCalledTimes(1));
+    const filter: any = mockDashboardPanelData.data.queries[0].fields.filter;
+    expect(filter.conditions.map((c: any) => [c.operator, c.value])).toEqual([
+      ["match_all", "timeout"],
+    ]);
+    expect(wrapper.vm.runBlocked).toBe(false);
+  });
+
+  it("abandons a run when the page re-initialises during the run's own awaits", async () => {
+    wrapper = createWrapper({
+      isSqlMode: false,
+      selectedStream: "fts_a",
+      whereClause: "level = 'x'",
+      freeTextFilter: false,
+    });
+    await initialized();
+    await flushPromises();
+    vi.clearAllMocks();
+    const editor = { runQuery: vi.fn() };
+    wrapper.vm.panelEditorRef = editor;
+    openPanelRunMock.mockReturnValueOnce(41);
+    mockUpdateGroupedFields.mockImplementationOnce(async () => {
+      searchState().searchObj.meta.savedBuildConfig = { config: {} };
+      await nextTick();
+    });
+
+    expect(await wrapper.vm.runQuery()).toBe(false);
+    expect(endPanelRunMock).toHaveBeenCalledWith(false);
+    expect(markPanelDispatchedMock).not.toHaveBeenCalledWith(41);
+
+    await vi.waitFor(() => expect(editor.runQuery).toHaveBeenCalledTimes(1));
+    expect(mockDashboardPanelData.data.queries[0].fields.filter).not.toEqual([]);
+  });
+
+  it("lets a run through once the user switches the builder to a custom query", async () => {
+    wrapper = createWrapper({
+      isSqlMode: false,
+      selectedStream: "fts_a",
+      whereClause: "NOT match_all('timeout')",
+      freeTextFilter: true,
+    });
+    await initialized();
+    await flushPromises();
+    const editor = { runQuery: vi.fn() };
+    wrapper.vm.panelEditorRef = editor;
+
+    mockDashboardPanelData.data.queries[0].customQuery = true;
+    try {
+      await wrapper.vm.runQuery(false, 7);
+      expect(wrapper.vm.runBlocked).toBe(false);
+      expect(editor.runQuery).toHaveBeenCalledWith(false);
+    } finally {
+      mockDashboardPanelData.data.queries[0].customQuery = false;
+    }
+  });
+
+  it("shows the notice when the stream cannot search text at all", async () => {
+    wrapper = createWrapper({
+      isSqlMode: false,
+      selectedStream: "nofts_b",
+      whereClause: "",
+      freeTextFilter: true,
+    });
+    await initialized();
+    await flushPromises();
+
+    expect(notice().exists()).toBe(true);
+    expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
+  });
+
+  it("leaves a SQL filter on today's path", async () => {
+    wrapper = createWrapper({
+      isSqlMode: false,
+      selectedStream: "fts_a",
+      whereClause: "NOT level = 'x'",
+      freeTextFilter: false,
+    });
+    await initialized();
+    await flushPromises();
+
+    expect(notice().exists()).toBe(false);
+    expect(mockMakeAutoSQLQuery).toHaveBeenCalled();
   });
 });

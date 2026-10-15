@@ -48,6 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-body text-base leading-[1.375rem]">{{
           t("billing.pricingErrorMessage")
         }}</span>
+        <OButton
+          variant="ghost"
+          size="sm"
+          class="ms-2"
+          data-test="billing-pricing-retry"
+          @click="$emit('retry-pricing')"
+        >
+          {{ t("common.retry") }}
+        </OButton>
       </div>
       <div
         v-for="(feature, index) in features"
@@ -79,7 +88,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </p>
 
     <div class="mt-4.5 flex justify-between p-3">
-      <OButton variant="primary" size="sm-action" class="w-full" @click="contactSales">
+      <OButton
+        variant="primary"
+        size="sm-action"
+        class="w-full"
+        data-test="billing-plans-enterprise-contact-btn"
+        @click="contactSales"
+      >
         {{ t("billing.contactLabel") }}
       </OButton>
     </div>
@@ -95,6 +110,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
+import analytics from "@/services/product_analytics";
 
 export default defineComponent({
   name: "enterprisePlan",
@@ -104,6 +120,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
 
     const contactSales = () => {
+      analytics.track("billing_contact_sales_clicked", { plan: "enterprise" });
       window.open(siteURL.contactSales, "_blank");
     };
 

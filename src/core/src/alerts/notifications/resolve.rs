@@ -171,13 +171,22 @@ fn substitute_raw_row(
         return serde_json::to_string(row).unwrap_or_default();
     }
 
+    if input.contains("{...row}") {
+        let json = serde_json::to_string(row).unwrap_or_default();
+        // Expand only source tokens, after resolving fields and unknown markers in each segment.
+        return input
+            .split("{...row}")
+            .map(|segment| substitute_raw_row(segment, row, unknown))
+            .collect::<Vec<_>>()
+            .join(&json);
+    }
+
     let mut unk: Vec<String> = scan_unmatched(input)
         .into_iter()
-        .filter(|name| name.as_str() != "...row" && !row.contains_key(name))
+        .filter(|name| !row.contains_key(name))
         .collect();
 
     let mut out = input.to_string();
-
     for (key, value) in row {
         let s = super::custom::stringify_row_value(value);
         scan_and_replace_var(&mut out, key, |len| {
@@ -188,12 +197,6 @@ fn substitute_raw_row(
             }
         });
     }
-
-    if out.contains("{...row}") {
-        let json = serde_json::to_string(row).unwrap_or_default();
-        out = out.replace("{...row}", &json);
-    }
-
     let replaced = replace_unmatched_with_marker(&out, &unk);
     unknown.append(&mut unk);
     replaced
@@ -413,6 +416,8 @@ pub(crate) fn scalar_vars(ctx: &NotificationContext) -> Vec<(&'static str, &str)
         ("alert_count", ctx.alert_count.as_str()),
         ("alert_agg_value", ctx.alert_agg_value.as_str()),
         ("alert_level", ctx.alert_level.as_str()),
+        ("alert_status", ctx.alert_status.as_str()),
+        ("episode_id", ctx.episode_id.as_deref().unwrap_or_default()),
         ("alert_priority", ctx.alert_priority.as_str()),
         ("alert_tags", ctx.alert_tags.as_str()),
         ("alert_threshold_crit", ctx.alert_threshold_crit.as_str()),
@@ -455,12 +460,16 @@ mod tests {
             alert_count: "3".into(),
             alert_agg_value: "92.5".into(),
             alert_level: "critical".into(),
+            alert_status: "firing".to_string(),
+            episode_id: None,
             alert_priority: "P1".into(),
             alert_tags: "infra, prod".into(),
             alert_threshold_crit: "90".into(),
             alert_threshold_warn: "80".into(),
             alert_start_time: "2026-08-01T10:00:00".into(),
             alert_end_time: "2026-08-01T10:10:00".into(),
+            alert_start_time_millis: "1785578400000".into(),
+            alert_end_time_millis: "1785579000000".into(),
             alert_url: "https://o2.example/short/abc".into(),
             alert_trigger_time: 1_754_000_000_000_000,
             alert_trigger_time_str: "2026-08-01T10:10:00".into(),
@@ -826,11 +835,9 @@ mod tests {
         let r = resolve_content(&spec, &fixture_ctx(), "webhook");
         let lines = r.row_lines.as_ref().unwrap();
         assert_eq!(lines.len(), 2);
-        // First line must be valid JSON with both row fields.
         let v: serde_json::Value = serde_json::from_str(&lines[0]).unwrap();
         assert_eq!(v.get("host").and_then(|v| v.as_str()), Some("web-1"));
         assert_eq!(v.get("cpu").and_then(|v| v.as_f64()), Some(92.5));
-        // Second row.
         let v2: serde_json::Value = serde_json::from_str(&lines[1]).unwrap();
         assert_eq!(v2.get("host").and_then(|v| v.as_str()), Some("web-2"));
     }
@@ -855,5 +862,65 @@ mod tests {
         let json_part = lines[0].strip_prefix("row=").unwrap();
         let v: serde_json::Value = serde_json::from_str(json_part).unwrap();
         assert!(v.get("host").is_some());
+    }
+
+    #[test]
+    fn spread_row_length_suffix_is_reported_as_unknown() {
+        let row = serde_json::from_value(serde_json::json!({"host": "web-1"})).unwrap();
+        for input in ["{...row:10}", "{...row:1}"] {
+            let mut unknown = Vec::new();
+            assert_eq!(
+                substitute_raw_row(input, &row, &mut unknown),
+                UNMATCHED_MARKER
+            );
+            assert_eq!(unknown, vec!["...row"]);
+        }
+    }
+
+    #[test]
+    fn spread_row_bare_token_does_not_hide_a_length_suffix() {
+        let row = serde_json::from_value(serde_json::json!({"host": "web-1"})).unwrap();
+        let json = serde_json::to_string(&row).unwrap();
+        for input in ["{...row} | {...row:10}", "{...row:10} | {...row}"] {
+            let mut unknown = Vec::new();
+            let expected = input
+                .replace("{...row}", &json)
+                .replace("{...row:10}", UNMATCHED_MARKER);
+            assert_eq!(substitute_raw_row(input, &row, &mut unknown), expected);
+            assert_eq!(unknown, vec!["...row"]);
+        }
+    }
+
+    #[test]
+    fn spread_row_preserves_token_like_data_and_unknown_markers() {
+        let row = serde_json::from_value(serde_json::json!({
+            "message": "{...row}",
+            "nested": {"text": "{missing} {...row:10}", "values": [true, null, 42]}
+        }))
+        .unwrap();
+        let mut unknown = Vec::new();
+        let output = substitute_raw_row(
+            "{message} | {...row} | {missing} | {...row}",
+            &row,
+            &mut unknown,
+        );
+        let json = serde_json::to_string(&row).unwrap();
+        assert_eq!(
+            output,
+            format!("{{...row}} | {json} | {UNMATCHED_MARKER} | {json}")
+        );
+        assert_eq!(unknown, vec!["missing"]);
+    }
+
+    #[test]
+    fn spread_row_serializes_an_empty_row() {
+        let mut unknown = Vec::new();
+        let row = config::utils::json::Map::new();
+        assert_eq!(substitute_raw_row("{...row}", &row, &mut unknown), "{}");
+        assert_eq!(
+            substitute_raw_row("row={...row}", &row, &mut unknown),
+            "row={}"
+        );
+        assert!(unknown.is_empty());
     }
 }

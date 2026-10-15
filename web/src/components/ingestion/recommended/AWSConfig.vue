@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="m-3 mt-1">
+  <div ref="root" class="m-3 mt-1">
     <div class="mb-4">
       <div
         data-test="aws-config-page-title"
@@ -62,8 +62,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("ingestion.awsSetup.manualDescription") }}
         </div>
       </div>
-      <CopyContent :content="raw(content)" />
+      <CredentialCodeBlock slug="aws" :content="content" />
     </div>
+
+    <FirstEventStatus
+      ref="bar"
+      :key="store.state.selectedOrganization.identifier"
+      class="mt-6"
+      :org="store.state.selectedOrganization.identifier"
+      @copy-command="copyManualSnippet"
+    />
   </div>
 </template>
 
@@ -74,12 +82,14 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { defineComponent, ref, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
+import FirstEventStatus from "@/components/ingestion/FirstEventStatus.vue";
+import { provideSnippetCopied } from "@/composables/firstEvent/firstEventCopied";
 import AWSQuickSetup from "./AWSQuickSetup.vue";
 import AWSIndividualServices from "./AWSIndividualServices.vue";
 
@@ -103,7 +113,8 @@ export default defineComponent({
     OTab,
     OTabPanels,
     OTabPanel,
-    CopyContent,
+    CredentialCodeBlock,
+    FirstEventStatus,
     AWSQuickSetup,
     AWSIndividualServices,
   },
@@ -155,13 +166,24 @@ export default defineComponent({
     const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/default/_kinesis_firehose
 Access Key: [BASIC_PASSCODE]`;
 
+    const root = ref<HTMLElement | null>(null);
+    const bar = ref<InstanceType<typeof FirstEventStatus> | null>(null);
+    provideSnippetCopied(bar);
+    // Re-copies through the page's own block, so the clipboard, the toast and snippet_copied match a click on it.
+    const copyManualSnippet = () =>
+      root.value
+        ?.querySelector<HTMLElement>('[data-test="ingestion-aws-code-block-copy-btn"]')
+        ?.click();
+
     return {
-      raw,
       t,
       store,
       config,
       endpoint,
       content,
+      root,
+      bar,
+      copyManualSnippet,
       getImageURL,
       activeTab,
     };

@@ -680,6 +680,46 @@ describe("SpanBlock", () => {
       // left = (startTimeUs - newStart) / duration * 100 = 50000/400000*100 = 12.5
       expect(wrapper.vm.leftPosition).toBeCloseTo(12.5, 0);
     });
+
+    // Regression: a page-long RUM view overruns both edges of a trace-fitted axis.
+    it("clamps a span that overruns both edges of the window to the window", async () => {
+      await wrapper.setProps({
+        span: { ...mockSpan, startTimeUs: mockSpan.startTimeUs - 1_000_000, durationUs: 25 * 60e6 },
+      });
+      expect(wrapper.vm.leftPosition).toBe(0);
+      expect(wrapper.vm.spanWidth).toBe(100);
+    });
+
+    it("draws only the in-window part of a span that starts before the window", async () => {
+      await wrapper.setProps({
+        span: { ...mockSpan, startTimeUs: mockSpan.startTimeUs - 100_000, durationUs: 200_000 },
+      });
+      // ends 100000us into a 350372us window
+      expect(wrapper.vm.leftPosition).toBe(0);
+      expect(wrapper.vm.spanWidth).toBeCloseTo(28.54, 1);
+    });
+
+    it("recalculates spanWidth when only the span's start moves", async () => {
+      await wrapper.setProps({
+        span: { ...mockSpan, startTimeUs: mockSpan.startTimeUs + 100_000 },
+      });
+      // 321372us from 100000us in would end past the window; 250372 of it is inside
+      expect(wrapper.vm.spanWidth).toBeCloseTo(71.46, 1);
+    });
+
+    // Regression: on a 25-minute axis a 300ms call is 0.6px wide and vanished.
+    it("keeps a minimum width on a span inside the window", async () => {
+      await wrapper.setProps({ span: { ...mockSpan, durationUs: 1 } });
+      expect(wrapper.vm.spanWidth).toBe(0);
+      expect(spanMarker().classes()).toContain("min-w-0.5");
+    });
+
+    it("gives no minimum width to a span that starts outside the window", async () => {
+      await wrapper.setProps({
+        span: { ...mockSpan, startTimeUs: mockSpan.startTimeUs - 1_000_000, durationUs: 0 },
+      });
+      expect(spanMarker().classes()).not.toContain("min-w-0.5");
+    });
   });
 
   describe("span-block-select-trigger click", () => {
@@ -1100,5 +1140,104 @@ describe("SpanBlock marker drill-down", () => {
     ]);
     // Still selects the span, so the sidebar opens at all.
     expect(wrapper.emitted("selectSpan")).toEqual([[mockSpan.spanId]]);
+  });
+});
+
+describe("SpanBlock critical path", () => {
+  const spanLengthUs = mockSpan.endTimeUs - mockSpan.startTimeUs;
+  const criticalSpan = {
+    ...mockSpan,
+    criticalSections: [
+      {
+        spanId: mockSpan.spanId,
+        sectionStartUs: mockSpan.startTimeUs - 0.4,
+        sectionEndUs: mockSpan.startTimeUs + spanLengthUs / 4,
+      },
+      {
+        spanId: mockSpan.spanId,
+        sectionStartUs: mockSpan.startTimeUs + spanLengthUs / 2,
+        sectionEndUs: mockSpan.endTimeUs + 0.6,
+      },
+    ],
+  };
+  const nonCriticalSpan = { ...mockSpan, criticalSections: [] };
+  let wrapper: any;
+
+  const mountBlock = async (span: any, showCriticalPath: boolean, selectedSpanId: any = null) => {
+    wrapper = mount(SpanBlock, {
+      props: {
+        span,
+        showCriticalPath,
+        baseTracePosition: mockBaseTracePosition,
+        spanDimensions: mockSpanDimensions,
+        spanData: mockSpanData,
+      },
+      global: { plugins: [i18n, router], provide: { store: mockStore } },
+    });
+    wrapper.vm.searchObj.data.traceDetails.selectedSpanId = selectedSpanId;
+    await flushPromises();
+  };
+
+  const isDimmed = () =>
+    wrapper.find('[data-test="span-block-select-trigger"]').classes().includes("opacity-30");
+
+  afterEach(() => {
+    wrapper.vm.searchObj.data.traceDetails.selectedSpanId = null;
+    wrapper.unmount();
+  });
+
+  it("draws one overlay per section, positioned on the bar's own time basis and clamped", async () => {
+    await mountBlock(criticalSpan, true);
+
+    const segments = wrapper.findAll('[data-test="span-critical-section"]');
+    expect(segments).toHaveLength(2);
+    expect(segments[0].attributes("style")).toContain("left: 0%");
+    expect(segments[0].attributes("style")).toContain("width: 25%");
+    expect(segments[1].attributes("style")).toContain("left: 50%");
+    expect(segments[1].attributes("style")).toContain("width: 50%");
+  });
+
+  it("colours the overlay with the accent token, not the error one", async () => {
+    await mountBlock(criticalSpan, true);
+
+    const classes = wrapper.find('[data-test="span-critical-section"]').classes();
+    expect(classes).toContain("bg-accent");
+    expect(classes).not.toContain("bg-status-error-text");
+  });
+
+  it("draws no overlay when the critical path toggle is off", async () => {
+    await mountBlock(criticalSpan, false);
+
+    expect(wrapper.findAll('[data-test="span-critical-section"]')).toHaveLength(0);
+  });
+
+  it("dims a span with no critical section while the toggle is on", async () => {
+    await mountBlock(nonCriticalSpan, true);
+
+    expect(isDimmed()).toBe(true);
+  });
+
+  it("does not dim a critical span while the toggle is on", async () => {
+    await mountBlock(criticalSpan, true);
+
+    expect(isDimmed()).toBe(false);
+  });
+
+  it("does not dim a non-critical span while the toggle is off", async () => {
+    await mountBlock(nonCriticalSpan, false);
+
+    expect(isDimmed()).toBe(false);
+  });
+
+  it("never dims the selected span, even when it is off the critical path", async () => {
+    await mountBlock(nonCriticalSpan, true, mockSpan.spanId);
+
+    expect(isDimmed()).toBe(false);
+  });
+
+  it("still dims a critical span when another span is selected", async () => {
+    await mountBlock(criticalSpan, true, "some-other-span");
+
+    expect(isDimmed()).toBe(true);
   });
 });

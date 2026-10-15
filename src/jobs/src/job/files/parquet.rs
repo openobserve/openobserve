@@ -730,7 +730,7 @@ async fn merge_files(
     let stream_settings = infra::schema::unwrap_stream_settings(&latest_schema);
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
     let full_text_search_fields = get_stream_setting_fts_fields(&stream_settings);
-    let index_fields = get_stream_setting_index_fields(&stream_settings);
+    let index_fields = get_stream_setting_index_fields(&stream_settings, stream_type);
     let (defined_schema_fields, need_original, index_original_data, index_all_values) =
         match stream_settings {
             Some(s) => (
@@ -911,14 +911,9 @@ pub(crate) async fn queue_service_streams_if_needed(
 ) {
     let service_streams_config = &get_enterprise_config().service_streams;
 
-    let valid_stream_type = stream_type == StreamType::Logs
-        || stream_type == StreamType::Metrics
-        || stream_type == StreamType::Traces;
-
     if service_streams_config.enabled
         && service_streams_config.node_matches_processing_node(&LOCAL_NODE)
-        && org_id != config::META_ORG_ID
-        && valid_stream_type
+        && is_service_discovery_candidate(org_id, stream_type, stream_name)
     {
         // Get stream count for this type (cached, 5-min TTL — counts rarely change).
         let stream_count = db::schema::get_stream_count_cached(org_id, stream_type).await;
@@ -967,6 +962,21 @@ pub(crate) async fn queue_service_streams_if_needed(
             });
         }
     }
+}
+
+/// Internal streams such as `_o2_db_stats` never feed service discovery.
+#[cfg(any(feature = "enterprise", test))]
+fn is_service_discovery_candidate(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> bool {
+    org_id != config::META_ORG_ID
+        && matches!(
+            stream_type,
+            StreamType::Logs | StreamType::Metrics | StreamType::Traces
+        )
+        && !config::meta::self_reporting::usage::is_internal_stream(stream_name)
 }
 
 fn split_perfix(prefix: &str) -> (String, StreamType, String, String) {
@@ -1135,6 +1145,46 @@ mod tests {
     use config::meta::stream::StreamType;
 
     use super::*;
+
+    #[test]
+    fn test_service_discovery_skips_internal_streams() {
+        assert!(is_service_discovery_candidate(
+            "default",
+            StreamType::Logs,
+            "app"
+        ));
+        assert!(is_service_discovery_candidate(
+            "default",
+            StreamType::Traces,
+            "default"
+        ));
+        assert!(!is_service_discovery_candidate(
+            "default",
+            StreamType::Logs,
+            "_o2_db_stats"
+        ));
+        assert!(!is_service_discovery_candidate(
+            "default",
+            StreamType::Metrics,
+            "_agent_signals"
+        ));
+        // A user stream may legitimately start with `_`.
+        assert!(is_service_discovery_candidate(
+            "default",
+            StreamType::Logs,
+            "_orders"
+        ));
+        assert!(!is_service_discovery_candidate(
+            "default",
+            StreamType::EnrichmentTables,
+            "app"
+        ));
+        assert!(!is_service_discovery_candidate(
+            config::META_ORG_ID,
+            StreamType::Logs,
+            "app"
+        ));
+    }
 
     #[test]
     fn test_split_perfix_logs() {

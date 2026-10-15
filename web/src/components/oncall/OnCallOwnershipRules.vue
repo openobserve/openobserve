@@ -50,10 +50,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="rule_id"
       :frame="false"
       :loading="loading"
+      :global-filter="search"
       :show-global-filter="false"
       table-id="oncall-ownership-rules"
+      :persist-columns="true"
+      :enable-column-resize="true"
       data-test="oncall-ownership-table"
     >
+      <template v-if="$slots.toolbar" #toolbar><slot name="toolbar" /></template>
+      <template v-if="$slots['toolbar-trailing']" #toolbar-trailing>
+        <slot name="toolbar-trailing" />
+      </template>
+
       <!-- The rule as the engine reads it, spaced to be read by a person. -->
       <template #cell-match="{ row }">
         <code class="text-text-body text-compact">{{ raw(sentenceOf(row)) }}</code>
@@ -68,11 +76,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-specificity="{ row }">
-        <span class="flex flex-wrap gap-1">
+        <OTruncatedText class="flex flex-wrap gap-1" :tooltip="dimensionsText(row)">
           <OTag v-for="name in dimensionNames(row)" :key="name" variant="purple-outline" size="sm">
             {{ displayOf(name) }}
           </OTag>
-        </span>
+        </OTruncatedText>
       </template>
 
       <template #cell-caught="{ row }">
@@ -105,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost"
             size="icon-sm"
             icon-left="edit"
+            class="max-md:hidden"
             :aria-label="t('oncall.edit')"
             :data-test="`oncall-ownership-edit-${row.rule_id}`"
             @click.stop="emit('edit', row)"
@@ -115,15 +124,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost"
             size="icon-sm"
             icon-left="delete-outline"
+            class="max-md:hidden"
             :aria-label="t('oncall.removeRule')"
             :data-test="`oncall-ownership-delete-${row.rule_id}`"
             @click.stop="emit('remove', row)"
           />
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                icon-left="more-vert"
+                variant="ghost"
+                size="icon-xs-sq"
+                class="md:hidden"
+                :aria-label="t('oncall.moreActions')"
+                data-test="oncall-ownership-row-more-actions"
+                @click.stop
+              />
+            </template>
+            <ODropdownItem
+              icon-left="edit"
+              class="md:hidden"
+              :data-test="`oncall-ownership-edit-${row.rule_id}-menu`"
+              @select="emit('edit', row)"
+            >
+              <span>{{ t("oncall.edit") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="delete-outline"
+              variant="destructive"
+              class="md:hidden"
+              :data-test="`oncall-ownership-delete-${row.rule_id}-menu`"
+              @select="emit('remove', row)"
+            >
+              <span>{{ t("oncall.removeRule") }}</span>
+            </ODropdownItem>
+          </ODropdown>
         </span>
       </template>
 
       <template #empty>
+        <!-- A search that matched nothing is not an org without rules. -->
         <OEmptyState
+          v-if="search"
+          size="hero"
+          preset="no-oncall-rules"
+          :filtered="!!search"
+          data-test="oncall-ownership-empty"
+          @action="onEmptyAction"
+        />
+        <OEmptyState
+          v-else
           size="block"
           preset="no-oncall-rules"
           :description="emptyDescription"
@@ -146,6 +196,9 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OwnershipRuleHealth, OwnershipRuleStats } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
@@ -163,6 +216,8 @@ const props = withDefaults(
     /** Hosts that already name the section — a tab strip, a page header — turn
      *  the title row off rather than repeat themselves. */
     showHeader?: boolean;
+    /** Filters the rows in the table, so each row keeps its precedence number from the full list. */
+    search?: string;
   }>(),
   {
     rules: () => [],
@@ -170,6 +225,7 @@ const props = withDefaults(
     loading: false,
     showTeam: false,
     showHeader: true,
+    search: "",
   },
 );
 
@@ -177,6 +233,7 @@ const emit = defineEmits<{
   (e: "add"): void;
   (e: "edit", rule: OwnershipRuleStats): void;
   (e: "remove", rule: OwnershipRuleStats): void;
+  (e: "clear-search"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -223,6 +280,7 @@ const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
     header: t("oncall.ruleSpecificity"),
     size: 150,
     sortable: false,
+    hideable: true,
     accessorFn: (row: OwnershipRuleStats) => dimensionNames(row).join(", "),
   },
   {
@@ -230,6 +288,7 @@ const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
     header: t("oncall.rulePagesCaughtHeader"),
     size: 150,
     sortable: true,
+    hideable: true,
     accessorFn: (row: OwnershipRuleStats) => row.pages_caught,
   },
   {
@@ -237,6 +296,7 @@ const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
     header: t("oncall.ruleLastMatched"),
     size: 150,
     sortable: true,
+    hideable: true,
     accessorFn: (row: OwnershipRuleStats) => row.last_matched_at ?? 0,
   },
   {
@@ -244,7 +304,9 @@ const columns = computed<OTableColumnDef<OwnershipRuleStats>[]>(() => [
     header: t("oncall.ruleHealth"),
     size: 180,
     sortable: false,
-    accessorFn: (row: OwnershipRuleStats) => row.health,
+    hideable: true,
+    // The label, not the enum: search has to match what the cell shows.
+    accessorFn: (row: OwnershipRuleStats) => String(healthLabel(row)),
   },
   {
     id: "actions",
@@ -271,6 +333,11 @@ function displayOf(name: string): I18nText {
   return raw(props.aliases.find((alias) => alias.id === name)?.display || name);
 }
 
+// The chips hold no separators in their text, so the cut-cell tooltip spells them out.
+function dimensionsText(rule: OwnershipRuleStats): I18nText {
+  return raw(dimensionNames(rule).map(displayOf).join(", "));
+}
+
 const HEALTH_TONES: Record<OwnershipRuleHealth, BadgeVariant> = {
   active: "success-soft",
   shadowed: "warning-soft",
@@ -291,5 +358,13 @@ function healthLabel(rule: OwnershipRuleStats): I18nText {
     if (who) return t("oncall.ruleAlsoClaimedBy", { team: raw(who) });
   }
   return rule.health === "never_used" ? t("oncall.ruleNeverUsed") : t("oncall.ruleActive");
+}
+
+function onEmptyAction(id?: string) {
+  if (id === "clear-filters") {
+    emit("clear-search");
+    return;
+  }
+  emit("add");
 }
 </script>

@@ -62,11 +62,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-ids="selectedDestinationIds"
           selection="multiple"
           pagination="client"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[5, 10, 20, 50, 100]"
           :current-page="currentPage"
-          :footer-title="t('alert_destinations.header')"
+          @update:page-size="pageSize = $event"
           sorting="client"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           :default-columns="false"
           :enable-column-resize="true"
           :persist-columns="true"
@@ -121,12 +125,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-          <template #bottom="{ totalRows }">
-            <span class="text-xs font-normal max-md:hidden">
-              {{ totalRows.toLocaleString() }} {{ t("alert_destinations.header") }}
-            </span>
+          <template #selection-actions>
             <OButton
-              v-if="selectedDestinations.length > 0"
               data-test="destination-list-delete-destinations-btn"
               variant="outline-destructive"
               size="sm"
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex min-w-0 items-center gap-2"
               :data-test="`destination-template-${row.name}`"
             >
-              <span class="min-w-0 truncate" :title="row.template">{{ row.template }}</span>
+              <OTruncatedText>{{ row.template }}</OTruncatedText>
               <OTag
                 v-if="isDefaultPrebuiltTemplate(row)"
                 :data-test="`destination-template-default-badge-${row.name}`"
@@ -353,6 +353,7 @@ import { templatesQuery } from "@/services/alert_templates.queries";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter, useRoute } from "vue-router";
+import { useListViewState } from "@/composables/useListViewState";
 import type { DestinationPayload } from "@/ts/interfaces";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
@@ -373,6 +374,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -402,6 +404,7 @@ export default defineComponent({
     ODropdownItem,
     OSearchInput,
     OTag,
+    OTruncatedText,
     OTable,
     OToggleGroup,
     OToggleGroupItem,
@@ -453,7 +456,8 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.url,
-        meta: { align: "left" },
+        // A webhook URL is its own secret: anyone holding it can post to the channel.
+        meta: { align: "left", cellOverflowTooltip: false },
       },
       {
         id: "template",
@@ -507,8 +511,17 @@ export default defineComponent({
     const showImportDestination = ref(false);
     const router = useRouter();
     const route = useRoute();
-    const filterQuery = ref("");
-    const resultTotal = ref(0);
+    const viewState = useListViewState("alertDestinations", {
+      filterQuery: "",
+      tab: "all" as "all" | "prebuilt" | "custom",
+      pageSize: 20,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
+    const pageSize = ref(viewState.pageSize);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
     const deletingDestinations = ref(new Set<string>());
     const oTableRef: any = ref(null);
 
@@ -623,7 +636,6 @@ export default defineComponent({
         const rows = list.filter(
           (destination: any) => destination.type == "http" || destination.type == "email",
         );
-        resultTotal.value = rows.length;
         destinations.value = rows;
         updateRoute();
       };
@@ -680,11 +692,21 @@ export default defineComponent({
         .fetchQuery(templatesQuery(store.state.selectedOrganization.identifier))
         .then((list: any) => (templates.value = list));
     };
+    // Called both on mount and every time `getDestinations()` resolves (cache-hit
+    // paint and the async fetch that follows it), so it can run more than once for
+    // the same `?action=add|update` — guard against re-opening (and thereby
+    // re-toggling closed) an editor that's already showing the right target.
     const updateRoute = () => {
-      if (router.currentRoute.value.query.action === "add") editDestination(null);
-      if (router.currentRoute.value.query.action === "update")
-        editDestination(getDestinationByName(router.currentRoute.value.query.name as string));
-      if (router.currentRoute.value.query.action === "import") showImportDestination.value = true;
+      const action = router.currentRoute.value.query.action;
+      if (action === "add") {
+        if (!showDestinationEditor.value || editingDestination.value) editDestination(null);
+      } else if (action === "update") {
+        const name = router.currentRoute.value.query.name as string;
+        if (!showDestinationEditor.value || editingDestination.value?.name !== name)
+          editDestination(getDestinationByName(name));
+      } else if (action === "import") {
+        showImportDestination.value = true;
+      }
     };
     const getDestinationByName = (name: string) => {
       return destinations.value.find((destination) => destination.name === name);
@@ -852,7 +874,16 @@ export default defineComponent({
     // (Slack/Opsgenie/PagerDuty/ServiceNow/etc., identified via the
     // `prebuilt_type` metadata or URL/template pattern); "custom" is the
     // negation, capturing user-defined HTTP/Email destinations.
-    const activeTab = ref<"all" | "prebuilt" | "custom">("all");
+    const activeTab = ref<"all" | "prebuilt" | "custom">(viewState.tab);
+    watch([filterQuery, activeTab, pageSize, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        tab: activeTab.value,
+        pageSize: pageSize.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
 
     const visibleRows = computed(() => {
       const base = destinations.value || [];
@@ -964,14 +995,6 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
-    watch(
-      visibleRows,
-      (newVisibleRows) => {
-        resultTotal.value = newVisibleRows.length;
-      },
-      { immediate: true },
-    );
-
     // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcuts([
       {
@@ -1008,6 +1031,9 @@ export default defineComponent({
       forbidden,
       conformDeleteDestination,
       filterQuery,
+      pageSize,
+      sortBy,
+      sortOrder,
       filterData,
       editingDestination,
       templates,
@@ -1018,7 +1044,6 @@ export default defineComponent({
       deleteDestination,
       cancelDeleteDestination,
       confirmDelete,
-      resultTotal,
       routeTo,
       exportDestination,
       showImportDestination,

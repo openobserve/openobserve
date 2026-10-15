@@ -1205,4 +1205,53 @@ describe("Login.vue", () => {
       expect(organizationsService.list).toHaveBeenCalled();
     });
   });
+
+  describe("signup prefill capture", () => {
+    const PREFILL = "o2.onboarding.prefill";
+    const mountWith = (query: Record<string, string>, referrer = "") => {
+      Object.defineProperty(document, "referrer", { value: referrer, configurable: true });
+      router.currentRoute = { value: { hash: "", path: "/login", query } };
+      wrapper = mount(LoginPage, { global: { plugins: [store, router], mocks: {} } });
+    };
+
+    const session = new Map<string, string>();
+
+    beforeEach(() => {
+      session.clear();
+      mockSessionStorage.getItem.mockImplementation((key: string) => session.get(key) ?? null);
+      mockSessionStorage.setItem.mockImplementation((key: string, value: string) => {
+        session.set(key, value);
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(document, "referrer", { value: "", configurable: true });
+      mockSessionStorage.getItem.mockReset();
+      mockSessionStorage.setItem.mockReset();
+    });
+
+    it("keeps the signup link's utm_content for the Get started dialog", () => {
+      mountWith({ utm_content: "kubernetes" });
+      expect(JSON.parse(session.get(PREFILL)!)).toEqual({ utm_content: "kubernetes" });
+    });
+
+    it("reads utm_content from a pending redirectURI when the login URL has none", () => {
+      session.set("redirectURI", "https://cloud.example/web/?utm_content=rum");
+      mountWith({});
+      expect(JSON.parse(session.get(PREFILL)!)).toEqual({ utm_content: "rum" });
+    });
+
+    it("keeps a docs referrer", () => {
+      mountWith({}, "https://openobserve.ai/docs/ingestion/logs/linux/");
+      expect(JSON.parse(session.get(PREFILL)!)).toEqual({
+        referrer: "https://openobserve.ai/docs/ingestion/logs/linux/",
+      });
+    });
+
+    it("does not overwrite the stored values on the SSO callback, which has neither", () => {
+      session.set(PREFILL, JSON.stringify({ utm_content: "otel" }));
+      mountWith({}, "https://dex.example/auth/callback");
+      expect(JSON.parse(session.get(PREFILL)!)).toEqual({ utm_content: "otel" });
+    });
+  });
 });

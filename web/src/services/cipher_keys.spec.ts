@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import cipherKeys from "@/services/cipher_keys";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -311,5 +314,36 @@ describe("cipher_keys service", () => {
         "Server error",
       );
     });
+  });
+});
+
+describe("cipher_keys product analytics", () => {
+  beforeEach(() => {
+    vi.mocked(analytics.track).mockClear();
+  });
+
+  it("tracks after create succeeds", async () => {
+    (http as any).mockImplementation(() => ({ post: vi.fn().mockResolvedValue({ data: {} }) }));
+    await cipherKeys.create("org1", {} as any);
+    expect(analytics.track).toHaveBeenCalledWith("cipher_key_created");
+  });
+
+  it("does not track when create fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({
+      post: vi.fn().mockRejectedValue(new Error("boom")),
+    }));
+    await expect(cipherKeys.create("org1", {} as any)).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+  it("tracks after update succeeds", async () => {
+    (http as any).mockImplementation(() => ({ put: vi.fn().mockResolvedValue({ data: {} }) }));
+    await cipherKeys.update("org1", {} as any, "k1");
+    expect(analytics.track).toHaveBeenCalledWith("cipher_key_updated");
+  });
+
+  it("does not track when update fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({ put: vi.fn().mockRejectedValue(new Error("boom")) }));
+    await expect(cipherKeys.update("org1", {} as any, "k1")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

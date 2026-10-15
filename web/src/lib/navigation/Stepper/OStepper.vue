@@ -9,12 +9,14 @@ import type {
 } from "./OStepper.types";
 import { computed, provide, reactive } from "vue";
 import { STEPPER_CONTEXT_KEY, STEPPER_REGISTER_KEY } from "./OStepper.types";
-import type { Component } from "vue";
+import type { Component, VNodeChild } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
+
+const StepDescription = (p: { render: () => unknown }) => p.render() as VNodeChild;
 
 const props = withDefaults(defineProps<OStepperProps>(), {
   orientation: "horizontal",
@@ -173,8 +175,11 @@ function triggerClasses(step: StepRegistration): string {
             <!-- Title + Description (stacked vertically, right of indicator) -->
             <span class="flex min-w-0 flex-col items-start">
               <span :class="titleClasses(step)">{{ step.title }}</span>
+              <span v-if="step.slots.description" class="mt-0.5 leading-tight">
+                <StepDescription :render="step.slots.description" />
+              </span>
               <span
-                v-if="step.description"
+                v-else-if="step.description"
                 class="text-2xs text-text-secondary mt-0.5 leading-tight"
               >
                 {{ step.description }}

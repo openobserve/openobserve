@@ -16,7 +16,7 @@
 import { z } from "zod";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
 import { isStorableAction } from "@/utils/synthetics/buildV2Steps";
-import { assertionNeedsExpected } from "@/constants/synthetics";
+import { assertionNeedsExpected, START_LOAD_STEP_ID } from "@/constants/synthetics";
 import { isHttpUrlTemplate } from "@/components/synthetics/variables/placeholders";
 import type { AssertionKind } from "@/types/synthetics";
 
@@ -91,6 +91,9 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
             name: z.string().trim().min(1, t("synthetics.validation.stepNameRequired")),
             value: z.string().optional(),
             timeout: z.number().optional(),
+            subtest: z.object({ id: z.string(), name: z.string().optional() }).optional(),
+            optional: z.boolean().optional(),
+            alwaysRun: z.boolean().optional(),
             // A step names its element here, and nowhere else. Declared
             // explicitly because z.object strips what it does not declare —
             // leaving it out made every step look target-less to the
@@ -108,16 +111,6 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
         .default([]),
     })
     .superRefine((val, ctx) => {
-      // First step must be "navigate"
-      const first = val.journey[0];
-      if (first && first.action !== "navigate") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["journey", 0, "action"],
-          message: t("synthetics.validation.firstStepMustNavigate"),
-        });
-      }
-
       // The two rules that decide whether a journey can be stored at all.
       // They used to be answered by isV2Journey, whose only consequence was a
       // quiet fall back to the version-1 payload shape — which discarded every
@@ -125,6 +118,39 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
       // answer has to reach the author, on the step it is about.
       for (let i = 0; i < val.journey.length; i++) {
         const step = val.journey[i];
+
+        if (step.id === START_LOAD_STEP_ID) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["journey", i, "id"],
+            message: t("synthetics.validation.stepIdReserved"),
+          });
+        }
+
+        if (step.action === "subtest") {
+          if (!step.subtest?.id) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["journey", i, "subtest"],
+              message: t("synthetics.validation.subtestRequired"),
+            });
+          }
+          if (step.optional) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["journey", i, "optional"],
+              message: t("synthetics.validation.subtestFlags"),
+            });
+          }
+          if (step.alwaysRun) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["journey", i, "alwaysRun"],
+              message: t("synthetics.validation.subtestFlags"),
+            });
+          }
+          continue;
+        }
 
         if (!isStorableAction(step.action)) {
           ctx.addIssue({

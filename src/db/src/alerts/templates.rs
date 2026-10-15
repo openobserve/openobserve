@@ -106,7 +106,8 @@ pub async fn set(template: Template) -> Result<Template, TemplateError> {
         .await
     {
         log::error!(
-            "[Template] error triggering super cluster event to add template to cache: {e}"
+            "[Template] error triggering super cluster event to add template to cache: org_id: {}, error: {e}",
+            saved.org_id
         );
     }
 
@@ -156,7 +157,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
         .await
     {
         log::error!(
-            "[Template] error triggering super cluster event to remove template from cache: {e}"
+            "[Template] error triggering super cluster event to remove template from cache: org_id: {org_id}, error: {e}"
         );
     }
 
@@ -206,11 +207,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_value: Template = match table::templates::get(org_id, name).await {
                     Ok(Some(val)) => val,
                     Ok(None) => {
-                        log::error!("Template not found in db");
+                        log::error!("Template not found in db, org_id: {org_id}");
                         continue;
                     }
                     Err(e) => {
-                        log::error!("Error getting from db: {e}");
+                        log::error!("Error getting from db: org_id: {org_id}, error: {e}");
                         continue;
                     }
                 };

@@ -45,6 +45,17 @@ describe("useSharedVariables", () => {
     expect(shared.loaded.value).toBe(true);
   });
 
+  it("environmentsLoaded is false when the environment list is refused, while loaded stays true", async () => {
+    service.listEnvironments.mockRejectedValue({ response: { status: 403 } });
+    service.listGlobalVariables.mockResolvedValue({ data: [{ name: "BASE_URL" }] });
+
+    const shared = useSharedVariables();
+    await shared.refresh();
+
+    expect(shared.environmentsLoaded.value).toBe(false);
+    expect(shared.loaded.value).toBe(true);
+  });
+
   it("reports nothing loaded when both lists fail", async () => {
     service.listEnvironments.mockRejectedValue(new Error("down"));
     service.listGlobalVariables.mockRejectedValue(new Error("down"));

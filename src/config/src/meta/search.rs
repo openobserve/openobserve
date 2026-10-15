@@ -1260,6 +1260,19 @@ pub struct MultiSearchPartitionRequest {
     pub histogram_interval: i64,
 }
 
+impl MultiSearchPartitionRequest {
+    #[inline]
+    pub fn decode(&mut self) -> Result<(), std::io::Error> {
+        if self.encoding == RequestEncoding::Base64 {
+            for sql in self.sql.iter_mut() {
+                *sql = base64::decode_url(sql)?;
+            }
+        }
+        self.encoding = RequestEncoding::Empty;
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct MultiSearchPartitionResponse {
     pub success: hashbrown::HashMap<String, SearchPartitionResponse>,
@@ -1835,6 +1848,8 @@ pub enum StreamResponses {
     },
     PromqlResponse {
         data: super::promql::QueryResult,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        warnings: Vec<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         trace_id: Option<String>,
     },

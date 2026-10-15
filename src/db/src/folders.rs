@@ -76,6 +76,13 @@ pub enum FolderError {
     /// An error that occurs when trying to delete a folder that contains workflows.
     #[error("Folder contains workflows. Please move/delete workflows from folder.")]
     DeleteWithWorkflows,
+    /// An error that occurs when trying to delete a folder that contains prompts.
+    #[error("Folder contains prompts. Please move/delete prompts from folder.")]
+    DeleteWithPrompts,
+
+    /// An error that occurs when trying to delete a folder that contains downtimes.
+    #[error("Folder contains downtimes. Please move/delete downtimes from folder.")]
+    DeleteWithDowntimes,
 
     /// An error that occurs when trying to delete a folder that cannot be found.
     #[error("Folder not found")]
@@ -125,10 +132,7 @@ pub async fn save_folder(
     set_ownership(org_id, folder_type_ofga, Authz::new(&folder.folder_id)).await;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
+    if publishes(folder_type) {
         let _ = o2_enterprise::enterprise::super_cluster::queue::folders_create(
             org_id,
             _id,
@@ -174,10 +178,7 @@ pub async fn ensure_default_folder(
     .await;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
+    if publishes(folder_type) {
         let _ = o2_enterprise::enterprise::super_cluster::queue::folders_create(
             org_id,
             _id,
@@ -212,10 +213,7 @@ pub async fn update_folder(
     let (_, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
+    if publishes(folder_type) {
         let _ = o2_enterprise::enterprise::super_cluster::queue::folders_update(
             org_id,
             folder_id,
@@ -244,6 +242,8 @@ pub async fn list_folders(
         FolderType::Reports => OFGA_MODELS.get("report_folders").unwrap().key,
         FolderType::Synthetics => OFGA_MODELS.get("synthetic_folder").unwrap().key,
         FolderType::Workflows => OFGA_MODELS.get("workflow_folder").unwrap().key,
+        FolderType::Downtimes => OFGA_MODELS.get("downtime_folders").unwrap().key,
+        FolderType::Prompts => OFGA_MODELS.get("prompt_folders").unwrap().key,
     };
     #[cfg(not(feature = "enterprise"))]
     let folder_ofga_model = "";
@@ -354,6 +354,46 @@ pub async fn delete_folder(
                 return Err(FolderError::DeleteWithWorkflows);
             }
         }
+        FolderType::Downtimes => {
+            if let Some(folder_pk) =
+                table::folders::get_pk_by_name(org_id, folder_id, folder_type).await?
+                && !table::downtimes::release_folder(org_id, &folder_pk).await?
+            {
+                return Err(FolderError::DeleteWithDowntimes);
+            }
+        }
+        FolderType::Prompts => {
+            if let Some(folder_pk) =
+                table::folders::get_pk_by_name(org_id, folder_id, folder_type).await?
+            {
+                use sea_orm::{
+                    ConnectionTrait, TryGetable,
+                    sea_query::{Alias, Expr, Func, Query},
+                };
+                let query = Query::select()
+                    .expr_as(
+                        Func::count(Expr::col(Alias::new("entity_id"))),
+                        Alias::new("count"),
+                    )
+                    .from(Alias::new("llm_prompts"))
+                    .and_where(Expr::col(Alias::new("org_id")).eq(org_id))
+                    .and_where(Expr::col(Alias::new("folder_id")).eq(folder_pk))
+                    .to_owned();
+                let statement = client.get_database_backend().build(&query);
+                let count = match client
+                    .query_one(statement)
+                    .await
+                    .map_err(infra::errors::Error::from)?
+                {
+                    Some(row) => i64::try_get(&row, "", "count")
+                        .map_err(|error| infra::errors::Error::Message(format!("{error:?}")))?,
+                    None => 0,
+                };
+                if count > 0 {
+                    return Err(FolderError::DeleteWithPrompts);
+                }
+            }
+        }
     };
 
     if !table::folders::exists(org_id, folder_id, folder_type).await? {
@@ -365,10 +405,7 @@ pub async fn delete_folder(
     remove_ownership(org_id, folder_type_ofga, Authz::new(folder_id)).await;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
+    if publishes(folder_type) {
         let _ = o2_enterprise::enterprise::super_cluster::queue::folders_delete(
             org_id,
             folder_id,
@@ -380,6 +417,15 @@ pub async fn delete_folder(
     Ok(())
 }
 
+/// A downtime folder travels with the rows filed in it, so it waits for downtime replication too.
+#[cfg(feature = "enterprise")]
+fn publishes(folder_type: FolderType) -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && (folder_type != FolderType::Downtimes || crate::downtimes::replicates())
+}
+
 /// OpenFGA object type that owns folders of the given kind.
 fn folder_type_ofga_name(folder_type: FolderType) -> &'static str {
     match folder_type {
@@ -388,6 +434,8 @@ fn folder_type_ofga_name(folder_type: FolderType) -> &'static str {
         FolderType::Reports => "report_folders",
         FolderType::Synthetics => "synthetic_folder",
         FolderType::Workflows => "workflow_folder",
+        FolderType::Downtimes => "downtime_folders",
+        FolderType::Prompts => "prompt_folders",
     }
 }
 
@@ -427,6 +475,13 @@ async fn permitted_folders(
             OFGA_MODELS.get("workflow_folder").unwrap().key,
             OFGA_MODELS.get("workflows").unwrap().key,
         ),
+        FolderType::Downtimes => (
+            OFGA_MODELS.get("downtime_folders").unwrap().key,
+            OFGA_MODELS.get("downtimes").unwrap().key,
+        ),
+        // Prompt grants are plain `prompt:{id}` with no folder prefix, so there is no
+        // individual grant to lift a folder into view: only folder `GET` counts.
+        FolderType::Prompts => (OFGA_MODELS.get("prompt_folders").unwrap().key, ""),
     };
 
     let Some(user_id) = user_id else {
@@ -437,6 +492,10 @@ async fn permitted_folders(
     let mut folder_list = list_objects_for_user(org_id, user_id, "GET", folder_ofga_model)
         .await
         .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
+
+    if child_ofga_model.is_empty() {
+        return Ok(folder_list);
+    }
 
     // In some cases, there might not be direct `GET` permission on the folder.
     // So, we need to check if the user has `GET` permission on any of the dashboards

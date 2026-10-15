@@ -33,16 +33,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="w-full">
       <OForm id="add-user-form" :form="form">
-        <p class="mt-2 truncate" v-if="!existingUser">
+        <OTruncatedText as="p" class="mt-2" v-if="!existingUser">
           {{ t("user.email") }} : <strong>{{ formEmail }}</strong>
-        </p>
-        <p class="mt-2 truncate" v-if="!existingUser && !beingUpdated">
+        </OTruncatedText>
+        <OTruncatedText as="p" class="mt-2" v-if="!existingUser && !beingUpdated">
           {{ t("user.roles") }} : <strong>{{ formRole }}</strong>
-        </p>
-        <p class="mt-2 truncate" v-if="!existingUser && !beingUpdated && formCustomRole?.length">
+        </OTruncatedText>
+        <OTruncatedText
+          as="p"
+          class="mt-2"
+          v-if="!existingUser && !beingUpdated && formCustomRole?.length"
+        >
           {{ t("user.customRole") }} :
           <strong>{{ formCustomRole.join(", ") }}</strong>
-        </p>
+        </OTruncatedText>
         <OFormInput
           v-if="existingUser && !beingUpdated"
           name="email"
@@ -258,6 +262,8 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import userServiece from "@/services/users";
+import { userKeys } from "@/services/users.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   getImageURL,
   useLocalCurrentUser,
@@ -275,6 +281,7 @@ import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddUserSchema, type AddUserForm } from "./AddUser.schema";
 import { usePasswordComplexity } from "@/composables/usePasswordComplexity";
@@ -309,6 +316,7 @@ export default defineComponent({
     OFormInput,
     OFormSelect,
     OFormSwitch,
+    OTruncatedText,
     PasswordRequirementList,
   },
   props: {
@@ -420,6 +428,11 @@ export default defineComponent({
       if (selectedOrg == "other") {
         selectedOrg = encodeURIComponent(value.other_organization);
       }
+      // Keyed by the plain org id, not the URL-encoded one; the destination form hosts this drawer and never re-reads users.
+      const writtenOrg =
+        organization.value == "other" ? value.other_organization : organization.value;
+      const expireUsers = () =>
+        void queryClient.invalidateQueries({ queryKey: userKeys.usersAll(writtenOrg) });
       if (beingUpdated.value) {
         const userEmail = editRecord.value?.email ?? value.email;
         // Round-trip the original record with the edited fields, minus email.
@@ -458,6 +471,7 @@ export default defineComponent({
         }
         try {
           const res: any = await userServiece.update(payload, selectedOrg, userEmail);
+          expireUsers();
           if (
             value.change_password == true &&
             loggedInUserEmail.value === props.modelValue?.email
@@ -491,6 +505,7 @@ export default defineComponent({
             selectedOrg,
             userEmail,
           );
+          expireUsers();
           emit(
             "updated",
             res.data,
@@ -527,6 +542,7 @@ export default defineComponent({
             delete payload.custom_role;
           }
           const res: any = await userServiece.create(payload, selectedOrg);
+          expireUsers();
           emit("updated", res.data, payload, "created");
           emit("update:open", false);
         } catch (err: any) {

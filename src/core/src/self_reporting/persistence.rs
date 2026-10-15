@@ -164,8 +164,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
     }
 
     let mut per_org_map = HashMap::new();
-    // If configured, automatically add each trigger's own org
-    if cfg.common.usage_report_to_own_org && usage_reporting_mode != "remote" {
+    if usage_reporting_mode != "remote" {
         for trigger_json in triggers {
             if let Ok(mut trigger) = json::from_value::<TriggerData>(trigger_json.clone()) {
                 trigger.normalize_legacy_outcome();

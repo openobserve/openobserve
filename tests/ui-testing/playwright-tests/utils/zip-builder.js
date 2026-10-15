@@ -3,7 +3,7 @@
 // Kept dependency-free so tests need no extra npm packages. Used to generate
 // sourcemap upload archives at TEST TIME from committed, diffable text
 // fixtures — no opaque .zip binaries are committed to the repo.
-// Shared by GeneralTests/rum-form-validation.spec.js and the RUM sourcemap
+// Shared by RUM/rum-form-validation.spec.js and the RUM sourcemap
 // specs.
 
 const fs = require('fs');

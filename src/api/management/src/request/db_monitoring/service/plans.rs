@@ -354,11 +354,7 @@ pub(crate) async fn read_plans_body(
     // plans are server-vantage records in the single shared LOGS stream that
     // deadlocks, blocking and activity all read. Requiring it would make the UI
     // hardcode a backend constant to reach its own endpoint.
-    let stream = q
-        .stream
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .unwrap_or(DEFAULT_SERVER_STREAM);
+    let stream = validate_server_stream(q.stream.as_deref())?.unwrap_or(DBM_SERVER_STREAM);
     // The shared prologue only applies when this section reads the very stream
     // it was computed for — an explicit `?stream=` must get its own auth and
     // schema, never the default stream's.
@@ -979,7 +975,7 @@ mod tests {
     /// `get_dbm_query_endpoints` — the handler this one otherwise mirrors —
     /// requires `stream` because it aggregates a caller-chosen TRACE stream.
     /// Plans are server-vantage records in the single shared LOGS stream, where
-    /// deadlocks, blocking and activity all default to `DEFAULT_SERVER_STREAM`.
+    /// deadlocks, blocking and activity all default to `DBM_SERVER_STREAM`.
     /// Requiring it here would make the UI hardcode a backend constant to call
     /// its own endpoint, and would diverge from its three siblings for no
     /// reason.
@@ -1005,7 +1001,7 @@ mod tests {
             "a plans query with no fingerprint would scan the whole stream"
         );
         assert!(
-            body.contains("DEFAULT_SERVER_STREAM"),
+            body.contains("validate_server_stream(") && body.contains("DBM_SERVER_STREAM"),
             "an absent stream must fall back to the shared server-vantage stream, matching \
              the deadlocks/blocking/activity handlers"
         );

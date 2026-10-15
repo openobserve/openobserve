@@ -317,10 +317,12 @@ describe("DbmSectionTabs", () => {
         .props("content") as string;
 
     /** STATE 1 — the trace rollup (`/badges → databases[].calls`). */
-    it("says client-observed when the trace rollup counted it", () => {
+    it("marks nothing on the badge when the trace rollup counted it", () => {
       const wrapper = mountWith({ count: 141984, complete: true, vantage: "client" });
       expect(wrapper.text()).toContain("141984");
-      expect(vantageOf(wrapper).text()).toBe("client-observed");
+      expect(wrapper.text()).not.toMatch(/client-observed/i);
+      expect(vantageOf(wrapper).exists()).toBe(false);
+      expect(wrapper.find("[data-test='dbm-app-source-marker']").exists()).toBe(false);
     });
 
     /** STATE 2 — the database-reported list (`server_samples`), capped. */
@@ -342,18 +344,19 @@ describe("DbmSectionTabs", () => {
     /**
      * The tooltip is the other half of D2: a fixed sentence cannot be true in
      * three states, so it is resolved WITH the count. The trace state must not
-     * claim the population — it counts instrumented callers only.
+     * claim the population — traces add to what the database reports.
      */
-    it("scopes the trace sentence to instrumented callers, never the population", () => {
+    it("frames the trace count as adding to the database's own, never the population", () => {
       const hint = samplesHint(mountWith({ count: 141984, complete: true, vantage: "client" }));
-      expect(hint).toContain("instrumented");
+      expect(hint).toContain("measured from your application's traces");
+      expect(hint).toContain("adding your apps' view to what your database reports");
       expect(hint).not.toContain("Every finished call in this window");
     });
 
     it("says the database counted it in the server state", () => {
       const hint = samplesHint(mountWith({ count: 100, complete: false, vantage: "server" }));
       expect(hint).toContain("inside the database");
-      expect(hint).not.toContain("instrumented");
+      expect(hint).not.toContain("traced");
     });
 
     /** The Top-queries badge swaps provenance the same way, and says so. */

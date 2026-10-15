@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod aggregate;
 pub mod cache;
 mod partition;
 mod pruner;
@@ -54,7 +55,6 @@ use tantivy_utils::puffin_directory::{
     reader::PuffinDirReader,
 };
 use tokio::sync::Semaphore;
-use tokio_stream::StreamExt as _;
 
 use self::{
     cache::{self as tantivy_result_cache, CacheEntry},
@@ -211,6 +211,7 @@ pub async fn tantivy_search(
             let index_condition_clone = index_condition.clone();
             let idx_optimize_rule_clone = idx_optimize_mode.clone();
             let semaphore_clone = semaphore.clone();
+            let file_key = file.key.clone();
             let task = tokio::task::spawn(async move {
                 let permit = semaphore_clone.acquire_owned().await.unwrap();
                 let ret = search_tantivy_index(
@@ -234,24 +235,18 @@ pub async fn tantivy_search(
                     }
                 }
             });
-            tasks.push(task)
+            tasks.push(async move {
+                task.await.unwrap_or_else(|e| {
+                    Err(anyhow::anyhow!("index task for {file_key} failed: {e}"))
+                })
+            })
         }
 
         // if more than cpu_num's file returned many row_ids, we skip tantivy search
         let mut threshold_num = cfg.limit.cpu_num;
         let mut total_row_ids_percent = 0;
         let mut tasks = stream::iter(tasks).buffer_unordered(target_partitions);
-        while let Some(result) = match tasks.try_next().await {
-            Err(e) => {
-                let took = start.elapsed().as_millis() as usize;
-                log::error!(
-                    "[trace_id {trace_id}] search->tantivy: error filtering via index, error: {e:?}, took: {took} ms",
-                );
-                // search error, need add filter back
-                return Ok((took, true, TantivyMultiResult::RowNums(0)));
-            }
-            Ok(result) => result,
-        } {
+        while let Some(result) = tasks.next().await {
             // Each result corresponds to a file in the file list
             match result {
                 Ok((file_name, result, has_skipped_conditions)) => {
@@ -473,6 +468,19 @@ async fn search_tantivy_index(
         index_condition.ok_or_else(|| anyhow::anyhow!("IndexCondition not found"))?;
     let (mut query, has_skipped_conditions) =
         condition.to_tantivy_query(trace_id, tantivy_schema.clone(), fts_field)?;
+
+    if let Some(mode) = idx_optimize_rule
+        .as_ref()
+        .filter(|mode| mode.is_aggregate())
+    {
+        anyhow::ensure!(
+            !has_skipped_conditions,
+            "aggregate query skipped index conditions"
+        );
+        for field in mode.referenced_fields() {
+            tantivy_schema.get_field(&field)?;
+        }
+    }
 
     if !file_in_range && let Ok(ts_field) = tantivy_schema.get_field(TIMESTAMP_COL_NAME) {
         let ts_range = RangeQuery::new(

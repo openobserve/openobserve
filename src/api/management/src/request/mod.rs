@@ -15,6 +15,8 @@
 
 #[cfg(feature = "enterprise")]
 pub mod ai;
+#[cfg(feature = "enterprise")]
+pub mod alert_calibration;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod annotation_queues;
@@ -34,6 +36,7 @@ pub mod db_monitoring;
 pub mod discovery;
 #[cfg(feature = "enterprise")]
 pub mod domain_management;
+pub mod downtimes;
 #[cfg(feature = "enterprise")]
 pub mod eval_jobs;
 #[cfg(feature = "enterprise")]
@@ -41,10 +44,12 @@ pub mod experiments;
 #[allow(deprecated)]
 pub mod folders;
 pub mod gen_ai;
+pub mod ingest_rejections;
 pub mod keys;
 pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod license;
+pub mod metrics_usage;
 pub mod model_pricing;
 pub mod oncall;
 pub mod organization;
@@ -55,9 +60,14 @@ pub mod playground;
 #[cfg(feature = "profiling")]
 pub mod profiling;
 #[cfg(feature = "enterprise")]
+pub mod prompts;
+#[cfg(feature = "enterprise")]
 pub mod providers;
+pub mod public_rate_limit;
+pub mod query_history;
 #[cfg(feature = "enterprise")]
 pub mod remote_tasks;
+pub mod rum_analytics;
 #[cfg(feature = "enterprise")]
 pub mod score_configs;
 #[cfg(feature = "enterprise")]

@@ -26,7 +26,7 @@ use hashbrown::{HashMap, hash_map::Entry};
 use super::{evaluate_partitions, range_expr::RangeExpr};
 use crate::{
     aggregations::{
-        Accumulate, AggFunc, AggOp, Avg, Count, Group, Max, Min, Rank, Stddev, Stdvar, Sum,
+        Accumulate, AggFunc, AggOp, Avg, Count, Group, Limit, Max, Min, Rank, Stddev, Stdvar, Sum,
     },
     series_stream::SeriesStream,
 };
@@ -54,6 +54,8 @@ where
         AggOp::Bottomk(k) => aggregate_with(sources, Rank::new(k, true), eval).await,
         AggOp::Count => aggregate_with(sources, Count, eval).await,
         AggOp::Group => aggregate_with(sources, Group, eval).await,
+        AggOp::Limitk(k) => aggregate_with(sources, Limit::K(k), eval).await,
+        AggOp::LimitRatio(ratio) => aggregate_with(sources, Limit::Ratio(ratio), eval).await,
         AggOp::Max => aggregate_with(sources, Max, eval).await,
         AggOp::Min => aggregate_with(sources, Min, eval).await,
         AggOp::Stddev => aggregate_with(sources, Stddev, eval).await,
@@ -119,7 +121,7 @@ async fn aggregate_partial<A: AggFunc, S: SeriesStream>(
         source.consume(&mut samples).await?;
         entry
             .acc
-            .push_series(eval.values(&samples), || source.labels());
+            .push_series(eval.values(&mut samples), || source.labels());
         series_count += 1;
         // the fold is pure CPU: give the runtime a chance to time out or abort it
         tokio::task::consume_budget().await;
@@ -284,6 +286,10 @@ mod tests {
             AggOp::Bottomk(ScalarParam::Const(2.0)),
             AggOp::Count,
             AggOp::Group,
+            AggOp::Limitk(ScalarParam::Const(1.0)),
+            AggOp::Limitk(ScalarParam::Const(2.0)),
+            AggOp::LimitRatio(ScalarParam::Const(0.5)),
+            AggOp::LimitRatio(ScalarParam::Const(-0.5)),
             AggOp::Max,
             AggOp::Min,
             AggOp::Stddev,
@@ -350,6 +356,12 @@ mod tests {
             "stddev_over_time",
             "stdvar_over_time",
             "sum_over_time",
+            "first_over_time",
+            "mad_over_time",
+            "ts_of_first_over_time",
+            "ts_of_last_over_time",
+            "ts_of_max_over_time",
+            "ts_of_min_over_time",
         ];
         let modifiers = [
             None,
@@ -640,7 +652,7 @@ mod tests {
     /// Series without the metric name, as the range function output the generic path folds.
     fn streamed_input(matrix: Vec<RangeValue>, func_name: &str) -> Vec<RangeValue> {
         let mut matrix = matrix;
-        if func_name != functions::KEEP_METRIC_NAME_FUNC {
+        if !functions::keeps_metric_name(func_name) {
             for series in &mut matrix {
                 series.labels.retain(|label| label.name != "__name__");
             }
