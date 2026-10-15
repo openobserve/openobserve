@@ -130,7 +130,7 @@ fn user_record(email: &str, must_reset_password: bool) -> UserRecord {
 }
 
 async fn seed() {
-    for org in ["acme", "other", "third"] {
+    for org in ["acme", "other", "third", "kv"] {
         organizations::add(org, org, OrganizationType::Custom)
             .await
             .unwrap();
@@ -138,6 +138,7 @@ async fn seed() {
     add_member("acme", ALICE, UserRole::Admin).await;
     add_member("other", ALICE, UserRole::Admin).await;
     add_member("third", ALICE, UserRole::Admin).await;
+    add_member("kv", ALICE, UserRole::Admin).await;
     add_member("acme", BOB, UserRole::Viewer).await;
     add_member("acme", STALE, UserRole::Admin).await;
     add_member("acme", CAROL, UserRole::Admin).await;
@@ -146,7 +147,7 @@ async fn seed() {
     store::slack_installations::revoke("I2", now_micros())
         .await
         .unwrap();
-    for org in ["acme", "other"] {
+    for org in ["acme", "other", "kv"] {
         connect("I1", org).await;
     }
     connect("I2", "acme").await;
@@ -315,6 +316,19 @@ async fn other_orgs_and_routes_are_refused() {
     );
 }
 
+async fn an_org_named_api_cannot_shift_the_path_org() {
+    let kv = token(ALICE, "kv", "lnk_alice");
+    assert_eq!(
+        status(Method::GET, "/api/kv/streams", &kv).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        status(Method::POST, "/api/api/kv/_search", &kv).await,
+        StatusCode::FORBIDDEN,
+        "org `api` reached kv::set while the token named org `kv`"
+    );
+}
+
 async fn link_refusals() {
     let unconnected = token(ALICE, "third", "lnk_alice");
     assert_eq!(
@@ -423,6 +437,7 @@ async fn phase0_http_proof() {
     seed().await;
     own_org_passes_and_is_audited().await;
     other_orgs_and_routes_are_refused().await;
+    an_org_named_api_cannot_shift_the_path_org().await;
     link_refusals().await;
     removed_member_is_refused_at_once().await;
     bad_tokens_are_401().await;
