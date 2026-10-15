@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          when the real toolbar is hidden (initial !streamsLoaded). On a mid-session
          switch the real toolbar is already shown, so `hideToolbar` drops this to
          avoid a duplicate toggle/picker row. The kpiOnly variant never shows it. -->
-    <div v-if="!kpiOnly && !hideToolbar" class="flex items-center justify-end gap-2 py-2">
+    <div v-if="!kpiOnly && !hideToolbar" class="flex items-center gap-3 py-2">
       <OSkeleton type="text" class="h-8 w-29" />
-      <OSkeleton type="text" class="h-9 w-56" />
+      <OSkeleton type="text" class="h-8.5 w-44" />
     </div>
 
     <!-- Row 1: 5 KPI cards -->

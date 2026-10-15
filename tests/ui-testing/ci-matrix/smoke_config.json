@@ -180,6 +180,12 @@
       "web/src/services/sourcemaps.*",
       "tests/ui-testing/pages/rumPages/**"
     ],
+    "RUM-Analytics": [
+      "web/src/components/rum/productAnalytics/**",
+      "web/src/views/RUM/**",
+      "web/src/services/rumProductAnalytics.*",
+      "tests/ui-testing/pages/rumPages/**"
+    ],
     "Streams": [
       "web/src/components/logstream/**",
       "web/src/components/ingestion/**",
@@ -202,6 +208,19 @@
       "web/src/views/slos/**",
       "web/src/services/slos.*",
       "tests/ui-testing/pages/sloPages/**"
+    ],
+    "Synthetics": [
+      "web/src/views/synthetics/**",
+      "web/src/views/SyntheticMonitoring.vue",
+      "web/src/components/synthetics/**",
+      "web/src/components/synthetic-monitoring/**",
+      "web/src/components/settings/*Synthetics*",
+      "web/src/components/iam/SyntheticsTokens.vue",
+      "web/src/services/synthetics*",
+      "web/src/types/synthetics.ts",
+      "web/src/services/status_pages.ts",
+      "tests/ui-testing/pages/generalPages/statusPagesPage.js",
+      "tests/ui-testing/pages/syntheticsPages/**"
     ]
   }
 }

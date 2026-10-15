@@ -23,7 +23,7 @@ import router from "@/test/unit/helpers/router";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { getRoles } from "@/services/iam";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { queryClient } from "@/composables/query/queryClient";
 
 // Create i18n instance with comprehensive translations for CI/CD compatibility
@@ -55,7 +55,7 @@ vi.mock("@/services/iam", async (importOriginal) => {
   const { automockService } = await import("@/test/unit/helpers/mockService");
   return automockService(await importOriginal());
 });
-vi.mock("@/services/segment_analytics");
+vi.mock("@/services/product_analytics");
 
 // Mock aws-exports config
 vi.mock("@/aws-exports", () => ({
@@ -154,11 +154,11 @@ const AddUserStub = {
   template: `<div class="add-user-stub" :data-open="String(open)" />`,
 };
 
-const MemberInvitationStub = {
-  name: "MemberInvitation",
-  props: ["currentrole"],
-  emits: ["update:currentrole", "invite-sent"],
-  template: `<div class="member-invitation-stub" />`,
+const InviteMembersDialogStub = {
+  name: "InviteMembersDialog",
+  props: ["open", "initialEmail"],
+  emits: ["update:open", "inviteSent"],
+  template: `<div class="invite-members-dialog-stub" :data-open="String(open)" :data-initial-email="initialEmail" />`,
 };
 
 const NoDataStub = {
@@ -182,7 +182,7 @@ const mountUser = () =>
         ODialog: ODialogStub,
         UpdateUserRole: UpdateUserRoleStub,
         AddUser: AddUserStub,
-        MemberInvitation: MemberInvitationStub,
+        InviteMembersDialog: InviteMembersDialogStub,
         NoData: NoDataStub,
         Pagination: PaginationStub,
         OIcon: { template: "<i />" },
@@ -198,7 +198,7 @@ const mountUser = () =>
 const mockUsersService = vi.mocked(usersService);
 const mockOrganizationsService = vi.mocked(organizationsService);
 const mockGetRoles = vi.mocked(getRoles);
-const mockSegment = vi.mocked(segment);
+const mockAnalytics = vi.mocked(analytics);
 
 beforeAll(() => {
   process.env.TZ = "UTC";
@@ -784,7 +784,7 @@ describe("User Component", () => {
       wrapper.vm.addUser(userProps, true);
       expect(wrapper.vm.isUpdated).toBe(true);
       expect(wrapper.vm.selectedUser).toEqual(userProps.row);
-      expect(mockSegment.track).toHaveBeenCalled();
+      expect(mockAnalytics.track).toHaveBeenCalled();
     });
   });
 
@@ -816,6 +816,157 @@ describe("User Component", () => {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
+    });
+  });
+
+  describe("Invite flow", () => {
+    let config: any;
+
+    const mountAs = async (role: string, cloud = "true") => {
+      config.isCloud = cloud;
+      mockUsersService.orgUsers.mockResolvedValue({
+        data: {
+          data: [
+            { email: "example@gmail.com", first_name: "Me", last_name: "", role },
+            { email: "member@example.com", first_name: "M", last_name: "", role: "viewer" },
+          ],
+        },
+      } as any);
+      queryClient.clear();
+      wrapper.unmount();
+      wrapper = mountUser();
+      await flushPromises();
+    };
+
+    // OTable holds its skeleton for a 50ms minimum before the empty slot can render.
+    const settleTable = async () => {
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      await flushPromises();
+    };
+
+    beforeEach(async () => {
+      config = (await import("@/aws-exports")).default;
+    });
+
+    afterEach(() => {
+      config.isCloud = "false";
+    });
+
+    it("shows the Invite members button to a Cloud admin instead of New user", async () => {
+      await mountAs("admin");
+      expect(wrapper.find('[data-test="invite-members-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-basic-user"]').exists()).toBe(false);
+      expect(wrapper.find(".invite-members-dialog-stub").exists()).toBe(true);
+    });
+
+    it("hides the Invite members button from a Cloud non-admin", async () => {
+      await mountAs("viewer");
+      expect(wrapper.find('[data-test="invite-members-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="add-basic-user"]').exists()).toBe(false);
+    });
+
+    it("keeps New user and no invite dialog outside Cloud", async () => {
+      await mountAs("admin", "false");
+      expect(wrapper.find('[data-test="add-basic-user"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="invite-members-btn"]').exists()).toBe(false);
+      expect(wrapper.find(".invite-members-dialog-stub").exists()).toBe(false);
+    });
+
+    it("opens the dialog with no prefilled email from the button", async () => {
+      await mountAs("admin");
+      await wrapper.find('[data-test="invite-members-btn"]').trigger("click");
+      const dialog = wrapper.find(".invite-members-dialog-stub");
+      expect(dialog.attributes("data-open")).toBe("true");
+      expect(dialog.attributes("data-initial-email")).toBe("");
+    });
+
+    it("routes the Cloud add flow (empty state + shortcut) to the invite dialog", async () => {
+      await mountAs("admin");
+      const pushSpy = vi.spyOn(router, "push").mockImplementation(() => Promise.resolve());
+      wrapper.vm.openAddFlow();
+      expect(wrapper.vm.showInviteDialog).toBe(true);
+      expect(pushSpy).not.toHaveBeenCalled();
+    });
+
+    it("keeps addRoutePush for the add flow outside Cloud", async () => {
+      await mountAs("admin", "false");
+      const pushSpy = vi.spyOn(router, "push").mockImplementation(() => Promise.resolve());
+      wrapper.vm.openAddFlow();
+      expect(wrapper.vm.showInviteDialog).toBe(false);
+      expect(pushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ action: "add" }) }),
+      );
+    });
+
+    it("offers a search that is one non-member email as an invite (lowercased)", async () => {
+      await mountAs("admin");
+      wrapper.vm.filterQuery = "  New@Example.com ";
+      expect(wrapper.vm.searchInviteEmail).toBe("new@example.com");
+    });
+
+    it("does not offer an invite for a member, a non-email or several emails", async () => {
+      await mountAs("admin");
+      wrapper.vm.filterQuery = "Member@Example.com";
+      expect(wrapper.vm.searchInviteEmail).toBe("");
+      wrapper.vm.filterQuery = "new";
+      expect(wrapper.vm.searchInviteEmail).toBe("");
+      wrapper.vm.filterQuery = "a@example.com, b@example.com";
+      expect(wrapper.vm.searchInviteEmail).toBe("");
+    });
+
+    it("does not offer an invite to a non-admin or outside Cloud", async () => {
+      await mountAs("viewer");
+      wrapper.vm.filterQuery = "new@example.com";
+      expect(wrapper.vm.searchInviteEmail).toBe("");
+
+      await mountAs("admin", "false");
+      wrapper.vm.filterQuery = "new@example.com";
+      expect(wrapper.vm.searchInviteEmail).toBe("");
+    });
+
+    it("renders the invite action in the empty state and opens the dialog prefilled", async () => {
+      await mountAs("admin");
+      wrapper.vm.filterQuery = "new@example.com";
+      await settleTable();
+
+      const invite = wrapper.find('[data-test="user-list-invite-searched-email"]');
+      expect(invite.exists()).toBe(true);
+      expect(invite.text()).toContain("Invite new@example.com");
+      expect(wrapper.find('[data-test="user-list-clear-filters"]').exists()).toBe(true);
+
+      await invite.trigger("click");
+      const dialog = wrapper.find(".invite-members-dialog-stub");
+      expect(dialog.attributes("data-open")).toBe("true");
+      expect(dialog.attributes("data-initial-email")).toBe("new@example.com");
+    });
+
+    it("keeps only Clear filters in the empty state when the search is not an email", async () => {
+      await mountAs("admin");
+      wrapper.vm.filterQuery = "nobody";
+      await settleTable();
+
+      expect(wrapper.find('[data-test="o2-empty-state"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="user-list-invite-searched-email"]').exists()).toBe(false);
+    });
+
+    it("clears search and role filter from the custom Clear filters card", async () => {
+      await mountAs("admin");
+      wrapper.vm.filterQuery = "new@example.com";
+      wrapper.vm.roleFilter = "viewer";
+      await settleTable();
+
+      await wrapper.find('[data-test="user-list-clear-filters"]').trigger("click");
+      expect(wrapper.vm.filterQuery).toBe("");
+      expect(wrapper.vm.roleFilter).toBe(null);
+    });
+
+    it("refreshes the members list after an invite is sent", async () => {
+      await mountAs("admin");
+      mockUsersService.orgUsers.mockClear();
+      wrapper.findComponent({ name: "InviteMembersDialog" }).vm.$emit("inviteSent");
+      await flushPromises();
+      expect(mockUsersService.orgUsers).toHaveBeenCalled();
     });
   });
 
@@ -1088,7 +1239,7 @@ describe("User Component", () => {
         },
         store.state.selectedOrganization.identifier,
       );
-      expect(mockSegment.track).toHaveBeenCalled();
+      expect(mockAnalytics.track).toHaveBeenCalled();
     });
 
     it("should handle update role error", async () => {

@@ -135,6 +135,14 @@ vi.mock("@/services/synthetics", async (importOriginal) => {
     },
   });
 });
+vi.mock("@/services/downtimes", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock((await importOriginal()) as any, {
+    default: {
+      list: vi.fn(async () => ({ data: { items: [{ id: "d1", name: "D1" }] } })),
+    },
+  });
+});
 vi.mock("@/services/workflows", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock((await importOriginal()) as any, {
@@ -185,6 +193,7 @@ import reportService from "@/services/reports";
 import savedviewsService from "@/services/saved_views";
 import serviceAccountService from "@/services/service_accounts";
 import syntheticsService from "@/services/synthetics";
+import downtimesService from "@/services/downtimes";
 import templateService from "@/services/alert_templates";
 import workflowService from "@/services/workflows";
 
@@ -577,6 +586,41 @@ describe("useRoleEntityLoaders - folder children", () => {
     );
   });
 
+  it("getDowntimeFolders lists folder type downtimes with downtime as the child", async () => {
+    const { getDowntimeFolders, updateResourceEntities } = setup();
+
+    await getDowntimeFolders();
+
+    expect(commonService.list_Folders).toHaveBeenCalledWith(ORG, "downtimes");
+    expect(updateResourceEntities).toHaveBeenCalledWith(
+      "downtime_folder",
+      ["folderId"],
+      [
+        { folderId: "default", name: "default" },
+        { folderId: "f9", name: "F9" },
+      ],
+      true,
+      "name",
+      "downtime",
+    );
+  });
+
+  it("getDowntimes names rows by plain downtime id from the folder's list", async () => {
+    const { getDowntimes, updateEntityEntities } = setup();
+    const folder = row({ name: "f9", childName: "downtime" });
+
+    await getDowntimes(folder as any);
+
+    expect(downtimesService.list).toHaveBeenCalledWith(ORG, { folder_id: "f9", page_size: 500 });
+    expect(updateEntityEntities).toHaveBeenCalledWith(
+      folder,
+      ["id"],
+      [{ id: "d1", name: "D1" }],
+      false,
+      "name",
+    );
+  });
+
   it("getSynthetics falls back to the legacy monitors key", async () => {
     const { getSynthetics, updateEntityEntities } = setup();
     vi.mocked(syntheticsService.listByFolderId).mockResolvedValueOnce({
@@ -763,14 +807,19 @@ describe("useRoleEntityLoaders - flat resource loaders", () => {
     ]);
   });
 
-  it("getPrompts keys prompts by entityId and labels them by name", async () => {
-    const { getPrompts, updateResourceEntities } = setup();
+  it("getPrompts lists one folder's prompts, keyed by entityId and labelled by name", async () => {
+    const { getPrompts, updateEntityEntities } = setup();
+    const folder = row({ name: "f9", childName: "prompt" });
 
-    await getPrompts();
+    await getPrompts(folder as any);
 
-    expect(llmPromptsService.list).toHaveBeenCalledWith(ORG);
-    expect(updateResourceEntities.mock.calls).toEqual([
-      ["prompt", ["entityId"], [{ entityId: "welcome", name: "Welcome" }], false, "name"],
-    ]);
+    expect(llmPromptsService.list).toHaveBeenCalledWith(ORG, { folderId: "f9" });
+    expect(updateEntityEntities).toHaveBeenCalledWith(
+      folder,
+      ["entityId"],
+      [{ entityId: "welcome", name: "Welcome" }],
+      false,
+      "name",
+    );
   });
 });

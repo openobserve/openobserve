@@ -20,6 +20,9 @@ import llmExperimentsService, {
   normalizeExperimentResultRowPage,
   normalizeExperimentRowDetail,
 } from "./llm-experiments.service";
+import analytics from "./product_analytics";
+
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("./http", () => {
   const mockClient = { get: vi.fn(), post: vi.fn() };
@@ -469,5 +472,48 @@ describe("normalizeExperimentRowDetail()", () => {
       scoreConfigVersion: 3,
       pendingCount: 1,
     });
+  });
+});
+
+describe("preview() cost estimate", () => {
+  const estimate = (dimensions: unknown[]) => ({
+    estimatedCost: 5,
+    taskCostEstimated: false,
+    incomplete: true,
+    warningThreshold: 10,
+    confirmationRequired: false,
+    dimensions,
+  });
+
+  it("flags an unpriced model from the dimensions, not from incomplete", async () => {
+    mockClient.post.mockResolvedValue({ data: { costEstimate: estimate([{ estimatedCost: 5 }]) } });
+    let preview = await llmExperimentsService.preview("acme", {} as any);
+    expect(preview.costEstimate?.hasUnpricedModel).toBe(false);
+
+    mockClient.post.mockResolvedValue({
+      data: { costEstimate: estimate([{ estimatedCost: 5 }, { estimatedCost: null }]) },
+    });
+    preview = await llmExperimentsService.preview("acme", {} as any);
+    expect(preview.costEstimate?.hasUnpricedModel).toBe(true);
+  });
+});
+
+describe("create() analytics", () => {
+  it("tracks llm_experiment_created when the server created a new experiment", async () => {
+    mockClient.post.mockResolvedValue({ data: { experiment: {}, preview: {}, created: true } });
+    await llmExperimentsService.create("acme", {} as any);
+    expect(analytics.track).toHaveBeenCalledWith("llm_experiment_created");
+  });
+
+  it("does not track an idempotent replay of an existing experiment", async () => {
+    mockClient.post.mockResolvedValue({ data: { experiment: {}, preview: {}, created: false } });
+    await llmExperimentsService.create("acme", {} as any);
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
+  it("does not track when the create is rejected", async () => {
+    mockClient.post.mockRejectedValue(new Error("boom"));
+    await expect(llmExperimentsService.create("acme", {} as any)).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

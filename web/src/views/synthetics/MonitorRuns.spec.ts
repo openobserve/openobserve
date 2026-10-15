@@ -140,6 +140,9 @@ vi.mock("vue-i18n", () => ({
   useI18n: vi.fn(() => ({ t: $t })),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
+
 vi.mock("@/services/synthetics", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -217,6 +220,7 @@ vi.mock("vue-router", () => ({
 }));
 
 import MonitorRuns from "./MonitorRuns.vue";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 // ── Stubs for every child component ─────────────────────────────────────
 const baseStubs = {
@@ -289,6 +293,7 @@ const baseStubs = {
       "pagination",
       "pageSize",
       "pageSizeOptions",
+      "currentPage",
       "sorting",
       "sortBy",
       "sortOrder",
@@ -377,10 +382,50 @@ describe("MonitorRuns", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
   });
 
   afterEach(() => {
     wrapper?.unmount();
+  });
+
+  describe("list view state", () => {
+    const runsTable = (w: VueWrapper) =>
+      w.findAllComponents({ name: "OTable" }).find((t) => t.props("pagination") === "client")!;
+
+    it("restores page, page size and sort saved for this monitor", () => {
+      Object.assign(useListViewState("synthetic-runs:mon-1", {}), {
+        currentPage: 3,
+        pageSize: 20,
+        sortBy: "duration",
+        sortOrder: "asc",
+      });
+      wrapper = mountRuns();
+      const table = runsTable(wrapper);
+      expect(table.props("currentPage")).toBe(3);
+      expect(table.props("pageSize")).toBe(20);
+      expect(table.props("sortBy")).toBe("duration");
+      expect(table.props("sortOrder")).toBe("asc");
+    });
+
+    it("does not apply another monitor's saved view", () => {
+      Object.assign(useListViewState("synthetic-runs:mon-2", {}), { currentPage: 5 });
+      wrapper = mountRuns();
+      expect(runsTable(wrapper).props("currentPage")).toBe(1);
+    });
+
+    it("saves table changes back to the view state", async () => {
+      wrapper = mountRuns();
+      const table = runsTable(wrapper);
+      table.vm.$emit("update:currentPage", 2);
+      table.vm.$emit("update:sortBy", "status");
+      table.vm.$emit("update:sortOrder", "asc");
+      await flushPromises();
+      const saved = useListViewState("synthetic-runs:mon-1", {}) as Record<string, unknown>;
+      expect(saved.currentPage).toBe(2);
+      expect(saved.sortBy).toBe("status");
+      expect(saved.sortOrder).toBe("asc");
+    });
   });
 
   describe("initial render", () => {
@@ -468,6 +513,28 @@ describe("MonitorRuns", () => {
         1_700_003_600_000_000,
         "ap1",
       );
+    });
+  });
+
+  describe("synthetic_test_run_triggered analytics", () => {
+    it("tracks a run once it is accepted", async () => {
+      wrapper = mountRuns();
+      await flushPromises();
+
+      await (wrapper.vm as any).triggerRun();
+
+      expect(analytics.track).toHaveBeenCalledWith("synthetic_test_run_triggered", { count: 1 });
+    });
+
+    it("does not track a rejected run", async () => {
+      mockRun.mockRejectedValueOnce(new Error("boom"));
+      wrapper = mountRuns();
+      await flushPromises();
+
+      await (wrapper.vm as any).triggerRun();
+
+      expect(mockRun).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 

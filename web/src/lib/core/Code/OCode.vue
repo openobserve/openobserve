@@ -1,6 +1,7 @@
 ﻿<script setup lang="ts">
 import type { CodeProps, CodeSlots } from "./OCode.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -8,6 +9,7 @@ withDefaults(defineProps<CodeProps>(), {
   block: false,
   copyable: false,
   truncate: false,
+  tooltip: undefined,
 });
 
 defineSlots<CodeSlots>();
@@ -68,10 +70,14 @@ const { t } = useI18nTyped();
       'rounded-default border-code-border bg-code-bg text-code-text border',
       'px-1 py-px',
       'font-mono text-xs leading-none',
-      truncate ? 'max-w-full truncate' : '',
+      truncate ? 'max-w-full min-w-0' : '',
     ]"
   >
-    <slot />
+    <!-- An inline-flex chip clips its text with no "…", so the text cuts inside its own box. -->
+    <OTruncatedText v-if="truncate" class="-my-px py-px" :tooltip="tooltip"
+      ><slot
+    /></OTruncatedText>
+    <slot v-else />
     <button
       v-if="copyable"
       type="button"

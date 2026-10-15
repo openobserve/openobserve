@@ -55,7 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="(row: OnCallResponse) => emit('open', row)"
     >
       <template #cell-subject="{ row }">
-        <span class="flex min-w-0 items-center gap-2">
+        <span
+          class="flex min-w-0 items-center gap-2 max-lg:flex-col max-lg:items-start max-lg:gap-1 max-lg:py-1.5"
+        >
           <OCodeCell :value="row.title || row.subject.source_id" :copy="false" />
           <!-- Only the two outcomes worth a second look are labelled: a page
                answered by the first person it woke is the norm, and tagging the
@@ -95,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import useBreakpoint from "@/composables/useBreakpoint";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -128,6 +131,7 @@ const props = withDefaults(
 const emit = defineEmits<{ open: [page: OnCallResponse]; "view-all": [] }>();
 
 const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 
 /// The delay before this record's ladder would have woken a SECOND person.
 function secondRungDelay(page: OnCallResponse): number | null {
@@ -151,6 +155,8 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
     id: "subject",
     header: t("oncall.subjectColumn"),
     accessorFn: (page: OnCallResponse) => page.title || page.subject.source_id,
+    // A phone table scrolls instead of flexing, and the default width there leaves the alert name a few characters.
+    ...(isMobile.value ? { size: 200 } : {}),
     meta: { isName: true, flex: true },
   },
   {

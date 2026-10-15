@@ -169,6 +169,29 @@ pub async fn get_org_setting_usage_stream_enabled(org_id: &str) -> Result<bool, 
     Ok(usage_stream_enabled)
 }
 
+/// Whether automatic RED anomaly insights are on for an org; absent settings mean off.
+pub async fn get_org_setting_red_insights_enabled(org_id: &str) -> Result<bool, Error> {
+    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
+    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
+        return Ok(v.red_insights_enabled);
+    }
+
+    let settings: OrganizationSetting = match db::get(&key).await {
+        Ok(settings) => json::from_slice(&settings)?,
+        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
+            OrganizationSetting::default()
+        }
+        Err(e) => return Err(e),
+    };
+    let red_insights_enabled = settings.red_insights_enabled;
+
+    ORGANIZATION_SETTING
+        .write()
+        .await
+        .insert(key.to_string(), settings);
+    Ok(red_insights_enabled)
+}
+
 /// Cache the existing org settings in the beginning
 pub async fn org_settings_cache() -> Result<(), anyhow::Error> {
     let prefix = ORG_SETTINGS_KEY_PREFIX;

@@ -12,6 +12,8 @@ export interface OTabProps {
   label?: I18nText;
   /** Material icon name shown before the label */
   icon?: string;
+  /** Registered OIcon name shown after the label (e.g. a lock glyph on a locked tab) */
+  suffixIcon?: string;
   /** Prevents interaction with this tab */
   disable?: boolean;
   /**
@@ -33,4 +35,6 @@ export interface OTabSlots {
   default?: () => unknown;
   /** Custom icon area — overrides the `icon` prop */
   icon?: () => unknown;
+  /** Controls beside the trigger (e.g. a toggle button), kept out of it so the tab never nests buttons. */
+  trailing?: () => unknown;
 }

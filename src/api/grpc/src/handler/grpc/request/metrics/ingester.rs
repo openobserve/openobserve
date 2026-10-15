@@ -22,7 +22,7 @@ use opentelemetry_proto::tonic::collector::metrics::v1::{
 };
 use tonic::{Response, Status};
 
-use crate::handler::grpc::request::otlp::{export_reply, observe_ok};
+use crate::handler::grpc::request::otlp::{export_reply, metadata_str, observe_ok};
 
 #[derive(Default)]
 pub struct MetricsIngester;
@@ -41,15 +41,11 @@ impl MetricsService for MetricsIngester {
             "Please specify organization id with header key '{}' ",
             cfg.grpc.org_header_key
         );
-        if !metadata.contains_key(&cfg.grpc.org_header_key) {
+        let Some(org_id) = metadata_str(&metadata, &cfg.grpc.org_header_key)? else {
             return Err(Status::invalid_argument(msg));
-        }
+        };
 
         let in_req = request.into_inner();
-        let org_id = metadata.get(&cfg.grpc.org_header_key);
-        if org_id.is_none() {
-            return Err(Status::invalid_argument(msg));
-        }
 
         let user_email = metadata
             .get("user_id")
@@ -62,7 +58,7 @@ impl MetricsService for MetricsIngester {
         let user = IngestUser::from_user_email(user_email);
 
         let resp = openobserve_core::metrics::otlp::handle_otlp_request(
-            org_id.unwrap().to_str().unwrap(),
+            org_id,
             in_req,
             OtlpRequestType::Grpc,
             user,
@@ -111,6 +107,25 @@ mod tests {
                 .unwrap_err();
             assert_eq!(status.code(), code, "{message}");
             assert_eq!(status.message(), message);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_non_ascii_metadata_is_invalid_argument() {
+        let cfg = config::get_config();
+        for key in [cfg.grpc.org_header_key.as_str()] {
+            let mut request = tonic::Request::new(ExportMetricsServiceRequest::default());
+            request.metadata_mut().insert(
+                tonic::metadata::MetadataKey::from_bytes(cfg.grpc.org_header_key.as_bytes())
+                    .unwrap(),
+                "default".parse().unwrap(),
+            );
+            request.metadata_mut().insert(
+                tonic::metadata::MetadataKey::from_bytes(key.as_bytes()).unwrap(),
+                tonic::metadata::AsciiMetadataValue::try_from(b"\xff").unwrap(),
+            );
+            let status = MetricsIngester.export(request).await.unwrap_err();
+            assert_eq!(status.code(), tonic::Code::InvalidArgument, "{key}");
         }
     }
 }

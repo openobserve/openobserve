@@ -14,16 +14,24 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 const template = {
   create: ({ org_identifier, data }: any) => {
-    return http().post(`/api/${org_identifier}/alerts/templates`, data);
+    return http()
+      .post(`/api/${org_identifier}/alerts/templates`, data)
+      .then((res) => {
+        analytics.track("alert_template_created");
+        return res;
+      });
   },
   update: ({ org_identifier, template_name, data }: any) => {
-    return http().put(
-      `/api/${org_identifier}/alerts/templates/${encodeURIComponent(template_name)}`,
-      data,
-    );
+    return http()
+      .put(`/api/${org_identifier}/alerts/templates/${encodeURIComponent(template_name)}`, data)
+      .then((res) => {
+        analytics.track("alert_template_updated");
+        return res;
+      });
   },
   list: ({ org_identifier }: any) => {
     return http().get(`/api/${org_identifier}/alerts/templates`);
@@ -34,12 +42,21 @@ const template = {
     );
   },
   delete: ({ org_identifier, template_name }: any) => {
-    return http().delete(
-      `/api/${org_identifier}/alerts/templates/${encodeURIComponent(template_name)}`,
-    );
+    return http()
+      .delete(`/api/${org_identifier}/alerts/templates/${encodeURIComponent(template_name)}`)
+      .then((res) => {
+        analytics.track("alert_template_deleted", { count: 1 });
+        return res;
+      });
   },
   bulkDelete: (org_identifier: string, data: any) => {
-    return http().delete(`/api/${org_identifier}/alerts/templates/bulk`, { data });
+    return http()
+      .delete(`/api/${org_identifier}/alerts/templates/bulk`, { data })
+      .then((res) => {
+        const count = res.data?.successful?.length ?? 0;
+        if (count > 0) analytics.track("alert_template_deleted", { count });
+        return res;
+      });
   },
   get_system_templates: ({ org_identifier }: any) => {
     return http().get(`/api/${org_identifier}/alerts/templates/system/prebuilt`);

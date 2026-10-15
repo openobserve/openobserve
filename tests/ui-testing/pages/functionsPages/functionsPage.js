@@ -8,6 +8,7 @@ class FunctionsPage {
 
     // Main page elements
     this.addFunctionButton = this.page.locator('[data-test="function-list-add-function-btn"]');
+    this.jsTypeBadge = this.page.locator('[data-test="function-list-type-badge-js"]');
     // OInput wrapper for the list-page search field
     this.searchInputWrapper = this.page.locator('[data-test="functions-list-search-input"]');
     // OInput's auto-derived inner native input
@@ -383,6 +384,11 @@ class FunctionsPage {
     await expect(this.jsOption).not.toBeVisible();
   }
 
+  async expectJsRadioLocked() {
+    await expect(this.jsOption).toBeVisible();
+    await expect(this.jsOption.locator('[data-test="function-transform-type-js-lock"]')).toBeVisible();
+  }
+
   // ==================== Complex Workflows ====================
 
   /**
@@ -459,6 +465,11 @@ class FunctionsPage {
   async acceptDeleteConfirm() {
     await this.confirmDialogPrimaryBtn.click();
     await this.confirmDialog.waitFor({ state: 'hidden', timeout: 10000 });
+  }
+
+  /** Assert the list shows a function as JavaScript rather than VRL. */
+  async expectFunctionTypeIsJavaScript() {
+    await expect(this.jsTypeBadge.first()).toBeVisible({ timeout: 15000 });
   }
 
   async expectFunctionAbsent(functionName) {

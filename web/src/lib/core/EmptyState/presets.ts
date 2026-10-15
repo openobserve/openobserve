@@ -119,6 +119,21 @@ export const emptyStatePresets = {
     ],
   },
 
+  "search-cancelled": {
+    illustration: "query",
+    variant: "neutral",
+    titleKey: "emptyState.searchCancelled.title",
+    descriptionKey: "emptyState.searchCancelled.description",
+    actions: [
+      {
+        id: "run",
+        icon: "play-arrow",
+        titleKey: "emptyState.searchCancelled.action",
+        descriptionKey: "emptyState.searchCancelled.actionDesc",
+      },
+    ],
+  },
+
   // --- first-run "create your first X" -------------------------------------
   "no-dashboards": {
     illustration: "board",
@@ -685,6 +700,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-downtimes": {
+    illustration: "schedule",
+    variant: "create",
+    titleKey: "emptyState.noDowntimes.title",
+    descriptionKey: "emptyState.noDowntimes.description",
+    actions: [
+      {
+        id: "create",
+        icon: "notifications-paused",
+        titleKey: "emptyState.noDowntimes.action",
+        descriptionKey: "emptyState.noDowntimes.actionDesc",
+      },
+    ],
+  },
   "no-pipeline-destinations": {
     illustration: "pipeline",
     variant: "create",
@@ -835,6 +864,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-named-events": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noNamedEvents.title",
+    descriptionKey: "emptyState.noNamedEvents.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noNamedEvents.action",
+        descriptionKey: "emptyState.noNamedEvents.actionDesc",
+      },
+    ],
+  },
   "no-storage-config": {
     illustration: "box",
     variant: "create",
@@ -981,6 +1024,20 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noPipelineHistory.title",
     descriptionKey: "emptyState.noPipelineHistory.description",
   },
+  "no-saved-funnels": {
+    illustration: "board",
+    variant: "create",
+    titleKey: "emptyState.noSavedFunnels.title",
+    descriptionKey: "emptyState.noSavedFunnels.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noSavedFunnels.action",
+        descriptionKey: "emptyState.noSavedFunnels.actionDesc",
+      },
+    ],
+  },
 } satisfies Record<string, EmptyStatePreset>;
 
 export type EmptyStatePresetName = keyof typeof emptyStatePresets;
@@ -1022,6 +1079,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-alert-sources": "emptyState.nouns.alertSources",
   "no-pipeline-destinations": "emptyState.nouns.pipelineDestinations",
   "no-alert-templates": "emptyState.nouns.alertTemplates",
+  "no-named-events": "emptyState.nouns.namedEvents",
   "no-eval-templates": "emptyState.nouns.evalTemplates",
   "no-enrichment-tables": "emptyState.nouns.enrichmentTables",
   "no-cipher-keys": "emptyState.nouns.cipherKeys",
@@ -1037,4 +1095,5 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-pipeline-history": "emptyState.nouns.pipelineHistory",
   "no-synthetic-monitors": "emptyState.nouns.monitors",
   "no-model-pricing": "emptyState.nouns.modelPricing",
+  "no-saved-funnels": "emptyState.nouns.savedFunnels",
 };

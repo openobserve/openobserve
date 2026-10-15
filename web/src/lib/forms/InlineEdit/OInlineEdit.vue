@@ -23,6 +23,7 @@
 import { computed, nextTick, ref, useAttrs, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { InlineEditProps, InlineEditEmits, InlineEditSlots } from "./OInlineEdit.types";
 
 defineOptions({ inheritAttrs: false });
@@ -34,6 +35,7 @@ const props = withDefaults(defineProps<InlineEditProps>(), {
   disabled: false,
   readonly: false,
   error: false,
+  submitOnEnter: true,
 });
 
 const emit = defineEmits<InlineEditEmits>();
@@ -148,8 +150,10 @@ const restoreTriggerFocus = async () => {
 // submission can't carry it: closing the editor unmounts the input before the
 // keypress that would have triggered it, so ask the form directly. A title with
 // no form owner (a workflow name, an incident title) submits nothing.
-const onEnter = () => {
-  const owner = inputRef.value?.form ?? null;
+const onEnter = (event: KeyboardEvent) => {
+  // Without the submit, the browser's implicit submission must not fire either.
+  if (!props.submitOnEnter) event.preventDefault();
+  const owner = props.submitOnEnter ? (inputRef.value?.form ?? null) : null;
   // Swallow the re-activation this same Enter would fire on the trigger once
   // focus returns to it (see startEdit); cleared after the key event settles.
   ignoreNextActivation = true;
@@ -266,17 +270,16 @@ defineExpose({ focus: startEdit });
     <!-- DISPLAY MODE — a button so Enter/Space and focus rings come for free.
          Readonly drops the button entirely: no affordance, no hover, no tab stop. -->
     <template v-else>
-      <span
+      <OTruncatedText
         v-if="readonly"
         :class="[
-          'min-w-0 truncate ring-transparent',
+          'ring-transparent',
           BOX_CLASSES,
           textClasses,
           isEmpty ? 'text-text-placeholder' : valueToneClass,
         ]"
-        :title="displayValue || placeholder"
         :data-test="dataTest ? `${dataTest}-value` : undefined"
-        >{{ displayValue || placeholder }}</span
+        >{{ displayValue || placeholder }}</OTruncatedText
       >
       <button
         v-else
@@ -306,15 +309,13 @@ defineExpose({ focus: startEdit });
         <!-- An empty field shows the placeholder in its normal muted colour even
              in the error state — the red ring alone signals the error. A non-empty
              value that is invalid still reads red. -->
-        <span
+        <OTruncatedText
           :class="[
-            'min-w-0 truncate',
             textClasses,
             isEmpty ? 'text-text-placeholder' : error ? 'text-input-error-text' : valueToneClass,
           ]"
-          :title="displayValue || undefined"
           :data-test="dataTest ? `${dataTest}-value` : undefined"
-          >{{ displayValue || placeholder }}</span
+          >{{ displayValue || placeholder }}</OTruncatedText
         >
         <!-- Always rendered, never hover-revealed: a pencil that only appears on
              hover cannot tell you the name is editable BEFORE you hover it. It

@@ -140,6 +140,9 @@ export interface PanelEditorChartData {
       min?: number;
       max?: number;
       time_shift?: any[];
+      formula?: string;
+      ref?: string;
+      hide?: boolean;
     };
   }>;
   [key: string]: any;
@@ -224,6 +227,14 @@ export interface PanelEditorProps {
    * @default false (dashboard), true (metrics, logs)
    */
   showAddToDashboardButton?: boolean;
+
+  addToDashboardDisabledReason?: I18nText | null;
+
+  /**
+   * While true, chart-type and config re-renders keep the queries the chart last ran.
+   * @default false
+   */
+  holdQueries?: boolean;
 
   // ---- Chart Configuration ----
   /**
@@ -513,7 +524,8 @@ export const DASHBOARD_PRESET: PanelEditorConfig = {
   showQueryBuilder: true,
   showVariablesSelector: true,
   showLastRefreshedTime: true,
-  showOutdatedWarning: true,
+  // Live preview runs builder edits itself; pending changes show on the Apply button.
+  showOutdatedWarning: false,
   showAddToDashboardButton: false, // Dashboard has Save button instead
   showQueryTypeSelector: false,
   showGeneratedQueryDisplay: false,

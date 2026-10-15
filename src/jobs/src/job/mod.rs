@@ -29,6 +29,8 @@ use crate::common::meta::user::{UserOrgRole, UserRequest};
 
 #[cfg(feature = "enterprise")]
 mod agent_signals;
+#[cfg(feature = "enterprise")]
+mod ai_chat_retention;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
 #[cfg(feature = "enterprise")]
@@ -38,6 +40,8 @@ mod cloud;
 mod compactor;
 pub mod config_watcher;
 mod db_monitoring;
+#[cfg(feature = "enterprise")]
+mod downtimes;
 mod file_list_dump;
 pub(crate) mod files;
 mod flatten_compactor;
@@ -65,6 +69,9 @@ mod pipeline_error_cleanup;
 mod prompt_webhook_delivery;
 mod promql;
 mod promql_self_consume;
+mod query_history_reaper;
+#[cfg(feature = "enterprise")]
+mod red_insights;
 mod scheduler;
 #[cfg(feature = "enterprise")]
 mod service_graph;
@@ -222,6 +229,63 @@ async fn enforce_usage_stream_retention() {
         stream::save_stream_settings(META_ORG_ID, USAGE_STREAM, StreamType::Logs, s)
             .await
             .unwrap(); //unwrap is intentional, we should panic if this fails
+    }
+}
+
+/// Repairs a missed coordinator event within a minute.
+#[cfg(feature = "enterprise")]
+async fn reload_downtimes_cache() {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+    interval.tick().await;
+    loop {
+        interval.tick().await;
+        if let Err(e) = db::downtimes::cache().await {
+            log::error!("[DOWNTIMES] cache reload failed: {e}");
+        }
+    }
+}
+
+/// Rows created before the RBAC fix have no folder ownership tuple, so only admins can open them.
+#[cfg(feature = "enterprise")]
+async fn backfill_downtime_ownership() {
+    use bytes::Bytes;
+
+    const MIGRATION_ORG: &str = "_migration";
+    const FLAG_KEY: &str = "downtimes_ownership_backfill_v1";
+
+    if openobserve_core::kv::get(MIGRATION_ORG, FLAG_KEY)
+        .await
+        .is_ok()
+    {
+        return;
+    }
+    // One node writes; the others find the flag on their next start. A single node is the leader.
+    let is_leader = infra::cluster::get_cached_online_nodes()
+        .await
+        .and_then(|mut nodes| {
+            nodes.sort_by_key(|n| n.id);
+            nodes.into_iter().next()
+        })
+        .map(|first| first.id == LOCAL_NODE.id)
+        .unwrap_or(true);
+    if !is_leader {
+        log::debug!("[DOWNTIMES] ownership backfill: not the lowest-id node, skipping");
+        return;
+    }
+    // The flag is set only after the write succeeded; a failed write is retried on the next start.
+    let rows = match db::downtimes::backfill_ownership().await {
+        Ok(rows) => rows,
+        Err(e) => {
+            log::warn!("[DOWNTIMES] ownership backfill failed, will retry on the next start: {e}");
+            return;
+        }
+    };
+    if let Err(e) =
+        openobserve_core::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
+    {
+        log::error!("[DOWNTIMES] could not set the ownership backfill flag: {e}");
+    } else {
+        log::info!("[DOWNTIMES] ownership tuples written for {rows} rows");
     }
 }
 
@@ -561,13 +625,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::functions::watch());
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
-    tokio::task::spawn(db::system_settings::watch());
     tokio::task::spawn(db::model_pricing::watch());
     tokio::task::spawn(openobserve_core::prompts::watch_invalidation());
     tokio::task::spawn(db::alerts::templates::watch());
     tokio::task::spawn(db::alerts::destinations::watch());
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
     tokio::task::spawn(db::alerts::alert::watch());
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().downtimes.enabled {
+        tokio::task::spawn(db::downtimes::watch());
+    }
     // Synthetics config caches (checks, locations, probe tokens, agents) live on
     // every node, so every node must hear invalidations — including routers,
     // which serve the probe auth path.
@@ -628,9 +695,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("prom cluster leader cache failed");
 
+    // Queue changes during hydration so the snapshot cannot overwrite newer events.
+    let system_settings_watcher = db::system_settings::create_watcher().await?;
     db::system_settings::cache()
         .await
         .expect("system settings cache failed");
+    tokio::task::spawn(system_settings_watcher);
+
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::common::remote_defaults::spawn_refresher();
 
     if config::get_config().common.model_pricing_enabled {
         db::model_pricing::cache()
@@ -674,6 +747,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
         log::error!("[TEMPLATES] default_alert_template backfill failed: {e}");
     }
 
+    // Backgrounded: the first boot after an upgrade seeds every org; serving must not wait.
+    #[cfg(feature = "enterprise")]
+    if LOCAL_NODE.is_scheduler() {
+        tokio::task::spawn(async {
+            if let Err(e) = alerts::prebuilt::seed_prebuilt_alerts().await {
+                log::error!("[PREBUILT_ALERTS] seeding failed: {e}");
+            }
+        });
+    }
+
     // cache alerts (this will include the system templates we just created)
     db::alerts::templates::cache()
         .await
@@ -688,6 +771,20 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::alerts::alert::cache()
         .await
         .expect("alerts cache failed");
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().downtimes.enabled {
+        db::downtimes::cache()
+            .await
+            .expect("downtimes cache failed");
+        tokio::task::spawn(reload_downtimes_cache());
+        if get_openfga_config().enabled {
+            tokio::task::spawn(backfill_downtime_ownership());
+        }
+        openobserve_synthetics::alerting::register_mute_check(
+            openobserve_core::synthetics::downtime_mute_check,
+            openobserve_core::synthetics::downtime_may_mute,
+        );
+    }
     // Warm the cache on queriers (UI APIs) and on whichever node role is the configured
     // processing node so that get_coverage_deficit returns accurate data from startup
     // rather than always returning (0, 0) until files happen to be processed.
@@ -1037,6 +1134,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
             },
         );
 
+        if get_o2_config().downtimes.enabled {
+            o2_enterprise::enterprise::anomaly_detection::query_executor::register_is_muted(
+                openobserve_core::anomaly_detection::downtime_is_muted,
+            );
+        }
+
         // When training completes, reset the scheduled_jobs trigger to now so
         // detection starts immediately rather than waiting for the next retry cycle.
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_training_complete_notifier(
@@ -1099,6 +1202,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .disabled
     {
         tokio::task::spawn(anomaly_claim_supervisor());
+        // Here because create_config does not check the anomaly kill switch itself.
+        tokio::task::spawn(red_insights::run());
     }
     // Every node that serves writes publishes them, not only the scheduler.
     openobserve_synthetics::service::start_publish_queue();
@@ -1244,6 +1349,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // gated: retention deletes do not replicate, so every region reaps its own
     // copy or it grows without bound.
     alert_eval_ledger_reaper::run();
+    query_history_reaper::run();
     // Reconciliation is what makes the rolling window actually roll: the
     // ingest pass only ever ADDS, so without this a 7-day SLO's covered_slices
     // climbs past what its window can hold. Also releases expired budget
@@ -1252,12 +1358,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // Nothing else notices a lost escalation timer: the thing that would have is the timer.
     #[cfg(feature = "enterprise")]
     oncall_maintenance::run();
+    #[cfg(feature = "enterprise")]
+    downtimes::run();
     // `_llm_scores` is authoritative for Workbench reviews. Repair the narrow
     // failure window where ingestion succeeded but QueueItem status did not.
     #[cfg(feature = "enterprise")]
     llm_review_reconciliation::run();
     // Replayable SDK requests are retained for 24h; reclaim the lapsed ones.
     llm_idempotency_purge::run();
+    // AI chat index rows whose events aged out of the chat-events stream.
+    #[cfg(feature = "enterprise")]
+    ai_chat_retention::run();
     // Early Experiment deletion marks the head and leaves the removal to this
     // sweep, which retries until the Experiment's own storage is gone.
     #[cfg(feature = "enterprise")]

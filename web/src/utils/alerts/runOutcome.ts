@@ -211,6 +211,7 @@ export function shouldShowLevel(
  */
 export function conditionSummary(row: {
   actual_value?: unknown;
+  rule_value?: string;
   threshold_value?: unknown;
   threshold_operator?: unknown;
   value_is_lower_bound?: unknown;
@@ -219,6 +220,7 @@ export function conditionSummary(row: {
     const n = Number(v);
     return Number.isFinite(n) ? String(n) : String(v);
   };
+  if (row.rule_value !== undefined && row.rule_value !== null) return row.rule_value;
   if (row.actual_value === undefined || row.actual_value === null) return "—";
   // §7.5: a legacy capped count fetch records min(true_count, fetch_size) —
   // the backend flags it and the value renders as a lower bound, not exact.

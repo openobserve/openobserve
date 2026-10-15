@@ -123,10 +123,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="panel-editor-add-to-dashboard-btn"
                         variant="primary"
                         size="xs"
+                        :disabled="!!addToDashboardDisabledReason"
+                        focusable-unavailable
                         @click="emit('addToDashboard')"
-                        :title="t('search.addToDashboard')"
+                        :title="
+                          addToDashboardDisabledReason ? undefined : t('search.addToDashboard')
+                        "
                       >
                         {{ t("search.addToDashboard") }}
+                        <OTooltip
+                          v-if="addToDashboardDisabledReason"
+                          :content="addToDashboardDisabledReason"
+                        />
+                        <template #unavailable-reason>{{ addToDashboardDisabledReason }}</template>
                       </OButton>
                     </div>
                   </div>
@@ -496,7 +505,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
                 <!-- Editor/Preview splitter -->
-                <div class="h-125 shrink-0 overflow-hidden">
+                <div
+                  class="overflow-hidden"
+                  :class="resolvedConfig.showQueryEditor ? 'h-125 shrink-0' : 'min-h-0 flex-1'"
+                >
                   <OSplitter
                     class="query-editor-splitter h-full"
                     v-model="splitterModel"
@@ -757,6 +769,7 @@ const props = withDefaults(defineProps<PanelEditorProps>(), {
   showLastRefreshedTime: undefined,
   showOutdatedWarning: undefined,
   showAddToDashboardButton: undefined,
+  addToDashboardDisabledReason: null,
   allowedChartTypes: undefined,
   externalChartData: undefined,
   searchResponse: undefined,
@@ -767,6 +780,7 @@ const props = withDefaults(defineProps<PanelEditorProps>(), {
   variablesData: undefined,
   dashboardData: undefined,
   editMode: false,
+  holdQueries: false,
 });
 
 const emit = defineEmits<PanelEditorEmits>();
@@ -831,12 +845,14 @@ const {
 
   // Computed
   isOutDated,
+  sparklinePendingApply,
   isLoading,
   currentPanelData,
 
   // Actions
   initChartData,
   runQuery,
+  reportValidationErrors,
   handleChartApiError,
   handleLastTriggeredAtUpdate,
   handleLimitNumberOfSeriesWarningMessage,
@@ -867,6 +883,7 @@ const {
   dateTimePickerRef: undefined, // Managed by parent
   selectedDate: undefined, // Managed by parent
   validatePanel,
+  holdQueries: () => props.holdQueries,
 });
 
 // The desktop 20% field-list splitter is unusable on a phone, so there it opens at ~half width.
@@ -1314,6 +1331,7 @@ defineExpose({
   // Actions
   initChartData,
   runQuery,
+  reportValidationErrors,
   resetErrors,
   collapseFieldList,
   updateDateTime,
@@ -1329,6 +1347,7 @@ defineExpose({
   // Panel data
   dashboardPanelData,
   isOutDated,
+  sparklinePendingApply,
 
   // Loading state
   isLoading,

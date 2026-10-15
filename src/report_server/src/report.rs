@@ -8,7 +8,7 @@ use chromiumoxide::{
     fetcher::{BrowserFetcher, BrowserFetcherOptions},
     handler::viewport::Viewport,
 };
-use config::{get_config, utils::time::now_micros};
+use config::{get_config, meta::dashboards::reports::format_dashb_var, utils::time::now_micros};
 use futures::StreamExt;
 use lettre::{
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
@@ -156,7 +156,10 @@ pub async fn generate_report(
 
     let mut dashb_vars = "".to_string();
     for variable in dashboard.variables.iter() {
-        dashb_vars = format!("{}&var-{}={}", dashb_vars, variable.key, variable.value);
+        dashb_vars = format!(
+            "{dashb_vars}&{}",
+            format_dashb_var(&variable.key, &variable.value)
+        );
     }
 
     if dashboard.tabs.is_empty() {
@@ -701,7 +704,10 @@ mod tests {
 
         let mut dashb_vars = "".to_string();
         for variable in variables.iter() {
-            dashb_vars = format!("{}&var-{}={}", dashb_vars, variable.key, variable.value);
+            dashb_vars = format!(
+                "{dashb_vars}&{}",
+                format_dashb_var(&variable.key, &variable.value)
+            );
         }
 
         assert_eq!(dashb_vars, "&var-env=prod&var-region=us-west");

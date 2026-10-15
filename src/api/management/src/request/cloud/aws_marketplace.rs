@@ -60,7 +60,7 @@ pub async fn aws_marketplace_register(
     );
 
     // Get the Dex login URL
-    let login_url = {
+    let (login_url, state) = {
         use o2_dex::service::auth::get_dex_login;
         let login_data = get_dex_login();
 
@@ -76,7 +76,7 @@ pub async fn aws_marketplace_register(
             log::error!("[AWS SAAS] Failed to store PKCE state: {}", e);
         }
 
-        login_data.url
+        (login_data.url, state)
     };
 
     // Create cookie with the marketplace token
@@ -90,7 +90,10 @@ pub async fn aws_marketplace_register(
 
     log::info!("[AWS SAAS] Redirecting to login: {}", login_url);
 
-    MetaHttpResponse::found(login_url, Some(cookie.to_string()))
+    crate::request::status::with_login_state_cookie(
+        MetaHttpResponse::found(login_url, Some(cookie.to_string())),
+        &state,
+    )
 }
 
 /// Request payload for linking AWS Marketplace subscription

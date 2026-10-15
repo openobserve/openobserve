@@ -61,6 +61,8 @@ async function buildCategoricalTablePanel(page, pm, dashboardName) {
   await pm.chartTypeSelector.selectChartType("table");
   await pm.chartTypeSelector.selectStreamType("logs");
   await pm.chartTypeSelector.selectStream("e2e_automate");
+  // Stream selection auto-seeds histogram(_timestamp) as x_axis_1; left in place it becomes column 0 and the grouping key.
+  await pm.chartTypeSelector.removeField("x_axis_1", "x");
   await pm.chartTypeSelector.removeField("y_axis_1", "y");
   await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "x");
   await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");

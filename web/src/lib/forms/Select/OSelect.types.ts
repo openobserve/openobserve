@@ -58,6 +58,8 @@ export interface SelectOption {
   expandable?: boolean;
   /** Nests this option under the `expandable` row with this value. */
   parentValue?: SelectValue;
+  /** Extra text the search matches besides the label, e.g. a zone's legacy names. */
+  searchText?: string;
   [key: string]: unknown;
 }
 
@@ -100,6 +102,12 @@ export interface SelectProps {
    * (search always spans every group).
    */
   collapsibleGroups?: boolean;
+  /**
+   * Multi-select with group headers: on open, float the selected options to the
+   * top of their own group, as flat lists always do. Default off, so groups
+   * that lead with a fixed entry (e.g. "Current Panel") keep their order.
+   */
+  pinSelectedInGroups?: boolean;
   /**
    * Renders a "Select All" master row at the top of the dropdown (multi-select
    * listbox mode only). Shows an indeterminate dash when only some options are

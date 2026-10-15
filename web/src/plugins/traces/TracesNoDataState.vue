@@ -19,11 +19,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Each card routes to a distinct, real tracing ingestion path.
 -->
 <template>
-  <OEmptyState illustration="trace" size="hero" :hide-action="true">
-    <template #title>{{ t("traces.noData.title", { product: raw("OpenObserve") }) }}</template>
-    <template #description><span v-html="description" /></template>
+  <OEmptyState v-bind="shell" :hide-action="true">
+    <template #title>
+      <span
+        v-if="alternativesOnly"
+        class="text-text-secondary text-sm font-normal"
+        data-test="traces-no-data-another-way"
+        >{{ t("ingestion.firstDataPanel.anotherWay") }}</span
+      >
+      <template v-else>{{ t("traces.noData.title", { product: raw("OpenObserve") }) }}</template>
+    </template>
+    <template v-if="!alternativesOnly" #description><span v-html="description" /></template>
 
     <template #actions>
+      <div v-if="$slots.status" class="flex basis-full justify-center">
+        <slot name="status" />
+      </div>
+
       <!-- OpenTelemetry OTLP — primary path for traces -->
       <EmptyStateIngestionCard
         icon="account-tree"
@@ -42,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- OTel Collector / agent -->
       <EmptyStateIngestionCard
-        icon="hub"
+        :image="getImageURL('images/ingestion/otlp.svg')"
         :label="raw('OTel Collector / Agent')"
         :sublabel="t('traces.noData.otelCollectorDesc', { product: raw('OTel Collector') })"
         icon-variant="blue"
@@ -108,8 +120,17 @@ import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionCh
 import { useAiIcon } from "@/composables/useAiIcon";
 import { getImageURL } from "@/utils/zincutils";
 
-defineProps<{ aiEnabled: boolean }>();
+const props = defineProps<{
+  aiEnabled: boolean;
+  /** Under FirstDataPanel's card: only the cards and chips, under an "Or start another way" caption. */
+  alternativesOnly?: boolean;
+}>();
 const emit = defineEmits<{ "ask-ai": [] }>();
+
+defineSlots<{
+  /** A line between the description and the cards. */
+  status?(): unknown;
+}>();
 
 const { t } = useI18nTyped();
 const router = useRouter();
@@ -119,6 +140,13 @@ const { aiIconSrc } = useAiIcon();
 const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization?.identifier,
 }));
+
+// v-bind keeps the hero's own defaults untouched; the caption form drops the illustration and backdrop.
+const shell = computed(() =>
+  props.alternativesOnly
+    ? { size: "block" as const, backdrop: false }
+    : { size: "hero" as const, illustration: "trace" as const },
+);
 
 const description = computed(() => t("traces.noData.description"));
 

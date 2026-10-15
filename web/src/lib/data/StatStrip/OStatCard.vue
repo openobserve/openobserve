@@ -20,7 +20,9 @@ import type { I18nText } from "@/types/i18n";
 
 import { computed, useSlots } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { StatTone, StatTrend } from "./OStatStrip.types";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -50,9 +52,11 @@ const props = withDefaults(
     clickable?: boolean;
     /** Active-filter state — accent border. */
     selected?: boolean;
+    /** Placeholder for the value until it first arrives; a 0 shown meanwhile reads as a real count. */
+    loading?: boolean;
     dataTest?: string;
   }>(),
-  { tone: "neutral", clickable: false, selected: false },
+  { tone: "neutral", clickable: false, selected: false, loading: false },
 );
 
 const slots = useSlots();
@@ -169,11 +173,19 @@ const trendClass = computed(() =>
           class="shrink-0 text-2xl leading-none font-semibold whitespace-nowrap max-lg:text-lg"
           :class="isMuted ? 'text-text-muted' : tc.value"
         >
-          <slot name="value">{{ displayValue }}</slot>
+          <OSkeleton
+            v-if="loading"
+            type="text"
+            class="block h-6 w-12 max-lg:h-4.5 max-lg:w-6"
+            data-test="o-stat-card-value-skeleton"
+          />
+          <slot v-else name="value">{{ displayValue }}</slot>
         </span>
-        <span v-if="label" class="text-text-secondary truncate text-xs font-medium max-lg:hidden">{{
-          label
-        }}</span>
+        <OTruncatedText
+          v-if="label"
+          class="text-text-secondary text-xs font-medium max-lg:hidden"
+          >{{ label }}</OTruncatedText
+        >
         <span v-if="trend" class="text-2xs shrink-0 font-semibold max-lg:hidden" :class="trendClass"
           >{{ trendArrow }} {{ trend.label }}</span
         >
@@ -191,9 +203,9 @@ const trendClass = computed(() =>
         >
           <OTooltip :content="subTooltip || sub" />
         </OIcon>
-        <span v-else-if="sub" class="text-text-label text-2xs min-w-0 truncate max-lg:hidden">{{
+        <OTruncatedText v-else-if="sub" class="text-text-label text-2xs max-lg:hidden">{{
           sub
-        }}</span>
+        }}</OTruncatedText>
       </div>
       <span
         v-if="icon || slots.icon"

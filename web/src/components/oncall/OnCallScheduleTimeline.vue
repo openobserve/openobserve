@@ -71,9 +71,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- The team's zone AND the reader's, because the two are usually
            different and a handover time is meaningless until you know which. -->
-      <OText variant="meta" data-test="oncall-timeline-zone">{{ zoneLine }}</OText>
+      <OText
+        variant="meta"
+        class="max-md:order-last max-md:basis-full"
+        data-test="oncall-timeline-zone"
+      >
+        {{ zoneLine }}
+      </OText>
 
-      <span class="ms-auto flex flex-wrap items-center gap-2">
+      <span class="ms-auto flex flex-wrap items-center gap-2 max-md:ms-0 max-md:w-full">
         <OToggleGroup
           :model-value="rangeKey"
           type="single"
@@ -111,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm-action"
+          class="max-md:hidden"
           data-test="oncall-timeline-presets"
           @click="emit('presets')"
         >
@@ -125,11 +132,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="canCover"
           variant="outline"
           size="sm-action"
+          class="max-md:hidden"
           data-test="oncall-timeline-request-cover"
           @click="emit('request-cover')"
         >
           {{ t("oncall.requestCover") }}
         </OButton>
+
+        <!-- A phone row fits the range and one button; the two rarer acts share a menu rather than a second row. -->
+        <ODropdown side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              icon-left="more-vert"
+              variant="outline"
+              size="icon-sm"
+              class="ms-auto md:hidden"
+              :aria-label="t('oncall.moreActions')"
+              data-test="oncall-timeline-more-actions"
+            />
+          </template>
+          <ODropdownItem
+            class="md:hidden"
+            data-test="oncall-timeline-presets-menu"
+            @select="emit('presets')"
+          >
+            <span>{{ t("oncall.presetsTitle") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="canCover"
+            class="md:hidden"
+            data-test="oncall-timeline-request-cover-menu"
+            @select="emit('request-cover')"
+          >
+            <span>{{ t("oncall.requestCover") }}</span>
+          </ODropdownItem>
+        </ODropdown>
       </span>
     </div>
 
@@ -170,7 +207,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             aria-hidden="true"
           />
           <OText variant="section">{{ track.label }}</OText>
-          <OText variant="meta" :data-test="`oncall-lane-cadence-${track.key}`">
+          <OText
+            variant="meta"
+            class="max-md:order-last max-md:basis-full"
+            :data-test="`oncall-lane-cadence-${track.key}`"
+          >
             {{ laneOf(track).cadence }}
           </OText>
 
@@ -312,6 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -381,6 +423,7 @@ const emit = defineEmits<{
 const window = defineModel<{ from: number; to: number }>("window", { required: true });
 
 const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 const store = useStore();
 
 const nowMicros = useOnCallClock();
@@ -723,8 +766,9 @@ const axisTicks = computed<ScheduleAxisTick[]>(() => {
     ticks.push({
       offset: share(at),
       label: raw(fmt(at, { day: "numeric" })),
+      // A phone column is narrower than "Wed · today", which would run into the next day; the emphasis still marks it.
       sublabel:
-        at === today
+        at === today && !isMobile.value
           ? t("oncall.schedAxisToday", { weekday: raw(fmt(at, { weekday: "short" })) })
           : raw(fmt(at, { weekday: "short" })),
       emphasis: at === today,

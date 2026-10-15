@@ -151,6 +151,7 @@ import Description from "~icons/material-symbols/description-outline";
 import Dns from "~icons/material-symbols/dns-outline";
 import ForkRight from "~icons/material-symbols/fork-right";
 import FullscreenExit from "~icons/material-symbols/fullscreen-exit";
+import FitScreen from "~icons/material-symbols/fit-screen";
 import Group from "~icons/material-symbols/group-outline";
 import HourglassEmpty from "~icons/material-symbols/hourglass-empty";
 import Label from "~icons/material-symbols/label-outline";
@@ -275,6 +276,8 @@ import SaveIcon from "~icons/material-symbols/save-outline";
 import SavedSearchIcon from "~icons/material-symbols/saved-search";
 import SearchOffIcon from "~icons/material-symbols/search-off";
 import SensorsOff from "~icons/material-symbols/sensors-off-outline";
+import NotificationsPaused from "~icons/material-symbols/notifications-paused-outline";
+import RepeatIcon from "~icons/material-symbols/repeat";
 import SecurityIcon from "~icons/material-symbols/shield-outline";
 import SentimentVeryDissatisfiedIcon from "~icons/material-symbols/mood-bad-outline";
 import AddReactionIcon from "~icons/material-symbols/add-reaction-outline";
@@ -532,6 +535,7 @@ export const iconRegistry = {
   "navigate-before": ChevronLeft,
   "navigate-next": ChevronRight,
   "fullscreen-exit": FullscreenExit,
+  "fit-screen": FitScreen,
   group: Group,
   "hourglass-empty": HourglassEmpty,
   label: Label,
@@ -715,6 +719,10 @@ export const iconRegistry = {
   // Batch 4: Alert Library (2026-08-20)
   // "no signal arriving" — the alert library's not-ingesting-this-stream state.
   "sensors-off": SensorsOff,
+
+  // Batch 5: Downtimes (2026-09-24)
+  "notifications-paused": NotificationsPaused,
+  repeat: RepeatIcon,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

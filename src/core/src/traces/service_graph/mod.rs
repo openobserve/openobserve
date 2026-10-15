@@ -24,8 +24,6 @@ pub mod api;
 pub mod processor;
 pub mod v4;
 
-use std::sync::atomic::Ordering;
-
 use config::meta::stream::StreamType;
 
 /// Default window (in minutes) used when no explicit time range is provided.
@@ -51,7 +49,7 @@ pub use o2_enterprise::enterprise::service_graph::{
 // Re-export processor for compactor
 pub use processor::process_service_graph;
 
-/// Where the topology API reads from; decided per request by `pick_source`.
+/// Where the topology API reads from; decided per request by `use_v4_source`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Source {
     V1,
@@ -65,29 +63,45 @@ struct RecentIngestedTraceStream {
     stream_name: String,
 }
 
-/// An org without a v1 stream (fresh install, collector-only) reads the metrics right away.
-pub fn pick_source(stopped: bool, v1_exists: bool) -> Source {
-    if stopped || !v1_exists {
-        Source::V4
-    } else {
-        Source::V1
+/// Parses a source spec from the env or `?source=`; `None` is auto, resolved by `use_v4_source`.
+pub fn parse_source(source: &str) -> Option<Source> {
+    match source {
+        "v1" => Some(Source::V1),
+        "v4" => Some(Source::V4),
+        _ => None,
     }
 }
 
-/// `v1/stopped` is write-once, so a true reading is cached for the process lifetime.
-pub async fn use_v4_source(org: &str) -> bool {
-    if v4::V1_STOPPED_SEEN.load(Ordering::Relaxed) {
+/// `O2_SERVICE_GRAPH_V1_STOP`; OSS never runs the v1 job, so it has nothing to stop.
+pub fn v1_stopped() -> bool {
+    configured().0
+}
+
+/// A stopped v1 always reads v4; otherwise the request's `source`, then the env, then auto.
+pub async fn use_v4_source(org: &str, requested: Option<&str>) -> bool {
+    let (stopped, configured) = configured();
+    if stopped {
         return true;
     }
-    let stopped = crate::db::service_graph::is_v1_stopped().await;
-    if stopped {
-        v4::V1_STOPPED_SEEN.store(true, Ordering::Relaxed);
+    if let Some(source) = requested.and_then(parse_source).or(configured) {
+        return source == Source::V4;
     }
     // the gRPC ServiceGraph arm writes through logs::ingest, so the v1 stream lives as a Logs
     // stream
-    let v1_exists =
-        !stopped && infra::schema::exists(org, StreamType::Logs, "_o2_service_graph").await;
-    pick_source(stopped, v1_exists) == Source::V4
+    !infra::schema::exists(org, StreamType::Logs, "_o2_service_graph").await
+}
+
+/// `(V1_STOP, SOURCE)` env; both go away next major version, when v4 becomes the only engine.
+fn configured() -> (bool, Option<Source>) {
+    #[cfg(feature = "enterprise")]
+    {
+        let sg = &o2_enterprise::enterprise::common::config::get_config().service_graph;
+        (sg.v1_stop, parse_source(&sg.source))
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        (false, None)
+    }
 }
 
 /// Runs a pre-aggregated graph query against a trace stream and returns the raw hits.
@@ -226,10 +240,10 @@ mod tests {
     }
 
     #[test]
-    fn test_pick_source_four_cases() {
-        assert_eq!(pick_source(false, true), Source::V1);
-        assert_eq!(pick_source(false, false), Source::V4);
-        assert_eq!(pick_source(true, true), Source::V4);
-        assert_eq!(pick_source(true, false), Source::V4);
+    fn test_parse_source() {
+        assert_eq!(parse_source("v1"), Some(Source::V1));
+        assert_eq!(parse_source("v4"), Some(Source::V4));
+        assert_eq!(parse_source("auto"), None);
+        assert_eq!(parse_source(""), None);
     }
 }

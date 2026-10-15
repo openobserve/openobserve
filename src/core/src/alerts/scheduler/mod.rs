@@ -15,6 +15,7 @@
 
 use config::get_config;
 
+mod calibration;
 pub mod handlers;
 #[cfg(feature = "enterprise")]
 pub mod query_optimization_recommendation;

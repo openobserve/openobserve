@@ -27,9 +27,11 @@ const props = defineProps<{
   getHighlightedHtml?: (columnId: string, cellValue: any) => string | null;
   wrap?: boolean;
   dense?: boolean;
+  compact?: boolean;
   bordered?: boolean;
   striped?: boolean;
   rowClass?: string | ((row: any) => string);
+  activeRowIndex?: number | null;
   rowStyleFn?: (row: any) => Record<string, any>;
   loading?: boolean;
   /** Enable drag-and-drop row reordering. */
@@ -151,6 +153,14 @@ function getRowForIndex(index: number) {
   return props.rows[index - (props.rowIndexOffset ?? 0)];
 }
 
+function isActiveRow(row: Row<any> | undefined): boolean {
+  return (
+    props.activeRowIndex !== null &&
+    props.activeRowIndex !== undefined &&
+    row?.index === props.activeRowIndex
+  );
+}
+
 /** Get the TanStack Row from a draggable model item (plain data). */
 function getRowForItem(item: any): Row<any> {
   return rowByOriginal.value.get(item) ?? props.rows[0];
@@ -241,9 +251,11 @@ const headingColspan = computed(
       :get-highlighted-html="getHighlightedHtml"
       :wrap="wrap"
       :dense="dense"
+      :compact="compact"
       :bordered="bordered"
       :striped="striped"
       :row-class-fn="rowClass"
+      :is-active="isActiveRow(getRowForItem(item))"
       :row-style-fn="rowStyleFn"
       :status-bar-color="getStatusBarColor?.(item)"
       :enable-cell-copy="enableCellCopy"
@@ -304,9 +316,11 @@ const headingColspan = computed(
         :get-highlighted-html="getHighlightedHtml"
         :wrap="wrap"
         :dense="dense"
+        :compact="compact"
         :bordered="bordered"
         :striped="striped"
         :row-class-fn="rowClass"
+        :is-active="isActiveRow(item.row)"
         :row-style-fn="rowStyleFn"
         :status-bar-color="getStatusBarColor?.(item.row.original)"
         :enable-cell-copy="enableCellCopy"
@@ -371,9 +385,11 @@ const headingColspan = computed(
       :get-highlighted-html="getHighlightedHtml"
       :wrap="wrap"
       :dense="dense"
+      :compact="compact"
       :bordered="bordered"
       :striped="striped"
       :row-class-fn="rowClass"
+      :is-active="isActiveRow(getRowForIndex(virtualRow.index))"
       :status-bar-color="getStatusBarColor?.(getRowForIndex(virtualRow.index)?.original)"
       :enable-cell-copy="enableCellCopy"
       :get-cell-style="getCellStyle"

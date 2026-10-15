@@ -37,12 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="{ background: color }"
               />
             </span>
-            <span
-              ref="triggerLabelRef"
-              class="text-text-body min-w-0 flex-1 overflow-hidden text-sm text-ellipsis whitespace-nowrap"
-              >{{ selectedOptionLabel }}</span
-            >
-            <OTooltip :content="selectedOptionLabel" :disabled="!isTriggerLabelTruncated" />
+            <!-- reka's SelectValue is pointer-events:none, so the label opts back in to receive the hover. -->
+            <OTruncatedText class="text-text-body pointer-events-auto flex-1 text-sm">{{
+              selectedOptionLabel
+            }}</OTruncatedText>
           </div>
         </template>
 
@@ -67,10 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :style="{ background: c }"
                 />
               </span>
-              <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
-                opt.label
-              }}</span>
-              <OTooltip :content="opt.label" />
+              <OTruncatedText class="flex-1">{{ opt.label }}</OTruncatedText>
             </div>
           </OSelectItem>
 
@@ -93,10 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 aria-hidden="true"
                 :style="{ background: `linear-gradient(to right, ${opt.colorPalette.join(', ')})` }"
               />
-              <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
-                opt.label
-              }}</span>
-              <OTooltip :content="opt.label" />
+              <OTruncatedText class="flex-1">{{ opt.label }}</OTruncatedText>
             </div>
           </OSelectItem>
         </OSelectGroup>
@@ -146,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
-import { computed, inject, onBeforeMount, defineComponent, ref } from "vue";
+import { computed, inject, onBeforeMount, defineComponent } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -154,8 +146,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
 import OSelectGroup from "@/lib/forms/Select/OSelectGroup.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useIsTruncated } from "@/lib/overlay/Tooltip/useIsTruncated";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 
 interface ColorOption {
@@ -170,12 +161,16 @@ type SelectableColorOption = ColorOption & { value: string };
 
 export default defineComponent({
   name: "ColorPaletteDropdown",
-  components: { OToggleGroup, OToggleGroupItem, OSelect, OSelectItem, OSelectGroup, OTooltip },
+  components: {
+    OToggleGroup,
+    OToggleGroupItem,
+    OSelect,
+    OSelectItem,
+    OSelectGroup,
+    OTruncatedText,
+  },
   setup() {
     const { t } = useI18nTyped();
-
-    const triggerLabelRef = ref<HTMLElement | null>(null);
-    const { isTruncated: isTriggerLabelTruncated } = useIsTruncated(triggerLabelRef);
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { dashboardPanelData, promqlMode } = useDashboardPanelData(dashboardPanelDataPageKey, t);
@@ -327,8 +322,6 @@ export default defineComponent({
       onColorModeChange,
       selectedOptionLabel,
       selectedOptionPalette,
-      triggerLabelRef,
-      isTriggerLabelTruncated,
     };
   },
 });

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
+    <CredentialCodeBlock slug="categraf" :content="content" />
     <IngestionDocLink href="https://github.com/flashcatcloud/categraf">
       {{ t("ingestion.categrafDocLinkText") }}
     </IngestionDocLink>
@@ -27,10 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "categraf-config",
@@ -42,7 +42,7 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent, IngestionContent, IngestionDocLink },
+  components: { CredentialCodeBlock, IngestionContent, IngestionDocLink },
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
@@ -63,7 +63,6 @@ basic_auth_user = "[EMAIL]"
 basic_auth_pass = "[PASSCODE]"`;
 
     return {
-      raw,
       t,
       content,
     };

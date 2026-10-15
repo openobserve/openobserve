@@ -14,7 +14,6 @@
         :columns="columns"
         row-key="configId"
         :loading="isLoading"
-        :footer-title="t('onlineEvals.quality.overview.title')"
         :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
@@ -78,12 +77,9 @@
               :label="t(`onlineEvals.quality.overview.status.${row.status}`)"
               :aria-label="t(`onlineEvals.quality.overview.status.${row.status}`)"
             />
-            <span
-              class="text-3xs text-text-secondary max-w-full truncate"
-              :title="healthSummary(row)"
-            >
+            <OTruncatedText class="text-3xs text-text-secondary max-w-full">
               {{ healthSummary(row) }}
-            </span>
+            </OTruncatedText>
           </div>
         </template>
 
@@ -184,6 +180,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfigRow } from "../composables/useQualityScoreConfigs";

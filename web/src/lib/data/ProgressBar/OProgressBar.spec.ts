@@ -49,6 +49,15 @@ describe("OProgressBar", () => {
       );
     });
 
+    it("applies bg-progress-bar-neutral for variant=neutral", () => {
+      const wrapper = mount(OProgressBar, {
+        props: { value: 0.5, variant: "neutral" },
+      });
+      expect(wrapper.find("[role='progressbar'] div").classes()).toContain(
+        "bg-progress-bar-neutral",
+      );
+    });
+
     it("applies bg-progress-bar-danger for variant=danger", () => {
       const wrapper = mount(OProgressBar, {
         props: { value: 1, variant: "danger" },

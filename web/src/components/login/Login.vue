@@ -49,31 +49,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="max-width: 9.375rem; max-height: 1.9375rem"
           />
         </span>
-        <img
+        <a
           v-if="store.state.zoConfig.custom_hide_self_logo == false"
-          class="appLogo h-auto"
-          :style="
-            store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
-          "
-          :src="
-            isDark
-              ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-              : getImageURL('images/common/openobserve_latest_light_2.svg')
-          "
-        />
+          href="https://openobserve.ai/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img
+            class="appLogo h-auto"
+            :style="
+              store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
+            "
+            :src="
+              isDark
+                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+                : getImageURL('images/common/openobserve_latest_light_2.svg')
+            "
+            :alt="t('login.openObserveLogoAlt')"
+          />
+        </a>
       </div>
       <div class="mb-4 flex justify-center" v-else>
-        <img
-          class="appLogo h-auto"
-          :style="
-            store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
-          "
-          :src="
-            isDark
-              ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-              : getImageURL('images/common/openobserve_latest_light_2.svg')
-          "
-        />
+        <a href="https://openobserve.ai/" target="_blank" rel="noopener noreferrer">
+          <img
+            class="appLogo h-auto"
+            :style="
+              store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
+            "
+            :alt="t('login.openObserveLogoAlt')"
+            :src="
+              isDark
+                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+                : getImageURL('images/common/openobserve_latest_light_2.svg')
+            "
+          />
+        </a>
       </div>
 
       <div v-if="autoRedirectDexLogin">
@@ -200,6 +210,7 @@ import {
   getImageURL,
 } from "@/utils/zincutils";
 import { redirectUser } from "@/utils/common";
+import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -277,11 +288,27 @@ export default defineComponent({
       return store.state.zoConfig.native_login_enabled;
     });
 
+    // Dex opens on its Create account tab when the request carries screen_hint=signup.
+    const withSignupHint = (url: string): string => {
+      if (router.currentRoute.value.query.mode !== "signup") return url;
+      try {
+        const target = new URL(url, window.location.origin);
+        if (target.searchParams.has("screen_hint")) return url;
+        // Appending to the raw search keeps the existing params byte-for-byte; re-serialising would re-encode them.
+        target.search = target.search
+          ? `${target.search}&screen_hint=signup`
+          : "?screen_hint=signup";
+        return target.toString();
+      } catch {
+        return url;
+      }
+    };
+
     const loginWithSSo = async () => {
       try {
         authService.get_dex_login().then((res) => {
           if (res) {
-            window.location.href = res;
+            window.location.href = withSignupHint(res);
             return;
           }
         });
@@ -339,6 +366,7 @@ export default defineComponent({
                 if (store.state.zoConfig?.rum?.enabled) {
                   // Set user information first
                   openobserveRum.setUser({
+                    id: userInfo.email,
                     name: userInfo.given_name + " " + userInfo.family_name,
                     email: userInfo.email,
                   });
@@ -374,7 +402,8 @@ export default defineComponent({
                   await organizationsService
                     .os_list(0, 100000, "id", false, "", "default")
                     .then((res: any) => {
-                      orgOptions.value = res.data.data.map(
+                      const labeledOrgs = withDisambiguatedOrgLabels(res.data.data);
+                      orgOptions.value = labeledOrgs.map(
                         (data: {
                           id: any;
                           name: any;
@@ -385,7 +414,9 @@ export default defineComponent({
                           search_threshold: any;
                           CustomerBillingObj: any;
                           status: any;
+                          label: string;
                         }) => {
+                          // `label` is the real name here; the disambiguated string is applied only to the dropdown copy returned below.
                           let optiondata: any = {
                             label: data.name,
                             id: data.id,
@@ -421,7 +452,7 @@ export default defineComponent({
                             tempDefaultOrg = optiondata;
                           }
 
-                          return optiondata;
+                          return { ...optiondata, label: data.label };
                         },
                       );
 
@@ -486,6 +517,7 @@ export default defineComponent({
       showSSO,
       showInternalLogin,
       loginWithSSo,
+      withSignupHint,
       config,
       autoRedirectDexLogin,
       isDark,

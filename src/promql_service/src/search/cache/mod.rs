@@ -27,7 +27,10 @@ use config::{
     },
 };
 use hashbrown::{HashMap, HashSet};
-use infra::errors::{Error, Result};
+use infra::{
+    cache::file_data::disk::METRICS_RESULT_CACHE_FILE_PREFIX,
+    errors::{Error, Result},
+};
 use prost::Message;
 use tokio::sync::RwLock;
 
@@ -89,31 +92,32 @@ pub async fn init() -> Result<()> {
             .write()
             .await;
         let items = std::mem::take(&mut *w);
-        for item in items.iter() {
-            if let Err(e) = load(item).await {
-                log::error!("load disk metrics cache error: {e}");
+        let total = items.len();
+        let mut malformed = Vec::new();
+        for item in items {
+            if !load(&item).await {
+                malformed.push(item);
             }
         }
+        let malformed_len = malformed.len();
+        // the disk scan already dropped legacy names; these carry the prefix but cannot be parsed
+        infra::cache::file_data::delete::add(malformed);
         log::info!(
-            "Loading disk metrics cache done, total items: {}",
-            items.len()
+            "Loading disk metrics cache done, total items: {total}, dropped malformed items: {malformed_len}"
         );
     });
     Ok(())
 }
 
-/// Get the samples from the cache
-///
-/// This function will return the samples from the cache if the samples are found.
-/// If the samples are not found, it will return None.
 pub async fn get(
+    org: &str,
     query: &str,
     start: i64,
     end: i64,
     step: i64,
 ) -> Result<Option<(i64, Vec<proto::cluster_rpc::Series>)>> {
     // get the bucket cache
-    let key = get_hash_key(query, step);
+    let key = get_hash_key(org, query, step);
     let bucket_id = get_bucket_id(&key);
     let r = GLOBAL_CACHE[bucket_id].read().await;
     let Some(index) = r.data.get(&key) else {
@@ -254,7 +258,8 @@ pub async fn set(
     }
 
     // get the bucket cache
-    let key = get_hash_key(query, step);
+    let hash = query_hash(query, step);
+    let key = scoped_cache_key(org, &hash);
     let bucket_id = get_bucket_id(&key);
     let r = GLOBAL_CACHE[bucket_id].read().await;
     if let Some(index) = r.data.get(&key) {
@@ -348,7 +353,7 @@ pub async fn set(
     let bytes_data = resp.encode_to_vec();
 
     // store the series to disk cache
-    let cache_key = get_cache_item_key(&key, org, start, new_end);
+    let cache_key = get_cache_item_key(org, &hash, start, new_end);
     infra::cache::file_data::disk::set(&cache_key, bytes_data.into())
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
@@ -371,31 +376,26 @@ pub async fn set(
     Ok(())
 }
 
-/// load the cache item from the secondary storage
-pub async fn load(cache_key: &str) -> Result<()> {
-    let cfg = get_config();
-    if !cfg.common.result_cache_enabled {
-        return Ok(());
-    }
+/// Adopt a cache file found on disk into the index; false means its name is not in this format.
+async fn load(cache_key: &str) -> bool {
     let Some((key, start, end)) = parse_cache_item_key(cache_key) else {
-        return Ok(());
+        return false;
     };
     // held across the insert so a concurrent disk eviction orders after it and prunes the entry
     let Some(_indexed) = infra::cache::file_data::disk::indexed_file_guard(cache_key).await else {
-        return Ok(());
+        return true;
     };
     let bucket_id = get_bucket_id(&key);
     // an over-budget bucket rejects startup adoption; the disk gc reclaims the unindexed files
     {
         let r = GLOBAL_CACHE[bucket_id].read().await;
         if r.cur_size >= r.max_size {
-            return Ok(());
+            return true;
         }
     }
     let cache_item = MetricsIndexCacheItem::new(cache_key, start, end);
     insert_index(bucket_id, key, "", cache_item).await;
-
-    Ok(())
+    true
 }
 
 /// Insert into the bucket index and queue evicted entries' disk files for deletion.
@@ -442,45 +442,6 @@ async fn remove_evicted_files(files: Vec<String>) {
 async fn remove_index_entry(bucket_id: usize, key: &str, file_key: String) {
     let mut w = GLOBAL_CACHE[bucket_id].write().await;
     w.remove_files(key, &HashSet::from_iter([file_key]));
-}
-
-fn get_hash_key(query: &str, step: i64) -> String {
-    config::utils::md5::hash(&format!("{query}-{step}"))
-}
-
-fn get_cache_item_key(prefix: &str, org: &str, start: i64, end: i64) -> String {
-    format!(
-        "metrics_results/{}/{}/{}_{}_{}_{}.pb",
-        org,
-        get_ymdh_from_micros(start, HourFormat::Real),
-        prefix,
-        start,
-        end,
-        CACHE_KEY_SUFFIX.fetch_add(1, Ordering::SeqCst)
-    )
-}
-
-/// parse the cache item key
-///
-/// the key format is: metrics_results/{date}/{prefix}_{start}_{end}_{suffix}.json
-fn parse_cache_item_key(key: &str) -> Option<(String, i64, i64)> {
-    if !key.starts_with("metrics_results/") || !key.ends_with(".pb") {
-        return None;
-    }
-    let item_key = key.split('/').next_back().unwrap_or("");
-    let parts = item_key.split('_').collect::<Vec<_>>();
-    if parts.len() != 4 {
-        return None;
-    }
-
-    let prefix = parts[0];
-    let Ok(start) = parts[1].parse::<i64>() else {
-        return None;
-    };
-    let Ok(end) = parts[2].parse::<i64>() else {
-        return None;
-    };
-    Some((prefix.to_string(), start, end))
 }
 
 fn get_bucket_id(key: &str) -> usize {
@@ -641,6 +602,57 @@ impl Drop for DiskFileCleanup {
     }
 }
 
+fn get_hash_key(org: &str, query: &str, step: i64) -> String {
+    scoped_cache_key(org, &query_hash(query, step))
+}
+
+fn query_hash(query: &str, step: i64) -> String {
+    config::utils::md5::hash(&format!("{query}-{step}"))
+}
+
+fn scoped_cache_key(org: &str, hash: &str) -> String {
+    format!("{}:{org}:{hash}", org.len())
+}
+
+fn get_cache_item_key(org: &str, hash: &str, start: i64, end: i64) -> String {
+    format!(
+        "metrics_results/{}/{}/{}{}_{}_{}_{}.pb",
+        org,
+        get_ymdh_from_micros(start, HourFormat::Real),
+        METRICS_RESULT_CACHE_FILE_PREFIX,
+        hash,
+        start,
+        end,
+        CACHE_KEY_SUFFIX.fetch_add(1, Ordering::SeqCst)
+    )
+}
+
+/// Parses `metrics_results/{org}/{Y/m/d/H}/v2_{md5}_{start}_{end}_{suffix}.pb`.
+fn parse_cache_item_key(key: &str) -> Option<(String, i64, i64)> {
+    let path = key.split('/').collect::<Vec<_>>();
+    if path.len() != 7 || path[0] != "metrics_results" || path[1].is_empty() {
+        return None;
+    }
+    let item_key = path[6]
+        .strip_suffix(".pb")?
+        .strip_prefix(METRICS_RESULT_CACHE_FILE_PREFIX)?;
+    let parts = item_key.split('_').collect::<Vec<_>>();
+    if parts.len() != 4 {
+        return None;
+    }
+    let hash = parts[0];
+    if hash.len() != 32 || !hash.bytes().all(|ch| ch.is_ascii_hexdigit()) {
+        return None;
+    }
+    let start = parts[1].parse::<i64>().ok()?;
+    let end = parts[2].parse::<i64>().ok()?;
+    parts[3].parse::<i64>().ok()?;
+    if start >= end {
+        return None;
+    }
+    Some((scoped_cache_key(path[1], hash), start, end))
+}
+
 fn index_base_size(key: &str, query: &str) -> usize {
     key.len() + query.len() + std::mem::size_of::<MetricsIndexCache>()
 }
@@ -655,18 +667,220 @@ fn key_size(key: &str, index: &MetricsIndexCache) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::promql::value::{Labels, Sample};
+    use config::meta::promql::value::{Label, Labels, Sample};
     use promql::adjust_start_end;
 
     use super::*;
+
+    struct IsolationFixture {
+        query: String,
+        start: i64,
+        end: i64,
+        step: i64,
+    }
+
+    impl IsolationFixture {
+        fn new() -> Option<Self> {
+            // set/get round-trip through the disk cache, which a local .env may switch off
+            if !get_config().disk_cache.enabled {
+                return None;
+            }
+            let start = 1_700_000_000_000_000;
+            let step = second_micros(15);
+            Some(Self {
+                query: format!("isolation_{}", config::ider::uuid()),
+                start,
+                end: start + 4 * step,
+                step,
+            })
+        }
+
+        async fn write(&self, org: &str, value: f64) -> String {
+            let values = vec![RangeValue {
+                labels: vec![Arc::new(Label::new("tenant", org))],
+                samples: (0..=4)
+                    .map(|i| Sample::new(self.start + i * self.step, value))
+                    .collect(),
+                exemplars: None,
+                time_window: None,
+            }];
+            set(
+                "isolation_test",
+                org,
+                &self.query,
+                self.start,
+                self.end,
+                self.step,
+                values,
+                false,
+            )
+            .await
+            .unwrap();
+            let key = get_hash_key(org, &self.query, self.step);
+            GLOBAL_CACHE[get_bucket_id(&key)].read().await.data[&key].entries[0]
+                .key
+                .clone()
+        }
+
+        async fn assert_hit(&self, org: &str, value: f64, start: i64, end: i64) {
+            let (next_start, series) = get(org, &self.query, start, end, self.step)
+                .await
+                .unwrap()
+                .expect("same-organization cache must remain reusable");
+            assert_eq!(next_start, self.end.min(end) + self.step);
+            assert_eq!(series.len(), 1);
+            assert_eq!(series[0].metric[0].name, "tenant");
+            assert_eq!(series[0].metric[0].value, org);
+            assert!(series[0].samples.iter().all(|sample| {
+                sample.value == value && sample.time >= start && sample.time <= end
+            }));
+            assert_eq!(series[0].samples[0].time, start);
+            assert_eq!(series[0].samples.last().unwrap().time, self.end.min(end));
+        }
+
+        async fn forget(&self, org: &str, file: &str) {
+            let key = get_hash_key(org, &self.query, self.step);
+            remove_index_entry(get_bucket_id(&key), &key, file.to_string()).await;
+        }
+
+        async fn delete(&self, org: &str, file: &str) {
+            self.forget(org, file).await;
+            infra::cache::file_data::disk::remove(file).await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn test_promql_cache_organization_isolation_full_partial_and_restored() {
+        let Some(fixture) = IsolationFixture::new() else {
+            return;
+        };
+        let file_a = fixture.write("isolation_a", 11.0).await;
+        assert!(
+            get(
+                "isolation_b",
+                &fixture.query,
+                fixture.start,
+                fixture.end,
+                fixture.step
+            )
+            .await
+            .unwrap()
+            .is_none()
+        );
+        let file_b = fixture.write("isolation_b", 22.0).await;
+        for (org, value) in [("isolation_a", 11.0), ("isolation_b", 22.0)] {
+            fixture
+                .assert_hit(org, value, fixture.start, fixture.end)
+                .await;
+            fixture
+                .assert_hit(org, value, fixture.start, fixture.end + 2 * fixture.step)
+                .await;
+            fixture
+                .assert_hit(
+                    org,
+                    value,
+                    fixture.start + fixture.step,
+                    fixture.end - fixture.step,
+                )
+                .await;
+        }
+        fixture.forget("isolation_a", &file_a).await;
+        fixture.forget("isolation_b", &file_b).await;
+        assert!(load(&file_a).await);
+        assert!(load(&file_b).await);
+        fixture
+            .assert_hit("isolation_a", 11.0, fixture.start, fixture.end)
+            .await;
+        fixture
+            .assert_hit(
+                "isolation_b",
+                22.0,
+                fixture.start,
+                fixture.end + fixture.step,
+            )
+            .await;
+        fixture.delete("isolation_a", &file_a).await;
+        fixture.delete("isolation_b", &file_b).await;
+    }
+
+    #[tokio::test]
+    async fn test_promql_cache_skips_legacy_files() {
+        let Some(fixture) = IsolationFixture::new() else {
+            return;
+        };
+        let file = fixture.write("legacy_org", 22.0).await;
+        let bytes = infra::cache::file_data::disk::get(&file, None)
+            .await
+            .unwrap();
+        let legacy = file.replace(METRICS_RESULT_CACHE_FILE_PREFIX, "");
+        infra::cache::file_data::disk::set(&legacy, bytes)
+            .await
+            .unwrap();
+        fixture.forget("legacy_org", &file).await;
+        assert!(!load(&legacy).await);
+        assert!(
+            get(
+                "legacy_org",
+                &fixture.query,
+                fixture.start,
+                fixture.end,
+                fixture.step
+            )
+            .await
+            .unwrap()
+            .is_none()
+        );
+        assert!(load(&file).await);
+        fixture
+            .assert_hit("legacy_org", 22.0, fixture.start, fixture.end)
+            .await;
+        fixture.delete("legacy_org", &file).await;
+        infra::cache::file_data::disk::remove(&legacy)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_promql_cache_organization_eviction_isolation() {
+        let Some(fixture) = IsolationFixture::new() else {
+            return;
+        };
+        let file_a = fixture.write("eviction_a", 11.0).await;
+        let file_b = fixture.write("eviction_b", 22.0).await;
+        infra::cache::file_data::disk::remove(&file_a)
+            .await
+            .unwrap();
+        remove_evicted_files(vec![file_a.clone()]).await;
+        assert!(
+            get(
+                "eviction_a",
+                &fixture.query,
+                fixture.start,
+                fixture.end,
+                fixture.step
+            )
+            .await
+            .unwrap()
+            .is_none()
+        );
+        fixture
+            .assert_hit("eviction_b", 22.0, fixture.start, fixture.end)
+            .await;
+        remove_evicted_files(vec![file_a]).await;
+        fixture
+            .assert_hit("eviction_b", 22.0, fixture.start, fixture.end)
+            .await;
+        fixture.delete("eviction_b", &file_b).await;
+    }
 
     #[test]
     fn test_promql_cache_hash_key_generation() {
         let query = "test_query";
         let step = 60000000; // 60 seconds in microseconds
 
-        let key = get_hash_key(query, step);
-        assert_eq!(key, "b235015c612525ad7c11c109e3fdc261");
+        let key = get_hash_key("default", query, step);
+        assert_eq!(key, "7:default:b235015c612525ad7c11c109e3fdc261");
+        assert_ne!(key, get_hash_key("other", query, step));
     }
 
     #[test]
@@ -718,7 +932,7 @@ mod tests {
         assert!(set_result.is_ok());
 
         // Test getting cache
-        let get_result = get(query, start, end, step).await;
+        let get_result = get(org, query, start, end, step).await;
         assert!(get_result.is_ok());
 
         if let Ok(Some((new_start, cached_range_values))) = get_result {
@@ -771,7 +985,7 @@ mod tests {
         }
 
         // Verify that the cache size is maintained
-        let key = get_hash_key(query, step);
+        let key = get_hash_key(org, query, step);
         let bucket_id = get_bucket_id(&key);
         let metrics = GLOBAL_CACHE[bucket_id].read().await;
 
@@ -784,24 +998,26 @@ mod tests {
 
     #[test]
     fn test_parse_cache_item_key() {
-        // Test valid key
-        let key = "metrics_results/2024/01/01/00/prefix_1234_5678_suffix.pb";
-        let result = parse_cache_item_key(key);
-        assert!(result.is_some());
-        let (prefix, start, end) = result.unwrap();
-        assert_eq!(prefix, "prefix");
-        assert_eq!(start, 1234);
-        assert_eq!(end, 5678);
+        let hash = query_hash("test_query", 60_000_000);
+        let file_key = get_cache_item_key("default", &hash, 1234, 5678);
+        assert_eq!(
+            parse_cache_item_key(&file_key),
+            Some((
+                get_hash_key("default", "test_query", 60_000_000),
+                1234,
+                5678
+            ))
+        );
 
-        // Test invalid keys
-        let invalid_keys = vec![
-            "invalid_key",                      // Too few parts
-            "prefix_abc_def_suffix.pb",         // Non-numeric values
-            "prefix_1234_5678",                 // Missing .pb extension
-            "prefix/1234/5678/extra/suffix.pb", // Too many parts
-        ];
-
-        for invalid_key in invalid_keys {
+        for invalid_key in [
+            "invalid_key",
+            "metrics_results/default/2024/01/01/00/b235015c612525ad7c11c109e3fdc261_1234_5678_1.pb",
+            "metrics_results/default/2024/01/01/00/v2_short_1234_5678_1.pb",
+            "metrics_results/default/2024/01/01/00/v2_b235015c612525ad7c11c109e3fdc261_5678_1234_1.pb",
+            "metrics_results/default/2024/01/01/00/v2_b235015c612525ad7c11c109e3fdc261_1234_5678_bad.pb",
+            "metrics_results/2024/01/01/00/v2_b235015c612525ad7c11c109e3fdc261_1234_5678_1.pb",
+            "metrics_results/default/2024/01/01/00/v2-b235015c612525ad7c11c109e3fdc261_1234_5678_1.pb",
+        ] {
             assert!(parse_cache_item_key(invalid_key).is_none());
         }
     }
@@ -928,7 +1144,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cancelled_insert_is_cleaned_up() {
-        let key = get_hash_key("cancel_probe_query", 15_000_000);
+        let key = get_hash_key("cancel_org", "cancel_probe_query", 15_000_000);
         let bucket_id = get_bucket_id(&key);
         let file_key = "metrics_results/cancel_org/2024/01/01/00/eee_1_2_3.pb".to_string();
         infra::cache::file_data::disk::set_size(&file_key, 1)

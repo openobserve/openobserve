@@ -2,6 +2,7 @@
 #[cfg(feature = "cloud")]
 pub use super::trial_quota_usage::Entity as TrialQuotaUsage;
 pub use super::{
+    alert_calibration_configs::Entity as AlertCalibrationConfigs,
     alert_composite_children::Entity as AlertCompositeChildren,
     alert_composites::Entity as AlertComposites,
     alert_incident_alerts::Entity as AlertIncidentAlerts,
@@ -26,6 +27,7 @@ pub use super::{
     organizations::Entity as Organizations, pipeline_last_errors::Entity as PipelineLastErrors,
     re_pattern_stream_map::Entity as RePatternStreamMap, re_patterns::Entity as RePatterns,
     report_dashboards::Entity as ReportDashboards, reports::Entity as Reports,
+    rum_pa_funnels::Entity as RumPaFunnels, rum_pa_named_events::Entity as RumPaNamedEvents,
     search_job_partitions::Entity as SearchJobPartitions,
     search_job_results::Entity as SearchJobResults, search_jobs::Entity as SearchJobs,
     search_queue::Entity as SearchQueue, sessions::Entity as Sessions,

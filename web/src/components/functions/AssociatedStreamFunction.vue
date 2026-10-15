@@ -171,7 +171,7 @@ import jsTransformService from "../../services/jstransform";
 import streamService from "../../services/stream";
 import SchemaIndex from "../logstream/schema.vue";
 import NoData from "../shared/grid/NoData.vue";
-import segment from "../../services/segment_analytics";
+import analytics from "../../services/product_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -416,7 +416,7 @@ export default defineComponent({
           });
       }
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Refresh Streams",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -529,7 +529,7 @@ export default defineComponent({
     //   schemaData.value.stream_type = props.row.stream_type;
     //   showIndexSchemaDialog.value = true;
 
-    //   segment.track("Button Click", {
+    //   analytics.track("Button Click", {
     //     button: "Actions",
     //     user_org: store.state.selectedOrganization.identifier,
     //     user_id: store.state.userInfo.email,

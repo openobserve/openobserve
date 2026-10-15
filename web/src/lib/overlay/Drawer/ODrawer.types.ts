@@ -157,6 +157,11 @@ export interface DrawerProps {
 
   /** Render the portal in place for a contained drawer surface. Default: false. */
   inline?: boolean;
+
+  /** When false, the page behind stays interactive and only the close button or Escape outside a field closes it. Default: true. */
+  modal?: boolean;
+
+  returnFocusTo?: () => HTMLElement | null;
 }
 
 export interface DrawerEmits {
@@ -168,6 +173,7 @@ export interface DrawerEmits {
   (e: "click:secondary"): void;
   /** Fires when the neutral inbuilt button is clicked. */
   (e: "click:neutral"): void;
+  (e: "after-close"): void;
 }
 
 export interface DrawerSlots {

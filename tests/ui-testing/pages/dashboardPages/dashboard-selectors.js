@@ -87,6 +87,7 @@ const DASHBOARD = {
 
   // Panels
   PANEL_CONTAINER: '[data-test="dashboard-panel-container"]',
+  PANEL_BAR: '[data-test="dashboard-panel-bar"]',
   PANEL_REFRESH_BTN: '[data-test="dashboard-panel-refresh-panel-btn"]',
   PANEL_ANY: '[data-test*="dashboard-panel-"]', // Wildcard match for any panel
   GRID_STACK_ITEM: ".grid-stack-item", // Grid slot of a panel; exists even while the panel itself is lazy-unmounted
@@ -94,6 +95,11 @@ const DASHBOARD = {
   // Common autocomplete
   AUTO_COMPLETE: '[data-test="common-auto-complete"]',
   AUTO_COMPLETE_OPTION: '[data-test="common-auto-complete-option"]',
+
+  // Panel editor — field list and config sidebar. PanelEditor.vue mounts both in
+  // TWO layout branches, so these match 2 nodes; pair them with visibleOnly().
+  FIELD_LIST_SEARCH: '[data-test="o-field-list-search-field"]',
+  CONFIG_DRILLDOWN_INFO: '[data-test="dashboard-addpanel-config-drilldown-info"]',
 
   // Chart type selection
   CHART_LINE_ITEM: '[data-test="selected-chart-line-item"]',
@@ -118,7 +124,15 @@ const ROLES = {
   LISTBOX: '[data-test$="-popover"]',
   ROLE_LISTBOX: '[data-test$="-popover"]', // Alias for clarity
   TOOLTIP: '[role="tooltip"]',
+  TOOLTIP_CONTENT: '[data-test="o-tooltip-content"]',
 };
+
+/**
+ * Narrow a selector to the rendered copy. PanelEditor.vue mounts ConfigPanel and
+ * the field list once per layout branch, so their data-tests match 2 nodes and a
+ * bare locator trips strict mode.
+ */
+const visibleOnly = (selector) => `${selector} >> visible=true`;
 
 /**
  * Inspector/Debug selectors
@@ -282,6 +296,7 @@ module.exports = {
   SELECTORS,
 
   // Dynamic selector functions
+  visibleOnly,
   getVariableSelector,
   getVariableSelectorInner,
   getEditVariableBtn,
