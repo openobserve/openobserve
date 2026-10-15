@@ -168,9 +168,18 @@ impl Engine for SearchEngine {
     }
 }
 
-/// The two searches a panel query runs; tests answer them in process.
+/// The stream check and the searches a panel query runs; tests answer them in process.
 #[async_trait]
 trait PanelSearch: Send + Sync {
+    /// [`authorize_query`] as the publisher.
+    async fn authorize(
+        &self,
+        org: &str,
+        user: &str,
+        query_type: &str,
+        text: &str,
+        target: (StreamType, &str),
+    ) -> Result<Vec<(StreamType, String)>, NotAvailableReason>;
     #[allow(clippy::too_many_arguments)]
     async fn sql(
         &self,
@@ -195,6 +204,17 @@ trait PanelSearch: Send + Sync {
 
 #[async_trait]
 impl PanelSearch for SearchEngine {
+    async fn authorize(
+        &self,
+        org: &str,
+        user: &str,
+        query_type: &str,
+        text: &str,
+        target: (StreamType, &str),
+    ) -> Result<Vec<(StreamType, String)>, NotAvailableReason> {
+        authorize_query(org, user, query_type, text, target).await
+    }
+
     async fn sql(
         &self,
         trace_id: &str,
@@ -1373,14 +1393,16 @@ async fn run_sql_panel(
         }
         let target = (q.fields.stream_type, q.fields.stream.as_str());
         record_sources(&mut manifest, "sql", &base, target);
-        if let Err(reason) = authorize_query(
-            &ctx.link.org_id,
-            &ctx.link.published_by,
-            "sql",
-            &base,
-            target,
-        )
-        .await
+        if let Err(reason) = ctx
+            .search
+            .authorize(
+                &ctx.link.org_id,
+                &ctx.link.published_by,
+                "sql",
+                &base,
+                target,
+            )
+            .await
         {
             return ctx.refused(panel, manifest, reason);
         }
@@ -1481,14 +1503,16 @@ async fn run_promql_panel(
     for (_, q, expr) in &queries {
         let target = (q.fields.stream_type, q.fields.stream.as_str());
         record_sources(&mut manifest, "promql", expr, target);
-        if let Err(reason) = authorize_query(
-            &ctx.link.org_id,
-            &ctx.link.published_by,
-            "promql",
-            expr,
-            target,
-        )
-        .await
+        if let Err(reason) = ctx
+            .search
+            .authorize(
+                &ctx.link.org_id,
+                &ctx.link.published_by,
+                "promql",
+                expr,
+                target,
+            )
+            .await
         {
             return ctx.refused(panel, manifest, reason);
         }
@@ -1654,14 +1678,16 @@ async fn fill_defaults(ctx: &Ctx<'_>, frozen: BTreeMap<String, serde_json::Value
             },
         );
         let target = (q.stream_type, q.stream.as_str());
-        let keys = match authorize_query(
-            &ctx.link.org_id,
-            &ctx.link.published_by,
-            "sql",
-            &q.sql,
-            target,
-        )
-        .await
+        let keys = match ctx
+            .search
+            .authorize(
+                &ctx.link.org_id,
+                &ctx.link.published_by,
+                "sql",
+                &q.sql,
+                target,
+            )
+            .await
         {
             Err(NotAvailableReason::BuildError) => {
                 out.failed.insert(key);
@@ -2422,19 +2448,6 @@ mod tests {
     }
 
     fn ctx_parts() -> (PublicDashboard, Dashboard, TraceFamily) {
-        // A root publisher passes every stream check, so Enterprise runs reach the fake search.
-        crate::common::infra::config::ORG_USERS.insert(
-            format!("{}/p@x", config::DEFAULT_ORG),
-            infra::table::org_users::OrgUserRecord {
-                email: "p@x".into(),
-                org_id: config::DEFAULT_ORG.into(),
-                role: config::meta::user::UserRole::Root,
-                token: String::new(),
-                rum_token: None,
-                created_at: 0,
-                allow_static_token: false,
-            },
-        );
         let link = PublicDashboard {
             id: "l1".into(),
             org_id: "o1".into(),
@@ -2987,6 +3000,18 @@ mod tests {
 
     #[async_trait]
     impl PanelSearch for FakeSearch {
+        // Allows what the query reads, as OSS does, without the process-wide user caches.
+        async fn authorize(
+            &self,
+            _org: &str,
+            _user: &str,
+            query_type: &str,
+            text: &str,
+            target: (StreamType, &str),
+        ) -> Result<Vec<(StreamType, String)>, NotAvailableReason> {
+            Ok(typed_sources(query_type, text, target))
+        }
+
         async fn sql(
             &self,
             _trace_id: &str,
