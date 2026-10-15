@@ -29,6 +29,25 @@ export const joinReadyMadeNames = (
   type: "conjunction" | "unit" = "conjunction",
 ): string => new Intl.ListFormat(locale, { style: "long", type }).format(names);
 
+/** Lists of five or more read as the first three and "N more", so twelve sources stay one line. */
+export const READY_MADE_NAMES_SHOWN = 4;
+
+export const joinReadyMadeNamesCapped = (
+  names: string[],
+  locale: string,
+  t: TranslateFn,
+  type: "conjunction" | "unit" = "conjunction",
+): string => {
+  if (names.length <= READY_MADE_NAMES_SHOWN) return joinReadyMadeNames(names, locale, type);
+  const shown = names.slice(0, READY_MADE_NAMES_SHOWN - 1);
+  const rest = names.length - shown.length;
+  return joinReadyMadeNames(
+    [...shown, t("dashboard.readyMade.moreNames", { count: rest }, rest)],
+    locale,
+    type,
+  );
+};
+
 export const createdReadyMadeDashboards = (
   result: ReadyMadeInstallSuccess,
 ): ReadyMadeInstalledDashboard[] => result.dashboards.filter((dashboard) => dashboard.created);

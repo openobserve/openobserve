@@ -284,6 +284,21 @@ describe(
       expect(memory?.sources.postgresql.state).toBe("added");
     });
 
+    it("the MongoDB page adds the MongoDB dashboard to a MongoDB folder", async () => {
+      openPage("mongoDB");
+      await dataArrives();
+      await eventually(() => expect(toastMock).toHaveBeenCalledTimes(1));
+
+      expect(svc.new_Folder.mock.calls[0]).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: "MongoDB" })]),
+      );
+      expect(rows.map((row) => row.role)).toEqual(["ready-made:mongodb/overview:1"]);
+      expect(toastMock.mock.calls[0][0].message).toBe(
+        tp("dashboard.readyMade.addedOne", { name: "MongoDB", folder: "MongoDB", count: 1 }, 1),
+      );
+      expect(memory?.sources.mongodb.state).toBe("added");
+    });
+
     it("keeps a notice above the card after the automatic add, for a user who missed the toast", async () => {
       openPage();
       await dataArrives();

@@ -552,6 +552,9 @@ describe("DataSourceSetupCard — ready-made dashboards wiring", () => {
     ["mySQL", "mysql"],
     ["mariaDB", "mysql"],
     ["redis", "redis"],
+    ["mongoDB", "mongodb"],
+    ["sqlServer", "sqlserver"],
+    ["oracle", "oracle"],
   ])(
     "detection on the %s card with no earlier answer installs %s silently and toasts the folder",
     async (slug, sourceId) => {
@@ -861,6 +864,30 @@ describe("DataSourceSetupCard — ready-made dashboards wiring", () => {
     await flushPromises();
     expect(installReadyMade).toHaveBeenCalledTimes(1);
     expect(router.push).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["mongoDB", "mongodb"],
+    ["sqlServer", "sqlserver"],
+    ["oracle", "oracle"],
+  ])("the %s step button installs and opens %s", async (slug, sourceId) => {
+    installReadyMade.mockResolvedValue(installed(sourceId));
+    wrapper = mountCard(slug);
+    renderer().vm.$emit("step-action", "open-ready-made-dashboard");
+    await flushPromises();
+    expect(installReadyMade).toHaveBeenCalledWith("test-org", sourceId, { userId: "t@e.com" });
+    expect(router.push).toHaveBeenCalledWith({
+      path: "/dashboards/view",
+      query: { org_identifier: "test-org", dashboard: "dash-0", folder: "f-1" },
+    });
+  });
+
+  it("the SQL Server card honours its own answer", async () => {
+    answered({ sqlserver: "dismissed" });
+    wrapper = mountCard("sqlServer");
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    expect(installReadyMade).not.toHaveBeenCalled();
   });
 
   it.each([

@@ -38,6 +38,7 @@ import {
   describeReadyMadeInstall,
   isReadyMadeGapFill,
   joinReadyMadeNames,
+  joinReadyMadeNamesCapped,
   primaryReadyMadeDashboard,
   type ReadyMadeInstallSuccess as InstallSuccess,
 } from "@/composables/readyMade/readyMadeMessages";
@@ -77,7 +78,7 @@ const foundText = computed<I18nText>(() =>
   single.value
     ? t("dashboard.readyMade.foundOne", { name: single.value.name })
     : t("dashboard.readyMade.foundMany", {
-        list: joinList(offered.value.map(nameOf), "conjunction"),
+        list: joinReadyMadeNamesCapped(offered.value.map(nameOf), locale.value, t),
       }),
 );
 const askText = computed<I18nText>(() =>
@@ -147,7 +148,7 @@ const toastMany = (results: InstallSuccess[]) => {
     message: t("dashboard.readyMade.addedMany", {
       count,
       folderCount: folders.length,
-      list: joinList(folders, "unit"),
+      list: joinReadyMadeNamesCapped(folders, locale.value, t, "unit"),
     }),
     timeout: 10000,
     action: {

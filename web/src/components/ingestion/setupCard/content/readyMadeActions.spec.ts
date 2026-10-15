@@ -23,6 +23,12 @@ const verifyAction = (slug: string) =>
   getDataSourceCard(slug, SUBS, gt)!.steps.find((step) => step.detectionAnchor)?.action;
 
 describe("ready-made step action on the setup cards", () => {
+  it("wires the MongoDB, SQL Server and Oracle cards", () => {
+    expect(Object.keys(READY_MADE_SOURCE_BY_SETUP_SLUG)).toEqual(
+      expect.arrayContaining(["mongoDB", "sqlServer", "oracle"]),
+    );
+  });
+
   it.each(Object.keys(READY_MADE_SOURCE_BY_SETUP_SLUG))(
     "%s shows the open button on its verify step once Test connects",
     (slug) => {
@@ -42,13 +48,22 @@ describe("ready-made step action on the setup cards", () => {
     expect(verifyAction("mariaDB")?.label).toBe(
       gt("ingestion.setupCard.readyMadeOpenOne", { name: "MySQL" }),
     );
+    expect(verifyAction("mongoDB")?.label).toBe(
+      gt("ingestion.setupCard.readyMadeOpenOne", { name: "MongoDB" }),
+    );
+    expect(verifyAction("sqlServer")?.label).toBe(
+      gt("ingestion.setupCard.readyMadeOpenOne", { name: "SQL Server" }),
+    );
+    expect(verifyAction("oracle")?.label).toBe(
+      gt("ingestion.setupCard.readyMadeOpenOne", { name: "Oracle" }),
+    );
     expect(verifyAction("kubernetes")?.label).toBe(
       gt("ingestion.setupCard.readyMadeOpenKubernetes"),
     );
   });
 
-  it("leaves the NVIDIA and host cards' own actions untouched", () => {
+  it("leaves the NVIDIA card's own action and cards without a ready-made dashboard alone", () => {
     expect(verifyAction("nvidiaDcgm")?.id).toBe("open-setup-dashboard");
-    expect(verifyAction("sqlServer")).toBeUndefined();
+    expect(verifyAction("cassandra")).toBeUndefined();
   });
 });

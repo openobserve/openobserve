@@ -6339,6 +6339,7 @@
       "importItem": "Ready-made dashboards",
       "foundOne": "We found {name} data.",
       "foundMany": "We found data for {list}.",
+      "moreNames": "{count} more | {count} more",
       "askOne": "Add a ready-made {name} dashboard?",
       "askKubernetes": "Add 4 ready-made Kubernetes dashboards (cluster, node, pod, workload)? Same numbers as Infrastructure → Kubernetes.",
       "askMany": "Add their ready-made dashboards?",

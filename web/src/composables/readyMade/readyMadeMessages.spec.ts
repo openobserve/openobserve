@@ -19,6 +19,7 @@ import type { TranslateFn } from "@/types/i18n";
 import {
   describeReadyMadeInstall,
   isReadyMadeGapFill,
+  joinReadyMadeNamesCapped,
   primaryReadyMadeDashboard,
   type ReadyMadeInstallSuccess,
 } from "./readyMadeMessages";
@@ -77,5 +78,24 @@ describe("gap fills", () => {
   it("opens the dashboard that came back, else the set's first", () => {
     expect(primaryReadyMadeDashboard(k8s(["Pod"])).title).toBe("Kubernetes / Pod");
     expect(primaryReadyMadeDashboard(k8s([])).title).toBe("Kubernetes / Cluster");
+  });
+});
+
+describe("joinReadyMadeNamesCapped", () => {
+  const names = ["Kubernetes", "PostgreSQL", "MySQL", "Redis", "OTel Collector", "MongoDB"];
+
+  it("names up to four in full", () => {
+    expect(joinReadyMadeNamesCapped(names.slice(0, 4), "en-US", t)).toBe(
+      "Kubernetes, PostgreSQL, MySQL, and Redis",
+    );
+  });
+
+  it("past four, names three and counts the rest", () => {
+    expect(joinReadyMadeNamesCapped(names.slice(0, 5), "en-US", t)).toBe(
+      "Kubernetes, PostgreSQL, MySQL, and 2 more",
+    );
+    expect(joinReadyMadeNamesCapped(names, "en-US", t, "unit")).toBe(
+      "Kubernetes, PostgreSQL, MySQL, 3 more",
+    );
   });
 });

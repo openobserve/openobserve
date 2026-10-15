@@ -16,7 +16,19 @@
 import type { I18nKey } from "@/types/i18n";
 import type { IconToken } from "@/lib/forms/EmojiPicker/OGlyph.types";
 
-export type ReadyMadeSourceId = "kubernetes" | "postgresql" | "mysql" | "redis" | "otelcol";
+export type ReadyMadeSourceId =
+  | "kubernetes"
+  | "postgresql"
+  | "mysql"
+  | "redis"
+  | "otelcol"
+  | "mongodb"
+  | "sqlserver"
+  | "oracle"
+  | "kafka"
+  | "rabbitmq"
+  | "nginx"
+  | "apache";
 
 export interface ReadyMadeDashboardRef {
   /** Stable key inside the marker, e.g. `cluster` in `ready-made:kubernetes/cluster:1`. */
@@ -125,6 +137,97 @@ export const READY_MADE_SOURCES: readonly ReadyMadeSource[] = [
         m.default,
       ]),
   },
+  {
+    id: "mongodb",
+    name: "MongoDB",
+    folderName: "MongoDB",
+    glyph: "o2:mongodb",
+    dashboards: [{ key: "overview", title: "MongoDB / Overview" }],
+    setupRoute: "mongodb",
+    askKey: "dashboard.readyMade.askOne",
+    folderSentenceKey: "dashboard.readyMade.folderSentenceOne",
+    contentsKey: "dashboard.readyMade.contentsOne",
+    load: () =>
+      import("@/assets/dashboards/ready-made/mongodb.dashboard.json").then((m) => [m.default]),
+  },
+  {
+    id: "sqlserver",
+    name: "SQL Server",
+    folderName: "SQL Server",
+    glyph: "o2:sqlserver",
+    dashboards: [{ key: "overview", title: "SQL Server / Overview" }],
+    setupRoute: "sqlserver",
+    askKey: "dashboard.readyMade.askOne",
+    folderSentenceKey: "dashboard.readyMade.folderSentenceOne",
+    contentsKey: "dashboard.readyMade.contentsOne",
+    load: () =>
+      import("@/assets/dashboards/ready-made/sqlserver.dashboard.json").then((m) => [m.default]),
+  },
+  {
+    id: "oracle",
+    name: "Oracle",
+    folderName: "Oracle",
+    glyph: "o2:oracle",
+    dashboards: [{ key: "overview", title: "Oracle / Overview" }],
+    setupRoute: "oracle",
+    askKey: "dashboard.readyMade.askOne",
+    folderSentenceKey: "dashboard.readyMade.folderSentenceOneAn",
+    contentsKey: "dashboard.readyMade.contentsOne",
+    load: () =>
+      import("@/assets/dashboards/ready-made/oracle.dashboard.json").then((m) => [m.default]),
+  },
+  {
+    id: "kafka",
+    name: "Kafka",
+    folderName: "Kafka",
+    glyph: "o2:kafka",
+    dashboards: [{ key: "overview", title: "Kafka / Overview" }],
+    setupRoute: "kafka",
+    askKey: "dashboard.readyMade.askOne",
+    folderSentenceKey: "dashboard.readyMade.folderSentenceOne",
+    contentsKey: "dashboard.readyMade.contentsOne",
+    load: () =>
+      import("@/assets/dashboards/ready-made/kafka.dashboard.json").then((m) => [m.default]),
+  },
+  {
+    id: "rabbitmq",
+    name: "RabbitMQ",
+    folderName: "RabbitMQ",
+    glyph: "o2:rabbitmq",
+    dashboards: [{ key: "overview", title: "RabbitMQ / Overview" }],
+    setupRoute: "rabbitmq",
+    askKey: "dashboard.readyMade.askOne",
+    folderSentenceKey: "dashboard.readyMade.folderSentenceOne",
+    contentsKey: "dashboard.readyMade.contentsOne",
+    load: () =>
+      import("@/assets/dashboards/ready-made/rabbitmq.dashboard.json").then((m) => [m.default]),
+  },
+  {
+    id: "nginx",
+    name: "Nginx",
+    folderName: "Nginx",
+    glyph: "o2:nginx",
+    dashboards: [{ key: "overview", title: "Nginx / Overview" }],
+    setupRoute: "nginx",
+    askKey: "dashboard.readyMade.askOne",
+    folderSentenceKey: "dashboard.readyMade.folderSentenceOneAn",
+    contentsKey: "dashboard.readyMade.contentsOne",
+    load: () =>
+      import("@/assets/dashboards/ready-made/nginx.dashboard.json").then((m) => [m.default]),
+  },
+  {
+    id: "apache",
+    name: "Apache",
+    folderName: "Apache",
+    glyph: "o2:apache",
+    dashboards: [{ key: "overview", title: "Apache / Overview" }],
+    setupRoute: "apache",
+    askKey: "dashboard.readyMade.askOne",
+    folderSentenceKey: "dashboard.readyMade.folderSentenceOneAn",
+    contentsKey: "dashboard.readyMade.contentsOne",
+    load: () =>
+      import("@/assets/dashboards/ready-made/apache.dashboard.json").then((m) => [m.default]),
+  },
 ];
 
 /** Detection over metrics stream NAMES only; edit a line here to adjust a source's signature. */
@@ -139,6 +242,13 @@ export const READY_MADE_DETECTION_RULES: readonly ReadyMadeDetectionRule[] = [
   { source: "mysql", prefix: "mysql_", min: 2 },
   { source: "redis", prefix: "redis_", min: 2 },
   { source: "otelcol", prefix: "otelcol_", min: 2 },
+  { source: "mongodb", prefix: "mongodb_", min: 2 },
+  { source: "sqlserver", prefix: "sqlserver_", min: 2 },
+  { source: "oracle", prefix: "oracledb_", min: 2 },
+  { source: "kafka", prefix: "kafka_", min: 2 },
+  { source: "rabbitmq", prefix: "rabbitmq_", min: 2 },
+  { source: "nginx", prefix: "nginx_", min: 2 },
+  { source: "apache", prefix: "apache_", min: 2 },
 ];
 
 /** Setup-card slugs whose Test installs a ready-made source; MariaDB speaks the mysql receiver. */
@@ -147,6 +257,9 @@ export const READY_MADE_SOURCE_BY_SETUP_SLUG: Readonly<Record<string, ReadyMadeS
   mySQL: "mysql",
   mariaDB: "mysql",
   redis: "redis",
+  mongoDB: "mongodb",
+  sqlServer: "sqlserver",
+  oracle: "oracle",
   kubernetes: "kubernetes",
 };
 

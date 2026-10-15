@@ -619,6 +619,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ReadyMadeOffers from "@/components/dashboards/readyMade/ReadyMadeOffers.vue";
 import { READY_MADE_SOURCES } from "@/composables/readyMade/catalog";
+import { joinReadyMadeNamesCapped } from "@/composables/readyMade/readyMadeMessages";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -695,7 +696,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const { t } = useI18nTyped();
+    const { t, locale } = useI18nTyped();
     const dashboard = ref({});
     const showAddDashboardDialog = ref(false);
     const showAddDashboardFromGitHub = ref(false);
@@ -1315,8 +1316,13 @@ export default defineComponent({
       return getDashboards(true);
     };
 
-    // Product names, never translated.
-    const readyMadeSourceList = raw(READY_MADE_SOURCES.map((source) => source.name).join(", "));
+    const readyMadeSourceList = computed(() =>
+      joinReadyMadeNamesCapped(
+        READY_MADE_SOURCES.map((source) => source.name),
+        locale.value,
+        t,
+      ),
+    );
     const openReadyMade = () => readyMadeRef.value?.openImport();
     // Post-write reload: the new dashboards will not appear from a cache hit.
     const onReadyMadeInstalled = () => getDashboards(true);

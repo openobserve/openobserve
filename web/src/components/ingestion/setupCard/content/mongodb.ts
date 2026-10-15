@@ -19,6 +19,7 @@
 import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
+import { getReadyMadeSource } from "@/composables/readyMade/catalog";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 
@@ -156,6 +157,14 @@ export default function mongodbCard(subs: CardSubstitutions, t: TranslateFn): Ri
           t("ingestion.setupCard.pillCursors"),
           t("ingestion.setupCard.pillDocuments"),
         ],
+        action: {
+          id: "open-ready-made-dashboard",
+          label: t("ingestion.setupCard.readyMadeOpenOne", {
+            name: getReadyMadeSource("mongodb").name,
+          }),
+          icon: "dashboard",
+          showOnDetect: true,
+        },
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "mongodb", filter: "" },

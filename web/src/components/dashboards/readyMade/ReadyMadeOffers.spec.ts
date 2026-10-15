@@ -72,6 +72,25 @@ const STREAMS: Record<string, string[]> = {
   mysql: ["mysql_threads", "mysql_operations"],
   redis: ["redis_clients", "redis_commands"],
   otelcol: ["otelcol_process_uptime", "otelcol_exporter_sent"],
+  mongodb: ["mongodb_connection_count", "mongodb_operation_count"],
+  sqlserver: ["sqlserver_user_connection_count", "sqlserver_batch_request_rate"],
+  oracle: ["oracledb_sessions_usage", "oracledb_cpu_time"],
+  kafka: ["kafka_brokers", "kafka_topic_partitions"],
+  rabbitmq: ["rabbitmq_consumer_count", "rabbitmq_message_current"],
+  nginx: ["nginx_requests", "nginx_connections_accepted"],
+  apache: ["apache_requests", "apache_workers"],
+};
+const ALL_IDS = Object.keys(STREAMS);
+const NEW_IDS = ["mongodb", "sqlserver", "oracle", "kafka", "rabbitmq", "nginx", "apache"];
+// Setup route each source's "Set up" link opens; the last four are the legacy pages.
+const SETUP_ROUTES: Record<string, string> = {
+  mongodb: "mongodb",
+  sqlserver: "sqlserver",
+  oracle: "oracle",
+  kafka: "kafka",
+  rabbitmq: "rabbitmq",
+  nginx: "nginx",
+  apache: "apache",
 };
 
 let rows: any[];
@@ -166,6 +185,7 @@ describe("ReadyMadeOffers — banner + checklist dialog", () => {
     await import("@/assets/dashboards/ready-made/mysql.dashboard.json");
     await import("@/assets/dashboards/ready-made/redis.dashboard.json");
     await import("@/assets/dashboards/ready-made/otel_collector.dashboard.json");
+    for (const id of NEW_IDS) await import(`@/assets/dashboards/ready-made/${id}.dashboard.json`);
     await import("@/composables/readyMade/kubernetesDashboards");
   });
 
@@ -188,6 +208,11 @@ describe("ReadyMadeOffers — banner + checklist dialog", () => {
         { path: "/ingest/otel", name: "otelCollector", component: { template: "<div />" } },
         { path: "/ingest/pg", name: "postgres", component: { template: "<div />" } },
         { path: "/ingest/k8s", name: "ingestFromKubernetes", component: { template: "<div />" } },
+        ...Object.values(SETUP_ROUTES).map((name) => ({
+          path: `/ingest/${name}`,
+          name,
+          component: { template: "<div />" },
+        })),
       ],
     });
     vi.spyOn(router, "push");
@@ -273,6 +298,41 @@ describe("ReadyMadeOffers — banner + checklist dialog", () => {
         t("dashboard.readyMade.addAll", { count: 3 }),
       );
       expect(wrapper.find('[data-test="dashboards-ready-made-banner-choose"]').exists()).toBe(true);
+    });
+
+    it("five or more sources: names three and counts the rest, in catalog order", async () => {
+      fakeBackend(["apache", "redis", "kafka", "postgresql", "mongodb"]);
+      wrapper = await mountOffers();
+      expect(bannerText()).toContain(
+        t("dashboard.readyMade.foundMany", {
+          list: `PostgreSQL, Redis, MongoDB, and ${t("dashboard.readyMade.moreNames", { count: 2 }, 2)}`,
+        }),
+      );
+      expect(bannerText()).not.toContain("Kafka");
+      expect(wrapper.find('[data-test="dashboards-ready-made-banner-add-all"]').text()).toBe(
+        t("dashboard.readyMade.addAll", { count: 5 }),
+      );
+    });
+
+    it("four sources are all named", async () => {
+      fakeBackend(["kafka", "rabbitmq", "nginx", "apache"]);
+      wrapper = await mountOffers();
+      expect(bannerText()).toContain(
+        t("dashboard.readyMade.foundMany", { list: "Kafka, RabbitMQ, Nginx, and Apache" }),
+      );
+    });
+
+    it.each([
+      ["oracle", "Oracle", "dashboard.readyMade.folderSentenceOneAn"],
+      ["nginx", "Nginx", "dashboard.readyMade.folderSentenceOneAn"],
+      ["apache", "Apache", "dashboard.readyMade.folderSentenceOneAn"],
+      ["sqlserver", "SQL Server", "dashboard.readyMade.folderSentenceOne"],
+      ["kafka", "Kafka", "dashboard.readyMade.folderSentenceOne"],
+    ])("one round-2 source (%s) names it and its folder", async (id, name, key) => {
+      fakeBackend([id]);
+      wrapper = await mountOffers();
+      expect(bannerText()).toContain(t("dashboard.readyMade.foundOne", { name }));
+      expect(bannerText()).toContain(t(key, { folder: name }));
     });
 
     it("leaves out a source the user already answered", async () => {
@@ -364,6 +424,39 @@ describe("ReadyMadeOffers — banner + checklist dialog", () => {
         path: "/dashboards",
         query: { org_identifier: ORG, folder: "f-Kubernetes" },
       });
+    });
+
+    it("Add all on twelve sources installs each into its own folder and caps the toast's folder list", async () => {
+      fakeBackend(ALL_IDS);
+      wrapper = await mountOffers();
+      await click("dashboards-ready-made-banner-add-all");
+      // Twelve installs in a row outlast one settle.
+      await vi.waitFor(() => expect(toastMock).toHaveBeenCalled(), { timeout: 10_000 });
+      expect(Object.keys(savedStates()).sort()).toEqual([...ALL_IDS].sort());
+      expect([...folders.keys()]).toEqual([
+        "Kubernetes",
+        "PostgreSQL",
+        "MySQL",
+        "Redis",
+        "OTel Collector",
+        "MongoDB",
+        "SQL Server",
+        "Oracle",
+        "Kafka",
+        "RabbitMQ",
+        "Nginx",
+        "Apache",
+      ]);
+      expect(rows.filter((r) => r.role.endsWith("/overview:1")).map((r) => r.title)).toContain(
+        "SQL Server / Overview",
+      );
+      expect(toastMock.mock.calls.at(-1)![0].message).toBe(
+        t("dashboard.readyMade.addedMany", {
+          count: 15,
+          folderCount: 12,
+          list: `Kubernetes, PostgreSQL, MySQL, ${t("dashboard.readyMade.moreNames", { count: 9 }, 9)}`,
+        }),
+      );
     });
 
     it("No thanks remembers every listed source as dismissed and says where to find them", async () => {
@@ -579,7 +672,42 @@ describe("ReadyMadeOffers — banner + checklist dialog", () => {
       await settle();
     };
 
-    it("lists all five sources, ignoring dismissals", async () => {
+    it("lists all twelve: detected first, each group in catalog order", async () => {
+      fakeBackend(["nginx", "mysql", "oracle"]);
+      wrapper = await mountOffers();
+      await openImport();
+      const ids = wrapper
+        .findAll('[data-test^="dashboards-ready-made-dialog-row-"]')
+        .map((w) => w.attributes("data-test")!.replace("dashboards-ready-made-dialog-row-", ""));
+      expect(ids).toEqual([
+        "mysql",
+        "oracle",
+        "nginx",
+        "kubernetes",
+        "postgresql",
+        "redis",
+        "otelcol",
+        "mongodb",
+        "sqlserver",
+        "kafka",
+        "rabbitmq",
+        "apache",
+      ]);
+      expect(primary().text()).toBe(t("dashboard.readyMade.addSelected", { count: 3 }));
+    });
+
+    it.each(NEW_IDS)("Set up on %s opens its Data sources page", async (id) => {
+      fakeBackend([]);
+      wrapper = await mountOffers();
+      await openImport();
+      await click(`dashboards-ready-made-dialog-set-up-${id}`);
+      expect(router.push).toHaveBeenCalledWith({
+        name: SETUP_ROUTES[id],
+        query: { org_identifier: ORG },
+      });
+    });
+
+    it("lists all twelve sources, ignoring dismissals", async () => {
       fakeBackend(["redis", "postgresql"]);
       storedSetting = { version: 1, sources: { redis: { state: "dismissed", at: "x" } } };
       seedInstalled("PostgreSQL / Overview", "ready-made:postgresql/overview:1", "DB team");
@@ -605,7 +733,7 @@ describe("ReadyMadeOffers — banner + checklist dialog", () => {
       expect(
         wrapper.find('[data-test="dashboards-ready-made-dialog-set-up-kubernetes"]').exists(),
       ).toBe(true);
-      expect(wrapper.findAll('[data-test^="dashboards-ready-made-dialog-row-"]')).toHaveLength(5);
+      expect(wrapper.findAll('[data-test^="dashboards-ready-made-dialog-row-"]')).toHaveLength(12);
     });
 
     it("unticking saves nothing; adding saves 'added'", async () => {

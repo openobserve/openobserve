@@ -44,13 +44,20 @@ import {
 
 describe("ready-made catalog", () => {
   describe("shared contract", () => {
-    it("lists the five sources in table order with their folders and titles", () => {
+    it("lists the twelve sources in table order with their folders and titles", () => {
       expect(READY_MADE_SOURCES.map((s) => [s.id, s.folderName])).toEqual([
         ["kubernetes", "Kubernetes"],
         ["postgresql", "PostgreSQL"],
         ["mysql", "MySQL"],
         ["redis", "Redis"],
         ["otelcol", "OTel Collector"],
+        ["mongodb", "MongoDB"],
+        ["sqlserver", "SQL Server"],
+        ["oracle", "Oracle"],
+        ["kafka", "Kafka"],
+        ["rabbitmq", "RabbitMQ"],
+        ["nginx", "Nginx"],
+        ["apache", "Apache"],
       ]);
       expect(getReadyMadeSource("kubernetes").dashboards).toEqual([
         { key: "cluster", title: "Kubernetes / Cluster" },
@@ -77,8 +84,33 @@ describe("ready-made catalog", () => {
         mySQL: "mysql",
         mariaDB: "mysql",
         redis: "redis",
+        mongoDB: "mongodb",
+        sqlServer: "sqlserver",
+        oracle: "oracle",
         kubernetes: "kubernetes",
       });
+    });
+
+    it.each([
+      ["mongodb", "MongoDB / Overview", "mongodb", "o2:mongodb"],
+      ["sqlserver", "SQL Server / Overview", "sqlserver", "o2:sqlserver"],
+      ["oracle", "Oracle / Overview", "oracle", "o2:oracle"],
+      ["kafka", "Kafka / Overview", "kafka", "o2:kafka"],
+      ["rabbitmq", "RabbitMQ / Overview", "rabbitmq", "o2:rabbitmq"],
+      ["nginx", "Nginx / Overview", "nginx", "o2:nginx"],
+      ["apache", "Apache / Overview", "apache", "o2:apache"],
+    ] as const)("%s has one overview, its setup route and glyph", (id, title, route, glyph) => {
+      const source = getReadyMadeSource(id);
+      expect(source.dashboards).toEqual([{ key: "overview", title }]);
+      expect(source.setupRoute).toBe(route);
+      expect(source.glyph).toBe(glyph);
+    });
+
+    it('takes "an" before the folder names that start with a vowel sound', () => {
+      const an = READY_MADE_SOURCES.filter(
+        (s) => s.folderSentenceKey === "dashboard.readyMade.folderSentenceOneAn",
+      ).map((s) => s.id);
+      expect(an).toEqual(["otelcol", "oracle", "nginx", "apache"]);
     });
   });
 
@@ -120,6 +152,23 @@ describe("ready-made catalog", () => {
       ]);
     });
 
+    it.each([
+      ["mongodb", "mongodb_"],
+      ["sqlserver", "sqlserver_"],
+      ["oracle", "oracledb_"],
+      ["kafka", "kafka_"],
+      ["rabbitmq", "rabbitmq_"],
+      ["nginx", "nginx_"],
+      ["apache", "apache_"],
+    ] as const)("%s needs two streams starting %s", (id, prefix) => {
+      expect(detectReadyMadeSources([`${prefix}a`])).toEqual([]);
+      expect(detectReadyMadeSources([`${prefix}a`, `${prefix}b`])).toEqual([id]);
+    });
+
+    it("does not take oracle_ for the oracledb receiver", () => {
+      expect(detectReadyMadeSources(["oracle_a", "oracle_b"])).toEqual([]);
+    });
+
     it("matches a prefix, not a substring", () => {
       expect(detectReadyMadeSources(["my_postgresql_a", "x_postgresql_b"])).toEqual([]);
     });
@@ -144,22 +193,43 @@ describe("ready-made catalog", () => {
         ]),
       ).toEqual(["kubernetes", "postgresql", "redis"]);
     });
+
+    it("finds all twelve at once, in catalog order", () => {
+      const names = [
+        "kube_pod_status_phase",
+        "k8s_node_cpu_usage",
+        ...["apache_", "nginx_", "rabbitmq_", "kafka_", "oracledb_", "sqlserver_", "mongodb_"]
+          .concat(["otelcol_", "redis_", "mysql_", "postgresql_"])
+          .flatMap((prefix) => [`${prefix}a`, `${prefix}b`]),
+      ];
+      expect(detectReadyMadeSources(names)).toEqual(READY_MADE_SOURCES.map((s) => s.id));
+    });
   });
 
   describe("bundled content", () => {
     // The Kubernetes chunk pulls in the curated engine; a cold transform inside the test outlasts its timeout.
     beforeAll(() => import("./kubernetesDashboards"), 60_000);
 
-    it.each(["postgresql", "mysql", "redis", "otelcol"] as const)(
-      "%s loads one v8 document carrying its marker",
-      async (id) => {
-        const docs = await getReadyMadeSource(id).load("org");
-        expect(docs).toHaveLength(1);
-        expect(docs[0].version).toBe(8);
-        expect(docs[0].title).toBe(getReadyMadeSource(id).dashboards[0].title);
-        expect(docs[0].role).toBe(readyMadeMarker(id, "overview"));
-      },
-    );
+    it.each([
+      "postgresql",
+      "mysql",
+      "redis",
+      "otelcol",
+      "mongodb",
+      "sqlserver",
+      "oracle",
+      "kafka",
+      "rabbitmq",
+      "nginx",
+      "apache",
+    ] as const)("%s loads one v8 document carrying its marker", async (id) => {
+      const docs = await getReadyMadeSource(id).load("org");
+      expect(docs).toHaveLength(1);
+      expect(docs[0].version).toBe(8);
+      expect(docs[0].title).toBe(getReadyMadeSource(id).dashboards[0].title);
+      expect(docs[0].role).toBe(readyMadeMarker(id, "overview"));
+      expect(docs[0].defaultDatetimeDuration.relativeTimePeriod).toBe("15m");
+    });
 
     it("Kubernetes renders four documents in table order", async () => {
       const docs = await getReadyMadeSource("kubernetes").load("org");

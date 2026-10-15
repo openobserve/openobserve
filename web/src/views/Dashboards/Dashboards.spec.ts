@@ -1354,6 +1354,13 @@ describe("Dashboards.vue", () => {
       expect(openImport).toHaveBeenCalledTimes(1);
     });
 
+    it("the Import item's subtitle names three of the twelve technologies and counts the rest", async () => {
+      await mountWithOffers();
+      expect(wrapper.vm.readyMadeSourceList).toBe(
+        `Kubernetes, PostgreSQL, MySQL, and ${(i18n.global as any).t("dashboard.readyMade.moreNames", { count: 9 }, 9)}`,
+      );
+    });
+
     it("Refresh forces the offers' reads too", async () => {
       await mountWithOffers();
       offersRefresh.mockClear();

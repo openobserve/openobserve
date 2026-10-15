@@ -19,6 +19,7 @@
 import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
+import { getReadyMadeSource } from "@/composables/readyMade/catalog";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants } from "./otelShared";
 
@@ -129,6 +130,14 @@ export default function oracleCard(subs: CardSubstitutions, t: TranslateFn): Ric
           t("ingestion.setupCard.pillDataFiles"),
           t("ingestion.setupCard.pillResourceLimits"),
         ],
+        action: {
+          id: "open-ready-made-dashboard",
+          label: t("ingestion.setupCard.readyMadeOpenOne", {
+            name: getReadyMadeSource("oracle").name,
+          }),
+          icon: "dashboard",
+          showOnDetect: true,
+        },
       },
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "oracledb", filter: "" },
