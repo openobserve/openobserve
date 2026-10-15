@@ -46,7 +46,13 @@ export class AiAssistantCreditsPage {
      */
     async openChat() {
         testLogger.debug('Opening AI chat panel');
-        await this.page.locator(this.aiChatToggle).click();
+        const toggle = this.page.locator(this.aiChatToggle);
+        // Header.vue hides (not locks) the toggle when ai_enabled is false.
+        if (!(await toggle.count())) {
+            testLogger.debug('AI chat toggle not present — feature disabled on this build');
+            return false;
+        }
+        await toggle.click();
         try {
             await this.page.locator(this.chatInput).waitFor({ state: 'visible', timeout: 15000 });
             return true;
