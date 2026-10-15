@@ -15,7 +15,6 @@
 
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 import { errorCode } from "@/services/alert_calibration";
-import { formatSeconds } from "./format";
 
 export const DIGEST_STREAM = "_o2_alert_calibration_digests";
 /** Every digest search asks for this many rows, and a full page means more may exist. */
@@ -31,8 +30,6 @@ export type Severity = "Info" | "Low" | "Medium" | "High";
 export type Confidence = "Low" | "Medium" | "High";
 
 export interface Coverage {
-  coverage_window_clamped: boolean;
-  coverage_dropped_span_secs: number;
   coverage_unreadable_definitions: number;
   coverage_facts_without_definition: number;
   coverage_definitions_without_facts: number;
@@ -77,8 +74,6 @@ export type FindingRecord = DigestRecord &
 export type CoverageVerdict = "none" | "gap" | "full";
 
 const COVERAGE_COLUMNS: (keyof Coverage)[] = [
-  "coverage_window_clamped",
-  "coverage_dropped_span_secs",
   "coverage_unreadable_definitions",
   "coverage_facts_without_definition",
   "coverage_definitions_without_facts",
@@ -151,8 +146,6 @@ export function runIdentity(record: DigestRecord): RunRow {
     skip_count: record.skip_count,
     alerts_in_scope: record.alerts_in_scope,
     coverage_gap: record.coverage_gap,
-    coverage_window_clamped: record.coverage_window_clamped,
-    coverage_dropped_span_secs: record.coverage_dropped_span_secs,
     coverage_unreadable_definitions: record.coverage_unreadable_definitions,
     coverage_facts_without_definition: record.coverage_facts_without_definition,
     coverage_definitions_without_facts: record.coverage_definitions_without_facts,
@@ -202,13 +195,6 @@ export function coverageNotes(t: TranslateFn, row: RunRow): I18nText[] {
   const notes: I18nText[] = [];
   if (row.coverage_stream_substrate_empty)
     notes.push(t("alertCalibration.coverage.substrateEmpty"));
-  if (row.coverage_window_clamped) {
-    notes.push(
-      t("alertCalibration.coverage.windowClamped", {
-        duration: formatSeconds(t, Number(row.coverage_dropped_span_secs)),
-      }),
-    );
-  }
   const counts: [keyof Coverage, I18nKey][] = [
     ["coverage_unreadable_definitions", "alertCalibration.coverage.unreadableDefinitions"],
     ["coverage_facts_without_definition", "alertCalibration.coverage.factsWithoutDefinition"],

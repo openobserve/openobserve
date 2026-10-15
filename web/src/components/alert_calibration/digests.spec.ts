@@ -39,8 +39,6 @@ const run = (overrides: Partial<RunRow> = {}): RunRow => ({
   skip_count: 0,
   alerts_in_scope: 4,
   coverage_gap: false,
-  coverage_window_clamped: false,
-  coverage_dropped_span_secs: 0,
   coverage_unreadable_definitions: 0,
   coverage_facts_without_definition: 0,
   coverage_definitions_without_facts: 0,
@@ -130,15 +128,12 @@ describe("a run's verdict", () => {
     const notes = coverageNotes(
       gt,
       run({
-        coverage_window_clamped: true,
-        coverage_dropped_span_secs: 7200,
         coverage_definitions_without_facts: 1,
         coverage_facts_without_definition: 2,
         coverage_meta_fallback_used: true,
       }),
     );
     expect(notes).toEqual([
-      "The window was cut to the stream's max query range, leaving 2 hours unanalysed.",
       "2 alerts had trigger rows but no definition.",
       "1 alert had no trigger rows in the window, which is not counted as a gap.",
       "Read from the triggers stream of the _meta organization, which is not counted as a gap.",

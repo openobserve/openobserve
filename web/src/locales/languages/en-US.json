@@ -7969,7 +7969,6 @@
       "gapShort": "Gap",
       "noneShort": "None",
       "substrateEmpty": "The organization has alerts, but the run found no trigger rows for its window, so it measured nothing.",
-      "windowClamped": "The window was cut to the stream's max query range, leaving {duration} unanalysed.",
       "unreadableDefinitions": "{count} alert definition could not be read. | {count} alert definitions could not be read.",
       "factsWithoutDefinition": "{count} alert had trigger rows but no definition. | {count} alerts had trigger rows but no definition.",
       "errorClustersUnattributed": "{count} error row could not be attributed to an alert. | {count} error rows could not be attributed to an alert.",

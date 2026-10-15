@@ -46,8 +46,6 @@ const run = (windowEnd: number, emittedAt: number, findings: number): RunRow => 
   skip_count: 2,
   alerts_in_scope: 8,
   coverage_gap: false,
-  coverage_window_clamped: false,
-  coverage_dropped_span_secs: 0,
   coverage_unreadable_definitions: 0,
   coverage_facts_without_definition: 0,
   coverage_definitions_without_facts: 0,
