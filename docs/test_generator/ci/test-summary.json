@@ -1,0 +1,32 @@
+[
+  {
+    "title": "save conflict opens the dialog and Reload discards my edit",
+    "action": "new",
+    "verifies": "a stale-hash save opens the 409 dialog on its main step and Reload adopts the latest version while discarding the pending edit"
+  },
+  {
+    "title": "Overwrite replaces their change after the impact confirmation",
+    "action": "new",
+    "verifies": "Overwrite enters the impact confirm step, then persists my panel rename and reverts the second actor's title change"
+  },
+  {
+    "title": "Merge applies my panel onto their latest version when the panel was untouched",
+    "action": "new",
+    "verifies": "the panel-editor Merge path previews merged rows and saves a dashboard holding both my panel edit and their title change"
+  },
+  {
+    "title": "closing without resolving leaves the Not saved banner and Resolve reopens the dialog",
+    "action": "new",
+    "verifies": "dismissing the dialog leaves the not-saved banner and its Resolve button reopens the dialog with the same choices"
+  },
+  {
+    "title": "Merge is hidden and a compare grid shows when the other actor touched my panel",
+    "action": "new",
+    "verifies": "a same-panel conflict renders the touched badge and compare grid while hiding Merge"
+  },
+  {
+    "title": "a non-panel save offers only Reload and Overwrite with no Merge",
+    "action": "new",
+    "verifies": "a save from a non-panel path (layout edit) shows the dialog without a Merge button"
+  }
+]
