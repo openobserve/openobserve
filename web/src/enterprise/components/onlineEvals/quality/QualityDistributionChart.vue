@@ -141,11 +141,19 @@ const options = computed(() => {
         const bucket = props.buckets[index];
         if (!bucket) return "";
         const detail = classified.value
-          ? t("onlineEvals.quality.detail.chartTooltip", {
-              count: formatCount(bucket.count),
-              unhealthy: formatCount(bucket.unhealthy ?? 0),
-            })
-          : t("onlineEvals.quality.detail.chartTooltipCount", { count: formatCount(bucket.count) });
+          ? t(
+              "onlineEvals.quality.detail.chartTooltip",
+              {
+                count: formatCount(bucket.count),
+                unhealthy: formatCount(bucket.unhealthy ?? 0),
+              },
+              bucket.count,
+            )
+          : t(
+              "onlineEvals.quality.detail.chartTooltipCount",
+              { count: formatCount(bucket.count) },
+              bucket.count,
+            );
         return `${escapeHtml(labels.value[index])}<br/>${escapeHtml(detail)}`;
       },
     },
