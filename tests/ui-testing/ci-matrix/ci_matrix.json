@@ -541,7 +541,8 @@
       "traceGenAiParts.spec.js",
       "tracesCharts.spec.js",
       "traceSessionReplay.spec.js",
-      "traces-jk-navigation.spec.js"
+      "traces-jk-navigation.spec.js",
+      "service-graph-side-panel.spec.js"
     ],
     "disabled": []
   },
