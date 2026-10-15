@@ -78,19 +78,27 @@ import type * as MonacoEditor from "monaco-editor/esm/vs/editor/editor.api";
 // Lazy load Monaco Editor - only loaded when this component is rendered
 // This reduces initial bundle size by ~3.1MB
 let monaco: any = null;
-const loadMonaco = async () => {
-  if (!monaco) {
-    // editor.api must be imported first — it bootstraps StandaloneServices (the
-    // Monaco DI container). Importing editor.all.js before api causes feature
-    // contributions (ICodeLensCache, ISuggestMemories, actionWidgetService, etc.)
-    // to register against an uninitialised container, producing "[createInstance]
-    // X depends on UNKNOWN service" errors that silently degrade intellisense.
-    monaco = await import("monaco-editor/esm/vs/editor/editor.api");
-    await import("monaco-editor/esm/vs/editor/editor.all.js");
-    // Monaco caches glyph widths once; a webfont swapping in later leaves carets drawn at stale offsets.
-    document.fonts?.addEventListener?.("loadingdone", () => monaco?.editor?.remeasureFonts?.());
-  }
-  return monaco;
+let monacoLoading: Promise<any> | null = null;
+const importMonaco = async () => {
+  // editor.api must be imported first — it bootstraps StandaloneServices (the
+  // Monaco DI container). Importing editor.all.js before api causes feature
+  // contributions (ICodeLensCache, ISuggestMemories, actionWidgetService, etc.)
+  // to register against an uninitialised container, producing "[createInstance]
+  // X depends on UNKNOWN service" errors that silently degrade intellisense.
+  const api = await import("monaco-editor/esm/vs/editor/editor.api");
+  await import("monaco-editor/esm/vs/editor/editor.all.js");
+  // Monaco caches glyph widths once; a webfont swapping in later leaves carets drawn at stale offsets.
+  document.fonts?.addEventListener?.("loadingdone", () => monaco?.editor?.remeasureFonts?.());
+  monaco = api;
+  return api;
+};
+// One promise for every editor: the first Monaco service call freezes its singletons, so none may run before editor.all.js.
+const loadMonaco = (): Promise<any> => {
+  monacoLoading ??= importMonaco().catch((error) => {
+    monacoLoading = null;
+    throw error;
+  });
+  return monacoLoading;
 };
 
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
@@ -120,6 +128,8 @@ interface EditorConfig {
   announce: (rows: number) => void;
   /** Text after the caret that is never a menu row; null clears it. */
   showHint: (text: string | null) => void;
+  /** Set when the value lookup searches a caller's own time range instead of the default lookback. */
+  valuesTimeRange: () => { startTime: number; endTime: number } | null;
 }
 
 interface ChainState {
@@ -239,6 +249,12 @@ const defineEditorThemes = (monaco: any): void => {
     colors: dark ? suggest : {},
   });
 };
+
+// Per editor: the latest value request, and the lookup that already refilled a still-loading menu.
+const valueRefills = new WeakMap<object, { seq: number; refilled: string | null }>();
+
+// Per-editor: true while the caret sits in an unclosed value quote, so Enter can close it.
+const VALUE_QUOTE_CONTEXT_KEY = "o2InValueQuote";
 
 const WRAP_DESCRIPTIONS: Record<string, string> = {
   str_match: "sqlEditor.completion.wrapStrMatch",
@@ -440,6 +456,11 @@ export default defineComponent({
     filterMode: {
       type: Boolean,
       default: false,
+    },
+    /** The range the field-value resolver searches, in microseconds; null means the default lookback. */
+    valuesTimeRange: {
+      type: Object as PropType<{ startTime: number; endTime: number } | null>,
+      default: null,
     },
     freeTextDecorations: {
       type: Object as PropType<{
@@ -695,29 +716,70 @@ export default defineComponent({
       ]);
     };
 
-    // A typed quote opens its menu unhighlighted; reopened as an auto Invoke it highlights the preselected first value, so Enter takes it.
-    const reopenInQuote = (version: number | undefined, escapes: number) => {
-      if (!editorObj || suggestMode.value === "off") return;
-      // Esc or a blur since the quote dismissed the menu, and triggerSuggest would also steal focus back.
-      if (escapes !== escapeCount || !editorObj.hasTextFocus?.()) return;
-      const model = editorObj.getModel();
-      // A key typed after the quote owns the menu now; reopening would highlight a menu it opened.
-      if (model?.getVersionId?.() !== version) return;
-      const caret = editorObj.getPosition();
-      if (!model || !caret) return;
+    const caretInValueQuote = (): boolean => {
+      const model = editorObj?.getModel();
+      const caret = editorObj?.getPosition();
+      if (!model || !caret) return false;
       const before = model.getValueInRange({
         startLineNumber: 1,
         startColumn: 1,
         endLineNumber: caret.lineNumber,
         endColumn: caret.column,
       });
-      const inQuote =
-        props.language === "sql"
-          ? parseValueContext(before)?.hasOpenQuote
-          : props.language === "promql" && parsePromqlValueContext(before)?.hasOpenQuote;
-      if (!inQuote) return;
+      return props.language === "sql"
+        ? !!parseValueContext(before)?.hasOpenQuote
+        : props.language === "promql" && !!parsePromqlValueContext(before)?.hasOpenQuote;
+    };
+
+    // A typed quote opens its menu unhighlighted; reopened as an auto Invoke it highlights the preselected first value, so Enter takes it.
+    const reopenInQuote = (version: number | undefined, escapes: number) => {
+      if (!editorObj || suggestMode.value === "off") return;
+      // Esc or a blur since the quote dismissed the menu, and triggerSuggest would also steal focus back.
+      if (escapes !== escapeCount || !editorObj.hasTextFocus?.()) return;
+      // A key typed after the quote owns the menu now; reopening would highlight a menu it opened.
+      if (editorObj.getModel()?.getVersionId?.() !== version) return;
+      if (!caretInValueQuote()) return;
       editorObj.trigger("o2", "hideSuggestWidget", {});
       editorObj.trigger("o2", "editor.action.triggerSuggest", { auto: true });
+    };
+
+    let valueQuoteKey: any = null;
+    const syncValueQuoteKey = () => {
+      if (!valueQuoteKey) return;
+      const selections = editorObj?.getSelections?.() ?? [];
+      const single = selections.length <= 1 && (editorObj?.getSelection?.()?.isEmpty?.() ?? true);
+      valueQuoteKey.set(
+        isQueryLanguage(props.language) &&
+          suggestMode.value !== "off" &&
+          single &&
+          caretInValueQuote(),
+      );
+    };
+
+    // Enter with no row focused ends the value instead of breaking the string across lines.
+    const closeValueQuote = () => {
+      const model = editorObj?.getModel();
+      const caret = editorObj?.getPosition();
+      if (!model || !caret || !monaco) return;
+      const quote = props.language === "promql" ? '"' : "'";
+      editorObj.trigger("o2", "hideSuggestWidget", {});
+      const after = model.getLineContent(caret.lineNumber).slice(caret.column - 1);
+      const column = caret.column + 1;
+      if (after.startsWith(quote)) {
+        editorObj.setPosition({ lineNumber: caret.lineNumber, column });
+        return;
+      }
+      editorObj.executeEdits(
+        "o2",
+        [
+          {
+            range: new monaco.Range(caret.lineNumber, caret.column, caret.lineNumber, caret.column),
+            text: quote,
+          },
+        ],
+        [new monaco.Selection(caret.lineNumber, column, caret.lineNumber, column)],
+      );
+      editorObj.pushUndoStop?.();
     };
 
     /** Point this editor's model at its live configuration. */
@@ -741,6 +803,7 @@ export default defineComponent({
         chain: chainState,
         announce: announceMenu,
         showHint,
+        valuesTimeRange: () => props.valuesTimeRange ?? null,
       });
     };
 
@@ -900,6 +963,14 @@ export default defineComponent({
         NAV_SKIP_CONTEXT_KEY,
         groupsHeaders(suggestMode.value),
       );
+      valueQuoteKey = editorObj.createContextKey(VALUE_QUOTE_CONTEXT_KEY, false);
+      editorObj.addAction?.({
+        id: "o2.suggest.closeValueQuote",
+        label: t("sqlEditor.completion.closeValueQuote"),
+        keybindings: [monaco.KeyCode.Enter],
+        precondition: `${VALUE_QUOTE_CONTEXT_KEY} && textInputFocus && !suggestWidgetHasFocusedSuggestion`,
+        run: closeValueQuote,
+      });
 
       // The editor's content only reaches the parent after `debounceTime`. Held
       // as a named handle so it can be flushed on the paths that consume the
@@ -920,7 +991,10 @@ export default defineComponent({
       // the query.
       commitPendingChange = () => commitModelChange.flush();
 
-      editorObj.onDidChangeCursorPosition(() => hintDecorations?.clear());
+      editorObj.onDidChangeCursorPosition(() => {
+        hintDecorations?.clear();
+        syncValueQuoteKey();
+      });
       editorObj.onDidChangeModelContent((e: any) => {
         const [change] = e?.changes ?? [];
         const chainSpace =
@@ -1178,6 +1252,7 @@ export default defineComponent({
     watch(suggestMode, (mode) => {
       if (!monaco || !isQueryLanguage(props.language)) return;
       navSkipKey?.set(groupsHeaders(mode));
+      syncValueQuoteKey();
       setTabPicksFirst(monaco, mode !== "off");
       editorObj?.updateOptions(suggestKeyOptions(mode, props.language));
     });
@@ -1319,6 +1394,28 @@ export default defineComponent({
         return { suggestions, incomplete: true };
       };
 
+      // Monaco never asks again on its own, so a menu left on "Still loading" is refilled once its lookup lands.
+      const refillWhenLoaded = (
+        config: EditorConfig,
+        snapshot: ReturnType<typeof takeValueGuardSnapshot>,
+        fetched: Promise<unknown>,
+      ) => {
+        const editor = config.editor();
+        if (!editor || !snapshot) return;
+        const state = valueRefills.get(editor) ?? { seq: 0, refilled: null };
+        const seq = state.seq;
+        valueRefills.set(editor, state);
+        void fetched.then(() => {
+          const key = `${snapshot.line}:${snapshot.column}:${snapshot.prefix}`;
+          if (state.seq !== seq || state.refilled === key || config.mode() === "off") return;
+          if (isValueAnswerStale(snapshot, config.editor(), config.escapeCount())) return;
+          state.refilled = key;
+          // triggerSuggest is a no-op while the widget is visible, so the open menu is closed first.
+          editor.trigger("o2", "hideSuggestWidget", {});
+          editor.trigger("o2", "editor.action.triggerSuggest", { auto: true });
+        });
+      };
+
       // Null means the answer went stale while it was awaited and must not be shown.
       const awaitValues = async (
         config: EditorConfig,
@@ -1335,6 +1432,10 @@ export default defineComponent({
         );
         const outcome = await Promise.race([fetched, budget]);
         clearTimeout(timer);
+        // A newer answer supersedes any refill still waiting on an older lookup.
+        const refills = valueRefills.get(config.editor() ?? {});
+        if (refills) refills.seq++;
+        if (outcome === "loading") refillWhenLoaded(config, snapshot, fetched);
         const stale =
           token?.isCancellationRequested ||
           isValueAnswerStale(snapshot, config.editor(), config.escapeCount());
@@ -1362,14 +1463,21 @@ export default defineComponent({
         { highlighted, inQuote }: { highlighted: boolean; inQuote: boolean },
       ) => {
         const asHint = (inQuote && status !== "loading") || (highlighted && !others.length);
+        // PromQL label values always use the default lookback.
+        const inRange = language === "sql" && status === "empty" && !!config.valuesTimeRange();
+        const text = inRange
+          ? t("sqlEditor.completion.valuesEmptyInRange", { field })
+          : valueStatusText(t, status, field, { minutes: FIELD_VALUES_LOOKBACK_MINUTES });
         if (asHint) {
-          config.showHint(
-            valueStatusText(t, status, field, { minutes: FIELD_VALUES_LOOKBACK_MINUTES }),
-          );
+          config.showHint(text);
           return others;
         }
+        const entry = buildValueStatusEntry(t, status, field, {
+          minutes: FIELD_VALUES_LOOKBACK_MINUTES,
+        });
         const row = {
-          ...buildValueStatusEntry(t, status, field, { minutes: FIELD_VALUES_LOOKBACK_MINUTES }),
+          ...entry,
+          label: inRange ? text : entry.label,
           range: caretRange(position, 0),
         };
         return highlighted ? [...others, { ...row, sortText: "\uffff" }] : [row, ...others];
@@ -1429,7 +1537,10 @@ export default defineComponent({
         if (!resolver || typedIsColumn || unknownField) return fields;
 
         const outcome = await awaitValues(config, token, (options) =>
-          resolver(context.field, options),
+          resolver(context.field, {
+            ...options,
+            prefix: context.hasOpenQuote ? context.typed : "",
+          }),
         );
         if (outcome === null) return null;
         if (outcome === "nolookup") return fields;
@@ -1569,7 +1680,13 @@ export default defineComponent({
       // Grouped menus lean on the full key contract, so `off` keeps today's flat menus.
       const groupsMenus = (config: EditorConfig) => language === "sql" && config.mode() !== "off";
 
-      const groupValueMenu = (entries: any[], typed: string, range: any, preselect: boolean) => {
+      const groupValueMenu = (
+        entries: any[],
+        typed: string,
+        range: any,
+        preselect: boolean,
+        inRange: boolean,
+      ) => {
         const inValues = (raw: any) => {
           const entry = objectEntry(raw);
           return entry?.kind === "Value" || String(entry?.name ?? "").startsWith("\u0000");
@@ -1578,7 +1695,12 @@ export default defineComponent({
         return groupEntries(
           [
             {
-              header: t("sqlEditor.completion.groupValues"),
+              // Values from a caller's own range are not the recent ones.
+              header: t(
+                inRange
+                  ? "sqlEditor.completion.groupValuesName"
+                  : "sqlEditor.completion.groupValues",
+              ),
               name: t("sqlEditor.completion.groupValuesName"),
               entries: entries.filter(inValues).map(objectEntry),
             },
@@ -1719,7 +1841,11 @@ export default defineComponent({
               if (!entries || !groupsMenus(config)) return reply(entries, typedRange);
               // `b.tr` names column `tr…` of table b, so only the part after the dot filters.
               const typed = qualified ? word.word : valueContext.typed;
-              return reply(groupValueMenu(entries, typed, typedRange, highlighted), typedRange);
+              const inRange = !!config.valuesTimeRange();
+              return reply(
+                groupValueMenu(entries, typed, typedRange, highlighted, inRange),
+                typedRange,
+              );
             }
             if (literalStateAtEnd(textUntilPosition) === "string") return reply([]);
             const operators = operatorEntries(
