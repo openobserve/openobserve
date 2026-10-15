@@ -22,7 +22,7 @@ use sea_orm::{
 use super::{
     entity::slack_installations::{ActiveModel, Column, Entity, Model},
     slack_shared::{
-        db_err, decode_all, enum_text, open, parse_enum, parse_json, seal, secrets_key,
+        db_err, decode_all, enum_text, open, parse_enum, parse_json, seal, secrets_key, with_region,
     },
 };
 use crate::{
@@ -72,6 +72,11 @@ pub async fn delete(id: &str) -> Result<(), Error> {
     delete_with(get_orm_client_rw().await, id).await
 }
 
+/// `revoke` that also stamps `origin_region`, the form every v1 write goes through.
+pub async fn revoke_in_region(id: &str, at: i64, origin_region: &str) -> Result<(), Error> {
+    revoke_in_region_with(get_orm_client_rw().await, id, at, origin_region).await
+}
+
 pub async fn put_with<C: ConnectionTrait>(conn: &C, row: &SlackInstallation) -> Result<(), Error> {
     let key = secrets_key(plaintext_secrets(row).iter().any(Option::is_some)).await?;
     put_keyed(conn, row, key.as_deref()).await
@@ -119,14 +124,16 @@ pub async fn list_by_ids_with<C: ConnectionTrait>(
 }
 
 pub async fn revoke_with<C: ConnectionTrait>(conn: &C, id: &str, at: i64) -> Result<(), Error> {
-    let mut update = Entity::update_many()
-        .col_expr(Column::RevokedAt, Expr::value(at))
-        .col_expr(Column::UpdatedAt, Expr::value(at));
-    for column in SECRET_COLUMNS {
-        update = update.col_expr(column, Expr::value(Option::<String>::None));
-    }
-    update.filter(Column::Id.eq(id)).exec(conn).await?;
-    Ok(())
+    revoke_columns(conn, id, at, None).await
+}
+
+pub async fn revoke_in_region_with<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    at: i64,
+    origin_region: &str,
+) -> Result<(), Error> {
+    revoke_columns(conn, id, at, Some(origin_region)).await
 }
 
 pub async fn delete_with<C: ConnectionTrait>(conn: &C, id: &str) -> Result<(), Error> {
@@ -136,6 +143,25 @@ pub async fn delete_with<C: ConnectionTrait>(conn: &C, id: &str) -> Result<(), E
 
 fn live() -> Select<Entity> {
     Entity::find().filter(Column::DeletedAt.is_null())
+}
+
+async fn revoke_columns<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    at: i64,
+    origin_region: Option<&str>,
+) -> Result<(), Error> {
+    let mut update = Entity::update_many()
+        .col_expr(Column::RevokedAt, Expr::value(at))
+        .col_expr(Column::UpdatedAt, Expr::value(at));
+    for column in SECRET_COLUMNS {
+        update = update.col_expr(column, Expr::value(Option::<String>::None));
+    }
+    with_region(update, Column::OriginRegion, origin_region)
+        .filter(Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
 async fn put_keyed<C: ConnectionTrait>(
@@ -258,9 +284,9 @@ fn from_model(model: Model, key: Option<&[u8]>) -> Result<SlackInstallation, Err
         client_id: model.client_id,
         client_secret,
         config_refresh_token,
-        manifest_options: parse_json(Some(&model.manifest_options))?,
+        manifest_options: parse_json("manifest_options", Some(&model.manifest_options))?,
         auto_link_enabled: model.auto_link_enabled,
-        auto_link_domains: parse_json(Some(&model.auto_link_domains))?,
+        auto_link_domains: parse_json("auto_link_domains", Some(&model.auto_link_domains))?,
         mode: parse_enum("mode", &model.mode)?,
         home_region: model.home_region,
         installed_by: model.installed_by,
@@ -447,6 +473,23 @@ mod tests {
         assert_eq!(read.updated_at, 2_000);
         assert!(read.credentials_readable);
         assert!(plaintext_secrets(&read).iter().all(Option::is_none));
+        assert_eq!(read.origin_region, "default");
+    }
+
+    #[tokio::test]
+    async fn region_aware_revoke_writes_both_replication_columns() {
+        let db = db().await;
+        put_keyed(&db, &installation("i1", "T1"), Some(&KEY))
+            .await
+            .unwrap();
+        revoke_in_region_with(&db, "i1", 2_000, "eu-west")
+            .await
+            .unwrap();
+        assert!(stored_secrets(&db, "i1").await.iter().all(Option::is_none));
+        let read = get_with(&db, "i1").await.unwrap().unwrap();
+        assert_eq!(read.revoked_at, Some(2_000));
+        assert_eq!(read.updated_at, 2_000);
+        assert_eq!(read.origin_region, "eu-west");
     }
 
     #[tokio::test]

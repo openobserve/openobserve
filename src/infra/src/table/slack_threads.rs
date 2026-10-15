@@ -25,7 +25,7 @@ use sea_orm::{
 
 use super::{
     entity::slack_threads::{ActiveModel, Column, Entity, Model},
-    slack_shared::{db_err, decode_pages, enum_text, parse_enum, parse_json},
+    slack_shared::{db_err, decode_pages, enum_text, parse_enum, parse_json, with_region},
 };
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
@@ -59,6 +59,23 @@ pub async fn touch(
     expires_at: i64,
 ) -> Result<(), Error> {
     touch_with(get_orm_client_rw().await, key, last_activity_at, expires_at).await
+}
+
+/// `touch` that also stamps `origin_region`, the form every v1 write goes through.
+pub async fn touch_in_region(
+    key: &SlackThreadKey,
+    last_activity_at: i64,
+    expires_at: i64,
+    origin_region: &str,
+) -> Result<(), Error> {
+    touch_in_region_with(
+        get_orm_client_rw().await,
+        key,
+        last_activity_at,
+        expires_at,
+        origin_region,
+    )
+    .await
 }
 
 pub async fn list_expired(before: i64, limit: u64) -> Result<Vec<SlackThread>, Error> {
@@ -118,16 +135,17 @@ pub async fn touch_with<C: ConnectionTrait>(
     last_activity_at: i64,
     expires_at: i64,
 ) -> Result<(), Error> {
-    Entity::update_many()
-        .col_expr(Column::LastActivityAt, Expr::value(last_activity_at))
-        .col_expr(Column::ExpiresAt, Expr::value(expires_at))
-        .col_expr(Column::UpdatedAt, Expr::value(last_activity_at))
-        .filter(Column::InstallationId.eq(&key.installation_id))
-        .filter(Column::ChannelId.eq(&key.channel_id))
-        .filter(Column::ThreadTs.eq(&key.thread_ts))
-        .exec(conn)
-        .await?;
-    Ok(())
+    touch_columns(conn, key, last_activity_at, expires_at, None).await
+}
+
+pub async fn touch_in_region_with<C: ConnectionTrait>(
+    conn: &C,
+    key: &SlackThreadKey,
+    last_activity_at: i64,
+    expires_at: i64,
+    origin_region: &str,
+) -> Result<(), Error> {
+    touch_columns(conn, key, last_activity_at, expires_at, Some(origin_region)).await
 }
 
 pub async fn list_expired_with<C: ConnectionTrait>(
@@ -181,6 +199,26 @@ pub async fn delete_by_installation_with<C: ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(result.rows_affected)
+}
+
+async fn touch_columns<C: ConnectionTrait>(
+    conn: &C,
+    key: &SlackThreadKey,
+    last_activity_at: i64,
+    expires_at: i64,
+    origin_region: Option<&str>,
+) -> Result<(), Error> {
+    let update = Entity::update_many()
+        .col_expr(Column::LastActivityAt, Expr::value(last_activity_at))
+        .col_expr(Column::ExpiresAt, Expr::value(expires_at))
+        .col_expr(Column::UpdatedAt, Expr::value(last_activity_at));
+    with_region(update, Column::OriginRegion, origin_region)
+        .filter(Column::InstallationId.eq(&key.installation_id))
+        .filter(Column::ChannelId.eq(&key.channel_id))
+        .filter(Column::ThreadTs.eq(&key.thread_ts))
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
 /// Raw rows in (expires_at, key) order, so the cursor moves past rows that fail to decode.
@@ -250,8 +288,8 @@ fn from_model(model: Model) -> Result<SlackThread, Error> {
         kind: parse_enum("kind", &model.kind)?,
         assistant_session_id: model.assistant_session_id,
         started_by_link_id: model.started_by_link_id,
-        shared_urls: parse_json(model.shared_urls.as_deref())?,
-        bot_answers: parse_json(model.bot_answers.as_deref())?,
+        shared_urls: parse_json("shared_urls", model.shared_urls.as_deref())?,
+        bot_answers: parse_json("bot_answers", model.bot_answers.as_deref())?,
         created_at: model.created_at,
         last_activity_at: model.last_activity_at,
         expires_at: model.expires_at,
@@ -348,6 +386,26 @@ mod tests {
                 last_activity_at: 500,
                 expires_at: 2_000,
                 updated_at: 500,
+                ..row
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn region_aware_touch_writes_both_replication_columns() {
+        let db = db().await;
+        let row = thread("1.1", "acme", 1_000);
+        put_with(&db, &row).await.unwrap();
+        touch_in_region_with(&db, &key("1.1"), 500, 2_000, "eu-west")
+            .await
+            .unwrap();
+        assert_eq!(
+            get_with(&db, "i1", "C1", "1.1").await.unwrap(),
+            Some(SlackThread {
+                last_activity_at: 500,
+                expires_at: 2_000,
+                updated_at: 500,
+                origin_region: "eu-west".to_string(),
                 ..row
             })
         );

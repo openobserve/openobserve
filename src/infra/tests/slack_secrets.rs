@@ -22,7 +22,10 @@ use config::{
 };
 use infra::{
     db::get_orm_client_rw,
-    table::{cipher, slack_installations, slack_link_requests},
+    table::{
+        cipher::{self, DEFAULT_DEK_NAME, EntryKind},
+        slack_installations, slack_link_requests,
+    },
 };
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
@@ -134,6 +137,8 @@ async fn installation_round_trip(conn: &DatabaseConnection, meta_dek: &[u8]) {
     assert!(read == row, "read back differs from what was written");
     assert!(read.credentials_readable);
 
+    readable_after_the_installing_org_loses_its_keys(conn, &row).await;
+
     slack_installations::revoke_with(conn, "I1", 30)
         .await
         .unwrap();
@@ -151,6 +156,47 @@ async fn installation_round_trip(conn: &DatabaseConnection, meta_dek: &[u8]) {
     assert_eq!(revoked.revoked_at, Some(30));
     assert!(plaintexts(&revoked).iter().all(Option::is_none));
     assert!(revoked.credentials_readable);
+}
+
+/// AC-2.4: the installing org's keys go with the org, and the secrets must not go with them.
+async fn readable_after_the_installing_org_loses_its_keys(
+    conn: &DatabaseConnection,
+    row: &SlackInstallation,
+) {
+    let org = row.installed_org_id.as_str();
+    cipher::get_dek(org).await.unwrap();
+    assert!(org_dek_stored(org).await, "the installing org has a DEK");
+    cipher::delete_by_org(org).await.unwrap();
+    assert!(
+        !org_dek_stored(org).await,
+        "the installing org's DEK is gone"
+    );
+    let read = slack_installations::get_with(conn, &row.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(read.credentials_readable);
+    assert!(
+        read == *row,
+        "secrets unreadable after the installing org's keys went"
+    );
+    let stored = raw_column(conn, "slack_installations", "bot_token_enc", &row.id)
+        .await
+        .unwrap();
+    let uncached_meta_dek = cipher::get_or_create_dek("_meta").await.unwrap();
+    assert_eq!(
+        decrypt_secret_value(&uncached_meta_dek, &stored).unwrap(),
+        "xoxb-bot"
+    );
+    let new_org_dek = cipher::get_or_create_dek(org).await.unwrap();
+    assert!(decrypt_secret_value(&new_org_dek, &stored).is_err());
+}
+
+async fn org_dek_stored(org: &str) -> bool {
+    cipher::get_data(org, EntryKind::CipherKey, DEFAULT_DEK_NAME)
+        .await
+        .unwrap()
+        .is_some()
 }
 
 async fn link_request_round_trip(conn: &DatabaseConnection, meta_dek: &[u8]) {
