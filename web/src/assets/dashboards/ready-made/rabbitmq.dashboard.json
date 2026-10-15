@@ -333,7 +333,7 @@
             "legends_position": "bottom",
             "unit": "numbers",
             "unit_custom": null,
-            "decimals": 0,
+            "decimals": 1,
             "drilldown": []
           },
           "queryType": "promql",
@@ -378,7 +378,7 @@
             "legends_position": "bottom",
             "unit": "numbers",
             "unit_custom": null,
-            "decimals": 0,
+            "decimals": 1,
             "drilldown": []
           },
           "queryType": "promql",
@@ -555,7 +555,7 @@
             "legends_position": "bottom",
             "unit": "numbers",
             "unit_custom": null,
-            "decimals": 0,
+            "decimals": 1,
             "drilldown": []
           },
           "queryType": "promql",
@@ -600,7 +600,7 @@
             "legends_position": "bottom",
             "unit": "numbers",
             "unit_custom": null,
-            "decimals": 0,
+            "decimals": 1,
             "drilldown": []
           },
           "queryType": "promql",

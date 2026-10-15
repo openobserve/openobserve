@@ -929,3 +929,38 @@ describe("ready-made Oracle dashboard: tablespace limits", () => {
     expect(use.queries[0].query).toMatch(/oracledb_tablespace_size_limit\{[^}]*\} > 0\)$/);
   });
 });
+
+describe("ready-made dashboards: y-axis ticks on small-range charts", () => {
+  const ALL = {
+    postgresql,
+    mysql,
+    redis,
+    otelCollector,
+    kafka,
+    rabbitmq,
+    nginx,
+    apache,
+    mongodb,
+    sqlserver,
+    oracle,
+  };
+  const panel = (doc: any, id: string) => dataPanels(doc).find((p) => p.id === id);
+
+  it.each([
+    ["kafka_out_of_sync_by_topic", kafka],
+    ["rabbitmq_queues_without_consumers", rabbitmq],
+    ["mongo_documents_by_db", mongodb],
+  ])("gives %s one decimal so its ticks stay distinct", (id, doc) => {
+    expect(panel(doc, id)?.config.decimals).toBe(1);
+  });
+
+  // A limit line keeps the axis range wide, so whole numbers stay distinct there.
+  it("gives every line chart at least one decimal unless it draws a limit line", () => {
+    for (const [name, doc] of Object.entries(ALL)) {
+      for (const p of dataPanels(doc).filter((x) => x.type === "line")) {
+        if (/ vs (max|limit|capacity)$/.test(p.title)) continue;
+        expect(p.config.decimals, `${name}/${p.id}`).toBeGreaterThanOrEqual(1);
+      }
+    }
+  });
+});
