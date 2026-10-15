@@ -51,8 +51,7 @@ pub enum Applied {
     Taken,
     /// The local row stays: it is newer, the same write, or soft-deleted.
     Kept,
-    /// The local write won a tie of equal revisions and was written again under a new revision,
-    /// which the caller sends to the other regions so they converge on it.
+    /// The local write won an equal-rev tie and was rewritten under a new rev for others to take.
     Reasserted(Box<links::Model>),
 }
 
@@ -170,22 +169,17 @@ pub async fn count_by_org_status<C: ConnectionTrait>(
     Ok(out)
 }
 
-/// Inserts the link unless its org or dashboard is at its cap; the count and the insert run under
-/// a per-org advisory lock on Postgres and behind SQLite's single writer, so no create overshoots.
+/// Inserts the link unless its org or dashboard is at its cap, queueing its Put when `queue`.
 pub async fn insert_capped(
     db: &DatabaseConnection,
     model: &links::Model,
     org_max: u32,
     dashboard_max: u32,
+    queue: bool,
 ) -> Result<CreateOutcome, errors::Error> {
     let txn = db.begin().await?;
-    if txn.get_database_backend() == DbBackend::Postgres {
-        txn.execute(Statement::from_sql_and_values(
-            DbBackend::Postgres,
-            "SELECT pg_advisory_xact_lock(hashtext($1))",
-            [format!("public_dashboards/{}", model.org_id).into()],
-        ))
-        .await?;
+    if let Some(lock) = cap_lock(txn.get_database_backend(), &model.org_id) {
+        txn.execute(lock).await?;
     }
     let live_in_org = links::Entity::find()
         .filter(links::Column::OrgId.eq(&model.org_id))
@@ -201,8 +195,41 @@ pub async fn insert_capped(
         return Ok(CreateOutcome::DashboardFull);
     }
     model.clone().into_active_model().insert(&txn).await?;
+    if queue {
+        outbox_put(&txn, &model.id, model.rev, model.updated_at).await?;
+    }
     txn.commit().await?;
     Ok(CreateOutcome::Created)
+}
+
+/// The lock around an org's link count and insert; SQLite's one writer connection needs none.
+pub fn cap_lock(backend: DbBackend, org_id: &str) -> Option<Statement> {
+    (backend == DbBackend::Postgres).then(|| {
+        Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "SELECT pg_advisory_xact_lock(hashtext($1))",
+            [format!("public_dashboards/{org_id}").into()],
+        )
+    })
+}
+
+/// [`update_cas`], queueing the row's Put in the same transaction when `queue`.
+pub async fn update_cas_queued<C: TransactionTrait>(
+    db: &C,
+    next: &links::Model,
+    seen: i64,
+    queue: bool,
+    now: i64,
+) -> Result<bool, errors::Error> {
+    let txn = db.begin().await?;
+    if !update_cas(&txn, next, seen).await? {
+        return Ok(false);
+    }
+    if queue {
+        outbox_put(&txn, &next.id, next.rev, now).await?;
+    }
+    txn.commit().await?;
+    Ok(true)
 }
 
 /// Writes the semantic columns of `next` only while the stored rev is still `seen`; false when
@@ -244,10 +271,8 @@ pub async fn update_cas<C: ConnectionTrait>(
     Ok(res.rows_affected == 1)
 }
 
-/// Applies a link row replicated from region `origin`: a higher rev wins, equal revs are ordered by
-/// `(updated_at, origin region)`, a soft delete always wins and is never revived, and a delete
-/// that arrives before the first Put is kept as a deleted row. Access counters stay region-local.
-pub async fn apply_replicated<C: ConnectionTrait>(
+/// Applies a link row replicated from region `origin` in the order of [`replicated_order`].
+pub async fn apply_replicated<C: ConnectionTrait + TransactionTrait>(
     db: &C,
     incoming: &links::Model,
     origin: &str,
@@ -284,7 +309,8 @@ pub async fn apply_replicated<C: ConnectionTrait>(
                 (next.clone(), Applied::Reasserted(Box::new(next)))
             }
         };
-        if update_cas(db, &next, local.rev).await? {
+        let queue = matches!(applied, Applied::Reasserted(_));
+        if update_cas_queued(db, &next, local.rev, queue, now).await? {
             return Ok(applied);
         }
     }
@@ -432,7 +458,16 @@ async fn upsert_settings_columns<C: ConnectionTrait>(
         .ok_or_else(|| errors::Error::Message(format!("settings of {org_id} vanished")))
 }
 
-/// Records a failed emit of `rev`; a pending entry keeps the higher rev and its attempt count.
+/// Removes the org's settings row; a recreated org starts with the env defaults.
+pub async fn delete_settings<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+) -> Result<(), errors::Error> {
+    settings::Entity::delete_by_id(org_id).exec(db).await?;
+    Ok(())
+}
+
+/// Queues the Put of `rev`; a pending entry keeps the higher rev and its attempt count.
 pub async fn outbox_put<C: ConnectionTrait>(
     db: &C,
     link_id: &str,
@@ -511,11 +546,11 @@ pub async fn outbox_delete<C: ConnectionTrait>(
 }
 
 /// Creates the three tables if absent, for tests in any crate.
-#[cfg(any(test, feature = "test-utils"))]
 pub async fn create_tables_for_tests(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
     super::migration::create_public_dashboards_schema_for_test(db).await
 }
 
+/// A higher rev wins, equal revs order by `(updated_at, origin)`, a delete wins and stays.
 fn replicated_order(
     local: &links::Model,
     incoming: &links::Model,
@@ -601,7 +636,7 @@ mod tests {
         let ins = |id: &str, dash: &str| {
             let m = link(id, "o", dash);
             let db = &db;
-            async move { insert_capped(db, &m, 3, 2).await.unwrap() }
+            async move { insert_capped(db, &m, 3, 2, false).await.unwrap() }
         };
         assert_eq!(ins("a", "d1").await, CreateOutcome::Created);
         assert_eq!(ins("b", "d1").await, CreateOutcome::Created);
@@ -633,7 +668,7 @@ mod tests {
                 let db = db.clone();
                 tokio::spawn(async move {
                     let m = link(&format!("l{i}"), "o", "d");
-                    insert_capped(&db, &m, 50, 5).await.unwrap()
+                    insert_capped(&db, &m, 50, 5, false).await.unwrap()
                 })
             })
             .collect();
@@ -650,7 +685,7 @@ mod tests {
     #[tokio::test]
     async fn a_stale_rev_loses_and_counters_survive_edits() {
         let db = db().await;
-        insert_capped(&db, &link("l", "o", "d"), 10, 10)
+        insert_capped(&db, &link("l", "o", "d"), 10, 10, false)
             .await
             .unwrap();
         flush_access(&db, "l", 50, 3).await.unwrap();
@@ -677,7 +712,7 @@ mod tests {
         for (id, deleted_at) in [("old", Some(5)), ("new", Some(50)), ("live", None)] {
             let mut m = link(id, "o", "d");
             m.deleted_at = deleted_at;
-            insert_capped(&db, &m, 10, 10).await.unwrap();
+            insert_capped(&db, &m, 10, 10, false).await.unwrap();
         }
         assert_eq!(purge_deleted(&db, 10).await.unwrap(), 1);
         assert!(get(&db, "old").await.unwrap().is_none());
@@ -764,7 +799,7 @@ mod tests {
             link("e", "o2", "d"),
         ] {
             assert_eq!(
-                insert_capped(&db, &model, 50, 50).await.unwrap(),
+                insert_capped(&db, &model, 50, 50, false).await.unwrap(),
                 CreateOutcome::Created
             );
         }
@@ -977,7 +1012,7 @@ mod tests {
     #[tokio::test]
     async fn gate07_local_concurrent_edits_serialize_on_the_compare_and_set() {
         let db = std::sync::Arc::new(db().await);
-        insert_capped(&db, &link("l", "o", "d"), 10, 10)
+        insert_capped(&db, &link("l", "o", "d"), 10, 10, false)
             .await
             .unwrap();
         let tasks: Vec<_> = (0..6)
@@ -1004,5 +1039,70 @@ mod tests {
         for i in 0..6 {
             assert!(row.name.contains(&format!("+{i}")), "{}", row.name);
         }
+    }
+
+    /// MySQL is no meta store; `write_pool_is_single_connection_on_sqlite` pins SQLite's writer.
+    #[test]
+    fn gate12_the_link_cap_locks_per_org_on_postgres_and_on_the_one_writer_on_sqlite() {
+        let lock = cap_lock(DbBackend::Postgres, "o1").unwrap();
+        assert_eq!(lock.sql, "SELECT pg_advisory_xact_lock(hashtext($1))");
+        let values = lock.values.unwrap().0;
+        assert_eq!(
+            values,
+            [sea_orm::Value::from("public_dashboards/o1".to_string())]
+        );
+        assert!(cap_lock(DbBackend::Sqlite, "o1").is_none());
+        let src = include_str!("public_dashboards.rs");
+        let start = src.find("pub async fn insert_capped(").unwrap();
+        let body = &src[start..start + src[start..].find("\n}\n").unwrap()];
+        let lock_at = body.find("cap_lock(txn.get_database_backend()").unwrap();
+        assert!(
+            lock_at < body.find(".count(&txn)").unwrap(),
+            "the lock precedes the count"
+        );
+    }
+
+    #[tokio::test]
+    async fn gate07_a_queued_write_commits_its_outbox_entry_with_the_row_and_only_then() {
+        let db = db().await;
+        async fn entries(db: &DatabaseConnection) -> Vec<(String, i64)> {
+            outbox_list_due(db, i64::MAX, 10)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|e| (e.link_id, e.rev))
+                .collect()
+        }
+        assert_eq!(
+            insert_capped(&db, &link("l", "o", "d"), 10, 10, true)
+                .await
+                .unwrap(),
+            CreateOutcome::Created
+        );
+        assert_eq!(entries(&db).await, [("l".to_string(), 1)]);
+        // A refused create queues nothing.
+        assert_eq!(
+            insert_capped(&db, &link("m", "o", "d"), 1, 10, true)
+                .await
+                .unwrap(),
+            CreateOutcome::OrgFull
+        );
+        assert_eq!(entries(&db).await.len(), 1);
+
+        let next = links::Model {
+            enabled: false,
+            rev: 2,
+            ..link("l", "o", "d")
+        };
+        assert!(update_cas_queued(&db, &next, 1, true, 5).await.unwrap());
+        assert_eq!(entries(&db).await, [("l".to_string(), 2)]);
+        // A lost compare-and-set leaves both the row and the outbox as they were.
+        let stale = links::Model {
+            rev: 3,
+            ..next.clone()
+        };
+        assert!(!update_cas_queued(&db, &stale, 1, true, 6).await.unwrap());
+        assert_eq!(entries(&db).await, [("l".to_string(), 2)]);
+        assert_eq!(get(&db, "l").await.unwrap().unwrap().rev, 2);
     }
 }

@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Sends public dashboard link rows whose super-cluster emit failed, so a revoke still reaches
-//! every region.
+//! Resends public dashboard link rows whose super-cluster emit failed.
 
 use config::{cluster::LOCAL_NODE, spawn_pausable_job};
 use openobserve_core::public_dashboards::replication;

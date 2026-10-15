@@ -1904,7 +1904,7 @@ mod tests {
             last_accessed_at: None,
             access_count: 0,
         };
-        links::insert_capped(get_orm_client_rw().await, &link, 50, 10)
+        links::insert_capped(get_orm_client_rw().await, &link, 50, 10, false)
             .await
             .unwrap();
 
