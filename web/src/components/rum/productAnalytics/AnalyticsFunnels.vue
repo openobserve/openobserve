@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="sm"
               icon-left="history"
+              icon-right="arrow-drop-down"
               data-test="rum-analytics-funnel-recent-btn"
               >{{ t("rum.analytics.funnel.recent") }}</OButton
             >
@@ -41,13 +42,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <KeySequence :keys="r.steps" :events="events" />
           </ODropdownItem>
         </ODropdown>
-        <OButton
-          variant="ghost"
-          size="sm"
-          data-test="rum-analytics-funnel-clear-btn"
-          @click="clear"
-          >{{ t("rum.analytics.funnel.clear") }}</OButton
-        >
+        <span
+          v-if="recent.length"
+          class="border-border-default mx-1 h-5 border-s"
+          aria-hidden="true"
+        />
         <span>
           <OButton
             variant="outline"
@@ -72,6 +71,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <OTooltip v-if="!dashboardReady" :content="dashboardTip" />
         </span>
+      </template>
+      <template v-if="def.steps.length" #menu>
+        <ODropdownItem
+          icon-left="delete-sweep"
+          data-test="rum-analytics-funnel-clear-btn"
+          @select="clear"
+          >{{ t("rum.analytics.funnel.clearSteps") }}</ODropdownItem
+        >
       </template>
     </SavedFunnelBar>
     <div class="px-page-edge flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-3">

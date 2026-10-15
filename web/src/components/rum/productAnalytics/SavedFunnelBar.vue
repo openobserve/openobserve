@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <OTooltip v-if="saveDisabled" :content="saveDisabled" />
       </span>
-      <ODropdown v-if="canWrite || opened" side="bottom" align="end">
+      <ODropdown v-if="canWrite || opened || $slots.menu" side="bottom" align="end">
         <template #trigger>
           <OButton
             variant="ghost"
@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ><OTooltip :content="t('rum.analytics.saved.more')"
           /></OButton>
         </template>
+        <slot name="menu" />
         <ODropdownItem
           v-if="canWrite"
           icon-left="bookmark-add"
