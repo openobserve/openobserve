@@ -1151,6 +1151,8 @@ export default defineComponent({
       if (outcome === "creditsExhausted" && !inputMessage.value) {
         inputMessage.value = userMessage;
         chatInput.value?.setContent?.(userMessage);
+        // A resend replaces the refused turn, so the images it held go back to the composer too.
+        if (!pendingImages.value.length) pendingImages.value = messagesToSend;
       }
     };
 

@@ -975,6 +975,27 @@ describe("O2AIChat", () => {
         expect((wrapper.vm as any).inputMessage).toBe("count errors");
       });
 
+      it("gives back the attached images with the draft", async () => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as any;
+        const image = { data: "aGVsbG8=", mimeType: "image/png", filename: "chart.png" };
+        vm.pendingImages = [image];
+        vm.inputMessage = "what does this chart show";
+        mockFetchAiChat.mockResolvedValueOnce({
+          ok: false,
+          status: 402,
+          json: vi
+            .fn()
+            .mockResolvedValue({ error_type: "ai_credits_exhausted", remedy: "subscribe" }),
+        });
+
+        await vm.sendMessage();
+        await flushPromises();
+
+        expect(vm.inputMessage).toBe("what does this chart show");
+        expect(vm.pendingImages).toEqual([image]);
+      });
+
       it("resending replaces the refused prompt instead of repeating it", async () => {
         await sendAndGetLast("subscribe");
         const vm = wrapper.vm as any;
