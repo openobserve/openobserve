@@ -2435,12 +2435,6 @@ pub struct Common {
     #[env_config(name = "ZO_ADDITIONAL_REPORTING_ORGS", default = "")]
     pub additional_reporting_orgs: String,
     #[env_config(
-        name = "ZO_USAGE_REPORT_TO_OWN_ORG",
-        default = true,
-        help = "Report alert/report triggers to the originating organization in addition to _meta org"
-    )]
-    pub usage_report_to_own_org: bool,
-    #[env_config(
         name = "ZO_USE_STREAM_SETTINGS_FOR_PARTITIONS_ENABLED",
         default = false,
         help = "Enable to use stream settings for partitions. This will apply for all streams"
@@ -5555,30 +5549,6 @@ mod tests {
 
         cfg.route.dispatch_strategy = RouteDispatchStrategy::Other;
         assert!(check_route_config(&cfg).is_err());
-    }
-
-    #[test]
-    fn test_usage_report_to_own_org_field_exists() {
-        // Test that usage_report_to_own_org field exists and is accessible
-        let cfg = Config::init().unwrap();
-        // Verify the field is accessible as a boolean
-        let _value: bool = cfg.common.usage_report_to_own_org;
-        // Test passes if we can access the field without error
-    }
-
-    #[test]
-    fn test_usage_report_to_own_org_env_override() {
-        // Test that environment variable can override the default
-        unsafe {
-            std::env::set_var("ZO_USAGE_REPORT_TO_OWN_ORG", "false");
-        }
-        let cfg = Config::init().unwrap();
-        // Note: This test may fail if the config is already loaded
-        // In that case, we just verify the field exists
-        let _ = cfg.common.usage_report_to_own_org;
-        unsafe {
-            std::env::remove_var("ZO_USAGE_REPORT_TO_OWN_ORG");
-        }
     }
 
     #[test]
