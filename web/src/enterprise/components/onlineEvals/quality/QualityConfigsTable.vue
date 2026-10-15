@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="emit('open', row, 'unhealthy')"
         >
           <OProgressBar
-            :value="unhealthyShare(row) ?? 0"
+            :value="barShare(unhealthyShare(row))"
             :variant="unhealthyTone(unhealthyShare(row)) ?? 'default'"
             size="sm"
           />
@@ -255,6 +255,7 @@ import OStatCard from "@/lib/data/StatStrip/OStatCard.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { QualityTileFilter, qualityTiles } from "../composables/useQualityList";
 import {
+  barShare,
   formatCount,
   formatPercent,
   healthSortValue,
