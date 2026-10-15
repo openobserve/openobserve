@@ -34,7 +34,7 @@ jq -j '.body // ""' "$OUT/issue.json" > "$OUT/body.md"
 gh api --paginate "$API/comments?per_page=100" \
   --jq '.[] | {user: .user.login, author_association, created_at, body}' > "$OUT/comments.jsonl"
 
-# A testing-stage label (Needs-Testing, Testing-InProgress, Testing-Completed, Test-Assist-*, Retested-Failed) means a fix already exists.
+# Any label containing testing / retested / verified / test-assist (Needs-Testing, Test-Assist-CI-Verified, Retested-Failed …) means a fix already exists.
 IN_TESTING=$(jq -r '[.labels[].name | select(test("testing|retested|verified|test-assist"; "i"))] | join(",")' "$OUT/issue.json")
 [ -z "$IN_TESTING" ] || skip "already in testing: $IN_TESTING"
 AUTHOR=$(jq -r .user.login "$OUT/issue.json")
