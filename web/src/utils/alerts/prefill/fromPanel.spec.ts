@@ -173,7 +173,7 @@ describe("buildPrefillFromPanel", () => {
         ...overrides,
       });
 
-    it("is written into the SQL too when the query was picked, since the form saves the SQL", () => {
+    it("is written into the SQL when the query was picked, since the form saves the SQL", () => {
       const p = buildPrefillFromPanel(
         thresholdPanel({
           queryChoices: [
@@ -184,14 +184,13 @@ describe("buildPrefillFromPanel", () => {
         makeId,
       );
       expect(p.meta?.sqlHaving).toEqual({ column: "y_axis_1", operator: ">=", value: 4.42 });
-      // Only in the SQL: the aggregation keeps its neutral default so the condition is not applied twice.
       expect(p.aggregation?.having).toEqual({ column: "y_axis_1", operator: ">=", value: 1 });
     });
 
-    it("stays in the aggregation alone on a single-query panel, as before", () => {
+    it("is written into the SQL on a single-query panel too, leaving the aggregation at its default", () => {
       const p = buildPrefillFromPanel(thresholdPanel({ queries: [builtQuery] }), makeId);
-      expect(p.meta).toEqual({ panelId: undefined, panelType: "line" });
-      expect(p.aggregation?.having).toEqual({ column: "y_axis_1", operator: ">=", value: 4.42 });
+      expect(p.meta?.sqlHaving).toEqual({ column: "y_axis_1", operator: ">=", value: 4.42 });
+      expect(p.aggregation?.having).toEqual({ column: "y_axis_1", operator: ">=", value: 1 });
     });
   });
 
@@ -451,7 +450,7 @@ describe("buildPrefillFromPanel — unresolved dashboard variables", () => {
   });
 });
 
-describe("buildPrefillFromPanel — a picked code-mode PromQL query's stream", () => {
+describe("buildPrefillFromPanel — a code-mode PromQL query's stream", () => {
   const codeQuery = (query: string, stream: string) => ({
     query,
     customQuery: true,
@@ -459,7 +458,6 @@ describe("buildPrefillFromPanel — a picked code-mode PromQL query's stream", (
   });
   const LEFTOVER = "traces_service_graph_request_server_failed_total";
   const other = codeQuery("up", "up");
-  // The query was picked from a multi-query panel, which is the only case the text decides the stream.
   const promqlPanel = (overrides: Partial<PanelPrefillInput> = {}): PanelPrefillInput => {
     const queries = [...(overrides.queries ?? []), other];
     return {
@@ -472,18 +470,17 @@ describe("buildPrefillFromPanel — a picked code-mode PromQL query's stream", (
     };
   };
 
-  it("keeps the leftover stream pick on a single-query panel, as before", () => {
-    const p = buildPrefillFromPanel(
-      {
-        panelTitle: "Disk",
-        queryType: "promql",
-        queries: [codeQuery("traces_service_graph_request_client_seconds_count", LEFTOVER)],
-        executedQuery: "traces_service_graph_request_client_seconds_count",
-      },
+  it("reads the same stream whether the query stands alone or beside a sibling", () => {
+    const query = codeQuery("traces_service_graph_request_client_seconds_count", LEFTOVER);
+    const executedQuery = "traces_service_graph_request_client_seconds_count";
+    const alone = buildPrefillFromPanel(
+      { panelTitle: "Disk", queryType: "promql", queries: [query], executedQuery },
       makeId,
     );
-    expect(p.streamName).toBe(LEFTOVER);
-    expect(p.streamCandidates).toBeUndefined();
+    const picked = buildPrefillFromPanel(promqlPanel({ queries: [query], executedQuery }), makeId);
+    expect(alone.streamName).toBe(executedQuery);
+    expect(picked.streamName).toBe(alone.streamName);
+    expect(alone.streamCandidates).toBeUndefined();
   });
 
   it("takes the metric the query reads, not the editor's leftover stream pick", () => {

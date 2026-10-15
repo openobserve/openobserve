@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onChartClick"
           @contextmenu="onChartContextMenu"
           @domcontextmenu="onChartDomContextMenu"
-          :find-line-on-context-menu="hasSeveralVisibleQueries"
+          :find-line-on-context-menu="findsLineOnContextMenu"
           @mouseover="exemplarInteraction.onMouseOver"
           @mouseout="exemplarInteraction.onMouseOut"
           @finished="onChartFinished"
@@ -325,7 +325,7 @@ import {
   usePanelDownload,
 } from "@/composables/dashboard/usePanelActions";
 import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
-import { isAlertableQuery } from "@/utils/alerts/prefill/fromPanel";
+import { alertableQueryIndexes } from "@/utils/alerts/prefill/fromPanel";
 import { overlayNewDataOnOldOptions, isOverlayEligible } from "@/utils/dashboard/streaming";
 import { usePanelExemplars } from "@/composables/dashboard/usePanelExemplars";
 import { usePanelExemplarInteraction } from "@/composables/dashboard/usePanelExemplarInteraction";
@@ -1179,12 +1179,17 @@ export default defineComponent({
       hideChartTooltip: () => chartRendererRef.value?.chart?.dispatchAction({ type: "hideTip" }),
       alertSource,
     });
+    const alertableQueries = computed(() =>
+      alertableQueryIndexes(panelSchema.value?.queries ?? [], visibleQueryIndexes.value),
+    );
     // Only a multi-query panel asks which query, so only it needs the clicked series' query resolved.
-    const hasSeveralVisibleQueries = computed(
+    const hasSeveralVisibleQueries = computed(() => alertableQueries.value.length > 1);
+    // A threshold needs the clicked line when there are several queries, or several y fields of one.
+    const findsLineOnContextMenu = computed(
       () =>
-        visibleQueryIndexes.value.filter((index: number) =>
-          isAlertableQuery(panelSchema.value?.queries?.[index]),
-        ).length > 1,
+        hasSeveralVisibleQueries.value ||
+        (panelSchema.value?.queryType !== "promql" &&
+          (panelSchema.value?.queries?.[alertableQueries.value[0]]?.fields?.y?.length ?? 0) > 1),
     );
     // SQL drops hidden queries' data but not their metadata, so a series' position counts the kept entries only.
     const sqlPanelQueryIndex = (position: number): number | undefined => {
@@ -1211,9 +1216,7 @@ export default defineComponent({
       openAlertContextMenu({
         ...event,
         // A query plotting several y fields needs to know which one the clicked series drew.
-        ...(hasSeveralVisibleQueries.value && typeof series?.yAxisGroup === "number"
-          ? { yField: series.yAxisGroup }
-          : {}),
+        ...(typeof series?.yAxisGroup === "number" ? { yField: series.yAxisGroup } : {}),
         panelQueryIndex,
         seriesRole: series?._seriesRole,
         ...(series?._seriesRole === "forecast"
@@ -2295,6 +2298,7 @@ export default defineComponent({
       onChartContextMenu,
       onChartDomContextMenu,
       hasSeveralVisibleQueries,
+      findsLineOnContextMenu,
       hideContextMenu,
       handleCreateAlert,
       cellDrawer,

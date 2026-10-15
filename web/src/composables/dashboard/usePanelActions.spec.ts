@@ -219,18 +219,23 @@ describe("usePanelActions", () => {
       closeAlertCreationDialog();
     });
 
-    it("drops the threshold of a single raw-SQL query with no y-axis fields, as main does", () => {
+    it("puts a single raw-SQL query's threshold on its own alias when it has no y-axis fields", () => {
       const args = makeBase();
       args.panelSchema.value.queries[0] = {
         query: 'select histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" from logs',
         fields: { stream: "logs", stream_type: "logs" },
       } as any;
+      args.metadata.value = { queries: [] };
       const api = usePanelAlertCreation(args as any);
 
       api.handleCreateAlert({ condition: "above", threshold: 4.42, panelQueryIndex: 0 });
 
       expect(args.router.push).toHaveBeenCalledTimes(1);
-      expect(readAlertPrefill()?.meta?.sqlHaving).toBeUndefined();
+      expect(readAlertPrefill()?.meta?.sqlHaving).toEqual({
+        column: "y_axis_1",
+        operator: ">=",
+        value: 4.42,
+      });
     });
 
     it("puts an empty-area threshold on a picked raw-SQL query's own column", () => {
@@ -281,7 +286,7 @@ describe("usePanelActions", () => {
       closeAlertCreationDialog();
     });
 
-    it("leaves a single builder query's right-clicked threshold in its aggregation, as before", () => {
+    it("writes a single builder query's right-clicked threshold into the SQL it saves", () => {
       const args = makeBase();
       const built = args.panelSchema.value.queries[0] as any;
       built.customQuery = false;
@@ -297,12 +302,12 @@ describe("usePanelActions", () => {
       expect(args.router.push).toHaveBeenCalledTimes(1);
       const stored = readAlertPrefill();
       expect(stored?.queryChoices).toBeUndefined();
-      expect(stored?.meta?.sqlHaving).toBeUndefined();
-      expect(stored?.aggregation?.having).toEqual({
+      expect(stored?.meta?.sqlHaving).toEqual({
         column: "errors",
         operator: ">=",
         value: 4.179104477611935,
       });
+      expect(stored?.aggregation?.having).toMatchObject({ operator: ">=", value: 1 });
     });
 
     describe("a builder query plotting two y fields", () => {
@@ -355,6 +360,27 @@ describe("usePanelActions", () => {
         const prefill = alertCreationDialog.value?.prefill;
         expect(prefill?.meta?.sqlHaving).toBeUndefined();
         expect(prefill?.aggregation?.having).toMatchObject({ operator: ">=", value: 1 });
+      });
+
+      it("does the same on a single-query panel, which still goes straight to the form", () => {
+        const args = twoY();
+        args.panelSchema.value.queries.pop();
+        args.contextMenuData.value = { yField: 1 };
+        const api = usePanelAlertCreation(args as any);
+
+        api.handleCreateAlert({ condition: "above", threshold: 250 });
+        expect(alertCreationDialog.value).toBeNull();
+        expect(readAlertPrefill()?.meta?.sqlHaving).toEqual({
+          column: "y_axis_2",
+          operator: ">=",
+          value: 250,
+        });
+
+        args.contextMenuData.value = {};
+        api.handleCreateAlert({ condition: "above", threshold: 250 });
+        expect(alertCreationDialog.value).toBeNull();
+        expect(readAlertPrefill()?.meta?.sqlHaving).toBeUndefined();
+        expect(args.router.push).toHaveBeenCalledTimes(2);
       });
     });
 

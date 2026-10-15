@@ -2298,7 +2298,7 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(0);
     });
 
-    it("leaves a series' own query untouched when only one query is visible", () => {
+    it("leaves a series' own query untouched when only one query is visible, but names its y field", () => {
       vi.mocked(usePanelDataLoader).mockReturnValueOnce({
         data: ref([[], []]),
         loading: ref(false),
@@ -2327,8 +2327,28 @@ describe("PanelSchemaRenderer", () => {
       wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0 });
 
       expect(wrapper.vm.hasSeveralVisibleQueries).toBe(false);
+      expect(wrapper.vm.findsLineOnContextMenu).toBe(false);
       expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(0);
-      expect(wrapper.vm.contextMenuData).not.toHaveProperty("yField");
+      expect(wrapper.vm.contextMenuData.yField).toBe(1);
+    });
+
+    it("looks for the clicked line on a single query plotting two y fields", () => {
+      const query = defaultProps.panelSchema.queries[0];
+      wrapper = createWrapper({
+        allowAlertCreation: true,
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          queries: [
+            {
+              ...query,
+              fields: { ...query.fields, y: [...query.fields.y, { alias: "avg", label: "Avg" }] },
+            },
+          ],
+        },
+      });
+
+      expect(wrapper.vm.hasSeveralVisibleQueries).toBe(false);
+      expect(wrapper.vm.findsLineOnContextMenu).toBe(true);
     });
 
     it("reads a forecast line's start and the clicked point's time, for the forecast alert", () => {

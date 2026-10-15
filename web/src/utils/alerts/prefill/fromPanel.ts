@@ -233,8 +233,12 @@ const codeModeStreams = (
 };
 
 /** A query with something to alert on: its own text, or a formula over other queries. */
-export const isAlertableQuery = (query: PanelQueryShape | undefined): boolean =>
+const isAlertableQuery = (query: PanelQueryShape | undefined): boolean =>
   isFormulaQuery(query) || !!query?.query?.trim();
+
+/** The shown queries an alert can target; an empty slot runs nothing, but a lone shown query is kept as is. */
+export const alertableQueryIndexes = (queries: PanelQueryShape[], shown: number[]): number[] =>
+  shown.length > 1 ? shown.filter((index) => isAlertableQuery(queries[index])) : shown;
 
 /** The executed text of a panel query's current-period window; shifted windows follow the primaries. */
 export const executedPanelQuery = (
@@ -279,16 +283,12 @@ export const buildPrefillFromPanel = (
   }
 
   const isPromql = input.queryType === "promql";
-  // Only a multi-query pick changes the prefill; a single-query panel keeps its established output.
-  const isQueryPick = (input.queryChoices?.length ?? 0) > 1;
   const sourceQuery = input.executedQuery || query?.query || "";
   const inputStreams = !isPromql
     ? []
     : isFormulaQuery(query)
       ? formulaInputStreams(input.queries ?? [], query.config.formula, input.metadataQueries)
-      : isQueryPick
-        ? codeModeStreams(query, sourceQuery)
-        : [];
+      : codeModeStreams(query, sourceQuery);
   // Raw text from a query that never ran may still hold dashboard variables the evaluator cannot fill.
   if (!input.executedQuery && /\$(\w|\{)/.test(sourceQuery)) {
     warnings.push(warn("unresolvedQuery", "blocking"));
@@ -307,9 +307,8 @@ export const buildPrefillFromPanel = (
 
   const hasThreshold = input.threshold !== undefined && !!input.condition;
   const operator = input.condition === "above" ? ">=" : "<=";
-  // A picked built query's threshold goes into its SQL alone: the form saves the SQL, and a second copy in the aggregation would apply it twice.
-  const thresholdInSql =
-    hasThreshold && !isPromql && !!input.yAxisColumn && (!aggregation || isQueryPick);
+  // The form saves a SQL alert's query text and drops its aggregation, so the threshold must live in the HAVING.
+  const thresholdInSql = hasThreshold && !isPromql && !!input.yAxisColumn;
 
   if (hasThreshold && aggregation && !thresholdInSql) {
     aggregation.having.value = input.threshold as number;
@@ -349,8 +348,7 @@ export const buildPrefillFromPanel = (
     }
   } else {
     prefill.sql = sourceQuery;
-    // Raw-SQL panels get their threshold as a HAVING clause injected into the
-    // query text, which needs the SQL parser — the consumer applies this.
+    // Injecting the HAVING needs the async SQL parser, so the consumer applies it.
     if (thresholdInSql) {
       prefill.meta = {
         ...prefill.meta,

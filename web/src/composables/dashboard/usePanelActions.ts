@@ -17,7 +17,7 @@ import {
   buildPrefillFromPanel,
   dateToMicros,
   executedPanelQuery,
-  isAlertableQuery,
+  alertableQueryIndexes,
   panelQueryChoices,
   type PanelQueryShape,
 } from "@/utils/alerts/prefill/fromPanel";
@@ -221,10 +221,10 @@ export function usePanelAlertCreation({
     hideContextMenu();
 
     const queries: any[] = panelSchema.value.queries ?? [];
-    const shown = visibleQueryIndexes?.value ?? queries.map((_, index) => index);
-    // An empty query slot runs nothing, so it is no alert target; a lone shown query keeps its established path.
-    const visible =
-      shown.length > 1 ? shown.filter((index) => isAlertableQuery(queries[index])) : shown;
+    const visible = alertableQueryIndexes(
+      queries,
+      visibleQueryIndexes?.value ?? queries.map((_, index) => index),
+    );
     const point = contextMenuData.value?.forecastPoint;
     const isForecast = selection.condition === "forecast" && !!point;
     // A forecast is fitted to the clicked series, so it cannot move to another query.
@@ -249,27 +249,22 @@ export function usePanelAlertCreation({
     // A series clicked on a multi-query panel ties its value to that series' own query.
     const pickedSeriesQuery = offerChoice && clicked !== undefined && visible.includes(clicked);
     const clickedYField = contextMenuData.value?.yField;
+    // Single-query series carry no query index, so the lone query owns the click.
+    const clickOwner = clicked ?? (offerChoice ? undefined : queryIndex);
     // A query plotting several y fields takes a threshold only for the one the clicked series drew.
     const yFieldOf = (index: number): number | undefined => {
       const count = queries[index]?.fields?.y?.length ?? 0;
       if (count <= 1) return 0;
-      return index === clicked && typeof clickedYField === "number" && clickedYField < count
+      return index === clickOwner && typeof clickedYField === "number" && clickedYField < count
         ? clickedYField
         : undefined;
     };
     // Only a SQL threshold needs the y-axis column; PromQL compares the series value.
     const yAxisColumnOf = (index: number) => {
       if (queryType !== "sql") return null;
-      if (!offerChoice) {
-        return sqlYAxisColumnOf(
-          queries[index],
-          executedQueryOf(index),
-          contextMenuData.value?.seriesName,
-        );
-      }
       // Right-click events carry no series name, so a query falls back to its own SQL alias.
       return (
-        (index === clicked
+        (index === clickOwner
           ? sqlYAxisColumnOf(
               queries[index],
               executedQueryOf(index),
@@ -282,7 +277,7 @@ export function usePanelAlertCreation({
     // The clicked value is on that series' scale, so another query gets the form's own default.
     const thresholdFor = (index: number) =>
       (pickedSeriesQuery && index !== clicked) ||
-      (offerChoice && queryType === "sql" && yFieldOf(index) === undefined)
+      (queryType === "sql" && yFieldOf(index) === undefined)
         ? {}
         : { threshold: selection.threshold, condition: selection.condition as "above" | "below" };
 

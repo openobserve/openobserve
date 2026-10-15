@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// A right-clicked threshold on a builder query picked in the multi-query dialog
-// has to reach the form once, as a HAVING in the SQL the form saves.
+// A right-clicked threshold on a builder query must reach the saved alert once, as a HAVING in its SQL.
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, afterEach } from "vitest";
@@ -41,8 +40,7 @@ vi.mock("@/composables/useFunctions", () => ({
   default: () => ({ getAllFunctions: vi.fn().mockResolvedValue({ functions: [] }) }),
 }));
 
-// The SQL preview asks the backend what the query's result set looks like.
-// Shape mirrors a real GROUP BY response so the chart lands on "line".
+// The SQL preview asks the backend for the query's result shape; a GROUP BY shape keeps the chart a line.
 vi.mock("@/services/search", () => ({
   default: {
     search: vi.fn(),
@@ -104,9 +102,7 @@ vi.mock("@/services/anomaly_detection", () => ({ default: { get: vi.fn() } }));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn() }) }));
 
-// QueryConfig and PreviewAlert are deliberately NOT stubbed — the defects this
-// spec pins live in what they do to the form on a whole-form seed, and in the
-// chart config PreviewAlert builds. Only the leaf chart renderer is stubbed.
+// QueryConfig stays real: it is what seeds the SQL and aggregation this spec checks.
 const stubs = {
   AlertSettings: true,
   CompareWithPast: true,
@@ -135,17 +131,21 @@ const builtQuery = {
   },
 };
 
-const openPickedBuilderQuery = async () => {
+const openBuilderQuery = async (picked: boolean) => {
   const prefill = buildPrefillFromPanel({
     panelTitle: "Retries",
     panelType: "line",
     queryType: "sql",
-    queries: [builtQuery, builtQuery],
-    queryIndex: 1,
-    queryChoices: [
-      { index: 0, query: builtQuery.query },
-      { index: 1, query: builtQuery.query },
-    ],
+    queries: picked ? [builtQuery, builtQuery] : [builtQuery],
+    queryIndex: picked ? 1 : 0,
+    ...(picked
+      ? {
+          queryChoices: [
+            { index: 0, query: builtQuery.query },
+            { index: 1, query: builtQuery.query },
+          ],
+        }
+      : {}),
     executedQuery: builtQuery.query,
     threshold: 4.42,
     condition: "above",
@@ -157,13 +157,11 @@ const openPickedBuilderQuery = async () => {
     global: { provide: { store }, plugins: [i18n], stubs },
     props: { modelValue: {}, isUpdated: false, destinations: [] },
   });
-  await flushPromises();
-  await new Promise((resolve) => setTimeout(resolve, 1200));
-  await flushPromises();
+  for (let round = 0; round < 5; round++) await flushPromises();
   return wrapper;
 };
 
-describe("AddAlert — a threshold right-clicked on a picked builder query", () => {
+describe("AddAlert — a threshold right-clicked on a builder query", () => {
   let wrapper: any;
 
   afterEach(() => {
@@ -173,15 +171,22 @@ describe("AddAlert — a threshold right-clicked on a picked builder query", () 
     vi.clearAllMocks();
   });
 
-  it("lands once, as a HAVING in the SQL, with the aggregation left at its default", async () => {
-    wrapper = await openPickedBuilderQuery();
+  it.each([
+    ["picked in the multi-query dialog", true],
+    ["on a single-query panel", false],
+  ])("%s, is saved once, as a HAVING in the SQL", async (_name, picked) => {
+    wrapper = await openBuilderQuery(picked);
     const condition = wrapper.vm.formData.query_condition;
 
     expect(condition.type).toBe("sql");
     expect(condition.sql.match(/HAVING/g)).toHaveLength(1);
     expect(condition.sql).toContain('HAVING "y_axis_1" >= 4.42');
-    expect(wrapper.vm.isAggregationEnabled).toBe(true);
     expect(condition.aggregation.having).toMatchObject({ operator: ">=", value: 1 });
-    expect(wrapper.vm.formData.trigger_condition).toMatchObject({ operator: ">=", threshold: 1 });
+
+    const saved = wrapper.vm.getAlertPayload().query_condition;
+    expect(saved.type).toBe("sql");
+    expect(saved.sql.match(/HAVING/g)).toHaveLength(1);
+    expect(saved.sql).toContain('HAVING "y_axis_1" >= 4.42');
+    expect(saved.aggregation).toBeNull();
   });
 });
