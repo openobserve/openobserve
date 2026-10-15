@@ -17131,6 +17131,9 @@
         "legendThreshold": "threshold {direction} {value}",
         "markLineHealthy": "healthy {direction} {value}",
         "filterRange": "{from} to {to}",
+        "filterBelow": "Below {to}",
+        "filterAtLeast": "{from} or more",
+        "filterAny": "Any value",
         "clearFilter": "Clear filter"
       },
       "review": {

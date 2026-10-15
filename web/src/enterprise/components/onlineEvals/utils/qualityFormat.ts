@@ -153,11 +153,29 @@ export function summarizeDistribution(distribution: QualityDistributionBucket[])
   return { total, unhealthy, status };
 }
 
-export function bucketLabel(bucket: QualityDistributionBucket): string {
+/** A bar's label. The backend folds values below the range into the first numeric bar and values above it into the last, so those two read open-ended: "< 0.1" and "≥ 0.9". */
+export function bucketLabel(
+  bucket: QualityDistributionBucket,
+  edge: { first?: boolean; last?: boolean } = {},
+): string {
   if (bucket.lower != null && bucket.upper != null) {
+    if (edge.first && !edge.last) return `< ${formatNumber(bucket.upper)}`;
+    if (edge.last && !edge.first) return `≥ ${formatNumber(bucket.lower)}`;
     return `${formatNumber(bucket.lower)}–${formatNumber(bucket.upper)}`;
   }
   return String(bucket.key);
+}
+
+/** The score trend's y axis: the config range, widened to any average or p95 outside it, so no line is clipped. */
+export function scoreAxisBounds(
+  range: { min: number; max: number } | null | undefined,
+  timeline: QualityTimelineBucket[],
+): { min: number | "dataMin"; max: number | "dataMax" } {
+  if (!range) return { min: "dataMin", max: "dataMax" };
+  const values = timeline
+    .flatMap((bucket) => [bucket.average, bucket.p95])
+    .filter((value): value is number => value != null && Number.isFinite(value));
+  return { min: Math.min(range.min, ...values), max: Math.max(range.max, ...values) };
 }
 
 /** The filter after a bar click: numeric bars select a bucket range (shift widens it), others one value; re-clicking the only bar clears it. */
@@ -239,10 +257,15 @@ export function chartFilterLabel(
   if (filter.kind === "value") return raw(filter.value);
   const first = distribution.find((b) => b.key === filter.from);
   const last = distribution.find((b) => b.key === filter.to);
-  return t("onlineEvals.quality.detail.filterRange", {
-    from: formatNumber(first?.lower ?? filter.from),
-    to: formatNumber(last?.upper ?? filter.to + 1),
-  });
+  const from = formatNumber(first?.lower ?? filter.from);
+  const to = formatNumber(last?.upper ?? filter.to + 1);
+  // The edge bars also hold the values outside the range, as their labels say.
+  const openLow = filter.from === distribution[0]?.key;
+  const openHigh = filter.to === distribution[distribution.length - 1]?.key;
+  if (openLow && openHigh) return t("onlineEvals.quality.detail.filterAny");
+  if (openLow) return t("onlineEvals.quality.detail.filterBelow", { to });
+  if (openHigh) return t("onlineEvals.quality.detail.filterAtLeast", { from });
+  return t("onlineEvals.quality.detail.filterRange", { from, to });
 }
 
 const pinned = (level: string) => !!level && level !== ALL_AGENTS_VALUE;
