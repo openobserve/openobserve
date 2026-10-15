@@ -67,13 +67,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-state="{ row }">
-        <OBadge
-          :variant="STATE_BADGES[row.state].variant"
-          size="sm"
-          :data-test="`settings-org-linked-domains-state-${row.domain}`"
-        >
-          {{ t(STATE_BADGES[row.state].labelKey) }}
-        </OBadge>
+        <span class="relative inline-flex">
+          <OBadge
+            :variant="STATE_BADGES[row.state].variant"
+            size="sm"
+            :data-test="`settings-org-linked-domains-state-${row.domain}`"
+          >
+            {{ t(STATE_BADGES[row.state].labelKey) }}
+          </OBadge>
+          <OTooltip
+            v-if="stateReason(row)"
+            :max-width="'25rem'"
+            :content="stateReason(row)!"
+            :data-test="`settings-org-linked-domains-state-reason-${row.domain}`"
+          />
+        </span>
       </template>
       <template #cell-method="{ row }">
         {{ t(METHOD_KEYS[row.method]) }}
@@ -94,6 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`settings-org-linked-domains-verify-${row.domain}`"
             @click.stop="verify(row.domain)"
           />
+          <!-- Holds the Verify slot so Remove stays in the same column on every link row. -->
+          <span v-else-if="row.link" class="h-8 w-8 shrink-0 max-md:hidden" aria-hidden="true" />
           <OButton
             v-if="row.link"
             variant="ghost-destructive"
@@ -141,16 +151,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #expansion="{ row }">
         <div class="px-page-edge py-3">
           <OrgDomainVerification v-if="row.link && row.method === 'dns'" :domain="row.link" />
-          <div
-            v-else-if="row.request"
-            class="flex flex-col gap-1 text-sm"
-            :data-test="`settings-org-linked-domains-reason-${row.domain}`"
-          >
-            <span class="text-text-label text-xs font-medium">
-              {{ t("settings.orgDomainMapping.rejectionReason") }}
-            </span>
-            <span class="text-text-body">{{ row.request.reason || dash }}</span>
-          </div>
         </div>
       </template>
     </OTable>
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
-import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -178,6 +178,7 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import type {
@@ -216,7 +217,11 @@ const props = defineProps<{ orgId: string; mappings: OrgDomainMapping[] }>();
 const { t } = useI18nTyped();
 const { confirm } = useConfirmDialog();
 
-const dash = raw("—");
+const FAILURE_REASON_KEYS: Record<number, I18nKey> = {
+  0: "settings.orgDomainMapping.failureReason.recordMissing",
+  1: "settings.orgDomainMapping.failureReason.valueMismatch",
+  2: "settings.orgDomainMapping.failureReason.dnsFailed",
+};
 
 const STATE_BADGES: Record<RowState, { variant: BadgeVariant; labelKey: I18nKey }> = {
   verified: { variant: "success-outline", labelKey: "settings.orgDomainMapping.state.verified" },
@@ -319,8 +324,15 @@ const columns: OTableColumnDef<LinkedDomainRow>[] = [
   },
 ];
 
-const isExpandable = (row: LinkedDomainRow) =>
-  row.method === "dns" || (row.state === "rejected" && !!row.request?.reason);
+// Only DNS links expand: they carry the record to copy. Why a row failed or was rejected is the badge tooltip.
+const isExpandable = (row: LinkedDomainRow) => row.method === "dns";
+
+const stateReason = (row: LinkedDomainRow): I18nText | null => {
+  const failure = row.link?.verification_failure_reason;
+  if (row.state === "failed" && failure != null) return t(FAILURE_REASON_KEYS[failure]);
+  if (row.state === "rejected" && row.request?.reason) return raw(row.request.reason);
+  return null;
+};
 
 const canVerify = (row: LinkedDomainRow) => row.method === "dns" && row.state !== "verified";
 

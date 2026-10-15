@@ -10769,7 +10769,6 @@
       "notVerifiedYet": "The DNS record was not found yet. It can take a while to propagate.",
       "requestSent": "Link request sent",
       "requestFailed": "Failed to send the link request",
-      "rejectionReason": "Reason for rejection",
       "keepRecordHint": "Keep this record in place. Ownership is re-checked every {minutes} minutes; if the record is missing for more than {grace} minutes, the domain is marked failed and its mappings stop applying.",
       "removeDomain": "Remove domain",
       "removeTitle": "Remove domain?",

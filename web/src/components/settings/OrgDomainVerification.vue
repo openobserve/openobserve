@@ -16,16 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col gap-2" :data-test="`settings-org-domain-verification-${domain.domain}`">
-    <OBanner
-      v-if="domain.verification_state === 2 && domain.verification_failure_reason !== null"
-      variant="error"
-      icon="warning"
-      dense
-      :data-test="`settings-org-domain-failure-${domain.domain}`"
-    >
-      {{ t(FAILURE_REASON_KEYS[domain.verification_failure_reason]) }}
-    </OBanner>
-
     <span class="text-text-heading text-sm font-medium">
       {{ t("settings.orgDomainMapping.recordInstructions") }}
     </span>
@@ -79,7 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -94,12 +83,6 @@ const { t } = useI18nTyped();
 const VERIFY_INTERVAL_MINUTES = 5;
 // Mirrors DOMAIN_EXPIRY_BUFFER_SEC in core/org_domain_ownership.rs.
 const FAILURE_GRACE_MINUTES = 30;
-
-const FAILURE_REASON_KEYS = {
-  0: "settings.orgDomainMapping.failureReason.recordMissing",
-  1: "settings.orgDomainMapping.failureReason.valueMismatch",
-  2: "settings.orgDomainMapping.failureReason.dnsFailed",
-} as const;
 
 const txtName = computed(() => `_o2-verify.${props.domain.domain}`);
 

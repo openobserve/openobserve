@@ -161,6 +161,49 @@ describe("OrgLinkedDomains", () => {
     expect(exists(wrapper, "settings-org-linked-domains-remove-asked.com")).toBe(false);
   });
 
+  it("explains a failed check and a rejection in the status tooltip, and expands only DNS rows", async () => {
+    api.list_org_domains.mockResolvedValue({
+      data: [
+        { ...link("broken.com", 2), verification_failure_reason: 1 },
+        link("pending.com", 0),
+        link("granted.com", 1, true),
+      ],
+    });
+    const wrapper = await mountList();
+    const reason = (domain: string) =>
+      wrapper.find(`[data-test="settings-org-linked-domains-state-reason-${domain}"]`);
+    const canExpand = (domain: string) =>
+      wrapper
+        .findAll("tr")
+        .find((tr) =>
+          tr.find(`[data-test="settings-org-linked-domains-state-${domain}"]`).exists(),
+        )!
+        .find('[data-test="o2-table-expand-cell"] button')
+        .exists();
+
+    expect(reason("broken.com").attributes("content")).toBe(
+      "TXT record found, but the value doesn't match",
+    );
+    expect(reason("denied.com").attributes("content")).toBe("not yours");
+    expect(reason("pending.com").exists()).toBe(false);
+
+    expect(canExpand("broken.com")).toBe(true);
+    expect(canExpand("pending.com")).toBe(true);
+    expect(canExpand("denied.com")).toBe(false);
+    expect(canExpand("granted.com")).toBe(false);
+  });
+
+  it("keeps Remove in the same slot whether or not Verify now is shown", async () => {
+    const wrapper = await mountList();
+    const slotOf = (domain: string) => {
+      const remove = wrapper.find(`[data-test="settings-org-linked-domains-remove-${domain}"]`);
+      return [...remove.element.parentElement!.children].indexOf(remove.element);
+    };
+
+    expect(slotOf("acme.com")).toBe(slotOf("pending.com"));
+    expect(slotOf("granted.com")).toBe(slotOf("pending.com"));
+  });
+
   it("links through DNS or raises a request depending on the method", async () => {
     const wrapper = await mountList();
 
