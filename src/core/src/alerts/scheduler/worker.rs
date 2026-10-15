@@ -317,8 +317,12 @@ impl SchedulerJobPuller {
             for trigger in triggers {
                 let job_id = trigger.id;
                 let job_key = trigger.module_key.clone();
-                let claim =
-                    (trigger.module == TriggerModule::CompositeAlert).then(|| trigger.clone());
+                let claim = trigger.module.completes_by_claim().then(|| trigger.clone());
+                let max_lifetime_secs = keep_alive_lifetime_secs(
+                    &trigger.module,
+                    self.config.alert_schedule_timeout,
+                    self.config.report_schedule_timeout,
+                );
                 let (tx, mut rx) = mpsc::channel::<()>(1);
                 let scheduled_job = ScheduledJob {
                     trace_id: trace_id.clone(),
@@ -331,8 +335,6 @@ impl SchedulerJobPuller {
                 let ttl = self.config.keep_alive_interval_secs;
                 let alert_timeout = self.config.alert_schedule_timeout;
                 let report_timeout = self.config.report_schedule_timeout;
-                // Maximum lifetime for keep-alive: use the larger timeout * 3
-                let max_lifetime_secs = std::cmp::max(alert_timeout, report_timeout) * 3;
                 tokio::task::spawn(async move {
                     let start_time = tokio::time::Instant::now();
                     let max_lifetime = tokio::time::Duration::from_secs(max_lifetime_secs as u64);
@@ -367,12 +369,12 @@ impl SchedulerJobPuller {
                                 Ok(true) => {}
                                 Ok(false) => {
                                     log::warn!(
-                                        "[SCHEDULER][JobPuller-{trace_id_keep_alive}] composite claim for job[{job_id}] trigger[{job_key}] is stale; stopping keep_alive"
+                                        "[SCHEDULER][JobPuller-{trace_id_keep_alive}] claim for job[{job_id}] trigger[{job_key}] is stale; stopping keep_alive"
                                     );
                                     return;
                                 }
                                 Err(e) => log::error!(
-                                    "[SCHEDULER][JobPuller-{trace_id_keep_alive}] keep_alive for composite job[{job_id}] trigger[{job_key}] failed: {e}"
+                                    "[SCHEDULER][JobPuller-{trace_id_keep_alive}] keep_alive for claimed job[{job_id}] trigger[{job_key}] failed: {e}"
                                 ),
                             }
                         } else if let Err(e) =
@@ -609,6 +611,18 @@ impl Scheduler {
     }
 }
 
+/// The longest a puller keeps a claim alive; a calibration pass bounds itself and may need longer.
+fn keep_alive_lifetime_secs(
+    module: &TriggerModule,
+    alert_timeout: i64,
+    report_timeout: i64,
+) -> i64 {
+    match module {
+        TriggerModule::AlertCalibration => super::calibration::claim_lifetime_secs(),
+        _ => std::cmp::max(alert_timeout, report_timeout) * 3,
+    }
+}
+
 /// Resolve the per-module pull budgets/cadences from config (A4). A per-module concurrency or
 /// interval of `0` inherits the shared default — alert concurrency
 /// (`ZO_ALERT_SCHEDULE_CONCURRENCY`) and the alert pull frequency (`ZO_ALERT_SCHEDULE_INTERVAL`)
@@ -685,6 +699,12 @@ fn resolve_module_configs(
             module: TriggerModule::QueryRecommendations,
             concurrency: pick_concurrency(cfg.limit.scheduler_query_reco_concurrency),
             poll_interval_secs: pick_interval(cfg.limit.scheduler_query_reco_interval),
+            lease_timeout_secs: None,
+        },
+        ModuleSchedulerConfig {
+            module: TriggerModule::AlertCalibration,
+            concurrency: std::cmp::max(1, cfg.limit.cpu_num as i64),
+            poll_interval_secs: pick_interval(cfg.limit.scheduler_alert_calibration_interval),
             lease_timeout_secs: None,
         },
     ]
@@ -944,20 +964,7 @@ mod tests {
         // never be pulled once per-module pullers are enabled.
         let cfg = config::Config::default();
         let configs = resolve_module_configs(&cfg, &make_config());
-        // Ten, and the list below is the authority: the count trailed the
-        // modules when `CompositeAlert` and `OncallEscalation` arrived from
-        // different branches, so it is asserted against the same number the
-        // loop walks rather than a literal somebody has to remember to bump.
-        let expected = 11;
-        assert_eq!(configs.len(), expected);
-        let modules: std::collections::HashSet<_> =
-            configs.iter().map(|c| c.module.clone()).collect();
-        assert_eq!(
-            modules.len(),
-            expected,
-            "duplicate module in resolved configs"
-        );
-        for m in [
+        let all = [
             TriggerModule::Alert,
             TriggerModule::CompositeAlert,
             TriggerModule::Report,
@@ -968,8 +975,18 @@ mod tests {
             TriggerModule::Slo,
             TriggerModule::SloBackfill,
             TriggerModule::OncallEscalation,
+            TriggerModule::AlertCalibration,
             TriggerModule::OncallSlackSync,
-        ] {
+        ];
+        assert_eq!(configs.len(), all.len());
+        let modules: std::collections::HashSet<_> =
+            configs.iter().map(|c| c.module.clone()).collect();
+        assert_eq!(
+            modules.len(),
+            all.len(),
+            "duplicate module in resolved configs"
+        );
+        for m in all {
             assert!(modules.contains(&m), "missing module {m:?}");
         }
     }
@@ -1053,6 +1070,26 @@ mod tests {
         assert_eq!(
             find_module(&configs, TriggerModule::SloBackfill).concurrency,
             2
+        );
+    }
+
+    #[test]
+    fn test_alert_calibration_lane_is_sized_by_the_cpu_count() {
+        let base = make_config(); // alert concurrency 3
+        let mut cfg = config::Config::default();
+        cfg.limit.cpu_num = 6;
+        let configs = resolve_module_configs(&cfg, &base);
+        assert_eq!(
+            find_module(&configs, TriggerModule::AlertCalibration).concurrency,
+            6
+        );
+
+        cfg.limit.cpu_num = 0;
+        let configs = resolve_module_configs(&cfg, &base);
+        assert_eq!(
+            find_module(&configs, TriggerModule::AlertCalibration).concurrency,
+            1,
+            "a lane with no workers would never pull"
         );
     }
 

@@ -149,6 +149,20 @@ const downtimesRouteGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
+// `=== false`, not falsy: a cold load with `/config` still in flight must not bounce.
+const alertCalibrationRouteGuard = (to: any, from: any, next: any) => {
+  const zoConfig = store.state.zoConfig;
+  if (
+    zoConfig?.build_type === "opensource" ||
+    (config.isEnterprise !== "true" && config.isCloud !== "true") ||
+    zoConfig?.alert_calibration_enabled === false
+  ) {
+    next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
@@ -237,6 +251,17 @@ const useRoutes = () => {
       component: Login,
       meta: {
         titleKey: "routeTitles.loginCallback",
+      },
+    },
+    {
+      // Outside MainLayout and the login redirect: anyone holding a public link can read it.
+      path: "/ai/public/:token",
+      name: "publicSharedChat",
+      component: () => import("@/views/SharedChatView.vue"),
+      props: (to: any) => ({ token: to.params.token, isPublic: true }),
+      meta: {
+        public: true,
+        titleKey: "routeTitles.sharedChat",
       },
     },
     {
@@ -927,6 +952,28 @@ const useRoutes = () => {
       },
     },
     {
+      path: "alert-calibration",
+      name: "alertCalibration",
+      component: () => import("@/components/alert_calibration/AlertCalibrationDigests.vue"),
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
+    },
+    {
+      path: "alert-calibration/dashboard",
+      name: "alertCalibrationDashboard",
+      component: () => import("@/components/alert_calibration/AlertCalibrationDashboard.vue"),
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
+    },
+    {
+      path: "alert-calibration/digests/:windowStart/:windowEnd",
+      name: "alertCalibrationDigest",
+      component: () => import("@/components/alert_calibration/AlertCalibrationDigestDetail.vue"),
+      props: true,
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
+    },
+    {
       path: "downtimes",
       name: "downtimes",
       component: () => import("@/components/alerts/downtimes/DowntimeList.vue"),
@@ -1083,6 +1130,15 @@ const useRoutes = () => {
           return;
         }
         routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "ai/shared/:token",
+      name: "sharedChat",
+      component: () => import("@/views/SharedChatView.vue"),
+      props: (to: any) => ({ token: to.params.token }),
+      meta: {
+        titleKey: "routeTitles.sharedChat",
       },
     },
     {

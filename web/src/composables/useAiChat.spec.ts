@@ -703,4 +703,22 @@ describe("useAiChat", () => {
       expect(analytics.track).not.toHaveBeenCalled();
     });
   });
+  describe("server-side chat requests", () => {
+    it("cancels a turn with a JSON body the server can tell from a form post", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+      await aiChatComposable.cancelAiChat("org1", "s/1");
+      const [url, init] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/org1/ai/chats/s%2F1/cancel");
+      expect(init).toMatchObject({ method: "POST", body: "{}", keepalive: true });
+      expect(init.headers["Content-Type"]).toBe("application/json");
+    });
+
+    it("sends known_version only alongside known_seq", async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+      await aiChatComposable.getServerChat("org1", "s1", 4, 50, "v2");
+      await aiChatComposable.getServerChat("org1", "s1", undefined, undefined, "v2");
+      expect(mockFetch.mock.calls[0][0]).toContain("?known_seq=4&known_version=v2&limit=50");
+      expect(mockFetch.mock.calls[1][0]).not.toContain("known_version");
+    });
+  });
 });

@@ -54,8 +54,29 @@ pub enum TriggerModule {
     /// next rung's delay. Its own lane so a paging timer is never queued
     /// behind an alert evaluation backlog.
     OncallEscalation,
+    /// Periodic alert calibration pass, one job per org config.
+    AlertCalibration,
     /// Slack sync of one page, keyed by its response id; region-local, never replicated.
     OncallSlackSync,
+}
+
+impl TriggerModule {
+    /// Exhaustive, so a new module has to choose; keep-alive must renew the claim it completes by.
+    pub fn completes_by_claim(&self) -> bool {
+        match self {
+            Self::CompositeAlert | Self::AlertCalibration => true,
+            Self::Report
+            | Self::Alert
+            | Self::DerivedStream
+            | Self::QueryRecommendations
+            | Self::Backfill
+            | Self::AnomalyDetection
+            | Self::Slo
+            | Self::SloBackfill
+            | Self::OncallEscalation
+            | Self::OncallSlackSync => false,
+        }
+    }
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -71,6 +92,7 @@ impl std::fmt::Display for TriggerModule {
             Self::SloBackfill => write!(f, "slo_backfill"),
             Self::CompositeAlert => write!(f, "composite_alert"),
             Self::OncallEscalation => write!(f, "oncall_escalation"),
+            Self::AlertCalibration => write!(f, "alert_calibration"),
             Self::OncallSlackSync => write!(f, "oncall_slack_sync"),
         }
     }
@@ -282,7 +304,8 @@ mod tests {
         assert_eq!(TriggerModule::SloBackfill as i32, 7);
         assert_eq!(TriggerModule::CompositeAlert as i32, 8);
         assert_eq!(TriggerModule::OncallEscalation as i32, 9);
-        assert_eq!(TriggerModule::OncallSlackSync as i32, 10);
+        assert_eq!(TriggerModule::AlertCalibration as i32, 10);
+        assert_eq!(TriggerModule::OncallSlackSync as i32, 11);
     }
 
     #[test]

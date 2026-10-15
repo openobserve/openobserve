@@ -43,7 +43,9 @@ pub enum Channel {
     Email,
     /// An existing alert Destination — Slack, Teams, or any HTTP endpoint.
     Webhook,
+    /// A text to the person's verified phone, sent through the org's telephony provider.
     Sms,
+    /// A call to the person's verified phone, sent through the org's telephony provider.
     Voice,
     /// A DM from the org's Slack app to the person's linked Slack account.
     Slack,

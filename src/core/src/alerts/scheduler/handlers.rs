@@ -735,7 +735,12 @@ pub async fn handle_triggers(
         let mut trigger = trigger;
         trigger.next_run_at = config::utils::time::now_micros() + 3600 * 1_000_000;
         trigger.status = db::scheduler::TriggerStatus::Waiting;
-        db::scheduler::update_trigger(trigger, false, trace_id).await?;
+        // Fenced and local like its own completion: a broadcast write can clobber a newer claim.
+        if trigger.module.completes_by_claim() {
+            infra::scheduler::complete_claim(trigger).await?;
+        } else {
+            db::scheduler::update_trigger(trigger, false, trace_id).await?;
+        }
         return Ok(());
     }
 
@@ -759,6 +764,9 @@ pub async fn handle_triggers(
         }
         db::scheduler::TriggerModule::OncallEscalation => {
             handle_oncall_escalation_triggers(trigger).await
+        }
+        db::scheduler::TriggerModule::AlertCalibration => {
+            super::calibration::handle_triggers(trace_id, trigger).await
         }
         db::scheduler::TriggerModule::OncallSlackSync => {
             handle_oncall_slack_sync_triggers(trigger).await

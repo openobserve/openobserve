@@ -101,9 +101,13 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 101: create downtimes; muted_by_downtime_id, last_downtime_id, slo_backfill_jobs kind/attempts.
 // 102: create downtime_notifications.
 // 103: create alert_calibration_configs.
-// 104: create oncall_phone_verifications and org_telephony.
-// 105: create oncall_chat_*; add oncall_responses.home_region and oncall_teams slack columns.
-pub const DB_SCHEMA_VERSION: u64 = 105;
+// 104: create ai_chat_sessions (server-side AI chat persistence).
+// 105: create ai_chat_shares and add fork columns to ai_chat_sessions.
+// 106: create ai_chat_turns and add replica_purged_at to ai_chat_sessions.
+// 107: add redact_tools to ai_chat_shares.
+// 108: create oncall_phone_verifications and org_telephony.
+// 109: create oncall_chat_*; add oncall_responses.home_region and oncall_teams slack columns.
+pub const DB_SCHEMA_VERSION: u64 = 109;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -222,8 +226,14 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-const _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS: [&str; 3] =
-    ["trace_id", "service_name", "operation_name"];
+const _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS: [&str; 6] = [
+    "trace_id",
+    "service_name",
+    "operation_name",
+    "_o2_trace_id",
+    "view_id",
+    "action_id",
+];
 pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let cfg = get_config();
     let default_fields: &[&str] = if cfg.common.feature_default_index_fields_enabled {
@@ -401,6 +411,12 @@ pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
         .collect()
 });
 
+/// `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES` as a set; `check_compact_config` validated it.
+pub static COMPACT_DYNAMIC_MERGE_STREAM_TYPES: Lazy<HashSet<StreamType>> = Lazy::new(|| {
+    parse_dynamic_merge_stream_types(&get_config().compact.dynamic_merge_stream_types)
+        .expect("validated at startup")
+});
+
 pub static NATS_KV_WATCH_MODULES: Lazy<HashSet<String>> = Lazy::new(|| {
     get_config()
         .nats
@@ -465,7 +481,6 @@ pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
         "ZO_SYNTHETICS_ENABLED",
         SyntheticsReloadClass::RestartRequired,
     ),
-    ("ZO_SYNTHETICS_SUBTESTS_ENABLED", SyntheticsReloadClass::Hot),
     (
         "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
         SyntheticsReloadClass::Hot,
@@ -528,7 +543,6 @@ pub(crate) fn synthetics_restart_required_changes(
     // compiling here until someone decides whether a reload can carry it.
     let Synthetics {
         enabled,
-        subtests_enabled: _,
         subtests_replication_grace_secs: _,
         status_page_rebuild_interval,
         status_page_domain_verify_interval,
@@ -1045,6 +1059,40 @@ pub struct Config {
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
     pub self_profiles: SelfProfiles,
+    pub public_ai_chat: PublicAiChat,
+}
+
+/// Unauthenticated read-only links to shared AI chats.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct PublicAiChat {
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_ENABLED",
+        default = false,
+        help = "Allow AI chats to be shared through public links. Off by default; the public route only exists when this is true."
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_RPM",
+        default = 60,
+        help = "Per-IP requests-per-minute limit on the public shared-chat route (0 disables)."
+    )]
+    pub rpm: u64,
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_MAX_EXPIRY_DAYS",
+        default = 90,
+        help = "Longest expiry, in days, a public AI chat link may have; public links must expire (0 means 90)."
+    )]
+    pub max_expiry_days: u64,
+}
+
+impl PublicAiChat {
+    /// Longest expiry of a public link in days: `max_expiry_days`, 90 when unset, at most 365.
+    pub fn expiry_limit_days(&self) -> u64 {
+        match self.max_expiry_days {
+            0 => 90,
+            days => days.min(365),
+        }
+    }
 }
 
 /// Background self CPU/memory profile ingest into `_meta.self_profiles`.
@@ -1142,13 +1190,6 @@ pub struct Synthetics {
         help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
     )]
     pub enabled: bool,
-    /// Off by default so no composed check can exist until an org opts in.
-    #[env_config(
-        name = "ZO_SYNTHETICS_SUBTESTS_ENABLED",
-        default = false,
-        help = "Enables subtest references in browser checks. Off by default; while false the server refuses composition writes and the UI hides Insert subtest."
-    )]
-    pub subtests_enabled: bool,
     /// Super-cluster only: how long a parent may reference a child that has not replicated yet.
     #[env_config(
         name = "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
@@ -2881,6 +2922,12 @@ pub struct Limit {
         help = "Poll cadence in seconds for the query-recommendation puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
     )]
     pub scheduler_query_reco_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_ALERT_CALIBRATION_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the alert calibration puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_alert_calibration_interval: i64,
     #[env_config(name = "ZO_SEARCH_JOB_WORKS", default = 1)]
     pub search_job_workers: i64,
     #[env_config(name = "ZO_SEARCH_JOB_SCHEDULE_INTERVAL", default = 10)] // seconds
@@ -3089,6 +3136,12 @@ pub struct Compact {
     pub extended_data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_STREAMS", default = "")] // use comma to split
     pub old_data_streams: String,
+    #[env_config(
+        name = "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES",
+        default = "",
+        help = "Comma-separated stream types (logs, metrics, traces) whose closed days the compactor merges across hours when the day holds many more files than its size needs. The stream setting `dynamic_merge` overrides it per stream. Empty disables the feature. Queries on an enabled stream select files with a daily max_ts bound; after removing a type here, set ZO_<TYPE>_QUERY_RETENTION=daily so already merged days are still found."
+    )]
+    pub dynamic_merge_stream_types: String,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
@@ -4688,6 +4741,7 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             "Data retention is not allowed to be less than 3 days."
         ));
     }
+    parse_dynamic_merge_stream_types(&cfg.compact.dynamic_merge_stream_types)?;
     if cfg.compact.interval < 1 {
         cfg.compact.interval = 10;
     }
@@ -4736,6 +4790,25 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+/// Parses `ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES`; only logs, metrics and traces are merged by day.
+fn parse_dynamic_merge_stream_types(list: &str) -> Result<HashSet<StreamType>, anyhow::Error> {
+    list.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            let stream_type = StreamType::from(s);
+            stream_type
+                .support_dynamic_merge()
+                .then_some(stream_type)
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "ZO_COMPACT_DYNAMIC_MERGE_STREAM_TYPES accepts logs, metrics, traces; got {s}"
+                    )
+                })
+        })
+        .collect()
 }
 
 fn check_sns_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
@@ -5153,7 +5226,6 @@ mod tests {
     /// `synthetics_restart_required_changes`.
     const ALL_SYNTHETICS_ENV_VARS: &[&str] = &[
         "ZO_SYNTHETICS_ENABLED",
-        "ZO_SYNTHETICS_SUBTESTS_ENABLED",
         "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
         "ZO_SYNTHETICS_LAMBDA_BROWSER",
         "ZO_SYNTHETICS_LAMBDA_NET",
@@ -5188,8 +5260,8 @@ mod tests {
     fn synthetics_reload_classification_is_pinned() {
         assert_eq!(
             SYNTHETICS_RELOAD_CLASSES.len(),
-            17,
-            "Synthetics has 17 keys; every one needs a reload class"
+            16,
+            "Synthetics has 16 keys; every one needs a reload class"
         );
 
         let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
@@ -5226,7 +5298,6 @@ mod tests {
                 "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
                 "ZO_SYNTHETICS_RECORDER_EXTENSION_URL",
                 "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
-                "ZO_SYNTHETICS_SUBTESTS_ENABLED",
                 "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
             ]
         );
@@ -5265,21 +5336,11 @@ mod tests {
         );
     }
 
-    #[test]
-    fn composition_is_off_by_default() {
-        let cfg = Config::init().unwrap();
-        assert!(
-            !cfg.synthetics.subtests_enabled,
-            "composition must ship dark: a fresh deployment must refuse subtest writes"
-        );
-    }
-
     /// Mutates every field away from its current value, so the two tests below
     /// run against the whole struct — an implementation that warns about an
     /// extra key cannot hide in the fields a subset forgot to touch.
     fn mutate_every_synthetics_field(cfg: &mut Synthetics) {
         cfg.enabled = !cfg.enabled;
-        cfg.subtests_enabled = !cfg.subtests_enabled;
         cfg.subtests_replication_grace_secs += 1;
         cfg.lambda_browser.push_str("-changed");
         cfg.lambda_net.push_str("-changed");
@@ -6491,6 +6552,18 @@ mod tests {
         let p = std::path::Path::new(r"C:\data\openobserve");
         let result = deverbatim(p);
         assert_eq!(result, r"C:\data\openobserve");
+    }
+
+    #[test]
+    fn dynamic_merge_stream_types_accept_only_merged_types() {
+        let set = super::parse_dynamic_merge_stream_types(" logs, Metrics ,,traces ").unwrap();
+        assert_eq!(set.len(), 3);
+        assert!(
+            super::parse_dynamic_merge_stream_types("")
+                .unwrap()
+                .is_empty()
+        );
+        assert!(super::parse_dynamic_merge_stream_types("logs,index").is_err());
     }
 
     #[test]

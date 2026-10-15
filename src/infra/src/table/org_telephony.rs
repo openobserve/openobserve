@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! One telephony account per org, its credentials sealed under the org DEK; region-local.
+//! One telephony account per org, replicated to every region and sealed under each region's key.
 
 use config::utils::encryption::Algorithm;
 use sea_orm::{ConnectionTrait, EntityTrait, Set, sea_query::OnConflict};

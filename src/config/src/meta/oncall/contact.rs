@@ -237,7 +237,7 @@ pub fn code_check(
     }
 }
 
-/// The refusal text and `Retry-After` seconds that tell a user when they may ask again. [pure]
+/// The refusal text and the `retry_after_secs` body field telling a user when to ask again. [pure]
 pub fn wait_message(micros: i64) -> (String, i64) {
     let secs = ((micros + 999_999) / 1_000_000).max(1);
     let minutes = (secs + 59) / 60;

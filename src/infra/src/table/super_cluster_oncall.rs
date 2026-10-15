@@ -52,7 +52,8 @@ use config::meta::oncall::{
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, NotSet,
-    QueryFilter, Set, TransactionTrait, sea_query::SimpleExpr,
+    QueryFilter, Set, TransactionTrait,
+    sea_query::{Expr, SimpleExpr},
 };
 
 use super::entity::{
@@ -539,13 +540,22 @@ async fn put_contact_in<C: ConnectionTrait>(
     phone: Option<String>,
     phone_verified_at: Option<i64>,
 ) -> Result<(), errors::Error> {
-    let existing = oncall_user_contacts::Entity::find()
-        .filter(oncall_user_contacts::Column::OrgId.eq(org_id))
-        .filter(oncall_user_contacts::Column::UserEmail.eq(user_email))
-        .one(conn)
-        .await?;
     // The proof is applied as received: the source already decided it, and V5 may have copied it.
-    let Some(existing) = existing else {
+    let updated = oncall_user_contacts::Entity::update_many()
+        .col_expr(
+            oncall_user_contacts::Column::Phone,
+            Expr::value(phone.clone()),
+        )
+        .col_expr(
+            oncall_user_contacts::Column::PhoneVerifiedAt,
+            Expr::value(phone_verified_at),
+        )
+        .filter(oncall_user_contacts::Column::OrgId.eq(org_id))
+        .filter(super::oncall_user_contacts::same_person(user_email))
+        .exec(conn)
+        .await?
+        .rows_affected;
+    if updated == 0 {
         oncall_user_contacts::ActiveModel {
             id: Set(id.to_string()),
             org_id: Set(org_id.to_string()),
@@ -559,12 +569,7 @@ async fn put_contact_in<C: ConnectionTrait>(
         }
         .insert(conn)
         .await?;
-        return Ok(());
-    };
-    let mut model: oncall_user_contacts::ActiveModel = existing.into();
-    model.phone = Set(phone);
-    model.phone_verified_at = Set(phone_verified_at);
-    model.update(conn).await?;
+    }
     Ok(())
 }
 
@@ -1190,5 +1195,37 @@ mod tests {
         let row = stored_contact(&db).await;
         assert_eq!(row.phone.as_deref(), Some("+15550199"));
         assert_eq!(row.phone_verified_at, Some(900));
+    }
+
+    /// R2: a put for `ana@` lands on the region's `Ana@` profile instead of adding a second one.
+    #[tokio::test]
+    async fn test_a_contact_put_updates_the_profile_saved_in_another_case() {
+        let db = db().await;
+        put_contact_in(
+            &db,
+            "c_1",
+            "acme",
+            "Ana@o2.ai",
+            Some("+15550100".into()),
+            Some(700),
+        )
+        .await
+        .unwrap();
+
+        put_contact_in(
+            &db,
+            "c_1",
+            "acme",
+            "ana@o2.ai",
+            Some("+15550199".into()),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let row = stored_contact(&db).await;
+        assert_eq!(row.user_email, "Ana@o2.ai");
+        assert_eq!(row.phone.as_deref(), Some("+15550199"));
+        assert_eq!(row.phone_verified_at, None);
     }
 }

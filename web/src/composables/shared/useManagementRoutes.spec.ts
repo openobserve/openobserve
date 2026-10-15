@@ -576,7 +576,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 25 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(26); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 16 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings, slackSettings, slackAppSettings)
+      expect(routes[0].children).toHaveLength(27); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 16 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings, slackSettings, slackAppSettings) + alert calibration
     });
 
     it("should have the announcement banner list and editor routes when enterprise", () => {
@@ -647,9 +647,9 @@ describe("useManagementRoutes", () => {
       expect(orgMgmtRoute.component).toBeDefined();
     });
 
-    it("should have exactly 10 children routes when cloud is enabled", () => {
+    it("should have exactly 12 children routes when cloud is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(11); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 1 cloud
+      expect(routes[0].children).toHaveLength(12); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + alert calibration + 1 cloud
     });
   });
 
@@ -666,7 +666,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 26 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(27); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 16 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings, slackSettings, slackAppSettings) + 1 cloud
+      expect(routes[0].children).toHaveLength(28); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 16 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings, slackSettings, slackAppSettings) + alert calibration + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
