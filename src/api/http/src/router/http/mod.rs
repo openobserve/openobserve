@@ -48,6 +48,9 @@ mod hec;
 pub use hec::is_splunk_collector_route;
 use hec::{splunk_payload_too_large, splunk_server_busy};
 
+/// Seconds a viewer waits after the router found no querier for a public dashboard read.
+const PUBLIC_RETRY_AFTER_SECS: &str = "5";
+
 /// Global HTTP client for connection pooling.
 /// Using OnceLock ensures thread-safe lazy initialization.
 static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
@@ -111,7 +114,15 @@ pub async fn dispatch(req: Request) -> Response {
         return route(req, path, None).await;
     }
     // The router's own 404, 502 and 503 answer the anonymous viewer too.
-    public_dashboards::public::with_headers(route(req, path, public_slug).await)
+    let mut resp = public_dashboards::public::with_headers(route(req, path, public_slug).await);
+    // A ring change is brief; without a hint the viewer would read the 503 as a paused link.
+    if resp.status() == StatusCode::SERVICE_UNAVAILABLE
+        && !resp.headers().contains_key(header::RETRY_AFTER)
+    {
+        let hint = header::HeaderValue::from_static(PUBLIC_RETRY_AFTER_SECS);
+        resp.headers_mut().insert(header::RETRY_AFTER, hint);
+    }
+    resp
 }
 
 async fn route(req: Request, path: String, public_slug: Option<String>) -> Response {
@@ -1062,6 +1073,7 @@ mod tests {
             let resp = dispatch(req).await;
             assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE, "{path}");
             assert_public_headers(&resp);
+            assert_eq!(resp.headers()[header::RETRY_AFTER], PUBLIC_RETRY_AFTER_SECS);
         }
     }
 
