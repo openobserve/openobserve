@@ -22,9 +22,8 @@ use arc_swap::ArcSwap;
 use chrono::Utc;
 use config::{
     ALL_VALUES_COL_NAME, BLOOM_FILTER_DEFAULT_FIELDS, COMPACT_DYNAMIC_MERGE_STREAM_TYPES,
-    METRICS_SECONDARY_INDEX_SEARCH_FIELDS, ORIGINAL_DATA_COL_NAME, RwAHashMap, RwHashMap,
-    RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
-    get_config,
+    ORIGINAL_DATA_COL_NAME, RwAHashMap, RwHashMap, RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS,
+    SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME, get_config,
     ider::SnowflakeIdGenerator,
     meta::{
         self_reporting::usage::INTERNAL_STREAM_NAMES,
@@ -482,8 +481,9 @@ pub fn get_stream_setting_index_fields<T: std::borrow::Borrow<StreamSettings>>(
     // fields into the index defaults here; the per-stream configured bloom
     // fields are unioned in the `Some` branch below (defensive for settings
     // persisted before bloom fields were merged into index_fields on update).
+    // metrics streams only index the fields their own stream settings ask for
     let default_fields = if stream_type == StreamType::Metrics {
-        METRICS_SECONDARY_INDEX_SEARCH_FIELDS.clone()
+        Vec::new()
     } else {
         let mut fields = SQL_SECONDARY_INDEX_SEARCH_FIELDS.clone();
         fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
@@ -1378,12 +1378,7 @@ mod tests {
     #[test]
     fn test_get_stream_setting_index_fields_metrics_skip_defaults() {
         let fields = get_stream_setting_index_fields(&None::<StreamSettings>, StreamType::Metrics);
-        assert_eq!(fields, METRICS_SECONDARY_INDEX_SEARCH_FIELDS.clone());
-        for field in SQL_SECONDARY_INDEX_SEARCH_FIELDS.iter() {
-            if !METRICS_SECONDARY_INDEX_SEARCH_FIELDS.contains(field) {
-                assert!(!fields.contains(field));
-            }
-        }
+        assert!(fields.is_empty());
 
         // explicit per-stream settings still apply to metrics
         let settings = StreamSettings {

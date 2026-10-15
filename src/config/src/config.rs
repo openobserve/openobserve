@@ -322,22 +322,6 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-/// Metrics index defaults: only the operator's `*_EXTRA_FIELDS`, never the built-in fields.
-pub static METRICS_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let cfg = get_config();
-    let mut fields = chain(
-        cfg.common.feature_secondary_index_extra_fields.split(','),
-        cfg.common.feature_bloom_filter_extra_fields.split(','),
-    )
-    .map(str::trim)
-    .filter(|s| !s.is_empty())
-    .map(str::to_string)
-    .collect::<Vec<_>>();
-    fields.sort();
-    fields.dedup();
-    fields
-});
-
 const _DEFAULT_SEARCH_AROUND_FIELDS: [&str; 6] = [
     "k8s_cluster",
     "k8s_namespace_name",
