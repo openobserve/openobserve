@@ -376,6 +376,10 @@ const CONTENT_PANEL_TYPES = ["markdown", "html"];
 const rowCount = (data: unknown[] | undefined): number =>
   Math.max(0, ...(data ?? []).map((rows) => (Array.isArray(rows) ? rows.length : 0)));
 
+// The server sends one metadata object per query; the chart converters read [query][partition].
+const asPartitions = (meta: unknown[] | undefined): unknown[][] =>
+  (meta ?? []).map((m) => (Array.isArray(m) ? m : m === null || m === undefined ? [] : [m]));
+
 // A truncated panel says how many rows it kept; a retained one shows its own build time, dimmed.
 const panelBadge = (result: PanelResult): I18nText | undefined => {
   if (result.state?.retained && result.built_at) {
@@ -411,7 +415,7 @@ const panelEntry = (panel: { id: string; type?: string }) => {
   return {
     data: result.data ?? [],
     metadata: result.metadata ?? { queries: [] },
-    resultMetaData: result.resultMetaData ?? [],
+    resultMetaData: asPartitions(result.resultMetaData),
     // A server-side partial build, not an interrupted load: the panel shows the Partial notice.
     serverPartial: !!result.state?.partial,
     dimmed: !!result.state?.retained,
