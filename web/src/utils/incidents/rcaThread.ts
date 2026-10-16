@@ -104,21 +104,55 @@ export const formatRcaElapsed = (ms: number): string =>
 export const formatRcaClock = (us: number): string =>
   formatTimestampInTimezone(us, "HH:mm:ss", "UTC");
 
-export type RcaNoteSegment = { kind: "text"; text: string } | { kind: "cite"; id: string };
+/**
+ * A piece of a step note: text with the inline marks the agent writes, or an
+ * `[eN]` citation. Marks are set only when true.
+ */
+export type RcaNoteSegment =
+  | { kind: "text"; text: string; bold?: true; italic?: true; code?: true }
+  | { kind: "cite"; id: string };
 
-const CITATION = /\[(e\d+)\]/g;
+type RcaNoteMarks = { bold?: true; italic?: true };
 
-/** Splits a step note into text and `[eN]` citation chips (02 TH29). */
-export function splitRcaNote(note: string): RcaNoteSegment[] {
-  const segments: RcaNoteSegment[] = [];
+// One alternation, first match wins: inline code, bold, citation, link, italics.
+const NOTE_TOKEN =
+  /`([^`\n]+)`|\*\*([^*\n]+?)\*\*|\[(e\d+)\]|\[([^\]\n]+)\]\(([^)\s]+)\)|(?<![\w*])\*([^*\s][^*\n]*?)\*(?![\w*])|(?<![\w_])_([^_\s][^_\n]*?)_(?![\w_])/g;
+
+function pushText(segments: RcaNoteSegment[], text: string, marks: RcaNoteMarks) {
+  if (text) segments.push({ kind: "text", text, ...marks });
+}
+
+function splitNoteInto(segments: RcaNoteSegment[], note: string, marks: RcaNoteMarks) {
   let last = 0;
-  for (const match of note.matchAll(CITATION)) {
+  for (const match of note.matchAll(NOTE_TOKEN)) {
     const at = match.index ?? 0;
-    if (at > last) segments.push({ kind: "text", text: note.slice(last, at) });
-    segments.push({ kind: "cite", id: match[1] });
+    pushText(segments, note.slice(last, at), marks);
+    const [, code, bold, cite, linkText, linkUrl, star, underscore] = match;
+    if (code !== undefined) {
+      segments.push({ kind: "text", text: code, ...marks, code: true });
+    } else if (bold !== undefined) {
+      splitNoteInto(segments, bold, { ...marks, bold: true });
+    } else if (cite !== undefined) {
+      segments.push({ kind: "cite", id: cite });
+    } else if (linkText !== undefined) {
+      // A link the agent writes shows as text and its URL in plain text (VE43).
+      pushText(segments, `${linkText} (${linkUrl})`, marks);
+    } else {
+      splitNoteInto(segments, star ?? underscore ?? "", { ...marks, italic: true });
+    }
     last = at + match[0].length;
   }
-  if (last < note.length) segments.push({ kind: "text", text: note.slice(last) });
+  pushText(segments, note.slice(last), marks);
+}
+
+/**
+ * Splits a step note into text and `[eN]` citation chips (02 TH29), with a safe
+ * inline-markdown subset: bold, italics and inline code. Links show as text; no
+ * HTML is ever produced.
+ */
+export function splitRcaNote(note: string): RcaNoteSegment[] {
+  const segments: RcaNoteSegment[] = [];
+  splitNoteInto(segments, note, {});
   return segments;
 }
 

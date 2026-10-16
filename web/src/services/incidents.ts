@@ -69,13 +69,20 @@ export type RcaTrigger =
 
 export type RcaRunMode = "fresh" | "build_on_previous";
 
+/** Outcome of a completed run (03 VE14). */
+export type RcaOutcome =
+  "root_cause_identified" | "contributing_factor" | "inconclusive" | "blocked";
+
+/** Graded confidence band (CG §5.3). */
+export type RcaBand = "high" | "medium" | "low";
+
 export type RcaRunSubjectType = "incident" | "alert";
 
 /** The finished result shown while a newer run is live, failed or cancelled. */
 export interface RcaPreviousResult {
   run_id: string;
-  outcome: string | null;
-  confidence: string | null;
+  outcome: RcaOutcome | null;
+  confidence: RcaBand | null;
   /** Microseconds since epoch. */
   ended_at: number;
 }
@@ -105,8 +112,8 @@ export interface RcaSummary {
   stale: boolean;
   started_at: number;
   updated_at: number;
-  outcome: string | null;
-  confidence: string | null;
+  outcome: RcaOutcome | null;
+  confidence: RcaBand | null;
   summary: RcaSummaryFields;
   /** Detail endpoint only: the newest run, without its report. */
   current_run?: RcaRun | null;
@@ -125,8 +132,8 @@ export interface RcaRunItem {
   state: RcaRunState;
   started_at: number;
   ended_at: number | null;
-  outcome: string | null;
-  confidence: string | null;
+  outcome: RcaOutcome | null;
+  confidence: RcaBand | null;
   cancelled_by: string | null;
   error_reason: string | null;
 }
@@ -161,8 +168,8 @@ export interface RcaRun {
   updated_at: number;
   ended_at: number | null;
   cancelled_by: string | null;
-  outcome: string | null;
-  confidence: string | null;
+  outcome: RcaOutcome | null;
+  confidence: RcaBand | null;
   report: string | null;
   result: unknown;
   error: RcaRunError | null;
@@ -251,6 +258,195 @@ export interface RcaThreadNotModified {
 }
 
 export type RcaThreadResponse = RcaThread | RcaThreadNotModified;
+
+/** Why the outcome was derived (03 VE14). */
+export type RcaOutcomeReason =
+  | "answer_deadline"
+  | "root_cause_graded"
+  | "ambiguous_cause"
+  | "leading_blocked"
+  | "contributing_graded"
+  | "cause_below_medium"
+  | "no_hypothesis"
+  | "no_confirmed_cause";
+
+export type RcaHypothesisStatus =
+  | "testing"
+  | "untested"
+  | "likely"
+  | "root_cause"
+  | "contributing"
+  | "symptom"
+  | "ruled_out"
+  | "inconclusive"
+  | "blocked";
+
+/** Signal class of a tool call (CG §5.3.2). */
+export type RcaSignalClass =
+  "logs" | "metrics" | "traces" | "change" | "infra" | "context" | "unclassified";
+
+export type RcaPolarity = "supports" | "contradicts" | "rules_out";
+export type RcaStrength = "decisive" | "supporting";
+
+/** Timeline status after the evidence check (03 VE31). */
+export type RcaTimelineStatus = "confirmed" | "refuted" | "likely" | "unverified";
+
+export type RcaBlindSpotAxis = "change" | "logs" | "metrics" | "traces" | "infra" | "other";
+export type RcaBlindSpotFix =
+  "connect_toolset" | "ingest_data" | "open_pipeline" | "sampling_rules" | "resume_run" | "none";
+
+export type RcaChangeKind = "deploy" | "commit" | "config_change" | "feature_flag" | "infra";
+
+/** Code-derived state of the suspect change (03 VE35). */
+export type RcaSuspectShownState = "confirmed" | "under_test" | "not_read";
+
+export interface RcaLeadingEntry {
+  id: string;
+  statement: string;
+}
+
+/** Live card label (03 VE21). */
+export interface RcaVerdictSoFar {
+  label: "preliminary" | "revised";
+  was?: string;
+}
+
+export interface RcaSummarySuspectChange {
+  kind: RcaChangeKind;
+  reference: string;
+  author?: string;
+  /** Microseconds since epoch. */
+  occurred_at: number;
+  shown_state: RcaSuspectShownState;
+  /** Author of the steering lead behind the subject hypothesis (VE35 "(from <author>)"). */
+  lead_author?: string;
+}
+
+export interface RcaImpact {
+  summary: string;
+  peak?: string;
+  /** Microseconds since epoch. */
+  window?: { start: number; end: number };
+}
+
+/** The verdict card of a summary; the server omits each field it has no value for. */
+export interface RcaSummaryCard {
+  outcome?: RcaOutcome;
+  outcome_reason?: RcaOutcomeReason;
+  headline?: string;
+  leading?: RcaLeadingEntry;
+  verdict_so_far?: RcaVerdictSoFar;
+  band?: RcaBand;
+  /** Server-built reason line (CG §5.3.4). */
+  band_reason?: string;
+  suspect_change?: RcaSummarySuspectChange;
+  impact?: RcaImpact;
+  needs?: string;
+}
+
+export interface RcaSummaryTimelineEntry {
+  /** Microseconds since epoch. */
+  at: number;
+  text: string;
+  status: RcaTimelineStatus;
+  evidence_numbers: number[];
+}
+
+export interface RcaSummaryStatusChange {
+  /** Microseconds since epoch. */
+  at: number;
+  status: RcaHypothesisStatus;
+  /** Author of the steering message that caused the change, if any. */
+  steered_by?: string;
+}
+
+export interface RcaSummaryHypothesis {
+  id: string;
+  statement: string;
+  status: RcaHypothesisStatus;
+  reason: string;
+  evidence_numbers: number[];
+  unverified_ids: string[];
+  lead_ids: string[];
+  first_seen_seq: number;
+  history: RcaSummaryStatusChange[];
+}
+
+/** Where an evidence entry's query ran (03 VE26); the UI builds the link (VE29). */
+export interface RcaEvidenceTarget {
+  signal: RcaSignalClass;
+  streams: string[];
+  sql?: string;
+  promql?: string;
+  filter?: string;
+  /** Shell or CLI command of change and infra evidence; never linked (VE29). */
+  command?: string;
+  /** Microseconds since epoch. */
+  start_us?: number;
+  end_us?: number;
+}
+
+export interface RcaCitation {
+  hypothesis_id: string;
+  evidence_id: string;
+  polarity: RcaPolarity;
+  strength: RcaStrength;
+  observation: string;
+}
+
+export interface RcaEvidenceEntry {
+  number: number;
+  ids: string[];
+  call_id: string;
+  kind: string;
+  target: RcaSignalClass;
+  link: RcaEvidenceTarget;
+  result_summary: string;
+  duration_ms: number;
+  decisive: boolean;
+  citations: RcaCitation[];
+}
+
+export interface RcaUnverifiedCitation {
+  hypothesis_id: string;
+  evidence_id: string;
+  tool: string;
+  query: string;
+  reason: "not_run" | "failed";
+}
+
+export interface RcaBlindSpot {
+  id: string;
+  axis: RcaBlindSpotAxis;
+  title: string;
+  why: string;
+  fix: RcaBlindSpotFix;
+}
+
+/** `GET …/rca/runs/{run_id}/summary` (03 §12). */
+export interface RcaRunSummary {
+  run_id: string;
+  state: RcaRunState;
+  state_version: string;
+  not_modified: false;
+  /** A finished run with no stored record (03 VE42). */
+  legacy: boolean;
+  card: RcaSummaryCard;
+  timeline: RcaSummaryTimelineEntry[];
+  hypotheses: RcaSummaryHypothesis[];
+  evidence: RcaEvidenceEntry[];
+  unverified: RcaUnverifiedCitation[];
+  blind_spots: RcaBlindSpot[];
+}
+
+/** The summary route's answer when `known_version` still matches. */
+export interface RcaRunSummaryNotModified {
+  run_id: string;
+  not_modified: true;
+  state_version: string;
+}
+
+export type RcaRunSummaryResponse = RcaRunSummary | RcaRunSummaryNotModified;
 
 export interface ListRcaRunsResponse {
   runs: RcaRunItem[];
@@ -501,6 +697,23 @@ const incidents = {
   ) => {
     return http().get<RcaThreadResponse>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/thread`,
+      { params: known_version ? { known_version } : {} },
+    );
+  },
+
+  /**
+   * Read the summary view of one run (03 §12): card, timeline, hypotheses,
+   * evidence and blind spots. With `known_version` equal to the server's, the
+   * answer is `{not_modified: true, state_version}`.
+   */
+  getRcaSummary: (
+    org_identifier: string,
+    incident_id: string,
+    run_id: string,
+    known_version?: string,
+  ) => {
+    return http().get<RcaRunSummaryResponse>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/summary`,
       { params: known_version ? { known_version } : {} },
     );
   },

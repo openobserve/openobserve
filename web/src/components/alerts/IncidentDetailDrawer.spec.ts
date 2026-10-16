@@ -63,6 +63,7 @@ vi.mock("@/services/incidents", async (importOriginal) => {
       cancelRca: vi.fn(),
       getRcaRun: vi.fn(),
       getRcaThread: vi.fn(),
+      getRcaSummary: vi.fn(),
       getCorrelatedStreams: vi.fn(),
       getEvents: vi.fn(),
       updateIncident: vi.fn(),
@@ -103,6 +104,7 @@ import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { rcaRunSummaryLive } from "@/test/unit/fixtures/rcaThread";
 
 // Test data factory
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
@@ -266,6 +268,10 @@ describe("IncidentDetailDrawer.vue", () => {
         stats: { steps: 0, tool_calls: 0, duration_ms: 0 },
       },
     } as never);
+
+    vi.mocked(incidentsService.getRcaSummary).mockImplementation((_org, _id, runId) =>
+      Promise.resolve({ data: rcaRunSummaryLive({ run_id: runId }) } as never),
+    );
 
     vi.mocked(incidentsService.cancelRca).mockResolvedValue({
       data: { run_id: "run-2", cancelled: true },
@@ -1488,6 +1494,17 @@ describe("IncidentDetailDrawer.vue", () => {
         "run-2",
         undefined,
       );
+      // 03 §12: the summary of the same run, read with the thread.
+      expect(incidentsService.getRcaSummary).toHaveBeenCalledWith(
+        "default",
+        "1",
+        "run-2",
+        undefined,
+      );
+      expect(panel.find('[data-test="rca-verdict-headline"]').text()).toBe(
+        "Leading: Deploy 4f2c1e exhausted the orders-db pool",
+      );
+      expect(panel.find('[data-test="rca-hypotheses"]').exists()).toBe(true);
     });
 
     it("K: with no run the Analysis tab offers Analyze and reads no thread", async () => {
@@ -1500,6 +1517,7 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.find('[data-test="trigger-rca-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="rca-thread-column"]').exists()).toBe(false);
       expect(incidentsService.getRcaThread).not.toHaveBeenCalled();
+      expect(incidentsService.getRcaSummary).not.toHaveBeenCalled();
     });
   });
 

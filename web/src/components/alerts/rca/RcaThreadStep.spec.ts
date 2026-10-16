@@ -20,8 +20,15 @@ import RcaThreadStep from "./RcaThreadStep.vue";
 import { rcaStep, rcaToolCall } from "@/test/unit/fixtures/rcaThread";
 import type { RcaStep } from "@/services/incidents";
 
-const mountStep = (step: RcaStep, runLive = false) =>
-  mount(RcaThreadStep, { props: { step, runLive }, global: { plugins: [i18n] } });
+const mountStep = (
+  step: RcaStep,
+  runLive = false,
+  evidenceNumbers: Map<string, number> | null = null,
+) =>
+  mount(RcaThreadStep, {
+    props: { step, runLive, evidenceNumbers },
+    global: { plugins: [i18n] },
+  });
 
 describe("RcaThreadStep (02 TH38)", () => {
   it("shows title, UTC time, the note with citation chips, and the calls line", () => {
@@ -99,5 +106,47 @@ describe("RcaThreadStep (02 TH38)", () => {
 
     expect(wrapper.find('[data-test="rca-thread-step-note"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="rca-thread-step-calls-toggle"]').exists()).toBe(false);
+  });
+
+  describe("evidence numbers (03 VE24, VE30; F9)", () => {
+    it("a verified id shows its entry number and opens it; an unknown id shows 'e7 · not verified'", async () => {
+      const wrapper = mountStep(rcaStep(), false, new Map([["e3", 4]]));
+
+      const chips = wrapper.findAll('[data-test="rca-citation-chip"]');
+      expect(chips.map((chip) => chip.text())).toEqual(["4"]);
+      expect(chips[0].element.tagName).toBe("BUTTON");
+      expect(chips[0].attributes("aria-label")).toBe("Open evidence 4");
+      expect(wrapper.find('[data-test="rca-citation-unverified"]').text()).toBe(
+        "e7 · not verified",
+      );
+
+      await chips[0].trigger("click");
+      expect(wrapper.emitted("open-evidence")).toEqual([[4]]);
+    });
+
+    it("with no summary the chips show the raw ids and are not buttons", () => {
+      const wrapper = mountStep(rcaStep());
+
+      const chips = wrapper.findAll('[data-test="rca-citation-chip"]');
+      expect(chips.map((chip) => chip.element.tagName)).toEqual(["SPAN", "SPAN"]);
+      expect(wrapper.find('[data-test="rca-citation-unverified"]').exists()).toBe(false);
+    });
+  });
+
+  it("inline markdown in a note renders as marks; HTML and links stay text (no injection)", () => {
+    const wrapper = mountStep(
+      rcaStep({
+        note: '**Pool full** <img src=x onerror="alert(1)"> see [logs](https://evil.example) `n=100`',
+        citations: [],
+      }),
+    );
+    const note = wrapper.find('[data-test="rca-thread-step-note"]');
+
+    expect(note.find("strong").text()).toBe("Pool full");
+    expect(note.find("code").text()).toBe("n=100");
+    expect(note.find("img").exists()).toBe(false);
+    expect(note.find("a").exists()).toBe(false);
+    expect(note.text()).toContain('<img src=x onerror="alert(1)">');
+    expect(note.text()).toContain("logs (https://evil.example)");
   });
 });

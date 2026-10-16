@@ -18,7 +18,9 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 
 const { toastMock } = vi.hoisted(() => ({ toastMock: vi.fn() }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
-vi.mock("@/services/incidents", () => ({ default: { getRcaThread: vi.fn() } }));
+vi.mock("@/services/incidents", () => ({
+  default: { getRcaThread: vi.fn(), getRcaSummary: vi.fn() },
+}));
 
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
 import i18n from "@/locales";
@@ -28,16 +30,30 @@ import { formatTimestamp } from "@/utils/date";
 import { RCA_UNFINISHED_TOOL_ERROR, rcaThreadPlainText } from "@/utils/incidents/rcaThread";
 import {
   RCA_T0,
+  rcaEvidenceEntry,
   rcaRun,
   rcaRunItem,
+  rcaRunSummary,
+  rcaRunSummaryBlocked,
+  rcaRunSummaryCancelled,
+  rcaRunSummaryLegacy,
+  rcaRunSummaryLive,
   rcaStep,
   rcaSummary,
   rcaThread,
   rcaToolCall,
   sec,
 } from "@/test/unit/fixtures/rcaThread";
+import type { RcaRunSummary } from "@/services/incidents";
 
 const getRcaThread = vi.mocked(incidentsService.getRcaThread);
+const getRcaSummary = vi.mocked(incidentsService.getRcaSummary);
+
+/** Every read of a run answers `summary` with that run's id. */
+const answerSummary = (summary: RcaRunSummary) =>
+  getRcaSummary.mockImplementation(
+    (_org, _incident, runId) => Promise.resolve({ data: { ...summary, run_id: runId } }) as never,
+  );
 
 const REPORT = "## Root Cause\n\nMemory leak in the payment service.";
 
@@ -112,6 +128,9 @@ describe("IncidentRCAAnalysis", () => {
   beforeEach(() => {
     getRcaThread.mockReset();
     getRcaThread.mockResolvedValue({ data: rcaThread() } as never);
+    // Phase 2 cases: runs with no stored record (VE42).
+    getRcaSummary.mockReset();
+    answerSummary(rcaRunSummaryLegacy());
     writeText.mockReset().mockResolvedValue(undefined);
   });
 
@@ -173,9 +192,14 @@ describe("IncidentRCAAnalysis", () => {
       expect(byTest(wrapper, "rca-existing-container").text()).toContain("Memory leak");
     });
 
-    it("shows a loading line while the report text loads", () => {
+    it("shows the analysis loading line until the summary answers, then the report loading line (legacy)", async () => {
       wrapper = mountPanel({ ...completedProps(), reportText: "", reportLoading: true });
 
+      expect(byTest(wrapper, "rca-summary-loading").text()).toBe("Loading the analysis…");
+      expect(byTest(wrapper, "rca-report-loading").exists()).toBe(false);
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-summary-loading").exists()).toBe(false);
       expect(byTest(wrapper, "rca-report-loading").text()).toBe("Loading report…");
       expect(byTest(wrapper, "rca-existing-container").exists()).toBe(false);
     });
@@ -693,6 +717,253 @@ describe("IncidentRCAAnalysis", () => {
       await flushPromises();
 
       expect(byTest(wrapper, "rca-thread-retry-btn").exists()).toBe(false);
+    });
+  });
+
+  describe("Phase 3: summary sections (F1, VE36, VE42)", () => {
+    const SECTIONS = [
+      "rca-what-happened",
+      "rca-hypotheses",
+      "rca-blind-spots",
+      "rca-evidence-list",
+    ] as const;
+
+    const shownSections = (w: VueWrapper) => SECTIONS.filter((id) => byTest(w, id).exists());
+
+    it("B: bar, card, What happened, Hypotheses, Blind spots, Evidence in that order; no markdown report", async () => {
+      answerSummary(rcaRunSummary());
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      expect(getRcaSummary).toHaveBeenCalledWith("default", "inc-1", "run-1", undefined);
+      const order = ["rca-analysis-bar", "rca-verdict-card", ...SECTIONS, "rca-thread-column"].map(
+        (id) => byTest(wrapper, id).element,
+      );
+      for (let i = 1; i < order.length; i++) expect(precedes(order[i - 1], order[i])).toBe(true);
+      expect(byTest(wrapper, "rca-existing-container").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Root cause identified");
+      expect(byTest(wrapper, "rca-verdict-band").text()).toContain("High");
+      // Copy report stays in the ⋯ menu.
+      expect(byTest(wrapper, "rca-copy-btn").attributes("data-disabled")).toBe("false");
+    });
+
+    it("legacy (VE42): the Analyzed card and the markdown report, none of the new sections", async () => {
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Analyzed");
+      expect(byTest(wrapper, "rca-verdict-band").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-existing-container").text()).toContain("Memory leak");
+      expect(shownSections(wrapper)).toEqual([]);
+    });
+
+    it("a finished run whose summary cannot be read falls back to the markdown report (F1)", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      getRcaSummary.mockRejectedValue({ isAxiosError: true, response: { status: 503 } });
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-existing-container").text()).toContain("Memory leak");
+      expect(shownSections(wrapper)).toEqual([]);
+    });
+
+    it("completed with a record but no outcome: Analyzed with no band, the sections, no markdown", async () => {
+      const base = rcaRunSummary();
+      answerSummary(
+        rcaRunSummary({ card: { ...base.card, outcome: undefined, outcome_reason: undefined } }),
+      );
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Analyzed");
+      expect(byTest(wrapper, "rca-verdict-band").exists()).toBe(false);
+      expect(shownSections(wrapper)).toEqual([...SECTIONS]);
+      expect(byTest(wrapper, "rca-existing-container").exists()).toBe(false);
+    });
+
+    it("A live: Leading card with no band; the timeline comes with the report; groups read Being tested", async () => {
+      answerSummary(rcaRunSummaryLive());
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+
+      expect(getRcaSummary).toHaveBeenCalledWith("default", "inc-1", "run-2", undefined);
+      expect(byTest(wrapper, "rca-verdict-headline").text()).toBe(
+        "Leading: Deploy 4f2c1e exhausted the orders-db pool",
+      );
+      expect(byTest(wrapper, "rca-verdict-qualifier").text()).toContain("Revised · was “");
+      expect(byTest(wrapper, "rca-verdict-band").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-verdict-facts").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-timeline-pending").text()).toBe(
+        "The causal timeline comes with the report.",
+      );
+      expect(byTest(wrapper, "rca-hypotheses").text()).toContain("Being tested");
+      expect(byTest(wrapper, "rca-report-pending").exists()).toBe(false);
+    });
+
+    it("polls the summary with the thread while live, then one final read (03 §12)", async () => {
+      vi.useFakeTimers();
+      getRcaSummary
+        .mockResolvedValueOnce({ data: rcaRunSummaryLive({ state_version: "s1" }) } as never)
+        .mockResolvedValue({
+          data: { run_id: "run-2", not_modified: true, state_version: "s1" },
+        } as never);
+      wrapper = mountPanel(liveProps());
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(8_000);
+      expect(getRcaSummary).toHaveBeenCalledTimes(3);
+      expect(getRcaSummary.mock.calls[2][3]).toBe("s1");
+
+      await wrapper.setProps({
+        rca: rcaSummary({ state: "completed", current_run: rcaRun({ state: "completed" }) }),
+        threadLive: false,
+      });
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(getRcaSummary).toHaveBeenCalledTimes(4);
+    });
+
+    it("waiting_input: the pill reads 'Blocked · waiting for an answer'", async () => {
+      answerSummary(rcaRunSummaryLive({ state: "waiting_input" }));
+      wrapper = mountPanel(liveProps({ rca: rcaSummary({ state: "waiting_input" }) }));
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Blocked · waiting for an answer");
+    });
+
+    it("D blocked: 'Needs: Change history' and the blind spot's button", async () => {
+      answerSummary(rcaRunSummaryBlocked());
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Blocked");
+      expect(byTest(wrapper, "rca-verdict-below").text()).toBe("Needs: Change history");
+      expect(byTest(wrapper, "rca-blind-spot-action").text()).toBe("Connect AI Toolset");
+    });
+
+    it("E cancelled with a partial record: no timeline, hypotheses, the run_end blind spot with no button", async () => {
+      answerSummary(rcaRunSummaryCancelled());
+      getRcaThread.mockResolvedValue({ data: rcaThread({ active: false }) } as never);
+      wrapper = mountPanel({
+        rca: rcaSummary({
+          state: "cancelled",
+          current_run: rcaRun({ state: "cancelled", ended_at: RCA_T0 + sec(180) }),
+        }),
+        threadRunId: "run-2",
+      });
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Failed");
+      expect(byTest(wrapper, "rca-verdict-headline").text()).toBe(
+        "Run cancelled before a verdict. Partial results below",
+      );
+      expect(byTest(wrapper, "rca-verdict-band").text()).toBe("No confidence");
+      expect(shownSections(wrapper)).toEqual([
+        "rca-hypotheses",
+        "rca-blind-spots",
+        "rca-evidence-list",
+      ]);
+      expect(byTest(wrapper, "rca-blind-spot").text()).toContain("3 stages did not run");
+      expect(byTest(wrapper, "rca-blind-spot-action").exists()).toBe(false);
+    });
+
+    it("F9: a thread chip shows the entry number and opens that entry in the Evidence index", async () => {
+      Element.prototype.scrollIntoView = vi.fn();
+      answerSummary(rcaRunSummary({ evidence: [rcaEvidenceEntry({ number: 1, ids: ["e3"] })] }));
+      getRcaThread.mockResolvedValue({
+        data: rcaThread({ run_id: "run-1", active: false, steps: [rcaStep()] }),
+      } as never);
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      const step = byTest(wrapper, "rca-thread-step");
+      expect(step.find('[data-test="rca-citation-unverified"]').text()).toBe("e7 · not verified");
+      const chip = step.find('[data-test="rca-citation-chip"]');
+      expect(chip.text()).toBe("1");
+      expect(
+        wrapper.find('[data-test="rca-evidence-list"] [data-test="rca-evidence-card"]').exists(),
+      ).toBe(false);
+
+      await chip.trigger("click");
+      await flushPromises();
+
+      expect(
+        wrapper
+          .find('[data-test="rca-evidence-list"] [data-number="1"] [data-test="rca-evidence-card"]')
+          .exists(),
+      ).toBe(true);
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+
+    it("the band chip opens 'Cited but not verified' (VE33)", async () => {
+      Element.prototype.scrollIntoView = vi.fn();
+      answerSummary(rcaRunSummary());
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      await byTest(wrapper, "rca-verdict-band").trigger("click");
+      await flushPromises();
+
+      expect(document.activeElement).toBe(byTest(wrapper, "rca-unverified").element);
+    });
+
+    it("a 410 on the summary of a live run leaves the card in its Phase 2 form and stops", async () => {
+      getRcaSummary.mockRejectedValue({ isAxiosError: true, response: { status: 410 } });
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-verdict-headline").text()).toBe("Investigating");
+      expect(shownSections(wrapper)).toEqual([]);
+      expect(getRcaSummary).toHaveBeenCalledTimes(1);
+    });
+
+    it("the run ends and its final summary read fails: the live view goes and the markdown report shows (F1)", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      getRcaSummary
+        .mockResolvedValueOnce({ data: rcaRunSummaryLive() } as never)
+        .mockRejectedValue({ isAxiosError: true, response: { status: 503 } });
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+      expect(byTest(wrapper, "rca-verdict-headline").text()).toContain("Leading: ");
+
+      await wrapper.setProps({
+        rca: rcaSummary({ state: "completed", current_run: rcaRun({ state: "completed" }) }),
+        reportRun: rcaRunItem({ run_id: "run-2" }),
+        reportText: REPORT,
+        threadLive: false,
+      });
+      await flushPromises();
+
+      expect(getRcaSummary).toHaveBeenCalledTimes(2);
+      expect(shownSections(wrapper)).toEqual([]);
+      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Analyzed");
+      expect(byTest(wrapper, "rca-verdict-headline").text()).not.toContain("Leading");
+      expect(byTest(wrapper, "rca-existing-container").text()).toContain("Memory leak");
+    });
+
+    it("F9: a thread chip for an id reused by a later entry opens the first entry (VE5, VE24)", async () => {
+      Element.prototype.scrollIntoView = vi.fn();
+      answerSummary(
+        rcaRunSummary({
+          evidence: [
+            rcaEvidenceEntry({ number: 1, ids: ["e3"] }),
+            rcaEvidenceEntry({ number: 2, ids: ["e3", "e7"], call_id: "call-9" }),
+          ],
+        }),
+      );
+      getRcaThread.mockResolvedValue({
+        data: rcaThread({ run_id: "run-1", active: false, steps: [rcaStep()] }),
+      } as never);
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      const chips = byTest(wrapper, "rca-thread-step").findAll('[data-test="rca-citation-chip"]');
+      expect(chips.map((chip) => chip.text())).toEqual(["1", "2"]);
+
+      await chips[0].trigger("click");
+      await flushPromises();
+
+      const list = byTest(wrapper, "rca-evidence-list");
+      expect(list.find('[data-number="1"] [data-test="rca-evidence-card"]').exists()).toBe(true);
+      expect(list.find('[data-number="2"] [data-test="rca-evidence-card"]').exists()).toBe(false);
     });
   });
 });

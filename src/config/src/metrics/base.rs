@@ -2826,6 +2826,115 @@ pub static RCA_RUNS_WITHOUT_REPORT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+// RCA verdicts (03 §14, confidence design §5.7); counted by the finalizer's winning end write.
+pub static RCA_OUTCOME_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_outcome_total",
+            "Outcomes that code derived for completed RCA runs",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "outcome", "trigger"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_OUTCOME_CLAIM_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_outcome_claim_total",
+            "Outcomes the agent claimed against the outcomes code derived for completed RCA runs",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "claimed", "derived"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_HYPOTHESIS_LEFT_TESTING_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_hypothesis_left_testing_total",
+            "Hypotheses still testing when their RCA run ended, rewritten to untested",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_LEDGER_TRUNCATED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_ledger_truncated_total",
+            "Evidence ledger items and strings cut at their limits, by field",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "field"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_LEDGER_INVALID_CALL_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_ledger_invalid_call_total",
+            "Evidence ledger calls dropped as invalid, by tool",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "tool"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_TIMELINE_UNVERIFIED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_timeline_unverified_total",
+            "Submitted timeline entries shown as unverified",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_VERDICT_REVISED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_verdict_revised_total",
+            "RCA runs whose leading hypothesis changed during the run",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_CONFIDENCE_GRADE_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_confidence_grade_total",
+            "Confidence bands the agent claimed against the bands code graded",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "claimed", "graded"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_UNVERIFIED_CITATIONS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_unverified_citations_total",
+            "Evidence citations that matched no successful tool call, by reason",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "reason"],
+    )
+    .expect("Metric created")
+});
 // Deliberate: spec §14.1 says `org_id` and four `result` values; `organization` is the house label.
 pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -3516,6 +3625,15 @@ pub(crate) fn register(registry: &Registry) {
         Box::new(RCA_RUN_TOOL_CALLS.clone()),
         Box::new(RCA_RUN_CONTINUATIONS_TOTAL.clone()),
         Box::new(RCA_RUNS_WITHOUT_REPORT_TOTAL.clone()),
+        Box::new(RCA_OUTCOME_TOTAL.clone()),
+        Box::new(RCA_OUTCOME_CLAIM_TOTAL.clone()),
+        Box::new(RCA_HYPOTHESIS_LEFT_TESTING_TOTAL.clone()),
+        Box::new(RCA_LEDGER_TRUNCATED_TOTAL.clone()),
+        Box::new(RCA_LEDGER_INVALID_CALL_TOTAL.clone()),
+        Box::new(RCA_TIMELINE_UNVERIFIED_TOTAL.clone()),
+        Box::new(RCA_VERDICT_REVISED_TOTAL.clone()),
+        Box::new(RCA_CONFIDENCE_GRADE_TOTAL.clone()),
+        Box::new(RCA_UNVERIFIED_CITATIONS_TOTAL.clone()),
     ] {
         registry.register(metric).expect("Metric registered");
     }

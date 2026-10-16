@@ -16,6 +16,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import incidents, {
   type CancelRcaResponse,
+  type RcaRunSummaryResponse,
   type RcaThreadResponse,
   type TriggerRcaResponse,
 } from "./incidents";
@@ -246,6 +247,38 @@ describe("incidents service", () => {
         { params: { known_version: "4.5.6" } },
       );
       expect(res.data).toEqual({ not_modified: true, state_version: "4.5.6" });
+    });
+  });
+
+  describe("getRcaSummary", () => {
+    it("calls GET …/rca/runs/{run_id}/summary without known_version on the first read", () => {
+      mockHttp.get.mockResolvedValue({
+        data: { run_id: "run-1", not_modified: true, state_version: "1" },
+      });
+
+      incidents.getRcaSummary("test-org", "incident-123", "run-1");
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/incident-123/rca/runs/run-1/summary",
+        { params: {} },
+      );
+    });
+
+    it("sends known_version when given (03 §12)", async () => {
+      const body: RcaRunSummaryResponse = {
+        run_id: "run-1",
+        not_modified: true,
+        state_version: "4.5.6",
+      };
+      mockHttp.get.mockResolvedValue({ data: body });
+
+      const res = await incidents.getRcaSummary("test-org", "incident-123", "run-1", "4.5.6");
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/incident-123/rca/runs/run-1/summary",
+        { params: { known_version: "4.5.6" } },
+      );
+      expect(res.data).toEqual(body);
     });
   });
 

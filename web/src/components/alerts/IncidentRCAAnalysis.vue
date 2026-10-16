@@ -14,8 +14,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The Analysis tab (contract E5): a left analysis column (analysis bar, verdict
-     card, report) and the right "Investigation thread" column (02 TH38). -->
+<!-- The Analysis tab (contract E5, P3 F1): a left analysis column (analysis bar,
+     verdict card, What happened, Hypotheses, Blind spots, Evidence) and the right
+     "Investigation thread" column (02 TH38). A legacy run shows its markdown
+     report in place of the sections (03 VE42). -->
 <template>
   <!-- K: nothing ran yet (02 TH40). -->
   <div
@@ -74,6 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <RcaVerdictCard
         :card-state="cardState"
         :run-id="cardRunId"
+        :waiting-input="waitingInput"
+        :summary="recordSummary"
         :stale="stale"
         :stale-since="staleSince"
         :stage-index="rca.summary.stage_index"
@@ -88,25 +92,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @cancel="$emit('cancel-rca')"
         @follow-thread="followThread"
         @retry="$emit('trigger-rca', $event)"
+        @show-unverified="evidenceList?.showUnverified()"
+        @show-blind-spots="showBlindSpots"
       />
 
+      <template v-if="recordSummary">
+        <RcaWhatHappened
+          v-if="cardState === 'investigating' || cardState === 'analyzed'"
+          :timeline="recordSummary.timeline"
+          :evidence="recordSummary.evidence"
+          :hypotheses="recordSummary.hypotheses"
+          :org="orgId"
+          :live="cardState === 'investigating'"
+        />
+        <RcaHypotheses
+          :hypotheses="recordSummary.hypotheses"
+          :outcome="recordSummary.card.outcome"
+          :evidence="recordSummary.evidence"
+          :org="orgId"
+          :live="cardState === 'investigating'"
+        />
+        <RcaBlindSpots
+          ref="blindSpots"
+          :blind-spots="recordSummary.blind_spots"
+          :org="orgId"
+          :live="cardState === 'investigating'"
+        />
+        <RcaEvidenceList
+          ref="evidenceList"
+          :evidence="recordSummary.evidence"
+          :unverified="recordSummary.unverified"
+          :hypotheses="recordSummary.hypotheses"
+          :org="orgId"
+        />
+      </template>
       <p
-        v-if="reportLoading && !reportText"
-        data-test="rca-report-loading"
+        v-else-if="summaryStatus === 'loading' && !showReport"
+        data-test="rca-summary-loading"
         class="text-text-secondary m-0 flex items-center gap-2 text-sm"
       >
         <OSpinner variant="dots" size="xs" />
-        {{ t("alerts.incidents.rcaRun.loadingReport") }}
+        {{ t("alerts.incidents.rcaSummary.loading") }}
       </p>
-      <RcaReportContent
-        v-else-if="reportText"
-        data-test="rca-existing-container"
-        class="max-w-215"
-        :html="formattedReport"
-        :is-dark-mode="isDark"
-      />
+
+      <template v-if="showReport">
+        <p
+          v-if="reportLoading && !reportText"
+          data-test="rca-report-loading"
+          class="text-text-secondary m-0 flex items-center gap-2 text-sm"
+        >
+          <OSpinner variant="dots" size="xs" />
+          {{ t("alerts.incidents.rcaRun.loadingReport") }}
+        </p>
+        <RcaReportContent
+          v-else-if="reportText"
+          data-test="rca-existing-container"
+          class="max-w-215"
+          :html="formattedReport"
+          :is-dark-mode="isDark"
+        />
+      </template>
       <p
-        v-else-if="live && !reportRun"
+        v-if="live && !reportRun && !recordSummary"
         data-test="rca-report-pending"
         class="text-text-secondary text-compact m-0"
       >
@@ -123,7 +170,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :trigger-label="threadTriggerLabel"
       :context-used="threadContextUsed"
       :run-stats="threadRunStats"
+      :evidence-numbers="evidenceNumbers"
       @retry="retryThread"
+      @open-evidence="evidenceList?.openEntry($event)"
     />
   </div>
 </template>
@@ -143,6 +192,7 @@ import type {
   RcaSummary,
 } from "@/services/incidents";
 import { useRcaThread } from "@/composables/useRcaThread";
+import { useRcaSummary } from "@/composables/useRcaSummary";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { humanizeElapsed, isLiveRca, userLocalPart } from "@/utils/incidents/rcaCell";
 import { renderRcaReport } from "@/utils/incidents/rcaReportMarkdown";
@@ -155,9 +205,14 @@ import {
   rcaTriggerLabel,
   type RcaCardState,
 } from "@/utils/incidents/rcaThread";
+import { rcaEvidenceNumbers } from "@/utils/incidents/rcaSummary";
 import RcaAnalysisBar from "./rca/RcaAnalysisBar.vue";
+import RcaBlindSpots from "./rca/RcaBlindSpots.vue";
+import RcaEvidenceList from "./rca/RcaEvidenceList.vue";
+import RcaHypotheses from "./rca/RcaHypotheses.vue";
 import RcaThreadColumn from "./rca/RcaThreadColumn.vue";
 import RcaVerdictCard from "./rca/RcaVerdictCard.vue";
+import RcaWhatHappened from "./rca/RcaWhatHappened.vue";
 import RcaReportContent from "./rca/RcaReportContent.vue";
 import { useTheme } from "@/composables/useTheme";
 
@@ -225,6 +280,47 @@ const {
   toRef(props, "threadLive"),
 );
 
+// The summary view of the same run, polled with the thread (03 §12).
+const { summary, status: summaryStatus } = useRcaSummary(
+  toRef(props, "orgId"),
+  toRef(props, "incidentId"),
+  toRef(props, "threadRunId"),
+  toRef(props, "threadLive"),
+);
+
+/** The summary of a run with a record (live or stored); null for legacy runs and errors. */
+const recordSummary = computed(() => {
+  const current = summary.value;
+  return current && !current.legacy && current.run_id === props.threadRunId ? current : null;
+});
+
+/** Evidence id → number for the thread's chips (03 VE24); null shows raw ids. */
+const evidenceNumbers = computed(() => rcaEvidenceNumbers(recordSummary.value));
+
+/**
+ * The markdown report shows for a legacy run (VE42), when the summary of a
+ * finished run cannot be read, and as the earlier result under a run that has
+ * not finished (RR-42). A run with a record shows none (F1).
+ */
+const showReport = computed(() => {
+  if (summary.value?.legacy) return true;
+  if (cardState.value !== "analyzed") return earlierReportNote.value !== null;
+  if (recordSummary.value) return false;
+  return (
+    summaryStatus.value !== "loading" &&
+    summaryStatus.value !== "ready" &&
+    summaryStatus.value !== "idle"
+  );
+});
+
+const evidenceList = ref<InstanceType<typeof RcaEvidenceList> | null>(null);
+const blindSpots = ref<InstanceType<typeof RcaBlindSpots> | null>(null);
+const showBlindSpots = () =>
+  (blindSpots.value?.$el as HTMLElement | undefined)?.scrollIntoView({
+    block: "start",
+    behavior: "smooth",
+  });
+
 // Ticks so the ages in the bar stay current: every second while live, else every 30 s.
 const now = ref(Date.now());
 let tickTimer: number | null = null;
@@ -258,6 +354,9 @@ const cardState = computed<RcaCardState>(() => {
 });
 
 const cardRunId = computed(() => props.viewedRun?.run_id ?? props.rca?.run_id ?? "");
+
+/** The latest run is paused for an answer (03 VE22); a picked run never is. */
+const waitingInput = computed(() => !props.viewedRun && props.rca?.state === "waiting_input");
 
 const findRun = (runId: string | null | undefined) =>
   runId ? (props.history.find((run) => run.run_id === runId) ?? null) : null;

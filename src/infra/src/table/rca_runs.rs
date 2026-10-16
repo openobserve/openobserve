@@ -121,8 +121,9 @@ pub struct RunUpdate {
     pub context_used: Option<serde_json::Value>,
     /// Adds one to `continuations` in SQL.
     pub continuations_inc: bool,
-    /// The final stats of a run in any state: writes only `stats` and, while the incident
-    /// still names the run, `rca_summary.steps`/`tool_calls`. Every other field is ignored.
+    /// The final stats of a run in any state: writes only `stats`, `result` while the run
+    /// has none and is not `completed` (VE34), and, while the incident still names the run,
+    /// `rca_summary.steps`/`tool_calls`. Every other field is ignored.
     pub final_stats_only: bool,
     /// Appended to the incident's timeline in the same transaction (incident subjects).
     pub event: Option<IncidentEvent>,
@@ -791,6 +792,8 @@ pub async fn update_run_with<C: TransactionTrait>(
 
 /// The `final_stats_only` write of [update_run_with], on any run state. Locks the incident
 /// before the run, as every other write does; never changes the state, report or timeline.
+/// `result` is written only to a run that has none and did not complete: the partial record
+/// of a run another write ended (VE34).
 async fn final_stats_with<C: TransactionTrait>(
     db: &C,
     org_id: &str,
@@ -844,14 +847,18 @@ async fn final_stats_with<C: TransactionTrait>(
             .await?;
     }
 
-    let Some(stored_stats) = locked(
+    let Some((stored_stats, stored_result, state)) = locked(
         &txn,
         rca_runs::Entity::find_by_id(run_id)
             .filter(rca_runs::Column::OrgId.eq(org_id))
             .select_only()
-            .column(rca_runs::Column::Stats),
+            .columns([
+                rca_runs::Column::Stats,
+                rca_runs::Column::Result,
+                rca_runs::Column::State,
+            ]),
     )
-    .into_tuple::<Option<serde_json::Value>>()
+    .into_tuple::<(Option<serde_json::Value>, Option<serde_json::Value>, String)>()
     .one(&txn)
     .await?
     else {
@@ -859,12 +866,19 @@ async fn final_stats_with<C: TransactionTrait>(
         return Ok(false);
     };
     let stats = merge_stats(stored_stats.as_ref(), upd.stats.as_ref(), None);
-    rca_runs::Entity::update_many()
+    let mut update = rca_runs::Entity::update_many()
         .col_expr(
             rca_runs::Column::Stats,
             Expr::value(encode(&stats, "stats")?),
         )
-        .col_expr(rca_runs::Column::UpdatedAt, Expr::value(upd.now_us))
+        .col_expr(rca_runs::Column::UpdatedAt, Expr::value(upd.now_us));
+    if stored_result.is_none()
+        && state != RunState::Completed.as_str()
+        && let Some(result) = upd.result.as_ref()
+    {
+        update = update.col_expr(rca_runs::Column::Result, Expr::value(result.clone()));
+    }
+    update
         .filter(rca_runs::Column::RunId.eq(run_id))
         .filter(rca_runs::Column::OrgId.eq(org_id))
         .exec(&txn)
@@ -963,6 +977,27 @@ async fn newest_completed_with<C: ConnectionTrait>(
         .order_by_desc(rca_runs::Column::StartedAt)
         .order_by_desc(rca_runs::Column::RunId)
         .one(conn)
+        .await
+}
+
+/// `completed` runs of the org that ended in `[from_us, to_us)` and carry a `result`, newest
+/// first, `limit` at most (CG §7 backtest).
+pub async fn list_completed_between(
+    org_id: &str,
+    from_us: i64,
+    to_us: i64,
+    limit: u64,
+) -> Result<Vec<Model>, DbErr> {
+    rca_runs::Entity::find()
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .filter(rca_runs::Column::State.eq(RunState::Completed.as_str()))
+        .filter(rca_runs::Column::EndedAt.gte(from_us))
+        .filter(rca_runs::Column::EndedAt.lt(to_us))
+        .filter(rca_runs::Column::Result.is_not_null())
+        .order_by_desc(rca_runs::Column::EndedAt)
+        .order_by_desc(rca_runs::Column::RunId)
+        .limit(limit.max(1))
+        .all(get_orm_client_ro().await)
         .await
 }
 
@@ -2031,6 +2066,49 @@ mod tests {
         assert_eq!(incident.rca_run_id.as_deref(), Some(new.as_str()));
         assert_eq!(summary_of(&incident).tool_calls, 0);
         assert!(!update_run_with(&db, ORG, "missing", upd).await.unwrap());
+    }
+
+    /// VE34: a stats-only write sets `result` only on a run that has none and did not
+    /// complete (the partial record of a run a cancel ended), and never replaces one.
+    #[tokio::test]
+    async fn a_stats_only_write_sets_the_result_only_when_null_and_not_completed() {
+        use RunState::*;
+        let stats_only = |result: serde_json::Value| {
+            let mut upd = update(None, T0 + 5 * SEC);
+            upd.final_stats_only = true;
+            upd.result = Some(result);
+            upd
+        };
+        let first = serde_json::json!({"schema_version": 1, "ledger": {"hypotheses": []}});
+        let second = serde_json::json!({"schema_version": 1, "ledger": {"truncations": 9}});
+        for state in [Running, WaitingInput, Completed, Failed, Cancelled] {
+            let db = db().await;
+            let run_id = run_in_state(&db, "inc-1", state).await;
+            assert_eq!(run(&db, &run_id).await.unwrap().result, None, "{state}");
+
+            assert!(
+                update_run_with(&db, ORG, &run_id, stats_only(first.clone()))
+                    .await
+                    .unwrap(),
+                "{state}"
+            );
+            let after = run(&db, &run_id).await.unwrap();
+            let expected = (state != Completed).then(|| first.clone());
+            assert_eq!(after.result, expected, "{state}");
+            assert_eq!(after.state, state.as_str(), "{state}");
+
+            assert!(
+                update_run_with(&db, ORG, &run_id, stats_only(second.clone()))
+                    .await
+                    .unwrap(),
+                "{state}"
+            );
+            assert_eq!(
+                run(&db, &run_id).await.unwrap().result,
+                expected,
+                "{state}: a stored result is never replaced"
+            );
+        }
     }
 
     /// TH1 (7.1), TH25, TH27: a progress write stores the session, stage, context and

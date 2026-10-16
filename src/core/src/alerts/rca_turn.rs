@@ -40,12 +40,17 @@ use config::{
         },
         oncall::{
             SubjectRef,
-            rca_run::{RcaSubmit, parse_submit, to_analysis_verdict},
+            rca_run::{
+                EndedBy, RcaRunRecord, RcaSubmit, RunEndInput, RunEndResult, record_run_end,
+            },
         },
     },
     metrics::{
-        RCA_RUN_CONTINUATIONS_TOTAL, RCA_RUN_DURATION_SECONDS, RCA_RUN_STEPS, RCA_RUN_TOOL_CALLS,
-        RCA_RUNS_WITHOUT_REPORT_TOTAL,
+        RCA_CONFIDENCE_GRADE_TOTAL, RCA_HYPOTHESIS_LEFT_TESTING_TOTAL,
+        RCA_LEDGER_INVALID_CALL_TOTAL, RCA_LEDGER_TRUNCATED_TOTAL, RCA_OUTCOME_CLAIM_TOTAL,
+        RCA_OUTCOME_TOTAL, RCA_RUN_CONTINUATIONS_TOTAL, RCA_RUN_DURATION_SECONDS, RCA_RUN_STEPS,
+        RCA_RUN_TOOL_CALLS, RCA_RUNS_WITHOUT_REPORT_TOTAL, RCA_TIMELINE_UNVERIFIED_TOTAL,
+        RCA_UNVERIFIED_CITATIONS_TOTAL, RCA_VERDICT_REVISED_TOTAL,
     },
     utils::time::now_micros,
 };
@@ -80,14 +85,14 @@ use crate::ai_chat::{
     StreamChatStore,
     admission::{self, AdmitError, AdmittedTurn},
     cancel::cancel_chat_turn,
-    projection::strip_mcp_prefix,
-    rca_thread::{RCA_STAGES, ThreadPart, ThreadStats, project_rca_thread},
+    rca_ledger::{RunTranscript, decode_run},
+    rca_thread::{
+        RCA_STAGES, SUBMIT_REPORT, ThreadPart, ThreadStats, ToolPart, project_rca_thread,
+        updated_part,
+    },
     read_committed_events,
 };
 
-const SUBMIT_REPORT: &str = "submit_report";
-/// The durable event type of a part change; stored types carry a `.N` version suffix.
-const PART_UPDATED: &str = "message.part.updated";
 /// TH25: the user text of the one continuation turn.
 const CONTINUE_PROMPT: &str = "The previous turn stopped. Continue from the last finished step. \
                                Do not repeat finished steps. Call submit_report when the \
@@ -493,11 +498,11 @@ async fn finalize(
         return false;
     }
 
-    let submit = events.as_deref().and_then(last_submit);
     let ending = RunEnd {
         thread: events
             .as_deref()
             .map(|events| project_rca_thread(events, &turns, false, false).stats),
+        transcript: events.as_deref().map(decode_run),
         turn_error: turns
             .iter()
             .rev()
@@ -507,7 +512,7 @@ async fn finalize(
         run,
         item,
     };
-    ending.end(submit, end.result, &turn_id, resume).await
+    ending.end(end.result, &turn_id, resume).await
 }
 
 /// The events and turn records of a run's session, read on the primary so the last
@@ -542,13 +547,14 @@ fn no_report_error(result: TurnResult) -> (&'static str, &'static str) {
     }
 }
 
-/// A run being ended, with its counts from the transcript (`None`: it could not be read)
-/// and the error code its ended turn's record holds.
+/// A run being ended, with its counts and its decoded transcript (both `None`: it could
+/// not be read) and the error code its ended turn's record holds.
 struct RunEnd {
     org_id: String,
     run: RunRow,
     item: RcaRunItem,
     thread: Option<ThreadStats>,
+    transcript: Option<RunTranscript>,
     turn_error: Option<String>,
 }
 
@@ -556,13 +562,7 @@ impl RunEnd {
     /// How the transcript ends the run: an ended run (a cancel) keeps its state and gets
     /// its counts (TH22, TH42); a committed report completes it whatever ended the turn
     /// (TH23); an interrupted turn continues once (TH25); else it fails (TH24).
-    async fn end(
-        &self,
-        submit: Option<RcaSubmit>,
-        result: TurnResult,
-        turn_id: &str,
-        resume: Option<RcaTurnRun>,
-    ) -> bool {
+    async fn end(&self, result: TurnResult, turn_id: &str, resume: Option<RcaTurnRun>) -> bool {
         if self.item.state.is_terminal() {
             // TH22, TH42: counts only. The run's end was counted and observed by the write
             // that ended it (a cancel observes its last progress counts), so a repeat
@@ -570,8 +570,10 @@ impl RunEnd {
             self.write_final_stats().await;
             return false;
         }
-        if let Some(submit) = submit {
-            return self.complete(submit).await;
+        if let Some(transcript) = self.transcript.as_ref()
+            && let Some(submit) = transcript.submit.as_ref()
+        {
+            return self.complete(transcript, submit).await;
         }
         if result == TurnResult::Interrupted
             && self.run.continuations == 0
@@ -624,13 +626,20 @@ impl RunEnd {
         }
     }
 
-    /// The counts of a run that has already ended (TH22, TH42).
+    /// The counts of a run that has already ended (TH22, TH42), and the partial record of
+    /// a run another write ended (a cancel) once, while the run has none (VE34).
     async fn write_final_stats(&self) {
-        if self.thread.is_none() {
+        let Some(transcript) = self.transcript.as_ref() else {
             return;
-        }
+        };
+        let result = if self.run.result.is_none() {
+            record_json(&self.run.run_id, &partial_end(transcript).record)
+        } else {
+            None
+        };
         let patch = RunPatch {
             final_stats_only: true,
+            result,
             ..self.counts()
         };
         if let Err(e) = rca_runs::update_run(&self.org_id, &self.run.run_id, patch).await {
@@ -641,27 +650,48 @@ impl RunEnd {
         }
     }
 
-    /// TH23: complete the run with the submitted report, then deliver it.
-    async fn complete(&self, submit: RcaSubmit) -> bool {
-        let verdict = submit.verdict.as_ref().map(to_analysis_verdict);
-        match rca_runs::complete_run(
-            &self.org_id,
-            &self.run.run_id,
-            &submit.markdown,
-            self.counts(),
-        )
-        .await
+    /// TH23: grade the submitted verdict, derive the outcome and complete the run with its
+    /// report and record (VE14–VE16, VE34, VE44, F6), then deliver the graded verdict
+    /// and its grade (VE38, F3).
+    async fn complete(&self, transcript: &RunTranscript, submit: &RcaSubmit) -> bool {
+        let submit = &self.with_report_ref(submit);
+        let end = record_run_end(&RunEndInput {
+            submit: Some(submit),
+            calls: &transcript.calls,
+            tool_log: &transcript.tool_log,
+            stages_run: &transcript.stages_run,
+            ended_by: EndedBy::Agent,
+            completed: true,
+        });
+        let record = &end.record;
+        let mut patch = RunPatch {
+            outcome: record.outcome.as_ref().map(|o| o.as_str().to_string()),
+            confidence: record.grade.as_ref().map(|g| g.band.as_str().to_string()),
+            result: record_json(&self.run.run_id, record),
+            ..self.counts()
+        };
+        // VE44: a blocked run's list cell names what it needs.
+        if let Some(detail) = end.summary_detail.clone() {
+            let summary = patch.summary.get_or_insert_with(RunSummaryPatch::default);
+            summary.detail = Some(Some(detail));
+        }
+        match rca_runs::complete_run(&self.org_id, &self.run.run_id, &submit.markdown, patch).await
         {
             Ok(true) => {
                 count_run_end(&self.org_id, self.item.trigger, RunState::Completed, "");
+                count_record(&self.org_id, self.item.trigger, &end);
+                self.report_defects(submit);
                 self.observe(RunState::Completed);
+                let verdict = end.verdict.as_ref();
+                let grade = record.grade.as_ref();
                 match self.item.subject_type {
                     RunSubjectType::Incident => {
                         rca_service::deliver_incident_result(
                             &self.org_id,
                             &self.run.subject_id,
                             &submit.markdown,
-                            verdict.as_ref(),
+                            verdict,
+                            grade,
                         )
                         .await;
                     }
@@ -670,7 +700,8 @@ impl RunEnd {
                             &self.org_id,
                             &self.subjects(),
                             &submit.markdown,
-                            verdict.as_ref(),
+                            verdict,
+                            grade,
                             None,
                         )
                         .await;
@@ -696,6 +727,35 @@ impl RunEnd {
                 .await
             }
         }
+    }
+
+    /// The submit with an empty verdict `report_ref` filled with the run's own reference,
+    /// which the on-call statement names.
+    fn with_report_ref(&self, submit: &RcaSubmit) -> RcaSubmit {
+        let mut submit = submit.clone();
+        if let Some(verdict) = submit.verdict.as_mut()
+            && verdict.report_ref.trim().is_empty()
+        {
+            verdict.report_ref = format!("{}/rca/{}", self.run.subject_id, self.run.run_id);
+        }
+        submit
+    }
+
+    /// What `parse_submit` defaulted, hoisted or dropped in the completed run's submit:
+    /// logged once and counted as invalid `submit_report` input.
+    fn report_defects(&self, submit: &RcaSubmit) {
+        if submit.defects.is_empty() {
+            return;
+        }
+        log::warn!(
+            "[RCA_TURN] org {} run {}: the submitted report needed repair: {}",
+            self.org_id,
+            self.run.run_id,
+            submit.defects.join("; ")
+        );
+        RCA_LEDGER_INVALID_CALL_TOTAL
+            .with_label_values(&[self.org_id.as_str(), SUBMIT_REPORT])
+            .inc_by(submit.defects.len() as u64);
     }
 
     /// TH25: count the continuation, then start it; `None` when it could not be recorded,
@@ -832,8 +892,16 @@ impl RunEnd {
         ended
     }
 
-    /// Fail the run with its counts; only the write that won releases the on-call holds.
+    /// Fail the run with its counts and, when the transcript was read, its partial record
+    /// (VE16, VE34); only the write that won releases the on-call holds.
     async fn fail(&self, code: &str, reason: &str, details: Option<String>) -> bool {
+        let end = self.transcript.as_ref().map(partial_end);
+        let extra = RunPatch {
+            result: end
+                .as_ref()
+                .and_then(|end| record_json(&self.run.run_id, &end.record)),
+            ..self.counts()
+        };
         match rca_runs::fail_run_with(
             &self.org_id,
             &self.run.run_id,
@@ -841,11 +909,14 @@ impl RunEnd {
             code,
             reason,
             details,
-            self.counts(),
+            extra,
         )
         .await
         {
             Ok(true) => {
+                if let Some(end) = end.as_ref() {
+                    count_record(&self.org_id, self.item.trigger, end);
+                }
                 self.observe(RunState::Failed);
                 self.release_without_verdict().await;
                 true
@@ -920,62 +991,79 @@ fn observe_counts(org_id: &str, thread: &ThreadStats) {
         .observe(f64::from(thread.tool_calls));
 }
 
-/// The run's report: the input of the last committed, completed `submit_report` (TH19, E3).
-fn last_submit(events: &[DurableEvent]) -> Option<RcaSubmit> {
-    events
-        .iter()
-        .rev()
-        .filter_map(updated_part)
-        .find_map(|part| {
-            let (name, input) = tool_call(part)?;
-            let completed = part
-                .get("state")
-                .and_then(|s| s.get("status"))
-                .and_then(Value::as_str)
-                == Some("completed");
-            if name == SUBMIT_REPORT && completed {
-                parse_submit(input?)
-            } else {
-                None
-            }
-        })
+/// The partial record of a run that ended without completing: no verdict, grade or
+/// outcome, the ledger with `testing` left as `untested`, and the stages that did not run
+/// as a blind spot (VE7, VE16, VE34).
+fn partial_end(transcript: &RunTranscript) -> RunEndResult {
+    record_run_end(&RunEndInput {
+        submit: None,
+        calls: &transcript.calls,
+        tool_log: &transcript.tool_log,
+        stages_run: &transcript.stages_run,
+        ended_by: EndedBy::Agent,
+        completed: false,
+    })
 }
 
-/// The part a `message.part.updated` event carries.
-fn updated_part(event: &DurableEvent) -> Option<&Map<String, Value>> {
-    let version = event.event_type.strip_prefix(PART_UPDATED)?;
-    let versioned = version.is_empty()
-        || version
-            .strip_prefix('.')
-            .is_some_and(|v| v.bytes().all(|b| b.is_ascii_digit()));
-    if !versioned {
-        return None;
+/// `rca_runs.result`; `None` (logged) when the record does not serialize.
+fn record_json(run_id: &str, record: &RcaRunRecord) -> Option<Value> {
+    match serde_json::to_value(record) {
+        Ok(value) => Some(value),
+        Err(e) => {
+            log::error!("[RCA_TURN] cannot serialize the record of run {run_id}: {e}");
+            None
+        }
     }
-    event.data.get("part").and_then(Value::as_object)
 }
 
-/// A tool part's tool name (MCP prefix stripped, `tools_call` unwrapped) and input.
-fn tool_call(part: &Map<String, Value>) -> Option<(&str, Option<&Value>)> {
-    if part.get("type").and_then(Value::as_str) != Some("tool") {
-        return None;
+/// F11: the verdict and ledger counts of a run whose end this finalizer wrote, once per
+/// run. A failed run's record has no outcome, grade or timeline, so it counts only its
+/// ledger and citations.
+fn count_record(org_id: &str, trigger: RunTrigger, end: &RunEndResult) {
+    let record = &end.record;
+    if let Some(outcome) = record.outcome.as_ref() {
+        RCA_OUTCOME_TOTAL
+            .with_label_values(&[org_id, outcome.as_str(), trigger.as_str()])
+            .inc();
+        if let Some(claimed) = record.claimed_outcome.as_ref() {
+            RCA_OUTCOME_CLAIM_TOTAL
+                .with_label_values(&[org_id, claimed.as_str(), outcome.as_str()])
+                .inc();
+        }
     }
-    let input = part.get("state").and_then(|s| s.get("input"));
-    let name = strip_mcp_prefix(part.get("tool")?.as_str()?);
-    if name == "tools_call" {
-        let inner = input?;
-        return Some((
-            strip_mcp_prefix(inner.get("tool")?.as_str()?),
-            inner.get("args"),
-        ));
+    if let Some(grade) = record.grade.as_ref() {
+        RCA_CONFIDENCE_GRADE_TOTAL
+            .with_label_values(&[org_id, grade.claimed.as_str(), grade.graded.as_str()])
+            .inc();
     }
-    Some((name, input))
-}
-
-fn tool_status(part: &Map<String, Value>) -> &str {
-    part.get("state")
-        .and_then(|s| s.get("status"))
-        .and_then(Value::as_str)
-        .unwrap_or_default()
+    if end.counts.left_testing > 0 {
+        RCA_HYPOTHESIS_LEFT_TESTING_TOTAL
+            .with_label_values(&[org_id])
+            .inc_by(u64::from(end.counts.left_testing));
+    }
+    for &(field, count) in &end.counts.truncated {
+        RCA_LEDGER_TRUNCATED_TOTAL
+            .with_label_values(&[org_id, field])
+            .inc_by(u64::from(count));
+    }
+    for (tool, count) in &end.counts.invalid_calls {
+        RCA_LEDGER_INVALID_CALL_TOTAL
+            .with_label_values(&[org_id, tool.as_str()])
+            .inc_by(u64::from(*count));
+    }
+    if end.timeline_unverified > 0 {
+        RCA_TIMELINE_UNVERIFIED_TOTAL
+            .with_label_values(&[org_id])
+            .inc_by(u64::from(end.timeline_unverified));
+    }
+    if record.leading_history.len() > 1 {
+        RCA_VERDICT_REVISED_TOTAL.with_label_values(&[org_id]).inc();
+    }
+    for citation in &record.unverified {
+        RCA_UNVERIFIED_CITATIONS_TOTAL
+            .with_label_values(&[org_id, citation.reason.as_str()])
+            .inc();
+    }
 }
 
 fn stage_index(stage: &str) -> Option<i16> {
@@ -1038,9 +1126,8 @@ impl Progress {
                 }
                 continue;
             }
-            if let Some((name, input)) = tool_call(part) {
-                let kind =
-                    ThreadPart::of(name, tool_status(part), input.and_then(|i| i.get("stage")));
+            if let Some(call) = ToolPart::of(part) {
+                let kind = call.kind();
                 if kind != ThreadPart::Hidden {
                     progress.parts.push((id.to_string(), kind));
                 }
@@ -1404,6 +1491,7 @@ async fn sweep_run(run: RunRow, now: i64, timeout_secs: u64) -> anyhow::Result<b
         run,
         item,
         thread: None,
+        transcript: None,
         turn_error: None,
     };
     Ok(ending
@@ -1452,13 +1540,16 @@ mod tests {
 
     use super::*;
     use crate::{
-        ai_chat::rca_thread::tests::{
-            SECOND_REPORT, Session, T, VISIBLE_TOOL_CALLS, hits, rca_session, search_sql,
-            without_report,
+        ai_chat::{
+            rca_ledger::tests::{H1, H2, hypothesis, ledger_session, submit, verdict},
+            rca_thread::tests::{
+                SECOND_REPORT, Session, T, VISIBLE_TOOL_CALLS, hits, rca_session, search_sql,
+                without_report,
+            },
         },
         alerts::rca_runs::tests::{
             FAIL_THE_WRITE, cancel_write, completes, db, failures, hold_page, hold_status,
-            new_incident, start, stored, timeline,
+            incident_row, new_incident, start, stored, timeline,
         },
     };
 
@@ -1554,7 +1645,7 @@ mod tests {
 
     // ---- TH19, TH22–TH25, TH42: the finalizer ----
 
-    /// The finalizer's view of the run: its row and the counts of `events`.
+    /// The finalizer's view of the run: its row, the counts of `events` and their decoding.
     async fn ending(org_id: &str, run_id: &str, events: &[DurableEvent]) -> RunEnd {
         let run = runs_table::get_rw(org_id, run_id).await.unwrap().unwrap();
         RunEnd {
@@ -1562,6 +1653,7 @@ mod tests {
             item: runs_table::to_item(&run),
             run,
             thread: Some(project_rca_thread(events, &[], false, false).stats),
+            transcript: Some(decode_run(events)),
             turn_error: None,
         }
     }
@@ -1570,7 +1662,7 @@ mod tests {
     async fn end(org_id: &str, run_id: &str, events: &[DurableEvent], result: TurnResult) -> bool {
         ending(org_id, run_id, events)
             .await
-            .end(last_submit(events), result, "turn-1", None)
+            .end(result, "turn-1", None)
             .await
     }
 
@@ -1740,7 +1832,7 @@ mod tests {
         let (org, inc) = new_incident(None).await;
         let run_id = start(&org, &inc, RunTrigger::Manual).await;
         let events = one_report(" \n\t");
-        assert!(last_submit(&events).is_none());
+        assert!(decode_run(&events).submit.is_none());
 
         assert!(end(&org, &run_id, &events, TurnResult::Persisted).await);
 
@@ -1884,6 +1976,415 @@ mod tests {
         assert!(released(hold_status(&org, &record).await));
     }
 
+    // ---- VE16, VE34, VE41, VE44, F6, F11: the run record ----
+
+    const ALL_STAGES: [&str; 7] = [
+        "context",
+        "topology",
+        "changes",
+        "traces",
+        "log_patterns",
+        "metrics",
+        "converge",
+    ];
+
+    /// [ledger_session] over `stages`, with one report carrying `verdict`.
+    fn reported(stages: &[&str], verdict: Value) -> Vec<DurableEvent> {
+        let mut s = ledger_session(stages);
+        submit(
+            &mut s,
+            "prt_p1",
+            "completed",
+            json!({
+                "markdown": SECOND_REPORT,
+                "verdict": verdict,
+                "timeline": [{"at": 1, "text": "Errors began", "status": "confirmed", "evidence_ids": ["e1"]}],
+            }),
+            4_000,
+        );
+        s.events
+    }
+
+    /// What the finalizer computes from `events` for a run that ends `completed`.
+    fn expected_end(events: &[DurableEvent], completed: bool) -> RunEndResult {
+        let transcript = decode_run(events);
+        record_run_end(&RunEndInput {
+            submit: transcript.submit.as_ref(),
+            calls: &transcript.calls,
+            tool_log: &transcript.tool_log,
+            stages_run: &transcript.stages_run,
+            ended_by: EndedBy::Agent,
+            completed,
+        })
+    }
+
+    fn record_of(run: &config::meta::alerts::rca_runs::RcaRun) -> RcaRunRecord {
+        serde_json::from_value(run.result.clone().expect("a stored result")).unwrap()
+    }
+
+    /// `rca_summary.detail` of the incident.
+    async fn list_detail(org: &str, inc: &str) -> Value {
+        let summary = incident_row(org, inc).await.rca_summary.unwrap_or_default();
+        summary.get("detail").cloned().unwrap_or(Value::Null)
+    }
+
+    /// F11 counters of one org: outcome, claim, grade, failed citations.
+    fn record_counts(org: &str) -> (u64, u64, u64, u64) {
+        (
+            RCA_OUTCOME_TOTAL
+                .with_label_values(&[org, "root_cause_identified", "manual"])
+                .get(),
+            RCA_OUTCOME_CLAIM_TOTAL
+                .with_label_values(&[org, "root_cause_identified", "root_cause_identified"])
+                .get(),
+            RCA_CONFIDENCE_GRADE_TOTAL
+                .with_label_values(&[org, "high", "high"])
+                .get(),
+            RCA_UNVERIFIED_CITATIONS_TOTAL
+                .with_label_values(&[org, "failed"])
+                .get(),
+        )
+    }
+
+    /// VE41, F6, F11, VE44: a completed run stores its record in `result`, the outcome and
+    /// the graded band in `outcome`/`confidence`, mirrors both to the incident, leaves the
+    /// list detail empty, and counts the record once; a repeat finalize changes nothing.
+    #[tokio::test]
+    async fn a_completed_run_stores_its_record_outcome_and_band_once() {
+        use config::meta::oncall::{
+            agent::Confidence,
+            confidence::{GradeReason, SignalClass, UnverifiedReason},
+            rca_run::{HypothesisStatus, OutcomeReason, RcaOutcome},
+        };
+
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        let events = reported(&ALL_STAGES, verdict(H1, "high", "root_cause_identified"));
+        let expected = expected_end(&events, true);
+
+        assert!(end(&org, &run_id, &events, TurnResult::Persisted).await);
+
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Completed);
+        assert_eq!(run.report.as_deref(), Some(SECOND_REPORT));
+        let record = record_of(&run);
+        assert_eq!(record, expected.record);
+        assert_eq!(record.schema_version, 1);
+        assert_eq!(record.outcome, Some(RcaOutcome::RootCauseIdentified));
+        assert_eq!(record.outcome_reason, Some(OutcomeReason::RootCauseGraded));
+        assert!(record.has_ledger);
+        let statuses: Vec<(&str, HypothesisStatus)> = record
+            .ledger
+            .hypotheses
+            .iter()
+            .map(|h| (h.id.as_str(), h.status))
+            .collect();
+        assert_eq!(
+            statuses,
+            [
+                ("h1", HypothesisStatus::RootCause),
+                ("h2", HypothesisStatus::RuledOut)
+            ]
+        );
+        let grade = record.grade.as_ref().expect("a graded run");
+        assert_eq!(
+            (grade.claimed, grade.graded, grade.band),
+            (Confidence::High, Confidence::High, Confidence::High)
+        );
+        assert_eq!(
+            grade.decisive_classes,
+            [SignalClass::Logs, SignalClass::Metrics]
+        );
+        assert_eq!(grade.ruled_out, [H2]);
+        assert!(
+            grade
+                .reasons
+                .contains(&GradeReason::TwoDecisiveClassesAndRuledOut)
+        );
+        let unverified: Vec<(&str, UnverifiedReason)> = record
+            .unverified
+            .iter()
+            .map(|u| (u.evidence_id.as_str(), u.reason))
+            .collect();
+        assert_eq!(unverified, [("e4", UnverifiedReason::Failed)]);
+        assert_eq!(
+            record.verdict.as_ref().map(|v| v.confidence),
+            Some(Confidence::High),
+            "VE38: the verdict carries the graded band"
+        );
+        assert!(
+            record.blind_spots.iter().all(|b| b.id != "run_end"),
+            "VE34: a completed run gets no run_end blind spot"
+        );
+
+        // VE41: the columns copy the record; the incident mirrors them.
+        assert_eq!(run.outcome.as_deref(), Some("root_cause_identified"));
+        assert_eq!(run.confidence.as_deref(), Some("high"));
+        let incident = incident_row(&org, &inc).await;
+        assert_eq!(incident.rca_outcome, run.outcome);
+        assert_eq!(incident.rca_confidence, run.confidence);
+        assert_eq!(
+            list_detail(&org, &inc).await,
+            Value::Null,
+            "VE44: not blocked"
+        );
+
+        assert_eq!(record_counts(&org), (1, 1, 1, 1), "F11: counted once");
+
+        for result in [TurnResult::Persisted, TurnResult::Timeout] {
+            assert!(!end(&org, &run_id, &events, result).await);
+        }
+        let again = stored(&org, &run_id).await;
+        assert_eq!(again.result, run.result);
+        assert_eq!(
+            (again.outcome, again.confidence),
+            (run.outcome, run.confidence)
+        );
+        assert_eq!(
+            record_counts(&org),
+            (1, 1, 1, 1),
+            "F11: a repeat finalize counts nothing"
+        );
+    }
+
+    /// VE44, VE15: a run whose leading hypothesis is blocked completes `blocked` with a low
+    /// band, and the same write sets the list detail to the first fixable blind spot.
+    #[tokio::test]
+    async fn a_blocked_run_writes_what_it_needs_to_the_list_detail() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        let mut s = Session::new();
+        s.message("msg_a1", "assistant", json!({"created": T}));
+        s.tool(
+            "msg_a1",
+            "prt_h1",
+            "record_hypothesis",
+            "completed",
+            hypothesis("h1", "The 10:02 deploy broke checkout", "blocked", vec![]),
+            json!({"output": "{}"}),
+            100,
+            101,
+        );
+        s.tool(
+            "msg_a1",
+            "prt_l1",
+            "record_blind_spot",
+            "completed",
+            json!({"id": "b1", "axis": "other", "title": "Optional note", "why": "w", "fix": "none"}),
+            json!({"output": "{}"}),
+            200,
+            201,
+        );
+        s.tool(
+            "msg_a1",
+            "prt_l2",
+            "record_blind_spot",
+            "completed",
+            json!({"id": "b2", "axis": "change", "title": "Change history", "why": "No deploy tool", "fix": "connect_toolset"}),
+            json!({"output": "{}"}),
+            300,
+            301,
+        );
+        submit(
+            &mut s,
+            "prt_p1",
+            "completed",
+            json!({"markdown": SECOND_REPORT, "verdict": verdict("The 10:02 deploy broke checkout", "medium", "blocked")}),
+            400,
+        );
+
+        assert!(end(&org, &run_id, &s.events, TurnResult::Persisted).await);
+
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Completed);
+        assert_eq!(run.outcome.as_deref(), Some("blocked"));
+        assert_eq!(run.confidence.as_deref(), Some("low"), "VE15");
+        let incident = incident_row(&org, &inc).await;
+        assert_eq!(incident.rca_outcome.as_deref(), Some("blocked"));
+        assert_eq!(incident.rca_confidence.as_deref(), Some("low"));
+        assert_eq!(
+            list_detail(&org, &inc).await,
+            json!("Needs: Change history")
+        );
+        assert_eq!(
+            record_of(&run).outcome_reason,
+            Some(config::meta::oncall::rca_run::OutcomeReason::LeadingBlocked)
+        );
+    }
+
+    /// VE16, VE34: a cancelled run gets its partial record once, through the stats-only
+    /// write: the ledger, its blind spots plus "3 stages did not run", and no verdict,
+    /// grade, outcome or band; a later finalize keeps the first record. A cancel is not
+    /// the finalizer's end, so nothing is counted (F11).
+    #[tokio::test]
+    async fn a_cancelled_run_gets_its_partial_record_once_and_no_outcome() {
+        use config::meta::oncall::rca_run::BlindSpotFix;
+
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        cancel_write(&org, &run_id).await;
+        let events = ledger_session(&ALL_STAGES[..4]).events;
+
+        assert!(!end(&org, &run_id, &events, TurnResult::Cancelled).await);
+
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Cancelled);
+        assert_eq!(
+            (run.outcome.as_deref(), run.confidence.as_deref()),
+            (None, None)
+        );
+        let record = record_of(&run);
+        assert_eq!(record, expected_end(&events, false).record);
+        assert_eq!(record.ledger.hypotheses.len(), 2);
+        assert_eq!(
+            (&record.verdict, &record.grade, &record.outcome),
+            (&None, &None, &None)
+        );
+        let run_end = record
+            .blind_spots
+            .iter()
+            .find(|b| b.id == "run_end")
+            .expect("the run_end blind spot");
+        assert_eq!(run_end.title, "3 stages did not run");
+        assert_eq!(run_end.why, "Log patterns, Metrics, Converge");
+        assert_eq!(run_end.fix, BlindSpotFix::ResumeRun);
+        assert!(record.blind_spots.iter().any(|b| b.id == "b1"));
+        let incident = incident_row(&org, &inc).await;
+        assert_eq!(
+            (incident.rca_outcome, incident.rca_confidence),
+            (None, None)
+        );
+
+        // A later finalize with more of the transcript keeps the first record.
+        let more = reported(&ALL_STAGES, verdict(H1, "high", "root_cause_identified"));
+        assert!(!end(&org, &run_id, &more, TurnResult::Persisted).await);
+        let again = stored(&org, &run_id).await;
+        assert_eq!(again.result, run.result);
+        assert_eq!(again.state, RunState::Cancelled);
+        assert_eq!((again.outcome, again.confidence), (None, None));
+        assert_eq!(record_counts(&org), (0, 0, 0, 0));
+    }
+
+    /// VE16, VE34, F11: a run that ends with no report is failed with its partial record
+    /// (no run_end blind spot when all seven stages ran), counted once.
+    #[tokio::test]
+    async fn a_failed_run_gets_its_partial_record() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        let events = ledger_session(&ALL_STAGES).events;
+
+        assert!(end(&org, &run_id, &events, TurnResult::Persisted).await);
+
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Failed);
+        assert_eq!(run.error.as_ref().unwrap().code, ERROR_NO_REPORT);
+        assert_eq!(
+            (run.outcome.as_deref(), run.confidence.as_deref()),
+            (None, None)
+        );
+        let record = record_of(&run);
+        assert_eq!(record, expected_end(&events, false).record);
+        assert_eq!(record.ledger.hypotheses.len(), 2);
+        assert_eq!(
+            (&record.verdict, &record.grade, &record.outcome),
+            (&None, &None, &None)
+        );
+        assert!(record.blind_spots.iter().all(|b| b.id != "run_end"));
+        assert_eq!(record_counts(&org), (0, 0, 0, 1));
+
+        assert!(!end(&org, &run_id, &events, TurnResult::Persisted).await);
+        assert_eq!(stored(&org, &run_id).await.result, run.result);
+        assert_eq!(record_counts(&org), (0, 0, 0, 1), "counted once");
+    }
+
+    /// `rca_ledger_invalid_call_total{tool="submit_report"}` of one org.
+    fn submit_defects(org: &str) -> u64 {
+        RCA_LEDGER_INVALID_CALL_TOTAL
+            .with_label_values(&[org, SUBMIT_REPORT])
+            .get()
+    }
+
+    /// Completes a run of `inc` whose report is `input`; returns the stored record's verdict
+    /// `report_ref` and the one the finalizer delivers (its graded verdict).
+    async fn complete_with(org: &str, run_id: &str, input: Value) -> (String, String) {
+        let mut s = ledger_session(&ALL_STAGES);
+        submit(&mut s, "prt_p1", "completed", input, 4_000);
+        let ending = ending(org, run_id, &s.events).await;
+        let transcript = decode_run(&s.events);
+        let submitted = ending.with_report_ref(transcript.submit.as_ref().unwrap());
+        let delivered = record_run_end(&RunEndInput {
+            submit: Some(&submitted),
+            calls: &transcript.calls,
+            tool_log: &transcript.tool_log,
+            stages_run: &transcript.stages_run,
+            ended_by: EndedBy::Agent,
+            completed: true,
+        })
+        .verdict
+        .expect("a graded verdict");
+
+        assert!(end(org, run_id, &s.events, TurnResult::Persisted).await);
+        let record = record_of(&stored(org, run_id).await);
+        assert_eq!(
+            record.verdict.as_ref(),
+            Some(&delivered),
+            "the stored verdict is the delivered one"
+        );
+        (record.verdict.unwrap().report_ref, delivered.report_ref)
+    }
+
+    /// VE1, VE38: a `report_ref` sent at the top level of the submit is taken into the
+    /// verdict, stored and delivered; the repair is one `submit_report` defect, counted once
+    /// on the winning write and never again on a repeat finalize.
+    #[tokio::test]
+    async fn a_top_level_report_ref_is_hoisted_and_counted_once() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        let mut v = verdict(H1, "high", "root_cause_identified");
+        v.as_object_mut().unwrap().remove("report_ref");
+        let input = json!({"markdown": SECOND_REPORT, "verdict": v, "report_ref": "inc_x/rca/top"});
+        let parsed = config::meta::oncall::rca_run::parse_submit(&input).unwrap();
+        assert_eq!(parsed.defects, ["verdict.report_ref: taken from top level"]);
+        assert_eq!(submit_defects(&org), 0);
+
+        let (stored_ref, delivered_ref) = complete_with(&org, &run_id, input.clone()).await;
+        assert_eq!(stored_ref, "inc_x/rca/top");
+        assert_eq!(delivered_ref, "inc_x/rca/top");
+        assert_eq!(submit_defects(&org), 1);
+
+        let mut s = ledger_session(&ALL_STAGES);
+        submit(&mut s, "prt_p1", "completed", input, 4_000);
+        assert!(!end(&org, &run_id, &s.events, TurnResult::Persisted).await);
+        assert_eq!(submit_defects(&org), 1, "a repeat finalize counts nothing");
+    }
+
+    /// A submit with no `report_ref` anywhere gets the run's own reference
+    /// `<subject_id>/rca/<run_id>`, stored and delivered; the default is one defect.
+    #[tokio::test]
+    async fn a_missing_report_ref_defaults_to_the_runs_reference() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        let mut v = verdict(H1, "high", "root_cause_identified");
+        v.as_object_mut().unwrap().remove("report_ref");
+
+        let (stored_ref, delivered_ref) = complete_with(
+            &org,
+            &run_id,
+            json!({"markdown": SECOND_REPORT, "verdict": v}),
+        )
+        .await;
+        let default_ref = format!("{inc}/rca/{run_id}");
+        assert_eq!(stored_ref, default_ref);
+        assert_eq!(delivered_ref, default_ref);
+        assert_eq!(submit_defects(&org), 1);
+    }
+
     fn continuation(org_id: &str, run_id: &str, incident_id: &str) -> RcaTurnRun {
         RcaTurnRun {
             org_id: org_id.to_string(),
@@ -1910,7 +2411,6 @@ mod tests {
         tokio::time::timeout(
             Duration::from_secs(60),
             ending.end(
-                None,
                 TurnResult::Interrupted,
                 "turn-1",
                 Some(continuation(&org, &run_id, &inc)),
@@ -1943,7 +2443,6 @@ mod tests {
         let ended = ending(&org, &run_id, &events)
             .await
             .end(
-                None,
                 TurnResult::Interrupted,
                 "turn-2",
                 Some(continuation(&org, &run_id, &inc)),

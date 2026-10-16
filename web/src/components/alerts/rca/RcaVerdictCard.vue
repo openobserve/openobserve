@@ -14,40 +14,137 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- Verdict card, Phase 2 form (contract E5): state pill, headline, the stage
-     stepper while live (02 TH37) and the banners of TH40 (M, L, N, E). No band,
-     no credits. Phase 3 adds the cause, confidence and facts. -->
+<!-- Verdict card (03 VE21, VE22, VE32, VE33, VE35; contract F2): pill, headline,
+     band and reason, suspect change and impact for a graded run; the live label
+     and leading hypothesis while live; the stage stepper (02 TH37) and the banners
+     of TH40 (M, L, N, E). A legacy run keeps the Phase 2 card (VE42). No credits. -->
 <template>
   <section
     data-test="rca-verdict-card"
     class="border-border-default flex flex-col gap-3 border-b pb-5"
   >
-    <div class="flex items-center gap-2">
-      <OBadge
+    <div class="flex flex-wrap items-center gap-2.5">
+      <RcaPill
         data-test="rca-verdict-state"
-        :variant="pill.variant"
-        :icon="pill.icon ?? undefined"
-        size="sm"
+        :tone="pill.tone"
+        :icon="pill.icon"
+        :spinner="pill.spinner"
       >
-        <template v-if="cardState === 'investigating'" #icon>
-          <OSpinner size="xs" />
-        </template>
         {{ pill.label }}
-      </OBadge>
+      </RcaPill>
+      <span
+        v-if="qualifier"
+        data-test="rca-verdict-qualifier"
+        class="text-text-secondary text-compact font-semibold"
+      >
+        {{ qualifier }}
+      </span>
     </div>
 
     <h2
       data-test="rca-verdict-headline"
-      class="text-text-heading m-0 text-2xl leading-tight font-bold"
+      class="text-text-heading m-0 max-w-215 text-2xl leading-tight font-bold [text-wrap:pretty]"
     >
       {{ headline }}
     </h2>
+
+    <p
+      v-if="belowHeadline"
+      data-test="rca-verdict-below"
+      class="text-text-secondary text-compact m-0 font-semibold"
+    >
+      {{ belowHeadline }}
+    </p>
+
+    <!-- Confidence line: graded and partial runs only, never while live (VE-D2). -->
+    <div
+      v-if="showConfidence"
+      data-test="rca-verdict-confidence"
+      class="flex max-w-225 flex-wrap items-center gap-2 text-sm"
+    >
+      <component
+        :is="unverifiedCount > 0 ? 'button' : 'span'"
+        data-test="rca-verdict-band"
+        :data-band="card?.band ?? 'none'"
+        :type="unverifiedCount > 0 ? 'button' : undefined"
+        class="text-text-heading inline-flex items-center gap-2 border-none bg-transparent p-0 font-bold"
+        :class="{ 'cursor-pointer hover:underline': unverifiedCount > 0 }"
+        @click="unverifiedCount > 0 && $emit('show-unverified')"
+      >
+        <span class="inline-flex h-3 items-end gap-0.5" aria-hidden="true">
+          <span
+            v-for="bar in 3"
+            :key="bar"
+            class="w-1 rounded-xs"
+            :class="[
+              BAR_HEIGHT[bar - 1],
+              bar <= rcaBandLevel(card?.band) ? 'bg-accent' : 'bg-border-default',
+            ]"
+          />
+        </span>
+        {{ rcaBandLabel(card?.band) }}
+      </component>
+      <span v-if="bandReason" data-test="rca-verdict-band-reason" class="text-text-secondary">
+        {{ bandReason }}
+      </span>
+      <span
+        v-if="unverifiedCount > 0"
+        data-test="rca-verdict-unverified-count"
+        class="text-status-warning-text text-xs font-semibold"
+      >
+        {{
+          t(
+            "alerts.incidents.rcaSummary.unverifiedCount",
+            { count: unverifiedCount },
+            unverifiedCount,
+          )
+        }}
+      </span>
+      <button
+        v-if="blindSpotCount > 0"
+        type="button"
+        data-test="rca-verdict-blind-link"
+        class="text-status-warning-text text-compact inline-flex cursor-pointer items-center gap-1 border-none bg-transparent p-0 font-semibold hover:underline"
+        @click="$emit('show-blind-spots')"
+      >
+        <OIcon name="visibility-off" size="sm" />
+        {{
+          t(
+            "alerts.incidents.rcaSummary.blindSpotsBelow",
+            { count: blindSpotCount },
+            blindSpotCount,
+          )
+        }}
+      </button>
+    </div>
 
     <RcaStageStepper
       v-if="cardState === 'investigating'"
       :stage-index="stageIndex"
       :stage="stage"
     />
+
+    <!-- Facts of a graded run (VE35); never while live (VE-D2). -->
+    <dl
+      v-if="graded"
+      data-test="rca-verdict-facts"
+      class="m-0 mt-0.5 flex flex-wrap items-end gap-8"
+    >
+      <div class="max-w-105 min-w-0">
+        <dt class="text-text-muted text-xs">
+          {{ t("alerts.incidents.rcaSummary.suspectChange") }}
+        </dt>
+        <dd data-test="rca-verdict-suspect" class="text-text-heading m-0 text-sm font-semibold">
+          {{ suspectText }}
+        </dd>
+      </div>
+      <div class="max-w-95 min-w-0">
+        <dt class="text-text-muted text-xs">{{ t("alerts.incidents.rcaSummary.impact") }}</dt>
+        <dd data-test="rca-verdict-impact" class="text-text-heading m-0 text-sm font-semibold">
+          {{ impactText }}
+        </dd>
+      </div>
+    </dl>
 
     <!-- N: stale live run (01 RR-19); it can still be cancelled. -->
     <OBanner
@@ -218,17 +315,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, useId, watch } from "vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
-import type { RcaRunError, RcaRunMode } from "@/services/incidents";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import type { RcaChangeKind, RcaRunError, RcaRunMode, RcaRunSummary } from "@/services/incidents";
+import {
+  RCA_OUTCOME_PILL,
+  rcaBandLabel,
+  rcaBandLevel,
+  rcaUtcRange,
+  type RcaPillTone,
+} from "@/utils/incidents/rcaSummary";
+import { formatTimestampInTimezone } from "@/utils/date";
 import type { RcaCardState } from "@/utils/incidents/rcaThread";
+import RcaPill from "./RcaPill.vue";
 import RcaStageStepper from "./RcaStageStepper.vue";
 
 const props = withDefaults(
@@ -236,6 +341,13 @@ const props = withDefaults(
     cardState: RcaCardState;
     /** Identifies the run the card shows; resets the error details toggle. */
     runId: string;
+    /** The shown run is live and waits for an answer (VE22). */
+    waitingInput?: boolean;
+    /**
+     * Summary view of the shown run (03 §12); null while loading, on a read
+     * error, and for a legacy run (VE42): the card then keeps its Phase 2 form.
+     */
+    summary?: RcaRunSummary | null;
     stale?: boolean;
     /** "HH:MM:SS" of the stale run's last update. */
     staleSince?: string;
@@ -254,6 +366,8 @@ const props = withDefaults(
     cancelling?: boolean;
   }>(),
   {
+    waitingInput: false,
+    summary: null,
     stale: false,
     staleSince: "",
     stageIndex: null,
@@ -272,43 +386,116 @@ defineEmits<{
   cancel: [];
   "follow-thread": [];
   retry: [options: { buildOnPrevious: boolean }];
+  /** The band chip: open "Cited but not verified" (VE33). */
+  "show-unverified": [];
+  /** "N blind spots below". */
+  "show-blind-spots": [];
 }>();
 
 const { t } = useI18nTyped();
 
-const pill = computed<{ variant: BadgeVariant; icon: string | null; label: I18nText }>(() => {
+/** Heights of the three band bars (redesign glyph). */
+const BAR_HEIGHT = ["h-1.5", "h-2.25", "h-3"] as const;
+
+const card = computed(() => props.summary?.card ?? null);
+const live = computed(() => props.cardState === "investigating");
+/** A completed run with a derived outcome (VE16). */
+const outcome = computed(() =>
+  props.cardState === "analyzed" ? (card.value?.outcome ?? null) : null,
+);
+/** A failed or cancelled run with a stored partial record (VE34). */
+const partial = computed(
+  () => (props.cardState === "failed" || props.cardState === "cancelled") && !!props.summary,
+);
+const graded = computed(() => outcome.value !== null);
+
+const pill = computed<{
+  tone: RcaPillTone;
+  icon: IconName | null;
+  spinner: boolean;
+  label: I18nText;
+}>(() => {
+  if (outcome.value) {
+    const view = RCA_OUTCOME_PILL[outcome.value];
+    return { tone: view.tone, icon: view.icon, spinner: false, label: t(view.key) };
+  }
   switch (props.cardState) {
     case "investigating":
-      return {
-        variant: "default-soft",
-        icon: null,
-        label: t("alerts.incidents.rcaRun.state.investigating"),
-      };
+      return props.waitingInput
+        ? {
+            tone: "warn",
+            icon: "block",
+            spinner: false,
+            label: t("alerts.incidents.rcaRun.state.waitingInput"),
+          }
+        : {
+            tone: "neutral",
+            icon: null,
+            spinner: true,
+            label: t("alerts.incidents.rcaRun.state.investigating"),
+          };
     case "analyzed":
       return {
-        variant: "success-soft",
+        tone: "ok",
         icon: "check-circle",
+        spinner: false,
         label: t("alerts.incidents.rcaRun.state.analyzed"),
       };
     case "failed":
       return {
-        variant: "error-soft",
+        tone: "err",
         icon: "error",
+        spinner: false,
         label: t("alerts.incidents.rcaRun.state.failed"),
       };
     default:
+      // A cancelled run with a partial record reads "Failed" (VE32 frame E); the
+      // recordless Phase 2 card keeps "Cancelled".
       return {
-        variant: "error-soft",
+        tone: "err",
         icon: "cancel",
-        label: t("alerts.incidents.rcaRun.state.cancelled"),
+        spinner: false,
+        label: partial.value
+          ? t("alerts.incidents.rcaRun.state.failed")
+          : t("alerts.incidents.rcaRun.state.cancelled"),
       };
   }
 });
 
-const headline = computed(() => {
+/** Next to the pill: the live label (VE21) or the inconclusive qualifier (VE17). */
+const qualifier = computed<I18nText | null>(() => {
+  if (live.value) {
+    const soFar = card.value?.verdict_so_far;
+    if (!soFar || !card.value?.leading) return null;
+    return soFar.label === "revised" && soFar.was
+      ? t("alerts.incidents.rcaSummary.verdictSoFarRevised", { was: soFar.was })
+      : t("alerts.incidents.rcaSummary.verdictSoFarPreliminary");
+  }
+  return outcome.value === "inconclusive" && card.value?.headline
+    ? t("alerts.incidents.rcaSummary.suspectedNotConfirmed")
+    : null;
+});
+
+const headline = computed<I18nText>(() => {
+  if (live.value) {
+    if (!props.summary) return t("alerts.incidents.rcaRun.headline.investigating");
+    const leading = card.value?.leading;
+    return leading
+      ? t("alerts.incidents.rcaSummary.leading", { statement: leading.statement })
+      : t("alerts.incidents.rcaSummary.noLeadingYet");
+  }
+  if (outcome.value) {
+    if (card.value?.headline) return raw(card.value.headline);
+    return outcome.value === "inconclusive"
+      ? t("alerts.incidents.rcaSummary.noHypothesisRecorded")
+      : t("alerts.incidents.rcaRun.headline.analyzed");
+  }
+  if (partial.value) {
+    return props.cardState === "cancelled"
+      ? t("alerts.incidents.rcaSummary.cancelledBeforeVerdict")
+      : t("alerts.incidents.rcaSummary.failedBeforeVerdict");
+  }
   switch (props.cardState) {
-    case "investigating":
-      return t("alerts.incidents.rcaRun.headline.investigating");
     case "analyzed":
       return t("alerts.incidents.rcaRun.headline.analyzed");
     case "failed":
@@ -316,6 +503,65 @@ const headline = computed(() => {
     default:
       return t("alerts.incidents.rcaRun.headline.cancelled");
   }
+});
+
+/** Under the headline (VE32): contributing factor and blocked runs. */
+const belowHeadline = computed<I18nText | null>(() => {
+  if (outcome.value === "contributing_factor") {
+    return t("alerts.incidents.rcaSummary.noSingleRootCause");
+  }
+  if (outcome.value === "blocked") {
+    return card.value?.needs
+      ? t("alerts.incidents.rcaSummary.needs", { needs: card.value.needs })
+      : t("alerts.incidents.rcaSummary.needsInput");
+  }
+  return null;
+});
+
+const showConfidence = computed(() => graded.value || partial.value);
+const bandReason = computed(() => (graded.value ? (card.value?.band_reason ?? null) : null));
+const unverifiedCount = computed(() =>
+  showConfidence.value ? (props.summary?.unverified.length ?? 0) : 0,
+);
+const blindSpotCount = computed(() =>
+  showConfidence.value ? (props.summary?.blind_spots.length ?? 0) : 0,
+);
+
+const CHANGE_KIND: Record<RcaChangeKind, I18nText> = {
+  deploy: t("alerts.incidents.rcaSummary.changeKind.deploy"),
+  commit: t("alerts.incidents.rcaSummary.changeKind.commit"),
+  config_change: t("alerts.incidents.rcaSummary.changeKind.configChange"),
+  feature_flag: t("alerts.incidents.rcaSummary.changeKind.featureFlag"),
+  infra: t("alerts.incidents.rcaSummary.changeKind.infra"),
+};
+
+/** "Deploy 4f2c1e · 14:02 UTC (diff not read) (from a.rao)" (VE35). */
+const suspectText = computed<I18nText>(() => {
+  const change = card.value?.suspect_change;
+  if (!change) return t("alerts.incidents.rcaSummary.noSuspectChange");
+  const parts = [
+    t("alerts.incidents.rcaSummary.suspectRef", {
+      kind: CHANGE_KIND[change.kind],
+      reference: change.reference,
+      time: formatTimestampInTimezone(change.occurred_at, "HH:mm", "UTC"),
+    }),
+  ];
+  if (change.shown_state === "under_test") parts.push(t("alerts.incidents.rcaSummary.underTest"));
+  if (change.shown_state === "not_read") parts.push(t("alerts.incidents.rcaSummary.diffNotRead"));
+  if (change.lead_author) {
+    parts.push(t("alerts.incidents.rcaSummary.fromAuthor", { author: change.lead_author }));
+  }
+  return raw(parts.join(" "));
+});
+
+/** "3 services · peak 4.1% 5xx · 14:04–14:31 UTC" */
+const impactText = computed<I18nText>(() => {
+  const impact = card.value?.impact;
+  if (!impact) return t("alerts.incidents.rcaSummary.noImpact");
+  const parts: string[] = [impact.summary];
+  if (impact.peak) parts.push(t("alerts.incidents.rcaSummary.peak", { peak: impact.peak }));
+  if (impact.window) parts.push(rcaUtcRange(impact.window.start, impact.window.end));
+  return raw(parts.join(" · "));
 });
 
 // Details stay collapsed for every new failure (01 RR-47).

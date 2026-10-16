@@ -9451,7 +9451,18 @@
         "rerunCancelledBy": "re-run cancelled by {user}",
         "rerunCancelled": "re-run cancelled",
         "started": "AI analysis started",
-        "unavailable": "AI analysis is not available for this organization."
+        "unavailable": "AI analysis is not available for this organization.",
+        "outcome": {
+          "rootCauseIdentified": "Root cause identified",
+          "contributingFactor": "Contributing factor",
+          "inconclusive": "Inconclusive",
+          "blocked": "Blocked"
+        },
+        "band": {
+          "high": "High",
+          "medium": "Medium",
+          "low": "Low"
+        }
       },
       "rerunAnalysisTitle": "Re-run AI Analysis?",
       "rerunAnalysisMessage": "Severity has changed. Would you like AI to re-analyze this incident?",
@@ -9577,13 +9588,26 @@
           "investigating": "Investigating",
           "analyzed": "Analyzed",
           "failed": "Failed",
-          "cancelled": "Cancelled"
+          "cancelled": "Cancelled",
+          "waitingInput": "Blocked · waiting for an answer"
         },
         "headline": {
           "investigating": "Investigating",
           "analyzed": "Analysis complete",
           "failed": "Analysis failed",
           "cancelled": "Analysis cancelled"
+        },
+        "outcome": {
+          "rootCauseIdentified": "Root cause identified",
+          "contributingFactor": "Contributing factor",
+          "inconclusive": "Inconclusive",
+          "blocked": "Blocked"
+        },
+        "band": {
+          "high": "High confidence",
+          "medium": "Medium confidence",
+          "low": "Low confidence",
+          "none": "No confidence"
         }
       },
       "rcaThread": {
@@ -9707,6 +9731,120 @@
         "minuteAgo": "{count} minute ago | {count} minutes ago",
         "hourAgo": "{count} hour ago | {count} hours ago",
         "dayAgo": "{count} day ago | {count} days ago"
+      },
+      "rcaSummary": {
+        "loading": "Loading the analysis…",
+        "leading": "Leading: {statement}",
+        "noLeadingYet": "No leading hypothesis yet",
+        "verdictSoFarPreliminary": "Verdict so far: Preliminary",
+        "verdictSoFarRevised": "Verdict so far: Revised · was “{was}”",
+        "suspectedNotConfirmed": "Suspected, not confirmed",
+        "noHypothesisRecorded": "No hypothesis recorded",
+        "noSingleRootCause": "No single root cause confirmed",
+        "needs": "Needs: {needs}",
+        "needsInput": "Needs input",
+        "cancelledBeforeVerdict": "Run cancelled before a verdict. Partial results below",
+        "failedBeforeVerdict": "Run failed before a verdict. Partial results below",
+        "unverifiedCount": "{count} citation not verified | {count} citations not verified",
+        "blindSpotsBelow": "{count} blind spot below | {count} blind spots below",
+        "suspectChange": "Suspect change",
+        "impact": "Impact",
+        "noSuspectChange": "None found",
+        "noImpact": "Not reported",
+        "suspectRef": "{kind} {reference} · {time} UTC",
+        "underTest": "(under test)",
+        "diffNotRead": "(diff not read)",
+        "fromAuthor": "(from {author})",
+        "peak": "peak {peak}",
+        "utcRange": "{start}–{end} UTC",
+        "changeKind": {
+          "deploy": "Deploy",
+          "commit": "Commit",
+          "configChange": "Config change",
+          "featureFlag": "Feature flag",
+          "infra": "Infra change"
+        },
+        "whatHappened": "What happened",
+        "linkCount": "{count} link | {count} links",
+        "clickNumberHint": "Click a number to see the query",
+        "timelineComesWithReport": "The causal timeline comes with the report.",
+        "timelineEmpty": "The report has no timeline.",
+        "marker": {
+          "confirmed": "Confirmed",
+          "inferred": "Inferred",
+          "unverified": "Unverified",
+          "refuted": "Refuted"
+        },
+        "openEvidence": "Open evidence {number}",
+        "notVerifiedId": "{id} · not verified",
+        "hypotheses": "Hypotheses",
+        "noHypotheses": "No hypotheses recorded yet.",
+        "noEvidenceYet": "No evidence yet",
+        "group": {
+          "explains": "Explains the incident",
+          "beingTested": "Being tested",
+          "notConfirmed": "Not confirmed",
+          "ruledOut": "Ruled out"
+        },
+        "status": {
+          "rootCause": "Root cause",
+          "rootCauseNotConfirmed": "Root cause · not confirmed",
+          "contributing": "Contributing",
+          "symptom": "Symptom",
+          "ruledOut": "Ruled out",
+          "inconclusive": "Inconclusive",
+          "blocked": "Blocked",
+          "testing": "Testing",
+          "untested": "Untested",
+          "likely": "Likely"
+        },
+        "statusHistory": "Status history · {count}",
+        "historyLine": "{time} UTC · {status} ({actor})",
+        "historyActorAgent": "agent",
+        "historyActorSteered": "agent · after {author}",
+        "blindSpots": "Blind spots",
+        "blindSpotsSubtitle": "· What the agent could not check",
+        "noBlindSpots": "None. The agent reported no gaps.",
+        "noBlindSpotsLive": "None so far. Gaps appear here as checks run.",
+        "fix": {
+          "connectToolset": "Connect AI Toolset",
+          "ingestData": "Ingest data",
+          "openPipeline": "Open pipeline",
+          "samplingRules": "Sampling rules"
+        },
+        "evidence": "Evidence",
+        "evidenceCount": "{count} · {decisive} decisive",
+        "evidenceFilter": "Filter evidence",
+        "filterAll": "All",
+        "filterDecisive": "Decisive {count}",
+        "filterSupporting": "Supporting",
+        "noEvidence": "No verified evidence.",
+        "decisive": "Decisive",
+        "supporting": "Supporting",
+        "polarity": {
+          "supports": "supports",
+          "contradicts": "contradicts",
+          "rulesOut": "rules out"
+        },
+        "agentsReading": "Agent's reading:",
+        "openInLogs": "Open in Logs",
+        "openInMetrics": "Open in Metrics",
+        "openInTraces": "Open in Traces",
+        "copyQuery": "Copy query",
+        "queryCopied": "Query copied",
+        "queryCopyFailed": "Could not copy the query",
+        "citedNotVerified": "Cited but not verified",
+        "unverifiedNotRun": "Not run",
+        "unverifiedFailed": "Failed",
+        "signal": {
+          "logs": "Logs",
+          "metrics": "Metrics",
+          "traces": "Traces",
+          "change": "Change",
+          "infra": "Infra",
+          "context": "Context",
+          "unclassified": "Other"
+        }
       }
     },
     "alertDetails": {

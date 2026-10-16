@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The "AI analysis" cell of the incidents list (01 §12.1, Phase 1 rows). The
+// The "AI analysis" cell of the incidents list (01 §12.1, RR-42, 03 VE14). The
 // model reads only `incident.rca`, `incident.rca_off_reason` and the severity;
 // `stale` comes from the server and is never computed here (RR-9).
 
-import { gt, raw, type I18nText } from "@/types/i18n";
-import type { Incident, RcaSummary } from "@/services/incidents";
+import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
+import type { Incident, RcaBand, RcaOutcome, RcaSummary } from "@/services/incidents";
 
 export type RcaCellTone = "muted" | "warn" | "warn-strong" | "ok" | "err";
 
@@ -79,6 +79,28 @@ const state = (
   showAnalyzeOnHover: false,
 });
 
+const OUTCOME: Record<RcaOutcome, { key: I18nKey; tone: RcaCellTone }> = {
+  root_cause_identified: {
+    key: "alerts.incidents.aiAnalysis.outcome.rootCauseIdentified",
+    tone: "ok",
+  },
+  contributing_factor: {
+    key: "alerts.incidents.aiAnalysis.outcome.contributingFactor",
+    tone: "warn",
+  },
+  inconclusive: { key: "alerts.incidents.aiAnalysis.outcome.inconclusive", tone: "warn" },
+  blocked: { key: "alerts.incidents.aiAnalysis.outcome.blocked", tone: "warn-strong" },
+};
+
+const BAND_KEY: Record<RcaBand, I18nKey> = {
+  high: "alerts.incidents.aiAnalysis.band.high",
+  medium: "alerts.incidents.aiAnalysis.band.medium",
+  low: "alerts.incidents.aiAnalysis.band.low",
+};
+
+/** The band as list detail ("High"), or empty when the run has none. */
+const bandDetail = (band: RcaBand | null): I18nText => (band ? gt(BAND_KEY[band]) : EMPTY);
+
 export function rcaCellModel(
   incident: Pick<Incident, "rca" | "rca_off_reason" | "severity">,
   { rcaEnabled, now }: RcaCellOptions,
@@ -138,25 +160,39 @@ export function rcaCellModel(
         "warn-strong",
         raw(rca.summary.detail),
       );
-    case "completed":
-      return state(
-        gt("alerts.incidents.aiAnalysis.analyzed"),
-        "ok",
-        gt("alerts.incidents.aiAnalysis.ago", { ago: sinceMicros(rca.updated_at, now) }),
-      );
+    case "completed": {
+      if (!rca.outcome) {
+        // A run with no outcome (legacy, before Phase 3) reads "Analyzed".
+        return state(
+          gt("alerts.incidents.aiAnalysis.analyzed"),
+          "ok",
+          gt("alerts.incidents.aiAnalysis.ago", { ago: sinceMicros(rca.updated_at, now) }),
+        );
+      }
+      const outcome = OUTCOME[rca.outcome];
+      // A blocked run names what it needs (VE44); the others show the band.
+      const detail =
+        rca.outcome === "blocked" ? raw(rca.summary.detail) : bandDetail(rca.confidence);
+      return state(gt(outcome.key), outcome.tone, detail);
+    }
     case "failed":
     case "cancelled": {
       const cancelledBy = rca.summary.cancelled_by ? userLocalPart(rca.summary.cancelled_by) : null;
       if (previous) {
         // A newer run that did not finish never hides the earlier result (RR-42).
-        // Phase 1 has no outcome label and no band: a finished result reads "Analyzed".
         const rerunNote =
           rca.state === "failed"
             ? gt("alerts.incidents.aiAnalysis.rerunFailed")
             : cancelledBy
               ? gt("alerts.incidents.aiAnalysis.rerunCancelledBy", { user: cancelledBy })
               : gt("alerts.incidents.aiAnalysis.rerunCancelled");
-        return state(gt("alerts.incidents.aiAnalysis.analyzed"), "ok", EMPTY, { rerunNote });
+        if (!previous.outcome) {
+          return state(gt("alerts.incidents.aiAnalysis.analyzed"), "ok", EMPTY, { rerunNote });
+        }
+        const outcome = OUTCOME[previous.outcome];
+        return state(gt(outcome.key), outcome.tone, bandDetail(previous.confidence), {
+          rerunNote,
+        });
       }
       // A cancelled run reads "Failed"; the detail tells it apart from a broken run.
       const detail =
