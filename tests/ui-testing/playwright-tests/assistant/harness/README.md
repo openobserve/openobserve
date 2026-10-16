@@ -110,10 +110,13 @@ above in the same PR.
 Working today: `historyStatus` (500 → history unavailable), `sharesStatus`,
 `sharedChatStatus` (404 → not available), `overage`, `configPatch`, `chats`, `shares`, `log`
 (every AI request seen), `persistence`, `publicLinks`, `aiEnabled` (config patches),
-`expireNext` (set by `expireSession`).
+`expireNext` (set by `expireSession`), `role` (`admin` | `editor` | `viewer` | `user` |
+`custom`: anything but `admin` rewrites the login response's role and turns `rbac_enabled` on,
+and the access probe `POST …/ai/chats/{id}/cancel` answers 403 for `viewer`, 404 otherwise),
+`capabilitiesEnabled` (B-06 `GET …/ai/capabilities` and `POST …/capabilities/test`; 404 while
+off) and `capabilities` (fields merged over the role-derived answer).
 
-Declared with a no-op default, filled in by the WP that owns the behaviour: `role`,
-`capabilitiesEnabled`, `capabilities`, `envelopeEnabled`, `lifecycleFramesEnabled`,
+Declared with a no-op default, filled in by the WP that owns the behaviour: `envelopeEnabled`, `lifecycleFramesEnabled`,
 `tailEnabled`, `decisionFramesEnabled`, `policyEnforced`, `ephemeralEnabled`, `usage`,
 `usageStatus`, `overageStatus`, `consentPutStatus`, `settingsEnabled`, `settings`,
 `toolsetHealthEnabled`, `grantsEnabled`, `activityEnabled`, `secretMergeEnabled`,

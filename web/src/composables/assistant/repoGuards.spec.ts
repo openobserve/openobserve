@@ -194,7 +194,9 @@ describe("assistant repo guards", () => {
   });
 
   it("builds ai_* events only in services/assistantAnalytics.ts", () => {
-    const call = /\b\w*(?:track|addAction)\w*\s*\(\s*(?:[\w.]+\s*,\s*)?["'`]ai_[a-z_]+/;
+    // `trackAssistant` is the sanctioned door into the builder, so its call sites are not offenders.
+    const call =
+      /\b(?!trackAssistant\b)\w*(?:track|addAction)\w*\s*\(\s*(?:[\w.]+\s*,\s*)?["'`]ai_[a-z_]+/;
     expect(
       offenders(
         (f) =>
