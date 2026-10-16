@@ -3,6 +3,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { createDashboardViaApi } = require('../../pages/dashboardPages/dashCreation.js');
 const { createDashboardReportViaApi } = require('../../pages/reportsPages/reportCreation.js');
+const APICleanup = require('../../pages/apiCleanup.js');
 
 const timestamp = Date.now();
 const DASH_PREFIX = 'report_history_dash_';
@@ -179,16 +180,16 @@ test.describe("Report History", () => {
     await pm.reportHistoryPage.expectDisabledStateVisible();
   });
 
-  test("Cleanup: Remove the reports and dashboards this spec created", {
-    tag: ['@reportHistory', '@cleanup']
-  }, async () => {
-    const reports = await pm.apiCleanup.fetchReports();
+  // afterAll runs even when a serial test fails, so a skipped cleanup test can no longer leak fixtures.
+  test.afterAll(async () => {
+    const apiCleanup = new APICleanup();
+    const reports = await apiCleanup.fetchReports();
     for (const report of (reports || []).filter(r => r.name && r.name.startsWith('report_history_'))) {
-      await pm.apiCleanup.deleteReport(report.name);
+      await apiCleanup.deleteReport(report.name);
     }
-    const dashboards = await pm.apiCleanup.fetchDashboardsInFolder('default');
+    const dashboards = await apiCleanup.fetchDashboardsInFolder('default');
     for (const d of dashboards.filter(x => x.title && x.title.startsWith(DASH_PREFIX))) {
-      await pm.apiCleanup.deleteDashboard(d.dashboard_id, d.folder_id || 'default');
+      await apiCleanup.deleteDashboard(d.dashboard_id, d.folder_id || 'default');
     }
   });
 });
