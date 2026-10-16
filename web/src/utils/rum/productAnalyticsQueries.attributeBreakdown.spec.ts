@@ -20,6 +20,7 @@ import {
   funnelAlertSql,
   funnelSql,
   funnelTrendSql,
+  stepFieldSampleSql,
   whyEnteredSql,
   type AnalyticsScope,
   type FunnelDef,
@@ -199,5 +200,94 @@ describe("step property conditions (pc) SQL", () => {
     expect(cte(why, "g")).toContain("MAX(CASE WHEN o0 = 1 AND p1 = 1 THEN 1 ELSE 0 END) AS o1");
     expect(cte(why, "g")).toContain("MAX(CASE WHEN k0 = 1 AND p1 = 1 THEN 1 ELSE 0 END) AS k1");
     expect(why).toMatchSnapshot();
+  });
+});
+
+describe("trend ranking for an attribute breakdown", () => {
+  const b = def({ breakdown: { f: PAY } });
+  const bounds = [0, 86400000000];
+  const pair = { a: 1, b: 3 };
+
+  it("ranks values by units at the table's start step and keeps none without units there", () => {
+    const sql = funnelTrendSql(s, null, b, bounds, pair, opts, 2);
+    assertJoinFree(sql);
+    expect(cte(sql, "tb")).toContain("SUM(r2) AS c2, SUM(r1) AS ca");
+    expect(cte(sql, "tk")).toContain("SUM(c2) OVER (PARTITION BY dim) AS tot");
+    expect(cte(sql, "tg")).toContain("CASE WHEN un = 0 AND tot > 0 AND rk <= 5 THEN dim END");
+  });
+
+  it("ranks from step 1 by default, and reads a rank step the funnel lacks as step 1", () => {
+    const base = funnelTrendSql(s, null, b, bounds, pair, opts);
+    expect(cte(base, "tb")).toContain("SUM(r1) AS c1, SUM(r1) AS ca");
+    expect(cte(base, "tg")).toContain("CASE WHEN un = 0 AND rk <= 5 THEN dim END");
+    expect(funnelTrendSql(s, null, b, bounds, pair, opts, 1)).toBe(base);
+    expect(funnelTrendSql(s, null, b, bounds, pair, opts, 4)).toBe(base);
+  });
+});
+
+describe("per-step field sample", () => {
+  it("takes the latest rows of each step's events, tagged with the first step they match", () => {
+    const sql = stepFieldSampleSql(s, def(), [], [PAY, "context_plan", "context_missing"], 200);
+    assertJoinFree(sql);
+    expect(sql).toContain(
+      "CASE WHEN (type = 'action' AND action_target_name <> '' AND regexp_replace(",
+    );
+    expect(sql).toMatch(/THEN 1 WHEN .* THEN 2 WHEN .* THEN 3 END AS st/);
+    expect(sql).toContain("ROW_NUMBER() OVER (PARTITION BY CASE WHEN");
+    expect(sql).toContain(
+      `ORDER BY _timestamp DESC) AS rn, "${PAY}", "context_plan" FROM "_rumdata"`,
+    );
+    expect(sql).not.toContain("context_missing");
+    expect(sql.endsWith("WHERE rn <= 200")).toBe(true);
+  });
+
+  it("reads only the step tag when no field is sampled", () => {
+    const sql = stepFieldSampleSql(s, def(), [], [], 200);
+    expect(sql.startsWith("SELECT st FROM (SELECT CASE")).toBe(true);
+    expect(sql).toContain(' AS rn FROM "_rumdata"');
+  });
+});
+
+describe("Why N? counts for the Filter all steps notice", () => {
+  const rules = {
+    bots: false,
+    builtinBots: { version: 1, families: [], devices: [] },
+    sessions: [{ field: "usr_id" as const, op: "eq" as const, values: ["bot"] }],
+    pages: [],
+  };
+  const ruled: AnalyticsScope = {
+    ...s,
+    schema: { ...s.schema, usr_id: true },
+    exclusions: rules,
+  };
+  const CARRY = `MAX(CASE WHEN "${PAY}" IS NOT NULL AND CAST("${PAY}" AS VARCHAR) <> '' THEN 1 ELSE 0 END) AS hf1`;
+
+  it("counts the step-1 sessions that ever carry each session filter's field", () => {
+    const sql = whyEnteredSql(s, def({ f: [UPI] }), opts);
+    assertJoinFree(sql);
+    expect(cte(sql, "g")).toContain(CARRY);
+    expect(tail(sql)).toContain(
+      "SUM(CASE WHEN o1 = 1 AND hf1 = 1 THEN 1 ELSE 0 END) AS carry1 FROM g LIMIT 1",
+    );
+    expect(sql).toContain(` OR "${PAY}" IS NOT NULL)`);
+  });
+
+  it("keeps the filter, carry and identity flags through step 1's property condition", () => {
+    const d = def({
+      steps: [c("product_viewed", { pc: [UPI] }), steps[1], steps[2]],
+      f: [{ field: "context_plan", op: "in", values: ["pro"] }],
+    });
+    const sql = whyEnteredSql(ruled, d, opts);
+    assertJoinFree(sql);
+    const g0 = cte(sql, "g0");
+    expect(g0).toContain(" AS ki1");
+    expect(g0).toContain(" AS hf1");
+    expect(g0).toContain(" AS xi");
+    expect(g0).toContain("AS p1");
+    const g = cte(sql, "g");
+    expect(g).toContain("MAX(ki1) AS ki1, MAX(hf1) AS hf1, MAX(xi) AS xi FROM g0 GROUP BY sid");
+    expect(tail(sql)).toContain(
+      "SUM(CASE WHEN k1 = 1 AND ki1 = 1 THEN 1 ELSE 0 END) AS kept, SUM(CASE WHEN o1 = 1 AND hf1 = 1 THEN 1 ELSE 0 END) AS carry1 FROM g WHERE xi = 0 LIMIT 1",
+    );
   });
 });

@@ -184,8 +184,8 @@ export function compareBreakdown(
 ): { rows: ComparedBreakdownRow[]; total: PrevSide | null } {
   const k = cur.start && !cur.start.anyStep ? cur.start.step : 1;
   const head = new Set(cur.rows.flatMap((r) => (r.value === null ? [] : [r.value])));
-  // An attribute breakdown keeps its unnamed units in their own row, apart from Other.
-  const split = cur.rows.some((r) => r.noValue || r.leftBefore);
+  // An attribute breakdown from a start step keeps its unnamed units in their own row, apart from Other.
+  const split = !!cur.start && !cur.start.anyStep;
   // Only a value with units at step k is in this period's Other; the rest show as previous-only rows.
   const folded = split
     ? cur.rows.some((r) => r.other)
@@ -231,7 +231,10 @@ export function compareBreakdown(
   if (overflow.length) rows.push(prevOnlyRow(overflow, steps, null, k));
   const unnamed = prevOnly.filter((h) => !isNamedDim(h));
   if (unnamed.length) rows.push(prevOnlyRow(unnamed, steps, null, k));
-  return { rows, total: prevSide(cur.total, sumCounts(prevHits, steps)) };
+  return {
+    rows,
+    total: prevSide(cur.total.slice(k - 1), sumCounts(prevHits, steps).slice(k - 1)),
+  };
 }
 
 /** A short range label ("8–11 Oct"); a range under a day shows times instead of days. */

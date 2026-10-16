@@ -193,6 +193,8 @@ export interface BreakdownStart {
   anyStep: boolean;
   covered: number;
   reached: number;
+  /** The step the automatic rule picks, even while another is pinned; null when no step reaches half. */
+  auto: number | null;
 }
 export interface BreakdownFold {
   rows: BreakdownRow[];
@@ -1479,18 +1481,30 @@ const breakdownStart = (
   const covered = Array.from({ length: steps }, (_, i) =>
     hits.reduce((sum, h) => sum + num(h[`dc${i + 1}`]), 0),
   );
+  // Coverage reads each step's own rows whatever the pin, so the automatic step is known either way.
+  const i = reached.findIndex((c, j) => c > 0 && covered[j] / c >= BREAKDOWN_COVERAGE);
+  const auto = i >= 0 ? i + 1 : null;
   const at = (step: number, pinned: boolean): BreakdownStart => ({
     step,
     pinned,
     anyStep: false,
     covered: covered[step - 1],
     reached: reached[step - 1],
+    auto,
   });
-  if (attribute.s !== undefined) return at(attribute.s, true);
-  const i = reached.findIndex((c, j) => c > 0 && covered[j] / c >= BREAKDOWN_COVERAGE);
-  if (i >= 0) return at(i + 1, false);
+  // A pin past the last step reads as automatic, as the SQL does.
+  if (attribute.s !== undefined && attribute.s >= 1 && attribute.s <= steps)
+    return at(attribute.s, true);
+  if (auto !== null) return at(auto, false);
   const named = hits.filter(isNamedDim).reduce((sum, h) => sum + num(h.c1), 0);
-  return { step: 1, pinned: false, anyStep: true, covered: named, reached: reached[0] ?? 0 };
+  return {
+    step: 1,
+    pinned: false,
+    anyStep: true,
+    covered: named,
+    reached: reached[0] ?? 0,
+    auto: null,
+  };
 };
 
 // Units with no value split by whether they reached the start step; from any step, they stay "Not set".
@@ -1582,8 +1596,7 @@ export function foldBreakdown(
   const head = named.slice(0, top);
   const rest = start ? named.slice(top) : sorted.filter((h) => !head.includes(h));
   const conversion = (c: number[]) => (c[k - 1] > 0 ? c[c.length - 1] / c[k - 1] : 0);
-  const median = (h: Record<string, unknown>) =>
-    start && k < steps ? nullableNum(h[`mt${k}`]) : null;
+  const median = (h: Record<string, unknown>) => (k < steps ? nullableNum(h[`mt${k}`]) : null);
   const row = (c: number[], over: Partial<BreakdownRow>): BreakdownRow => ({
     value: null,
     label: "",

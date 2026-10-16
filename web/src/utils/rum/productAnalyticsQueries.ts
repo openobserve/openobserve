@@ -461,8 +461,9 @@ const rowFilterMatch = (scope: AnalyticsScope, r: FunnelFilter): string =>
   r.not ? `NOT ${filterMatch(scope, r)}` : filterMatch(scope, r);
 
 // Identity and attribute values are missing from a session's first views, so they are checked per session.
-const isSessionFilter = (r: FunnelFilter): boolean =>
-  (IDENTITY_FIELDS as readonly string[]).includes(r.field) || !isBuiltinFilter(r.field);
+export function isSessionFilter(r: FunnelFilter): boolean {
+  return (IDENTITY_FIELDS as readonly string[]).includes(r.field) || !isBuiltinFilter(r.field);
+}
 
 const funnelFilters = (def: FunnelDef, perSession: boolean): FunnelFilter[] =>
   (def.f ?? []).filter((r) => isSessionFilter(r) === perSession);
@@ -780,6 +781,22 @@ export function filterValuesSql(scope: AnalyticsScope, field: FunnelFilter["fiel
   if (!has(scope, field)) throw new Error(`Field ${field} is not in the stream`);
   const v = filterValue(field);
   return `SELECT ${v} AS v, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${rowScope(scope)} AND ${filterColumn(field)} IS NOT NULL AND ${v} <> '' GROUP BY ${v} ORDER BY sessions DESC, v LIMIT 20`;
+}
+
+/** The latest `perStep` rows of each step's events with `fields`, tagged `st` with the first step they match. */
+export function stepFieldSampleSql(
+  scope: AnalyticsScope,
+  def: FunnelDef,
+  events: NamedEvent[],
+  fields: readonly string[],
+  perStep: number,
+): string {
+  const preds = def.steps.map((s) => stepPredicateRaw(s, scope, events));
+  const st = `CASE ${preds.map((p, i) => `WHEN ${p} THEN ${i + 1}`).join(" ")} END`;
+  // A field name is parsed to [a-z0-9_] before it gets here, so quoting it is safe.
+  const cols = fields.filter((f) => has(scope, f)).map((f) => `"${f}"`);
+  const picked = cols.length ? `, ${cols.join(", ")}` : "";
+  return `SELECT st${picked} FROM (SELECT ${st} AS st, ROW_NUMBER() OVER (PARTITION BY ${st} ORDER BY _timestamp DESC) AS rn${picked} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (${preds.join(" OR ")})) WHERE rn <= ${Math.trunc(perStep)}`;
 }
 
 /** Top browser and device families over the scope without any exclusion, for the likely-bot suggestions. */
@@ -1676,7 +1693,8 @@ const coverageCols = (n: number): string[] =>
 
 // Time from start step k to the last step, for each k the page may pick; d_i counts from step 1.
 const breakdownTimes = (dim: DimSql, n: number): string[] => {
-  const starts = dim.step === null ? range1(n - 1) : dim.step < n ? [dim.step] : [];
+  const pinned = dim.step === null ? range1(n - 1) : [dim.step];
+  const starts = (dim.attr ? pinned : [1]).filter((k) => k < n);
   return starts.map(
     (k) => `approx_percentile_cont(${k === 1 ? `d${n}` : `d${n} - d${k}`}, 0.5) AS mt${k}`,
   );
@@ -1697,11 +1715,9 @@ export function funnelSql(
       ...range1(n).map((i) => `SUM(r${i}) AS c${i}`),
       ...xr.map((j) => `SUM(xr${j}) AS xr${j}`),
       ...(dim.attr
-        ? [
-            ...range1(n).map((i) => `SUM(CASE WHEN r${i} = 1 THEN h${i} ELSE 0 END) AS dc${i}`),
-            ...breakdownTimes(dim, n),
-          ]
+        ? range1(n).map((i) => `SUM(CASE WHEN r${i} = 1 THEN h${i} ELSE 0 END) AS dc${i}`)
         : []),
+      ...breakdownTimes(dim, n),
     ];
     return withCtes(
       ctes,
@@ -1733,7 +1749,7 @@ export function funnelSql(
   );
 }
 
-/** Each unit's entry into `pair.a`, bucketed by `boundariesUs`; a breakdown keeps the top values and folds the rest. */
+/** Each unit's entry into `pair.a`, bucketed by `boundariesUs`; a breakdown keeps the top values at `rankStep` and folds the rest. */
 export function funnelTrendSql(
   scope: AnalyticsScope,
   id: IdentitySql | null,
@@ -1741,6 +1757,7 @@ export function funnelTrendSql(
   boundariesUs: number[],
   pair: FunnelPair,
   opts: BuildOpts,
+  rankStep = 1,
 ): string {
   const dim = breakdownField(scope, def);
   const { ctes, users } = funnelCtes(scope, id, def, opts.events, dim, pair.a);
@@ -1754,13 +1771,15 @@ export function funnelTrendSql(
       `SELECT ${bk} AS bk, SUM(r${a}) AS ca, SUM(r${b}) AS cb FROM ${from}${users ? " AND" : " WHERE"} r${a} = 1 GROUP BY bk ORDER BY bk LIMIT ${m}`,
     );
   }
-  // Ranked by step-1 units like a built-in breakdown table; an attribute table ranks from its start step instead.
-  const top = `un = 0 AND rk <= ${BREAKDOWN_TOP}`;
+  // Ranked by units at the table's start step, so lines and table rows name the same values.
+  const k =
+    Number.isInteger(rankStep) && rankStep > 1 && rankStep <= def.steps.length ? rankStep : 1;
+  const top = `un = 0${k > 1 ? " AND tot > 0" : ""} AND rk <= ${BREAKDOWN_TOP}`;
   return withCtes(
     [
       ...ctes,
-      `tb AS (SELECT dim, CASE WHEN r${a} = 1 THEN ${bk} END AS bk, SUM(r1) AS c1, SUM(r${a}) AS ca, SUM(r${b}) AS cb FROM ${from} GROUP BY dim, CASE WHEN r${a} = 1 THEN ${bk} END)`,
-      "tk AS (SELECT *, SUM(c1) OVER (PARTITION BY dim) AS tot, CASE WHEN dim IS NULL OR dim = '' THEN 1 ELSE 0 END AS un FROM tb)",
+      `tb AS (SELECT dim, CASE WHEN r${a} = 1 THEN ${bk} END AS bk, SUM(r${k}) AS c${k}, SUM(r${a}) AS ca, SUM(r${b}) AS cb FROM ${from} GROUP BY dim, CASE WHEN r${a} = 1 THEN ${bk} END)`,
+      `tk AS (SELECT *, SUM(c${k}) OVER (PARTITION BY dim) AS tot, CASE WHEN dim IS NULL OR dim = '' THEN 1 ELSE 0 END AS un FROM tb)`,
       "tr AS (SELECT *, DENSE_RANK() OVER (ORDER BY un, tot DESC, dim) AS rk FROM tk)",
       `tg AS (SELECT CASE WHEN ${top} THEN dim END AS gd, un, tot, bk, ca, cb FROM tr WHERE bk IS NOT NULL)`,
     ],
@@ -1826,7 +1845,14 @@ export function funnelAlertSql(
   );
 }
 
-/** Sessions that opened step 1 (`opened`) and those of them inside Filter all steps (`kept`), for "Why N?". */
+// Whether any of the session's rows carries a value in a session filter's field, whatever the value.
+const carriesFlags = (scope: AnalyticsScope, filters: FunnelFilter[]): string[] =>
+  filters.map(
+    (r, i) =>
+      `MAX(CASE WHEN ${has(scope, r.field) ? `${filterColumn(r.field)} IS NOT NULL AND ${filterValue(r.field)} <> ''` : "1 = 0"} THEN 1 ELSE 0 END) AS hf${i + 1}`,
+  );
+
+/** Sessions that opened step 1 (`opened`), those inside Filter all steps (`kept`), and per session filter those that ever carry its field (`carryN`). */
 export function whyEnteredSql(scope: AnalyticsScope, def: FunnelDef, opts: BuildOpts): string {
   const s1 = def.steps[0];
   const conds = (s1.f?.vc ?? []).map((c) => ` AND ${viewCondRaw(c, scope)}`).join("");
@@ -1838,11 +1864,18 @@ export function whyEnteredSql(scope: AnalyticsScope, def: FunnelDef, opts: Build
   const widen = `${base?.widen ?? ""}${sessionFilterWiden(scope, ids)}`;
   const pc = s1.f?.pc ?? [];
   const where = `"_rumdata" WHERE ${scopeClause(scope, opts.sample)} AND (${opened}${widen})`;
-  const flags = [...sessionFilterFlags(scope, ids), ...(base ? [base.xi] : [])];
+  const flags = [
+    ...sessionFilterFlags(scope, ids),
+    ...carriesFlags(scope, ids),
+    ...(base ? [base.xi] : []),
+  ];
   const inFilter = ["k1 = 1", ...ids.map((r, i) => sessionFilterKeep(r, `ki${i + 1}`))].join(
     " AND ",
   );
-  const tail = `SELECT SUM(o1) AS opened, SUM(CASE WHEN ${inFilter} THEN 1 ELSE 0 END) AS kept FROM g${base ? " WHERE xi = 0" : ""} LIMIT 1`;
+  const carry = ids.map(
+    (_, i) => `, SUM(CASE WHEN o1 = 1 AND hf${i + 1} = 1 THEN 1 ELSE 0 END) AS carry${i + 1}`,
+  );
+  const tail = `SELECT SUM(o1) AS opened, SUM(CASE WHEN ${inFilter} THEN 1 ELSE 0 END) AS kept${carry.join("")} FROM g${base ? " WHERE xi = 0" : ""} LIMIT 1`;
   if (!pc.length) {
     const g = [
       "session_id AS sid",
