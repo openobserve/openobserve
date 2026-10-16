@@ -8070,6 +8070,7 @@
       "noDestination": "Sem destino",
       "noise": "Ruído",
       "notifyFailed": "Falha na notificação",
+      "schedulerHealth": "Atraso do agendador",
       "silent": "Silencioso"
     },
     "evidence": {
@@ -8086,6 +8087,12 @@
       "failureRatio": "Taxa de falhas",
       "history": "Histórico",
       "deliveredThroughIncidents": "Entregue por meio de incidentes",
+      "affectedOrgs": "Organizações afetadas",
+      "congestedHours": "Horas congestionadas",
+      "skippedWindows": "Janelas ignoradas",
+      "lateEvaluations": "Avaliações atrasadas",
+      "lateRatio": "Proporção de atrasos",
+      "longestDelay": "Maior atraso",
       "yes": "Sim",
       "no": "Não"
     },
@@ -8103,7 +8110,9 @@
       "repairDestination": "Reparar o destino",
       "repairDestinationDesc": "A entrega falha em um destino usado pelo alerta.",
       "attachDestination": "Anexar destino",
-      "attachDestinationDesc": "Dê ao alerta um destino para entrega."
+      "attachDestinationDesc": "Dê ao alerta um destino para entrega.",
+      "scaleAlertScheduler": "Escale o agendador de alertas",
+      "scaleAlertSchedulerDesc": "Aumente {concurrency}, adicione nós de alerta ou aumente {pullers}."
     },
     "severity": {
       "high": "Alta",
@@ -8187,6 +8196,7 @@
       "suggestionsOnly": "Apenas sugestões, nada é aplicado automaticamente",
       "filterAll": "Todos",
       "showingCapped": "Exibindo {shown} de {total} achados: a busca parou em {count} registros.",
+      "perSubjectNote": "Uma constatação que nomeia vários alertas tem um cartão para cada um, então os cartões são mais numerosos que as constatações.",
       "nothingTitle": "Nada a relatar",
       "nothingDescription": "Sem lacuna de cobertura e nada recusado: em {count} alertas no escopo, a calibração de alertas não encontrou nada.",
       "noneFoundTitle": "Nenhum encontrado",
@@ -8200,6 +8210,9 @@
       "declinedNotWritten": "Os motivos por alerta não são gravados no stream, apenas esta contagem.",
       "evidence": "Evidências",
       "alert": "Alerta",
+      "topOrgs": "Organizações mais afetadas",
+      "worstHours": "Piores horas",
+      "lagImpact": "{skipped} ignoradas, {late} de {evaluations} atrasadas",
       "proposedActions": "Ações propostas"
     },
     "dashboard": {

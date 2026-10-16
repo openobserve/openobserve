@@ -8070,6 +8070,7 @@
       "noDestination": "Aucune destination",
       "noise": "Bruit",
       "notifyFailed": "Échec de notification",
+      "schedulerHealth": "Retard du planificateur",
       "silent": "Silencieux"
     },
     "evidence": {
@@ -8086,6 +8087,12 @@
       "failureRatio": "Taux d'échec",
       "history": "Historique",
       "deliveredThroughIncidents": "Livré via des incidents",
+      "affectedOrgs": "Organisations affectées",
+      "congestedHours": "Heures congestionnées",
+      "skippedWindows": "Fenêtres ignorées",
+      "lateEvaluations": "Évaluations tardives",
+      "lateRatio": "Part des retards",
+      "longestDelay": "Délai le plus long",
       "yes": "Oui",
       "no": "Non"
     },
@@ -8103,7 +8110,9 @@
       "repairDestination": "Réparer la destination",
       "repairDestinationDesc": "La livraison échoue sur une destination utilisée par l'alerte.",
       "attachDestination": "Associer une destination",
-      "attachDestinationDesc": "Donnez à l'alerte une destination de livraison."
+      "attachDestinationDesc": "Donnez à l'alerte une destination de livraison.",
+      "scaleAlertScheduler": "Mettre à l'échelle le planificateur d'alertes",
+      "scaleAlertSchedulerDesc": "Augmentez {concurrency}, ajoutez des nœuds d'alerte ou augmentez {pullers}."
     },
     "severity": {
       "high": "Élevée",
@@ -8187,6 +8196,7 @@
       "suggestionsOnly": "Suggestions uniquement, rien n'est appliqué automatiquement",
       "filterAll": "Tous",
       "showingCapped": "Affichage de {shown} sur {total} constats : la recherche s'est arrêtée à {count} enregistrements.",
+      "perSubjectNote": "Un constat qui nomme plusieurs alertes a une carte pour chacune, donc les cartes sont plus nombreuses que les constats.",
       "nothingTitle": "Rien à signaler",
       "nothingDescription": "Aucune lacune de couverture et aucun refus : sur {count} alertes du périmètre, la calibration des alertes n'a rien trouvé.",
       "noneFoundTitle": "Aucun résultat",
@@ -8200,6 +8210,9 @@
       "declinedNotWritten": "Les raisons par alerte ne sont pas écrites dans le flux, seul ce comptage l'est.",
       "evidence": "Preuves",
       "alert": "Alerte",
+      "topOrgs": "Organisations les plus affectées",
+      "worstHours": "Heures les plus critiques",
+      "lagImpact": "{skipped} ignorées, {late} sur {evaluations} tardives",
       "proposedActions": "Actions proposées"
     },
     "dashboard": {

@@ -8070,6 +8070,7 @@
       "noDestination": "Nessuna destinazione",
       "noise": "Rumore",
       "notifyFailed": "Notifica non riuscita",
+      "schedulerHealth": "Ritardo dello scheduler",
       "silent": "Silenzioso"
     },
     "evidence": {
@@ -8086,6 +8087,12 @@
       "failureRatio": "Rapporto di fallimenti",
       "history": "Cronologia",
       "deliveredThroughIncidents": "Consegnate tramite incidenti",
+      "affectedOrgs": "Organizzazioni interessate",
+      "congestedHours": "Ore congestionate",
+      "skippedWindows": "Finestre saltate",
+      "lateEvaluations": "Valutazioni in ritardo",
+      "lateRatio": "Quota in ritardo",
+      "longestDelay": "Ritardo più lungo",
       "yes": "Sì",
       "no": "No"
     },
@@ -8103,7 +8110,9 @@
       "repairDestination": "Ripara la destinazione",
       "repairDestinationDesc": "La consegna fallisce su una destinazione utilizzata dall'avviso.",
       "attachDestination": "Collega destinazione",
-      "attachDestinationDesc": "Dai all'avviso una destinazione a cui recapitare i dati."
+      "attachDestinationDesc": "Dai all'avviso una destinazione a cui recapitare i dati.",
+      "scaleAlertScheduler": "Scala lo scheduler degli avvisi",
+      "scaleAlertSchedulerDesc": "Aumenta {concurrency}, aggiungi nodi di avviso o aumenta {pullers}."
     },
     "severity": {
       "high": "Alta",
@@ -8187,6 +8196,7 @@
       "suggestionsOnly": "Solo suggerimenti, nulla viene applicato automaticamente",
       "filterAll": "Tutti",
       "showingCapped": "Visualizzazione di {shown} riscontri su {total}: la ricerca si è fermata a {count} record.",
+      "perSubjectNote": "Un riscontro che nomina più avvisi ha una scheda per ciascuno, quindi le schede superano i riscontri.",
       "nothingTitle": "Niente da segnalare",
       "nothingDescription": "Nessuna lacuna di copertura e nulla rifiutato: su {count} avvisi nell'ambito, la calibrazione degli avvisi non ha trovato nulla.",
       "noneFoundTitle": "Nessun riscontro trovato",
@@ -8200,6 +8210,9 @@
       "declinedNotWritten": "I motivi per singolo avviso non vengono scritti nello stream, solo questo conteggio.",
       "evidence": "Evidenze",
       "alert": "Avviso",
+      "topOrgs": "Organizzazioni più interessate",
+      "worstHours": "Ore peggiori",
+      "lagImpact": "{skipped} saltate, {late} di {evaluations} in ritardo",
       "proposedActions": "Azioni proposte"
     },
     "dashboard": {

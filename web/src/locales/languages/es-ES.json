@@ -8070,6 +8070,7 @@
       "noDestination": "Sin destino",
       "noise": "Ruido",
       "notifyFailed": "Notificación fallida",
+      "schedulerHealth": "Retraso del programador",
       "silent": "Silenciosa"
     },
     "evidence": {
@@ -8086,6 +8087,12 @@
       "failureRatio": "Tasa de fallos",
       "history": "Historial",
       "deliveredThroughIncidents": "Entregado mediante incidentes",
+      "affectedOrgs": "Organizaciones afectadas",
+      "congestedHours": "Horas congestionadas",
+      "skippedWindows": "Ventanas omitidas",
+      "lateEvaluations": "Evaluaciones tardías",
+      "lateRatio": "Proporción de retrasos",
+      "longestDelay": "Mayor retraso",
       "yes": "Sí",
       "no": "No"
     },
@@ -8103,7 +8110,9 @@
       "repairDestination": "Reparar el destino",
       "repairDestinationDesc": "La entrega falla en un destino que usa la alerta.",
       "attachDestination": "Adjuntar destino",
-      "attachDestinationDesc": "Dale a la alerta un destino al que entregar."
+      "attachDestinationDesc": "Dale a la alerta un destino al que entregar.",
+      "scaleAlertScheduler": "Escalar el programador de alertas",
+      "scaleAlertSchedulerDesc": "Aumenta {concurrency}, agrega nodos de alertas o aumenta {pullers}."
     },
     "severity": {
       "high": "Alta",
@@ -8187,6 +8196,7 @@
       "suggestionsOnly": "Solo sugerencias, nada se aplica automáticamente",
       "filterAll": "Todos",
       "showingCapped": "Mostrando {shown} de {total} hallazgos: la búsqueda se detuvo en {count} registros.",
+      "perSubjectNote": "Un hallazgo que menciona varias alertas tiene una tarjeta para cada una, por lo que las tarjetas superan en número a los hallazgos.",
       "nothingTitle": "Nada que reportar",
       "nothingDescription": "Sin brechas de cobertura y nada rechazado: en {count} alertas en alcance, la calibración de alertas no encontró nada.",
       "noneFoundTitle": "No se encontró ninguno",
@@ -8200,6 +8210,9 @@
       "declinedNotWritten": "Los motivos por alerta no se escriben en el stream, solo este recuento.",
       "evidence": "Evidencia",
       "alert": "Alerta",
+      "topOrgs": "Organizaciones más afectadas",
+      "worstHours": "Peores horas",
+      "lagImpact": "{skipped} omitidas, {late} de {evaluations} tardías",
       "proposedActions": "Acciones propuestas"
     },
     "dashboard": {

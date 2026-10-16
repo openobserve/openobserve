@@ -8070,6 +8070,7 @@
       "noDestination": "Không có đích đến",
       "noise": "Nhiễu",
       "notifyFailed": "Thông báo thất bại",
+      "schedulerHealth": "Độ trễ bộ lập lịch",
       "silent": "Im lặng"
     },
     "evidence": {
@@ -8086,6 +8087,12 @@
       "failureRatio": "Tỷ lệ thất bại",
       "history": "Lịch sử",
       "deliveredThroughIncidents": "Được gửi qua sự cố",
+      "affectedOrgs": "Các tổ chức bị ảnh hưởng",
+      "congestedHours": "Khung giờ quá tải",
+      "skippedWindows": "Cửa sổ bị bỏ qua",
+      "lateEvaluations": "Lượt đánh giá trễ",
+      "lateRatio": "Tỷ lệ trễ",
+      "longestDelay": "Độ trễ dài nhất",
       "yes": "Có",
       "no": "Không"
     },
@@ -8103,7 +8110,9 @@
       "repairDestination": "Khắc phục đích đến",
       "repairDestinationDesc": "Việc gửi thất bại ở một đích đến mà cảnh báo sử dụng.",
       "attachDestination": "Đính kèm điểm đến",
-      "attachDestinationDesc": "Cung cấp cho cảnh báo một nơi để gửi đến."
+      "attachDestinationDesc": "Cung cấp cho cảnh báo một nơi để gửi đến.",
+      "scaleAlertScheduler": "Mở rộng bộ lập lịch cảnh báo",
+      "scaleAlertSchedulerDesc": "Tăng {concurrency}, thêm nút cảnh báo, hoặc tăng {pullers}."
     },
     "severity": {
       "high": "Cao",
@@ -8187,6 +8196,7 @@
       "suggestionsOnly": "Chỉ là gợi ý, không có gì được áp dụng tự động",
       "filterAll": "Tất cả",
       "showingCapped": "Đang hiển thị {shown} trong {total} phát hiện: tìm kiếm đã dừng ở {count} bản ghi.",
+      "perSubjectNote": "Một phát hiện nhắc đến nhiều cảnh báo sẽ có một thẻ cho mỗi cảnh báo, nên số thẻ nhiều hơn số phát hiện.",
       "nothingTitle": "Không có gì để báo cáo",
       "nothingDescription": "Không có khoảng trống bao phủ và không có gì bị từ chối: trong {count} cảnh báo thuộc phạm vi, hiệu chỉnh cảnh báo không tìm thấy gì.",
       "noneFoundTitle": "Không tìm thấy",
@@ -8200,6 +8210,9 @@
       "declinedNotWritten": "Lý do cho từng cảnh báo không được ghi vào stream, chỉ có số đếm này.",
       "evidence": "Bằng chứng",
       "alert": "Cảnh báo",
+      "topOrgs": "Các tổ chức bị ảnh hưởng nhiều nhất",
+      "worstHours": "Khung giờ tệ nhất",
+      "lagImpact": "{skipped} bị bỏ qua, {late} trên {evaluations} bị trễ",
       "proposedActions": "Hành động đề xuất"
     },
     "dashboard": {

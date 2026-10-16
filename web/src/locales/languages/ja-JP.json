@@ -8070,6 +8070,7 @@
       "noDestination": "宛先なし",
       "noise": "ノイズ",
       "notifyFailed": "通知に失敗",
+      "schedulerHealth": "スケジューラの遅延",
       "silent": "サイレント"
     },
     "evidence": {
@@ -8086,6 +8087,12 @@
       "failureRatio": "失敗率",
       "history": "履歴",
       "deliveredThroughIncidents": "インシデント経由で配信",
+      "affectedOrgs": "影響を受けた組織",
+      "congestedHours": "混雑時間帯",
+      "skippedWindows": "スキップされたウィンドウ",
+      "lateEvaluations": "遅延した評価",
+      "lateRatio": "遅延の割合",
+      "longestDelay": "最長遅延",
       "yes": "はい",
       "no": "いいえ"
     },
@@ -8103,7 +8110,9 @@
       "repairDestination": "宛先を修復",
       "repairDestinationDesc": "アラートが使用する宛先で配信が失敗します。",
       "attachDestination": "送信先を関連付け",
-      "attachDestinationDesc": "アラートの送信先を設定します。"
+      "attachDestinationDesc": "アラートの送信先を設定します。",
+      "scaleAlertScheduler": "アラートスケジューラをスケールする",
+      "scaleAlertSchedulerDesc": "{concurrency}を増やし、アラートノードを追加するか、{pullers}を増やします。"
     },
     "severity": {
       "high": "高",
@@ -8187,6 +8196,7 @@
       "suggestionsOnly": "提案のみで、自動的に適用されるものはありません",
       "filterAll": "すべて",
       "showingCapped": "検出結果 {total} 件中 {shown} 件を表示: 検索は {count} レコードで停止しました。",
+      "perSubjectNote": "複数のアラートを指す検出事項にはそれぞれ 1 枚ずつカードが作成されるため、カードの数は検出事項の数より多くなります。",
       "nothingTitle": "報告するものはありません",
       "nothingDescription": "カバレッジの欠落も判断対象外もありません: 対象範囲の {count} 件のアラート全体で、アラートキャリブレーションは何も検出しませんでした。",
       "noneFoundTitle": "見つかりません",
@@ -8200,6 +8210,9 @@
       "declinedNotWritten": "アラートごとの理由はストリームに書き込まれず、この件数のみが記録されます。",
       "evidence": "エビデンス",
       "alert": "アラート",
+      "topOrgs": "最も影響を受けた組織",
+      "worstHours": "最も深刻な時間帯",
+      "lagImpact": "{skipped} 件スキップ、{evaluations} 件中 {late} 件が遅延",
       "proposedActions": "提案されたアクション"
     },
     "dashboard": {

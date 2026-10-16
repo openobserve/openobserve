@@ -2331,7 +2331,9 @@
       "repairDestination": "dc220b9ce3c261b9",
       "repairDestinationDesc": "49e59a3817fd66fa",
       "reviewForDeletion": "d2ea27a0d259757d",
-      "reviewForDeletionDesc": "1fcab149d6280055"
+      "reviewForDeletionDesc": "1fcab149d6280055",
+      "scaleAlertScheduler": "fddca6573a9b63fc",
+      "scaleAlertSchedulerDesc": "c57e8c585e44f7c6"
     },
     "confidence": {
       "high": "cf9e47c3fb67b498",
@@ -2385,6 +2387,7 @@
       "evidence": "03867aea70acaf4c",
       "filterAll": "a52ace420f2175d0",
       "findingsHeading": "e171c2ff25b55e5a",
+      "lagImpact": "e058e98635dc1d23",
       "loadFailed": "d209798dda2325be",
       "noRecords": "d3b98b3f340b534b",
       "noneFoundDeclined": "2366f8dc1f762210",
@@ -2396,7 +2399,7 @@
       "nothingTitle": "f5a637211cc64316",
       "partialCoverage": "60fd12418e25d554",
       "partialCoverageDesc": "8ce8cc7880e9dd0d",
-      "perAlertNote": "5a49abb9686699c8",
+      "perSubjectNote": "408316bcb1ec66c6",
       "proposedActions": "5232196f46259ef9",
       "showingCapped": "7b1e926077b02e63",
       "statAlertsInScope": "462d229c0e8e094e",
@@ -2408,9 +2411,11 @@
       "suggestionsOnly": "357032ec6b39ea01",
       "title": "8dbb0536ceb34789",
       "titleLoading": "6e2f80bf9cfaabad",
+      "topOrgs": "ae1c3084e1e20261",
       "unavailableTitle": "a030dd7586742d54",
       "viewInLogs": "883e94635f999293",
-      "viewInLogsHint": "a189e3c6ec717210"
+      "viewInLogsHint": "a189e3c6ec717210",
+      "worstHours": "70f88e29c362afb6"
     },
     "digests": {
       "clean": "5137c8760c941186",
@@ -2452,7 +2457,9 @@
       "years": "10028741dd3aca87"
     },
     "evidence": {
+      "affectedOrgs": "209e707ee0ed9a97",
       "attemptedDeliveries": "620978f8c1e6d930",
+      "congestedHours": "cf086478554aea50",
       "deliveredThroughIncidents": "4799b9b701bda900",
       "errorRatio": "cc77aff1102de93f",
       "errors": "cb702378f31507ef",
@@ -2462,8 +2469,12 @@
       "firings": "0838951ca772ed6b",
       "history": "0e76960093379060",
       "incidentLinkage": "cd3275dc05f10bad",
+      "lateEvaluations": "8018a410c31d0b3c",
+      "lateRatio": "187536284eb2c6ef",
+      "longestDelay": "089ad7c3f7d12988",
       "meanTimeToNormal": "9b2ba411a4f00998",
       "no": "1ea442a134b2a184",
+      "skippedWindows": "dafdf849efe2e108",
       "topError": "3665d0a07b0b0e8f",
       "topErrorCount": "ca8b0a60fc94bf97",
       "yes": "85a39ab345d672ff"
@@ -2480,6 +2491,7 @@
       "noDestination": "e67e03dade4eb238",
       "noise": "9ada8e83c1186cd6",
       "notifyFailed": "b54fae0801ecc1c7",
+      "schedulerHealth": "de2b6f30634b1b22",
       "silent": "ddbcf06726488a43"
     },
     "runFailed": "3fd109d157d1b626",

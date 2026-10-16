@@ -8070,6 +8070,7 @@
       "noDestination": "대상 없음",
       "noise": "노이즈",
       "notifyFailed": "알림 전송 실패",
+      "schedulerHealth": "스케줄러 지연",
       "silent": "알림 없음"
     },
     "evidence": {
@@ -8086,6 +8087,12 @@
       "failureRatio": "실패 비율",
       "history": "기록",
       "deliveredThroughIncidents": "인시던트를 통해 전달됨",
+      "affectedOrgs": "영향받은 조직",
+      "congestedHours": "혼잡한 시간대",
+      "skippedWindows": "건너뛴 윈도우",
+      "lateEvaluations": "지연된 평가",
+      "lateRatio": "지연 비율",
+      "longestDelay": "최장 지연",
       "yes": "예",
       "no": "아니요"
     },
@@ -8103,7 +8110,9 @@
       "repairDestination": "대상 복구",
       "repairDestinationDesc": "알림이 사용하는 대상에서 전송이 실패합니다.",
       "attachDestination": "대상 연결",
-      "attachDestinationDesc": "알림이 전달될 대상을 지정하세요."
+      "attachDestinationDesc": "알림이 전달될 대상을 지정하세요.",
+      "scaleAlertScheduler": "알림 스케줄러 확장",
+      "scaleAlertSchedulerDesc": "{concurrency}을(를) 높이거나, 알림 노드를 추가하거나, {pullers}을(를) 높이세요."
     },
     "severity": {
       "high": "높음",
@@ -8187,6 +8196,7 @@
       "suggestionsOnly": "제안일 뿐이며 자동으로 적용되는 것은 없습니다",
       "filterAll": "전체",
       "showingCapped": "{total}개 발견 사항 중 {shown}개 표시: 검색이 {count}개 레코드에서 중단되었습니다.",
+      "perSubjectNote": "여러 알림을 언급한 발견 사항에는 각각 카드가 하나씩 있으므로 카드 수가 발견 사항 수보다 많습니다.",
       "nothingTitle": "보고할 내용 없음",
       "nothingDescription": "커버리지 공백도 없고 판정 제외도 없음: 범위 내 {count}개 알림 전체에서 알림 캘리브레이션은 아무것도 발견하지 못했습니다.",
       "noneFoundTitle": "찾은 항목 없음",
@@ -8200,6 +8210,9 @@
       "declinedNotWritten": "알림별 사유는 스트림에 기록되지 않으며, 이 개수만 기록됩니다.",
       "evidence": "증거",
       "alert": "알림",
+      "topOrgs": "영향을 가장 많이 받은 조직",
+      "worstHours": "최악의 시간대",
+      "lagImpact": "{skipped}건 건너뜀, {evaluations}건 중 {late}건 지연",
       "proposedActions": "제안된 작업"
     },
     "dashboard": {

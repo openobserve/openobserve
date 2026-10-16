@@ -8070,6 +8070,7 @@
       "noDestination": "لا توجد وجهة",
       "noise": "ضجيج",
       "notifyFailed": "فشل الإشعار",
+      "schedulerHealth": "تأخر المجدول",
       "silent": "صامت"
     },
     "evidence": {
@@ -8086,6 +8087,12 @@
       "failureRatio": "نسبة الفشل",
       "history": "السجل",
       "deliveredThroughIncidents": "التسليم عبر الحوادث",
+      "affectedOrgs": "المؤسسات المتأثرة",
+      "congestedHours": "الساعات المزدحمة",
+      "skippedWindows": "النوافذ المتخطاة",
+      "lateEvaluations": "التقييمات المتأخرة",
+      "lateRatio": "نسبة التأخر",
+      "longestDelay": "أطول تأخير",
       "yes": "نعم",
       "no": "لا"
     },
@@ -8103,7 +8110,9 @@
       "repairDestination": "إصلاح الوجهة",
       "repairDestinationDesc": "يفشل التسليم إلى وجهة يستخدمها التنبيه.",
       "attachDestination": "إرفاق وجهة",
-      "attachDestinationDesc": "امنح التنبيه وجهةً للتسليم إليها."
+      "attachDestinationDesc": "امنح التنبيه وجهةً للتسليم إليها.",
+      "scaleAlertScheduler": "توسيع نطاق مجدول التنبيهات",
+      "scaleAlertSchedulerDesc": "ارفع {concurrency}، أو أضف عُقد تنبيهات، أو ارفع {pullers}."
     },
     "severity": {
       "high": "عالي",
@@ -8187,6 +8196,7 @@
       "suggestionsOnly": "اقتراحات فقط، ولا يُطبَّق أي شيء تلقائيًا",
       "filterAll": "الكل",
       "showingCapped": "يُعرض {shown} من {total} نتيجة: توقف البحث عند {count} سجلًا.",
+      "perSubjectNote": "النتيجة التي تشير إلى عدة تنبيهات لها بطاقة واحدة لكل منها، لذا يفوق عدد البطاقات عدد النتائج.",
       "nothingTitle": "لا شيء للإبلاغ عنه",
       "nothingDescription": "لا توجد فجوة تغطية ولم يُرفض شيء: عبر {count} تنبيهًا ضمن النطاق، لم تجد معايرة التنبيهات أي شيء.",
       "noneFoundTitle": "لم يُعثر على شيء",
@@ -8200,6 +8210,9 @@
       "declinedNotWritten": "لا تُكتب الأسباب الخاصة بكل تنبيه في الجدول، بل هذا العدد فقط.",
       "evidence": "الأدلة",
       "alert": "تنبيه",
+      "topOrgs": "المؤسسات الأكثر تأثرًا",
+      "worstHours": "أسوأ الساعات",
+      "lagImpact": "{skipped} متخطاة، و{late} من {evaluations} متأخرة",
       "proposedActions": "الإجراءات المقترحة"
     },
     "dashboard": {

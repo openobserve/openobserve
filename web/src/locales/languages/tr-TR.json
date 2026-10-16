@@ -8070,6 +8070,7 @@
       "noDestination": "Hedef yok",
       "noise": "Gürültü",
       "notifyFailed": "Bildirim başarısız",
+      "schedulerHealth": "Zamanlayıcı gecikmesi",
       "silent": "Sessiz"
     },
     "evidence": {
@@ -8086,6 +8087,12 @@
       "failureRatio": "Başarısızlık oranı",
       "history": "Geçmiş",
       "deliveredThroughIncidents": "Olaylar üzerinden iletildi",
+      "affectedOrgs": "Etkilenen kuruluşlar",
+      "congestedHours": "Yoğun saatler",
+      "skippedWindows": "Atlanan pencereler",
+      "lateEvaluations": "Geç değerlendirmeler",
+      "lateRatio": "Geç oranı",
+      "longestDelay": "En uzun gecikme",
       "yes": "Evet",
       "no": "Hayır"
     },
@@ -8103,7 +8110,9 @@
       "repairDestination": "Hedefi onar",
       "repairDestinationDesc": "Uyarının kullandığı bir hedefte teslimat başarısız olur.",
       "attachDestination": "Hedef ekle",
-      "attachDestinationDesc": "Uyarıya teslim edecek bir yer verin."
+      "attachDestinationDesc": "Uyarıya teslim edecek bir yer verin.",
+      "scaleAlertScheduler": "Uyarı zamanlayıcısını ölçeklendirin",
+      "scaleAlertSchedulerDesc": "{concurrency} değerini yükseltin, uyarı düğümleri ekleyin veya {pullers} değerini yükseltin."
     },
     "severity": {
       "high": "Yüksek",
@@ -8187,6 +8196,7 @@
       "suggestionsOnly": "Yalnızca öneriler, hiçbir şey otomatik uygulanmaz",
       "filterAll": "Tümü",
       "showingCapped": "{total} bulgunun {shown} tanesi gösteriliyor: arama {count} kayıtta durdu.",
+      "perSubjectNote": "Birden fazla uyarıyı belirten bir bulgunun her biri için bir kartı olur, bu nedenle kartlar bulgulardan daha fazladır.",
       "nothingTitle": "Bildirilecek bir şey yok",
       "nothingDescription": "Kapsam boşluğu yok ve hiçbir şey reddedilmedi: kapsamdaki {count} uyarı genelinde uyarı kalibrasyonu hiçbir şey bulamadı.",
       "noneFoundTitle": "Hiçbiri bulunamadı",
@@ -8200,6 +8210,9 @@
       "declinedNotWritten": "Uyarı başına nedenler akışa yazılmaz, yalnızca bu sayı yazılır.",
       "evidence": "Kanıt",
       "alert": "Uyarı",
+      "topOrgs": "En çok etkilenen kuruluşlar",
+      "worstHours": "En kötü saatler",
+      "lagImpact": "{skipped} atlandı, {evaluations} değerlendirmenin {late} tanesi geç",
       "proposedActions": "Önerilen eylemler"
     },
     "dashboard": {
