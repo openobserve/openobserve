@@ -73,11 +73,12 @@ const REVIEWED: Record<string, { pins: Record<string, string>; banned: RegExp }>
       "menu.traces": "Traces",
       "menu.rum": "RUM",
       "menu.help": "Ajuda",
+      "menu.onCall": "Piquete",
       "menu.downtimes": "Janelas de manutenção",
       "menu.dashboard": "Dashboards",
     },
     banned:
-      /[Oo]leodut|[Gg]asodut|[Gg]oleador|Socorro|\btoras\b|\btroncos\b|Doutor Num|[Tt]axa de queima|\b[Rr]astros?\b|Monitoramento de usuários reais|ao vivo/,
+      /[Oo]leodut|[Gg]asodut|[Gg]oleador|Socorro|\btoras\b|\btroncos\b|Doutor Num|[Tt]axa de queima|\b[Rr]astros?\b|Monitoramento de usuários reais|ao vivo|\bvocê\b|Tem certeza|\bsalvar\b|\busuário|\btela\b|\bequipe\b|[Pp]lantão/,
   },
   "nl-NL": {
     pins: {
