@@ -44,6 +44,7 @@ import type { useChatHistory } from "@/composables/useChatHistory";
 import type { useChatScroll } from "@/composables/useChatScroll";
 import type { useTypewriter } from "@/composables/useTypewriter";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { aiCreditsRemedy } from "@/utils/aiCredits";
 import analytics from "@/services/product_analytics";
 import type {
   ChatHistoryEntry,
@@ -97,8 +98,8 @@ const trackAnswerOutcome = (turn: AbortController | null, event: string, propert
   analytics.track(event, properties);
 };
 
-/** How a turn ended for the caller: `turnLimit` means the server refused it before it started. */
-export type TurnOutcome = "done" | "turnLimit";
+/** How a turn ended for the caller: `turnLimit` means the server refused it before it started; `creditsExhausted` (402) hands the draft back to the input. */
+export type TurnOutcome = "done" | "turnLimit" | "creditsExhausted";
 
 // The server refuses a turn past its concurrency caps with 429 before anything is stored.
 export const isTurnLimitResponse = (status: number | undefined, body: unknown): boolean => {
@@ -629,8 +630,32 @@ export function useChatStream(options: UseChatStreamOptions) {
     return code === "session_owner_unavailable";
   };
 
-  const appendErrorBlock = (message: string, recoverable = false) => {
-    const block: ContentBlock = { type: "error", message: raw(message), recoverable };
+  const appendErrorBlock = (message: string, recoverable = false) =>
+    appendBlock({ type: "error", message: raw(message), recoverable });
+
+  /** A 402 carries its remedy; ephemeral so a stale "out of credits" never reloads from history. */
+  const appendCreditsExhaustedBlock = (errorBody: any) => {
+    const remedy = errorBody?.remedy;
+    const block: ContentBlock = {
+      type: "error",
+      message: t("aiAssistant.creditsExhausted"),
+      errorType: "ai_credits_exhausted",
+      ephemeral: true,
+      suggestion: aiCreditsRemedy(errorBody, t),
+      recoverable: remedy === "retry",
+    };
+    if (remedy === "subscribe") {
+      block.navigationAction = {
+        resource_type: "billing",
+        action: "navigate_direct",
+        label: t("billing.plansLabel"),
+        target: { path: "/billings/plans" },
+      };
+    }
+    appendBlock(block);
+  };
+
+  const appendBlock = (block: ContentBlock) => {
     const msgs = chatMessages.value;
     const last = msgs[msgs.length - 1];
     if (last && last.role === "assistant") {
@@ -738,6 +763,8 @@ export function useChatStream(options: UseChatStreamOptions) {
     if (target) {
       await router.push({ path: target.path, query: target.query });
     }
+    // Leaving for billing is not an answer to the chat; saving one would outlive the notice that offered it.
+    if (action.resource_type === "billing") return;
 
     // Use setTimeout to add message AFTER navigation fully completes and settles
     setTimeout(async () => {
@@ -938,6 +965,13 @@ export function useChatStream(options: UseChatStreamOptions) {
             return outcome;
           }
           continue;
+        }
+
+        // Not thrown: the catch below would persist the raw server text into history.
+        if (response.status === 402) {
+          appendCreditsExhaustedBlock(errorBody);
+          outcome = "creditsExhausted";
+          return outcome;
         }
 
         const err: any = new Error(

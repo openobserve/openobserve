@@ -40,6 +40,7 @@ import type {
   Rotation,
   CauseAnalytics,
   ConfigRisks,
+  Contact,
   EscalationPreview,
   CauseGroup,
   ResolutionCause,
@@ -54,6 +55,9 @@ import type {
   Override,
   PromoteResult,
   PromoteSeverity,
+  PutTelephonyBody,
+  TelephonyView,
+  OrgTelephonyView,
   TestPageResult,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
@@ -791,6 +795,61 @@ const oncall = {
     org_identifier: string;
     data: { event_ids?: string[]; all?: boolean; read?: boolean };
   }) => http().post<MyDeliveriesRead>(`/api/${org_identifier}/oncall/my/deliveries/read`, data),
+
+  /// The server refuses any email but the caller's own (403), so only the signed-in user's is passed.
+  getContact: ({ org_identifier, user_email }: { org_identifier: string; user_email: string }) =>
+    http().get<Contact>(`/api/${org_identifier}/oncall/contacts/${encodeURIComponent(user_email)}`),
+
+  setContact: ({
+    org_identifier,
+    user_email,
+    data,
+  }: {
+    org_identifier: string;
+    user_email: string;
+    data: { phone: string };
+  }) =>
+    http().put<Contact>(
+      `/api/${org_identifier}/oncall/contacts/${encodeURIComponent(user_email)}`,
+      data,
+    ),
+
+  /// 204 on a sent code; a refusal carries a `VerificationRefusalBody`.
+  sendContactCode: ({
+    org_identifier,
+    user_email,
+  }: {
+    org_identifier: string;
+    user_email: string;
+  }) =>
+    http().post<void>(
+      `/api/${org_identifier}/oncall/contacts/${encodeURIComponent(user_email)}/verify`,
+    ),
+
+  confirmContactCode: ({
+    org_identifier,
+    user_email,
+    code,
+  }: {
+    org_identifier: string;
+    user_email: string;
+    code: string;
+  }) =>
+    http().post<{ phone_verified_at: number }>(
+      `/api/${org_identifier}/oncall/contacts/${encodeURIComponent(user_email)}/verify/confirm`,
+      { code },
+    ),
+
+  /// A refusal carries a `TelephonyRefusalBody`; a 403 means the caller may not read Settings.
+  getTelephony: ({ org_identifier }: { org_identifier: string }) =>
+    http().get<TelephonyView>(`/api/${org_identifier}/telephony`),
+
+  /// Twilio is asked first; nothing is stored unless it reports the account active.
+  putTelephony: ({ org_identifier, data }: { org_identifier: string; data: PutTelephonyBody }) =>
+    http().put<OrgTelephonyView>(`/api/${org_identifier}/telephony`, data),
+
+  deleteTelephony: ({ org_identifier }: { org_identifier: string }) =>
+    http().delete<{ deleted: boolean }>(`/api/${org_identifier}/telephony`),
 
   /// Somebody stands in for the rotation over a window. Outside it the
   /// rotation resolves as normal, which is what makes an override safe.

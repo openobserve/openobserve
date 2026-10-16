@@ -493,6 +493,14 @@ pub async fn update_stream_settings(
     if let Some(v) = new_settings.approx_partition {
         settings.approx_partition = v;
     }
+    if let Some(v) = new_settings.dynamic_merge {
+        if !stream_type.support_dynamic_merge() {
+            return Ok(MetaHttpResponse::bad_request(
+                "dynamic_merge is only supported for logs, metrics and traces streams",
+            ));
+        }
+        settings.dynamic_merge = Some(v);
+    }
     if let Some(v) = new_settings.index_original_data {
         settings.index_original_data = v;
     }
@@ -1175,16 +1183,6 @@ pub async fn update_fields_type(
     .await?;
 
     Ok(())
-}
-
-pub async fn get_stream_retention(
-    org_id: &str,
-    stream_type: StreamType,
-    stream: &str,
-) -> Option<i64> {
-    infra::schema::get_settings(org_id, stream, stream_type)
-        .await
-        .map(|s| s.data_retention)
 }
 
 #[cfg(test)]

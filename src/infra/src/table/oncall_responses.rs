@@ -1335,6 +1335,7 @@ struct PersonTally {
 #[derive(Debug, FromQueryResult)]
 struct DeliveryTally {
     who: String,
+    channel: Option<i32>,
     delivered: Option<bool>,
     count: i64,
 }
@@ -1365,7 +1366,7 @@ pub async fn acks_by_person(
 
 /// Whether the transport has actually been taking pages to each person lately.
 ///
-/// `(delivered, failed)` per recipient over the window, from the delivery
+/// `(delivered, failed)` per (recipient, channel) over the window, from the delivery
 /// ledger. Reachability could previously only say whether a channel was
 /// CONFIGURED, so a deployment whose SMTP credentials were rejected on every
 /// send still reported `would_a_page_land: true` — the one screen whose job is
@@ -1377,10 +1378,19 @@ pub async fn delivery_health(
     org_id: &str,
     team_id: &str,
     since: i64,
-) -> Result<std::collections::HashMap<String, (i64, i64)>, errors::Error> {
+) -> Result<std::collections::HashMap<(String, Channel), (i64, i64)>, errors::Error> {
+    delivery_health_in(get_orm_client_rw().await, org_id, team_id, since).await
+}
+
+/// [`delivery_health`] against a caller-supplied connection.
+async fn delivery_health_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    team_id: &str,
+    since: i64,
+) -> Result<std::collections::HashMap<(String, Channel), (i64, i64)>, errors::Error> {
     use sea_orm::sea_query::Query;
 
-    let client = get_orm_client_rw().await;
     let rows: Vec<DeliveryTally> = oncall_response_events::Entity::find()
         .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Delivery.to_i32()))
         .filter(oncall_response_events::Column::Recipient.is_not_null())
@@ -1397,17 +1407,24 @@ pub async fn delivery_health(
         )
         .select_only()
         .column_as(oncall_response_events::Column::Recipient, "who")
+        .column_as(oncall_response_events::Column::Channel, "channel")
         .column_as(oncall_response_events::Column::Delivered, "delivered")
         .column_as(oncall_response_events::Column::Id.count(), "count")
         .group_by(oncall_response_events::Column::Recipient)
+        .group_by(oncall_response_events::Column::Channel)
         .group_by(oncall_response_events::Column::Delivered)
         .into_model()
-        .all(client)
+        .all(conn)
         .await?;
 
-    let mut out: std::collections::HashMap<String, (i64, i64)> = std::collections::HashMap::new();
+    let mut out: std::collections::HashMap<(String, Channel), (i64, i64)> =
+        std::collections::HashMap::new();
     for row in rows {
-        let entry = out.entry(row.who).or_insert((0, 0));
+        // A row with no readable channel cannot be charged to any one channel's health.
+        let Some(channel) = row.channel.and_then(Channel::from_i32) else {
+            continue;
+        };
+        let entry = out.entry((row.who, channel)).or_insert((0, 0));
         // A NULL `delivered` predates the column: guessing hides a real failure or invents one.
         match row.delivered {
             Some(true) => entry.0 += row.count,
@@ -1786,5 +1803,60 @@ mod tests {
         let prefix = format!("{}#", "al_ck");
         assert!(!"al_ckt#1".starts_with(&prefix));
         assert!("al_ck#1".starts_with(&prefix));
+    }
+
+    /// Reachability judges each channel on its own, so SMS failures must not be
+    /// counted against the person's email.
+    #[tokio::test]
+    async fn test_delivery_health_is_split_by_channel() {
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(oncall_responses::Entity),
+            schema.create_table_from_entity(oncall_response_events::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        oncall_responses::ActiveModel::from(model())
+            .insert(&db)
+            .await
+            .unwrap();
+
+        let rows = [
+            ("ana@o2.ai", Some(Channel::Email.to_i32()), true),
+            ("ana@o2.ai", Some(Channel::Email.to_i32()), true),
+            ("ana@o2.ai", Some(Channel::Sms.to_i32()), false),
+            ("bo@o2.ai", Some(Channel::Email.to_i32()), false),
+            ("bo@o2.ai", Some(Channel::Sms.to_i32()), true),
+            ("bo@o2.ai", None, false),
+            ("bo@o2.ai", Some(99), false),
+        ];
+        for (i, (who, channel, delivered)) in rows.into_iter().enumerate() {
+            let mut m = event_model(ResponseEventKind::Delivery);
+            m.id = format!("ev_{i}");
+            m.recipient = Some(who.into());
+            m.channel = channel;
+            m.delivered = Some(delivered);
+            oncall_response_events::ActiveModel::from(m)
+                .insert(&db)
+                .await
+                .unwrap();
+        }
+
+        let health = delivery_health_in(&db, "default", "team_1", 0)
+            .await
+            .unwrap();
+        let expected: std::collections::HashMap<(String, Channel), (i64, i64)> = [
+            (("ana@o2.ai".to_string(), Channel::Email), (2, 0)),
+            (("ana@o2.ai".to_string(), Channel::Sms), (0, 1)),
+            (("bo@o2.ai".to_string(), Channel::Email), (0, 1)),
+            (("bo@o2.ai".to_string(), Channel::Sms), (1, 0)),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(health, expected);
     }
 }

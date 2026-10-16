@@ -259,8 +259,14 @@ export default defineComponent({
     // debounce. Assigned when the editor is created; see `commitModelChange`.
     let commitPendingChange: (() => void) | null = null;
     const { searchObj } = searchState();
-    const { detectNaturalLanguage, generateSQL, transformToSQL, isGenerating, streamingResponse } =
-      useNLQuery(t);
+    const {
+      detectNaturalLanguage,
+      generateSQL,
+      transformToSQL,
+      isGenerating,
+      streamingResponse,
+      refusalNotice,
+    } = useNLQuery(t);
 
     const currentEditorText = ref("");
 
@@ -348,6 +354,11 @@ export default defineComponent({
         const generatedSQL = await generateSQL(prompt, orgId, abortSignal, sessionId);
 
         if (!generatedSQL || generatedSQL.trim() === "") {
+          // A refused request already says why and what to do; the generic error would hide it.
+          if (refusalNotice.value) {
+            showErrorNotification(raw(refusalNotice.value));
+            return;
+          }
           // Show error notification - use streaming error message if available (e.g. Unauthorized Access)
           const errorMsg = isAuthError(streamingResponse.value)
             ? streamingResponse.value
@@ -1267,6 +1278,8 @@ export default defineComponent({
       isGenerating,
       handleGenerateSQL,
       streamingResponse,
+      // Read by the AI bar after a generation: set when the server refused it.
+      refusalNotice,
       t,
       aiIcon,
       toggleNlpMode,

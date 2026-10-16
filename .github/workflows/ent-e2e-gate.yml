@@ -30,14 +30,17 @@ name: Playwright E2E Crosscheck
 
 on:
   pull_request:
-    # Fires once per PR when "Merge when ready" is clicked, then for pushes/labels while auto-merge stays on.
-    types: [auto_merge_enabled, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
+    types: [synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
+  # Runs once a labelled PR is approved, then for pushes/labels while the approval stands.
+  pull_request_review:
+    types: [submitted]
   # A required check must also report on merge-queue commits; the gate already passed on the PR head.
   merge_group:
 
 # PR-scoped: a new push/label supersedes the previous gate attempt for the same PR.
 concurrency:
-  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}
+  # A review that is not an approval does nothing, so it must not cancel a running gate.
+  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 permissions:
@@ -45,9 +48,32 @@ permissions:
   pull-requests: write
 
 jobs:
+  approval:
+    # reviewDecision of a stacked PR is judged by the stack's merge rules, so it is what the merge will require.
+    if: ${{ github.event_name != 'merge_group' && (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) && (github.event_name != 'pull_request_review' || github.event.review.state == 'approved') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      approved: ${{ steps.check.outputs.approved }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          DECISION=$(gh pr view "$PR" --json reviewDecision --jq .reviewDecision)
+          echo "reviewDecision: $DECISION"
+          APPROVED=false
+          if [ "$DECISION" = "APPROVED" ]; then APPROVED=true; fi
+          echo "approved=$APPROVED" >> "$GITHUB_OUTPUT"
+
   playwright-e2e-crosscheck:
-    # A pre-merge gate: runs once auto-merge is enabled on a labelled PR, not on every push.
-    if: ${{ github.event_name == 'merge_group' || ((contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) && github.event.pull_request.auto_merge != null) }}
+    needs: approval
+    # A pre-merge gate: runs once a labelled PR is approved, not on every push.
+    if: ${{ !cancelled() && (github.event_name == 'merge_group' || needs.approval.outputs.approved == 'true') }}
     name: Playwright E2E Crosscheck
     runs-on: ubuntu-latest
     # ~5 min to find the ENT run + up to ~75 min to poll. Generous on purpose: normal is ~20 min,
@@ -247,8 +273,17 @@ jobs:
           # and for specs list the failing files from the engine's failed-specs artifact.
           BUILD_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="build_binary")|.conclusion' 2>/dev/null || echo "")
           TEST_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="ent_gate_tests")|.conclusion' 2>/dev/null || echo "")
+          # A test job that failed with no failed step was killed from outside (runner lost), not by a spec.
+          TEST_FAILED_STEPS=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '[.jobs[]|select(.name=="ent_gate_tests")|.steps[]|select(.conclusion=="failure")]|length' 2>/dev/null || echo "")
 
-          if [ "$TEST_CONCL" = "failure" ]; then
+          if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_FAILED_STEPS" = "0" ]; then
+          sticky "### ⚠️ Playwright E2E Crosscheck — runner lost, re-run needed
+
+          $MARKER
+          The enterprise test runner stopped before the specs finished (infra, not this PR). Re-run the failed job of this check.
+
+          $SISTER_NOTE · [ENT run]($RUN_URL)"
+          elif [ "$TEST_CONCL" = "failure" ]; then
             rm -rf /tmp/fs; SPEC_LIST=""
             if gh run download "$RUN_ID" --repo "$REPO" -n failed-specs -D /tmp/fs >/dev/null 2>&1 && [ -f /tmp/fs/failed-specs.txt ]; then
               SPEC_LIST=$(sed '/^[[:space:]]*$/d; s/^/- `/; s/$/`/' /tmp/fs/failed-specs.txt)
@@ -279,5 +314,5 @@ jobs:
 
           $SISTER_NOTE"
           fi
-          echo "::error::Enterprise gate failed (conclusion=$CONCL build=$BUILD_CONCL test=$TEST_CONCL)."
+          echo "::error::Enterprise gate failed (conclusion=$CONCL build=$BUILD_CONCL test=$TEST_CONCL failed_steps=$TEST_FAILED_STEPS)."
           exit 1

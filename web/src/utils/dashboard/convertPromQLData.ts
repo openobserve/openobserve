@@ -30,6 +30,7 @@ import {
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 import { escapeHtml } from "@/utils/html";
+import { addCommasToNumber } from "@/utils/formatters";
 import {
   chartColor,
   chartNumber,
@@ -337,16 +338,31 @@ export const convertPromQLData = async (
 
   // Add warning if total number of series exceeds limit
   // Check if series limiting info is available from data loader (PromQL streaming)
+  const setSeriesLimit = (shown: number, total: number, cap: number) => {
+    extras.seriesLimit = { shown, total, cap };
+    extras.limitNumberOfSeriesWarningMessage = gt("dashboard.utils.seriesLimitWarningCounts", {
+      shown: addCommasToNumber(shown),
+      total: addCommasToNumber(total),
+    });
+  };
   if (metadata?.seriesLimiting) {
     const { uniqueSeriesSeen, metricsStored } = metadata.seriesLimiting;
     // Streaming re-delivers the same series in every chunk, so only distinct-series
     // count proves a drop; comparing arrivals warned whenever a panel had 2+ chunks.
     if ((uniqueSeriesSeen ?? metricsStored) > metricsStored) {
-      extras.limitNumberOfSeriesWarningMessage = gt("dashboard.utils.seriesLimitWarning");
+      setSeriesLimit(
+        metricsStored,
+        uniqueSeriesSeen ?? metricsStored,
+        metadata.seriesLimiting.maxSeries ?? maxSeries,
+      );
     }
   } else if (totalSeries > (store.state?.zoConfig?.max_dashboard_series ?? 100)) {
     // Fallback: Series limiting happens here (for non-streaming queries)
-    extras.limitNumberOfSeriesWarningMessage = gt("dashboard.utils.seriesLimitWarning");
+    const keptSeries = limitedSearchQueryData.reduce(
+      (total: number, queryData: any) => total + (queryData?.result?.length ?? 0),
+      0,
+    );
+    setSeriesLimit(keptSeries, totalSeries, maxSeries);
   }
 
   // flag to check if the data is time seriesc

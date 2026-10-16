@@ -30,8 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   narrowed rather than rendering a second copy of it.
 -->
 <template>
-  <!-- Reached from the On-Call header, same as Teams and Routing, and with the
-       same single rail entry behind it. -->
+  <!-- Reached from the profile menu, behind the same gate as the On-Call nav entry. -->
   <OPageLayout
     bleed
     data-test="oncall-mine-page"
@@ -79,8 +78,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <OContent v-else y class="flex flex-col gap-5">
-      <!-- Duty first, because it is the fact that decides whether the rest of
-           this page is urgent. -->
+      <!-- Phone first: until it is verified, nothing below can reach the reader. -->
+      <OnCallPhoneCard ref="phoneRef" />
+
       <div
         class="card-container rounded-surface bg-surface-base border-border-default flex flex-col gap-2 border px-4 py-3"
         data-test="oncall-mine-teams"
@@ -168,6 +168,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OnCallMyDeliveries from "@/components/oncall/OnCallMyDeliveries.vue";
+import OnCallPhoneCard from "@/components/oncall/OnCallPhoneCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
@@ -249,12 +250,13 @@ function openTeam(teamId: string) {
 
 const refreshing = ref(false);
 const deliveriesRef = ref<{ refresh: () => Promise<void> } | null>(null);
+const phoneRef = ref<{ refresh: () => Promise<void> } | null>(null);
 
 /// Named, so the click event cannot land on `force`.
 async function refreshPage() {
   refreshing.value = true;
   try {
-    await Promise.all([fetchMine(true), deliveriesRef.value?.refresh()]);
+    await Promise.all([fetchMine(true), deliveriesRef.value?.refresh(), phoneRef.value?.refresh()]);
   } finally {
     refreshing.value = false;
   }

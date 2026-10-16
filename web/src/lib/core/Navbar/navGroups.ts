@@ -215,7 +215,12 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "alertCalibration",
         requires: "alertList",
         gate: "alertCalibration",
-        activeOnRoutes: ["alertCalibrationDashboard", "alertCalibrationDigest"],
+        activeOnRoutes: [
+          "alertCalibrationRuns",
+          "alertCalibrationDigest",
+          "alertCalibrationSettings",
+        ],
+        beta: true,
       },
       // A page is where an alert escalates to a person, so On-Call sits in the
       // same workflow tile rather than as its own rail entry. Pages, Teams and

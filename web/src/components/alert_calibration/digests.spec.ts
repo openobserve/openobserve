@@ -18,18 +18,19 @@ import { gt } from "@/types/i18n";
 import {
   coverageNotes,
   coverageVerdict,
+  findingsByRule,
+  titleAfterName,
   isClean,
-  isNotYetWritten,
   latestEmission,
   latestPerWindow,
   latestRun,
-  runsWithAlertSql,
   type DigestRecord,
+  type FindingRecord,
   type RuleId,
   type RunRow,
   type Severity,
 } from "./digests";
-import { formatEvidence, formatMinutes } from "./format";
+import { formatEvidence, formatMinutes, splitMinutes } from "./format";
 
 const run = (overrides: Partial<RunRow> = {}): RunRow => ({
   window_start: 100,
@@ -148,21 +149,39 @@ describe("a run's verdict", () => {
   });
 });
 
-describe("the digest searches", () => {
-  it("quote an alert name so it cannot widen the query", () => {
-    expect(runsWithAlertSql("it's")).toContain("str_match_ignore_case(alert_name, 'it''s')");
+describe("the dashboard grouping", () => {
+  it("lists every rule, worst first, with its findings in severity order", () => {
+    const f = (rule_id: RuleId, severity: Severity, alert_name: string) =>
+      ({ rule_id, severity, alert_name }) as FindingRecord;
+    const groups = findingsByRule(
+      ["failure", "noise", "silent"],
+      [f("noise", "Low", "b"), f("failure", "High", "a"), f("noise", "Medium", "c")],
+    );
+    expect(groups.map((g) => [g.rule_id, g.severity, g.findings.length])).toEqual([
+      ["failure", "High", 1],
+      ["noise", "Low", 2],
+      ["silent", null, 0],
+    ]);
   });
+});
 
-  it("read a stream or column no run has written yet as empty, and nothing else", () => {
-    const failure = (code: number) => ({ response: { status: 400, data: { code, message: "x" } } });
-    expect(isNotYetWritten(failure(20002))).toBe(true);
-    expect(isNotYetWritten(failure(20004))).toBe(true);
-    expect(isNotYetWritten(failure(20001))).toBe(false);
-    expect(isNotYetWritten(new Error("Network Error"))).toBe(false);
+describe("the dashboard row", () => {
+  it("drops the alert's name from the front of its title, and nothing else", () => {
+    const f = (title: string, alert_name?: string) => ({ title, alert_name }) as FindingRecord;
+    expect(titleAfterName(f("cpu fired 40 times", "cpu"))).toBe("fired 40 times");
+    expect(titleAfterName(f("cpu-high fired 40 times", "cpu"))).toBe("-high fired 40 times");
+    expect(titleAfterName(f("fired 40 times", "cpu"))).toBe("fired 40 times");
+    expect(titleAfterName(f("fired 40 times"))).toBe("fired 40 times");
   });
 });
 
 describe("the formatting", () => {
+  it("splits a duration into the number a tile shows large and the unit beside it", () => {
+    expect(splitMinutes(gt, 43_200)).toEqual({ count: 30, unit: "days" });
+    expect(splitMinutes(gt, 1440)).toEqual({ count: 1, unit: "day" });
+    expect(splitMinutes(gt, 90)).toEqual({ count: 90, unit: "minutes" });
+  });
+
   it("names a duration in its largest whole unit", () => {
     expect([15, 60, 1440, 10_080, 525_600].map((m) => formatMinutes(gt, m))).toEqual([
       "15 minutes",

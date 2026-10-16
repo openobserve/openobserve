@@ -98,10 +98,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="dateTimePicker"
             class="dashboard-icons h-7.5 [transition:all_0.2s_ease] max-md:[&_.date-time-label]:hidden"
             size="sm"
-            v-model="selectedDate"
+            :modelValue="pickedDate ?? selectedDate"
+            :auto-apply-dashboard="true"
             :initialTimezone="initialTimezone"
             :disable="arePanelsLoading"
-            @hide="setTimeForVariables"
+            @update:modelValue="timeGate.onPick"
+            @show="timeGate.onShow"
+            @hide="onTimePickerHide"
+            @timezone-change="timeGate.flush"
             data-test="dashboard-global-date-time-picker"
           />
           <AutoRefreshInterval
@@ -126,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               v-else
-              :variant="isVariablesChanged ? 'warning' : 'outline'"
+              :variant="isRefreshPending ? 'warning' : 'outline'"
               size="icon-toolbar"
               @click="refreshData()"
               :disabled="arePanelsLoading"
@@ -134,16 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-refresh-btn"
               :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
             >
-              <OTooltip
-                :content="
-                  isAutoRunOn
-                    ? t('search.autoRunEnabled')
-                    : isVariablesChanged
-                      ? t('dashboard.viewDashboard.refreshToApplyVariables')
-                      : t('dashboard.viewDashboard.refresh')
-                "
-                shortcut-id="dashboardRefresh"
-              />
+              <OTooltip :content="refreshTooltip" shortcut-id="dashboardRefresh" />
             </OButton>
             <ODropdown align="end" side="bottom">
               <template #trigger>
@@ -151,7 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :variant="refreshOptionsVariant"
                   size="icon-toolbar"
                   class="w-5"
-                  :disabled="arePanelsLoading"
                   :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
                   data-test="dashboard-refresh-options-btn"
                   icon-left="arrow-drop-down"
@@ -160,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownItem
                 data-test="dashboard-refresh-without-cache-btn"
                 icon-left="cached"
+                :disabled="arePanelsLoading"
                 @select="refreshData(true)"
               >
                 {{ t("dashboard.viewDashboard.refreshCacheReload") }}
@@ -179,7 +174,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
                     </div>
                     <div class="text-text-secondary text-xs">
-                      {{ t("search.liveModeTooltip") }}
+                      {{ t("dashboard.viewDashboard.autoRunDescription") }}
+                    </div>
+                    <div class="text-text-secondary text-xs" data-test="dashboard-auto-run-scope">
+                      {{ t("dashboard.viewDashboard.autoRunScope") }}
                     </div>
                   </span>
                 </ODropdownItem>
@@ -416,6 +414,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </template>
 
+        <OBanner
+          v-if="hasUnsavedConflict"
+          variant="warning"
+          icon="warning"
+          dense
+          inline-actions
+          class="mx-page-edge mt-2 shrink-0"
+          data-test="dashboard-unsaved-conflict-banner"
+        >
+          {{
+            saveConflictState.myChange
+              ? t("dashboard.saveConflict.notSavedChange", { change: saveConflictState.myChange })
+              : t("dashboard.saveConflict.notSaved")
+          }}
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              data-test="dashboard-unsaved-conflict-resolve"
+              @click="resolveSaveConflict"
+            >
+              {{ t("dashboard.saveConflict.resolve") }}
+            </OButton>
+          </template>
+        </OBanner>
+
         <RenderDashboardCharts
           :frame="false"
           :class="store.state.printMode ? '' : 'min-h-0 flex-1'"
@@ -546,7 +570,7 @@ import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
-import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
+import { parseDuration, generateDurationLabel } from "../../utils/date";
 import { useRoute } from "vue-router";
 import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import { deletePanel } from "../../utils/commons";
@@ -559,16 +583,25 @@ import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import useNotifications from "@/composables/useNotifications";
 import {
-  DASHBOARD_FRESH_PANEL_TIME,
-  resolveAppliedRangeNow,
-} from "@/composables/dashboard/dashboardFreshPanelTime";
+  onDashboardConflictResolved,
+  useDashboardSaveConflict,
+  useDashboardSaveConflictDialog,
+} from "@/composables/dashboard/useDashboardSaveConflict";
+import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
+import { DASHBOARD_FRESH_PANEL_TIME } from "@/composables/dashboard/dashboardFreshPanelTime";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import reports from "@/services/reports";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
+import { useDashboardTimeGate } from "@/composables/dashboard/useDashboardTimeGate";
+import {
+  createDashboardFreshOnOpen,
+  DASHBOARD_FRESH_ON_OPEN,
+} from "@/composables/dashboard/dashboardFreshOnOpen";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -585,7 +618,14 @@ import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
 import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
-import { hasPanelTime, queryChangeAffectsPanelTimes } from "@/utils/dashboard/panelTimeUtils";
+import {
+  arePickerValuesEqual,
+  hasPanelTime,
+  isEffectivePanelTimeRelative,
+  pickerValueToTimeObj,
+  queryChangeAffectsPanelTimes,
+  toPickerSavedDate,
+} from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import {
@@ -615,6 +655,7 @@ export default defineComponent({
   name: "ViewDashboard",
   emits: ["onDeletePanel", "sendToAiChat"],
   components: {
+    OBanner,
     OPageLayout,
     DateTimePickerDashboard,
     ShareButton,
@@ -646,11 +687,8 @@ export default defineComponent({
       data: {},
     });
     const showScheduledReportsDialog = ref(false);
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
 
     // Variables manager will be initialized by RenderDashboardCharts
     // and we'll receive a reference to it via the @variablesManagerReady event
@@ -730,26 +768,23 @@ export default defineComponent({
       relativeTimePeriod: params.period ? params.period : "15m",
     });
 
-    const setTimeForVariables = () => {
-      if (selectedDate.value && dateTimePicker.value) {
-        const date = dateTimePicker.value?.getConsumableDateTime();
-        const startTime = new Date(date.startTime);
-        const endTime = new Date(date.endTime);
+    // Everything that loads data reads this, never the live picker: a range still waiting must not reach a panel.
+    const getAppliedGlobalTime = () => pickerValueToTimeObj(selectedDate.value);
 
+    const setTimeForVariables = () => {
+      const appliedTime = getAppliedGlobalTime();
+      if (appliedTime && dateTimePicker.value) {
         // Update only the variables time object
         currentTimeObjPerPanel.value = {
           ...currentTimeObjPerPanel.value,
-          __variables: {
-            start_time: startTime,
-            end_time: endTime,
-          },
+          __variables: appliedTime,
         };
       }
     };
 
     const dateTimePicker = ref(null); // holds a reference to the date time picker
 
-    // holds the date picker v-modal
+    // The applied range: what panels, the URL and the Share link use. The picker's own value is `pickedDate`.
     const selectedDate = ref(null);
 
     // holds the current time for the dashboard
@@ -799,6 +834,32 @@ export default defineComponent({
 
     const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
     provide("dashboardAutoRun", isAutoRunOn);
+
+    const showRangeInPicker = (value: any) =>
+      dateTimePicker.value?.setSavedDate(toPickerSavedDate(value, store.state.timezone));
+
+    const timeGate = useDashboardTimeGate({
+      applied: selectedDate,
+      isAutoRunOn: () => isAutoRunOn.value,
+      showInPicker: showRangeInPicker,
+    });
+
+    const onTimePickerHide = () => {
+      timeGate.onHide();
+      setTimeForVariables();
+    };
+
+    const freshOnOpen = createDashboardFreshOnOpen({
+      isAutoRunOn: () => isAutoRunOn.value,
+      isRelativeRange: (panel) =>
+        isEffectivePanelTimeRelative(panel, route.query, selectedDate.value),
+    });
+    provide(DASHBOARD_FRESH_ON_OPEN, freshOnOpen);
+    // A cross-dashboard drilldown keeps this view mounted, so each dashboard it opens is a new visit.
+    watch(
+      () => route.query.dashboard,
+      () => freshOnOpen.reset(),
+    );
 
     // variables data
     const variablesData = reactive({});
@@ -881,6 +942,22 @@ export default defineComponent({
       const normalizedRefreshed = normalizeVariables(refreshedVariablesData);
 
       return !isEqual(normalizedCurrent, normalizedRefreshed);
+    });
+
+    const isRefreshPending = computed(
+      () => isVariablesChanged.value || timeGate.needsRefresh.value,
+    );
+
+    const refreshTooltip = computed(() => {
+      if (isAutoRunOn.value) return t("dashboard.viewDashboard.autoRunDescription");
+      if (timeGate.needsRefresh.value) {
+        return isVariablesChanged.value
+          ? t("dashboard.refreshToApplyTimeRangeAndVariables")
+          : t("dashboard.refreshToApplyTimeRange");
+      }
+      return isVariablesChanged.value
+        ? t("dashboard.viewDashboard.refreshToApplyVariables")
+        : t("dashboard.viewDashboard.refresh");
     });
     // ======= [START] default variable values
 
@@ -1015,6 +1092,8 @@ export default defineComponent({
         refreshedVariablesData.values = [];
       }
 
+      const previousAppliedDate = selectedDate.value;
+
       // check if route has time related query params
       // if not, take dashboard default time settings
       if (!((route.query.from && route.query.to) || route.query.period)) {
@@ -1039,6 +1118,18 @@ export default defineComponent({
         // take route time related query params
         selectedDate.value = getSelectedDateFromQueryParams(route.query);
       }
+
+      if (previousAppliedDate && !arePickerValuesEqual(previousAppliedDate, selectedDate.value)) {
+        showAppliedDateInPicker();
+      }
+    };
+
+    // The mounted picker reads its v-model only once, so a range applied by another dashboard's URL is pushed in.
+    const showAppliedDateInPicker = () => {
+      if (!dateTimePicker.value || !selectedDate.value) return;
+
+      timeGate.adopt();
+      showRangeInPicker(selectedDate.value);
     };
 
     // [START] cancel running queries
@@ -1111,6 +1202,17 @@ export default defineComponent({
       if (!isSavingLayout.value) layoutDraft.redo();
     };
 
+    // The page keeps my unsaved edit on screen, so it must say it is not saved until the conflict is resolved.
+    const hasUnsavedConflict = computed(
+      () =>
+        !!dashboardSaveConflictState.unresolvedDashboardId &&
+        dashboardSaveConflictState.unresolvedDashboardId === String(route.query.dashboard),
+    );
+    const { reopen: reopenSaveConflict, reload: reloadSaveConflict } =
+      useDashboardSaveConflictDialog();
+    // Set when the edit-mode Save lost a conflict, so Discard can resolve that conflict too.
+    let layoutSaveConflicted = false;
+
     const saveLayout = async () => {
       if (!layoutDraft.isDirty.value || isSavingLayout.value) return;
       isSavingLayout.value = true;
@@ -1118,6 +1220,7 @@ export default defineComponent({
         // saveDashboardData owns the toast and the 409 path; a failed save keeps the draft.
         const saved = await renderDashboardChartsRef.value?.saveDashboardData?.execute?.();
         if (saved) layoutDraft.finish();
+        else if (hasUnsavedConflict.value) layoutSaveConflicted = true;
       } finally {
         isSavingLayout.value = false;
       }
@@ -1145,6 +1248,9 @@ export default defineComponent({
       if (!isEditingLayout.value || isSavingLayout.value) return;
       if (layoutDraft.isDirty.value && !(await confirmDiscard("exit"))) return;
       layoutDraft.discard();
+      // Discarding the layout that lost a save conflict is the conflict's Reload: show the latest and drop the not-saved banner.
+      if (layoutSaveConflicted && hasUnsavedConflict.value) await reloadSaveConflict();
+      layoutSaveConflicted = false;
     };
 
     // Esc belongs to an open dialog or menu first; the layout only hears it when nothing else would.
@@ -1188,28 +1294,6 @@ export default defineComponent({
 
     // ===== Panel Time Configuration =====
 
-    // Helper: Convert picker format to time object
-    const convertPickerToTimeObj = (pickerValue: any) => {
-      if (!pickerValue) return null;
-
-      if (pickerValue.valueType === "relative" && pickerValue.relativeTimePeriod) {
-        const result = getConsumableRelativeTime(pickerValue.relativeTimePeriod);
-        if (result) {
-          return {
-            start_time: new Date(result.startTime),
-            end_time: new Date(result.endTime),
-          };
-        }
-      } else if (pickerValue.valueType === "absolute") {
-        return {
-          start_time: new Date(pickerValue.startTime),
-          end_time: new Date(pickerValue.endTime),
-        };
-      }
-
-      return null;
-    };
-
     // Compute effective time for a specific panel
     // Priority: 1. URL params (highest) → 2. panel_time_range → 3. global time AS-IS
     const computePanelTime = (panel: any, globalTime: any) => {
@@ -1219,14 +1303,14 @@ export default defineComponent({
       // URL params always win, even if panel_time_range is null
       const urlPanelTime = getPanelTimeFromURL(panel.id, route.query);
       if (urlPanelTime) {
-        return convertPickerToTimeObj(urlPanelTime);
+        return pickerValueToTimeObj(urlPanelTime);
       }
 
       // Priority 2: Use panel's configured time range (if set)
       if (panel.config?.panel_time_range) {
         const pickerValue = convertPanelTimeRangeToPicker(panel.config.panel_time_range);
         if (pickerValue) {
-          return convertPickerToTimeObj(pickerValue);
+          return pickerValueToTimeObj(pickerValue);
         }
       }
 
@@ -1250,14 +1334,10 @@ export default defineComponent({
         }
       }
 
-      if (!targetPanel) {
+      const globalTime = getAppliedGlobalTime();
+      if (!targetPanel || !globalTime) {
         return;
       }
-
-      const globalTime = {
-        start_time: new Date(dateTimePicker.value.getConsumableDateTime().startTime),
-        end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
-      };
 
       // Check if panel has its own time configuration
       if (hasPanelTime(targetPanel)) {
@@ -1282,7 +1362,7 @@ export default defineComponent({
       const panel = currentDashboardData.data?.tabs
         ?.flatMap((tab: any) => tab.panels ?? [])
         .find((p: any) => p.id === panelId);
-      const globalTime = panel && resolveAppliedRangeNow(selectedDate.value);
+      const globalTime = panel && getAppliedGlobalTime();
       if (!globalTime) return undefined;
       return hasPanelTime(panel) ? computePanelTime(panel, globalTime) : globalTime;
     });
@@ -1304,14 +1384,10 @@ export default defineComponent({
     // Compute times for all panels in all tabs
     // @param forceRefresh - If true, always create new time objects to force all panels to refresh
     const computeAllPanelTimes = (forceRefresh = false) => {
-      if (!currentDashboardData.data?.tabs || !dateTimePicker.value) {
+      const globalTime = getAppliedGlobalTime();
+      if (!currentDashboardData.data?.tabs || !dateTimePicker.value || !globalTime) {
         return;
       }
-
-      const globalTime = {
-        start_time: new Date(dateTimePicker.value.getConsumableDateTime().startTime),
-        end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
-      };
 
       // A non-forced recompute must not advance a relative range: its resolved now drifts a few hundred ms between calls during load, refiring every global panel's time watcher (cache paint → spurious refetch).
       const existingGlobalTime = currentTimeObjPerPanel.value.__global;
@@ -1371,19 +1447,15 @@ export default defineComponent({
       });
     };
 
-    // when the date changes from the picker, update the current time object for the dashboard
+    // when the applied range changes, update the current time object for the dashboard
     watch(selectedDate, async () => {
-      if (selectedDate.value && dateTimePicker.value) {
+      const appliedTime = getAppliedGlobalTime();
+      if (appliedTime && dateTimePicker.value) {
         // CRITICAL: Clear panelIdToBeRefreshed to ensure all panels refresh
         // When global date time changes, all panels should update
         panelIdToBeRefreshed.value = null;
 
-        const date = dateTimePicker.value?.getConsumableDateTime();
-
-        currentTimeObj.value = {
-          start_time: new Date(date.startTime),
-          end_time: new Date(date.endTime),
-        };
+        currentTimeObj.value = appliedTime;
 
         // DON'T reset currentTimeObjPerPanel here - let computeAllPanelTimes() handle it
         // This prevents losing panel-specific times during the update
@@ -1585,7 +1657,7 @@ export default defineComponent({
 
     const refreshOptionsVariant = computed(() => {
       if (config.isEnterprise == "true" && arePanelsLoading.value) return "outline-destructive";
-      return isVariablesChanged.value ? "warning" : "outline";
+      return isRefreshPending.value ? "warning" : "outline";
     });
 
     const refreshData = async (withoutCache = false) => {
@@ -1614,15 +1686,15 @@ export default defineComponent({
         // Sync panel-level datetime pickers FIRST (updates URL)
         await renderDashboardChartsRef.value?.syncAllPanelDateTimePickers();
 
+        // Applied before the recompute below, which reads the applied range and not the picker.
+        timeGate.refresh();
+
         // Recompute all panel times after syncing
         // Pass forceRefresh=true to ensure ALL panels refresh (create new time objects)
         computeAllPanelTimes(true);
 
         // Commit all live variable changes to committed state
         renderDashboardChartsRef.value?.commitAllVariables();
-
-        // Refresh the dashboard (syncs global datetime picker)
-        dateTimePicker.value.refresh();
       }
     };
 
@@ -1644,8 +1716,9 @@ export default defineComponent({
       // set it as a absolute time
       dateTimePicker?.value?.setCustomDate("absolute", selectedDateObj);
 
-      // refresh dashboard
+      // The picker reports the zoomed range here; a zoom applies at once even while Auto Run is off.
       dateTimePicker.value.refresh();
+      timeGate.refresh();
     };
 
     // ------- work with query params ----------
@@ -1895,7 +1968,30 @@ export default defineComponent({
       { deep: true },
     );
 
+    // Resolve only reopens the dialog: no save is attempted, and the dialog re-reads the working copy, so an edit-mode draft that moved on is what Overwrite saves.
+    const resolveSaveConflict = () => reopenSaveConflict();
+
+    onDashboardConflictResolved((dashboardId, outcome) => {
+      if (dashboardId !== route.query.dashboard) return;
+      layoutSaveConflicted = false;
+      // Overwrite saved my layout, so edit mode ends as after a normal save; Reload drops the draft and its undo history.
+      if (isEditingLayout.value) {
+        if (outcome === "overwritten") layoutDraft.finish();
+        else layoutDraft.discard();
+      }
+      loadDashboard();
+    });
+
+    // Read before the save helpers edit the cached dashboard in place.
+    const panelTitleOf = (panelId: any) =>
+      (currentDashboardData.data as any)?.tabs
+        ?.flatMap((tab: any) => tab?.panels ?? [])
+        .find((panel: any) => panel?.id === panelId)?.title ?? String(panelId);
+
     const onDeletePanel = async (panelId: any) => {
+      const change = t("dashboard.saveConflict.change.deletedPanel", {
+        name: panelTitleOf(panelId),
+      });
       try {
         await deletePanel(
           store,
@@ -1910,13 +2006,12 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.viewDashboard.panelDeletionFailed"),
-            t,
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: route.query.dashboard as string,
+            folderId: (route.query.folder as string) ?? "default",
+            change,
+          });
         } else {
           showErrorNotification(
             error?.message ?? t("dashboard.viewDashboard.panelDeletionFailed"),
@@ -1930,6 +2025,7 @@ export default defineComponent({
 
     // move single panel to another tab
     const onMovePanel = async (panelId: any, newTabId: any) => {
+      const change = t("dashboard.saveConflict.change.movedPanel", { name: panelTitleOf(panelId) });
       try {
         await movePanelToAnotherTab(
           store,
@@ -1945,13 +2041,12 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.viewDashboard.panelMoveFailed"),
-            t,
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: route.query.dashboard as string,
+            folderId: (route.query.folder as string) ?? "default",
+            change,
+          });
         } else {
           showErrorNotification(error?.message ?? t("dashboard.viewDashboard.panelMoveFailed"), {
             timeout: 2000,
@@ -2156,7 +2251,11 @@ export default defineComponent({
 
         // Save changes using existing renderDashboardChartsRef
         if (renderDashboardChartsRef?.value?.saveDashboardData?.execute) {
-          await renderDashboardChartsRef.value.saveDashboardData.execute();
+          const saved = await renderDashboardChartsRef.value.saveDashboardData.execute(
+            t("dashboard.saveConflict.change.editedJson"),
+          );
+          // A conflict opened the dialog with my JSON; reloading here would replace it on screen with the latest.
+          if (!saved) return;
 
           // Reload the dashboard to reflect changes
           await loadDashboard();
@@ -2255,11 +2354,19 @@ export default defineComponent({
       toggleAutoRun,
       refreshOptionsVariant,
       isVariablesChanged,
+      isRefreshPending,
+      refreshTooltip,
+      timeGate,
+      pickedDate: timeGate.picked,
+      onTimePickerHide,
       refreshedVariablesDataUpdated,
       onDeletePanel,
       variablesData,
       variablesDataUpdated,
       showDashboardSettingsDialog,
+      hasUnsavedConflict,
+      resolveSaveConflict,
+      saveConflictState: dashboardSaveConflictState,
       openSettingsDialog,
       loadDashboard,
       refreshPanelRequest,

@@ -29,7 +29,7 @@ pub const MAX_CREATES: usize = 15;
 
 const HISTOGRAM_INTERVAL: &str = "5m";
 const SCHEDULE_INTERVAL: &str = "1h";
-const DETECTION_WINDOW_SECONDS: i64 = 3_900;
+const DETECTION_WINDOW_SECONDS: i64 = 10_800;
 const MIN_BUCKET_REQUESTS: u32 = 20;
 const NAME_SEPARATOR: &str = " · ";
 /// Alert names forbid `/`; U+2215 reads the same and the web strip maps it back.

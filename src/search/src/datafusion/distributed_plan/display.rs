@@ -17,31 +17,13 @@ use std::{fmt, fmt::Formatter};
 
 use datafusion::physical_plan::{DisplayFormatType, ExecutionPlan, ExecutionPlanVisitor};
 
-#[derive(Debug, Clone, Copy)]
-enum ShowMetrics {
-    Aggregated,
-    Full,
-}
-
 pub struct DisplayableExecutionPlan<'a> {
     inner: &'a dyn ExecutionPlan,
-    show_metrics: ShowMetrics,
 }
 
 impl<'a> DisplayableExecutionPlan<'a> {
     pub fn new(inner: &'a dyn ExecutionPlan) -> Self {
-        Self {
-            inner,
-            show_metrics: ShowMetrics::Aggregated,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn with_full_metrics(inner: &'a dyn ExecutionPlan) -> Self {
-        Self {
-            inner,
-            show_metrics: ShowMetrics::Full,
-        }
+        Self { inner }
     }
 
     pub fn indent(&self, verbose: bool) -> impl fmt::Display + 'a {
@@ -53,7 +35,6 @@ impl<'a> DisplayableExecutionPlan<'a> {
         struct Wrapper<'a> {
             format_type: DisplayFormatType,
             plan: &'a dyn ExecutionPlan,
-            show_metrics: ShowMetrics,
         }
         impl fmt::Display for Wrapper<'_> {
             fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -61,7 +42,6 @@ impl<'a> DisplayableExecutionPlan<'a> {
                     t: self.format_type,
                     f,
                     indent: 0,
-                    show_metrics: self.show_metrics,
                 };
                 visit_plan(self.plan, &mut visitor)
             }
@@ -69,7 +49,6 @@ impl<'a> DisplayableExecutionPlan<'a> {
         Wrapper {
             format_type,
             plan: self.inner,
-            show_metrics: self.show_metrics,
         }
     }
 }
@@ -78,7 +57,6 @@ struct IndentVisitor<'a, 'b> {
     t: DisplayFormatType,
     f: &'a mut Formatter<'b>,
     indent: usize,
-    show_metrics: ShowMetrics,
 }
 
 impl ExecutionPlanVisitor for IndentVisitor<'_, '_> {
@@ -86,26 +64,15 @@ impl ExecutionPlanVisitor for IndentVisitor<'_, '_> {
     fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> Result<bool, Self::Error> {
         write!(self.f, "{:indent$}", "", indent = self.indent * 2)?;
         plan.fmt_as(self.t, self.f)?;
-        match self.show_metrics {
-            ShowMetrics::Aggregated => {
-                if let Some(metrics) = plan.metrics() {
-                    let metrics = metrics
-                        .aggregate_by_name()
-                        .sorted_for_display()
-                        .timestamps_removed();
+        if let Some(metrics) = plan.metrics() {
+            let metrics = metrics
+                .aggregate_by_name()
+                .sorted_for_display()
+                .timestamps_removed();
 
-                    write!(self.f, ", metrics=[{metrics}]")?;
-                } else {
-                    write!(self.f, ", metrics=[]")?;
-                }
-            }
-            ShowMetrics::Full => {
-                if let Some(metrics) = plan.metrics() {
-                    write!(self.f, ", metrics=[{metrics}]")?;
-                } else {
-                    write!(self.f, ", metrics=[]")?;
-                }
-            }
+            write!(self.f, ", metrics=[{metrics}]")?;
+        } else {
+            write!(self.f, ", metrics=[]")?;
         }
         writeln!(self.f)?;
         self.indent += 1;
@@ -138,15 +105,6 @@ mod tests {
         let s = format!("{}", d.indent(false));
         assert!(s.contains("EmptyExec"));
         // EmptyExec has no metrics, so the aggregated branch writes "metrics=[]"
-        assert!(s.contains("metrics=[]"));
-    }
-
-    #[test]
-    fn test_with_full_metrics_output() {
-        let plan = empty_plan();
-        let d = DisplayableExecutionPlan::with_full_metrics(plan.as_ref());
-        let s = format!("{}", d.indent(false));
-        assert!(s.contains("EmptyExec"));
         assert!(s.contains("metrics=[]"));
     }
 
