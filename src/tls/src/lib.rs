@@ -15,14 +15,10 @@
 
 //! TLS configuration and certificate utilities.
 
-use std::{
-    io::BufReader,
-    net::{Ipv4Addr, Ipv6Addr},
-};
+use std::io::BufReader;
 
 use itertools::Itertools;
 use rustls::pki_types::{CertificateDer, pem::PemObject};
-use x509_parser::prelude::*;
 
 pub fn client_tls_config() -> Result<rustls::ClientConfig, anyhow::Error> {
     let cfg = config::get_config();
@@ -84,119 +80,4 @@ pub fn reqwest_client_tls_config() -> Result<reqwest::Client, anyhow::Error> {
     }
 
     Ok(client_builder.build()?)
-}
-
-pub fn get_server_url_from_cert(cert: &[u8]) -> Result<String, anyhow::Error> {
-    match parse_x509_certificate(cert) {
-        Ok((_, certificate)) => {
-            let result = String::new();
-            for ext in certificate.extensions() {
-                match ext.parsed_extension() {
-                    ParsedExtension::SubjectAlternativeName(san) => {
-                        if let Some(GeneralName::DNSName(dns_name)) =
-                            san.general_names.iter().find(|&san| {
-                                if let GeneralName::DNSName(_) = san {
-                                    return true;
-                                }
-                                false
-                            })
-                        {
-                            return Ok(dns_name.to_string());
-                        }
-
-                        if let Some(GeneralName::IPAddress(ip_addr)) =
-                            san.general_names.iter().find(|&san| {
-                                if let GeneralName::IPAddress(_) = san {
-                                    return true;
-                                }
-                                false
-                            })
-                        {
-                            if ip_addr.len() == 4 {
-                                let ip_addr = <&[u8; 4]>::try_from(*ip_addr).unwrap();
-                                return Ok(Ipv4Addr::from(*ip_addr).to_string());
-                            } else if ip_addr.len() == 16 {
-                                let ip_addr = <&[u8; 16]>::try_from(*ip_addr).unwrap();
-                                return Ok(Ipv6Addr::from(*ip_addr).to_string());
-                            } else {
-                                return Err(anyhow::anyhow!(
-                                    "Failed to parse certificate, invalid IP address length"
-                                ));
-                            }
-                        }
-                        return Err(anyhow::anyhow!(
-                            "Failed to parse certificate, could not find DNS name or IP address in SAN"
-                        ));
-                    }
-                    _ => {
-                        continue;
-                    }
-                }
-            }
-            if !result.is_empty() {
-                Ok(result)
-            } else {
-                Err(anyhow::anyhow!(
-                    "Failed to parse certificate, could not find SAN"
-                ))
-            }
-        }
-        Err(e) => Err(anyhow::anyhow!("Failed to parse certificate: {}", e)),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use rcgen::{CertifiedKey, generate_simple_self_signed};
-
-    use super::*;
-
-    #[test]
-    fn test_get_server_url_from_cert_prefers_dns_name() {
-        // Generate an example certificate
-        let subject_alt_names = vec!["127.0.0.1".to_string(), "example.com".to_string()];
-        let CertifiedKey {
-            cert,
-            signing_key: _,
-        } = generate_simple_self_signed(subject_alt_names).unwrap();
-        let result = get_server_url_from_cert(cert.der().iter().as_slice());
-        assert_eq!(result.unwrap(), "example.com");
-    }
-
-    #[test]
-    fn test_get_server_url_from_cert_gets_ip_addr_v4() {
-        // Generate an example certificate
-        let subject_alt_names = vec!["127.0.0.1".to_string()];
-        let CertifiedKey {
-            cert,
-            signing_key: _,
-        } = generate_simple_self_signed(subject_alt_names).unwrap();
-        let result = get_server_url_from_cert(cert.der().iter().as_slice());
-        assert_eq!(result.unwrap(), "127.0.0.1");
-    }
-
-    #[test]
-    fn test_get_server_url_from_cert_gets_ip_addr_v6() {
-        // Generate an example certificate
-        let subject_alt_names = vec!["2001:db8:85a3::8a2e:370:7334".to_string()];
-        let CertifiedKey {
-            cert,
-            signing_key: _,
-        } = generate_simple_self_signed(subject_alt_names).unwrap();
-        let result = get_server_url_from_cert(cert.der().iter().as_slice());
-        assert_eq!(result.unwrap(), "2001:db8:85a3::8a2e:370:7334");
-    }
-
-    #[test]
-    fn test_get_server_url_from_cert_invalid_bytes_returns_error() {
-        let garbage = b"not a valid certificate";
-        let result = get_server_url_from_cert(garbage);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_get_server_url_from_cert_empty_bytes_returns_error() {
-        let result = get_server_url_from_cert(&[]);
-        assert!(result.is_err());
-    }
 }
