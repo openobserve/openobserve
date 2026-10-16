@@ -99,9 +99,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex-1 max-md:hidden" />
 
       <div class="flex shrink-0 items-center gap-2 max-md:ms-auto max-md:gap-1">
+        <!-- Explore keeps Apply: a date change there re-queries the whole card grid. -->
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
           v-model="selectedDate"
+          :auto-apply-dashboard="mode === 'visualize'"
           @on:date-change="onDateChange"
         />
         <AutoRefreshInterval
