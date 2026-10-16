@@ -1,0 +1,25 @@
+{
+  "feature_slug": "rum-app-performance-toolbar",
+  "feature_title": "RUM App Performance Toolbar & Toggle Group",
+  "area": "RUM",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "app-performance.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/RUM/app-performance.spec.js",
+  "playwright_group": "RUM",
+  "source_files": [
+    "web/src/views/RUM/AppPerformance.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The only changed files are web/src/views/RUM/AppPerformance.vue and its Vitest spec web/src/views/RUM/AppPerformance.spec.ts — both frontend paths in the openobserve (OSS) repo. No enterprise-owned directories (enterprise/, o2_enterprise/, src/enterprise/) and no enterprise keywords (SSO/SAML/RBAC/SDR/cipher/logo-management) appear in the paths or symbols, so this is an OSS change.",
+    "skip": "Not skipped. No opt-out label (tests-added) or skip comment was provided (trigger_comment.txt and feature_hint.txt are both empty), and the diff alters a user-facing page: it removes the App Performance page header and replaces the OTabs tab bar with an OToggleGroup toolbar, so this is a user-facing UI flow, not a docs/CI-only change.",
+    "e2e": "E2E is warranted because the RUM App Performance page's navigation and controls changed in a user-observable way: the tab bar became a toggle group, the page title/subtitle were removed, and the date-time picker, auto-refresh, refresh button, and share-link button were consolidated into a single toolbar row. A user can exercise and observe these layout and interaction changes.",
+    "area": "RUM — the change lives entirely under web/src/views/RUM/, and the Playwright suite already has a RUM area folder (tests/ui-testing/playwright-tests/RUM/) with sibling specs such as rum-token.spec.js and rum-page-dataflow.spec.js.",
+    "group": "The ci-matrix already defines a RUM shard (testfolder and actual_folder both 'RUM', seen in ci_matrix_cloud.json), so the new spec joins the existing RUM group rather than creating a new shard.",
+    "existing_tests": "No Playwright E2E specs under tests/ui-testing/playwright-tests/ are changed in the diff. The only test file present is web/src/views/RUM/AppPerformance.spec.ts, a Vitest unit test, which is not E2E coverage — so existing_tests_in_diff is false."
+  }
+}
