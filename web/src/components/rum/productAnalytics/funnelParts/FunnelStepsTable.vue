@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="col.id === 'step' ? '' : 'justify-end'"
         :data-test="`rum-analytics-funnel-col-${col.id}`"
         >{{ col.label }}
-        <span class="flex items-center">
-          <OIcon name="info-outline" size="xs" :aria-label="col.tip" />
+        <span tabindex="0" role="img" :aria-label="col.tip" class="flex items-center">
+          <OIcon name="info-outline" size="xs" />
           <OTooltip :content="col.tip" />
         </span>
       </span>

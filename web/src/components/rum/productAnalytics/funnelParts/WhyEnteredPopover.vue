@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         t("rum.analytics.funnel.whyTitle", { count: addCommasToNumber(count) }, count)
       }}</span>
       <span
-        v-if="state === 'loading' || state === 'idle'"
+        v-if="state === 'loading' || state === 'idle' || (state === 'ok' && !lines)"
         class="text-text-secondary text-xs"
         data-test="rum-analytics-funnel-why-loading"
         >{{ t("rum.analytics.funnel.whyLoading") }}</span

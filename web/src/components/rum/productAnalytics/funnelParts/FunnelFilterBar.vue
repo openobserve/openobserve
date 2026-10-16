@@ -43,8 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="edit(r.field)"
         @remove="emit('update:def', removeFilter(def, r.field))"
       >
-        <span class="min-w-0 truncate">{{ chipLabel(r) }}</span>
-        <OTooltip :content="chipLabel(r)" />
+        <OTruncatedText as="span" class="min-w-0">{{ chipLabel(r) }}</OTruncatedText>
       </OTag>
     </span>
     <template #action>
@@ -67,8 +66,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-label="t('rum.analytics.funnel.addFilter')"
               data-test="rum-analytics-funnel-add-filter-btn"
               @click="editing = null"
-              ><OTooltip :content="blocked ?? t('rum.analytics.funnel.addFilter')"
-            /></OButton>
+            />
+            <OTooltip v-if="stacked" :content="blocked ?? t('rum.analytics.funnel.addFilter')" />
             <template v-else>
               <OButton
                 variant="ghost-primary"
@@ -107,6 +106,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import FunnelSectionRow from "@/components/rum/productAnalytics/funnelParts/FunnelSectionRow.vue";
 import SessionFieldPicker from "@/components/rum/productAnalytics/funnelParts/SessionFieldPicker.vue";

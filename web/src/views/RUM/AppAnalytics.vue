@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTruncatedText class="leading-normal">{{ t("rum.analytics.subtitle") }}</OTruncatedText>
         <span
           tabindex="0"
+          role="img"
           class="text-text-secondary flex shrink-0 items-center"
           :aria-label="t('rum.analytics.sdkSampled')"
           data-test="rum-analytics-sdk-sampling"
@@ -149,6 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :active="state.newUsers"
         :aria-pressed="state.newUsers"
         :disabled="newUsersDisabled"
+        focusable-unavailable
         data-test="rum-analytics-new-users-chip"
         @click="toggleNewUsers"
         >{{ t("rum.analytics.exclusions.newUsersOnly")

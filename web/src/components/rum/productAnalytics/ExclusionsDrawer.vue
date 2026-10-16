@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :sub-title="t('rum.analytics.exclusions.subtitle')"
     :form-id="readOnly ? undefined : FORM_ID"
     :primary-button-label="readOnly ? undefined : t('common.save')"
+    :primary-button-disabled="!base"
     :secondary-button-label="readOnly ? t('common.close') : t('common.cancel')"
     data-test="rum-analytics-exclusions-drawer"
     @update:open="(v) => emit('update:open', v)"
@@ -64,7 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OForm v-if="!readOnly" :id="FORM_ID" :form="form" class="flex flex-col gap-4">
         <OFormSection :title="t('rum.analytics.exclusions.builtinTitle')">
           <template #actions>
-            <OFormSwitch name="bots" data-test="rum-analytics-exclusions-builtin-switch" />
+            <OFormSwitch
+              name="bots"
+              :aria-label="t('rum.analytics.exclusions.builtinTitle')"
+              data-test="rum-analytics-exclusions-builtin-switch"
+            />
           </template>
           <BuiltinBotsSummary :builtin="base?.builtinBots" :removed="builtinRemoved" />
         </OFormSection>
@@ -124,8 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="editRule(i)"
                   @remove="removeRule(i)"
                 >
-                  <span class="min-w-0 truncate">{{ ruleLabel(rule) }}</span>
-                  <OTooltip :content="ruleLabel(rule)" />
+                  <OTruncatedText as="span" class="min-w-0">{{ ruleLabel(rule) }}</OTruncatedText>
                 </OTag>
                 <OTag
                   v-if="!pa.schema.value[rule.field]"
@@ -193,8 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="editPage(i)"
                 @remove="removePage(i)"
               >
-                <span class="min-w-0 truncate">{{ pageLabel(page) }}</span>
-                <OTooltip :content="pageLabel(page)" />
+                <OTruncatedText as="span" class="min-w-0">{{ pageLabel(page) }}</OTruncatedText>
               </OTag>
             </span>
             <OPopover
@@ -236,7 +239,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else-if="base">
         <OFormSection :title="t('rum.analytics.exclusions.builtinTitle')">
           <template #actions>
-            <OSwitch :model-value="base.bots" disabled />
+            <OSwitch
+              :model-value="base.bots"
+              disabled
+              :aria-label="t('rum.analytics.exclusions.builtinTitle')"
+            />
           </template>
           <BuiltinBotsSummary :builtin="base.builtinBots" :removed="builtinRemoved" />
         </OFormSection>
@@ -245,6 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :info="t('rum.analytics.exclusions.sessionsCaption')"
         >
           <ul class="flex flex-col gap-1 text-sm">
+            <li v-if="!base.sessions.length" class="text-text-muted">{{ dash }}</li>
             <li v-for="(rule, i) in base.sessions" :key="i" class="flex flex-wrap gap-2">
               <span>{{ ruleLabel(rule) }}</span>
               <OTag
@@ -261,6 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :info="t('rum.analytics.exclusions.pagesCaption')"
         >
           <ul class="flex flex-col gap-1 text-sm">
+            <li v-if="!base.pages.length" class="text-text-muted">{{ dash }}</li>
             <li v-for="(page, i) in base.pages" :key="i">{{ pageLabel(page) }}</li>
           </ul>
           <span class="text-text-secondary text-xs">{{
@@ -276,10 +285,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-analytics-exclusions-preview"
       >
         {{
-          t("rum.analytics.exclusions.preview", {
-            remain: addCommasToNumber(preview.remain),
-            total: addCommasToNumber(preview.total),
-          })
+          t(
+            "rum.analytics.exclusions.preview",
+            {
+              remain: addCommasToNumber(preview.remain),
+              total: addCommasToNumber(preview.total),
+            },
+            preview.total,
+          )
         }}
       </p>
     </div>
@@ -295,7 +308,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
@@ -371,6 +384,7 @@ const base = computed(() => conflictRow.value ?? saved.value);
 // Named events and exclusions share the rum_analytics PUT permission.
 const readOnly = computed(() => denied.value || namedEvents.permission.value === "read");
 
+const dash = raw("—");
 const schema = makeAppSettingsSchema(t);
 const form = useOForm<AppSettingsForm>({
   defaultValues: base.value
@@ -471,10 +485,13 @@ const builtinRemoved = computed(() => {
   return s ? Math.max(0, s.totalSessions - s.builtinKeptSessions) : null;
 });
 
-const suggestions = computed(() => [
-  ...suggest.ua.value,
-  ...(suggest.identity.value ? [suggest.identity.value] : []),
-]);
+// The suggestions read the saved rules, so one the draft already holds is dropped to keep a click from adding it twice.
+const suggestions = computed(() =>
+  [...suggest.ua.value, ...(suggest.identity.value ? [suggest.identity.value] : [])].filter(
+    (s) =>
+      !draft.value.sessions.some((r) => r.field === s.rule.field && r.values.includes(s.value)),
+  ),
+);
 
 const audit = computed(() => {
   const row = base.value;
@@ -564,6 +581,11 @@ watch(
     void suggest.loadUa();
   },
 );
+
+// A drawer opened before the rules loaded holds defaults, which Save would write over the stored rules.
+watch(saved, (now, before) => {
+  if (props.open && now && !before && !conflictRow.value) form.reset(appSettingsDefaults(now));
+});
 
 const addRule = (rule: SessionRule) => {
   if (draft.value.sessions.length >= MAX_SESSION_RULES) return;

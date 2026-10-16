@@ -97,6 +97,12 @@ describe("parseFunnelDef", () => {
     expect(parseFunnelDef({ s: RAW_STEPS, x: [{ s: ["p", "/b"], a: 1, b: 2 }] })).not.toBeNull();
   });
 
+  it("rejects a link whose exclusion step carries options, which no query applies", () => {
+    const x = [{ s: ["p", "/z", { min: 1000 }], a: 1, b: 2 }];
+    expect(parseFunnelDef({ s: RAW_STEPS, x })).toBeNull();
+    expect(parseFunnelDef({ s: RAW_STEPS, x: [{ s: ["p", "/z"], a: 1, b: 2 }] })).not.toBeNull();
+  });
+
   it("rejects a link whose within exclusion is step a's page", () => {
     expect(parseFunnelDef({ s: RAW_STEPS, x: [{ s: ["p", "/a"], a: 1, w: 5000 }] })).toBeNull();
   });

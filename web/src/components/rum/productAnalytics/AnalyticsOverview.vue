@@ -25,10 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #actions>
         <OButton
-          v-for="s in suggest.ua.value"
+          v-for="s in canExclude ? suggest.ua.value : []"
           :key="s.value"
           variant="ghost"
           size="sm"
+          :disabled="excluding"
           :data-test="`rum-analytics-exclusions-banner-exclude-${s.value}`"
           @click="excludeNow(s.rule)"
           >{{ t("rum.analytics.exclusions.exclude", { value: raw(s.value) }) }}</OButton
@@ -318,9 +319,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-text-heading text-sm font-semibold">{{
             t("rum.analytics.unnamedClicks.title")
           }}</span>
-          <span class="text-text-secondary min-w-0 flex-1 truncate text-xs">{{
-            t("rum.analytics.unnamedClicks.caption", { attribute: raw("data-test") })
-          }}</span>
+          <span
+            tabindex="0"
+            role="img"
+            :aria-label="unnamedCaption"
+            class="text-text-secondary flex items-center"
+            data-test="rum-analytics-overview-unnamed-clicks-info"
+          >
+            <OIcon name="info-outline" size="xs" />
+            <OTooltip :content="unnamedCaption" />
+          </span>
         </div>
         <AnalyticsPanelState
           :state="unnamedPanel"
@@ -388,6 +396,8 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -740,9 +750,17 @@ const includeExcluded = async () => {
 };
 
 // The banner's chip saves at once; the drawer is the place to review before saving.
+// Named events and app filters share the rum_analytics PUT permission.
+const canExclude = computed(() => namedEvents.permission.value !== "read");
+const excluding = ref(false);
+const unnamedCaption = computed(() =>
+  t("rum.analytics.unnamedClicks.caption", { attribute: raw("data-test") }),
+);
+
 const excludeNow = async (rule: SessionRule) => {
   const ex = exclusions.value as AppSettings | undefined;
-  if (!ex) return;
+  if (!ex || excluding.value) return;
+  excluding.value = true;
   try {
     await pa.saveAppSettings({
       bots: ex.bots,
@@ -751,13 +769,14 @@ const excludeNow = async (rule: SessionRule) => {
       version: ex.version,
     });
   } catch (e) {
-    toast({
-      variant: "error",
-      message:
-        rumPaError(e).status === 403
-          ? t("rum.analytics.exclusions.readOnly")
-          : t("rum.analytics.exclusions.saveFailed"),
-    });
+    const err = rumPaError(e);
+    let message = t("rum.analytics.exclusions.saveFailed");
+    if (err.status === 403) message = t("rum.analytics.exclusions.readOnly");
+    else if (err.code === "version_conflict") message = t("rum.analytics.exclusions.conflict");
+    toast({ variant: "error", message });
+    if (err.code === "version_conflict") void pa.refresh();
+  } finally {
+    excluding.value = false;
   }
 };
 

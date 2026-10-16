@@ -952,6 +952,8 @@ const parseExclusion = (raw: unknown, steps: StepRef[]): ExclusionStep | null =>
   const step = parseStepRef(raw.s);
   const { a, b, w } = raw;
   const n = steps.length;
+  // The queries match an exclusion by its step alone, so options on it would be ignored.
+  if (step?.f) return null;
   if (!step || typeof a !== "number" || !Number.isInteger(a) || a < 1) return null;
   if ((b === undefined) === (w === undefined)) return null;
   let x: ExclusionStep | null = null;

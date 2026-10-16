@@ -1418,7 +1418,7 @@ mod tests {
     }
 
     #[test]
-    fn p1_r7_app_settings_are_unique_by_app() {
+    fn p1_r7_app_settings_list_in_app_order() {
         assert_eq!(<AppSettings as PaTable>::NAME_KEY.as_str(), "app");
     }
 

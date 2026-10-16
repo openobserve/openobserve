@@ -684,8 +684,10 @@ export default function useProductAnalytics() {
     const forOrg = org();
     const wanted = [state.app, ...comparedApps.value];
     const key = `${forOrg}|${wanted.join(",")}`;
-    if (!force && settingsFor === key) return null;
-    appSettings.value = {};
+    const same = settingsFor === key;
+    if (!force && same) return null;
+    // A refresh keeps the rules it is replacing, so the scope key does not change under the load.
+    if (!same) appSettings.value = {};
     settingsFor = "";
     try {
       const rows = await Promise.all(wanted.map((a) => api.getAppSettings(forOrg, a)));

@@ -36,10 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ><OTooltip :content="t('rum.analytics.pathsView.backToFunnel')"
           /></OButton>
           <OIcon name="filter-alt" size="sm" class="text-text-secondary shrink-0" />
-          <span
-            class="text-text-heading max-w-60 truncate text-sm font-semibold"
+          <OTruncatedText
+            as="span"
+            class="text-text-heading max-w-60 text-sm font-semibold"
             data-test="rum-analytics-paths-cohort-funnel"
-            >{{ cohortFunnelName }}</span
+            >{{ cohortFunnelName }}</OTruncatedText
           >
           <OSeparator vertical class="my-1" />
         </span>
@@ -93,8 +94,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="text-text-secondary shrink-0">{{
                         t("rum.analytics.pathsView.cohortStep", { step: def.cohort.stepIndex })
                       }}</span>
-                      <span class="min-w-0 truncate font-mono">{{ anchorLabel }}</span>
-                      <OTooltip :content="cohortCondition" />
+                      <OTruncatedText as="span" class="min-w-0 font-mono">{{
+                        anchorLabel
+                      }}</OTruncatedText>
                     </OTag>
                   </span>
                 </template>
@@ -369,6 +371,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -450,8 +454,12 @@ const eventsStatus = computed(() => (usesEvents.value ? pa.eventsStatus.value : 
 const eventsBlocked = computed(
   () => eventsStatus.value === "failed" || eventsStatus.value === "forbidden",
 );
+// New users are judged per user, and a session sample would hide a user's earlier sessions.
 const ratio = computed<SampleRatio>(() =>
-  def.value.cohort?.funnel.unit === "users" && pa.identitySql.value ? 1 : pa.sampleRatio.value,
+  pa.identitySql.value &&
+  (def.value.cohort?.funnel.unit === "users" || pa.scope.value.newSince !== undefined)
+    ? 1
+    : pa.sampleRatio.value,
 );
 
 const depthOptions = computed(() =>
@@ -528,7 +536,10 @@ const cohortCondition = computed(() => {
 // The health query groups by outcome, so a cohort nobody dropped out of has no "dropped" row at all.
 const cohortCount = computed(() => {
   const c = def.value.cohort;
-  if (!c || cohortPanel.value.status !== "ok") return t("rum.analytics.pathsView.cohortCounting");
+  const st = cohortPanel.value.status;
+  if (c && (st === "error" || st === "forbidden"))
+    return t("rum.analytics.pathsView.cohortCountFailed");
+  if (!c || st !== "ok") return t("rum.analytics.pathsView.cohortCounting");
   const dropped = cohortPanel.value.rows.find((r) => r.side === "dropped");
   const sessions = Number(dropped?.sessions ?? 0);
   const units = Number(dropped?.units ?? 0);
@@ -571,7 +582,11 @@ const backToFunnel = async () => {
       pa.state.app,
       id,
     );
-    if (saved && saved !== "failed") {
+    if (saved === "failed") {
+      toast({ variant: "error", message: t("rum.analytics.saved.loadFailed") });
+      return;
+    }
+    if (saved) {
       await funnelDraft.openSaved(saved);
       return;
     }
@@ -669,8 +684,9 @@ const compute = async (force = false) => {
             d.cohort.funnel,
             d.cohort.stepIndex,
             opts,
+            true,
           ),
-          ...pa.newUsersRange(cur, d.cohort.funnel.unit === "users" && !!pa.identitySql.value),
+          ...pa.newUsersRange(cur, !!pa.identitySql.value),
           limit: 2,
           sampled: ratio.value,
         },
