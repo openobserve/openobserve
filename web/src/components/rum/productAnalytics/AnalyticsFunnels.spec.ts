@@ -2190,11 +2190,11 @@ describe("AnalyticsFunnels", () => {
     it("the step-field sample runs once per funnel on request and hands its fields to the layout", async () => {
       const PAY = "context_payment_method";
       withSchema(["usr_email", PAY, "view_url"]);
-      routes = [[/AS st, ROW_NUMBER\(\) OVER/, [{ st: 2, [PAY]: "card" }]], ...baseRoutes()];
+      routes = [[/AS s1, ROW_NUMBER\(\) OVER/, [{ s1: 0, s2: 1, [PAY]: "card" }]], ...baseRoutes()];
       respond();
       await mountFunnels();
       await twoSteps();
-      const sampleSql = () => sqls().filter((q) => q.includes("AS st, ROW_NUMBER() OVER"));
+      const sampleSql = () => sqls().filter((q) => q.includes("AS s1, ROW_NUMBER() OVER"));
       expect(sampleSql()).toHaveLength(0);
       expect(layout().props("fieldSampleState")).toBe("idle");
       layout().vm.$emit("load-fields");
@@ -2207,6 +2207,25 @@ describe("AnalyticsFunnels", () => {
       expect(layout().props("fieldSample")).toEqual({
         fields: [{ field: PAY, steps: [2], top: ["card"], more: 0, many: false }],
       });
+    });
+
+    it("a step menu's break-down opens the toolbar picker on that step's fields and pins the pick", async () => {
+      const PAY = "context_payment_method";
+      withSchema(["usr_email", PAY]);
+      routes = [[/AS s1, ROW_NUMBER\(\) OVER/, [{ s1: 0, s2: 1, [PAY]: "card" }]], ...baseRoutes()];
+      respond();
+      await mountFunnels();
+      await twoSteps();
+      layout().vm.$emit("load-fields");
+      layout().vm.$emit("break-down-step", 2);
+      await settle();
+      const picker = wrapper!.find('[data-test="rum-analytics-funnel-field-picker"]');
+      expect(picker.text()).toContain("On step 2 (1)");
+      await wrapper!
+        .find(`[data-test="rum-analytics-funnel-field-picker-field-${PAY}"]`)
+        .trigger("click");
+      await settle();
+      expect(useProductAnalytics().funnel.value.breakdown).toEqual({ f: PAY, s: 2 });
     });
 
     it("Why N? runs its own query only when opened, and its lines add up to the entry count", async () => {
@@ -2576,7 +2595,7 @@ describe("AnalyticsFunnels", () => {
       const pa = useProductAnalytics();
       pa.funnel.value = { ...pa.funnel.value, breakdown: { f: PAY, s: 2 } };
       await settle();
-      expect(trendCalls().at(-1)!.sql).toContain("SUM(r2) AS c2, SUM(r1) AS ca");
+      expect(trendCalls().at(-1)!.sql).toContain("SUM(r1) AS c1, SUM(r2) AS c2, SUM(r1) AS ca");
       pa.funnel.value = { ...pa.funnel.value, breakdown: { f: PAY } };
       await settle();
       await settle();

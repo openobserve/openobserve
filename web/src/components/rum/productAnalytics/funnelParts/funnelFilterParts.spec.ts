@@ -563,6 +563,40 @@ describe("StepConditionPopover, Property", () => {
     expect(lastStep(w)).toEqual({ kind: "c", key: "payment_info_submitted" });
   });
 
+  it("keeps a linked negated contains rule as it is while another row is edited", async () => {
+    const plan = {
+      field: "context_plan",
+      op: "contains" as const,
+      values: ["pro"],
+      not: true as const,
+    };
+    const w = mountClick({ kind: "c", key: "payment_info_submitted", f: { pc: [plan] } });
+    await w.find(dt("rum-analytics-funnel-step-4-filters")).trigger("click");
+    const op = select(w, "rum-analytics-funnel-step-4-prop-0-op");
+    const ops = op.props("options") as { value: string }[];
+    expect(ops.map((o) => o.value)).toEqual(["in", "notIn", "contains", "notContains", "regex"]);
+    expect(op.props("modelValue")).toBe("notContains");
+    await w.find(dt("rum-analytics-funnel-step-4-prop-add")).trigger("click");
+    select(w, "rum-analytics-funnel-step-4-prop-1-field").vm.$emit("update:modelValue", PAY);
+    await w.vm.$nextTick();
+    select(w, "rum-analytics-funnel-step-4-prop-1-add-value").vm.$emit("update:modelValue", "upi");
+    await w.vm.$nextTick();
+    expect(lastStep(w).f?.pc).toEqual([plan, { field: PAY, op: "in", values: ["upi"] }]);
+  });
+
+  it("a step whose property rule is removed elsewhere goes back to one blank row", async () => {
+    const w = mountClick({
+      kind: "c",
+      key: "payment_info_submitted",
+      f: { pc: [{ field: PAY, op: "in", values: ["upi"] }] },
+    });
+    await w.find(dt("rum-analytics-funnel-step-4-filters")).trigger("click");
+    await w.setProps({ step: { kind: "c", key: "payment_info_submitted" } });
+    expect(w.find(dt("rum-analytics-funnel-step-4-prop-0")).exists()).toBe(true);
+    expect(w.find(dt("rum-analytics-funnel-step-4-prop-1")).exists()).toBe(false);
+    expect(select(w, "rum-analytics-funnel-step-4-prop-0-field").props("modelValue")).toBeNull();
+  });
+
   it("says when the sample saw no field on this step", async () => {
     wrapper = mount(StepConditionPopover, {
       props: { step: { kind: "c", key: "x" }, index: 0, fields: [], fieldsState: "ok" },
@@ -626,23 +660,15 @@ describe("FunnelStepsTable step menu", () => {
     return wrapper;
   };
 
-  it("breaks the funnel down by a property of that step, pinned to it", async () => {
+  it("its entry asks the page to open the picker for that step, after loading the fields", async () => {
     const w = mountTable("ok");
     await w.find(dt("rum-analytics-funnel-step-1-menu")).trigger("click");
     expect(w.emitted("load-fields")).toHaveLength(1);
-    expect(w.find(dt("rum-analytics-funnel-step-0-break-down-state")).text()).toBe(
-      "No fields seen on this step",
+    expect(w.find(dt("rum-analytics-funnel-step-1-break-down")).text()).toBe(
+      "Break down by a property of this step",
     );
-    await w.find(dt(`rum-analytics-funnel-step-1-break-down-${PAY}`)).trigger("click");
-    const [[next]] = w.emitted("update:def") as [FunnelDef][];
-    expect(next.breakdown).toEqual({ f: PAY, s: 2 });
-  });
-
-  it("says it is still reading the step's fields", () => {
-    const w = mountTable("loading");
-    expect(w.find(dt("rum-analytics-funnel-step-1-break-down-state")).text()).toBe(
-      "Reading this step's fields…",
-    );
+    await w.find(dt("rum-analytics-funnel-step-1-break-down")).trigger("click");
+    expect(w.emitted("break-down-step")).toEqual([[2]]);
   });
 });
 
@@ -665,6 +691,11 @@ describe("Filter all steps notice", () => {
     expect(filterNoticeOf(def([country]), { opened: 10, kept: 1 })).toBeNull();
     expect(filterNoticeOf(def([UPI]), null)).toBeNull();
     expect(filterNoticeOf(def([UPI]), { opened: 0, kept: 0, carry1: 0 })).toBeNull();
+  });
+
+  it("never flags a negated filter, which keeps the sessions that lack the field", () => {
+    const row = { opened: 84, kept: 70, carry1: 41 };
+    expect(filterNoticeOf(def([{ ...UPI, not: true }]), row)).toBeNull();
   });
 
   it("shows the kept count with one way out, and the reason behind an info link", async () => {

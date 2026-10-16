@@ -194,6 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @filter-values="loadFilterValues"
         @load-fields="fieldSample.load()"
         @break-down="breakDownBy"
+        @break-down-step="breakDownAtStep"
         @dropoff="openDropoff"
         @suggestions-retry="retrySuggestions"
         @include-hidden="appFilters.setIncludeHidden(router, true)"
@@ -341,6 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
           <FunnelBreakdownControl
+            ref="breakdownControl"
             :def="def"
             :dims="breakdownDims"
             :fields="filterFields"
@@ -716,6 +718,7 @@ defineOptions({ name: "AnalyticsFunnels" });
 const AddToDashboard = defineAsyncComponent(() => import("@/plugins/metrics/AddToDashboard.vue"));
 
 const DEBOUNCE_MS = 300;
+const MENU_CLOSE_MS = 150;
 
 const emit = defineEmits<{ "open-exclusions": [] }>();
 const { t } = useI18nTyped();
@@ -1414,6 +1417,13 @@ const filterNotice = computed(() =>
 // The notice's way out: the filter goes and the field becomes the breakdown, so no session is dropped.
 const breakDownBy = (field: string) =>
   applyDef({ ...removeFilter(def.value, field), breakdown: { f: field } });
+
+const breakdownControl = ref<InstanceType<typeof FunnelBreakdownControl> | null>(null);
+
+// The step menu closes and hands focus back to its button first, which would dismiss a picker opened in the same tick.
+const breakDownAtStep = (step: number) => {
+  setTimeout(() => breakdownControl.value?.openForStep(step), MENU_CLOSE_MS);
+};
 
 const onWhyOpen = (open: boolean) => {
   whyOpen.value = open;

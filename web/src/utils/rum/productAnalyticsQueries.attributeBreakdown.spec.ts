@@ -211,8 +211,13 @@ describe("trend ranking for an attribute breakdown", () => {
   it("ranks values by units at the table's start step and keeps none without units there", () => {
     const sql = funnelTrendSql(s, null, b, bounds, pair, opts, 2);
     assertJoinFree(sql);
-    expect(cte(sql, "tb")).toContain("SUM(r2) AS c2, SUM(r1) AS ca");
-    expect(cte(sql, "tk")).toContain("SUM(c2) OVER (PARTITION BY dim) AS tot");
+    expect(cte(sql, "tb")).toContain("SUM(r1) AS c1, SUM(r2) AS c2, SUM(r1) AS ca");
+    expect(cte(sql, "tk")).toContain(
+      "SUM(c2) OVER (PARTITION BY dim) AS tot, SUM(c1) OVER (PARTITION BY dim) AS t1",
+    );
+    // Ties at step k fall back to step-1 units, as foldBreakdown's stable sort does.
+    expect(cte(sql, "tr")).toContain("DENSE_RANK() OVER (ORDER BY un, tot DESC, t1 DESC, dim)");
+    expect(tail(sql)).toContain("MAX(tot) AS tot, MAX(t1) AS t1, bk");
     expect(cte(sql, "tg")).toContain("CASE WHEN un = 0 AND tot > 0 AND rk <= 5 THEN dim END");
   });
 
@@ -226,25 +231,28 @@ describe("trend ranking for an attribute breakdown", () => {
 });
 
 describe("per-step field sample", () => {
-  it("takes the latest rows of each step's events, tagged with the first step they match", () => {
+  it("ranks each step's own rows, so a row matching two steps is sampled for both", () => {
     const sql = stepFieldSampleSql(s, def(), [], [PAY, "context_plan", "context_missing"], 200);
     assertJoinFree(sql);
     expect(sql).toContain(
       "CASE WHEN (type = 'action' AND action_target_name <> '' AND regexp_replace(",
     );
-    expect(sql).toMatch(/THEN 1 WHEN .* THEN 2 WHEN .* THEN 3 END AS st/);
-    expect(sql).toContain("ROW_NUMBER() OVER (PARTITION BY CASE WHEN");
-    expect(sql).toContain(
-      `ORDER BY _timestamp DESC) AS rn, "${PAY}", "context_plan" FROM "_rumdata"`,
-    );
+    expect(sql).toMatch(/THEN 1 ELSE 0 END AS s1, ROW_NUMBER\(\) OVER \(PARTITION BY CASE WHEN/);
+    expect(sql).toContain("ORDER BY _timestamp DESC) AS r3");
+    expect(sql).toContain(`AS r3, "${PAY}", "context_plan" FROM "_rumdata"`);
+    expect(sql.startsWith(`SELECT s1, s2, s3, "${PAY}", "context_plan" FROM (`)).toBe(true);
     expect(sql).not.toContain("context_missing");
-    expect(sql.endsWith("WHERE rn <= 200")).toBe(true);
+    expect(
+      sql.endsWith(
+        "WHERE (s1 = 1 AND r1 <= 200) OR (s2 = 1 AND r2 <= 200) OR (s3 = 1 AND r3 <= 200)",
+      ),
+    ).toBe(true);
   });
 
-  it("reads only the step tag when no field is sampled", () => {
+  it("reads only the step flags when no field is sampled", () => {
     const sql = stepFieldSampleSql(s, def(), [], [], 200);
-    expect(sql.startsWith("SELECT st FROM (SELECT CASE")).toBe(true);
-    expect(sql).toContain(' AS rn FROM "_rumdata"');
+    expect(sql.startsWith("SELECT s1, s2, s3 FROM (SELECT CASE")).toBe(true);
+    expect(sql).toContain(' AS r3 FROM "_rumdata"');
   });
 });
 

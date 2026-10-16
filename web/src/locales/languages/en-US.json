@@ -2226,9 +2226,6 @@
         "fromStepItem": "Step {step} · {name}",
         "stepMenu": "Step actions",
         "breakDownByStep": "Break down by a property of this step",
-        "stepFieldsLoading": "Reading this step's fields…",
-        "stepFieldsNone": "No fields seen on this step",
-        "stepFieldsFailed": "Could not read this step's fields",
         "stepFieldValues": "{values} +{more}",
         "stepFieldMany": "Many values",
         "breakdownBy": "By {field}",
@@ -2261,7 +2258,8 @@
         "filterNotice": "Keeps {kept} of {opened} {unit}.",
         "filterNoticeAction": "Break down by {field}",
         "filterNoticeWhy": "Why every step shows 100%",
-        "filterNoticeReason": "Filter all steps keeps or drops whole {unit}. {missing} of the {opened} {unit} that opened step 1 never set {field}, so they are dropped before step 1 and the early steps can read 100%."
+        "filterNoticeReason": "Filter all steps keeps or drops whole {unit}. {missing} of the {opened} {unit} that opened step 1 never set {field}, so they are dropped before step 1 and the early steps can read 100%.",
+        "pickerOnStep": "On step {step}"
       },
       "viewer": {
         "droppedAfter": "Dropped after step {step}: {label}",

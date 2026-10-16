@@ -177,9 +177,10 @@ export function foldTrend(
   }
   // The SQL ranked values by units at the table's start step, so order and colours match the Steps breakdown.
   const total = (id: string) => Math.max(0, ...(groups.get(id) ?? []).map((r) => num(r.tot)));
+  const first = (id: string) => Math.max(0, ...(groups.get(id) ?? []).map((r) => num(r.t1)));
   const ids = [...groups.keys()]
     .filter((id) => id !== REST_ID)
-    .sort((x, y) => total(y) - total(x) || (x < y ? -1 : x > y ? 1 : 0));
+    .sort((x, y) => total(y) - total(x) || first(y) - first(x) || (x < y ? -1 : x > y ? 1 : 0));
   const series = ids.map((id) => toSeries(id, id, "value", groups.get(id)!, periods, ctx));
   const rest = groups.get(REST_ID);
   if (rest) {
