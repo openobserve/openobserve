@@ -91,7 +91,7 @@ def test_js_switch_is_refused_while_a_pipeline_uses_the_function(create_session,
             json={"name": vrl_function, "function": JS_BODY, "params": "row", "transType": 1},
         )
         assert refused.status_code == 400, f"expected 400, got {refused.status_code}: {refused.text[:300]}"
-        assert "cannot be used in pipelines" in refused.text
+        assert "cannot become a JavaScript function" in refused.text
         assert f"{vrl_function}_pl" in refused.text
 
         listed = create_session.get(f"{base_url}api/{ORG_ID}/functions")

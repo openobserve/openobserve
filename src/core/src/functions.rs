@@ -401,7 +401,7 @@ pub async fn update_function_checked(
         }
     }
     // Refused before the write: a persisted JS body survives into the next pipeline rebuild.
-    if func.is_js() {
+    if !func.is_vrl() {
         let dependencies = match get_dependencies(org_id, &func.name).await {
             Ok(dependencies) => dependencies,
             // Refuse rather than let an unreadable pipeline list wave JavaScript through.
@@ -554,7 +554,7 @@ fn js_in_pipelines_refusal(
     func: &Transform,
     dependencies: &[PipelineDependencyItem],
 ) -> Option<String> {
-    if !func.is_js() || dependencies.is_empty() {
+    if func.is_vrl() || dependencies.is_empty() {
         return None;
     }
     let names = dependencies
@@ -563,7 +563,7 @@ fn js_in_pipelines_refusal(
         .collect::<Vec<_>>()
         .join(", ");
     Some(format!(
-        "JavaScript functions cannot be used in pipelines. Function '{}' is used by pipeline(s): {}. Remove it from them first.",
+        "Pipelines run VRL only, so '{}' cannot become a JavaScript function while pipeline(s) {} use it. Remove it from them first.",
         func.name, names
     ))
 }
@@ -813,12 +813,22 @@ mod tests {
             (
                 1,
                 vec![dependency("pl_a")],
-                Some("Function 'referenced_fn' is used by pipeline(s): pl_a."),
+                Some(
+                    "'referenced_fn' cannot become a JavaScript function while pipeline(s) pl_a use it",
+                ),
             ),
             (
                 1,
                 vec![dependency("pl_a"), dependency("pl_b")],
-                Some("Function 'referenced_fn' is used by pipeline(s): pl_a, pl_b."),
+                Some("while pipeline(s) pl_a, pl_b use it"),
+            ),
+            // Only VRL is allowed through, so a type this endpoint does not know stays out too.
+            (
+                2,
+                vec![dependency("pl_a")],
+                Some(
+                    "'referenced_fn' cannot become a JavaScript function while pipeline(s) pl_a use it",
+                ),
             ),
         ];
         for (trans_type, dependencies, expected) in cases {
@@ -827,10 +837,7 @@ mod tests {
                 None => assert_eq!(refusal, None, "trans_type {trans_type}"),
                 Some(names) => {
                     let message = refusal.expect("a refusal");
-                    assert!(
-                        message.starts_with("JavaScript functions cannot be used in pipelines."),
-                        "{message}"
-                    );
+                    assert!(message.starts_with("Pipelines run VRL only,"), "{message}");
                     assert!(message.contains(names), "{message}");
                 }
             }
