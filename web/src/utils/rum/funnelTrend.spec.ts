@@ -236,6 +236,12 @@ describe("foldTrend", () => {
       { dim: null, un: 0, tot: 500, bk: 1, ca: 50, cb: 1 },
     ];
     expect(foldTrend(hits, p, ctx(), true).map((s) => s.value)).toEqual(["Chrome", "Safari", null]);
+    const tied = [
+      { dim: "chrome", un: 0, tot: 40, bk: 1, ca: 4, cb: 1 },
+      { dim: "Safari", un: 0, tot: 40, bk: 1, ca: 4, cb: 1 },
+    ];
+    // Byte order, like the SQL's DENSE_RANK and the Steps breakdown, puts "Safari" before "chrome".
+    expect(foldTrend(tied, p, ctx(), true).map((s) => s.value)).toEqual(["Safari", "chrome"]);
   });
 
   it("a breakdown value's average pools closed buckets and leaves the still-converting one out", () => {
