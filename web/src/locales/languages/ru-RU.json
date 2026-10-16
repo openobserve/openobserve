@@ -8207,7 +8207,6 @@
       "alert": "Оповещение",
       "topOrgs": "Наиболее затронутые организации",
       "worstHours": "Худшие часы",
-      "lagImpact": "{skipped} пропущено, {late} из {evaluations} с задержкой",
       "proposedActions": "Предлагаемые действия",
       "openAlert": "Открыть оповещение"
     },

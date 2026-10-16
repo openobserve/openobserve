@@ -8207,7 +8207,6 @@
       "alert": "Alarm",
       "topOrgs": "Meest getroffen organisaties",
       "worstHours": "Slechtste uren",
-      "lagImpact": "{skipped} overgeslagen, {late} van {evaluations} te laat",
       "proposedActions": "Voorgestelde acties",
       "openAlert": "Alarm openen"
     },
