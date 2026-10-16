@@ -4721,6 +4721,7 @@
       "openInLogs": "Günlüklerde Aç",
       "openInMetrics": "Metriklerde Aç",
       "openInTraces": "İzlerde Aç",
+      "openInProfiles": "Profillerde Aç",
       "setupAnother": "Başka bir kaynak ayarla",
       "connectSource": "Gerçek kaynağınızı bağlayın",
       "receivedHint": "{action}, bu ilk kaydın çevresindeki 30 dakikayı gösterir; zaman damgası geçmişte olsa bile.",

@@ -4721,6 +4721,7 @@
       "openInLogs": "Apri in Log",
       "openInMetrics": "Apri in Metriche",
       "openInTraces": "Apri in Tracce",
+      "openInProfiles": "Apri in Profili",
       "setupAnother": "Configura un'altra origine",
       "connectSource": "Connetti la tua origine reale",
       "receivedHint": "{action} mostra i 30 minuti intorno a questo primo record, anche se il suo timestamp è nel passato.",

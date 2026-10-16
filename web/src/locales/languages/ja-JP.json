@@ -4721,6 +4721,7 @@
       "openInLogs": "ログで開く",
       "openInMetrics": "メトリクスで開く",
       "openInTraces": "トレースで開く",
+      "openInProfiles": "プロファイルで開く",
       "setupAnother": "別のソースを設定",
       "connectSource": "実際のソースを接続",
       "receivedHint": "{action} は、この最初のレコードを中心とした30分間を表示します。タイムスタンプが過去であっても同様です。",

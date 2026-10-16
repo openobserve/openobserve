@@ -4721,6 +4721,7 @@
       "openInLogs": "Openen in Logboeken",
       "openInMetrics": "Openen in Metrieken",
       "openInTraces": "Openen in Traces",
+      "openInProfiles": "Openen in Profielen",
       "setupAnother": "Nog een bron instellen",
       "connectSource": "Verbind je echte bron",
       "receivedHint": "{action} toont de 30 minuten rond dit eerste record, zelfs als de tijdstempel in het verleden ligt.",

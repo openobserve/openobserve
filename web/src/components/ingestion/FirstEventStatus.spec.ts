@@ -56,7 +56,7 @@ const awsConfig = vi.hoisted(() => ({ isEnterprise: "false", isCloud: "false" })
 vi.mock("@/aws-exports", () => ({ default: awsConfig }));
 
 const NOW = Date.UTC(2026, 9, 7, 10, 0, 0);
-const routes = ["logs", "metrics", "traces", "recommended", "curl"].map((name) => ({
+const routes = ["logs", "metrics", "traces", "profiles", "recommended", "curl"].map((name) => ({
   path: `/${name}`,
   name,
   component: { template: "<div />" },
@@ -256,6 +256,22 @@ describe("FirstEventStatus — received", () => {
     expect(router.currentRoute.value.query).toMatchObject({
       metric: "up",
       from: String(result.rangeStart / 1000),
+    });
+  });
+
+  it("sends a profiles record to the Profiles page, in microseconds", async () => {
+    mountBar();
+    fake.result.value = { ...result, streamType: "profiles", streamName: "default" };
+    fake.state.value = "received";
+    await nextTick();
+    expect(q("first-event-status-open-btn").text()).toBe("Open in Profiles");
+    await q("first-event-status-open-btn").trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("profiles");
+    expect(router.currentRoute.value.query).toMatchObject({
+      stream: "default",
+      from: String(result.rangeStart),
+      to: String(result.rangeEnd),
     });
   });
 

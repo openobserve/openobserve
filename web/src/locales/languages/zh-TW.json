@@ -4721,6 +4721,7 @@
       "openInLogs": "在日誌中開啟",
       "openInMetrics": "在指標中開啟",
       "openInTraces": "在追蹤中開啟",
+      "openInProfiles": "在效能剖析中開啟",
       "setupAnother": "設定另一個來源",
       "connectSource": "連接您的實際來源",
       "receivedHint": "{action} 會顯示這筆第一筆記錄前後的 30 分鐘，即使其時間戳記在過去。",

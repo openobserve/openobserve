@@ -4721,6 +4721,7 @@
       "openInLogs": "在日志中打开",
       "openInMetrics": "在指标中打开",
       "openInTraces": "在追踪中打开",
+      "openInProfiles": "在性能分析中打开",
       "setupAnother": "设置另一个数据源",
       "connectSource": "连接你的真实数据源",
       "receivedHint": "{action} 会显示这条首条记录前后的 30 分钟，即使其时间戳在过去。",

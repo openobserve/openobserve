@@ -4721,6 +4721,7 @@
       "openInLogs": "Otwórz w Logach",
       "openInMetrics": "Otwórz w Metrykach",
       "openInTraces": "Otwórz w Trace",
+      "openInProfiles": "Otwórz w Profilach",
       "setupAnother": "Skonfiguruj inne źródło",
       "connectSource": "Podłącz swoje rzeczywiste źródło",
       "receivedHint": "{action} pokazuje 30 minut wokół tego pierwszego rekordu, nawet jeśli jego znacznik czasu jest z przeszłości.",

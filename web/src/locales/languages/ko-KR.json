@@ -4721,6 +4721,7 @@
       "openInLogs": "로그에서 열기",
       "openInMetrics": "메트릭에서 열기",
       "openInTraces": "트레이스에서 열기",
+      "openInProfiles": "프로파일에서 열기",
       "setupAnother": "다른 소스 설정",
       "connectSource": "실제 소스 연결",
       "receivedHint": "{action}은 이 첫 레코드 전후의 30분을 표시합니다. 타임스탬프가 과거에 있더라도 마찬가지입니다.",

@@ -4721,6 +4721,7 @@
       "openInLogs": "فتح في السجلات",
       "openInMetrics": "فتح في المقاييس",
       "openInTraces": "فتح في آثار",
+      "openInProfiles": "فتح في التوصيف",
       "setupAnother": "إعداد مصدر آخر",
       "connectSource": "اربط مصدرك الفعلي",
       "receivedHint": "{action} يعرض 30 دقيقة حول هذا السجل الأول، حتى إذا كان طابعه الزمني في الماضي.",
