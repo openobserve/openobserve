@@ -244,9 +244,8 @@ const { search: searchDigests, orgId } = useDigestSearch();
 const configQuery = useQuery(() => alertCalibrationConfigQuery(orgId.value));
 const config = computed(() => configQuery.data.value ?? null);
 
-const FINDINGS_COL = 120;
-/** Room for "Measured nothing", the widest coverage badge. */
-const COVERAGE_COL = 140;
+/** Both badge columns, so they line up; "Measured nothing" is the widest badge. */
+const BADGE_COL = 140;
 
 const nowMicros = () => Date.now() * 1000;
 const windowMinutes = (row: RunRow) => Math.round((row.window_end - row.window_start) / 60_000_000);
@@ -346,8 +345,8 @@ const columns = computed<OTableColumnDef<RunRow>[]>(() => [
     header: t("alertCalibration.digests.colFindings"),
     accessorKey: "finding_count",
     sortable: true,
-    size: FINDINGS_COL,
-    maxSize: FINDINGS_COL,
+    size: BADGE_COL,
+    maxSize: BADGE_COL,
     meta: { align: "left" },
   },
   {
@@ -355,8 +354,8 @@ const columns = computed<OTableColumnDef<RunRow>[]>(() => [
     header: t("alertCalibration.digests.colCoverage"),
     accessorFn: (row) => coverageVerdict(row),
     sortable: true,
-    size: COVERAGE_COL,
-    maxSize: COVERAGE_COL,
+    size: BADGE_COL,
+    maxSize: BADGE_COL,
     meta: { align: "left" },
   },
 ]);
