@@ -1,9 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// hclLanguage.ts — a highlight.js grammar for HCL / Terraform.
-//
-// highlight.js ships no HCL grammar, and the near neighbours read badly: `ini`
-// colours `key = value` but leaves `resource "type" "name" {` unclassed.
+
+// highlight.js ships no HCL grammar, and `ini` leaves `resource "type" "name" {` unclassed.
 
 import type { HLJSApi, Language } from "highlight.js";
 
