@@ -58,7 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
       <template #cell-conversion="{ row }">
-        <span v-if="row.prevOnly" class="text-text-secondary flex justify-end">{{ dash }}</span>
+        <span v-if="row.prevOnly || row.leftBefore" class="text-text-secondary flex justify-end">{{
+          dash
+        }}</span>
         <ODataBarCell
           v-else
           :value="row.conversion * 100"
@@ -120,6 +122,7 @@ interface TableRow {
   builtinOnly: boolean;
   prev: PrevSide | null;
   prevOnly: boolean;
+  leftBefore: boolean;
 }
 
 const props = withDefaults(
@@ -134,8 +137,11 @@ const props = withDefaults(
     builtinOnly?: string[];
     compare?: BreakdownCompareState | null;
     unitNoun?: I18nText;
+    /** The 1-based step an attribute breakdown's value rates start at. */
+    startStep?: number;
   }>(),
   {
+    startStep: 1,
     sampled: 1,
     deletedNames: () => ({}),
     builtinOnly: () => [],
@@ -163,14 +169,17 @@ const prevTip = (row: TableRow): I18nText | undefined => {
 const prevOf = (r: BreakdownRow | ComparedBreakdownRow): PrevSide | null =>
   props.compare?.status === "ok" && "prev" in r ? r.prev : null;
 
+const rowLabel = (r: BreakdownRow): string => {
+  if (r.leftBefore) return t("rum.analytics.funnel.leftBefore", { step: props.startStep });
+  if (r.noValue) return t("rum.analytics.funnel.reachedNoValue", { step: props.startStep });
+  if (r.notSet) return t("rum.analytics.funnel.notSet");
+  return r.other ? t("rum.analytics.funnel.other") : r.label;
+};
+
 const tableRows = computed<TableRow[]>(() => [
   ...props.rows.map((r, i) => ({
     id: `r${i}`,
-    label: r.notSet
-      ? t("rum.analytics.funnel.notSet")
-      : r.other
-        ? t("rum.analytics.funnel.other")
-        : r.label,
+    label: rowLabel(r),
     counts: r.counts,
     conversion: r.conversion,
     atLeast: r.atLeast,
@@ -178,6 +187,7 @@ const tableRows = computed<TableRow[]>(() => [
     builtinOnly: !r.notSet && !r.other && props.builtinOnly.includes(r.label),
     prev: prevOf(r),
     prevOnly: "prevOnly" in r && r.prevOnly,
+    leftBefore: r.leftBefore,
   })),
   {
     id: "total",
@@ -189,6 +199,7 @@ const tableRows = computed<TableRow[]>(() => [
     builtinOnly: false,
     prev: props.compare?.status === "ok" ? props.compare.total : null,
     prevOnly: false,
+    leftBefore: false,
   },
 ]);
 

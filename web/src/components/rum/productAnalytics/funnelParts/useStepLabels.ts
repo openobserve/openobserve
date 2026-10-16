@@ -19,6 +19,10 @@ import type { NamedEventsStatus } from "@/composables/rum/useNamedEvents";
 import type { NamedEvent } from "@/utils/rum/productAnalyticsModel";
 import type { StepKind, StepRef } from "@/utils/rum/productAnalyticsQueries";
 import { stepLabel } from "@/utils/rum/productAnalyticsPanels";
+import {
+  conditionOf,
+  filterFieldLabel,
+} from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
 
 const KIND_LABEL = {
   p: "rum.analytics.kind.page",
@@ -64,6 +68,13 @@ export default function useStepLabels(
             values: raw(c.values.join(" | ")),
           })
         : t("rum.analytics.funnel.condRefTag", { values: raw(c.values.join(" | ")) }),
+    ),
+    ...(s.f?.pc ?? []).map((r) =>
+      t("rum.analytics.funnel.filterChipCondition", {
+        field: filterFieldLabel(t, r.field),
+        condition: t(`rum.analytics.funnel.conditions.${conditionOf(r).id}`),
+        values: raw(r.values.join(", ")),
+      }),
     ),
   ];
 

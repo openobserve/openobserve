@@ -342,14 +342,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <OSelect
             id="rum-analytics-funnel-breakdown"
-            :model-value="def.breakdown ?? 'none'"
+            :model-value="breakdownValue"
             :options="breakdownOptions"
             size="xs"
             width="xs"
             data-test="rum-analytics-funnel-breakdown-select"
-            @update:model-value="
-              (v) => update({ breakdown: v === 'none' ? null : (v as BreakdownDim) })
-            "
+            @update:model-value="pickBreakdown"
           />
           <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
           <template v-if="trend.shown.value">
@@ -531,6 +529,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               t("rum.analytics.funnel.breakdownTimeHidden")
             }}</span>
             <span
+              v-if="breakdownStartNote"
+              class="text-text-secondary px-4 text-xs"
+              data-test="rum-analytics-funnel-breakdown-start"
+              >{{ breakdownStartNote }}</span
+            >
+            <span
               v-if="def.breakdown === 'app'"
               class="text-text-secondary px-4 text-xs"
               data-test="rum-analytics-funnel-by-app-rules"
@@ -539,6 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <FunnelBreakdown
               :rows="breakdownCompare?.rows ?? breakdown.rows"
               :total="breakdown.total"
+              :start-step="breakdown.start && !breakdown.start.anyStep ? breakdown.start.step : 1"
               :steps="def.steps"
               :dim-label="dimLabel"
               :events="events"
@@ -630,6 +635,7 @@ import useNamedEvents from "@/composables/rum/useNamedEvents";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { addCommasToNumber } from "@/utils/formatters";
 import {
+  BREAKDOWN_TOP,
   FILTER_FIELDS,
   exclusionRemoved,
   foldBreakdown,
@@ -646,6 +652,7 @@ import {
 import {
   DIMENSIONS,
   filterValuesSql,
+  isAttributeBreakdown,
   funnelSql,
   nextStepsSql,
   storedFunnelScope,
@@ -765,16 +772,35 @@ const dimLabels = computed<Record<BreakdownDim, I18nText>>(() => ({
   app: t("rum.analytics.funnel.dims.app"),
 }));
 
-const breakdownOptions = computed(() => [
-  { label: t("rum.analytics.funnel.breakdownNone"), value: "none" },
-  ...(Object.keys(DIMENSIONS) as BreakdownDim[])
-    .filter((d) => (d === "app" ? !!pa.scope.value.apps?.length : pa.schema.value[DIMENSIONS[d]]))
-    .map((d) => ({ label: dimLabels.value[d], value: d })),
-]);
+// Not a column name, so an attribute breakdown opened from a link never collides with an option.
+const ATTRIBUTE_OPTION = ":attribute";
 
-const dimLabel = computed(() =>
-  def.value.breakdown ? dimLabels.value[def.value.breakdown] : raw(""),
-);
+const breakdownOptions = computed(() => {
+  const b = def.value.breakdown;
+  return [
+    { label: t("rum.analytics.funnel.breakdownNone"), value: "none" },
+    ...(Object.keys(DIMENSIONS) as BreakdownDim[])
+      .filter((d) => (d === "app" ? !!pa.scope.value.apps?.length : pa.schema.value[DIMENSIONS[d]]))
+      .map((d) => ({ label: dimLabels.value[d], value: d })),
+    ...(isAttributeBreakdown(b) ? [{ label: raw(b.f), value: ATTRIBUTE_OPTION }] : []),
+  ];
+});
+
+const breakdownValue = computed(() => {
+  const b = def.value.breakdown;
+  return isAttributeBreakdown(b) ? ATTRIBUTE_OPTION : (b ?? "none");
+});
+
+const pickBreakdown = (v: unknown) => {
+  if (v === ATTRIBUTE_OPTION) return;
+  update({ breakdown: v === "none" ? null : (v as BreakdownDim) });
+};
+
+const dimLabel = computed(() => {
+  const b = def.value.breakdown;
+  if (isAttributeBreakdown(b)) return raw(b.f);
+  return b ? dimLabels.value[b] : raw("");
+});
 
 // Exclusions are applied to whatever the funnel's unit links together, so the caption names that span.
 const exclusionsCaption = computed<I18nText>(() => {
@@ -802,11 +828,27 @@ const needsNewer = computed(
   () => linkProblem.value === "unreadable" || pa.invalidParams.value.includes("funnel"),
 );
 
-const breakdown = computed(() =>
-  def.value.breakdown && funnelPanel.value.status === "ok"
-    ? foldBreakdown(funnelPanel.value.rows, def.value.steps.length)
-    : null,
-);
+const breakdown = computed(() => {
+  const b = def.value.breakdown;
+  if (!b || funnelPanel.value.status !== "ok") return null;
+  const attribute = isAttributeBreakdown(b) ? b : null;
+  return foldBreakdown(funnelPanel.value.rows, def.value.steps.length, BREAKDOWN_TOP, attribute);
+});
+
+const breakdownStartNote = computed<I18nText | null>(() => {
+  const start = breakdown.value?.start;
+  if (!start) return null;
+  const args = {
+    field: dimLabel.value,
+    covered: raw(addCommasToNumber(start.covered)),
+    reached: raw(addCommasToNumber(start.reached)),
+    unit: unitNoun.value,
+    step: start.step,
+  };
+  return start.anyStep
+    ? t("rum.analytics.funnel.breakdownFromAnyStep", args)
+    : t("rum.analytics.funnel.breakdownFromStep", args);
+});
 
 // The previous period goes through the same fold, so turning compare on never touches these numbers.
 const result = computed<FunnelResult | null>(() =>
