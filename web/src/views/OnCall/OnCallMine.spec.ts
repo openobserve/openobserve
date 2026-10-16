@@ -44,6 +44,11 @@ const stubs = {
     template: "<div />",
     methods: { refresh: deliveriesRefresh },
   },
+  OnCallPhoneCard: {
+    name: "OnCallPhoneCard",
+    template: "<div data-test='oncall-phone-card' />",
+    methods: { refresh: vi.fn().mockResolvedValue(undefined) },
+  },
 };
 
 const MINE = {
@@ -70,6 +75,18 @@ describe("OnCallMine", () => {
 
     expect(service.myOnCall).toHaveBeenCalledTimes(1);
     expect(wrapper.find('[data-test="oncall-mine-team-team_1"]').text()).toContain("Payments");
+  });
+
+  /// Without a verified phone nothing below can reach the reader, so the phone leads.
+  it("shows the phone before the teams", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    const html = wrapper.html();
+    expect(html.indexOf('data-test="oncall-phone-card"')).toBeGreaterThan(-1);
+    expect(html.indexOf('data-test="oncall-phone-card"')).toBeLessThan(
+      html.indexOf('data-test="oncall-mine-teams"'),
+    );
   });
 
   it("forces both of its reads on Refresh", async () => {
