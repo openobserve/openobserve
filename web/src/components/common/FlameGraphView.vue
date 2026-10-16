@@ -505,6 +505,7 @@ const emit = defineEmits<{
   search: [name: string];
   sandwich: [name: string];
   details: [name: string];
+  focus: [path: string | null];
 }>();
 
 const searchFunction = () => {
@@ -527,10 +528,13 @@ const showDetails = () => {
 
 /** Focus a frame by its path ("root/0/2"); the Call Tree uses the same ids. */
 const focus = (path: string) => {
+  // A shared link can name a frame that the data no longer has.
+  if (!findNodeByPath(props.root ?? null, path)) return;
   focusPath.value = path;
   closeMenu();
 };
 defineExpose({ focus });
+watch(focusPath, (path) => emit("focus", path));
 
 const focusBlock = () => {
   const id = menu.value?.block.id;

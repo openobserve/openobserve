@@ -432,6 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else
                   ref="flameGraphRef"
                   :root="mergeResult?.root ?? null"
+                  @focus="flameFocus = $event"
                   :summary-label="t('profiles.total')"
                   :summary-value="formatTableValue(mergeResult?.total ?? 0)"
                   v-bind="flameGraphProps"
@@ -663,6 +664,10 @@ type RouteSeed = {
   profileType: string | null;
   filters: ProfileFilter[];
   view: ProfileView | null;
+  sandwichFunction: string | null;
+  search: string;
+  focus: string | null;
+  details: string | null;
 };
 
 const PROFILE_VIEWS: ProfileView[] = ["top", "flame", "tree", "sandwich"];
@@ -710,6 +715,8 @@ const flameGraphRef = ref<{ focus: (path: string) => void } | null>(null);
 const sandwichFunction = ref<string | null>(null);
 // The function in the Function Details panel; null hides the panel.
 const detailsName = ref<string | null>(null);
+// The focused flame graph frame, kept here so it outlives a view switch and goes into the URL.
+const flameFocus = ref<string | null>(null);
 
 /** Matching functions from the Top list, and their share of samples from the tree, with nested matches counted once. */
 const searchSummary = computed(() => {
@@ -1256,6 +1263,7 @@ const resetProfilesState = () => {
   activeView.value = "top";
   sandwichFunction.value = null;
   detailsName.value = null;
+  flameFocus.value = null;
   errorMessage.value = "";
 };
 
@@ -1480,6 +1488,10 @@ const parseRouteSeed = (query: LocationQuery): RouteSeed | null => {
     profileType: type ? `${type}\u0000${queryString(query.profile_unit)}` : null,
     filters: parseProfileFilters(queryString(query.filters)),
     view: PROFILE_VIEWS.find((item) => item === view) ?? null,
+    sandwichFunction: queryString(query.fn) || null,
+    search: queryString(query.search),
+    focus: queryString(query.focus) || null,
+    details: queryString(query.details) || null,
   };
 };
 
@@ -1532,9 +1544,19 @@ const pageQuery = (range?: { startTime: number; endTime: number } | null) => {
 };
 
 /** Writes the page state to the URL (replace, no history entry), as Metrics does, so a reload keeps it. */
+/** What is on screen beyond the run inputs: the view, Sandwich function, search, focus and open details. */
+const viewQuery = () => {
+  const query: Record<string, string> = { view: activeView.value };
+  if (sandwichFunction.value) query.fn = sandwichFunction.value;
+  if (searchQuery.value.trim()) query.search = searchQuery.value.trim();
+  if (flameFocus.value) query.focus = flameFocus.value;
+  if (detailsName.value) query.details = detailsName.value;
+  return query;
+};
+
 const syncUrl = () => {
   if (route.name !== pageRouteName || !lastRun.value) return;
-  const query: Record<string, string> = { ...lastRun.value.query, view: activeView.value };
+  const query: Record<string, string> = { ...lastRun.value.query, ...viewQuery() };
   const changed =
     Object.keys(query).some((key) => query[key] !== queryString(route.query[key])) ||
     Object.keys(route.query).some((key) => !(key in query));
@@ -1553,7 +1575,7 @@ const shareUrl = computed(() => {
     ...run.query,
     from: String(run.range.startTime),
     to: String(run.range.endTime),
-    view: activeView.value,
+    ...viewQuery(),
   };
   delete query.period;
   for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
@@ -1607,6 +1629,10 @@ const initPage = async () => {
     if (seed) {
       appliedFilters.value = seed.filters;
       if (seed.view) activeView.value = seed.view;
+      searchQuery.value = seed.search;
+      sandwichFunction.value = seed.sandwichFunction;
+      detailsName.value = seed.details;
+      flameFocus.value = seed.focus;
     }
     await runQuery();
   } finally {
@@ -1698,7 +1724,12 @@ watch(
   },
 );
 
-watch(activeView, () => {
+watch([activeView, sandwichFunction, searchQuery, flameFocus, detailsName], () => {
   if (!seeding && mergeResult.value) syncUrl();
+});
+
+// The graph keeps its own focus, so a graph that mounts again (or from a link) gets the page's focus.
+watch(flameGraphRef, (graph) => {
+  if (graph && flameFocus.value) graph.focus(flameFocus.value);
 });
 </script>
