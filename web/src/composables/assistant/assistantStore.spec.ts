@@ -22,6 +22,7 @@ import type { ImageAttachment } from "@/ts/interfaces/chat";
 
 import {
   IDLE_SESSION_LIMIT,
+  SIGN_OUT_STOP_WAIT_MS,
   MAX_CHIP_BYTES,
   UNDO_WINDOW_MS,
   createAssistantStore,
@@ -926,6 +927,28 @@ describe("lifecycle seams", () => {
     expect(Object.keys(sessionStorage).filter((k) => k.startsWith("o2.assistant.tab:"))).toEqual(
       [],
     );
+  });
+
+  it("stops this tab's turns before the sign-out reset, waiting no longer than 300 ms", async () => {
+    vi.useFakeTimers();
+    const seen: number[] = [];
+    let stopAll!: ReturnType<typeof vi.fn>;
+    const { store } = makeStore({
+      engine: {
+        ...inertAssistantDeps().engine,
+        stopAll: (stopAll = vi.fn(() => {
+          seen.push(Object.keys(store.state.sessions).length);
+          return new Promise<void>(() => undefined);
+        })),
+      },
+    });
+    newSession(store);
+    const signOut = store.onSignOut();
+    expect(stopAll).toHaveBeenCalledWith("sign_out");
+    expect(seen).toEqual([1]);
+    await vi.advanceTimersByTimeAsync(SIGN_OUT_STOP_WAIT_MS);
+    await expect(signOut).resolves.toBe("proceed");
+    expect(store.state.sessions).toEqual({});
   });
 
   it("queues announcements for the turn region and reloads prefs on a prefs hint", () => {

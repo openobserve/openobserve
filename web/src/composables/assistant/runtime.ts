@@ -26,6 +26,7 @@ import { QueryObserver, type QueryKey, type QueryObserverOptions } from "@tansta
 import type { Router } from "vue-router";
 
 import config from "@/aws-exports";
+import { contextRegistry } from "@/composables/contextProviders/registry";
 import { queryClient } from "@/composables/query/queryClient";
 import useBreakpoint from "@/composables/useBreakpoint";
 import assistantService, { type AssistantCapabilitiesResponse } from "@/services/assistant";
@@ -48,12 +49,14 @@ import type {
   OpenAssistantResult,
 } from "./assistantStore.types";
 import { createOpenAssistant, type OpenAssistantCall } from "./openAssistant";
+import { createTurnEngine, type TurnEngineDeps } from "./turnEngine";
 import {
   createAssistantCapability,
   type AssistantCapabilityHandle,
   type AssistantServerConfig,
   type CapabilityDeps,
 } from "./useAssistantCapability";
+import { useAssistantClient } from "./useAssistantClient";
 
 const TELEMETRY_ROLES: Record<string, TelemetryRole> = {
   admin: "admin",
@@ -84,6 +87,8 @@ export interface AssistantRuntime {
   capability: AssistantCapabilityHandle;
   hosts: HostRegistry;
   context: ShallowRef<AssistantRuntimeContext | null>;
+  /** Set by `telemetryContext`; the `context.client.ui_version` of every turn (B-13). */
+  uiVersion: ShallowRef<string>;
   openAssistant(args: OpenAssistantCall): Promise<OpenAssistantResult>;
 }
 
@@ -114,7 +119,10 @@ function lazyAssistantStore(): AssistantRuntimeStore {
           rt.context.value = context;
         };
       if (prop === "telemetryContext")
-        return (uiVersion: string) => telemetryGetters(rt, uiVersion);
+        return (uiVersion: string) => {
+          rt.uiVersion.value = uiVersion;
+          return telemetryGetters(rt, uiVersion);
+        };
       const value = Reflect.get(rt.store, prop);
       return typeof value === "function" ? value.bind(rt.store) : value;
     },
@@ -125,17 +133,27 @@ function buildRuntime(): AssistantRuntime {
   // Detached, so a first access from inside a component never ties the runtime to that component's life.
   return effectScope(true).run(() => {
     const context = shallowRef<AssistantRuntimeContext | null>(null);
+    const uiVersion = shallowRef("");
+    const { lgUp } = useBreakpoint();
     const deps: AssistantStoreDeps = inertAssistantDeps({
       getOrg: () => context.value?.getOrg() ?? null,
       getUser: () => context.value?.getUser() ?? null,
     });
     // Services: each later package appends one `deps.<name> = create…()` line here, in WP order.
+    deps.engine = createTurnEngine(
+      engineDeps(
+        deps,
+        () => store,
+        () => capability,
+        () => lgUp.value,
+        uiVersion,
+      ),
+    );
 
     const store = createAssistantStore(deps, { signOutKeys: () => orgKeysOf(context.value) });
     flushDraftsOnLeave(store);
     const capability = createAssistantCapability(capabilityDeps(context));
     const hosts = createHostRegistry();
-    const { lgUp } = useBreakpoint();
     // Synchronous, so `state.ready` never lags the gate a door just read.
     watch(capability.capability, (value) => store.syncCapability(value), {
       immediate: true,
@@ -155,8 +173,37 @@ function buildRuntime(): AssistantRuntime {
       currentOrg: () => context.value?.getOrg()?.identifier ?? null,
       now: deps.now,
     });
-    return { store, capability, hosts, context, openAssistant };
+    return { store, capability, hosts, context, uiVersion, openAssistant };
   })!;
+}
+
+// Getters, because the engine is registered before the store and the capability it calls exist.
+function engineDeps(
+  deps: AssistantStoreDeps,
+  store: () => AssistantStoreInternal,
+  capability: () => AssistantCapabilityHandle,
+  lgUp: () => boolean,
+  uiVersion: ShallowRef<string>,
+): TurnEngineDeps {
+  return {
+    client: useAssistantClient(),
+    store,
+    capability: () => {
+      const handle = capability();
+      return {
+        noteForbidden: handle.noteForbidden,
+        noteAgentUnavailable: handle.noteAgentUnavailable,
+        noteAdmitted: handle.noteAdmitted,
+        persistence: () => handle.capability.value.persistence,
+      };
+    },
+    history: () => deps.history,
+    now: () => deps.now(),
+    uuid: () => deps.uuid(),
+    pageContext: () => contextRegistry.getActiveContext(),
+    uiVersion: () => uiVersion.value,
+    container: () => containerOf(store().state.shell.placement, lgUp()) ?? "home",
+  };
 }
 
 function capabilityDeps(context: ShallowRef<AssistantRuntimeContext | null>): CapabilityDeps {

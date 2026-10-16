@@ -20,6 +20,7 @@ import authService from "@/services/auth";
 import store from "@/stores";
 import { getUUID, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
 import { attemptTokenRefresh } from "@/services/http";
+import { clearSessionStorageKeepingDrafts } from "@/utils/clearSessionStorage";
 import { patchLargeNumbersInJson } from "@/utils/nsFieldsPatch";
 
 // Create and manage stream workers
@@ -452,7 +453,7 @@ const useHttpStreaming = () => {
         store.dispatch("logout");
         useLocalCurrentUser("", true);
         useLocalUserInfo("", true);
-        sessionStorage.clear();
+        clearSessionStorageKeepingDrafts();
         window.location.reload();
       } else {
         onError(traceId, error);

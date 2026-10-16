@@ -17,6 +17,7 @@ import store from "../stores";
 import axios from "axios";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { gt } from "@/types/i18n";
+import { clearSessionStorageKeepingDrafts } from "@/utils/clearSessionStorage";
 
 const http = () => {
   const instance = axios.create({
@@ -45,7 +46,7 @@ const http = () => {
             });
             store.dispatch("logout");
             localStorage.clear();
-            sessionStorage.clear();
+            clearSessionStorageKeepingDrafts();
             window.location.reload();
             break;
           case 404:

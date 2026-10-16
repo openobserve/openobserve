@@ -7812,6 +7812,8 @@
   "assistant": {
     "beta": "Beta",
     "client": {
+      "copyManually": "Couldn't copy. Select the text and copy it.",
+      "popupBlocked": "Your browser blocked the new tab. Open it here instead?",
       "storageBlocked": "Drafts won't be kept if you reload this page."
     },
     "entry": {
@@ -7821,7 +7823,220 @@
       "orgChanged": "This page belongs to another organization. Reload it to ask about it.",
       "queuedWhileRunning": "Added to the chat. Send it when the current answer finishes."
     },
-    "name": "O2 Assistant"
+    "error": {
+      "agent_unavailable": {
+        "action": "Retry",
+        "body": "Nothing was changed.",
+        "title": "The assistant service didn't respond."
+      },
+      "already_submitted": {
+        "action": "Reload chat",
+        "title": "This message was already sent. Reload the chat to see its answer."
+      },
+      "approval_delivery_failed": {
+        "action": "Send again",
+        "title": "Your decision didn't reach the assistant. Nothing was changed."
+      },
+      "approval_expired": {
+        "action": "Ask again",
+        "title": "No answer in time, so the assistant didn't run this action."
+      },
+      "authorization_unavailable": {
+        "action": "Retry",
+        "title": "Couldn't check AI credits. Your message wasn't sent."
+      },
+      "cancelled_elsewhere": {
+        "title": "This answer was stopped from another tab."
+      },
+      "consent_declined": {
+        "title": "Paid usage wasn't enabled. Your message wasn't sent."
+      },
+      "consent_still_required": {
+        "action": "Manage paid usage",
+        "actionAdmin": "Manage paid usage",
+        "actionMember": "Ask an admin",
+        "body": "Enable it in Billing › Paid usage.",
+        "title": "Paid usage isn't enabled for every organization this needs."
+      },
+      "credits_exhausted": {
+        "action": "Manage paid usage",
+        "actionAdmin": "Manage paid usage",
+        "actionMember": "Ask an admin",
+        "body": "Included credits don't renew.",
+        "title": "AI credits are used up for {org}."
+      },
+      "data_level_blocked": {
+        "action": "Change level",
+        "actionAdmin": "Change level",
+        "actionMember": "Ask an admin",
+        "title": "Raw rows aren't shared with the model in this organization."
+      },
+      "empty_response": {
+        "action": "Retry",
+        "title": "The assistant didn't answer."
+      },
+      "history_unavailable": {
+        "action": "Retry",
+        "title": "This chat's history couldn't be loaded. Your message wasn't sent."
+      },
+      "not_enabled": {
+        "action": "Open assistant settings",
+        "actionAdmin": "Open assistant settings",
+        "actionMember": "Ask an admin",
+        "body": "Past chats stay readable.",
+        "title": "{product} is off for this organization."
+      },
+      "off_for_org": {
+        "action": "Open assistant settings",
+        "actionAdmin": "Open assistant settings",
+        "actionMember": "Ask an admin",
+        "body": "Past chats stay readable.",
+        "title": "{product} is off for this organization."
+      },
+      "offline": {
+        "action": "Retry",
+        "title": "You're offline. Your message wasn't sent."
+      },
+      "permission_denied": {
+        "action": "Open IAM roles",
+        "actionAdmin": "Open IAM roles",
+        "actionMember": "Ask an admin",
+        "body": "An admin can grant access in IAM › Roles › Assistant.",
+        "title": "{product} isn't available to your role."
+      },
+      "permission_denied_tool": {
+        "action": "Open assistant settings",
+        "actionAdmin": "Open assistant settings",
+        "actionMember": "Ask an admin",
+        "body": "Your organization's assistant policy blocks it.",
+        "title": "The assistant wasn't allowed to run {tool}."
+      },
+      "persistence_failed": {
+        "action": "Retry save",
+        "title": "Answered, but not saved to history."
+      },
+      "provider_error": {
+        "action": "Retry",
+        "body": "Findings so far are kept above.",
+        "reason": {
+          "modelUnavailable": "model unavailable",
+          "overloaded": "overloaded",
+          "requestTooLarge": "request too large",
+          "timedOut": "timed out"
+        },
+        "title": "The AI provider failed: {reason}.",
+        "titleNoReason": "The AI provider failed."
+      },
+      "rate_limited": {
+        "action": "Retry",
+        "title": "The AI provider is rate-limiting requests. Try again in about a minute."
+      },
+      "restore_required": {
+        "action": "Reload chat",
+        "title": "This chat was reset on the server. Reload to continue."
+      },
+      "session_expired": {
+        "action": "Sign in",
+        "title": "Your session expired. Your draft is kept."
+      },
+      "session_owner_unavailable": {
+        "action": "Retry",
+        "title": "The chat moved to another server and couldn't be resumed."
+      },
+      "signed_out": {
+        "action": "Sign in",
+        "title": "You signed out in another tab. This answer was stopped."
+      },
+      "stale_epoch": {
+        "action": "Reload chat",
+        "title": "This chat was reset on the server. Reload to continue."
+      },
+      "stopped_before_send": {
+        "action": "Retry",
+        "title": "Stopped before sending. Your message wasn't sent."
+      },
+      "stream_dropped": {
+        "action": "Retry",
+        "body": "Findings so far are kept above.",
+        "title": "Connection lost after {elapsed}. Nothing was changed."
+      },
+      "stream_oversized": {
+        "action": "Retry",
+        "body": "Nothing was changed.",
+        "title": "This answer was too large to display."
+      },
+      "subscription_required": {
+        "action": "View plans",
+        "actionAdmin": "View plans",
+        "actionMember": "Ask an admin",
+        "body": "Subscribe to keep using the assistant.",
+        "title": "Included AI credits are used up for {org}."
+      },
+      "turn_busy": {
+        "action": "Stop it",
+        "title": "Another answer is still running in this chat. Your message wasn't sent."
+      },
+      "turn_limit": {
+        "action": "Retry",
+        "title": "Too many answers are running. Wait for one to finish."
+      },
+      "unknown": {
+        "action": "Retry",
+        "title": "Something went wrong."
+      },
+      "unreachable": {
+        "action": "Retry",
+        "title": "Couldn't reach OpenObserve. Your message wasn't sent."
+      }
+    },
+    "name": "O2 Assistant",
+    "outcome": {
+      "readonlyFailed": "Failed: {title}"
+    },
+    "step": {
+      "create": "Creating {resource}",
+      "delete": "Deleting {resource}",
+      "done": "Done",
+      "failed": "Failed",
+      "fallback": "Running {tool}",
+      "interrupted": "Interrupted",
+      "running": "Running",
+      "SearchPromQL": "Querying metrics",
+      "SearchSQL": "Querying `{stream}`",
+      "StreamList": "Listing streams",
+      "StreamSchema": "Reading schema for `{stream}`",
+      "TraceSearch": "Searching traces",
+      "update": "Updating {resource}"
+    },
+    "turn": {
+      "cancelUnconfirmed": "The server may still be finishing this answer.",
+      "caughtUp": "Caught up",
+      "connecting": "Connecting…",
+      "continue": "Continue",
+      "continuePrefill": "Continue",
+      "done": "Done",
+      "elapsedMinutes": "{m} min {s} s",
+      "elapsedSeconds": "{n} s",
+      "messageRestored": "Your message was restored",
+      "noResponse": "No response for {n} s",
+      "notSaved": "Answered, but not saved to history.",
+      "reconnecting": "Reconnecting…",
+      "restored": "This chat moved to another server and continued.",
+      "retryNote": "Retrying won't undo anything already changed.",
+      "retrySave": "Retry save",
+      "returnedToPrevious": "Your message was returned to the previous chat",
+      "sending": "Sending…",
+      "sendLabel": "Send message",
+      "stopLabel": "Stop answering",
+      "stopped": "Stopped",
+      "stoppedWithSteps": "Stopped after {n} step · findings kept | Stopped after {n} steps · findings kept",
+      "stopping": "Stopping…",
+      "thinking": "Thinking",
+      "waitingApproval": "Waiting for your approval",
+      "waitingConsent": "Waiting for your decision on paid usage",
+      "withElapsed": "{status} · {elapsed}",
+      "writing": "Writing the answer"
+    }
   },
   "llmObservability": {
     "playground": {
