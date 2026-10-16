@@ -8055,6 +8055,7 @@
     "refresh": "Actualizar",
     "retry": "Reintentar",
     "tabs": {
+      "runs": "Ejecuciones",
       "dashboard": "Dashboard"
     },
     "duration": {
@@ -8063,6 +8064,12 @@
       "hours": "{count} hora | {count} horas",
       "days": "{count} día | {count} días",
       "years": "{count} año | {count} años"
+    },
+    "unit": {
+      "minutes": "minuto | minutos",
+      "hours": "hora | horas",
+      "days": "día | días",
+      "years": "año | años"
     },
     "rules": {
       "failure": "Fallo",
@@ -8124,7 +8131,7 @@
       "noneShort": "Ninguna",
       "substrateEmpty": "La organización tiene alertas, pero la ejecución no encontró filas de activación para su ventana, por lo que no midió nada.",
       "unreadableDefinitions": "{count} definición de alerta no se pudo leer. | {count} definiciones de alerta no se pudieron leer.",
-      "factsWithoutDefinition": "{count} alerta tenía filas de activación pero ninguna definición. | {count} alertas tenían filas de activación pero ninguna definición.",
+      "factsWithoutDefinition": "{count} alerta tenía filas de activación pero ninguna definición, normalmente una eliminada durante la ventana; no se cuenta como una brecha. | {count} alertas tenían filas de activación pero ninguna definición, normalmente eliminadas durante la ventana; no se cuentan como brechas.",
       "errorClustersUnattributed": "{count} fila de error no se pudo atribuir a una alerta. | {count} filas de error no se pudieron atribuir a una alerta.",
       "definitionsWithoutFacts": "{count} alerta no tenía filas de activación en la ventana, lo que no se cuenta como una brecha. | {count} alertas no tenían filas de activación en la ventana, lo que no se cuenta como una brecha.",
       "transitionsTruncated": "Las transiciones de estado se truncaron.",
@@ -8136,6 +8143,7 @@
       "schedule": "Programación",
       "off": "Desactivado",
       "notConfigured": "No configurado",
+      "noScheduledRun": "No hay ejecución programada",
       "window": "Ventana de análisis",
       "latestFindings": "Hallazgos de la última ejecución",
       "trend": "Tendencia de hallazgos",
@@ -8175,6 +8183,7 @@
       "statAlertsInScope": "Alertas en alcance",
       "statDeclined": "Rechazadas",
       "statDeclinedSub": "Rechazadas, no confirmadas",
+      "statDeclinedTooltip": "Pares de regla y alerta que una regla no evaluaría, porque la alerta tenía muy poco historial o muy pocas muestras para ello. Es una puerta de entrada, no una autorización; los motivos por alerta no se escriben en el stream.",
       "statWindow": "Ventana",
       "findingsHeading": "Hallazgos",
       "suggestionsOnly": "Solo sugerencias, nada se aplica automáticamente",
@@ -8189,12 +8198,23 @@
       "noneFoundNotClearance": "Cero hallazgos aquí no es una confirmación.",
       "evidence": "Evidencia",
       "alert": "Alerta",
-      "proposedActions": "Acciones propuestas"
+      "proposedActions": "Acciones propuestas",
+      "openAlert": "Abrir alerta"
     },
     "dashboard": {
+      "latestRunAgo": "Última ejecución {time}",
       "findings": "Hallazgos",
       "alertsInScope": "Alertas en alcance",
       "coverage": "Cobertura",
+      "attention": "Qué requiere atención",
+      "attentionCaption": "De la última ejecución. Abre una regla para ver las alertas que marcó.",
+      "alertsFlagged": "{count} alerta | {count} alertas",
+      "nothingFlagged": "Ninguna alerta marcada por esta regla en la última ejecución.",
+      "allClear": "La última ejecución no encontró nada que corregir.",
+      "openAlert": "Abrir alerta",
+      "viewEvidence": "Ver evidencia",
+      "notEnabledTitle": "La calibración de alertas no está en ejecución para esta organización",
+      "notEnabledDescription": "Actívala en los ajustes. La primera ejecución se realizará en cuanto esté activada.",
       "emptyTitle": "Sin ejecuciones en los últimos {days} días",
       "emptyDescription": "El dashboard se completa una vez que se haya ejecutado la calibración de alertas."
     },
@@ -8209,7 +8229,9 @@
       "enabled": "Ejecutar la calibración de alertas para esta organización",
       "enabledHelp": "Mientras está desactivada, la organización no tiene ejecuciones programadas. Al activarla, la primera ejecución vence de inmediato.",
       "frequency": "Ejecutar cada",
+      "frequencyHelp": "Entre 1 hora y 30 días.",
       "window": "Ventana de análisis",
+      "windowHelp": "Hasta dónde retrocede cada ejecución, entre 1 minuto y 90 días. Una ventana más larga que la cadencia hace que las ejecuciones consecutivas se solapen y reporten los mismos hallazgos de nuevo.",
       "noConfig": "Esta organización aún no tiene ajustes de calibración de alertas. Los valores a continuación son los predeterminados que almacenará tu primer guardado.",
       "warnGap": "Se ejecuta cada {every} pero solo mira atrás {window}, así que el tiempo entre ventanas nunca se analiza.",
       "warnStarved": "Una ventana de {window} es demasiado corta para {rules}, así que cada ejecución las descarta en todas las alertas.",
@@ -8223,7 +8245,10 @@
       "saveFailed": "No se pudieron guardar los ajustes: {message}",
       "loadFailed": "No se pudieron cargar los ajustes: {message}",
       "lastSaved": "Último guardado {time}",
-      "runNowHeading": "Ejecutar ahora"
+      "runNowHeading": "Ejecutar ahora",
+      "findingsDesc": "Los hallazgos se escriben en el stream {stream} de esta organización y se conservan durante la retención de ese stream. La calibración de alertas no envía notificaciones.",
+      "frequencyRange": "Elige una cadencia entre 1 hora y 30 días.",
+      "windowRange": "Elige una ventana entre 1 minuto y 90 días."
     }
   },
   "alerts": {

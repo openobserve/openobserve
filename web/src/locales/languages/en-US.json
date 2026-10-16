@@ -8131,7 +8131,7 @@
       "noneShort": "None",
       "substrateEmpty": "The organization has alerts, but the run found no trigger rows for its window, so it measured nothing.",
       "unreadableDefinitions": "{count} alert definition could not be read. | {count} alert definitions could not be read.",
-      "factsWithoutDefinition": "{count} alert had trigger rows but no definition. | {count} alerts had trigger rows but no definition.",
+      "factsWithoutDefinition": "{count} alert had trigger rows but no definition, usually one deleted during the window; not counted as a gap. | {count} alerts had trigger rows but no definition, usually ones deleted during the window; not counted as a gap.",
       "errorClustersUnattributed": "{count} error row could not be attributed to an alert. | {count} error rows could not be attributed to an alert.",
       "definitionsWithoutFacts": "{count} alert had no trigger rows in the window, which is not counted as a gap. | {count} alerts had no trigger rows in the window, which is not counted as a gap.",
       "transitionsTruncated": "State transitions were truncated.",
