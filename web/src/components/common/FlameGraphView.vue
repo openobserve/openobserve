@@ -15,28 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    ref="rootEl"
-    class="bg-surface-panel rounded-default border-border-default relative border p-2"
-  >
+  <div ref="rootEl" class="relative">
     <div v-if="!hasData" class="text-text-secondary flex h-40 items-center justify-center text-sm">
       {{ emptyLabel }}
     </div>
 
-    <div
-      v-else
-      class="bg-theme-body-bg-secondary rounded-default border-border-default border p-1.5"
-    >
-      <div class="mb-1.5 flex min-w-0 flex-nowrap items-center gap-2">
+    <template v-else>
+      <div class="mb-1.5 flex h-8 min-w-0 flex-nowrap items-center gap-2 overflow-hidden">
         <span
-          class="border-border-default bg-surface-page text-text-secondary rounded-default inline-flex shrink-0 items-center px-2 py-1 text-xs whitespace-nowrap"
+          class="border-border-default bg-surface-page text-text-secondary rounded-default inline-flex h-7 shrink-0 items-center px-2 text-xs whitespace-nowrap"
         >
           {{ summaryLabel }}: {{ summaryValue }} ({{ unitLabel }})
         </span>
 
         <div
           v-if="focusPath"
-          class="border-border-default bg-surface-page rounded-default flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden px-2 py-1 text-xs"
+          class="border-border-default bg-surface-page rounded-default flex h-7 min-h-0 min-w-0 flex-1 items-center gap-1.5 overflow-hidden px-2 text-xs"
           data-test="flame-graph-focus-bar"
         >
           <OTruncatedText class="text-text-body font-medium">{{
@@ -48,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             class="shrink-0"
             variant="ghost"
-            size="xs"
+            size="icon-chip"
             icon-left="close"
             :aria-label="t('profiles.resetFocus')"
             data-test="flame-graph-focus-reset"
@@ -99,12 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ChartRenderer
             v-if="hasData"
             :data="chartData"
+            track-container-size
             class="h-full w-full"
             @click="onChartClick"
           />
         </div>
       </div>
-    </div>
+    </template>
 
     <div
       v-if="menu"
@@ -130,6 +125,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("profiles.focusBlock") }}
       </OButton>
+      <OButton
+        variant="ghost"
+        size="sm"
+        class="w-full justify-start"
+        data-test="flame-graph-function-details"
+        @click="openFunctionDetails"
+      >
+        {{ t("profiles.functionDetails") }}
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="sm"
+        class="w-full justify-start"
+        data-test="flame-graph-sandwich-view"
+        @click="openSandwichView"
+      >
+        {{ t("profiles.sandwichView") }}
+      </OButton>
     </div>
   </div>
 </template>
@@ -147,6 +160,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { escapeHtml } from "@/utils/html";
 import { cssToken } from "@/utils/theme";
+import { compareProfilesNodesByTotal } from "@/services/profiles";
 import { useI18nTyped } from "@/types/i18n";
 
 export interface FlameGraphNode {
@@ -203,14 +217,23 @@ const props = withDefaults(
     emptyLabel?: string;
     valueFormatter?: (value: number) => string;
     searchQuery?: string;
+    externalFocusPath?: string | null;
+    externalFocusNonce?: number;
   }>(),
   {
     root: null,
     emptyLabel: "No flame graph data",
     valueFormatter: (value: number) => value.toLocaleString(),
     searchQuery: "",
+    externalFocusPath: null,
+    externalFocusNonce: 0,
   },
 );
+
+const emit = defineEmits<{
+  functionDetails: [payload: { name: string; self: number; total: number; path: string }];
+  sandwichView: [path: string];
+}>();
 
 const { t } = useI18nTyped();
 
@@ -275,7 +298,7 @@ const findNodeByPath = (
   let current: FlameGraphNode = root;
   for (const part of parts) {
     const index = Number(part);
-    const children = [...(current.children ?? [])].sort((a, b) => b.total - a.total);
+    const children = [...(current.children ?? [])].sort(compareProfilesNodesByTotal);
     const next = children[index];
     if (!next) return null;
     current = next;
@@ -336,7 +359,7 @@ const collectBlocks = (root: FlameGraphNode | null): FlameBlock[] => {
       matched,
     });
     if (!node.children?.length || parentTotal <= 0) return;
-    const children = [...node.children].sort((a, b) => b.total - a.total);
+    const children = [...node.children].sort(compareProfilesNodesByTotal);
     let offset = left;
     for (const [index, child] of children.entries()) {
       const childWidth = width * (child.total / parentTotal);
@@ -364,6 +387,7 @@ const chartHeight = computed(() => (maxDepth.value + 1) * (BLOCK_HEIGHT + BLOCK_
 
 const menuStyle = computed(() => {
   if (!menu.value) return undefined;
+  // Pointer coordinates are CSS pixels; rem would shift the menu when the root font size changes.
   return { left: `${menu.value.x}px`, top: `${menu.value.y}px` };
 });
 
@@ -411,6 +435,25 @@ const focusBlock = () => {
   closeMenu();
 };
 
+const openFunctionDetails = () => {
+  const block = menu.value?.block;
+  if (!block) return;
+  emit("functionDetails", {
+    name: block.name,
+    self: block.self,
+    total: block.total,
+    path: block.id,
+  });
+  closeMenu();
+};
+
+const openSandwichView = () => {
+  const id = menu.value?.block.id;
+  if (!id) return;
+  emit("sandwichView", id);
+  closeMenu();
+};
+
 const onDocumentClick = (event: MouseEvent) => {
   if (!menu.value || !rootEl.value) return;
   if (!rootEl.value.contains(event.target as Node)) {
@@ -431,6 +474,14 @@ watch(
     focusPath.value = null;
     closeMenu();
   },
+);
+
+watch(
+  () => [props.externalFocusPath, props.externalFocusNonce] as const,
+  ([path]) => {
+    focusPath.value = path || null;
+  },
+  { immediate: true },
 );
 
 const chartData = computed(() => {

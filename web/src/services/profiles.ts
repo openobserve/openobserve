@@ -54,6 +54,15 @@ export interface ProfilesTreeNode {
   children?: ProfilesTreeNode[];
 }
 
+/** Same order the flame graph and sandwich view use to number `root/0` paths. */
+export const compareProfilesNodesByTotal = (
+  a: { total: number; name: string },
+  b: { total: number; name: string },
+) => {
+  if (a.total !== b.total) return b.total - a.total;
+  return a.name.localeCompare(b.name);
+};
+
 export interface ProfilesTopRow {
   name: string;
   self: number;
