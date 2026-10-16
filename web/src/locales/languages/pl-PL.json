@@ -8076,6 +8076,7 @@
       "noDestination": "Brak miejsca docelowego",
       "noise": "Szum",
       "notifyFailed": "Powiadomienie nie powiodło się",
+      "schedulerHealth": "Opóźnienie schedulera",
       "silent": "Milczący"
     },
     "evidence": {
@@ -8092,6 +8093,12 @@
       "failureRatio": "Współczynnik niepowodzeń",
       "history": "Historia",
       "deliveredThroughIncidents": "Dostarczone przez incydenty",
+      "affectedOrgs": "Dotknięte organizacje",
+      "congestedHours": "Godziny przeciążenia",
+      "skippedWindows": "Pominięte okna",
+      "lateEvaluations": "Opóźnione ewaluacje",
+      "lateRatio": "Udział opóźnień",
+      "longestDelay": "Najdłuższe opóźnienie",
       "yes": "Tak",
       "no": "Nie"
     },
@@ -8109,7 +8116,9 @@
       "repairDestination": "Napraw miejsce docelowe",
       "repairDestinationDesc": "Dostarczanie zawodzi w przypadku miejsca docelowego używanego przez alert.",
       "attachDestination": "Dołącz cel",
-      "attachDestinationDesc": "Określ miejsce docelowe, do którego alert ma dostarczać powiadomienia."
+      "attachDestinationDesc": "Określ miejsce docelowe, do którego alert ma dostarczać powiadomienia.",
+      "scaleAlertScheduler": "Skaluj scheduler alertów",
+      "scaleAlertSchedulerDesc": "Zwiększ {concurrency}, dodaj węzły alertów lub zwiększ {pullers}."
     },
     "severity": {
       "high": "Wysoki",
@@ -8189,7 +8198,7 @@
       "suggestionsOnly": "Tylko sugestie, nic nie jest stosowane automatycznie",
       "filterAll": "Wszystkie",
       "showingCapped": "Wyświetlanie {shown} z {total} ustaleń: wyszukiwanie zatrzymało się na {count} rekordach.",
-      "perAlertNote": "Strumień przechowuje jeden rekord na ustalenie dla każdego nazwanego alertu, więc ustalenie, które nie wskazuje żadnego alertu, nie ma karty.",
+      "perSubjectNote": "Ustalenie wymieniające kilka alertów ma osobną kartę dla każdego z nich, więc kart jest więcej niż ustaleń.",
       "nothingTitle": "Nie ma nic do zgłoszenia",
       "nothingDescription": "Brak luki w pokryciu i nic nie odrzucono: wśród {count} alertów w zakresie kalibracja alertów nie znalazła nic.",
       "noneFoundTitle": "Nie znaleziono",
@@ -8198,6 +8207,9 @@
       "noneFoundNotClearance": "Zero ustaleń tutaj nie jest potwierdzeniem poprawności.",
       "evidence": "Dowody",
       "alert": "Alert",
+      "topOrgs": "Najbardziej dotknięte organizacje",
+      "worstHours": "Najgorsze godziny",
+      "lagImpact": "{skipped} pominiętych, {late} z {evaluations} opóźnionych",
       "proposedActions": "Proponowane działania",
       "openAlert": "Otwórz alert"
     },
@@ -8210,6 +8222,7 @@
       "attentionCaption": "Z ostatniego uruchomienia. Otwórz regułę, aby zobaczyć alerty, które oznaczyła.",
       "alertsFlagged": "{count} alert | {count} alertów",
       "nothingFlagged": "Ta reguła nie oznaczyła żadnego alertu w ostatnim uruchomieniu.",
+      "nothingCongested": "Harmonogram alertów nadążał w ostatnim uruchomieniu.",
       "allClear": "Ostatnie uruchomienie nie znalazło nic do poprawy.",
       "openAlert": "Otwórz alert",
       "viewEvidence": "Zobacz dowody",

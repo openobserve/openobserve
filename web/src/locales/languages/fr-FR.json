@@ -8076,6 +8076,7 @@
       "noDestination": "Aucune destination",
       "noise": "Bruit",
       "notifyFailed": "Échec de notification",
+      "schedulerHealth": "Retard du planificateur",
       "silent": "Silencieux"
     },
     "evidence": {
@@ -8092,6 +8093,12 @@
       "failureRatio": "Taux d'échec",
       "history": "Historique",
       "deliveredThroughIncidents": "Livré via des incidents",
+      "affectedOrgs": "Organisations affectées",
+      "congestedHours": "Heures congestionnées",
+      "skippedWindows": "Fenêtres ignorées",
+      "lateEvaluations": "Évaluations tardives",
+      "lateRatio": "Part des retards",
+      "longestDelay": "Délai le plus long",
       "yes": "Oui",
       "no": "Non"
     },
@@ -8109,7 +8116,9 @@
       "repairDestination": "Réparer la destination",
       "repairDestinationDesc": "La livraison échoue sur une destination utilisée par l'alerte.",
       "attachDestination": "Associer une destination",
-      "attachDestinationDesc": "Donnez à l'alerte une destination de livraison."
+      "attachDestinationDesc": "Donnez à l'alerte une destination de livraison.",
+      "scaleAlertScheduler": "Mettre à l'échelle le planificateur d'alertes",
+      "scaleAlertSchedulerDesc": "Augmentez {concurrency}, ajoutez des nœuds d'alerte ou augmentez {pullers}."
     },
     "severity": {
       "high": "Élevée",
@@ -8189,7 +8198,7 @@
       "suggestionsOnly": "Suggestions uniquement, rien n'est appliqué automatiquement",
       "filterAll": "Tous",
       "showingCapped": "Affichage de {shown} sur {total} constats : la recherche s'est arrêtée à {count} enregistrements.",
-      "perAlertNote": "Le flux contient un enregistrement par constat et par alerte nommée ; un constat qui ne nomme aucune alerte n'a donc pas de carte.",
+      "perSubjectNote": "Un constat qui nomme plusieurs alertes a une carte pour chacune, donc les cartes sont plus nombreuses que les constats.",
       "nothingTitle": "Rien à signaler",
       "nothingDescription": "Aucune lacune de couverture et aucun refus : sur {count} alertes du périmètre, la calibration des alertes n'a rien trouvé.",
       "noneFoundTitle": "Aucun résultat",
@@ -8198,6 +8207,9 @@
       "noneFoundNotClearance": "Zéro constat ici ne vaut pas validation.",
       "evidence": "Preuves",
       "alert": "Alerte",
+      "topOrgs": "Organisations les plus affectées",
+      "worstHours": "Heures les plus critiques",
+      "lagImpact": "{skipped} ignorées, {late} sur {evaluations} tardives",
       "proposedActions": "Actions proposées",
       "openAlert": "Ouvrir l'alerte"
     },
@@ -8210,6 +8222,7 @@
       "attentionCaption": "D'après la dernière exécution. Ouvrez une règle pour voir les alertes qu'elle a signalées.",
       "alertsFlagged": "{count} alerte | {count} alertes",
       "nothingFlagged": "Aucune alerte signalée par cette règle lors de la dernière exécution.",
+      "nothingCongested": "Le planificateur d'alertes a tenu le rythme lors de la dernière exécution.",
       "allClear": "La dernière exécution n'a rien trouvé à corriger.",
       "openAlert": "Ouvrir l'alerte",
       "viewEvidence": "Voir les preuves",
