@@ -691,7 +691,6 @@ const dateState = ref(defaultDateState());
 const datePickerRef = ref<{
   setCustomDate: (type: string, range: { start: Date; end: Date }) => void;
   setSavedDate: (date: Record<string, unknown>) => void;
-  refresh: () => void;
 } | null>(null);
 const streamOptions = ref<SelectOption[]>([]);
 const selectedStream = ref<string | null>(null);
@@ -1195,10 +1194,7 @@ const resetStackExpansion = (root?: ProfilesTreeNode) => {
   expandedStackIds.value = [];
 };
 
-/**
- * A drag on the chart becomes the page's absolute time range, then the query runs.
- * Same as the Metrics page: whole minutes, at least one minute, set through the picker so it shows the range.
- */
+/** A drag on the chart sets the picker to that range, in whole minutes, and the query runs, as on Metrics. */
 const onRangeSelect = async ({ start, end }: { start: number; end: number }) => {
   if (!start || !end || end <= start) return;
   const range = { start: new Date(start), end: new Date(end) };
@@ -1206,11 +1202,9 @@ const onRangeSelect = async ({ start, end }: { start: number; end: number }) => 
   range.end.setSeconds(0, 0);
   if (range.start.getTime() === range.end.getTime())
     range.end.setMinutes(range.end.getMinutes() + 1);
-  // setCustomDate only shows the range (the picker has an Apply step); refresh() emits it, as Metrics does on run.
-  // The date watcher then runs the query when the new range lands.
+  // The picker applies at once, so setCustomDate alone emits the range; a refresh() would emit it twice.
   runNextRange = true;
   datePickerRef.value?.setCustomDate("absolute", range);
-  datePickerRef.value?.refresh();
 };
 
 const resolveTimeRange = () => {
