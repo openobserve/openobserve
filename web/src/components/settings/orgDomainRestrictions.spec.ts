@@ -14,12 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import {
-  blockEmailsInConfig,
-  cardsSnapshot,
-  cardsToConfig,
-  configToCards,
-} from "./orgDomainRestrictions";
+import { blockEmailsInConfig, cardsToConfig, configToCards } from "./orgDomainRestrictions";
 
 describe("orgDomainRestrictions", () => {
   it("returns no cards for a missing config", () => {
@@ -108,27 +103,6 @@ describe("orgDomainRestrictions", () => {
     expect(configToCards(cardsToConfig(cards))).toEqual(cards);
   });
 
-  it("produces the same snapshot regardless of card and email order", () => {
-    const a = [
-      {
-        name: "b.io",
-        policy: "allow_specific" as const,
-        allowedEmails: ["y@b.io", "x@b.io"],
-        blockedEmails: [],
-      },
-      { name: "a.io", policy: "allow_all" as const, allowedEmails: [], blockedEmails: [] },
-    ];
-    const b = [
-      { name: "a.io", policy: "allow_all" as const, allowedEmails: [], blockedEmails: [] },
-      {
-        name: "b.io",
-        policy: "allow_specific" as const,
-        allowedEmails: ["x@b.io", "y@b.io"],
-        blockedEmails: [],
-      },
-    ];
-    expect(cardsSnapshot(a)).toBe(cardsSnapshot(b));
-  });
   it("keeps the allow policy when an allowed domain also has blocked emails", () => {
     const config = {
       domains: [

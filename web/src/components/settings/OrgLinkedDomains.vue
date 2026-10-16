@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="settings-org-linked-domains"
   >
     <OTable
-      v-model:expanded-ids="expandedIds"
       :frame="false"
       data-test="settings-org-linked-domains-table"
       :data="visibleRows"
@@ -28,9 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       pagination="client"
       sorting="client"
-      expansion="single"
-      :get-row-expansion-enabled="isExpandable"
-      :expand-on-row-click="isExpandable"
       :show-global-filter="false"
       :loading="loading"
       :error="loadError"
@@ -92,18 +88,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-actions="{ row }">
         <div class="flex items-center justify-center gap-1">
           <OButton
-            v-if="canVerify(row)"
             variant="ghost"
             size="icon-sm"
-            icon-left="refresh"
+            icon-left="info"
             class="max-md:hidden"
-            :loading="verifyingDomain === row.domain"
-            :title="t('settings.orgDomainMapping.verifyNow')"
-            :data-test="`settings-org-linked-domains-verify-${row.domain}`"
-            @click.stop="verify(row.domain)"
+            :title="t('settings.orgDomainMapping.details')"
+            :data-test="`settings-org-linked-domains-details-${row.domain}`"
+            @click.stop="openDetails(row)"
           />
-          <!-- Holds the Verify slot so Remove stays in the same column on every link row. -->
-          <span v-else-if="row.link" class="h-8 w-8 shrink-0 max-md:hidden" aria-hidden="true" />
           <OButton
             v-if="row.link"
             variant="ghost-destructive"
@@ -114,7 +106,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`settings-org-linked-domains-remove-${row.domain}`"
             @click.stop="remove(row)"
           />
-          <ODropdown v-if="canVerify(row) || row.link" side="bottom" align="end">
+          <!-- Holds the Remove slot on request rows so Details stays in the same column. -->
+          <span v-else class="h-8 w-8 shrink-0 max-md:hidden" aria-hidden="true" />
+          <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
                 icon-left="more-vert"
@@ -126,13 +120,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <ODropdownItem
-              v-if="canVerify(row)"
-              icon-left="refresh"
+              icon-left="info"
               class="md:hidden"
-              :data-test="`settings-org-linked-domains-verify-${row.domain}-menu`"
-              @select="verify(row.domain)"
+              :data-test="`settings-org-linked-domains-details-${row.domain}-menu`"
+              @select="openDetails(row)"
             >
-              <span>{{ t("settings.orgDomainMapping.verifyNow") }}</span>
+              <span>{{ t("settings.orgDomainMapping.details") }}</span>
             </ODropdownItem>
             <ODropdownItem
               v-if="row.link"
@@ -147,18 +140,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODropdown>
         </div>
       </template>
-
-      <template #expansion="{ row }">
-        <div class="px-page-edge py-3">
-          <OrgDomainVerification v-if="row.link && row.method === 'dns'" :domain="row.link" />
-        </div>
-      </template>
     </OTable>
 
     <OrgLinkDomainDialog
       v-model:open="linkDialogOpen"
       :initial-method="linkDialogMethod"
       :submit="submitLink"
+    />
+
+    <OrgDomainDetailsDialog
+      v-model:open="detailsOpen"
+      :domain="detailsRow?.domain ?? ''"
+      :link="detailsRow?.link ?? null"
+      :request="detailsRow?.request ?? null"
+      :failure-reason="detailsRow?.link ? failureReason(detailsRow.link) : null"
+      :verifying="verifyingDomain !== null"
+      @verify="detailsRow?.link && verify(detailsRow.link.domain)"
     />
   </div>
 </template>
@@ -195,7 +192,7 @@ import {
   updateOrgSettingsMutation,
   verifyOrgDomainMutation,
 } from "@/services/organizations.queries";
-import OrgDomainVerification from "./OrgDomainVerification.vue";
+import OrgDomainDetailsDialog from "./OrgDomainDetailsDialog.vue";
 import OrgLinkDomainDialog from "./OrgLinkDomainDialog.vue";
 import type { LinkMethod } from "./OrgDomainMapping.schema";
 
@@ -256,6 +253,12 @@ const loadError = computed(() => {
 
 // An approved request becomes a link, so only open and rejected requests are listed beside the links.
 const rows = computed<LinkedDomainRow[]>(() => {
+  const ownRequests = (requests.data.value ?? []).filter((r) => r.org_id === props.orgId);
+  // An approved link keeps its request, so Details can say who asked and why it was approved.
+  const approvedRequest = (domain: string) =>
+    ownRequests
+      .filter((r) => r.status === 1 && r.domain === domain)
+      .sort((a, b) => b.updated_at - a.updated_at)[0] ?? null;
   const result: LinkedDomainRow[] = (domains.data.value ?? []).map((link) => ({
     id: `link-${link.id}`,
     domain: link.domain,
@@ -263,10 +266,10 @@ const rows = computed<LinkedDomainRow[]>(() => {
     method: link.meta_mapped ? "approved" : "dns",
     updated: link.last_checked_at ?? link.updated_at,
     link,
-    request: null,
+    request: link.meta_mapped ? approvedRequest(link.domain) : null,
   }));
-  for (const request of requests.data.value ?? []) {
-    if (request.org_id !== props.orgId || request.status === 1) continue;
+  for (const request of ownRequests) {
+    if (request.status === 1) continue;
     result.push({
       id: `request-${request.id}`,
       domain: request.domain,
@@ -324,29 +327,43 @@ const columns: OTableColumnDef<LinkedDomainRow>[] = [
   },
 ];
 
-// Only DNS links expand: they carry the record to copy. Why a row failed or was rejected is the badge tooltip.
-const isExpandable = (row: LinkedDomainRow) => row.method === "dns";
+const failureReason = (link: OrgDomainOwnership): I18nText | null =>
+  link.verification_state === 2 && link.verification_failure_reason != null
+    ? t(FAILURE_REASON_KEYS[link.verification_failure_reason])
+    : null;
 
 const stateReason = (row: LinkedDomainRow): I18nText | null => {
-  const failure = row.link?.verification_failure_reason;
-  if (row.state === "failed" && failure != null) return t(FAILURE_REASON_KEYS[failure]);
+  if (row.link) return failureReason(row.link);
   if (row.state === "rejected" && row.request?.reason) return raw(row.request.reason);
   return null;
 };
 
-const canVerify = (row: LinkedDomainRow) => row.method === "dns" && row.state !== "verified";
-
-const expandedIds = ref<string[]>([]);
-// Set after a DNS link so its record opens once the new row arrives.
-const expandOnArrival = ref<string | null>(null);
-
-watch(rows, (next) => {
-  if (!expandOnArrival.value) return;
-  const row = next.find((r) => r.link && r.domain === expandOnArrival.value);
-  if (!row) return;
-  expandedIds.value = [row.id];
-  expandOnArrival.value = null;
+// The dialog reads the live row by id, so it shows the new state after Verify now refetches.
+const detailsRowId = ref<string | null>(null);
+const detailsRow = computed(() => rows.value.find((row) => row.id === detailsRowId.value) ?? null);
+const detailsOpen = computed({
+  get: () => detailsRowId.value !== null,
+  set: (open: boolean) => {
+    if (!open) detailsRowId.value = null;
+  },
 });
+
+function openDetails(row: LinkedDomainRow) {
+  detailsRowId.value = row.id;
+}
+
+// Set after a DNS link so the record opens once the new link arrives.
+const openOnArrival = ref<string | null>(null);
+
+function openArrivedRecord() {
+  if (!openOnArrival.value) return;
+  const row = rows.value.find((r) => r.link && r.domain === openOnArrival.value);
+  if (!row) return;
+  openDetails(row);
+  openOnArrival.value = null;
+}
+
+watch(rows, openArrivedRecord);
 
 const errorMessage = (err: any) => raw(err?.response?.data?.message || err?.message);
 
@@ -398,7 +415,8 @@ async function submitLink(domain: string, method: LinkMethod): Promise<boolean> 
     });
     return false;
   }
-  expandOnArrival.value = domain;
+  openOnArrival.value = domain;
+  openArrivedRecord();
   toast({ variant: "success", message: t("settings.orgDomainMapping.linked") });
   return true;
 }

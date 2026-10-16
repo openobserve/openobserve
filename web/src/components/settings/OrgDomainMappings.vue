@@ -16,20 +16,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex h-full min-h-0 flex-col" data-test="settings-org-domain-mappings">
-    <OContent class="border-border-default shrink-0 border-b py-2">
-      <OSettingRow
-        :label="t('settings.orgDomainMapping.enforceTitle')"
-        :description="t('settings.orgDomainMapping.enforceDesc')"
+    <div class="px-page-edge shrink-0 py-3">
+      <div
+        class="rounded-default bg-surface-overlay border-border-default flex items-center gap-4 border p-4"
         data-test="settings-org-domain-mappings-enforce"
       >
+        <div
+          class="rounded-default bg-surface-subtle border-border-default text-text-secondary flex h-9 w-9 shrink-0 items-center justify-center border"
+        >
+          <OIcon name="layers" size="sm" />
+        </div>
+        <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span class="text-text-heading text-sm font-semibold">
+            {{ t("settings.orgDomainMapping.enforceTitle") }}
+          </span>
+          <span class="text-text-secondary max-w-2xl text-sm">
+            {{ t("settings.orgDomainMapping.enforceDesc") }}
+          </span>
+        </div>
         <OSwitch
           :model-value="enforceValue"
           :disabled="savingEnforce"
+          label-position="left"
           data-test="settings-org-domain-mappings-enforce-switch"
           @update:model-value="setEnforce(!!$event)"
-        />
-      </OSettingRow>
-    </OContent>
+        >
+          <template #label>
+            <span class="sr-only">{{ t("settings.orgDomainMapping.enforceTitle") }}</span>
+            <span class="text-text-secondary font-normal">
+              {{
+                enforceValue
+                  ? t("components.badge.booleanState.on")
+                  : t("components.badge.booleanState.off")
+              }}
+            </span>
+          </template>
+        </OSwitch>
+      </div>
+    </div>
 
     <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
       <OTable
@@ -182,11 +206,10 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -420,16 +443,21 @@ const pendingEnforce = ref<boolean | null>(null);
 const enforceValue = computed(() => pendingEnforce.value ?? props.enforceAllowedOrgsOnly);
 
 async function setEnforce(value: boolean) {
+  // Hold the new value while asking, so a declined confirm changes the prop back
+  // and the switch (which keeps its own state) flips back with it.
+  pendingEnforce.value = value;
   if (value) {
     const ok = await confirm({
       title: t("settings.orgDomainMapping.enforceConfirmTitle"),
       message: t("settings.orgDomainMapping.enforceConfirmBody"),
       confirmLabel: t("settings.orgDomainMapping.enforceConfirmAction"),
     });
-    if (!ok) return;
+    if (!ok) {
+      pendingEnforce.value = null;
+      return;
+    }
   }
   savingEnforce.value = true;
-  pendingEnforce.value = value;
   try {
     await updateSettings.mutateAsync({ enforce_allowed_orgs_only: value });
     toast({ variant: "success", message: t("settings.orgDomainMapping.enforceSaved") });

@@ -478,7 +478,8 @@
       "experiments": "experiments",
       "linkedDomains": "linked domains",
       "domainMappings": "domain mappings",
-      "domainRequests": "link requests"
+      "domainRequests": "link requests",
+      "accessRules": "access rules"
     },
     "demo": {
       "pageTitle": "Empty states — full set for review",
@@ -577,6 +578,12 @@
       "description": "Add users who sign in with a verified domain to this organization or its billing group members automatically.",
       "action": "Add mapping",
       "actionDesc": "Choose a domain, an organization and a role"
+    },
+    "noAccessRules": {
+      "title": "No access rules yet",
+      "description": "Every user from your verified domains can join. Add a rule to allow only some users or to block users.",
+      "action": "Add rule",
+      "actionDesc": "Choose a domain and who from it can join"
     },
     "noDomainRequests": {
       "title": "No link requests",
@@ -10706,6 +10713,14 @@
       "roleClaimNameHelp": "Optional. SSO token claim listing the user's custom roles. On each SSO sign-in, their custom roles in that organization are replaced with the claimed ones; claimed roles that don't exist are skipped unless they are created.",
       "createMissingRoles": "Create claimed roles that don't exist in the organization",
       "verifyNow": "Verify now",
+      "details": "Details",
+      "detailsDialogTitle": "Link details for {domain}",
+      "approvedLinkInfo": "Linked by OpenObserve after a link request. No DNS record is needed.",
+      "pendingRequestInfo": "OpenObserve is reviewing this request. Nothing to do until it is approved.",
+      "rejectedRequestInfo": "OpenObserve rejected this request.",
+      "verifyDialogTitle": "Verify {domain}",
+      "recordDialogTitle": "DNS record for {domain}",
+      "lastCheckFailed": "Last check failed: {reason}",
       "state": {
         "pending": "Pending",
         "verified": "Verified",
@@ -10731,16 +10746,12 @@
       "txtValueCopied": "Record value copied",
       "verifyHint": "Verification runs automatically every {minutes} minutes. You can also verify now.",
       "alreadyLinked": "This domain is already linked to this organization",
-      "accessAllowAllMessage": "Every user from {domain} can be added to this organization and its billing group.",
-      "accessBlockAllMessage": "Users from {domain} are removed from this organization and its billing group when they next sign in, and domain mappings no longer add them.",
       "accessNoAllowedEmails": "No emails are allowed yet, so every user from {domain} is blocked from this organization and its billing group.",
-      "accessRulesHint": "Rules apply only to domains verified by this organization and take effect at a user's next SSO sign-in. Blocked users are removed from this organization and its billing group; it does not stop them signing in to other organizations.",
       "failureReason": {
         "recordMissing": "TXT record not found",
         "valueMismatch": "TXT record found, but the value doesn't match",
         "dnsFailed": "DNS resolution failed"
       },
-      "restrictionsSubtitle": "Control which users from your verified domains can be in this organization and its billing group. Rules are applied when a user signs in through SSO.",
       "pageSubtitle": "Link your email domains, map their users to organizations, and control which of them can join.",
       "linkedTab": "Linked domains",
       "mappingsTab": "Mappings",
@@ -10789,6 +10800,35 @@
       "enforceConfirmBody": "Each time a user whose email domain has a mapping here signs in through SSO, they will be removed from every organization that is not this one or in its billing group, including their personal organizations.",
       "enforceConfirmAction": "Turn on",
       "enforceSaved": "Setting saved",
+      "addRule": "Add rule",
+      "editRule": "Edit rule",
+      "ruleColumn": "Rule",
+      "emailsColumn": "Emails",
+      "rulePolicy": {
+        "allow_all": "Allow all",
+        "allow_specific": "Allow only listed",
+        "block_specific": "Block listed",
+        "block_all": "Block all"
+      },
+      "allowedCount": "{count} allowed | {count} allowed",
+      "blockedCount": "{count} blocked | {count} blocked",
+      "allowedEmails": "Allowed emails",
+      "blockedEmails": "Blocked emails",
+      "blockedEmailsOptional": "Blocked emails (optional)",
+      "rulePolicyHelp": {
+        "allow_all": "Everyone from {domain} can join. You can still block a few people below.",
+        "allow_specific": "Only the emails you list can join. Everyone else from {domain} is blocked.",
+        "block_specific": "Everyone from {domain} can join except the emails you list.",
+        "block_all": "Nobody from {domain} can join."
+      },
+      "ruleDomainHelp": "One of this organization's verified domains. The rule applies at each user's next SSO sign-in.",
+      "ruleBlockedRequired": "Add at least one email to block",
+      "noDomainForRule": "Every verified domain already has a rule. Link and verify another domain to add one.",
+      "deleteRuleTitle": "Remove rule?",
+      "deleteRuleBody": "The rule for {domain} is removed when you save.",
+      "ruleSaved": "Rule saved",
+      "ruleDeleted": "Rule removed",
+      "domainRulesSection": "Domain rules",
       "filterPending": "Pending",
       "filterAll": "All",
       "requestedBy": "Requested by",

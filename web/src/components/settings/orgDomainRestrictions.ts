@@ -115,16 +115,3 @@ export function blockEmailsInConfig(
     updated_at: now * 1000,
   };
 }
-
-export function cardsSnapshot(cards: RestrictionCard[]): string {
-  return JSON.stringify(
-    cards
-      .map((c) => ({
-        name: c.name,
-        policy: c.policy,
-        allowedEmails: [...c.allowedEmails].sort(),
-        blockedEmails: [...c.blockedEmails].sort(),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name)),
-  );
-}

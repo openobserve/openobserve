@@ -265,4 +265,16 @@ describe("OrgDomainMappings", () => {
       enforce_allowed_orgs_only: false,
     });
   });
+
+  it("flips the switch back when turning it on is declined", async () => {
+    mockConfirm.mockResolvedValue(false);
+    const wrapper = await mountList([existing]);
+    const switchEl = () => wrapper.find('[role="switch"]');
+
+    await switchEl().trigger("click");
+    await flushPromises();
+
+    expect(switchEl().attributes("aria-checked")).toBe("false");
+    expect(api.post_organization_settings).not.toHaveBeenCalled();
+  });
 });

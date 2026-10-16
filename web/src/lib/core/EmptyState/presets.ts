@@ -1043,6 +1043,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-access-rules": {
+    illustration: "users",
+    variant: "create",
+    titleKey: "emptyState.noAccessRules.title",
+    descriptionKey: "emptyState.noAccessRules.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noAccessRules.action",
+        descriptionKey: "emptyState.noAccessRules.actionDesc",
+      },
+    ],
+  },
   "no-domain-requests": {
     illustration: "check",
     variant: "neutral",
@@ -1110,4 +1124,5 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-linked-domains": "emptyState.nouns.linkedDomains",
   "no-domain-mappings": "emptyState.nouns.domainMappings",
   "no-domain-requests": "emptyState.nouns.domainRequests",
+  "no-access-rules": "emptyState.nouns.accessRules",
 };

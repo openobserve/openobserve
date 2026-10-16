@@ -54,6 +54,13 @@ const DialogStub = defineComponent({
   template: "<div />",
 });
 
+const DetailsDialogStub = defineComponent({
+  name: "OrgDomainDetailsDialog",
+  props: ["open", "domain", "link", "request", "failureReason", "verifying"],
+  emits: ["update:open", "verify"],
+  template: "<div />",
+});
+
 const link = (domain: string, state = 1, metaMapped = false) => ({
   id: domain,
   org_id: "acme",
@@ -101,7 +108,11 @@ const mountList = async (mappings: OrgDomainMapping[] = []) => {
     props: { orgId: "acme", mappings },
     global: {
       plugins: [i18n, withQueryClient()],
-      stubs: { OrgLinkDomainDialog: DialogStub, OTooltip: true, OrgDomainVerification: true },
+      stubs: {
+        OrgLinkDomainDialog: DialogStub,
+        OrgDomainDetailsDialog: DetailsDialogStub,
+        OTooltip: true,
+      },
     },
   });
   await settle();
@@ -152,16 +163,71 @@ describe("OrgLinkedDomains", () => {
     ).toHaveLength(1);
   });
 
-  it("offers verify only on DNS links that are not verified", async () => {
+  it("offers Details on every row and Remove on links only", async () => {
     const wrapper = await mountList();
 
-    expect(exists(wrapper, "settings-org-linked-domains-verify-pending.com")).toBe(true);
-    expect(exists(wrapper, "settings-org-linked-domains-verify-acme.com")).toBe(false);
-    expect(exists(wrapper, "settings-org-linked-domains-verify-granted.com")).toBe(false);
+    for (const domain of ["acme.com", "pending.com", "granted.com", "asked.com", "denied.com"]) {
+      expect(exists(wrapper, `settings-org-linked-domains-details-${domain}`)).toBe(true);
+    }
+    expect(exists(wrapper, "settings-org-linked-domains-remove-granted.com")).toBe(true);
     expect(exists(wrapper, "settings-org-linked-domains-remove-asked.com")).toBe(false);
   });
 
-  it("explains a failed check and a rejection in the status tooltip, and expands only DNS rows", async () => {
+  it("passes the approving request with an approved link, and the request itself for request rows", async () => {
+    const wrapper = await mountList();
+    const dialog = () => wrapper.findComponent(DetailsDialogStub);
+    const open = async (domain: string) =>
+      wrapper.find(`[data-test="settings-org-linked-domains-details-${domain}"]`).trigger("click");
+
+    await open("granted.com");
+    expect(dialog().props("link").domain).toBe("granted.com");
+    expect(dialog().props("request").id).toBe("req-granted.com");
+
+    await open("denied.com");
+    expect(dialog().props("link")).toBeNull();
+    expect(dialog().props("request").status).toBe(2);
+  });
+
+  it("opens the record dialog from the row and verifies from it", async () => {
+    api.verify_org_domain.mockResolvedValue({ data: { verification_state: 0 } });
+    const wrapper = await mountList();
+    const dialog = () => wrapper.findComponent(DetailsDialogStub);
+
+    expect(dialog().props("open")).toBe(false);
+    await wrapper
+      .find('[data-test="settings-org-linked-domains-details-pending.com"]')
+      .trigger("click");
+    expect(dialog().props("open")).toBe(true);
+    expect(dialog().props("link").domain).toBe("pending.com");
+
+    dialog().vm.$emit("verify");
+    await settle();
+    expect(api.verify_org_domain).toHaveBeenCalledWith("acme", "pending.com");
+    expect(dialog().props("open")).toBe(true);
+  });
+
+  it("opens the record dialog once a new DNS link arrives", async () => {
+    const wrapper = await mountList();
+    api.list_org_domains.mockResolvedValue({
+      data: [
+        link("acme.com"),
+        link("pending.com", 0),
+        link("granted.com", 1, true),
+        link("new.com", 0),
+      ],
+    });
+
+    await expect(submitFrom(wrapper)("new.com", "dns")).resolves.toBe(true);
+    // The app refetches through mutation meta.invalidates; the test client has no such hook.
+    await wrapper.find('[data-test="settings-org-linked-domains-refresh-btn"]').trigger("click");
+    await settle();
+
+    const dialog = wrapper.findComponent(DetailsDialogStub);
+    expect(dialog.props("open")).toBe(true);
+    expect(dialog.props("link").domain).toBe("new.com");
+  });
+
+  it("explains a failed check and a rejection in the status tooltip, and no row expands", async () => {
     api.list_org_domains.mockResolvedValue({
       data: [
         { ...link("broken.com", 2), verification_failure_reason: 1 },
@@ -172,14 +238,6 @@ describe("OrgLinkedDomains", () => {
     const wrapper = await mountList();
     const reason = (domain: string) =>
       wrapper.find(`[data-test="settings-org-linked-domains-state-reason-${domain}"]`);
-    const canExpand = (domain: string) =>
-      wrapper
-        .findAll("tr")
-        .find((tr) =>
-          tr.find(`[data-test="settings-org-linked-domains-state-${domain}"]`).exists(),
-        )!
-        .find('[data-test="o2-table-expand-cell"] button')
-        .exists();
 
     expect(reason("broken.com").attributes("content")).toBe(
       "TXT record found, but the value doesn't match",
@@ -187,13 +245,10 @@ describe("OrgLinkedDomains", () => {
     expect(reason("denied.com").attributes("content")).toBe("not yours");
     expect(reason("pending.com").exists()).toBe(false);
 
-    expect(canExpand("broken.com")).toBe(true);
-    expect(canExpand("pending.com")).toBe(true);
-    expect(canExpand("denied.com")).toBe(false);
-    expect(canExpand("granted.com")).toBe(false);
+    expect(wrapper.find('[data-test="o2-table-expand-cell"]').exists()).toBe(false);
   });
 
-  it("keeps Remove in the same slot whether or not Verify now is shown", async () => {
+  it("keeps Details and Remove in the same slots on every row", async () => {
     const wrapper = await mountList();
     const slotOf = (domain: string) => {
       const remove = wrapper.find(`[data-test="settings-org-linked-domains-remove-${domain}"]`);
@@ -202,6 +257,12 @@ describe("OrgLinkedDomains", () => {
 
     expect(slotOf("acme.com")).toBe(slotOf("pending.com"));
     expect(slotOf("granted.com")).toBe(slotOf("pending.com"));
+
+    // A request row has no Remove, so a placeholder keeps the same number of slots.
+    const slotsOf = (domain: string) =>
+      wrapper.find(`[data-test="settings-org-linked-domains-details-${domain}"]`).element
+        .parentElement!.children.length;
+    expect(slotsOf("asked.com")).toBe(slotsOf("acme.com"));
   });
 
   it("links through DNS or raises a request depending on the method", async () => {

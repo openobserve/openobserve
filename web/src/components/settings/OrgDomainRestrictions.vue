@@ -15,326 +15,292 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="settings-org-domain-restrictions">
-    <div class="text-text-secondary mb-3 text-sm">
-      {{ t("settings.orgDomainMapping.restrictionsSubtitle") }}
-    </div>
-
-    <OForm
-      ref="addDomainForm"
-      :schema="addDomainSchema"
-      :default-values="addDomainDefaults()"
-      class="flex items-start gap-x-2"
-      @submit="addDomain"
+  <div class="flex flex-col gap-4" data-test="settings-org-domain-restrictions">
+    <OFormSection
+      :title="t('settings.orgDomainMapping.domainRulesSection')"
+      data-test="settings-org-domain-restrictions-rules"
     >
-      <div class="w-75 shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1">
-        <OFormInput
-          data-test="settings-org-domain-restrictions-domain-input"
-          name="newDomain"
-          :placeholder="t('settings.domainPlaceholder', { example: raw('example.com') })"
-        />
-      </div>
-      <OButton
-        data-test="settings-org-domain-restrictions-add-domain-btn"
-        variant="outline"
-        size="sm-action"
-        type="submit"
-        >{{ t("settings.addDomain") }}</OButton
-      >
-    </OForm>
-    <div class="text-text-secondary mt-1 mb-3 text-xs">
-      {{ t("settings.domainHint", { at_sign: "@" }) }}
-    </div>
-
-    <div v-if="cards.length > 0" class="flex flex-col gap-2">
-      <div
-        v-for="(card, index) in cards"
-        :key="card.name"
-        :data-test="`settings-org-domain-restrictions-card-${card.name}`"
-        class="border-border-default rounded-surface bg-surface-base border"
-      >
-        <div
-          class="border-b-border-default rounded-t-surface bg-surface-subtle flex items-center justify-between border-b px-3 py-2"
-        >
-          <div class="text-sm font-semibold">{{ card.name }}</div>
-          <OButton
-            icon-left="close"
-            variant="ghost-destructive"
-            size="icon-xs-sq"
-            :title="t('common.delete')"
-            :data-test="`settings-org-domain-restrictions-remove-${card.name}`"
-            @click="removeDomain(index)"
-          />
-        </div>
-        <div class="flex flex-col gap-3 p-3">
-          <ORadioGroup v-model="card.policy" orientation="vertical">
-            <ORadio
-              v-for="option in POLICY_OPTIONS"
-              :key="option.value"
-              :val="option.value"
-              :label="t(option.labelKey, { domain: '@' + card.name })"
-              :data-test="`settings-org-domain-restrictions-${option.value}-${card.name}`"
-            />
-          </ORadioGroup>
-
-          <div
-            v-if="card.policy === 'allow_all'"
-            class="rounded-default bg-status-info-bg text-status-info-text p-2 text-sm"
-          >
-            {{ t("settings.orgDomainMapping.accessAllowAllMessage", { domain: "@" + card.name }) }}
-          </div>
-          <div
-            v-if="card.policy === 'block_all'"
-            class="rounded-default bg-status-error-bg text-status-error-text p-2 text-sm"
-          >
-            {{ t("settings.orgDomainMapping.accessBlockAllMessage", { domain: "@" + card.name }) }}
-          </div>
-
-          <div
-            v-for="kind in emailKinds(card.policy)"
-            :key="kind"
-            :data-test="`settings-org-domain-restrictions-${kind}-emails-${card.name}`"
-            class="ms-6 max-md:ms-0"
-          >
-            <OForm
-              :key="`${card.name}-${card.policy}-${kind}`"
-              :ref="(el) => setEmailFormRef(`${card.name}-${kind}`, el)"
-              :schema="getEmailSchema(card.name)"
-              :default-values="addEmailDefaults()"
-              @submit="(v) => addEmail(card, kind, v.newEmail)"
-            >
-              <div class="text-input-label-text mb-1 text-sm font-medium">
-                {{
-                  kind === "allowed"
-                    ? t("settings.emailPlaceholder", { domain: "@" + card.name })
-                    : t("settings.blockedEmailPlaceholder", { domain: "@" + card.name })
-                }}
-              </div>
-              <div class="flex items-start gap-x-2">
-                <OFormInput
-                  :data-test="`settings-org-domain-restrictions-${kind}-email-input-${card.name}`"
-                  name="newEmail"
-                  class="min-w-62.5 max-md:min-w-0 max-md:flex-1"
-                />
-                <OButton
-                  :data-test="`settings-org-domain-restrictions-add-${kind}-email-${card.name}`"
-                  :variant="kind === 'allowed' ? 'primary' : 'destructive'"
-                  size="sm-action"
-                  type="submit"
-                  >{{
-                    kind === "allowed" ? t("settings.addEmail") : t("settings.addBlockedEmail")
-                  }}</OButton
-                >
-              </div>
-            </OForm>
-            <div
-              v-if="kind === 'allowed' && card.allowedEmails.length === 0"
-              :data-test="`settings-org-domain-restrictions-no-allowed-${card.name}`"
-              class="rounded-default bg-status-warning-bg text-status-warning-text mt-1 p-2 text-sm"
-            >
-              {{
-                t("settings.orgDomainMapping.accessNoAllowedEmails", { domain: "@" + card.name })
-              }}
-            </div>
-            <div
-              v-for="(email, emailIndex) in emailList(card, kind)"
-              :key="email"
-              class="rounded-default border-border-default bg-surface-subtle mt-1 flex items-center justify-between border p-2"
-            >
-              <div class="text-sm">{{ email }}</div>
-              <OButton
-                icon-left="close"
-                variant="ghost-destructive"
-                size="icon-xs-sq"
-                :title="t('common.delete')"
-                @click="emailList(card, kind).splice(emailIndex, 1)"
-              />
-            </div>
-          </div>
-
-          <div
-            v-if="!isAllowPolicy(card.policy) || card.blockedEmails.length > 0"
-            class="text-text-secondary text-xs"
-          >
-            {{ t("settings.orgDomainMapping.accessRulesHint") }}
-          </div>
-        </div>
-      </div>
-    </div>
-    <div
-      v-else
-      data-test="settings-org-domain-restrictions-empty"
-      class="text-text-secondary border-border-default rounded-surface border py-6 text-center text-sm"
-    >
-      {{ t("settings.noDomainMessage") }}
-    </div>
-
-    <div class="mt-3 flex items-center justify-between gap-2">
-      <div
-        v-if="isDirty"
-        data-test="settings-org-domain-restrictions-unsaved"
-        class="text-text-secondary flex items-center gap-2 text-sm"
-      >
-        <span class="bg-accent inline-block h-2 w-2 shrink-0 rounded-full"></span>
-        {{ t("common.unsavedChanges") }}
-      </div>
-      <div v-else></div>
-      <div class="flex gap-2">
+      <template #actions>
         <OButton
           variant="outline"
-          size="sm-action"
-          :disabled="!isDirty || saving"
-          data-test="settings-org-domain-restrictions-cancel-btn"
-          @click="reset"
-          >{{ t("common.cancel") }}</OButton
+          size="sm"
+          :disabled="addableDomains.length === 0"
+          :title="
+            addableDomains.length === 0 ? t('settings.orgDomainMapping.noDomainForRule') : undefined
+          "
+          data-test="settings-org-domain-restrictions-add-rule-btn"
+          @click="openAdd"
         >
-        <OButton
-          variant="primary"
-          size="sm-action"
-          :loading="saving"
-          :disabled="!isDirty"
-          data-test="settings-org-domain-restrictions-save-btn"
-          @click="save"
-          >{{ t("settings.saveChanges") }}</OButton
+          {{ t("settings.orgDomainMapping.addRule") }}
+        </OButton>
+      </template>
+
+      <div class="py-1">
+        <OTable
+          data-test="settings-org-domain-restrictions-table"
+          :data="cards"
+          :columns="columns"
+          row-key="name"
+          show-index
+          pagination="none"
+          sorting="client"
+          :fill-height="false"
+          :show-global-filter="false"
         >
+          <template #empty>
+            <OEmptyState
+              preset="no-access-rules"
+              :actions="addableDomains.length === 0 ? [] : undefined"
+              @action="openAdd"
+            />
+          </template>
+          <template #cell-policy="{ row }">
+            <OBadge
+              :variant="RULE_BADGES[row.policy].variant"
+              size="sm"
+              :data-test="`settings-org-domain-restrictions-rule-${row.name}`"
+            >
+              {{ t(RULE_BADGES[row.policy].labelKey) }}
+            </OBadge>
+          </template>
+          <template #cell-emails="{ row }">
+            <span
+              v-if="emailSummary(row)"
+              class="relative inline-flex"
+              :data-test="`settings-org-domain-restrictions-emails-${row.name}`"
+            >
+              {{ emailSummary(row) }}
+              <OTooltip :max-width="'25rem'" :content="emailList(row)" />
+            </span>
+            <span v-else class="text-text-secondary">{{ dash }}</span>
+          </template>
+          <template #cell-actions="{ row }">
+            <div class="flex items-center justify-center gap-1">
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                icon-left="edit"
+                class="max-md:hidden"
+                :title="t('common.edit')"
+                :data-test="`settings-org-domain-restrictions-edit-${row.name}`"
+                @click.stop="openEdit(row)"
+              />
+              <OButton
+                variant="ghost-destructive"
+                size="icon-sm"
+                icon-left="delete"
+                class="max-md:hidden"
+                :title="t('common.delete')"
+                :data-test="`settings-org-domain-restrictions-remove-${row.name}`"
+                @click.stop="removeRule(row)"
+              />
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    :data-test="`settings-org-domain-restrictions-more-${row.name}`"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  :data-test="`settings-org-domain-restrictions-edit-${row.name}-menu`"
+                  @select="openEdit(row)"
+                >
+                  <span>{{ t("common.edit") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  :data-test="`settings-org-domain-restrictions-remove-${row.name}-menu`"
+                  @select="removeRule(row)"
+                >
+                  <span>{{ t("common.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
+            </div>
+          </template>
+        </OTable>
       </div>
-    </div>
+    </OFormSection>
+
+    <OrgDomainRuleDialog
+      v-model:open="ruleDialogOpen"
+      :rule="editingRule"
+      :domain-options="ruleDomainOptions"
+      :submit="submitRule"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
-import { useMutation } from "@tanstack/vue-query";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { computed, ref } from "vue";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OForm from "@/lib/forms/Form/OForm.vue";
-import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import ORadio from "@/lib/forms/Radio/ORadio.vue";
-import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import { updateOrgSettingsMutation } from "@/services/organizations.queries";
+import { orgDomainsQuery, updateOrgSettingsMutation } from "@/services/organizations.queries";
 import {
-  addDomainDefaults,
-  addEmailDefaults,
-  makeAddDomainSchema,
-  makeAddEmailSchema,
-  type AddDomainForm,
-} from "./DomainManagement.schema";
-import {
-  cardsSnapshot,
   cardsToConfig,
   configToCards,
-  isAllowPolicy,
   type DomainManagementConfig,
   type RestrictionCard,
   type RestrictionPolicy,
 } from "./orgDomainRestrictions";
+import OrgDomainRuleDialog from "./OrgDomainRuleDialog.vue";
 
-const props = defineProps<{ orgId: string; config?: Partial<DomainManagementConfig> }>();
+const props = defineProps<{
+  orgId: string;
+  config?: Partial<DomainManagementConfig>;
+}>();
 
 const { t } = useI18nTyped();
 const { confirm } = useConfirmDialog();
 
-const POLICY_OPTIONS = [
-  { value: "allow_all", labelKey: "settings.allowAllUsersFromDomain" },
-  { value: "allow_specific", labelKey: "settings.allowOnlySpecificUsers" },
-  { value: "block_specific", labelKey: "settings.blockSpecificUsers" },
-  { value: "block_all", labelKey: "settings.blockAllUsersFromDomain" },
-] as const;
+const dash = raw("—");
+
+const RULE_BADGES: Record<RestrictionPolicy, { variant: BadgeVariant; labelKey: I18nKey }> = {
+  allow_all: {
+    variant: "success-outline",
+    labelKey: "settings.orgDomainMapping.rulePolicy.allow_all",
+  },
+  allow_specific: {
+    variant: "default-outline",
+    labelKey: "settings.orgDomainMapping.rulePolicy.allow_specific",
+  },
+  block_specific: {
+    variant: "warning-outline",
+    labelKey: "settings.orgDomainMapping.rulePolicy.block_specific",
+  },
+  block_all: {
+    variant: "error-outline",
+    labelKey: "settings.orgDomainMapping.rulePolicy.block_all",
+  },
+};
 
 const updateSettings = useMutation(() => updateOrgSettingsMutation(props.orgId));
+const domains = useQuery(() => orgDomainsQuery(props.orgId));
 
-const cards = reactive<RestrictionCard[]>(configToCards(props.config));
-const savedSnapshot = ref(cardsSnapshot(cards));
-const isDirty = computed(() => cardsSnapshot(cards) !== savedSnapshot.value);
-const saving = ref(false);
+const cards = computed(() => configToCards(props.config));
 
-const addDomainForm = ref<any>(null);
-const addDomainSchema = makeAddDomainSchema(t);
+const columns: OTableColumnDef<RestrictionCard>[] = [
+  {
+    id: "name",
+    header: t("settings.orgDomainMapping.domain"),
+    accessorKey: "name",
+    sortable: true,
+    size: 280,
+    meta: { isName: true, flex: true },
+  },
+  {
+    id: "policy",
+    header: t("settings.orgDomainMapping.ruleColumn"),
+    accessorKey: "policy",
+    sortable: true,
+    size: 180,
+  },
+  {
+    id: "emails",
+    header: t("settings.orgDomainMapping.emailsColumn"),
+    accessorFn: (row) => row.allowedEmails.length + row.blockedEmails.length,
+    size: 200,
+  },
+  {
+    id: "actions",
+    header: t("common.actions"),
+    isAction: true,
+    pinned: "right",
+    meta: { align: "center", actionCount: 2 },
+  },
+];
 
-const emailSchemaCache = new Map<string, ReturnType<typeof makeAddEmailSchema>>();
-const getEmailSchema = (domain: string) => {
-  if (!emailSchemaCache.has(domain)) emailSchemaCache.set(domain, makeAddEmailSchema(domain, t));
-  return emailSchemaCache.get(domain);
-};
+// Rules only apply to domains this org owns, so new rules pick from its verified domains.
+const verifiedDomains = computed(() =>
+  (domains.data.value ?? []).filter((d) => d.verification_state === 1).map((d) => d.domain),
+);
+const addableDomains = computed(() =>
+  [...new Set(verifiedDomains.value)].filter((d) => !cards.value.some((c) => c.name === d)),
+);
 
-const emailFormRefs: Record<string, any> = {};
-const setEmailFormRef = (key: string, el: any) => {
-  if (el) emailFormRefs[key] = el;
-  else delete emailFormRefs[key];
-};
+const ruleDialogOpen = ref(false);
+const editingRule = ref<RestrictionCard | null>(null);
+const ruleDomainOptions = computed<SelectOption[]>(() => {
+  const names = editingRule.value ? [editingRule.value.name] : addableDomains.value;
+  return names.map((name) => ({ label: raw(name), value: name }));
+});
 
-type EmailKind = "allowed" | "blocked";
-
-const emailKinds = (policy: RestrictionPolicy): EmailKind[] => {
-  if (policy === "allow_specific") return ["allowed", "blocked"];
-  if (policy === "block_all") return [];
-  return ["blocked"];
-};
-
-const emailList = (card: RestrictionCard, kind: EmailKind) =>
-  kind === "allowed" ? card.allowedEmails : card.blockedEmails;
-
-function addDomain(value?: AddDomainForm) {
-  const name = (value?.newDomain ?? "").trim().toLowerCase();
-  if (!name) return;
-  if (cards.some((c) => c.name === name)) {
-    toast({ variant: "error", message: t("settings.domainAlreadyExists") });
-    return;
-  }
-  cards.push({ name, policy: "allow_all", allowedEmails: [], blockedEmails: [] });
-  addDomainForm.value?.form?.reset();
+function openAdd() {
+  editingRule.value = null;
+  ruleDialogOpen.value = true;
 }
 
-async function removeDomain(index: number) {
-  const ok = await confirm({
-    title: t("common.confirm"),
-    message: t("settings.confirmRemoveDomain", { domain: cards[index].name }),
-  });
-  if (ok) cards.splice(index, 1);
+function openEdit(rule: RestrictionCard) {
+  editingRule.value = rule;
+  ruleDialogOpen.value = true;
 }
 
-function addEmail(card: RestrictionCard, kind: EmailKind, value?: string) {
-  const email = (value ?? "").trim().toLowerCase();
-  if (!email) return;
-  const list = emailList(card, kind);
-  if (list.includes(email)) {
-    toast({ variant: "error", message: t("settings.emailAlreadyExists") });
-    return;
-  }
-  list.push(email);
-  emailFormRefs[`${card.name}-${kind}`]?.form?.reset();
-}
-
-function reset() {
-  cards.splice(0, cards.length, ...configToCards(props.config));
-}
-
-async function save() {
-  for (const card of cards) {
-    if (card.policy === "block_specific" && card.blockedEmails.length === 0) {
-      toast({
-        variant: "error",
-        message: t("settings.domainNeedsBlockedEmails", { domain: card.name }),
-      });
-      return;
-    }
-  }
-  saving.value = true;
+async function saveRules(next: RestrictionCard[], successMessage: I18nText): Promise<boolean> {
   try {
-    await updateSettings.mutateAsync({ domain_management_config: cardsToConfig(cards) });
-    savedSnapshot.value = cardsSnapshot(cards);
-    toast({ variant: "success", message: t("settings.domainSettingsSaved") });
+    await updateSettings.mutateAsync({ domain_management_config: cardsToConfig(next) });
   } catch (err: any) {
     toast({
       variant: "error",
       message:
         raw(err?.response?.data?.message || err?.message) ||
-        t("settings.errorSavingDomainSettings"),
+        t("settings.orgDomainMapping.saveFailed"),
     });
-  } finally {
-    saving.value = false;
+    return false;
   }
+  toast({ variant: "success", message: successMessage });
+  return true;
 }
+
+function submitRule(rule: RestrictionCard): Promise<boolean> {
+  const exists = cards.value.some((c) => c.name === rule.name);
+  const next = exists
+    ? cards.value.map((c) => (c.name === rule.name ? rule : c))
+    : [...cards.value, rule];
+  return saveRules(next, t("settings.orgDomainMapping.ruleSaved"));
+}
+
+async function removeRule(rule: RestrictionCard) {
+  const ok = await confirm({
+    title: t("settings.orgDomainMapping.deleteRuleTitle"),
+    message: t("settings.orgDomainMapping.deleteRuleBody", { domain: rule.name }),
+    confirmLabel: t("common.delete"),
+  });
+  if (!ok) return;
+  await saveRules(
+    cards.value.filter((c) => c.name !== rule.name),
+    t("settings.orgDomainMapping.ruleDeleted"),
+  );
+}
+
+const emailSummary = (rule: RestrictionCard): I18nText | null => {
+  const parts: I18nText[] = [];
+  const allowed = rule.allowedEmails.length;
+  const blocked = rule.blockedEmails.length;
+  if (allowed) parts.push(t("settings.orgDomainMapping.allowedCount", { count: allowed }, allowed));
+  if (blocked) parts.push(t("settings.orgDomainMapping.blockedCount", { count: blocked }, blocked));
+  return parts.length ? raw(parts.join(" · ")) : null;
+};
+
+const emailList = (rule: RestrictionCard) =>
+  raw([...rule.allowedEmails, ...rule.blockedEmails].join(", "));
 </script>
