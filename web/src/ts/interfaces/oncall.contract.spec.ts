@@ -57,6 +57,7 @@ import type {
   SubjectType,
 } from "@/ts/interfaces/oncall";
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
+import type { RcaSignalClass, RcaUnverifiedCitation } from "@/services/incidents";
 
 // ── The Rust side, parsed from source ───────────────────────────────────────
 
@@ -206,7 +207,23 @@ const PRESET_INPUT_KINDS = [
 const _c10: Complete<PresetInputKind, typeof PRESET_INPUT_KINDS> = true;
 
 const _causes: Complete<ResolutionCause, typeof RESOLUTION_CAUSES> = true;
-void [_c1, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c10, _c11, _causes];
+
+// RCA confidence enums that reach the UI through the run summary route.
+const SIGNAL_CLASSES = [
+  "logs",
+  "metrics",
+  "traces",
+  "change",
+  "infra",
+  "context",
+  "unclassified",
+] as const satisfies readonly RcaSignalClass[];
+const _c12: Complete<RcaSignalClass, typeof SIGNAL_CLASSES> = true;
+
+type UnverifiedReason = RcaUnverifiedCitation["reason"];
+const UNVERIFIED_REASONS = ["not_run", "failed"] as const satisfies readonly UnverifiedReason[];
+const _c13: Complete<UnverifiedReason, typeof UNVERIFIED_REASONS> = true;
+void [_c1, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c10, _c11, _c12, _c13, _causes];
 
 // `FinalAction` names no map below: `EscalationPolicy` carries no `final_action` field yet, so it is not a Rust enum a MIRRORED or SKIPPED entry could point at without failing the stale-entry check — `_FINAL_ACTIONS`/`_c7` above still pin `PolicyFinalAction` against drift on its own.
 /** Rust enum name → the TS mirror it must equal. */
@@ -222,6 +239,8 @@ const MIRRORED: Record<string, readonly string[]> = {
   RoutingDecision: ROUTING_DECISION_KINDS,
   PresetInputKind: PRESET_INPUT_KINDS,
   ResolutionCause: RESOLUTION_CAUSES,
+  SignalClass: SIGNAL_CLASSES,
+  UnverifiedReason: UNVERIFIED_REASONS,
 };
 
 /**
@@ -248,6 +267,9 @@ const SKIPPED: Record<string, string> = {
   // exactly what that forbids.
   PresetId: "catalogue-driven by design; the UI must not know preset ids",
   PresetSpec: "request body built from the catalogue's own inputs schema",
+  // The UI shows the server-built reason line (`card.band_reason`); the raw grading
+  // rules stored in the run record are not read by the UI.
+  GradeReason: "flattened into the band reason line before it reaches the UI",
 };
 
 // ── The re-check ────────────────────────────────────────────────────────────
