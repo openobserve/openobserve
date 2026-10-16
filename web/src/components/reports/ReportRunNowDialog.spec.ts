@@ -18,6 +18,8 @@ import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { withQueryClient } from "@/test/unit/helpers/queryClient";
+import { queryClient } from "@/composables/query/queryClient";
+import { reportKeys } from "@/services/reports.querykeys";
 import reports from "@/services/reports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { pendingManualRuns } from "@/utils/reports/reportRun";
@@ -55,12 +57,19 @@ const RUN = {
 
 const wrappers: ReturnType<typeof mount>[] = [];
 const originalOrg = store.state.selectedOrganization.identifier;
+const cachedOrganizations = new Set<string>();
+const settlementKeys = (org: string) => [
+  reportKeys.detail(org, RUN.report_id),
+  reportKeys.list(org, { folder: "default" }),
+  reportKeys.history(org, { report_id: RUN.report_id, start_time: 1, end_time: 2 }),
+  reportKeys.history(org, { start_time: 1, end_time: 2 }),
+];
 
 const mountDialog = (props: Record<string, unknown> = {}) => {
   const wrapper = mount(ReportRunNowDialog, {
     props: { open: true, reportId: "r-dialog", reportName: "Exec KPI digest", ...props },
     global: {
-      plugins: [i18n, store, withQueryClient()],
+      plugins: [i18n, store, withQueryClient(queryClient)],
       stubs: { ConfirmDialog: { template: "<div />" } },
     },
   });
@@ -71,12 +80,16 @@ const mountDialog = (props: Record<string, unknown> = {}) => {
 afterEach(() => {
   wrappers.splice(0).forEach((wrapper) => wrapper.unmount());
   store.state.selectedOrganization.identifier = originalOrg;
+  for (const org of cachedOrganizations)
+    queryClient.removeQueries({ queryKey: reportKeys.all(org) });
+  cachedOrganizations.clear();
 });
 
 describe("ReportRunNowDialog", () => {
   beforeEach(() => {
     push.mockClear();
     vi.mocked(toast).mockClear();
+    vi.mocked(reports.triggerReportById).mockClear();
     vi.mocked(reports.getReportById).mockResolvedValue({
       data: { destinations: [{ email: "lin@acme.io" }, { email: "cfo@acme.io" }] },
     } as any);
@@ -157,6 +170,11 @@ describe("ReportRunNowDialog", () => {
       const orgA = `dialog-${outcome}-a`;
       const orgB = `dialog-${outcome}-b`;
       store.state.selectedOrganization.identifier = orgA;
+      for (const org of [orgA, orgB]) {
+        cachedOrganizations.add(org);
+        for (const queryKey of settlementKeys(org))
+          queryClient.setQueryData(queryKey, { last_run_status: "succeeded" });
+      }
       let settle!: () => void;
       const hit = {
         ...RUN,
@@ -187,6 +205,10 @@ describe("ReportRunNowDialog", () => {
       expect(pendingManualRuns(orgB, undefined, [])).toEqual([]);
       expect(w.emitted("ran")).toBeUndefined();
       expect(w.emitted("update:running")).toEqual([[true], [false]]);
+      for (const queryKey of settlementKeys(orgA))
+        expect(queryClient.getQueryState(queryKey)?.isInvalidated).toBe(true);
+      for (const queryKey of settlementKeys(orgB))
+        expect(queryClient.getQueryState(queryKey)?.isInvalidated).toBe(false);
       store.state.selectedOrganization.identifier = `dialog-${outcome}-c`;
       await flushPromises();
       const action = vi.mocked(toast).mock.calls.at(-1)![0].action!;
@@ -237,4 +259,49 @@ describe("ReportRunNowDialog", () => {
     expect((w.vm as any).message).toContain("new@acme.io");
     expect((w.vm as any).message).not.toContain("old@acme.io");
   });
+
+  it.each(["same organization", "another organization"])(
+    "visibly blocks a second confirmation in %s and allows retry after settlement",
+    async (scope) => {
+      const orgA = "dialog-single-pending-a";
+      store.state.selectedOrganization.identifier = orgA;
+      let resolveFirst!: (value: any) => void;
+      vi.mocked(reports.triggerReportById).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve;
+          }),
+      );
+      const w = mountDialog();
+      await flushPromises();
+      const first = (w.vm as any).runNow();
+      await flushPromises();
+      if (scope === "another organization")
+        store.state.selectedOrganization.identifier = "dialog-single-pending-b";
+      await w.setProps({ reportId: "second-report", reportName: "Second report" });
+      await flushPromises();
+      await (w.vm as any).runNow();
+      expect(reports.triggerReportById).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(toast).mock.calls.at(-1)![0]).toMatchObject({
+        variant: "warning",
+        message: "Another report is running. Wait for it to finish, then try again.",
+      });
+      expect(w.emitted("update:running")).toEqual([[true]]);
+      resolveFirst({ data: { run: RUN } });
+      await first;
+      await flushPromises();
+      expect(w.emitted("update:running")).toEqual([[true], [false]]);
+      vi.mocked(reports.triggerReportById).mockResolvedValueOnce({
+        data: { run: { ...RUN, report_id: "second-report" } },
+      } as any);
+      await (w.vm as any).runNow();
+      await flushPromises();
+      expect(reports.triggerReportById).toHaveBeenCalledTimes(2);
+      expect(reports.triggerReportById).toHaveBeenLastCalledWith(
+        store.state.selectedOrganization.identifier,
+        "second-report",
+      );
+      expect(w.emitted("update:running")).toEqual([[true], [false], [true], [false]]);
+    },
+  );
 });

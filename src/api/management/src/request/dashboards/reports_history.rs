@@ -324,7 +324,7 @@ impl HistoryFilter {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("report_id" = Option<String>, Query, description = "Report ID (KSUID); omit for every report"),
-        ("run_report_id" = Option<String>, Query, description = "Run report ID within the org-wide visibility policy"),
+        ("run_report_id" = Option<String>, Query, description = "Exact run's report ID (KSUID); requires GET access to that report"),
         ("start_time" = Option<i64>, Query, description = "Start time in Unix microseconds (default: 7 days ago)"),
         ("end_time" = Option<i64>, Query, description = "End time in Unix microseconds (default: now)"),
         ("status" = Option<Vec<String>>, Query, description = "Repeatable: succeeded, error, skipped"),
@@ -579,7 +579,7 @@ async fn permitted_report_ids(
     user_id: &str,
     report_id: Option<&Ksuid>,
 ) -> Result<Option<Vec<Ksuid>>, Response> {
-    if db::user::is_root_user(user_id) || !o2_openfga::config::get_config().enabled {
+    if db::user::is_root_user(user_id) || !openobserve_core::authz::rbac_enforced().await {
         return Ok(None);
     }
     let user = openobserve_core::users::get_user(Some(org_id), user_id)

@@ -12072,6 +12072,7 @@
       "runNowSent": "Report sent to {count} recipient. | Report sent to {count} recipients.",
       "runNowCached": "Dashboard cache warmed.",
       "runNowFailed": "The report could not be sent",
+      "runNowBusy": "Another report is running. Wait for it to finish, then try again.",
       "viewRun": "View run",
       "drawerTitle": "Run · {time}",
       "attempt": "Attempt {count}",

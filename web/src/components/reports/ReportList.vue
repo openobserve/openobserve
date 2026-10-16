@@ -276,6 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   :loading="runningReportId === row.report_id"
+                  :disabled="!!runningReportId"
                   :title="t('reports.history.runNow')"
                   class="max-md:hidden"
                   @click.stop="openRunNow(row)"
@@ -341,6 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="send"
                     class="md:hidden"
                     :data-test="`report-list-${row.name}-run-now-menu`"
+                    :disabled="!!runningReportId"
                     @select="openRunNow(row)"
                   >
                     <span>{{ t("reports.history.runNow") }}</span>

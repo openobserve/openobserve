@@ -120,7 +120,10 @@ const openRun = (org: string, run: ReportRunHit) =>
   });
 
 const runNow = async () => {
-  if (trigger.isPending.value) return;
+  if (trigger.isPending.value) {
+    toast({ variant: "warning", message: t("reports.history.runNowBusy") });
+    return;
+  }
   const operation = Object.freeze({ org: orgId.value, reportId: props.reportId });
   const version = viewVersion;
   const isCurrentView = () => version === viewVersion;
