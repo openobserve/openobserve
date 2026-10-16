@@ -183,6 +183,10 @@ function leaves(node: unknown, path = "", out: [string, string][] = []): [string
 const locale = JSON.parse(readFileSync(join(SRC, "locales/languages/en-US.json"), "utf8"));
 
 describe("assistant repo guards", () => {
+  it("never wipes sessionStorage outright, so a forced logout keeps assistant drafts (round 1 E-01)", () => {
+    expect(offenders((f) => /sessionStorage\.clear\(\)/.test(f.text))).toEqual([]);
+  });
+
   it("changes placement only inside the store", () => {
     expect(
       offenders(

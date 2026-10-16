@@ -55,10 +55,41 @@ export interface AssistantCapabilitiesTestResponse {
   error?: string;
 }
 
+/** `POST /ai/confirm/{sid}`; Edit then approve resolves as a deny, so there is no `edits` (round 2 X-30). */
+export interface ConfirmBody {
+  approved: boolean;
+  scope?: string;
+  items?: string[];
+  reply?: string;
+}
+
+export interface ConfirmResponse {
+  deleted?: number;
+  count?: number;
+  total?: number;
+  results?: unknown[];
+}
+
+/** `POST /ai/feedback`; `trace_id` ties the rating to the turn's workflow trace. */
+export interface FeedbackBody {
+  feedback_type: string;
+  query_index: number;
+  trace_id?: string;
+  comment?: string;
+  rating?: string;
+}
+
 export const PROBE_TIMEOUT_MS = 5_000;
 
 // Assistant calls render their own 403 and handle 401 without the interceptor's logout-and-reload.
 const ASSISTANT_REQUEST: AxiosRequestConfig = { silentForbidden: true, assistantManaged: true };
+
+// A cancel must outlive the page that sent it (sign-out, tab close), which only fetch's keepalive gives.
+const KEEPALIVE_REQUEST: AxiosRequestConfig = {
+  ...ASSISTANT_REQUEST,
+  adapter: "fetch",
+  fetchOptions: { keepalive: true },
+};
 
 const enc = encodeURIComponent;
 
@@ -107,6 +138,40 @@ const assistant = {
       ASSISTANT_REQUEST,
     );
     return res.data;
+  },
+
+  /** Stop on the server; JSON, because a cross-site form post cannot send that content type (constraint 15). */
+  cancelTurn: async (org: string, sid: string, turnId: string): Promise<void> => {
+    await http().post(
+      `/api/${enc(org)}/ai/chats/${enc(sid)}/cancel`,
+      { turn_id: turnId },
+      { ...KEEPALIVE_REQUEST, headers: { "x-o2-assistant-session-id": sid } },
+    );
+  },
+
+  /** The incident analysis has its own cancel route (`incidents.rs:755`; round 1 E-10). */
+  cancelIncidentAnalysis: async (org: string, incidentId: string): Promise<void> => {
+    await http().delete(
+      `/api/v2/${enc(org)}/alerts/incidents/${enc(incidentId)}/rca`,
+      KEEPALIVE_REQUEST,
+    );
+  },
+
+  /** Posted on the originating session only (constraint 6). */
+  confirm: async (org: string, sid: string, body: ConfirmBody): Promise<ConfirmResponse> => {
+    const res = await http().post<ConfirmResponse>(
+      `/api/${enc(org)}/ai/confirm/${enc(sid)}`,
+      body,
+      ASSISTANT_REQUEST,
+    );
+    return res.data ?? {};
+  },
+
+  feedback: async (org: string, sid: string, body: FeedbackBody): Promise<void> => {
+    await http().post(`/api/${enc(org)}/ai/feedback`, body, {
+      ...ASSISTANT_REQUEST,
+      headers: { "x-o2-assistant-session-id": sid },
+    });
   },
 };
 

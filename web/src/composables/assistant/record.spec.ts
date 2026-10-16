@@ -15,12 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  foldTurns,
-  mergeIncremental,
-  messagesFromTurns,
-  type StoredTurn,
-} from "./O2AIChat.history";
+import { foldTurns, mergeIncremental, messagesFromTurns, type StoredTurn } from "./record";
 
 const t = ((key: string, params?: { message?: string }) =>
   params?.message ? `${key}: ${params.message}` : key) as any;
@@ -364,5 +359,118 @@ describe("mergeIncremental", () => {
     const merged = mergeIncremental(cached, 4, [seqTurn("b2", 3, 6)], t);
     expect(merged.spans.map((s) => s.first_seq ?? s.turn_id)).toEqual([1, 3, "f1"]);
     expect(merged.messages[2].content).toBe("b2");
+  });
+});
+
+describe("foldTurns: replay phase", () => {
+  const replay = (turns: StoredTurn[]) => messagesFromTurns(turns, t, "owner", "replay");
+
+  it("renders a stored step without a result interrupted, never running (HT-05 AC 5)", () => {
+    const [, answer] = replay([
+      turn("q", [
+        { type: "tool_call", tool: "SearchSQL", call_id: "c1", message: "Querying", context: {} },
+        { type: "message_delta", content: "so far" },
+      ]),
+    ]);
+    expect(answer.contentBlocks?.[0]).toMatchObject({ call_id: "c1", stepState: "interrupted" });
+  });
+
+  it("ends a stored turn that never finished with the stream_dropped outcome (HT-01 AC 7)", () => {
+    const unfinished: StoredTurn = {
+      user: { text: "q" },
+      frames: [{ type: "message_delta", content: "partial" }],
+    };
+    for (const status of [undefined, "interrupted", "running"] as const) {
+      const [, answer] = replay([{ ...unfinished, ...(status && { status }) }]);
+      expect(answer.contentBlocks?.at(-1)).toEqual({ type: "error", errorType: "stream_dropped" });
+    }
+  });
+
+  it("names a stored failure without an error frame by its stored code", () => {
+    const failed: StoredTurn = {
+      user: { text: "q" },
+      frames: [],
+      status: "failed",
+      error_code: "agent_unreachable",
+    };
+    const [, answer] = replay([failed]);
+    expect(answer.contentBlocks).toEqual([{ type: "error", errorType: "agent_unavailable" }]);
+  });
+
+  it("adds no marker to a completed turn and no live status to any turn", () => {
+    const [, answer] = replay([
+      turn("q", [{ type: "message_delta", content: "done" }, { type: "complete" }], {
+        status: "completed",
+      }),
+    ]);
+    expect(answer.contentBlocks).toEqual([{ type: "text", text: "done" }]);
+    const running = replay([
+      turn("q", [{ type: "message_delta", content: "x" }], { status: "running" }),
+    ]);
+    expect(
+      running.flatMap((m) => m.contentBlocks ?? []).some((b) => b.turnStatus === "running"),
+    ).toBe(false);
+  });
+
+  it("replays a stored stopped turn whose frames end with cancelled as stopped", () => {
+    const stopped: StoredTurn = {
+      user: { text: "q" },
+      frames: [
+        { type: "tool_call", tool: "SearchSQL", call_id: "c1", context: {} },
+        { type: "message_delta", content: "partial" },
+        { type: "cancelled" },
+      ],
+      status: "cancelled",
+    };
+    for (const status of ["cancelled", undefined] as const) {
+      const [, answer] = replay([{ ...stopped, status }]);
+      const blocks = answer.contentBlocks ?? [];
+      expect(blocks.at(-1)).toEqual({ type: "status", turnStatus: "stopped" });
+      expect(blocks.filter((b) => b.turnStatus === "stopped")).toHaveLength(1);
+      expect(blocks[0].stepState).toBe("interrupted");
+    }
+  });
+
+  it("replays an owner-race failure with its outcome marker", () => {
+    const failed: StoredTurn = {
+      user: { text: "q" },
+      frames: [{ type: "error", category: "session_owner_unavailable", message: "moved" }],
+      status: "failed",
+    };
+    const [, answer] = replay([failed]);
+    expect(answer.contentBlocks).toEqual([
+      { type: "error", errorType: "session_owner_unavailable" },
+    ]);
+  });
+
+  it("adds no second marker to a failure whose error frame already named it", () => {
+    const failed: StoredTurn = {
+      user: { text: "q" },
+      frames: [{ type: "error", error_type: "llm_overload", message: "busy" }],
+      status: "failed",
+    };
+    const [, answer] = replay([failed]);
+    expect(answer.contentBlocks).toEqual([{ type: "error", errorType: "provider_error" }]);
+  });
+
+  it("marks a cancelled turn stopped without the legacy sentence", () => {
+    const stopped: StoredTurn = {
+      user: { text: "q" },
+      frames: [{ type: "message_delta", content: "x" }],
+      status: "cancelled",
+    };
+    const [, answer] = replay([stopped]);
+    expect(answer.contentBlocks?.at(-1)).toEqual({ type: "status", turnStatus: "stopped" });
+  });
+
+  it("leaves the default (legacy) fold unchanged", () => {
+    const stored = [
+      turn("q", [{ type: "tool_call", tool: "A", call_id: "c1", context: {} }], {
+        status: "interrupted",
+      }),
+    ];
+    const blocks = messagesFromTurns(stored, t).flatMap((m) => m.contentBlocks ?? []);
+    expect(blocks.some((b) => b.stepState)).toBe(false);
+    expect(blocks.at(-1)).toMatchObject({ type: "error", message: "aiAssistant.turnInterrupted" });
   });
 });

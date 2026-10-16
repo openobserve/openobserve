@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
@@ -48,6 +51,7 @@ const CONFIG = {
 };
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   resetAssistantRuntimeForTests();
   queryClient.clear();
   sessionStorage.clear();
@@ -149,5 +153,39 @@ describe("assistant runtime", () => {
     pushRecall(other, { text: "token=abc", chips: [], at: 1 });
     await assistantStore.onSignOut();
     expect(readRecall(other)).toEqual([]);
+  });
+
+  it("sends a turn end to end through the registered engine (WP-03 §5.9)", async () => {
+    const frame = (name: string) =>
+      JSON.parse(readFileSync(join(__dirname, "__fixtures__", "frames", `${name}.json`), "utf8"))
+        .frame;
+    const frames = ["status", "title", "tool_call", "tool_result", "message_delta", "complete"].map(
+      frame,
+    );
+    // The harness stream-shim's wire format: one `data:` line per frame, replayed from the fixtures.
+    const body = frames.map((f) => `data: ${JSON.stringify(f)}\n\n`).join("");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("requestAnimationFrame", (cb: () => void) => setTimeout(cb, 0));
+    assistantStore.init(context("admin"));
+    await vi.waitFor(() => expect(assistantStore.state.ready).toBe(true));
+    const sid = assistantStore.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+      thread: "new",
+    });
+    assistantStore.setDraft(sid, { text: "why?" });
+    await expect(assistantStore.send(sid)).resolves.toEqual({ state: "done", saved: "server" });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/api\/org1\/ai\/chat_stream$/);
+    expect(init.headers["x-o2-assistant-session-id"]).toBe(sid);
+    expect(JSON.parse(init.body).messages).toEqual([{ role: "user", content: "why?" }]);
+    const session = assistantStore.state.sessions[sid];
+    expect(session.messages.map((m) => m.role)).toEqual(["user", "assistant"]);
+    expect(session.turnMeta.traceId).toBe("4bf92f3577b34da6a3ce929d0e0e4736");
+    expect(session.turnMeta.usage).toMatchObject({ tokensIn: 18342, tokensOut: 612 });
   });
 });

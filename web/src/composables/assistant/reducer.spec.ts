@@ -16,13 +16,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  answerProgress,
   extractStreamText,
+  interruptSteps,
   reduce,
   type ReducerCtx,
   type StreamEffect,
   type StreamPhase,
   type StreamState,
-} from "@/components/O2AIChat.reducer";
+} from "./reducer";
 import type { ChatMessage, NavigationAction } from "@/ts/interfaces/chat";
 import { raw, type TranslateFn } from "@/types/i18n";
 
@@ -1003,5 +1005,286 @@ describe("reduce: state identity", () => {
     reduce(state, { type: "message_delta", content: "hi" }, makeCtx({ isActive: false }));
     expect(state.messages).toBe(messages);
     expect(messages).toHaveLength(1);
+  });
+});
+
+describe("reduce: typed phases (live)", () => {
+  const live = () => makeCtx({ phase: "live", isActive: false });
+  const blocksOf = (state: StreamState) =>
+    state.messages[state.messages.length - 1].contentBlocks ?? [];
+
+  it("appends a running step at once and settles it in place by call id (HT-05)", () => {
+    const state = makeState();
+    reduce(state, { type: "tool_call", tool: "SearchSQL", call_id: "c1", context: {} }, live());
+    expect(blocksOf(state)).toEqual([
+      expect.objectContaining({ type: "tool_call", call_id: "c1", stepState: "running" }),
+    ]);
+    reduce(
+      state,
+      { type: "tool_result", tool: "SearchSQL", call_id: "c1", summary: "4 rows" },
+      live(),
+    );
+    expect(blocksOf(state)).toEqual([
+      expect.objectContaining({
+        call_id: "c1",
+        stepState: "done",
+        success: true,
+        summary: "4 rows",
+      }),
+    ]);
+    expect(state.activeToolCall).toBeNull();
+  });
+
+  it("marks a failed result failed and counts it", () => {
+    const state = makeState();
+    reduce(state, { type: "tool_call", tool: "SearchSQL", call_id: "c1" }, live());
+    reduce(
+      state,
+      {
+        type: "tool_result",
+        tool: "SearchSQL",
+        call_id: "c1",
+        success: false,
+        error_type: "query_error",
+      },
+      live(),
+    );
+    expect(blocksOf(state)[0]).toMatchObject({
+      stepState: "failed",
+      success: false,
+      errorType: "query_error",
+    });
+    expect(state.extras).toMatchObject({ toolCalls: 1, toolErrors: 1 });
+  });
+
+  it("keeps a result for a call it never saw as a done step (HT-05 edge)", () => {
+    const state = makeState({ messages: [assistant()] });
+    reduce(state, { type: "tool_result", tool: "StreamList", call_id: "c7" }, live());
+    expect(blocksOf(state)).toEqual([
+      expect.objectContaining({ tool: "StreamList", call_id: "c7", stepState: "done" }),
+    ]);
+  });
+
+  it("interrupts a running step on an error, never a green check (HT-05 AC 3)", () => {
+    const state = makeState();
+    reduce(state, { type: "tool_call", tool: "SearchSQL", call_id: "c1" }, live());
+    const effects = reduce(
+      state,
+      { type: "error", error_type: "llm_overload", message: "busy" },
+      live(),
+    );
+    expect(blocksOf(state)[0].stepState).toBe("interrupted");
+    expect(blocksOf(state).some((b) => b.type === "text")).toBe(false);
+    expect(state.halted).toBe(true);
+    expect(kinds(effects)).toEqual(["save"]);
+  });
+
+  it.each([
+    ["complete", { type: "complete" }],
+    ["cancelled", { type: "cancelled" }],
+  ])("interrupts a step still running at %s", (_name, frame) => {
+    const state = makeState();
+    reduce(state, { type: "tool_call", tool: "SearchSQL", call_id: "c1" }, live());
+    reduce(state, frame, live());
+    expect(blocksOf(state)[0].stepState).toBe("interrupted");
+  });
+
+  it("interruptSteps marks only the running ones", () => {
+    const state = makeState();
+    reduce(state, { type: "tool_call", tool: "A", call_id: "a" }, live());
+    reduce(state, { type: "tool_result", tool: "A", call_id: "a" }, live());
+    reduce(state, { type: "tool_call", tool: "B", call_id: "b" }, live());
+    interruptSteps(state);
+    expect(blocksOf(state).map((b) => b.stepState)).toEqual(["done", "interrupted"]);
+    expect(answerProgress(state)).toEqual({ steps: 2, partial: false });
+  });
+
+  it("flips O2AIChat.stream.spec.ts:653: text before a trailing tool_call is kept", () => {
+    const state = makeState();
+    reduce(state, { type: "message_delta", content: "let me check" }, live());
+    reduce(state, { type: "tool_call", tool: "A", call_id: "c1" }, live());
+    reduce(state, { type: "complete" }, live());
+    expect(blocksOf(state)[0]).toEqual({ type: "text", text: "let me check" });
+    expect(state.messages[0].content).toBe("let me check");
+    expect(answerProgress(state).partial).toBe(true);
+  });
+
+  it("flips O2AIChat.stream.spec.ts:1723: a turn no container shows still records its steps", () => {
+    const state = makeState();
+    reduce(
+      state,
+      { type: "tool_call", tool: "SearchLogs", call_id: "c1" },
+      makeCtx({ phase: "live", isActive: false }),
+    );
+    expect(blocksOf(state)).toHaveLength(1);
+  });
+
+  it("keeps text, step, text order across a tool call", () => {
+    const state = makeState();
+    reduce(state, { type: "message_delta", content: "before" }, live());
+    reduce(state, { type: "tool_call", tool: "A", call_id: "c1" }, live());
+    reduce(state, { type: "message_delta", content: "after" }, live());
+    expect(blocksOf(state).map((b) => b.type)).toEqual(["text", "tool_call", "text"]);
+    expect(blocksOf(state)[2].text).toBe("after");
+  });
+
+  it("never writes an error into the answer and flags the owner race by code or category (BE D7)", () => {
+    for (const frame of [
+      { type: "error", code: "session_owner_unavailable" },
+      { type: "error", category: "session_owner_unavailable", message: "moved" },
+    ]) {
+      const state = makeState();
+      expect(reduce(state, frame, live())).toEqual([]);
+      expect(state.ownerUnavailable).toBe(true);
+      expect(state.messages).toEqual([]);
+    }
+  });
+
+  it("leaves the answer alone on persistence_failed (constraint 14)", () => {
+    const state = makeState();
+    reduce(state, { type: "message_delta", content: "answer" }, live());
+    expect(reduce(state, { type: "error", code: "persistence_failed" }, live())).toEqual([]);
+    expect(state.halted).toBe(false);
+  });
+
+  it("keeps usage, compacted, persisted and the trace id of complete (HT-07 AC 8)", () => {
+    const state = makeState();
+    reduce(state, { type: "message_delta", content: "a" }, live());
+    reduce(
+      state,
+      {
+        type: "complete",
+        compacted: true,
+        persisted: false,
+        trace_id: "tr1",
+        usage: { input_tokens: 5, output_tokens: 2 },
+      },
+      live(),
+    );
+    expect(state.lastTraceId).toBe("tr1");
+    expect(state.extras).toMatchObject({
+      compacted: true,
+      persisted: false,
+      usage: { input_tokens: 5, output_tokens: 2 },
+    });
+  });
+
+  it("records the B-02, B-04, B-07 and EB-A2 frames without touching the transcript", () => {
+    const state = makeState();
+    const frames = [
+      { type: "turn_started", turn_id: "srv-1" },
+      { type: "step", kind: "query", label: "query_logs", params: { stream: "default" } },
+      { type: "retrying", attempt: 2 },
+      { type: "compacting" },
+      { type: "usage", usage: { input_tokens: 9 } },
+      { type: "query", language: "sql", text: "SELECT 1" },
+      { type: "resource_changed", resource_type: "alert", op: "update" },
+      {
+        type: "findings",
+        likely_cause: "x",
+        confidence: "low",
+        evidence: [],
+        ruled_out: [],
+        unknowns: [],
+        next_steps: [],
+      },
+      { type: "status", message: "thinking" },
+    ];
+    for (const frame of frames) expect(reduce(state, frame, live())).toEqual([]);
+    expect(state.messages).toEqual([]);
+    expect(state.extras).toMatchObject({
+      serverTurnId: "srv-1",
+      step: { kind: "query", label: "query_logs" },
+      retrying: 2,
+      compacting: true,
+      usage: { input_tokens: 9 },
+      queries: [expect.objectContaining({ text: "SELECT 1" })],
+      resourceChanges: [expect.objectContaining({ op: "update" })],
+      findings: expect.objectContaining({ likely_cause: "x" }),
+    });
+  });
+
+  it("fails a denied tool step by policy, data level apart (B-02, A-01)", () => {
+    const state = makeState();
+    reduce(state, { type: "tool_call", tool: "o2_UpdateAlert", call_id: "c1" }, live());
+    reduce(
+      state,
+      { type: "permission_denied", tool: "o2_UpdateAlert", policy: "permission_tier" },
+      live(),
+    );
+    reduce(
+      state,
+      { type: "permission_denied", tool: "SearchSQL", policy: "data_sharing_level" },
+      live(),
+    );
+    expect(blocksOf(state).map((b) => [b.stepState, b.errorType])).toEqual([
+      ["failed", "permission_denied_tool"],
+      ["failed", "data_level_blocked"],
+    ]);
+  });
+
+  it("resolves a pending confirmation from confirmation_resolved (B-04)", () => {
+    const state = makeState();
+    reduce(
+      state,
+      { type: "confirmation_required", tool: "o2_delete", call_id: "c9", message: "Delete?" },
+      live(),
+    );
+    reduce(state, { type: "confirmation_resolved", id: "c9", approved: false }, live());
+    expect(blocksOf(state)[0]).toMatchObject({
+      pendingConfirmation: false,
+      stepState: "interrupted",
+    });
+  });
+
+  it("applies confirmation and navigation frames the legacy tail flush drops", () => {
+    for (const phase of ["live", "replay"] as const) {
+      const state = makeState({ messages: [assistant()] });
+      reduce(
+        state,
+        { type: "navigation_action", resource_type: "logs", action: "load_query", target: {} },
+        makeCtx({ phase }),
+      );
+      expect(blocksOf(state)[0].pendingConfirmation).toBe(true);
+    }
+  });
+
+  it("names a replayed failure by its code, never its server text", () => {
+    const state = makeState();
+    reduce(state, { type: "message_delta", content: "partial" }, makeCtx({ phase: "replay" }));
+    reduce(
+      state,
+      { type: "error", error_type: "llm_overload", message: "raw server text" },
+      makeCtx({ phase: "replay" }),
+    );
+    expect(blocksOf(state)[1]).toEqual({ type: "error", errorType: "provider_error" });
+  });
+
+  it("drops the animate, dashboard and segment effects the shell used to run", () => {
+    const state = makeState();
+    const effects = [
+      ...reduce(state, { type: "title", title: "T" }, live()),
+      ...reduce(state, { type: "message_delta", content: "a" }, live()),
+      ...reduce(state, { type: "tool_call", tool: "updateDashboard", call_id: "c1" }, live()),
+      ...reduce(
+        state,
+        {
+          type: "tool_result",
+          tool: "updateDashboard",
+          call_id: "c1",
+          call_args: { dashboard_id: "d" },
+        },
+        live(),
+      ),
+    ];
+    expect(kinds(effects)).not.toContain("dashboardEvent");
+    expect(state.title).toBe("T");
+  });
+
+  it("keeps the legacy phases byte-identical: stream still pushes on result, not on call", () => {
+    const state = makeState({ messages: [assistant()] });
+    reduce(state, { type: "tool_call", tool: "A", call_id: "c1" }, makeCtx());
+    expect(state.messages[0].contentBlocks).toEqual([]);
+    expect(state.extras).toBeUndefined();
   });
 });

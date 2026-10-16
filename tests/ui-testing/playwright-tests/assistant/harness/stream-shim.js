@@ -4,6 +4,10 @@
   const SCENARIOS = window.__O2MOCK_SCENARIOS__ || {};
   const HTTP_SCENARIOS = window.__O2MOCK_HTTP_SCENARIOS__ || {};
   const mock = (window.__o2mock = window.__o2mock || {});
+  // tailEnabled (B-03), envelopeEnabled (B-01), lifecycleFramesEnabled (B-02), cancelDelayMs, cancelStatus.
+  mock.knobs = { ...(window.__O2MOCK_KNOBS__ || {}), ...(mock.knobs || {}) };
+  // The last streamed turn, so the tail route can resume it.
+  mock.lastTurn = null;
   // `next` is consumed by the next chat_stream call; `sticky` applies to every call.
   mock.next = mock.next ?? null;
   mock.sticky = mock.sticky ?? null;
@@ -37,7 +41,26 @@
     return "complete";
   };
 
-  const sseStream = (scenario, signal) => {
+  // Pseudo frames: `keepalive` (an SSE comment), `oversized` (one line over 1 MiB), `raw` (a literal line).
+  const encodeFrame = (frame, seq) => {
+    if (frame.keepalive) return ": keepalive\n\n";
+    if (frame.oversized) return `data: {"type":"message_delta","content":"${"x".repeat(1024 * 1024 + 16)}"}\n\n`;
+    if (frame.raw) return `${frame.raw}\n\n`;
+    const id = mock.knobs.tailEnabled ? `id: ${seq}\n` : "";
+    return `${id}data: ${JSON.stringify(frame)}\n\n`;
+  };
+
+  const withLifecycle = (frames, turnId) => {
+    if (!mock.knobs.lifecycleFramesEnabled) return frames;
+    const out = [{ type: "turn_started", turn_id: turnId || "turn" }];
+    for (const frame of frames) {
+      if (frame.type === "tool_call") out.push({ type: "step", kind: "tool", label: frame.tool, params: { call_id: frame.call_id, stream: frame.context?.stream_name } });
+      out.push(frame);
+    }
+    return out;
+  };
+
+  const sseStream = (scenario, signal, firstSeq = 1) => {
     const enc = new TextEncoder();
     return new ReadableStream({
       async start(controller) {
@@ -47,6 +70,7 @@
           } catch (_) {}
         };
         signal?.addEventListener("abort", onAbort, { once: true });
+        let seq = firstSeq;
         for (const frame of scenario.frames) {
           if (signal?.aborted) return;
           if (frame.waitForConfirm) {
@@ -55,8 +79,10 @@
           }
           await sleep((scenario.delayMs ?? 30) / (mock.speed || 1));
           if (signal?.aborted) return;
-          controller.enqueue(enc.encode(`data: ${JSON.stringify(frame)}\n\n`));
+          controller.enqueue(enc.encode(encodeFrame(frame, seq)));
+          seq += 1;
         }
+        if (mock.lastTurn) mock.lastTurn.seq = seq - 1;
         if (scenario.holdOpen) {
           await new Promise((r) => (mock.release = r));
         }
@@ -81,13 +107,36 @@
       const httpErr = HTTP_SCENARIOS[name];
       if (httpErr) {
         await sleep(150);
-        return new Response(JSON.stringify(httpErr.body), {
+        // `repeat` keeps the scenario for the next call too (consent_twice: the same-turn retry is refused again).
+        mock.repeats = mock.repeats || {};
+        mock.repeats[name] = (mock.repeats[name] ?? httpErr.repeat ?? 1) - 1;
+        if (mock.repeats[name] > 0) mock.next = name;
+        else delete mock.repeats[name];
+        if (httpErr.networkError) throw new TypeError("Failed to fetch");
+        const body = mock.knobs.envelopeEnabled && httpErr.envelope ? httpErr.envelope : httpErr.body;
+        return new Response(JSON.stringify(body), {
           status: httpErr.status,
           headers: { "Content-Type": "application/json" },
         });
       }
       const scenario = SCENARIOS[name] || SCENARIOS.complete;
-      return new Response(sseStream(scenario, init.signal), {
+      const turnId = (init.headers || {})["x-o2-assistant-turn-id"];
+      mock.lastTurn = { name, turnId, seq: 0 };
+      return new Response(sseStream({ ...scenario, frames: withLifecycle(scenario.frames, turnId) }, init.signal), {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    }
+    // B-03 resumable tail: 404 while `tailEnabled` is off, else the scenario's `tailFrames` after `from_seq`.
+    const tail = url.match(/\/api\/[^/]+\/ai\/chats\/[^/]+\/turns\/[^/]+\/stream\?from_seq=(\d+)/);
+    if (tail) {
+      mock.tails = (mock.tails || []).concat([{ url, fromSeq: Number(tail[1]) }]);
+      if (!mock.knobs.tailEnabled || !mock.lastTurn) {
+        return new Response(JSON.stringify({ code: 404, message: "Not Found" }), { status: 404, headers: { "Content-Type": "application/json" } });
+      }
+      const scenario = SCENARIOS[mock.lastTurn.name] || SCENARIOS.complete;
+      const frames = scenario.tailFrames || [{ type: "complete" }];
+      return new Response(sseStream({ ...scenario, frames }, init.signal, Number(tail[1]) + 1), {
         status: 200,
         headers: { "Content-Type": "text/event-stream" },
       });
@@ -101,8 +150,11 @@
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
     if (/\/api\/[^/]+\/ai\/chats\/[^/]+\/cancel/.test(url)) {
+      mock.cancels = (mock.cancels || []).concat([{ url, body: typeof init.body === "string" ? init.body : "", keepalive: !!(init.keepalive ?? input?.keepalive) }]);
+      if (mock.knobs.cancelDelayMs) await sleep(mock.knobs.cancelDelayMs);
       mock.release?.();
-      return new Response(JSON.stringify({ cancelled: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+      const status = mock.knobs.cancelStatus || 200;
+      return new Response(JSON.stringify(status === 200 ? { cancelled: true } : { code: status, message: "cancel failed" }), { status, headers: { "Content-Type": "application/json" } });
     }
     return origFetch(input, init);
   };
