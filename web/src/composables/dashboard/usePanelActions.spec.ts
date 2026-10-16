@@ -592,7 +592,7 @@ describe("usePanelActions", () => {
       expect(alertCreationDialog.value?.prefill.source).toBe("explorer");
     });
 
-    it("alerts on the visible query when a series names a hidden one", () => {
+    it("treats a series naming a hidden query as no series, carrying its value to the visible one", () => {
       const args = { ...makePromql(), visibleQueryIndexes: { value: [1] } };
       const api = usePanelAlertCreation(args);
 
@@ -601,12 +601,30 @@ describe("usePanelActions", () => {
       expect(alertCreationDialog.value).toBeNull();
       const stored = readAlertPrefill();
       expect(stored?.promql).toBe("sum(rate(io_ops[1m]))");
-      expect(stored?.promqlCondition).toBeUndefined();
-      expect(stored?.warnings).toContainEqual({
-        key: "thresholdNotCarried",
-        level: "warning",
-        params: { value: "5" },
+      expect(stored?.promqlCondition).toEqual({ column: "value", operator: ">=", value: 5 });
+      expect(stored?.warnings.map((w) => w.key)).not.toContain("thresholdNotCarried");
+    });
+
+    it("on several visible queries, asks without a preselection and carries the value like an empty-area click", () => {
+      const args = makePromql();
+      args.panelSchema.value.queries.push({
+        query: "max(disk_used)",
+        fields: { stream: "disk_used", stream_type: "metrics" },
       });
+      const api = usePanelAlertCreation({ ...args, visibleQueryIndexes: { value: [0, 2] } });
+
+      api.handleCreateAlert({ condition: "above", threshold: 5, panelQueryIndex: 1 });
+
+      const prefill = alertCreationDialog.value?.prefill;
+      expect(prefill?.queryChoices?.map((c) => c.index)).toEqual([0, 2]);
+      expect(prefill?.queryIndex).toBe(0);
+      expect(prefill?.promqlCondition?.value).toBe(5);
+
+      rebuildAlertPrefill({ queryIndex: 2 });
+      expect(alertCreationDialog.value?.prefill.promqlCondition?.value).toBe(5);
+      expect(alertCreationDialog.value?.prefill.warnings.map((w) => w.key)).not.toContain(
+        "thresholdNotCarried",
+      );
     });
 
     describe("the not-carried threshold in the form's banner", () => {

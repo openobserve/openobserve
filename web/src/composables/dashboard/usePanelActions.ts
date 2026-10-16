@@ -229,10 +229,11 @@ export function usePanelAlertCreation({
     const isForecast = selection.condition === "forecast" && !!point;
     // A forecast is fitted to the clicked series, so it cannot move to another query.
     const offerChoice = visible.length > 1 && !isForecast;
-    const clicked = selection.panelQueryIndex;
-    // A hidden query draws nothing, so a series naming one was mislabelled; a forecast keeps its own query.
-    const queryIndex =
-      clicked !== undefined && (isForecast || visible.includes(clicked)) ? clicked : visible[0];
+    const named = selection.panelQueryIndex;
+    // A hidden query draws nothing, so a series naming one was mislabelled and counts as no series; a forecast keeps its query.
+    const clicked =
+      named !== undefined && (isForecast || visible.includes(named)) ? named : undefined;
+    const queryIndex = clicked ?? visible[0];
     const query = queries[queryIndex];
     if (!query) {
       return;
@@ -272,7 +273,7 @@ export function usePanelAlertCreation({
           : null) ?? ownYAxisColumnOf(queries[index], executedQueryOf(index))
       );
     };
-    // The clicked value is on that series' scale, so another query, a hidden one's fallback included, gets the form's default.
+    // The clicked value is on that series' scale, so a query the user switched to gets the form's default.
     const carriesThreshold = (index: number) => clicked === undefined || index === clicked;
     const thresholdFor = (index: number) =>
       carriesThreshold(index)

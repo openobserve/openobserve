@@ -222,6 +222,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useColorizedQuery } from "@/composables/useColorizedQuery";
 import { copyToClipboard } from "@/utils/clipboard";
+import { escapeHtml } from "@/utils/html";
 import type {
   AlertBuildOptions,
   AlertPatternMode,
@@ -316,10 +317,7 @@ const pickedQueryColoured = useColorizedQuery(
     import("@/utils/query/colorizeQuery").then((module) => module.colorizeQuery(query, language)),
 );
 
-const escapedText = (text: string) =>
-  Object.assign(document.createElement("div"), { textContent: text }).innerHTML;
-
-const pickedQueryHtml = computed(() => pickedQueryColoured.value || escapedText(pickedQuery.value));
+const pickedQueryHtml = computed(() => pickedQueryColoured.value || escapeHtml(pickedQuery.value));
 
 const onQueryChange = (value: unknown) => {
   if (typeof value !== "number" || value === props.prefill?.queryIndex) return;
