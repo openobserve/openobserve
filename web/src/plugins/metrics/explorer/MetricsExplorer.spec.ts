@@ -1857,17 +1857,24 @@ describe("MetricsExplorer wiring", () => {
       );
     });
 
-    it("Visualize keeps the Refresh button beside Run; Refresh re-runs without recording", async () => {
+    it("Visualize shows Run but no Refresh button; the refresh shortcut still re-runs without recording", async () => {
       const wrapper = withButtons();
       (wrapper.vm as any).setMode("visualize");
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find(RUN).exists()).toBe(true);
-      const refresh = wrapper.find('[data-test="metrics-explorer-refresh"]');
-      expect(refresh.exists()).toBe(true);
-      await refresh.trigger("click");
+      expect(wrapper.find('[data-test="metrics-explorer-refresh"]').exists()).toBe(false);
+      shortcuts.handlers.metricsRefresh();
       expect(visualizeRunQuery).toHaveBeenCalledTimes(1);
       expect(visualizeOnUserRun).not.toHaveBeenCalled();
+    });
+
+    it("Explore and Workspace keep the Refresh button", async () => {
+      const wrapper = withButtons();
+      expect(wrapper.find('[data-test="metrics-explorer-refresh"]').exists()).toBe(true);
+      (wrapper.vm as any).setMode("workspace");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="metrics-explorer-refresh"]').exists()).toBe(true);
     });
 
     it("the run shortcut in Explore refreshes the grid and records nothing", async () => {

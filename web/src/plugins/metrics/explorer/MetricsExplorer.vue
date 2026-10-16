@@ -129,8 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OButton>
         </template>
+        <!-- Visualize's Run query already re-runs the chart; the r shortcut and auto-refresh still refresh there. -->
         <OButton
-          :variant="mode === 'visualize' ? 'outline' : 'primary'"
+          v-if="mode !== 'visualize'"
+          variant="primary"
           size="sm-toolbar"
           icon-left="refresh"
           :disabled="isGridMode && (refreshing || grid.loading.value)"
