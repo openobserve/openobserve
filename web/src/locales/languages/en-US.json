@@ -8207,7 +8207,6 @@
       "alert": "Alert",
       "topOrgs": "Most affected orgs",
       "worstHours": "Worst hours",
-      "lagImpact": "{skipped} skipped, {late} of {evaluations} late",
       "proposedActions": "Proposed actions",
       "openAlert": "Open alert"
     },
@@ -9165,7 +9164,7 @@
       "helpYourVariablesEmpty": "You haven't added any variables yet.",
       "helpRowTemplateExplain": "An alert can match many rows. The row template decides how a single row looks. Then {'{'}rows{'}'} in your main template drops in every matched row, already formatted.",
       "helpRowTemplateTypeHeading": "String vs JSON",
-      "helpRowTemplateTypeExplain": "String produces plain text per row. JSON produces a JSON object per row, suitable for structured destinations.",
+      "helpRowTemplateTypeExplain": "String produces plain text per row. JSON produces a JSON object per row, suitable for structured destinations. Use {'{'}...row{'}'} as the entire template to include all row fields automatically. A row field named ...row takes precedence.",
       "helpRowTemplateTypeCurrent": "Currently selected:",
       "helpPreviewHeadingShort": "Preview",
       "helpWhyHeading": "Why use a variable?",
@@ -9236,8 +9235,8 @@
       "selectTemplate": "Select Template",
       "templateTypeString": "String",
       "templateTypeJson": "JSON",
-      "rowTemplatePlaceholderJson": "e.g - {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'}",
-      "rowTemplatePlaceholderString": "e.g - Alert was triggered at {'{'}timestamp{'}'}"
+      "rowTemplatePlaceholderJson": "e.g. {'{'}\"user\": \"{'{'}name{'}'}\", \"timestamp\": \"{'{'}timestamp{'}'}\"{'}'} or {'{'}...row{'}'}",
+      "rowTemplatePlaceholderString": "e.g. Alert was triggered at {'{'}timestamp{'}'}"
     },
     "editJson": "Edit Alert JSON",
     "additional_settings": "Additional Settings",
@@ -10550,7 +10549,7 @@
     "rowsMax": "Max rows",
     "rowsFormat": "Row format (optional)",
     "rowsFormatLint": "Format references a column this template doesn't restrict rows to",
-    "rowsFormatCaption": "Builds one line per matching log row. Tokens are that row's own field names — e.g. {'{'}level{'}'} {'{'}message{'}'} for a row with level and message fields. Leave empty to show every field.",
+    "rowsFormatCaption": "Builds one line per matching log row. Tokens are that row's own field names — e.g. {'{'}level{'}'} {'{'}message{'}'} for a row with level and message fields. Use {'{'}...row{'}'} to include all fields as serialized JSON text. A row field named ...row takes precedence. Leave empty to show every field.",
     "bodyMarkdownLint": "Line {line} starts with \"{marker}\" but has no space after it, so it will render as plain text, not a list or heading. Add a space to fix it.",
     "addToTemplate": "Add to this template",
     "addToTemplateCaption": "Fields, links, matching rows, channel titles, chart",

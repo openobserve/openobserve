@@ -223,7 +223,7 @@ async fn request(
         req = req.body(body);
     }
 
-    let resp = req.send().await?;
+    let resp = req.send().await.map_err(reqwest::Error::without_url)?;
     let status = resp.status();
     let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
     let text = resp.text().await.unwrap_or_default();

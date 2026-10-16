@@ -8207,7 +8207,6 @@
       "alert": "Alert",
       "topOrgs": "Najbardziej dotknięte organizacje",
       "worstHours": "Najgorsze godziny",
-      "lagImpact": "{skipped} pominiętych, {late} z {evaluations} opóźnionych",
       "proposedActions": "Proponowane działania",
       "openAlert": "Otwórz alert"
     },

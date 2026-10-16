@@ -8202,7 +8202,6 @@
       "alert": "警示",
       "topOrgs": "受影響最嚴重的組織",
       "worstHours": "最嚴重的時段",
-      "lagImpact": "略過 {skipped}，{evaluations} 次中有 {late} 次延遲",
       "proposedActions": "建議動作",
       "openAlert": "開啟警示"
     },

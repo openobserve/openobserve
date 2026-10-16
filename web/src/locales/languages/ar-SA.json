@@ -8207,7 +8207,6 @@
       "alert": "تنبيه",
       "topOrgs": "المؤسسات الأكثر تأثرًا",
       "worstHours": "أسوأ الساعات",
-      "lagImpact": "{skipped} متخطاة، و{late} من {evaluations} متأخرة",
       "proposedActions": "الإجراءات المقترحة",
       "openAlert": "فتح التنبيه"
     },

@@ -8207,7 +8207,6 @@
       "alert": "Uyarı",
       "topOrgs": "En çok etkilenen kuruluşlar",
       "worstHours": "En kötü saatler",
-      "lagImpact": "{skipped} atlandı, {evaluations} değerlendirmenin {late} tanesi geç",
       "proposedActions": "Önerilen eylemler",
       "openAlert": "Uyarıyı aç"
     },

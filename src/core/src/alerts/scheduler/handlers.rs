@@ -2878,7 +2878,7 @@ async fn handle_alert_triggers(
 ) -> Result<(), anyhow::Error> {
     let query_trace_id = ider::generate_trace_id();
     let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
-    let (_, max_retries) = get_scheduler_max_retries();
+    let max_retries = get_scheduler_max_retries();
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_alert_triggers: processing trigger: {}",
         trigger.module_key
@@ -4531,7 +4531,7 @@ async fn handle_report_triggers(
     let conn = get_orm_client_rw().await;
     let query_trace_id = ider::generate_trace_id();
     let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
-    let (_, max_retries) = get_scheduler_max_retries();
+    let max_retries = get_scheduler_max_retries();
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_report_trigger,org: {}, module_key: {}",
         trigger.org,
@@ -4867,7 +4867,7 @@ async fn handle_derived_stream_triggers(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_derived_stream_triggers processing trigger: {}",
         trigger.module_key
     );
-    let (_, max_retries) = get_scheduler_max_retries();
+    let max_retries = get_scheduler_max_retries();
 
     // module_key format: stream_type/org_id/pipeline_name/pipeline_id
     let (org_id, stream_type, pipeline_name, pipeline_id) = match get_pipeline_info_from_module_key(
@@ -5250,10 +5250,7 @@ async fn handle_derived_stream_triggers(
         return Ok(());
     }
 
-    // In case the scheduler background job (watch_timeout) updates the trigger retries
-    // (not through this handler), we need to skip to the next run at but with the same
-    // trigger start time. If we don't handle here, in that case, the `clean_complete`
-    // background job will clear this job as it has reached max retries.
+    // watch_timeout can bump retries outside this handler; past the cap, skip to the next run.
     if trigger.retries >= max_retries {
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream trigger: {}/{} has reached maximum possible retries. Skipping to next run",
@@ -5612,7 +5609,7 @@ async fn handle_backfill_triggers(
         triggers::{DeletionStatus, ScheduledTriggerData},
     };
 
-    let (_, max_retries) = get_scheduler_max_retries();
+    let max_retries = get_scheduler_max_retries();
     let job_id = trigger.module_key.clone();
     let org_id = trigger.org.clone();
     let query_trace_id = ider::generate_trace_id();

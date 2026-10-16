@@ -21,7 +21,7 @@ use config::{
 };
 use sqlx::Row;
 
-use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_max_retries};
+use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus};
 use crate::{
     db::{
         self, IndexStatement,
@@ -868,30 +868,6 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
                 .await?
         };
         Ok(jobs)
-    }
-
-    /// Background job that frequently (30 secs interval) cleans "Completed" jobs or jobs with
-    /// retries >= threshold set through environment
-    async fn clean_complete(&self) -> Result<()> {
-        let pool = CLIENT_RW.clone();
-        log::debug!("[SCHEDULER] cleaning completed jobs");
-        let (include_max, mut max_retries) = get_scheduler_max_retries();
-        if include_max {
-            max_retries += 1;
-        }
-        DB_QUERY_NUMS
-            .with_label_values(&["delete", "scheduled_jobs"])
-            .inc();
-        // Since alert scheduled_jobs contain last_satisfied_at field, we should not delete them
-        sqlx::query(
-            r#"DELETE FROM scheduled_jobs WHERE (status = $1 OR retries >= $2) AND module != $3;"#,
-        )
-        .bind(TriggerStatus::Completed)
-        .bind(max_retries)
-        .bind(TriggerModule::Alert)
-        .execute(&pool)
-        .await?;
-        Ok(())
     }
 
     /// Background job that watches for timeout of a job

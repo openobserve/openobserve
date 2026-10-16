@@ -53,49 +53,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OSeparator />
 
-    <OCardSection role="body" class="flex flex-col gap-2 pt-3">
-      <dl class="flex flex-wrap gap-x-6 gap-y-1">
+    <OCardSection role="body" class="flex flex-col gap-3 pt-3">
+      <dl class="flex flex-wrap gap-x-8 gap-y-2">
         <div
           v-for="row in evidence"
           :key="row.column"
-          class="flex min-w-0 items-baseline gap-1.5"
+          class="flex min-w-0 flex-col"
           :class="row.wide ? 'basis-full' : ''"
         >
-          <dt class="text-text-secondary shrink-0 text-xs">{{ row.label }}</dt>
-          <OTruncatedText as="dd" class="text-text-body min-w-0 text-xs font-medium tabular-nums">
+          <dt class="text-text-secondary text-xs">{{ row.label }}</dt>
+          <OTruncatedText as="dd" class="text-text-body min-w-0 text-sm font-medium tabular-nums">
             {{ row.value }}
           </OTruncatedText>
         </div>
       </dl>
 
-      <div
-        v-for="list in lagLists"
-        :key="list.column"
-        class="flex flex-col gap-1.5"
-        :data-test="`alert-calibration-finding-${list.key}-list`"
-      >
-        <OText variant="label" as="div">{{ list.label }}</OText>
-        <ul class="flex flex-col gap-1">
-          <li
+      <div v-if="lagLists.length" class="grid gap-3 lg:grid-cols-2">
+        <div
+          v-for="list in lagLists"
+          :key="list.column"
+          class="border-border-default rounded-default grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-4 gap-y-1.5 border px-3 py-2"
+          :data-test="`alert-calibration-finding-${list.key}-list`"
+        >
+          <OText variant="label" as="div" class="min-w-0">{{ list.label }}</OText>
+          <OText
+            v-for="column in LAG_COLUMNS"
+            :key="column.field"
+            variant="label"
+            as="div"
+            class="text-end"
+          >
+            {{ t(column.labelKey) }}
+          </OText>
+          <div
             v-for="row in list.rows"
             :key="row.key"
-            class="flex min-w-0 items-baseline justify-between gap-3"
+            class="contents"
             data-test="alert-calibration-finding-lag-row"
           >
-            <OTruncatedText class="text-text-body min-w-0 text-xs font-medium">
+            <OTruncatedText
+              class="text-text-body min-w-0 text-xs font-medium"
+              data-test="alert-calibration-finding-lag-cell"
+            >
               {{ row.label }}
             </OTruncatedText>
-            <span class="text-text-secondary shrink-0 text-xs tabular-nums">
-              {{
-                t("alertCalibration.detail.lagImpact", {
-                  skipped: formatEvidence(t, row.skipped_windows, "count"),
-                  late: formatEvidence(t, row.late_evaluations, "count"),
-                  evaluations: formatEvidence(t, row.evaluations, "count"),
-                })
-              }}
+            <span
+              v-for="column in LAG_COLUMNS"
+              :key="column.field"
+              class="text-text-body text-end text-xs tabular-nums"
+              data-test="alert-calibration-finding-lag-cell"
+            >
+              {{ formatEvidence(t, row[column.field], "count") }}
             </span>
-          </li>
-        </ul>
+          </div>
+        </div>
       </div>
 
       <div
@@ -130,8 +141,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useOrgId } from "@/composables/query";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { parseLagRows, type FindingRecord } from "./digests";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import { parseLagRows, type FindingRecord, type LagRow } from "./digests";
 import { ACTION_META, isProposedAction, RULE_META } from "./rules";
 import {
   CONFIDENCE_LABEL,
@@ -142,6 +153,12 @@ import {
 } from "./format";
 
 const props = defineProps<{ finding: FindingRecord }>();
+
+const LAG_COLUMNS: { field: keyof LagRow; labelKey: I18nKey }[] = [
+  { field: "skipped_windows", labelKey: "alertCalibration.evidence.skippedWindows" },
+  { field: "late_evaluations", labelKey: "alertCalibration.evidence.lateEvaluations" },
+  { field: "evaluations", labelKey: "alertCalibration.evidence.evaluations" },
+];
 
 const { t } = useI18nTyped();
 const router = useRouter();

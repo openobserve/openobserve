@@ -189,7 +189,7 @@ pub async fn list_overlapping(
     range_start_us: i64,
     range_end_us: i64,
 ) -> Result<Vec<AlertEvalInterval>, errors::Error> {
-    let client = get_orm_client_rw().await;
+    let client = get_orm_client_ro().await;
     list_overlapping_with(client, alert_id, range_start_us, range_end_us).await
 }
 
