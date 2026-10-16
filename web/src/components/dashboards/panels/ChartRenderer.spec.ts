@@ -616,21 +616,33 @@ describe("ChartRenderer", () => {
 
       it("reports events only while the panel needs to know which line was meant", async () => {
         const mockChart = await chartMock();
-        const lastSeries = () =>
-          vi.mocked(mockChart.setOption).mock.calls.at(-1)?.[0].series as Record<string, unknown>[];
+        const series = [{ type: "line" }, { type: "bar" }];
+        const lastCall = () => vi.mocked(mockChart.setOption).mock.calls.at(-1);
 
         await wrapper.setProps({
-          data: {
-            ...mockChartData,
-            options: { ...mockChartData.options, series: [{ type: "line" }, { type: "bar" }] },
-          },
+          data: { ...mockChartData, options: { ...mockChartData.options, series } },
         });
         await flushPromises();
-        expect(lastSeries().map((entry) => entry.triggerEvent)).toEqual([undefined, undefined]);
+        expect(
+          (lastCall()?.[0].series as Record<string, unknown>[]).map((entry) => entry.triggerEvent),
+        ).toEqual([undefined, undefined]);
 
+        vi.mocked(mockChart.getOption).mockReturnValue({ series });
+        vi.mocked(mockChart.setOption).mockClear();
         await wrapper.setProps({ findLineOnContextMenu: true });
         await flushPromises();
-        expect(lastSeries().map((entry) => entry.triggerEvent)).toEqual(["line", undefined]);
+        expect(mockChart.setOption).toHaveBeenCalledTimes(1);
+        expect(lastCall()).toEqual([
+          { series: [{ triggerEvent: "line" }, {}] },
+          { lazyUpdate: true },
+        ]);
+
+        await wrapper.setProps({ findLineOnContextMenu: false });
+        await flushPromises();
+        expect(lastCall()).toEqual([
+          { series: [{ triggerEvent: false }, {}] },
+          { lazyUpdate: true },
+        ]);
       });
 
       it("keeps stroke events away from click, hover and move, which drive drilldown and exemplars", async () => {

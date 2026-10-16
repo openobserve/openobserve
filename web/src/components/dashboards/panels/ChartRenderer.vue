@@ -119,6 +119,7 @@ import {
   indexesNearX,
   isLineStrokeEvent,
   lineSeriesAtPoint,
+  lineStrokeEventsPatch,
   nearestIndexByX,
   withLineStrokeEvents,
   type LineStrokeEvent,
@@ -989,11 +990,11 @@ export default defineComponent({
 
     watch(
       () => props.findLineOnContextMenu,
-      () => {
+      (on) => {
         try {
-          chart?.setOption(chartOptions(props?.data?.options || {}), {
+          // Merge only the switch, so zoom and other interactive state survive the flip.
+          chart?.setOption(lineStrokeEventsPatch(chart.getOption()?.series, on), {
             lazyUpdate: true,
-            notMerge: true,
           });
         } catch (error) {
           console.error("Error during setOption", error);

@@ -47,6 +47,13 @@ export const withLineStrokeEvents = (
       }
     : options;
 
+/** A merge-mode patch that turns the line strokes' events on or off, leaving every other option as it is. */
+export const lineStrokeEventsPatch = (series: unknown, on: boolean) => ({
+  series: (Array.isArray(series) ? (series as { type?: string }[]) : []).map((entry) =>
+    entry?.type === "line" ? { triggerEvent: on ? "line" : false } : {},
+  ),
+});
+
 /** An event from a line's stroke rather than a data point; only `withLineStrokeEvents` makes strokes report. */
 export const isLineStrokeEvent = (params: unknown): params is LineStrokeEvent => {
   const event = params as { selfType?: string; seriesIndex?: unknown } | null;

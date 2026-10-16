@@ -15,7 +15,11 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import * as echarts from "echarts";
-import { isLineStrokeEvent, withLineStrokeEvents } from "./lineSeriesAtPoint";
+import {
+  isLineStrokeEvent,
+  lineStrokeEventsPatch,
+  withLineStrokeEvents,
+} from "./lineSeriesAtPoint";
 
 // Real ECharts with the SVG renderer: hit-testing is zrender's path math, so jsdom can drive it.
 const WIDTH = 400;
@@ -232,6 +236,25 @@ describe("a line's drawn stroke as a right-click target", () => {
 
     expect((chart.convertFromPixel({ seriesIndex: 1 }, pixel) as number[])[1]).toBeCloseTo(500);
     expect((chart.convertFromPixel({ gridIndex: 0 }, pixel) as number[])[1]).not.toBeCloseTo(500);
+  });
+
+  it("turns stroke events on and off by merging the patch, keeping the zoom", () => {
+    const at = strokeAt(smooth, 0, 1.5) as number[];
+    const { chart, recorded, gesture } = render(smooth, "item", false);
+    const strokeHits = () => {
+      recorded.length = 0;
+      gesture(at);
+      return recorded.filter((event) => isLineStrokeEvent(event)).length;
+    };
+    chart.setOption(lineStrokeEventsPatch(chart.getOption().series, true));
+    expect(strokeHits()).toBeGreaterThan(0);
+
+    chart.setOption(lineStrokeEventsPatch(chart.getOption().series, false));
+    expect(strokeHits()).toBe(0);
+
+    chart.setOption({ dataZoom: [{ type: "inside", startValue: 0.5, endValue: 3 }] });
+    chart.setOption(lineStrokeEventsPatch(chart.getOption().series, true));
+    expect((chart.getOption().dataZoom as { startValue?: number }[])[0].startValue).toBe(0.5);
   });
 
   it("stays silent on a stroke while the option is off", () => {
