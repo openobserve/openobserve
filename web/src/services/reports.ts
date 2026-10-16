@@ -223,7 +223,7 @@ export interface ReportRunCounts {
 }
 
 export type ReportHistoryDisabledReason =
-  "usage_report_to_own_org_off" | "usage_reporting_remote" | "trial_expired";
+  "usage_reporting_remote" | "trial_expired";
 
 export interface ReportHistoryResponse {
   total: number;

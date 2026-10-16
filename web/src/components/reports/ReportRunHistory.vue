@@ -507,13 +507,9 @@ const disabledDescription = computed(() => {
   switch (history.data.value?.disabled_reason) {
     case "trial_expired":
       return t("reports.history.disabledTrialDescription");
-    case "usage_reporting_remote":
+    default:
       return t("reports.history.disabledRemoteDescription", {
         setting: raw("ZO_USAGE_REPORTING_MODE"),
-      });
-    default:
-      return t("reports.history.disabledOwnOrgDescription", {
-        setting: raw("ZO_USAGE_REPORT_TO_OWN_ORG"),
       });
   }
 });

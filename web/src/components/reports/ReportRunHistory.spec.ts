@@ -126,12 +126,12 @@ describe("ReportRunHistory", () => {
 
   it("names the cause when the org records no runs", async () => {
     vi.mocked(reports.getHistory).mockResolvedValue({
-      data: { ...RESPONSE, total: 0, hits: [], disabled_reason: "usage_report_to_own_org_off" },
+      data: { ...RESPONSE, total: 0, hits: [], disabled_reason: "usage_reporting_remote" },
     } as any);
     const w = mountHistory();
     await flushPromises();
     expect(w.find('[data-test="reports-reportrunhistory-disabled"]').text()).toContain(
-      "ZO_USAGE_REPORT_TO_OWN_ORG",
+      "ZO_USAGE_REPORTING_MODE",
     );
   });
 

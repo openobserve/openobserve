@@ -41,7 +41,6 @@ use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
 
-pub const DISABLED_OWN_ORG_OFF: &str = "usage_report_to_own_org_off";
 pub const DISABLED_REMOTE: &str = "usage_reporting_remote";
 pub const DISABLED_TRIAL_EXPIRED: &str = "trial_expired";
 const MODULE_REPORT: &str = "report";
@@ -578,7 +577,6 @@ async fn disabled_reason(_org_id: &str) -> Option<&'static str> {
     #[cfg(not(feature = "cloud"))]
     let trial_over = false;
     disabled_reason_for(
-        cfg.common.usage_report_to_own_org,
         &cfg.common.usage_reporting_mode,
         cfg!(feature = "enterprise"),
         trial_over,
@@ -587,14 +585,11 @@ async fn disabled_reason(_org_id: &str) -> Option<&'static str> {
 
 /// Mirrors the own-org write rules in self_reporting::persistence.
 fn disabled_reason_for(
-    usage_report_to_own_org: bool,
     usage_reporting_mode: &str,
     enterprise: bool,
     trial_over: bool,
 ) -> Option<&'static str> {
-    if !usage_report_to_own_org {
-        Some(DISABLED_OWN_ORG_OFF)
-    } else if !enterprise && usage_reporting_mode == "remote" {
+    if !enterprise && usage_reporting_mode == "remote" {
         Some(DISABLED_REMOTE)
     } else if trial_over {
         Some(DISABLED_TRIAL_EXPIRED)
@@ -882,18 +877,15 @@ mod tests {
     #[test]
     fn disabled_reason_names_each_cause() {
         assert_eq!(
-            disabled_reason_for(false, "local", false, false),
-            Some(DISABLED_OWN_ORG_OFF)
-        );
-        assert_eq!(
-            disabled_reason_for(true, "remote", false, false),
+            disabled_reason_for("remote", false, false),
             Some(DISABLED_REMOTE)
         );
-        assert_eq!(disabled_reason_for(true, "remote", true, false), None);
+        assert_eq!(disabled_reason_for("remote", true, false), None);
         assert_eq!(
-            disabled_reason_for(true, "local", false, true),
+            disabled_reason_for("local", false, true),
             Some(DISABLED_TRIAL_EXPIRED)
         );
-        assert_eq!(disabled_reason_for(true, "both", false, false), None);
+        assert_eq!(disabled_reason_for("local", false, false), None);
+        assert_eq!(disabled_reason_for("both", false, false), None);
     }
 }
