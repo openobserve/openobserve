@@ -195,6 +195,7 @@ const setFilters = (patch: { minMs?: number; frustrated?: boolean; errored?: boo
     ...(merged.frustrated ? { frustrated: true as const } : {}),
     ...(merged.errored ? { errored: true as const } : {}),
     ...(merged.vc?.length ? { vc: merged.vc } : {}),
+    ...(merged.pc?.length ? { pc: merged.pc } : {}),
   };
   emit(
     "update",

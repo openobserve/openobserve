@@ -19,6 +19,7 @@ import {
   hitCounts,
   isNamedDim,
   type BreakdownRow,
+  type BreakdownStart,
   type FunnelResult,
 } from "@/utils/rum/productAnalyticsModel";
 
@@ -176,29 +177,43 @@ export function compareFunnel(cur: FunnelResult, prev: FunnelResult): FunnelComp
 
 /** Lines the previous run's per-value rows up with this period's folded rows; only overall conversion is compared. */
 export function compareBreakdown(
-  cur: { rows: BreakdownRow[]; total: number[] },
+  cur: { rows: BreakdownRow[]; total: number[]; start?: BreakdownStart | null },
   curHits: Record<string, unknown>[],
   prevHits: Record<string, unknown>[],
   steps: number,
 ): { rows: ComparedBreakdownRow[]; total: PrevSide | null } {
+  const k = cur.start && !cur.start.anyStep ? cur.start.step : 1;
   const head = new Set(cur.rows.flatMap((r) => (r.value === null ? [] : [r.value])));
   const seenNow = new Set(curHits.filter(isNamedDim).map((h) => String(h.dim)));
-  const restRow = cur.rows.find((r) => r.value === null);
+  // An attribute breakdown keeps its unnamed units in their own row, apart from Other.
+  const split = cur.rows.some((r) => r.noValue || r.leftBefore);
+  const restRow = cur.rows.find((r) => r.value === null && (split ? r.noValue : true));
   const byValue = new Map<string, Record<string, unknown>[]>();
-  const intoRest: Record<string, unknown>[] = [];
+  const restNamed: Record<string, unknown>[] = [];
+  const restUnnamed: Record<string, unknown>[] = [];
   const prevOnly: Record<string, unknown>[] = [];
   for (const h of prevHits) {
     const dim = String(h.dim);
     if (isNamedDim(h) && head.has(dim)) byValue.set(dim, [...(byValue.get(dim) ?? []), h]);
     // A value folded into this period's Other is compared there; an unnamed one goes to this period's null row.
-    else if (isNamedDim(h) ? seenNow.has(dim) : !!restRow) intoRest.push(h);
+    else if (isNamedDim(h) && seenNow.has(dim)) restNamed.push(h);
+    else if (!isNamedDim(h) && restRow) restUnnamed.push(h);
     else prevOnly.push(h);
   }
+  const hitsOf = (r: BreakdownRow): Record<string, unknown>[] | null => {
+    if (r.leftBefore) return null;
+    if (r.value !== null) return byValue.get(r.value) ?? [];
+    if (r.noValue) return restUnnamed;
+    return split ? restNamed : [...restNamed, ...restUnnamed];
+  };
   const rows: ComparedBreakdownRow[] = cur.rows.map((r) => {
-    const hits = r.value === null ? intoRest : (byValue.get(r.value) ?? []);
+    const hits = hitsOf(r);
     return {
       ...r,
-      prev: prevSide(r.counts, hits.length ? sumCounts(hits, steps) : null),
+      prev: prevSide(
+        r.counts.slice(k - 1),
+        hits?.length ? sumCounts(hits, steps).slice(k - 1) : null,
+      ),
       prevOnly: false,
     };
   });
@@ -268,6 +283,9 @@ const prevOnlyRow = (
     atLeast: false,
     other: value === null && !notSet,
     notSet,
+    noValue: false,
+    leftBefore: false,
+    medianMs: null,
     prev: prevSide(zeros, sumCounts(hits, steps)),
     prevOnly: true,
   };

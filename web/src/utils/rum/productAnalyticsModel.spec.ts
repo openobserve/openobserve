@@ -798,7 +798,7 @@ describe("URL codec and validators (D-45, AC-14, AC-20)", () => {
     ["unknown window", { s: [["p", "/"]], u: "users", w: "2y" }],
     ["kind x", { s: [["x", "/"]], u: "sessions", w: "session" }],
     ["1,000 steps", { s: Array(1000).fill(["p", "/"]), u: "sessions", w: "session" }],
-    ["unknown dimension", { s: [["p", "/"]], u: "sessions", w: "session", b: "email" }],
+    ["unknown dimension", { s: [["p", "/"]], u: "sessions", w: "session", b: "usr_email" }],
     ["long key", { s: [["p", "x".repeat(1025)]], u: "sessions", w: "session" }],
     ["no steps", { s: [], u: "sessions", w: "session" }],
   ])("rejects %s", (_label, raw) => {
