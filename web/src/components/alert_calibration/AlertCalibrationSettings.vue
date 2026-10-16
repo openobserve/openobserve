@@ -72,9 +72,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OText>
             </div>
             <AlertCalibrationLastRun v-if="config" />
-            <OText variant="meta" as="p">
-              {{ t("alertCalibration.settings.findingsDesc", { stream: DIGEST_STREAM }) }}
-            </OText>
+            <blockquote
+              class="rounded-default bg-surface-subtle border-s-border-strong border-s-4 px-3 py-2"
+            >
+              <OText variant="meta" as="p">
+                {{ t("alertCalibration.settings.findingsDesc", { stream: DIGEST_STREAM }) }}
+              </OText>
+            </blockquote>
           </div>
         </OFormSection>
       </template>
