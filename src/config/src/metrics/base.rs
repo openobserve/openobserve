@@ -3012,6 +3012,31 @@ pub static RCA_ANSWER_WAIT_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+// RCA feedback and resume (README §9)
+pub static RCA_FEEDBACK_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_feedback_total",
+            "Saved responder feedback on RCA runs, by verdict: yes, no or change",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "verdict"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RESUME_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_resume_total",
+            "Requests to resume an RCA run, by result: started or refused",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "result"],
+    )
+    .expect("Metric created")
+});
 // Deliberate: spec §14.1 says `org_id` and four `result` values; `organization` is the house label.
 pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -3717,6 +3742,8 @@ pub(crate) fn register(registry: &Registry) {
         Box::new(RCA_STEERING_ACKS_TOTAL.clone()),
         Box::new(RCA_QUESTIONS_TOTAL.clone()),
         Box::new(RCA_ANSWER_WAIT_SECONDS.clone()),
+        Box::new(RCA_FEEDBACK_TOTAL.clone()),
+        Box::new(RCA_RESUME_TOTAL.clone()),
     ] {
         registry.register(metric).expect("Metric registered");
     }

@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!-- Analysis bar (contract E5): run version selector from the history, the
-     trigger + age line, Re-analyze ▾ (not live; Fresh, Build on previous, With
-     guidance… (04 frame I)) or Cancel run (live), and the ⋯ menu with Copy
-     report / Download as Markdown / Copy thread. -->
+     trigger + age line, "Ask about this analysis" (J5; not live), Re-analyze ▾
+     (not live; Fresh, Build on previous, With guidance… (04 frame I)) or Cancel
+     run (live), and the ⋯ menu with Copy report / Download as Markdown / Copy thread. -->
 <template>
   <div data-test="rca-analysis-bar" class="flex flex-wrap items-center gap-2.5">
     <ODropdown align="start" content-class="w-80">
@@ -66,9 +66,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("alerts.incidents.rcaRun.cancelRun") }}
     </OButton>
 
-    <ODropdown v-else align="end" content-class="w-75">
+    <OButton
+      v-if="!live && canAsk"
+      data-test="rca-ask-btn"
+      variant="outline"
+      size="sm"
+      icon-left="auto-awesome"
+      @click="$emit('ask')"
+    >
+      {{ t("alerts.incidents.rcaAsk.button") }}
+    </OButton>
+
+    <ODropdown v-if="!live" align="end" content-class="w-75">
       <template #trigger>
-        <OButton data-test="rca-reanalyze-btn" variant="outline" size="sm" :loading="triggering">
+        <OButton
+          data-test="rca-reanalyze-btn"
+          variant="outline"
+          size="sm"
+          :loading="triggering"
+          :disabled="resuming"
+        >
           <OIcon name="refresh" size="sm" class="me-1" />
           {{ t("alerts.incidents.rcaReanalyze") }}
           <OIcon name="expand-more" size="sm" class="ms-1" />
@@ -166,10 +183,14 @@ const props = withDefaults(
     /** A completed run exists to build on. */
     canBuildOnPrevious: boolean;
     hasThread: boolean;
+    /** The shown run has a report or a record and AI chat is available (J5). */
+    canAsk?: boolean;
     triggering?: boolean;
+    /** A resume is in flight: Re-analyze waits for it. */
+    resuming?: boolean;
     cancelling?: boolean;
   }>(),
-  { triggering: false, cancelling: false },
+  { canAsk: false, triggering: false, resuming: false, cancelling: false },
 );
 
 defineEmits<{
@@ -181,6 +202,8 @@ defineEmits<{
   "copy-report": [];
   "download-report": [];
   "copy-thread": [];
+  /** "Ask about this analysis": open a new AI chat with the analysis attached. */
+  ask: [];
 }>();
 
 const { t } = useI18nTyped();

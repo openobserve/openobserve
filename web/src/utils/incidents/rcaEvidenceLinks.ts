@@ -133,7 +133,7 @@ export function rcaBlindSpotRoute(fix: RcaBlindSpotFix, org: string): RouteLocat
     case "open_pipeline":
     case "sampling_rules":
       return { name: "pipelines", query };
-    // Resume is Phase 5: no button until it ships.
+    // Resume run is an action, not a page: the blind spot's button emits it (J9).
     case "resume_run":
     case "none":
       return null;

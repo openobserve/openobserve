@@ -24,6 +24,32 @@ import { raw, useI18nTyped } from "@/types/i18n";
 /** How often the incident detail is re-read while its latest run is live. */
 export const RCA_POLL_INTERVAL_MS = 10_000;
 
+/** Error codes a run cannot be resumed from (J7: start codes and lost transcripts). */
+const NOT_RESUMABLE_CODES: Record<string, true> = {
+  turn_limit: true,
+  credentials: true,
+  agent_unavailable: true,
+  busy: true,
+  usage_denied: true,
+  rca_disabled: true,
+  agent_not_configured: true,
+  l0_off: true,
+  transcript_deleted: true,
+  persistence_failed: true,
+};
+
+/**
+ * Codes of a Resume child that never ran a turn on its fork, so it is
+ * transparent and its source run stays resumable (server `is_transparent_resume_of`).
+ */
+const NEVER_RAN_CODES: Record<string, true> = {
+  resume_failed: true,
+  turn_limit: true,
+  credentials: true,
+  agent_unavailable: true,
+  busy: true,
+};
+
 /** The server message of a rejected request, if it sent one. */
 const serverMessage = (error: unknown): string | null => {
   const body: unknown = isAxiosError(error) ? error.response?.data : null;
@@ -49,7 +75,7 @@ const serverMessage = (error: unknown): string | null => {
  */
 export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWithAlerts | null>) {
   const { t } = useI18nTyped();
-  const { requestRca } = useRcaTrigger();
+  const { requestRca, requestResume } = useRcaTrigger();
   const queryClient = useQueryClient();
 
   // The incidents list shows each row's run summary; drop it whenever a run
@@ -79,6 +105,47 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
       details: null,
       trigger_type: null,
     };
+  });
+
+  /**
+   * The run "Resume run" resumes, or null when there is none. Client mirror of
+   * the server's checks (J7); the server re-checks and its 409/410 message is
+   * shown as is.
+   * - The latest run, when it failed or was cancelled, has a session, finished
+   *   at least one step and has no report.
+   * - A Resume child that never ran a turn is transparent: failed with a
+   *   never-ran code, or failed or cancelled with no session. Its source run is
+   *   resumed instead, if the history shows that run failed or was cancelled
+   *   without an outcome. A cancelled child with a session is not redirected
+   *   (only the server sees its committed events); it is judged as a run of
+   *   its own by the first rule.
+   *   The source's session and steps are not on the list item; the server
+   *   checks them.
+   */
+  const resumeRunId = computed<string | null>(() => {
+    const run = currentRun.value;
+    const latest = summary.value;
+    if (!run || !latest || run.run_id !== latest.run_id) return null;
+    if (run.state !== "failed" && run.state !== "cancelled") return null;
+    const code = run.error?.code ?? "";
+    const resumedFrom = run.context_used?.resumed_from;
+    const sourceRunId = resumedFrom?.run_id;
+    // A Resume child with no turn of its own (server `is_transparent_resume_of`):
+    // no session, or failed with a never-ran code. Codes do not apply to a cancel.
+    const neverRan =
+      run.trigger === "resume" &&
+      !!resumedFrom &&
+      (!run.session_id || (run.state === "failed" && !!NEVER_RAN_CODES[code]));
+    if (sourceRunId && neverRan) {
+      const source = history.value.find((item) => item.run_id === sourceRunId);
+      const sourceStopped = source?.state === "failed" || source?.state === "cancelled";
+      return source && sourceStopped && !source.outcome ? sourceRunId : null;
+    }
+    if (!run.session_id || run.report || run.outcome) return null;
+    if (NOT_RESUMABLE_CODES[code]) return null;
+    // `steps` counts the open step too, so one finished step means two recorded.
+    const steps = run.stats?.steps ?? latest.summary.steps;
+    return steps >= 2 ? run.run_id : null;
   });
 
   // A completed run picked from the history; null follows the latest run and
@@ -114,6 +181,7 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
   });
 
   const triggering = ref(false);
+  const resuming = ref(false);
   const cancelling = ref(false);
 
   const isCurrentIncident = (org: string, incidentId: string) =>
@@ -155,6 +223,7 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
       reports.value = {};
       triggering.value = false;
       cancelling.value = false;
+      resuming.value = false;
     },
   );
 
@@ -224,7 +293,7 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
    */
   const trigger = async (options: { buildOnPrevious?: boolean; guidance?: string } = {}) => {
     const incident = incidentRef.value;
-    if (!incident || triggering.value) return;
+    if (!incident || triggering.value || resuming.value) return;
     const org = orgRef.value;
     const incidentId = incident.id;
     const previousRunId = currentRun.value?.run_id ?? null;
@@ -306,6 +375,66 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
     }
   };
 
+  /**
+   * Resume the latest failed or cancelled run (J9): a new run that reuses its
+   * finished steps. Consent (402/412) is handled like a trigger. As in
+   * `trigger`, a failed request re-reads the detail first: a run the server
+   * created and then failed shows its banner; only a request that created no
+   * run (409/410 refusals) keeps the server's message as a toast.
+   */
+  const resume = async (runId: string) => {
+    const incident = incidentRef.value;
+    if (!incident || resuming.value || triggering.value) return;
+    const org = orgRef.value;
+    const incidentId = incident.id;
+    const previousRunId = currentRun.value?.run_id ?? null;
+
+    resuming.value = true;
+    viewedRunId.value = null;
+    try {
+      const result = await requestResume(org, incidentId, runId, {
+        signal: lifecycle.signal,
+        isStillActive: () => isCurrentIncident(org, incidentId),
+      });
+      if (!isCurrentIncident(org, incidentId)) return;
+      if (result.status === "unavailable") {
+        toast({ variant: "error", message: result.message });
+        return;
+      }
+      if (result.status === "started") {
+        const { reused_steps: steps, from_step: fromStep } = result.data;
+        toast({
+          variant: "success",
+          message: t(
+            "alerts.incidents.rcaResume.started",
+            { step: fromStep.title, count: steps },
+            steps,
+          ),
+        });
+        invalidateList(org);
+        await reload();
+      }
+    } catch (error) {
+      console.error("Failed to resume RCA:", error);
+      if (!isCurrentIncident(org, incidentId)) return;
+      await reload();
+      if (!isCurrentIncident(org, incidentId)) return;
+      const latestRunId = currentRun.value?.run_id ?? null;
+      if (latestRunId && latestRunId !== previousRunId) {
+        // The server created the resumed run; its state (the failure banner) says the rest.
+        invalidateList(org);
+        return;
+      }
+      const message = serverMessage(error);
+      toast({
+        variant: "error",
+        message: message ? raw(message) : t("alerts.incidents.rcaResume.failed"),
+      });
+    } finally {
+      if (incidentRef.value?.id === incidentId) resuming.value = false;
+    }
+  };
+
   onScopeDispose(() => {
     stopPolling();
     lifecycle.abort();
@@ -328,10 +457,13 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
     reportLoading,
     triggering,
     cancelling,
+    resuming,
+    resumeRunId,
     reload,
     viewRun,
     trigger,
     cancel,
+    resume,
   };
 }
 

@@ -95,6 +95,10 @@ pub const SAVE_FAILED_REASON: &str = "The analysis result could not be saved";
 pub const ERROR_USAGE_DENIED: &str = "usage_denied";
 /// `error.reason` of a `usage_denied` run.
 pub const USAGE_DENIED_REASON: &str = "AI usage was not authorized";
+/// `error.code` of a resumed run whose source session could not be copied (J8).
+pub const ERROR_RESUME_FAILED: &str = "resume_failed";
+/// `error.reason` of a `resume_failed` run.
+pub const RESUME_FAILED_REASON: &str = "The earlier steps could not be reused";
 
 /// Longest `error.details` a run stores after redaction, as the failure event always has.
 const ERROR_DETAILS_MAX_CHARS: usize = 500;
@@ -128,6 +132,8 @@ pub struct StartRun {
     pub skip_cooldown: bool,
     /// Serialized `Vec<SubjectRef>`: the pending on-call records of an alert run.
     pub oncall_subjects: Option<serde_json::Value>,
+    /// `context_used` stored with the row: a resumed run's `{resumed_from}` (J8, M1).
+    pub context_used: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -190,6 +196,7 @@ pub async fn start_run(req: StartRun) -> anyhow::Result<StartOutcome> {
         guidance,
         skip_cooldown,
         oncall_subjects,
+        context_used,
     } = req;
     let cfg = get_o2_config();
 
@@ -233,6 +240,7 @@ pub async fn start_run(req: StartRun) -> anyhow::Result<StartOutcome> {
         started_by,
         guidance,
         oncall_subjects,
+        context_used,
     };
     let guards = StartGuards {
         now_us,
@@ -702,6 +710,7 @@ pub(crate) mod tests {
             guidance: None,
             skip_cooldown: trigger.is_user_started(),
             oncall_subjects: None,
+            context_used: None,
         }
     }
 
@@ -1173,6 +1182,7 @@ pub(crate) mod tests {
             guidance: None,
             skip_cooldown: true,
             oncall_subjects: None,
+            context_used: None,
         };
         let StartOutcome::Started { run_id: done } = start_run(start_alert("al_1")).await.unwrap()
         else {

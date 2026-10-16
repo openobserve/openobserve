@@ -453,6 +453,9 @@ export default defineComponent({
       text: string;
       autoSend: boolean;
       id: number;
+      chipName?: string;
+      newChat?: boolean;
+      context?: Record<string, unknown> | null;
     } | null>(null);
     let customOrganization = Object.prototype.hasOwnProperty.call(
       router.currentRoute.value.query,
@@ -1589,20 +1592,47 @@ export default defineComponent({
       localStorage.removeItem("isFirstTimeLogin");
     };
 
+    /**
+     * `value` is a string, or `{ query, autoSend?, chipName?, newChat?, context? }`.
+     * With `chipName` the query arrives as a named context chip (never auto-sent), `newChat` opens
+     * a fresh chat first, and `context` is pinned as that chat's explicit context.
+     */
     const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
-      if (!store.state.isAiChatEnabled) {
+      const wasOpen = store.state.isAiChatEnabled;
+      if (!wasOpen) {
         store.dispatch("setIsAiChatEnabled", true);
       }
 
       // Support object payload { query, autoSend } from OverviewTab
       let text = value;
       let shouldAutoSend = autoSend;
+      let handoff: {
+        chipName: string;
+        newChat: boolean;
+        context: Record<string, unknown> | null;
+      } | null = null;
       if (value && typeof value === "object" && "query" in value) {
         text = value.query;
         shouldAutoSend = value.autoSend ?? false;
+        if (typeof value.chipName === "string" && value.chipName) {
+          handoff = {
+            chipName: value.chipName,
+            newChat: !!value.newChat,
+            context: value.context && typeof value.context === "object" ? value.context : null,
+          };
+        }
       }
 
       aiChatAppendMode.value = append;
+
+      if (handoff) {
+        // Named-chip hand-off: O2AIChat builds the chip itself, so the legacy "Log Entry" channel stays silent.
+        const payload = { text, autoSend: false, id: Date.now(), ...handoff };
+        // A chat opened just now mounts on the next render; deliver after it so its watcher sees the change.
+        if (wasOpen) aiChatPayload.value = payload;
+        else nextTick(() => (aiChatPayload.value = payload));
+        return;
+      }
 
       // Deliver text + autoSend atomically in a single object so O2AIChat
       // watcher always sees both values together — no timing race.

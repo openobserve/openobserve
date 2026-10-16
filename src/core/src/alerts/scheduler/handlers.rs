@@ -2247,6 +2247,7 @@ async fn trigger_rca_for_alert_firing(
             guidance: None,
             skip_cooldown: true,
             oncall_subjects: serde_json::to_value(&subjects).ok(),
+            context_used: None,
         })
         .await
         {

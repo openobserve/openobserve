@@ -114,7 +114,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 114: backfill rca_runs from topology_context reports and incident_events.
 // 115: add RCA stage, context, continuation and on-call subject columns.
 // 116: create rca_steering and add the input columns to rca_runs.
-pub const DB_SCHEMA_VERSION: u64 = 116;
+// 117: create rca_feedback.
+pub const DB_SCHEMA_VERSION: u64 = 117;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

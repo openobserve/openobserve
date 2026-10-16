@@ -39,7 +39,7 @@ use super::{
 };
 use crate::redact::redact_internal_details;
 
-const RECORD_STEP: &str = "record_step";
+pub(crate) const RECORD_STEP: &str = "record_step";
 pub(crate) const SUBMIT_REPORT: &str = "submit_report";
 /// The durable event type of a part change; stored types carry a `.N` version suffix.
 const PART_UPDATED: &str = "message.part.updated";
@@ -203,6 +203,17 @@ pub(crate) fn updated_part(event: &DurableEvent) -> Option<&Map<String, Value>> 
         return None;
     }
     event.data.get("part").and_then(Value::as_object)
+}
+
+/// The title the thread gives the `index`-th (1-based) step: its trimmed `title` argument
+/// cut to [STEP_TITLE_MAX_CHARS], else "Step <index>".
+pub(crate) fn step_title(title: Option<&Value>, index: usize) -> String {
+    title
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(|t| t.chars().take(STEP_TITLE_MAX_CHARS).collect::<String>())
+        .unwrap_or_else(|| format!("Step {index}"))
 }
 
 const NOTE_MAX_CHARS: usize = 1_000;
@@ -639,12 +650,7 @@ impl Builder {
         ended_at: Option<i64>,
     ) {
         let stage = stage.map(str::to_string);
-        let title = title
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|t| !t.is_empty())
-            .map(|t| t.chars().take(STEP_TITLE_MAX_CHARS).collect::<String>())
-            .unwrap_or_else(|| format!("Step {}", self.steps.len() + 1));
+        let title = step_title(title, self.steps.len() + 1);
         self.push_step(stage, title, started_at);
         if let Some(step) = self.steps.last_mut() {
             step.extend(ended_at);
@@ -712,7 +718,15 @@ impl Builder {
                 question.answered_at = answer.at;
             }
         }
-        let duration_ms = self.first_ms.zip(self.last_ms).map_or(0, |(f, l)| l - f);
+        // J10: a resumed run's session starts with copied events that no turn row covers;
+        // its duration counts from its first turn, not from the first copied event.
+        let first_ms = match turns.first() {
+            Some(turn) if turn.start_seq.is_some_and(|seq| seq > 0) => Some(turn.started_at / 1000),
+            _ => self.first_ms,
+        };
+        let duration_ms = first_ms
+            .zip(self.last_ms)
+            .map_or(0, |(f, l)| (l - f).max(0));
         RcaThread {
             run_id: String::new(),
             state_version: String::new(),
@@ -1118,7 +1132,7 @@ pub(crate) mod tests {
         Some((T + ms) * 1000)
     }
 
-    fn load_replay() -> Vec<DurableEvent> {
+    pub(crate) fn load_replay() -> Vec<DurableEvent> {
         let path = format!(
             "{}/src/ai_chat/testdata/replay_session.json",
             env!("CARGO_MANIFEST_DIR")
@@ -1694,5 +1708,77 @@ pub(crate) mod tests {
             json.get("steer_id").is_none() && json.get("read_at").is_none(),
             "a turn prompt carries no steering fields: {json}"
         );
+    }
+
+    /// A turn row of the session: admitted at `started_ms`, its first event at `start_seq`.
+    fn turn_row(start_seq: Option<i64>, started_ms: i64) -> ai_chat_turns::Model {
+        ai_chat_turns::Model {
+            org_id: "default".to_string(),
+            session_id: "0195a1b2-c3d4-7e5f-8a9b-f0e4ed000003".to_string(),
+            turn_id: "turn-1".to_string(),
+            status: "running".to_string(),
+            error_code: None,
+            start_seq,
+            end_seq: None,
+            started_at: started_ms * 1000,
+            ended_at: None,
+        }
+    }
+
+    /// J10: a resumed run's session starts with copied events no turn row covers; its
+    /// duration counts from its first turn row, not from the source's first event. A
+    /// session whose first turn starts at seq 0 counts from its first event.
+    #[test]
+    fn a_resumed_sessions_duration_counts_from_its_first_turn() {
+        use crate::ai_chat::fork::tests::{THREE_STEPS_CUT, three_steps};
+
+        let copied = three_steps()[..=THREE_STEPS_CUT as usize].to_vec();
+        let first_new = copied.len() as i64;
+        let resumed_at = T + 60_000;
+        let mut s = Session {
+            events: copied.clone(),
+        };
+        s.message("msg_b1", "assistant", json!({"created": resumed_at + 500}));
+        s.tool(
+            "msg_b1",
+            "prt_s9",
+            RECORD_STEP,
+            "completed",
+            json!({"stage": "changes", "title": "Check recent deploys"}),
+            json!({"output": "{\"type\":\"rca_step\"}"}),
+            60_600,
+            60_601,
+        );
+        s.tool(
+            "msg_b1",
+            "prt_q9",
+            "o2_SearchSQL",
+            "completed",
+            search_sql("SELECT 1"),
+            hits(1),
+            60_700,
+            61_010,
+        );
+        let last = T + 61_010;
+
+        let resumed = [turn_row(Some(first_new), resumed_at)];
+        let thread = project_rca_thread(&s.events, &resumed, true, false);
+        assert_eq!(thread.stats.duration_ms, last - resumed_at);
+        assert_eq!(thread.stats.steps, 3, "the copied steps are still shown");
+
+        let before_any_event = project_rca_thread(&copied, &resumed, true, false);
+        assert_eq!(
+            before_any_event.stats.duration_ms, 0,
+            "a resumed turn with no event yet has run for no time, never less"
+        );
+
+        for turns in [
+            vec![],
+            vec![turn_row(Some(0), T + 5)],
+            vec![turn_row(None, T + 5)],
+        ] {
+            let thread = project_rca_thread(&s.events, &turns, false, false);
+            assert_eq!(thread.stats.duration_ms, last - T, "{turns:?}");
+        }
     }
 }

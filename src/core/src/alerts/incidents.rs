@@ -2427,6 +2427,7 @@ async fn start_automatic_rca(
         guidance: None,
         skip_cooldown: trigger == RunTrigger::AutoNewIncident,
         oncall_subjects: None,
+        context_used: None,
     })
     .await;
     let run_id = match outcome {
@@ -2471,6 +2472,8 @@ async fn start_automatic_rca(
                 usage_permit: None,
                 // Automatic runs carry no guidance.
                 guidance: None,
+                // Automatic runs start fresh.
+                resume: None,
             },
         )
         .await
@@ -2613,12 +2616,16 @@ pub struct RcaLaunch {
     /// SG33: the run was started with this guidance; its queued `guidance` row, written
     /// with the start, rides on the first turn's prompt.
     pub guidance: Option<String>,
+    /// J8: the run resumes a stopped run from this seed: it skips "Build on previous",
+    /// continues on a copy of the source's session and takes the source's mode.
+    pub resume: Option<super::rca_resume::ResumeSeed>,
 }
 
 /// Start a started run's investigation turn (TH12, TH16).
 ///
 /// Returns once the turn is spawned: the turn's finalizer ends the run. A guard
-/// that no longer holds fails the run with its code and returns `Ok`; a turn
+/// that no longer holds, or a resumed run whose source session cannot be copied
+/// (`resume_failed`), fails the run with its code and returns `Ok`; a turn
 /// that cannot start fails the run with the turn's code, releases the triage
 /// hold, and returns the error so a manual caller can answer with it.
 #[cfg(feature = "enterprise")]
@@ -2635,6 +2642,7 @@ pub async fn trigger_rca_for_incident(
         build_on_previous,
         usage_permit,
         guidance,
+        resume,
     } = launch;
     use config::meta::alerts::rca_runs::RunMode;
     use o2_enterprise::enterprise::{
@@ -2644,10 +2652,13 @@ pub async fn trigger_rca_for_incident(
     use super::{
         rca_runs::{
             AGENT_NOT_CONFIGURED_REASON, ERROR_AGENT_NOT_CONFIGURED, ERROR_L0_OFF,
-            ERROR_RCA_DISABLED, L0_OFF_REASON, RCA_DISABLED_REASON, RunSubject, fail_run,
-            newest_completed_report,
+            ERROR_RCA_DISABLED, ERROR_RESUME_FAILED, L0_OFF_REASON, RCA_DISABLED_REASON,
+            RESUME_FAILED_REASON, RunSubject, fail_run, newest_completed_report,
         },
-        rca_turn::{RcaPrompt, RcaPromptSubject, RcaTurnError, RcaTurnRun, start_rca_turn},
+        rca_turn::{
+            RcaPrompt, RcaPromptSubject, RcaTurnError, RcaTurnRun, start_forked_rca_turn,
+            start_rca_turn,
+        },
     };
 
     // Ends the run as failed and releases any triage hold: no verdict is coming (§6).
@@ -2721,8 +2732,9 @@ pub async fn trigger_rca_for_incident(
         trigger.as_str()
     );
 
-    // RR-27: "Build on previous" extends the newest completed report.
-    let previous_analysis = if build_on_previous {
+    // RR-27: "Build on previous" extends the newest completed report; a resumed run has
+    // its source's steps instead.
+    let previous_analysis = if build_on_previous && resume.is_none() {
         newest_completed_report(&org_id, &incident_id)
             .await
             .unwrap_or_else(|e| {
@@ -2781,6 +2793,39 @@ pub async fn trigger_rca_for_incident(
         debug_assert_eq!(usage_permit.feature(), feature);
     }
 
+    // J8: a resumed run goes on from a copy of its source's session, cut at the last
+    // finished step; a copy that fails ends the run like a guard.
+    let (mode, fork) = match resume {
+        Some(seed) => {
+            let source_run_id = seed.source_run_id.clone();
+            match fork_for_resume(
+                &org_id,
+                &run_id,
+                seed,
+                crate::ai_chat::fork::fork_run_session,
+            )
+            .await
+            {
+                Ok((mode, fork)) => (mode, Some(fork)),
+                Err(e) => {
+                    log::warn!(
+                        "[INCIDENTS::RCA] Run {run_id} could not copy the session of run \
+                         {source_run_id}: {e:#}"
+                    );
+                    end_failed(
+                        ERROR_RESUME_FAILED,
+                        RESUME_FAILED_REASON,
+                        Some(format!("{e:#}")),
+                    )
+                    .await;
+                    return Ok(());
+                }
+            }
+        }
+        None if build_on_previous => (RunMode::BuildOnPrevious, None),
+        None => (RunMode::Fresh, None),
+    };
+
     // SG33: the guidance goes after the initial prompt, with its header.
     let guidance_row = if has_guidance {
         let row = super::rca_steering::queued_guidance(&org_id, &run_id).await;
@@ -2793,33 +2838,35 @@ pub async fn trigger_rca_for_incident(
     } else {
         None
     };
-    let prompt = RcaPrompt::Initial {
-        trigger,
-        subject: RcaPromptSubject::Incident {
-            id: incident_id.clone(),
-            title: incident
-                .title
-                .clone()
-                .unwrap_or_else(|| incident_id.clone()),
-            alerts: u32::try_from(incident.alert_count).unwrap_or(0),
-            severity: incident.severity.clone(),
-        },
-        guidance: guidance_row.as_ref().map(super::rca_steering::render_row),
-    };
     let run = RcaTurnRun {
         org_id: org_id.clone(),
         run_id: run_id.clone(),
         subject: RunSubject::Incident(incident_id.clone()),
         trigger,
-        mode: if build_on_previous {
-            RunMode::BuildOnPrevious
-        } else {
-            RunMode::Fresh
-        },
+        mode,
         context,
         session_id: None,
     };
-    match start_rca_turn(run, prompt).await {
+    let started = match fork {
+        Some(fork) => start_forked_rca_turn(run, fork).await,
+        None => {
+            let prompt = RcaPrompt::Initial {
+                trigger,
+                subject: RcaPromptSubject::Incident {
+                    id: incident_id.clone(),
+                    title: incident
+                        .title
+                        .clone()
+                        .unwrap_or_else(|| incident_id.clone()),
+                    alerts: u32::try_from(incident.alert_count).unwrap_or(0),
+                    severity: incident.severity.clone(),
+                },
+                guidance: guidance_row.as_ref().map(super::rca_steering::render_row),
+            };
+            start_rca_turn(run, prompt).await
+        }
+    };
+    match started {
         Ok(started) => {
             log::info!(
                 "[INCIDENTS::RCA] Run {run_id} for {incident_id} started turn {} in session {}",
@@ -2834,6 +2881,54 @@ pub async fn trigger_rca_for_incident(
         }
         Err(e) => end_turn_failed(e).await,
     }
+}
+
+/// J8: copy `seed`'s session for the resumed run `run_id` with `fork`; the session it
+/// continues on and the source's mode.
+#[cfg(feature = "enterprise")]
+async fn fork_for_resume<F>(
+    org_id: &str,
+    run_id: &str,
+    seed: super::rca_resume::ResumeSeed,
+    fork: F,
+) -> anyhow::Result<(
+    config::meta::alerts::rca_runs::RunMode,
+    super::rca_turn::ForkedSession,
+)>
+where
+    F: AsyncFnOnce(
+        &str,
+        &infra::table::ai_chat_sessions::Model,
+        Vec<o2_enterprise::enterprise::ai::chat::batcher::DurableEvent>,
+        &str,
+    ) -> anyhow::Result<crate::ai_chat::fork::RunFork>,
+{
+    // The same lineage the route wrote on the run before the launch.
+    let resumed_from = seed.resumed_from();
+    let reused = crate::ai_chat::rca_thread::project_rca_thread(&seed.prefix, &[], false, false);
+    let stage = reused.steps.last().and_then(|step| step.stage.clone());
+    let fork = fork(
+        org_id,
+        &seed.source_session,
+        seed.prefix,
+        &seed.source_run_id,
+    )
+    .await?;
+    log::info!(
+        "[INCIDENTS::RCA] Run {run_id} resumes run {} after {} steps, on session {} (seq 0..={} \
+         copied)",
+        seed.source_run_id,
+        seed.reused_steps,
+        fork.session_id,
+        fork.last_seq
+    );
+    let fork = super::rca_turn::ForkedSession {
+        session_id: fork.session_id,
+        resumed_from,
+        reused: reused.stats,
+        stage,
+    };
+    Ok((seed.mode, fork))
 }
 
 /// Convert database model to domain model
@@ -3680,6 +3775,7 @@ mod tests {
                 build_on_previous: false,
                 usage_permit: None,
                 guidance: None,
+                resume: None,
             },
         )
         .await
@@ -3689,6 +3785,256 @@ mod tests {
         assert_eq!(run.state, RunState::Failed);
         assert_eq!(run.error.unwrap().code, "rca_disabled");
         assert_eq!(failures(&timeline(&org, &inc).await).len(), 1);
+    }
+
+    /// A seed of `source_run` over [three_steps](crate::ai_chat::fork::tests::three_steps),
+    /// as `prepare_resume` makes it.
+    #[cfg(feature = "enterprise")]
+    fn resume_seed(org_id: &str, source_run: &str) -> super::super::rca_resume::ResumeSeed {
+        use config::meta::alerts::rca_runs::RunMode;
+        use infra::table::ai_chat_sessions::STATUS_ACTIVE;
+
+        use crate::{
+            ai_chat::fork::{plan_resume, tests::three_steps},
+            alerts::rca_resume::{ResumeSeed, ResumeStep, tests::session_row},
+        };
+
+        let events = three_steps();
+        let plan = plan_resume(&events).unwrap();
+        ResumeSeed {
+            source_run_id: source_run.to_string(),
+            source_session: session_row(org_id, &format!("ses-{source_run}"), 17, STATUS_ACTIVE),
+            prefix: events[..=plan.cut_seq as usize].to_vec(),
+            cut_seq: plan.cut_seq,
+            reused_steps: plan.reused_steps,
+            from_step: ResumeStep {
+                index: plan.from_step.index,
+                stage: plan.from_step.stage.unwrap_or_default().to_string(),
+                title: plan.from_step.title,
+            },
+            mode: RunMode::BuildOnPrevious,
+        }
+    }
+
+    /// J8: a resumed run copies the source's session and goes on from it: the source's
+    /// events, owner and run reach the copy; the first turn runs on the fork in the
+    /// source's mode, with the lineage and the copied steps' counts and stage on the run;
+    /// a continuation of the run (TH25, SG18) stays on the fork.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_resumed_run_goes_on_from_the_fork_with_the_copied_counts() {
+        use std::time::Duration;
+
+        use config::meta::alerts::rca_runs::{RunMode, RunState, RunTrigger};
+        use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
+        use serde_json::json;
+
+        use crate::{
+            ai_chat::{fork::RunFork, rca_thread::project_rca_thread},
+            alerts::{
+                rca_runs::{
+                    RunSubject, StartOutcome, StartRun, start_run,
+                    tests::{db, incident_start, new_incident, start, stored},
+                },
+                rca_turn::{RcaTurnRun, start_forked_rca_turn, turn_run_of},
+            },
+        };
+
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let source_run = start(&org, &inc, RunTrigger::Manual).await;
+        crate::alerts::rca_runs::fail_run(
+            &org,
+            &source_run,
+            RunTrigger::Manual,
+            "timeout",
+            "stopped",
+            None,
+        )
+        .await
+        .unwrap();
+        let seed = resume_seed(&org, &source_run);
+        let start_resume = StartRun {
+            mode: seed.mode,
+            context_used: Some(json!({ "resumed_from": seed.resumed_from() })),
+            ..incident_start(&org, &inc, RunTrigger::Resume)
+        };
+        let StartOutcome::Started { run_id } = start_run(start_resume).await.unwrap() else {
+            panic!("the resume did not start");
+        };
+
+        // A copy that fails is the launch's error and changes nothing on the run.
+        let failed = fork_for_resume(
+            &org,
+            &run_id,
+            seed.clone(),
+            async |_: &str,
+                   _: &infra::table::ai_chat_sessions::Model,
+                   _: Vec<DurableEvent>,
+                   _: &str| {
+                Err::<RunFork, _>(anyhow::anyhow!("the stream refused the batch"))
+            },
+        )
+        .await;
+        assert!(failed.is_err());
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Running);
+        assert_eq!(run.session_id, None);
+        assert_eq!(
+            run.context_used,
+            Some(json!({"resumed_from": seed.resumed_from()}))
+        );
+
+        let fork_session = "0195a1b2-c3d4-7e5f-8a9b-f0e4ed000001".to_string();
+        let copied = seed.prefix.clone();
+        let (mode, fork) = fork_for_resume(
+            &org,
+            &run_id,
+            seed.clone(),
+            async |org_id: &str,
+                   source: &infra::table::ai_chat_sessions::Model,
+                   prefix: Vec<DurableEvent>,
+                   from_run: &str| {
+                assert_eq!(org_id, org);
+                assert_eq!(source.session_id, format!("ses-{source_run}"));
+                assert_eq!(prefix, copied);
+                assert_eq!(from_run, source_run);
+                Ok(RunFork {
+                    session_id: fork_session.clone(),
+                    opencode_session_id: "ses_0817c5614ffea1NfBrR9UndbIb".to_string(),
+                    last_seq: seed.cut_seq,
+                })
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(mode, RunMode::BuildOnPrevious);
+        assert_eq!(fork.session_id, fork_session);
+
+        // No agent here: the turn stops at its credentials. What it wrote on the run before
+        // is under test.
+        let turn = RcaTurnRun {
+            org_id: org.clone(),
+            run_id: run_id.clone(),
+            subject: RunSubject::Incident(inc.clone()),
+            trigger: RunTrigger::Resume,
+            mode,
+            context: json!({}),
+            session_id: None,
+        };
+        let started =
+            tokio::time::timeout(Duration::from_secs(60), start_forked_rca_turn(turn, fork))
+                .await
+                .expect("the start ends");
+        assert!(started.is_err());
+
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.session_id.as_deref(), Some(fork_session.as_str()));
+        assert_eq!(run.mode, RunMode::BuildOnPrevious);
+        let used = run.context_used.unwrap();
+        assert_eq!(used["resumed_from"], seed.resumed_from());
+        assert!(
+            used.get("toolsets").is_some(),
+            "the first turn's context_used, the lineage kept in it: {used}"
+        );
+        let reused = project_rca_thread(&seed.prefix, &[], false, false).stats;
+        assert_eq!(reused.steps, 2);
+        let stats = run.stats.unwrap();
+        assert_eq!(
+            (stats.steps, stats.tool_calls),
+            (Some(reused.steps), Some(reused.tool_calls)),
+            "the live counts start from the copied steps"
+        );
+        assert_eq!(
+            stats.tokens,
+            Some(json!({"input": 3_000, "output": 600, "reasoning": 50, "cache_read": 400}))
+        );
+        assert_eq!(run.stage.as_deref(), Some("metrics"));
+        assert_eq!(run.stage_index, Some(6));
+
+        let row = infra::table::rca_runs::get_rw(&org, &run_id)
+            .await
+            .unwrap()
+            .unwrap();
+        let next = turn_run_of(&row).await.unwrap();
+        assert_eq!(next.session_id.as_deref(), Some(fork_session.as_str()));
+        assert_eq!(
+            (next.trigger, next.mode),
+            (RunTrigger::Resume, RunMode::BuildOnPrevious)
+        );
+    }
+
+    /// J8: a resume launch ends on the same guards as any run, before anything is copied.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_resume_refused_by_a_guard_copies_nothing() {
+        use std::time::Duration;
+
+        use config::meta::alerts::rca_runs::{RunState, RunTrigger};
+        use infra::table::entity::ai_chat_sessions as session_rows;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+        use crate::alerts::rca_runs::{
+            StartOutcome, StartRun, start_run,
+            tests::{db, incident_start, new_incident, start, stored},
+        };
+
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let source_run = start(&org, &inc, RunTrigger::Manual).await;
+        crate::alerts::rca_runs::fail_run(
+            &org,
+            &source_run,
+            RunTrigger::Manual,
+            "timeout",
+            "stopped",
+            None,
+        )
+        .await
+        .unwrap();
+        let seed = resume_seed(&org, &source_run);
+        let start_resume = StartRun {
+            context_used: Some(serde_json::json!({ "resumed_from": seed.resumed_from() })),
+            ..incident_start(&org, &inc, RunTrigger::Resume)
+        };
+        let StartOutcome::Started { run_id } = start_run(start_resume).await.unwrap() else {
+            panic!("the resume did not start");
+        };
+
+        tokio::time::timeout(
+            Duration::from_secs(60),
+            trigger_rca_for_incident(
+                org.clone(),
+                inc.clone(),
+                run_id.clone(),
+                RcaLaunch {
+                    trigger: RunTrigger::Resume,
+                    user_email: "a.rao@acme.io".to_string(),
+                    build_on_previous: false,
+                    usage_permit: None,
+                    guidance: None,
+                    resume: Some(seed.clone()),
+                },
+            ),
+        )
+        .await
+        .expect("the launch ends")
+        .unwrap();
+
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Failed);
+        assert_eq!(run.error.unwrap().code, "rca_disabled");
+        assert_eq!(run.session_id, None);
+        assert_eq!(
+            run.context_used.unwrap()["resumed_from"],
+            seed.resumed_from()
+        );
+        let sessions = session_rows::Entity::find()
+            .filter(session_rows::Column::OrgId.eq(&org))
+            .all(infra::db::get_orm_client_rw().await)
+            .await
+            .unwrap();
+        assert!(sessions.is_empty(), "no copy was made");
     }
 
     /// RR-19, RR-20, TH41: a stale live run can be cancelled; the user is recorded.

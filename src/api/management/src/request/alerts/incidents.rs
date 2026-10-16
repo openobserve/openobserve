@@ -409,6 +409,21 @@ pub struct RcaStartedResponse {
     pub run_id: String,
 }
 
+/// Response for a resumed RCA run (202)
+#[cfg(feature = "enterprise")]
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RcaResumedResponse {
+    pub message: String,
+    /// The new run
+    pub run_id: String,
+    /// The failed or cancelled run it continues
+    pub resumed_from: String,
+    /// Finished steps of the earlier run that the new run keeps
+    pub reused_steps: u32,
+    /// The step the new run redoes first
+    pub from_step: openobserve_core::alerts::rca_resume::ResumeStep,
+}
+
 /// Response for cancelling an in-flight RCA analysis
 #[derive(Debug, Serialize, ToSchema)]
 pub struct CancelRcaResponse {
@@ -600,6 +615,7 @@ pub async fn trigger_incident_rca(
         guidance: guidance.clone(),
         skip_cooldown: true,
         oncall_subjects: None,
+        context_used: None,
     })
     .await
     {
@@ -663,6 +679,7 @@ pub async fn trigger_incident_rca(
                 build_on_previous: query.build_on_previous,
                 usage_permit,
                 guidance,
+                resume: None,
             },
         )
         .await
@@ -1207,6 +1224,569 @@ pub async fn get_incident_rca_steering(
     match rca_steering::steering_view(&org_id, &incident_id, &run_id, can_steer).await {
         Ok(view) => MetaHttpResponse::json(view),
         Err(e) => steer_error_response(&e, "Failed to read the steering messages"),
+    }
+}
+
+/// The incident's run for a feedback route: 404 for an unknown run or a run of another
+/// incident.
+#[cfg(feature = "enterprise")]
+async fn incident_run(
+    org_id: &str,
+    incident_id: &str,
+    run_id: &str,
+) -> Result<infra::table::rca_runs::Model, Response> {
+    match infra::table::rca_runs::get(org_id, run_id).await {
+        Ok(Some(run)) if run.incident_id.as_deref() == Some(incident_id) => Ok(run),
+        Ok(_) => Err(rca_error_response(
+            axum::http::StatusCode::NOT_FOUND,
+            "Run not found",
+            None,
+            None,
+        )),
+        Err(e) => Err(MetaHttpResponse::internal_error(e)),
+    }
+}
+
+/// The write permission of the feedback routes: that of starting an analysis (J2). 404 for
+/// an unknown incident, 403 otherwise.
+#[cfg(feature = "enterprise")]
+async fn require_rca_permission(
+    org_id: &str,
+    user_id: &str,
+    incident_id: &str,
+    action: &str,
+) -> Result<(), Response> {
+    if crate::request::ai::chat::can_run_incident_rca(org_id, user_id, incident_id).await {
+        return Ok(());
+    }
+    Err(
+        match infra::table::alert_incidents::get(org_id, incident_id).await {
+            Ok(None) => MetaHttpResponse::not_found("Incident not found"),
+            Err(e) => MetaHttpResponse::internal_error(e),
+            Ok(Some(_)) => rca_error_response(
+                axum::http::StatusCode::FORBIDDEN,
+                &format!("You cannot {action} on this incident"),
+                None,
+                None,
+            ),
+        },
+    )
+}
+
+/// A run takes feedback once it completed with a stored record that has an outcome.
+#[cfg(feature = "enterprise")]
+fn is_rateable(run: &infra::table::rca_runs::Model) -> bool {
+    use config::meta::{alerts::rca_runs::RunState, oncall::rca_run::RcaRunRecord};
+
+    run.state == RunState::Completed.as_str()
+        && run.result.as_ref().is_some_and(|result| {
+            serde_json::from_value::<RcaRunRecord>(result.clone())
+                .is_ok_and(|record| record.outcome.is_some())
+        })
+}
+
+#[cfg(feature = "enterprise")]
+/// PutIncidentRcaFeedback
+#[utoipa::path(
+    put,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "PutIncidentRcaFeedback",
+    summary = "Say whether a finished analysis found the cause",
+    description = "Saves the caller's answer to \"Is this the cause?\" for a completed analysis run: `yes`, `no` with up to four reasons, or `change` with the actual cause. A `change` becomes a past cause that later analyses of the same subject treat as a lead. One answer per user and run; a new answer replaces the earlier one. The author is the authenticated user.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID"),
+    ),
+    request_body(content = config::meta::alerts::rca_feedback::PutRcaFeedbackRequest, description = "The answer", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Saved feedback", content_type = "application/json", body = config::meta::alerts::rca_feedback::RcaFeedback),
+        (status = 400, description = "Invalid body (`error_code`: `invalid_body`, `invalid_feedback`)", content_type = "application/json", body = Object),
+        (status = 403, description = "The user cannot run an analysis on this incident", content_type = "application/json", body = Object),
+        (status = 404, description = "Unknown incident or run", content_type = "application/json", body = Object),
+        (status = 409, description = "`error_code: not_rateable`: the run has not completed with an outcome", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+    )
+)]
+pub async fn put_incident_rca_feedback(
+    Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    body: axum::body::Bytes,
+) -> Response {
+    use axum::http::StatusCode;
+    use config::meta::alerts::rca_feedback::{PutRcaFeedbackRequest, bare_subject_id};
+    use infra::table::rca_feedback;
+
+    // Parsed here, not by the `Json` extractor, so an unknown field is a 400 like every
+    // other invalid body.
+    let request: PutRcaFeedbackRequest = match serde_json::from_slice(&body) {
+        Ok(request) => request,
+        Err(e) => {
+            return rca_error_response(
+                StatusCode::BAD_REQUEST,
+                &format!("Invalid request body: {e}"),
+                Some("invalid_body"),
+                None,
+            );
+        }
+    };
+    let feedback = match request.validate() {
+        Ok(feedback) => feedback,
+        Err(message) => {
+            return rca_error_response(
+                StatusCode::BAD_REQUEST,
+                &message,
+                Some("invalid_feedback"),
+                None,
+            );
+        }
+    };
+    if let Err(response) = require_rca_permission(
+        &org_id,
+        &user_email.user_id,
+        &incident_id,
+        "rate an analysis",
+    )
+    .await
+    {
+        return response;
+    }
+    let run = match incident_run(&org_id, &incident_id, &run_id).await {
+        Ok(run) => run,
+        Err(response) => return response,
+    };
+    if !is_rateable(&run) {
+        return rca_error_response(
+            StatusCode::CONFLICT,
+            "Feedback opens when the analysis has finished with a result",
+            Some("not_rateable"),
+            None,
+        );
+    }
+
+    // Keyed by subject so the row outlives the run prune; an alert id is stored bare.
+    let subject_id = if run.subject_type == "alert" {
+        bare_subject_id(&run.subject_id).to_string()
+    } else {
+        run.subject_id.clone()
+    };
+    let now = config::utils::time::now_micros();
+    let row = rca_feedback::Model {
+        org_id: org_id.clone(),
+        run_id: run.run_id,
+        author_email: user_email.user_id,
+        incident_id: run.incident_id,
+        subject_type: run.subject_type,
+        subject_id,
+        verdict: feedback.verdict.as_str().to_string(),
+        cause: feedback.cause.map(|c| c.as_str().to_string()),
+        note: feedback.note,
+        reasons: rca_feedback::reasons_column(&feedback.reasons),
+        created_at: now,
+        updated_at: now,
+    };
+    match rca_feedback::upsert(&row).await {
+        Ok(stored) => match rca_feedback::to_feedback(stored) {
+            Some(stored) => {
+                config::metrics::RCA_FEEDBACK_TOTAL
+                    .with_label_values(&[org_id.as_str(), feedback.verdict.as_str()])
+                    .inc();
+                MetaHttpResponse::json(stored)
+            }
+            None => MetaHttpResponse::internal_error("The saved feedback could not be read"),
+        },
+        Err(e) => {
+            log::error!("[INCIDENTS::RCA] Failed to save feedback on run {run_id}: {e}");
+            rca_error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to save the feedback",
+                None,
+                None,
+            )
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+/// GetIncidentRcaFeedback
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentRcaFeedback",
+    summary = "Get the feedback on an analysis run",
+    description = "Returns every user's answer to \"Is this the cause?\" for the run (`items`) and the caller's own answer (`mine`, null when the caller has not answered).",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID"),
+    ),
+    responses(
+        (status = 200, description = "Feedback on the run", content_type = "application/json", body = config::meta::alerts::rca_feedback::ListRcaFeedbackResponse),
+        (status = 404, description = "Run not found", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+    )
+)]
+pub async fn get_incident_rca_feedback(
+    Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    use config::meta::alerts::rca_feedback::{ListRcaFeedbackResponse, RcaFeedback};
+    use infra::table::rca_feedback;
+
+    if let Err(response) = incident_run(&org_id, &incident_id, &run_id).await {
+        return response;
+    }
+    match rca_feedback::list_for_run(&org_id, &run_id).await {
+        Ok(rows) => {
+            let items: Vec<RcaFeedback> = rows
+                .into_iter()
+                .filter_map(rca_feedback::to_feedback)
+                .collect();
+            let mine = items
+                .iter()
+                .find(|f| f.author_email == user_email.user_id)
+                .cloned();
+            MetaHttpResponse::json(ListRcaFeedbackResponse { items, mine })
+        }
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+/// DeleteIncidentRcaFeedback
+#[utoipa::path(
+    delete,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "DeleteIncidentRcaFeedback",
+    summary = "Remove your feedback on an analysis run",
+    description = "Deletes the caller's own answer to \"Is this the cause?\" for the run (Undo). Other users' answers are never touched. Succeeds also when the caller had no answer.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID"),
+    ),
+    responses(
+        (status = 204, description = "Feedback removed"),
+        (status = 403, description = "The user cannot run an analysis on this incident", content_type = "application/json", body = Object),
+        (status = 404, description = "Unknown incident or run", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+    )
+)]
+pub async fn delete_incident_rca_feedback(
+    Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    use axum::response::IntoResponse;
+
+    if let Err(response) = require_rca_permission(
+        &org_id,
+        &user_email.user_id,
+        &incident_id,
+        "rate an analysis",
+    )
+    .await
+    {
+        return response;
+    }
+    if let Err(response) = incident_run(&org_id, &incident_id, &run_id).await {
+        return response;
+    }
+    match infra::table::rca_feedback::delete_own(&org_id, &run_id, &user_email.user_id).await {
+        Ok(_) => axum::http::StatusCode::NO_CONTENT.into_response(),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+/// ResumeIncidentRcaRun
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "ResumeIncidentRcaRun",
+    summary = "Resume a failed or cancelled analysis run",
+    description = "Starts a new analysis run that keeps the finished steps of the incident's latest run, when that run failed or was cancelled, and redoes the step it stopped in. Returns 202 with the new run id as soon as its investigation turn is spawned. The body is empty.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID of the failed or cancelled run"),
+    ),
+    responses(
+        (status = 202, description = "Resumed run started", content_type = "application/json", body = RcaResumedResponse),
+        (status = 400, description = "RCA not enabled", content_type = "application/json", body = ()),
+        (status = 402, description = "AI credits exhausted", content_type = "application/json", body = ()),
+        (status = 404, description = "Unknown incident or run", content_type = "application/json", body = Object),
+        (status = 409, description = "`error_code`: `not_resumable`, `nothing_to_resume` or `run_in_flight`", content_type = "application/json", body = Object),
+        (status = 410, description = "`error_code: transcript_expired`: the earlier run's transcript is gone", content_type = "application/json", body = Object),
+        (status = 412, description = "Paid usage requires organization consent", content_type = "application/json", body = ()),
+        (status = 429, description = "Too many analyses running; body {error_code: \"turn_limit\", message}", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal error", content_type = "application/json", body = Object),
+        (status = 503, description = "RCA agent or billing state unavailable, or the earlier run's transcript could not be read in full (`error_code: history_unavailable`)", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+    )
+)]
+pub async fn resume_incident_rca_run(
+    Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    let response = resume_run(org_id.clone(), incident_id, run_id, user_email).await;
+    let status = response.status();
+    let result = if status == axum::http::StatusCode::ACCEPTED {
+        Some("started")
+    } else if status.is_client_error() {
+        Some("refused")
+    } else {
+        None
+    };
+    if let Some(result) = result {
+        config::metrics::RCA_RESUME_TOTAL
+            .with_label_values(&[org_id.as_str(), result])
+            .inc();
+    }
+    response
+}
+
+/// [resume_incident_rca_run] without the metric: the steps of `trigger_incident_rca` with
+/// the J7 checks and the fork seed (precheck → prepare → start → authorize → launch).
+#[cfg(feature = "enterprise")]
+async fn resume_run(
+    org_id: String,
+    incident_id: String,
+    run_id: String,
+    user_email: UserEmail,
+) -> Response {
+    use axum::http::StatusCode;
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+    use openobserve_core::alerts::rca_resume;
+
+    let o2_cfg = get_o2_config();
+    if !o2_cfg.incidents.enabled || !o2_cfg.incidents.rca_enabled {
+        return MetaHttpResponse::bad_request("RCA is not enabled");
+    }
+    if !o2_cfg.ai.has_agent_target() {
+        return json_status_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            serde_json::json!({"error": "RCA agent URL is not configured"}),
+        );
+    }
+
+    // Cloud: a resume is a new run, metered as `IncidentReAnalysis` (the feature
+    // `trigger_rca_for_incident` checks the permit against for `RunTrigger::Resume`); refuse
+    // what cannot be paid for before any work, meter only right before the agent is called.
+    #[cfg(feature = "cloud")]
+    if let Err(error) = openobserve_core::trial_quota::precheck_ai_usage(
+        &org_id,
+        openobserve_core::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+        &user_email.user_id,
+    )
+    .await
+    {
+        return crate::request::ai::chat::ai_authorization_error_response(error);
+    }
+
+    let seed = match rca_resume::prepare_resume(&org_id, &incident_id, &run_id).await {
+        Ok(seed) => seed,
+        Err(error) => return resume_error_response(&run_id, &error),
+    };
+    start_resumed_run(org_id, incident_id, user_email, seed).await
+}
+
+/// The answer for a run that cannot be resumed (J7).
+#[cfg(feature = "enterprise")]
+fn resume_error_response(
+    run_id: &str,
+    error: &openobserve_core::alerts::rca_resume::ResumeError,
+) -> Response {
+    use axum::http::StatusCode;
+    use openobserve_core::alerts::rca_resume::ResumeError;
+
+    match error {
+        ResumeError::NotFound => {
+            rca_error_response(StatusCode::NOT_FOUND, "Run not found", None, None)
+        }
+        ResumeError::NotResumable(message) => {
+            rca_error_response(StatusCode::CONFLICT, message, Some("not_resumable"), None)
+        }
+        ResumeError::NothingToResume => rca_error_response(
+            StatusCode::CONFLICT,
+            "The run finished no step, so there is nothing to resume",
+            Some("nothing_to_resume"),
+            None,
+        ),
+        ResumeError::TranscriptExpired => rca_error_response(
+            StatusCode::GONE,
+            "The run's transcript is no longer available, so it cannot be resumed",
+            Some("transcript_expired"),
+            None,
+        ),
+        ResumeError::Unavailable(e) => {
+            log::warn!("[INCIDENTS::RCA] Cannot read the transcript of run {run_id}: {e}");
+            rca_error_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "This analysis transcript could not be read in full; please retry",
+                Some("history_unavailable"),
+                None,
+            )
+        }
+        ResumeError::Internal(e) => {
+            log::error!("[INCIDENTS::RCA] Failed to prepare resuming run {run_id}: {e}");
+            rca_error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to resume the analysis",
+                None,
+                None,
+            )
+        }
+    }
+}
+
+/// The rest of [resume_run] once the seed is ready: start → authorize → launch.
+#[cfg(feature = "enterprise")]
+async fn start_resumed_run(
+    org_id: String,
+    incident_id: String,
+    user_email: UserEmail,
+    seed: openobserve_core::alerts::rca_resume::ResumeSeed,
+) -> Response {
+    use axum::http::StatusCode;
+    use config::meta::alerts::rca_runs::RunTrigger;
+    #[cfg(feature = "cloud")]
+    use o2_enterprise::enterprise::alerts::rca_service;
+    use openobserve_core::alerts::rca_runs;
+
+    #[cfg(feature = "cloud")]
+    let (usage_feature, usage_context) = (
+        openobserve_core::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+        openobserve_core::trial_quota::AiUsageContext {
+            user_email: user_email.user_id.clone(),
+            incident_id: Some(incident_id.clone()),
+            ..Default::default()
+        },
+    );
+
+    // The start transaction is the in-flight guard and appends the Begin event. The
+    // lineage is stored with the row, so a resume that fails at any later point leaves
+    // its source resumable (M1).
+    let new_run_id = match rca_runs::start_run(rca_runs::StartRun {
+        org_id: org_id.clone(),
+        subject: rca_runs::RunSubject::Incident(incident_id.clone()),
+        trigger: RunTrigger::Resume,
+        mode: seed.mode,
+        started_by: user_email.user_id.clone(),
+        guidance: None,
+        skip_cooldown: true,
+        oncall_subjects: None,
+        context_used: Some(serde_json::json!({ "resumed_from": seed.resumed_from() })),
+    })
+    .await
+    {
+        Ok(rca_runs::StartOutcome::Started { run_id }) => run_id,
+        Ok(rca_runs::StartOutcome::InFlight) | Ok(rca_runs::StartOutcome::CoolingDown) => {
+            return rca_error_response(
+                StatusCode::CONFLICT,
+                "Analysis already in progress",
+                Some("run_in_flight"),
+                None,
+            );
+        }
+        Err(e) => {
+            return MetaHttpResponse::internal_error(format!("Failed to start analysis: {e}"));
+        }
+    };
+
+    let started = RcaResumedResponse {
+        message: "Analysis resumed".to_string(),
+        run_id: new_run_id.clone(),
+        resumed_from: seed.source_run_id.clone(),
+        reused_steps: seed.reused_steps,
+        from_step: seed.from_step.clone(),
+    };
+
+    // The run is started, so the rest runs in its own task: a client that disconnects drops
+    // only this wait, and the task still ends the run.
+    let task = tokio::spawn(async move {
+        #[cfg(feature = "cloud")]
+        let usage_permit = match openobserve_core::trial_quota::authorize_ai_usage(
+            &org_id,
+            usage_feature,
+            &usage_context,
+        )
+        .await
+        {
+            Ok(permit) => Some(permit),
+            Err(error) => {
+                match rca_runs::fail_run(
+                    &org_id,
+                    &new_run_id,
+                    RunTrigger::Resume,
+                    rca_runs::ERROR_USAGE_DENIED,
+                    rca_runs::USAGE_DENIED_REASON,
+                    Some(error.to_string()),
+                )
+                .await
+                {
+                    Ok(true) => {
+                        rca_service::skip_analysis_for_incident(&org_id, &incident_id).await
+                    }
+                    Ok(false) => {}
+                    Err(e) => log::error!(
+                        "[INCIDENTS::RCA] Failed to end run {new_run_id} as failed: {e}"
+                    ),
+                }
+                return crate::request::ai::chat::ai_authorization_error_response(error);
+            }
+        };
+        #[cfg(not(feature = "cloud"))]
+        let usage_permit = None;
+
+        // Every error has already ended the run with the turn's code and freed its page.
+        match openobserve_core::alerts::incidents::trigger_rca_for_incident(
+            org_id,
+            incident_id,
+            new_run_id,
+            openobserve_core::alerts::incidents::RcaLaunch {
+                trigger: RunTrigger::Resume,
+                user_email: user_email.user_id,
+                build_on_previous: false,
+                usage_permit,
+                guidance: None,
+                resume: Some(seed),
+            },
+        )
+        .await
+        {
+            Ok(()) => json_status_response(
+                StatusCode::ACCEPTED,
+                serde_json::to_value(started).unwrap_or_default(),
+            ),
+            Err(e) => rca_turn_error_response(&e),
+        }
+    });
+    match task.await {
+        Ok(response) => response,
+        Err(e) => MetaHttpResponse::internal_error(format!("The analysis task failed: {e}")),
     }
 }
 
@@ -1984,6 +2564,124 @@ pub async fn get_incident_rca_steering(
     _headers: Headers<UserEmail>,
 ) -> Response {
     MetaHttpResponse::forbidden("Steering an analysis is only available in enterprise")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    put,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "PutIncidentRcaFeedback",
+    summary = "Say whether a finished analysis found the cause",
+    description = "Saves the caller's feedback on an analysis run. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID"),
+    ),
+    request_body(content = Object, description = "The answer", content_type = "application/json"),
+    responses(
+        (status = 403, description = "Not supported without enterprise features", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+    )
+)]
+pub async fn put_incident_rca_feedback(
+    _path: Path<(String, String, String)>,
+    _headers: Headers<UserEmail>,
+    _body: axum::body::Bytes,
+) -> Response {
+    MetaHttpResponse::forbidden("Analysis feedback is only available in enterprise")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentRcaFeedback",
+    summary = "Get the feedback on an analysis run",
+    description = "Returns the feedback on an analysis run. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID"),
+    ),
+    responses(
+        (status = 403, description = "Not supported without enterprise features", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+    )
+)]
+pub async fn get_incident_rca_feedback(
+    _path: Path<(String, String, String)>,
+    _headers: Headers<UserEmail>,
+) -> Response {
+    MetaHttpResponse::forbidden("Analysis feedback is only available in enterprise")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    delete,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "DeleteIncidentRcaFeedback",
+    summary = "Remove your feedback on an analysis run",
+    description = "Deletes the caller's feedback on an analysis run. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID"),
+    ),
+    responses(
+        (status = 403, description = "Not supported without enterprise features", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+    )
+)]
+pub async fn delete_incident_rca_feedback(
+    _path: Path<(String, String, String)>,
+    _headers: Headers<UserEmail>,
+) -> Response {
+    MetaHttpResponse::forbidden("Analysis feedback is only available in enterprise")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "ResumeIncidentRcaRun",
+    summary = "Resume a failed or cancelled analysis run",
+    description = "Starts a new analysis run that keeps the finished steps of a failed or cancelled run. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID of the failed or cancelled run"),
+    ),
+    responses(
+        (status = 403, description = "Not supported without enterprise features", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+    )
+)]
+pub async fn resume_incident_rca_run(
+    _path: Path<(String, String, String)>,
+    _headers: Headers<UserEmail>,
+) -> Response {
+    MetaHttpResponse::forbidden("Resuming an analysis is only available in enterprise")
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -3181,7 +3879,7 @@ mod tests {
     async fn steering_tables() -> &'static sea_orm::DatabaseConnection {
         use infra::table::entity::{
             ai_chat_sessions, ai_chat_turns, alert_incident_alerts, alert_incidents,
-            incident_events, rca_runs, rca_steering,
+            incident_events, rca_feedback, rca_runs, rca_steering,
         };
         use sea_orm::{ConnectionTrait, Schema};
 
@@ -3212,6 +3910,7 @@ mod tests {
                     schema.create_table_from_entity(incident_events::Entity),
                     schema.create_table_from_entity(rca_runs::Entity),
                     schema.create_table_from_entity(rca_steering::Entity),
+                    schema.create_table_from_entity(rca_feedback::Entity),
                     schema.create_table_from_entity(ai_chat_sessions::Entity),
                     schema.create_table_from_entity(ai_chat_turns::Entity),
                 ] {
@@ -3850,6 +4549,1375 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    /// A second root user: two authors who both pass the feedback write permission.
+    #[cfg(feature = "enterprise")]
+    const FEEDBACK_ROOT: &str = "second-root@feedback.incidents.test";
+
+    /// [steering_tables] (which creates `rca_feedback` too) with [FEEDBACK_ROOT] as a root user.
+    #[cfg(feature = "enterprise")]
+    async fn feedback_tables() -> &'static sea_orm::DatabaseConnection {
+        let conn = steering_tables().await;
+        common::infra::config::ORG_USERS.insert(
+            format!("{}/{FEEDBACK_ROOT}", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord::new(
+                config::DEFAULT_ORG,
+                FEEDBACK_ROOT,
+                config::meta::user::UserRole::Root,
+                "token",
+                None,
+            ),
+        );
+        conn
+    }
+
+    /// A run of `incident_id` in `state` with `result` as its stored record and no session.
+    #[cfg(feature = "enterprise")]
+    async fn feedback_run(
+        conn: &sea_orm::DatabaseConnection,
+        org_id: &str,
+        run_id: &str,
+        incident_id: &str,
+        state: &str,
+        result: Option<serde_json::Value>,
+    ) {
+        use infra::table::entity::rca_runs;
+        use sea_orm::{ActiveModelTrait, EntityTrait};
+
+        let mut run = thread_run(
+            org_id,
+            &sid(org_id, run_id),
+            &sid(org_id, incident_id),
+            None,
+        );
+        run.state = state.to_string();
+        run.result = result;
+        if matches!(state, "running" | "waiting_input") {
+            run.ended_at = None;
+            run.report = None;
+        }
+        rca_runs::Entity::insert(rca_runs::ActiveModel::from(run).reset_all())
+            .exec(conn)
+            .await
+            .unwrap();
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn feedback_path(
+        org_id: &str,
+        incident_id: &str,
+        run_id: &str,
+    ) -> Path<(String, String, String)> {
+        Path((
+            org_id.to_string(),
+            sid(org_id, incident_id),
+            sid(org_id, run_id),
+        ))
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn as_user(user: &str) -> Headers<UserEmail> {
+        Headers(UserEmail {
+            user_id: user.to_string(),
+        })
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn put_feedback_as(
+        org_id: &str,
+        incident_id: &str,
+        run_id: &str,
+        user: &str,
+        body: &str,
+    ) -> (axum::http::StatusCode, serde_json::Value) {
+        status_and_body(
+            put_incident_rca_feedback(
+                feedback_path(org_id, incident_id, run_id),
+                as_user(user),
+                axum::body::Bytes::from(body.to_string()),
+            )
+            .await,
+        )
+        .await
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn get_feedback_as(
+        org_id: &str,
+        incident_id: &str,
+        run_id: &str,
+        user: &str,
+    ) -> (axum::http::StatusCode, serde_json::Value) {
+        status_and_body(
+            get_incident_rca_feedback(feedback_path(org_id, incident_id, run_id), as_user(user))
+                .await,
+        )
+        .await
+    }
+
+    /// The DELETE answer's status and raw body (a 204 has none).
+    #[cfg(feature = "enterprise")]
+    async fn delete_feedback_as(
+        org_id: &str,
+        incident_id: &str,
+        run_id: &str,
+        user: &str,
+    ) -> (axum::http::StatusCode, axum::body::Bytes) {
+        let response =
+            delete_incident_rca_feedback(feedback_path(org_id, incident_id, run_id), as_user(user))
+                .await;
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, body)
+    }
+
+    /// The run's stored feedback as the routes serialize it, oldest first.
+    #[cfg(feature = "enterprise")]
+    async fn feedback_rows(org_id: &str, run_id: &str) -> Vec<serde_json::Value> {
+        infra::table::rca_feedback::list_for_run(org_id, &sid(org_id, run_id))
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| {
+                serde_json::to_value(infra::table::rca_feedback::to_feedback(row).unwrap()).unwrap()
+            })
+            .collect()
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn feedback_count(org_id: &str, verdict: &str) -> u64 {
+        config::metrics::RCA_FEEDBACK_TOTAL
+            .with_label_values(&[org_id, verdict])
+            .get()
+    }
+
+    /// J2: a body that does not parse, names an unknown field (an author too), or carries an
+    /// unknown verdict, reason or cause is 400 `invalid_body`; `change` without a cause or
+    /// with `still_unknown`, a cause or reasons on the wrong verdict, a repeated reason, more
+    /// than four reasons, or a note over 1,000 characters is 400 `invalid_feedback`. A refused
+    /// body stores nothing and counts nothing. The boundaries pass: a 1,000-character note
+    /// (Unicode scalar values, after trimming) with all four reasons, a blank note (stored
+    /// as none), `no` without reasons, `change` without a note.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_an_invalid_feedback_body_is_400_with_its_code() {
+        use axum::http::StatusCode;
+        use serde_json::json;
+
+        let conn = feedback_tables().await;
+        let org = steering_org("fb400");
+        steering_incident(conn, &org, "inc_1", Some("run_done")).await;
+        feedback_run(
+            conn,
+            &org,
+            "run_done",
+            "inc_1",
+            "completed",
+            Some(stored_record()),
+        )
+        .await;
+
+        let all_reasons = [
+            "wrong_service",
+            "symptom_not_cause",
+            "evidence_does_not_hold",
+            "missed_change",
+        ];
+        let five_reasons = json!({
+            "verdict": "no",
+            "reasons": ["wrong_service", "symptom_not_cause", "evidence_does_not_hold", "missed_change", "wrong_service"],
+        })
+        .to_string();
+        let too_long = json!({"verdict": "no", "note": "é".repeat(1001)}).to_string();
+        for (body, code) in [
+            ("not json", "invalid_body"),
+            ("{}", "invalid_body"),
+            (r#"{"verdict":"maybe"}"#, "invalid_body"),
+            (
+                r#"{"verdict":"yes","author_email":"x@acme.io"}"#,
+                "invalid_body",
+            ),
+            (r#"{"verdict":"yes","priority":1}"#, "invalid_body"),
+            (r#"{"verdict":"no","reasons":["too_slow"]}"#, "invalid_body"),
+            (
+                r#"{"verdict":"change","cause":"cosmic_rays"}"#,
+                "invalid_body",
+            ),
+            (r#"{"verdict":"change"}"#, "invalid_feedback"),
+            (
+                r#"{"verdict":"change","cause":"still_unknown"}"#,
+                "invalid_feedback",
+            ),
+            (
+                r#"{"verdict":"change","cause":"capacity_or_load","reasons":["wrong_service"]}"#,
+                "invalid_feedback",
+            ),
+            (
+                r#"{"verdict":"yes","cause":"capacity_or_load"}"#,
+                "invalid_feedback",
+            ),
+            (
+                r#"{"verdict":"yes","reasons":["wrong_service"]}"#,
+                "invalid_feedback",
+            ),
+            (
+                r#"{"verdict":"no","cause":"capacity_or_load"}"#,
+                "invalid_feedback",
+            ),
+            (
+                r#"{"verdict":"no","reasons":["wrong_service","wrong_service"]}"#,
+                "invalid_feedback",
+            ),
+            (five_reasons.as_str(), "invalid_feedback"),
+            (too_long.as_str(), "invalid_feedback"),
+        ] {
+            let label: String = body.chars().take(80).collect();
+            let (status, answer) =
+                put_feedback_as(&org, "inc_1", "run_done", STEER_ROOT, body).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{label}: {answer}");
+            assert_eq!(answer["code"], 400, "{label}");
+            assert_eq!(answer["error_code"], code, "{label}: {answer}");
+        }
+        assert!(feedback_rows(&org, "run_done").await.is_empty());
+        for verdict in ["yes", "no", "change"] {
+            assert_eq!(feedback_count(&org, verdict), 0, "{verdict}");
+        }
+
+        let longest = json!({
+            "verdict": "no",
+            "note": format!("  {}  ", "é".repeat(1000)),
+            "reasons": all_reasons,
+        })
+        .to_string();
+        let (status, row) = put_feedback_as(&org, "inc_1", "run_done", STEER_ROOT, &longest).await;
+        assert_eq!(status, StatusCode::OK, "{row}");
+        assert_eq!(row["note"].as_str().unwrap().chars().count(), 1000);
+        assert!(!row["note"].as_str().unwrap().starts_with(' '));
+        assert_eq!(row["reasons"], json!(all_reasons));
+
+        for (body, verdict, cause, reasons) in [
+            (
+                r#"{"verdict":"no","note":"   "}"#,
+                "no",
+                json!(null),
+                json!([]),
+            ),
+            (
+                r#"{"verdict":"change","cause":"capacity_or_load"}"#,
+                "change",
+                json!("capacity_or_load"),
+                json!([]),
+            ),
+            (
+                r#"{"verdict":"yes","note":"spot on"}"#,
+                "yes",
+                json!(null),
+                json!([]),
+            ),
+        ] {
+            let (status, row) = put_feedback_as(&org, "inc_1", "run_done", STEER_ROOT, body).await;
+            assert_eq!(status, StatusCode::OK, "{body}: {row}");
+            assert_eq!(row["verdict"], verdict, "{body}");
+            assert_eq!(row["cause"], cause, "{body}");
+            assert_eq!(row["reasons"], reasons, "{body}");
+            if verdict == "yes" {
+                assert_eq!(row["note"], "spot on");
+            } else {
+                assert!(row["note"].is_null(), "{body}: {row}");
+            }
+        }
+        assert_eq!(feedback_rows(&org, "run_done").await.len(), 1);
+    }
+
+    /// J2: feedback is for a run of the incident (404 for an unknown run, a run of another
+    /// incident or an unknown incident, on all three methods) that completed with a stored
+    /// record that has an outcome: a failed, cancelled, live or waiting run, a completed
+    /// run without a record (legacy), with a record whose outcome is null, or with an
+    /// unreadable record is 409 `not_rateable` and gets no row.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_feedback_needs_a_run_of_the_incident_that_completed_with_an_outcome() {
+        use axum::http::StatusCode;
+
+        let conn = feedback_tables().await;
+        let org = steering_org("fb409");
+        steering_incident(conn, &org, "inc_1", Some("run_done")).await;
+        steering_incident(conn, &org, "inc_2", None).await;
+        feedback_run(
+            conn,
+            &org,
+            "run_done",
+            "inc_1",
+            "completed",
+            Some(stored_record()),
+        )
+        .await;
+        let mut no_outcome = stored_record();
+        assert!(
+            !no_outcome["outcome"].is_null(),
+            "the fixture record has an outcome"
+        );
+        no_outcome["outcome"] = serde_json::Value::Null;
+        for (run, state, result) in [
+            ("run_failed", "failed", Some(stored_record())),
+            ("run_cancelled", "cancelled", Some(stored_record())),
+            ("run_live", "running", None),
+            ("run_waiting", "waiting_input", None),
+            ("run_legacy", "completed", None),
+            ("run_no_outcome", "completed", Some(no_outcome)),
+            (
+                "run_unreadable",
+                "completed",
+                Some(serde_json::json!({"outcome": 7})),
+            ),
+        ] {
+            feedback_run(conn, &org, run, "inc_1", state, result).await;
+        }
+        let yes = r#"{"verdict":"yes"}"#;
+
+        for (incident, run) in [
+            ("inc_1", "run_unknown"),
+            ("inc_2", "run_done"),
+            ("inc_unknown", "run_done"),
+        ] {
+            let (status, body) = put_feedback_as(&org, incident, run, STEER_ROOT, yes).await;
+            assert_eq!(
+                status,
+                StatusCode::NOT_FOUND,
+                "PUT {incident}/{run}: {body}"
+            );
+            let (status, body) = get_feedback_as(&org, incident, run, STEER_ROOT).await;
+            assert_eq!(
+                status,
+                StatusCode::NOT_FOUND,
+                "GET {incident}/{run}: {body}"
+            );
+            let (status, _) = delete_feedback_as(&org, incident, run, STEER_ROOT).await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "DELETE {incident}/{run}");
+        }
+        assert!(feedback_rows(&org, "run_done").await.is_empty());
+
+        for run in [
+            "run_failed",
+            "run_cancelled",
+            "run_live",
+            "run_waiting",
+            "run_legacy",
+            "run_no_outcome",
+            "run_unreadable",
+        ] {
+            let (status, body) = put_feedback_as(&org, "inc_1", run, STEER_ROOT, yes).await;
+            assert_eq!(status, StatusCode::CONFLICT, "{run}: {body}");
+            assert_eq!(body["code"], 409, "{run}");
+            assert_eq!(body["error_code"], "not_rateable", "{run}");
+            assert!(feedback_rows(&org, run).await.is_empty(), "{run}");
+        }
+        assert_eq!(feedback_count(&org, "yes"), 0);
+
+        let (status, body) = put_feedback_as(&org, "inc_1", "run_done", STEER_ROOT, yes).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+    }
+
+    /// J1, J2, J11: one row per run and author; a second answer replaces the first (same
+    /// `created_at`, newer `updated_at`) and the answer is the stored row. GET lists every
+    /// author's row oldest first, with the caller's own as `mine` (null for a caller without
+    /// one). DELETE answers 204 with no body, removes only the caller's row, and answers 204
+    /// again when there is nothing left to remove. Each saved answer counts once under its
+    /// verdict; deletes count nothing.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_feedback_is_one_row_per_author_and_delete_removes_only_the_callers() {
+        use axum::http::StatusCode;
+        use serde_json::json;
+
+        let conn = feedback_tables().await;
+        let org = steering_org("fbrows");
+        steering_incident(conn, &org, "inc_1", Some("run_done")).await;
+        feedback_run(
+            conn,
+            &org,
+            "run_done",
+            "inc_1",
+            "completed",
+            Some(stored_record()),
+        )
+        .await;
+
+        let (status, first) = put_feedback_as(
+            &org,
+            "inc_1",
+            "run_done",
+            STEER_ROOT,
+            r#"{"verdict":"yes"}"#,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{first}");
+        let created_at = first["created_at"].as_i64().unwrap();
+        assert!(created_at > 0);
+        assert_eq!(first["updated_at"], created_at);
+        let mut expected = first.clone();
+        for key in ["created_at", "updated_at"] {
+            expected.as_object_mut().unwrap().remove(key);
+        }
+        assert_eq!(
+            expected,
+            json!({
+                "org_id": org,
+                "run_id": sid(&org, "run_done"),
+                "author_email": STEER_ROOT,
+                "incident_id": sid(&org, "inc_1"),
+                "subject_type": "incident",
+                "subject_id": sid(&org, "inc_1"),
+                "verdict": "yes",
+                "cause": null,
+                "note": null,
+                "reasons": [],
+            })
+        );
+        assert_eq!(
+            feedback_rows(&org, "run_done").await,
+            std::slice::from_ref(&first)
+        );
+
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        let (status, mine) = put_feedback_as(
+            &org,
+            "inc_1",
+            "run_done",
+            STEER_ROOT,
+            r#"{"verdict":"change","cause":"capacity_or_load","note":"The orders pool was raised to 150 on Oct 8"}"#,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{mine}");
+        assert_eq!(mine["verdict"], "change");
+        assert_eq!(mine["cause"], "capacity_or_load");
+        assert_eq!(mine["note"], "The orders pool was raised to 150 on Oct 8");
+        assert_eq!(mine["created_at"], created_at, "an upsert keeps created_at");
+        assert!(mine["updated_at"].as_i64().unwrap() > created_at);
+
+        let (status, theirs) = put_feedback_as(
+            &org,
+            "inc_1",
+            "run_done",
+            FEEDBACK_ROOT,
+            r#"{"verdict":"no","reasons":["wrong_service","missed_change"]}"#,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{theirs}");
+        assert_eq!(theirs["author_email"], FEEDBACK_ROOT);
+        assert_eq!(theirs["reasons"], json!(["wrong_service", "missed_change"]));
+        assert_eq!(
+            feedback_rows(&org, "run_done").await,
+            [mine.clone(), theirs.clone()]
+        );
+
+        for (user, own) in [
+            (STEER_ROOT, mine.clone()),
+            (FEEDBACK_ROOT, theirs.clone()),
+            (STEER_READER, json!(null)),
+        ] {
+            let (status, view) = get_feedback_as(&org, "inc_1", "run_done", user).await;
+            assert_eq!(status, StatusCode::OK, "{user}: {view}");
+            assert_eq!(
+                view,
+                json!({"items": [mine.clone(), theirs.clone()], "mine": own}),
+                "{user}"
+            );
+        }
+        for (verdict, count) in [("yes", 1), ("change", 1), ("no", 1)] {
+            assert_eq!(feedback_count(&org, verdict), count, "{verdict}");
+        }
+
+        for _ in 0..2 {
+            let (status, body) = delete_feedback_as(&org, "inc_1", "run_done", STEER_ROOT).await;
+            assert_eq!(status, StatusCode::NO_CONTENT);
+            assert!(body.is_empty(), "{body:?}");
+            assert_eq!(
+                feedback_rows(&org, "run_done").await,
+                std::slice::from_ref(&theirs)
+            );
+        }
+        let (status, view) = get_feedback_as(&org, "inc_1", "run_done", STEER_ROOT).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(view, json!({"items": [theirs.clone()], "mine": null}));
+        for (verdict, count) in [("yes", 1), ("change", 1), ("no", 1)] {
+            assert_eq!(feedback_count(&org, verdict), count, "{verdict}");
+        }
+    }
+
+    /// J2: writing or removing feedback needs the RCA trigger permission: a user who can
+    /// read the incident but not start its analysis gets 403 on PUT and DELETE, and neither
+    /// writes nor removes a row (nor counts). Reading the run's feedback is the route's read
+    /// permission, so the same user gets 200.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_feedback_writes_need_the_rca_permission() {
+        use axum::http::StatusCode;
+
+        let conn = feedback_tables().await;
+        let org = steering_org("fb403");
+        steering_incident(conn, &org, "inc_1", Some("run_done")).await;
+        feedback_run(
+            conn,
+            &org,
+            "run_done",
+            "inc_1",
+            "completed",
+            Some(stored_record()),
+        )
+        .await;
+        let (status, row) = put_feedback_as(
+            &org,
+            "inc_1",
+            "run_done",
+            FEEDBACK_ROOT,
+            r#"{"verdict":"yes"}"#,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{row}");
+
+        let (status, body) = put_feedback_as(
+            &org,
+            "inc_1",
+            "run_done",
+            STEER_READER,
+            r#"{"verdict":"no"}"#,
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+        let (status, _) = delete_feedback_as(&org, "inc_1", "run_done", STEER_READER).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(
+            feedback_rows(&org, "run_done").await,
+            std::slice::from_ref(&row)
+        );
+        assert_eq!(feedback_count(&org, "yes"), 1);
+        assert_eq!(feedback_count(&org, "no"), 0);
+
+        let (status, view) = get_feedback_as(&org, "inc_1", "run_done", STEER_READER).await;
+        assert_eq!(status, StatusCode::OK, "{view}");
+        assert_eq!(view["items"], serde_json::json!([row]));
+        assert!(view["mine"].is_null());
+    }
+
+    /// J1, J3a: feedback on an alert run is keyed by the bare alert id, so a `change` is a
+    /// past-cause correction for every firing of the alert.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_feedback_on_an_alert_run_is_keyed_by_the_bare_alert_id() {
+        use axum::http::StatusCode;
+        use infra::table::entity::rca_runs;
+        use sea_orm::{ActiveModelTrait, EntityTrait};
+
+        let conn = feedback_tables().await;
+        let org = steering_org("fbalert");
+        steering_incident(conn, &org, "inc_1", Some("run_alert")).await;
+        let mut run = thread_run(&org, &sid(&org, "run_alert"), &sid(&org, "inc_1"), None);
+        run.subject_type = "alert".to_string();
+        run.subject_id = "alert_7:group:payments".to_string();
+        run.result = Some(stored_record());
+        rca_runs::Entity::insert(rca_runs::ActiveModel::from(run).reset_all())
+            .exec(conn)
+            .await
+            .unwrap();
+
+        let (status, row) = put_feedback_as(
+            &org,
+            "inc_1",
+            "run_alert",
+            STEER_ROOT,
+            r#"{"verdict":"change","cause":"dependency_failure"}"#,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{row}");
+        assert_eq!(row["subject_type"], "alert");
+        assert_eq!(row["subject_id"], "alert_7");
+        let corrections =
+            infra::table::rca_feedback::list_corrections_for_subject(&org, "alert", "alert_7", 10)
+                .await
+                .unwrap();
+        assert_eq!(corrections.len(), 1, "{corrections:?}");
+        assert_eq!(corrections[0].cause.as_deref(), Some("dependency_failure"));
+    }
+
+    /// A run of `incident_id` in `state`, with session `session` (scoped to the org) and
+    /// `error.code`.
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    async fn resume_source(
+        conn: &sea_orm::DatabaseConnection,
+        org_id: &str,
+        run_id: &str,
+        incident_id: &str,
+        state: &str,
+        session: Option<&str>,
+        error_code: Option<&str>,
+    ) {
+        use infra::table::entity::rca_runs;
+        use sea_orm::{ActiveModelTrait, EntityTrait};
+
+        let session = session.map(|name| sid(org_id, name));
+        let mut run = thread_run(
+            org_id,
+            &sid(org_id, run_id),
+            &sid(org_id, incident_id),
+            session.as_deref(),
+        );
+        run.state = state.to_string();
+        run.report = None;
+        if matches!(state, "running" | "waiting_input") {
+            run.ended_at = None;
+        }
+        run.error = error_code.map(|code| serde_json::json!({"code": code, "reason": "r"}));
+        rca_runs::Entity::insert(rca_runs::ActiveModel::from(run).reset_all())
+            .exec(conn)
+            .await
+            .unwrap();
+    }
+
+    /// An `sre-rca` session row (scoped to the org) with `status` and `last_committed_seq`,
+    /// and no event time range.
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    fn resume_session_row(
+        org_id: &str,
+        name: &str,
+        status: &str,
+        last_committed_seq: i64,
+    ) -> infra::table::ai_chat_sessions::Model {
+        infra::table::ai_chat_sessions::Model {
+            org_id: org_id.to_string(),
+            session_id: sid(org_id, name),
+            user_id: "sys".to_string(),
+            user_email: "sys@acme.io".to_string(),
+            opencode_session_id: Some(format!("ses_{name}")),
+            agent_type: "sre-rca".to_string(),
+            title: "Analyze incident".to_string(),
+            title_source: "prompt".to_string(),
+            status: status.to_string(),
+            created_at: 1_000,
+            updated_at: 1_500,
+            first_event_at: None,
+            last_event_at: None,
+            last_committed_seq,
+            session_epoch: 1,
+            last_turn_id: None,
+            forked_from_share: None,
+            fork_seed_seq: None,
+            replica_purged_at: None,
+        }
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    async fn insert_session(
+        conn: &sea_orm::DatabaseConnection,
+        row: infra::table::ai_chat_sessions::Model,
+    ) {
+        use infra::table::entity::ai_chat_sessions;
+        use sea_orm::{ActiveModelTrait, EntityTrait};
+
+        ai_chat_sessions::Entity::insert(ai_chat_sessions::ActiveModel::from(row).reset_all())
+            .exec(conn)
+            .await
+            .unwrap();
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    async fn resume_as(
+        org_id: &str,
+        incident_id: &str,
+        run_id: &str,
+    ) -> (axum::http::StatusCode, serde_json::Value) {
+        status_and_body(
+            resume_incident_rca_run(
+                feedback_path(org_id, incident_id, run_id),
+                as_user(STEER_ROOT),
+            )
+            .await,
+        )
+        .await
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    fn resume_count(org_id: &str, result: &str) -> u64 {
+        config::metrics::RCA_RESUME_TOTAL
+            .with_label_values(&[org_id, result])
+            .get()
+    }
+
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    async fn incident_runs(
+        conn: &sea_orm::DatabaseConnection,
+        org_id: &str,
+        incident_id: &str,
+    ) -> Vec<infra::table::entity::rca_runs::Model> {
+        use infra::table::entity::rca_runs;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+        rca_runs::Entity::find()
+            .filter(rca_runs::Column::OrgId.eq(org_id))
+            .filter(rca_runs::Column::IncidentId.eq(sid(org_id, incident_id)))
+            .all(conn)
+            .await
+            .unwrap()
+    }
+
+    /// J7, J11: only the incident's latest run, failed or cancelled, with a session and an
+    /// error that leaves something to reuse, is resumable. Each refusal answers its status
+    /// and code, starts no run, and counts `refused`; a 503 counts nothing. Unknown run,
+    /// another incident's run, unknown incident: 404. Completed, live, not the latest, a
+    /// `transcript_deleted` or turn-start error, no session: 409 `not_resumable`. A missing
+    /// or deleted session: 410 `transcript_expired`. No committed event: 409
+    /// `nothing_to_resume`. Committed events the reader cannot locate: 503
+    /// `history_unavailable`. Cloud prechecks billing first, so this runs without `cloud`.
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[tokio::test]
+    async fn test_a_run_that_cannot_be_resumed_answers_by_reason() {
+        use axum::http::StatusCode;
+        use infra::table::ai_chat_sessions::{NO_SEQ, STATUS_ACTIVE, STATUS_DELETED};
+
+        let conn = feedback_tables().await;
+        let org = steering_org("resume_refused");
+        // (incident, its latest run, run state, session, error code)
+        type Source<'a> = (&'a str, &'a str, &'a str, Option<&'a str>, Option<&'a str>);
+        let sources: [Source; 9] = [
+            ("inc_done", "run_done", "completed", Some("ses_full"), None),
+            ("inc_live", "run_live", "running", Some("ses_full"), None),
+            (
+                "inc_deleted",
+                "run_deleted",
+                "failed",
+                Some("ses_full"),
+                Some("transcript_deleted"),
+            ),
+            (
+                "inc_never",
+                "run_never",
+                "failed",
+                Some("ses_full"),
+                Some("turn_limit"),
+            ),
+            ("inc_bare", "run_bare", "failed", None, Some("timeout")),
+            (
+                "inc_gone",
+                "run_gone",
+                "cancelled",
+                Some("ses_missing"),
+                None,
+            ),
+            (
+                "inc_purged",
+                "run_purged",
+                "failed",
+                Some("ses_deleted"),
+                Some("timeout"),
+            ),
+            (
+                "inc_empty",
+                "run_empty",
+                "failed",
+                Some("ses_empty"),
+                Some("timeout"),
+            ),
+            (
+                "inc_unread",
+                "run_unread",
+                "cancelled",
+                Some("ses_unread"),
+                None,
+            ),
+        ];
+        for (incident, run, state, session, code) in sources {
+            steering_incident(conn, &org, incident, Some(run)).await;
+            resume_source(conn, &org, run, incident, state, session, code).await;
+        }
+        // An older failed run of an incident whose latest run completed.
+        steering_incident(conn, &org, "inc_newer", Some("run_newer")).await;
+        resume_source(
+            conn,
+            &org,
+            "run_old",
+            "inc_newer",
+            "failed",
+            Some("ses_full"),
+            Some("timeout"),
+        )
+        .await;
+        resume_source(
+            conn,
+            &org,
+            "run_newer",
+            "inc_newer",
+            "completed",
+            Some("ses_full"),
+            None,
+        )
+        .await;
+        for row in [
+            resume_session_row(&org, "ses_full", STATUS_ACTIVE, 9),
+            resume_session_row(&org, "ses_deleted", STATUS_DELETED, 9),
+            resume_session_row(&org, "ses_empty", STATUS_ACTIVE, NO_SEQ),
+            resume_session_row(&org, "ses_unread", STATUS_ACTIVE, 9),
+        ] {
+            insert_session(conn, row).await;
+        }
+        let runs_before = {
+            let mut count = 0;
+            for incident in [
+                "inc_done",
+                "inc_live",
+                "inc_deleted",
+                "inc_never",
+                "inc_bare",
+                "inc_gone",
+                "inc_purged",
+                "inc_empty",
+                "inc_unread",
+                "inc_newer",
+            ] {
+                count += incident_runs(conn, &org, incident).await.len();
+            }
+            count
+        };
+
+        let mut refused = 0;
+        for (incident, run, status, code) in [
+            ("inc_done", "run_unknown", StatusCode::NOT_FOUND, None),
+            ("inc_live", "run_done", StatusCode::NOT_FOUND, None),
+            ("inc_unknown", "run_done", StatusCode::NOT_FOUND, None),
+            (
+                "inc_done",
+                "run_done",
+                StatusCode::CONFLICT,
+                Some("not_resumable"),
+            ),
+            (
+                "inc_live",
+                "run_live",
+                StatusCode::CONFLICT,
+                Some("not_resumable"),
+            ),
+            (
+                "inc_newer",
+                "run_old",
+                StatusCode::CONFLICT,
+                Some("not_resumable"),
+            ),
+            (
+                "inc_deleted",
+                "run_deleted",
+                StatusCode::CONFLICT,
+                Some("not_resumable"),
+            ),
+            (
+                "inc_never",
+                "run_never",
+                StatusCode::CONFLICT,
+                Some("not_resumable"),
+            ),
+            (
+                "inc_bare",
+                "run_bare",
+                StatusCode::CONFLICT,
+                Some("not_resumable"),
+            ),
+            (
+                "inc_gone",
+                "run_gone",
+                StatusCode::GONE,
+                Some("transcript_expired"),
+            ),
+            (
+                "inc_purged",
+                "run_purged",
+                StatusCode::GONE,
+                Some("transcript_expired"),
+            ),
+            (
+                "inc_empty",
+                "run_empty",
+                StatusCode::CONFLICT,
+                Some("nothing_to_resume"),
+            ),
+        ] {
+            let (got, body) = resume_as(&org, incident, run).await;
+            assert_eq!(got, status, "{incident}/{run}: {body}");
+            assert_eq!(body["code"], status.as_u16(), "{incident}/{run}: {body}");
+            assert_eq!(
+                body.get("error_code").and_then(|c| c.as_str()),
+                code,
+                "{incident}/{run}: {body}"
+            );
+            refused += 1;
+            assert_eq!(resume_count(&org, "refused"), refused, "{incident}/{run}");
+        }
+
+        let (got, body) = resume_as(&org, "inc_unread", "run_unread").await;
+        assert_eq!(got, StatusCode::SERVICE_UNAVAILABLE, "{body}");
+        assert_eq!(body["error_code"], "history_unavailable");
+        assert_eq!(
+            resume_count(&org, "refused"),
+            refused,
+            "a 503 is not a refusal"
+        );
+        assert_eq!(resume_count(&org, "started"), 0);
+
+        let mut runs_after = 0;
+        for incident in [
+            "inc_done",
+            "inc_live",
+            "inc_deleted",
+            "inc_never",
+            "inc_bare",
+            "inc_gone",
+            "inc_purged",
+            "inc_empty",
+            "inc_unread",
+            "inc_newer",
+        ] {
+            runs_after += incident_runs(conn, &org, incident).await.len();
+        }
+        assert_eq!(runs_after, runs_before, "a refused resume starts no run");
+    }
+
+    /// J7: each reason a run cannot be resumed answers its status and code; the 409
+    /// `not_resumable` message is the reason's, and a 503 or 500 never shows its details.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_each_resume_refusal_maps_to_its_status_and_code() {
+        use axum::http::StatusCode;
+        use openobserve_core::alerts::rca_resume::ResumeError;
+
+        let details = "reading the chat-events stream failed: search 10.0.0.7:5080 timed out";
+        let reason = "Only a failed or cancelled analysis can be resumed";
+        for (error, status, code) in [
+            (ResumeError::NotFound, StatusCode::NOT_FOUND, None),
+            (
+                ResumeError::NotResumable(reason.to_string()),
+                StatusCode::CONFLICT,
+                Some("not_resumable"),
+            ),
+            (
+                ResumeError::NothingToResume,
+                StatusCode::CONFLICT,
+                Some("nothing_to_resume"),
+            ),
+            (
+                ResumeError::TranscriptExpired,
+                StatusCode::GONE,
+                Some("transcript_expired"),
+            ),
+            (
+                ResumeError::Unavailable(details.to_string()),
+                StatusCode::SERVICE_UNAVAILABLE,
+                Some("history_unavailable"),
+            ),
+            (
+                ResumeError::Internal(details.to_string()),
+                StatusCode::INTERNAL_SERVER_ERROR,
+                None,
+            ),
+        ] {
+            let (got, body) = status_and_body(resume_error_response("run_1", &error)).await;
+            assert_eq!(got, status, "{error:?}");
+            assert_eq!(body["code"], status.as_u16(), "{error:?}");
+            assert_eq!(
+                body.get("error_code").and_then(|c| c.as_str()),
+                code,
+                "{error:?}: {body}"
+            );
+            let message = body["message"].as_str().unwrap();
+            assert!(!message.is_empty(), "{error:?}");
+            assert!(
+                !message.contains("10.0.0.7") && !message.contains("search"),
+                "{error:?}: {message}"
+            );
+            if matches!(error, ResumeError::NotResumable(_)) {
+                assert_eq!(message, reason);
+            }
+        }
+    }
+
+    /// A seed of `source_run_id` as `prepare_resume` returns it, with no events to copy: the
+    /// launch's copy refuses an empty prefix, so the resumed run ends `resume_failed` before
+    /// any agent call.
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    fn resume_seed(
+        org_id: &str,
+        source_run_id: &str,
+    ) -> openobserve_core::alerts::rca_resume::ResumeSeed {
+        use openobserve_core::alerts::rca_resume::{ResumeSeed, ResumeStep};
+
+        ResumeSeed {
+            source_run_id: sid(org_id, source_run_id),
+            source_session: resume_session_row(
+                org_id,
+                "ses_src",
+                infra::table::ai_chat_sessions::STATUS_ACTIVE,
+                infra::table::ai_chat_sessions::NO_SEQ,
+            ),
+            prefix: Vec::new(),
+            cut_seq: 17,
+            reused_steps: 3,
+            from_step: ResumeStep {
+                index: 4,
+                stage: "verify".to_string(),
+                title: "Check the orders pool".to_string(),
+            },
+            mode: config::meta::alerts::rca_runs::RunMode::BuildOnPrevious,
+        }
+    }
+
+    /// J7, J8, M1: a resume starts a new `resume` run of the incident in the source's mode,
+    /// started by the caller, that names its source in `context_used.resumed_from` before
+    /// the launch, and answers 202 `{message, run_id, resumed_from, reused_steps, from_step}`.
+    /// Its copy failing here ends it `resume_failed` and leaves the source resumable: the
+    /// next resume of the source is judged on the source's own transcript (here
+    /// `nothing_to_resume`), not refused as no longer the latest run.
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[tokio::test]
+    async fn test_a_resume_starts_a_run_that_names_its_source() {
+        use axum::http::StatusCode;
+        use serde_json::json;
+
+        let conn = feedback_tables().await;
+        let org = steering_org("resume202");
+        steering_incident(conn, &org, "inc_1", Some("run_src")).await;
+        resume_source(
+            conn,
+            &org,
+            "run_src",
+            "inc_1",
+            "failed",
+            Some("ses_src"),
+            Some("timeout"),
+        )
+        .await;
+        insert_session(
+            conn,
+            resume_session_row(
+                &org,
+                "ses_src",
+                infra::table::ai_chat_sessions::STATUS_ACTIVE,
+                infra::table::ai_chat_sessions::NO_SEQ,
+            ),
+        )
+        .await;
+
+        let (status, body) = status_and_body(
+            start_resumed_run(
+                org.clone(),
+                sid(&org, "inc_1"),
+                UserEmail {
+                    user_id: STEER_ROOT.to_string(),
+                },
+                resume_seed(&org, "run_src"),
+            )
+            .await,
+        )
+        .await;
+        assert_eq!(status, StatusCode::ACCEPTED, "{body}");
+        let runs = incident_runs(conn, &org, "inc_1").await;
+        assert_eq!(runs.len(), 2, "{runs:?}");
+        let new_run = runs
+            .iter()
+            .find(|run| run.run_id != sid(&org, "run_src"))
+            .unwrap();
+        let mut keys: Vec<&str> = body
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            [
+                "from_step",
+                "message",
+                "resumed_from",
+                "reused_steps",
+                "run_id"
+            ]
+        );
+        assert!(!body["message"].as_str().unwrap().is_empty());
+        assert_eq!(body["run_id"], new_run.run_id.as_str());
+        assert_eq!(body["resumed_from"], sid(&org, "run_src"));
+        assert_eq!(body["reused_steps"], 3);
+        let from_step = json!({"index": 4, "stage": "verify", "title": "Check the orders pool"});
+        assert_eq!(body["from_step"], from_step);
+
+        assert_eq!(new_run.trigger, "resume");
+        assert_eq!(new_run.mode, "build_on_previous");
+        assert_eq!(new_run.started_by, STEER_ROOT);
+        assert_eq!(new_run.guidance, None);
+        assert_eq!(
+            new_run
+                .context_used
+                .as_ref()
+                .map(|used| &used["resumed_from"]),
+            Some(&json!({"run_id": sid(&org, "run_src"), "steps": 3, "from_step": from_step})),
+            "{:?}",
+            new_run.context_used
+        );
+        assert_eq!(new_run.state, "failed");
+        assert_eq!(
+            new_run.error.as_ref().map(|error| &error["code"]),
+            Some(&json!("resume_failed"))
+        );
+        let source = runs
+            .iter()
+            .find(|run| run.run_id == sid(&org, "run_src"))
+            .unwrap();
+        assert_eq!(source.state, "failed", "the source is not touched");
+
+        let (status, body) = resume_as(&org, "inc_1", "run_src").await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        assert_eq!(body["error_code"], "nothing_to_resume", "{body}");
+    }
+
+    /// J7: a resume while the incident has a live run answers 409 `run_in_flight` like a
+    /// second start, and starts no run.
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[tokio::test]
+    async fn test_a_resume_while_a_run_is_live_is_409_and_starts_nothing() {
+        use axum::http::StatusCode;
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
+
+        let conn = feedback_tables().await;
+        let org = steering_org("resume_inflight");
+        steering_incident(conn, &org, "inc_1", Some("run_live")).await;
+        resume_source(
+            conn,
+            &org,
+            "run_src",
+            "inc_1",
+            "failed",
+            Some("ses_src"),
+            Some("timeout"),
+        )
+        .await;
+        resume_source(conn, &org, "run_live", "inc_1", "running", None, None).await;
+        alert_incidents::Entity::update_many()
+            .col_expr(alert_incidents::Column::RcaState, Expr::value("running"))
+            .col_expr(
+                alert_incidents::Column::RcaUpdatedAt,
+                Expr::value(config::utils::time::now_micros()),
+            )
+            .filter(alert_incidents::Column::Id.eq(sid(&org, "inc_1")))
+            .exec(conn)
+            .await
+            .unwrap();
+
+        let (status, body) = status_and_body(
+            start_resumed_run(
+                org.clone(),
+                sid(&org, "inc_1"),
+                UserEmail {
+                    user_id: STEER_ROOT.to_string(),
+                },
+                resume_seed(&org, "run_src"),
+            )
+            .await,
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        assert_eq!(body["code"], 409);
+        assert_eq!(body["error_code"], "run_in_flight");
+        assert_eq!(incident_runs(conn, &org, "inc_1").await.len(), 2);
+    }
+
+    /// J7, M1: a resumed run that fails at launch (here its copy: `resume_failed`, no
+    /// session) carries `context_used.resumed_from` from its insert: a SQLite trigger scoped
+    /// to this test's org refuses every update that changes `context_used`, so no later write
+    /// can have put it there. Its source stays resumable: the next resume of the source passes
+    /// the latest-run check and is judged on the source's own transcript, whose committed
+    /// events this test has no stream for (503 `history_unavailable`, not 409).
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[tokio::test]
+    async fn test_a_resume_that_fails_at_launch_keeps_its_lineage_and_its_source() {
+        use axum::http::StatusCode;
+        use sea_orm::ConnectionTrait;
+        use serde_json::json;
+
+        let conn = feedback_tables().await;
+        let org = steering_org("resume_lineage");
+        steering_incident(conn, &org, "inc_1", Some("run_src")).await;
+        resume_source(
+            conn,
+            &org,
+            "run_src",
+            "inc_1",
+            "failed",
+            Some("ses_src"),
+            Some("timeout"),
+        )
+        .await;
+        insert_session(
+            conn,
+            resume_session_row(
+                &org,
+                "ses_src",
+                infra::table::ai_chat_sessions::STATUS_ACTIVE,
+                9,
+            ),
+        )
+        .await;
+        let trigger = format!("freeze_lineage_{org}");
+        conn.execute_unprepared(&format!(
+            "CREATE TRIGGER {trigger} BEFORE UPDATE ON rca_runs \
+             WHEN NEW.org_id = '{org}' AND NEW.context_used IS NOT OLD.context_used \
+             BEGIN SELECT RAISE(ABORT, 'lineage update refused by the test'); END"
+        ))
+        .await
+        .unwrap();
+        let response = start_resumed_run(
+            org.clone(),
+            sid(&org, "inc_1"),
+            UserEmail {
+                user_id: STEER_ROOT.to_string(),
+            },
+            resume_seed(&org, "run_src"),
+        )
+        .await;
+        conn.execute_unprepared(&format!("DROP TRIGGER {trigger}"))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+
+        let runs = incident_runs(conn, &org, "inc_1").await;
+        assert_eq!(runs.len(), 2, "{runs:?}");
+        let new_run = runs
+            .iter()
+            .find(|run| run.run_id != sid(&org, "run_src"))
+            .unwrap();
+        assert_eq!(new_run.trigger, "resume");
+        assert_eq!(new_run.state, "failed");
+        assert_eq!(
+            new_run.error.as_ref().map(|error| &error["code"]),
+            Some(&json!("resume_failed"))
+        );
+        assert!(new_run.session_id.is_none());
+        assert_eq!(
+            new_run
+                .context_used
+                .as_ref()
+                .map(|used| &used["resumed_from"]),
+            Some(&json!({
+                "run_id": sid(&org, "run_src"),
+                "steps": 3,
+                "from_step": {"index": 4, "stage": "verify", "title": "Check the orders pool"},
+            })),
+            "{:?}",
+            new_run.context_used
+        );
+
+        let (status, body) = resume_as(&org, "inc_1", "run_src").await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{body}");
+        assert_eq!(body["error_code"], "history_unavailable", "{body}");
+    }
+
+    /// M1 through the route: a later run hides its source only when it is something else
+    /// than a Resume of that source that failed before its first turn. A failed Resume of
+    /// the source with a turn-start error and no session leaves the source resumable (judged
+    /// on its own transcript, here `nothing_to_resume`); the same failure on a Resume of
+    /// another run, or a failed manual run, makes the source no longer the latest
+    /// (`not_resumable`).
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+    #[tokio::test]
+    async fn test_only_a_failed_resume_of_the_source_leaves_it_resumable() {
+        use axum::http::StatusCode;
+        use infra::table::entity::rca_runs;
+        use sea_orm::{ActiveModelTrait, EntityTrait};
+
+        let conn = feedback_tables().await;
+        let org = steering_org("resume_child");
+        for (incident, trigger, resumed_from, code) in [
+            ("inc_own", "resume", "run_src", "nothing_to_resume"),
+            ("inc_other", "resume", "run_elsewhere", "not_resumable"),
+            ("inc_manual", "manual", "", "not_resumable"),
+        ] {
+            let source = format!("run_src_{incident}");
+            let child = format!("run_child_{incident}");
+            let session = format!("ses_{incident}");
+            steering_incident(conn, &org, incident, Some(&child)).await;
+            resume_source(
+                conn,
+                &org,
+                &source,
+                incident,
+                "failed",
+                Some(&session),
+                Some("timeout"),
+            )
+            .await;
+            insert_session(
+                conn,
+                resume_session_row(
+                    &org,
+                    &session,
+                    infra::table::ai_chat_sessions::STATUS_ACTIVE,
+                    infra::table::ai_chat_sessions::NO_SEQ,
+                ),
+            )
+            .await;
+            let mut run = thread_run(&org, &sid(&org, &child), &sid(&org, incident), None);
+            run.trigger = trigger.to_string();
+            run.state = "failed".to_string();
+            run.report = None;
+            run.error = Some(serde_json::json!({"code": "agent_unavailable", "reason": "r"}));
+            if !resumed_from.is_empty() {
+                let named = if resumed_from == "run_src" {
+                    sid(&org, &source)
+                } else {
+                    sid(&org, resumed_from)
+                };
+                run.context_used = Some(serde_json::json!({
+                    "resumed_from": {"run_id": named, "steps": 1, "from_step": {"index": 2, "stage": "", "title": "t"}},
+                }));
+            }
+            rca_runs::Entity::insert(rca_runs::ActiveModel::from(run).reset_all())
+                .exec(conn)
+                .await
+                .unwrap();
+
+            let (status, body) = resume_as(&org, incident, &source).await;
+            assert_eq!(status, StatusCode::CONFLICT, "{incident}: {body}");
+            assert_eq!(body["error_code"], code, "{incident}: {body}");
+        }
+    }
+
+    /// J2, J7: without enterprise features the feedback and resume routes answer 403.
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_the_oss_feedback_and_resume_routes_are_403() {
+        let path = || {
+            Path((
+                "default".to_string(),
+                "inc_1".to_string(),
+                "run_1".to_string(),
+            ))
+        };
+        let user = || {
+            Headers(UserEmail {
+                user_id: "a.rao@acme.io".to_string(),
+            })
+        };
+        for response in [
+            put_incident_rca_feedback(
+                path(),
+                user(),
+                axum::body::Bytes::from_static(br#"{"verdict":"yes"}"#),
+            )
+            .await,
+            get_incident_rca_feedback(path(), user()).await,
+            delete_incident_rca_feedback(path(), user()).await,
+            resume_incident_rca_run(path(), user()).await,
+        ] {
+            assert_eq!(response.status(), axum::http::StatusCode::FORBIDDEN);
+        }
     }
 
     /// §9.1: without enterprise features both steering routes answer 403.

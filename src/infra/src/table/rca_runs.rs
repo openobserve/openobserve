@@ -72,6 +72,9 @@ pub struct NewRun {
     pub guidance: Option<String>,
     /// Serialized `Vec<SubjectRef>`: the pending on-call records of an alert run.
     pub oncall_subjects: Option<serde_json::Value>,
+    /// Written with the row: a resumed run's `{resumed_from}`, so its source is named even
+    /// if nothing else is ever written to it (J8, M1).
+    pub context_used: Option<serde_json::Value>,
 }
 
 /// The values [start_run] decides with.
@@ -362,7 +365,7 @@ pub async fn start_run_with<C: TransactionTrait>(
         stats: Set(None),
         stage: Set(None),
         stage_index: Set(None),
-        context_used: Set(None),
+        context_used: Set(new.context_used.clone()),
         continuations: Set(0),
         oncall_subjects: Set(new.oncall_subjects.clone()),
         input_deadline_at: Set(None),
@@ -1440,6 +1443,7 @@ mod tests {
             started_by: "a.rao@acme.io".to_string(),
             guidance: None,
             oncall_subjects: None,
+            context_used: None,
         }
     }
 

@@ -16,7 +16,10 @@
 import { getCurrentScope, onScopeDispose } from "vue";
 import { isAxiosError } from "axios";
 import config from "@/aws-exports";
-import incidentsService, { type TriggerRcaResponse } from "@/services/incidents";
+import incidentsService, {
+  type ResumeRcaResponse,
+  type TriggerRcaResponse,
+} from "@/services/incidents";
 import {
   isPaidOverageConsentError,
   usePaidOverageConsent,
@@ -45,6 +48,11 @@ export type RcaTriggerResult =
   | { status: "declined" }
   | { status: "unavailable"; message: I18nText };
 
+export type RcaResumeResult =
+  | { status: "started"; runId: string; data: ResumeRcaResponse }
+  | { status: "declined" }
+  | { status: "unavailable"; message: I18nText };
+
 /**
  * Starts an RCA run and handles the paid-usage consent flow (RR-33).
  *
@@ -61,22 +69,21 @@ export function useRcaTrigger() {
   const lifecycle = new AbortController();
   if (getCurrentScope()) onScopeDispose(() => lifecycle.abort());
 
-  const started = (data: TriggerRcaResponse): RcaTriggerResult => ({
-    status: "started",
-    runId: data.run_id,
-    data,
-  });
+  type Gated<T> =
+    | { status: "started"; data: T }
+    | { status: "declined" }
+    | { status: "unavailable"; message: I18nText };
 
-  const requestRca = async (
+  /** One request with the 402/412 consent flow; a resume is metered like a manual run (J7). */
+  const withConsent = async <T>(
     org: string,
-    incidentId: string,
-    params: RcaTriggerParams,
-    opts: RcaTriggerOptions = {},
-  ): Promise<RcaTriggerResult> => {
+    send: () => Promise<{ data: T }>,
+    opts: RcaTriggerOptions,
+  ): Promise<Gated<T>> => {
     const { signal } = opts;
     try {
-      const res = await incidentsService.triggerRca(org, incidentId, params, { signal });
-      return started(res.data);
+      const res = await send();
+      return { status: "started", data: res.data };
     } catch (error: unknown) {
       const status = isAxiosError(error) ? (error.response?.status ?? 0) : 0;
       const body: unknown = isAxiosError(error) ? error.response?.data : null;
@@ -108,12 +115,45 @@ export function useRcaTrigger() {
       }
 
       // Exactly one guarded replacement request. A second denial propagates.
-      const retry = await incidentsService.triggerRca(org, incidentId, params, { signal });
-      return started(retry.data);
+      const retry = await send();
+      return { status: "started", data: retry.data };
     }
   };
 
-  return { requestRca };
+  const requestRca = async (
+    org: string,
+    incidentId: string,
+    params: RcaTriggerParams,
+    opts: RcaTriggerOptions = {},
+  ): Promise<RcaTriggerResult> => {
+    const result = await withConsent(
+      org,
+      () => incidentsService.triggerRca(org, incidentId, params, { signal: opts.signal }),
+      opts,
+    );
+    return result.status === "started"
+      ? { status: "started", runId: result.data.run_id, data: result.data }
+      : result;
+  };
+
+  /** Resume a failed or cancelled run (J7) with the same consent flow as a trigger. */
+  const requestResume = async (
+    org: string,
+    incidentId: string,
+    runId: string,
+    opts: RcaTriggerOptions = {},
+  ): Promise<RcaResumeResult> => {
+    const result = await withConsent(
+      org,
+      () => incidentsService.resumeRca(org, incidentId, runId, { signal: opts.signal }),
+      opts,
+    );
+    return result.status === "started"
+      ? { status: "started", runId: result.data.run_id, data: result.data }
+      : result;
+  };
+
+  return { requestRca, requestResume };
 }
 
 export default useRcaTrigger;

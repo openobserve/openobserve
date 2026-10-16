@@ -183,6 +183,10 @@ use crate::{
         openobserve_api_management::request::alerts::incidents::get_incident_rca_thread,
         openobserve_api_management::request::alerts::incidents::steer_incident_rca_run,
         openobserve_api_management::request::alerts::incidents::get_incident_rca_steering,
+        openobserve_api_management::request::alerts::incidents::put_incident_rca_feedback,
+        openobserve_api_management::request::alerts::incidents::get_incident_rca_feedback,
+        openobserve_api_management::request::alerts::incidents::delete_incident_rca_feedback,
+        openobserve_api_management::request::alerts::incidents::resume_incident_rca_run,
         openobserve_api_management::request::alerts::incidents::get_incident_rca_summary,
         openobserve_api_management::request::alerts::incidents::run_incident_rca_backtest,
         openobserve_api_management::request::alerts::templates::list_templates,
@@ -507,6 +511,11 @@ use crate::{
             config::meta::alerts::rca_steering::SteerStatus,
             config::meta::alerts::rca_steering::SteerAction,
             config::meta::alerts::rca_steering::SteerStatusReason,
+            config::meta::alerts::rca_feedback::RcaFeedback,
+            config::meta::alerts::rca_feedback::FeedbackVerdict,
+            config::meta::alerts::rca_feedback::FeedbackReason,
+            config::meta::alerts::rca_feedback::PutRcaFeedbackRequest,
+            config::meta::alerts::rca_feedback::ListRcaFeedbackResponse,
             config::meta::alerts::rca_runs::RcaSummary,
             config::meta::alerts::rca_runs::RcaDetailFields,
             config::meta::alerts::rca_runs::RunSummaryFields,
@@ -859,6 +868,8 @@ pub struct ApiDoc;
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
     o2_enterprise::enterprise::password_policy::lockout::LockoutState,
     openobserve_api_management::request::users::UserDetailsResponse,
+    openobserve_api_management::request::alerts::incidents::RcaResumedResponse,
+    openobserve_core::alerts::rca_resume::ResumeStep,
 )))]
 struct EnterpriseExperimentApiDoc;
 
@@ -1639,6 +1650,71 @@ mod tests {
             .collect();
         assert!(tags.contains(&"Product Analytics"), "{tags:?}");
         assert!(!tags.contains(&"RUM"), "{tags:?}");
+    }
+
+    /// J2, J7: the feedback and resume operations are published with their ids and rate
+    /// limit operations; with enterprise features each documents the statuses it answers.
+    #[test]
+    fn rca_feedback_and_resume_paths_are_documented() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec["paths"].as_object().unwrap();
+        let feedback = "/api/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback";
+        let resume = "/api/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/resume";
+        for (path, method, operation_id, ratelimit, statuses) in [
+            (
+                feedback,
+                "put",
+                "PutIncidentRcaFeedback",
+                "update",
+                &["200", "400", "403", "404", "409"][..],
+            ),
+            (
+                feedback,
+                "get",
+                "GetIncidentRcaFeedback",
+                "get",
+                &["200", "404"][..],
+            ),
+            (
+                feedback,
+                "delete",
+                "DeleteIncidentRcaFeedback",
+                "update",
+                &["204", "403", "404"][..],
+            ),
+            (
+                resume,
+                "post",
+                "ResumeIncidentRcaRun",
+                "update",
+                &["202", "404", "409", "410", "503"][..],
+            ),
+        ] {
+            let op = &paths[path][method];
+            assert!(op.is_object(), "{method} {path} missing");
+            assert_eq!(op["operationId"], operation_id, "{method} {path}");
+            assert_eq!(
+                op["tags"],
+                serde_json::json!(["Incidents"]),
+                "{method} {path}"
+            );
+            assert_eq!(op["x-o2-ratelimit"]["module"], "Alerts", "{method} {path}");
+            assert_eq!(
+                op["x-o2-ratelimit"]["operation"], ratelimit,
+                "{method} {path}"
+            );
+            #[cfg(not(feature = "enterprise"))]
+            let _ = statuses;
+            #[cfg(feature = "enterprise")]
+            for status in statuses {
+                assert!(
+                    op["responses"].get(*status).is_some(),
+                    "{method} {path} {status}"
+                );
+            }
+        }
+        assert!(paths[resume].get("get").is_none());
+        assert!(paths[feedback].get("post").is_none());
     }
 
     #[test]

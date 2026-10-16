@@ -9544,6 +9544,45 @@
       "rcaBuildOnPrevious": "Build on previous report",
       "rcaBuildOnPreviousHint": "Send the current report so the agent extends it",
       "rcaHistory": "Report history",
+      "rcaFeedback": {
+        "question": "Is this the cause?",
+        "yes": "Yes",
+        "no": "No",
+        "change": "Correct the cause",
+        "yesSaved": "Marked as the cause.",
+        "noPrompt": "What’s wrong with it?",
+        "reason": {
+          "wrong_service": "Wrong service",
+          "symptom_not_cause": "Symptom, not cause",
+          "evidence_does_not_hold": "Evidence doesn’t hold",
+          "missed_change": "Missed a change"
+        },
+        "noteLabel": "Note for the agent (optional)",
+        "notePlaceholder": "e.g. pool size was raised to 150 on Oct 8",
+        "send": "Send feedback",
+        "noSaved": "Marked as not the cause.",
+        "changeLabel": "What was the actual cause?",
+        "changeNoteLabel": "Note for the next analysis (optional)",
+        "save": "Save cause",
+        "changeSavedIncident": "Saved as a past cause for this incident.",
+        "changeSavedAlert": "Saved as a past cause for this alert.",
+        "cancel": "Cancel",
+        "undo": "Undo",
+        "loadFailed": "Could not load your feedback.",
+        "saveFailed": "Could not save your feedback.",
+        "undoFailed": "Could not undo your feedback.",
+        "forbidden": "You do not have permission to send feedback.",
+        "notRateable": "Feedback opens when the run has finished."
+      },
+      "rcaAsk": {
+        "button": "Ask about this analysis",
+        "chip": "Analysis · {run}"
+      },
+      "rcaResume": {
+        "button": "Resume run",
+        "started": "Resuming from “{step}”. The finished step is reused. | Resuming from “{step}”. The {count} finished steps are reused.",
+        "failed": "Could not resume the run."
+      },
       "rcaSteer": {
         "composerTitleLive": "Steer this run",
         "composerHintLive": "Read after the current step",
@@ -9897,7 +9936,8 @@
           "connectToolset": "Connect AI Toolset",
           "ingestData": "Ingest data",
           "openPipeline": "Open pipeline",
-          "samplingRules": "Sampling rules"
+          "samplingRules": "Sampling rules",
+          "resumeRun": "Resume run"
         },
         "evidence": "Evidence",
         "evidenceCount": "{count} · {decisive} decisive",

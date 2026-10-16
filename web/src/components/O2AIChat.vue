@@ -545,6 +545,9 @@ export default defineComponent({
         text: string;
         autoSend: boolean;
         id: number;
+        chipName?: string;
+        newChat?: boolean;
+        context?: Record<string, unknown> | null;
       } | null,
       default: null,
     },
@@ -710,6 +713,9 @@ export default defineComponent({
     const expandedLogEntries = ref<Set<string>>(new Set());
 
     const {
+      setPinnedContext,
+      clearPinnedContext,
+      releasePinnedContextFor,
       isLoading,
       currentSessionId,
       lastTraceId,
@@ -808,6 +814,10 @@ export default defineComponent({
       }
     };
 
+    // Ask hand-off (J5): once its chip lands, the caret goes before it, so the question leads
+    // the message and the chat title is taken from the question, not from the record.
+    let caretBeforeChips = false;
+
     const processPendingChips = () => {
       if (pendingChips.value.length > 0) {
         nextTick(() => {
@@ -833,6 +843,10 @@ export default defineComponent({
               chatInput.value.insertChip(chip);
             });
             pendingChips.value = [];
+            if (caretBeforeChips) {
+              caretBeforeChips = false;
+              focusInputBeforeChips();
+            }
           }
         });
       }
@@ -876,6 +890,31 @@ export default defineComponent({
       () => props.aiChatPayload,
       (payload) => {
         if (!payload?.text) return;
+        if (payload.chipName) {
+          // Ask hand-off: fresh chat, named context chip, pinned context; the user writes the question.
+          if (payload.newChat) addNewChat();
+          const text = payload.text;
+          const chipName = payload.chipName;
+          const context = payload.context ?? null;
+          // Deferred past addNewChat's chatUpdated re-entry, which would clear the pin set any sooner.
+          nextTick(() => {
+            setTimeout(() => {
+              setPinnedContext(context);
+              pendingChips.value.push({
+                id: `context-${Date.now()}`,
+                filename: raw(chipName),
+                // J5: the chip shows its name ("Analysis · <run>"), not the first words of the record.
+                preview: chipName,
+                fullContent: text,
+                charCount: text.length,
+                type: "context",
+              });
+              caretBeforeChips = true;
+              if (componentReady.value) processPendingChips();
+            }, 50);
+          });
+          return;
+        }
         if (payload.autoSend) {
           inputMessage.value = payload.text;
           nextTick(() => {
@@ -941,6 +980,7 @@ export default defineComponent({
     const addNewChat = () => {
       loadSeq += 1;
       detachCurrentStream();
+      clearPinnedContext();
       historyUnavailable.value = false;
       turnLimitError.value = false;
 
@@ -969,6 +1009,7 @@ export default defineComponent({
 
         const seq = ++loadSeq;
         detachCurrentStream();
+        releasePinnedContextFor(chatId);
 
         const chat = await dbLoadChat(chatId);
         if (seq !== loadSeq) return;
@@ -1184,6 +1225,21 @@ export default defineComponent({
         e.preventDefault();
         recallHistory("down");
       }
+    };
+
+    const focusInputBeforeChips = () => {
+      const div: HTMLElement | undefined = chatInput.value?.editableDiv;
+      if (!div) {
+        focusInput();
+        return;
+      }
+      div.focus();
+      const range = document.createRange();
+      range.setStart(div, 0);
+      range.collapse(true);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
     };
 
     const focusInput = () => {

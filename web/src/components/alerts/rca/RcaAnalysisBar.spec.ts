@@ -172,6 +172,41 @@ describe("RcaAnalysisBar (contract E5)", () => {
     },
   );
 
+  describe("J5: Ask about this analysis", () => {
+    it("not live with canAsk: shown before Re-analyze and emits ask", async () => {
+      const wrapper = mountBar({ live: false, canAsk: true });
+      const ask = byTest(wrapper, "rca-ask-btn");
+
+      expect(ask.text()).toBe("Ask about this analysis");
+      const html = wrapper.html();
+      expect(html.indexOf('data-test="rca-ask-btn"')).toBeLessThan(
+        html.indexOf('data-test="rca-reanalyze-btn"'),
+      );
+      await ask.trigger("click");
+      expect(wrapper.emitted("ask")).toHaveLength(1);
+    });
+
+    it("hidden on a live run even with canAsk", () => {
+      const wrapper = mountBar({ live: true, canAsk: true });
+
+      expect(byTest(wrapper, "rca-ask-btn").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-cancel-btn").exists()).toBe(true);
+    });
+
+    it("hidden without canAsk; Re-analyze stays", () => {
+      const wrapper = mountBar({ live: false });
+
+      expect(byTest(wrapper, "rca-ask-btn").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-reanalyze-btn").exists()).toBe(true);
+    });
+  });
+
+  it("J9: Re-analyze is disabled while a resume is in flight", () => {
+    const wrapper = mountBar({ live: false, resuming: true });
+
+    expect(byTest(wrapper, "rca-reanalyze-btn").attributes("disabled")).toBeDefined();
+  });
+
   describe("⋯ menu", () => {
     it("has Copy report, Download as Markdown and Copy thread, and emits each", async () => {
       const wrapper = mountBar();
