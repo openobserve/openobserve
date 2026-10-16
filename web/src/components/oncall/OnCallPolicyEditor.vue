@@ -404,25 +404,49 @@
 
               <!-- Channels apply to everyone paged at this priority; the primary
                      and the secondary are not treated differently. -->
-              <div v-if="current" class="flex flex-wrap items-center gap-2">
-                <OText variant="label" class="w-32 shrink-0">{{ t("oncall.channels") }}</OText>
-                <OCheckbox
-                  v-for="channel in CHANNELS"
-                  :key="channel"
-                  :model-value="current.channels.includes(channel)"
-                  :label="t(`oncall.channel_${channel}`)"
-                  :data-test="`oncall-policy-channel-${current.priority}-${channel}`"
-                  @update:model-value="
-                    (on: CheckboxModelValue) => toggleChannel(current!, channel, on === true)
-                  "
-                />
-                <OText variant="meta">
-                  {{
-                    t("oncall.policyChannelsHint", {
-                      priority: raw(priorityLabel(current.priority)),
-                    })
-                  }}
-                </OText>
+              <div v-if="current" class="flex flex-col gap-2">
+                <div class="flex flex-wrap items-center gap-2">
+                  <OText variant="label" class="w-32 shrink-0">{{ t("oncall.channels") }}</OText>
+                  <OCheckbox
+                    v-for="channel in CHANNELS"
+                    :key="channel"
+                    :model-value="current.channels.includes(channel)"
+                    :label="t(`oncall.channel_${channel}`)"
+                    :disabled="!canConfigure"
+                    :data-test="`oncall-policy-channel-${current.priority}-${channel}`"
+                    @update:model-value="
+                      (on: CheckboxModelValue) => toggleChannel(current!, channel, on === true)
+                    "
+                  />
+                </div>
+                <div class="flex flex-col items-start gap-2 ps-34 max-md:ps-0">
+                  <OText variant="meta" data-test="oncall-policy-channels-hint">
+                    {{
+                      t("oncall.policyChannelsHint", {
+                        priority: raw(priorityLabel(current.priority)),
+                      })
+                    }}
+                  </OText>
+                  <span
+                    v-if="phoneWithoutEmail(current)"
+                    class="text-status-error-text text-xs"
+                    data-test="oncall-policy-phone-without-email"
+                  >
+                    {{ t("oncall.policyPhoneWithoutEmail") }}
+                  </span>
+                  <!-- Info, not a block: the ticks stay right for the day a provider is connected. -->
+                  <OBanner v-if="noProvider" variant="info" data-test="oncall-policy-no-provider">
+                    {{ t("oncall.policyNoProvider") }}
+                    <OButton
+                      variant="ghost-primary"
+                      size="xs"
+                      data-test="oncall-policy-telephony-link"
+                      @click="openTelephony"
+                    >
+                      {{ t("oncall.policyNoProviderLink") }}
+                    </OButton>
+                  </OBanner>
+                </div>
               </div>
 
               <!-- Ticking `webhook` above says HOW to page; this says WHERE. Without
@@ -553,7 +577,7 @@
             variant="primary"
             size="sm-action"
             :loading="saving"
-            :disabled="!l0Valid"
+            :disabled="!l0Valid || !canConfigure"
             data-test="oncall-policy-save"
             @click="save"
           >
@@ -567,6 +591,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OnCallL0Editor from "@/components/oncall/OnCallL0Editor.vue";
@@ -585,16 +610,18 @@ import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { destinationsQuery } from "@/services/alert_destination.queries";
+import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import { queryClient } from "@/composables/query/queryClient";
 import oncallService from "@/services/oncall";
 import {
+  contactQuery,
   setTeamChannelMutation,
   setTeamPolicyMutation,
   teamMembersQuery,
   whoIsOnCallQuery,
 } from "@/services/oncall.queries";
-import { useMutation } from "@tanstack/vue-query";
+import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
   Channel,
   TeamChannel,
@@ -612,7 +639,13 @@ import { MICROS_PER_MINUTE, TARGET_KINDS } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
-import { DELIVERABLE_CHANNELS, describeTarget, priorityLabel, resolveLadder } from "@/utils/oncall";
+import {
+  DELIVERABLE_CHANNELS,
+  describeTarget,
+  phoneWithoutEmail,
+  priorityLabel,
+  resolveLadder,
+} from "@/utils/oncall";
 
 const props = withDefaults(
   defineProps<{
@@ -640,6 +673,8 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const store = useStore();
+const router = useRouter();
+const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
 
 // Only channels a Notifier can actually send. Rendering the rest would let
 // somebody tick SMS and receive nothing.
@@ -700,6 +735,15 @@ const destinationOptions = computed(() =>
 );
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+const selfEmail = computed(() => String(store.state.userInfo?.email ?? ""));
+
+// Provider presence rides on the caller's own contact, because `GET /telephony` can 403 for non-admins (A10).
+const contactRead = useQuery(() =>
+  Object.assign(contactQuery(orgId.value, selfEmail.value), {
+    enabled: !!props.open && !!orgId.value && !!selfEmail.value,
+  }),
+);
+const noProvider = computed(() => contactRead.data.value?.phone_provider_available === false);
 
 const savePolicyWrite = useMutation(() => setTeamPolicyMutation(orgId.value, props.teamId));
 const saveChannelWrite = useMutation(() => setTeamChannelMutation(orgId.value, props.teamId));
@@ -1123,6 +1167,10 @@ function toggleChannel(rung: PriorityRung, channel: Channel, on: boolean) {
   }
 }
 
+function openTelephony() {
+  router.push({ name: "telephonySettings", query: { org_identifier: orgId.value } });
+}
+
 function onL0Update(value: L0Policy) {
   l0Draft.value = value;
   l0Touched.value = true;
@@ -1141,6 +1189,7 @@ async function save() {
     toast({ variant: "success", message: t("oncall.policySaved") });
     emit("saved");
   } catch (err: any) {
+    noteConfigurationDenied(err);
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.savePolicyFailed"),
