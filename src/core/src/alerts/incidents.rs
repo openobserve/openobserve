@@ -354,7 +354,8 @@ async fn collect_incident_destinations(
     destinations
 }
 
-/// Send an incident notification rendered with the template `alert`'s own notification would use.
+/// Send an incident notification: `alert`'s own destinations get its rows and template, merged-in
+/// ones a rowless context and their own template.
 #[cfg(feature = "enterprise")]
 #[allow(clippy::too_many_arguments)]
 async fn send_incident_notifications(
@@ -653,6 +654,7 @@ pub async fn correlate_alert_to_incident(
     // Warning → P3). None (manual triggers, single-level alerts) keeps the
     // enterprise default.
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    // The exact evaluated observation, so `{alert_count}` is not capped at the sampled rows.
     actual_value: Option<f64>,
     downtime: Option<&config::meta::downtimes::ActiveDowntime>,
 ) -> Result<Option<CorrelatedIncident>, anyhow::Error> {
