@@ -585,6 +585,7 @@ async fn permitted_report_ids(
     let user = openobserve_core::users::get_user(Some(org_id), user_id)
         .await
         .ok_or_else(|| MetaHttpResponse::forbidden("User not found"))?;
+    let role = user.role.to_string();
     if let Some(id) = report_id {
         let folder_id =
             match openobserve_core::dashboards::reports::get_by_id(org_id, &id.to_string()).await {
@@ -601,7 +602,7 @@ async fn permitted_report_ids(
             "GET",
             &format!("report:{id}"),
             &folder_id,
-            &user.role.to_string(),
+            &role,
             false,
             true,
             false,
@@ -612,19 +613,29 @@ async fn permitted_report_ids(
         }
         return Ok(None);
     }
-    // History is an authorization boundary independent of list visibility preferences.
-    let permitted = o2_openfga::authorizer::authz::list_objects(
-        user_id,
-        "GET",
-        "report",
-        org_id,
-        &user.role.to_string(),
-    )
-    .await
-    .map_err(|e| MetaHttpResponse::forbidden(e.to_string()))?;
-    if permitted.contains(&format!("report:_all_{org_id}")) {
-        return Ok(None);
+    if matches!(role.as_str(), "admin" | "editor" | "viewer") {
+        if o2_openfga::authorizer::authz::is_allowed(
+            org_id,
+            user_id,
+            "GET",
+            &format!("report:_all_{org_id}"),
+            "",
+            &role,
+            false,
+            false,
+            false,
+        )
+        .await
+        {
+            return Ok(None);
+        }
+        return Err(MetaHttpResponse::forbidden("Access denied to reports"));
     }
+    // History is an authorization boundary independent of list visibility preferences.
+    let permitted =
+        o2_openfga::authorizer::authz::list_objects(user_id, "GET", "report", org_id, &role)
+            .await
+            .map_err(|e| MetaHttpResponse::forbidden(e.to_string()))?;
     let reports = if permitted.iter().any(|entry| {
         entry
             .strip_prefix("report:")
@@ -1094,6 +1105,16 @@ mod tests {
         assert_eq!(
             resolve_permitted_ids(&permitted, reports.into_iter()),
             vec![allowed.parse::<Ksuid>().unwrap()]
+        );
+        assert!(resolve_permitted_ids(&permitted, std::iter::empty()).is_empty());
+    }
+
+    #[test]
+    fn custom_all_marker_does_not_grant_report_ids() {
+        let id = ksuid().to_string();
+        let permitted = vec!["report:_all_org_a".to_string()];
+        assert!(
+            resolve_permitted_ids(&permitted, [(id.as_str(), "default")].into_iter()).is_empty()
         );
         assert!(resolve_permitted_ids(&permitted, std::iter::empty()).is_empty());
     }
