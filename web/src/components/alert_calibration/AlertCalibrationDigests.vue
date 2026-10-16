@@ -246,7 +246,7 @@ const config = computed(() => configQuery.data.value ?? null);
 
 const FINDINGS_COL = 120;
 /** Room for "Measured nothing", the widest coverage badge. */
-const COVERAGE_COL = 130;
+const COVERAGE_COL = 140;
 
 const nowMicros = () => Date.now() * 1000;
 const windowMinutes = (row: RunRow) => Math.round((row.window_end - row.window_start) / 60_000_000);
