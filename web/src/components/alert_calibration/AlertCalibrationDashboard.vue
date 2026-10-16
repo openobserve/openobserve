@@ -307,12 +307,15 @@ const latestStats = computed<StatItem[]>(() => {
 const configure = () =>
   router.push({ name: "alertCalibrationSettings", query: { org_identifier: orgId.value } });
 
-const openAlert = (finding: FindingRecord) =>
-  router.push({
+/** A new tab, so the board stays where it was while the alert is fixed. */
+const openAlert = (finding: FindingRecord) => {
+  const { href } = router.resolve({
     name: "alertDetail",
     params: { alert_id: finding.alert_id },
     query: { org_identifier: orgId.value },
   });
+  window.open(href, "_blank", "noopener,noreferrer");
+};
 
 const viewEvidence = (rule: RuleId) => {
   if (!latest.value) return;

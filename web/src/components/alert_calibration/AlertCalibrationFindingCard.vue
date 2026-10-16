@@ -72,15 +72,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="label" as="span" class="me-1">{{
           t("alertCalibration.detail.proposedActions")
         }}</OText>
-        <OTag
-          v-for="action in actions"
+        <span
+          v-for="(action, i) in actions"
           :key="action.name"
-          icon="lightbulb-outline"
-          variant="default-soft"
-          size="sm"
-          :label="action.label"
+          class="text-text-body text-sm"
           :title="action.description"
-        />
+        >
+          {{ action.label }}<span v-if="i < actions.length - 1" class="text-text-secondary">,</span>
+        </span>
       </div>
     </OCardSection>
   </OCard>
@@ -96,7 +95,6 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -118,12 +116,15 @@ const orgId = useOrgId();
 
 const meta = computed(() => RULE_META[props.finding.rule_id]);
 
-const openAlert = () =>
-  router.push({
+/** A new tab, so the digest stays where it was while the alert is fixed. */
+const openAlert = () => {
+  const { href } = router.resolve({
     name: "alertDetail",
     params: { alert_id: props.finding.alert_id },
     query: { org_identifier: orgId.value },
   });
+  window.open(href, "_blank", "noopener,noreferrer");
+};
 
 const evidence = computed(() =>
   meta.value.evidence.map((field) => ({

@@ -194,10 +194,14 @@ describe("AlertCalibrationDashboard", () => {
       .find('[data-test="alert-calibration-dashboard-rule-failure"] button')
       .trigger("click");
     await flushPromises();
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
     await wrapper.find('[data-test="alert-calibration-dashboard-open-alert"]').trigger("click");
-    await flushPromises();
-    expect(wrapper.router.currentRoute.value.name).toBe("alertDetail");
-    expect(wrapper.router.currentRoute.value.params).toEqual({ alert_id: "a1" });
+    expect(open).toHaveBeenCalledWith(
+      expect.stringContaining("/alerts/detail/a1"),
+      "_blank",
+      "noopener,noreferrer",
+    );
+    open.mockRestore();
 
     // The rule stays open across the route change, since the page itself was never left.
     await wrapper.find('[data-test="alert-calibration-dashboard-view-evidence"]').trigger("click");
