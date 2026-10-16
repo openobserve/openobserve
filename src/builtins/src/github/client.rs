@@ -24,7 +24,7 @@ use super::{
 
 /// Generic GitHub Data Service
 ///
-/// Provides methods to fetch raw or JSON data from GitHub with caching and retry logic.
+/// Provides methods to fetch raw data from GitHub with caching and retry logic.
 #[derive(Clone)]
 pub struct GitHubDataService {
     client: reqwest::Client,
