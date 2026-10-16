@@ -669,7 +669,7 @@ const lastRunTooltip = (row: any) => {
   }
   if (row.last_run_chip === "succeeded") return t("reports.history.acceptedTooltip");
   if (row.last_run_chip === "cached") return t("reports.history.cachedTooltip");
-  return t("reports.history.neverTooltip");
+  return t("reports.history.unrecordedTooltip");
 };
 
 const deleteDialog = ref({

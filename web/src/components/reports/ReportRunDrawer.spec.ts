@@ -41,6 +41,7 @@ const run = (over: Partial<ReportRunHit> = {}): ReportRunHit => ({
   time_in_queue_ms: 120,
   retries: 2,
   recipient_count: 4,
+  delivery_attempted: null,
   attachment_type: "png",
   dashboard_count: 2,
   error: "report server 500: SMTP 550 mailbox unavailable",
@@ -64,11 +65,11 @@ const mountDrawer = (props: Record<string, unknown>) =>
   });
 
 describe("ReportRunDrawer", () => {
-  it("shows the full error and says nobody received a rejected send", () => {
+  it("shows the full error and preserves unknown acceptance", () => {
     const w = mountDrawer({ run: run() });
     expect(w.text()).toContain("SMTP 550 mailbox unavailable");
     expect(w.find('[data-test="reports-reportrundrawer-outcome"]').text()).toContain(
-      "Not accepted by the mail server",
+      "Email acceptance is unknown",
     );
     expect(w.text()).toContain("Attempt 3");
   });
@@ -98,12 +99,45 @@ describe("ReportRunDrawer", () => {
     );
   });
 
-  it("lists the report's recipients when the page has the report", () => {
+  it("shows the recorded recipient count instead of current addresses", () => {
     const w = mountDrawer({
       run: run(),
       report: { timezone: "Asia/Kolkata", destinations: [{ email: "a@acme.io" }], dashboards: [] },
     });
-    expect(w.text()).toContain("a@acme.io");
+    expect(w.text()).not.toContain("a@acme.io");
+    expect(w.text()).toContain("4");
     expect(w.text()).toContain("(Asia/Kolkata)");
+  });
+  it.each<[boolean | null, string]>([
+    [false, "Failed before sending email."],
+    [true, "Email send attempt failed; acceptance by the mail server is unconfirmed."],
+    [null, "Email acceptance is unknown. Check with a recipient before running again."],
+  ])(
+    "preserves delivery evidence %s after a timeout or send failure",
+    (delivery_attempted, expected) => {
+      const w = mountDrawer({ run: run({ delivery_attempted, error: "request timed out" }) });
+      expect(w.find('[data-test="reports-reportrundrawer-outcome"]').text()).toBe(expected);
+      expect(w.text()).not.toContain("nobody received");
+    },
+  );
+
+  it.each([
+    ["error", "Cache warming failed; completion is unconfirmed."],
+    ["skipped", "Cache warming was skipped."],
+    ["succeeded", "The dashboard cache was warmed. This report sends no email."],
+  ])("checks the %s outcome before cache state", (status, expected) => {
+    const w = mountDrawer({
+      run: run({ is_cached: true, status: status as ReportRunHit["status"] }),
+    });
+    expect(w.find('[data-test="reports-reportrundrawer-outcome"]').text()).toBe(expected);
+  });
+
+  it("shows unknown recipients for retained legacy rows", () => {
+    const w = mountDrawer({
+      run: run({ recipient_count: null }),
+      report: { destinations: [{ email: "current@example.com" }] },
+    });
+    expect(w.text()).toContain("Unknown");
+    expect(w.text()).not.toContain("current@example.com");
   });
 });

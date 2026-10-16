@@ -63,6 +63,7 @@ pub struct ReportHistoryQuery {
     pub is_cached: Option<bool>,
     pub from: Option<i64>,
     pub size: Option<i64>,
+    pub retries: Option<i32>,
     pub sort_by: Option<String>,
     pub sort_order: Option<String>,
 }
@@ -88,6 +89,7 @@ pub struct ReportRunHit {
     pub time_in_queue_ms: Option<i64>,
     pub retries: i32,
     pub recipient_count: Option<i32>,
+    pub delivery_attempted: Option<bool>,
     pub attachment_type: Option<String>,
     pub dashboard_count: Option<i32>,
     pub error: Option<String>,
@@ -144,6 +146,7 @@ impl ReportRunHit {
                 .and_then(|r| i32::try_from(r).ok())
                 .unwrap_or_default(),
             recipient_count: int_of("recipient_count").and_then(|r| i32::try_from(r).ok()),
+            delivery_attempted: row.get("delivery_attempted").and_then(|v| v.as_bool()),
             attachment_type: str_of("attachment_type").filter(|s| !s.is_empty()),
             dashboard_count: int_of("dashboard_count").and_then(|r| i32::try_from(r).ok()),
             error: str_of("error").filter(|s| !s.is_empty()),
@@ -213,6 +216,7 @@ struct HistoryFilter {
     trigger_source: Option<&'static str>,
     statuses: Vec<&'static str>,
     is_cached: Option<bool>,
+    retries: Option<i32>,
 }
 
 impl HistoryFilter {
@@ -234,6 +238,13 @@ impl HistoryFilter {
                 .collect::<Vec<_>>()
                 .join(" OR ");
             sql.push_str(&format!(" AND ({any})"));
+        }
+        if let Some(retries) = self.retries {
+            if retries == 0 {
+                sql.push_str(" AND (retries = 0 OR retries IS NULL)");
+            } else {
+                sql.push_str(&format!(" AND retries = {retries}"));
+            }
         }
         match self.trigger_source {
             Some(TRIGGER_SOURCE_MANUAL) => {
@@ -306,6 +317,7 @@ impl HistoryFilter {
         ("is_cached" = Option<bool>, Query, description = "true for cache-warming runs, false for emailed runs"),
         ("from" = Option<i64>, Query, description = "Pagination offset (default: 0)"),
         ("size" = Option<i64>, Query, description = "Page size (default: 100, max: 1000)"),
+        ("retries" = Option<i32>, Query, description = "Exact retry index for a shared run link"),
         ("sort_by" = Option<String>, Query, description = "_timestamp, status, end_time or retries (default: _timestamp)"),
         ("sort_order" = Option<String>, Query, description = "asc or desc (default: desc)"),
     ),
@@ -343,7 +355,7 @@ pub async fn get_report_history(
     )
     .await;
 
-    match permitted_report_ids(&org_id, &user_email.user_id).await {
+    match permitted_report_ids(&org_id, &user_email.user_id, filter.report_id.as_ref()).await {
         Ok(None) => {}
         Ok(Some(ids)) => {
             if filter.report_id.is_some_and(|id| !ids.contains(&id)) {
@@ -479,6 +491,7 @@ fn parse_filter(org_id: &str, query: &ReportHistoryQuery) -> Result<HistoryFilte
         trigger_source,
         statuses,
         is_cached: query.is_cached,
+        retries: query.retries,
     })
 }
 
@@ -526,9 +539,45 @@ async fn clamp_to_max_query_range(org_id: &str, user_id: &str, start: i64, end: 
     }
 }
 
-/// The ids of the reports the user may read, with the same rule the report list applies.
 #[cfg(feature = "enterprise")]
-async fn permitted_report_ids(org_id: &str, user_id: &str) -> Result<Option<Vec<Ksuid>>, Response> {
+async fn permitted_report_ids(
+    org_id: &str,
+    user_id: &str,
+    report_id: Option<&Ksuid>,
+) -> Result<Option<Vec<Ksuid>>, Response> {
+    if db::user::is_root_user(user_id) || !o2_openfga::config::get_config().enabled {
+        return Ok(None);
+    }
+    if let Some(id) = report_id {
+        let user = openobserve_core::users::get_user(Some(org_id), user_id)
+            .await
+            .ok_or_else(|| MetaHttpResponse::forbidden("User not found"))?;
+        let folder_id =
+            match openobserve_core::dashboards::reports::get_by_id(org_id, &id.to_string()).await {
+                Ok((folder, _)) => folder.folder_id,
+                // Deleted history cannot inherit an unknown folder.
+                Err(openobserve_core::dashboards::reports::ReportError::ReportNotFound) => {
+                    String::new()
+                }
+                Err(e) => return Err(MetaHttpResponse::internal_error(e)),
+            };
+        if !o2_openfga::authorizer::authz::is_allowed(
+            org_id,
+            user_id,
+            "GET",
+            &format!("report:{id}"),
+            &folder_id,
+            &user.role.to_string(),
+            false,
+            true,
+            false,
+        )
+        .await
+        {
+            return Err(MetaHttpResponse::forbidden("Access denied to this report"));
+        }
+        return Ok(None);
+    }
     let permitted = openobserve_api_common::auth::validator::list_objects_for_user(
         org_id, user_id, "GET", "report",
     )
@@ -540,30 +589,65 @@ async fn permitted_report_ids(org_id: &str, user_id: &str) -> Result<Option<Vec<
     if permitted.contains(&format!("report:_all_{org_id}")) {
         return Ok(None);
     }
-    let reports = openobserve_core::dashboards::reports::list(
-        org_id,
-        config::meta::dashboards::reports::ReportListFilters {
-            dashboard: None,
-            folder: None,
-            destination_less: None,
-            name_substring: None,
-        },
-        Some(permitted),
-    )
-    .await
-    .map_err(MetaHttpResponse::internal_error)?;
-    Ok(Some(
+    let reports = if permitted.iter().any(|entry| {
+        entry
+            .strip_prefix("report:")
+            .is_some_and(|id| id.parse::<Ksuid>().is_err())
+    }) {
+        openobserve_core::dashboards::reports::list(
+            org_id,
+            config::meta::dashboards::reports::ReportListFilters {
+                dashboard: None,
+                folder: None,
+                destination_less: None,
+                name_substring: None,
+            },
+            None,
+        )
+        .await
+        .map_err(MetaHttpResponse::internal_error)?
+    } else {
+        Vec::new()
+    };
+    Ok(Some(resolve_permitted_ids(
+        &permitted,
         reports
             .iter()
-            .filter_map(|r| r.report_id.parse::<Ksuid>().ok())
-            .collect(),
-    ))
+            .map(|r| (r.report_name.as_str(), r.report_id.as_str())),
+    )))
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn resolve_permitted_ids<'a>(
+    permitted: &[String],
+    reports: impl Iterator<Item = (&'a str, &'a str)>,
+) -> Vec<Ksuid> {
+    let entries = permitted
+        .iter()
+        .filter_map(|entry| entry.strip_prefix("report:"))
+        .collect::<Vec<_>>();
+    let mut ids = entries
+        .iter()
+        .filter_map(|id| id.parse::<Ksuid>().ok())
+        .collect::<Vec<_>>();
+    // KSUID-shaped grants always identify IDs, even when another report uses that text as its name.
+    for (name, id) in reports {
+        if name.parse::<Ksuid>().is_err() && entries.contains(&name) {
+            if let Ok(id) = id.parse::<Ksuid>() {
+                ids.push(id);
+            }
+        }
+    }
+    ids.sort();
+    ids.dedup();
+    ids
 }
 
 #[cfg(not(feature = "enterprise"))]
 async fn permitted_report_ids(
     _org_id: &str,
     _user_id: &str,
+    _report_id: Option<&Ksuid>,
 ) -> Result<Option<Vec<Ksuid>>, Response> {
     Ok(None)
 }
@@ -887,5 +971,62 @@ mod tests {
         );
         assert_eq!(disabled_reason_for("local", false, false), None);
         assert_eq!(disabled_reason_for("both", false, false), None);
+    }
+    #[test]
+    fn delivery_attempted_preserves_true_false_and_legacy_unknown() {
+        for value in [Some(true), Some(false), None] {
+            let row = json::json!({"delivery_attempted": value});
+            let hit = ReportRunHit::from_row(&row);
+            assert_eq!(hit.delivery_attempted, value);
+            assert_eq!(
+                json::to_value(&hit).unwrap()["delivery_attempted"],
+                json::json!(value)
+            );
+            let trigger = TriggerData {
+                delivery_attempted: value,
+                ..Default::default()
+            };
+            assert_eq!(
+                ReportRunHit::from_trigger(&trigger).delivery_attempted,
+                value
+            );
+        }
+        assert_eq!(
+            ReportRunHit::from_row(&json::json!({})).delivery_attempted,
+            None
+        );
+    }
+
+    #[test]
+    fn permitted_ids_keep_direct_and_deleted_ids_without_name_collision() {
+        let granted = ksuid();
+        let collision = ksuid();
+        let legacy = ksuid();
+        let granted_string = granted.to_string();
+        let collision_string = collision.to_string();
+        let legacy_string = legacy.to_string();
+        let permitted = vec![format!("report:{granted}"), "report:daily".to_string()];
+        let reports = [
+            (granted_string.as_str(), collision_string.as_str()),
+            ("daily", legacy_string.as_str()),
+        ];
+        let ids = resolve_permitted_ids(&permitted, reports.into_iter());
+        assert!(ids.contains(&granted));
+        assert!(ids.contains(&legacy));
+        assert!(!ids.contains(&collision));
+        assert_eq!(
+            resolve_permitted_ids(&[format!("report:{granted}")], std::iter::empty()),
+            vec![granted]
+        );
+    }
+
+    #[test]
+    fn exact_link_retry_is_applied_to_page_and_counts() {
+        let f = HistoryFilter {
+            retries: Some(2),
+            ..filter()
+        };
+        assert!(f.base_where().contains("AND retries = 2"));
+        assert!(f.page_where().contains("AND retries = 2"));
     }
 }

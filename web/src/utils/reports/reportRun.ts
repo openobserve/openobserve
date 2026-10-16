@@ -32,7 +32,7 @@ export type ReportHistoryRange = (typeof REPORT_HISTORY_RANGES)[number]["value"]
 
 /** Values of the `reportRunStatus` badge group. */
 export type ReportRunChip =
-  "succeeded" | "partial" | "cached" | "error" | "skipped" | "overdue" | "never" | "paused";
+  "succeeded" | "partial" | "cached" | "error" | "skipped" | "overdue" | "unrecorded" | "paused";
 
 /** The last-run fields the list and get endpoints return. */
 export interface ReportLastRun {
@@ -73,7 +73,7 @@ export function lastRunChip(
     case "skipped":
       return "skipped";
     default:
-      return "never";
+      return "unrecorded";
   }
 }
 
@@ -116,7 +116,9 @@ export function rememberManualRun(org: string, hit: ReportRunHit, now = Date.now
   manualRuns.value = [
     { org, hit, rememberedAt: now },
     ...manualRuns.value.filter(
-      (r) => now - r.rememberedAt < MANUAL_RUN_TTL_MS && r.hit.timestamp !== hit.timestamp,
+      (r) =>
+        now - r.rememberedAt < MANUAL_RUN_TTL_MS &&
+        (r.org !== org || runIdentity(r.hit) !== runIdentity(hit)),
     ),
   ];
 }
@@ -128,14 +130,14 @@ export function pendingManualRuns(
   served: ReportRunHit[],
   now = Date.now(),
 ): ReportRunHit[] {
-  const seen = new Set(served.map((r) => `${r.report_id}:${r.timestamp}`));
+  const seen = new Set(served.map((r) => runIdentity(r)));
   return manualRuns.value
     .filter(
       (r) =>
         r.org === org &&
         now - r.rememberedAt < MANUAL_RUN_TTL_MS &&
         (!reportId || r.hit.report_id === reportId) &&
-        !seen.has(`${r.hit.report_id}:${r.hit.timestamp}`),
+        !seen.has(runIdentity(r.hit)),
     )
     .map((r) => r.hit);
 }
@@ -143,4 +145,10 @@ export function pendingManualRuns(
 /** Identifies a run in the URL; retries break the tie when two attempts share a microsecond. */
 export function runKey(hit: Pick<ReportRunHit, "timestamp" | "retries">): string {
   return hit.retries ? `${hit.timestamp}-${hit.retries}` : String(hit.timestamp);
+}
+
+export function runIdentity(
+  hit: Pick<ReportRunHit, "report_id" | "timestamp" | "retries">,
+): string {
+  return `${hit.report_id}:${runKey(hit)}`;
 }

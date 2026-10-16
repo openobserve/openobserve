@@ -1572,7 +1572,10 @@ export const BADGE_GROUPS = {
       error: { variant: "error-soft", labelKey: "components.badge.reportRunStatus.failed" },
       skipped: { variant: "warning-soft", labelKey: "components.badge.reportRunStatus.skipped" },
       overdue: { variant: "warning-soft", labelKey: "components.badge.reportRunStatus.overdue" },
-      never: { variant: "default-soft", labelKey: "components.badge.reportRunStatus.never" },
+      unrecorded: {
+        variant: "default-soft",
+        labelKey: "components.badge.reportRunStatus.unrecorded",
+      },
       paused: { variant: "default-soft", labelKey: "components.badge.reportRunStatus.paused" },
     },
     fallback: { variant: "default-soft" },

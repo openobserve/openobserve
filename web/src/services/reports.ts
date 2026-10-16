@@ -183,6 +183,7 @@ export interface ReportHistoryQuery {
   is_cached?: boolean;
   from?: number;
   size?: number;
+  retries?: number;
   sort_by?: "_timestamp" | "status" | "end_time" | "retries";
   sort_order?: "asc" | "desc";
 }
@@ -205,6 +206,7 @@ export interface ReportRunHit {
   time_in_queue_ms: number | null;
   retries: number;
   recipient_count: number | null;
+  delivery_attempted: boolean | null;
   attachment_type: string | null;
   dashboard_count: number | null;
   error: string | null;
@@ -222,8 +224,7 @@ export interface ReportRunCounts {
   total: number;
 }
 
-export type ReportHistoryDisabledReason =
-  "usage_reporting_remote" | "trial_expired";
+export type ReportHistoryDisabledReason = "usage_reporting_remote" | "trial_expired";
 
 export interface ReportHistoryResponse {
   total: number;

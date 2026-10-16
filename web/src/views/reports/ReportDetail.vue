@@ -121,7 +121,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ report.dashboards?.length ?? 0 }}
           </ODescriptionItem>
           <ODescriptionItem :label="t('reports.history.lastRun')">
-            <OTag type="reportRunStatus" :value="lastRunValue" />
+            <span class="inline-flex">
+              <OTag type="reportRunStatus" :value="lastRunValue" />
+              <OTooltip
+                v-if="lastRunValue === 'unrecorded'"
+                :content="t('reports.history.unrecordedTooltip')"
+              />
+            </span>
           </ODescriptionItem>
         </ODescriptionList>
       </OContent>
@@ -147,6 +153,7 @@ import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -194,7 +201,7 @@ const isCached = computed(() => !!report.value && recipients.value.length === 0)
 const attachmentType = computed<string>(() => report.value?.dashboards?.[0]?.report_type ?? "");
 const overdue = computed(() => !!report.value && isOverdue(report.value));
 const lastRunValue = computed(() =>
-  report.value ? lastRunChip(report.value, isCached.value) : "never",
+  report.value ? lastRunChip(report.value, isCached.value) : "unrecorded",
 );
 
 const frequencyText = computed<I18nText>(() => {

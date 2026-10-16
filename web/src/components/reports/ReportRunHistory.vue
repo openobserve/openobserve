@@ -16,6 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex h-full min-h-0 flex-col" data-test="reports-reportrunhistory">
+    <OBanner
+      v-if="linkedRunMessage"
+      variant="warning"
+      :content="linkedRunMessage"
+      data-test="reports-reportrunhistory-linked-run-message"
+    />
     <OTable
       :data="rows"
       :columns="columns"
@@ -242,6 +248,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
 import ReportRunDrawer from "@/components/reports/ReportRunDrawer.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -254,7 +261,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useOrgId } from "@/composables/query/useOrgId";
-import { reportHistoryQuery } from "@/services/reports.queries";
+import { reportHistoryQuery, reportRunQuery } from "@/services/reports.queries";
 import type {
   ReportHistoryQuery,
   ReportRunHit,
@@ -268,6 +275,7 @@ import {
   pendingManualRuns,
   runChip,
   runKey,
+  runIdentity,
   runRailTone,
   type ReportHistoryRange,
 } from "@/utils/reports/reportRun";
@@ -329,13 +337,33 @@ const window = computed(() => {
   return { start: (anchor.value - preset.ms) * 1000, end: anchor.value * 1000 };
 });
 
+const searchableRunKeys = ref(new Set<string>());
+const historyDisabled = ref(false);
+const pending = computed(() => {
+  if (
+    historyDisabled.value ||
+    sortColumn.value !== "timestamp" ||
+    sortOrder.value !== "desc" ||
+    tile.value ||
+    triggerSource.value === "scheduled"
+  )
+    return [];
+  return pendingManualRuns(orgId.value, props.reportId, [])
+    .filter((hit) => !searchableRunKeys.value.has(runIdentity(hit)))
+    .filter((hit) => hit.timestamp >= window.value.start && hit.timestamp <= window.value.end)
+    .sort((a, b) => b.timestamp - a.timestamp);
+});
+const pendingOnPage = computed(() =>
+  pending.value.slice((currentPage.value - 1) * pageSize.value, currentPage.value * pageSize.value),
+);
+
 const query = computed<ReportHistoryQuery>(() => {
   const q: ReportHistoryQuery = {
     report_id: props.reportId || undefined,
     start_time: window.value.start,
     end_time: window.value.end,
-    from: (currentPage.value - 1) * pageSize.value,
-    size: pageSize.value,
+    from: Math.max(0, (currentPage.value - 1) * pageSize.value - pending.value.length),
+    size: Math.max(1, pageSize.value - pendingOnPage.value.length),
     sort_by: SORT_KEYS[sortColumn.value] ?? "_timestamp",
     sort_order: sortOrder.value,
   };
@@ -367,17 +395,25 @@ const loadError = computed(() => {
 });
 
 const served = computed<ReportRunHit[]>(() => history.data.value?.hits ?? []);
-const totalCount = computed(() => history.data.value?.total ?? 0);
-
-/** A run started with Run now shows at once, before its stream copy is searchable. */
-const rows = computed<ReportRunHit[]>(() => {
-  const filtered = !!tile.value || triggerSource.value === "scheduled";
-  // With history off the stream never takes the row over, so the empty state must show instead.
-  if (currentPage.value !== 1 || filtered || history.data.value?.disabled_reason) {
-    return served.value;
+watch(history.data, (data) => {
+  historyDisabled.value = !!data?.disabled_reason;
+  const pendingKeys = new Set(pendingManualRuns(orgId.value, props.reportId, []).map(runIdentity));
+  const known = new Set(searchableRunKeys.value);
+  for (const hit of data?.hits ?? []) {
+    const key = runIdentity(hit);
+    if (pendingKeys.has(key)) known.add(key);
   }
-  return [...pendingManualRuns(orgId.value, props.reportId, served.value), ...served.value];
+  searchableRunKeys.value = known;
 });
+watch(orgId, () => {
+  searchableRunKeys.value = new Set();
+  historyDisabled.value = false;
+});
+const totalCount = computed(() => (history.data.value?.total ?? 0) + pending.value.length);
+const rows = computed<ReportRunHit[]>(() => [
+  ...pendingOnPage.value,
+  ...served.value.slice(0, pageSize.value - pendingOnPage.value.length),
+]);
 
 const rowKeyOf = (row: ReportRunHit) => `${row.report_id}:${runKey(row)}`;
 const rowClass = (row: ReportRunHit) => (row.status === "error" ? "!bg-status-error-bg" : "");
@@ -524,35 +560,86 @@ const noRunsDescription = computed(() => {
   });
 });
 
-// ── Run drawer, deep-linked through ?run= ──
-const selectedRun = computed<ReportRunHit | null>(() => {
+const linkedIdentity = computed(() => {
   const key = route.query.run;
-  if (typeof key !== "string" || !key) return null;
-  return rows.value.find((r) => runKey(r) === key) ?? null;
+  if (typeof key !== "string") return null;
+  const match = /^(\d+)(?:-(\d+))?$/.exec(key);
+  if (!match) return null;
+  const timestamp = Number(match[1]);
+  const retries = Number(match[2] ?? 0);
+  if (!Number.isSafeInteger(timestamp) || timestamp <= 0 || !Number.isSafeInteger(retries))
+    return null;
+  const reportId =
+    props.reportId ||
+    (typeof route.query.run_report_id === "string" ? route.query.run_report_id : undefined);
+  return { timestamp, retries, reportId };
 });
-
-/** A shared link may point outside the current window or page; the key carries the run's timestamp, so narrow the view to that day once. */
-const HALF_DAY_US = 12 * 60 * 60 * 1000 * 1000;
-let retargetedForLink = false;
-watch(rows, () => {
-  const key = route.query.run;
-  if (retargetedForLink || typeof key !== "string" || !key || !history.isSuccess.value) return;
-  if (rows.value.some((r) => runKey(r) === key)) return;
-  const ts = Number(key.split("-")[0]);
-  if (!Number.isFinite(ts) || ts <= 0) return;
-  retargetedForLink = true;
-  customRange.value = { start: ts - HALF_DAY_US, end: ts + HALF_DAY_US };
-  range.value = "custom";
-  tile.value = null;
-  triggerSource.value = "all";
-  currentPage.value = 1;
+const linkedRun = useQuery(() => {
+  const identity = linkedIdentity.value;
+  return Object.assign(
+    reportRunQuery(
+      orgId.value,
+      identity?.reportId,
+      identity?.timestamp ?? 0,
+      identity?.retries ?? 0,
+    ),
+    {
+      enabled: !!orgId.value && !!identity,
+    },
+  );
+});
+const linkedMatches = computed(() => {
+  const identity = linkedIdentity.value;
+  if (!identity) return [];
+  return (linkedRun.data.value?.hits ?? []).filter(
+    (hit) =>
+      hit.timestamp === identity.timestamp &&
+      hit.retries === identity.retries &&
+      (!identity.reportId || hit.report_id === identity.reportId),
+  );
+});
+const selectedRun = computed<ReportRunHit | null>(() => {
+  if (!linkedIdentity.value || linkedRun.error.value) return null;
+  if (linkedRun.isSuccess.value) {
+    if (!linkedIdentity.value.reportId && (linkedRun.data.value?.total ?? 0) > 1) return null;
+    const pendingHit = pending.value.find(
+      (hit) => hit.report_id === linkedIdentity.value?.reportId && runKey(hit) === route.query.run,
+    );
+    return linkedMatches.value.length === 1 ? linkedMatches.value[0] : (pendingHit ?? null);
+  }
+  const identity = linkedIdentity.value;
+  if (!identity.reportId) return null;
+  return (
+    rows.value.find(
+      (hit) =>
+        hit.report_id === identity.reportId &&
+        hit.timestamp === identity.timestamp &&
+        hit.retries === identity.retries,
+    ) ?? null
+  );
+});
+const linkedRunMessage = computed(() => {
+  if (!route.query.run) return null;
+  if (!linkedIdentity.value) return t("reports.history.linkedRunInvalid");
+  const error: any = linkedRun.error.value;
+  if (error?.response?.status === 403) return t("reports.history.linkedRunForbidden");
+  if (error) return t("reports.history.loadError");
+  if (!linkedRun.isSuccess.value) return null;
+  if (
+    linkedMatches.value.length > 1 ||
+    (!linkedIdentity.value.reportId && (linkedRun.data.value?.total ?? 0) > 1)
+  )
+    return t("reports.history.linkedRunAmbiguous");
+  return linkedMatches.value.length === 0 && !selectedRun.value
+    ? t("reports.history.linkedRunMissing")
+    : null;
 });
 
 const openRun = (row: ReportRunHit) =>
-  router.replace({ query: { ...route.query, run: runKey(row) } });
+  router.replace({ query: { ...route.query, run: runKey(row), run_report_id: row.report_id } });
 
 const closeRun = () => {
-  const { run: _run, ...rest } = route.query;
+  const { run: _run, run_report_id: _report, ...rest } = route.query;
   router.replace({ query: rest });
 };
 

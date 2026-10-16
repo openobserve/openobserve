@@ -91,6 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-last_run="{ row }">
           <span class="inline-flex cursor-pointer items-center gap-2" @click="openReport(row)">
             <OTag type="reportRunStatus" :value="row.last_run_chip" />
+            <OTooltip
+              v-if="row.last_run_chip === 'unrecorded'"
+              :content="t('reports.history.unrecordedTooltip')"
+            />
             <OTimeCell
               v-if="row.last_run_at_raw"
               :value="row.last_run_at_raw"
@@ -137,6 +141,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { isCachedReport, lastRunChip } from "@/utils/reports/reportRun";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";

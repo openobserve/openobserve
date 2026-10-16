@@ -48,6 +48,7 @@ const hit = (over: Partial<ReportRunHit> = {}): ReportRunHit => ({
   time_in_queue_ms: null,
   retries: 0,
   recipient_count: 2,
+  delivery_attempted: null,
   attachment_type: "pdf",
   dashboard_count: 1,
   error: null,
@@ -81,7 +82,19 @@ describe("lastRunChip", () => {
     expect(lastRunChip({ last_run_status: "succeeded" }, false, NOW)).toBe("succeeded");
     expect(lastRunChip({ last_run_status: "error" }, false, NOW)).toBe("error");
     expect(lastRunChip({ last_run_status: "skipped" }, false, NOW)).toBe("skipped");
-    expect(lastRunChip({ last_run_status: null }, false, NOW)).toBe("never");
+    expect(lastRunChip({ last_run_status: null }, false, NOW)).toBe("unrecorded");
+  });
+
+  it("keeps legacy reports neutral regardless of enabled state or scheduler pickup", () => {
+    for (const enabled of [true, false]) {
+      expect(
+        lastRunChip(
+          { enabled, last_run_at: null, last_run_status: null, next_run_at: null },
+          false,
+          NOW,
+        ),
+      ).toBe("unrecorded");
+    }
   });
 
   it("reads a successful cache-only report as Cached, not Sent", () => {
@@ -118,7 +131,7 @@ describe("runChip and runRailTone", () => {
       "error",
       "skipped",
       "overdue",
-      "never",
+      "unrecorded",
       "paused",
     ]) {
       expect(values[v], v).toBeTruthy();
@@ -133,6 +146,17 @@ describe("manual runs", () => {
     expect(pendingManualRuns("org1", "pending-1", [], 2_000)).toEqual([run]);
     expect(pendingManualRuns("org1", "other", [], 2_000)).toEqual([]);
     expect(pendingManualRuns("org1", "pending-1", [run], 2_000)).toEqual([]);
+  });
+
+  it("keeps reports, retries and organizations with simultaneous timestamps distinct", () => {
+    const first = hit({ report_id: "identity-a", timestamp: 44, retries: 0 });
+    const retry = hit({ ...first, retries: 1 });
+    const other = hit({ ...first, report_id: "identity-b" });
+    rememberManualRun("identity-org", first, 1000);
+    rememberManualRun("identity-org", retry, 1000);
+    rememberManualRun("identity-org", other, 1000);
+    rememberManualRun("other-org", first, 1000);
+    expect(pendingManualRuns("identity-org", undefined, [first], 2000)).toEqual([other, retry]);
   });
 
   it("drops a run from another org and one older than the TTL", () => {

@@ -433,7 +433,7 @@ describe("ReportList", () => {
   describe("last run column", () => {
     it("shows Never for a report that has not run", () => {
       const row = wrapper.vm.reportsTableRows.find((r: any) => r.name === REPORT_SCHEDULED.name);
-      expect(row.last_run_chip).toBe("never");
+      expect(row.last_run_chip).toBe("unrecorded");
     });
 
     it("maps the stored last run onto the chip", () => {

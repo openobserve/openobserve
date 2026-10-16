@@ -58,6 +58,30 @@ export const reportHistoryQuery = (org: string, query: ReportHistoryQuery) => {
   });
 };
 
+export const reportRunQuery = (
+  org: string,
+  reportId: string | undefined,
+  timestamp: number,
+  retries: number,
+) =>
+  queryOptions({
+    queryKey: reportKeys.run(org, reportId, timestamp, retries),
+    queryFn: async (): Promise<ReportHistoryResponse> =>
+      (
+        await reports.getHistory(org, {
+          report_id: reportId,
+          start_time: timestamp,
+          end_time: timestamp + 1,
+          retries,
+          size: 3,
+          from: 0,
+          sort_by: "_timestamp",
+          sort_order: "asc",
+        })
+      ).data,
+    staleTime: LIVE_STALE_TIME,
+  });
+
 // ── Writes ──────────────────────────────────────────────────────────────────
 
 /** Three save shapes, one scope: `reportKeys.all` also covers the cross-folder search entry a Vuex prune never reached. */

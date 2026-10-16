@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODescriptionList dense>
           <ODescriptionItem :label="t('reports.history.colRecipients')">
             <template v-if="run.is_cached">{{ t("reports.history.noRecipients") }}</template>
-            <template v-else-if="recipients.length">{{ recipients.join(", ") }}</template>
             <template v-else-if="run.recipient_count != null">{{ run.recipient_count }}</template>
+            <template v-else>{{ t("reports.history.unknownRecipients") }}</template>
           </ODescriptionItem>
           <ODescriptionItem :label="t('reports.history.colAttachment')">
             <template v-if="run.attachment_type">
@@ -236,12 +236,6 @@ const title = computed(() =>
     : t("reports.history.tab"),
 );
 
-const recipients = computed<string[]>(() =>
-  (props.report?.destinations ?? [])
-    .map((d: { email?: string }) => d.email)
-    .filter((e: string | undefined): e is string => !!e),
-);
-
 const dashboards = computed<RenderedDashboard[]>(() => props.report?.dashboards ?? []);
 
 const durationSecs = computed(() =>
@@ -258,14 +252,24 @@ const finishedAfter = computed(() => {
 const outcome = computed(() => {
   const run = props.run;
   if (!run) return "";
-  if (run.is_cached) return t("reports.history.outcomeCached");
   if (run.status === "succeeded") {
+    if (run.is_cached) return t("reports.history.outcomeCached");
     return run.is_partial
       ? t("reports.history.outcomePartial")
       : t("reports.history.outcomeAccepted");
   }
-  if (run.status === "error") return t("reports.history.outcomeRejected");
-  return t("reports.history.outcomeNotSent");
+  if (run.status === "skipped")
+    return run.is_cached
+      ? t("reports.history.outcomeCacheSkipped")
+      : t("reports.history.outcomeNotSent");
+  if (run.status === "error") {
+    if (run.is_cached) return t("reports.history.outcomeCacheUnconfirmed");
+    if (run.delivery_attempted === false) return t("reports.history.outcomeBeforeSend");
+    if (run.delivery_attempted === true) return t("reports.history.outcomeAttemptFailed");
+  }
+  return run.is_cached
+    ? t("reports.history.outcomeCacheUnknown")
+    : t("reports.history.outcomeUnknown");
 });
 
 const openDashboard = (d: RenderedDashboard) => {
