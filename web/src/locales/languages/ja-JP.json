@@ -8207,7 +8207,6 @@
       "alert": "アラート",
       "topOrgs": "最も影響を受けた組織",
       "worstHours": "最も深刻な時間帯",
-      "lagImpact": "{skipped} 件スキップ、{evaluations} 件中 {late} 件が遅延",
       "proposedActions": "提案されたアクション",
       "openAlert": "アラートを開く"
     },

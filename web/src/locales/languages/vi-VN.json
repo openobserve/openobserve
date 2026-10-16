@@ -8207,7 +8207,6 @@
       "alert": "Cảnh báo",
       "topOrgs": "Các tổ chức bị ảnh hưởng nhiều nhất",
       "worstHours": "Khung giờ tệ nhất",
-      "lagImpact": "{skipped} bị bỏ qua, {late} trên {evaluations} bị trễ",
       "proposedActions": "Hành động đề xuất",
       "openAlert": "Mở cảnh báo"
     },

@@ -8207,7 +8207,6 @@
       "alert": "알림",
       "topOrgs": "영향을 가장 많이 받은 조직",
       "worstHours": "최악의 시간대",
-      "lagImpact": "{skipped}건 건너뜀, {evaluations}건 중 {late}건 지연",
       "proposedActions": "제안된 작업",
       "openAlert": "알림 열기"
     },

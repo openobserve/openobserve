@@ -8207,7 +8207,6 @@
       "alert": "告警",
       "topOrgs": "受影响最严重的组织",
       "worstHours": "最糟糕的时段",
-      "lagImpact": "{skipped} 个跳过，{evaluations} 个中 {late} 个延迟",
       "proposedActions": "建议的操作",
       "openAlert": "打开告警"
     },
