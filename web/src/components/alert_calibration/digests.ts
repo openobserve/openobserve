@@ -164,6 +164,30 @@ const findingOrder = (a: FindingRecord, b: FindingRecord) =>
   a.rule_id.localeCompare(b.rule_id) ||
   (a.alert_name ?? "").localeCompare(b.alert_name ?? "");
 
+export interface RuleGroup {
+  rule_id: RuleId;
+  /** In severity order, as `latestEmission` sorts them. */
+  findings: FindingRecord[];
+  severity: Severity | null;
+}
+
+/** Every rule, worst first, so a rule that flagged nothing still shows as clear rather than missing. */
+export function findingsByRule(rules: RuleId[], findings: FindingRecord[]): RuleGroup[] {
+  const rank = (s: Severity | null) => (s ? SEVERITY_RANK[s] + 1 : 0);
+  return rules
+    .map((rule_id) => {
+      const mine = findings.filter((f) => f.rule_id === rule_id);
+      return { rule_id, findings: mine, severity: mine[0]?.severity ?? null };
+    })
+    .sort((a, b) => rank(b.severity) - rank(a.severity) || b.findings.length - a.findings.length);
+}
+
+/** A title restates the alert's name, which a row that already shows the name can drop. */
+export const titleAfterName = (f: FindingRecord): string =>
+  f.alert_name && f.title.startsWith(f.alert_name)
+    ? f.title.slice(f.alert_name.length).trimStart()
+    : f.title;
+
 export const latestRun = (rows: RunRow[]): RunRow | null =>
   rows.reduce<RunRow | null>((a, b) => (!a || b.window_end > a.window_end ? b : a), null);
 

@@ -128,6 +128,7 @@ function trackPanelRuns(page) {
   });
   return {
     of: (key) => runs.filter((sql) => sql.includes(`"${key}_cnt"`)),
+    from: (stream) => runs.filter((sql) => sql.includes(`"${stream}"`)),
   };
 }
 
