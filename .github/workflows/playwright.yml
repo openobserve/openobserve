@@ -273,6 +273,7 @@ jobs:
       matrix: ${{ steps.gen.outputs.matrix }}
       smoke_active: ${{ steps.gen.outputs.smoke_active }}
       shards_selected: ${{ steps.gen.outputs.shards_selected }}
+      assistant_selected: ${{ steps.gen.outputs.assistant_selected }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -311,6 +312,8 @@ jobs:
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           COUNT=$(echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log('generated',m.include.length,'shards:', m.include.map(s=>s.testfolder).join(', ')); require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'shards_selected='+m.include.length+'\n')")
           echo "smoke_active=$([ -n "$SELECT_ARGS" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          ASSISTANT_SELECTED=$(echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(m.include.some(s=>s.testfolder==='Assistant'))")
+          echo "assistant_selected=$ASSISTANT_SELECTED" >> "$GITHUB_OUTPUT"
           # Durable record of what ran and why, visible from the PR checks page.
           {
             echo "### Playwright shard selection"
@@ -625,17 +628,17 @@ jobs:
         if: always()
         run: cat o2.log
 
-  # The O2 Assistant flows that rewrite the edition (forceOssBuild / forceCloudBuild: GATE-01,
-  # ADMIN-14, CRED-*, CONS-*) need the Vite dev server, because only it serves aws-exports.ts
-  # as a module; the matrix shard runs the embedded production bundle, where they skip.
+  # Edition-rewriting assistant flows need the Vite dev server, the only one that serves aws-exports.ts as a module.
   assistant_editions:
     timeout-minutes: 30
     name: e2e / Assistant editions
-    needs: [resolve_binary, build_binary]
+    needs: [resolve_binary, build_binary, generate_matrix]
     if: >-
       always() &&
       !cancelled() &&
       needs.resolve_binary.result == 'success' &&
+      needs.generate_matrix.result == 'success' &&
+      needs.generate_matrix.outputs.assistant_selected == 'true' &&
       (needs.resolve_binary.outputs.reuse == 'true' || needs.build_binary.result == 'success')
     runs-on:
       labels: eks-openobserve-standard-8
@@ -1022,7 +1025,9 @@ jobs:
         check_changes,
         resolve_binary,
         build_binary,
+        generate_matrix,
         ui_integration_tests,
+        assistant_editions,
       ]
     if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     steps:
@@ -1053,7 +1058,14 @@ jobs:
             exit 1
           fi
 
-          # 4. Runtime readiness alone is not enough; all selected shards must pass.
+          # 4. The editions job runs whenever the Assistant shard is selected, and then it must pass.
+          if [ "${{ needs.generate_matrix.outputs.assistant_selected }}" == "true" ] && \
+             [ "${{ needs.assistant_editions.result }}" != "success" ]; then
+            echo "Assistant editions job did not succeed: ${{ needs.assistant_editions.result }}"
+            exit 1
+          fi
+
+          # 5. Runtime readiness alone is not enough; all selected shards must pass.
           if [ "${{ needs.ui_integration_tests.result }}" == "success" ]; then
             echo "All Playwright tests completed successfully"
             exit 0

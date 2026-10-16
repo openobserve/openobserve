@@ -83,10 +83,18 @@ describe("AssistantStatusDot", () => {
     }
   });
 
-  it("is hidden from assistive tech; the parent's name carries the state", () => {
-    expect(
-      mountDot("working").get('[data-test="assistant-status-dot"]').attributes("aria-hidden"),
-    ).toBe("true");
+  it("hides every shape from assistive tech; the parent's name carries the state", () => {
+    for (const state of SIGNALS) {
+      const root = mountDot(state).get('[data-test="assistant-status-dot"]');
+      expect(root.attributes("aria-hidden")).toBeUndefined();
+      expect(root.element.children).toHaveLength(1);
+      expect(root.element.children[0].getAttribute("aria-hidden")).toBe("true");
+    }
+  });
+
+  it("keeps the count outside every aria-hidden subtree so it is read below md", () => {
+    const count = mountDot("attention", { count: 3 }).get(".tabular-nums");
+    expect(count.element.closest('[aria-hidden="true"]')).toBeNull();
   });
 
   it("sits in the corner of a positioned parent on request", () => {

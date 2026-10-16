@@ -1,8 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-// Browser init script: replaces window.fetch for the AI streaming endpoints so the
-// UI receives a real, incrementally delivered SSE body (Playwright's route.fulfill
-// can only deliver a body at once). Expects window.__O2MOCK_SCENARIOS__ and
-// window.__O2MOCK_HTTP_SCENARIOS__ to be defined before this script runs.
+// Replaces window.fetch for AI streams because route.fulfill cannot deliver an SSE body incrementally.
 (() => {
   const SCENARIOS = window.__O2MOCK_SCENARIOS__ || {};
   const HTTP_SCENARIOS = window.__O2MOCK_HTTP_SCENARIOS__ || {};

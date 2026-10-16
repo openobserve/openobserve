@@ -26,6 +26,9 @@ import {
   TURN_SCOPED_EVENTS,
   assistantEventProblems,
   legacyEventsFor,
+  admissionLegacyEvents,
+  trackAssistantAdmitted,
+  MAX_PENDING_ADMISSIONS,
   setAssistantTelemetryContext,
   trackAssistant,
   type AiErrorCode,
@@ -316,7 +319,7 @@ describe("event catalogue", () => {
     expect(wrong).toBeTruthy();
   });
 
-  it("uses exactly the 99 §3.5 codes for error_code", () => {
+  it("uses exactly the 99 §3.5 codes plus stopped_before_send for error_code", () => {
     const codes: AiErrorCode[] = [
       "offline",
       "unreachable",
@@ -327,6 +330,7 @@ describe("event catalogue", () => {
       "subscription_required",
       "consent_declined",
       "consent_still_required",
+      "stopped_before_send",
       "authorization_unavailable",
       "turn_limit",
       "rate_limited",
@@ -347,10 +351,10 @@ describe("event catalogue", () => {
       "stream_oversized",
       "unknown",
     ];
-    expect(new Set(codes).size).toBe(28);
+    expect(new Set(codes).size).toBe(29);
     expectTypeOf<AiErrorCode>().toEqualTypeOf<(typeof codes)[number]>();
     expectTypeOf<Exclude<AssistantErrorCode, AiErrorCode>>().toEqualTypeOf<
-      "off_for_org" | "data_level_blocked" | "permission_denied_tool"
+      "history_unavailable" | "off_for_org" | "data_level_blocked" | "permission_denied_tool"
     >();
   });
 });
@@ -396,6 +400,13 @@ describe("trackAssistant", () => {
   it("requires a turn_id on every turn-scoped event", () => {
     for (const name of TURN_SCOPED_EVENTS) {
       expect(() => fire(name, SAMPLES[name])).toThrow(/turn_id/);
+    }
+    expect(track).not.toHaveBeenCalled();
+  });
+
+  it("requires a session_id on every turn-scoped event", () => {
+    for (const name of TURN_SCOPED_EVENTS) {
+      expect(() => fire(name, SAMPLES[name], { turnId: "t-1" })).toThrow(/session_id/);
     }
     expect(track).not.toHaveBeenCalled();
   });
@@ -469,44 +480,39 @@ describe("without RUM", () => {
 
 describe("legacy mapping (one release)", () => {
   it("emits the old names from the new events", () => {
-    const sidebar = { container: "sidebar" };
     const snapshot = {
-      ai_turn_sent: legacyEventsFor("ai_turn_sent", SAMPLES.ai_turn_sent, sidebar),
-      ai_turn_sent_rca: legacyEventsFor("ai_turn_sent", SAMPLES.ai_turn_sent, { container: "rca" }),
-      ai_turn_ended_done: legacyEventsFor("ai_turn_ended", SAMPLES.ai_turn_ended, sidebar),
-      ai_turn_ended_failed: legacyEventsFor(
-        "ai_turn_ended",
-        { ...SAMPLES.ai_turn_ended, outcome: "failed" },
-        sidebar,
-      ),
-      ai_turn_ended_refused: legacyEventsFor(
-        "ai_turn_ended",
-        { ...SAMPLES.ai_turn_ended, outcome: "refused" },
-        sidebar,
-      ),
-      ai_turn_ended_stopped: legacyEventsFor(
-        "ai_turn_ended",
-        { ...SAMPLES.ai_turn_ended, outcome: "stopped" },
-        sidebar,
-      ),
-      ai_stop_chat: legacyEventsFor("ai_stop", SAMPLES.ai_stop, sidebar),
-      ai_stop_helper: legacyEventsFor(
-        "ai_stop",
-        { ...SAMPLES.ai_stop, surface: "inline_helper" },
-        sidebar,
-      ),
-      ai_approval_decided: legacyEventsFor(
-        "ai_approval_decided",
-        SAMPLES.ai_approval_decided,
-        sidebar,
-      ),
-      ai_feedback: legacyEventsFor("ai_feedback", SAMPLES.ai_feedback, sidebar),
-      ai_nl_proposal: legacyEventsFor("ai_nl_proposal", SAMPLES.ai_nl_proposal, sidebar),
-      ai_nl_proposal_failed: legacyEventsFor(
-        "ai_nl_proposal",
-        { ...SAMPLES.ai_nl_proposal, outcome: "failed" },
-        sidebar,
-      ),
+      ai_turn_sent: legacyEventsFor("ai_turn_sent", SAMPLES.ai_turn_sent),
+      ai_turn_sent_admitted: admissionLegacyEvents(SAMPLES.ai_turn_sent, "sidebar"),
+      ai_turn_sent_rca_admitted: admissionLegacyEvents(SAMPLES.ai_turn_sent, "rca"),
+      ai_turn_sent_rca_build_on_previous: admissionLegacyEvents(SAMPLES.ai_turn_sent, "rca", {
+        buildOnPrevious: true,
+      }),
+      ai_turn_ended_done: legacyEventsFor("ai_turn_ended", SAMPLES.ai_turn_ended),
+      ai_turn_ended_failed: legacyEventsFor("ai_turn_ended", {
+        ...SAMPLES.ai_turn_ended,
+        outcome: "failed",
+      }),
+      ai_turn_ended_refused: legacyEventsFor("ai_turn_ended", {
+        ...SAMPLES.ai_turn_ended,
+        outcome: "refused",
+      }),
+      ai_turn_ended_lost: legacyEventsFor("ai_turn_ended", {
+        ...SAMPLES.ai_turn_ended,
+        outcome: "lost",
+      }),
+      ai_turn_ended_stopped: legacyEventsFor("ai_turn_ended", {
+        ...SAMPLES.ai_turn_ended,
+        outcome: "stopped",
+      }),
+      ai_stop_chat: legacyEventsFor("ai_stop", SAMPLES.ai_stop),
+      ai_stop_helper: legacyEventsFor("ai_stop", { ...SAMPLES.ai_stop, surface: "inline_helper" }),
+      ai_approval_decided: legacyEventsFor("ai_approval_decided", SAMPLES.ai_approval_decided),
+      ai_feedback: legacyEventsFor("ai_feedback", SAMPLES.ai_feedback),
+      ai_nl_proposal: legacyEventsFor("ai_nl_proposal", SAMPLES.ai_nl_proposal),
+      ai_nl_proposal_failed: legacyEventsFor("ai_nl_proposal", {
+        ...SAMPLES.ai_nl_proposal,
+        outcome: "failed",
+      }),
     };
     expect(snapshot).toMatchInlineSnapshot(`
       {
@@ -554,6 +560,14 @@ describe("legacy mapping (one release)", () => {
             },
           },
         ],
+        "ai_turn_ended_lost": [
+          {
+            "name": "ai_assistant_answer_failed",
+            "properties": {
+              "stage": "stream",
+            },
+          },
+        ],
         "ai_turn_ended_refused": [
           {
             "name": "ai_assistant_answer_failed",
@@ -563,7 +577,8 @@ describe("legacy mapping (one release)", () => {
           },
         ],
         "ai_turn_ended_stopped": [],
-        "ai_turn_sent": [
+        "ai_turn_sent": [],
+        "ai_turn_sent_admitted": [
           {
             "name": "ai_assistant_message_sent",
             "properties": {
@@ -572,14 +587,72 @@ describe("legacy mapping (one release)", () => {
             },
           },
         ],
-        "ai_turn_sent_rca": [
+        "ai_turn_sent_rca_admitted": [
           {
             "name": "incident_rca_requested",
-            "properties": {},
+            "properties": {
+              "build_on_previous": false,
+            },
+          },
+        ],
+        "ai_turn_sent_rca_build_on_previous": [
+          {
+            "name": "incident_rca_requested",
+            "properties": {
+              "build_on_previous": true,
+            },
           },
         ],
       }
     `);
+  });
+
+  it("sends ai_assistant_message_sent only once the turn is admitted", () => {
+    trackAssistant("ai_turn_sent", SAMPLES.ai_turn_sent, TURN);
+    expect(track.mock.calls.map(([name]) => name)).toEqual(["ai_turn_sent"]);
+    trackAssistantAdmitted(TURN);
+    expect(track.mock.calls.map(([name]) => name)).toEqual([
+      "ai_turn_sent",
+      "ai_assistant_message_sent",
+    ]);
+    expect(() => trackAssistantAdmitted(TURN)).toThrow(/no ai_turn_sent/);
+    expect(track).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps build_on_previous on the admitted RCA request", () => {
+    setAssistantTelemetryContext({
+      getContainer: () => "rca",
+      getRoute: () => "incidents",
+      getViewport: () => "desktop",
+      getEdition: () => "ee",
+      getCreditMode: () => "none",
+      getRole: () => "admin",
+      getOrg: () => "default",
+      getGate: () => "available",
+      uiVersion: "abc1234",
+    });
+    trackAssistant("ai_turn_sent", SAMPLES.ai_turn_sent, TURN);
+    trackAssistantAdmitted(TURN, { buildOnPrevious: true });
+    expect(track.mock.calls[1]).toEqual(["incident_rca_requested", { build_on_previous: true }]);
+  });
+
+  it("evicts the oldest held send past the cap, so abandoned turns cannot pile up", () => {
+    const turn = (i: number) => ({ ...TURN, turnId: `cap-${i}` });
+    for (let i = 0; i <= MAX_PENDING_ADMISSIONS; i++) {
+      trackAssistant("ai_turn_sent", SAMPLES.ai_turn_sent, turn(i));
+    }
+    expect(() => trackAssistantAdmitted(turn(0))).toThrow(/no ai_turn_sent/);
+    trackAssistantAdmitted(turn(1));
+    trackAssistantAdmitted(turn(MAX_PENDING_ADMISSIONS));
+    const sent = track.mock.calls.filter(([name]) => name === "ai_assistant_message_sent");
+    expect(sent).toHaveLength(2);
+  });
+
+  it("never sends the legacy send event for a turn refused before admission", () => {
+    trackAssistant("ai_turn_sent", SAMPLES.ai_turn_sent, TURN);
+    trackAssistant("ai_turn_ended", { ...SAMPLES.ai_turn_ended, outcome: "refused" }, TURN);
+    expect(() => trackAssistantAdmitted(TURN)).toThrow(/no ai_turn_sent/);
+    expect(track.mock.calls.map(([name]) => name)).not.toContain("ai_assistant_message_sent");
   });
 
   it("sends the legacy event after the new one through the same emitter", () => {

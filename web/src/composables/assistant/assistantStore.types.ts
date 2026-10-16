@@ -407,6 +407,7 @@ export type AssistantErrorCode =
   | "subscription_required"
   | "consent_declined"
   | "consent_still_required"
+  | "stopped_before_send"
   | "authorization_unavailable"
   | "turn_limit"
   | "rate_limited"
@@ -426,6 +427,7 @@ export type AssistantErrorCode =
   | "approval_delivery_failed"
   | "stream_oversized"
   | "unknown"
+  | "history_unavailable"
   | "off_for_org"
   | "data_level_blocked"
   | "permission_denied_tool";
@@ -742,7 +744,7 @@ export type MutationResult = { ok: true } | { ok: false; error: AssistantError }
 
 export interface HistoryService {
   open(ref: { sid: Sid } | { chatId: number }): Promise<Sid>;
-  new (): Sid;
+  create(): Sid;
   recent(n: number): ComputedRef<HistoryRow[]>;
   save(sid: Sid): Promise<"server" | "local" | "not_saved">;
   rename(sid: Sid, title: string): Promise<MutationResult>;

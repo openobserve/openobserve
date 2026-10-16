@@ -1,7 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-// Mock payloads for every AI endpoint the OpenObserve UI calls. Shapes follow
-// web/src/services/ai_chat_share.ts, web/src/composables/useAiChat.ts,
-// web/src/composables/useChatHistory.ts and o2-ai/src/server (SSE events).
+// Payload shapes follow ai_chat_share.ts, useAiChat.ts, useChatHistory.ts and the o2-ai SSE events.
 
 const US = 1000; // ms -> µs multiplier
 const NOW = Date.now();
@@ -14,9 +12,7 @@ export function uuidv7(ms, salt = 0) {
   return `${ts.slice(0, 8)}-${ts.slice(8, 12)}-7${rnd(3)}-a${rnd(3)}-${rnd(12)}`;
 }
 
-// ---------------------------------------------------------------------------
 // Config gating: fields flipped on /config and /api/{org}/config responses.
-// ---------------------------------------------------------------------------
 export const CONFIG_PATCH = {
   ai_enabled: true, // gates every AI affordance (Header.vue:693, HomeView.vue:268, O2AIContextAddBtn.vue:4 ...)
   ai_chat_persistence_enabled: true, // server history + sharing (useAiChat.ts chatHistoryServer, chatShare.ts:103)
@@ -24,9 +20,7 @@ export const CONFIG_PATCH = {
   public_ai_chat_max_expiry_days: 30,
 };
 
-// ---------------------------------------------------------------------------
 // SSE frame builders (o2-ai EventType, src/server/constants.py:27-46).
-// ---------------------------------------------------------------------------
 const f = {
   status: (message = "processing") => ({ type: "status", message }),
   title: (title) => ({ type: "title", title }),
@@ -255,9 +249,7 @@ export function overageStatus({ effective = false, billing_status = "eligible", 
   };
 }
 
-// ---------------------------------------------------------------------------
 // Chat history (server persistence) and shares.
-// ---------------------------------------------------------------------------
 const H = 3_600_000;
 export const CHATS = [
   { title: "Checkout 5xx spike in prod", ago: 0.3 * H, frames: completeFrames(), user: "Why did checkout start throwing 5xx errors in the last 15 minutes?" },

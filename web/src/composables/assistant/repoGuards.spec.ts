@@ -76,7 +76,10 @@ const AI_TOKEN_LEGACY_CONSUMERS = [
   "utils/activityTimeline.ts",
   "views/HomeView.vue",
 ];
-const AI_ASSISTANT_KEY_COUNT = 170;
+const AI_ASSISTANT_KEYS: string[] = JSON.parse(
+  readFileSync(join(__dirname, "__fixtures__/aiAssistantKeys.json"), "utf8"),
+);
+const PURE_CONSTRUCTORS = new Set(["Set", "Map"]);
 
 const TOP_LEVEL_DECLARATIONS = new Set([
   ts.SyntaxKind.ImportDeclaration,
@@ -121,6 +124,52 @@ const inAssistantUi = (path: string) =>
 
 const offenders = (predicate: (file: SourceFile) => boolean) =>
   sources.filter(predicate).map((file) => file.path);
+
+// Function bodies do not run at import, so only calls outside them count.
+function importTimeCalls(node: ts.Node, out: ts.Node[] = []): ts.Node[] {
+  if (ts.isFunctionLike(node)) return out;
+  if (ts.isCallExpression(node) || ts.isNewExpression(node)) out.push(node);
+  ts.forEachChild(node, (child) => {
+    importTimeCalls(child, out);
+  });
+  return out;
+}
+
+function calleeRoot(expression: ts.Expression): ts.Expression {
+  let node = expression;
+  while (ts.isPropertyAccessExpression(node) || ts.isCallExpression(node)) node = node.expression;
+  return node;
+}
+
+function isAllowedImportTimeCall(call: ts.Node, file: ts.SourceFile, zodRoots: Set<string>) {
+  if (/[@#]__PURE__/.test(file.text.slice(call.getFullStart(), call.getStart(file)))) return true;
+  if (ts.isNewExpression(call)) {
+    return ts.isIdentifier(call.expression) && PURE_CONSTRUCTORS.has(call.expression.text);
+  }
+  const root = calleeRoot((call as ts.CallExpression).expression);
+  return ts.isIdentifier(root) && zodRoots.has(root.text);
+}
+
+// A top-level const built from `z` is itself a schema, so chaining on it (`schema.optional()`) stays pure.
+function disallowedImportTimeCalls(file: ts.SourceFile): ts.Node[] {
+  const zodRoots = new Set(["z"]);
+  const disallowed: ts.Node[] = [];
+  for (const statement of file.statements) {
+    const bad = importTimeCalls(statement).filter(
+      (call) => !isAllowedImportTimeCall(call, file, zodRoots),
+    );
+    disallowed.push(...bad);
+    if (bad.length || !ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      const init = declaration.initializer;
+      if (init && ts.isIdentifier(declaration.name) && ts.isCallExpression(init)) {
+        const root = calleeRoot(init.expression);
+        if (ts.isIdentifier(root) && zodRoots.has(root.text)) zodRoots.add(declaration.name.text);
+      }
+    }
+  }
+  return disallowed;
+}
 
 function leaves(node: unknown, path = "", out: [string, string][] = []): [string, string][] {
   if (typeof node === "string") out.push([path, node]);
@@ -196,7 +245,8 @@ describe("assistant repo guards", () => {
   });
 
   it("adds no aiAssistant.* keys", () => {
-    expect(leaves(locale.aiAssistant).length).toBeLessThanOrEqual(AI_ASSISTANT_KEY_COUNT);
+    const keys = leaves(locale.aiAssistant).map(([key]) => key);
+    expect(keys.sort()).toEqual(AI_ASSISTANT_KEYS);
   });
 
   it("keeps the product literal only in assistant.name", () => {
@@ -244,6 +294,34 @@ describe("assistant repo guards", () => {
         ),
     );
     expect(statements).toEqual([]);
+  });
+
+  it("runs no top-level call in composables/assistant except zod schemas, new Set/Map and @__PURE__", () => {
+    const files = sources.filter(
+      (f) => f.path.startsWith("composables/assistant/") && f.path.endsWith(".ts"),
+    );
+    const calls = files.flatMap((f) => {
+      const file = ts.createSourceFile(f.path, f.text, ts.ScriptTarget.Latest, true);
+      return disallowedImportTimeCalls(file).map(
+        (call) => `${f.path}: ${call.getText(file).slice(0, 60)}`,
+      );
+    });
+    expect(calls).toEqual([]);
+  });
+
+  it.each([
+    ["const a = setup();", false],
+    ["export const a = new Worker('x');", false],
+    ["const a = z.object({}).strict();", true],
+    ["const a = new Map([[1, 2]]);", true],
+    ["const a = /* @__PURE__ */ build();", true],
+    ["const a = () => track();", true],
+    ["const a = { b: register() };", false],
+    ["const a = z.string();\nconst b = a.optional();", true],
+    ["const a = make();\nconst b = a.optional();", false],
+  ])("judges %j as side-effect free: %s", (code, allowed) => {
+    const file = ts.createSourceFile("probe.ts", code, ts.ScriptTarget.Latest, true);
+    expect(disallowedImportTimeCalls(file).length === 0).toBe(allowed);
   });
 
   it("resolves every assistant colour utility to a registered token", () => {

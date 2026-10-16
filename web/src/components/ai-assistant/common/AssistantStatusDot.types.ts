@@ -27,7 +27,7 @@ export const assistantSignalShape: Record<AssistantSignal, AssistantSignalShape>
 
 export interface AssistantStatusDotProps {
   state: AssistantSignal;
-  /** Visible count badge (needs you); below md it is sr-only text next to the dot. */
+  /** Needs-you count; assistive tech reads it at every width, and it shows visually from md up. */
   count?: number;
   /** Position relative to a positioned parent. */
   placement?: "corner" | "inline";

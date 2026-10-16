@@ -892,6 +892,7 @@
     "enterValueOrVariable": "Enter value or $variable",
     "all": "All",
     "jsonFilesOnlyHint": ".json files only",
+    "justNow": "just now",
     "fileUploadJsonTab": "File Upload / JSON",
     "urlImportTab": "URL Import",
     "relativeTimeAgo": "{value} {unit} ago",
@@ -7838,7 +7839,8 @@
       }
     },
     "threadView": {
-      "assistant": "Assistant"
+      "assistant": "Assistant",
+      "userNamed": "User {user}"
     }
   },
   "billing": {
