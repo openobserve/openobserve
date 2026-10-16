@@ -4721,6 +4721,7 @@
       "openInLogs": "Mở trong Nhật ký",
       "openInMetrics": "Mở trong Chỉ số",
       "openInTraces": "Mở trong Trace",
+      "openInProfiles": "Mở trong Profiles",
       "setupAnother": "Thiết lập nguồn khác",
       "connectSource": "Kết nối nguồn thực của bạn",
       "receivedHint": "{action} hiển thị 30 phút xung quanh bản ghi đầu tiên này, ngay cả khi dấu thời gian của nó nằm trong quá khứ.",

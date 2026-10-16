@@ -4721,6 +4721,7 @@
       "openInLogs": "Abrir em Registros",
       "openInMetrics": "Abrir em Métricas",
       "openInTraces": "Abrir em Rastros",
+      "openInProfiles": "Abrir em Perfis",
       "setupAnother": "Configurar outra fonte",
       "connectSource": "Conecte sua fonte real",
       "receivedHint": "{action} mostra os 30 minutos ao redor deste primeiro registro, mesmo que seu carimbo de data/hora esteja no passado.",

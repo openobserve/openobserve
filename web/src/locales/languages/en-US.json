@@ -4721,6 +4721,7 @@
       "openInLogs": "Open in Logs",
       "openInMetrics": "Open in Metrics",
       "openInTraces": "Open in Traces",
+      "openInProfiles": "Open in Profiles",
       "setupAnother": "Set up another source",
       "connectSource": "Connect your real source",
       "receivedHint": "{action} shows the 30 minutes around this first record, even if its timestamp is in the past.",

@@ -4721,6 +4721,7 @@
       "openInLogs": "Ouvrir dans Logs",
       "openInMetrics": "Ouvrir dans Métriques",
       "openInTraces": "Ouvrir dans Traces",
+      "openInProfiles": "Ouvrir dans Profils",
       "setupAnother": "Configurer une autre source",
       "connectSource": "Connectez votre source réelle",
       "receivedHint": "{action} affiche les 30 minutes autour de ce premier enregistrement, même si son horodatage est dans le passé.",

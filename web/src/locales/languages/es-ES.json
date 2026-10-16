@@ -4721,6 +4721,7 @@
       "openInLogs": "Abrir en Logs",
       "openInMetrics": "Abrir en Métricas",
       "openInTraces": "Abrir en Trazas",
+      "openInProfiles": "Abrir en Perfiles",
       "setupAnother": "Configurar otra fuente",
       "connectSource": "Conecta tu fuente real",
       "receivedHint": "{action} muestra los 30 minutos alrededor de este primer registro, incluso si su marca de tiempo está en el pasado.",

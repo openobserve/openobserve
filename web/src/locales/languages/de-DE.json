@@ -4721,6 +4721,7 @@
       "openInLogs": "In Logs öffnen",
       "openInMetrics": "In Metriken öffnen",
       "openInTraces": "In Traces öffnen",
+      "openInProfiles": "In Profilen öffnen",
       "setupAnother": "Weitere Quelle einrichten",
       "connectSource": "Ihre echte Quelle verbinden",
       "receivedHint": "{action} zeigt die 30 Minuten um diesen ersten Datensatz, auch wenn sein Zeitstempel in der Vergangenheit liegt.",
