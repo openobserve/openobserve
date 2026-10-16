@@ -21,7 +21,7 @@ use config::{
     get_config,
     meta::{
         self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
-        triggers::{Trigger, TriggerStatus},
+        triggers::{Trigger, TriggerModule, TriggerStatus},
     },
     utils::{
         json,
@@ -30,7 +30,7 @@ use config::{
 };
 use infra::{
     db::get_orm_client_ro,
-    errors::Error as InfraError,
+    errors::{DbError, Error as InfraError},
     scheduler::get_scheduler_max_retries,
     table::{
         alert_calibration::{self, DEFAULT_FREQUENCY_MINUTES},
@@ -50,6 +50,17 @@ type ConfigRead = Result<Option<CalibrationConfig>, InfraError>;
 #[derive(Default, Deserialize, Serialize)]
 struct JobData {
     config_misses: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_run: Option<LastRun>,
+}
+
+/// How the latest attempted pass ended; a failed pass writes no digest, so only the row can say
+/// why.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct LastRun {
+    pub status: RunOutcome,
+    pub error: Option<String>,
+    pub finished_at: i64,
 }
 
 /// What a pass decided before any analysis.
@@ -132,6 +143,13 @@ impl<'a> Pass<'a> {
             },
         };
         data.config_misses = 0;
+        if !matches!(self, Self::Disabled(_)) {
+            data.last_run = Some(LastRun {
+                status: status.clone(),
+                error: error.clone(),
+                finished_at: now,
+            });
+        }
         Outcome {
             status,
             error,
@@ -208,6 +226,18 @@ pub(super) async fn handle_triggers(
 /// How long the scheduler keeps a pass's claim alive: its analysis budget plus room to write.
 pub(super) fn claim_lifetime_secs() -> i64 {
     analysis_budget_secs() + WRITE_ALLOWANCE_SECS
+}
+
+/// How the latest attempted pass of the org's config `key` ended, if one has.
+pub async fn last_run(org: &str, key: &str) -> Result<Option<LastRun>, anyhow::Error> {
+    let trigger = match infra::scheduler::get(org, TriggerModule::AlertCalibration, key).await {
+        Ok(trigger) => trigger,
+        Err(InfraError::DbError(DbError::KeyNotExists(_))) => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
+    Ok(json::from_str::<JobData>(&trigger.data)
+        .unwrap_or_default()
+        .last_run)
 }
 
 async fn read_config(trigger: &Trigger) -> Option<ConfigRead> {
@@ -354,8 +384,6 @@ fn trigger_data(
 
 #[cfg(test)]
 mod tests {
-    use infra::errors::DbError;
-
     use super::*;
 
     const NOW: i64 = 1_700_000_000_000_000;
@@ -404,7 +432,10 @@ mod tests {
 
     #[test]
     fn a_switched_off_deployment_looks_again_in_a_day_and_keeps_the_backoff() {
-        let mut data = JobData { config_misses: 3 };
+        let mut data = JobData {
+            config_misses: 3,
+            ..Default::default()
+        };
         let outcome = Pass::SwitchedOff.settle(&mut data, 0, NOW, None);
         assert_eq!(outcome.status, RunOutcome::Skipped);
         assert_eq!(outcome.next_run_at, NOW + 1440 * MINUTE);
@@ -433,7 +464,10 @@ mod tests {
 
     #[test]
     fn a_due_pass_reports_its_analysis_and_re_arms_on_its_cadence() {
-        let mut data = JobData { config_misses: 5 };
+        let mut data = JobData {
+            config_misses: 5,
+            ..Default::default()
+        };
         let enabled = config(true, 30);
         let done = Pass::Due(&enabled).settle(&mut data, 0, NOW, Some(Ok((NOW - MINUTE, NOW))));
         assert_eq!(data.config_misses, 0);
@@ -450,6 +484,21 @@ mod tests {
         assert_eq!(
             (failed.status, failed.error, failed.window),
             (RunOutcome::Error, Some("querier down".to_string()), None)
+        );
+    }
+
+    #[test]
+    fn the_row_keeps_the_latest_attempted_pass_and_not_a_disabled_one() {
+        let mut data = JobData::default();
+        Pass::Due(&config(true, 30)).settle(&mut data, 0, NOW, Some(Err("querier down".into())));
+        Pass::Disabled(&config(false, 30)).settle(&mut data, 0, NOW + MINUTE, None);
+        assert_eq!(
+            data.last_run,
+            Some(LastRun {
+                status: RunOutcome::Error,
+                error: Some("querier down".to_string()),
+                finished_at: NOW,
+            })
         );
     }
 

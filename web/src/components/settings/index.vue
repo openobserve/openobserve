@@ -70,7 +70,6 @@ import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
-import { isAlertCalibrationEnabled } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 
 export default defineComponent({
   name: "AppSettings",
@@ -100,6 +99,7 @@ export default defineComponent({
       announcementBanners: "announcements",
       announcementBannerEditor: "announcements",
       pipelineDestinations: "pipeline_destinations",
+      telephonySettings: "telephony",
       alertTemplates: "templates",
       modelPricing: "model_pricing",
       modelPricingEditor: "model_pricing",
@@ -112,7 +112,6 @@ export default defineComponent({
       syntheticsLocations: "synthetics_locations",
       correlationSettings: "correlation_settings",
       genAiAgentMapping: "gen_ai_agent_mapping",
-      alertCalibrationSettings: "alert_calibration",
     };
 
     const settingsTab = ref(
@@ -210,6 +209,7 @@ export default defineComponent({
       const domainManagementAccess = checkFeatureAccess("domainManagement", featureGateCtx);
       const passwordPolicyAccess = checkFeatureAccess("passwordPolicy", featureGateCtx);
       const pipelineDestinationsAccess = checkFeatureAccess("pipelineDestinations", featureGateCtx);
+      const oncallAccess = checkFeatureAccess("oncall", featureGateCtx);
       const storageSettingsAccess = checkFeatureAccess("storageSettings", featureGateCtx);
       const modelPricingAccess = checkFeatureAccess("modelPricing", featureGateCtx);
       const correlationSettingsAccess = checkFeatureAccess("correlationSettings", featureGateCtx);
@@ -315,6 +315,19 @@ export default defineComponent({
           group: "Destinations",
         },
         {
+          key: "telephony",
+          label: t("telephony.title"),
+          description: t("telephony.subtitle"),
+          icon: "call",
+          to: { name: "telephonySettings", query: { org_identifier: org } },
+          // The route guard's rule: only an explicit `oncall_enabled: false` closes it.
+          visible: z.oncall_enabled !== false && oncallAccess.visible,
+          locked: !oncallAccess.allowed,
+          lockedMessage: oncallAccess.message,
+          dataTest: "telephony-settings-tab",
+          group: "Destinations",
+        },
+        {
           key: "storageSettings",
           label: t("storage_settings.tabLabel"),
           description: t("settings.storageSettingsDesc"),
@@ -402,16 +415,6 @@ export default defineComponent({
           locked: !nodesAccess.allowed,
           lockedMessage: nodesAccess.message,
           dataTest: "nodes-tab",
-          group: "Operations",
-        },
-        {
-          key: "alert_calibration",
-          label: t("settings.alertCalibration"),
-          description: t("settings.alertCalibrationDesc"),
-          icon: "tune",
-          to: { name: "alertCalibrationSettings", query: { org_identifier: org } },
-          visible: isAlertCalibrationEnabled(z),
-          dataTest: "alert-calibration-settings-tab",
           group: "Operations",
         },
         {

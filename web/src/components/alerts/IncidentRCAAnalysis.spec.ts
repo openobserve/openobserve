@@ -535,6 +535,17 @@ describe("IncidentRCAAnalysis", () => {
     });
   });
 
+  describe("Credit cost", () => {
+    it("uses the singular for one credit and the plural otherwise", () => {
+      wrapper = mountComponent({ analyzeCreditCost: 1 });
+      expect(findByTestId(wrapper, "rca-credit-cost").text()).toBe("Uses 1 AI credit");
+
+      wrapper.unmount();
+      wrapper = mountComponent({ analyzeCreditCost: 50 });
+      expect(findByTestId(wrapper, "rca-credit-cost").text()).toBe("Uses 50 AI credits");
+    });
+  });
+
   describe("Failure State", () => {
     const failure = { reason: "Agent unavailable", details: "connection refused" };
 
@@ -554,6 +565,22 @@ describe("IncidentRCAAnalysis", () => {
 
       await findByTestId(wrapper, "rca-retry-btn").trigger("click");
       expect(wrapper.emitted("trigger-rca")).toBeTruthy();
+    });
+
+    it("should lead with Plans when AI credits blocked the run", () => {
+      wrapper = mountComponent({ rcaError: { ...failure, remedy: "plans" } });
+
+      expect(existsByTestId(wrapper, "rca-plans-btn")).toBe(true);
+      expect(existsByTestId(wrapper, "rca-error-details")).toBe(false);
+    });
+
+    it("should announce both failure banners to screen readers", () => {
+      wrapper = mountComponent({ rcaError: failure });
+      expect(findByTestId(wrapper, "rca-error-banner").attributes("role")).toBe("alert");
+
+      wrapper.unmount();
+      wrapper = mountComponent({ rcaError: { ...failure, remedy: "plans" } });
+      expect(findByTestId(wrapper, "rca-error-banner").attributes("role")).toBe("alert");
     });
 
     it("should keep an existing report visible alongside a failed reanalysis", () => {

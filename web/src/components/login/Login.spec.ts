@@ -368,6 +368,31 @@ describe("Login", () => {
     expect(window.location.href).toBe("https://sso.example.com");
   });
 
+  it("should not log a dex login request the browser aborted", async () => {
+    const authService = await import("@/services/auth");
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    wrapper = mount(Login, { global: { plugins: [i18n, store, router] } });
+    (authService.default.get_dex_login as any).mockRejectedValueOnce(
+      Object.assign(new Error("Request aborted"), { code: "ECONNABORTED" }),
+    );
+
+    await expect(wrapper.vm.loginWithSSo()).resolves.toBeUndefined();
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("should handle a failed dex login request instead of leaving it unhandled", async () => {
+    const authService = await import("@/services/auth");
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    wrapper = mount(Login, { global: { plugins: [i18n, store, router] } });
+    const networkError = Object.assign(new Error("Network Error"), { code: "ERR_NETWORK" });
+    (authService.default.get_dex_login as any).mockRejectedValueOnce(networkError);
+
+    await expect(wrapper.vm.loginWithSSo()).resolves.toBeUndefined();
+    expect(consoleError).toHaveBeenCalledWith("Error during redirection:", networkError);
+    consoleError.mockRestore();
+  });
+
   describe("sign-up intent (screen_hint)", () => {
     const DEX_URL =
       "https://dex.example.com/dex/auth?client_id=o2&redirect_uri=https%3A%2F%2Fcloud.example.com%2Fweb%2Fcb&scope=openid%20profile";

@@ -368,6 +368,7 @@
           @always-confirm="handleToolAlwaysConfirm"
         />
         <O2AIPaidUsageConsent v-if="showPaidUsageConsent" />
+        <O2AICreditsNotice v-if="isCloud" :busy="isLoading" />
 
         <input
           ref="imageInputRef"
@@ -434,6 +435,8 @@ import { useChatConsentSurface } from "@/composables/usePaidOverageConsent";
 import O2AIHomeWelcome from "@/components/ai-assistant/welcome/O2AIHomeWelcome.vue";
 import O2AIChatHistoryMenu from "@/components/ai-assistant/chat/O2AIChatHistoryMenu.vue";
 import O2AIChatInput from "@/components/ai-assistant/chat/O2AIChatInput.vue";
+import O2AICreditsNotice from "@/components/ai-assistant/chat/O2AICreditsNotice.vue";
+import config from "@/aws-exports";
 import O2AIChatMessage from "@/components/ai-assistant/chat/O2AIChatMessage.vue";
 import O2AIChatToolCallIndicator from "@/components/ai-assistant/chat/O2AIChatToolCallIndicator.vue";
 import AiChatShareDialog from "@/components/ai-assistant/share/AiChatShareDialog.vue";
@@ -507,6 +510,7 @@ export default defineComponent({
     O2AIHomeWelcome,
     O2AIChatHistoryMenu,
     O2AIChatInput,
+    O2AICreditsNotice,
     O2AIChatMessage,
     O2AIChatToolCallIndicator,
     ODropdown,
@@ -1132,6 +1136,13 @@ export default defineComponent({
       if (outcome === "turnLimit" && chatMessages.value === turnMessages) {
         await undoRefusedTurn(userMessage, messagesToSend, wasEmpty);
       }
+      // Keep the draft so it can be resent once billing allows it.
+      if (outcome === "creditsExhausted" && !inputMessage.value) {
+        inputMessage.value = userMessage;
+        chatInput.value?.setContent?.(userMessage);
+        // The draft goes back with its images, so a resend carries them too.
+        if (!pendingImages.value.length) pendingImages.value = messagesToSend;
+      }
     };
 
     const selectCapability = (capability: string) => {
@@ -1491,6 +1502,7 @@ export default defineComponent({
 
     return {
       raw,
+      isCloud: config.isCloud === "true",
       showPaidUsageConsent,
       inputMessage,
       chatMessages,

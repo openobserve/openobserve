@@ -31,14 +31,12 @@ export class QueryManagementPage {
     this.searchTypeFilter = this.allQueriesList.locator('[data-otoggle-value="dashboards"]');
   }
 
-  async mockRunningQueries(queries) {
-    await this.page.route('**/api/*/query_manager/status', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: queries }) })
-    );
-  }
-
+  // The All Queries tab is v-show-toggled, so the row actions exist in the DOM
+  // while User Summary is showing — wait for visibility, not just attachment.
   async openFirstQueryDetails() {
-    await this.queryListButton.first().click();
+    const button = this.queryListButton.first();
+    await expect(button).toBeVisible({ timeout: 15000 });
+    await button.click();
     await expect(this.queryDetailsTable).toBeVisible({ timeout: 15000 });
   }
 
