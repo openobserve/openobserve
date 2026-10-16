@@ -1,0 +1,1249 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import {
+  computed,
+  markRaw,
+  reactive,
+  ref,
+  shallowRef,
+  toRaw,
+  toValue,
+  type ComputedRef,
+  type MaybeRefOrGetter,
+  type Ref,
+} from "vue";
+
+import useBreakpoint from "@/composables/useBreakpoint";
+import {
+  ALLOWED_IMAGE_TYPES,
+  MAX_IMAGE_SIZE_BYTES,
+  type ChatMessage,
+  type ImageAttachment,
+} from "@/ts/interfaces/chat";
+import type { I18nKey, I18nText } from "@/types/i18n";
+import { getUUIDv7 } from "@/utils/uuid";
+
+import type {
+  AssistantCapability,
+  AssistantSession,
+  AssistantState,
+  AssistantStoreApi,
+  AssistantStoreDeps,
+  BlockAnnotation,
+  ComposerSnapshot,
+  ComposerState,
+  Container,
+  HistoryRow,
+  HistoryService,
+  Placement,
+  SessionOrigin,
+  ShellState,
+  Sid,
+} from "./assistantStore.types";
+import type { ContextChip } from "./context/types";
+import { createDraftStore, type DraftStore } from "./drafts";
+import {
+  markTabAlive,
+  pushRecall,
+  readPlacement,
+  readRecall,
+  readSidebar,
+  recallSelection,
+  rememberSelection,
+  removeAllSessionKeys,
+  removeRecall,
+  watchPrefs,
+  writePlacement,
+  writeSidebar,
+  type RecallEntry,
+} from "./prefs";
+import { getAssistantRuntime } from "./runtime";
+import { isTerminal, type TurnState, type TurnTerminal } from "./turnStates";
+
+export const MAX_CHIP_ROWS = 20;
+
+export const MAX_CHIP_BYTES = 32 * 1024;
+
+export const MAX_IMAGES = 4;
+
+/** Above this many idle sessions the least recently used release their transcript (`00` §4.2 rule 10). */
+export const IDLE_SESSION_LIMIT = 10;
+
+export const UNDO_WINDOW_MS = 10_000;
+
+export const SIDEBAR_MIN_REM = 20;
+
+export const SIDEBAR_MAX_REM = 32;
+
+/** `<main>` never drops below this beside a pinned sidebar (`20` §2.1). */
+export const MAIN_MIN_REM = 32;
+
+const SIDEBAR_DEFAULT_MIN_REM = 22;
+
+const ROW_KINDS: ReadonlySet<ContextChip["kind"]> = new Set(["log_row", "cell", "span"]);
+
+const INERT_GATES: ReadonlySet<AssistantCapability["gate"]> = new Set([
+  "loading",
+  "not_entitled",
+  "not_configured",
+]);
+
+const TITLE_RANK: Record<AssistantSession["titleSource"], number> = {
+  generated: 0,
+  object: 1,
+  renamed: 2,
+};
+
+export type HeaderLightState = "needs_you" | "working" | "unread" | "open" | "idle";
+
+/** This tab's light over the current user+org's sessions (`00` §12.2). */
+export interface HeaderLight {
+  state: HeaderLightState;
+  sid: Sid | null;
+  /** The unread answer failed: the light shows the failed glyph. */
+  failed: boolean;
+}
+
+/** What a container renders beside the turn state (`00` §5.4); computed, never stored. */
+export interface SessionView {
+  running: boolean;
+  elsewhere: boolean;
+  doneNotSaved: boolean;
+  needsYou: boolean;
+  unread: boolean;
+  visible: boolean;
+}
+
+export interface AssistantStoreIdentity {
+  userOrgKey: string;
+  org: string;
+}
+
+/** A one-shot request for the visible container to focus its composer (`95` §4). */
+export interface FocusRequest {
+  seq: number;
+  target: "composer";
+}
+
+/** The turn region's next line (`95` §2). */
+export interface AssistantAnnouncement {
+  seq: number;
+  sid: Sid;
+  key: I18nKey;
+  params?: Record<string, unknown>;
+}
+
+/** The store as the runtime and the doors see it: the binding API plus the seams later packages fill. */
+export interface AssistantStoreInternal extends AssistantStoreApi {
+  readonly drafts: DraftStore;
+  readonly headerLight: ComputedRef<HeaderLight>;
+  readonly focusRequest: Readonly<Ref<FocusRequest | null>>;
+  readonly announcement: Readonly<Ref<AssistantAnnouncement | null>>;
+  setIdentity(identity: AssistantStoreIdentity | null): void;
+  syncCapability(capability: AssistantCapability): void;
+  /** The helper line a door left on the composer (`assistant.entry.*`); cleared by the next edit or send. */
+  entryNotice(sid: Sid): I18nKey | null;
+  setEntryNotice(sid: Sid, key: I18nKey | null): void;
+  invokerOf(sid: Sid): HTMLElement | null;
+  /** When the session's last turn ended, for the 30 min thread rule. */
+  lastTurnAt(sid: Sid): number | null;
+  hasStoredSidebarMode(): boolean;
+  /** Post-completion data on an immutable block (`00` §4.2 rule 10). */
+  annotate(sid: Sid, blockId: string, patch: BlockAnnotation): void;
+  /** A save in flight keeps the session from being released until it settles. */
+  trackSave(sid: Sid, save: Promise<unknown>): void;
+}
+
+export interface AssistantStoreOptions {
+  drafts?: DraftStore;
+  /** Viewport width in rem; defaults to the window's. */
+  viewportRem?: () => number;
+}
+
+export interface AssistantSessionView {
+  session: ComputedRef<AssistantSession | null>;
+  view: ComputedRef<SessionView | null>;
+  composer: ComputedRef<ComposerState | null>;
+  turn: ComputedRef<TurnState | null>;
+  messages: ComputedRef<ChatMessage[]>;
+  entryNotice: ComputedRef<I18nKey | null>;
+  storageBlocked: Readonly<Ref<boolean>>;
+  send(opts?: Parameters<AssistantStoreApi["send"]>[1]): Promise<TurnTerminal>;
+  stop(): Promise<void>;
+  retry(): Promise<TurnTerminal>;
+  stage(payload: Parameters<AssistantStoreApi["stage"]>[1]): void;
+  setDraft(patch: Partial<ComposerState>): void;
+  addChip(chip: ContextChip): ReturnType<AssistantStoreApi["addChip"]>;
+  removeChip(chipId: string): void;
+  addImage(image: ImageAttachment): ReturnType<AssistantStoreApi["addImage"]>;
+  removeImage(id: string): void;
+  clearDraft(reason: "new_chat" | "org_switch"): string | null;
+  undoClear(token: string): void;
+  recall(direction: "older" | "newer"): void;
+  toggleStep(callId: string): void;
+  setFollow(follow: boolean): void;
+  selectVersion(turnId: string, n: number): void;
+  markRead(): void;
+}
+
+export interface AssistantPlacementView {
+  placement: ComputedRef<Placement>;
+  isVisible: ComputedRef<boolean>;
+  container: ComputedRef<Container | null>;
+  sidebarForcedFloating: ComputedRef<boolean>;
+  focusRequest: Readonly<Ref<FocusRequest | null>>;
+  open: AssistantStoreApi["open"];
+  close: AssistantStoreApi["close"];
+  moveTo: AssistantStoreApi["moveTo"];
+}
+
+interface UndoEntry {
+  sid: Sid;
+  userOrgKey: string;
+  at: number;
+  snapshot: ComposerSnapshot & { removedPageKeys: string[] };
+}
+
+/** Shared by the store's slices; never leaves this file. */
+interface StoreCore {
+  deps: AssistantStoreDeps;
+  state: AssistantState;
+  drafts: DraftStore;
+  viewportRem(): number;
+  invokers: Map<Sid, WeakRef<HTMLElement>>;
+  released: Set<Sid>;
+  endedAt: Map<Sid, number>;
+  savesPending: Map<Sid, number>;
+  notices: Record<Sid, I18nKey>;
+  focusRequest: Ref<FocusRequest | null>;
+  sidebarModeStored: Ref<boolean>;
+  session(sid: Sid | null | undefined): AssistantSession | undefined;
+  writable(session: AssistantSession): boolean;
+  persistDraft(session: AssistantSession): void;
+  persistPlacement(): void;
+  setActive(sid: Sid | null): void;
+  releaseIdle(): void;
+}
+
+export function createAssistantStore(
+  deps: AssistantStoreDeps,
+  options: AssistantStoreOptions = {},
+): AssistantStoreInternal {
+  const state = reactive<AssistantState>(initialState(options.viewportRem ?? windowRem));
+  const core = createCore(deps, state, options);
+  const sessions = createSessionSlice(core);
+  const lifecycle = createLifecycleSlice(core, sessions.openSession);
+  const store: AssistantStoreInternal = {
+    state,
+    drafts: core.drafts,
+    headerLight: computed(() => headerLightOf(state)),
+    focusRequest: core.focusRequest,
+    announcement: lifecycle.announcement,
+    ...sessions,
+    ...createPlacementSlice(core),
+    ...createComposerSlice(core),
+    ...createTurnSlice(core),
+    ...lifecycle.api,
+  };
+  return store;
+}
+
+/** The inert services WP-02 ships; later packages replace them one by one in `runtime.ts`. */
+export function inertAssistantDeps(
+  overrides: Partial<AssistantStoreDeps> = {},
+): AssistantStoreDeps {
+  const refused: TurnTerminal = {
+    state: "refused",
+    error: { code: "unknown", phase: "pre_admission", retryable: false, action: "none" },
+  };
+  return {
+    getOrg: () => null,
+    getUser: () => null,
+    now: () => Date.now(),
+    uuid: () => getUUIDv7(),
+    engine: {
+      send: async () => refused,
+      stop: async () => undefined,
+      stopAll: async () => undefined,
+      retry: async () => refused,
+      continueTurn: () => undefined,
+      retrySave: async () => undefined,
+      setRequestBuilder: () => undefined,
+      setConsentHandler: () => undefined,
+    },
+    history: inertHistory(),
+    hints: {
+      post: () => undefined,
+      on: () => () => undefined,
+      rebind: () => undefined,
+      close: () => undefined,
+    },
+    approvals: {
+      onConfirmationRequired: () => undefined,
+      decide: async () => ({ status: "failed", items: [], resolvedBy: "", resolvedAt: Date.now() }),
+      withdraw: async () => undefined,
+      onResolved: () => undefined,
+    },
+    consent: {
+      onConsentRequired: () => undefined,
+      resolve: async () => undefined,
+      cancel: () => undefined,
+    },
+    actions: { apply: async () => ({ ok: false, reason: "failed" }) },
+    ...overrides,
+  };
+}
+
+export function useAssistantStore(): AssistantStoreInternal {
+  return getAssistantRuntime().store;
+}
+
+/** Computed slices and bound actions of one session; components never hold the session itself. */
+export function useAssistantSession(
+  sid: MaybeRefOrGetter<Sid | null>,
+  store: AssistantStoreInternal = useAssistantStore(),
+): AssistantSessionView {
+  const current = () => toValue(sid);
+  const session = computed(() => store.state.sessions[current() ?? ""] ?? null);
+  const call = <R>(fallback: R, fn: (id: Sid) => R): R => {
+    const id = current();
+    return id ? fn(id) : fallback;
+  };
+  const refused = () => Promise.resolve(refusedUnknown());
+  return {
+    session,
+    view: computed(() => (session.value ? sessionView(session.value, store.state.shell) : null)),
+    composer: computed(() => session.value?.composer ?? null),
+    turn: computed(() => session.value?.turn ?? null),
+    messages: computed(() => session.value?.messages ?? []),
+    entryNotice: computed(() => call(null, (id) => store.entryNotice(id))),
+    storageBlocked: store.drafts.storageBlocked,
+    send: (opts) => call(refused(), (id) => store.send(id, opts)),
+    stop: () => call(Promise.resolve(), (id) => store.stop(id)),
+    retry: () => call(refused(), (id) => store.retry(id)),
+    stage: (payload) => call(undefined, (id) => store.stage(id, payload)),
+    setDraft: (patch) => call(undefined, (id) => store.setDraft(id, patch)),
+    addChip: (chip) => call({ ok: false, cap: "type" }, (id) => store.addChip(id, chip)),
+    removeChip: (chipId) => call(undefined, (id) => store.removeChip(id, chipId)),
+    addImage: (image) => call({ ok: false, cap: "type" }, (id) => store.addImage(id, image)),
+    removeImage: (imageId) => call(undefined, (id) => store.removeImage(id, imageId)),
+    clearDraft: (reason) => call(null, (id) => store.clearDraft(id, reason)),
+    undoClear: (token) => call(undefined, (id) => store.undoClear(id, token)),
+    recall: (direction) => call(undefined, (id) => store.recall(id, direction)),
+    toggleStep: (callId) => call(undefined, (id) => store.toggleStep(id, callId)),
+    setFollow: (follow) => call(undefined, (id) => store.setFollow(id, follow)),
+    selectVersion: (turnId, n) => call(undefined, (id) => store.selectVersion(id, turnId, n)),
+    markRead: () => call(undefined, (id) => store.markRead(id)),
+  };
+}
+
+/** Placement as computed views; the breakpoint changes the rendering, never the value. */
+export function useAssistantPlacement(
+  store: AssistantStoreInternal = useAssistantStore(),
+): AssistantPlacementView {
+  const { lgUp } = useBreakpoint();
+  const placement = computed(() => store.state.shell.placement);
+  return {
+    placement,
+    isVisible: computed(() => placement.value.kind !== "hidden"),
+    container: computed(() => containerOf(placement.value, lgUp.value)),
+    // Derived from the viewport only: below 20 + 32 rem a pinned sidebar would squeeze <main> (`20` §2.1).
+    sidebarForcedFloating: computed(
+      () => lgUp.value && windowRem() < SIDEBAR_MIN_REM + MAIN_MIN_REM,
+    ),
+    focusRequest: store.focusRequest,
+    open: store.open,
+    close: store.close,
+    moveTo: store.moveTo,
+  };
+}
+
+export function sessionView(session: AssistantSession, shell: ShellState): SessionView {
+  const running = isRunning(session.turn);
+  return {
+    running,
+    elsewhere: running && !session.turnMeta.ownedByThisTab,
+    doneNotSaved: session.turn.state === "done" && session.turn.saved === "not_saved",
+    needsYou: needsYou(session),
+    unread: session.unread,
+    visible: shell.placement.kind !== "hidden" && shell.activeSid === session.sid,
+  };
+}
+
+/** `needs_you > working > unread > open > idle` over this tab's sessions of the current user+org. */
+export function headerLightOf(state: AssistantState): HeaderLight {
+  const sessions = Object.values(state.sessions).filter((s) => s.userOrgKey === state.userOrgKey);
+  const waiting = sessions.find(needsYou);
+  if (waiting) return { state: "needs_you", sid: waiting.sid, failed: false };
+  const working = sessions.find((s) => isRunning(s.turn));
+  if (working) return { state: "working", sid: working.sid, failed: false };
+  const unread = sessions.find((s) => s.unread);
+  if (unread) {
+    const failed = unread.turn.state === "failed" || unread.turn.state === "refused";
+    return { state: "unread", sid: unread.sid, failed };
+  }
+  if (state.shell.placement.kind !== "hidden")
+    return { state: "open", sid: state.shell.activeSid, failed: false };
+  return { state: "idle", sid: null, failed: false };
+}
+
+/** The telemetry and `context.client` container of a placement; below `lg` the sidebar and dock render as the sheet. */
+export function containerOf(placement: Placement, lgUp: boolean): Container | null {
+  if (placement.kind === "hidden") return null;
+  if (placement.kind === "full") return "full_view";
+  if (!lgUp) return "sheet";
+  return placement.kind === "sidebar" ? "sidebar" : `docked.${placement.hostId}`;
+}
+
+export function isRunning(turn: TurnState): boolean {
+  return turn.state !== "idle" && !isTerminal(turn);
+}
+
+function createCore(
+  deps: AssistantStoreDeps,
+  state: AssistantState,
+  options: AssistantStoreOptions,
+): StoreCore {
+  const core: StoreCore = {
+    deps,
+    state,
+    drafts: options.drafts ?? createDraftStore(),
+    viewportRem: options.viewportRem ?? windowRem,
+    invokers: new Map(),
+    released: new Set(),
+    endedAt: new Map(),
+    savesPending: new Map(),
+    notices: reactive<Record<Sid, I18nKey>>({}),
+    focusRequest: shallowRef<FocusRequest | null>(null),
+    sidebarModeStored: ref(false),
+    session: (sid) => (sid ? state.sessions[sid] : undefined),
+    // Rule 7: a write under another user+org than the session's captured key is refused.
+    writable: (session) => state.ready && session.userOrgKey === state.userOrgKey,
+    persistDraft(session) {
+      if (!core.writable(session)) return;
+      const { text, chips, timeOverride, removedPageKeys } = toRaw(session.composer);
+      core.drafts.schedule(session.userOrgKey, session.sid, {
+        text,
+        chips,
+        timeOverride,
+        removedPageKeys,
+      });
+    },
+    persistPlacement() {
+      const { placement, previousPlacement } = state.shell;
+      if (state.ready && state.userOrgKey)
+        writePlacement(state.userOrgKey, { placement: { ...placement }, previousPlacement });
+    },
+    setActive(sid) {
+      if (sid && !state.sessions[sid]) return;
+      state.shell.activeSid = sid;
+      if (sid) {
+        state.recent = [sid, ...state.recent.filter((id) => id !== sid)];
+        if (state.shell.placement.kind !== "hidden") state.sessions[sid].unread = false;
+      }
+      if (state.ready && state.userOrgKey) rememberSelection(state.userOrgKey, sid);
+      core.releaseIdle();
+    },
+    releaseIdle() {
+      const holding = state.recent.filter((sid) => {
+        const session = state.sessions[sid];
+        return session && session.messages.length > 0 && isIdle(core, session);
+      });
+      for (const sid of holding.slice(IDLE_SESSION_LIMIT)) {
+        state.sessions[sid].messages = [];
+        core.released.add(sid);
+      }
+    },
+  };
+  return core;
+}
+
+function createSessionSlice(core: StoreCore) {
+  const { state, deps } = core;
+  const api: Pick<
+    AssistantStoreInternal,
+    | "createSession"
+    | "openSession"
+    | "dropSession"
+    | "setTitle"
+    | "setActive"
+    | "markRead"
+    | "lastTurnAt"
+    | "annotate"
+    | "trackSave"
+  > = {
+    createSession(init) {
+      if (!state.ready || !state.userOrgKey) throw new Error("The assistant store is inert here");
+      const active = core.session(state.shell.activeSid);
+      if (active && active.userOrgKey === state.userOrgKey && isEmptySession(active))
+        return active.sid;
+      const sid = deps.uuid();
+      state.sessions[sid] = blankSession(sid, state.userOrgKey, deps, init);
+      core.setActive(sid);
+      return sid;
+    },
+    async openSession(target, opts) {
+      const known =
+        "sid" in target
+          ? core.session(target.sid)
+          : Object.values(state.sessions).find((s) => s.chatId === target.chatId);
+      if (known && !core.released.has(known.sid)) {
+        core.setActive(known.sid);
+        if (opts?.focus) requestFocus(core);
+        return known.sid;
+      }
+      try {
+        const sid = await deps.history.open(target);
+        core.released.delete(sid);
+        restoreStoredDraft(core, sid);
+        core.setActive(sid);
+        if (opts?.focus) requestFocus(core);
+        return sid;
+      } catch (err) {
+        if (!known) throw err;
+        known.record.historyUnavailable = true;
+        core.setActive(known.sid);
+        return known.sid;
+      }
+    },
+    dropSession(sid) {
+      const session = core.session(sid);
+      if (!session) return;
+      core.drafts.remove(session.userOrgKey, sid);
+      delete state.sessions[sid];
+      delete core.notices[sid];
+      state.recent = state.recent.filter((id) => id !== sid);
+      for (const map of [core.invokers, core.endedAt, core.savesPending]) map.delete(sid);
+      core.released.delete(sid);
+      if (state.shell.activeSid === sid) core.setActive(null);
+      if (state.shell.invoker?.sid === sid) state.shell.invoker = null;
+    },
+    setTitle(sid, title, source) {
+      const session = core.session(sid);
+      if (!session) return;
+      if (session.title !== null && TITLE_RANK[source] < TITLE_RANK[session.titleSource]) return;
+      session.title = title;
+      session.titleSource = source;
+    },
+    setActive: (sid) => core.setActive(sid),
+    markRead(sid) {
+      const session = core.session(sid);
+      if (session) session.unread = false;
+    },
+    lastTurnAt: (sid) => core.endedAt.get(sid) ?? core.session(sid)?.turnMeta.startedAt ?? null,
+    annotate(sid, blockId, patch) {
+      const session = core.session(sid);
+      if (session) session.annotations[blockId] = { ...session.annotations[blockId], ...patch };
+    },
+    trackSave(sid, save) {
+      core.savesPending.set(sid, (core.savesPending.get(sid) ?? 0) + 1);
+      void save
+        .catch(() => undefined)
+        .then(() => {
+          const left = (core.savesPending.get(sid) ?? 1) - 1;
+          if (left > 0) core.savesPending.set(sid, left);
+          else core.savesPending.delete(sid);
+          core.releaseIdle();
+        });
+    },
+  };
+  return api;
+}
+
+function createPlacementSlice(core: StoreCore) {
+  const { state } = core;
+  const apply = (target: Placement) => {
+    const shell = state.shell;
+    shell.previousPlacement = previousFor(shell.placement, target, shell.previousPlacement);
+    shell.placement = { ...target };
+    const active = core.session(shell.activeSid);
+    if (active && target.kind !== "hidden") active.unread = false;
+    core.persistPlacement();
+  };
+  const api: Pick<
+    AssistantStoreInternal,
+    | "open"
+    | "close"
+    | "moveTo"
+    | "setSidebarWidth"
+    | "setSidebarMode"
+    | "setSheetSnap"
+    | "invokerOf"
+    | "hasStoredSidebarMode"
+  > = {
+    open(target, opts) {
+      if (!state.ready) return;
+      if (target.kind === "hidden") return api.close("close");
+      if (opts.sid) core.setActive(opts.sid);
+      const sid = state.shell.activeSid;
+      if (opts.invoker && sid) {
+        const el = new WeakRef(opts.invoker);
+        core.invokers.set(sid, el);
+        state.shell.invoker = markRaw({ el, sid });
+      }
+      apply(target);
+      if (opts.focus === "composer") requestFocus(core);
+    },
+    close(reason) {
+      const { placement, previousPlacement } = state.shell;
+      if (placement.kind === "hidden") return;
+      const restore =
+        placement.kind === "docked" || (placement.kind === "full" && reason === "route");
+      state.shell.placement =
+        restore && previousPlacement ? { ...previousPlacement } : { kind: "hidden" };
+      state.shell.previousPlacement = null;
+      core.persistPlacement();
+    },
+    moveTo(target) {
+      if (state.ready) apply(target);
+    },
+    setSidebarWidth(rem) {
+      const max = Math.max(SIDEBAR_MIN_REM, core.viewportRem() / 2);
+      const widthRem = Math.min(Math.max(rem, SIDEBAR_MIN_REM), max);
+      state.shell.sidebarWidthRem = widthRem;
+      if (state.ready && state.userOrgKey) writeSidebar(state.userOrgKey, { widthRem });
+    },
+    setSidebarMode(mode) {
+      state.shell.sidebarMode = mode;
+      core.sidebarModeStored.value = true;
+      if (state.ready && state.userOrgKey) writeSidebar(state.userOrgKey, { mode });
+    },
+    setSheetSnap(snap) {
+      state.shell.sheetSnap = snap;
+    },
+    invokerOf: (sid) => core.invokers.get(sid)?.deref() ?? null,
+    hasStoredSidebarMode: () => core.sidebarModeStored.value,
+  };
+  return api;
+}
+
+function createComposerSlice(core: StoreCore) {
+  const { deps } = core;
+  const undo = new Map<string, UndoEntry>();
+  const edit = (sid: Sid, fn: (composer: ComposerState) => void) => {
+    const session = core.session(sid);
+    if (!session) return;
+    fn(session.composer);
+    core.persistDraft(session);
+  };
+  const api: Pick<
+    AssistantStoreInternal,
+    | "stage"
+    | "setDraft"
+    | "restoreDraft"
+    | "addChip"
+    | "removeChip"
+    | "addBackChip"
+    | "addImage"
+    | "removeImage"
+    | "setTimeOverride"
+    | "startReply"
+    | "cancelReply"
+    | "clearDraft"
+    | "undoClear"
+    | "recall"
+    | "toggleStep"
+    | "setFollow"
+    | "selectVersion"
+    | "entryNotice"
+    | "setEntryNotice"
+  > = {
+    stage(sid, payload) {
+      edit(sid, (composer) => {
+        for (const chip of payload.chips ?? []) addChipTo(composer, chip);
+        if (!payload.text) return;
+        const keep = payload.mode === "append" && composer.text.trim() !== "";
+        composer.text = keep ? `${composer.text}\n${payload.text}` : payload.text;
+      });
+    },
+    setDraft(sid, patch) {
+      if (patch.text !== undefined) delete core.notices[sid];
+      edit(sid, (composer) => Object.assign(composer, patch));
+    },
+    restoreDraft(sid, snapshot) {
+      edit(sid, (composer) => {
+        composer.text = snapshot.text;
+        composer.chips = snapshot.chips.map((chip) => ({ ...chip }));
+        composer.images = [...snapshot.images];
+        composer.timeOverride = snapshot.timeOverride ? { ...snapshot.timeOverride } : null;
+      });
+    },
+    addChip(sid, chip) {
+      const session = core.session(sid);
+      if (!session) return { ok: false, cap: "type" };
+      const result = addChipTo(session.composer, chip);
+      core.persistDraft(session);
+      return result;
+    },
+    removeChip(sid, chipId) {
+      edit(sid, (composer) => {
+        const chip = composer.chips.find((c) => c.id === chipId);
+        if (!chip) return;
+        composer.chips = composer.chips.filter((c) => c.id !== chipId);
+        if (chip.provenance === "page" && !composer.removedPageKeys.includes(chip.kind))
+          composer.removedPageKeys.push(chip.kind);
+      });
+    },
+    addBackChip(sid, key) {
+      edit(sid, (composer) => {
+        composer.removedPageKeys = composer.removedPageKeys.filter((k) => k !== key);
+      });
+    },
+    addImage(sid, image) {
+      const composer = core.session(sid)?.composer;
+      if (!composer) return { ok: false, cap: "type" };
+      if (composer.images.some((i) => i.filename === image.filename)) return { ok: true };
+      if (composer.images.length >= MAX_IMAGES) return { ok: false, cap: "images" };
+      if (!ALLOWED_IMAGE_TYPES.includes(image.mimeType)) return { ok: false, cap: "type" };
+      if (image.size > MAX_IMAGE_SIZE_BYTES) return { ok: false, cap: "size" };
+      composer.images.push(image);
+      return { ok: true };
+    },
+    removeImage(sid, id) {
+      const composer = core.session(sid)?.composer;
+      if (composer) composer.images = composer.images.filter((i) => i.filename !== id);
+    },
+    setTimeOverride(sid, range) {
+      edit(sid, (composer) => {
+        composer.timeOverride = range ? { ...range } : null;
+      });
+    },
+    startReply(sid, approvalId) {
+      edit(sid, (composer) => {
+        composer.mode = "reply";
+        composer.replyApprovalId = approvalId;
+      });
+    },
+    cancelReply(sid) {
+      edit(sid, (composer) => {
+        composer.mode = "compose";
+        delete composer.replyApprovalId;
+      });
+    },
+    clearDraft(sid, reason) {
+      const session = core.session(sid);
+      if (!session) return null;
+      const snapshot = {
+        ...snapshotOf(session.composer),
+        removedPageKeys: [...session.composer.removedPageKeys],
+      };
+      edit(sid, (composer) => Object.assign(composer, emptyComposer(deps.uuid())));
+      delete core.notices[sid];
+      // A draft never crosses orgs, so an org switch clears without Undo (`40` §9).
+      if (reason === "org_switch") return null;
+      const token = deps.uuid();
+      undo.set(token, { sid, userOrgKey: session.userOrgKey, at: deps.now(), snapshot });
+      return token;
+    },
+    undoClear(sid, token) {
+      const entry = undo.get(token);
+      undo.delete(token);
+      const session = core.session(sid);
+      if (!entry || !session || entry.userOrgKey !== session.userOrgKey) return;
+      if (deps.now() - entry.at > UNDO_WINDOW_MS) return;
+      edit(sid, (composer) => {
+        composer.text = entry.snapshot.text;
+        composer.chips = entry.snapshot.chips;
+        composer.images = entry.snapshot.images;
+        composer.timeOverride = entry.snapshot.timeOverride;
+        composer.removedPageKeys = entry.snapshot.removedPageKeys;
+      });
+    },
+    recall(sid, direction) {
+      const session = core.session(sid);
+      if (!session || !core.writable(session)) return;
+      recallStep(session.composer, readRecall(session.userOrgKey), direction);
+    },
+    toggleStep(sid, callId) {
+      const ui = core.session(sid)?.ui;
+      if (!ui) return;
+      ui.expandedSteps = ui.expandedSteps.includes(callId)
+        ? ui.expandedSteps.filter((id) => id !== callId)
+        : [...ui.expandedSteps, callId];
+    },
+    setFollow(sid, follow) {
+      const ui = core.session(sid)?.ui;
+      if (!ui) return;
+      ui.follow = follow;
+      if (follow) ui.unseen = 0;
+    },
+    selectVersion(sid, turnId, n) {
+      const ui = core.session(sid)?.ui;
+      if (ui) ui.activeVersion[turnId] = n;
+    },
+    entryNotice: (sid) => core.notices[sid] ?? null,
+    setEntryNotice(sid, key) {
+      if (key) core.notices[sid] = key;
+      else delete core.notices[sid];
+    },
+  };
+  return api;
+}
+
+function createTurnSlice(core: StoreCore) {
+  const { state, deps } = core;
+  const inFlight = new Map<Sid, Promise<TurnTerminal>>();
+  const settle = (sid: Sid, before: TurnState | undefined, terminal: TurnTerminal) => {
+    const session = core.session(sid);
+    core.endedAt.set(sid, deps.now());
+    if (!session) return terminal;
+    // A terminal the engine already wrote for this turn wins; one left from an earlier turn does not.
+    if (!isTerminal(session.turn) || toRaw(session.turn) === before) session.turn = terminal;
+    // Completed blocks are immutable; later changes go to `annotations` (`00` §4.2 rule 10).
+    session.messages = session.messages.map((message) => markRaw(toRaw(message)));
+    if (!sessionView(session, state.shell).visible) session.unread = true;
+    if (terminal.state !== "refused") core.drafts.remove(session.userOrgKey, sid);
+    core.releaseIdle();
+    return terminal;
+  };
+  const api: Pick<
+    AssistantStoreInternal,
+    | "send"
+    | "stop"
+    | "retry"
+    | "continueTurn"
+    | "retrySave"
+    | "decideApproval"
+    | "resolveConsent"
+    | "dispatch"
+    | "markNotSaved"
+  > = {
+    send(sid, opts) {
+      const session = core.session(sid);
+      if (!session) return Promise.resolve(refusedUnknown());
+      const running = inFlight.get(sid);
+      if (running) return running;
+      delete core.notices[sid];
+      rememberPrompt(core, session);
+      const before = toRaw(session.turn);
+      const run = deps.engine
+        .send(sid, opts)
+        .then((terminal) => settle(sid, before, terminal))
+        .finally(() => inFlight.delete(sid));
+      inFlight.set(sid, run);
+      return run;
+    },
+    stop: (sid) => deps.engine.stop(sid),
+    retry(sid) {
+      const turn = core.session(sid)?.turn;
+      const before = turn && toRaw(turn);
+      return deps.engine.retry(sid).then((terminal) => settle(sid, before, terminal));
+    },
+    continueTurn: (sid) => deps.engine.continueTurn(sid),
+    retrySave: (sid, turnId) => deps.engine.retrySave(sid, turnId),
+    decideApproval: (sid, decision) => deps.approvals.decide(sid, decision),
+    resolveConsent: (sid, accepted) => deps.consent.resolve(sid, accepted),
+    dispatch: (sid, action) => deps.actions.apply(sid, action),
+    markNotSaved(sid) {
+      const session = core.session(sid);
+      if (session?.turn.state === "done") session.turn = { state: "done", saved: "not_saved" };
+    },
+  };
+  return api;
+}
+
+function createLifecycleSlice(core: StoreCore, openSession: AssistantStoreApi["openSession"]) {
+  const { state, deps } = core;
+  const announcement = shallowRef<AssistantAnnouncement | null>(null);
+  let announceSeq = 0;
+  const restored = new Set<string>();
+  let stopPrefsWatch: (() => void) | null = null;
+
+  const loadSidebarPrefs = () => {
+    if (!state.userOrgKey) return;
+    const stored = readSidebar(state.userOrgKey);
+    if (typeof stored.widthRem === "number") state.shell.sidebarWidthRem = stored.widthRem;
+    if (stored.mode) state.shell.sidebarMode = stored.mode;
+    core.sidebarModeStored.value = !!stored.mode;
+  };
+
+  const restoreTab = (userOrgKey: string) => {
+    if (restored.has(userOrgKey)) return;
+    restored.add(userOrgKey);
+    const tab = markTabAlive(userOrgKey);
+    // A duplicated tab starts hidden with an empty draft; only a reload restores (SH-02 AC 7).
+    if (tab.duplicated) {
+      core.drafts.clearAllForUser(userOrgKey);
+      return;
+    }
+    const stored = readPlacement(userOrgKey);
+    if (stored?.placement.kind === "sidebar") state.shell.placement = { ...stored.placement };
+    else if (stored?.placement.kind === "docked" && stored.previousPlacement?.kind === "sidebar")
+      state.shell.placement = { ...stored.previousPlacement };
+    const selected = recallSelection(userOrgKey);
+    if (selected) void openSession({ sid: selected }).catch(() => undefined);
+  };
+
+  const updateReady = () => {
+    const ready = !!state.userOrgKey && !INERT_GATES.has(state.capability.gate);
+    state.ready = ready;
+    if (ready && state.userOrgKey) restoreTab(state.userOrgKey);
+  };
+
+  const api: Pick<
+    AssistantStoreInternal,
+    | "setIdentity"
+    | "syncCapability"
+    | "announce"
+    | "applyHint"
+    | "onVisible"
+    | "onOrgSwitch"
+    | "onSignOut"
+    | "reset"
+  > = {
+    setIdentity(identity) {
+      if (identity?.userOrgKey === state.userOrgKey) return;
+      stopPrefsWatch?.();
+      stopPrefsWatch = null;
+      state.userOrgKey = identity?.userOrgKey ?? null;
+      if (identity) {
+        loadSidebarPrefs();
+        stopPrefsWatch = watchPrefs(identity.userOrgKey, (name) => {
+          if (name === "sidebar" && state.shell.placement.kind !== "sidebar") loadSidebarPrefs();
+        });
+      }
+      updateReady();
+    },
+    syncCapability(capability) {
+      state.capability = capability;
+      updateReady();
+    },
+    announce(sid, key, params) {
+      announceSeq += 1;
+      announcement.value = { seq: announceSeq, sid, key, ...(params && { params }) };
+    },
+    applyHint(hint) {
+      if (hint.type === "prefs_changed" && hint.key !== "prompt_history") loadSidebarPrefs();
+    },
+    onVisible() {
+      if (state.shell.placement.kind !== "sidebar") loadSidebarPrefs();
+    },
+    async onOrgSwitch(next) {
+      for (const sid of Object.keys(core.notices)) delete core.notices[sid];
+      state.shell.activeSid = null;
+      deps.hints.rebind(next.userOrgKey);
+      return "proceed";
+    },
+    async onSignOut() {
+      const userOrgKey = state.userOrgKey;
+      if (userOrgKey) {
+        core.drafts.clearAllForUser(userOrgKey);
+        removeAllSessionKeys(userOrgKey);
+        removeRecall(userOrgKey);
+      }
+      deps.hints.post({ v: 1, type: "signed_out", at: deps.now() });
+      api.reset();
+      return "proceed";
+    },
+    reset() {
+      for (const sid of Object.keys(state.sessions)) delete state.sessions[sid];
+      for (const sid of Object.keys(core.notices)) delete core.notices[sid];
+      state.recent = [];
+      Object.assign(state.shell, {
+        placement: { kind: "hidden" },
+        previousPlacement: null,
+        activeSid: null,
+        invoker: null,
+      });
+      for (const map of [core.invokers, core.endedAt, core.savesPending]) map.clear();
+      core.released.clear();
+    },
+  };
+  return { api, announcement };
+}
+
+function initialState(viewportRem: () => number): AssistantState {
+  return {
+    ready: false,
+    userOrgKey: null,
+    capability: initialCapability(),
+    shell: {
+      placement: { kind: "hidden" },
+      previousPlacement: null,
+      activeSid: null,
+      sidebarWidthRem: defaultSidebarWidth(viewportRem()),
+      sidebarMode: "pinned",
+      sheetSnap: "half",
+      invoker: null,
+    },
+    sessions: {},
+    recent: [],
+    history: {
+      filter: { kind: "all", q: "" },
+      cursor: null,
+      hasMore: false,
+      importState: "idle",
+    },
+  };
+}
+
+function initialCapability(): AssistantCapability {
+  return {
+    gate: "loading",
+    edition: "oss",
+    configured: false,
+    health: "unknown",
+    canChat: "unknown",
+    canWrite: "unknown",
+    canShare: "unknown",
+    canShareRead: "unknown",
+    persistence: false,
+    publicLinks: false,
+    publicMaxExpiryDays: 0,
+    isAdmin: false,
+    rcaEnabled: false,
+    source: "heuristic",
+    reasonCode: "loading",
+  };
+}
+
+function blankSession(
+  sid: Sid,
+  userOrgKey: string,
+  deps: AssistantStoreDeps,
+  init: { origin: SessionOrigin; title?: I18nText },
+): AssistantSession {
+  return {
+    sid,
+    chatId: chatIdOf(sid),
+    userOrgKey,
+    org: deps.getOrg()?.identifier ?? "",
+    title: init.title ?? null,
+    titleSource: init.title ? "object" : "generated",
+    origin: { ...init.origin },
+    messages: [],
+    record: {
+      serverBacked: false,
+      cachedLastSeq: null,
+      stateVersion: null,
+      turnSpans: [],
+      liveTurnId: null,
+      liveSavedAt: null,
+      forkedFromShare: null,
+      historyUnavailable: false,
+      ephemeral: false,
+      pinned: false,
+    },
+    composer: emptyComposer(deps.uuid()),
+    scroll: { top: "bottom" },
+    ui: { expandedSteps: [], follow: true, unseen: 0, activeVersion: {} },
+    turn: { state: "idle" },
+    turnMeta: {
+      turnId: null,
+      serverTurnId: null,
+      ownedByThisTab: true,
+      startedAt: null,
+      firstByteAt: null,
+      traceId: null,
+      lastSeq: null,
+      usage: null,
+      contextUsed: null,
+    },
+    pendingApproval: null,
+    pendingConsent: null,
+    annotations: {},
+    share: null,
+    ledger: [],
+    unread: false,
+  };
+}
+
+function emptyComposer(sendId: string): ComposerState {
+  return {
+    text: "",
+    chips: [],
+    images: [],
+    recallIndex: -1,
+    recallDraft: null,
+    timeOverride: null,
+    removedPageKeys: [],
+    mode: "compose",
+    sendId,
+  };
+}
+
+function snapshotOf(composer: ComposerState): ComposerSnapshot {
+  return {
+    text: composer.text,
+    chips: composer.chips.map((chip) => ({ ...toRaw(chip) })),
+    images: [...composer.images],
+    mentions: [],
+    timeOverride: composer.timeOverride ? { ...composer.timeOverride } : null,
+  };
+}
+
+function addChipTo(
+  composer: ComposerState,
+  chip: ContextChip,
+): { ok: true } | { ok: false; cap: "rows" | "bytes" | "type" } {
+  if (chip.kind === "image") return { ok: false, cap: "type" };
+  if (composer.chips.some((c) => sameChip(c, chip))) return { ok: true };
+  if (ROW_KINDS.has(chip.kind) && rowsOf(composer.chips) + rowsOf([chip]) > MAX_CHIP_ROWS)
+    return { ok: false, cap: "rows" };
+  const bytes = composer.chips.reduce((sum, c) => sum + c.sizeBytes, 0);
+  if (bytes + chip.sizeBytes > MAX_CHIP_BYTES) return { ok: false, cap: "bytes" };
+  composer.chips.push({ ...chip });
+  if (chip.provenance === "page")
+    composer.removedPageKeys = composer.removedPageKeys.filter((k) => k !== chip.kind);
+  return { ok: true };
+}
+
+// A second activation of the same door is a no-op (`40` §4, round 1 X-21).
+function sameChip(a: ContextChip, b: ContextChip): boolean {
+  if (a.id === b.id) return true;
+  if (a.kind !== b.kind || !a.ref?.id || !b.ref?.id) return false;
+  return a.ref.type === b.ref.type && a.ref.id === b.ref.id && a.ref.org === b.ref.org;
+}
+
+function rowsOf(chips: ContextChip[]): number {
+  return chips
+    .filter((chip) => ROW_KINDS.has(chip.kind))
+    .reduce((sum, chip) => sum + (chip.count ?? 1), 0);
+}
+
+function recallStep(
+  composer: ComposerState,
+  entries: RecallEntry[],
+  direction: "older" | "newer",
+): void {
+  const index = composer.recallIndex;
+  if (direction === "older") {
+    if (index + 1 >= entries.length) return;
+    if (index === -1) composer.recallDraft = snapshotOf(composer);
+    composer.recallIndex = index + 1;
+    applyRecall(composer, entries[index + 1]);
+    return;
+  }
+  if (index === -1) return;
+  composer.recallIndex = index - 1;
+  if (index - 1 >= 0) return applyRecall(composer, entries[index - 1]);
+  const draft = composer.recallDraft;
+  composer.recallDraft = null;
+  if (draft) applyRecall(composer, { text: draft.text, chips: draft.chips, at: 0 });
+}
+
+function applyRecall(composer: ComposerState, entry: RecallEntry | undefined): void {
+  if (!entry) return;
+  composer.text = entry.text;
+  composer.chips = entry.chips.map((chip) => ({ ...chip }));
+}
+
+function rememberPrompt(core: StoreCore, session: AssistantSession): void {
+  const text = session.composer.text.trim();
+  if (!text || !core.writable(session)) return;
+  const chips = toRaw(session.composer.chips).map((chip) => ({ ...chip }));
+  pushRecall(session.userOrgKey, { text, chips, at: core.deps.now() });
+}
+
+function restoreStoredDraft(core: StoreCore, sid: Sid): void {
+  const session = core.session(sid);
+  if (!session || !core.writable(session) || session.composer.text) return;
+  const draft = core.drafts.read(session.userOrgKey, sid);
+  if (draft) Object.assign(session.composer, draft);
+}
+
+function requestFocus(core: StoreCore): void {
+  core.focusRequest.value = { seq: (core.focusRequest.value?.seq ?? 0) + 1, target: "composer" };
+}
+
+function isIdle(core: StoreCore, session: AssistantSession): boolean {
+  const { composer, turn } = session;
+  return (
+    session.sid !== core.state.shell.activeSid &&
+    !isRunning(turn) &&
+    !composer.text &&
+    composer.chips.length === 0 &&
+    composer.images.length === 0 &&
+    !session.pendingApproval &&
+    !session.pendingConsent &&
+    !(turn.state === "done" && turn.saved === "not_saved") &&
+    !core.savesPending.has(session.sid)
+  );
+}
+
+function isEmptySession(session: AssistantSession): boolean {
+  const { composer } = session;
+  return (
+    session.messages.length === 0 &&
+    session.turn.state === "idle" &&
+    !composer.text.trim() &&
+    composer.chips.length === 0 &&
+    composer.images.length === 0
+  );
+}
+
+function needsYou(session: AssistantSession): boolean {
+  const state = session.turn.state;
+  return (
+    state === "awaiting_approval" ||
+    state === "awaiting_consent" ||
+    !!session.pendingApproval ||
+    !!session.pendingConsent
+  );
+}
+
+function previousFor(from: Placement, to: Placement, previous: Placement | null): Placement | null {
+  if (to.kind === "docked") return from.kind === "docked" ? previous : { ...from };
+  if (to.kind !== "full") return null;
+  return from.kind === "sidebar" || from.kind === "hidden" ? { ...from } : previous;
+}
+
+// The milliseconds prefix of a UUIDv7 is the IndexedDB chat id (`00` §4.1).
+function chatIdOf(sid: Sid): number | null {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-7/i.test(sid)) return null;
+  return parseInt(sid.replace(/-/g, "").slice(0, 12), 16);
+}
+
+function defaultSidebarWidth(viewportRem: number): number {
+  return Math.min(Math.max(viewportRem * 0.3, SIDEBAR_DEFAULT_MIN_REM), SIDEBAR_MAX_REM);
+}
+
+function windowRem(): number {
+  return typeof window === "undefined" ? 80 : window.innerWidth / 16;
+}
+
+function refusedUnknown(): TurnTerminal {
+  return {
+    state: "refused",
+    error: { code: "unknown", phase: "pre_admission", retryable: false, action: "none" },
+  };
+}
+
+function inertHistory(): HistoryService {
+  const none = computed<HistoryRow[]>(() => []);
+  // `HistoryService.new` is declared as a construct signature (WP-01), which an object literal cannot carry.
+  const ctor = function () {
+    throw new Error("History is not available yet");
+  } as unknown as new () => Sid;
+  return Object.assign(ctor, {
+    open: async () => {
+      throw new Error("History is not available yet");
+    },
+    recent: () => none,
+    save: async () => "not_saved" as const,
+    rename: async () => ({ ok: true }) as const,
+    pin: async () => ({ ok: true }) as const,
+    remove: async () => ({ ok: true }) as const,
+    clearAll: async () => ({ ok: true }) as const,
+    importLocal: async function* () {
+      yield* [];
+    },
+    rows: none,
+    mode: computed<"server" | "local">(() => "local"),
+    hasMore: computed(() => false),
+    loadOlder: async () => undefined,
+  });
+}

@@ -41,6 +41,7 @@ import { isExtensionOnlyError } from "./utils/rum/extensionFrames";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 
 // Apply the resolved theme synchronously before the app mounts so the first
 // paint already uses the correct colors (no flash of the base stylesheet theme).
@@ -118,6 +119,7 @@ const getConfig = async () => {
     if (res.data.commit_hash) {
       buildVersionChecker.setInitialVersion(res.data.commit_hash);
     }
+    if (isAssistantV2()) void initAssistant(res.data.commit_hash?.slice(0, 12) ?? "unknown");
     if (res.data.rum?.enabled) {
       const options = {
         clientToken: res.data.rum.client_token,
@@ -230,6 +232,41 @@ const getConfig = async () => {
     }
   });
 };
+
+// Dynamic imports only: with the flag off nothing of the assistant runtime is loaded.
+async function initAssistant(uiVersion: string) {
+  const [{ assistantStore }, { setAssistantTelemetryContext }, share] = await Promise.all([
+    import("@/composables/assistant"),
+    import("@/services/assistantAnalytics"),
+    import("@/components/ai-assistant/share/chatShare"),
+  ]);
+  assistantStore.init({
+    getOrg: () => {
+      const org = store.state.selectedOrganization;
+      return org?.identifier ? { identifier: org.identifier, name: org.label ?? "" } : null;
+    },
+    getUser: () => {
+      const email = (store.state.userInfo as { email?: string })?.email;
+      const role = (store.state.currentuser as { role?: string })?.role ?? "";
+      return email ? { email, role } : null;
+    },
+    getConfig: () => {
+      const zo = store.state.zoConfig;
+      if (typeof zo?.ai_enabled !== "boolean") return null;
+      return {
+        aiEnabled: zo.ai_enabled,
+        rbacEnabled: zo.rbac_enabled !== false,
+        persistence: share.isChatPersistenceEnabled(zo),
+        publicLinks: share.isPublicChatEnabled(zo),
+        publicMaxExpiryDays: share.publicMaxExpirySecs(zo) / 86_400,
+        rcaEnabled: zo.rca_enabled === true,
+      };
+    },
+    isOrgAdmin: () => share.orgAdminFlag(store.state),
+    router,
+  });
+  setAssistantTelemetryContext(assistantStore.telemetryContext(uiVersion));
+}
 
 getConfig();
 

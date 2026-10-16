@@ -8132,6 +8132,16 @@
   },
   "assistant": {
     "beta": "Beta",
+    "client": {
+      "storageBlocked": "Drafts won't be kept if you reload this page."
+    },
+    "entry": {
+      "addedBehindCard": "Added to chat. Answer the pending question to send.",
+      "addedToDraft": "Added to your message. Press Send when ready.",
+      "open": "Open",
+      "orgChanged": "This page belongs to another organization. Reload it to ask about it.",
+      "queuedWhileRunning": "Added to the chat. Send it when the current answer finishes."
+    },
     "name": "O2 Assistant"
   },
   "llmObservability": {
@@ -19425,7 +19435,8 @@
       "rum": "RUM",
       "runningQueries": "Running Queries",
       "oncall": "On-Call",
-      "synthetics": "Synthetics"
+      "synthetics": "Synthetics",
+      "assistant": "O2 Assistant"
     },
     "pages": {
       "global": "Global",
@@ -19478,7 +19489,10 @@
       "oncall": "On-Call",
       "oncallDetail": "On-Call Page",
       "syntheticsJourney": "Synthetics journey",
-      "downtimes": "Downtimes"
+      "downtimes": "Downtimes",
+      "assistant": "O2 Assistant",
+      "assistantComposer": "O2 Assistant composer",
+      "queryEditor": "Query editor"
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
@@ -19556,6 +19570,15 @@
       "syntheticsTokensRefresh": "Refresh token list",
       "aiChatToggle": "Toggle AI chat",
       "aiChatClose": "Close AI chat",
+      "assistantClose": "Close O2 Assistant",
+      "assistantComposerNewline": "New line",
+      "assistantComposerRecall": "Recall previous prompt",
+      "assistantComposerSend": "Send message",
+      "assistantGoToAnswer": "Go to the latest answer",
+      "assistantHelper": "Ask AI to write this query",
+      "assistantHistory": "Open chats",
+      "assistantOpen": "Open O2 Assistant",
+      "editorTabFocusMode": "Let Tab leave the editor",
       "logsSaveView": "Save as saved view",
       "logsExport": "Export results as CSV",
       "tracesCopyUrl": "Copy trace share URL",

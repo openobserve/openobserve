@@ -1,4 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
+
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
 import {
   getShortcutDef,
   SHORTCUT_MODULES,
@@ -16,6 +18,7 @@ const OSS: ShortcutCapabilities = {
   rbacEnabled: false,
   aiEnabled: false,
   downtimesEnabled: false,
+  assistantCanChat: false,
 };
 const ENTERPRISE: ShortcutCapabilities = {
   isEnterprise: true,
@@ -27,6 +30,7 @@ const ENTERPRISE: ShortcutCapabilities = {
   rbacEnabled: true,
   aiEnabled: true,
   downtimesEnabled: true,
+  assistantCanChat: true,
 };
 const CLOUD: ShortcutCapabilities = {
   isEnterprise: false,
@@ -38,6 +42,7 @@ const CLOUD: ShortcutCapabilities = {
   rbacEnabled: true,
   aiEnabled: true,
   downtimesEnabled: true,
+  assistantCanChat: true,
 };
 
 /** Mirrors ShortcutCheatsheet: a page shows unless its gate rejects the caps. */
@@ -279,5 +284,88 @@ describe("row navigation entries (item 4a)", () => {
     expect(getShortcutDef("tracePrevSpan")?.descriptionKey).toBe(
       "shortcuts.actions.tracePrevVisibleSpan",
     );
+  });
+});
+
+describe("assistant entries", () => {
+  const ASSISTANT_IDS = [
+    "assistantOpen",
+    "assistantClose",
+    "assistantHelper",
+    "assistantHistory",
+    "assistantComposerSend",
+    "assistantComposerNewline",
+    "assistantComposerRecall",
+    "assistantGoToAnswer",
+    "editorTabFocusMode",
+  ];
+  const assistantPages = [
+    "shortcuts.pages.assistant",
+    "shortcuts.pages.assistantComposer",
+    "shortcuts.pages.queryEditor",
+  ];
+
+  afterEach(() => {
+    delete window.__O2_ASSISTANT_V2__;
+    resetAssistantV2ForTests();
+  });
+
+  it("leaves the cheatsheet unchanged with the flag off, on every edition", () => {
+    window.__O2_ASSISTANT_V2__ = false;
+    for (const caps of [OSS, ENTERPRISE, CLOUD]) {
+      for (const id of ASSISTANT_IDS) expect(entryVisible(id, caps), id).toBe(false);
+      for (const page of assistantPages) expect(visiblePages(caps).has(page), page).toBe(false);
+      expect(visibleModuleTitles(caps)).not.toContain("shortcuts.modules.assistant");
+    }
+    expect(entryVisible("aiChatToggle", ENTERPRISE)).toBe(true);
+  });
+
+  it("shows the rows only while the assistant can chat, and never assistantClose", () => {
+    window.__O2_ASSISTANT_V2__ = true;
+    expect(entryVisible("assistantOpen", ENTERPRISE)).toBe(true);
+    expect(entryVisible("assistantOpen", { ...ENTERPRISE, assistantCanChat: false })).toBe(false);
+    expect(entryVisible("assistantOpen", { ...ENTERPRISE, aiEnabled: false })).toBe(false);
+    expect(entryVisible("assistantClose", ENTERPRISE)).toBe(false);
+    expect(visibleModuleTitles(ENTERPRISE)).toContain("shortcuts.modules.assistant");
+  });
+
+  it("binds the chords of 10 §6.1 with their scopes and input flags", () => {
+    expect(getShortcutDef("assistantOpen")).toMatchObject({
+      keyForWindows: "ctrl+i",
+      keyForMac: "meta+i",
+      skipInInput: false,
+      scope: undefined,
+    });
+    expect(getShortcutDef("assistantClose")).toMatchObject({
+      key: "escape",
+      scope: "assistant",
+      allowInInput: true,
+    });
+    expect(getShortcutDef("assistantHistory")).toMatchObject({
+      keyForWindows: "ctrl+shift+h",
+      keyForMac: "meta+shift+h",
+      scope: "assistant",
+      allowInInput: true,
+    });
+    expect(getShortcutDef("assistantHelper")).toMatchObject({
+      keyForWindows: "ctrl+i",
+      scope: "editor",
+    });
+    expect(getShortcutDef("assistantGoToAnswer")).toMatchObject({
+      keyForWindows: "ctrl+up",
+      keyForMac: "meta+up",
+      scope: "assistantComposer",
+    });
+    expect(getShortcutDef("editorTabFocusMode")).toMatchObject({
+      keyForWindows: "ctrl+m",
+      keyForMac: "ctrl+shift+m",
+      scope: "editor",
+    });
+    for (const id of [
+      "assistantComposerSend",
+      "assistantComposerNewline",
+      "assistantComposerRecall",
+    ])
+      expect(getShortcutDef(id), id).toBeUndefined();
   });
 });

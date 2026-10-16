@@ -220,7 +220,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onUnmounted } from "vue";
+import { computed, ref, shallowRef, watch, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -233,6 +233,7 @@ import { SHORTCUT_REGISTRY, SHORTCUT_MODULES } from "./shortcutRegistry";
 import type { ShortcutEntry, ShortcutCapabilities } from "./shortcutRegistry";
 import { isMacOS } from "@/utils/keyboardShortcuts";
 import config from "@/aws-exports";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 
 const props = withDefaults(
   defineProps<{
@@ -251,6 +252,14 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const store = useStore();
+// Loaded only with the flag on, so the legacy path neither builds nor downloads the assistant runtime.
+const assistantCanChat = shallowRef<(() => boolean) | null>(null);
+if (isAssistantV2()) {
+  void import("@/composables/assistant").then(({ useAssistantCapability }) => {
+    const capability = useAssistantCapability();
+    assistantCanChat.value = () => capability.assistantCanChat.value;
+  });
+}
 
 // Edition + `/config` flags that decide which feature pages the build can reach.
 const capabilities = computed<ShortcutCapabilities>(() => ({
@@ -265,6 +274,7 @@ const capabilities = computed<ShortcutCapabilities>(() => ({
   rbacEnabled: Boolean(store.state.zoConfig?.rbac_enabled),
   aiEnabled: Boolean(store.state.zoConfig?.ai_enabled),
   downtimesEnabled: store.state.zoConfig?.downtimes_enabled === true,
+  assistantCanChat: assistantCanChat.value?.() ?? false,
 }));
 
 const open = computed({
