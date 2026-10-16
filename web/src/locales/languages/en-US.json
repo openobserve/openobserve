@@ -8132,6 +8132,7 @@
       "on": "On",
       "off": "Off",
       "notConfigured": "Not configured",
+      "noScheduledRun": "No scheduled run",
       "every": "Every {duration}",
       "window": "Analysis window",
       "currentSettings": "Current settings",

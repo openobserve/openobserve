@@ -300,13 +300,16 @@ const stats = computed<StatItem[]>(() => {
     {
       key: "schedule",
       label: t("alertCalibration.digests.schedule"),
+      // The value carries the cadence, so the tile still reads once a narrow screen hides its label.
       value: c
         ? c.enabled
-          ? t("alertCalibration.digests.on")
+          ? t("alertCalibration.digests.every", { duration: formatMinutes(t, c.frequency_minutes) })
           : t("alertCalibration.digests.off")
         : raw("—"),
       sub: c
-        ? t("alertCalibration.digests.every", { duration: formatMinutes(t, c.frequency_minutes) })
+        ? c.enabled
+          ? t("alertCalibration.digests.on")
+          : t("alertCalibration.digests.noScheduledRun")
         : t("alertCalibration.digests.notConfigured"),
       icon: "schedule",
       tone: c?.enabled ? "success" : "neutral",
