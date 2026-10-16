@@ -8196,8 +8196,6 @@
       "proposedActions": "Voorgestelde acties"
     },
     "dashboard": {
-      "latestRun": "Laatste run",
-      "latestRunCaption": "Venster {start} tot {end}, geschreven {time}",
       "findings": "Bevindingen",
       "alertsInScope": "Alarmen binnen bereik",
       "coverage": "Dekking",

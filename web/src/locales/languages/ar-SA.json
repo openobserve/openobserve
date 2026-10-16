@@ -8196,8 +8196,6 @@
       "proposedActions": "الإجراءات المقترحة"
     },
     "dashboard": {
-      "latestRun": "أحدث عملية تشغيل",
-      "latestRunCaption": "النافذة من {start} إلى {end}، كُتبت في {time}",
       "findings": "النتائج",
       "alertsInScope": "التنبيهات ضمن النطاق",
       "coverage": "التغطية",

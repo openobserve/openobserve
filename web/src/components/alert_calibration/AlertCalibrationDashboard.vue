@@ -87,12 +87,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="flex flex-col gap-5" data-test="alert-calibration-dashboard">
       <AlertCalibrationLastRun only-failure />
 
-      <section class="flex flex-col gap-3">
-        <div class="flex flex-col gap-0.5">
-          <OText variant="card-title" as="h2">{{
-            t("alertCalibration.dashboard.latestRun")
-          }}</OText>
-          <OText variant="meta" as="p">
+      <section class="flex flex-col gap-2">
+        <OStatStrip :items="latestStats" data-test="alert-calibration-dashboard-latest" />
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <div class="flex min-w-0 flex-col">
+            <OText v-for="note in coverageNotes(t, latest)" :key="note" variant="meta" as="p">{{
+              note
+            }}</OText>
+          </div>
+          <OText variant="meta" as="p" class="ms-auto text-end">
             {{
               t("alertCalibration.dashboard.latestRunCaption", {
                 start: formatTime(latest.window_start),
@@ -102,10 +105,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}
           </OText>
         </div>
-        <OStatStrip :items="latestStats" data-test="alert-calibration-dashboard-latest" />
-        <OText v-for="note in coverageNotes(t, latest)" :key="note" variant="meta" as="p">{{
-          note
-        }}</OText>
       </section>
 
       <section class="flex flex-col gap-3" data-test="alert-calibration-dashboard-attention">

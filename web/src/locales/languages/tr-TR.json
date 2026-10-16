@@ -8196,8 +8196,6 @@
       "proposedActions": "Önerilen eylemler"
     },
     "dashboard": {
-      "latestRun": "En son çalıştırma",
-      "latestRunCaption": "Pencere {start} ile {end} arası, {time} yazıldı",
       "findings": "Bulgular",
       "alertsInScope": "Kapsamdaki uyarılar",
       "coverage": "Kapsam",

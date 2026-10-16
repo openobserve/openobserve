@@ -8191,8 +8191,6 @@
       "proposedActions": "建議動作"
     },
     "dashboard": {
-      "latestRun": "最新執行",
-      "latestRunCaption": "時間範圍 {start} 至 {end}，寫入於 {time}",
       "findings": "發現項目",
       "alertsInScope": "範圍內的警示",
       "coverage": "涵蓋範圍",

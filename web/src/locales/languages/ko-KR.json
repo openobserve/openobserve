@@ -8196,8 +8196,6 @@
       "proposedActions": "제안된 작업"
     },
     "dashboard": {
-      "latestRun": "최근 실행",
-      "latestRunCaption": "기간 {start} ~ {end}, {time}에 기록됨",
       "findings": "발견 사항",
       "alertsInScope": "범위 내 알림",
       "coverage": "커버리지",

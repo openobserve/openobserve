@@ -8196,8 +8196,6 @@
       "proposedActions": "Предлагаемые действия"
     },
     "dashboard": {
-      "latestRun": "Последний запуск",
-      "latestRunCaption": "Окно с {start} по {end}, записано {time}",
       "findings": "Находки",
       "alertsInScope": "Оповещения в области действия",
       "coverage": "Покрытие",

@@ -8196,8 +8196,6 @@
       "proposedActions": "Acciones propuestas"
     },
     "dashboard": {
-      "latestRun": "Última ejecución",
-      "latestRunCaption": "Ventana de {start} a {end}, registrada {time}",
       "findings": "Hallazgos",
       "alertsInScope": "Alertas en alcance",
       "coverage": "Cobertura",

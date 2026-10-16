@@ -8196,8 +8196,6 @@
       "proposedActions": "建议的操作"
     },
     "dashboard": {
-      "latestRun": "最新运行",
-      "latestRunCaption": "窗口 {start} 至 {end}，写入于 {time}",
       "findings": "发现项",
       "alertsInScope": "范围内的告警",
       "coverage": "覆盖率",

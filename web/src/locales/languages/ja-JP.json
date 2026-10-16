@@ -8196,8 +8196,6 @@
       "proposedActions": "提案されたアクション"
     },
     "dashboard": {
-      "latestRun": "最新の実行",
-      "latestRunCaption": "ウィンドウ {start} から {end}、書き込み {time}",
       "findings": "検出結果",
       "alertsInScope": "対象範囲のアラート",
       "coverage": "カバレッジ",

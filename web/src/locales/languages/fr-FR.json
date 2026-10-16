@@ -8196,8 +8196,6 @@
       "proposedActions": "Actions proposées"
     },
     "dashboard": {
-      "latestRun": "Dernière exécution",
-      "latestRunCaption": "Fenêtre de {start} à {end}, écrite à {time}",
       "findings": "Constats",
       "alertsInScope": "Alertes dans le périmètre",
       "coverage": "Couverture",

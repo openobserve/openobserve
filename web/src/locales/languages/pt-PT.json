@@ -8196,8 +8196,6 @@
       "proposedActions": "Ações propostas"
     },
     "dashboard": {
-      "latestRun": "Execução mais recente",
-      "latestRunCaption": "Janela de {start} a {end}, gravada em {time}",
       "findings": "Achados",
       "alertsInScope": "Alertas no escopo",
       "coverage": "Cobertura",

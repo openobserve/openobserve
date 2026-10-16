@@ -8196,8 +8196,6 @@
       "proposedActions": "Hành động đề xuất"
     },
     "dashboard": {
-      "latestRun": "Lượt chạy mới nhất",
-      "latestRunCaption": "Cửa sổ từ {start} đến {end}, được ghi lúc {time}",
       "findings": "Phát hiện",
       "alertsInScope": "Cảnh báo trong phạm vi",
       "coverage": "Bao phủ",
