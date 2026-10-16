@@ -127,7 +127,11 @@ export const updateOrgSettingsMutation = (org: string) =>
     // Not the selected org: domain management writes the meta org.
     mutationFn: (payload: any) => organizations.post_organization_settings(org, payload),
     // Every call site renders its own success and failure toasts.
-    meta: { invalidates: [organizationKeys.settings(org)], silentError: true },
+    meta: {
+      invalidates: [organizationKeys.settings(org)],
+      awaitInvalidation: true,
+      silentError: true,
+    },
   });
 
 export const linkOrgDomainMutation = (org: string) =>

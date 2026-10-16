@@ -102,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-sm"
             icon-left="delete"
             class="max-md:hidden"
+            :disabled="!settingsReady"
             :title="t('settings.orgDomainMapping.removeDomain')"
             :data-test="`settings-org-linked-domains-remove-${row.domain}`"
             @click.stop="remove(row)"
@@ -132,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="delete"
               variant="destructive"
               class="md:hidden"
+              :disabled="!settingsReady"
               :data-test="`settings-org-linked-domains-remove-${row.domain}-menu`"
               @select="remove(row)"
             >
@@ -209,7 +211,12 @@ interface LinkedDomainRow {
   request: OrgDomainRequest | null;
 }
 
-const props = defineProps<{ orgId: string; mappings: OrgDomainMapping[] }>();
+const props = defineProps<{
+  orgId: string;
+  mappings: OrgDomainMapping[];
+  /** False until org settings load, when `mappings` cannot yet be trusted to be complete. */
+  settingsReady: boolean;
+}>();
 
 const { t } = useI18nTyped();
 const { confirm } = useConfirmDialog();
@@ -445,6 +452,8 @@ async function verify(domain: string) {
 }
 
 async function remove(row: LinkedDomainRow) {
+  // Without the real mappings, the unlink would leave the domain's mappings behind and block every later mapping save.
+  if (!props.settingsReady) return;
   const remaining = props.mappings.filter((m) => m.domain.toLowerCase() !== row.domain);
   const mappedCount = props.mappings.length - remaining.length;
   const ok = await confirm({

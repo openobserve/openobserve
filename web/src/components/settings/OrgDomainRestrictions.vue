@@ -158,6 +158,7 @@ import {
   type DomainManagementConfig,
 } from "./orgDomainRestrictions";
 import OrgDomainBlocklistDialog from "./OrgDomainBlocklistDialog.vue";
+import { createSaveQueue } from "./saveQueue";
 
 const props = defineProps<{
   orgId: string;
@@ -205,6 +206,8 @@ const addableDomains = computed(() =>
   [...new Set(verifiedDomains.value)].filter((d) => !blocklists.value.some((b) => b.name === d)),
 );
 
+const queueSave = createSaveQueue();
+
 const dialogOpen = ref(false);
 const editing = ref<DomainBlocklist | null>(null);
 const dialogDomainOptions = computed<SelectOption[]>(() => {
@@ -223,6 +226,14 @@ function openEdit(blocklist: DomainBlocklist) {
 }
 
 async function saveBlocklist(
+  domain: string,
+  emails: string[],
+  successMessage: I18nText,
+): Promise<boolean> {
+  return queueSave(() => writeBlocklist(domain, emails, successMessage));
+}
+
+async function writeBlocklist(
   domain: string,
   emails: string[],
   successMessage: I18nText,

@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="`linked-${orgId}`"
         :org-id="orgId"
         :mappings="settingsData.domain_org_mappings ?? []"
+        :settings-ready="settings.isSuccess.value"
       />
       <template v-else-if="activeTab === 'requests' && isMetaOrg">
         <OrgDomainRequests :key="`requests-${orgId}`" :org-id="orgId" />

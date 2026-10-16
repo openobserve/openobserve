@@ -103,9 +103,9 @@ const settle = async () => {
   }
 };
 
-const mountList = async (mappings: OrgDomainMapping[] = []) => {
+const mountList = async (mappings: OrgDomainMapping[] = [], settingsReady = true) => {
   const wrapper = mount(OrgLinkedDomains, {
-    props: { orgId: "acme", mappings },
+    props: { orgId: "acme", mappings, settingsReady },
     global: {
       plugins: [i18n, withQueryClient()],
       stubs: {
@@ -356,6 +356,18 @@ describe("OrgLinkedDomains", () => {
     await flushPromises();
 
     expect(api.post_organization_settings).not.toHaveBeenCalled();
+    expect(api.unlink_org_domain).not.toHaveBeenCalled();
+  });
+
+  it("blocks removal until org settings have loaded", async () => {
+    const wrapper = await mountList([], false);
+
+    const remove = wrapper.find('[data-test="settings-org-linked-domains-remove-acme.com"]');
+    expect(remove.attributes("disabled")).toBeDefined();
+    await remove.trigger("click");
+    await flushPromises();
+
+    expect(mockConfirm).not.toHaveBeenCalled();
     expect(api.unlink_org_domain).not.toHaveBeenCalled();
   });
 });

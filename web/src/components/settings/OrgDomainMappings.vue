@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OrgDomainMappingDialog
       v-model:open="dialogOpen"
-      :mode="editingIndex === null ? 'add' : 'edit'"
+      :mode="editingKey === null ? 'add' : 'edit'"
       :mapping="dialogMapping"
       :domain-options="domainOptions"
       :org-options="orgOptions"
@@ -228,10 +228,10 @@ import {
   updateOrgSettingsMutation,
 } from "@/services/organizations.queries";
 import OrgDomainMappingDialog from "./OrgDomainMappingDialog.vue";
+import { createSaveQueue } from "./saveQueue";
 
 interface MappingRow {
   id: string;
-  index: number;
   mapping: OrgDomainMapping;
   verified: boolean;
 }
@@ -300,9 +300,8 @@ const mappingKey = (m: Pick<OrgDomainMapping, "domain" | "org_id">) =>
 
 const rows = computed<MappingRow[]>(() => {
   const verified = new Set(verifiedDomains.value);
-  return props.mappings.map((mapping, index) => ({
+  return props.mappings.map((mapping) => ({
     id: mappingKey(mapping),
-    index,
     mapping,
     verified: verified.has(mapping.domain.toLowerCase()),
   }));
@@ -373,22 +372,21 @@ function refresh() {
 
 const dialogOpen = ref(false);
 const dialogMapping = ref<OrgDomainMapping | null>(null);
-const editingIndex = ref<number | null>(null);
+const editingKey = ref<string | null>(null);
+const queueSave = createSaveQueue();
 
 const takenKeys = computed(() =>
-  props.mappings
-    .filter((_, index) => index !== editingIndex.value)
-    .map((mapping) => mappingKey(mapping)),
+  props.mappings.map((mapping) => mappingKey(mapping)).filter((key) => key !== editingKey.value),
 );
 
 function openAdd() {
-  editingIndex.value = null;
+  editingKey.value = null;
   dialogMapping.value = null;
   dialogOpen.value = true;
 }
 
 function openEdit(row: MappingRow) {
-  editingIndex.value = row.index;
+  editingKey.value = row.id;
   dialogMapping.value = { ...row.mapping };
   dialogOpen.value = true;
 }
@@ -414,12 +412,15 @@ async function saveMappings(next: OrgDomainMapping[], successMessage: I18nText):
 }
 
 function submitMapping(mapping: OrgDomainMapping): Promise<boolean> {
-  const index = editingIndex.value;
-  const next =
-    index === null
-      ? [...props.mappings, mapping]
-      : props.mappings.map((m, i) => (i === index ? mapping : m));
-  return saveMappings(next, t("settings.orgDomainMapping.saved"));
+  const key = editingKey.value;
+  return queueSave(() =>
+    saveMappings(
+      key === null
+        ? [...props.mappings, mapping]
+        : props.mappings.map((m) => (mappingKey(m) === key ? mapping : m)),
+      t("settings.orgDomainMapping.saved"),
+    ),
+  );
 }
 
 async function remove(row: MappingRow) {
@@ -432,9 +433,11 @@ async function remove(row: MappingRow) {
     confirmLabel: t("common.delete"),
   });
   if (!ok) return;
-  await saveMappings(
-    props.mappings.filter((_, i) => i !== row.index),
-    t("settings.orgDomainMapping.deleted"),
+  await queueSave(() =>
+    saveMappings(
+      props.mappings.filter((m) => mappingKey(m) !== row.id),
+      t("settings.orgDomainMapping.deleted"),
+    ),
   );
 }
 

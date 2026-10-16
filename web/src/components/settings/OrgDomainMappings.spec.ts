@@ -208,6 +208,31 @@ describe("OrgDomainMappings", () => {
     });
   });
 
+  it("builds a second removal on the list the first one left", async () => {
+    let finishFirst: (_v: unknown) => void = () => {};
+    api.post_organization_settings.mockReturnValueOnce(
+      new Promise((resolve) => (finishFirst = resolve)),
+    );
+    const wrapper = await mountList([existing, childMapping]);
+
+    await wrapper
+      .find('[data-test="settings-org-domain-mappings-delete-acme.com|acme"]')
+      .trigger("click");
+    await wrapper
+      .find('[data-test="settings-org-domain-mappings-delete-acme.com|child"]')
+      .trigger("click");
+    await flushPromises();
+    expect(api.post_organization_settings).toHaveBeenCalledTimes(1);
+
+    await wrapper.setProps({ mappings: [childMapping] });
+    finishFirst({ data: {} });
+    await settle();
+
+    expect(api.post_organization_settings).toHaveBeenLastCalledWith("acme", {
+      domain_org_mappings: [],
+    });
+  });
+
   it("does nothing when the removal is not confirmed", async () => {
     mockConfirm.mockResolvedValue(false);
     const wrapper = await mountList([existing]);
