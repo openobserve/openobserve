@@ -838,6 +838,12 @@ const breakdown = computed(() => {
 const breakdownStartNote = computed<I18nText | null>(() => {
   const start = breakdown.value?.start;
   if (!start) return null;
+  const b = def.value.breakdown;
+  if (isAttributeBreakdown(b) && !pa.schema.value[b.f])
+    return t("rum.analytics.funnel.breakdownFieldMissing", {
+      field: dimLabel.value,
+      unit: unitNoun.value,
+    });
   const args = {
     field: dimLabel.value,
     covered: raw(addCommasToNumber(start.covered)),

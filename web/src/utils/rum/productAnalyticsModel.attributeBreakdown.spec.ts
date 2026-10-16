@@ -21,6 +21,7 @@ import {
   funnelParam,
   parseFunnelDef,
   parseStepRef,
+  pinnedAfter,
   stepRefParam,
 } from "@/utils/rum/productAnalyticsModel";
 import { compareBreakdown } from "@/utils/rum/funnelCompare";
@@ -123,6 +124,21 @@ describe("step property conditions (pc) in the link", () => {
     expect(parseFunnelDef({ s: [S[0], raw] })).toBeNull();
   });
 
+  it("refuses pc on an exclusion step, which the exclusion SQL would ignore", () => {
+    const x = (step: unknown[]) => ({ s: S, x: [{ s: step, a: 1, b: 3 }] });
+    expect(parseFunnelDef(x(["c", "Buy", { pc: [UPI] }]))).toBeNull();
+    expect(parseFunnelDef(x(["p", "/z", { min: 1, pc: [UPI] }]))).toBeNull();
+    expect(parseFunnelDef(x(["p", "/z", { min: 1 }]))?.x).toHaveLength(1);
+  });
+
+  it("maps a pinned step through a step change", () => {
+    const b = { f: PAY, s: 2 };
+    expect(pinnedAfter(b, (k) => k + 1)).toEqual({ f: PAY, s: 3 });
+    expect(pinnedAfter(b, () => null)).toEqual({ f: PAY });
+    expect(pinnedAfter({ f: PAY }, () => null)).toEqual({ f: PAY });
+    expect(pinnedAfter("browser", () => null)).toBe("browser");
+  });
+
   it("accepts ten rules", () => {
     expect(parseStepRef(["c", "k", { pc: Array(10).fill(UPI) }])?.f?.pc).toHaveLength(10);
   });
@@ -223,5 +239,17 @@ describe("foldBreakdown for an attribute", () => {
     expect(rows[1].prev).toBeNull();
     expect(rows[2].prev).toMatchObject({ first: 3, last: 3, conversion: 1 });
     expect(rows[3].prev).toBeNull();
+  });
+
+  it("shows a previous value with no units at step k now as previous-only, read from step k", () => {
+    const cod = { dim: "cod", c1: 3, c2: 0, c3: 0, dc1: 0, dc2: 0, dc3: 0 };
+    const hits = [...HITS, cod];
+    const cur = foldBreakdown(hits, 3, 5, { f: PAY });
+    expect(cur.rows.some((r) => r.other)).toBe(false);
+    const prev = [{ dim: "cod", c1: 9, c2: 4, c3: 2 }];
+    const { rows } = compareBreakdown(cur, hits, prev, 3);
+    const last = rows[rows.length - 1];
+    expect(last).toMatchObject({ value: "cod", prevOnly: true });
+    expect(last.prev).toMatchObject({ first: 4, last: 2, conversion: 0.5 });
   });
 });

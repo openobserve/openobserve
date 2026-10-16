@@ -184,9 +184,15 @@ export function compareBreakdown(
 ): { rows: ComparedBreakdownRow[]; total: PrevSide | null } {
   const k = cur.start && !cur.start.anyStep ? cur.start.step : 1;
   const head = new Set(cur.rows.flatMap((r) => (r.value === null ? [] : [r.value])));
-  const seenNow = new Set(curHits.filter(isNamedDim).map((h) => String(h.dim)));
   // An attribute breakdown keeps its unnamed units in their own row, apart from Other.
   const split = cur.rows.some((r) => r.noValue || r.leftBefore);
+  // Only a value with units at step k is in this period's Other; the rest show as previous-only rows.
+  const folded = split
+    ? cur.rows.some((r) => r.other)
+      ? curHits.filter((h) => isNamedDim(h) && hitCounts(h, k)[k - 1] > 0)
+      : []
+    : curHits.filter(isNamedDim);
+  const seenNow = new Set(folded.map((h) => String(h.dim)));
   const restRow = cur.rows.find((r) => r.value === null && (split ? r.noValue : true));
   const byValue = new Map<string, Record<string, unknown>[]>();
   const restNamed: Record<string, unknown>[] = [];
@@ -217,13 +223,14 @@ export function compareBreakdown(
       prevOnly: false,
     };
   });
-  const named = prevOnly.filter(isNamedDim).sort((a, b) => hitCounts(b, 1)[0] - hitCounts(a, 1)[0]);
+  const atK = (h: Record<string, unknown>) => hitCounts(h, k)[k - 1];
+  const named = prevOnly.filter(isNamedDim).sort((a, b) => atK(b) - atK(a));
   const own = named.slice(0, BREAKDOWN_TOP);
-  rows.push(...own.map((h) => prevOnlyRow([h], steps, String(h.dim))));
+  rows.push(...own.map((h) => prevOnlyRow([h], steps, String(h.dim), k)));
   const overflow = named.slice(BREAKDOWN_TOP);
-  if (overflow.length) rows.push(prevOnlyRow(overflow, steps, null));
+  if (overflow.length) rows.push(prevOnlyRow(overflow, steps, null, k));
   const unnamed = prevOnly.filter((h) => !isNamedDim(h));
-  if (unnamed.length) rows.push(prevOnlyRow(unnamed, steps, null));
+  if (unnamed.length) rows.push(prevOnlyRow(unnamed, steps, null, k));
   return { rows, total: prevSide(cur.total, sumCounts(prevHits, steps)) };
 }
 
@@ -272,6 +279,7 @@ const prevOnlyRow = (
   hits: Record<string, unknown>[],
   steps: number,
   value: string | null,
+  k: number,
 ): ComparedBreakdownRow => {
   const zeros: number[] = Array(steps).fill(0);
   const notSet = value === null && hits.every((h) => !isNamedDim(h));
@@ -286,7 +294,7 @@ const prevOnlyRow = (
     noValue: false,
     leftBefore: false,
     medianMs: null,
-    prev: prevSide(zeros, sumCounts(hits, steps)),
+    prev: prevSide(zeros.slice(k - 1), sumCounts(hits, steps).slice(k - 1)),
     prevOnly: true,
   };
 };
