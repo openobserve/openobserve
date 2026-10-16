@@ -117,24 +117,30 @@ impl Matches {
         }
     }
 
-    pub(super) fn read_candidates(&self) -> Vec<(TargetModule, &str, &str)> {
-        [
-            TargetModule::Alerts,
-            TargetModule::AnomalyDetections,
-            TargetModule::Synthetics,
-            TargetModule::Slos,
-        ]
-        .into_iter()
-        .flat_map(|module| {
-            let matches = self.module(module);
-            matches
-                .matched
-                .iter()
-                .chain(&matches.at_fire_time)
-                .chain(&matches.undecidable)
-                .map(move |item| (module, item.id.as_str(), item.folder_id.as_str()))
-        })
-        .collect()
+    pub(super) fn output_lists(
+        &self,
+        include_undecidable: bool,
+    ) -> Vec<(TargetModule, &[PreviewMatch])> {
+        let mut lists = vec![
+            (TargetModule::Alerts, self.alerts.matched.as_slice()),
+            (
+                TargetModule::AnomalyDetections,
+                self.anomalies.matched.as_slice(),
+            ),
+            (TargetModule::Synthetics, self.synthetics.matched.as_slice()),
+            (TargetModule::Slos, self.slos.matched.as_slice()),
+            (TargetModule::Alerts, self.alerts.at_fire_time.as_slice()),
+        ];
+        if include_undecidable {
+            for module in [
+                TargetModule::Alerts,
+                TargetModule::AnomalyDetections,
+                TargetModule::Slos,
+            ] {
+                lists.push((module, self.module(module).undecidable.as_slice()));
+            }
+        }
+        lists
     }
 }
 

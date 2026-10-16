@@ -197,7 +197,8 @@ pub async fn get(org: &str, user_id: &str, id: &str) -> Result<DowntimeDetail, D
     access::authorize_row(org, user_id, &row, "GET").await?;
     let inventory = inventory::cached(org).await?;
     let matches = matches_of(&row, &inventory);
-    let visibility = access::visibility(org, user_id, matches.read_candidates()).await?;
+    let visibility =
+        access::match_visibility(org, user_id, &matches, access::MatchOutput::Detail).await?;
     let now = now_micros();
     let mut affected = affected(&matches, &visibility);
     mark_slo_applies(&mut affected.slos, &row, &inventory, now);
@@ -430,7 +431,8 @@ pub async fn preview(
     let condition = req.condition.as_ref().map(normalized_condition);
     let inventory = inventory::load(org).await?;
     let matches = matching::match_all(&inventory, condition.as_ref(), &req.targets);
-    let visibility = access::visibility(org, user_id, matches.read_candidates()).await?;
+    let visibility =
+        access::match_visibility(org, user_id, &matches, access::MatchOutput::Preview).await?;
     Ok(matching::to_preview(&matches, &visibility))
 }
 
