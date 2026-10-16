@@ -286,6 +286,20 @@ pub struct RcaRun {
     pub error: Option<RunError>,
     pub session_id: Option<String>,
     pub stats: Option<RunStats>,
+    /// Current stage of the seven-stage protocol.
+    #[serde(default)]
+    pub stage: Option<String>,
+    #[serde(default)]
+    pub stage_index: Option<i16>,
+    /// `{past_causes: [{id, summary}], skills: [name], toolsets: [name]}`.
+    #[serde(default)]
+    pub context_used: Option<serde_json::Value>,
+    /// Continuation turns the run used.
+    #[serde(default)]
+    pub continuations: i16,
+    /// Serialized `Vec<SubjectRef>` of an alert run's pending on-call records.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oncall_subjects: Option<serde_json::Value>,
 }
 
 /// `GET .../rca/runs` response.
@@ -293,17 +307,6 @@ pub struct RcaRun {
 pub struct ListRcaRunsResponse {
     pub runs: Vec<RcaRunItem>,
     pub has_more: bool,
-}
-
-/// How a Phase 1 streaming analysis ended (RR-18, RR-46).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RcaStreamEnd {
-    /// The stream ended without error; the accumulated report text.
-    Completed(String),
-    /// The stream ended without error and without content.
-    Empty,
-    /// The stream ended with an error; the error text.
-    Errored(String),
 }
 
 /// `(timeout + 120 s)` in µs: a `running` run with no write for longer is stale (RR-9).

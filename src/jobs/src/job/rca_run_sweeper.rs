@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Ends RCA runs that stopped writing as `failed`/`stale` (RR-40).
+// Finalizes RCA runs whose turn ended on a lost node, and ends runs that stopped
+// writing before a turn started as `failed`/`stale` (TH28, RR-40).
 
 use config::{cluster::LOCAL_NODE, spawn_pausable_job};
 
@@ -25,9 +26,9 @@ pub fn run() {
         return;
     }
     spawn_pausable_job!("rca_run_sweeper", SWEEP_INTERVAL_SECS, {
-        match openobserve_core::alerts::rca_runs::sweep_stale_runs().await {
+        match openobserve_core::alerts::rca_turn::sweep_rca_runs().await {
             Ok(0) => {}
-            Ok(ended) => log::info!("[RCA_RUN_SWEEPER] ended {ended} stale runs"),
+            Ok(ended) => log::info!("[RCA_RUN_SWEEPER] ended {ended} runs"),
             Err(e) => log::error!("[RCA_RUN_SWEEPER] sweep failed: {e}"),
         }
     });

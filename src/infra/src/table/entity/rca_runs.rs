@@ -36,6 +36,13 @@ pub struct Model {
     pub session_id: Option<String>,
     /// `{steps, tool_calls, duration_ms, tokens, credits, steered}`.
     pub stats: Option<Json>,
+    pub stage: Option<String>,
+    pub stage_index: Option<i16>,
+    /// `{past_causes: [{id, summary}], skills: [name], toolsets: [name]}`.
+    pub context_used: Option<Json>,
+    pub continuations: i16,
+    /// Serialized `Vec<SubjectRef>` of an alert run's pending on-call records.
+    pub oncall_subjects: Option<Json>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

@@ -13,92 +13,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 
 const { toastMock } = vi.hoisted(() => ({ toastMock: vi.fn() }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
+vi.mock("@/services/incidents", () => ({ default: { getRcaThread: vi.fn() } }));
 
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
 import i18n from "@/locales";
-import type { RcaRun, RcaRunItem, RcaSummary } from "@/services/incidents";
+import store from "@/test/unit/helpers/store";
+import incidentsService from "@/services/incidents";
 import { formatTimestamp } from "@/utils/date";
+import { RCA_UNFINISHED_TOOL_ERROR, rcaThreadPlainText } from "@/utils/incidents/rcaThread";
+import {
+  RCA_T0,
+  rcaRun,
+  rcaRunItem,
+  rcaStep,
+  rcaSummary,
+  rcaThread,
+  rcaToolCall,
+  sec,
+} from "@/test/unit/fixtures/rcaThread";
 
-// ==================== FIXTURES ====================
+const getRcaThread = vi.mocked(incidentsService.getRcaThread);
 
-const T0 = 1_760_000_000_000_000; // microseconds
-
-function runItem(overrides: Partial<RcaRunItem> = {}): RcaRunItem {
-  return {
-    run_id: "run-1",
-    subject_type: "incident",
-    trigger: "auto_new_incident",
-    mode: "fresh",
-    started_by: "system",
-    state: "completed",
-    started_at: T0,
-    ended_at: T0 + 60_000_000,
-    outcome: null,
-    confidence: null,
-    cancelled_by: null,
-    error_reason: null,
-    ...overrides,
-  };
-}
-
-function currentRun(overrides: Partial<RcaRun> = {}): RcaRun {
-  return {
-    run_id: "run-2",
-    subject_type: "incident",
-    subject_id: "inc-1",
-    incident_id: "inc-1",
-    trigger: "reanalyze",
-    mode: "fresh",
-    started_by: "a.rao@acme.io",
-    guidance: null,
-    state: "running",
-    started_at: T0 + 120_000_000,
-    updated_at: T0 + 120_000_000,
-    ended_at: null,
-    cancelled_by: null,
-    outcome: null,
-    confidence: null,
-    report: null,
-    result: null,
-    error: null,
-    session_id: null,
-    stats: null,
-    ...overrides,
-  };
-}
-
-function summary(overrides: Partial<RcaSummary> = {}): RcaSummary {
-  return {
-    run_id: "run-2",
-    state: "running",
-    stale: false,
-    started_at: T0 + 120_000_000,
-    updated_at: T0 + 120_000_000,
-    outcome: null,
-    confidence: null,
-    summary: {
-      stage: null,
-      stage_index: null,
-      stage_count: 0,
-      steps: 0,
-      tool_calls: 0,
-      steered_by: [],
-      unblocked_by: null,
-      detail: null,
-      deadline_at: null,
-      cancelled_by: null,
-      previous: null,
-    },
-    ...overrides,
-  };
-}
-
-const REPORT_HTML = "<p>Root cause: memory leak in payment service</p>";
+const REPORT = "## Root Cause\n\nMemory leak in the payment service.";
 
 // ODropdown renders its menu only when open; the stubs render every item so the
 // menu contents can be asserted and selected directly.
@@ -114,247 +55,644 @@ const stubs = {
 
 function mountPanel(props: Record<string, unknown> = {}) {
   return mount(IncidentRCAAnalysis, {
-    props: { isDarkMode: false, ...props },
-    global: { plugins: [i18n], stubs },
+    props: { orgId: "default", incidentId: "inc-1", ...props },
+    global: { plugins: [i18n, store], stubs },
+    attachTo: document.body,
   });
 }
 
 const byTest = (wrapper: VueWrapper, id: string) => wrapper.find(`[data-test="${id}"]`);
 
-// ==================== TESTS ====================
+/** True when `first` comes before `second` in document order. */
+const precedes = (first: Element, second: Element) =>
+  (first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+/** The latest run is live: run-2, a re-analysis after the completed run-1. */
+const liveProps = (overrides: Record<string, unknown> = {}) => ({
+  rca: rcaSummary({
+    summary: { stage: "log_patterns", stage_index: 5, steps: 9, tool_calls: 27 },
+    current_run: rcaRun(),
+  }),
+  history: [
+    rcaRunItem({
+      run_id: "run-2",
+      trigger: "reanalyze",
+      started_by: "a.rao@acme.io",
+      state: "running",
+      started_at: RCA_T0 + sec(120),
+      ended_at: null,
+    }),
+    rcaRunItem(),
+  ],
+  threadRunId: "run-2",
+  threadLive: true,
+  ...overrides,
+});
+
+const completedProps = () => ({
+  rca: rcaSummary({
+    run_id: "run-1",
+    state: "completed",
+    started_at: RCA_T0,
+    updated_at: RCA_T0 + sec(60),
+    current_run: rcaRun({ run_id: "run-1", state: "completed", ended_at: RCA_T0 + sec(60) }),
+  }),
+  reportRun: rcaRunItem(),
+  history: [rcaRunItem()],
+  reportText: REPORT,
+  threadRunId: "run-1",
+  threadLive: false,
+});
 
 describe("IncidentRCAAnalysis", () => {
   let wrapper: VueWrapper;
+  // The test setup installs a writable navigator.clipboard with a vi.fn writeText.
+  const writeText = vi.mocked(navigator.clipboard.writeText);
+
+  beforeEach(() => {
+    getRcaThread.mockReset();
+    getRcaThread.mockResolvedValue({ data: rcaThread() } as never);
+    writeText.mockReset().mockResolvedValue(undefined);
+  });
 
   afterEach(() => {
     wrapper?.unmount();
     toastMock.mockClear();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
-  describe("No run yet", () => {
-    it("offers the first run and emits a fresh trigger", async () => {
-      wrapper = mountPanel();
+  describe("TH40 K: no run", () => {
+    it("shows the Analyze button only, and emits a fresh trigger", async () => {
+      wrapper = mountPanel({ rca: null });
 
-      expect(byTest(wrapper, "rca-existing-container").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-trigger-section").text()).toContain("No analysis yet");
+      expect(byTest(wrapper, "rca-analysis-bar").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-verdict-card").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-thread-column").exists()).toBe(false);
+      expect(wrapper.findAll('[role="tab"]')).toHaveLength(0);
+      expect(byTest(wrapper, "trigger-rca-btn").text()).toBe("Analyze Incident");
+
       await byTest(wrapper, "trigger-rca-btn").trigger("click");
 
       expect(wrapper.emitted("trigger-rca")).toEqual([[{ buildOnPrevious: false }]]);
+      expect(getRcaThread).not.toHaveBeenCalled();
     });
   });
 
-  describe("Live run", () => {
-    it("first run shows the analyzing banner with Cancel and no trigger button", async () => {
-      wrapper = mountPanel({ rca: summary({ current_run: currentRun() }) });
+  describe("E5 / TH36: one analysis column and the thread column, no view tabs", () => {
+    it("has no Summary/Thread/Report tabs; bar, card, report in that order; thread on the right", async () => {
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
 
-      expect(byTest(wrapper, "rca-inflight-container").exists()).toBe(true);
-      expect(byTest(wrapper, "trigger-rca-btn").exists()).toBe(false);
-      await byTest(wrapper, "rca-cancel-btn").trigger("click");
-      expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
+      expect(wrapper.findAll('[role="tab"]')).toHaveLength(0);
+      expect(wrapper.findAll('[role="tablist"]')).toHaveLength(0);
+      const bar = byTest(wrapper, "rca-analysis-bar").element;
+      const card = byTest(wrapper, "rca-verdict-card").element;
+      const report = byTest(wrapper, "rca-existing-container").element;
+      const column = byTest(wrapper, "rca-thread-column").element;
+      expect(precedes(bar, card)).toBe(true);
+      expect(precedes(card, report)).toBe(true);
+      expect(precedes(report, column)).toBe(true);
+      expect(report.textContent).toContain("Memory leak in the payment service.");
     });
 
-    it("a re-run names its mode and keeps the earlier report readable below", () => {
-      wrapper = mountPanel({
-        rca: summary({ current_run: currentRun({ mode: "build_on_previous" }) }),
-        reportRun: runItem(),
-        formattedRcaContent: REPORT_HTML,
-      });
+    it('live with no earlier report: "The report shows after the run."', async () => {
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
 
-      expect(byTest(wrapper, "rca-inflight-message").text()).toBe(
-        "Building on the previous report…",
-      );
-      expect(byTest(wrapper, "rca-existing-content").html()).toContain("memory leak");
-    });
-
-    it("the earlier-report note names the run actually shown (a picked earlier run)", () => {
-      const reportRun = runItem({ run_id: "run-5", started_at: T0 });
-      const viewedRun = runItem({ run_id: "run-2", started_at: T0 - 3 * 3_600_000_000 });
-      wrapper = mountPanel({
-        rca: summary({ state: "failed", current_run: currentRun({ state: "failed" }) }),
-        error: { code: "x", reason: "Agent unavailable", details: null, trigger_type: null },
-        reportRun,
-        viewedRun,
-        history: [reportRun, viewedRun],
-        formattedRcaContent: REPORT_HTML,
-      });
-
-      const note = byTest(wrapper, "rca-earlier-report-note").text();
-      expect(note).toBe(
-        `The report below is from the ${formatTimestamp(viewedRun.started_at, "HH:mm")} run.`,
-      );
-      expect(note).not.toContain(formatTimestamp(reportRun.started_at, "HH:mm"));
-    });
-
-    it("disables Cancel while the cancel is in flight", () => {
-      wrapper = mountPanel({ rca: summary(), cancelling: true });
-
-      expect(byTest(wrapper, "rca-cancel-btn").attributes("disabled")).toBeDefined();
-    });
-
-    it("server stale flag shows the stale banner, still cancellable", async () => {
-      wrapper = mountPanel({ rca: summary({ stale: true }), stale: true });
-
-      expect(byTest(wrapper, "rca-stale-banner").exists()).toBe(true);
-      expect(byTest(wrapper, "rca-inflight-container").exists()).toBe(false);
-      await byTest(wrapper, "rca-cancel-btn").trigger("click");
-      expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
-    });
-  });
-
-  describe("RR-47: failed latest run with an earlier completed run", () => {
-    const failedProps = () => ({
-      rca: summary({
-        state: "failed",
-        current_run: currentRun({ state: "failed", ended_at: T0 + 180_000_000 }),
-      }),
-      error: {
-        code: "agent_unavailable",
-        reason: "Agent unavailable",
-        details: "connect ECONNREFUSED 10.0.0.4:8080",
-        trigger_type: null,
-      },
-      reportRun: runItem(),
-      formattedRcaContent: REPORT_HTML,
-    });
-
-    it("shows the reason as heading, details collapsed behind Show details, no toast", async () => {
-      wrapper = mountPanel(failedProps());
-
-      expect(byTest(wrapper, "rca-error-banner").exists()).toBe(true);
-      expect(byTest(wrapper, "rca-error-reason").text()).toBe("Agent unavailable");
-      expect(byTest(wrapper, "rca-error-details").exists()).toBe(false);
-      const toggle = byTest(wrapper, "rca-error-details-toggle");
-      expect(toggle.text()).toBe("Show details");
-      expect(toggle.attributes("aria-expanded")).toBe("false");
-
-      await toggle.trigger("click");
-
-      expect(byTest(wrapper, "rca-error-details").text()).toContain("ECONNREFUSED");
-      expect(byTest(wrapper, "rca-existing-content").html()).toContain("memory leak");
-      expect(toastMock).not.toHaveBeenCalled();
-    });
-
-    it("Retry offers both modes with the failed run's mode first", async () => {
-      wrapper = mountPanel(failedProps());
-
-      const items = wrapper
-        .findAll('[data-test^="rca-retry-"]')
-        .map((w) => w.attributes("data-test"));
-      expect(items).toEqual(["rca-retry-btn", "rca-retry-fresh", "rca-retry-build"]);
-      await byTest(wrapper, "rca-retry-build").trigger("click");
-      expect(wrapper.emitted("trigger-rca")).toEqual([[{ buildOnPrevious: true }]]);
-    });
-
-    it("without an earlier report offers a plain Retry", async () => {
-      wrapper = mountPanel({ ...failedProps(), reportRun: null, formattedRcaContent: "" });
-
-      expect(byTest(wrapper, "rca-retry-fresh").exists()).toBe(false);
-      await byTest(wrapper, "rca-retry-btn").trigger("click");
-      expect(wrapper.emitted("trigger-rca")).toEqual([[{ buildOnPrevious: false }]]);
-    });
-  });
-
-  describe("Cancelled latest run", () => {
-    it("names who cancelled it", () => {
-      wrapper = mountPanel({
-        rca: summary({
-          state: "cancelled",
-          current_run: currentRun({
-            state: "cancelled",
-            cancelled_by: "a.rao@acme.io",
-            ended_at: T0 + 180_000_000,
-          }),
-        }),
-      });
-
-      expect(byTest(wrapper, "rca-cancelled-message").text()).toMatch(
-        /^Cancelled by a\.rao at \d{2}:\d{2}:\d{2} UTC after 1m\.$/,
-      );
-    });
-  });
-
-  describe("Report", () => {
-    it("renders the report and emits copy and download", async () => {
-      wrapper = mountPanel({
-        rca: summary({ state: "completed" }),
-        reportRun: runItem(),
-        formattedRcaContent: REPORT_HTML,
-      });
-
-      expect(byTest(wrapper, "rca-existing-content").html()).toContain("memory leak");
-      await byTest(wrapper, "rca-copy-btn").trigger("click");
-      await byTest(wrapper, "rca-download-btn").trigger("click");
-      expect(wrapper.emitted("copy-report")).toHaveLength(1);
-      expect(wrapper.emitted("download-report")).toHaveLength(1);
-    });
-
-    it("shows a loading line while the report text loads", () => {
-      wrapper = mountPanel({ reportRun: runItem(), reportLoading: true });
-
-      expect(byTest(wrapper, "rca-report-loading").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-report-pending").text()).toBe("The report shows after the run.");
       expect(byTest(wrapper, "rca-existing-container").exists()).toBe(false);
     });
 
-    it("Re-analyze offers fresh and build-on-previous", async () => {
-      wrapper = mountPanel({
-        rca: summary({ state: "completed" }),
-        reportRun: runItem(),
-        formattedRcaContent: REPORT_HTML,
-      });
+    it("live with an earlier report shows that report under the card, not the pending line", async () => {
+      wrapper = mountPanel(liveProps({ reportRun: rcaRunItem(), reportText: REPORT }));
+      await flushPromises();
 
-      await byTest(wrapper, "rca-reanalyze-fresh").trigger("click");
-      await byTest(wrapper, "rca-reanalyze-build").trigger("click");
-      expect(wrapper.emitted("trigger-rca")).toEqual([
-        [{ buildOnPrevious: false }],
-        [{ buildOnPrevious: true }],
-      ]);
+      expect(byTest(wrapper, "rca-report-pending").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-existing-container").text()).toContain("Memory leak");
+    });
+
+    it("shows a loading line while the report text loads", () => {
+      wrapper = mountPanel({ ...completedProps(), reportText: "", reportLoading: true });
+
+      expect(byTest(wrapper, "rca-report-loading").text()).toBe("Loading report…");
+      expect(byTest(wrapper, "rca-existing-container").exists()).toBe(false);
     });
   });
 
-  describe("RR-36: run history", () => {
-    const history = [
-      runItem({ run_id: "run-5", trigger: "reanalyze", started_by: "a.rao@acme.io" }),
-      runItem({ run_id: "run-4", trigger: "manual", started_by: "j.doe@acme.io", state: "failed" }),
-      runItem({ run_id: "run-3", trigger: "auto_reopen", state: "cancelled" }),
-      runItem({ run_id: "run-2", trigger: "oncall_page" }),
-      runItem({ run_id: "run-1", trigger: "legacy", started_by: "" }),
-    ];
-
-    it("hides the picker with a single run", () => {
-      wrapper = mountPanel({ reportRun: history[0], history: [history[0]] });
-
-      expect(byTest(wrapper, "rca-history-btn").exists()).toBe(false);
-    });
-
-    it("labels each item by its trigger and marks failed and cancelled runs", () => {
-      wrapper = mountPanel({ reportRun: history[0], history, formattedRcaContent: REPORT_HTML });
-
-      const labels = wrapper.findAll('[data-test="rca-history-item-label"]').map((w) => w.text());
-      expect(labels).toEqual([
-        "Re-analyze by a.rao",
-        "Analysis by j.doe",
-        "Auto on reopen",
-        "On-call page",
-        "Earlier report",
-      ]);
-      expect(byTest(wrapper, "rca-history-item-1").text()).toContain("Failed");
-      expect(byTest(wrapper, "rca-history-item-2").text()).toContain("Cancelled");
-      // Only completed runs other than the displayed one open.
-      expect(byTest(wrapper, "rca-history-item-0").attributes("data-disabled")).toBe("true");
-      expect(byTest(wrapper, "rca-history-item-1").attributes("data-disabled")).toBe("true");
-      expect(byTest(wrapper, "rca-history-item-3").attributes("data-disabled")).toBe("false");
-    });
-
-    it("picking an earlier run emits its id; the archived banner goes back", async () => {
-      wrapper = mountPanel({ reportRun: history[0], history, formattedRcaContent: REPORT_HTML });
-
-      await byTest(wrapper, "rca-history-item-3").trigger("click");
-      expect(wrapper.emitted("view-run")).toEqual([["run-2"]]);
-
-      await wrapper.setProps({ viewedRun: history[3] });
+  describe("TH37: stage and stats", () => {
+    it('shows "Stage 5/7 · Log patterns" and "9 checks · 27 tool calls · 4m12s", no credits', async () => {
+      wrapper = mountPanel(liveProps());
       await flushPromises();
-      expect(byTest(wrapper, "rca-archived-banner").exists()).toBe(true);
-      await byTest(wrapper, "rca-back-to-current-btn").trigger("click");
-      expect(wrapper.emitted("view-run")?.[1]).toEqual([null]);
+
+      expect(byTest(wrapper, "rca-stage-label").text()).toBe("Stage 5/7 · Log patterns");
+      expect(byTest(wrapper, "rca-thread-stats").text()).toBe("9 checks · 27 tool calls · 4m12s");
+      expect(wrapper.text().toLowerCase()).not.toContain("credit");
+    });
+
+    it("hides the stepper once the run is not live", async () => {
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-stage-stepper").exists()).toBe(false);
+    });
+  });
+
+  describe("TH38: the thread column", () => {
+    it("reads the thread of the run and shows it Live with its trigger", async () => {
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+
+      expect(getRcaThread).toHaveBeenCalledWith("default", "inc-1", "run-2", undefined);
+      expect(byTest(wrapper, "rca-thread-live-pill").text()).toBe("Live");
+      expect(byTest(wrapper, "rca-thread-start-trigger").text()).toBe("Re-analyze by a.rao");
+      expect(wrapper.findAll('[data-test="rca-thread-step"]')).toHaveLength(2);
+    });
+
+    it("shows Context used from the current run", async () => {
+      wrapper = mountPanel(
+        liveProps({
+          rca: rcaSummary({
+            current_run: rcaRun({
+              context_used: { past_causes: [], skills: ["k8s"], toolsets: [] },
+            }),
+          }),
+        }),
+      );
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-thread-context-toggle").text()).toBe("Context used · 1 skill");
+    });
+
+    it("a completed run is Saved with the final note", async () => {
+      getRcaThread.mockResolvedValue({
+        data: rcaThread({ run_id: "run-1", active: false, steps: [rcaStep()] }),
+      } as never);
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-thread-saved-pill").text()).toBe("Saved");
+      expect(byTest(wrapper, "rca-thread-final-note").exists()).toBe(true);
+    });
+
+    it("TH32: polls every 4 s while live and stops after one final read", async () => {
+      vi.useFakeTimers();
+      wrapper = mountPanel(liveProps());
+      await vi.advanceTimersByTimeAsync(0);
+      expect(getRcaThread).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(8_000);
+      expect(getRcaThread).toHaveBeenCalledTimes(3);
+      expect(getRcaThread.mock.calls[1][3]).toBe("12.100.200");
+
+      await wrapper.setProps({
+        rca: rcaSummary({ state: "completed", current_run: rcaRun({ state: "completed" }) }),
+        threadLive: false,
+      });
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(getRcaThread).toHaveBeenCalledTimes(4);
+    });
+
+    it("TH32: a 410 shows the expired transcript and stops", async () => {
+      getRcaThread.mockRejectedValue({ isAxiosError: true, response: { status: 410 } });
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-thread-empty").text()).toBe(
+        "The transcript of this run is no longer stored.",
+      );
+    });
+  });
+
+  describe("TH40 banners from the run summary", () => {
+    // The suite pins TZ=UTC; a zone 5:30 ahead proves the banners format in UTC, not local time.
+    beforeAll(() => {
+      process.env.TZ = "Asia/Kolkata";
+    });
+    afterAll(() => {
+      process.env.TZ = "UTC";
+    });
+
+    it("runs in a non-UTC local zone", () => {
+      expect(formatTimestamp(RCA_T0, "HH:mm")).toBe("14:23");
+    });
+
+    it("M: a live re-run with an earlier report shows the re-analyzing banner", async () => {
+      const reportRun = rcaRunItem();
+      wrapper = mountPanel(
+        liveProps({
+          rca: rcaSummary({ current_run: rcaRun({ mode: "build_on_previous" }) }),
+          reportRun,
+          reportText: REPORT,
+        }),
+      );
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-reanalyzing-message").text()).toBe(
+        "Building on the previous report…",
+      );
+      expect(byTest(wrapper, "rca-earlier-report-note").text()).toBe(
+        "The report below is from the 08:53 UTC run.",
+      );
+      await byTest(wrapper, "rca-banner-cancel-btn").trigger("click");
+      expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
+    });
+
+    it("M: Follow in thread scrolls the thread column", async () => {
+      const scrollTo = vi.fn();
+      Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        value: scrollTo,
+        configurable: true,
+      });
+      wrapper = mountPanel(liveProps({ reportRun: rcaRunItem(), reportText: REPORT }));
+      await flushPromises();
+
+      await byTest(wrapper, "rca-follow-thread-btn").trigger("click");
+      await flushPromises();
+
+      expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth" }));
+    });
+
+    it("L: a failed run with an earlier report shows the reason, the report, and Retry modes", async () => {
+      wrapper = mountPanel({
+        rca: rcaSummary({
+          state: "failed",
+          current_run: rcaRun({ state: "failed", ended_at: RCA_T0 + sec(180) }),
+        }),
+        error: {
+          code: "agent_unavailable",
+          reason: "Agent unavailable",
+          details: null,
+          trigger_type: null,
+        },
+        reportRun: rcaRunItem(),
+        reportText: REPORT,
+        threadRunId: "run-2",
+      });
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-error-reason").text()).toBe("Agent unavailable");
+      expect(byTest(wrapper, "rca-existing-container").text()).toContain("Memory leak");
+      await byTest(wrapper, "rca-retry-fresh").trigger("click");
+      expect(wrapper.emitted("trigger-rca")).toEqual([[{ buildOnPrevious: false }]]);
+    });
+
+    it("N: the stale flag shows the stale warning with Cancel run", async () => {
+      wrapper = mountPanel(liveProps({ rca: rcaSummary({ stale: true }), stale: true }));
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-stale-message").text()).toBe(
+        "This analysis has been running unusually long and may have stopped. No new messages since 08:55:20 UTC. Cancel it and try again.",
+      );
+      await byTest(wrapper, "rca-stale-cancel-btn").trigger("click");
+      expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
+    });
+
+    it("E: names who cancelled, when, after how long, and the checks finished", async () => {
+      // One finished step and one that never finished.
+      getRcaThread.mockResolvedValue({ data: rcaThread({ active: false }) } as never);
+      wrapper = mountPanel({
+        rca: rcaSummary({
+          state: "cancelled",
+          current_run: rcaRun({
+            state: "cancelled",
+            cancelled_by: "a.rao@acme.io",
+            ended_at: RCA_T0 + sec(180),
+          }),
+        }),
+        threadRunId: "run-2",
+      });
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-cancelled-message").text()).toBe(
+        "Cancelled by a.rao at 08:56:20 UTC after 1m00s. 1 of 2 checks finished; the partial results below are not a verdict.",
+      );
+    });
+
+    const cancelledProps = (summarySteps: number) => ({
+      rca: rcaSummary({
+        state: "cancelled",
+        summary: { steps: summarySteps },
+        current_run: rcaRun({
+          state: "cancelled",
+          cancelled_by: "a.rao@acme.io",
+          ended_at: RCA_T0 + sec(180),
+        }),
+      }),
+      threadRunId: "run-2",
+    });
+
+    const cancelledSentence = (done: number, total: number) =>
+      `Cancelled by a.rao at 08:56:20 UTC after 1m00s. ${done} of ${total} checks finished; the partial results below are not a verdict.`;
+
+    it("E (m1): a step cut off by the run's end does not count; m = max(thread steps, summary.steps)", async () => {
+      const cut = rcaToolCall({ status: "error", error: RCA_UNFINISHED_TOOL_ERROR });
+      getRcaThread.mockResolvedValue({
+        data: rcaThread({
+          active: false,
+          report_submitted: false,
+          // Every step closed by the projection; the third was cut off mid-call.
+          steps: [
+            rcaStep({ index: 1 }),
+            rcaStep({ index: 2 }),
+            rcaStep({ index: 3, tool_calls: [rcaToolCall(), cut] }),
+          ],
+        }),
+      } as never);
+      wrapper = mountPanel(cancelledProps(4));
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-cancelled-message").text()).toBe(cancelledSentence(2, 4));
+    });
+
+    it("E (m1): the thread's step count wins when the summary lags", async () => {
+      getRcaThread.mockResolvedValue({ data: rcaThread({ active: false }) } as never);
+      wrapper = mountPanel(cancelledProps(1));
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-cancelled-message").text()).toBe(cancelledSentence(1, 2));
+    });
+
+    it("E (m1): with no thread, n = m - 1 from the summary", async () => {
+      getRcaThread.mockRejectedValue({ isAxiosError: true, response: { status: 410 } });
+      wrapper = mountPanel(cancelledProps(5));
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-cancelled-message").text()).toBe(cancelledSentence(4, 5));
+    });
+
+    it("E (m1): with no thread and no steps, 0 of 0", async () => {
+      getRcaThread.mockRejectedValue({ isAxiosError: true, response: { status: 410 } });
+      wrapper = mountPanel(cancelledProps(0));
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-cancelled-message").text()).toBe(cancelledSentence(0, 0));
+    });
+  });
+
+  describe("analysis bar", () => {
+    it("the run selector lists the history; picking a completed run emits view-run", async () => {
+      const history = [
+        rcaRunItem({ run_id: "run-3", trigger: "reanalyze", started_by: "a.rao@acme.io" }),
+        rcaRunItem({
+          run_id: "run-2",
+          trigger: "manual",
+          started_by: "j.doe@acme.io",
+          state: "failed",
+        }),
+        rcaRunItem({ run_id: "run-1", trigger: "auto_new_incident" }),
+      ];
+      wrapper = mountPanel({
+        ...completedProps(),
+        rca: rcaSummary({ run_id: "run-3", state: "completed" }),
+        history,
+      });
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-history-item-1").attributes("data-disabled")).toBe("true");
+      await byTest(wrapper, "rca-history-item-2").trigger("click");
+      await byTest(wrapper, "rca-history-item-0").trigger("click");
+      expect(wrapper.emitted("view-run")).toEqual([["run-1"], [null]]);
+    });
+
+    it("a picked completed run shows as Analyzed while the latest run failed", async () => {
+      const viewedRun = rcaRunItem();
+      wrapper = mountPanel({
+        rca: rcaSummary({ state: "failed", current_run: rcaRun({ state: "failed" }) }),
+        error: { code: "x", reason: "Boom", details: null, trigger_type: null },
+        viewedRun,
+        reportRun: viewedRun,
+        history: [rcaRunItem({ run_id: "run-2", state: "failed" }), viewedRun],
+        reportText: REPORT,
+        threadRunId: "run-1",
+      });
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-verdict-state").text()).toBe("Analyzed");
+      expect(byTest(wrapper, "rca-error-banner").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-run-selector-label").text()).toBe("Run 1 · Oct 9, 08:53 UTC");
+      expect(getRcaThread).toHaveBeenCalledWith("default", "inc-1", "run-1", undefined);
+    });
+
+    it("the subtitle names the trigger and age", async () => {
+      vi.useFakeTimers({ toFake: ["Date"], now: (RCA_T0 + sec(127)) / 1000 });
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-analysis-subtitle").text()).toBe(
+        "Re-analyze by a.rao · started 7s ago",
+      );
+    });
+
+    it("Re-analyze emits the chosen mode", async () => {
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      await byTest(wrapper, "rca-reanalyze-build").trigger("click");
+      expect(wrapper.emitted("trigger-rca")).toEqual([[{ buildOnPrevious: true }]]);
+    });
+
+    it("Cancel run emits cancel-rca while live", async () => {
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+
+      await byTest(wrapper, "rca-cancel-btn").trigger("click");
+      expect(wrapper.emitted("cancel-rca")).toHaveLength(1);
+    });
+  });
+
+  describe("⋯ menu (E5)", () => {
+    it("Copy report puts the markdown on the clipboard", async () => {
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      await byTest(wrapper, "rca-copy-btn").trigger("click");
+      await flushPromises();
+
+      expect(writeText).toHaveBeenCalledWith(REPORT);
+      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    });
+
+    it("Download as Markdown writes a .md file with the same text", async () => {
+      const createObjectURL = vi.mocked(URL.createObjectURL);
+      createObjectURL.mockClear().mockReturnValueOnce("blob:rca");
+      vi.mocked(URL.revokeObjectURL).mockClear();
+      const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      await byTest(wrapper, "rca-download-btn").trigger("click");
+
+      expect(click).toHaveBeenCalledTimes(1);
+      const anchor = click.mock.contexts[0] as HTMLAnchorElement;
+      expect(anchor.download).toBe("incident-inc-1-rca.md");
+      const blob = createObjectURL.mock.calls[0][0] as Blob;
+      expect(blob.type).toBe("text/markdown;charset=utf-8");
+      // jsdom's Blob has no text(); FileReader reads it.
+      const reader = new FileReader();
+      const read = Promise.withResolvers<void>();
+      reader.onload = () => read.resolve();
+      reader.readAsText(blob);
+      await read.promise;
+      expect(reader.result).toBe(REPORT);
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:rca");
+    });
+
+    it("Copy thread puts the plain-text transcript on the clipboard", async () => {
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+
+      await byTest(wrapper, "rca-copy-thread-btn").trigger("click");
+      await flushPromises();
+
+      expect(writeText).toHaveBeenCalledWith(
+        rcaThreadPlainText(rcaThread(), "Investigation thread"),
+      );
+      expect(toastMock).toHaveBeenCalledWith({
+        variant: "success",
+        message: "Thread copied to clipboard",
+      });
+    });
+
+    it("a clipboard failure shows the failure toast", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      writeText.mockRejectedValue(new Error("denied"));
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+
+      await byTest(wrapper, "rca-copy-thread-btn").trigger("click");
+      await flushPromises();
+
+      expect(toastMock).toHaveBeenCalledWith({
+        variant: "error",
+        message: "Failed to copy thread",
+      });
+    });
+
+    it("Copy thread is disabled when the run has no transcript", async () => {
+      getRcaThread.mockResolvedValue({
+        data: rcaThread({ transcript: "none", steps: [], started: null }),
+      } as never);
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-copy-thread-btn").attributes("data-disabled")).toBe("true");
+      expect(byTest(wrapper, "rca-thread-empty").text()).toBe("This run has no stored transcript.");
+    });
+  });
+
+  describe("review fixes", () => {
+    it("Build on previous is enabled by a completed run even while its report text loads", async () => {
+      wrapper = mountPanel({ ...completedProps(), reportText: "", reportLoading: true });
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-reanalyze-build").attributes("data-disabled")).toBe("false");
+      // Copy/Download still need the text.
+      expect(byTest(wrapper, "rca-copy-btn").attributes("data-disabled")).toBe("true");
+    });
+
+    it("Build on previous is disabled without a completed run", async () => {
+      wrapper = mountPanel({
+        rca: rcaSummary({ state: "failed", current_run: rcaRun({ state: "failed" }) }),
+        error: { code: "x", reason: "Boom", details: null, trigger_type: null },
+        threadRunId: "run-2",
+      });
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-reanalyze-build").attributes("data-disabled")).toBe("true");
+    });
+
+    const statsProps = () => ({
+      ...completedProps(),
+      rca: rcaSummary({
+        run_id: "run-1",
+        state: "completed",
+        current_run: rcaRun({
+          run_id: "run-1",
+          state: "completed",
+          stats: { steps: 5, tool_calls: 11, duration_ms: 107_000 },
+        }),
+      }),
+    });
+
+    it.each([
+      [
+        "transcript none",
+        () =>
+          getRcaThread.mockResolvedValue({
+            data: rcaThread({ run_id: "run-1", transcript: "none", steps: [], started: null }),
+          } as never),
+      ],
+      [
+        "410",
+        () => getRcaThread.mockRejectedValue({ isAxiosError: true, response: { status: 410 } }),
+      ],
+      [
+        "410 transcript_incomplete",
+        () =>
+          getRcaThread.mockRejectedValue({
+            isAxiosError: true,
+            response: { status: 410, data: { error_code: "transcript_incomplete" } },
+          }),
+      ],
+      [
+        "503",
+        () => {
+          vi.spyOn(console, "error").mockImplementation(() => {});
+          getRcaThread.mockRejectedValue({ isAxiosError: true, response: { status: 503 } });
+        },
+      ],
+    ])("m5: the stats line falls back to the run's stats for %s", async (_case, arrange) => {
+      arrange();
+      wrapper = mountPanel(statsProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-thread-stats").text()).toBe("5 checks · 11 tool calls · 1m47s");
+    });
+
+    it("a 410 transcript_incomplete shows the incomplete message, not the expired one", async () => {
+      getRcaThread.mockRejectedValue({
+        isAxiosError: true,
+        response: { status: 410, data: { error_code: "transcript_incomplete" } },
+      });
+      wrapper = mountPanel(statsProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-thread-empty").text()).toBe(
+        "Part of this run's transcript was lost, so the thread cannot be shown.",
+      );
+      expect(byTest(wrapper, "rca-thread-retry-btn").exists()).toBe(false);
+      expect(getRcaThread).toHaveBeenCalledTimes(1);
+    });
+
+    it("Retry: a saved run whose thread read failed re-reads once on Retry", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      getRcaThread
+        .mockRejectedValueOnce({ isAxiosError: true, response: { status: 503 } })
+        .mockResolvedValue({ data: rcaThread({ run_id: "run-1", active: false }) } as never);
+      wrapper = mountPanel(completedProps());
+      await flushPromises();
+      expect(byTest(wrapper, "rca-thread-empty").text()).toContain(
+        "The thread could not be loaded.",
+      );
+
+      await byTest(wrapper, "rca-thread-retry-btn").trigger("click");
+      await flushPromises();
+
+      expect(getRcaThread).toHaveBeenCalledTimes(2);
+      expect(getRcaThread).toHaveBeenLastCalledWith("default", "inc-1", "run-1", undefined);
+      expect(byTest(wrapper, "rca-thread-retry-btn").exists()).toBe(false);
+      expect(wrapper.findAll('[data-test="rca-thread-step"]')).toHaveLength(2);
+    });
+
+    it("Retry is not offered while the run is live (its poll retries)", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      getRcaThread.mockRejectedValue({ isAxiosError: true, response: { status: 503 } });
+      wrapper = mountPanel(liveProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-thread-retry-btn").exists()).toBe(false);
     });
   });
 });

@@ -81,7 +81,8 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
     };
   });
 
-  // A completed run picked from the history; null shows `report_run`.
+  // A completed run picked from the history; null follows the latest run and
+  // shows the newest report (`report_run`).
   const viewedRunId = ref<string | null>(null);
   const viewedRun = computed<RcaRunItem | null>(() => {
     const id = viewedRunId.value;
@@ -90,6 +91,14 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
   });
   const displayedRunId = computed<string | null>(
     () => viewedRun.value?.run_id ?? reportRun.value?.run_id ?? null,
+  );
+
+  // The Thread follows the latest run (live or not) unless a run was picked (02 TH32).
+  const threadRunId = computed<string | null>(
+    () => viewedRun.value?.run_id ?? summary.value?.run_id ?? null,
+  );
+  const threadLive = computed(
+    () => live.value && threadRunId.value !== null && threadRunId.value === summary.value?.run_id,
   );
 
   // Report text per run id. A completed run's report never changes.
@@ -195,9 +204,9 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
     { immediate: true },
   );
 
-  /** Show a completed run's report; null returns to the newest report. */
+  /** Show a completed run's report and thread; null (or the latest run) follows the latest run. */
   const viewRun = (runId: string | null) => {
-    if (!runId || runId === reportRun.value?.run_id) {
+    if (!runId || runId === summary.value?.run_id) {
       viewedRunId.value = null;
       return;
     }
@@ -307,6 +316,8 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
     history,
     viewedRun,
     displayedRunId,
+    threadRunId,
+    threadLive,
     reportText,
     reportLoading,
     triggering,

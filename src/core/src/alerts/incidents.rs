@@ -2343,77 +2343,6 @@ async fn dependency_edge_type_v1(org_id: &str, from: &str, to: &str) -> EdgeType
     }
 }
 
-/// What a cancel did: the run it ended and whether this node aborted its task.
-#[cfg(feature = "enterprise")]
-#[derive(Debug, Clone, PartialEq)]
-pub struct CancelOutcome {
-    pub run_id: String,
-    pub aborted_local_task: bool,
-}
-
-/// Cancel the incident's live run (RR-19..21).
-///
-/// The run ends `cancelled` first; only the winner of that write aborts the local
-/// task, so a cancel can never abort a newer run. A stale run can be cancelled.
-/// Returns `Ok(None)` when no live run holds the incident.
-#[cfg(feature = "enterprise")]
-pub async fn cancel_rca_for_incident(
-    org_id: &str,
-    incident_id: &str,
-    user_id: &str,
-) -> Result<Option<CancelOutcome>, anyhow::Error> {
-    use std::str::FromStr;
-
-    use config::meta::alerts::rca_runs::RunState;
-
-    // The primary: a cancel right after a start must see that run (RR-19).
-    let Some(incident) = infra::table::alert_incidents::get_rw(org_id, incident_id).await? else {
-        return Ok(None);
-    };
-    let Some(run_id) = incident.rca_run_id else {
-        return Ok(None);
-    };
-    let live = incident
-        .rca_state
-        .as_deref()
-        .and_then(|s| RunState::from_str(s).ok())
-        .is_some_and(|state| state.is_live());
-    if !live {
-        return Ok(None);
-    }
-
-    let cancelled = super::rca_runs::update_run(
-        org_id,
-        &run_id,
-        super::rca_runs::RunPatch {
-            state: Some(RunState::Cancelled),
-            cancelled_by: Some(user_id.to_string()),
-            event: Some(
-                config::meta::alerts::incidents::IncidentEvent::ai_analysis_cancelled(Some(
-                    user_id.to_string(),
-                )),
-            ),
-            ..Default::default()
-        },
-    )
-    .await?;
-    if !cancelled {
-        return Ok(None);
-    }
-
-    let aborted_local_task = super::rca_runs::abort_local_rca_task(&run_id);
-    // §6: no verdict is coming, so nothing may go on holding a page for one.
-    o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(org_id, incident_id)
-        .await;
-    log::info!(
-        "[INCIDENTS::RCA] Cancelled run {run_id} for {incident_id} (local_task={aborted_local_task})"
-    );
-    Ok(Some(CancelOutcome {
-        run_id,
-        aborted_local_task,
-    }))
-}
-
 /// Whether the deployment can run an analysis at all. Callers check this before
 /// authorizing AI usage so a run that cannot happen is never charged. When it
 /// returns false no verdict is coming, so any triage hold is released here.
@@ -2436,8 +2365,8 @@ const SYSTEM_USER_EMAIL: &str = "system@openobserve.ai";
 /// The one start path of automatic runs (RR-7, RR-39, RR-45).
 ///
 /// Deployment checks, the incident's `rca_off_reason`, the Cloud precheck, then
-/// `start_run`; only a started run spawns the agent call, which meters usage
-/// right before it calls the agent.
+/// `start_run`; only a started run starts its investigation turn, which meters
+/// usage right before the turn starts.
 #[cfg(feature = "enterprise")]
 async fn start_automatic_rca(
     org_id: &str,
@@ -2497,6 +2426,7 @@ async fn start_automatic_rca(
         started_by: "system".to_string(),
         guidance: None,
         skip_cooldown: trigger == RunTrigger::AutoNewIncident,
+        oncall_subjects: None,
     })
     .await;
     let run_id = match outcome {
@@ -2523,44 +2453,31 @@ async fn start_automatic_rca(
         }
     };
 
+    // The turn's finalizer ends the run; this task only starts it.
     let org_id_rca = org_id.to_string();
     let incident_id_rca = incident_id.to_string();
-    let run_id_rca = run_id.clone();
-    let handle = tokio::spawn(async move {
+    tokio::spawn(async move {
+        // Every failure has already ended the run and released the hold.
         if let Err(e) = trigger_rca_for_incident(
-            org_id_rca.clone(),
+            org_id_rca,
             incident_id_rca.clone(),
-            run_id_rca.clone(),
+            run_id.clone(),
             trigger,
             SYSTEM_USER_EMAIL.to_string(),
             // Automatic runs stand on their own.
             false,
-            // Metered inside, right before the agent call.
+            // Metered inside, right before the turn starts.
             None,
         )
         .await
         {
             log::debug!(
-                "[INCIDENTS::RCA] {} run {run_id_rca} failed for {incident_id_rca}: {e}",
-                trigger.as_str()
+                "[INCIDENTS::RCA] {} run {run_id} for {incident_id_rca} did not start: {}",
+                trigger.as_str(),
+                e.error_code()
             );
-            // A run the trigger already ended ignores this second write (RR-15).
-            if let Err(err) = super::rca_runs::fail_run(
-                &org_id_rca,
-                &run_id_rca,
-                trigger,
-                super::rca_runs::ERROR_SERVICE_CALL_FAILED,
-                super::rca_runs::SERVICE_CALL_FAILED_REASON,
-                Some(format!("{e:#}")),
-            )
-            .await
-            {
-                log::error!("[INCIDENTS::RCA] Could not end run {run_id_rca} as failed: {err}");
-            }
         }
-        super::rca_runs::unregister_rca_task(&run_id_rca);
     });
-    super::rca_runs::register_rca_task(&run_id, handle.abort_handle());
 }
 
 /// A new incident's first analysis, decided after on-call routing (RR-45).
@@ -2652,10 +2569,37 @@ async fn l0_off_for_record(org_id: &str, record: &config::meta::oncall::Response
     }
 }
 
-/// Execute a started run: the agent call and its terminal write.
+/// The run's `error.reason` and `error.details` for a turn that could not start.
+#[cfg(feature = "enterprise")]
+pub(crate) fn rca_turn_failure(
+    error: &super::rca_turn::RcaTurnError,
+) -> (&'static str, Option<String>) {
+    use super::{rca_runs, rca_turn::RcaTurnError};
+
+    match error {
+        RcaTurnError::TurnLimit => (TURN_LIMIT_REASON, None),
+        RcaTurnError::Credentials(details) => (rca_runs::CREDENTIALS_REASON, Some(details.clone())),
+        RcaTurnError::AgentUnavailable(details) => {
+            (rca_runs::AGENT_UNAVAILABLE_REASON, Some(details.clone()))
+        }
+        RcaTurnError::Busy => (TURN_BUSY_REASON, None),
+        RcaTurnError::Other(details) => (rca_runs::AGENT_ERROR_REASON, Some(details.clone())),
+    }
+}
+
+/// `error.reason` of a run refused by the active-turn cap.
+#[cfg(feature = "enterprise")]
+pub const TURN_LIMIT_REASON: &str = "Too many analyses running";
+/// `error.reason` of a run whose session already had a turn running.
+#[cfg(feature = "enterprise")]
+const TURN_BUSY_REASON: &str = "The analysis session is busy";
+
+/// Start a started run's investigation turn (TH12, TH16).
 ///
-/// Every return ends the run (RR-13): a guard that no longer holds fails it with
-/// its code, the agent result completes it, and an agent error fails it (RR-14).
+/// Returns once the turn is spawned: the turn's finalizer ends the run. A guard
+/// that no longer holds fails the run with its code and returns `Ok`; a turn
+/// that cannot start fails the run with the turn's code, releases the triage
+/// hold, and returns the error so a manual caller can answer with it.
 #[cfg(feature = "enterprise")]
 pub async fn trigger_rca_for_incident(
     org_id: String,
@@ -2667,22 +2611,24 @@ pub async fn trigger_rca_for_incident(
     #[cfg_attr(not(feature = "cloud"), allow(unused_variables))] user_email: String,
     // When true, the newest completed report is sent so the agent extends it (RR-27).
     build_on_previous: bool,
-    // A permit the caller already holds; `None` meters right before the agent
-    // call, after every guard, so the spawned task cannot meter twice.
+    // A permit the caller already holds; `None` meters right before the turn
+    // starts, after every guard, so the spawned task cannot meter twice.
     #[cfg_attr(not(feature = "cloud"), allow(unused_variables))] usage_permit: Option<
         crate::AiUsagePermit,
     >,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), super::rca_turn::RcaTurnError> {
+    use config::meta::alerts::rca_runs::RunMode;
     use o2_enterprise::enterprise::{
-        ai::client::get_agent_client, alerts::rca_service,
-        common::config::get_config as get_o2_config,
+        alerts::rca_service, common::config::get_config as get_o2_config,
     };
 
-    use super::rca_runs::{
-        AGENT_NOT_CONFIGURED_REASON, AGENT_UNAVAILABLE_REASON, CREDENTIALS_REASON,
-        ERROR_AGENT_NOT_CONFIGURED, ERROR_AGENT_UNAVAILABLE, ERROR_CREDENTIALS, ERROR_L0_OFF,
-        ERROR_RCA_DISABLED, ERROR_SERVICE_CALL_FAILED, L0_OFF_REASON, RCA_DISABLED_REASON,
-        SERVICE_CALL_FAILED_REASON, complete_incident_run, fail_run, newest_completed_report,
+    use super::{
+        rca_runs::{
+            AGENT_NOT_CONFIGURED_REASON, ERROR_AGENT_NOT_CONFIGURED, ERROR_L0_OFF,
+            ERROR_RCA_DISABLED, L0_OFF_REASON, RCA_DISABLED_REASON, RunSubject, fail_run,
+            newest_completed_report,
+        },
+        rca_turn::{RcaPrompt, RcaPromptSubject, RcaTurnError, RcaTurnRun, start_rca_turn},
     };
 
     // Ends the run as failed and releases any triage hold: no verdict is coming (§6).
@@ -2691,6 +2637,15 @@ pub async fn trigger_rca_for_incident(
             log::error!("[INCIDENTS::RCA] Could not end run {run_id} as failed: {e}");
         }
         rca_service::skip_analysis_for_incident(&org_id, &incident_id).await;
+    };
+    let end_turn_failed = async |e: RcaTurnError| {
+        let (reason, details) = rca_turn_failure(&e);
+        log::warn!(
+            "[INCIDENTS::RCA] Run {run_id} for {org_id}/{incident_id} could not start its turn: {}",
+            e.error_code()
+        );
+        end_failed(e.error_code(), reason, details).await;
+        Err(e)
     };
 
     let config = get_o2_config();
@@ -2712,7 +2667,7 @@ pub async fn trigger_rca_for_incident(
         return Ok(());
     }
 
-    // I20: the run must be refused before the billable agent call. User-started
+    // I20: the run must be refused before the billable turn. User-started
     // runs never consult L0 (D2, RR-45).
     if !trigger.is_user_started() && rca_service::l0_off_for_incident(&org_id, &incident_id).await {
         log::debug!("[INCIDENTS::RCA] L0 is off for {incident_id}'s priority, ending run {run_id}");
@@ -2720,45 +2675,22 @@ pub async fn trigger_rca_for_incident(
         return Ok(());
     }
 
+    // The prompt names the incident (TH6); the primary, since the run just started.
+    let incident = match infra::table::alert_incidents::get_rw(&org_id, &incident_id).await {
+        Ok(Some(incident)) => incident,
+        Ok(None) => {
+            return end_turn_failed(RcaTurnError::Other(format!(
+                "incident {incident_id} not found"
+            )))
+            .await;
+        }
+        Err(e) => return end_turn_failed(RcaTurnError::Other(format!("{e:#}"))).await,
+    };
+
     log::info!(
         "[INCIDENTS::RCA] Running RCA {run_id} for incident {incident_id} (trigger={})",
         trigger.as_str()
     );
-
-    let (email, token) = match crate::organization::get_sre_agent_credentials(&org_id).await {
-        Ok(credentials) => credentials,
-        Err(e) => {
-            end_failed(
-                ERROR_CREDENTIALS,
-                CREDENTIALS_REASON,
-                Some(format!("{e:#}")),
-            )
-            .await;
-            return Err(e);
-        }
-    };
-    let auth_header = crate::auth::build_basic_auth_header(&email, &token);
-
-    let Some(client) = get_agent_client() else {
-        end_failed(
-            ERROR_AGENT_NOT_CONFIGURED,
-            AGENT_NOT_CONFIGURED_REASON,
-            None,
-        )
-        .await;
-        return Err(anyhow::anyhow!("RCA agent client not initialized"));
-    };
-
-    if let Err(e) = client.health(&auth_header).await {
-        log::debug!("[INCIDENTS::RCA] Agent health check failed for run {run_id}: {e}");
-        end_failed(
-            ERROR_AGENT_UNAVAILABLE,
-            AGENT_UNAVAILABLE_REASON,
-            Some(format!("{e:#}")),
-        )
-        .await;
-        return Err(anyhow::anyhow!("RCA agent not available: {}", e));
-    }
 
     // RR-27: "Build on previous" extends the newest completed report.
     let previous_analysis = if build_on_previous {
@@ -2773,12 +2705,14 @@ pub async fn trigger_rca_for_incident(
     } else {
         None
     };
-    // §7/C1: the single builder, so this and the manual endpoint cannot tell
-    // the agent different things about the same incident.
+    // §7/C1: the single builder, so every trigger tells the agent the same
+    // things about the same incident.
     let context =
         rca_service::build_incident_context(&org_id, &incident_id, previous_analysis).await;
-    // Metered only now that every guard has held and the agent is about to be
-    // called (RR-39): a run that ends on a guard never charges.
+    let context = rca_service::rca_context_json(&context);
+
+    // Metered only now that every guard has held and the turn is about to
+    // start (RR-39): a run that ends on a guard never charges.
     #[cfg(feature = "cloud")]
     {
         use config::meta::alerts::rca_runs::RunTrigger;
@@ -2818,27 +2752,41 @@ pub async fn trigger_rca_for_incident(
         debug_assert_eq!(usage_permit.feature(), feature);
     }
 
-    match client.analyze_incident(context, &auth_header).await {
-        Ok(rca_result) => {
+    let prompt = RcaPrompt::Initial {
+        trigger,
+        subject: RcaPromptSubject::Incident {
+            id: incident_id.clone(),
+            title: incident
+                .title
+                .clone()
+                .unwrap_or_else(|| incident_id.clone()),
+            alerts: u32::try_from(incident.alert_count).unwrap_or(0),
+            severity: incident.severity.clone(),
+        },
+    };
+    let run = RcaTurnRun {
+        org_id: org_id.clone(),
+        run_id: run_id.clone(),
+        subject: RunSubject::Incident(incident_id.clone()),
+        trigger,
+        mode: if build_on_previous {
+            RunMode::BuildOnPrevious
+        } else {
+            RunMode::Fresh
+        },
+        context,
+        session_id: None,
+    };
+    match start_rca_turn(run, prompt).await {
+        Ok(started) => {
             log::info!(
-                "[INCIDENTS::RCA] RCA {run_id} completed for {incident_id}: {} chars",
-                rca_result.len()
+                "[INCIDENTS::RCA] Run {run_id} for {incident_id} started turn {} in session {}",
+                started.turn_id,
+                started.session_id
             );
-            // Empty content ends the run `no_report` (RR-18); delivery to the
-            // on-call path follows only a committed completion (RR-12).
-            complete_incident_run(&org_id, &incident_id, &run_id, &rca_result).await?;
             Ok(())
         }
-        Err(e) => {
-            log::warn!("[INCIDENTS::RCA] RCA {run_id} failed for {org_id}/{incident_id}: {e}");
-            end_failed(
-                ERROR_SERVICE_CALL_FAILED,
-                SERVICE_CALL_FAILED_REASON,
-                Some(format!("{e:#}")),
-            )
-            .await;
-            Err(e)
-        }
+        Err(e) => end_turn_failed(e).await,
     }
 }
 
@@ -3683,8 +3631,7 @@ mod tests {
         assert_eq!(failures(&timeline(&org, &inc).await).len(), 1);
     }
 
-    /// RR-19, RR-20: a stale live run can be cancelled; the user is recorded, and a run
-    /// whose task this node does not hold is still ended.
+    /// RR-19, RR-20, TH41: a stale live run can be cancelled; the user is recorded.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_stale_run_on_another_node_is_cancelled_by_the_user() {
@@ -3705,18 +3652,12 @@ mod tests {
         let run_id = start(&org, &inc, RunTrigger::Manual).await;
         age(&org, &inc, &run_id, timeout as i64 + 121).await;
 
-        let outcome = cancel_rca_for_incident(&org, &inc, "a.rao@acme.io")
+        let cancelled = crate::alerts::rca_turn::cancel_rca_run(&org, &inc, "a.rao@acme.io")
             .await
             .unwrap()
             .expect("a stale running run is cancellable");
 
-        assert_eq!(
-            outcome,
-            CancelOutcome {
-                run_id: run_id.clone(),
-                aborted_local_task: false,
-            }
-        );
+        assert_eq!(cancelled, run_id);
         let run = stored(&org, &run_id).await;
         assert_eq!(run.state, RunState::Cancelled);
         assert_eq!(run.cancelled_by.as_deref(), Some("a.rao@acme.io"));
@@ -3737,62 +3678,35 @@ mod tests {
         assert_eq!(cancels, [Some("a.rao@acme.io".to_string())]);
     }
 
-    /// RR-20: the node that holds the run's task aborts it after the cancel commits.
-    #[cfg(feature = "enterprise")]
-    #[tokio::test]
-    async fn a_cancel_aborts_the_task_this_node_holds() {
-        use config::meta::alerts::rca_runs::RunTrigger;
-
-        use crate::alerts::rca_runs::{
-            register_rca_task,
-            tests::{db, new_incident, start},
-        };
-
-        let _db = db().await;
-        let (org, inc) = new_incident(None).await;
-        let run_id = start(&org, &inc, RunTrigger::Manual).await;
-        let task = tokio::spawn(std::future::pending::<()>());
-        register_rca_task(&run_id, task.abort_handle());
-
-        let outcome = cancel_rca_for_incident(&org, &inc, "a.rao@acme.io")
-            .await
-            .unwrap()
-            .unwrap();
-
-        assert!(outcome.aborted_local_task);
-        assert!(task.await.unwrap_err().is_cancelled());
-    }
-
     /// RR-19: with no live run there is nothing to cancel.
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_cancel_of_an_ended_or_absent_run_returns_none() {
         use config::meta::alerts::rca_runs::{RunState, RunTrigger};
 
-        use crate::alerts::rca_runs::{
-            complete_incident_run,
-            tests::{db, new_incident, start, stored},
+        use crate::alerts::{
+            rca_runs::{
+                RunPatch, complete_run,
+                tests::{db, new_incident, start, stored},
+            },
+            rca_turn::cancel_rca_run,
         };
 
         let _db = db().await;
         let (org, inc) = new_incident(None).await;
         assert_eq!(
-            cancel_rca_for_incident(&org, &inc, "a.rao@acme.io")
-                .await
-                .unwrap(),
+            cancel_rca_run(&org, &inc, "a.rao@acme.io").await.unwrap(),
             None
         );
         let run_id = start(&org, &inc, RunTrigger::Manual).await;
         assert!(
-            complete_incident_run(&org, &inc, &run_id, "report")
+            complete_run(&org, &run_id, "report", RunPatch::default())
                 .await
                 .unwrap()
         );
 
         assert_eq!(
-            cancel_rca_for_incident(&org, &inc, "a.rao@acme.io")
-                .await
-                .unwrap(),
+            cancel_rca_run(&org, &inc, "a.rao@acme.io").await.unwrap(),
             None
         );
         let run = stored(&org, &run_id).await;
@@ -3837,5 +3751,72 @@ mod tests {
         assert!(json_of(&analyzed)["rca"].get("current_run").is_none());
         assert!(json_of(&never)["rca"].is_null());
         assert!(json_of(&never).as_object().unwrap().contains_key("rca"));
+    }
+
+    /// TH24: a turn that could not start fails its run with the turn's code and a reason
+    /// a reader can act on; details only where the error carries them.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_turn_that_could_not_start_names_its_code_and_reason() {
+        use crate::alerts::{rca_runs, rca_turn::RcaTurnError};
+
+        for (error, code, reason, details) in [
+            (
+                RcaTurnError::TurnLimit,
+                "turn_limit",
+                TURN_LIMIT_REASON,
+                None,
+            ),
+            (
+                RcaTurnError::Credentials("no SA".to_string()),
+                "credentials",
+                rca_runs::CREDENTIALS_REASON,
+                Some("no SA"),
+            ),
+            (
+                RcaTurnError::AgentUnavailable("down".to_string()),
+                "agent_unavailable",
+                rca_runs::AGENT_UNAVAILABLE_REASON,
+                Some("down"),
+            ),
+            (RcaTurnError::Busy, "busy", TURN_BUSY_REASON, None),
+            (
+                RcaTurnError::Other("boom".to_string()),
+                "agent_error",
+                rca_runs::AGENT_ERROR_REASON,
+                Some("boom"),
+            ),
+        ] {
+            assert_eq!(error.error_code(), code);
+            let (got_reason, got_details) = rca_turn_failure(&error);
+            assert_eq!(got_reason, reason, "{error:?}");
+            assert_eq!(got_details.as_deref(), details, "{error:?}");
+        }
+    }
+
+    /// TH10: the cap and a busy session are their own codes; a missing SysRcaAgent user is a
+    /// credentials failure; every other refusal is an agent error.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_admission_refusal_maps_to_a_turn_error() {
+        use crate::{ai_chat::admission::AdmitError, alerts::rca_turn::RcaTurnError};
+
+        assert_eq!(
+            RcaTurnError::from(AdmitError::TurnLimit("user")),
+            RcaTurnError::TurnLimit
+        );
+        assert_eq!(RcaTurnError::from(AdmitError::Busy), RcaTurnError::Busy);
+        assert!(matches!(
+            RcaTurnError::from(AdmitError::NotRegistered),
+            RcaTurnError::Credentials(_)
+        ));
+        for other in [
+            AdmitError::InvalidSession("bad"),
+            AdmitError::NotFound("gone"),
+            AdmitError::AlreadySubmitted,
+            AdmitError::Unavailable("down"),
+        ] {
+            assert_eq!(RcaTurnError::from(other).error_code(), "agent_error");
+        }
     }
 }

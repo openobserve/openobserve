@@ -33,7 +33,7 @@ const STREAM_HOLDBACK_WORDS: usize = 3;
 const STREAM_CARRY_MAX: usize = 4096;
 const STREAM_HOLDBACK: usize = 48;
 
-const SESSION_ARG: &str = "_o2_session";
+pub(crate) const SESSION_ARG: &str = "_o2_session";
 const NAVIGATION_TOOL: &str = "create_navigation";
 const FIRST_PARTY_MCP_PREFIX: &str = "o2_";
 const O2_DELETE_TOOL: &str = "o2_delete";
@@ -44,7 +44,8 @@ const TEST_FUNCTION_MAX_OUTPUT_RESULTS: usize = 5;
 const ERROR_DUMP_CHARS: usize = 500;
 const FIRST_ERR_CHARS: usize = 200;
 
-const HIDDEN_TOOLS: [&str; 19] = [
+/// Tools no projection shows; the sentinels at the end are RCA thread structure (TH20).
+pub(crate) const HIDDEN_TOOLS: [&str; 25] = [
     "tool_search",
     "convert_time_to_microseconds",
     "calculate_time_range",
@@ -64,6 +65,12 @@ const HIDDEN_TOOLS: [&str; 19] = [
     "todowrite",
     "todoread",
     "skill",
+    "record_step",
+    "submit_report",
+    "record_hypothesis",
+    "record_blind_spot",
+    "ask_responders",
+    "acknowledge_steering",
 ];
 
 const TOOL_DESCRIPTIONS: [(&str, &str); 37] = [
@@ -443,17 +450,17 @@ impl Turn {
 
 /// The event log folded to each message's latest info and each part's final snapshot.
 #[derive(Default)]
-struct Folded {
-    title: Option<String>,
-    last_seq: i64,
-    infos: Map<String, Value>,
-    parts: HashMap<String, Map<String, Value>>,
+pub(crate) struct Folded {
+    pub(crate) title: Option<String>,
+    pub(crate) last_seq: i64,
+    pub(crate) infos: Map<String, Value>,
+    pub(crate) parts: HashMap<String, Map<String, Value>>,
     /// Message id to the `(min, max)` seq of the events about it.
-    spans: HashMap<String, (i64, i64)>,
+    pub(crate) spans: HashMap<String, (i64, i64)>,
 }
 
 impl Folded {
-    fn fold(events: &[DurableEvent]) -> Self {
+    pub(crate) fn fold(events: &[DurableEvent]) -> Self {
         let mut folded = Folded {
             last_seq: -1,
             ..Default::default()
@@ -693,13 +700,13 @@ fn generated_title(title: &Value) -> Option<String> {
     Some(stripped.to_string())
 }
 
-fn is_injected(part: &Map<String, Value>) -> bool {
+pub(crate) fn is_injected(part: &Map<String, Value>) -> bool {
     obj(part.get("metadata"))
         .and_then(|m| m.get(INJECTED_KEY))
         .is_some_and(|v| py_num_eq(v, 1))
 }
 
-fn strip_mcp_prefix(tool_name: &str) -> &str {
+pub(crate) fn strip_mcp_prefix(tool_name: &str) -> &str {
     match tool_name.split_once('_') {
         Some((prefix, rest)) if !rest.is_empty() && MCP_SERVER_PREFIXES.contains(&prefix) => rest,
         _ => tool_name,
@@ -1015,7 +1022,7 @@ fn add_test_function_details(
 }
 
 /// The response body inside an MCP content wrapper; `Null` when there is none.
-fn extract_mcp_response(result: &Map<String, Value>) -> Value {
+pub(crate) fn extract_mcp_response(result: &Map<String, Value>) -> Value {
     let Some(Value::Object(first)) = result
         .get("content")
         .and_then(Value::as_array)
@@ -1090,7 +1097,7 @@ fn scrub_event_text(mut event: Map<String, Value>) -> Map<String, Value> {
     event
 }
 
-fn coerce_tool_output(output: Option<&Value>, metadata: Value) -> Map<String, Value> {
+pub(crate) fn coerce_tool_output(output: Option<&Value>, metadata: Value) -> Map<String, Value> {
     let mut wrapped = Map::new();
     match output {
         Some(Value::Object(m)) => return m.clone(),
@@ -1172,7 +1179,7 @@ fn is_permission_rejection(message: &str) -> bool {
     PERMISSION_REJECTION_MARKERS.iter().any(|m| low.contains(m))
 }
 
-fn extract_error_message(error: &Value) -> String {
+pub(crate) fn extract_error_message(error: &Value) -> String {
     match error {
         Value::String(s) => s.clone(),
         Value::Object(m) => {
@@ -1221,7 +1228,7 @@ fn count_lines(text: &str) -> usize {
     text.matches('\n').count() + usize::from(!text.ends_with('\n'))
 }
 
-fn obj(value: Option<&Value>) -> Option<&Map<String, Value>> {
+pub(crate) fn obj(value: Option<&Value>) -> Option<&Map<String, Value>> {
     value.and_then(Value::as_object)
 }
 
@@ -1234,7 +1241,7 @@ fn truthy_key(value: Option<&Value>) -> Option<String> {
 }
 
 /// Python truthiness of a JSON value.
-fn truthy(value: &Value) -> bool {
+pub(crate) fn truthy(value: &Value) -> bool {
     match value {
         Value::Null => false,
         Value::Bool(b) => *b,

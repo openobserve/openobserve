@@ -168,24 +168,105 @@ export interface RcaRun {
   error: RcaRunError | null;
   session_id: string | null;
   stats: RcaRunStats | null;
+  /** Current stage of the seven-stage protocol (02 TH18). */
+  stage?: string | null;
+  /** 1-based index of `stage`. */
+  stage_index?: number | null;
+  /** What the run was given as leads (02 TH38): past causes, skills, AI toolsets. */
+  context_used?: RcaContextUsed | null;
+  /** Continuation turns the run used. */
+  continuations?: number;
 }
+
+/** `rca_runs.context_used`: the leads the run started with, not evidence. */
+export interface RcaContextUsed {
+  past_causes?: { id: string; summary: string }[];
+  skills?: string[];
+  toolsets?: string[];
+}
+
+/** Whether a run's transcript can be read (02 §7.3). */
+export type RcaTranscriptState = "available" | "expired" | "none";
+
+export type RcaToolCallStatus = "ok" | "error" | "running";
+
+/** One tool call of a thread step. Times are microseconds since epoch. */
+export interface RcaToolCall {
+  call_id: string;
+  tool: string;
+  key_arg: string;
+  status: RcaToolCallStatus;
+  started_at: number;
+  duration_ms: number | null;
+  result_summary: string | null;
+  error: string | null;
+  /** Present only with the org setting `ai_rca_thread_tool_output` (02 TH34). */
+  input?: unknown;
+  /** Present only with the org setting `ai_rca_thread_tool_output` (02 TH34). */
+  output?: string | null;
+}
+
+/** One step the agent recorded with `record_step` (02 TH29). */
+export interface RcaStep {
+  index: number;
+  stage: string | null;
+  title: string;
+  started_at: number;
+  /** Null while the step runs. */
+  ended_at: number | null;
+  note: string | null;
+  note_truncated: boolean;
+  /** Evidence ids cited in the note, e.g. "e3". */
+  citations: string[];
+  from_steering?: boolean;
+  tool_calls: RcaToolCall[];
+}
+
+export interface RcaThreadStats {
+  steps: number;
+  tool_calls: number;
+  duration_ms: number;
+  tokens?: { input: number; output: number; reasoning: number; cache_read: number };
+}
+
+/** `GET …/rca/runs/{run_id}/thread` (02 TH29–TH31). */
+export interface RcaThread {
+  run_id: string;
+  state_version: string;
+  not_modified: false;
+  active: boolean;
+  transcript: RcaTranscriptState;
+  started: { at: number; prompt: string } | null;
+  steps: RcaStep[];
+  user_messages: unknown[];
+  questions: unknown[];
+  report_submitted: boolean;
+  stats: RcaThreadStats;
+}
+
+/** The thread route's answer when `known_version` still matches (02 TH31). */
+export interface RcaThreadNotModified {
+  not_modified: true;
+  state_version: string;
+}
+
+export type RcaThreadResponse = RcaThread | RcaThreadNotModified;
 
 export interface ListRcaRunsResponse {
   runs: RcaRunItem[];
   has_more: boolean;
 }
 
-/** POST …/rca: 202 `{message, run_id}` (spawned) or 200 `{rca_content, run_id}` (inline). */
+/** POST …/rca: 202 `{message, run_id}` (02 TH13). */
 export interface TriggerRcaResponse {
-  message?: string;
-  rca_content?: string;
+  message: string;
   run_id: string;
 }
 
+/** DELETE …/rca (02 TH41). */
 export interface CancelRcaResponse {
-  message: string;
-  aborted_local_task: boolean;
   run_id: string;
+  cancelled: boolean;
 }
 
 export interface IncidentTopology {
@@ -363,7 +444,7 @@ const incidents = {
   },
 
   /**
-   * Trigger RCA analysis and return the complete result
+   * Start an RCA run; the run itself runs in the background (202).
    */
   triggerRca: (
     org_identifier: string,
@@ -409,10 +490,23 @@ const incidents = {
   },
 
   /**
-   * Cancel the live RCA run of an incident.
-   *
-   * Aborts the server-side task when the handling node owns it, and always ends the
-   * run as cancelled so a new run can start, stale or not.
+   * Read the investigation thread of one run (02 TH29–TH31). With `known_version`
+   * equal to the server's, the answer is `{not_modified: true, state_version}`.
+   */
+  getRcaThread: (
+    org_identifier: string,
+    incident_id: string,
+    run_id: string,
+    known_version?: string,
+  ) => {
+    return http().get<RcaThreadResponse>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/thread`,
+      { params: known_version ? { known_version } : {} },
+    );
+  },
+
+  /**
+   * Cancel the live RCA run of an incident through its session (02 TH41).
    */
   cancelRca: (org_identifier: string, incident_id: string) => {
     return http().delete<CancelRcaResponse>(
