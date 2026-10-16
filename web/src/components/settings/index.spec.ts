@@ -195,6 +195,19 @@ describe("SettingsIndex", () => {
       expect(items.some((i: any) => i.dataTest === "pipeline-destinations-tab")).toBe(true);
     });
 
+    it("lists Telephony with the page's icon, gated on enterprise and on-call", () => {
+      const telephony = () => getAllItems(createWrapper()).find((i: any) => i.key === "telephony");
+      expect(telephony()).toMatchObject({
+        icon: "call",
+        group: "Destinations",
+        dataTest: "telephony-settings-tab",
+        to: { name: "telephonySettings", query: { org_identifier: "test-org" } },
+        visible: true,
+      });
+      mockStore.state.zoConfig = { service_streams_enabled: true, oncall_enabled: false } as any;
+      expect(telephony().visible).toBe(false);
+    });
+
     it("should include synthetics_locations item with correct properties", () => {
       const wrapper = createWrapper();
       const items = getAllItems(wrapper);
@@ -254,6 +267,17 @@ describe("SettingsIndex", () => {
     });
   });
 
+  it("maps the telephonySettings route to the telephony section", () => {
+    const originalRoute = router.currentRoute.value;
+    router.currentRoute.value = {
+      ...router.currentRoute.value,
+      name: "telephonySettings",
+      path: "/telephony",
+    } as any;
+    expect(createWrapper().vm.settingsTab).toBe("telephony");
+    router.currentRoute.value = originalRoute;
+  });
+
   describe("Theme integration", () => {
     // regexIcon is computed internally and used in settingsItems icon field
     // (not directly exposed on vm), so we verify it via the sectionGroups items.
@@ -290,12 +314,15 @@ describe("SettingsIndex", () => {
       expect(generalGroup).toBeDefined();
     });
 
-    it("should contain a Destinations group holding only Pipeline Destinations", () => {
+    it("should contain a Destinations group holding Pipeline Destinations, then Telephony", () => {
       const wrapper = createWrapper();
       const groups = wrapper.vm.sectionGroups as any[];
       const destGroup = groups.find((g: any) => g.label === "Destinations");
       expect(destGroup).toBeDefined();
-      expect(destGroup.items.map((i: any) => i.key)).toEqual(["pipeline_destinations"]);
+      expect(destGroup.items.map((i: any) => i.key)).toEqual([
+        "pipeline_destinations",
+        "telephony",
+      ]);
     });
 
     it("should contain a Synthetics group", () => {

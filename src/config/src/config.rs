@@ -105,9 +105,10 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 105: create ai_chat_shares and add fork columns to ai_chat_sessions.
 // 106: create ai_chat_turns and add replica_purged_at to ai_chat_sessions.
 // 107: add redact_tools to ai_chat_shares.
-// 108: create public_dashboards, public_dashboard_org_settings and public_dashboard_outbox.
-// 109: add search_type to search_queue.
-pub const DB_SCHEMA_VERSION: u64 = 109;
+// 108: create oncall_phone_verifications and org_telephony.
+// 109: create public_dashboards, public_dashboard_org_settings and public_dashboard_outbox.
+// 110: add search_type to search_queue.
+pub const DB_SCHEMA_VERSION: u64 = 110;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

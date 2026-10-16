@@ -221,6 +221,8 @@ mod m20261009_000003_add_last_downtime_id_to_alert_states;
 mod m20261009_000004_add_kind_to_slo_backfill_jobs;
 mod m20261009_000005_create_downtime_notifications;
 mod m20261012_000001_create_alert_calibration_configs;
+mod m20261013_000001_create_oncall_phone_verifications;
+mod m20261013_000002_create_org_telephony;
 mod m20261015_000001_create_public_dashboards;
 mod m20261015_000002_add_search_type_to_search_queue;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
@@ -601,6 +603,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261006_000001_create_ai_chat_shares::Migration),
             Box::new(m20261007_000001_create_ai_chat_turns::Migration),
             Box::new(m20261007_000002_add_redact_tools_to_ai_chat_shares::Migration),
+            Box::new(m20261013_000001_create_oncall_phone_verifications::Migration),
+            Box::new(m20261013_000002_create_org_telephony::Migration),
             Box::new(m20261015_000001_create_public_dashboards::Migration),
             Box::new(m20261015_000002_add_search_type_to_search_queue::Migration),
         ]
@@ -669,8 +673,9 @@ mod tests {
         (105, "m20261006_000001_create_ai_chat_shares"),
         (106, "m20261007_000001_create_ai_chat_turns"),
         (107, "m20261007_000002_add_redact_tools_to_ai_chat_shares"),
-        (108, "m20261015_000001_create_public_dashboards"),
-        (109, "m20261015_000002_add_search_type_to_search_queue"),
+        (108, "m20261013_000002_create_org_telephony"),
+        (109, "m20261015_000001_create_public_dashboards"),
+        (110, "m20261015_000002_add_search_type_to_search_queue"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

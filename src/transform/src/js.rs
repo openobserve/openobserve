@@ -85,11 +85,6 @@ struct CachedJsContext {
     heap_bytes: usize,
 }
 
-/// Verifies that a sandboxed JS runtime and context can be created.
-pub fn init_js_runtime() -> Result<(), String> {
-    new_js_context().map(|_| ())
-}
-
 /// Compile and validate a JS function
 /// Similar to compile_vrl_function but for JavaScript
 pub fn compile_js_function(func: &str, org_id: &str) -> Result<JSRuntimeConfig, std::io::Error> {
@@ -455,9 +450,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_init_js_runtime() {
-        let result = init_js_runtime();
-        assert!(result.is_ok());
+    fn test_new_js_context() {
+        assert!(new_js_context().is_ok());
     }
 
     #[test]

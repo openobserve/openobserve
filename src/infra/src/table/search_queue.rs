@@ -254,7 +254,7 @@ mod tests {
             .unwrap();
         assert_eq!((other.type_global, other.type_org), (1, 0));
 
-        // No type counts nothing, including the untyped rows written before migration 109.
+        // No type counts nothing, including the untyped rows written before migration 110.
         let untyped = count_all_levels_on(&db, "short", Some("o1"), None, None)
             .await
             .unwrap();
