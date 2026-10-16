@@ -127,7 +127,7 @@ describe("sameDbmRange", () => {
    * Relative ranges compare by PERIOD, never by bounds: the microsecond bounds
    * re-anchor on every load by design (see `useDbmScope`), so comparing them
    * could never match and the seed would be dead code that still looked right —
-   * the exact trap `dbmTabCountsKey` documents.
+   * the exact trap `dbMonitoringKeys.badges` documents.
    */
   it("matches relative ranges on the period alone", () => {
     const a = relative("15m");

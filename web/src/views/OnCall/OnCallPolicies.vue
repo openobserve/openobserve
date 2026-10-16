@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
   >
     <OTable
+      ref="oTableRef"
       :frame="false"
       :data="rows"
       :columns="columns"
@@ -51,7 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :show-global-filter="false"
       :enable-column-resize="true"
       data-test="oncall-policies-table"
+      :page-size="pageSize"
+      :current-page="currentPage"
+      :sort-by="sortBy"
+      :sort-order="sortOrder"
       @row-click="openTeam"
+      @update:current-page="currentPage = $event"
+      @update:page-size="pageSize = $event"
+      @update:sort-by="sortBy = $event"
+      @update:sort-order="sortOrder = $event"
     >
       <template #subheader>
         <div class="px-page-edge border-table-row-divider border-b py-1.5">
@@ -60,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #toolbar>
-        <div class="flex w-full items-center gap-2">
+        <div class="flex w-full items-center gap-2 max-md:contents">
           <OSearchInput
             v-model="search"
             class="flex-1"
@@ -72,16 +81,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #toolbar-trailing>
-        <OButton
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          :last-run-at="lastUpdatedAt"
           :loading="loading"
           data-test="oncall-policies-refresh"
-          @click="fetchAll"
-        >
-          <OTooltip side="bottom" :content="t('oncall.refresh')" />
-        </OButton>
+          @click="refreshAll"
+        />
       </template>
 
       <template #cell-on_call="{ row }">
@@ -136,14 +143,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -151,9 +158,10 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import oncallService from "@/services/oncall";
-import type { OnCallTeam } from "@/ts/interfaces/oncall";
+import { queryClient } from "@/composables/query/queryClient";
+import { useListViewState } from "@/composables/useListViewState";
+import { oncallTeamsQuery, teamPolicyQuery, whoIsOnCallQuery } from "@/services/oncall.queries";
+import type { OnCallPolicy, OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { priorityLabel, priorityTagVariant, resolveLadder } from "@/utils/oncall";
 
@@ -176,7 +184,40 @@ const ABSENT = raw("—");
 
 const allRows = ref<PolicyRow[]>([]);
 const loading = ref(false);
-const search = ref("");
+const lastUpdatedAt = ref<number | null>(null);
+const savedView = useListViewState("oncall-policies", {
+  search: "",
+  currentPage: 1,
+  pageSize: 20,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const search = ref(savedView.search);
+const currentPage = ref(savedView.currentPage);
+const pageSize = ref(savedView.pageSize);
+const sortBy = ref(savedView.sortBy);
+const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+const oTableRef = ref<any>(null);
+
+watch(search, () => {
+  currentPage.value = 1;
+});
+watch([search, currentPage, pageSize, sortBy, sortOrder], () => {
+  Object.assign(savedView, {
+    search: search.value,
+    currentPage: currentPage.value,
+    pageSize: pageSize.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
+// The first load lands after mount and TanStack resets to page 0 on its own deferred queue; setTimeout(0) runs after it so the restored page wins.
+let pageRestored = false;
+watch(loading, (isLoading) => {
+  if (isLoading || pageRestored) return;
+  pageRestored = true;
+  setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+});
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
@@ -251,21 +292,37 @@ const summaryStats = computed<StatItem[]>(() => [
   },
 ]);
 
+/// Cache-first on mount; the refresh button forces every read the page makes,
+/// which is why `force` is threaded down rather than read from a page-level ref.
+async function read<T>(
+  options: { queryKey: readonly unknown[]; [k: string]: any },
+  force: boolean,
+): Promise<T> {
+  if (force) {
+    await queryClient.invalidateQueries({
+      queryKey: options.queryKey,
+      exact: true,
+      refetchType: "none",
+    });
+  }
+  return queryClient.fetchQuery(options as any) as Promise<T>;
+}
+
 /// One request per team for the policy and one for the rotation: there is no
 /// bulk form of either, so the fan-out is the cost of the page. Settled rather
 /// than awaited together, so one team failing leaves the other rows readable.
-async function fetchTeamRow(team: OnCallTeam): Promise<PolicyRow | null> {
+async function fetchTeamRow(team: OnCallTeam, force: boolean): Promise<PolicyRow | null> {
   const [policyRes, onCallRes] = await Promise.allSettled([
-    oncallService.getPolicy({ org_identifier: orgId.value, team_id: team.id }),
-    oncallService.whoIsOnCall({ org_identifier: orgId.value, team_id: team.id }),
+    read<OnCallPolicy | null>(teamPolicyQuery(orgId.value, team.id), force),
+    read<OnCallPosition[]>(whoIsOnCallQuery(orgId.value, team.id), force),
   ]);
 
   // A policy we could not read is not a policy that pages nobody, and saying
   // so would send somebody to fix a team that is fine.
   if (policyRes.status !== "fulfilled") return null;
 
-  const slots = onCallRes.status === "fulfilled" ? (onCallRes.value.data ?? []) : [];
-  const rungs = policyRes.value.data?.rungs ?? [];
+  const slots = onCallRes.status === "fulfilled" ? (onCallRes.value ?? []) : [];
+  const rungs = policyRes.value?.rungs ?? [];
 
   return {
     teamId: team.id,
@@ -280,13 +337,19 @@ async function fetchTeamRow(team: OnCallTeam): Promise<PolicyRow | null> {
   };
 }
 
-async function fetchAll() {
+async function fetchAll(force = false) {
   loading.value = true;
   try {
-    const teamsRes = await oncallService.listTeams({ org_identifier: orgId.value });
-    const teams = teamsRes.data ?? [];
-    const settled = await Promise.all(teams.map((team) => fetchTeamRow(team)));
+    const teams = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), force);
+    const settled = await Promise.all(teams.map((team) => fetchTeamRow(team, force)));
     allRows.value = settled.filter((row): row is PolicyRow => row !== null);
+    // The oldest of the reads the rows are built from, so the age never claims the table is fresher than it is.
+    lastUpdatedAt.value = Math.min(
+      ...[
+        oncallTeamsQuery(orgId.value),
+        ...teams.map((team) => teamPolicyQuery(orgId.value, team.id)),
+      ].map((options) => queryClient.getQueryState(options.queryKey)?.dataUpdatedAt || Date.now()),
+    );
   } catch (err: any) {
     toast({
       variant: "error",
@@ -296,6 +359,10 @@ async function fetchAll() {
     loading.value = false;
   }
 }
+
+// Named, not `@click="fetchAll"`: the handler would receive the MouseEvent as
+// `force`.
+const refreshAll = () => fetchAll(true);
 
 function openTeam(row: PolicyRow) {
   router.push({

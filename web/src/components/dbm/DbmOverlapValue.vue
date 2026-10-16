@@ -35,7 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   and unobtrusive: it is a unit, not a finding, and a column of loud chips
   would compete with the numbers the reader is actually scanning. The header
   sub-label states the PROVENANCE ("server"/"client", constant per render);
-  this marker states what the number IS ("wait"/"exec"/"observed").
+  this marker states what the number IS ("wait"/"exec"), or shows the
+  traces glyph for a figure from the application's traces.
 
   The invariant, enforced here rather than trusted to callers: a value with no
   qualifier does not render. There is no code path that puts an unqualified
@@ -50,7 +51,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            sentence out — the short form fits the column, the long form is what
            settles an argument about which number is being quoted. -->
       <span class="flex items-center gap-1.5">
-        <span class="text-text-secondary text-3xs" data-test="dbm-overlap-qualifier">
+        <template v-if="fromApp">
+          <DbmAppSourceMarker v-if="withMarker" />
+        </template>
+        <span v-else class="text-text-secondary text-3xs" data-test="dbm-overlap-qualifier">
           <OTooltip v-if="qualifierTitle" :content="qualifierTitle" />
           {{ qualifierLabel }}
         </span>
@@ -66,9 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import DbmAppSourceMarker from "@/components/dbm/DbmAppSourceMarker.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import type { DbmOverlapSource } from "@/utils/dbm/overlapMetrics";
+import { APP_SOURCE_QUALIFIER, type DbmOverlapSource } from "@/utils/dbm/overlapMetrics";
 
 const props = withDefaults(
   defineProps<{
@@ -83,6 +88,8 @@ const props = withDefaults(
     qualifierKey?: string | null;
     /** The engine that reported it, for the tooltip's attribution sentence. */
     engine?: string | null;
+    /** Off where the column header already names the app source for every row. */
+    withMarker?: boolean;
     dataTest?: string;
   }>(),
   {
@@ -90,6 +97,7 @@ const props = withDefaults(
     source: null,
     qualifierKey: null,
     engine: null,
+    withMarker: true,
     dataTest: undefined,
   },
 );
@@ -103,8 +111,11 @@ const { t } = useI18nTyped();
  */
 const renders = computed(() => props.value !== null && props.qualifierKey !== null);
 
+// An app-sourced figure carries the marker, not a text qualifier.
+const fromApp = computed(() => props.qualifierKey === APP_SOURCE_QUALIFIER);
+
 const qualifierLabel = computed(() =>
-  props.qualifierKey === null
+  props.qualifierKey === null || fromApp.value
     ? raw("")
     : t(`dbm.list.overlap.${props.qualifierKey}` as "dbm.list.overlap.serverWait"),
 );
@@ -115,7 +126,7 @@ const qualifierLabel = computed(() =>
  * which is the contradiction this whole change exists to remove.
  */
 const qualifierTitle = computed(() =>
-  props.qualifierKey === null
+  props.qualifierKey === null || fromApp.value
     ? undefined
     : t(`dbm.detail.overlap.${props.qualifierKey}` as "dbm.detail.overlap.serverWait", {
         engine: props.engine ?? "",

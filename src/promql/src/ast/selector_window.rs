@@ -24,8 +24,6 @@ use crate::{ast::at_modifier::at_micros, micros, utils::offset_micros};
 pub struct SelectorWindow {
     /// The farthest read after an evaluation timestamp: the largest negative offset.
     pub ahead: Duration,
-    /// A subquery evaluates its inner expression inside the evaluated range only.
-    pub subquery: bool,
     /// The latest instant an `@` modifier reads, whatever range is evaluated.
     pub pinned: Option<i64>,
 }
@@ -39,7 +37,6 @@ impl SelectorWindow {
     fn merge(self, other: Self) -> Self {
         Self {
             ahead: self.ahead.max(other.ahead),
-            subquery: self.subquery || other.subquery,
             pinned: self.pinned.max(other.pinned),
         }
     }
@@ -53,7 +50,6 @@ pub fn selector_window(expr: &Expr) -> SelectorWindow {
             let inner = selector_window(&sq.expr);
             SelectorWindow {
                 ahead: inner.ahead + negative_offset(&sq.offset),
-                subquery: true,
                 pinned: inner.pinned,
             }
         }
@@ -82,7 +78,6 @@ pub fn selector_window(expr: &Expr) -> SelectorWindow {
 fn vector_selector_window(vs: &VectorSelector) -> SelectorWindow {
     SelectorWindow {
         ahead: negative_offset(&vs.offset),
-        subquery: false,
         pinned: vs.at.as_ref().map(|at| pinned_read_end(at, &vs.offset)),
     }
 }
@@ -124,7 +119,6 @@ mod tests {
             window("up offset -10m"),
             SelectorWindow {
                 ahead: minutes(10),
-                subquery: false,
                 pinned: None,
             }
         );
@@ -132,7 +126,6 @@ mod tests {
             window("topk(3, rate(a[5m] offset -3m)) + rate(b[1h] offset 2m)"),
             SelectorWindow {
                 ahead: minutes(3),
-                subquery: false,
                 pinned: None,
             }
         );
@@ -166,22 +159,18 @@ mod tests {
     }
 
     #[test]
-    fn test_selector_window_flags_subqueries() {
+    fn test_selector_window_reads_ahead_through_subqueries() {
         assert_eq!(
             window("max_over_time(rate(a[5m])[1h:1m])"),
-            SelectorWindow {
-                ahead: Duration::ZERO,
-                subquery: true,
-                pinned: None,
-            }
+            SelectorWindow::default()
         );
         assert_eq!(
-            window("sum(a) + max_over_time(b[1h:1m] offset -5m)"),
-            SelectorWindow {
-                ahead: minutes(5),
-                subquery: true,
-                pinned: None,
-            }
+            window("sum(a) + max_over_time(b[1h:1m] offset -5m)").ahead,
+            minutes(5)
+        );
+        assert_eq!(
+            window("max_over_time((b offset -2m)[1h:1m] offset -5m)").ahead,
+            minutes(7)
         );
     }
 }

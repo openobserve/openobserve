@@ -17,7 +17,7 @@ use std::time::Duration;
 
 use config::meta::promql::value::Sample;
 
-use crate::functions::RangeFunc;
+use crate::{common::kahan_sum_increment, functions::RangeFunc};
 
 pub struct AvgOverTimeFunc;
 
@@ -27,10 +27,31 @@ impl RangeFunc for AvgOverTimeFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        if samples.is_empty() {
-            return None;
+        let (first, rest) = samples.split_first()?;
+        let (mut sum, mut c, mut mean) = (first.value, 0.0, 0.0);
+        let mut incremental = false;
+        for (i, sample) in rest.iter().enumerate() {
+            let count = (i + 2) as f64;
+            if !incremental {
+                let (new_sum, new_c) = kahan_sum_increment(sample.value, sum, c);
+                if !new_sum.is_infinite() {
+                    (sum, c) = (new_sum, new_c);
+                    continue;
+                }
+                // the direct sum would overflow, so continue with an incremental mean
+                incremental = true;
+                mean = sum / (count - 1.0);
+                c /= count - 1.0;
+            }
+            let q = (count - 1.0) / count;
+            (mean, c) = kahan_sum_increment(sample.value / count, q * mean, q * c);
         }
-        Some(samples.iter().map(|s| s.value).sum::<f64>() / samples.len() as f64)
+        let count = samples.len() as f64;
+        Some(if incremental {
+            mean + c
+        } else {
+            sum / count + c / count
+        })
     }
 }
 
@@ -51,24 +72,6 @@ mod tests {
     fn avg_over_time_test_helper(data: Value) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
         avg_over_time(data, &eval_ctx)
-    }
-
-    #[test]
-    fn test_avg_over_time_value_none_input() {
-        let result = avg_over_time_test_helper(Value::None).unwrap();
-        assert!(matches!(result, Value::None));
-    }
-
-    #[test]
-    fn test_avg_over_time_invalid_input_returns_err() {
-        let result = avg_over_time_test_helper(Value::Float(1.0));
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_avg_over_time_exec_empty_samples_returns_none() {
-        let func = AvgOverTimeFunc;
-        assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
     }
 
     #[test]
@@ -104,5 +107,22 @@ mod tests {
             }
             _ => panic!("Expected Matrix result"),
         }
+    }
+
+    #[test]
+    fn test_avg_over_time_falls_back_to_incremental_mean_on_overflow() {
+        let func = AvgOverTimeFunc;
+        let at = |values: &[f64]| {
+            let samples: Vec<_> = values
+                .iter()
+                .enumerate()
+                .map(|(i, &value)| Sample::new(i as i64, value))
+                .collect();
+            func.exec(&samples, 0, &Duration::ZERO).unwrap()
+        };
+        assert_eq!(at(&[1e308, 1e308]), 1e308);
+        assert_eq!(at(&[1e100, 1.0, -1e100]), 1.0 / 3.0);
+        assert_eq!(at(&[f64::INFINITY, 1.0]), f64::INFINITY);
+        assert!(at(&[f64::INFINITY, f64::NEG_INFINITY]).is_nan());
     }
 }

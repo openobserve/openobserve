@@ -88,6 +88,7 @@ mod tests_equivalence;
 mod tests_server_vantage;
 
 use std::{
+    borrow::Cow,
     collections::BTreeMap,
     hash::{Hash, Hasher},
     num::NonZeroUsize,
@@ -249,13 +250,15 @@ pub(crate) fn normalize_cached(
     {
         return cached.clone();
     }
+    // lexer runs outside the shard lock so a cold statement never stalls its shard's hits
     let result = normalize_with_opts(text, dialect, fold_identifiers)
         .ok()
         .map(Arc::new);
-    if let Ok(mut cache) = shard.lock() {
-        cache.put(key, result.clone());
+    match shard.lock() {
+        // a racing miss that inserted first wins, so the hot copy is never replaced
+        Ok(mut cache) => cache.get_or_insert(key, || result).clone(),
+        Err(_) => result,
     }
-    result
 }
 
 /// Attribute source for [`enrich`]: both the OTLP call site's `HashMap` and the JSON call site's
@@ -437,15 +440,15 @@ pub fn enrich_with_opts<A: SpanAttrs>(
     // method+endpoint). The request body is never normalized into the template.
     // `text` is moved in (not cloned) — nothing below reads it; the later checks use
     // `effective_text`.
-    let effective_text: Option<String> = if dialect == Some(Dialect::Elasticsearch) {
+    let effective_text: Option<Cow<str>> = if dialect == Some(Dialect::Elasticsearch) {
         let method = resolve(attrs, &[("http.request.method", "http_request_method")])
             .or_else(|| op_attr.clone());
         match (
             method,
             resolve(attrs, &[("url.full", "url_full")]).and_then(|u| url_path_of(&u)),
         ) {
-            (Some(m), Some(p)) => Some(format!("{m} {p}")),
-            (None, Some(p)) => Some(p),
+            (Some(m), Some(p)) => Some(Cow::Owned(format!("{m} {p}"))),
+            (None, Some(p)) => Some(Cow::Owned(p)),
             (_, None) => text,
         }
     } else {
@@ -462,7 +465,10 @@ pub fn enrich_with_opts<A: SpanAttrs>(
 
     // Resolution order (design §3.1): `db.operation.name` → `db.operation` → first token of
     // normalized text (skipping leading TCL statements — handled by the normalizer).
-    let operation = op_attr.or_else(|| ns.as_ref().and_then(|n| n.operation.clone()));
+    let operation = op_attr.or_else(|| {
+        ns.as_ref()
+            .and_then(|n| n.operation.clone().map(Cow::Owned))
+    });
 
     let query_norm: Option<String> = if !opts.store_norm_text {
         // `store_norm_text: false`: fingerprint-only on spans (§3.2 storage
@@ -528,7 +534,8 @@ pub fn enrich_with_opts<A: SpanAttrs>(
         resolve(
             attrs,
             &[("db.namespace", "db_namespace"), ("db.name", "db_name")],
-        ),
+        )
+        .map(Cow::into_owned),
     );
     put(
         O2_DB_INSTANCE,
@@ -542,15 +549,19 @@ pub fn enrich_with_opts<A: SpanAttrs>(
         .as_deref()
         .map(strip_port),
     );
-    put(O2_DB_OPERATION, operation);
+    put(O2_DB_OPERATION, operation.map(Cow::into_owned));
     put(
         O2_DB_STATUS_CODE,
         resolve(
             attrs,
             &[("db.response.status_code", "db_response_status_code")],
-        ),
+        )
+        .map(Cow::into_owned),
     );
-    put(O2_DB_USER, resolve(attrs, &[("db.user", "db_user")]));
+    put(
+        O2_DB_USER,
+        resolve(attrs, &[("db.user", "db_user")]).map(Cow::into_owned),
+    );
     put(
         O2_DB_ENV,
         resolve(
@@ -559,7 +570,8 @@ pub fn enrich_with_opts<A: SpanAttrs>(
                 ("deployment.environment.name", "deployment_environment_name"),
                 ("deployment.environment", "deployment_environment"),
             ],
-        ),
+        )
+        .map(Cow::into_owned),
     );
     if let Some(n) = &ns
         && n.batch_multiplier > 1
@@ -576,7 +588,7 @@ pub fn enrich_with_opts<A: SpanAttrs>(
 /// flattened (underscore) form. Both forms are precomputed const pairs — `resolve` runs ~10
 /// times per DB span, and a runtime `replace('.', "_")` per candidate would allocate a String
 /// for every probe.
-fn resolve<A: SpanAttrs>(attrs: &A, names: &[(&str, &str)]) -> Option<String> {
+fn resolve<'a, A: SpanAttrs>(attrs: &'a A, names: &[(&str, &str)]) -> Option<Cow<'a, str>> {
     for (dotted, underscored) in names {
         debug_assert_eq!(
             *underscored,
@@ -588,8 +600,8 @@ fn resolve<A: SpanAttrs>(attrs: &A, names: &[(&str, &str)]) -> Option<String> {
             .or_else(|| attrs.get_attr(underscored));
         if let Some(v) = val {
             let s = match v {
-                Value::String(s) => s.clone(),
-                Value::Number(n) => n.to_string(),
+                Value::String(s) => Cow::Borrowed(s.as_str()),
+                Value::Number(n) => Cow::Owned(n.to_string()),
                 _ => continue,
             };
             if !s.is_empty() {

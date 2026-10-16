@@ -46,9 +46,11 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             };
             let actual_message: RePatternsMessage = serde_json::from_slice(&v)?;
             match actual_message {
-                RePatternsMessage::Delete { id } => {
-                    log::info!("[SUPER_CLUSTER:DB] deleting pattern with id {id}");
-                    infra::table::re_pattern::remove(&id).await?;
+                RePatternsMessage::Delete { org_id, id } => {
+                    log::info!(
+                        "[SUPER_CLUSTER:DB] deleting pattern with id {id} from org {org_id}"
+                    );
+                    infra::table::re_pattern::remove(&org_id, &id).await?;
                     let mgr = get_pattern_manager().await?;
                     mgr.remove_pattern(&id);
 
@@ -116,25 +118,39 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                         "[SUPER_CLUSTER:DB] updating associations for {org}/{stype}/{stream}"
                     );
 
-                    let update: UpdateSettingsWrapper<PatternAssociation> =
+                    let mut update: UpdateSettingsWrapper<PatternAssociation> =
                         serde_json::from_slice(&updates)?;
 
                     if update.add.is_empty() && update.remove.is_empty() {
                         return Ok(());
                     }
 
+                    // Taken before the degrade, so the row keeps the policy the author wrote.
+                    let wire_policies: Vec<String> =
+                        update.add.iter().map(|item| item.policy.clone()).collect();
+
+                    // Node-to-node, not user input: rejecting here would wedge the queue.
+                    db::re_pattern::degrade_unsupported_policies(
+                        &org,
+                        &stream,
+                        stype,
+                        &mut update.add,
+                    );
+
                     let added = update
                         .add
                         .clone()
                         .into_iter()
-                        .map(|item| PatternAssociationEntry {
+                        .zip(wire_policies)
+                        .map(|(item, wire_policy)| PatternAssociationEntry {
                             id: 0,
                             org: org.to_string(),
                             stream: stream.to_string(),
                             stream_type: stype,
                             field: item.field,
                             pattern_id: item.pattern_id,
-                            policy: PatternPolicy::from(item.policy),
+                            policy: PatternPolicy::from(&item.policy),
+                            policy_repr: Some(wire_policy),
                             apply_at: ApplyPolicy::from(item.apply_at),
                         })
                         .collect();
@@ -149,7 +165,8 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                             stream_type: stype,
                             field: item.field,
                             pattern_id: item.pattern_id,
-                            policy: PatternPolicy::from(item.policy),
+                            policy: PatternPolicy::from(&item.policy),
+                            policy_repr: Some(item.policy),
                             apply_at: ApplyPolicy::from(item.apply_at),
                         })
                         .collect();

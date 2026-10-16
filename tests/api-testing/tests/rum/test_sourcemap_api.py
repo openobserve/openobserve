@@ -11,13 +11,12 @@ Test Coverage:
 - Delete sourcemaps
 
 Prerequisites:
-- OpenObserve ENTERPRISE build running on ZO_BASE_URL
+- OpenObserve running on ZO_BASE_URL (either edition; the sourcemaps routes are not enterprise-gated)
 - RUM enabled (ZO_RUM_ENABLED=true)
 - Static sourcemap fixtures at tests/api-testing/fixtures/sourcemaps/
 
 Note:
 - Tests use pre-built sourcemaps (no build step required)
-- Tests marked with @pytest.mark.skip for OSS CI (enterprise-only feature)
 - Tests must run serially due to shared module-scoped fixture
 - Use: pytest test_sourcemap_api.py -v (no -n flag for parallel)
 """
@@ -25,10 +24,11 @@ Note:
 import pytest
 import logging
 
-# Mark all tests in this module to run serially and skip in OSS (enterprise-only feature)
+# Serial: these cases share one sourcemap store. They run on OSS too -- the
+# sourcemaps routes are outside the enterprise cfg block in router/mod.rs, and
+# the previous blanket skip (which never ran them on ANY build) was mistaken.
 pytestmark = [
     pytest.mark.order(1),
-    pytest.mark.skip(reason="Sourcemaps is an enterprise feature and cannot be tested in CI with non-enterprise build")
 ]
 from helpers.sourcemap_helpers import (
     load_static_sourcemaps,

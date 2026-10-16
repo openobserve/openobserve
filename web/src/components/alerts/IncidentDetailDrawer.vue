@@ -173,6 +173,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!loading && incidentDetails"
         class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
+        <div v-if="incidentDetails.muted_by_downtime_id" class="shrink-0 px-3 pt-2">
+          <OBanner
+            variant="warning"
+            dense
+            inline-actions
+            icon="notifications-paused"
+            data-test="incident-detail-muted-banner"
+          >
+            {{ mutedBannerText }}
+            <template #actions>
+              <OButton
+                variant="ghost"
+                size="sm"
+                data-test="incident-detail-muted-view"
+                @click="openMutingDowntime"
+              >
+                {{ t("toastMessages.downtimes.viewDowntime") }}
+              </OButton>
+            </template>
+          </OBanner>
+        </div>
         <!-- Tab Content Container -->
         <div class="flex flex-1 overflow-hidden">
           <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
@@ -459,9 +480,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 font-mono text-xs"
                             >
-                              <span class="min-w-0 flex-1 truncate">{{
+                              <OTruncatedText class="flex-1">{{
                                 incidentDetails?.id || raw("N/A")
-                              }}</span>
+                              }}</OTruncatedText>
                               <OIcon
                                 :name="copiedField === 'incident_id' ? 'check' : 'content-copy'"
                                 size="sm"
@@ -484,9 +505,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
                             >
-                              <span class="min-w-0 flex-1 truncate">{{
+                              <OTruncatedText class="flex-1">{{
                                 incidentDetails?.title || raw("N/A")
-                              }}</span>
+                              }}</OTruncatedText>
                               <OIcon
                                 :name="copiedField === 'incident_title' ? 'check' : 'content-copy'"
                                 size="sm"
@@ -607,10 +628,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span class="text-text-secondary text-xs">
                             {{ t("alerts.incidents.onCallTeam") }}
                           </span>
-                          <span class="text-text-body truncate text-xs">
+                          <OTruncatedText class="text-text-body text-xs">
                             {{ raw(oncallTeamName) }}
-                            <OTooltip side="bottom" :content="raw(oncallTeamName)" />
-                          </span>
+                          </OTruncatedText>
                         </div>
                         <div class="flex items-center justify-between gap-2">
                           <span class="text-text-secondary text-xs">
@@ -701,9 +721,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :key="liaison.id"
                             class="flex items-center justify-between gap-2"
                           >
-                            <span class="text-text-body truncate text-xs">
+                            <OTruncatedText class="text-text-body text-xs">
                               {{ raw(oncallTeamNameFor(liaison.team_id)) }}
-                            </span>
+                            </OTruncatedText>
                             <OTag type="oncallResponseState" :value="liaison.state" size="sm" />
                           </span>
                         </div>
@@ -897,17 +917,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ index + 1 }}.
                               </span>
                               <div class="min-w-0 flex-1">
-                                <OTooltip
-                                  v-if="alert.name.length > 30"
-                                  :content="raw(alert.name)"
-                                />
-                                <span class="block truncate font-medium">
-                                  {{
-                                    alert.name.length > 30
-                                      ? alert.name.substring(0, 30) + "..."
-                                      : alert.name
-                                  }}
-                                </span>
+                                <OTruncatedText class="block font-medium">
+                                  {{ alert.name }}
+                                </OTruncatedText>
                               </div>
                               <div class="w-30 flex-shrink-0">
                                 <span :class="'text-text-secondary'">
@@ -952,6 +964,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @download-report="downloadReport"
                 :is-dark-mode="isDarkMode"
                 :analysis-in-flight="analysisInFlight"
+                :analyze-credit-cost="aiCreditCosts?.incident"
+                :reanalyze-credit-cost="aiCreditCosts?.incident_reanalysis"
                 @trigger-rca="triggerRca"
               />
 
@@ -1060,9 +1074,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.stream_name") }}
                               </span>
-                              <span :class="'text-text-body'" class="truncate text-sm font-medium">
+                              <OTruncatedText :class="'text-text-body'" class="text-sm font-medium">
                                 {{ alerts[selectedAlertIndex]?.stream_name || raw("N/A") }}
-                              </span>
+                              </OTruncatedText>
                             </div>
                           </div>
 
@@ -1472,6 +1486,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
+import { formatWindowTime } from "@/utils/downtimes/schedule";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import {
@@ -1487,6 +1504,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
+import { isAxiosError } from "axios";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, {
   Incident,
@@ -1495,7 +1513,7 @@ import incidentsService, {
   IncidentCorrelatedStreams,
   ArchivedRcaReport,
 } from "@/services/incidents";
-import oncallService from "@/services/oncall";
+import { oncallTeamsQuery, responsesForIncidentQuery } from "@/services/oncall.queries";
 import type { OnCallResponse } from "@/ts/interfaces/oncall";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
@@ -1526,10 +1544,18 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import {
+  isPaidOverageConsentError,
+  usePaidOverageConsent,
+} from "@/composables/usePaidOverageConsent";
+import BillingService, { type AiCreditCounts } from "@/services/billings";
+import { aiCreditsAction, aiCreditsNotice, isAiCreditsExhausted } from "@/utils/aiCredits";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1552,7 +1578,9 @@ export default defineComponent({
     OUserCell,
     OIcon,
     OTag,
+    OTruncatedText,
     OInlineEdit,
+    OBanner,
   },
   emits: ["close", "status-updated", "sendToAiChat"],
   setup(props, { emit }) {
@@ -1561,6 +1589,8 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const { confirm } = useConfirmDialog();
+    const { promptForConsent } = usePaidOverageConsent();
+    const consentLifecycle = new AbortController();
 
     const incidentOrgId = useOrgId();
     const updateIncidentStatus = useMutation(() =>
@@ -1592,6 +1622,35 @@ export default defineComponent({
     const incidentDetails = ref<(IncidentWithAlerts & { correlation_reason?: string }) | null>(
       null,
     );
+    // The downtimes list is read only to name the downtime that mutes this incident.
+    const { downtimeOf, nameOf } = useDowntimeLookup(
+      () => !!incidentDetails.value?.muted_by_downtime_id,
+    );
+
+    const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const mutedBannerText = computed(() => {
+      const id = incidentDetails.value?.muted_by_downtime_id;
+      if (!id) return "";
+      const end = downtimeOf(id)?.current_window?.end;
+      return end
+        ? t("alerts.downtimes.incident.bannerUntil", {
+            name: nameOf(id),
+            end: formatWindowTime(end, viewerZone),
+          })
+        : t("alerts.downtimes.incident.banner", { name: nameOf(id) });
+    });
+    const openMutingDowntime = () => {
+      const id = incidentDetails.value?.muted_by_downtime_id;
+      if (!id) return;
+      void router.push({
+        name: "downtimeDetail",
+        params: { id },
+        query: {
+          org_identifier: store.state.selectedOrganization?.identifier,
+          folder: downtimeOf(id)?.folder_id,
+        },
+      });
+    };
     // The on-call record this incident paged, if any. Null in OSS, when
     // on-call is off, and when nothing was routed — all of which mean the
     // panel simply does not render.
@@ -1608,11 +1667,7 @@ export default defineComponent({
     /// claiming nobody was paged.
     async function loadOnCallResponse(org: string, incidentId: string) {
       try {
-        const res = await oncallService.listResponsesForIncident({
-          org_identifier: org,
-          incident_id: incidentId,
-        });
-        const records = res.data ?? [];
+        const records = await queryClient.fetchQuery(responsesForIncidentQuery(org, incidentId));
         oncallResponses.value = records;
         // The owner fixes the thing; a liaison contains the blast radius. The
         // owner's record is the one the panel is about.
@@ -1630,10 +1685,8 @@ export default defineComponent({
     async function loadOnCallTeamNames(org: string, records: OnCallResponse[]) {
       if (!records.some((record) => record.team_id)) return;
       try {
-        const res = await oncallService.listTeams({ org_identifier: org });
-        oncallTeamNames.value = Object.fromEntries(
-          (res.data ?? []).map((team) => [team.id, team.name]),
-        );
+        const teams = await queryClient.fetchQuery(oncallTeamsQuery(org));
+        oncallTeamNames.value = Object.fromEntries(teams.map((team) => [team.id, team.name]));
       } catch {
         // The ids still render; a failed lookup must not blank the panel.
         oncallTeamNames.value = {};
@@ -1754,7 +1807,9 @@ export default defineComponent({
     // show elapsed time and flag a run that has outlived the server's staleness window.
     const analysisStartedAt = ref<number | null>(null);
     // Last terminal failure, surfaced persistently in the panel instead of a transient toast.
-    const rcaError = ref<{ reason: string; details: string } | null>(null);
+    const rcaError = ref<{ reason: string; details: string; remedy?: "plans" | "contact" } | null>(
+      null,
+    );
     const rcaCancelling = ref(false);
 
     // Superseded reports (newest first) and which one is being viewed.
@@ -1844,13 +1899,18 @@ export default defineComponent({
 
         // Keep the failure visible until the next run starts. Only the most recent
         // terminal event matters: a later success or cancel clears a older failure.
-        rcaError.value =
-          !nowInFlight && lastTerminalEvent?.type === "ai_analysis_failed"
-            ? {
-                reason: lastTerminalEvent.data?.reason || t("alerts.incidents.rcaFailed"),
-                details: lastTerminalEvent.data?.error_details || "",
-              }
-            : null;
+        // A refused run (no AI credits, consent declined) writes no event, so its
+        // remedy banner stays until a run starts or the user retries.
+        const refused = rcaError.value?.remedy ? rcaError.value : null;
+        rcaError.value = nowInFlight
+          ? null
+          : (refused ??
+            (lastTerminalEvent?.type === "ai_analysis_failed"
+              ? {
+                  reason: lastTerminalEvent.data?.reason || t("alerts.incidents.rcaFailed"),
+                  details: lastTerminalEvent.data?.error_details || "",
+                }
+              : null));
 
         // Transition: banner was showing and analysis just finished — reload to pick up
         // the new report. Skipped when the run failed, since there is nothing new to fetch.
@@ -2554,6 +2614,8 @@ export default defineComponent({
       // Reset correlation state when loading new incident
       correlationData.value = null;
       correlationError.value = null;
+      // A refused run's banner writes no event, so only this can stop it carrying over.
+      if (incidentDetails.value?.id !== incidentId) rcaError.value = null;
 
       try {
         const org = store.state.selectedOrganization.identifier;
@@ -2643,6 +2705,7 @@ export default defineComponent({
       stopInFlightPolling();
       rcaAbortController?.abort();
       rcaAbortController = null;
+      consentLifecycle.abort();
     });
 
     const close = () => {
@@ -2689,9 +2752,17 @@ export default defineComponent({
       }
     };
 
+    // Credit costs label the analysis actions; without them the actions simply show no cost.
+    const aiCreditCosts = ref<AiCreditCounts | null>(null);
+
     // Add keyboard event listener on mount
     onMounted(() => {
       window.addEventListener("keydown", handleEscapeKey);
+      if (config.isCloud === "true") {
+        BillingService.get_ai_usage(store.state.selectedOrganization.identifier)
+          .then((res) => (aiCreditCosts.value = res.data.costs))
+          .catch(() => {});
+      }
     });
 
     // Remove keyboard event listener on unmount
@@ -2955,6 +3026,55 @@ export default defineComponent({
       }
     };
 
+    const requestRcaWithConsent = async (
+      org: string,
+      incidentId: string,
+      params: { reanalysis?: boolean; build_on_previous?: boolean },
+      signal?: AbortSignal,
+    ) => {
+      try {
+        return await incidentsService.triggerRca(org, incidentId, params, { signal });
+      } catch (error: unknown) {
+        const status = isAxiosError(error) ? (error.response?.status ?? 0) : 0;
+        const body: unknown = isAxiosError(error) ? error.response?.data : null;
+        if (!isPaidOverageConsentError(status, body)) throw error;
+
+        // A denied request never started on the server. Stop optimistic loading
+        // and polling while the user decides whether to authorize paid usage.
+        const wasLoading = rcaLoading.value;
+        rcaLoading.value = false;
+        analysisStartedAt.value = null;
+        if (!analysisInFlight.value) stopInFlightPolling();
+
+        const consentSignal = signal ?? consentLifecycle.signal;
+        const accepted = await promptForConsent(org, "ai_credits", body.consent, consentSignal);
+        const drawerStillActive =
+          !consentSignal.aborted &&
+          store.state.selectedOrganization.identifier === org &&
+          incidentDetails.value?.id === incidentId;
+        if (!accepted || !drawerStillActive) {
+          if (!accepted && drawerStillActive) {
+            // Persist it with the way out: Plans is where paid usage is turned on.
+            rcaError.value = {
+              reason: t("paidUsage.declinedNotice"),
+              details: "",
+              remedy: "plans",
+            };
+          }
+          return null;
+        }
+
+        // The replacement request is the run itself, so it gets the running state back.
+        if (wasLoading) {
+          rcaLoading.value = true;
+          analysisStartedAt.value = Date.now() * 1000;
+          startInFlightPolling();
+        }
+        // Exactly one guarded replacement request. A second denial propagates.
+        return incidentsService.triggerRca(org, incidentId, params, { signal });
+      }
+    };
+
     // Handle severity change from dropdown
     const handleSeverityChange = async (newSeverity: "P1" | "P2" | "P3" | "P4") => {
       if (!incidentDetails.value || updating.value) return;
@@ -2992,25 +3112,46 @@ export default defineComponent({
           } else {
             const ok = await confirm({
               title: t("alerts.incidents.rerunAnalysisTitle"),
-              message: t("alerts.incidents.rerunAnalysisMessage"),
+              message: aiCreditCosts.value
+                ? t(
+                    "alerts.incidents.rerunAnalysisMessageWithCost",
+                    { cost: aiCreditCosts.value.incident_reanalysis },
+                    aiCreditCosts.value.incident_reanalysis,
+                  )
+                : t("alerts.incidents.rerunAnalysisMessage"),
               confirmLabel: t("alerts.incidents.rerunAnalysisConfirmLabel"),
               cancelLabel: t("alerts.incidents.rerunAnalysisCancelLabel"),
               persistent: false,
             });
             if (ok) {
               try {
-                await incidentsService.triggerRca(org, incidentId, { reanalysis: true });
+                const response = await requestRcaWithConsent(org, incidentId, {
+                  reanalysis: true,
+                });
+                if (!response) return;
                 toast({
                   variant: "success",
                   message: t("toastMessages.alerts.aiReanalysisStarted"),
                 });
                 await loadDetails(incidentId);
-              } catch (e: any) {
-                toast({
-                  variant: "error",
-                  message:
-                    e?.response?.data?.message || t("alerts.incidents.reanalysisStartFailed"),
-                });
+              } catch (error: unknown) {
+                const responseData: unknown = isAxiosError(error) ? error.response?.data : null;
+                const message = isAiCreditsExhausted(responseData)
+                  ? aiCreditsNotice(responseData, t)
+                  : responseData &&
+                      typeof responseData === "object" &&
+                      "message" in responseData &&
+                      typeof responseData.message === "string"
+                    ? raw(responseData.message)
+                    : t("alerts.incidents.reanalysisStartFailed");
+                if (isAiCreditsExhausted(responseData)) {
+                  rcaError.value = {
+                    reason: message,
+                    details: "",
+                    remedy: aiCreditsAction(responseData),
+                  };
+                }
+                toast({ variant: "error", message });
               }
             }
           }
@@ -3068,6 +3209,19 @@ export default defineComponent({
       }
     };
 
+    // A fence only closes on the character it opened with, so ``` inside ~~~ stays code.
+    const createCodeFenceTracker = () => {
+      let openFence: string | null = null;
+      return (line: string): boolean => {
+        const marker = line.match(/^\s*(```|~~~)/)?.[1];
+        if (marker && (!openFence || openFence === marker)) {
+          openFence = openFence ? null : marker;
+          return true;
+        }
+        return openFence !== null;
+      };
+    };
+
     // Extract headings from markdown content to build table of contents
     const extractTableOfContents = (content: string): TocItem[] => {
       // Handle both actual newlines and escaped \n in JSON strings
@@ -3075,19 +3229,10 @@ export default defineComponent({
       const lines = normalizedContent.split("\n");
       const toc: TocItem[] = [];
       const stack: TocItem[] = [];
-      let inCodeBlock = false;
+      const isCode = createCodeFenceTracker();
 
       lines.forEach((line) => {
-        // Check for code block delimiters (````)
-        if (line.trim().startsWith("```")) {
-          inCodeBlock = !inCodeBlock;
-          return;
-        }
-
-        // Skip lines inside code blocks
-        if (inCodeBlock) {
-          return;
-        }
+        if (isCode(line)) return;
 
         const match = line.match(/^(#{1,3})\s+(.+)$/);
         if (match) {
@@ -3254,7 +3399,32 @@ export default defineComponent({
       return result.join("\n");
     };
 
-    const formatRcaContent = (content: string) => {
+    // Some agent reports mark sections with a standalone bold line instead of `##`.
+    const promoteBoldLinesToHeadings = (content: string): string => {
+      const isCode = createCodeFenceTracker();
+      const lines = content.split("\n").map((text) => ({ text, prose: !isCode(text) }));
+      // A report that already has sections uses its bold lines as sub-labels, not sections.
+      if (lines.some((l) => l.prose && /^#{2,3}\s/.test(l.text))) return content;
+      return lines
+        .map(({ text, prose }, i) => {
+          const prev = lines[i - 1]?.text.trim() ?? "";
+          // A bold line glued to the line above is part of that paragraph or list.
+          const startsBlock = prev === "" || /^([-*_])\1{2,}$/.test(prev);
+          const match =
+            prose && startsBlock
+              ? text.match(
+                  /^(?:\*\*([^*\s](?:[^*\n]*[^*\s])?)\*\*|__([^_\s](?:[^_\n]*[^_\s])?)__)\s*:?\s*$/,
+                )
+              : null;
+          if (!match) return text;
+          return `## ${(match[1] ?? match[2] ?? "").replace(/:$/, "").trim()}`;
+        })
+        .join("\n");
+    };
+
+    const formatRcaContent = (rawContent: string) => {
+      const content = promoteBoldLinesToHeadings(rawContent);
+
       // First, extract table of contents - only update if content changed
       const newToc = extractTableOfContents(content);
       if (JSON.stringify(newToc) !== JSON.stringify(tableOfContents.value)) {
@@ -3474,13 +3644,14 @@ export default defineComponent({
       rcaAbortController = new AbortController();
 
       try {
-        const response = await incidentsService.triggerRca(
+        const response = await requestRcaWithConsent(
           org,
           incidentId,
           // Fresh analysis unless the user explicitly asked to build on the previous one.
           { build_on_previous: options.buildOnPrevious === true },
-          { signal: rcaAbortController.signal },
+          rcaAbortController.signal,
         );
+        if (!response) return;
 
         // Set the RCA content immediately
         rcaStreamContent.value = response.data.rca_content;
@@ -3503,12 +3674,16 @@ export default defineComponent({
         }
 
         console.error("Failed to trigger RCA:", error);
-        const message =
-          error?.response?.data?.message ||
-          error?.message ||
-          t("alerts.incidents.rcaFailedGeneric");
+        const responseData = error?.response?.data;
+        const message = isAiCreditsExhausted(responseData)
+          ? aiCreditsNotice(responseData, t)
+          : responseData?.message || error?.message || t("alerts.incidents.rcaFailedGeneric");
         // Persist the failure in the panel; the toast alone disappears.
-        rcaError.value = { reason: message, details: "" };
+        rcaError.value = {
+          reason: message,
+          details: "",
+          remedy: isAiCreditsExhausted(responseData) ? aiCreditsAction(responseData) : undefined,
+        };
         toast({ variant: "error", message });
         // Surface the failure event in the Activity timeline too.
         timelineRefreshTrigger.value++;
@@ -3573,6 +3748,9 @@ export default defineComponent({
     };
 
     return {
+      aiCreditCosts,
+      mutedBannerText,
+      openMutingDowntime,
       raw,
       t,
       store,

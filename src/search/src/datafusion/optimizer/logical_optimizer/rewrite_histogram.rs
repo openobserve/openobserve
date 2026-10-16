@@ -254,7 +254,7 @@ impl TreeNodeRewriter for HistogramToDatebin {
                             &self.options,
                         ))),
                         args: vec![Expr::Literal(
-                            ScalarValue::from("2001-01-01T00:00:00"),
+                            ScalarValue::from(config::meta::histogram_origin::ORIGIN_LITERAL),
                             None,
                         )],
                     });

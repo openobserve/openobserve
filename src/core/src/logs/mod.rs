@@ -66,6 +66,62 @@ static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
 pub type IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
 
+/// No association names `_all_values`, so the scan leaves its stale pre-redaction text.
+#[cfg(feature = "vectorscan")]
+pub fn snapshot_derived_sources(records: &[(i64, Map<String, Value>)]) -> Vec<String> {
+    let max_len = get_config().limit.index_all_max_value_length;
+    records
+        .iter()
+        .map(|(_, record)| {
+            if record.contains_key(config::ALL_VALUES_COL_NAME) {
+                all_values_of(record, max_len)
+            } else {
+                String::new()
+            }
+        })
+        .collect()
+}
+
+/// `_original` is redacted in place by the engine; only `_all_values` needs rebuilding here.
+#[cfg(feature = "vectorscan")]
+pub fn refresh_derived_columns(before: &[String], records: &mut [(i64, Map<String, Value>)]) {
+    let max_len = get_config().limit.index_all_max_value_length;
+    for (stale, (_, record)) in before.iter().zip(records.iter_mut()) {
+        if !record.contains_key(config::ALL_VALUES_COL_NAME) {
+            continue;
+        }
+        let values = all_values_of(record, max_len);
+        if &values == stale {
+            continue;
+        }
+        record.insert(
+            config::ALL_VALUES_COL_NAME.to_string(),
+            Value::String(values),
+        );
+    }
+}
+
+/// The `_all_values` concatenation: every field but the derived ones, space-joined.
+#[cfg(feature = "vectorscan")]
+fn all_values_of(record: &Map<String, Value>, max_len: usize) -> String {
+    let mut values = Vec::with_capacity(record.len());
+    for (k, value) in record.iter() {
+        if [
+            TIMESTAMP_COL_NAME,
+            config::ID_COL_NAME,
+            config::ORIGINAL_DATA_COL_NAME,
+            config::ALL_VALUES_COL_NAME,
+        ]
+        .contains(&k.as_str())
+            || (max_len != 0 && value.as_str().is_some_and(|s| s.len() > max_len))
+        {
+            continue;
+        }
+        values.push(value.to_string());
+    }
+    values.join(" ")
+}
+
 fn parse_bulk_index(v: &Value) -> Option<(&str, &str, Option<&str>)> {
     let local_val = v.as_object()?;
     for action in BULK_OPERATORS {
@@ -213,38 +269,43 @@ async fn write_logs_by_stream(
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, &stream_name, None)
         {
-            log::warn!("stream [{stream_name}] is being deleted");
+            log::warn!("stream [{org_id}/{stream_name}] is being deleted");
             stream_skipped = true;
             continue; // skip
         }
 
-        // for cloud, we want to sent event when user creates a new stream
-        #[cfg(feature = "cloud")]
-        if get_stream(org_id, &stream_name, StreamType::Logs)
-            .await
-            .is_none()
+        if crate::ingestion::checks_for_new_stream(org_id)
+            && !infra::schema::exists(org_id, StreamType::Logs, &stream_name).await
         {
-            let org = match super::organization::get_org(org_id).await {
-                None => {
-                    return Err(Error::Message(format!(
-                        "org with id {org_id} not found in db"
-                    )));
-                }
-                Some(org) => org,
-            };
+            // for cloud, we want to sent event when user creates a new stream
+            #[cfg(feature = "cloud")]
+            if get_stream(org_id, &stream_name, StreamType::Logs)
+                .await
+                .is_none()
+            {
+                let org = match super::organization::get_org(org_id).await {
+                    None => {
+                        return Err(Error::Message(format!(
+                            "org with id {org_id} not found in db"
+                        )));
+                    }
+                    Some(org) => org,
+                };
 
-            super::self_reporting::cloud_events::enqueue_cloud_event(
-                super::self_reporting::cloud_events::CloudEvent {
-                    org_id: org.identifier.clone(),
-                    org_name: org.name.clone(),
-                    org_type: org.org_type.clone(),
-                    user: Some(user_email.to_string()),
-                    event: super::self_reporting::cloud_events::EventType::StreamCreated,
-                    subscription_type: None,
-                    stream_name: Some(stream_name.clone()),
-                },
-            )
-            .await;
+                super::self_reporting::cloud_events::enqueue_cloud_event(
+                    super::self_reporting::cloud_events::CloudEvent {
+                        org_id: org.identifier.clone(),
+                        org_name: org.name.clone(),
+                        org_type: org.org_type.clone(),
+                        user: Some(user_email.to_string()),
+                        event: super::self_reporting::cloud_events::EventType::StreamCreated,
+                        subscription_type: None,
+                        stream_name: Some(stream_name.clone()),
+                    },
+                )
+                .await;
+            }
+            super::onboarding::on_user_stream_created(org_id, StreamType::Logs, &stream_name);
         }
 
         // write json data by stream
@@ -348,6 +409,7 @@ async fn write_logs(
     }
 
     if config::get_config().db_monitoring.enabled
+        && crate::db_monitoring::server_vantage::is_dbm_server_stream(stream_name)
         && crate::db_monitoring::server_vantage::batch_has_dbm_records(
             json_data.iter().map(|(_, record)| record),
         )
@@ -358,15 +420,19 @@ async fn write_logs(
 
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    crate::ingestion::get_stream_alerts(
-        &[StreamParams {
-            org_id: org_id.to_owned().into(),
-            stream_name: stream_name.to_owned().into(),
-            stream_type: StreamType::Logs,
-        }],
-        &mut stream_alerts_map,
-    )
-    .await;
+    // Chat history never reaches a realtime alert, even one stored before alerts there were
+    // refused.
+    if !config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(stream_name) {
+        crate::ingestion::get_stream_alerts(
+            &[StreamParams {
+                org_id: org_id.to_owned().into(),
+                stream_name: stream_name.to_owned().into(),
+                stream_type: StreamType::Logs,
+            }],
+            &mut stream_alerts_map,
+        )
+        .await;
+    }
     let cur_stream_alerts =
         stream_alerts_map.get(&format!("{}/{}/{}", org_id, StreamType::Logs, stream_name));
     let mut triggers: TriggerAlertData =
@@ -504,7 +570,9 @@ async fn write_logs(
                         // the data doesn't satisfy the alert condition
                     }
                     Err(e) => {
-                        log::error!("[LOGS] Error while evaluating realtime alert: {e}");
+                        log::error!(
+                            "[LOGS] Error while evaluating realtime alert: org_id: {org_id}, error: {e}"
+                        );
                     }
                 }
             }
@@ -776,5 +844,63 @@ mod tests {
         assert!(ts >= before && ts <= after);
         // field should be inserted
         assert!(val.get(TIMESTAMP_COL_NAME).is_some());
+    }
+
+    #[cfg(feature = "vectorscan")]
+    fn record_with(pairs: &[(&str, &str)]) -> (i64, Map<String, Value>) {
+        let mut record = Map::new();
+        for (k, v) in pairs {
+            record.insert(k.to_string(), Value::from(*v));
+        }
+        (1, record)
+    }
+
+    #[test]
+    #[cfg(feature = "vectorscan")]
+    fn refresh_rebuilds_all_values_from_the_redacted_fields() {
+        let mut records = vec![record_with(&[
+            ("email", "bob@x.com"),
+            (config::ALL_VALUES_COL_NAME, "\"bob@x.com\""),
+        ])];
+        let before = snapshot_derived_sources(&records);
+        records[0]
+            .1
+            .insert("email".to_string(), Value::from("[REDACTED]"));
+        refresh_derived_columns(&before, &mut records);
+
+        let rebuilt = records[0].1[config::ALL_VALUES_COL_NAME].as_str().unwrap();
+        assert!(rebuilt.contains("[REDACTED]"));
+        assert!(!rebuilt.contains("bob@x.com"));
+    }
+
+    #[test]
+    #[cfg(feature = "vectorscan")]
+    fn refresh_keeps_original_the_engine_already_redacted() {
+        let mut records = vec![record_with(&[
+            ("email", "[REDACTED]"),
+            (config::ORIGINAL_DATA_COL_NAME, "{\"email\":\"[REDACTED]\"}"),
+            (config::ALL_VALUES_COL_NAME, "\"bob@x.com\""),
+        ])];
+        let before = vec!["stale".to_string()];
+        refresh_derived_columns(&before, &mut records);
+
+        assert_eq!(
+            records[0].1[config::ORIGINAL_DATA_COL_NAME].as_str(),
+            Some("{\"email\":\"[REDACTED]\"}")
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "vectorscan")]
+    fn a_record_without_all_values_is_left_alone() {
+        let mut records = vec![record_with(&[
+            ("email", "[REDACTED]"),
+            (config::ORIGINAL_DATA_COL_NAME, "{\"email\":\"[REDACTED]\"}"),
+        ])];
+        let before = snapshot_derived_sources(&records);
+        assert_eq!(before, vec![String::new()]);
+
+        refresh_derived_columns(&before, &mut records);
+        assert_eq!(records[0].1.len(), 2);
     }
 }

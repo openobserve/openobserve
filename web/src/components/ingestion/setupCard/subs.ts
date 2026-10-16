@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { maskSecret } from "@/composables/useCredentialSnippet";
 import type { CardSubstitutions } from "./types";
 
-/** Placeholder shown in masked code instead of the base64 token. */
+/** Placeholder shown in masked code while the token is not known yet. */
 export const MASKED_TOKEN = "••••••••••••••••••••••••••••";
 
 /**
@@ -41,7 +42,10 @@ export function applySubs(template: string, subs: CardSubstitutions): string {
     .replaceAll("{token}", subs.token);
 }
 
-/** The masked counterpart of applySubs — same template, token hidden. */
+/** The masked counterpart of applySubs: the token keeps its first and last four characters, as on every snippet. */
 export function applySubsMasked(template: string, subs: CardSubstitutions): string {
-  return applySubs(template, { ...subs, token: MASKED_TOKEN });
+  return applySubs(template, {
+    ...subs,
+    token: subs.token ? maskSecret(subs.token) : MASKED_TOKEN,
+  });
 }

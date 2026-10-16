@@ -21,7 +21,7 @@ function onSelect(prompt: string) {
     ></div>
     <!-- eslint-enable local/no-hardcoded-px -->
     <div
-      class="o2-ai-home-welcome__inner relative z-1 flex w-full max-w-240 flex-col items-center gap-6 px-6 pt-6 pb-4"
+      class="o2-ai-home-welcome__inner relative z-1 flex w-full max-w-240 flex-col items-center gap-6 px-6 pt-6 pb-4 max-md:gap-3 max-md:px-2 max-md:pt-1"
     >
       <WelcomeGreeting />
       <CapabilityCards @select="onSelect" />

@@ -55,7 +55,8 @@ const mergedSteps = computed(() => {
   const ex = props.execution;
   if (!ex) return [];
   const nameMap = new Map<string, RecordedStep>(ex.recordedSteps.map((s) => [s.id, s]));
-  if (ex.steps.length) {
+  // A failed start load ran no Step, and a Step that never ran is not a failed one.
+  if (ex.steps.length || ex.startLoad) {
     return ex.steps.map((s: StepResult) => ({
       ...s,
       name: nameMap.get(s.stepId)?.name ?? s.stepId,
@@ -147,11 +148,75 @@ function fmtDuration(ms: number) {
 
           <!-- Steps -->
           <div class="flex-1 overflow-y-auto px-5 py-4">
-            <p v-if="!mergedSteps.length" class="text-text-muted text-xs italic">
+            <p
+              v-if="!mergedSteps.length && !execution.startLoad"
+              class="text-text-muted text-xs italic"
+            >
               {{ t("synthetics.executionDetail.noStepData") }}
             </p>
 
             <div v-else class="flex flex-col gap-3">
+              <!-- Row 0: the Starting URL, above the numbered Steps and counted in none of them. -->
+              <div
+                v-if="execution.startLoad"
+                class="rounded-default overflow-hidden border"
+                :class="
+                  execution.startLoad.status === 'fail'
+                    ? 'border-error-500/40'
+                    : 'border-border-default'
+                "
+                data-test="synthetics-execution-detail-start-row"
+              >
+                <div
+                  class="flex items-start gap-3 px-3 py-2.5"
+                  :class="
+                    execution.startLoad.status === 'fail' ? 'bg-error-500/10' : 'bg-surface-panel'
+                  "
+                >
+                  <span
+                    class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white"
+                    :class="
+                      execution.startLoad.status === 'fail' ? 'bg-error-500' : 'bg-success-600'
+                    "
+                  >
+                    <OIcon name="language" size="xs" aria-hidden="true" />
+                  </span>
+                  <p
+                    class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium"
+                    :title="execution.startLoad.url"
+                  >
+                    {{ t("synthetics.runDetail.startLoadLabel", { url: execution.startLoad.url }) }}
+                  </p>
+                  <span class="text-text-muted mt-0.5 shrink-0 text-xs tabular-nums">
+                    {{ fmtDuration(execution.startLoad.durationMs) }}
+                  </span>
+                </div>
+                <div
+                  v-if="execution.startLoad.error"
+                  class="border-error-500/20 bg-error-500/5 border-t px-3 py-2"
+                >
+                  <p class="text-error-600 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+                    {{ execution.startLoad.error }}
+                  </p>
+                </div>
+                <div
+                  v-if="execution.startLoad.screenshotKey"
+                  class="border-border-default border-t"
+                >
+                  <a
+                    :href="artifactUrlFn(execution.startLoad.screenshotKey)"
+                    target="_blank"
+                    class="block"
+                  >
+                    <img
+                      :src="artifactUrlFn(execution.startLoad.screenshotKey)"
+                      :alt="t('synthetics.runDetail.screenshotAlt')"
+                      class="max-h-64 w-full object-contain"
+                      loading="lazy"
+                    />
+                  </a>
+                </div>
+              </div>
               <div
                 v-for="(step, i) in mergedSteps"
                 :key="step.stepId"

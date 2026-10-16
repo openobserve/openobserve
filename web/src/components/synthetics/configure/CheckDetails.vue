@@ -19,6 +19,9 @@ import { computed, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BrowserCheck, SyntheticsFolder } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTemplateInput from "@/lib/forms/TemplateInput/OTemplateInput.vue";
+import VariableSuggestionRow from "../variables/VariableSuggestionRow.vue";
+import type { VariableSuggestion } from "../variables/suggestions";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -34,6 +37,10 @@ const props = defineProps<{
   /** Override the target field label/placeholder (protocol checks take a host, not a URL). */
   targetLabel?: I18nText;
   targetPlaceholder?: I18nText;
+  /** Under the URL field; the host says whether the run opens the Starting URL at all. */
+  targetHint?: I18nText;
+  /** Rows offered on `{{` in the target field; absent keeps it a plain input. */
+  variableSuggestions?: VariableSuggestion[];
 }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
@@ -147,15 +154,21 @@ function handleTagKeydown(event: KeyboardEvent) {
         data-test="synthetics-check-details-enabled-switch"
       />
 
-      <OInput
+      <OTemplateInput
         v-model="url"
         :label="targetLabel ?? t('synthetics.checkDetails.startingUrl')"
         required
         :error="!!props.validationErrors?.url"
         :error-message="raw(props.validationErrors?.url)"
         :placeholder="targetPlaceholder ?? t('synthetics.checkDetails.startingUrlPlaceholder')"
+        :help-text="targetHint"
+        :suggestions="variableSuggestions"
         data-test="synthetics-check-details-url-input"
-      />
+      >
+        <template #suggestion="{ suggestion, active }">
+          <VariableSuggestionRow :suggestion="suggestion" :active="active" />
+        </template>
+      </OTemplateInput>
 
       <OInput
         v-model="description"

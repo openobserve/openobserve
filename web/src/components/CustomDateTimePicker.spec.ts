@@ -58,6 +58,29 @@ describe("CustomDateTimePicker.vue", () => {
     });
   });
 
+  describe("Fixed-length units only", () => {
+    const periodValues = (vm: any) => ({
+      rows: vm.relativePeriods.map((p: any) => p.value),
+      select: vm.relativePeriodsSelect.map((p: any) => p.value),
+    });
+
+    it("offers the month unit by default", () => {
+      wrapper = createWrapper({ modelValue: "1d" });
+      const { rows, select } = periodValues(wrapper.vm);
+      expect(rows).toContain("M");
+      expect(select).toContain("M");
+    });
+
+    it("leaves the month unit out when excludeMonths is set", () => {
+      wrapper = createWrapper({ modelValue: "1d", excludeMonths: true });
+      const { rows, select } = periodValues(wrapper.vm);
+      expect(rows).not.toContain("M");
+      expect(select).not.toContain("M");
+      expect(rows).toEqual(expect.arrayContaining(["m", "h", "d", "w"]));
+      expect(select).toEqual(expect.arrayContaining(["m", "h", "d", "w"]));
+    });
+  });
+
   describe("Model Value Handling", () => {
     it("parses modelValue correctly on initialization", () => {
       wrapper = createWrapper({ modelValue: "10m" });

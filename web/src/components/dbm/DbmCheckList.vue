@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   DbmCheckList — the checklist grammar every DBM empty state speaks.
 
   DbmEmptyState and DbmLockEmptyState both render "here is everything that has
-  to be true, with a verdict per line": an uppercase header, then one row per
+  to be true, with a verdict per line": a header, then one row per
   check with a tone-coloured glyph, a title and the specific fix. That grammar
   is the product claim — three different empty screens reading as ONE system —
   so it lives in one component; two hand-kept copies would drift apart one
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex items-center gap-2">
         <span
-          class="text-3xs grid size-3.5 shrink-0 place-items-center rounded-full leading-none font-bold text-white"
+          class="text-3xs text-text-inverse grid size-3.5 shrink-0 place-items-center rounded-full leading-none font-bold"
           :class="STATUS_TONES[check.status]"
         >
           {{ STATUS_GLYPHS[check.status] }}
@@ -78,7 +78,7 @@ export interface DbmCheckRow {
 }
 
 defineProps<{
-  /** The uppercase header — "How we know", "What has to be true". */
+  /** The header — "How we know", "What has to be true". */
   title: I18nText;
   checks: DbmCheckRow[];
   /** `data-test` on the container. */

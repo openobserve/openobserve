@@ -236,7 +236,7 @@ impl super::FileList for PostgresFileList {
             // we don't care the id here, because the id is from file_list table not for this table
             let mut tx = pool.begin().await?;
             let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-                "INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, flattened, created_at)",
+                "INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, mindex_file, flattened, created_at)",
             );
             query_builder.push_values(files, |mut b, item| {
                 let (stream_key, date_key, file_name) =
@@ -247,6 +247,7 @@ impl super::FileList for PostgresFileList {
                     .push_bind(date_key)
                     .push_bind(file_name)
                     .push_bind(item.index_file)
+                    .push_bind(item.mindex_file)
                     .push_bind(item.flattened)
                     .push_bind(created_at);
             });
@@ -497,7 +498,10 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
                 .fetch_all(&pool).await
         } else {
             let (time_start, time_end) = time_range;
-            let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
+            let max_ts_upper_bound = super::calculate_max_ts_upper_bound(
+                time_end,
+                super::max_ts_bound_level(org_id, stream_type, stream_name).await,
+            );
             let (date_from, date_to) = derive_date_range(time_start, time_end);
             let sql = r#"
 SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, mindex_size, bloom_ver, flattened
@@ -576,7 +580,10 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         DB_QUERY_NUMS
             .with_label_values(&["query", "file_list"])
             .inc();
-        let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
+        let max_ts_upper_bound = super::calculate_max_ts_upper_bound(
+            time_end,
+            super::max_ts_bound_level(org_id, stream_type, stream_name).await,
+        );
         let (date_from, date_to) = derive_date_range(time_start, time_end);
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"SELECT * FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND date >= $5 AND date < $6;"#,
@@ -734,6 +741,7 @@ SELECT id, account, stream, date, file, records, index_size, mindex_size FROM fi
         };
         log::debug!("file_list day_partitions: {day_partitions:?}");
 
+        let max_ts_level = super::max_ts_bound_level(org_id, stream_type, stream_name).await;
         let mut tasks = Vec::with_capacity(day_partitions.len());
 
         for (time_start, time_end) in day_partitions {
@@ -743,7 +751,8 @@ SELECT id, account, stream, date, file, records, index_size, mindex_size FROM fi
                 DB_QUERY_NUMS
                 .with_label_values(&["query_ids", "file_list"])
                 .inc();
-                let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
+                let max_ts_upper_bound =
+                    super::calculate_max_ts_upper_bound(time_end, max_ts_level);
                 let (date_from, date_to) = derive_date_range(time_start, time_end);
                 let query = "SELECT id, records, original_size FROM file_list WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts < $4 AND date >= $5 AND date < $6;";
                 sqlx::query_as::<_, super::FileId>(query)
@@ -835,7 +844,10 @@ SELECT id, account, stream, date, file, records, index_size, mindex_size FROM fi
             .with_label_values(&["query_old_data_hours", "file_list"])
             .inc();
         let cfg = get_config();
-        let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
+        let max_ts_upper_bound = super::calculate_max_ts_upper_bound(
+            time_end,
+            super::max_ts_bound_level(org_id, stream_type, stream_name).await,
+        );
         let (date_from, date_to) = derive_date_range(time_start, time_end);
         let sql = r#"
 SELECT date
@@ -898,7 +910,7 @@ SELECT date
             .with_label_values(&["select", "file_list_deleted"])
             .inc();
         let items: Vec<FileListDeleted> = match sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 ORDER BY created_at ASC LIMIT $3;"#
+            r#"SELECT id, account, stream, date, file, index_file, mindex_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 ORDER BY created_at ASC LIMIT $3;"#
         )
         .bind(org_id)
         .bind(time_max)
@@ -912,6 +924,7 @@ SELECT date
                     account: r.account.to_string(),
                     file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                     index_file: r.index_file,
+                    mindex_file: r.mindex_file,
                     flattened: r.flattened,
                 })
                 .collect(),
@@ -975,7 +988,7 @@ SELECT date
             .with_label_values(&["select", "file_list_deleted"])
             .inc();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT id, account, stream, date, file, index_file, flattened FROM file_list_deleted;"#,
+            r#"SELECT id, account, stream, date, file, index_file, mindex_file, flattened FROM file_list_deleted;"#,
         )
         .fetch_all(&pool)
         .await?;
@@ -986,6 +999,7 @@ SELECT date
                 account: r.account.to_string(),
                 file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                 index_file: r.index_file,
+                mindex_file: r.mindex_file,
                 flattened: r.flattened,
             })
             .collect())
@@ -1935,8 +1949,8 @@ WHERE org = $1 AND account = $2;"#;
             .with_label_values(&["insert", "file_list_deleted"])
             .inc();
         sqlx::query(
-            r#"INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, flattened, created_at)
-               SELECT account, org, stream, date, file, index_file, flattened, $2
+            r#"INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, mindex_file, flattened, created_at)
+               SELECT account, org, stream, date, file, index_file, mindex_size > 0, flattened, $2
                FROM file_list WHERE org = $1;"#,
         )
         .bind(org_id)
@@ -3054,6 +3068,7 @@ CREATE TABLE IF NOT EXISTS file_list_deleted
     date       VARCHAR(16)  not null,
     file       VARCHAR(1024) not null,
     index_file BOOLEAN default false not null,
+    mindex_file BOOLEAN DEFAULT FALSE NOT NULL,
     flattened  BOOLEAN default false not null,
     created_at BIGINT not null
 );
@@ -3114,6 +3129,12 @@ CREATE TABLE IF NOT EXISTS stream_stats
         "file_list_deleted",
         "index_file",
         "BOOLEAN default false not null",
+    )
+    .await?;
+    add_column(
+        "file_list_deleted",
+        "mindex_file",
+        "BOOLEAN DEFAULT FALSE NOT NULL",
     )
     .await?;
     add_column(
@@ -3652,6 +3673,7 @@ mod tests {
                 date VARCHAR(16) not null,
                 file VARCHAR(1024) not null,
                 index_file BOOLEAN default false not null,
+                mindex_file BOOLEAN DEFAULT FALSE NOT NULL,
                 flattened BOOLEAN default false not null,
                 created_at BIGINT not null
             )
@@ -3954,6 +3976,7 @@ mod tests {
                 file: "org1/stream1/logs/2021/01/01/pg_deleted1.parquet".to_string(),
                 flattened: false,
                 index_file: false,
+                mindex_file: false,
             },
             FileListDeleted {
                 id: 0,
@@ -3961,6 +3984,7 @@ mod tests {
                 file: "org1/stream1/logs/2021/01/01/pg_deleted2.parquet".to_string(),
                 flattened: true,
                 index_file: true,
+                mindex_file: false,
             },
         ];
 

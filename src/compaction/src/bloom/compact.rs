@@ -103,7 +103,7 @@ pub(crate) async fn build_for_stream(
         return Ok(false);
     }
     let index_fields: HashSet<String> =
-        infra::schema::get_stream_setting_index_fields(&stream_settings)
+        infra::schema::get_stream_setting_index_fields(&stream_settings, stream_type)
             .into_iter()
             .collect();
     // Global default bloom fields apply to every stream, so drop the ones this stream never had.
@@ -320,6 +320,7 @@ async fn cleanup_orphan_blooms(
                     account,
                     file: path,
                     index_file: false, // a `.bf` has no companion `.ttv`
+                    mindex_file: false,
                     flattened: false,
                 });
             }

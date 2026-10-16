@@ -26,7 +26,7 @@ use hashbrown::{HashMap, hash_map::Entry};
 use super::{evaluate_partitions, range_expr::RangeExpr};
 use crate::{
     aggregations::{
-        Accumulate, AggFunc, AggOp, Avg, Count, Group, Max, Min, Rank, Stddev, Stdvar, Sum,
+        Accumulate, AggFunc, AggOp, Avg, Count, Group, Limit, Max, Min, Rank, Stddev, Stdvar, Sum,
     },
     series_stream::SeriesStream,
 };
@@ -54,6 +54,8 @@ where
         AggOp::Bottomk(k) => aggregate_with(sources, Rank::new(k, true), eval).await,
         AggOp::Count => aggregate_with(sources, Count, eval).await,
         AggOp::Group => aggregate_with(sources, Group, eval).await,
+        AggOp::Limitk(k) => aggregate_with(sources, Limit::K(k), eval).await,
+        AggOp::LimitRatio(ratio) => aggregate_with(sources, Limit::Ratio(ratio), eval).await,
         AggOp::Max => aggregate_with(sources, Max, eval).await,
         AggOp::Min => aggregate_with(sources, Min, eval).await,
         AggOp::Stddev => aggregate_with(sources, Stddev, eval).await,
@@ -69,7 +71,7 @@ async fn aggregate_with<A, F, S>(
     eval: Arc<RangeExpr>,
 ) -> Result<(Value, usize)>
 where
-    A: AggFunc + Copy + Send + 'static,
+    A: AggFunc + Clone + Send + 'static,
     A::Accumulator: 'static,
     F: Future<Output = Result<S>> + Send + 'static,
     S: SeriesStream + 'static,
@@ -77,19 +79,18 @@ where
     let start_time = std::time::Instant::now();
     let func_name = eval.func.name();
     let trace_id = &eval.eval_ctx.trace_id;
+    let op_name = func.name();
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) started with {} partitions",
-        func.name(),
+        "[trace_id: {trace_id}] [PromQL Timing] fused {op_name}({func_name}) started with {} partitions",
         sources.len(),
     );
     let (folds, series_count) = evaluate_partitions(sources, &eval, move |source, eval| {
-        aggregate_partial(source, func, eval)
+        aggregate_partial(source, func.clone(), eval)
     })
     .await?;
     let value = aggregate_final(folds, &eval.timestamps);
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) execution took: {:?}, folded {series_count} series into {} series",
-        func.name(),
+        "[trace_id: {trace_id}] [PromQL Timing] fused {op_name}({func_name}) execution took: {:?}, folded {series_count} series into {} series",
         start_time.elapsed(),
         match &value {
             Value::Matrix(matrix) => matrix.len(),
@@ -120,7 +121,7 @@ async fn aggregate_partial<A: AggFunc, S: SeriesStream>(
         source.consume(&mut samples).await?;
         entry
             .acc
-            .push_series(eval.values(&samples), || source.labels());
+            .push_series(eval.values(&mut samples), || source.labels());
         series_count += 1;
         // the fold is pure CPU: give the runtime a chance to time out or abort it
         tokio::task::consume_budget().await;
@@ -180,6 +181,7 @@ mod tests {
     };
     use crate::{
         functions::{self, RangeFunc},
+        scalar_param::ScalarParam,
         series_stream::matrix::{MATRIX_PARTITION_CHUNK, group_sources},
     };
 
@@ -280,17 +282,21 @@ mod tests {
     fn all_ops() -> Vec<AggOp> {
         vec![
             AggOp::Avg,
-            AggOp::Bottomk(1),
-            AggOp::Bottomk(2),
+            AggOp::Bottomk(ScalarParam::Const(1.0)),
+            AggOp::Bottomk(ScalarParam::Const(2.0)),
             AggOp::Count,
             AggOp::Group,
+            AggOp::Limitk(ScalarParam::Const(1.0)),
+            AggOp::Limitk(ScalarParam::Const(2.0)),
+            AggOp::LimitRatio(ScalarParam::Const(0.5)),
+            AggOp::LimitRatio(ScalarParam::Const(-0.5)),
             AggOp::Max,
             AggOp::Min,
             AggOp::Stddev,
             AggOp::Stdvar,
             AggOp::Sum,
-            AggOp::Topk(1),
-            AggOp::Topk(3),
+            AggOp::Topk(ScalarParam::Const(1.0)),
+            AggOp::Topk(ScalarParam::Const(3.0)),
         ]
     }
 
@@ -350,6 +356,12 @@ mod tests {
             "stddev_over_time",
             "stdvar_over_time",
             "sum_over_time",
+            "first_over_time",
+            "mad_over_time",
+            "ts_of_first_over_time",
+            "ts_of_last_over_time",
+            "ts_of_max_over_time",
+            "ts_of_min_over_time",
         ];
         let modifiers = [
             None,
@@ -364,12 +376,18 @@ mod tests {
             for func_name in range_cases {
                 for modifier in &modifiers {
                     let expected =
-                        run_generic(modifier, matrix.clone(), func_name, op, &eval_ctx).unwrap();
-
-                    let actual =
-                        run_materialized(modifier, matrix.clone(), func_name, op, &eval_ctx)
-                            .await
+                        run_generic(modifier, matrix.clone(), func_name, op.clone(), &eval_ctx)
                             .unwrap();
+
+                    let actual = run_materialized(
+                        modifier,
+                        matrix.clone(),
+                        func_name,
+                        op.clone(),
+                        &eval_ctx,
+                    )
+                    .await
+                    .unwrap();
 
                     assert_eq!(
                         canonical_matrix(expected),
@@ -406,12 +424,24 @@ mod tests {
 
         for op in all_ops() {
             for modifier in [None, by(&["path"])] {
-                let expected =
-                    run_generic(&modifier, matrix.clone(), "sum_over_time", op, &eval_ctx).unwrap();
+                let expected = run_generic(
+                    &modifier,
+                    matrix.clone(),
+                    "sum_over_time",
+                    op.clone(),
+                    &eval_ctx,
+                )
+                .unwrap();
                 let first = canonical_matrix(
-                    run_materialized(&modifier, matrix.clone(), "sum_over_time", op, &eval_ctx)
-                        .await
-                        .unwrap(),
+                    run_materialized(
+                        &modifier,
+                        matrix.clone(),
+                        "sum_over_time",
+                        op.clone(),
+                        &eval_ctx,
+                    )
+                    .await
+                    .unwrap(),
                 );
                 assert_eq!(
                     canonical_matrix(expected),
@@ -419,9 +449,15 @@ mod tests {
                     "chunked fused {op:?}(sum_over_time) diverged from generic (modifier: {modifier:?})",
                 );
                 let second = canonical_matrix(
-                    run_materialized(&modifier, matrix.clone(), "sum_over_time", op, &eval_ctx)
-                        .await
-                        .unwrap(),
+                    run_materialized(
+                        &modifier,
+                        matrix.clone(),
+                        "sum_over_time",
+                        op.clone(),
+                        &eval_ctx,
+                    )
+                    .await
+                    .unwrap(),
                 );
                 assert_eq!(
                     first, second,
@@ -456,10 +492,10 @@ mod tests {
 
         for op in [AggOp::Sum, AggOp::Avg] {
             let expected = canonical_matrix(
-                run_generic(&None, matrix.clone(), "rate", op, &eval_ctx).unwrap(),
+                run_generic(&None, matrix.clone(), "rate", op.clone(), &eval_ctx).unwrap(),
             );
             let actual = canonical_matrix(
-                run_materialized(&None, matrix.clone(), "rate", op, &eval_ctx)
+                run_materialized(&None, matrix.clone(), "rate", op.clone(), &eval_ctx)
                     .await
                     .unwrap(),
             );
@@ -616,7 +652,7 @@ mod tests {
     /// Series without the metric name, as the range function output the generic path folds.
     fn streamed_input(matrix: Vec<RangeValue>, func_name: &str) -> Vec<RangeValue> {
         let mut matrix = matrix;
-        if func_name != functions::KEEP_METRIC_NAME_FUNC {
+        if !functions::keeps_metric_name(func_name) {
             for series in &mut matrix {
                 series.labels.retain(|label| label.name != "__name__");
             }
@@ -656,17 +692,28 @@ mod tests {
             by(&["nope"]),
         ];
         let mut ops = all_ops();
-        ops.extend([AggOp::Topk(0), AggOp::Topk(10), AggOp::Bottomk(10)]);
+        ops.extend([
+            AggOp::Topk(ScalarParam::Const(0.0)),
+            AggOp::Topk(ScalarParam::Const(10.0)),
+            AggOp::Bottomk(ScalarParam::Const(10.0)),
+        ]);
         for func_name in ["rate", "last_over_time", "sum_over_time", "delta"] {
-            for &op in &ops {
+            for op in &ops {
                 for modifier in &modifiers {
                     let expected = canonical_matrix(
-                        run_generic(modifier, rank_matrix(), func_name, op, &eval_ctx()).unwrap(),
+                        run_generic(modifier, rank_matrix(), func_name, op.clone(), &eval_ctx())
+                            .unwrap(),
                     );
                     for partitions in [1, 2, 3] {
                         let actual = canonical_matrix(
-                            run_partitioned(rank_matrix(), partitions, func_name, op, modifier)
-                                .await,
+                            run_partitioned(
+                                rank_matrix(),
+                                partitions,
+                                func_name,
+                                op.clone(),
+                                modifier,
+                            )
+                            .await,
                         );
                         let context = format!(
                             "{op:?}({func_name}) over {partitions} partitions (modifier: {modifier:?})"
@@ -696,8 +743,11 @@ mod tests {
             .min_by_key(|series| signature(&series.labels))
             .map(|series| series.labels[0].value.clone())
             .unwrap();
-        for op in [AggOp::Topk(1), AggOp::Bottomk(1)] {
-            let value = run_partitioned(tied.clone(), 2, "rate", op, &None).await;
+        for op in [
+            AggOp::Topk(ScalarParam::Const(1.0)),
+            AggOp::Bottomk(ScalarParam::Const(1.0)),
+        ] {
+            let value = run_partitioned(tied.clone(), 2, "rate", op.clone(), &None).await;
             let Value::Matrix(matrix) = value else {
                 panic!("expected a matrix");
             };
@@ -706,7 +756,7 @@ mod tests {
             assert_eq!(matrix[0].samples.len(), 3, "{op:?}");
             assert_eq!(
                 canonical_matrix(
-                    run_generic(&None, tied.clone(), "rate", op, &eval_ctx()).unwrap()
+                    run_generic(&None, tied.clone(), "rate", op.clone(), &eval_ctx()).unwrap()
                 ),
                 canonical_matrix(Value::Matrix(matrix)),
                 "{op:?}"
@@ -716,9 +766,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_fused_rank_k_zero_and_no_series_are_none() {
-        let value = run_partitioned(rank_matrix(), 2, "rate", AggOp::Topk(0), &None).await;
+        let value = run_partitioned(
+            rank_matrix(),
+            2,
+            "rate",
+            AggOp::Topk(ScalarParam::Const(0.0)),
+            &None,
+        )
+        .await;
         assert!(matches!(value, Value::None));
-        let value = run_partitioned(vec![], 2, "rate", AggOp::Bottomk(3), &None).await;
+        let value = run_partitioned(
+            vec![],
+            2,
+            "rate",
+            AggOp::Bottomk(ScalarParam::Const(3.0)),
+            &None,
+        )
+        .await;
         assert!(matches!(value, Value::None));
     }
 
@@ -726,7 +790,7 @@ mod tests {
     #[tokio::test]
     async fn test_fused_outputs_carry_no_window() {
         for op in all_ops() {
-            let value = run_partitioned(rank_matrix(), 1, "rate", op, &None).await;
+            let value = run_partitioned(rank_matrix(), 1, "rate", op.clone(), &None).await;
             let Value::Matrix(matrix) = value else {
                 panic!("{op:?}: expected a matrix");
             };

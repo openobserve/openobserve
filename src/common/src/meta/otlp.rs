@@ -23,7 +23,10 @@ use opentelemetry_proto::tonic::collector::{
 };
 use prost::Message;
 
-use super::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};
+use super::http::{
+    CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, ERROR_HEADER, HttpResponse as MetaHttpResponse,
+    error_header_value,
+};
 
 /// OTLP `Export*ServiceResponse` whose `partial_success` gets a ProtoJSON body.
 pub trait OtlpExportResponse: Message {
@@ -55,11 +58,11 @@ impl OtlpExportResponse for ExportProfilesServiceResponse {
 
 /// Minimal `google.rpc.Status` for OTLP/HTTP failure bodies.
 #[derive(Clone, PartialEq, Message)]
-struct GoogleRpcStatus {
+pub struct GoogleRpcStatus {
     #[prost(int32, tag = "1")]
-    code: i32,
+    pub code: i32,
     #[prost(string, tag = "2")]
-    message: String,
+    pub message: String,
 }
 
 /// OTLP/HTTP error response: a `google.rpc.Status` encoded the way the request was.
@@ -96,6 +99,28 @@ pub fn otlp_error_response(
                 .into_response()
         }
     }
+}
+
+/// gRPC callers keep the JSON body because `export_reply` reads the reason out of it.
+pub fn otlp_rejection_response(
+    req_type: OtlpRequestType,
+    status: StatusCode,
+    message: impl Into<String>,
+) -> Response {
+    let message = message.into();
+    if req_type == OtlpRequestType::Grpc {
+        return MetaHttpResponse::error_with_header(status, message);
+    }
+    let rpc_code = match status {
+        StatusCode::BAD_REQUEST => 3,          // INVALID_ARGUMENT
+        StatusCode::TOO_MANY_REQUESTS => 8,    // RESOURCE_EXHAUSTED
+        StatusCode::SERVICE_UNAVAILABLE => 14, // UNAVAILABLE
+        _ => 13,                               // INTERNAL
+    };
+    let header = error_header_value(&message);
+    let mut resp = otlp_error_response(req_type, status, rpc_code, message);
+    resp.headers_mut().insert(ERROR_HEADER, header);
+    resp
 }
 
 /// OTLP/HTTP requires the response body to use the encoding the request arrived in.
@@ -177,5 +202,56 @@ mod tests {
             body,
             json::json!({"code": 14, "message": "memtable is full"})
         );
+    }
+
+    async fn body_bytes(resp: Response) -> axum::body::Bytes {
+        to_bytes(resp.into_body(), usize::MAX).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_otlp_rejection_protobuf_is_rpc_status_with_header() {
+        let resp = otlp_rejection_response(
+            OtlpRequestType::HttpProtobuf,
+            StatusCode::BAD_REQUEST,
+            "error while writing log data: too many columns",
+        );
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(resp.headers()[header::CONTENT_TYPE], CONTENT_TYPE_PROTO);
+        assert_eq!(
+            resp.headers()[ERROR_HEADER],
+            "error while writing log data: too many columns"
+        );
+        let status = GoogleRpcStatus::decode(body_bytes(resp).await).unwrap();
+        assert_eq!(status.code, 3);
+        assert_eq!(
+            status.message,
+            "error while writing log data: too many columns"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_otlp_rejection_json_is_proto_json_status_with_header() {
+        let resp = otlp_rejection_response(
+            OtlpRequestType::HttpJson,
+            StatusCode::TOO_MANY_REQUESTS,
+            "trial expired",
+        );
+        assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(resp.headers()[header::CONTENT_TYPE], CONTENT_TYPE_JSON);
+        assert!(resp.headers().contains_key(ERROR_HEADER));
+        let body: json::Value = json::from_slice(&body_bytes(resp).await).unwrap();
+        assert_eq!(body, json::json!({"code": 8, "message": "trial expired"}));
+    }
+
+    #[tokio::test]
+    async fn test_otlp_rejection_grpc_keeps_json_http_response() {
+        let resp = otlp_rejection_response(
+            OtlpRequestType::Grpc,
+            StatusCode::SERVICE_UNAVAILABLE,
+            "memtable is full",
+        );
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let body: MetaHttpResponse = json::from_slice(&body_bytes(resp).await).unwrap();
+        assert_eq!(body.message, "memtable is full");
     }
 }

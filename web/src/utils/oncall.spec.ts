@@ -52,6 +52,7 @@ import {
   priorityTagVariant,
   priorityTone,
   parseRoutingReason,
+  phoneWithoutEmail,
   promoteSeverityFloor,
   promoteSeverityOptions,
   resolvableTimezones,
@@ -1077,9 +1078,29 @@ describe("CHANNEL_WAKES", () => {
   // how a team discovers at 3 a.m. that their P1 only ever sent an email.
   it.each([
     ["email", false],
+    ["sms", true],
+    ["voice", true],
     ["webhook", false],
   ] as const)("%s wakes a locked phone: %s", (channel, expected) => {
     expect(CHANNEL_WAKES[channel]).toBe(expected);
+  });
+});
+
+describe("phoneWithoutEmail", () => {
+  // D13: the server refuses the same rungs on save, and only when the rung has steps.
+  const STEP = { after_micros: 0, targets: [] };
+  it.each([
+    [["sms"], 1, true],
+    [["voice"], 1, true],
+    [["sms", "voice"], 1, true],
+    [["email", "sms"], 1, false],
+    [["email", "sms", "voice"], 1, false],
+    [["webhook"], 1, false],
+    [[], 1, false],
+    [["sms"], 0, false],
+  ] as const)("%j with %i steps needs Email: %s", (channels, steps, expected) => {
+    const rung = { priority: 1, steps: Array(steps).fill(STEP), channels: [...channels] };
+    expect(phoneWithoutEmail(rung)).toBe(expected);
   });
 });
 
@@ -1593,6 +1614,19 @@ describe("toZonedInputValue / fromZonedInputValue", () => {
     for (const partial of ["", "2026", "2026-08", "2026-08-17", "not a date"]) {
       expect(fromZonedInputValue(partial, "UTC"), partial).toBeNull();
     }
+  });
+
+  /// A date field mid-edit (e.g. the year segment re-typed digit by digit)
+  /// round-trips a *zero-padded* partial year through this function —
+  /// `@internationalized/date` pads "19" (two digits typed so far) out to
+  /// "0019". `Date.UTC`'s legacy two-digit-year rule folds any 0-99 year to
+  /// 1900-1999, so a naive implementation reads that as 1919 and commits it,
+  /// stomping whatever the user was typing (issue #14854: rotation "First
+  /// handover" year snapping to 1919 mid-edit). The correct reading is the
+  /// literal year 19.
+  it("does not fold a small zero-padded year into 19xx", () => {
+    const literalYear19 = new Date("0019-09-26T10:00:00.000Z").getTime() * 1000;
+    expect(fromZonedInputValue("0019-09-26T10:00", "UTC")).toBe(literalYear19);
   });
 
   it("falls back rather than throwing on a zone the runtime cannot resolve", () => {

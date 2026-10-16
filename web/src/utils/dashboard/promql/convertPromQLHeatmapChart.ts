@@ -427,9 +427,8 @@ export class HeatmapConverter implements PromQLChartConverter {
       });
     });
 
-    // De-accumulated counts are clamped at zero, so this resolves to [0, max];
-    // routed through the shared helper so the empty-data case is handled in one place.
-    const visualMapRange = visualMapRangeOf(minValue, maxValue);
+    // [0, max] for clamped counts, unless heatmaps drawn side by side share a range so colours compare.
+    const visualMapRange = config?.visual_map_range ?? visualMapRangeOf(minValue, maxValue);
 
     const xAxisData = buildXAxisData(timestamps);
 

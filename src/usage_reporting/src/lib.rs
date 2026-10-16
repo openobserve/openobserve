@@ -5,6 +5,8 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
+pub mod redaction_evidence;
+
 use std::{
     sync::{Arc, LazyLock as Lazy, OnceLock},
     time::Duration,
@@ -82,8 +84,7 @@ pub async fn run() {
 /// rate, so there is no cost argument for gating it the way there is for
 /// `UsageData`.
 ///
-/// Where the record lands is still configurable: `ZO_USAGE_REPORT_TO_OWN_ORG`
-/// governs own-org delivery, and `_meta` always receives a copy.
+/// `_meta` always receives a copy; the originating org's own stream does unless the mode is remote.
 pub fn publish_triggers_usage(trigger: TriggerData) {
     log::debug!(
         "[SELF-REPORTING] Publishing trigger usage: org={}, module={:?}, key={}, status={:?}",
@@ -521,8 +522,11 @@ fn decrement_queue_depth(batch: &[ReportingData]) {
 }
 
 fn count_data(data: &[ReportingData]) -> (i64, i64) {
+    // Redaction rides the usage queue, so it must be counted against that depth gauge.
     data.iter().fold((0, 0), |(usage, error), item| match item {
-        ReportingData::Usage(_) | ReportingData::Trigger(_) => (usage + 1, error),
+        ReportingData::Usage(_) | ReportingData::Trigger(_) | ReportingData::Redaction(_) => {
+            (usage + 1, error)
+        }
         ReportingData::Error(_) => (usage, error + 1),
     })
 }
@@ -655,6 +659,7 @@ mod tests {
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
@@ -662,6 +667,8 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
+            delivery_attempted: None,
         }
     }
 

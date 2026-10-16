@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-show="!item.hideOnDashboard"
           class="me-4 mt-1 max-w-37.5!"
-          :debounce="1000"
+          :debounce="textboxDebounce"
           v-model="item.value"
           :label="item.label || item.name"
           label-position="inside"
@@ -139,7 +139,10 @@ import {
 } from "@/utils/dashboard/variables/variablesUtils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
-import { getVariableKey } from "@/composables/dashboard/useVariablesManager";
+import {
+  getVariableKey,
+  LIVE_COMMIT_DEBOUNCE_MS,
+} from "@/composables/dashboard/useVariablesManager";
 import { useVariablesWatcher, variableLog } from "@/composables/dashboard/useVariableDebugger";
 
 export default defineComponent({
@@ -207,6 +210,10 @@ export default defineComponent({
 
     // Determine if we're using the new manager-based approach
     const useManager = !!manager;
+
+    const textboxDebounce = computed(() =>
+      manager?.isLiveMode?.value ? LIVE_COMMIT_DEBOUNCE_MS : 1000,
+    );
 
     // Computed property to get filtered variables from manager
     const managerVariables = computed(() => {
@@ -320,8 +327,11 @@ export default defineComponent({
       }
     };
 
+    let isUnmounted = false;
+
     // onUnmounted want to cancel the values api call for all http2, and streaming
     onUnmounted(() => {
+      isUnmounted = true;
       // Cancel all active trace IDs for all variables
       Object.keys(traceIdMapper.value).forEach((field) => {
         cancelTraceId(field);
@@ -332,7 +342,31 @@ export default defineComponent({
       Object.keys(currentlyExecutingPromises).forEach((key) => {
         currentlyExecutingPromises[key] = null;
       });
+
+      // A cancelled stream may never call back, and a variable left loading is never fetched again.
+      variablesData.values.forEach((v: any) => {
+        if (v.isLoading && !v.isVariablePartialLoaded) v.isLoading = false;
+      });
     });
+
+    // A load that ended without a stream still running counts as finished, so it never holds panels back.
+    const markLoadEnded = (variableObject: any) => {
+      // Unmounting released this load, and a late callback must not touch the next selector's load.
+      if (isUnmounted) return;
+      if (traceIdMapper.value[variableObject.name]?.length) return;
+      variableObject.isLoading = false;
+      variableObject.isVariableLoadingPending = false;
+      if (!useManager || !manager || variableObject.isVariablePartialLoaded) return;
+      variableObject.isVariablePartialLoaded = true;
+      manager.onVariablePartiallyLoaded(
+        getVariableKey(
+          variableObject.name,
+          variableObject.scope || "global",
+          variableObject.tabId,
+          variableObject.panelId,
+        ),
+      );
+    };
 
     const handleSearchClose = (payload: any, response: any, variableObject: any) => {
       variableObject.isLoading = false;
@@ -356,6 +390,7 @@ export default defineComponent({
       }
 
       removeTraceId(variableObject.name, payload.traceId);
+      markLoadEnded(variableObject);
     };
 
     const handleSearchError = (request: any, err: any, variableObject: any) => {
@@ -365,7 +400,7 @@ export default defineComponent({
       removeTraceId(variableObject.name, request.traceId);
 
       // Mark as done on error so manager's isLoading resolves and panels are not blocked
-      if (!variableObject.isVariablePartialLoaded) {
+      if (!isUnmounted && !variableObject.isVariablePartialLoaded) {
         variableObject.isVariablePartialLoaded = true;
         if (useManager && manager) {
           const variableKey = getVariableKey(
@@ -402,11 +437,13 @@ export default defineComponent({
       // Check if this operation was cancelled before processing
       if (currentlyExecutingPromises[variableObject.name] === null) {
         removeTraceId(variableObject.name, payload.traceId);
+        markLoadEnded(variableObject);
         return;
       }
 
       if (response.type === "cancel_response") {
         removeTraceId(variableObject.name, response.content.trace_id);
+        markLoadEnded(variableObject);
         return;
       }
 
@@ -692,6 +729,7 @@ export default defineComponent({
 
       // Check if this operation was cancelled before proceeding
       if (currentlyExecutingPromises[variableObject.name] === null) {
+        markLoadEnded(variableObject);
         return;
       }
 
@@ -732,8 +770,7 @@ export default defineComponent({
         initializeStreamingConnection(wsPayload, variableObject);
         addTraceId(variableObject.name, wsPayload.traceId);
       } catch (error) {
-        variableObject.isLoading = false;
-        variableObject.isVariableLoadingPending = false;
+        markLoadEnded(variableObject);
       }
     };
 
@@ -1977,8 +2014,7 @@ export default defineComponent({
         // Emit updated data
         emitVariablesData();
       } else {
-        variableObject.isLoading = false;
-        variableObject.isVariableLoadingPending = false;
+        markLoadEnded(variableObject);
       }
     };
 
@@ -2377,6 +2413,7 @@ export default defineComponent({
     return {
       t,
       props,
+      textboxDebounce,
       isVariableCapped,
       isVariableOmitted,
       isVariableOffTab,

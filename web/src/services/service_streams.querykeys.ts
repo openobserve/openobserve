@@ -20,6 +20,8 @@ export const serviceStreamKeys = {
   all: (org: string) => orgKey(org, "serviceStreams"),
   semanticGroups: (org: string) => orgKey(org, "serviceStreams", "semanticGroups"),
   identityConfig: (org: string) => orgKey(org, "serviceStreams", "identityConfig"),
+  servicesList: (org: string) => orgKey(org, "serviceStreams", "servicesList"),
+  dimensionAnalytics: (org: string) => orgKey(org, "serviceStreams", "dimensionAnalytics"),
 };
 
 /** Org-scoped keys cannot be swept for every org at once, so the all-org clear has to be a predicate. */

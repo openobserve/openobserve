@@ -190,11 +190,11 @@ test.describe("Dashboard Create Alert testcases", () => {
       // Verify menu items contain threshold text
       const aboveOption = pm.dashboardPanelEdit.getAlertContextMenuAbove();
       await expect(aboveOption).toBeVisible({ timeout: 5000 });
-      await expect(aboveOption).toContainText("Create Alert with threshold above");
+      await expect(aboveOption).toContainText("Alert when above");
 
       const belowOption = pm.dashboardPanelEdit.getAlertContextMenuBelow();
       await expect(belowOption).toBeVisible({ timeout: 5000 });
-      await expect(belowOption).toContainText("Create Alert with threshold below");
+      await expect(belowOption).toContainText("Alert when below");
 
       // Click "above threshold" option and wait for navigation simultaneously
       await Promise.all([
@@ -375,6 +375,149 @@ test.describe("Dashboard Create Alert testcases", () => {
     }
   );
 
+  test(
+    "should show alert context menu on right-clicking a scatter chart and navigate to alert creation via above threshold",
+    { tag: ["@dashboardCreateAlert", "@functional", "@P0"] },
+    async ({ page }) => {
+      testLogger.info(
+        "Testing alert context menu on scatter chart right-click (above threshold)"
+      );
+
+      const pm = new PageManager(page);
+      const dashName =
+        "Dashboard_Alert_Scatter_" + Math.random().toString(36).slice(2, 11);
+      const panelName =
+        pm.dashboardPanelActions.generateUniquePanelName("alert-scatter");
+
+      await pm.dashboardList.menuItem("dashboards-item");
+      await waitForDashboardPage(page);
+
+      await pm.dashboardCreate.createDashboard(dashName);
+
+      await pm.dashboardCreate.addPanel();
+      await pm.dashboardPanelActions.addPanelName(panelName);
+      await pm.chartTypeSelector.selectChartType("scatter");
+      // A silent chart-type miss leaves bar/line, which also opens the menu and would pass vacuously.
+      await expect(
+        pm.chartTypeSelector.getSelectedChartItem("scatter")
+      ).toHaveAttribute("data-selected", "true");
+      await pm.chartTypeSelector.selectStreamType("logs");
+      await pm.chartTypeSelector.selectStream("e2e_automate");
+      // Scatter allows one X field, so the seeded histogram(_timestamp) must go first.
+      await pm.chartTypeSelector.removeField("x_axis_1", "x");
+      await pm.chartTypeSelector.searchAndAddField("took", "x");
+      // Field names are lowercased on ingest (FloatValue -> floatvalue).
+      await pm.chartTypeSelector.searchAndAddField("floatvalue", "y");
+
+      const streamPromise = waitForStreamComplete(page);
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await streamPromise;
+      await pm.dashboardPanelActions.waitForChartToRender();
+
+      // waitForResponse resolves on SSE headers; waitForStreamComplete waits for the [[DONE]] marker.
+      const dashboardStreamPromise = waitForStreamComplete(page, 30000);
+      await pm.dashboardPanelActions.savePanel();
+      await dashboardStreamPromise;
+      await pm.dashboardPanelActions.getChartRendererCanvasElement().first().waitFor({ state: "visible", timeout: 15000 });
+
+      await pm.dashboardPanelEdit.rightClickChartForAlert();
+
+      await pm.dashboardPanelEdit.expectAlertContextMenuVisible();
+      testLogger.info("Alert context menu is visible after scatter right-click");
+
+      const aboveOption = pm.dashboardPanelEdit.getAlertContextMenuAbove();
+      await expect(aboveOption).toBeVisible({ timeout: 5000 });
+      await expect(aboveOption).toContainText("Alert when above");
+
+      const belowOption = pm.dashboardPanelEdit.getAlertContextMenuBelow();
+      await expect(belowOption).toBeVisible({ timeout: 5000 });
+      await expect(belowOption).toContainText("Alert when below");
+
+      await Promise.all([
+        page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
+          timeout: 15000,
+        }),
+        pm.dashboardPanelEdit.selectAlertAboveThreshold(),
+      ]);
+
+      const currentUrl = page.url();
+      expect(currentUrl).toContain("prefill=panel");
+      // Panel payload rides sessionStorage, since a long query string can be truncated by a proxy.
+      expect(currentUrl).not.toContain("panelData=");
+
+      testLogger.info(
+        "Navigated to alert creation page from scatter context menu (above threshold)"
+      );
+
+      await returnToDashboardFolder(page, pm);
+      await deleteDashboard(page, dashName);
+
+      testLogger.info(
+        "Test completed: Scatter alert context menu above threshold"
+      );
+    }
+  );
+
+  test(
+    "should not show alert context menu on right-clicking a pie chart (non-cartesian series)",
+    { tag: ["@dashboardCreateAlert", "@functional", "@P1"] },
+    async ({ page }) => {
+      testLogger.info(
+        "Testing no alert context menu on pie chart right-click (whitelist no-op)"
+      );
+
+      const pm = new PageManager(page);
+      const dashName =
+        "Dashboard_Alert_Pie_" + Math.random().toString(36).slice(2, 11);
+      const panelName =
+        pm.dashboardPanelActions.generateUniquePanelName("alert-pie");
+
+      await pm.dashboardList.menuItem("dashboards-item");
+      await waitForDashboardPage(page);
+
+      await pm.dashboardCreate.createDashboard(dashName);
+
+      await pm.dashboardCreate.addPanel();
+      await pm.dashboardPanelActions.addPanelName(panelName);
+      await pm.chartTypeSelector.selectChartType("pie");
+      await pm.chartTypeSelector.selectStreamType("logs");
+      await pm.chartTypeSelector.selectStream("e2e_automate");
+      // Pie allows a single Y field, so the seeded count(_timestamp) must go first.
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
+      await pm.chartTypeSelector.searchAndAddField("floatvalue", "y");
+
+      const streamPromise = waitForStreamComplete(page);
+      await pm.dashboardPanelActions.applyDashboardBtn();
+      await streamPromise;
+      await pm.dashboardPanelActions.waitForChartToRender();
+
+      const dashboardStreamPromise = waitForStreamComplete(page, 30000);
+      await pm.dashboardPanelActions.savePanel();
+      await dashboardStreamPromise;
+      await pm.dashboardPanelActions.getChartRendererCanvasElement().first().waitFor({ state: "visible", timeout: 15000 });
+
+      // A lingering no-data overlay would swallow the right-click and make the hidden-menu check vacuous.
+      await pm.dashboardPanelActions.expectCustomChartRendered(expect);
+      await pm.dashboardPanelActions
+        .getNoDataLocator()
+        .first()
+        .waitFor({ state: "hidden", timeout: 20000 });
+
+      // Pie is outside CONTEXT_MENU_SERIES_TYPES, so no menu may appear.
+      await pm.dashboardPanelEdit.rightClickChart();
+
+      await pm.dashboardPanelEdit.expectAlertContextMenuHidden();
+      testLogger.info("No alert context menu after pie right-click (as expected)");
+
+      await pm.dashboardCreate.backToDashboardList();
+      await deleteDashboard(page, dashName);
+
+      testLogger.info(
+        "Test completed: No alert context menu for pie chart"
+      );
+    }
+  );
+
   // ===== P0: END-TO-END ALERT CREATION =====
   // this is skipped for now as we are working on alert v3 
 
@@ -401,7 +544,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       await pm.alertTemplatesPage.ensureTemplateExists(templateName);
       await pm.alertDestinationsPage.ensureDestinationExists(
         destinationName,
-        "DEMO",
+        "https://example.com/webhook",
         templateName
       );
       testLogger.info("Alert infrastructure ready", {
@@ -517,7 +660,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       testLogger.info("Alert found in alerts list", { alertName });
 
       // Cleanup: Delete the alert via kebab menu on the first row
-      const kebabButton = firstRow.locator('[data-test*="-more-options"]').first();
+      const kebabButton = pm.alertsPage.getAlertRowMoreOptions(firstRow);
       await kebabButton.waitFor({ state: "visible", timeout: 5000 });
       await kebabButton.click();
       await pm.alertsPage.getDeleteMenuOption().waitFor({ state: "visible", timeout: 5000 });

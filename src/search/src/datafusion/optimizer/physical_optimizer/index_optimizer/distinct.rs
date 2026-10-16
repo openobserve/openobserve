@@ -30,7 +30,7 @@ use datafusion::{
 use hashbrown::HashSet;
 
 use crate::datafusion::optimizer::physical_optimizer::{
-    index_optimizer::utils::is_complex_plan,
+    index_optimizer::utils::{aggregate_input_drops_rows, is_complex_plan},
     utils::{get_column_name, is_column, is_only_timestamp_filter},
 };
 
@@ -104,6 +104,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
             // only one group by field, no aggregate function
             if aggregate.group_expr().expr().len() == 1
                 && aggregate.aggr_expr().is_empty()
+                && !aggregate_input_drops_rows(aggregate)
                 && let Some((group_expr, _)) = aggregate.group_expr().expr().first()
             {
                 let column_name = get_column_name(group_expr);
@@ -243,6 +244,14 @@ mod tests {
             ),
             (
                 "select name from t where _timestamp >= 175256100000000 and str_match(name, 'a') and _timestamp < 17525610000000000 and status = 'success' group by name order by name asc limit 10",
+                None,
+            ),
+            (
+                "select name from (select * from t where _timestamp >= 175256100000000 and _timestamp < 17525610000000000 limit 100) group by name order by name asc limit 10",
+                None,
+            ),
+            (
+                "select name from (select * from t where _timestamp >= 175256100000000 and _timestamp < 17525610000000000 order by _timestamp desc limit 100) group by name order by name asc limit 10",
                 None,
             ),
             ("SELECT count(*) from t", None),

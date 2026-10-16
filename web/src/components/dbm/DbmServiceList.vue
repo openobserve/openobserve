@@ -41,12 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :style="{ backgroundColor: colorOf(service) }"
         aria-hidden="true"
       ></span>
-      <span class="text-text-body min-w-0 truncate text-xs">
-        {{ raw(service) }}
-        <OTooltip side="bottom" align="center">
-          <template #content>{{ raw(service) }}</template>
-        </OTooltip>
-      </span>
+      <OTruncatedText class="text-text-body text-xs">{{ raw(service) }}</OTruncatedText>
     </span>
     <span v-if="hiddenCount > 0" class="text-text-muted text-2xs shrink-0">
       {{ t("dbm.databases.moreServices", { count: hiddenCount }) }}
@@ -58,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import { raw, useI18nTyped } from "@/types/i18n";
 

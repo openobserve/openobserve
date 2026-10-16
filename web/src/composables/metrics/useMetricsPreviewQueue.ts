@@ -117,6 +117,8 @@ export interface PreviewQueue {
   cancelAll(): void;
   /** Drop one cached response, so the next request for it really runs. */
   invalidate(key: string): void;
+  /** Raises a queued job's priority; a running or unknown key is left alone. */
+  reprioritize(key: string, priority: number): void;
   clearCache(): void;
   setTtl(ms: number): void;
   readonly inFlight: number;
@@ -189,6 +191,11 @@ export function createPreviewQueue(concurrency: number = PREVIEW_CONCURRENCY): P
     for (const waiter of job.waiters) fn(waiter);
     job.waiters = [];
     return true;
+  };
+
+  /** The single priority rule: a job only ever moves up. */
+  const bump = (job: PendingJob, priority: number) => {
+    job.priority = Math.min(job.priority, priority);
   };
 
   const pump = () => {
@@ -298,8 +305,8 @@ export function createPreviewQueue(concurrency: number = PREVIEW_CONCURRENCY): P
 
       const pending = waiting.find((j) => j.key === key);
       if (pending) {
-        // Re-prioritize: a queued prefetch that becomes visible should jump.
-        pending.priority = Math.min(pending.priority, priority);
+        // A queued prefetch that becomes visible should jump.
+        bump(pending, priority);
         return join<T>(pending);
       }
 
@@ -355,6 +362,11 @@ export function createPreviewQueue(concurrency: number = PREVIEW_CONCURRENCY): P
 
     invalidate(key: string) {
       cache.delete(key);
+    },
+
+    reprioritize(key: string, priority: number) {
+      const pending = waiting.find((j) => j.key === key);
+      if (pending) bump(pending, priority);
     },
 
     clearCache() {

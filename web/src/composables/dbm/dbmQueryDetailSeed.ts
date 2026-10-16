@@ -49,7 +49,7 @@ export interface DbmQueryDetailSeed {
 }
 
 /**
- * Same question, window-wise — the comparison `dbmTabCountsKey` already makes:
+ * Same question, window-wise — the comparison `dbMonitoringKeys.badges` already makes:
  * a relative range is the PERIOD (its microsecond bounds re-anchor on every
  * load by design, so comparing them could never match), an absolute range is
  * its exact bounds.

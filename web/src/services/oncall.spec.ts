@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import http from "./http";
 import oncallService from "./oncall";
+import analytics from "./product_analytics";
 
 vi.mock("./http", () => {
   const mockClient = {
@@ -27,6 +28,7 @@ vi.mock("./http", () => {
   };
   return { default: vi.fn(() => mockClient) };
 });
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 describe("oncall service — the request shapes the server actually accepts", () => {
   const client = (http as unknown as ReturnType<typeof vi.fn>)();
@@ -76,9 +78,116 @@ describe("oncall service — the request shapes the server actually accepts", ()
   /// one would be cargo cult.
   describe("acknowledgeResponse", () => {
     it("posts with no body, which is what its handler expects", () => {
+      client.post.mockResolvedValue({ data: {} });
       oncallService.acknowledgeResponse({ org_identifier: "default", response_id: "resp_1" });
 
       expect(client.post).toHaveBeenCalledWith("/api/default/oncall/responses/resp_1/acknowledge");
+    });
+  });
+
+  describe("product analytics", () => {
+    const org_identifier = "default";
+    const team_id = "team_1";
+    const response_id = "resp_1";
+    const cases: [string, "post" | "put", () => Promise<unknown>, string, object?][] = [
+      [
+        "createTeam",
+        "post",
+        () => oncallService.createTeam({ org_identifier, data: { name: "a", timezone: "UTC" } }),
+        "oncall_team_created",
+      ],
+      [
+        "applySchedulePreset",
+        "post",
+        () =>
+          oncallService.applySchedulePreset({
+            org_identifier,
+            team_id,
+            data: { preset: "weekly" },
+          }),
+        "oncall_schedule_saved",
+        { source: "preset", preset: "weekly" },
+      ],
+      [
+        "setPolicy",
+        "put",
+        () => oncallService.setPolicy({ org_identifier, team_id, data: { rungs: [] } }),
+        "oncall_escalation_policy_saved",
+      ],
+      [
+        "createOwnershipRule",
+        "post",
+        () =>
+          oncallService.createOwnershipRule({ org_identifier, data: { team_id, dimensions: {} } }),
+        "oncall_ownership_rule_created",
+      ],
+      [
+        "testPage",
+        "post",
+        () => oncallService.testPage({ org_identifier, team_id }),
+        "oncall_test_page_sent",
+        { reached_anyone: true },
+      ],
+    ];
+
+    it.each(cases)("%s tracks once the server confirms", async (_, verb, call, event, props) => {
+      client[verb].mockResolvedValue({ data: { reached_anyone: true } });
+
+      await call();
+
+      if (props) expect(analytics.track).toHaveBeenCalledWith(event, props);
+      else expect(analytics.track).toHaveBeenCalledWith(event);
+    });
+
+    it.each(cases)("%s does not track a rejected request", async (_, verb, call) => {
+      client[verb].mockRejectedValue(new Error("boom"));
+
+      await expect(call()).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("acknowledge and resolve do not track, since one user action calls them per firing", async () => {
+      client.post.mockResolvedValue({ data: {} });
+
+      await oncallService.acknowledgeResponse({ org_identifier, response_id });
+      await oncallService.resolveResponse({ org_identifier, response_id });
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("testPage reports a missing reached_anyone as false", async () => {
+      client.post.mockResolvedValue({ data: {} });
+
+      await oncallService.testPage({ org_identifier, team_id });
+
+      expect(analytics.track).toHaveBeenCalledWith("oncall_test_page_sent", {
+        reached_anyone: false,
+      });
+    });
+
+    it("setSchedule does not track, since team creation calls it too", async () => {
+      client.put.mockResolvedValue({ data: {} });
+
+      await oncallService.setSchedule({
+        org_identifier,
+        team_id,
+        data: { timezone: "UTC", rotations: [] },
+      });
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("createOverride does not track, since a rolled-back swap calls it too", async () => {
+      client.post.mockResolvedValue({ data: { id: "o1" } });
+
+      await oncallService.createOverride({
+        org_identifier,
+        team_id,
+        data: { user_email: "a@b.c", start_at: 1, end_at: 2 },
+      });
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

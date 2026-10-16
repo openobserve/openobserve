@@ -31,6 +31,11 @@ use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::{check_folder_write_permissions, check_permissions};
 use openobserve_core::{auth::UserEmail, slo::service as slo_service};
+#[cfg(feature = "enterprise")]
+use openobserve_core::{
+    authz::WriteCheck,
+    background_access::{StreamReadCheck, guard_loaded, rbac_enforced},
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -170,8 +175,21 @@ pub async fn create_slo(
             "name must be non empty and less than 256 characters",
         );
     }
-
-    match slo_service::create(&mut slo).await {
+    #[cfg(feature = "enterprise")]
+    let created = {
+        let org_id = slo.org.clone();
+        let check = StreamReadCheck {
+            org_id: &org_id,
+            user_id: &user_email.user_id,
+        };
+        let check = rbac_enforced()
+            .await
+            .then_some(&check as &dyn WriteCheck<Slo>);
+        slo_service::create_checked(&mut slo, check).await
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let created = slo_service::create(&mut slo).await;
+    match created {
         Ok(()) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "SLO saved")
                 .with_id(slo.id.clone())
@@ -232,11 +250,34 @@ pub async fn update_slo(
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
+    #[cfg(not(feature = "enterprise"))]
     if slo.owner.is_none() {
         slo.owner = Some(user_email.user_id.clone());
     }
-
-    match slo_service::update(&mut slo).await {
+    #[cfg(not(feature = "enterprise"))]
+    let editor = slo.owner.clone();
+    // only a named owner moves ownership; an omitted one keeps the stored owner
+    #[cfg(feature = "enterprise")]
+    {
+        slo.owner = slo.owner.take().filter(|owner| !owner.is_empty());
+    }
+    #[cfg(feature = "enterprise")]
+    let editor = Some(user_email.user_id.clone());
+    #[cfg(feature = "enterprise")]
+    let updated = {
+        let org_id = slo.org.clone();
+        let check = StreamReadCheck {
+            org_id: &org_id,
+            user_id: &user_email.user_id,
+        };
+        let check = rbac_enforced()
+            .await
+            .then_some(&check as &dyn WriteCheck<Slo>);
+        slo_service::update_checked(&mut slo, editor.as_deref(), check).await
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let updated = slo_service::update(&mut slo, editor.as_deref()).await;
+    match updated {
         Ok(()) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "SLO updated")
                 .with_id(slo.id.clone())
@@ -413,7 +454,19 @@ pub struct EnableQuery {
 pub async fn enable_slo(
     Path((org_id, slo_id)): Path<(String, String)>,
     Query(q): Query<EnableQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    if q.value
+        && let Err(resp) = guard_loaded(
+            &org_id,
+            &user_email.user_id,
+            openobserve_core::background_access::stored_slo_sources(&org_id, &slo_id),
+        )
+        .await
+    {
+        return resp;
+    }
     match slo_service::set_enabled(&org_id, &slo_id, q.value).await {
         Ok(true) => MetaHttpResponse::json(MetaHttpResponse::message(
             StatusCode::OK,
@@ -559,6 +612,10 @@ fn internal(e: anyhow::Error) -> Response {
 /// the rejection to show its working.
 fn save_error(e: openobserve_core::slo::service::SloError) -> Response {
     use openobserve_core::slo::service::SloError;
+    let e = match e {
+        SloError::Refused(refusal) => return refusal.into_response(),
+        e => e,
+    };
     let status = match &e {
         SloError::Validation(_) => StatusCode::BAD_REQUEST,
         SloError::Budget(_) => StatusCode::PAYLOAD_TOO_LARGE,
@@ -570,6 +627,7 @@ fn save_error(e: openobserve_core::slo::service::SloError) -> Response {
         SloError::FolderNotFound(_) => StatusCode::NOT_FOUND,
         SloError::TemporarilyUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
         SloError::Db(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        SloError::Refused(_) => StatusCode::FORBIDDEN,
     };
     if status == StatusCode::INTERNAL_SERVER_ERROR {
         tracing::error!("[slo] save failed: {e}");

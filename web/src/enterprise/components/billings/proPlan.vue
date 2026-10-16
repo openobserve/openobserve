@@ -48,6 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-body text-base leading-5.5">{{
           t("billing.pricingErrorMessage")
         }}</span>
+        <OButton
+          variant="ghost"
+          size="sm"
+          class="ms-2"
+          data-test="billing-pricing-retry"
+          @click="$emit('retry-pricing')"
+        >
+          {{ t("common.retry") }}
+        </OButton>
       </div>
       <div
         v-for="(feature, index) in features"
@@ -119,11 +128,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="sm-action"
         block
+        data-test="billing-plans-pro-cancel-btn"
         @click="cancelSubscription"
       >
         {{ btnCancelSubscription }}
       </OButton>
-      <OButton v-else variant="primary" size="sm-action" block @click="onSubscribe">
+      <OButton
+        v-else
+        variant="primary"
+        size="sm-action"
+        block
+        data-test="billing-plans-pro-subscribe-btn"
+        @click="onSubscribe"
+      >
         {{ btnSubscribe }}
       </OButton>
     </div>
@@ -138,6 +155,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
+import analytics from "@/services/product_analytics";
 
 export default defineComponent({
   name: "proPlan",
@@ -154,6 +172,7 @@ export default defineComponent({
       setTimeout(function () {
         btnCancelSubscription.value = t("billing.manageSubscription");
       }, 1000);
+      analytics.track("billing_manage_subscription_clicked", { plan: planName });
       emit("update:cancelSubscription");
     };
 
@@ -162,6 +181,7 @@ export default defineComponent({
       setTimeout(function () {
         btnSubscribe.value = t("billing.subscribe");
       }, 1000);
+      analytics.track("billing_subscribe_clicked", { plan: planName });
       emit("update:proSubscription");
     };
 

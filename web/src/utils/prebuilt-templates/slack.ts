@@ -48,13 +48,13 @@ export const isValidSlackWebhookUrl = (url: string): boolean => {
  */
 const slackTemplateBody = JSON.stringify(
   {
-    text: "🚨 *Alert: {alert_name}*",
+    text: "[{alert_status}] *{alert_name}*",
     blocks: [
       {
         type: "header",
         text: {
           type: "plain_text",
-          text: "🚨 {alert_name}",
+          text: "[{alert_status}] {alert_name}",
         },
       },
       {
@@ -62,7 +62,7 @@ const slackTemplateBody = JSON.stringify(
         fields: [
           { type: "mrkdwn", text: "*Stream:*\n{stream_name}" },
           { type: "mrkdwn", text: "*Type:*\n{stream_type}" },
-          { type: "mrkdwn", text: "*Status:*\n🔴 Firing" },
+          { type: "mrkdwn", text: "*Status:*\n{alert_status}" },
           { type: "mrkdwn", text: "*Count:*\n{alert_count}" },
         ],
       },

@@ -24,9 +24,14 @@ export function useSharedVariables() {
   const environments = ref<SyntheticsEnvironment[]>([]);
   const globals = ref<SyntheticsVariable[]>([]);
   const loaded = ref(false);
+  const environmentsLoaded = ref(false);
+  const refreshing = ref(false);
+  let inFlight = 0;
 
   async function refresh() {
     const org = store.state.selectedOrganization.identifier;
+    inFlight += 1;
+    refreshing.value = true;
     // Settled apart: a role that cannot list environments still reads the open global list.
     const [envs, vars] = await Promise.allSettled([
       syntheticsService.listEnvironments(org),
@@ -36,7 +41,10 @@ export function useSharedVariables() {
     globals.value = vars.status === "fulfilled" ? (vars.value.data ?? []) : [];
     // Costs the editor a hint, never the author's work.
     loaded.value = envs.status === "fulfilled" || vars.status === "fulfilled";
+    environmentsLoaded.value = envs.status === "fulfilled";
+    inFlight -= 1;
+    refreshing.value = inFlight > 0;
   }
 
-  return { environments, globals, loaded, refresh };
+  return { environments, globals, loaded, environmentsLoaded, refreshing, refresh };
 }

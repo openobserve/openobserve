@@ -57,6 +57,7 @@ vi.mock("@/composables/usePrebuiltDestinations", () => ({
 }));
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises } from "@vue/test-utils";
 import AlertsDestinationList from "./AlertsDestinationList.vue";
 import destinationService from "@/services/alert_destination";
@@ -97,7 +98,7 @@ const OTableStub = {
       <slot name="toolbar" />
       <slot name="empty" />
       <slot name="actions" />
-      <slot name="bottom" :totalRows="data ? data.length : 0" />
+      <slot name="selection-actions" />
       <template v-for="row in data" :key="row.name">
         <div :data-test="'destination-url-' + row.name">
           <slot name="cell-url" :row="row">{{ urlOf(row) }}</slot>
@@ -174,6 +175,7 @@ describe("AlertsDestinationList", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
 
     // Reset router state
     (router as any).currentRoute.value.query = {};
@@ -243,6 +245,14 @@ describe("AlertsDestinationList", () => {
       wrapper = mountComponent();
       await flushPromises();
       expect(destinationService.list).toHaveBeenCalled();
+    });
+
+    it("asks for include_usage, so its own request shares the dependency graph's cache entry", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(destinationService.list).toHaveBeenCalledWith(
+        expect.objectContaining({ include_usage: true }),
+      );
     });
 
     it("calls templateService.list on mount", async () => {
@@ -657,6 +667,38 @@ describe("AlertsDestinationList", () => {
       const pushedQuery = pushSpy.mock.calls[0][0].query;
       expect(pushedQuery.page).toBe("3");
       expect(pushedQuery.action).toBe("import");
+    });
+  });
+
+  describe("view state restore", () => {
+    it("restores search, tab, page size and sort", () => {
+      useListViewState("alertDestinations", {
+        filterQuery: "slack",
+        tab: "custom",
+        pageSize: 50,
+        sortBy: "name",
+        sortOrder: "desc",
+      });
+      wrapper = mountComponent();
+      const vm = wrapper.vm as any;
+      expect(vm.filterQuery).toBe("slack");
+      expect(vm.activeTab).toBe("custom");
+      expect(vm.pageSize).toBe(50);
+      expect(vm.sortBy).toBe("name");
+      expect(vm.sortOrder).toBe("desc");
+    });
+
+    it("saves changes to the view state", async () => {
+      wrapper = mountComponent();
+      const vm = wrapper.vm as any;
+      vm.filterQuery = "abc";
+      vm.activeTab = "prebuilt";
+      vm.pageSize = 100;
+      await vm.$nextTick();
+      const saved: any = useListViewState("alertDestinations", {});
+      expect(saved.filterQuery).toBe("abc");
+      expect(saved.tab).toBe("prebuilt");
+      expect(saved.pageSize).toBe(100);
     });
   });
 });

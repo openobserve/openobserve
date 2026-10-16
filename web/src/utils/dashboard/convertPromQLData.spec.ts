@@ -298,8 +298,9 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
-        "Limiting the displayed series to ensure optimal performance",
+        "Showing 100 of 150 series to keep the chart fast",
       );
+      expect(result.extras.seriesLimit).toEqual({ shown: 100, total: 150, cap: 100 });
     });
 
     it("should NOT show warning when streaming receives duplicate metrics without hitting limit", async () => {
@@ -397,8 +398,9 @@ describe("Convert PromQL Data Utils", () => {
 
       // Should show warning because we hit the limit and dropped metrics
       expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
-        "Limiting the displayed series to ensure optimal performance",
+        "Showing 100 of 150 series to keep the chart fast",
       );
+      expect(result.extras.seriesLimit).toEqual({ shown: 100, total: 150, cap: 100 });
     });
 
     it("should handle gauge chart type", async () => {
@@ -2287,6 +2289,41 @@ describe("Convert PromQL Data Utils", () => {
       expect(formattedValue).toBe("75.5"); // Based on our mock getUnitValue
     });
 
+    it("should show the latest value of a series on a gauge", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "gauge",
+        config: {},
+        queries: [{ config: { promql_legend: "", min: 0, max: 100 } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { __name__: "gauge_metric" },
+              values: [
+                [1640438800, "45"],
+                [1640442400, "80"],
+                [1640435200, "10"],
+              ],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      expect(result.options.series[0].data[0].value).toBe("80");
+    });
+
     it("should test gauge tooltip valueFormatter function (lines 650-658)", async () => {
       const panelSchema = {
         id: "panel1",
@@ -3322,8 +3359,9 @@ describe("Convert PromQL Data Utils", () => {
 
       // Should limit series and show warning
       expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
-        "Limiting the displayed series to ensure optimal performance",
+        "Showing 100 of 200 series to keep the chart fast",
       );
+      expect(result.extras.seriesLimit).toEqual({ shown: 100, total: 200, cap: 100 });
 
       // Should still calculate legend width for limited series
       expect(result.options.grid.right).toBeGreaterThan(0);
@@ -4764,8 +4802,9 @@ describe("Convert PromQL Data Utils", () => {
       const result = await convert(fixture);
 
       expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
-        "Limiting the displayed series to ensure optimal performance",
+        "Showing 100 of 150 series to keep the chart fast",
       );
+      expect(result.extras.seriesLimit).toEqual({ shown: 100, total: 150, cap: 100 });
     });
 
     it("does not warn when every series survived, even at exactly the cap", async () => {

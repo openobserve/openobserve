@@ -31,6 +31,7 @@ import MemberSubscription from "@/views/MemberSubscription.vue";
 import Error404 from "@/views/Error404.vue";
 import ShortUrl from "@/views/ShortUrl.vue";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 
 const Search = () => import("@/plugins/logs/Index.vue");
 const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
@@ -133,6 +134,35 @@ const dbmEnterpriseGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
+// `=== false`, not falsy: a cold load with `/config` still in flight must not bounce.
+const downtimesRouteGuard = (to: any, from: any, next: any) => {
+  const zoConfig = store.state.zoConfig;
+  const isOss = zoConfig?.build_type === "opensource";
+  if (
+    isOss ||
+    (config.isEnterprise !== "true" && config.isCloud !== "true") ||
+    zoConfig?.downtimes_enabled === false
+  ) {
+    next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
+// `=== false`, not falsy: a cold load with `/config` still in flight must not bounce.
+const alertCalibrationRouteGuard = (to: any, from: any, next: any) => {
+  const zoConfig = store.state.zoConfig;
+  if (
+    zoConfig?.build_type === "opensource" ||
+    (config.isEnterprise !== "true" && config.isCloud !== "true") ||
+    zoConfig?.alert_calibration_enabled === false
+  ) {
+    next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
@@ -145,6 +175,7 @@ const AlertLibrary = () => import("@/views/AlertLibrary/AlertLibrary.vue");
 
 const Functions = () => import("@/views/Functions.vue");
 const FunctionList = () => import("@/components/functions/FunctionList.vue");
+const ImportFunction = () => import("@/components/functions/ImportFunction.vue");
 const EnrichmentTableList = () => import("@/components/functions/EnrichmentTableList.vue");
 const RealUserMonitoring = () => import("@/views/RUM/RealUserMonitoring.vue");
 const SessionViewer = () => import("@/views/RUM/SessionViewer.vue");
@@ -152,6 +183,15 @@ const ErrorViewer = () => import("@/views/RUM/ErrorViewer.vue");
 const AppPerformance = () => import("@/views/RUM/AppPerformance.vue");
 const AppErrors = () => import("@/views/RUM/AppErrors.vue");
 const AppSessions = () => import("@/views/RUM/AppSessions.vue");
+const AppAnalytics = () => import("@/views/RUM/AppAnalytics.vue");
+const AnalyticsOverview = () => import("@/components/rum/productAnalytics/AnalyticsOverview.vue");
+const AnalyticsFunnels = () => import("@/components/rum/productAnalytics/AnalyticsFunnels.vue");
+const SavedFunnelsPage = () => import("@/components/rum/productAnalytics/SavedFunnelsPage.vue");
+const AnalyticsPaths = () => import("@/components/rum/productAnalytics/AnalyticsPaths.vue");
+const AnalyticsRetention = () => import("@/components/rum/productAnalytics/AnalyticsRetention.vue");
+const NamedEventsListPage = () =>
+  import("@/components/rum/productAnalytics/NamedEventsListPage.vue");
+const NamedEventEditor = () => import("@/views/RUM/NamedEventEditor.vue");
 const SourceMaps = () => import("@/views/RUM/SourceMaps.vue");
 const UploadSourceMaps = () => import("@/views/RUM/UploadSourceMaps.vue");
 
@@ -182,6 +222,11 @@ const useRoutes = () => {
       },
     },
     {
+      // A redirect record resolves before the auth guard runs, so the guard only ever sees /login.
+      path: "/signup",
+      redirect: (to: any) => ({ path: "/login", query: { ...to.query, mode: "signup" } }),
+    },
+    {
       path: "/logout",
       // vue-router drops a record with no component/children/redirect, which
       // made this deep link a 404 — the component never renders (the guard
@@ -209,6 +254,17 @@ const useRoutes = () => {
       },
     },
     {
+      // Outside MainLayout and the login redirect: anyone holding a public link can read it.
+      path: "/ai/public/:token",
+      name: "publicSharedChat",
+      component: () => import("@/views/SharedChatView.vue"),
+      props: (to: any) => ({ token: to.params.token, isPublic: true }),
+      meta: {
+        public: true,
+        titleKey: "routeTitles.sharedChat",
+      },
+    },
+    {
       path: "/slack/oauth/callback",
       name: "slackOAuthCallback",
       component: () => import("@/views/SlackOAuthCallback.vue"),
@@ -226,6 +282,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         titleKey: "menu.home",
+        allowOnEmptyData: true,
       },
     },
     {
@@ -235,6 +292,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         titleKey: "menu.search",
+        allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         // Back-compat: Search History / Scheduler used to be `?action=…` overlays
@@ -311,6 +369,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: false,
         titleKey: "menu.metrics",
+        allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         if (hasMetricsEditorParams(to.query) && to.query.mode !== "visualize") {
@@ -360,6 +419,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         titleKey: "menu.traces",
+        allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         const tab = supportedTraceTab(to.query?.tab);
@@ -528,6 +588,13 @@ const useRoutes = () => {
       beforeEnter: routeGuard,
     },
     {
+      path: "infra/kubernetes-2",
+      name: "infraKubernetes2",
+      component: () => import("@/views/Infrastructure/kubernetes2/KubernetesPage.vue"),
+      meta: { titleKey: "menu.kubernetes2" },
+      beforeEnter: routeGuard,
+    },
+    {
       path: "traces/trace-details",
       name: "traceDetails",
       component: TraceDetails,
@@ -593,6 +660,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: false,
         titleKey: "menu.dashboard",
+        allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -662,6 +730,17 @@ const useRoutes = () => {
           path: "functions",
           name: "functionList",
           component: FunctionList,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "functions/import",
+          name: "importFunction",
+          component: ImportFunction,
+          meta: {
+            titleKey: "function.import.title",
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -864,6 +943,80 @@ const useRoutes = () => {
       },
     },
     {
+      path: "alert-calibration",
+      name: "alertCalibration",
+      component: () => import("@/components/alert_calibration/AlertCalibrationDashboard.vue"),
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
+    },
+    {
+      path: "alert-calibration/runs",
+      name: "alertCalibrationRuns",
+      component: () => import("@/components/alert_calibration/AlertCalibrationDigests.vue"),
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
+    },
+    {
+      path: "alert-calibration/settings",
+      name: "alertCalibrationSettings",
+      component: () => import("@/components/alert_calibration/AlertCalibrationSettings.vue"),
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
+    },
+    {
+      path: "alert-calibration/digests/:windowStart/:windowEnd",
+      name: "alertCalibrationDigest",
+      component: () => import("@/components/alert_calibration/AlertCalibrationDigestDetail.vue"),
+      props: true,
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
+    },
+    {
+      path: "downtimes",
+      name: "downtimes",
+      component: () => import("@/components/alerts/downtimes/DowntimeList.vue"),
+      meta: {
+        titleKey: "menu.downtimes",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        downtimesRouteGuard(to, from, next);
+      },
+    },
+    {
+      // Literal segments before the :id catch-all.
+      path: "downtimes/add",
+      name: "addDowntime",
+      component: () => import("@/components/alerts/downtimes/AddDowntime.vue"),
+      meta: {
+        titleKey: "alerts.downtimes.newTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        downtimesRouteGuard(to, from, next);
+      },
+    },
+    {
+      path: "downtimes/:id/edit",
+      name: "editDowntime",
+      component: () => import("@/components/alerts/downtimes/AddDowntime.vue"),
+      meta: {
+        titleKey: "alerts.downtimes.editTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        downtimesRouteGuard(to, from, next);
+      },
+    },
+    {
+      path: "downtimes/:id",
+      name: "downtimeDetail",
+      component: () => import("@/components/alerts/downtimes/DowntimeDetail.vue"),
+      meta: {
+        titleKey: "alerts.downtimes.detailTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        downtimesRouteGuard(to, from, next);
+      },
+    },
+    {
       // Alert status page. Replaces the row-click side panel, and is where a
       // multi-alert's per-group state lives (alerts_2.md §5.4).
       path: "alerts/detail/:alert_id",
@@ -975,6 +1128,15 @@ const useRoutes = () => {
           return;
         }
         routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "ai/shared/:token",
+      name: "sharedChat",
+      component: () => import("@/views/SharedChatView.vue"),
+      props: (to: any) => ({ token: to.params.token }),
+      meta: {
+        titleKey: "routeTitles.sharedChat",
       },
     },
     {
@@ -1112,6 +1274,91 @@ const useRoutes = () => {
           ],
         },
       ],
+    },
+    {
+      path: "product-analytics",
+      name: PA_ROUTES.shell,
+      component: AppAnalytics,
+      meta: {
+        titleKey: "menu.productAnalytics",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+      children: [
+        {
+          path: "overview",
+          name: PA_ROUTES.overview,
+          component: AnalyticsOverview,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "funnels",
+          name: PA_ROUTES.funnels,
+          component: SavedFunnelsPage,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "funnels/build",
+          name: PA_ROUTES.funnelBuilder,
+          component: AnalyticsFunnels,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "paths",
+          name: PA_ROUTES.paths,
+          component: AnalyticsPaths,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "retention",
+          name: PA_ROUTES.retention,
+          component: AnalyticsRetention,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "events",
+          name: PA_ROUTES.events,
+          component: NamedEventsListPage,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+      ],
+    },
+    // Siblings of the shell, not children, so the editor renders without its sub-tab strip.
+    {
+      path: "product-analytics/events/new",
+      name: PA_ROUTES.eventNew,
+      component: NamedEventEditor,
+      meta: {
+        titleKey: "rum.analytics.events.createTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "product-analytics/events/:id/edit",
+      name: PA_ROUTES.eventEdit,
+      component: NamedEventEditor,
+      props: true,
+      meta: {
+        titleKey: "rum.analytics.events.editTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
     },
     ...useIngestionRoutes(),
     ...useEnterpriseRoutes(),

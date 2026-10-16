@@ -65,7 +65,9 @@ pub async fn set_deduplication_config(
         )
         .await
     {
-        log::error!("[SUPER_CLUSTER] Failed to publish semantic_groups put: {e}");
+        log::error!(
+            "[SUPER_CLUSTER] Failed to publish semantic_groups put: org_id: {org_id}, error: {e}"
+        );
     }
 
     Ok(())
@@ -88,7 +90,9 @@ pub async fn delete_deduplication_config(org_id: &str) -> Result<(), anyhow::Err
         && let Err(e) =
             o2_enterprise::enterprise::super_cluster::queue::semantic_groups_delete(org_id).await
     {
-        log::error!("[SUPER_CLUSTER] Failed to publish semantic_groups delete: {e}");
+        log::error!(
+            "[SUPER_CLUSTER] Failed to publish semantic_groups delete: org_id: {org_id}, error: {e}"
+        );
     }
 
     Ok(())

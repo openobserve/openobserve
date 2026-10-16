@@ -40,11 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ patternLevelInfo.level }}
             </span>
-            <h4
-              class="text-text-heading m-0 min-w-0 truncate text-base leading-tight font-semibold"
+            <OTruncatedText
+              as="h4"
+              class="text-text-heading m-0 text-base leading-tight font-semibold"
             >
               {{ selectedPattern?.pattern?.description || t("search.patternDetailsTitle") }}
-            </h4>
+            </OTruncatedText>
             <template v-if="selectedPattern">
               <OTag type="countChip" value="neutral" class="shrink-0">
                 {{ selectedTemplateTokens.length }}
@@ -65,10 +66,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </div>
           <!-- Row 2: full-width module path, truncates at edge -->
-          <code
+          <OTruncatedText
             v-if="selectedPattern && patternPathToken"
-            class="text-text-code text-2xs text-text-secondary block w-full truncate font-mono"
-            >{{ patternPathToken }}</code
+            as="code"
+            :tooltip="false"
+            class="text-text-code text-2xs text-text-secondary block w-full font-mono"
+            >{{ patternPathToken }}</OTruncatedText
           >
         </div>
       </template>
@@ -249,9 +252,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="border-card-glass-border w-full border border-solid"
             >
               <template #cell-name="{ row }">
-                <div class="text-primary text-left font-bold">
+                <span class="text-primary text-left font-bold">
                   {{ raw(row.name || "var_" + row.index) }}
-                </div>
+                </span>
               </template>
 
               <template #cell-type="{ row }">
@@ -358,6 +361,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";

@@ -254,16 +254,19 @@ pub(super) fn generate_downsampling_sql(schema: &Schema, rule: &DownsamplingRule
         )
     };
 
+    // a NULL value is a stale marker, which downsampling skips like any SQL aggregate
     let sql = format!(
-        "SELECT {}, to_unixtime(date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('2001-01-01T00:00:00'))) * 1000000 as {}, {}, {} FROM tbl GROUP BY {}, {}",
+        "SELECT {}, to_unixtime(date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('{origin}'))) * 1000000 as {}, {}, {} FROM tbl WHERE {} IS NOT NULL GROUP BY {}, {}",
         HASH_LABEL,
         step,
         TIMESTAMP_COL_NAME,
         TIMESTAMP_ALIAS,
         fields.join(", "),
         fun_str,
+        VALUE_LABEL,
         HASH_LABEL,
         TIMESTAMP_ALIAS,
+        origin = config::meta::histogram_origin::ORIGIN_LITERAL,
     );
 
     let fields = schema
@@ -419,5 +422,75 @@ mod tests {
         assert!(sql.contains("__value__"));
         assert!(sql.contains("300 second"));
         assert!(sql.contains("ORDER BY"));
+    }
+
+    #[tokio::test]
+    async fn test_downsampling_skips_stale_markers() {
+        use arrow::array::{AsArray, Float64Array, UInt64Array};
+        use arrow_schema::Schema;
+        use config::meta::promql::{DownsamplingRule, Function};
+        use datafusion::{datasource::MemTable, prelude::SessionContext};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("instance", DataType::Utf8, true),
+        ]));
+        let second = 1_000_000;
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(UInt64Array::from(vec![1, 1, 1, 1])),
+                Arc::new(Float64Array::from(vec![Some(1.0), Some(2.0), None, None])),
+                Arc::new(Int64Array::from(vec![
+                    0,
+                    10 * second,
+                    20 * second,
+                    400 * second,
+                ])),
+                Arc::new(StringArray::from(vec!["a"; 4])),
+            ],
+        )
+        .unwrap();
+        for (function, expected) in [
+            (Function::Last, 2.0),
+            (Function::First, 1.0),
+            (Function::Avg, 1.5),
+            (Function::Count, 2.0),
+        ] {
+            let ctx = SessionContext::new();
+            let table = MemTable::try_new(schema.clone(), vec![vec![batch.clone()]]).unwrap();
+            ctx.register_table("tbl", Arc::new(table)).unwrap();
+            let rule = DownsamplingRule {
+                rule: None,
+                function: function.clone(),
+                offset: 0,
+                step: 300,
+            };
+            let batches = ctx
+                .sql(&generate_downsampling_sql(&schema, &rule))
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap();
+            let values: Vec<Option<f64>> = batches
+                .iter()
+                .flat_map(|batch| {
+                    let values = arrow::compute::cast(
+                        batch.column_by_name(VALUE_LABEL).unwrap(),
+                        &DataType::Float64,
+                    )
+                    .unwrap();
+                    values
+                        .as_primitive::<arrow::datatypes::Float64Type>()
+                        .iter()
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            // the bucket holding only a marker writes no row
+            assert_eq!(values, vec![Some(expected)], "{function:?}");
+        }
     }
 }

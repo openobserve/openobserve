@@ -116,7 +116,10 @@ const mockSearchObj = reactive({
       // wrap binding start `undefined` and hid the reactivity problem below.
       wrapCells: false,
       navigation: {
-        currentRowIndex: 0,
+        currentRowIndex: 0 as number | null,
+        selectionActive: false,
+        pendingPageSelection: null as any,
+        lastOpenedId: null as string | null,
       },
     },
   },
@@ -232,6 +235,30 @@ describe("SearchResult", () => {
 
       expect(wrapper.emitted("update:datetime")).toBeTruthy();
       expect(wrapper.emitted("update:datetime")[0]).toEqual([{ start, end }]);
+    });
+
+    it("should relay the heatmap's editor-filter-set as metrics:editor-filter-set", async () => {
+      const dashboard = wrapper.findComponent('[data-test="traces-metrics-dashboard"]');
+      await dashboard.vm.$emit("editor-filter-set", "(a = '1') and duration < '1ms'");
+
+      expect(wrapper.emitted("metrics:editor-filter-set")).toEqual([
+        ["(a = '1') and duration < '1ms'"],
+      ]);
+    });
+  });
+
+  describe("comparison relays", () => {
+    it("should relay the comparison's editor-filter-run as metrics:editor-filter-run", async () => {
+      const dashboard = wrapper.findComponent('[data-test="traces-metrics-dashboard"]');
+      await dashboard.vm.$emit("editor-filter-run", "(a = '1') and b = '2'");
+      expect(wrapper.emitted("metrics:editor-filter-run")).toEqual([["(a = '1') and b = '2'"]]);
+    });
+
+    it("should open the comparison through the metrics dashboard", () => {
+      const openComparison = vi.fn();
+      wrapper.vm.metricsDashboardRef = { openComparison };
+      wrapper.vm.openComparison();
+      expect(openComparison).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -368,7 +395,8 @@ describe("SearchResult", () => {
         "remove:searchTerm",
         "search:timeboxed",
         "get:traceDetails",
-        "metrics:filters-updated",
+        "metrics:editor-filter-set",
+        "metrics:editor-filter-run",
         "run-query",
         "remove-filter",
         "jump-to-stream-data",
@@ -389,6 +417,52 @@ describe("SearchResult", () => {
 
     it("should include TracesSearchResultList component", () => {
       expect(wrapper.vm.$options.components).toHaveProperty("TracesSearchResultList");
+    });
+  });
+
+  describe("J/K selection across pages (4a §3.4)", () => {
+    const navigation = () => mockSearchObj.meta.resultGrid.navigation;
+    const select = (index: number) => {
+      navigation().selectionActive = true;
+      navigation().currentRowIndex = index;
+    };
+
+    beforeEach(() => {
+      mockSearchObj.loading = false;
+      navigation().pendingPageSelection = null;
+    });
+
+    it("a paginator change clears the selection, so page 2 row 7 never inherits page 1's (AC6.4)", () => {
+      select(7);
+      wrapper.vm.changePage(2);
+      expect(navigation().selectionActive).toBe(false);
+      expect(navigation().currentRowIndex).toBeNull();
+      expect(mockSearchObj.data.resultGrid.currentPage).toBe(1);
+      expect(wrapper.emitted("update:scroll")).toBeTruthy();
+    });
+
+    it("a J/K crossing keeps its pending selection", () => {
+      select(9);
+      navigation().pendingPageSelection = { page: 2, position: "first", requestId: null };
+      wrapper.findComponent({ name: "TracesSearchResultList" }).vm.$emit("cross-page", 2);
+      expect(navigation().pendingPageSelection?.page).toBe(2);
+      expect(navigation().selectionActive).toBe(true);
+      expect(mockSearchObj.data.resultGrid.currentPage).toBe(1);
+    });
+
+    it("rows-per-page and sort changes clear the selection", () => {
+      select(3);
+      wrapper.vm.changeRowsPerPage(25);
+      expect(navigation().selectionActive).toBe(false);
+      select(3);
+      wrapper.vm.changeSortBy("duration", "asc");
+      expect(navigation().currentRowIndex).toBeNull();
+    });
+
+    it("remembers the opened trace for the Back restore", () => {
+      mockSearchObj.meta.searchMode = "traces";
+      wrapper.vm.expandRowDetail({ trace_id: "abc", trace_start_time: 1, trace_end_time: 2 });
+      expect(navigation().lastOpenedId).toBe("abc");
     });
   });
 });

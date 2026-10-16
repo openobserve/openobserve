@@ -3,7 +3,7 @@ import { LogsQueryPage } from './logsQueryPage.js';
 import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
-import { openNavFlyoutChild } from '../commonActions.js';
+import { openNavFlyoutChild, clickNavUntilRoute, selectLogsViewMode } from '../commonActions.js';
 import { openOSelectDropdown } from '../alertsPages/oselectHelpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -122,7 +122,7 @@ export class LogsPage {
         this.savedViewDialog = '[data-test="search-bar-store-state-saved-view-dialog"]';
         this.savedViewArrow = '[data-test="logs-search-bar-utilities-menu-btn"]';
         // OInput convention §4: drive the auto-derived `-field` inner native input for fill().
-        this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input-field"]';
+        this.savedViewSearchInput = '[data-test="logs-saved-views-dialog-search-field"]';
         // Matches both ConfirmDialog.vue (data-test="confirm-dialog") and SearchBar's inline
         // ODialog (data-test="search-bar-confirm-dialog") via substring selector.
         this.confirmButton = '[data-test*="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
@@ -133,7 +133,7 @@ export class LogsPage {
         this.menuTransformEditorToggleBtn = '[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]';
         this.menuListSavedViewsBtn = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
         this.menuCreateSavedViewBtn = '[data-test="logs-search-bar-menu-create-saved-view-btn"]';
-        this.savedViewsListDialogEl = '[data-test="saved-views-list-dialog"]';
+        this.savedViewsListDialogEl = '[data-test="logs-saved-views-dialog"]';
         this.menuHistogramBtn = '[data-test="logs-search-bar-menu-histogram-btn"]';
         this.menuSqlModeBtn = '[data-test="logs-search-bar-menu-sql-mode-btn"]';
         this.menuSqlModeBtnState = '[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]';
@@ -349,6 +349,8 @@ export class LogsPage {
         this.requiredFieldsErrorText = 'Please select required fields to render the chart';
         // logs.index.selectStarNotSupportedForVisualization (en-US.json)
         this.selectStarNotSupportedToastText = 'Select * query is not supported for visualization';
+        // logs.index.patternsUnavailableForMultiStream (en-US.json) — the multi-stream guard error toast.
+        this.multiStreamPatternsToastText = 'Patterns are not available when multiple streams are selected. Please select a single stream.';
 
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
@@ -382,6 +384,12 @@ export class LogsPage {
         this.logDetailCloseButton = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
         this.logDetailPreviousBtn = '[data-test="log-detail-previous-detail-btn"]';
         this.logDetailNextBtn = '[data-test="log-detail-next-detail-btn"]';
+        this.logDetailPreviousKbd = '[data-test="log-detail-previous-detail-btn-kbd"]';
+        this.logDetailNextKbd = '[data-test="log-detail-next-detail-btn-kbd"]';
+        this.logDetailPageLoading = '[data-test="log-detail-page-loading"]';
+        this.logsDetailNavLive = '[data-test="logs-detail-nav-live"]';
+        this.logsRowNavLive = '[data-test="logs-row-nav-live"]';
+        this.logDetailDialog = '[data-test="logs-search-result-detail-dialog"]';
         this.logDetailWrapToggle = '[data-test="log-detail-wrap-values-toggle-btn"]';
 
         // ===== VIEW RELATED / CORRELATION SELECTORS (Enterprise Feature) =====
@@ -400,11 +408,10 @@ export class LogsPage {
         this.correlationErrorMessage = '.tw\\:text-red-500';
 
         // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
-        // TracesAnalysisDashboard.vue now renders inside <ODrawer data-test="traces-analysis-dashboard-drawer">
-        // The drawer's panel exposes that data-test on the root element; close button is from ODrawer's slot.
-        this.logsAnalyzeDimensionsButton = '[data-test="logs-analyze-dimensions-button"]';
-        this.analysisDashboardCard = '[data-test="traces-analysis-dashboard-drawer"]';
-        this.analysisDashboardClose = '[data-test="traces-analysis-dashboard-drawer"] [data-test="o-drawer-close-btn"]';
+        // Drill down renders the dashboard embedded; the Search toggle replaces close.
+        this.logsAnalyzeDimensionsButton = '[data-test="logs-drilldown-toggle"]';
+        this.analysisDashboardCard = '[data-test="traces-analysis-dashboard-page"]';
+        this.analysisDashboardClose = '[data-test="logs-logs-toggle"]';
         // Dimension sidebar (visible by default in analysis dashboard, not a dialog)
         this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
         this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
@@ -412,14 +419,14 @@ export class LogsPage {
         // OInput's inner native <input> field — required for `fill()` (the wrapper div above isn't editable)
         this.dimensionSearchInputField = '[data-test="dimension-search-input-field"]';
         // Analysis dashboard states
-        this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-loading-indicator"]';
-        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] [data-test="logs-search-error-state"], [data-test="traces-analysis-dashboard-drawer"] [role="alert"]';
+        this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-page"] [data-test="traces-analysis-dashboard-loading-indicator"]';
+        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-page"] [data-test="traces-analysis-dashboard-error"]';
         // Loading indicator (top-level — appears immediately on click, before drawer's scoped placement)
         this.analysisDashboardLoadingIndicator = '[data-test="traces-analysis-dashboard-loading-indicator"]';
         // Dimension checkboxes (any value)
         this.dimensionCheckboxAny = '[data-test^="dimension-checkbox-"]';
-        // Dashboard chart panel inside the analysis dashboard drawer (via data-test prefix)
-        this.analysisDashboardChartPanel = '[data-test="traces-analysis-dashboard-drawer"] [data-test^="dashboard-panel-"]';
+        // Dashboard chart panel inside the analysis dashboard page (via data-test prefix)
+        this.analysisDashboardChartPanel = '[data-test="traces-analysis-dashboard-page"] [data-test^="dashboard-panel-"]';
         // SQL Mode toggle (OSwitch) — sourced from SearchBar.vue
         this.sqlModeToggleBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
         // Inner <button role="switch"> rendered by OSwitch — carries data-state="checked|unchecked"
@@ -504,6 +511,20 @@ export class LogsPage {
         this.resultsLoadingBanner = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-loading-banner"]';
         this.noResultsFoundText = '[data-test="logs-search-no-events-found-text"]';
         this.resultsProgressBar = '[data-test="logs-results-progress"]';
+        this.queryPlanDialog = '[data-test="query-plan-dialog"]';
+        this.queryEditorSplitter = '[role="separator"][aria-orientation="horizontal"]';
+        // useLogsHighlighter marks FTS matches with .log-highlighted inside the result cell.
+        this.highlightedMatch = '[data-test="logs-search-result-logs-table"] .log-highlighted';
+        // The "=" icon is revealed on hover over its sidebar field row.
+        this.fieldListItemPrefix = 'logs-field-list-item-';
+        this.logDetailRowPrefix = 'log-detail-row-';
+        this.fieldValuesList = '[data-test="field-values-panel-values-list"]';
+        this.fieldValueLabelPrefix = (field) => `[data-test^="logs-search-subfield-add-${field}-"]`;
+        this.fieldEqualsButton = (field) => `[data-test="log-search-index-list-filter-${field}-field-btn"]`;
+        this.logDetailRow = (field) => `[data-test="log-detail-row-${field}"]`;
+        this.logDetailFieldMenuTrigger = '[data-test="log-details-include-exclude-field-btn"]';
+        this.logDetailAddFieldItem = '[data-test="log-details-add-field-btn"]';
+        this.tableExpandCell = '[data-test="logs-search-result-logs-table"] tbody tr[data-test="o2-table-row-0"] td[data-test="o2-table-expand-cell"]';
         this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';
@@ -2021,6 +2042,130 @@ export class LogsPage {
         await expect(searchResult).toContainText(expectedPattern, { timeout: 15000 });
     }
 
+    /** Choose a page size without asserting the banner, for tests that assert rows instead. */
+    async selectRecordsPerPage(size) {
+        const dropdown = this.page.locator(this.recordsPerPageDropdown);
+        await dropdown.waitFor({ state: 'visible', timeout: 15000 });
+        await dropdown.click({ force: true });
+        const option = this.page.locator(this.recordsPerPageOption(size)).first();
+        await option.waitFor({ state: 'visible', timeout: 10000 });
+        await option.click({ force: true });
+        await expect(this.page.locator(this.paginationRowCountTitle))
+            .toContainText(`1 to ${size}`, { timeout: 30000 });
+    }
+
+    /**
+     * Wait until the banner reports the expected total.
+     *
+     * Ingest acknowledges before every row is searchable, so a query fired
+     * immediately after seeding sees an arbitrary prefix of the rows -- the same
+     * seed produced 12, then 6, then 3 across consecutive runs. Re-running the
+     * query while polling lets the index catch up.
+     */
+    async waitForResultTotal(expected, attempts = 12) {
+        for (let i = 0; i < attempts; i++) {
+            const title = await this.getResultTitleText();
+            const total = Number((title.match(/out of\s+([\d.]+)/) || [])[1]);
+            if (total === expected) return title;
+            await this.page.waitForTimeout(2000);
+            await this.clickRefreshButton();
+            await this.expectResultsGridSettledWithRows();
+        }
+        throw new Error(
+            `banner never reported ${expected} events; last was "${(await this.getResultTitleText()).replace(/\n/g, ' | ')}"`,
+        );
+    }
+
+    /** The "1 to N out of M events" banner, used to compare the claim against rendered rows. */
+    async getResultTitleText() {
+        return (await this.page.locator(this.paginationRowCountTitle).first().innerText()).trim();
+    }
+
+    /** #9542: match_all matches must render highlighted, not plain. */
+    async expectHighlightedMatchesRendered() {
+        await expect(this.page.locator(this.highlightedMatch).first()).toBeVisible({ timeout: 20000 });
+    }
+
+    async getHighlightedMatchCount() {
+        return await this.page.locator(this.highlightedMatch).count();
+    }
+
+    /**
+     * Rendered text and wrapping of a sidebar field's first value row.
+     *
+     * The wrapping lives on an inner value div carrying `title`, not on the
+     * labelled element itself, so reading the label's own computed style
+     * reports the wrapper's `normal` and misses the fix entirely.
+     */
+    async getFirstFieldValueRendering(field) {
+        const label = this.page.locator(this.fieldValueLabelPrefix(field)).first();
+        await label.waitFor({ state: 'visible', timeout: 20000 });
+        const value = label.locator('div[title]').first();
+        await value.waitFor({ state: 'visible', timeout: 10000 });
+        return await value.evaluate((el) => ({
+            whiteSpace: getComputedStyle(el).whiteSpace,
+            text: el.innerText,
+            newlineCount: (el.innerText.match(/\n/g) || []).length,
+        }));
+    }
+
+    /** Sidebar fields that offer an "=" filter, in render order; the set varies by dataset. */
+    async getFilterableSidebarFields(count = 2) {
+        const fields = await this.page
+            .locator(`[data-test^="${this.fieldListItemPrefix}"]`)
+            .evaluateAll((items, prefix) =>
+                items.map((i) => (i.getAttribute('data-test') || '').replace(prefix, '')),
+            this.fieldListItemPrefix);
+        const usable = fields.filter((f) => f && f !== '_timestamp');
+        if (usable.length < count) {
+            throw new Error(`need ${count} filterable sidebar fields, saw: ${fields.join(', ')}`);
+        }
+        return usable.slice(0, count);
+    }
+
+    /** Click a sidebar field's "=" icon; it only renders while its row is hovered. */
+    async addEqualsFilterForField(field) {
+        await this.page.locator(this.fieldListItem(field)).first().hover();
+        const button = this.page.locator(this.fieldEqualsButton(field)).first();
+        await button.waitFor({ state: 'visible', timeout: 10000 });
+        await button.click();
+    }
+
+    async expandFirstResultRow() {
+        await this.page.locator(this.tableExpandCell).click();
+        await expect(this.page.locator(this.logDetailRow('_timestamp'))).toBeVisible({ timeout: 15000 });
+    }
+
+    /** First expanded-row field that offers the add/remove action; timestamp never does. */
+    async getFirstActionableDetailField() {
+        const fields = await this.page
+            .locator(`[data-test^="${this.logDetailRowPrefix}"]`)
+            .evaluateAll((rows, prefix) =>
+                rows.map((r) => (r.getAttribute('data-test') || '').replace(prefix, '')),
+            this.logDetailRowPrefix);
+        const field = fields.find((f) => f && f !== '_timestamp');
+        if (!field) throw new Error(`no actionable field in the expanded row, saw: ${fields.join(', ')}`);
+        return field;
+    }
+
+    /**
+     * Open one expanded-row field's action menu and read its add/remove label.
+     * The menu is scoped to its own log-detail-row: the timestamp column renders no
+     * add item at all, so an unscoped lookup finds nothing.
+     */
+    async getAddOrRemoveFieldLabel(field) {
+        const row = this.page.locator(this.logDetailRow(field));
+        await row.hover();
+        await row.locator(this.logDetailFieldMenuTrigger).first().click();
+        const item = this.page.locator(this.logDetailAddFieldItem).first();
+        await item.waitFor({ state: 'visible', timeout: 10000 });
+        return (await item.innerText()).trim();
+    }
+
+    async clickAddOrRemoveFieldItem() {
+        await this.page.locator(this.logDetailAddFieldItem).first().click();
+    }
+
     async pageNotVisible() {
         // When LIMIT caps results below per-page floor, OSelect records-per-page dropdown hides.
         const recordsDropdown = this.page.locator(this.recordsPerPageDropdown);
@@ -2833,21 +2978,8 @@ export class LogsPage {
         await this.page.waitForTimeout(200);
     }
 
-    /**
-     * Click Run query and wait for query execution to complete.
-     * Uses button UI state (loading/disabled → ready) instead of response matching
-     * to avoid capturing stale responses from auto-searches.
-     * @param {number} timeout - Max wait time in ms (default 60000)
-     */
-    async runQueryAndWaitForResults(timeout = 60000) {
-        const btn = this.page.locator(this.queryButton);
-
-        // If a prior auto-search (e.g. from toggling SQL mode) is still running, the button
-        // renders as "Cancel query" via a v-if/v-else swap — wait for the run-mode variant
-        // to appear (not in Cancel state) before clicking, so we don't accidentally cancel it.
-        // Use the full timeout here (not a hard-coded 15 s) so a slow CI auto-search never
-        // causes us to force-click the Cancel button instead of the Run button.
-        let buttonWasInCancelState = false;
+    async waitForRunQueryButton(timeout = 60000) {
+        // An automatic search shares this button, so a premature click would cancel it.
         await this.page.waitForFunction(
             (selector) => {
                 const el = document.querySelector(selector);
@@ -2858,7 +2990,14 @@ export class LogsPage {
             },
             this.queryButton,
             { timeout }
-        ).catch(() => {
+        );
+    }
+
+    async runQueryAndWaitForResults(timeout = 60000) {
+        const btn = this.page.locator(this.queryButton);
+
+        let buttonWasInCancelState = false;
+        await this.waitForRunQueryButton(timeout).catch(() => {
             buttonWasInCancelState = true;
             testLogger.warn('runQueryAndWaitForResults: refresh button never exited Cancel state, force-clicking to cancel in-flight search');
         });
@@ -3044,10 +3183,7 @@ export class LogsPage {
     }
 
     async clickSearchBarRefreshButton() {
-        // Use .first() to avoid strict-mode violations when multiple data-test matches exist.
-        // waitForSearchBarRefreshButton() must be called first to ensure the button is enabled;
-        // OButton.handleClick() guards on props.loading/disabled and will not emit when loading,
-        // making force-click on a loading button a silent no-op.
+        await this.waitForRunQueryButton();
         return await this.page.locator(this.searchBarRefreshButton).first().click({ force: true });
     }
 
@@ -3210,7 +3346,7 @@ export class LogsPage {
     async clickSaveViewButton() {
         // Post-menu-migration: "Create saved view" moved into utilities ("More") menu.
         // Close any open menus/dialogs first, then open the menu and click the item.
-        const listDialog = this.page.locator('[data-test="saved-views-list-dialog"]');
+        const listDialog = this.page.locator(this.savedViewsListDialogEl);
         const isListOpen = await listDialog.isVisible({ timeout: 500 }).catch(() => false);
         if (isListOpen) {
             await listDialog.locator('[data-test="o-dialog-close-btn"]').click();
@@ -3321,17 +3457,23 @@ export class LogsPage {
         return await searchInput.fill(text);
     }
 
+    // The `-apply-` prefix keeps the favourites pane (`-favorites-apply-`) out of the match.
+    savedViewApplyLocator(name) {
+        if (typeof name !== 'string') {
+            throw new TypeError(`savedViewApplyLocator expects the exact view name, got ${name}`);
+        }
+        return this.page.locator(`[data-test^="logs-saved-views-dialog-apply-"][data-test-view-name="${LogsPage.escapeCssAttrValue(name)}"]`);
+    }
+
     async clickSavedViewByTitle(title) {
-        const element = this.page.locator(`[data-test="logs-search-bar-apply-${title}-saved-view-btn"]`).first();
+        const element = this.savedViewApplyLocator(title).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         // force: true — ODropdown portal transiently detaches items during initial render
         return await element.click({ force: true });
     }
 
     async clickDeleteButton() {
-        // Delete buttons in saved views carry data-test="logs-search-bar-delete-{view_id}-saved-view-btn"
-        // Click the first visible delete button in the saved views area
-        const deleteBtn = this.page.locator('[data-test*="logs-search-bar-delete-"][data-test*="-saved-view-btn"]').first();
+        const deleteBtn = this.page.locator('[data-test="logs-saved-views-dialog-table"] [data-test^="logs-saved-views-dialog-delete-"]:not([data-test$="-menu"])').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
         return await deleteBtn.click();
     }
@@ -3384,13 +3526,13 @@ export class LogsPage {
     }
 
     async clickSavedViewByText(text) {
-        const element = this.page.locator(`[data-test="logs-search-bar-apply-${text}-saved-view-btn"]`).first();
+        const element = this.savedViewApplyLocator(text).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         return await element.click();
     }
 
     async waitForSavedViewText(text) {
-        return await this.page.locator(`[data-test="logs-search-bar-apply-${text}-saved-view-btn"]`).first().waitFor({ state: 'visible', timeout: 10000 });
+        return await this.savedViewApplyLocator(text).first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
     /**
@@ -3413,7 +3555,7 @@ export class LogsPage {
     async clickDeleteSavedViewButton(savedViewName) {
         // The caller (clickSavedViewByTitle) closes the dialog. Wait passively for it to
         // reach hidden state so the re-open sequence doesn't race the close animation.
-        await this.page.locator('[data-test="saved-views-list-dialog"]')
+        await this.page.locator(this.savedViewsListDialogEl)
             .waitFor({ state: 'hidden', timeout: 5000 })
             .catch(() => {});
 
@@ -3435,8 +3577,8 @@ export class LogsPage {
         // The delete button data-test uses view_id (a UUID), not the view name, so we
         // can't build the exact selector. Instead scope to the main saved-views table
         // (not favorites) — after filtering by name there is exactly one visible row.
-        const mainTable = this.page.locator('[data-test="log-search-saved-view-list-fields-table"]');
-        const deleteBtn = mainTable.locator('[data-test*="logs-search-bar-delete-"]').first();
+        const mainTable = this.page.locator('[data-test="logs-saved-views-dialog-table"]');
+        const deleteBtn = mainTable.locator('[data-test^="logs-saved-views-dialog-delete-"]:not([data-test$="-menu"])').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
         await deleteBtn.scrollIntoViewIfNeeded();
         await deleteBtn.click();
@@ -3552,6 +3694,34 @@ export class LogsPage {
 
     async clickIncludeFieldButton() {
         return await this.page.locator(this.includeFieldButton).click();
+    }
+
+    // Loading the SQL through the URL guarantees the editor holds it before the first run.
+    async openLogsWithSqlQuery(stream, sql, period = '15m') {
+        const orgId = getOrgIdentifier() || 'default';
+        const query = encodeURIComponent(Buffer.from(sql).toString('base64'));
+        await this.page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}&stream_type=logs&stream=${encodeURIComponent(stream)}&period=${period}&sql_mode=true&quick_mode=false&query=${query}`);
+        await this.getQueryEditorTextWhenReady(stream);
+    }
+
+    async getResultRowTexts() {
+        return await this.page.locator(this.logsSearchResultTableRows).allInnerTexts();
+    }
+
+    async openLogDetailForRowContaining(text) {
+        const row = this.page.locator(this.logsSearchResultTableRows).filter({ hasText: text }).first();
+        await row.locator('[data-test^="o2-table-cell-"]').first().click();
+        await this.page.locator(this.logDetailDialog).waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    async getLogDetailDialogText() {
+        return await this.page.locator(this.logDetailDialog).innerText();
+    }
+
+    // "Add field to the table" shares the include data-test, so the menu item is picked by its label.
+    async includeLogDetailFieldValue(field) {
+        await this.page.locator(this.logDetailDialog).locator(`[data-test="log-details-include-exclude-field-btn-${field}"]`).click();
+        await this.page.locator(this.includeFieldButton).filter({ hasText: 'Include Search Term' }).click();
     }
 
     async clickCloseDialog() {
@@ -3745,6 +3915,19 @@ export class LogsPage {
         testLogger.info('✓ Previous and Next navigation buttons are visible');
     }
 
+    logResultsRow(n) {
+        return this.page.locator(`[data-test="logs-search-result-logs-table"] [data-test="o2-table-row-${n}"]`);
+    }
+
+    async pressLogRowKey(key, options = {}) {
+        await this.page.keyboard.press(key, options);
+    }
+
+    async expectActiveLogRow(n) {
+        await expect(this.logResultsRow(n)).toHaveAttribute('aria-current', 'true');
+        await expect(this.page.locator('[data-test="logs-search-result-logs-table"] [data-active-row="true"]')).toHaveCount(1);
+    }
+
     // ===== VIEW RELATED / CORRELATION METHODS (Enterprise Feature) =====
 
     /**
@@ -3915,7 +4098,7 @@ export class LogsPage {
     }
 
     async clickSavedViewByLabel(label) {
-        const element = this.page.locator(`[data-test="logs-search-bar-apply-${label}-saved-view-btn"]`).first();
+        const element = this.savedViewApplyLocator(label).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         return await element.click({ force: true });
     }
@@ -3988,6 +4171,15 @@ export class LogsPage {
             `[data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"]`
         ).first();
         return await expect(errorLocator).toBeVisible({ timeout: 30000 });
+    }
+
+    /** Assert the logs error banner is showing and carries the given text. */
+    async expectSearchErrorContaining(text, timeout = 30000) {
+        const errorLocator = this.page.locator(
+            `[data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"]`
+        ).first();
+        await expect(errorLocator).toBeVisible({ timeout });
+        await expect(errorLocator).toContainText(text, { timeout });
     }
 
     async expectSqlErrorStateNotVisible(timeout = 5000) {
@@ -4338,6 +4530,20 @@ export class LogsPage {
             await toggleItem.click();
             await functionDropdown.waitFor({ state: 'visible', timeout: 10000 });
         }
+    }
+
+    /**
+     * Open the saved-function dropdown and apply one by name.
+     *
+     * The dropdown only renders while the transform editor is on, so call
+     * toggleVrlEditor() first.
+     */
+    async selectSavedFunction(name) {
+        await this.page.locator(this.logsSearchBarFunctionDropdown).first().click();
+        const item = this.page.locator(`[data-test="logs-search-saved-function-${name}"]`);
+        await item.waitFor({ state: 'visible', timeout: 15000 });
+        await item.click();
+        testLogger.info('Applied saved function from the logs dropdown', { name });
     }
 
     async clickVrlEditor() {
@@ -4856,7 +5062,7 @@ export class LogsPage {
     }
 
     async clickMenuLinkLogsItem() {
-        await this.clickMenuLinkByType('logs');
+        await clickNavUntilRoute(this.page, this.logsMenuItem, '/logs');
         // Sidebar nav is an in-SPA route change; gate on the Search toggle re-mounting before
         // callers read persisted state. Unlike visualizeToggle, this item has no v-if guard
         // (zoConfig.timechart_enabled, enterprise, viewport width), so it's present in every
@@ -6949,26 +7155,19 @@ export class LogsPage {
 
             for (const row of rows) {
                 const text = row.textContent;
-                // OTable draws the spine as a ::before on the row's first cell, fed by
-                // the --row-status-color custom property set inline on the <tr>, and
-                // marks the row with data-status-bar. The level rides along on the row
-                // class (o2-log-level-<level>) so it stays machine-readable whichever
-                // column is shown.
-                const raw = row.style.getPropertyValue('--row-status-color').trim();
-                if (!raw || raw === 'rgba(0, 0, 0, 0)' || raw === 'transparent') continue;
-                // The token resolves to a hex; callers normalise through rgbToHex,
-                // so hand back the rgb() form a computed style would have given.
-                let bgColor = raw;
-                const hex = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-                if (hex) {
-                    let h = hex[1];
-                    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
-                    const n = parseInt(h, 16);
-                    bgColor = `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
-                }
+                const firstCell = row.querySelector('td');
+                if (!firstCell) continue;
+                const spine = getComputedStyle(firstCell, '::before');
+                const backgroundImage = spine.backgroundImage;
+                const bgColor = spine.backgroundColor;
+                if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
 
-                const levelClass = Array.from(row.classList).find((c) => c.startsWith('o2-log-level-'));
+                const levelClass = Array.from(row.classList).find(
+                    (c) => c.startsWith('o2-log-level-') && !c.startsWith('o2-log-level-src-'),
+                );
                 const level = levelClass ? levelClass.replace('o2-log-level-', '') : null;
+                const sourceClass = Array.from(row.classList).find((c) => c.startsWith('o2-log-level-src-'));
+                const source = sourceClass ? sourceClass.replace('o2-log-level-src-', '') : null;
 
                 // Best-effort: also recover the raw severity number when the JSON
                 // source column is visible (kept for backward compatibility).
@@ -6988,7 +7187,7 @@ export class LogsPage {
                 }
 
                 if (level === null && severity === null) continue;
-                findings.push({ severity, level, color: bgColor });
+                findings.push({ severity, level, source, backgroundImage, color: bgColor });
             }
 
             return findings;
@@ -7139,8 +7338,9 @@ export class LogsPage {
      * Expect Analyze Dimensions button to NOT be visible
      */
     async expectAnalyzeDimensionsButtonNotVisible() {
-        await expect(this.page.locator(this.logsAnalyzeDimensionsButton)).not.toBeVisible({ timeout: 5000 });
-        testLogger.info('Analyze Dimensions button is not visible (as expected)');
+        // The Drill down toggle stays visible but is disabled where the old button was hidden (SQL mode)
+        await expect(this.page.locator(this.logsAnalyzeDimensionsButton)).toBeDisabled({ timeout: 5000 });
+        testLogger.info('Drill down toggle is disabled (as expected)');
     }
 
     /**
@@ -7365,8 +7565,15 @@ export class LogsPage {
      * Click the share link button on the logs search bar
      */
     async clickShareLinkButton() {
-        await this.page.locator(this.shareLinkButton).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator(this.shareLinkButton).click();
+        const btn = this.page.locator(this.shareLinkButton);
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        const enabled = await expect(btn).toBeEnabled({ timeout: 30000 }).then(() => true).catch(() => false);
+        if (!enabled) {
+            testLogger.warn('Share link button still disabled after 30s; reloading once', { url: this.page.url() });
+            await this.page.reload({ waitUntil: 'domcontentloaded' });
+            await expect(btn, 'share link button never enabled: the query has not run yet (G1), or web_url is missing from the org config').toBeEnabled({ timeout: 30000 });
+        }
+        await btn.click();
         testLogger.info('Clicked share link button');
     }
 
@@ -8360,13 +8567,26 @@ export class LogsPage {
      */
     async clickRelative1HourOrFallback() {
         const oneHourButton = this.page.locator('[data-test="date-time-relative-1-h-btn"]');
+        let picked;
         if (await oneHourButton.isVisible({ timeout: 2000 }).catch(() => false)) {
             await oneHourButton.click();
-            return 'Last 1 hour';
+            picked = 'Last 1 hour';
         } else {
             await this.clickRelative15MinButton();
-            return 'Last 15 minutes';
+            picked = 'Last 15 minutes';
         }
+        await this.closeDateTimePickerIfOpen();
+        return picked;
+    }
+
+    /** The auto-apply picker stays open after a pick, and force-clicks behind it land on the panel. */
+    async closeDateTimePickerIfOpen() {
+        const panel = this.page.locator('#date-time-menu');
+        if (!(await panel.isVisible().catch(() => false))) return;
+        await this.page.keyboard.press('Escape');
+        const closed = await panel.waitFor({ state: 'hidden', timeout: 2000 }).then(() => true).catch(() => false);
+        if (!closed) await this.page.locator(this.dateTimeButton).click();
+        await expect(panel).toBeHidden({ timeout: 5000 });
     }
 
     /**
@@ -8679,9 +8899,7 @@ export class LogsPage {
      * @param {string} name - Saved view name
      */
     async clickSavedViewByName(name) {
-        // SearchBar.vue uses data-test="logs-search-bar-apply-${value}-saved-view-btn" for the apply button.
-        // The previously used `logs-search-saved-view-item-${name}` does not exist in the DOM.
-        const savedView = this.page.locator(`[data-test="logs-search-bar-apply-${name}-saved-view-btn"]`).first();
+        const savedView = this.savedViewApplyLocator(name).first();
         await savedView.waitFor({ state: 'visible', timeout: 10000 });
         // force: true — ODropdown portal transiently detaches items during initial render
         await savedView.click({ force: true });
@@ -8755,8 +8973,8 @@ export class LogsPage {
      */
     async clickDeleteSavedViewByName(name) {
         // data-test uses view_id (UUID), not name — scope to main table after filtering.
-        const mainTable = this.page.locator('[data-test="log-search-saved-view-list-fields-table"]');
-        const deleteBtn = mainTable.locator('[data-test*="logs-search-bar-delete-"]').first();
+        const mainTable = this.page.locator('[data-test="logs-saved-views-dialog-table"]');
+        const deleteBtn = mainTable.locator('[data-test^="logs-saved-views-dialog-delete-"]:not([data-test$="-menu"])').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
         await deleteBtn.click();
         testLogger.info(`Clicked delete for saved view: ${name}`);
@@ -8952,7 +9170,7 @@ export class LogsPage {
             });
         }, this.queryEditor, { timeout: 10000 });
         // Set value via the monaco model so undo history is preserved and Vue v-model fires
-        await this.page.evaluate(({ selector, value }) => {
+        const applyValue = () => this.page.evaluate(({ selector, value }) => {
             const host = document.querySelector(selector);
             const editors = window.monaco?.editor?.getEditors?.() ?? [];
             const target = editors.find(ed => {
@@ -8974,11 +9192,84 @@ export class LogsPage {
             }
             target.setSelection(model.getFullModelRange());
         }, { selector: this.queryEditor, value: query });
+        // A pending editor remount (e.g. SQL-mode switch) or state->editor sync can discard the edit, so re-apply until it holds past the 500ms change debounce.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            await applyValue();
+            const applied = await expect.poll(() => this.getQueryEditorText(), { timeout: 3000 }).toBe(query).then(() => true).catch(() => false);
+            if (applied && await this._queryEditorValueHolds(query, 700)) break;
+            testLogger.warn(`Query editor value did not stick (attempt ${attempt}/3); re-applying`);
+        }
         // Verify via getValue() that the model now reflects the value (handles empty string too)
         await expect.poll(async () => {
             return await this.getQueryEditorText();
         }, { timeout: 5000 }).toBe(query);
         testLogger.info(`Query editor set to: "${query.substring(0, 60)}"`);
+    }
+
+    /**
+     * Wait until the app's search state holds `query`, re-firing the editor change if the commit was dropped.
+     * @param {string} query
+     */
+    async waitForSearchQueryCommitted(query, timeout = 20000) {
+        const expected = query.trim();
+        await expect.poll(async () => {
+            const state = await this._mutateSearchObj((searchObj) => ({
+                query: (searchObj.data.query || '').trim(),
+                loading: !!searchObj.loadingStream,
+            }));
+            if (!state) return 'search state unreachable';
+            if (state.query === expected) return 'committed';
+            // SearchBar.updateQueryValue drops editor emissions while loadingStream is set, so the edit never reaches searchObj.
+            if (!state.loading) {
+                testLogger.warn('Query edit never reached searchObj (dropped during loadingStream); re-firing editor change', { state: state.query.slice(0, 60) });
+                await this.page.evaluate(({ selector, value }) => {
+                    const host = document.querySelector(selector);
+                    const ed = (window.monaco?.editor?.getEditors?.() ?? []).find(e => host?.contains(e.getDomNode?.()));
+                    if (!ed) return;
+                    ed.getModel().setValue(`${value} `);
+                    ed.getModel().setValue(value);
+                }, { selector: this.queryEditor, value: query });
+            }
+            return `pending (loadingStream=${state.loading}, state="${state.query.slice(0, 60)}")`;
+        }, { timeout, intervals: [300, 700, 1000] }).toBe('committed');
+    }
+
+    /**
+     * Wait until the app's search state holds the VRL function, re-firing the VRL editor change if the commit was lost.
+     * @param {string} vrl
+     */
+    async waitForVrlFunctionCommitted(vrl, timeout = 20000) {
+        const norm = (s) => (s || '').replace(/\s+/g, '');
+        const expected = norm(vrl);
+        await expect.poll(async () => {
+            const state = await this._mutateSearchObj((searchObj) => ({
+                fn: searchObj.data.tempFunctionContent || '',
+                type: searchObj.data.transformType,
+            }));
+            if (!state) return 'search state unreachable';
+            if (norm(state.fn) === expected && state.type === 'function') return 'committed';
+            // Visualize only forces table + dynamic columns when tempFunctionContent is already set as it opens.
+            if (norm(state.fn) !== expected) {
+                testLogger.warn('VRL edit never reached tempFunctionContent; re-firing editor change', { fn: state.fn.slice(0, 40) });
+                await this.page.evaluate(({ selector, value }) => {
+                    const host = document.querySelector(selector);
+                    const ed = (window.monaco?.editor?.getEditors?.() ?? []).find(e => host?.contains(e.getDomNode?.()));
+                    if (!ed) return;
+                    ed.getModel().setValue(`${value} `);
+                    ed.getModel().setValue(value);
+                }, { selector: '[data-test="logs-vrl-function-editor"]', value: vrl });
+            }
+            return `pending (transformType=${state.type}, fn="${state.fn.slice(0, 40)}")`;
+        }, { timeout, intervals: [300, 700, 1000] }).toBe('committed');
+    }
+
+    async _queryEditorValueHolds(expected, holdMs) {
+        const deadline = Date.now() + holdMs;
+        while (Date.now() < deadline) {
+            if ((await this.getQueryEditorText()) !== expected) return false;
+            await this.page.waitForTimeout(100);
+        }
+        return (await this.getQueryEditorText()) === expected;
     }
 
     /**
@@ -9691,7 +9982,7 @@ export class LogsPage {
      * Click the Build tab toggle to switch to Build mode
      */
     async clickBuildToggle() {
-        await this.page.locator(this.buildToggle).click();
+        await selectLogsViewMode(this.page, 'build');
         testLogger.info('Clicked Build tab toggle');
     }
 
@@ -9824,7 +10115,7 @@ export class LogsPage {
      * Click the Logs tab toggle to switch back to Logs mode
      */
     async clickLogsToggle() {
-        await this.page.locator(this.logsToggle).click();
+        await selectLogsViewMode(this.page, 'logs');
         await this.page.waitForTimeout(500);
         testLogger.info('Clicked Logs tab toggle');
     }
@@ -9833,7 +10124,7 @@ export class LogsPage {
      * Click the Visualize tab toggle
      */
     async clickVisualizeToggle() {
-        await this.page.locator(this.visualizeToggle).click();
+        await selectLogsViewMode(this.page, 'visualize');
         await this.page.waitForTimeout(500);
         testLogger.info('Clicked Visualize tab toggle');
     }
@@ -9844,7 +10135,8 @@ export class LogsPage {
      * Click the Dashboard sidebar menu item to navigate away from Logs.
      */
     async clickMenuLinkDashboardItem() {
-        await this.page.locator(this.dashboardMenuItem).click();
+        // Confirming the route commit matters: an unconfirmed click lets the next nav click race it and be dropped.
+        await clickNavUntilRoute(this.page, this.dashboardMenuItem, '/dashboards');
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Clicked Dashboard sidebar menu item');
     }
@@ -10102,6 +10394,20 @@ export class LogsPage {
      */
     async expectSelectStarVisualizationToast() {
         await this.expectToastContaining(this.selectStarNotSupportedToastText);
+    }
+
+    async expectMultiStreamPatternsToast() {
+        // The guard fires synchronously on mount before any network call, so the caller
+        // arms the toast recorder (startToastRecorder) before navigating to the patterns URL.
+        await this.expectToastContaining(this.multiStreamPatternsToastText);
+    }
+
+    async expectNoMultiStreamPatternsToast() {
+        // Wait for a full mount first: the guard runs during setupLogsTab, so a buggy guard
+        // that fired for a single stream would already be recorded before this assertion.
+        await expect(this.page.locator(this.qPageContainer)).toBeVisible({ timeout: 30000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        await this.expectNoToastContaining(this.multiStreamPatternsToastText);
     }
 
     /**
@@ -10912,6 +11218,87 @@ export class LogsPage {
         testLogger.info('Results grid settled with rows, no skeleton or loading banner');
     }
 
+    /** Bounds the query/results splitter advertises; #12452's fix is that a max exists at all. */
+    async getQueryEditorSplitterBounds() {
+        const separator = this.page.locator(this.queryEditorSplitter);
+        const [now, min, max] = await Promise.all([
+            separator.getAttribute('aria-valuenow'),
+            separator.getAttribute('aria-valuemin'),
+            separator.getAttribute('aria-valuemax'),
+        ]);
+        return { now: Number(now), min: Number(min), max: Number(max) };
+    }
+
+    async getViewportHeight() {
+        return await this.page.evaluate(() => window.innerHeight);
+    }
+
+    /** Drive the splitter from the keyboard; End requests the maximum in one step. */
+    async pressQueryEditorSplitterKey(key, times = 1) {
+        const separator = this.page.locator(this.queryEditorSplitter);
+        await separator.focus();
+        for (let i = 0; i < times; i++) {
+            await separator.press(key);
+        }
+    }
+
+    /** Drag the splitter down by deltaY, the gesture #12452 was reported against. */
+    async dragQueryEditorSplitterBy(deltaY) {
+        const separator = this.page.locator(this.queryEditorSplitter);
+        const box = await separator.boundingBox();
+        await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await this.page.mouse.down();
+        await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 + deltaY, { steps: 12 });
+        await this.page.mouse.up();
+    }
+
+    /** Distance from the separator to the bottom of the viewport; negative means off-screen. */
+    async getQueryEditorSplitterViewportGap() {
+        return await this.page.locator(this.queryEditorSplitter).evaluate(
+            (el) => window.innerHeight - el.getBoundingClientRect().bottom,
+        );
+    }
+
+    /** Assert the query execution plan dialog actually opened. */
+    async expectQueryPlanDialogVisible() {
+        await expect(this.page.locator(this.queryPlanDialog)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Query plan dialog is visible');
+    }
+
+    /** Assert the query execution plan dialog closed. */
+    async expectQueryPlanDialogHidden() {
+        await expect(this.page.locator(this.queryPlanDialog)).toBeHidden({ timeout: 10000 });
+        testLogger.info('Query plan dialog is hidden');
+    }
+
+    /** The logs table delegates scrolling to an unnamed ancestor, so resolve it at runtime. */
+    async getResultsScrollTop() {
+        return await this.page.locator(this.logsSearchResultLogsTable).evaluate((el) => {
+            let node = el.parentElement;
+            while (node && node !== document.body) {
+                const overflowY = getComputedStyle(node).overflowY;
+                if (/(auto|scroll)/.test(overflowY) && node.scrollHeight > node.clientHeight + 20) {
+                    return node.scrollTop;
+                }
+                node = node.parentElement;
+            }
+            return null;
+        });
+    }
+
+    /** Wheel over the results grid; hovering first is required or the wheel lands elsewhere. */
+    async scrollResultsGrid(deltaY = 400) {
+        await this.page.locator(this.logsSearchResultLogsTable).hover();
+        await this.page.mouse.wheel(0, deltaY);
+    }
+
+    /** The #9996 contract: the grid must keep rendering rows, never blank out mid-scroll. */
+    async expectResultsGridStillRendersRows() {
+        await expect(this.page.locator(this.logsSearchResultTableRows).first()).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator(this.resultsSkeleton)).toHaveCount(0);
+        await expect(this.page.locator(this.noResultsFoundText)).toHaveCount(0);
+    }
+
     /** Assert the results progress bar has faded out once the search settled. */
     async expectResultsProgressBarFadedOut() {
         // The bar stays mounted to run its own fade, so absence is opacity-0, not detachment.
@@ -10992,10 +11379,12 @@ export class LogsPage {
         const count = Math.min(await cells.count(), limit);
         const values = [];
         for (let i = 0; i < count; i++) {
-            let text = await cells.nth(i).textContent();
+            const valueSpan = cells.nth(i).locator('[data-test="log-row-timestamp-value"]');
+            let text = (await valueSpan.count()) > 0
+                ? await valueSpan.first().textContent()
+                : await cells.nth(i).textContent();
             text = text?.trim() || '';
             // Strip expand button icon text that appears before the timestamp
-            // The cell contains both the expand icon ("chevron_right" or "expand_more") and the timestamp
             text = text.replace(/^(chevron_right|expand_more|chevron_left|expand_less)/, '').trim();
             values.push(text);
         }
@@ -12599,4 +12988,391 @@ export class LogsPage {
             .locator('[data-test^="log-details-include-field-"], [data-test^="log-details-exclude-field-"]')
             .count();
     }
+
+    /** Open the logs explorer already scoped to a stream type. */
+    async openExplorerForStreamType(streamType) {
+        const orgId = getOrgIdentifier();
+        await this.page.goto(
+            `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${orgId}&stream_type=${streamType}`,
+            { waitUntil: 'domcontentloaded', timeout: 30000 }
+        );
+        await this.page.locator(this.indexDropDown).waitFor({ state: 'visible', timeout: 20000 });
+        await this.waitForUrlParam('stream_type', streamType, 20000, true);
+    }
+
+    getBackToLogsStreamTypeButton() {
+        return this.page.locator('[data-test="log-search-index-list-back-to-logs-btn"]');
+    }
+
+    /** The only way back to logs once the explorer is scoped to another stream type. */
+    async clickBackToLogsStreamType() {
+        const button = this.getBackToLogsStreamTypeButton();
+        await button.waitFor({ state: 'visible', timeout: 15000 });
+        await button.click();
+        // The button is rendered only for a non-logs type, so its removal is the switch
+        // completing — the URL is not rewritten until the next search runs.
+        await button.waitFor({ state: 'hidden', timeout: 15000 });
+    }
+
+    async expectBackToLogsStreamTypeButtonVisible() {
+        await expect(this.getBackToLogsStreamTypeButton()).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectBackToLogsStreamTypeButtonAbsent() {
+        await expect(this.getBackToLogsStreamTypeButton()).toHaveCount(0);
+    }
+
+    /** Open the stream picker and read back which streams it offers. */
+    async listStreamOptionValues(filterText = '') {
+        const trigger = this.page.locator('[data-test="log-search-index-list-select-stream-trigger"]');
+        const popover = this.page.locator('[data-test="log-search-index-list-select-stream-popover"]');
+        const search = this.page.locator('[data-test="log-search-index-list-select-stream-search"]');
+        const options = this.page.locator('[data-test="log-search-index-list-select-stream-option"]');
+
+        if (await trigger.count() > 0) {
+            await trigger.first().click();
+        } else {
+            await this.page.locator(this.indexDropDown).click();
+        }
+        await popover.waitFor({ state: 'visible', timeout: 15000 });
+
+        if (filterText && await search.count() > 0) {
+            await search.press('ControlOrMeta+a').catch(() => {});
+            await search.press('Backspace').catch(() => {});
+            await search.fill(filterText);
+        }
+        // The option list is virtualised, so give the filtered rows a beat to render.
+        await options.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+
+        const values = await options.evaluateAll((nodes) =>
+            nodes.map((n) => n.getAttribute('data-test-value')).filter(Boolean)
+        );
+        await this.page.keyboard.press('Escape');
+        return values;
+    }
+
+    /**
+     * Poll the search API until a seeded window is fully searchable.
+     *
+     * Ingest acknowledges before every row is indexed, so a page loaded straight
+     * after seeding queries an arbitrary prefix. Settling over the API first costs
+     * one request per poll, where settling through the UI re-runs the whole render.
+     */
+    async waitForSearchableRowCount(stream, expected, startTimeMicros, endTimeMicros, timeout = 90000) {
+        const orgId = getOrgIdentifier();
+        const url = `${process.env.ZO_BASE_URL}/api/${orgId}/_search?type=logs&use_cache=false`;
+        let last = null;
+        await expect.poll(async () => {
+            const resp = await this.page.request.post(url, {
+                headers: getAuthHeaders(),
+                data: {
+                    query: {
+                        sql: `SELECT COUNT(*) AS cnt FROM "${stream}"`,
+                        start_time: startTimeMicros,
+                        end_time: endTimeMicros,
+                        size: 1,
+                    },
+                },
+            });
+            if (!resp.ok()) return -1;
+            const body = await resp.json().catch(() => ({}));
+            // Coerced: a 64-bit count can serialise as a string, which no strict compare matches.
+            last = Number(body?.hits?.[0]?.cnt ?? 0);
+            return last;
+        }, { timeout, intervals: [1000, 2000, 3000] }).toBe(expected);
+        return last;
+    }
+
+    getWrapContentButton() {
+        return this.page.locator('[data-test="logs-search-result-wrap-table-content-btn"]');
+    }
+
+    /** Wrap is a persisted preference, so localStorage is the state -- not the button's styling.
+     *  The key is absent until the user first toggles, which reads as off. */
+    async isWrapContentOn() {
+        return await this.page.evaluate(() => {
+            try {
+                return localStorage.getItem('wrapContent') === 'true';
+            } catch (e) {
+                return false;
+            }
+        });
+    }
+
+    async setWrapContentOff() {
+        await this.getWrapContentButton().waitFor({ state: 'visible', timeout: 15000 });
+        if (await this.isWrapContentOn()) {
+            await this.getWrapContentButton().click();
+        }
+        await expect
+            .poll(async () => await this.isWrapContentOn(), { timeout: 10000 })
+            .toBe(false);
+    }
+
+    async expectWrapContentOn(expected) {
+        await expect
+            .poll(async () => await this.isWrapContentOn(), { timeout: 15000 })
+            .toBe(expected);
+    }
+
+    async expectHistogramChartVisible() {
+        await expect(
+            this.page.locator('[data-test="logs-search-result-bar-chart"]')
+        ).toBeVisible({ timeout: 30000 });
+    }
+
+    /**
+     * Land on the stream explorer. The explore button on the streams page produces
+     * exactly this URL, and going straight to it avoids picking a row out of a list
+     * whose filter matches substrings -- `e2e_automate` also lists `e2e_automate_w0`
+     * and friends, and which of those a click lands on differs per environment.
+     */
+    async exploreStreamFromStreamsPage(streamName) {
+        const orgId = getOrgIdentifier();
+        const url = `${process.env.ZO_BASE_URL}/web/logs`
+            + `?stream_type=logs&stream=${streamName}&period=15m&refresh=0`
+            + `&type=stream_explorer&org_identifier=${orgId}&show_histogram=true`;
+        await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await this.page.waitForURL(/type=stream_explorer/, { timeout: 30000 });
+    }
+
+    getStreamPickerTrigger() {
+        return this.page.locator(this.indexDropDownTrigger);
+    }
+
+    getStreamPickerPopover() {
+        return this.page.locator(this.indexDropDownPopover);
+    }
+
+    getStreamPickerOption(streamName) {
+        return this.page.locator(
+            `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`
+        );
+    }
+
+    /** Open the picker, type a filter, and click the option that survives it. */
+    async pickStreamByTypedFilter(filterText, streamName) {
+        await this.getStreamPickerTrigger().click();
+        await this.getStreamPickerPopover().waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.locator(this.indexDropDownSearch).fill(filterText);
+        const option = this.getStreamPickerOption(streamName);
+        await option.waitFor({ state: 'visible', timeout: 15000 });
+        await option.click();
+    }
+
+    async expectStreamPickerClosed() {
+        await expect(this.getStreamPickerPopover()).toBeHidden({ timeout: 15000 });
+    }
+
+    /** The trigger renders the selected name alone -- a typed filter must not survive in it. */
+    async expectSelectedStreamLabel(streamName) {
+        const trigger = this.getStreamPickerTrigger();
+        await expect(trigger).toHaveAttribute('data-test-selected-label', streamName, { timeout: 15000 });
+        await expect(trigger).toHaveText(streamName, { timeout: 15000 });
+    }
+
+    async openStreamPicker() {
+        await this.getStreamPickerTrigger().click();
+        await this.getStreamPickerPopover().waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    /** Every offered stream must render its name; a blank row is the #10598 symptom. */
+    async getStreamOptionLabels() {
+        const options = this.page.locator('[data-test="log-search-index-list-select-stream-option"]');
+        await options.first().waitFor({ state: 'visible', timeout: 15000 });
+        return await options.evaluateAll((nodes) =>
+            nodes.map((n) => ({
+                value: n.getAttribute('data-test-value'),
+                text: (n.textContent || '').trim(),
+            }))
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Results-table reads for the #15086 coverage specs.
+    //
+    // logs-highlighting, logs-default-columns and logs-search-around-multistream
+    // each declared these selectors inline; every one of them already existed on
+    // this class (logsSearchResultLogsTable, searchBarRefreshButton,
+    // highlightedMatch, logsDetailTableSearchAroundBtn, logDetailDialog), so the
+    // specs were re-declaring page-object surface rather than extending it.
+    // -----------------------------------------------------------------------
+
+    /** The results table itself. */
+    resultsTable() {
+        return this.page.locator(this.logsSearchResultLogsTable);
+    }
+
+    /** Refreshes and waits for the results table to render. */
+    async runSearchAndWaitForResults(timeout = 30000) {
+        await this.page.locator(this.searchBarRefreshButton).click();
+        await expect(this.resultsTable()).toBeVisible({ timeout });
+    }
+
+    /** Body cells of one column in the results table. */
+    resultCells(column) {
+        return this.page.locator(
+            `${this.logsSearchResultLogsTable} td[data-test="o2-table-cell-${column}"]`
+        );
+    }
+
+    /** Highlighted strings inside one column's cells. */
+    highlightsIn(column) {
+        return this.resultCells(column).locator('.log-highlighted');
+    }
+
+    /**
+     * Highlight texts of one column, polled until they settle.
+     *
+     * Highlighting is applied asynchronously after the rows render
+     * (processHitsInChunks), so the table is visible — and even partly highlighted —
+     * before the final markup exists. Reading allInnerTexts() once races that and
+     * returns [] or a partial list.
+     */
+    expectHighlightsIn(column, timeout = 20000) {
+        return expect.poll(async () => this.highlightsIn(column).allInnerTexts(), { timeout });
+    }
+
+    /**
+     * Asserts nothing is highlighted, and keeps asserting it across a settled window.
+     *
+     * The same async pass is why this cannot be a single count(): a zero read before
+     * processHitsInChunks runs is indistinguishable from "never highlighted", so a
+     * one-shot assertion passes for the wrong reason and a regression that started
+     * highlighting negative filters would still go green. A retrying toHaveCount(0)
+     * does not help either — it is satisfied by its first check, which is exactly the
+     * read that is too early. Sampling until the window closes can tell them apart.
+     */
+    async expectNoHighlights(windowMs = 5000) {
+        const highlights = this.page.locator(this.highlightedMatch);
+        const deadline = Date.now() + windowMs;
+        let worst = 0;
+        do {
+            worst = Math.max(worst, await highlights.count());
+            await this.page.waitForTimeout(250);
+        } while (Date.now() < deadline);
+        expect(worst, 'a highlight appeared where a negative filter should mark nothing').toBe(0);
+    }
+
+    /** Column ids actually rendered in the results table, in order. */
+    async renderedColumnIds() {
+        return this.page
+            .locator(`${this.logsSearchResultLogsTable} td[data-test^="o2-table-cell-"]`)
+            .evaluateAll((cells) => [
+                ...new Set(
+                    cells.map((td) => td.getAttribute('data-test').replace('o2-table-cell-', ''))
+                ),
+            ]);
+    }
+
+    /** The rendered column set, polled: it is re-resolved on every search. */
+    expectRenderedColumnIds(timeout = 30000) {
+        return expect.poll(() => this.renderedColumnIds(), { timeout });
+    }
+
+    /** The per-row stream-name cells a multi-stream result set carries. */
+    streamNameCells() {
+        return this.resultCells('_stream_name');
+    }
+
+    /** The distinct stream names the results currently show. */
+    async distinctStreamNames() {
+        const cells = await this.streamNameCells().allInnerTexts();
+        return [...new Set(cells.map((c) => c.trim()))].filter(Boolean);
+    }
+
+    /** Opens the first row's detail and returns the stream name that row came from. */
+    async openFirstHitDetail(timeout = 20000) {
+        const streamCell = this.streamNameCells().first();
+        const hitStream = (await streamCell.innerText()).trim();
+        await streamCell.click();
+        await expect(this.page.locator(this.logDetailDialog)).toBeVisible({ timeout });
+        return hitStream;
+    }
+
+    searchAroundButton() {
+        return this.page.locator(this.logsDetailTableSearchAroundBtn);
+    }
+
+    /**
+     * Clicks Search around and resolves with the _around response.
+     *
+     * Reading the table straight after the click races the round trip: the pre-click
+     * table is still the previous result set, so an assertion about the new rows can be
+     * satisfied by the old ones.
+     */
+    async clickSearchAroundAwaitingResponse(timeout = 30000) {
+        const [response] = await Promise.all([
+            this.page.waitForResponse((r) => /_around/.test(r.url()), { timeout }),
+            this.searchAroundButton().click(),
+        ]);
+        return response;
+    }
+
+    /** Clicks Search around and resolves with the _around request (not its answer). */
+    async clickSearchAroundAwaitingRequest(timeout = 30000) {
+        const [request] = await Promise.all([
+            this.page.waitForRequest((r) => /_around/.test(r.url()), { timeout }),
+            this.searchAroundButton().click(),
+        ]);
+        return request;
+    }
+
+    /** The sidebar row for `field` must be listed. */
+    async expectFieldListItemVisible(field) {
+        await expect(
+            this.page.locator(this.fieldListItem(field)).first(),
+            `Field "${field}" must be listed in the sidebar`
+        ).toBeVisible({ timeout: 15000 });
+    }
+
+    /**
+     * How many interesting-field (ⓘ) toggles the sidebar renders for `field`.
+     * FieldRow renders one in the row itself and one in the hover-actions tray, both
+     * carrying the same data-test, so an eligible field counts more than one.
+     */
+    async countInterestingFieldButtons(field) {
+        await this.expectFieldListItemVisible(field);
+        return await this.page.locator(this.interestingFieldBtn(field)).count();
+    }
+
+    /**
+     * Push `field` straight into searchObj.data.stream.interestingFieldList, which is
+     * how a list persisted by a build that still starred the field comes back. Throws
+     * if Vue state could not be reached, so a test can't pass on a silent no-op.
+     */
+    async forceInterestingFieldInState(field) {
+        const list = await this._mutateSearchObj((searchObj, name) => {
+            const fields = searchObj.data?.stream?.interestingFieldList;
+            if (!Array.isArray(fields)) return null;
+            if (!fields.includes(name)) fields.push(name);
+            return [...fields];
+        }, field);
+        if (!list?.includes(field)) {
+            throw new Error(`forceInterestingFieldInState: could not add "${field}" to interestingFieldList`);
+        }
+        testLogger.info(`interestingFieldList forced to: ${list.join(',')}`);
+        return list;
+    }
+
+    /** Reads searchObj.data.stream.interestingFieldList. */
+    async getInterestingFieldList() {
+        return await this._mutateSearchObj((searchObj) => [
+            ...(searchObj.data?.stream?.interestingFieldList || []),
+        ]);
+    }
+
+    /** The search must not have failed — asserts the error state is absent. */
+    async expectNoSearchError() {
+        const error = this.page.locator(this.errorMessage);
+        try {
+            await expect(error).toBeHidden();
+        } catch {
+            // Read the text only once the wait has settled on "visible", otherwise it
+            // is empty precisely when the error is the thing worth reporting.
+            const text = (await error.first().textContent().catch(() => '')) || '';
+            throw new Error(`Search must not error, but the error state shows: "${text.trim()}"`);
+        }
+    }
+
 }

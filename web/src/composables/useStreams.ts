@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { CancelledError } from "@tanstack/vue-query";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { streamKeys } from "@/services/stream.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
@@ -20,6 +21,7 @@ import { useStore } from "vuex";
 import StreamService from "@/services/stream";
 import { computed, ComputedRef } from "vue";
 import { deepCopy } from "@/utils/zincutils";
+import { isUserDataStream } from "@/utils/internalStreams";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn, I18nText } from "@/types/i18n";
 
@@ -27,6 +29,10 @@ import type { TranslateFn, I18nText } from "@/types/i18n";
 // apart from any other failure, and a bare Error would drop it.
 const withResponse = (err: Error, source: any): Error =>
   Object.assign(err, { response: source?.response, status: source?.status });
+
+// A cancelled fetch stays a CancelledError so callers can ignore superseded requests.
+const toStreamError = (e: any): Error =>
+  e instanceof CancelledError ? e : withResponse(new Error(e.message), e);
 
 const useStreams = (t: TranslateFn) => {
   const store = useStore();
@@ -136,7 +142,7 @@ const useStreams = (t: TranslateFn) => {
               })
               .catch((e: any) => {
                 dismiss();
-                reject(withResponse(new Error(e.message), e));
+                reject(toStreamError(e));
               });
           } else {
             queryClient
@@ -155,11 +161,11 @@ const useStreams = (t: TranslateFn) => {
               })
               .catch((e: any) => {
                 dismiss();
-                reject(withResponse(new Error(e.message), e));
+                reject(toStreamError(e));
               });
           }
         } catch (e: any) {
-          reject(withResponse(new Error(e.message), e));
+          reject(toStreamError(e));
         }
       })();
     });
@@ -215,10 +221,10 @@ const useStreams = (t: TranslateFn) => {
             })
             .catch((e: any) => {
               dismiss();
-              reject(withResponse(new Error(e.message), e));
+              reject(toStreamError(e));
             });
         } catch (e: any) {
-          reject(withResponse(new Error(e.message), e));
+          reject(toStreamError(e));
         }
       })();
     });
@@ -254,7 +260,7 @@ const useStreams = (t: TranslateFn) => {
         try {
           await getStreams(streamType, false);
         } catch (e: any) {
-          reject(withResponse(new Error(e.message), e));
+          reject(toStreamError(e));
         }
 
         try {
@@ -310,7 +316,7 @@ const useStreams = (t: TranslateFn) => {
             );
           }
         } catch (e: any) {
-          reject(withResponse(new Error(e.message), e));
+          reject(toStreamError(e));
         }
       })();
     });
@@ -362,7 +368,7 @@ const useStreams = (t: TranslateFn) => {
           return streamsCache[streamType].value?.list?.[streamIndex] || {};
         } catch (e: any) {
           // Use reject in Promise.all to catch errors specifically.
-          throw withResponse(new Error(e.message), e);
+          throw toStreamError(e);
         }
       }),
     );
@@ -370,9 +376,12 @@ const useStreams = (t: TranslateFn) => {
 
   function removeSchemaFields(streamData: any) {
     if (streamData.schema) {
-      streamData.schema = streamData.schema.filter((field: any) => {
-        return field.name != "_o2_id" && field.name != "_original" && field.name != "_all_values";
-      });
+      const isRemoved = (field: any) =>
+        field.name === "_o2_id" || field.name === "_original" || field.name === "_all_values";
+      streamData.removedSchemaFields = streamData.schema
+        .filter(isRemoved)
+        .map((field: any) => ({ name: field.name, type: field.type }));
+      streamData.schema = streamData.schema.filter((field: any) => !isRemoved(field));
     }
     return streamData;
   }
@@ -401,8 +410,12 @@ const useStreams = (t: TranslateFn) => {
   // No "already fetched" bail-out: the caller only reaches here with a list the
   // query just produced, and refusing to store it would discard a refetch.
   const setStreams = (streamName: string = "all", streamList: any[] = []) => {
-    if (!store.state.organizationData.isDataIngested && !!streamList.length)
-      store.dispatch("setIsDataIngested", !!streamList.length);
+    // only user data flips the flag: internal streams such as usage exist before any ingest
+    if (
+      !store.state.organizationData.isDataIngested &&
+      streamList.some((s) => isUserDataStream(s?.name ?? "", s?.stream_type ?? streamName))
+    )
+      store.dispatch("setIsDataIngested", true);
 
     const streamObject = getStreamPayload();
     streamObject.name = streamName;

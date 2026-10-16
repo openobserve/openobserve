@@ -19,7 +19,7 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::{
         alerts::{alert, level::PAYLOAD_SAMPLE_ROWS},
-        promql::{METRICS_HASH_EXCLUDED_LABELS, Metadata, VALUE_LABEL},
+        promql::{METRICS_HASH_EXCLUDED_LABELS, Metadata, VALUE_LABEL, is_stale_marker},
     },
     utils::{
         hash::{Sum64, gxhash},
@@ -38,6 +38,7 @@ pub mod otlp;
 mod otlp_json_compat;
 pub mod prom;
 mod prom_decode;
+pub mod usage;
 
 /// Distinct label sets one realtime notification carries, matching the scheduled path's sample.
 const TRIGGER_LABEL_LIMIT: usize = PAYLOAD_SAMPLE_ROWS as usize;
@@ -69,6 +70,43 @@ impl LabelPair for (std::borrow::Cow<'_, str>, std::borrow::Cow<'_, str>) {
     }
 }
 
+/// What the value policy makes of one sample.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum SanitizedValue {
+    /// A sample written with this value.
+    Value(f64),
+    /// A Prometheus staleness marker, written as a NULL `value` while markers are enabled.
+    Stale,
+    /// A sample that writes no row.
+    Drop,
+}
+
+impl SanitizedValue {
+    /// The row's `value` cell: `Some(None)` is a stale marker's NULL, `None` writes no row.
+    pub fn row_value(self) -> Option<Option<f64>> {
+        // only a marker depends on the flag, so ordinary samples skip the config load
+        let markers =
+            matches!(self, Self::Stale) && config::get_config().prom.staleness_markers_enabled;
+        self.row_value_with(markers)
+    }
+
+    fn row_value_with(self, stale_markers: bool) -> Option<Option<f64>> {
+        match self {
+            Self::Value(v) => Some(Some(v)),
+            Self::Stale => stale_markers.then_some(None),
+            Self::Drop => None,
+        }
+    }
+
+    /// The value for a path that cannot carry a stale marker.
+    pub fn value(self) -> Option<f64> {
+        match self {
+            Self::Value(v) => Some(v),
+            Self::Stale | Self::Drop => None,
+        }
+    }
+}
+
 /// An alert's pending notification for the request being ingested.
 struct TriggerSlot {
     idx: usize,
@@ -82,28 +120,34 @@ struct TriggerSlot {
 /// itself represents no data, and a NaN written through serde_json becomes `Value::Null` --
 /// an all-null column is never inferred into the Arrow schema, so the stream it lands in can
 /// never be read by PromQL while still costing full ingest, storage and replication.
+/// The one exception is the staleness-marker NaN, which is [`SanitizedValue::Stale`].
 /// Infinities clamp to the f64 bounds.
 ///
 /// All three ingestion paths go through here: OTLP (`otlp.rs`), remote-write (`prom.rs`) and
 /// JSON (`json.rs`). JSON has no NaN or infinity *literal*, but `1e400` is a valid JSON number
 /// whose value is an infinity, so it is not exempt.
-pub fn sanitize_metric_value(v: f64) -> Option<f64> {
+pub fn sanitize_metric_value(v: f64) -> SanitizedValue {
+    if is_stale_marker(v) {
+        return SanitizedValue::Stale;
+    }
     if v.is_nan() {
-        return None;
+        return SanitizedValue::Drop;
     }
     if v == f64::INFINITY {
-        Some(f64::MAX)
+        SanitizedValue::Value(f64::MAX)
     } else if v == f64::NEG_INFINITY {
-        Some(f64::MIN)
+        SanitizedValue::Value(f64::MIN)
     } else {
-        Some(v)
+        SanitizedValue::Value(v)
     }
 }
 
 /// [`sanitize_metric_value`], as the JSON a record carries. `None` means the record must not
 /// be written at all.
 pub fn metric_value(v: f64) -> Option<config::utils::json::Value> {
-    sanitize_metric_value(v).map(|v| config::utils::json::json!(v))
+    sanitize_metric_value(v)
+        .value()
+        .map(|v| config::utils::json::json!(v))
 }
 
 pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
@@ -364,22 +408,51 @@ mod tests {
     /// back), so it is asserted on its own and not only through `metric_value`.
     #[test]
     fn test_sanitize_metric_value() {
-        assert!(sanitize_metric_value(f64::NAN).is_none());
-        assert_eq!(sanitize_metric_value(f64::INFINITY), Some(f64::MAX));
-        assert_eq!(sanitize_metric_value(f64::NEG_INFINITY), Some(f64::MIN));
-        assert_eq!(sanitize_metric_value(0.0), Some(0.0));
-        assert_eq!(sanitize_metric_value(-1.5), Some(-1.5));
-        assert_eq!(sanitize_metric_value(f64::MAX), Some(f64::MAX));
-        assert_eq!(sanitize_metric_value(f64::MIN), Some(f64::MIN));
+        use SanitizedValue::*;
+        assert_eq!(sanitize_metric_value(f64::NAN), Drop);
+        assert_eq!(sanitize_metric_value(f64::INFINITY), Value(f64::MAX));
+        assert_eq!(sanitize_metric_value(f64::NEG_INFINITY), Value(f64::MIN));
+        assert_eq!(sanitize_metric_value(0.0), Value(0.0));
+        assert_eq!(sanitize_metric_value(-1.5), Value(-1.5));
+        assert_eq!(sanitize_metric_value(f64::MAX), Value(f64::MAX));
+        assert_eq!(sanitize_metric_value(f64::MIN), Value(f64::MIN));
         assert_eq!(
             sanitize_metric_value(f64::MIN_POSITIVE),
-            Some(f64::MIN_POSITIVE)
+            Value(f64::MIN_POSITIVE)
+        );
+    }
+
+    #[test]
+    fn test_sanitize_metric_value_keeps_only_the_stale_nan_as_a_marker() {
+        let stale = f64::from_bits(config::meta::promql::STALE_NAN_BITS);
+        assert_eq!(sanitize_metric_value(stale), SanitizedValue::Stale);
+        // a quiet NaN with another payload is an ordinary NaN
+        assert_eq!(
+            sanitize_metric_value(f64::from_bits(0x7ff8_0000_0000_0002)),
+            SanitizedValue::Drop
+        );
+    }
+
+    #[test]
+    fn test_row_value_writes_a_stale_marker_as_a_null_cell() {
+        assert_eq!(SanitizedValue::Value(1.5).row_value(), Some(Some(1.5)));
+        assert_eq!(SanitizedValue::Stale.row_value(), Some(None));
+        assert_eq!(SanitizedValue::Drop.row_value(), None);
+    }
+
+    #[test]
+    fn test_row_value_drops_a_stale_marker_with_markers_off() {
+        assert_eq!(SanitizedValue::Stale.row_value_with(false), None);
+        assert_eq!(
+            SanitizedValue::Value(1.5).row_value_with(false),
+            Some(Some(1.5))
         );
     }
 
     #[test]
     fn test_metric_value_drops_nan() {
         assert!(metric_value(f64::NAN).is_none());
+        assert!(metric_value(f64::from_bits(config::meta::promql::STALE_NAN_BITS)).is_none());
     }
 
     #[test]
@@ -646,5 +719,38 @@ mod tests {
         let a = labels(&[("host", json::json!("a")), ("region", json::json!("eu"))]);
         let b = labels(&[("host", json::json!("b")), ("region", json::json!("eu"))]);
         assert_ne!(series_signature(&a), series_signature(&b));
+    }
+
+    #[test]
+    fn series_signature_is_stable_over_a_hashed_record() {
+        let mut record = json::Map::new();
+        record.insert("__name__".to_string(), json::json!("http_requests"));
+        record.insert("region".to_string(), json::json!("us-east-1"));
+        record.insert(VALUE_LABEL.to_string(), json::json!(1.0));
+        let first = signature_without_labels(&record, METRICS_HASH_EXCLUDED_LABELS);
+        record.insert(HASH_LABEL.to_string(), json::json!(first));
+        assert_eq!(
+            first,
+            signature_without_labels(&record, METRICS_HASH_EXCLUDED_LABELS)
+        );
+    }
+
+    #[test]
+    fn a_dropped_label_gives_a_record_the_hash_of_the_series_it_became() {
+        // A DropField redaction makes these one series; a stale hash would split them in two.
+        let mut redacted = json::Map::new();
+        redacted.insert("__name__".to_string(), json::json!("http_requests"));
+        redacted.insert("env".to_string(), json::json!("prod"));
+        redacted.insert(HASH_LABEL.to_string(), json::json!(12345_u64));
+
+        let mut never_had_the_label = json::Map::new();
+        never_had_the_label.insert("__name__".to_string(), json::json!("http_requests"));
+        never_had_the_label.insert("env".to_string(), json::json!("prod"));
+
+        assert_eq!(
+            signature_without_labels(&redacted, METRICS_HASH_EXCLUDED_LABELS),
+            signature_without_labels(&never_had_the_label, METRICS_HASH_EXCLUDED_LABELS),
+            "the stale hash must not contribute to the recomputed signature"
+        );
     }
 }

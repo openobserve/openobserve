@@ -27,11 +27,11 @@ use config::{
     },
     utils::time::{now_micros, second_micros},
 };
-use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
+use datafusion::error::DataFusionError;
 use hashbrown::HashSet;
 use infra::errors::Result;
 use promql::{
-    DEFAULT_LOOKBACK, TableProvider,
+    DEFAULT_LOOKBACK, ScanContext, TableProvider,
     ast::{
         name_visitor,
         selector_window::{SelectorWindow, selector_window},
@@ -47,8 +47,6 @@ use tokio::sync::mpsc;
 
 mod storage;
 mod wal;
-
-type Context = (SessionContext, Arc<Schema>, ScanStats, bool);
 
 /// What a range query's groups are planned from.
 struct GroupPlan {
@@ -73,9 +71,9 @@ impl TableProvider for StorageProvider {
         matchers: Matchers,
         label_selector: HashSet<String>,
         filters: &mut [(String, Vec<String>)],
-    ) -> datafusion::error::Result<Vec<Context>> {
+        streaming: bool,
+    ) -> datafusion::error::Result<Vec<ScanContext>> {
         let mut ctxs = Vec::new();
-        // register storage table
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
         let ctx = storage::create_context(
             &trace_id,
@@ -84,13 +82,15 @@ impl TableProvider for StorageProvider {
             time_range,
             matchers.clone(),
             filters,
+            storage::SourcePreference {
+                streaming,
+                output_labels: &label_selector,
+            },
         )
         .await?;
         if let Some(ctx) = ctx {
             ctxs.push(ctx);
         }
-
-        // register Wal table
         if self.need_wal {
             let trace_id = self.trace_id.to_owned() + "-wal-" + stream_name;
             let wal_ctx_list = wal::create_context(
@@ -150,7 +150,16 @@ pub async fn search(
     } else {
         // 1. get max records stream
         let start_ts = std::time::Instant::now();
-        let plan = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
+        let plan = match get_max_file_list(
+            &trace_id,
+            org_id,
+            &query.query,
+            start,
+            end,
+            query.query_exemplars,
+        )
+        .await
+        {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
@@ -167,11 +176,10 @@ pub async fn search(
         // 2. generate search group with max records stream
         let start_ts = std::time::Instant::now();
         let wal_floor = wal_floor();
-        // no cut without streaming, around a per-group subquery, or with an `@` pin on the WAL
+        // no cut without streaming, or with an `@` pin on the WAL
         let cut = if cfg.search.feature_metrics_streaming_agg_enabled
             && !query.query_exemplars
             && !req.is_super_cluster
-            && !plan.window.subquery
             && plan.window.pinned.is_none()
         {
             wal_cut(start, end, step, micros(plan.window.ahead), wal_floor)
@@ -179,8 +187,16 @@ pub async fn search(
             None
         };
         let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
-        let group = match generate_search_groups(memory_limit, plan.files, start, end, step, cut)
-            .await
+        let group_step = grouping_step(step, query.query_exemplars);
+        let group = match generate_search_groups(
+            memory_limit,
+            plan.files,
+            start,
+            end,
+            group_step,
+            cut,
+        )
+        .await
         {
             Ok(v) => v,
             Err(e) => {
@@ -223,9 +239,10 @@ pub async fn search(
     };
 
     let mut scan_stats = ScanStats::default();
-    for (value, _result_type, stats, _took) in results {
+    for (value, _result_type, stats, _took, warnings) in results {
         add_value(&mut resp, value);
         scan_stats.add(&stats);
+        resp.warnings.extend(warnings);
     }
     resp.scan_stats = Some(cluster_rpc::ScanStats::from(&scan_stats));
 
@@ -246,7 +263,8 @@ pub async fn data(
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
     let org_id = &req.org_id;
 
-    let (data_tx, mut data_rx) = mpsc::channel::<(value::Value, String, ScanStats, i64)>(2);
+    let (data_tx, mut data_rx) =
+        mpsc::channel::<(value::Value, String, ScanStats, i64, Vec<String>)>(2);
     let data_trace_id = trace_id.clone();
     let job = req.job.clone();
     tokio::task::spawn(async move {
@@ -256,11 +274,12 @@ pub async fn data(
                     log::info!("[trace_id {data_trace_id}] promql->data->grpc: data streaming end");
                     break;
                 }
-                Some((value, result_type, stats, took)) => {
+                Some((value, result_type, stats, took, warnings)) => {
                     let mut resp = cluster_rpc::MetricsQueryResponse {
                         job: job.clone(),
                         took: took as i32,
                         result_type: result_type.clone(),
+                        warnings,
                         ..Default::default()
                     };
 
@@ -289,7 +308,16 @@ pub async fn data(
         return Ok(());
     }
     // 1. get max records stream
-    let plan = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
+    let plan = match get_max_file_list(
+        &trace_id,
+        org_id,
+        &query.query,
+        start,
+        end,
+        query.query_exemplars,
+    )
+    .await
+    {
         Ok(v) => v,
         Err(e) => {
             log::error!(
@@ -306,7 +334,9 @@ pub async fn data(
     // 2. generate search group with max records stream
     let start_ts = std::time::Instant::now();
     let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
-    let group = match generate_search_group(memory_limit, plan.files, start, end, step).await {
+    let group_step = grouping_step(step, query.query_exemplars);
+    let group = match generate_search_group(memory_limit, plan.files, start, end, group_step).await
+    {
         Ok(v) => v,
         Err(e) => {
             log::error!(
@@ -356,12 +386,12 @@ pub async fn data(
 #[tracing::instrument(name = "promql:search:grpc:search_inner", skip_all, fields(org_id = req.org_id))]
 pub async fn search_inner(
     req: &cluster_rpc::MetricsQueryRequest,
-) -> Result<(value::Value, String, ScanStats, i64)> {
+) -> Result<(value::Value, String, ScanStats, i64, Vec<String>)> {
     let start = std::time::Instant::now();
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
     let org_id = &req.org_id;
     let query = req.query.as_ref().unwrap();
-    let prom_expr = parser::parse(&query.query).map_err(DataFusionError::Execution)?;
+    let prom_expr = promql::parse(&query.query).map_err(DataFusionError::Execution)?;
 
     let eval_stmt = parser::EvalStmt {
         expr: prom_expr,
@@ -404,7 +434,7 @@ pub async fn search_inner(
         query.label_selector.clone(),
     );
 
-    let (value, result_type, mut scan_stats) = if query.query_exemplars {
+    let (value, result_type, mut scan_stats, warnings) = if query.query_exemplars {
         ctx.query_exemplars(&trace_id, eval_stmt).await?
     } else {
         ctx.exec(&trace_id, eval_stmt).await?
@@ -419,7 +449,7 @@ pub async fn search_inner(
 
     scan_stats.format_to_mb();
     let took = start.elapsed().as_millis() as i64;
-    Ok((value, result_type, scan_stats, took))
+    Ok((value, result_type, scan_stats, took, warnings))
 }
 
 async fn get_max_file_list(
@@ -428,12 +458,20 @@ async fn get_max_file_list(
     query: &str,
     start: i64,
     end: i64,
+    query_exemplars: bool,
 ) -> Result<GroupPlan> {
     // 1. get metrics name
-    let ast = parser::parse(query).map_err(DataFusionError::Execution)?;
+    let ast = promql::parse(query).map_err(DataFusionError::Execution)?;
     let mut visitor = name_visitor::MetricNameVisitor::default();
     walk_expr(&mut visitor, &ast).map_err(|e| DataFusionError::Execution(e.to_string()))?;
-    let metrics_name = visitor.into_names();
+    let mut metrics_name = visitor.into_names();
+    if query_exemplars {
+        let mut mapped = std::collections::HashSet::with_capacity(metrics_name.len());
+        for name in &metrics_name {
+            mapped.insert(promql::utils::exemplars_stream_for(org_id, name).await);
+        }
+        metrics_name = mapped;
+    }
     let window = selector_window(&ast);
 
     // 2. get max records stream
@@ -473,13 +511,23 @@ fn wal_floor() -> i64 {
 fn wal_cut(start: i64, end: i64, step: i64, ahead: i64, wal_floor: i64) -> Option<i64> {
     // a group ending before the cut still reads `ahead` past its end, which must stay off the WAL
     let cut = wal_floor - ahead;
-    if cut <= start || cut > end {
+    if step <= 0 || cut <= start || cut > end {
         return None;
     }
     // groups evaluate on the query's own grid
     let cut = start + (cut - start + step - 1) / step * step;
     // a lone point evaluates as an instant vector the leader cannot merge: both pieces keep two
     (cut >= start + 2 * step && cut + step <= end).then_some(cut)
+}
+
+/// Exemplars are off the step grid, so their groups must abut without a step gap.
+fn grouping_step(step: i64, query_exemplars: bool) -> i64 {
+    // grouping takes `% step`, and a sender may forward a zero step
+    if query_exemplars || step <= 0 {
+        1
+    } else {
+        step
+    }
 }
 
 /// Sizes the groups by memory on each side of the cut, so no group straddles it.
@@ -740,6 +788,66 @@ mod tests {
         assert_eq!(wal_cut(0, 3000, 30, 0, 31), Some(60));
         // a negative offset reads past the group end, so the cut moves that far earlier
         assert_eq!(wal_cut(0, 3000, 30, 100, 2000), Some(1920));
+    }
+
+    #[tokio::test]
+    async fn test_exemplar_groups_abut_so_no_exemplar_falls_between_them() {
+        let files: Vec<FileKey> = (0..5)
+            .map(|i| FileKey {
+                meta: FileMeta {
+                    records: 100,
+                    min_ts: i * 100,
+                    max_ts: (i + 1) * 100,
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .collect();
+        let step = 30;
+
+        let samples = generate_search_group(200, files.clone(), 0, 500, grouping_step(step, false))
+            .await
+            .unwrap();
+        assert!(samples.windows(2).any(|w| w[1].0 > w[0].1 + 1));
+
+        let exemplars = generate_search_group(200, files, 0, 500, grouping_step(step, true))
+            .await
+            .unwrap();
+        assert!(exemplars.len() > 1);
+        assert_eq!(exemplars.first().unwrap().0, 0);
+        assert_eq!(exemplars.last().unwrap().1, 500);
+        assert!(exemplars.windows(2).all(|w| w[1].0 == w[0].1 + 1));
+    }
+
+    #[test]
+    fn test_grouping_step_is_never_zero_for_exemplars() {
+        assert_eq!(grouping_step(0, true), 1);
+        assert_eq!(grouping_step(300_000_000, true), 1);
+        assert_eq!(grouping_step(30, false), 30);
+    }
+
+    #[tokio::test]
+    async fn test_non_positive_step_from_a_sender_groups_without_panicking() {
+        assert_eq!(grouping_step(0, false), 1);
+        assert_eq!(grouping_step(-30, false), 1);
+        assert_eq!(wal_cut(0, 3000, 0, 0, 2000), None);
+        assert_eq!(wal_cut(0, 3000, -30, 0, 2000), None);
+        let files: Vec<FileKey> = (0..5).map(|i| file(i * 100, (i + 1) * 100, 100)).collect();
+        for step in [0, -30] {
+            let groups = generate_search_groups(
+                200,
+                files.clone(),
+                0,
+                500,
+                grouping_step(step, false),
+                None,
+            )
+            .await
+            .unwrap();
+            assert!(groups.len() > 1);
+            assert_eq!(groups.first().unwrap().0, 0);
+            assert_eq!(groups.last().unwrap().1, 500);
+        }
     }
 
     #[tokio::test]

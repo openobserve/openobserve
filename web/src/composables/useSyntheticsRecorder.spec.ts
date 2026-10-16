@@ -15,8 +15,14 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { gt } from "@/types/i18n";
-import useSyntheticsRecorder, { isExtensionOutdated } from "./useSyntheticsRecorder";
+import useSyntheticsRecorder, {
+  isExtensionOutdated,
+  UnresolvedVariableError,
+} from "./useSyntheticsRecorder";
 import type { BrowserStep, WireStep } from "@/types/synthetics";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // ── Bridge test helpers ───────────────────────────────────────────────────
 
@@ -1090,6 +1096,43 @@ describe("useSyntheticsRecorder", () => {
       expect(r.replayResult.value).toEqual({ success: true, passed: true });
     });
 
+    it("tracks synthetic_test_replay_completed with the outcome when a replay finishes", async () => {
+      vi.mocked(analytics.track).mockClear();
+      const r = useSyntheticsRecorder(gt);
+      const passing = r.replay(steps);
+      await settleProbeDelay();
+      respondToLastCommand({ success: true, passed: true });
+      await passing;
+      expect(analytics.track).toHaveBeenCalledWith("synthetic_test_replay_completed", {
+        passed: true,
+      });
+
+      const failing = r.replay(steps);
+      await settleProbeDelay();
+      emitStreamEvent({ method: "stepReplayResult", stepId: "s1", passed: false, duration_ms: 3 });
+      respondToLastCommand({ success: true, passed: false });
+      await failing;
+      expect(analytics.track).toHaveBeenLastCalledWith("synthetic_test_replay_completed", {
+        passed: false,
+      });
+    });
+
+    it("does not track a replay that was stopped or never ran a step", async () => {
+      vi.mocked(analytics.track).mockClear();
+      const r = useSyntheticsRecorder(gt);
+      const stopped = r.replay(steps);
+      await settleProbeDelay();
+      respondToLastCommand({ success: true, passed: false, stopped: true });
+      await stopped;
+
+      const preflight = r.replay(steps);
+      await settleProbeDelay();
+      respondToLastCommand({ success: false, passed: false, error: "blocked" });
+      await preflight;
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
     it("should accept auth, headers, cookies, and variables without throwing", async () => {
       const r = useSyntheticsRecorder(gt);
       const vars = [{ name: "BASE_URL", value: "https://example.com" }];
@@ -1487,6 +1530,143 @@ describe("useSyntheticsRecorder", () => {
       const res = await promise;
       expect(res).toBeNull();
       expect(r.isReplaying.value).toBe(false);
+    });
+  });
+
+  // The extension opens `targetUrl` first, so a `{{baseUrl}}` left in it opens nothing.
+  describe("Starting URL variable substitution", () => {
+    const vars = [{ name: "baseUrl", value: "example.com" }];
+    const click: WireStep[] = [{ id: "s1", action: "click", selector: "#go" } as WireStep];
+
+    it("resolves the Starting URL before startRecording", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const promise = r.startRecording("https://{{baseUrl}}/x", undefined, vars);
+
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await promise;
+
+      expect(getLastCommand()).toMatchObject({
+        action: "startRecording",
+        targetUrl: "https://example.com/x",
+      });
+    });
+
+    it("resolves the Starting URL before startRecordingFrom", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const promise = r.startRecordingFrom(click, {
+        targetUrl: "https://{{baseUrl}}/x",
+        variables: vars,
+      });
+
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await promise;
+
+      expect(getLastCommand()).toMatchObject({
+        action: "startRecordingFrom",
+        targetUrl: "https://example.com/x",
+      });
+    });
+
+    it("resolves the Starting URL before replay", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const promise = r.replay(click, "https://{{baseUrl}}/x", vars);
+
+      await settleProbeDelay();
+      respondToLastCommand({ success: true, passed: true });
+      await promise;
+
+      expect(getLastCommand()).toMatchObject({
+        action: "replay",
+        targetUrl: "https://example.com/x",
+      });
+    });
+
+    // Substituted like a Step url: a missing variable stops the command rather than opening a guess.
+    it("rejects an unresolved placeholder in the Starting URL like one in a step", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const promise = r.startRecordingFrom(click, {
+        targetUrl: "https://{{missing}}/x",
+        variables: vars,
+      });
+      const outcome = expect(promise).rejects.toThrow("unresolved variable {{missing}}");
+
+      await settleProbeDelay();
+      if (getLastCommandNonce()) respondToLastCommand({ success: true });
+      await outcome;
+
+      expect(getLastCommand()?.action).not.toBe("startRecordingFrom");
+    });
+
+    // The refusal must happen before any state flips, or the editor stays locked on a replay that never ran.
+    it("leaves no phantom running replay behind an unresolved Starting URL", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const promise = r.replay(click, "https://{{missing}}/x", vars);
+      const outcome = expect(promise).rejects.toThrow("unresolved variable {{missing}}");
+
+      await settleProbeDelay();
+      if (getLastCommandNonce()) respondToLastCommand({ success: true, passed: true });
+      await outcome;
+
+      expect(r.isReplaying.value).toBe(false);
+      expect(r.replayPhase.value).toBe("idle");
+      expect(getLastCommand()?.action).not.toBe("replay");
+    });
+
+    it("stops a replay with a step placeholder and no variables before any state change", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const typed = [{ id: "s2_c1", action: "type", selector: "#q", value: "{{X}}" } as WireStep];
+      const promise = r.replay(typed, "https://app.test/x");
+      const outcome = expect(promise).rejects.toThrow("unresolved variable {{X}}");
+
+      await settleProbeDelay();
+      if (getLastCommandNonce()) respondToLastCommand({ success: true, passed: true });
+      await outcome;
+
+      expect(r.isReplaying.value).toBe(false);
+      expect(r.replayPhase.value).toBe("idle");
+      expect(getLastCommand()?.action).not.toBe("replay");
+    });
+
+    it("throws an UnresolvedVariableError carrying the name", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const typed = [{ id: "s2_c1", action: "type", selector: "#q", value: "{{X}}" } as WireStep];
+      const promise = r.replay(typed, "https://app.test/x");
+      const caught = promise.catch((err: unknown) => err);
+
+      await settleProbeDelay();
+      if (getLastCommandNonce()) respondToLastCommand({ success: true, passed: true });
+      const err = await caught;
+
+      expect(err).toBeInstanceOf(UnresolvedVariableError);
+      expect((err as { variableName?: string }).variableName).toBe("X");
+      expect((err as Error).message).toBe("unresolved variable {{X}}");
+    });
+
+    it("stops a restore with a prefix placeholder and no variables before any state change", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const typed = [{ id: "s2_c1", action: "type", selector: "#q", value: "{{X}}" } as WireStep];
+      const promise = r.startRecordingFrom(typed, { targetUrl: "https://app.test/x" });
+      const outcome = expect(promise).rejects.toThrow("unresolved variable {{X}}");
+
+      await settleProbeDelay();
+      if (getLastCommandNonce()) respondToLastCommand({ success: true });
+      await outcome;
+
+      expect(r.replayPhase.value).toBe("idle");
+      expect(getLastCommand()?.action).not.toBe("startRecordingFrom");
+    });
+
+    it("sends a Starting URL with no placeholders unchanged when no variables are given", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const promise = r.startRecording("https://app.test/x");
+
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await promise;
+
+      expect(getLastCommand()?.targetUrl).toBe("https://app.test/x");
     });
   });
 });

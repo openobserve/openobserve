@@ -37,10 +37,14 @@ export default class DashboardPanel {
       '[data-test="dashboard-panel-refresh-panel-btn"]'
     );
     this.editLayout = page.locator('[data-test="dashboard-edit-layout"]');
+    this.layoutEditBtn = page.locator('[data-test="dashboard-edit-btn"]');
+    this.layoutEditSaveBtn = page.locator('[data-test="dashboard-edit-save-btn"]');
     this.panelHeight = page.locator(
-      '[data-test="panel-layout-settings-height-input"]'
+      '[data-test="panel-layout-settings-height-input-field"]'
     );
-    this.saveLayout = page.locator('[data-test="panel-layout-settings-save"]');
+    this.saveLayout = page.locator(
+      '[data-test="panel-layout-settings-drawer"] [data-test="o-dialog-primary-btn"]'
+    );
     this.cancelLayout = page.locator(
       '[data-test="panel-layout-settings-cancel"]'
     );
@@ -187,6 +191,8 @@ export default class DashboardPanel {
 
   //edit layout
   async editLayoutPanel(panelName, height) {
+    await this.layoutEditBtn.waitFor({ state: "visible" });
+    await this.layoutEditBtn.click();
     const dropdownBtn = this.page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);
     await dropdownBtn.waitFor({ state: "visible" });
     await dropdownBtn.click();
@@ -196,6 +202,9 @@ export default class DashboardPanel {
     await this.panelHeight.click();
     await this.panelHeight.fill(height);
     await this.saveLayout.click();
+    await expect(this.layoutEditSaveBtn).toBeEnabled();
+    await this.layoutEditSaveBtn.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
   }
 
   //Edit Panel: Go to logs
@@ -219,26 +228,7 @@ export default class DashboardPanel {
   // Right-click on chart center to open alert context menu
   // Retries because ECharts needs time after data load to register contextmenu handlers
   async rightClickChartForAlert(maxRetries = 3) {
-    const chartCanvas = this.chartRendererCanvas.first();
-    await chartCanvas.waitFor({ state: "visible", timeout: 15000 });
-
-    // savePanel() triggers a fresh panel query; chart-renderer's DOM node stays
-    // "visible" the whole time, but a same-sized "no-data" empty-state overlay
-    // (absolute inset-0 sibling) covers it and intercepts clicks until that
-    // re-query resolves. A waitForResponse on the search-stream call isn't
-    // enough here (the caller already awaits one) — the DOM/no-data state
-    // updates a beat after the network response resolves, via Vue reactivity.
-    // Wait for the overlay to clear before right-clicking, otherwise the
-    // click lands on the overlay instead of the chart.
-    await this.noDataElement
-      .first()
-      .waitFor({ state: "hidden", timeout: 20000 })
-      .catch(() => {});
-
-    const box = await chartCanvas.boundingBox();
-    const position = box
-      ? { x: Math.floor(box.width / 2), y: Math.floor(box.height / 2) }
-      : { x: 200, y: 100 };
+    const { chartCanvas, position } = await this.getChartRightClickTarget();
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       await chartCanvas.click({ button: "right", position });
@@ -250,6 +240,29 @@ export default class DashboardPanel {
     }
     // Final attempt without catching - let it throw if still not visible
     await chartCanvas.click({ button: "right", position });
+  }
+
+  // Single right-click with no menu retry, for series types that must not open the menu.
+  async rightClickChart() {
+    const { chartCanvas, position } = await this.getChartRightClickTarget();
+    await chartCanvas.click({ button: "right", position });
+  }
+
+  async getChartRightClickTarget() {
+    const chartCanvas = this.chartRendererCanvas.first();
+    await chartCanvas.waitFor({ state: "visible", timeout: 15000 });
+
+    // After savePanel() a same-sized no-data overlay intercepts clicks until the re-query renders.
+    await this.noDataElement
+      .first()
+      .waitFor({ state: "hidden", timeout: 20000 })
+      .catch(() => {});
+
+    const box = await chartCanvas.boundingBox();
+    const position = box
+      ? { x: Math.floor(box.width / 2), y: Math.floor(box.height / 2) }
+      : { x: 200, y: 100 };
+    return { chartCanvas, position };
   }
 
   // Verify alert context menu is visible

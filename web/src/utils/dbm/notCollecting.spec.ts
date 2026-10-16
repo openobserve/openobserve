@@ -16,9 +16,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
+import en from "@/locales/languages/en-US.json";
 import { raw, type TranslateFn } from "@/types/i18n";
 
-import { buildDbmNotCollectingChecks } from "./notCollecting";
+import { buildDbmNotCollectingChecks, type DbmNotCollectingNamespace } from "./notCollecting";
 
 /**
  * A `t` that echoes its key (with params appended) so the assertions read
@@ -140,4 +141,28 @@ describe("buildDbmNotCollectingChecks", () => {
     const checks = buildDbmNotCollectingChecks("blocked", signals(), t, extras);
     expect(checks.map((check) => check.id)).toEqual(["queries", "enabled", "sampling", "settings"]);
   });
+
+  // The keys are built at runtime, so neither the type checker nor the echoing `t` above would notice one missing.
+  it.each<DbmNotCollectingNamespace>(["activity", "blocked", "deadlocks", "samples"])(
+    "finds every key it reads under dbm.%s in the locale file",
+    (namespace) => {
+      const keys: string[] = [];
+      const recording = ((key: string) => {
+        keys.push(key);
+        return key;
+      }) as unknown as TranslateFn;
+      for (const branch of [
+        signals(),
+        signals({ databaseCount: 0 }),
+        signals({ queryCount: 0, dbmEnabled: false }),
+      ]) {
+        buildDbmNotCollectingChecks(namespace, branch, recording, []);
+      }
+      const lookup = (path: string) =>
+        path
+          .split(".")
+          .reduce<unknown>((node, key) => (node as Record<string, unknown> | undefined)?.[key], en);
+      expect(keys.filter((key) => typeof lookup(key) !== "string")).toEqual([]);
+    },
+  );
 });

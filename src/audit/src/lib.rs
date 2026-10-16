@@ -64,7 +64,7 @@ pub async fn report_http(
         audit(AuditMessage {
             user_email: user_id,
             org_id,
-            _timestamp: chrono::Utc::now().timestamp(),
+            _timestamp: config::utils::time::now_micros(),
             protocol: Protocol::Http,
             response_meta: ResponseMeta {
                 http_method,

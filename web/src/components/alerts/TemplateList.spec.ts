@@ -22,6 +22,7 @@ import alertsFixture from "@/test/unit/mockData/alerts";
 import router from "@/test/unit/helpers/router";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -311,5 +312,48 @@ describe("TemplateList pagination persistence", () => {
     expect(pushedQuery.page).toBe("3");
     expect(pushedQuery.action).toBeUndefined();
     expect(pushedQuery.name).toBeUndefined();
+  });
+});
+
+describe("alertTemplates view state restore", () => {
+  let viewWrapper: any;
+  const mountComponent = () =>
+    mount(TemplateList, {
+      attachTo: "#app",
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+
+  beforeEach(() => resetListViewState());
+
+  afterEach(() => viewWrapper?.unmount());
+
+  it("restores search, tab, page size and sort", () => {
+    useListViewState("alertTemplates", {
+      filterQuery: "slack",
+      tab: "custom",
+      pageSize: 50,
+      sortBy: "name",
+      sortOrder: "desc",
+    });
+    viewWrapper = mountComponent();
+    const vm = viewWrapper.vm as any;
+    expect(vm.filterQuery).toBe("slack");
+    expect(vm.activeTab).toBe("custom");
+    expect(vm.pageSize).toBe(50);
+    expect(vm.sortBy).toBe("name");
+    expect(vm.sortOrder).toBe("desc");
+  });
+
+  it("saves changes to the view state", async () => {
+    viewWrapper = mountComponent();
+    const vm = viewWrapper.vm as any;
+    vm.filterQuery = "abc";
+    vm.activeTab = "prebuilt";
+    vm.pageSize = 100;
+    await flushPromises();
+    const saved: any = useListViewState("alertTemplates", {});
+    expect(saved.filterQuery).toBe("abc");
+    expect(saved.tab).toBe("prebuilt");
+    expect(saved.pageSize).toBe(100);
   });
 });

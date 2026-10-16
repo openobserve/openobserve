@@ -100,6 +100,10 @@ fn same_immutable_definition(
         && left.trial_count == right.trial_count
         && left.metadata == right.metadata
         && left.idempotency_key == right.idempotency_key
+        && left.prompt_id == right.prompt_id
+        && left.prompt_name == right.prompt_name
+        && left.prompt_version == right.prompt_version
+        && left.prompt_content_hash == right.prompt_content_hash
         && left.created_by == right.created_by
         && left.created_at == right.created_at
 }
@@ -157,6 +161,10 @@ mod tests {
             scores_settled_at: None,
             idempotency_key: Some("key-1".to_string()),
             is_baseline: false,
+            prompt_id: None,
+            prompt_name: None,
+            prompt_version: None,
+            prompt_content_hash: None,
             deleted_at: None,
             created_by: "owner@example.com".to_string(),
             created_at: 1,
@@ -198,6 +206,10 @@ mod tests {
             scores_settled_at: None,
             idempotency_key: Some("key-1".to_string()),
             is_baseline: false,
+            prompt_id: None,
+            prompt_name: None,
+            prompt_version: None,
+            prompt_content_hash: None,
             deleted_at: None,
             created_by: "owner@example.com".to_string(),
             created_at: 1,
@@ -222,5 +234,48 @@ mod tests {
         assert!(valid_model_lifecycle_transition(&current, &retry));
         retry.retry_count = 0;
         assert!(!valid_model_lifecycle_transition(&current, &retry));
+    }
+
+    #[test]
+    fn prompt_ref_definition_and_evidence_are_immutable() {
+        let current = llm_experiments::Model {
+            id: "experiment-prompt".to_string(),
+            org_id: "org-1".to_string(),
+            name: "Managed Prompt".to_string(),
+            description: None,
+            dataset_id: "dataset-1".to_string(),
+            dataset_version: 1,
+            dataset_filter: None,
+            task_config: serde_json::json!({
+                "type": "prompt_ref",
+                "id": "prompt-1",
+                "version": 3,
+                "provider_id": "provider-1"
+            }),
+            scorers: serde_json::json!([]),
+            trial_count: 1,
+            metadata: None,
+            status: "running".to_string(),
+            status_reason: None,
+            deadline_at: 86_400_001,
+            completed_at: None,
+            lifecycle_version: 0,
+            retry_count: 0,
+            scores_settled_at: None,
+            idempotency_key: Some("key-prompt".to_string()),
+            is_baseline: false,
+            deleted_at: None,
+            prompt_id: Some("prompt-1".to_string()),
+            prompt_name: Some("Support answer".to_string()),
+            prompt_version: Some(3),
+            prompt_content_hash: Some("sha256:content".to_string()),
+            created_by: "owner@example.com".to_string(),
+            created_at: 1,
+        };
+        let mut incoming = current.clone();
+        assert!(same_immutable_definition(&current, &incoming));
+
+        incoming.prompt_version = Some(4);
+        assert!(!same_immutable_definition(&current, &incoming));
     }
 }

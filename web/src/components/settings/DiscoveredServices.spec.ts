@@ -37,6 +37,8 @@ vi.mock("@/components/common/GroupHeader.vue", () => ({
 }));
 
 import serviceStreamsService from "@/services/service_streams";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 
 // ODrawer stub mirrors the migrated component API: open/title/size + slots
 // (default, header-right) and emits update:open + click:primary/secondary/neutral.
@@ -865,6 +867,24 @@ describe("DiscoveredServices", () => {
       await flushPromises();
 
       expect(wrapper.vm.resetting).toBe(false);
+    });
+
+    // The reset deletes the rows the cached services list and analytics are built from.
+    it("expires the service-correlation cache after a successful reset, and not after a failed one", async () => {
+      const scope = { queryKey: serviceStreamKeys.all("test-org") };
+      const spy = vi.spyOn(queryClient, "invalidateQueries");
+      wrapper = mountComponent();
+      await flushPromises();
+
+      vi.mocked(serviceStreamsService.resetServices).mockRejectedValueOnce(new Error("boom"));
+      await wrapper.vm.doResetServices();
+      await flushPromises();
+      expect(spy).not.toHaveBeenCalledWith(scope);
+
+      await wrapper.vm.doResetServices();
+      await flushPromises();
+      expect(spy).toHaveBeenCalledWith(scope);
+      spy.mockRestore();
     });
 
     it("should throw via no-org branch when doResetServices is called without an org", async () => {

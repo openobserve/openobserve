@@ -76,6 +76,8 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 });
 
 import userServiece from "@/services/users";
+import { userKeys } from "@/services/users.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { invalidateLoginData } from "@/utils/zincutils";
 import config from "@/aws-exports";
 
@@ -769,6 +771,69 @@ describe("AddUser", () => {
       await flushPromises();
 
       expect(userServiece.get).not.toHaveBeenCalled();
+    });
+  });
+
+  // The destination form hosts this drawer and never re-reads users, so every write expires the shared list itself.
+  describe("expiring the shared users list", () => {
+    const scope = { queryKey: userKeys.usersAll("default") };
+    let spy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      spy = vi.spyOn(queryClient, "invalidateQueries");
+    });
+
+    afterEach(() => {
+      spy.mockRestore();
+    });
+
+    it("after adding an existing user", async () => {
+      vi.mocked(userServiece.updateexistinguser).mockResolvedValue({ data: {} } as any);
+      wrapper = mountComp();
+      setField(wrapper, "email", "newuser@example.com");
+      setField(wrapper, "role", "admin");
+      await submitForm(wrapper);
+
+      expect(userServiece.updateexistinguser).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith(scope);
+    });
+
+    it("after creating a user", async () => {
+      vi.mocked(userServiece.create).mockResolvedValue({ data: {} } as any);
+      wrapper = mountComp();
+      wrapper.vm.existingUser = false;
+      await flushPromises();
+      setField(wrapper, "password", "Str0ng!Pass");
+      await submitForm(wrapper);
+
+      expect(userServiece.create).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith(scope);
+    });
+
+    it("after updating a user", async () => {
+      vi.mocked(userServiece.getUserRoles).mockResolvedValue({ data: [] } as any);
+      vi.mocked(userServiece.update).mockResolvedValue({ data: {} } as any);
+      wrapper = mountComp({
+        modelValue: { email: "other@example.com", first_name: "Other", org_member_id: "2" },
+      });
+      await flushPromises();
+      await submitForm(wrapper);
+
+      expect(userServiece.update).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith(scope);
+    });
+
+    it("not when the write fails", async () => {
+      vi.mocked(userServiece.updateexistinguser).mockRejectedValue({
+        response: { status: 500, data: { message: "boom" } },
+      });
+      wrapper = mountComp();
+      setField(wrapper, "email", "newuser@example.com");
+      setField(wrapper, "role", "admin");
+      await submitForm(wrapper);
+
+      expect(userServiece.updateexistinguser).toHaveBeenCalledTimes(1);
+      expect(spy).not.toHaveBeenCalledWith(scope);
     });
   });
 });

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import AlertContextMenu from "./AlertContextMenu.vue";
+import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 describe("AlertContextMenu Component", () => {
   let wrapper: any;
@@ -125,9 +127,9 @@ describe("AlertContextMenu Component", () => {
       expect(wrapper.vm.menuStyle.top).toBe("400px");
     });
 
-    it("should handle zero position values", () => {
+    it("keeps a click at the viewport's corner off its edge", () => {
       wrapper = createWrapper({ x: 0, y: 0 });
-      expect(wrapper.vm.menuStyle).toEqual({ left: "0px", top: "0px" });
+      expect(wrapper.vm.menuStyle).toEqual({ left: "8px", top: "8px" });
     });
   });
 
@@ -152,6 +154,43 @@ describe("AlertContextMenu Component", () => {
         condition: "below",
         threshold: 50,
       });
+    });
+
+    it("passes the clicked series' panel query and role through", () => {
+      wrapper = createWrapper({ value: 3, panelQueryIndex: 1, seriesRole: "shifted" });
+      wrapper.vm.handleMenuItemClick("above");
+
+      expect(wrapper.emitted("select")[0][0]).toEqual({
+        condition: "above",
+        threshold: 3,
+        panelQueryIndex: 1,
+        seriesRole: "shifted",
+      });
+    });
+
+    it("offers only the forecast alert on a forecast line", async () => {
+      wrapper = createWrapper({ value: 0.9, panelQueryIndex: 0, seriesRole: "forecast" });
+
+      expect(wrapper.find('[data-test="alert-context-menu-above"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-context-menu-below"]').exists()).toBe(false);
+      const item = wrapper.find('[data-test="alert-context-menu-forecast"]');
+      expect(item.text()).toBe("Alert when forecast reaches 0.9");
+
+      await item.trigger("click");
+      expect(wrapper.emitted("select")[0][0]).toEqual({
+        condition: "forecast",
+        threshold: 0.9,
+        panelQueryIndex: 0,
+        seriesRole: "forecast",
+      });
+    });
+
+    it("alerts on the forecast value it shows", async () => {
+      wrapper = createWrapper({ value: 0.904237, panelQueryIndex: 0, seriesRole: "forecast" });
+      const item = wrapper.find('[data-test="alert-context-menu-forecast"]');
+      expect(item.text()).toBe("Alert when forecast reaches 0.9042");
+      await item.trigger("click");
+      expect(wrapper.emitted("select")[0][0].threshold).toBe(0.9042);
     });
 
     it("should emit select with the current value as threshold", () => {
@@ -203,6 +242,89 @@ describe("AlertContextMenu Component", () => {
       wrapper = createWrapper({ value: 42, visible: true });
       const belowItem = wrapper.find('[data-test="alert-context-menu-below"]');
       expect(belowItem.text()).toContain("42");
+    });
+  });
+
+  describe("Copy and placement", () => {
+    it("reads as one phrase per item", async () => {
+      wrapper = createWrapper({ value: 42 });
+      expect(wrapper.find('[data-test="alert-context-menu-above"]').text()).toBe(
+        "Alert when above 42",
+      );
+      expect(wrapper.find('[data-test="alert-context-menu-below"]').text()).toBe(
+        "Alert when below 42",
+      );
+      await wrapper.setProps({ seriesRole: "forecast" });
+      expect(wrapper.find('[data-test="alert-context-menu-forecast"]').text()).toBe(
+        "Alert when forecast reaches 42",
+      );
+    });
+
+    it("shows the value in the panel's unit", () => {
+      wrapper = createWrapper({ value: 2, unit: "bytes" });
+      const shown = formatUnitValue(getUnitValue(2, "bytes", "", 0));
+      expect(wrapper.find('[data-test="alert-context-menu-above"]').text()).toBe(
+        `Alert when above ${shown}`,
+      );
+    });
+
+    it("shows the threshold it writes, not a rescaled one", async () => {
+      wrapper = createWrapper({ value: 1536, unit: "bytes" });
+      for (const condition of ["above", "below"]) {
+        const item = wrapper.find(`[data-test="alert-context-menu-${condition}"]`);
+        expect(item.text()).toContain("1,536");
+        expect(item.text()).not.toContain("KB");
+      }
+      await wrapper.find('[data-test="alert-context-menu-above"]').trigger("click");
+      expect(wrapper.emitted("select")![0][0]).toMatchObject({ threshold: 1536 });
+    });
+
+    it("shows the forecast threshold it writes, in the unit only when that keeps the number", async () => {
+      wrapper = createWrapper({ value: 0.904249, unit: "percent", seriesRole: "forecast" });
+      const item = () => wrapper.find('[data-test="alert-context-menu-forecast"]');
+      expect(item().text()).toBe("Alert when forecast reaches 0.9042%");
+      await item().trigger("click");
+      expect(wrapper.emitted("select")![0][0]).toMatchObject({ threshold: 0.9042 });
+
+      await wrapper.setProps({ value: 1536, unit: "bytes" });
+      expect(item().text()).toContain("1536");
+      expect(item().text()).not.toContain("KB");
+    });
+
+    it("measures itself again when its text changes while open", async () => {
+      const width = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(100);
+      const height = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(40);
+      wrapper = createWrapper({ visible: false, x: window.innerWidth - 150, y: 100 });
+      await wrapper.setProps({ visible: true });
+      await nextTick();
+      expect(wrapper.vm.menuStyle.left).toBe(`${window.innerWidth - 150}px`);
+      width.mockReturnValue(280);
+      await wrapper.setProps({ value: 123456789 });
+      await nextTick();
+      expect(wrapper.vm.menuStyle.left).toBe(`${window.innerWidth - 150 - 280}px`);
+      width.mockRestore();
+      height.mockRestore();
+    });
+
+    it("keeps item text on one line, and inside a phone's width", () => {
+      wrapper = createWrapper();
+      expect(wrapper.find('[data-test="alert-context-menu"]').classes()).toContain(
+        "max-w-[calc(100vw-1rem)]",
+      );
+      expect(
+        wrapper.find('[data-test="alert-context-menu-above"] span.select-none').classes(),
+      ).toContain("whitespace-nowrap");
+    });
+
+    it("flips to the left of the click near the viewport's right edge", async () => {
+      const width = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(280);
+      const height = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(40);
+      wrapper = createWrapper({ visible: false, x: window.innerWidth - 20, y: 100 });
+      await wrapper.setProps({ visible: true });
+      await nextTick();
+      expect(wrapper.vm.menuStyle.left).toBe(`${window.innerWidth - 20 - 280}px`);
+      width.mockRestore();
+      height.mockRestore();
     });
   });
 

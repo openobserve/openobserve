@@ -148,6 +148,7 @@ describe("emojiCatalog", () => {
       CategrafConfig: "categraf",
       NightingaleConfig: "nightingale",
       VMagentConfig: "vmagent",
+      GpuConfig: "nvidia",
       KubernetesConfig: "kubernetes",
       LinuxConfig: "linux",
       MacOSConfig: "macos",
@@ -156,6 +157,7 @@ describe("emojiCatalog", () => {
       AWSIndividualServices: "aws",
       AzureConfig: "azure",
       GCPConfig: "gcp",
+      KinesisFirehose: "kinesis",
     };
 
     // Not third-party products, so there is no vendor mark to ship:

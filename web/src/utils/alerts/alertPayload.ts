@@ -6,6 +6,7 @@ import { cloneDeep } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import alertsService from "@/services/alerts";
 import { transformFEToBE } from "./alertDataTransforms";
+import { hasDeliveryTarget } from "./deliveryTarget";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, type TranslateFn, type I18nText } from "@/types/i18n";
 
@@ -39,8 +40,12 @@ export interface PayloadFormData {
     aggregation?: any;
     conditions: any[];
     promql_condition?: any;
+    promql_rule_mode?: boolean;
+    promql_multi_alert?: boolean;
+    promql_warning_value?: number | string | null;
     sql: string;
     vrl_function?: string | null;
+    multi_time_range?: any[] | null;
     /**
      * The SLO burn/budget condition. The backend enforces
      * `query_type == "slo"` IFF this is present, in BOTH directions, so a
@@ -55,6 +60,9 @@ export interface PayloadFormData {
   row_template?: string;
   row_template_type?: string;
   creates_incident?: boolean;
+  notify_on_recovery?: boolean;
+  recovery_destinations?: string[];
+  keep_firing_for?: number;
   /** Feature 2: integer storage id 1..5, or null/undefined when unset. */
   priority?: number | string | null;
   tags?: string[];
@@ -123,6 +131,8 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   payload.context_attributes = {} as any;
 
   payload.query_condition.type = payload.is_real_time ? "custom" : formData.query_condition.type;
+  // Compare-with-Past windows only run with SQL; never send them for another type.
+  if (payload.query_condition.type !== "sql") payload.query_condition.multi_time_range = [];
 
   formData.context_attributes.forEach((attr: any) => {
     if (attr.key?.trim() && attr.value?.trim()) payload.context_attributes[attr.key] = attr.value;
@@ -165,13 +175,31 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 
   payload.trigger_condition.silence = parseInt(formData.trigger_condition.silence as any);
 
+  // A `type="number"` input hands back a STRING, and the API takes an i64 — an
+  // uncoerced "60" is rejected by serde before any validation runs, so the user
+  // sees a deserialization error instead of the field's own rule.
+  //
+  // Both are forced off for realtime, same belt-and-suspenders as
+  // pending_period_sec below: a realtime alert persists no state, so it never
+  // opens an episode and neither field could ever act.
+  payload.keep_firing_for = payload.is_real_time
+    ? 0
+    : parseInt(formData.keep_firing_for as any, 10) || 0;
+  payload.notify_on_recovery = payload.is_real_time ? false : !!formData.notify_on_recovery;
+  // Dropped with the switch off, or the API refuses a list nothing would use.
+  payload.recovery_destinations = payload.notify_on_recovery
+    ? (formData.recovery_destinations ?? [])
+    : [];
+
   // Minutes on the form, seconds on the wire. Forced to 0 for realtime even
   // though the field is unreachable in that template — same belt-and-suspenders
   // as the warning_threshold strip below, in case a stale value survives a
   // realtime<->scheduled toggle without a full remount.
-  payload.pending_period_sec = payload.is_real_time
-    ? 0
-    : Math.round((parseInt(formData.pending_period_sec as any, 10) || 0) * 60);
+  const pendingMinutes =
+    payload.query_condition.type === "promql" && payload.query_condition.promql_rule_mode
+      ? Number(formData.pending_period_sec)
+      : parseInt(formData.pending_period_sec as any, 10);
+  payload.pending_period_sec = payload.is_real_time ? 0 : Math.round((pendingMinutes || 0) * 60);
 
   payload.description = raw(formData.description.trim());
 
@@ -192,10 +220,7 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 
   if (getSelectedTab.value === "sql" || getSelectedTab.value === "custom") {
     payload.query_condition.promql_condition = null;
-  }
-
-  if (getSelectedTab.value === "promql") {
-    payload.query_condition.sql = "";
+    payload.query_condition.promql_rule_mode = false;
   }
 
   // Feature 5 (§6b.6). The backend enforces `query_type == slo` IFF
@@ -290,7 +315,8 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   ) {
     delete (payload.trigger_condition as any).warning_threshold;
   }
-  if (getSelectedTab.value !== "promql") {
+  // Forecast mode has no warning value: its condition is the horizon in days.
+  if (getSelectedTab.value !== "promql" || (formData as any)._ui?.forecast) {
     delete (payload.query_condition as any).promql_warning_value;
   }
   // Realtime alerts carry no warning family at all (D12) — and the form hides
@@ -345,6 +371,14 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
     payload.lastTriggeredAt = new Date().getTime();
     payload.lastEditedBy = store.state.userInfo.email;
     formData.updatedAt = new Date().toISOString();
+  }
+
+  if (
+    payload.query_condition.type === "promql" &&
+    payload.query_condition.promql_rule_mode &&
+    Number(payload.pending_period_sec) > 0
+  ) {
+    payload.query_condition.promql_multi_alert = true;
   }
 
   return payload;
@@ -410,7 +444,9 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       emit("update:list", activeFolderId.value);
       toast({
         variant: "success",
-        message: t("toastMessages.alerts.alertUpdatedSuccessfully"),
+        message: hasDeliveryTarget(payload)
+          ? t("toastMessages.alerts.alertUpdatedSuccessfully")
+          : t("alerts.messages.alertUpdatedNoDestination"),
       });
     } else {
       await alertsService.create_by_alert_id(
@@ -421,7 +457,9 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       emit("update:list", activeFolderId.value);
       toast({
         variant: "success",
-        message: t("toastMessages.alerts.alertSavedSuccessfully"),
+        message: hasDeliveryTarget(payload)
+          ? t("toastMessages.alerts.alertSavedSuccessfully")
+          : t("alerts.messages.alertSavedNoDestination"),
       });
     }
     dismiss();

@@ -287,7 +287,7 @@ pub async fn process_search_stream_request(
                         audit(AuditMessage {
                             user_email: user_id,
                             org_id,
-                            _timestamp: chrono::Utc::now().timestamp(),
+                            _timestamp: config::utils::time::now_micros(),
                             protocol: Protocol::Http,
                             response_meta: ResponseMeta {
                                 http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
@@ -392,7 +392,7 @@ pub async fn process_search_stream_request(
                         audit(AuditMessage {
                             user_email: user_id,
                             org_id,
-                            _timestamp: chrono::Utc::now().timestamp(),
+                            _timestamp: config::utils::time::now_micros(),
                             protocol: Protocol::Http,
                             response_meta: ResponseMeta {
                                 http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
@@ -472,7 +472,7 @@ pub async fn process_search_stream_request(
                         audit(AuditMessage {
                             user_email: user_id,
                             org_id,
-                            _timestamp: chrono::Utc::now().timestamp(),
+                            _timestamp: config::utils::time::now_micros(),
                             protocol: Protocol::Http,
                             response_meta: ResponseMeta {
                                 http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
@@ -545,7 +545,7 @@ pub async fn process_search_stream_request(
                     audit(AuditMessage {
                         user_email: user_id,
                         org_id,
-                        _timestamp: chrono::Utc::now().timestamp(),
+                        _timestamp: config::utils::time::now_micros(),
                         protocol: Protocol::Http,
                         response_meta: ResponseMeta {
                             http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
@@ -607,7 +607,7 @@ pub async fn process_search_stream_request(
                     audit(AuditMessage {
                         user_email: user_id,
                         org_id,
-                        _timestamp: chrono::Utc::now().timestamp(),
+                        _timestamp: config::utils::time::now_micros(),
                         protocol: Protocol::Http,
                         response_meta: ResponseMeta {
                             http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
@@ -691,7 +691,7 @@ pub async fn process_search_stream_request(
             audit(AuditMessage {
                 user_email: user_id,
                 org_id,
-                _timestamp: chrono::Utc::now().timestamp(),
+                _timestamp: config::utils::time::now_micros(),
                 protocol: Protocol::Http,
                 response_meta: ResponseMeta {
                     http_method: audit_ctx.method.to_string(),
@@ -1115,7 +1115,7 @@ pub async fn process_search_stream_request_multi(
         audit(AuditMessage {
             user_email: user_id,
             org_id,
-            _timestamp: chrono::Utc::now().timestamp(),
+            _timestamp: config::utils::time::now_micros(),
             protocol: Protocol::Http,
             response_meta: ResponseMeta {
                 http_method: audit_ctx.method.to_string(),

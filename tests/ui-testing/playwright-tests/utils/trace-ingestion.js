@@ -316,9 +316,49 @@ async function ingestTraces(page, traceCount = 10, options = {}) {
   };
 }
 
+/**
+ * Ingest `count` single-span ERROR traces named err-op-000.. (newest first) into `streamName`,
+ * each followed by an OK span, so a span_status filter and page boundaries are both checkable.
+ * @returns {Promise<{status: number}>}
+ */
+async function ingestSequencedErrorSpans(page, streamName, count) {
+  const orgId = getOrgIdentifier() || "default";
+  const baseUrl = (process.env.ZO_BASE_URL || process.env.INGESTION_URL).replace(/\/$/, '');
+  const now = BigInt(Date.now()) * 1000000n;
+  const span = (name, startNs, durationMs, statusCode) => ({
+    traceId: generateHexId(16),
+    spanId: generateHexId(8),
+    name,
+    kind: 2,
+    startTimeUnixNano: String(startNs),
+    endTimeUnixNano: String(startNs + BigInt(durationMs) * 1000000n),
+    attributes: [],
+    status: { code: statusCode },
+  });
+  const spans = [];
+  for (let i = 0; i < count; i++) {
+    const start = now - BigInt(i + 1) * 4000000000n;
+    const seq = String(i).padStart(3, '0');
+    spans.push(span(`err-op-${seq}`, start, i + 1, 2));
+    spans.push(span(`ok-op-${seq}`, start + 2000000000n, 1, 1));
+  }
+  const response = await page.request.post(`${baseUrl}/api/${orgId}/v1/traces`, {
+    headers: { ...getAuthHeaders(), 'stream-name': streamName },
+    data: {
+      resourceSpans: [{
+        resource: { attributes: [{ key: 'service.name', value: { stringValue: 'e2e-sequenced-errors' } }] },
+        scopeSpans: [{ scope: { name: 'e2e' }, spans }],
+      }],
+    },
+  });
+  testLogger.info('Sequenced error spans ingested', { streamName, count, status: response.status() });
+  return { status: response.status() };
+}
+
 module.exports = {
   generateTrace,
   ingestTraces,
+  ingestSequencedErrorSpans,
   generateHexId,
   getTimestampNs
 };

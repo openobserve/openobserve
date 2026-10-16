@@ -14,7 +14,6 @@
         :columns="columns"
         row-key="configId"
         :loading="isLoading"
-        :footer-title="t('onlineEvals.quality.overview.title')"
         :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
@@ -78,12 +77,9 @@
               :label="t(`onlineEvals.quality.overview.status.${row.status}`)"
               :aria-label="t(`onlineEvals.quality.overview.status.${row.status}`)"
             />
-            <span
-              class="text-3xs text-text-secondary max-w-full truncate"
-              :title="healthSummary(row)"
-            >
+            <OTruncatedText class="text-3xs text-text-secondary max-w-full">
               {{ healthSummary(row) }}
-            </span>
+            </OTruncatedText>
           </div>
         </template>
 
@@ -184,6 +180,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfigRow } from "../composables/useQualityScoreConfigs";
@@ -256,6 +253,7 @@ const columns = computed(() =>
       accessorFn: (row: ScoreConfigRow) => row.statusPriority,
       sortable: true,
       size: 190,
+      minSize: 136,
       meta: { align: "left" },
     },
     {
@@ -274,6 +272,8 @@ const columns = computed(() =>
       accessorKey: "dataType",
       sortable: true,
       size: COL.type,
+      // Fits the widest badge ("Categorical") so resizing can't clip it.
+      minSize: 104,
       meta: { align: "left" },
     },
     {
@@ -282,6 +282,7 @@ const columns = computed(() =>
       accessorKey: "qualityValue",
       sortable: true,
       size: 120,
+      minSize: 88,
       meta: { align: "right" },
     },
     {
@@ -289,7 +290,8 @@ const columns = computed(() =>
       header: t("onlineEvals.quality.overview.columns.totalScores"),
       accessorKey: "totalScores",
       sortable: true,
-      size: COL.count,
+      size: 120,
+      minSize: 112,
       meta: { align: "right" },
     },
     {
@@ -297,6 +299,7 @@ const columns = computed(() =>
       header: t("onlineEvals.quality.overview.columns.scopeMix"),
       sortable: false,
       size: 240,
+      minSize: 96,
       meta: { align: "left" },
     },
     {
@@ -304,6 +307,7 @@ const columns = computed(() =>
       header: t("onlineEvals.quality.overview.columns.volumeTrend"),
       sortable: false,
       size: 120,
+      minSize: 104,
       meta: { align: "left" },
     },
     {
@@ -312,6 +316,7 @@ const columns = computed(() =>
       accessorKey: "lastUpdatedMs",
       sortable: true,
       size: COL.date,
+      minSize: 112,
       meta: { align: "left" },
     },
   ].map((c: any) => ({

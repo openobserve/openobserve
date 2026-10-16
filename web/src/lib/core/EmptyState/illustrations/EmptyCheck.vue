@@ -86,17 +86,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </g>
 
     <!-- sparkles -->
-    <g class="es-spark es-spark-a" transform="translate(166 44)">
-      <path
-        d="M0 -7 L1.6 -1.6 L7 0 L1.6 1.6 L0 7 L-1.6 1.6 L-7 0 L-1.6 -1.6 Z"
-        fill="var(--color-success-500)"
-      />
+    <!-- The twinkle keyframes set a CSS transform, which would replace a translate on the same element. -->
+    <g transform="translate(166 44)">
+      <g class="es-spark es-spark-a">
+        <path
+          d="M0 -7 L1.6 -1.6 L7 0 L1.6 1.6 L0 7 L-1.6 1.6 L-7 0 L-1.6 -1.6 Z"
+          fill="var(--color-success-500)"
+        />
+      </g>
     </g>
-    <g class="es-spark es-spark-b" transform="translate(70 52)">
-      <path
-        d="M0 -5 L1.2 -1.2 L5 0 L1.2 1.2 L0 5 L-1.2 1.2 L-5 0 L-1.2 -1.2 Z"
-        fill="var(--color-primary-400)"
-      />
+    <g transform="translate(70 52)">
+      <g class="es-spark es-spark-b">
+        <path
+          d="M0 -5 L1.2 -1.2 L5 0 L1.2 1.2 L0 5 L-1.2 1.2 L-5 0 L-1.2 -1.2 Z"
+          fill="var(--color-primary-400)"
+        />
+      </g>
     </g>
   </svg>
 </template>

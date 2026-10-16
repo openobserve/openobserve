@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import OnCallPolicies from "@/views/OnCall/OnCallPolicies.vue";
@@ -34,11 +35,18 @@ const stubs = {
   OPageLayout: { name: "OPageLayout", template: "<div><slot /></div>" },
   OTable: {
     name: "OTable",
-    props: ["data", "columns"],
-    template: "<div><slot name='subheader' /></div>",
+    props: ["data", "columns", "currentPage", "pageSize", "sortBy", "sortOrder"],
+    emits: ["update:currentPage", "update:pageSize", "update:sortBy", "update:sortOrder"],
+    template:
+      "<div><slot name='subheader' /><slot name='toolbar' /><slot name='toolbar-trailing' /></div>",
   },
   OStatStrip: { name: "OStatStrip", props: ["items"], template: "<div />" },
-  OSearchInput: { name: "OSearchInput", template: "<div />" },
+  OSearchInput: {
+    name: "OSearchInput",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template: "<div />",
+  },
   OButton: { name: "OButton", template: "<button />" },
   OTooltip: { name: "OTooltip", template: "<div />" },
   OEmptyState: { name: "OEmptyState", template: "<div />" },
@@ -70,6 +78,7 @@ const statsOf = (w: any) =>
 describe("OnCallPolicies", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
     service.listTeams.mockResolvedValue({ data: TEAMS } as any);
     service.whoIsOnCall.mockResolvedValue({
       data: [{ rotation: "Weekdays", user_email: "ana@o2.ai", next_user_email: "bob@o2.ai" }],
@@ -140,6 +149,27 @@ describe("OnCallPolicies", () => {
     expect(rowsOf(wrapper)[0].onCall).toBe("");
   });
 
+  /// The audit is two requests per team wide, so a revisit that repeats them
+  /// pays the whole page again; only the refresh button is allowed to.
+  it("serves a revisit from the cache and reaches the server on refresh", async () => {
+    const first = render();
+    await flushPromises();
+    expect(service.listTeams).toHaveBeenCalledTimes(1);
+    expect(service.getPolicy).toHaveBeenCalledTimes(2);
+    first.unmount();
+
+    const second = render();
+    await flushPromises();
+    expect(service.listTeams).toHaveBeenCalledTimes(1);
+    expect(service.getPolicy).toHaveBeenCalledTimes(2);
+
+    await second.find('[data-test="oncall-policies-refresh"]').trigger("click");
+    await flushPromises();
+    expect(service.listTeams).toHaveBeenCalledTimes(2);
+    expect(service.getPolicy).toHaveBeenCalledTimes(4);
+    expect(service.whoIsOnCall).toHaveBeenCalledTimes(4);
+  });
+
   /// On-Call owns one rail entry, so a sub-page with no Back is a dead end.
   /// Mounted through the REAL page layout: the button lives in OPageHeader, and
   /// a stubbed layout would report success while nothing rendered.
@@ -172,5 +202,42 @@ describe("OnCallPolicies", () => {
         params: { teamId: "t1", tab: "escalation" },
       }),
     );
+  });
+
+  describe("list view state", () => {
+    it("restores search, page, page size and sort", async () => {
+      Object.assign(
+        useListViewState("oncall-policies", {
+          search: "",
+          currentPage: 1,
+          pageSize: 20,
+          sortBy: "",
+          sortOrder: "asc",
+        }),
+        { search: "pay", currentPage: 2, pageSize: 50, sortBy: "teamName", sortOrder: "desc" },
+      );
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OSearchInput" }).props("modelValue")).toBe("pay");
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("currentPage")).toBe(2);
+      expect(table.props("pageSize")).toBe(50);
+      expect(table.props("sortBy")).toBe("teamName");
+      expect(table.props("sortOrder")).toBe("desc");
+    });
+
+    it("saves table changes", async () => {
+      const wrapper = render();
+      await flushPromises();
+      const table = wrapper.findComponent({ name: "OTable" });
+      table.vm.$emit("update:currentPage", 4);
+      table.vm.$emit("update:sortOrder", "desc");
+      await flushPromises();
+
+      const saved = useListViewState("oncall-policies", {}) as Record<string, unknown>;
+      expect(saved.currentPage).toBe(4);
+      expect(saved.sortOrder).toBe("desc");
+    });
   });
 });

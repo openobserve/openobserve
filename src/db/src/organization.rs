@@ -139,12 +139,7 @@ pub async fn get_org_setting_toggle_ingestion_logs(org_id: &str) -> Result<bool,
 }
 
 /// Get the usage stream enabled setting for an org.
-/// When no explicit setting exists, this falls back to
-/// `OrganizationSetting::default()`, whose `usage_stream_enabled` defaults to
-/// the global `ZO_USAGE_REPORT_TO_OWN_ORG` flag (see
-/// `default_usage_stream_enabled`). So with self-reporting on, orgs report to
-/// their own `usage` stream by default; a user can toggle it off per org
-/// (which persists an explicit `false`), reverting to the billing-API view.
+/// Without a stored setting this falls back to `default_usage_stream_enabled`, which is off.
 pub async fn get_org_setting_usage_stream_enabled(org_id: &str) -> Result<bool, Error> {
     let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
     if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
@@ -167,6 +162,29 @@ pub async fn get_org_setting_usage_stream_enabled(org_id: &str) -> Result<bool, 
         .await
         .insert(key.to_string(), settings);
     Ok(usage_stream_enabled)
+}
+
+/// Whether automatic RED anomaly insights are on for an org; absent settings mean off.
+pub async fn get_org_setting_red_insights_enabled(org_id: &str) -> Result<bool, Error> {
+    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
+    if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
+        return Ok(v.red_insights_enabled);
+    }
+
+    let settings: OrganizationSetting = match db::get(&key).await {
+        Ok(settings) => json::from_slice(&settings)?,
+        Err(Error::DbError(infra::errors::DbError::KeyNotExists(_))) => {
+            OrganizationSetting::default()
+        }
+        Err(e) => return Err(e),
+    };
+    let red_insights_enabled = settings.red_insights_enabled;
+
+    ORGANIZATION_SETTING
+        .write()
+        .await
+        .insert(key.to_string(), settings);
+    Ok(red_insights_enabled)
 }
 
 /// Cache the existing org settings in the beginning

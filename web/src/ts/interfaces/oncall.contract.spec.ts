@@ -145,7 +145,7 @@ const RESPONSE_EVENT_KINDS = [
 ] as const satisfies readonly ResponseEventKind[];
 const _c1: Complete<ResponseEventKind, typeof RESPONSE_EVENT_KINDS> = true;
 
-const CHANNELS = ["email", "webhook"] as const satisfies readonly Channel[];
+const CHANNELS = ["email", "sms", "voice", "webhook"] as const satisfies readonly Channel[];
 const _c2: Complete<Channel, typeof CHANNELS> = true;
 
 const RESPONSE_STATES = [
@@ -180,7 +180,7 @@ const _FINAL_ACTIONS = [
 ] as const satisfies readonly PolicyFinalAction[];
 const _c7: Complete<PolicyFinalAction, typeof _FINAL_ACTIONS> = true;
 
-const L0_MODES = ["parallel", "gate", "only"] as const satisfies readonly L0Mode[];
+const L0_MODES = ["parallel", "gate", "only", "off"] as const satisfies readonly L0Mode[];
 const _c8: Complete<L0Mode, typeof L0_MODES> = true;
 
 const ROUTING_DECISION_KINDS = [

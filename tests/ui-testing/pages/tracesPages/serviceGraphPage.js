@@ -59,6 +59,16 @@ export class ServiceGraphPage {
     this.nodesTable = '[data-test="service-graph-side-panel-nodes-table"]';
     this.podsPanel = '[data-test="service-graph-side-panel-pods"]';
     this.podsTable = '[data-test="service-graph-side-panel-pods-table"]';
+    // OTable marks headers o2-table-th-<id> and body cells o2-table-cell-<id>.
+    this.tableHeaderPrefix = 'thead th[data-test^="o2-table-th-"]';
+    this.tableHeader = (columnId) => `thead th[data-test="o2-table-th-${columnId}"]`;
+    this.tableCell = (columnId) => `tbody td[data-test="o2-table-cell-${columnId}"]`;
+    this.nodePanelTabPrefix = '[data-test^="service-graph-node-panel-tab-"]';
+    // Resource tabs and their tables are generated per detected OTEL field, so both
+    // data-tests carry a dynamic id (k8s-pod-name, k8s-node-name, ...), never 'pods'/'nodes'.
+    this.resourceTab = (tabId) => `[data-test="service-graph-node-panel-tab-${tabId}"]`;
+    this.resourceTable = (tabId) => `[data-test="service-graph-side-panel-${tabId}-table"]`;
+    this.fixedPanelTabs = ['operations', 'behavior', 'metrics'];
 
     // ===== TELEMETRY CORRELATION (Metrics tab) =====
     this.metricsTab = '[data-test="service-graph-node-panel-tab-metrics"]';
@@ -504,6 +514,80 @@ export class ServiceGraphPage {
       tabNames.push((await tabs.nth(i).textContent()).trim());
     }
     return tabNames;
+  }
+
+  // ===== SIDE PANEL TABLES (Operations / resource tabs) =====
+
+  async getOperationsColumnIds() {
+    return await this.getResourceTableColumnIds(this.operationsTable);
+  }
+
+  async sortOperationsByColumn(columnId) {
+    const previousOrder = (await this.getOperationsColumnText('operation')).join('|');
+    await this.page.locator(`${this.operationsTable} ${this.tableHeader(columnId)}`).click();
+    // The re-sort is a client-side computed, so wait for the rendered order to
+    // change rather than guessing a settle time. Data whose keys are all equal
+    // legitimately keeps its order, and the caller's assertions still hold.
+    await this.page
+      .waitForFunction(
+        ([selector, previous]) => {
+          const rows = [...document.querySelectorAll(selector)].map((c) => c.innerText.trim());
+          return rows.length > 0 && rows.join('|') !== previous;
+        },
+        [`${this.operationsTable} ${this.tableCell('operation')}`, previousOrder],
+        { timeout: 10000 },
+      )
+      .catch(() => {});
+  }
+
+  /** Text of one operations column, top to bottom, for comparing row order. */
+  async getOperationsColumnText(columnId) {
+    return await this.page
+      .locator(`${this.operationsTable} ${this.tableCell(columnId)}`)
+      .evaluateAll((cells) => cells.map((c) => c.innerText.trim()));
+  }
+
+  /**
+   * Latency cells render a ServiceCatalogBarCell whose progress bar carries
+   * aria-valuenow = round(value / columnMax * 100), monotonic in the raw duration.
+   * Reading it avoids parsing formatted latencies across us/ms/s units.
+   */
+  async getOperationsDurationRatios(columnId) {
+    return await this.page
+      .locator(`${this.operationsTable} ${this.tableCell(columnId)} [role="progressbar"]`)
+      .evaluateAll((bars) => bars.map((b) => Number(b.getAttribute('aria-valuenow'))));
+  }
+
+  /** Resource tabs are generated per OTEL workload, so the set varies by data. */
+  async getSidePanelTabIds() {
+    return await this.page
+      .locator(this.nodePanelTabPrefix)
+      .evaluateAll((nodes) =>
+        nodes.map((n) => (n.getAttribute('data-test') || '').replace('service-graph-node-panel-tab-', '')),
+      );
+  }
+
+  /** Tab ids for the generated resource tabs, with the fixed tabs removed. */
+  async getResourceTabIds() {
+    const tabIds = await this.getSidePanelTabIds();
+    return tabIds.filter((id) => id && !this.fixedPanelTabs.includes(id));
+  }
+
+  async switchToResourceTab(tabId) {
+    await this.page.locator(this.resourceTab(tabId)).click();
+  }
+
+  async expectResourceTableVisible(tabId) {
+    await expect(this.page.locator(this.resourceTable(tabId))).toBeVisible({ timeout: 15000 });
+  }
+
+  async getResourceTableColumnIds(tableSelector) {
+    const ids = await this.page
+      .locator(`${tableSelector} ${this.tableHeaderPrefix}`)
+      .evaluateAll((nodes) =>
+        nodes.map((n) => (n.getAttribute('data-test') || '').replace('o2-table-th-', '')),
+      );
+    return ids.filter((id) => id && id !== '__spacer__');
   }
 
   // ===== SCREENSHOTS (Visual Verification) =====

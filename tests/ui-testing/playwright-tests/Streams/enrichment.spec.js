@@ -1,0 +1,329 @@
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const PageManager = require('../../pages/page-manager.js');
+const testLogger = require('../utils/test-logger.js');
+const { v4: uuidv4 } = require('uuid');
+const { getOrgIdentifier, getAuthHeaders } = require('../utils/cloud-auth.js');
+
+test.describe.configure({ mode: "parallel" });
+
+test.describe("Enrichment data testcases", () => {
+    let pm;
+
+    // Backend-readiness gate: on cloud the e2e_automate stream is indexed
+    // asynchronously AFTER ingestion returns. Selecting it in the logs UI before it
+    // is actually queryable means applyQuery() never fires a real _search — which is
+    // exactly why the page-armed waitForResponse timed out. Poll the same streams API
+    // that logsPage.waitForStreamAvailable uses (bounded, tolerant of transient cloud
+    // connection resets) until the stream is present, so the UI selection is
+    // deterministic. Returns true once the stream is confirmed selectable.
+    async function waitForStreamQueryable(page, streamName, maxWaitMs = 60000, pollIntervalMs = 3000) {
+        const apiUrl = process.env["INGESTION_URL"] || process.env["ZO_BASE_URL"];
+        const org = getOrgIdentifier();
+        const url = `${apiUrl}/api/${org}/streams?type=logs&keyword=${streamName}`;
+        const deadline = Date.now() + maxWaitMs;
+        let attempt = 0;
+
+        while (Date.now() < deadline) {
+            attempt++;
+            try {
+                const response = await page.request.get(url, { headers: getAuthHeaders() });
+                if (response.ok()) {
+                    const body = await response.json().catch(() => ({}));
+                    if ((body.list || []).some((s) => s.name === streamName)) {
+                        testLogger.info('Stream confirmed queryable via streams API', { streamName, attempt });
+                        return true;
+                    }
+                } else {
+                    testLogger.debug('Stream readiness poll non-OK', { status: response.status(), attempt });
+                }
+            } catch (err) {
+                // Tolerate transient cloud errors (Connection timeout / ECONNRESET) and retry.
+                testLogger.debug('Stream readiness poll error (retrying)', { error: err.message, attempt });
+            }
+            // Documented consistency backoff between readiness polls (cloud indexing lag).
+            await page.waitForTimeout(pollIntervalMs);
+        }
+        return false;
+    }
+
+    // Helper function for tests that need logs data setup
+    async function setupLogsData(page, pm) {
+        await pm.ingestionPage.ingestion();
+
+        // Gate on backend readiness BEFORE driving the logs UI so the stream is
+        // actually selectable and the subsequent search fires against a real stream.
+        const streamReady = await waitForStreamQueryable(page, "e2e_automate");
+        if (!streamReady) {
+            throw new Error('setupLogsData: e2e_automate stream not queryable via streams API within readiness window; cannot deterministically select it in the logs UI');
+        }
+
+        const logsUrl = `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=${getOrgIdentifier()}`;
+        testLogger.navigation('Navigating to logs page', { url: logsUrl });
+
+        try {
+            await page.goto(logsUrl);
+
+            // Select the confirmed-present stream. selectStream throws after its
+            // internal retries, so a silent mis-selection now surfaces here.
+            await pm.logsPage.selectStream("e2e_automate");
+
+            // Arm the search-response wait IMMEDIATELY BEFORE the action that triggers
+            // it. Previously it was armed before the slow selectStream, so its 30s timer
+            // elapsed during selectStream's up-to-120s cloud stream-indexing wait and
+            // timed out even when the search later succeeded. Gate on a 200 for the
+            // org's _search so we only accept a successful search against the selected
+            // stream — a real backend signal, not a weakened assertion.
+            const org = getOrgIdentifier();
+            const successfulSearch = page.waitForResponse(
+                (response) =>
+                    response.url().includes(`/api/${org}/_search`) &&
+                    response.status() === 200,
+                { timeout: 30000 }
+            );
+            await pm.enrichmentPage.applyQuery();
+            await successfulSearch;
+            testLogger.info('Logs data setup completed');
+        } catch (error) {
+            testLogger.error('Logs data setup failed', {
+                error: error.message,
+                pageUrl: page.url()
+            });
+            throw error;
+        }
+    }
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+    });
+
+    test("should upload an enrichment table under functions", {
+        tag: ['@enrichment', '@upload', '@explore', '@P1', '@all']
+    }, async ({ page }) => {
+        testLogger.info('Testing enrichment table upload functionality');
+
+        // Setup logs data for exploration
+        await setupLogsData(page, pm);
+
+        // Navigate to add enrichment table
+        await pm.pipelinesPage.navigateToAddEnrichmentTable();
+
+        // Generate a unique file name and replace hyphens with underscores
+        let fileName = `enrichment_info_${uuidv4()}_csv`.replace(/-/g, "_");
+        testLogger.debug('Generated File Name', { fileName });
+
+        // Upload and explore enrichment table
+        const fileContentPath = "../test-data/enrichment_info.csv";
+        await pm.enrichmentPage.uploadAndExploreEnrichmentTable(fileContentPath, fileName);
+
+        // Verify the uploaded table actually landed in the enrichment tables list
+        // (the upload-and-explore workflow itself asserted nothing about persistence).
+        await pm.enrichmentPage.navigateToEnrichmentTable();
+        await pm.enrichmentPage.searchEnrichmentTableInList(fileName);
+        await pm.enrichmentPage.verifyTableVisibleInList(fileName);
+
+        // Clean up - delete the uploaded table
+        await pm.pipelinesPage.deleteEnrichmentTableByName(fileName);
+
+        testLogger.info('Enrichment table upload test completed');
+    });
+
+    test("should upload an enrichment table under functions with VRL", {
+        tag: ['@enrichment', '@upload', '@vrl', '@P1', '@all']
+    }, async ({ page }, testInfo) => {
+        // VRL test involves multiple networkidle waits + VRL editor init; give extra headroom
+        test.setTimeout(480000);
+        testLogger.info('Testing enrichment table upload with VRL functionality');
+
+        // Setup logs data for exploration
+        await setupLogsData(page, pm);
+
+        // Navigate to add enrichment table
+        await pm.pipelinesPage.navigateToAddEnrichmentTable();
+
+        // Generate a unique file name
+        let fileName = `protocols_${uuidv4()}_csv`.replace(/-/g, "_");
+        testLogger.debug('Generated File Name', { fileName });
+
+        // Upload file with VRL processing using page object methods
+        const fileContentPath = "../test-data/protocols.csv";
+        await pm.enrichmentPage.uploadFileWithVRLQuery(fileContentPath, fileName);
+        await pm.enrichmentPage.exploreWithVRLProcessing(fileName);
+
+        // Clean up - delete the uploaded table
+        await pm.enrichmentPage.navigateToEnrichmentTable();
+        await pm.pipelinesPage.deleteEnrichmentTableByName(fileName);
+
+        testLogger.info('Enrichment table VRL test completed');
+    });
+
+    test("should display error when CSV not added in enrichment table", {
+        tag: ['@enrichment', '@validation', '@csvRequired', '@P1', '@all']
+    }, async ({ page }) => {
+        testLogger.info('Testing CSV validation error functionality');
+
+        // Navigate to add enrichment table
+        await pm.pipelinesPage.navigateToAddEnrichmentTable();
+
+        // Test CSV validation error
+        await pm.enrichmentPage.testCSVValidationError();
+
+        testLogger.info('CSV validation error test completed');
+    });
+
+    test("should display error when name field is empty in enrichment table", {
+        tag: ['@enrichment', '@validation', '@nameRequired', '@P1', '@all']
+    }, async ({ page }) => {
+        testLogger.info('Testing name field validation error functionality');
+
+        // Navigate to add enrichment table
+        await pm.pipelinesPage.navigateToAddEnrichmentTable();
+
+        // Test name validation error - upload CSV without entering name
+        const fileContentPath = "../test-data/enrichment_info.csv";
+        await pm.enrichmentPage.attemptSaveWithoutName(fileContentPath);
+
+        testLogger.info('Name field validation error test completed');
+    });
+
+    test("should append an enrichment table under functions", {
+        tag: ['@enrichment', '@append', '@P1', '@all']
+    }, async ({ page }) => {
+        testLogger.info('Testing enrichment table append functionality');
+
+        // Navigate to add enrichment table
+        await pm.pipelinesPage.navigateToAddEnrichmentTable();
+
+        // Generate a unique file name and replace hyphens with underscores
+        let fileName = `append_${uuidv4()}_csv`.replace(/-/g, "_");
+        testLogger.debug('Generated File Name', { fileName });
+
+        // Upload file and test append functionality using page object methods
+        const fileContentPath = "../test-data/append.csv";
+        await pm.enrichmentPage.uploadFileForAppendTest(fileContentPath, fileName);
+        await pm.enrichmentPage.exploreAndVerifyInitialData();
+        await pm.enrichmentPage.navigateAndAppendData(fileName, fileContentPath);
+        await pm.enrichmentPage.verifyAppendedData(fileName);
+
+        // Clean up - delete the enrichment table
+        await pm.enrichmentPage.navigateToEnrichmentTable();
+        await pm.enrichmentPage.searchEnrichmentTableInList(fileName);
+        await pm.pipelinesPage.deleteEnrichmentTableByName(fileName);
+
+        testLogger.info('Enrichment table append test completed');
+    });
+
+    test("should cancel enrichment table creation and return to list", {
+        tag: ['@enrichment', '@cancel', '@P1', '@all']
+    }, async ({ page }) => {
+        testLogger.info('Testing cancel button functionality');
+
+        // Navigate to add enrichment table
+        await pm.pipelinesPage.navigateToAddEnrichmentTable();
+
+        // Click cancel without entering any data
+        await pm.enrichmentPage.clickCancelButton();
+
+        // Verify we're back on enrichment tables list
+        await pm.enrichmentPage.verifyBackOnEnrichmentList();
+
+        testLogger.info('Cancel button test completed');
+    });
+
+    test("should search and filter enrichment tables", {
+        tag: ['@enrichment', '@search', '@filter', '@P1', '@all']
+    }, async ({ page }) => {
+        testLogger.info('Testing search/filter functionality');
+
+        // Create a table to search for
+        await pm.pipelinesPage.navigateToAddEnrichmentTable();
+        let fileName = `search_test_${uuidv4()}_csv`.replace(/-/g, "_");
+        testLogger.debug('Generated File Name', { fileName });
+
+        const fileContentPath = "../test-data/enrichment_info.csv";
+        await pm.enrichmentPage.uploadEnrichmentFile(fileContentPath, fileName);
+
+        // After upload, we're already on the enrichment tables list
+        // Search for the table
+        await pm.enrichmentPage.searchEnrichmentTableInList(fileName);
+
+        // Verify table is visible in filtered results
+        await pm.enrichmentPage.verifyTableVisibleInList(fileName);
+
+        // Clean up - delete without explicit navigation (already on list)
+        await pm.pipelinesPage.deleteEnrichmentTableByName(fileName);
+
+        testLogger.info('Search/filter test completed');
+    });
+
+    test("should open edit mode with disabled name field", {
+        tag: ['@enrichment', '@edit', '@P0', '@all']
+    }, async ({ page }) => {
+        testLogger.info('Testing edit workflow functionality');
+
+        // Create a table first
+        await pm.pipelinesPage.navigateToAddEnrichmentTable();
+        let fileName = `edit_test_${uuidv4()}_csv`.replace(/-/g, "_");
+        testLogger.debug('Generated File Name', { fileName });
+
+        const fileContentPath = "../test-data/enrichment_info.csv";
+        await pm.enrichmentPage.uploadEnrichmentFile(fileContentPath, fileName);
+
+        // After upload, we're already on the enrichment tables list
+        // Search for the table
+        await pm.enrichmentPage.searchEnrichmentTableInList(fileName);
+
+        // Click edit button
+        await pm.enrichmentPage.clickEditButton(fileName);
+
+        // Verify we're in update mode
+        await pm.enrichmentPage.verifyUpdateMode();
+
+        // Verify name field is disabled
+        await pm.enrichmentPage.verifyNameFieldDisabled();
+
+        // Cancel - returns to list
+        await pm.enrichmentPage.clickCancelButton();
+
+        // Clean up - delete without explicit navigation (already on list after cancel)
+        await pm.pipelinesPage.deleteEnrichmentTableByName(fileName);
+
+        testLogger.info('Edit workflow test completed');
+    });
+
+    test("should show delete confirmation dialog with cancel", {
+        tag: ['@enrichment', '@delete', '@confirmation', '@P1', '@all']
+    }, async ({ page }) => {
+        testLogger.info('Testing delete confirmation dialog');
+
+        // Create a table first
+        await pm.pipelinesPage.navigateToAddEnrichmentTable();
+        let fileName = `delete_test_${uuidv4()}_csv`.replace(/-/g, "_");
+        testLogger.debug('Generated File Name', { fileName });
+
+        const fileContentPath = "../test-data/enrichment_info.csv";
+        await pm.enrichmentPage.uploadEnrichmentFile(fileContentPath, fileName);
+
+        // After upload, we're already on the enrichment tables list
+        // Search for the table
+        await pm.enrichmentPage.searchEnrichmentTableInList(fileName);
+
+        // Click delete button
+        await pm.enrichmentPage.clickDeleteButton(fileName);
+
+        // Verify confirmation dialog appears
+        await pm.enrichmentPage.verifyDeleteConfirmationDialog();
+
+        // Click Cancel - table should still exist
+        await pm.enrichmentPage.clickDeleteCancel();
+
+        // Verify table still visible
+        await pm.enrichmentPage.verifyTableVisibleInList(fileName);
+
+        // Clean up - actually delete it (already on list)
+        await pm.pipelinesPage.deleteEnrichmentTableByName(fileName);
+
+        testLogger.info('Delete confirmation dialog test completed');
+    });
+});

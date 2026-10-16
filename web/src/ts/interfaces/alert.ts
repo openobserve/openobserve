@@ -61,6 +61,10 @@ export interface Alert {
     };
   };
   creates_incident?: boolean;
+  /** Send one notification to the firing's destinations when the alert recovers. */
+  notify_on_recovery?: boolean;
+  /** Seconds the condition must stay clear before the alert recovers. 0 = immediately. */
+  keep_firing_for?: number;
 }
 
 // Alert object which is modified in frontend to display in table and form
@@ -219,6 +223,7 @@ export interface AlertGroupTransition {
   /** Absent where nothing was observed — a vanished group has no reading, and
    *  rendering 0 would read as a real measurement. */
   value?: number;
+  rule_value?: string;
 }
 
 export type StaleChildPolicy = "treat_as_false" | "treat_as_true" | "use_last_state";

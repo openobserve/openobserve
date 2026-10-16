@@ -186,6 +186,7 @@ mod m20260831_000001_add_exhausted_at_to_oncall_responses;
 mod m20260901_000001_reset_anomaly_detection_retries;
 mod m20260903_000001_add_anomaly_last_failed_at;
 mod m20260906_000001_add_anomaly_last_alert_fired_at;
+mod m20260908_000001_create_synthetics_refs;
 mod m20260910_000001_add_folder_id_to_workflows;
 mod m20260911_000001_add_splunk_token_to_org_ingestion_tokens;
 mod m20260912_000001_add_anomaly_alert_budget;
@@ -195,12 +196,44 @@ mod m20260916_000001_add_folder_id_to_workflow_drafts;
 mod m20260917_000001_add_env_to_synthetics_jobs;
 mod m20260917_000001_create_llm_experiment_slot_retries;
 mod m20260917_000001_create_synthetics_shared_variables;
+mod m20260918_000001_create_oncall_response_reports;
+mod m20260920_000001_add_anomaly_level_half_width;
 mod m20260921_000001_add_input_preview_to_llm_annotation_queue_items;
 mod m20260922_000001_add_password_policy_columns_to_users;
 mod m20260922_000002_create_user_password_history_table;
 mod m20260922_000003_create_user_auth_state_table;
+mod m20260923_000001_create_ai_chat_sessions;
+mod m20260923_000001_create_llm_prompts;
+mod m20260924_000001_add_recovery_episode_columns;
+mod m20260928_000001_add_alert_recovery_destinations;
+mod m20261001_000001_add_anomaly_band_settings;
+mod m20261003_000001_create_rum_pa_tables;
+mod m20261004_000001_create_query_history;
+mod m20261006_000001_create_ai_chat_shares;
+mod m20261007_000001_create_ai_chat_turns;
+mod m20261007_000001_scope_alert_dedup_state_by_org;
+mod m20261007_000002_add_redact_tools_to_ai_chat_shares;
+mod m20261008_000001_add_name_to_rum_pa_tombstones;
+mod m20261009_000001_add_promql_rule_mode;
+mod m20261009_000001_create_downtimes;
+mod m20261009_000002_add_muted_by_downtime_id_to_alert_incidents;
+mod m20261009_000003_add_last_downtime_id_to_alert_states;
+mod m20261009_000004_add_kind_to_slo_backfill_jobs;
+mod m20261009_000005_create_downtime_notifications;
+mod m20261012_000001_create_alert_calibration_configs;
+mod m20261013_000001_create_oncall_phone_verifications;
+mod m20261013_000002_create_org_telephony;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
+
+#[cfg(test)]
+pub(crate) async fn create_llm_prompt_schema_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20260923_000001_create_llm_prompts::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -292,6 +325,41 @@ pub(crate) async fn create_slo_tables_for_test(
     use sea_orm_migration::MigrationTrait;
     let manager = SchemaManager::new(db);
     m20260727_000001_create_slo_tables::Migration
+        .up(&manager)
+        .await?;
+    m20261009_000004_add_kind_to_slo_backfill_jobs::Migration
+        .up(&manager)
+        .await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_downtime_notifications_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    m20261009_000005_create_downtime_notifications::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_alert_calibration_configs_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20261012_000001_create_alert_calibration_configs::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+/// Apply only the RUM Product Analytics tables, idempotently, for tests in any crate.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
+    m20261003_000001_create_rum_pa_tables::Migration
+        .up(&manager)
+        .await?;
+    m20261008_000001_add_name_to_rum_pa_tombstones::Migration
         .up(&manager)
         .await
 }
@@ -483,6 +551,30 @@ impl MigratorTrait for Migrator {
             Box::new(m20260922_000001_add_password_policy_columns_to_users::Migration),
             Box::new(m20260922_000002_create_user_password_history_table::Migration),
             Box::new(m20260922_000003_create_user_auth_state_table::Migration),
+            Box::new(m20260920_000001_add_anomaly_level_half_width::Migration),
+            Box::new(m20260923_000001_create_llm_prompts::Migration),
+            Box::new(m20260924_000001_add_recovery_episode_columns::Migration),
+            Box::new(m20260928_000001_add_alert_recovery_destinations::Migration),
+            Box::new(m20260918_000001_create_oncall_response_reports::Migration),
+            Box::new(m20260908_000001_create_synthetics_refs::Migration),
+            Box::new(m20261001_000001_add_anomaly_band_settings::Migration),
+            Box::new(m20261003_000001_create_rum_pa_tables::Migration),
+            Box::new(m20261004_000001_create_query_history::Migration),
+            Box::new(m20261007_000001_scope_alert_dedup_state_by_org::Migration),
+            Box::new(m20261008_000001_add_name_to_rum_pa_tombstones::Migration),
+            Box::new(m20261009_000001_add_promql_rule_mode::Migration),
+            Box::new(m20261009_000001_create_downtimes::Migration),
+            Box::new(m20261009_000002_add_muted_by_downtime_id_to_alert_incidents::Migration),
+            Box::new(m20261009_000003_add_last_downtime_id_to_alert_states::Migration),
+            Box::new(m20261009_000004_add_kind_to_slo_backfill_jobs::Migration),
+            Box::new(m20261009_000005_create_downtime_notifications::Migration),
+            Box::new(m20261012_000001_create_alert_calibration_configs::Migration),
+            Box::new(m20260923_000001_create_ai_chat_sessions::Migration),
+            Box::new(m20261006_000001_create_ai_chat_shares::Migration),
+            Box::new(m20261007_000001_create_ai_chat_turns::Migration),
+            Box::new(m20261007_000002_add_redact_tools_to_ai_chat_shares::Migration),
+            Box::new(m20261013_000001_create_oncall_phone_verifications::Migration),
+            Box::new(m20261013_000002_create_org_telephony::Migration),
         ]
     }
 }
@@ -530,7 +622,45 @@ mod tests {
             "m20260921_000001_add_input_preview_to_llm_annotation_queue_items",
         ),
         (88, "m20260922_000003_create_user_auth_state_table"),
+        (89, "m20260920_000001_add_anomaly_level_half_width"),
+        (90, "m20260923_000001_create_llm_prompts"),
+        (91, "m20260924_000001_add_recovery_episode_columns"),
+        (92, "m20260928_000001_add_alert_recovery_destinations"),
+        (93, "m20260918_000001_create_oncall_response_reports"),
+        (94, "m20260908_000001_create_synthetics_refs"),
+        (95, "m20261001_000001_add_anomaly_band_settings"),
+        (96, "m20261003_000001_create_rum_pa_tables"),
+        (97, "m20261004_000001_create_query_history"),
+        (98, "m20261007_000001_scope_alert_dedup_state_by_org"),
+        (99, "m20261008_000001_add_name_to_rum_pa_tombstones"),
+        (100, "m20261009_000001_add_promql_rule_mode"),
+        (101, "m20261009_000004_add_kind_to_slo_backfill_jobs"),
+        (102, "m20261009_000005_create_downtime_notifications"),
+        (103, "m20261012_000001_create_alert_calibration_configs"),
+        (104, "m20260923_000001_create_ai_chat_sessions"),
+        (105, "m20261006_000001_create_ai_chat_shares"),
+        (106, "m20261007_000001_create_ai_chat_turns"),
+        (107, "m20261007_000002_add_redact_tools_to_ai_chat_shares"),
+        (108, "m20261013_000002_create_org_telephony"),
     ];
+
+    // Two branches that each claim the next version merge cleanly, so a reused number must fail
+    // here.
+    #[test]
+    fn version_coverage_claims_each_version_once_up_to_db_schema_version() {
+        let mut seen = std::collections::HashSet::new();
+        for (version, name) in VERSION_COVERAGE {
+            assert!(
+                seen.insert(*version),
+                "version {version} is claimed twice (again by `{name}`)"
+            );
+        }
+        assert_eq!(
+            VERSION_COVERAGE.iter().map(|(v, _)| *v).max(),
+            Some(config::DB_SCHEMA_VERSION),
+            "the highest VERSION_COVERAGE entry must equal DB_SCHEMA_VERSION"
+        );
+    }
 
     #[test]
     fn db_schema_version_covers_every_registered_migration() {
@@ -587,6 +717,7 @@ mod tests {
 
         // Registration alone is what makes a migration run at all.
         position("m20260812_000001_create_composite_alerts");
+        position("m20260923_000001_create_ai_chat_sessions");
 
         for (earlier, later) in [
             (
@@ -604,6 +735,46 @@ mod tests {
             (
                 "m20260921_000001_add_input_preview_to_llm_annotation_queue_items",
                 "m20260922_000001_add_password_policy_columns_to_users",
+            ),
+            (
+                "m20260725_000001_create_alert_states_tables",
+                "m20260924_000001_add_recovery_episode_columns",
+            ),
+            (
+                "m20250109_092400_recreate_tables_with_ksuids",
+                "m20261009_000001_create_downtimes",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261009_000002_add_muted_by_downtime_id_to_alert_incidents",
+            ),
+            (
+                "m20260725_000001_create_alert_states_tables",
+                "m20261009_000003_add_last_downtime_id_to_alert_states",
+            ),
+            (
+                "m20260727_000001_create_slo_tables",
+                "m20261009_000004_add_kind_to_slo_backfill_jobs",
+            ),
+            (
+                "m20261007_000001_scope_alert_dedup_state_by_org",
+                "m20261009_000001_create_downtimes",
+            ),
+            (
+                "m20261009_000001_create_downtimes",
+                "m20261009_000005_create_downtime_notifications",
+            ),
+            (
+                "m20260923_000001_create_ai_chat_sessions",
+                "m20261006_000001_create_ai_chat_shares",
+            ),
+            (
+                "m20261006_000001_create_ai_chat_shares",
+                "m20261007_000002_add_redact_tools_to_ai_chat_shares",
+            ),
+            (
+                "m20260923_000001_create_ai_chat_sessions",
+                "m20261007_000001_create_ai_chat_turns",
             ),
         ] {
             assert!(

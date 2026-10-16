@@ -41,6 +41,7 @@ export default function windowsCard(subs: CardSubstitutions, t: TranslateFn): Ri
   const icon = envIcons();
   return {
     provider: {
+      id: "windows",
       name: raw("Windows"),
       tagline: t("ingestion.setupCard.taglineWindows"),
       logo: getImageURL("images/common/windows.svg"),

@@ -86,7 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Cadence and anchor are one decision — "every week, starting then" —
          so they sit on one row rather than reading as two unrelated
          questions. -->
-    <div class="grid gap-3 sm:grid-cols-2">
+    <!-- Two columns only from lg: below it the drawer is too narrow for three fields to share half of it. -->
+    <div class="grid gap-3 max-lg:grid-cols-1 lg:grid-cols-2">
       <OSelect
         v-model="rule.shift_micros"
         :label="t('oncall.shiftLength')"
@@ -97,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            at 14:32 handed over at 14:32 forever. Timezone rides along as a
            disabled third field rather than a hint — there is one zone per
            schedule, set on the team, so it is shown here, not chosen here. -->
-      <div class="flex gap-2">
+      <div class="flex gap-2 max-md:flex-wrap">
         <ODate
           class="min-w-0 flex-1"
           :model-value="handoverDate"
@@ -114,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="setHandoverTime"
         />
         <OSelect
-          class="min-w-0 flex-1"
+          class="min-w-0 flex-1 max-md:basis-full"
           :model-value="timezone"
           disabled
           :label="t('oncall.timezone')"
@@ -235,23 +236,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OText variant="meta">{{ t("oncall.rotationRetireHint") }}</OText>
           <div
             v-if="isRetired(rule)"
-            class="flex gap-2 pt-1"
+            class="flex flex-col gap-1 pt-1"
             :data-test="`oncall-schedule-retire-at-${ruleIndex}`"
           >
-            <ODate
-              class="min-w-0 flex-1"
-              :model-value="retiredAtDate"
-              :label="t('oncall.rotationRetiredOn')"
-              :help-text="t('oncall.rotationRetiredOnHint', { zone: raw(timezone) })"
-              :data-test="`oncall-schedule-retire-at-${ruleIndex}-date`"
-              @update:model-value="setRetiredAtDate"
-            />
-            <OTime
-              class="min-w-0 flex-1"
-              :model-value="retiredAtTime"
-              :data-test="`oncall-schedule-retire-at-${ruleIndex}-time`"
-              @update:model-value="setRetiredAtTime"
-            />
+            <span class="o-input-label text-sm leading-tight font-semibold">
+              {{ t("oncall.rotationRetiredOn") }}
+            </span>
+            <div class="flex gap-2">
+              <ODate
+                class="min-w-0 flex-1"
+                :model-value="retiredAtDate"
+                :help-text="t('oncall.rotationRetiredOnHint', { zone: raw(timezone) })"
+                :data-test="`oncall-schedule-retire-at-${ruleIndex}-date`"
+                @update:model-value="setRetiredAtDate"
+              />
+              <OTime
+                class="min-w-0 flex-1"
+                :model-value="retiredAtTime"
+                :data-test="`oncall-schedule-retire-at-${ruleIndex}-time`"
+                @update:model-value="setRetiredAtTime"
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -74,6 +74,8 @@ export type AlertPriorityValue = 1 | 2 | 3 | 4 | 5;
 
 export type Channel =
   | "email"
+  | "sms"
+  | "voice"
   /** An existing alert Destination — Slack, Teams, or any HTTP endpoint. */
   | "webhook";
 
@@ -451,8 +453,10 @@ export type L0Mode =
   | "parallel"
   /** The page is held for the triage budget, or until the verdict lands. */
   | "gate"
-  /** The agent investigates and nobody is paged. */
-  | "only";
+  /** The agent investigates; whether the priority also pages is the team's ladder, not this mode. */
+  | "only"
+  /** The agent never runs; the page behaves exactly as it did without AI triage. */
+  | "off";
 
 /**
  * Per-severity modes, keyed by the UPPERCASE strings the wire uses
@@ -460,13 +464,14 @@ export type L0Mode =
  * Both forms in one policy object; this is not a mistake (API-FOR-UI §H).
  */
 export interface L0Modes {
-  /** Pinned `parallel` server-side — holding a critical page behind a model
-   *  is not a setting the product offers. The server 400s anything else. */
+  /** `parallel` or `off` only — holding, or silencing, a critical page is not
+   *  a setting the product offers. The server 400s anything else. */
   P1: L0Mode;
+  /** `gate`, `parallel` or `off` — `only` would silence a paging severity. */
   P2: L0Mode;
   P3: L0Mode;
-  /** Covers P4 AND P5 — neither pages a human, so neither has a gate to set.
-   *  Pinned `only`; the server 400s anything else. */
+  /** Covers P4 AND P5 — neither pages a human, so `only` or `off` alone; the
+   *  server 400s anything else. */
   P4: L0Mode;
 }
 
@@ -716,8 +721,8 @@ export interface PreviewRung {
  * The L0 agent's part in one priority's ladder, as the preview reports it.
  *
  * `mode` arrives **already resolved for this priority** — the server applies
- * the P1 invariant (always `parallel`) and the pages-nobody rule (P4/P5 →
- * `only`) before answering. Never re-derive it from `policy.l0.mode`: two
+ * the P1 invariant (never held) and the pages-nobody rule (P4/P5 → `only` or
+ * `off`) before answering. Never re-derive it from `policy.l0.mode`: two
  * places deciding what P1 means is how they come to disagree.
  */
 export interface PreviewL0 {
@@ -922,6 +927,14 @@ export interface CauseGroup {
   note?: string | null;
   last_response_id: string;
   last_closed_at?: number | null;
+}
+
+/// What the agent wrote for this page, kept per record — the verdict card's
+/// one sentence is the conclusion, this is the working behind it.
+export interface OnCallResponseReport {
+  report: string;
+  model?: string | null;
+  generated_at: number;
 }
 
 /// One row of the pages list when grouping is on: the most recent firing of
@@ -1168,6 +1181,79 @@ export interface MyOnCall {
   /** True if any team is true. */
   on_call_now: boolean;
   teams: MyOnCallTeam[];
+}
+
+/** `GET /oncall/contacts/{email}` — the caller's own phone and whether a code can be sent to it. */
+export interface Contact {
+  /** E.164; absent when none is saved. */
+  phone?: string;
+  /** Micros; absent until a code is confirmed for the saved number. */
+  phone_verified_at?: number;
+  unverified: string[];
+  phone_is_pageable: boolean;
+  phone_provider_available: boolean;
+  press4_available: boolean;
+}
+
+/** Why a send or confirm was refused; the wire form is the backend's `RefusalReason` in snake_case. */
+export type RefusalReason =
+  | "wrong_code"
+  | "expired"
+  | "too_many_tries"
+  | "no_code"
+  | "too_soon"
+  | "user_daily_limit"
+  | "number_daily_limit"
+  | "no_provider"
+  | "no_phone"
+  | "number_rejected"
+  | "provider_unavailable";
+
+/** The 400/429/503 body of a refused send or confirm; `message` is the English API text. */
+export interface VerificationRefusalBody {
+  message: string;
+  reason: RefusalReason;
+  tries_left?: number;
+  retry_after_secs?: number;
+}
+
+/** `GET /telephony`: the deployment's account is reported by presence and From number only, never its SID or token. */
+export interface TelephonyView {
+  deployment_account_present: boolean;
+  deployment_from_number?: string | null;
+  press4_available: boolean;
+  org?: OrgTelephonyView | null;
+}
+
+/** The org's own account; the token never comes back. */
+export interface OrgTelephonyView {
+  provider: string;
+  account_sid: string;
+  from_number: string;
+}
+
+/** `PUT /telephony`; an absent `auth_token` keeps the stored one. */
+export interface PutTelephonyBody {
+  provider: "twilio";
+  account_sid: string;
+  auth_token?: string;
+  from_number: string;
+}
+
+/** Why a telephony save or read was refused; the wire form is the backend's `TelephonyReason` in snake_case. */
+export type TelephonyReason =
+  | "bad_provider"
+  | "bad_sid"
+  | "bad_from_number"
+  | "token_required"
+  | "no_master_key"
+  | "account_rejected"
+  | "unreadable";
+
+/** The 400 body of a refused telephony call; `message` is the English API text. */
+export interface TelephonyRefusalBody {
+  message: string;
+  reason: TelephonyReason;
 }
 
 /**

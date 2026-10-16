@@ -24,12 +24,15 @@ pub mod db;
 pub mod dist_lock;
 pub mod errors;
 pub mod file_list;
+pub mod idempotency;
 pub mod local_lock;
+pub mod outbound_http;
 pub mod pipeline;
 pub mod queue;
 pub mod runtime;
 pub mod scheduler;
 pub mod schema;
+pub mod secrets;
 pub mod storage;
 pub mod table;
 
@@ -63,17 +66,19 @@ fn is_db_schema_version_missing(e: &errors::Error) -> bool {
         errors::Error::DbError(errors::DbError::KeyNotExists(_)) => true,
         // meta table not created yet: fresh install. the sqlite/postgres
         // Db::get() wrap the sqlx error text into DBOperError
-        errors::Error::DbError(errors::DbError::DBOperError(msg, _)) => {
-            let db_file = format!("{}metadata.sqlite", config::get_config().common.data_db_dir);
-            is_table_missing_message(msg)
-                || is_sqlite_cantopen_fresh_install(msg, std::path::Path::new(&db_file).exists())
-        }
+        errors::Error::DbError(errors::DbError::DBOperError(msg, _)) => is_fresh_db_message(msg),
         errors::Error::SqlxError(sqlx::Error::Database(e)) => {
             e.code().as_deref() == Some("42P01") // postgres: undefined_table
-                || is_table_missing_message(e.message())
+                || is_fresh_db_message(e.message())
         }
         _ => false,
     }
+}
+
+fn is_fresh_db_message(msg: &str) -> bool {
+    let db_file = format!("{}metadata.sqlite", config::get_config().common.data_db_dir);
+    is_table_missing_message(msg)
+        || is_sqlite_cantopen_fresh_install(msg, std::path::Path::new(&db_file).exists())
 }
 
 fn is_table_missing_message(msg: &str) -> bool {

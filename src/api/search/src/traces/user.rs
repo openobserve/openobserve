@@ -16,7 +16,7 @@
 use axum::{extract::Path, http::HeaderMap, response::Response};
 use config::{
     TIMESTAMP_COL_NAME, get_config,
-    meta::{search::PaginatedResponse, stream::StreamType},
+    meta::{search::PaginatedResponse, stream::StreamType, traces::session::quote_identifier},
     metrics,
     utils::json,
 };
@@ -123,6 +123,10 @@ pub async fn get_latest_users(
         Some(v) => v.to_string(),
         None => "".to_string(),
     };
+    // F2: the filter is spliced into WHERE, so it has to be one boolean expression.
+    if let Err(e) = config::utils::sql::validate_optional_where_fragment(&filter) {
+        return MetaHttpResponse::bad_request(format!("invalid filter: {e}"));
+    }
 
     let from = query
         .get("from")
@@ -185,20 +189,7 @@ pub async fn get_latest_users(
     let user_id_opt = Some(user_id.to_string());
 
     // Get paginated user list with trace_ids per user
-    let user_filter = if filter.is_empty() {
-        format!("{user_id_col} IS NOT NULL AND {user_id_col} != ''")
-    } else {
-        format!("{user_id_col} IS NOT NULL AND {user_id_col} != '' AND {filter}")
-    };
-    let query_sql = format!(
-        "SELECT {user_id_col}, \
-        min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-        array_agg(DISTINCT trace_id) as trace_ids \
-        FROM \"{stream_name}\" \
-        WHERE {user_filter} \
-        GROUP BY {user_id_col} \
-        ORDER BY zo_sql_timestamp DESC"
-    );
+    let query_sql = build_latest_users_page_sql(&stream_name, user_id_col, &filter);
 
     let mut req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -292,32 +283,7 @@ pub async fn get_latest_users(
         .filter(|tid| !tid.is_empty())
         .collect();
     let trace_ids_sql = sanitized_ids.join("','");
-    let query_sql = if has_gen_ai_fields {
-        format!(
-            "SELECT trace_id, \
-            min(start_time) as trace_start_time, \
-            max(end_time) as trace_end_time, \
-            sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
-            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details \
-            FROM \"{stream_name}\" \
-            WHERE trace_id IN ('{trace_ids_sql}') \
-            GROUP BY trace_id"
-        )
-    } else {
-        // Legacy `_o2_llm` schema (pre-PR #11626): tokens live under
-        // `llm_usage_tokens_total` and cost under `llm_usage_cost_total`.
-        format!(
-            "SELECT trace_id, \
-            min(start_time) as trace_start_time, \
-            max(end_time) as trace_end_time, \
-            sum(llm_usage_tokens_total) as gen_ai_usage_details_total, \
-            sum(llm_usage_cost_total) as gen_ai_usage_cost_details \
-            FROM \"{stream_name}\" \
-            WHERE trace_id IN ('{trace_ids_sql}') \
-            GROUP BY trace_id"
-        )
-    };
-    req.query.sql = query_sql;
+    req.query.sql = build_user_trace_usage_sql(&stream_name, &trace_ids_sql, has_gen_ai_fields);
     req.query.from = 0;
     req.query.size = all_trace_ids.len() as i64;
 
@@ -516,6 +482,58 @@ fn aggregate_users(
     }
     users_data.sort_by_key(|k| std::cmp::Reverse(k.last_event));
     users_data
+}
+
+fn build_latest_users_page_sql(stream_name: &str, user_id_col: &str, filter: &str) -> String {
+    // Parentheses keep an OR in the filter from escaping the user-id predicate it is ANDed onto.
+    let user_filter = if filter.is_empty() {
+        format!("{user_id_col} IS NOT NULL AND {user_id_col} != ''")
+    } else {
+        format!("{user_id_col} IS NOT NULL AND {user_id_col} != '' AND ({filter})")
+    };
+    let stream_ident = quote_identifier(stream_name);
+    format!(
+        "SELECT {user_id_col}, \
+        min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+        array_agg(DISTINCT trace_id) as trace_ids \
+        FROM {stream_ident} \
+        WHERE {user_filter} \
+        GROUP BY {user_id_col} \
+        ORDER BY zo_sql_timestamp DESC"
+    )
+}
+
+fn build_user_trace_usage_sql(
+    stream_name: &str,
+    trace_ids_sql: &str,
+    has_gen_ai_fields: bool,
+) -> String {
+    let stream_ident = quote_identifier(stream_name);
+    if has_gen_ai_fields {
+        format!(
+            "SELECT trace_id, \
+            min(start_time) as trace_start_time, \
+            max(end_time) as trace_end_time, \
+            sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
+            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details \
+            FROM {stream_ident} \
+            WHERE trace_id IN ('{trace_ids_sql}') \
+            GROUP BY trace_id"
+        )
+    } else {
+        // Legacy `_o2_llm` schema (pre-PR #11626): tokens live under
+        // `llm_usage_tokens_total` and cost under `llm_usage_cost_total`.
+        format!(
+            "SELECT trace_id, \
+            min(start_time) as trace_start_time, \
+            max(end_time) as trace_end_time, \
+            sum(llm_usage_tokens_total) as gen_ai_usage_details_total, \
+            sum(llm_usage_cost_total) as gen_ai_usage_cost_details \
+            FROM {stream_ident} \
+            WHERE trace_id IN ('{trace_ids_sql}') \
+            GROUP BY trace_id"
+        )
+    }
 }
 
 #[cfg(test)]
@@ -738,5 +756,42 @@ mod tests {
         assert_eq!(user.total_events, 5);
         assert_eq!(user.first_event, 0);
         assert_eq!(user.last_event, 0);
+    }
+
+    #[test]
+    fn user_page_sql_splices_a_filter_and_quotes_the_stream() {
+        let sql = build_latest_users_page_sql("default", "user_id", "service_name = 'api'");
+        assert!(sql.contains("FROM \"default\""));
+        assert!(
+            sql.contains("WHERE user_id IS NOT NULL AND user_id != '' AND (service_name = 'api')")
+        );
+        let or_filter = build_latest_users_page_sql("default", "user_id", "a = 1 OR b = 2");
+        assert!(or_filter.contains("AND (a = 1 OR b = 2)"));
+
+        let unfiltered = build_latest_users_page_sql("default", "llm_user_id", "");
+        assert!(
+            unfiltered.contains(
+                "WHERE llm_user_id IS NOT NULL AND llm_user_id != '' GROUP BY llm_user_id"
+            )
+        );
+        assert!(!unfiltered.contains("AND service_name"));
+
+        let quoted = build_latest_users_page_sql("a\"b", "user_id", "");
+        assert!(quoted.contains("FROM \"a\"\"b\""));
+        assert!(!quoted.contains("FROM \"a\"b\""));
+    }
+
+    #[test]
+    fn user_trace_usage_sql_quotes_the_stream_for_both_schemas() {
+        let current = build_user_trace_usage_sql("a\"b", "abc-1", true);
+        let legacy = build_user_trace_usage_sql("a\"b", "abc-1", false);
+        for sql in [&current, &legacy] {
+            assert!(sql.contains("FROM \"a\"\"b\""));
+            assert!(sql.contains("WHERE trace_id IN ('abc-1')"));
+            assert!(!sql.contains("FROM \"a\"b\""));
+        }
+        assert!(current.contains("sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total"));
+        assert!(legacy.contains("sum(llm_usage_tokens_total) as gen_ai_usage_details_total"));
+        assert!(legacy.contains("sum(llm_usage_cost_total) as gen_ai_usage_cost_details"));
     }
 }

@@ -1,0 +1,120 @@
+{
+  "basePath": "/api/{org}/rum/analytics",
+  "namedEvent": {
+    "id": "2kY9pF34Qy6nB3Wwd25rq4f5zr3",
+    "app": "web-app",
+    "name": "Opened logs",
+    "rules": [
+      { "t": "view", "op": "eq", "value": "/web/logs" },
+      { "t": "action", "targets": ["Search"], "onPage": "/web/logs" }
+    ],
+    "version": 1,
+    "createdBy": "editor@example.com",
+    "createdAt": 1759300000000,
+    "updatedBy": "editor@example.com",
+    "updatedAt": 1759300000000
+  },
+  "savedFunnel": {
+    "id": "2A7YeEEBY3ABp3e2zS8iq9y7Ajz",
+    "app": "web-app",
+    "name": "Signup flow",
+    "description": "Landing to signup",
+    "def": {
+      "s": [
+        ["p", "/web/"],
+        ["e", "2kY9pF34Qy6nB3Wwd25rq4f5zr3"]
+      ],
+      "u": "sessions",
+      "w": "session"
+    },
+    "sql": "SELECT 1 AS x_axis_1 FROM \"_rumdata\"",
+    "eventIds": ["2kY9pF34Qy6nB3Wwd25rq4f5zr3"],
+    "version": 1,
+    "createdBy": "editor@example.com",
+    "createdAt": 1759300000000,
+    "updatedBy": "editor@example.com",
+    "updatedAt": 1759300000000
+  },
+  "createEvent": {
+    "name": "Opened logs",
+    "rules": [{ "t": "view", "op": "eq", "value": "/web/logs" }]
+  },
+  "updateEvent": {
+    "name": "Opened logs",
+    "rules": [{ "t": "view", "op": "prefix", "value": "/web/logs" }],
+    "version": 1
+  },
+  "createFunnel": {
+    "name": "Signup flow",
+    "description": "Landing to signup",
+    "def": {
+      "s": [
+        ["p", "/web/"],
+        ["e", "2kY9pF34Qy6nB3Wwd25rq4f5zr3"]
+      ],
+      "u": "sessions",
+      "w": "session"
+    },
+    "sql": "SELECT 1 AS x_axis_1 FROM \"_rumdata\""
+  },
+  "updateFunnel": {
+    "name": "Signup flow",
+    "def": {
+      "s": [
+        ["p", "/web/"],
+        ["p", "/web/signup"]
+      ],
+      "u": "users",
+      "w": "1d",
+      "b": "browser"
+    },
+    "sql": "SELECT 1 AS x_axis_1 FROM \"_rumdata\"",
+    "version": 1
+  },
+  "usages": {
+    "list": [{ "id": "2A7YeEEBY3ABp3e2zS8iq9y7Ajz", "name": "Signup flow" }]
+  },
+  "errors": [
+    { "status": 400, "body": { "code": "invalid_body", "message": "Invalid request body" } },
+    { "status": 400, "body": { "code": "invalid_name", "message": "Invalid name" } },
+    { "status": 400, "body": { "code": "invalid_rules", "message": "Invalid rules" } },
+    {
+      "status": 400,
+      "body": { "code": "invalid_definition", "message": "Invalid funnel definition" }
+    },
+    { "status": 400, "body": { "code": "invalid_sql", "message": "Invalid sql" } },
+    { "status": 400, "body": { "code": "invalid_app", "message": "Invalid app" } },
+    { "status": 400, "body": { "code": "invalid_id", "message": "Invalid id" } },
+    { "status": 404, "body": { "code": "not_found", "message": "Not found" } },
+    { "status": 409, "body": { "code": "duplicate_name", "message": "Name already exists" } },
+    {
+      "status": 409,
+      "body": {
+        "code": "version_conflict",
+        "message": "Version conflict",
+        "current": {
+          "id": "2kY9pF34Qy6nB3Wwd25rq4f5zr3",
+          "app": "web-app",
+          "name": "Opened logs",
+          "rules": [{ "t": "view", "op": "eq", "value": "/web/logs" }],
+          "version": 2,
+          "createdBy": "editor@example.com",
+          "createdAt": 1759300000000,
+          "updatedBy": "other@example.com",
+          "updatedAt": 1759300600000
+        }
+      }
+    },
+    { "status": 409, "body": { "code": "limit_reached", "message": "Limit reached" } },
+    {
+      "status": 409,
+      "body": {
+        "code": "event_in_use",
+        "message": "Event is used by saved funnels",
+        "funnels": [{ "id": "2A7YeEEBY3ABp3e2zS8iq9y7Ajz", "name": "Signup flow" }]
+      }
+    },
+    { "status": 409, "body": { "code": "unknown_event", "message": "Unknown named event" } },
+    { "status": 500, "body": { "code": "internal_error", "message": "Internal server error" } }
+  ]
+}

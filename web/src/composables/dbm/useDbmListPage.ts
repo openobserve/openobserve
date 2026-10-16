@@ -39,6 +39,7 @@ import {
   DBM_CONTEXT_KEY,
   type ContextProvider,
 } from "@/composables/contextProviders";
+import { refreshDbmFleet } from "@/composables/dbm/useDbmFleetInstances";
 import { useDbmRequestSeq, type DbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import { useDbmScopeSyncScope } from "@/composables/dbm/useDbmScopeSync";
@@ -145,6 +146,8 @@ export function useDbmListPage(options: DbmListPageOptions) {
 
   const loading = ref(false);
   const error = ref<string | null>(null);
+  // A 403 on a page without its own permission diagnosis: the table shows "no access", not the raw error.
+  const forbidden = ref(false);
   const search = ref("");
 
   /**
@@ -183,6 +186,7 @@ export function useDbmListPage(options: DbmListPageOptions) {
     const token = requestSeq.begin();
     loading.value = true;
     error.value = null;
+    forbidden.value = false;
     scope.refresh();
     runOptions.before?.();
 
@@ -202,6 +206,8 @@ export function useDbmListPage(options: DbmListPageOptions) {
         runOptions.onNotCollecting();
       } else if (status === 403 && runOptions.onForbidden) {
         runOptions.onForbidden();
+      } else if (status === 403) {
+        forbidden.value = true;
       } else if (runOptions.onError) {
         runOptions.onError(serverMessage, err);
       } else {
@@ -223,6 +229,7 @@ export function useDbmListPage(options: DbmListPageOptions) {
   const onRefresh = () => {
     void options.load();
     tabCountsContext.refresh({ force: true });
+    refreshDbmFleet();
   };
 
   /** Mirror the scope into the URL so it survives a tab switch and a reload. */
@@ -297,6 +304,7 @@ export function useDbmListPage(options: DbmListPageOptions) {
     tabCountsContext,
     loading,
     error,
+    forbidden,
     search,
     lastRunAt,
     org,

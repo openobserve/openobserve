@@ -30,8 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   narrowed rather than rendering a second copy of it.
 -->
 <template>
-  <!-- Reached from the On-Call header, same as Teams and Routing, and with the
-       same single rail entry behind it. -->
+  <!-- Reached from the profile menu, behind the same gate as the On-Call nav entry. -->
   <OPageLayout
     bleed
     data-test="oncall-mine-page"
@@ -46,14 +45,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     scroll
   >
     <template #actions>
+      <ORefreshButton
+        v-if="loaded && !unavailable"
+        :last-run-at="lastFetchedAt"
+        :loading="refreshing"
+        data-test="oncall-mine-refresh"
+        @click="refreshPage"
+      />
+      <!-- Icon-only on phones so the actions share the title row; sr-only keeps the button named. -->
       <OButton
         variant="outline"
         size="sm-action"
         icon-left="notifications-active"
+        class="max-md:min-w-0 max-md:ps-2 max-md:pe-2"
         data-test="oncall-mine-open-pages"
         @click="openMyPages"
       >
-        {{ t("oncall.mineOpenPages") }}
+        <span class="max-md:sr-only">{{ t("oncall.mineOpenPages") }}</span>
       </OButton>
     </template>
 
@@ -70,8 +78,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <OContent v-else y class="flex flex-col gap-5">
-      <!-- Duty first, because it is the fact that decides whether the rest of
-           this page is urgent. -->
+      <!-- Phone first: until it is verified, nothing below can reach the reader. -->
+      <OnCallPhoneCard ref="phoneRef" />
+
       <div
         class="card-container rounded-surface bg-surface-base border-border-default flex flex-col gap-2 border px-4 py-3"
         data-test="oncall-mine-teams"
@@ -148,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OText>
       </div>
 
-      <OnCallMyDeliveries :team-names="teamNames" />
+      <OnCallMyDeliveries ref="deliveriesRef" :team-names="teamNames" />
     </OContent>
   </OPageLayout>
 </template>
@@ -159,13 +168,17 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OnCallMyDeliveries from "@/components/oncall/OnCallMyDeliveries.vue";
+import OnCallPhoneCard from "@/components/oncall/OnCallPhoneCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import oncallService from "@/services/oncall";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { queryClient } from "@/composables/query/queryClient";
+import { myOnCallQuery } from "@/services/oncall.queries";
 import type { MyOnCall } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { isOnCallUnavailable } from "@/utils/oncall";
@@ -177,6 +190,7 @@ const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 const mine = ref<MyOnCall | null>(null);
 const loaded = ref(false);
+const lastFetchedAt = ref<number | null>(null);
 const unavailable = ref(false);
 
 const teamNames = computed(() =>
@@ -187,12 +201,32 @@ const teamNames = computed(() =>
 /// for it. The triage list derives a narrower version of this from one
 /// `/on-call` call per team, which is the right trade there — it needs the
 /// rotation name and the handover instant, which this does not carry.
-async function fetchMine() {
+async function fetchMine(force = false) {
   try {
-    const res = await oncallService.myOnCall({ org_identifier: orgId.value });
-    mine.value = res.data ?? null;
-  } catch (err) {
-    if (isOnCallUnavailable(err)) unavailable.value = true;
+    const options = myOnCallQuery(orgId.value);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    mine.value = await queryClient.fetchQuery(options);
+    lastFetchedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null;
+  } catch (err: any) {
+    if (isOnCallUnavailable(err)) {
+      unavailable.value = true;
+      mine.value = null;
+      return;
+    }
+    // A failed refresh keeps what is on screen: blanking it would tell an on-call engineer they are off duty.
+    if (loaded.value) {
+      toast({
+        variant: "error",
+        message: raw(err?.response?.data?.message) || t("oncall.refreshFailed"),
+      });
+      return;
+    }
     mine.value = null;
   } finally {
     loaded.value = true;
@@ -214,5 +248,20 @@ function openTeam(teamId: string) {
   });
 }
 
-onMounted(fetchMine);
+const refreshing = ref(false);
+const deliveriesRef = ref<{ refresh: () => Promise<void> } | null>(null);
+const phoneRef = ref<{ refresh: () => Promise<void> } | null>(null);
+
+/// Named, so the click event cannot land on `force`.
+async function refreshPage() {
+  refreshing.value = true;
+  try {
+    await Promise.all([fetchMine(true), deliveriesRef.value?.refresh(), phoneRef.value?.refresh()]);
+  } finally {
+    refreshing.value = false;
+  }
+}
+
+// Wrapped, so nothing can ever pass `force` in.
+onMounted(() => fetchMine());
 </script>

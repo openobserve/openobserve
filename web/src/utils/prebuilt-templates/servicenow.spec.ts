@@ -118,12 +118,12 @@ describe("servicenow template", () => {
       expect(passwordField?.type).toBe("password");
     });
 
-    it("persists only the assignment group in destination metadata", () => {
+    it("persists only the non-secret fields in destination metadata", () => {
       const persistentFields = servicenowConfig.credentialFields
         .filter((field) => field.persistInMetadata)
         .map((field) => field.key);
 
-      expect(persistentFields).toEqual(["assignmentGroup"]);
+      expect(persistentFields).toEqual(["assignmentGroup", "resolutionCode"]);
     });
   });
 

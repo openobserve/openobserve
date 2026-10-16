@@ -17,7 +17,12 @@ import { describe, it, expect } from "vitest";
 
 import { gt } from "@/types/i18n";
 
-import { MARIADB_DBM_CONFIG_YAML, MYSQL_DBM_CONFIG_YAML } from "./dbmShared";
+import {
+  MARIADB_DBM_CONFIG_YAML,
+  MSSQL_DBM_CONFIG_YAML,
+  MYSQL_DBM_CONFIG_YAML,
+  PG_DBM_CONFIG_YAML,
+} from "./dbmShared";
 import mariadbCard from "./mariadb";
 
 const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVzdEB0b2tlbg==" };
@@ -324,5 +329,37 @@ describe("MariaDB table and index health recipes", () => {
       expect(indexAttrs, `index alias ${alias} must ride as an attribute`).toContain(alias);
     }
     expect(indexAttrs).not.toContain("idx_scan");
+  });
+});
+
+// A leftover ts capture becomes a _o2_dbm_server column that shadowed the Metrics tab's ts alias.
+describe("the log recipes drop the parsed ts capture", () => {
+  const configs = {
+    postgres: PG_DBM_CONFIG_YAML,
+    mysql: MYSQL_DBM_CONFIG_YAML,
+    mariadb: MARIADB_DBM_CONFIG_YAML,
+    mssql: MSSQL_DBM_CONFIG_YAML,
+  };
+
+  for (const [engine, config] of Object.entries(configs)) {
+    it(`${engine}: removes attributes.ts right after every timestamp parse`, () => {
+      const captures = config.match(/\(\?P<ts>/g)?.length ?? 0;
+      const parses = config.match(/parse_from: attributes\.ts\n/g)?.length ?? 0;
+      expect(parses, "every ts capture is parsed into the record timestamp").toBe(captures);
+
+      const removedAfterParse =
+        config.match(
+          /parse_from: attributes\.ts\n\s+layout: [^\n]+\n(?:\s+#[^\n]*\n)?\s+- type: remove\n(?:\s+if: 'attributes\.ts != nil'\n)?\s+field: attributes\.ts\n/g,
+        )?.length ?? 0;
+      expect(removedAfterParse, "the operator after the parse must remove attributes.ts").toBe(
+        captures,
+      );
+    });
+  }
+
+  it("covers the three filelog recipes that capture ts", () => {
+    expect(PG_DBM_CONFIG_YAML).toContain("(?P<ts>");
+    expect(MYSQL_DBM_CONFIG_YAML).toContain("(?P<ts>");
+    expect(MARIADB_DBM_CONFIG_YAML).toContain("(?P<ts>");
   });
 });

@@ -60,7 +60,9 @@ mod tests {
     use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST};
     use ingestion_common::IngestionResponse;
     use openobserve::migration;
-    use openobserve_api_grpc::handler::grpc::{auth::check_auth, flight::FlightServiceImpl};
+    use openobserve_api_grpc::handler::grpc::{
+        auth::check_internal_auth, flight::FlightServiceImpl,
+    };
     use openobserve_api_http::handler::http::router::{
         basic_routes, config_routes, service_routes,
     };
@@ -185,7 +187,7 @@ mod tests {
 
         log::info!("starting gRPC server at {}", gaddr);
         tonic::transport::Server::builder()
-            .layer(tonic::service::InterceptorLayer::new(check_auth))
+            .layer(tonic::service::InterceptorLayer::new(check_internal_auth))
             .add_service(search_svc)
             .add_service(flight_svc)
             .serve(gaddr)
@@ -315,6 +317,18 @@ mod tests {
         // db migration steps, since it's separated out
         infra::table::migrate().await.unwrap();
         infra::init().await.unwrap();
+        #[cfg(feature = "enterprise")]
+        let master_key = Some(
+            o2_enterprise::enterprise::common::config::get_config()
+                .encryption
+                .master_key
+                .clone(),
+        );
+        #[cfg(not(feature = "enterprise"))]
+        let master_key: Option<String> = None;
+        infra::table::cipher::boot(master_key.as_deref())
+            .await
+            .unwrap();
         openobserve_core::bootstrap::init().await.unwrap();
         // ingester init
         ingester::init().await.unwrap();
@@ -1353,19 +1367,39 @@ mod tests {
             value: f64::NAN,
             timestamp: Utc::now().timestamp_micros(),
         });
-        let loc_exemp: Vec<prometheus_rpc::Exemplar> = vec![];
+        let exemplar = |trace_id: &str| prometheus_rpc::Exemplar {
+            labels: vec![
+                prometheus_rpc::Label {
+                    name: "trace_id".to_string(),
+                    value: trace_id.to_string(),
+                },
+                prometheus_rpc::Label {
+                    name: "span_id".to_string(),
+                    value: "def".to_string(),
+                },
+            ],
+            value: 1.0,
+            timestamp: Utc::now().timestamp_millis(),
+        };
         let loc_hist: Vec<prometheus_rpc::Histogram> = vec![];
 
         let ts = prometheus_rpc::TimeSeries {
-            labels: loc_label,
+            labels: loc_label.clone(),
             samples: loc_samples,
-            exemplars: loc_exemp,
+            exemplars: vec![exemplar("with-sample")],
             histograms: loc_hist,
+        };
+        // Prometheus sends an exemplar as a series entry of its own, without the sample
+        let exemplar_only = prometheus_rpc::TimeSeries {
+            labels: loc_label,
+            samples: vec![],
+            exemplars: vec![exemplar("exemplar-only")],
+            histograms: vec![],
         };
 
         let metadata: Vec<prometheus_rpc::MetricMetadata> = vec![];
         let wr_req: prometheus_rpc::WriteRequest = prometheus_rpc::WriteRequest {
-            timeseries: vec![ts],
+            timeseries: vec![ts, exemplar_only],
             metadata,
         };
         let mut out = BytesMut::with_capacity(wr_req.encoded_len());

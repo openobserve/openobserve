@@ -628,6 +628,20 @@ describe("ThreadView", () => {
       expect(chip.text()).toContain("500ms");
     });
 
+    it("computes the total duration over 200,000 spans without a RangeError", () => {
+      const spans: Record<string, unknown>[] = Array.from({ length: 200_000 }, (_, i) => ({
+        trace_id: "trace-001",
+        span_id: `plain-${i}`,
+        span_kind: "1",
+        start_time: 1_000_000_000 + i,
+        end_time: 1_000_000_001 + i,
+      }));
+      spans[0] = makeLLMSpan({ start_time: 1_000_000_000, end_time: 1_500_000_000 });
+      spans[199_999] = { ...spans[199_999], end_time: 3_000_000_000 };
+      wrapper = mountThreadView({ spans });
+      expect(wrapper.find(".thread-chip--duration").text()).toContain("2.00s");
+    }, 60_000);
+
     it("should format second-range durations with two decimal places followed by s", () => {
       // 2_000 ms = 2_000_000_000 ns → "2.00s"
       wrapper = mountThreadView({

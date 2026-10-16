@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper, config } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper, config } from "@vue/test-utils";
 import i18n from "@/locales";
 import CustomChartRenderer from "./CustomChartRenderer.vue";
 
@@ -195,6 +195,17 @@ describe("CustomChartRenderer", () => {
       wrapper.unmount();
 
       expect(mockChart.dispose).toHaveBeenCalled();
+    });
+
+    it("should not init ECharts when unmounted while echarts-gl loads", async () => {
+      const echarts = await import("echarts");
+      const unmounted = createWrapper();
+      unmounted.unmount();
+
+      await import("echarts-gl");
+      await flushPromises();
+
+      expect(echarts.init).not.toHaveBeenCalled();
     });
 
     it("should use canvas renderer by default", async () => {

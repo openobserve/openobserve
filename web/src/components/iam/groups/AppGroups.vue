@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
+          ref="oTableRef"
           :frame="false"
           data-test="iam-groups-table-section"
           :data="rows"
@@ -62,15 +63,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
           pagination="client"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[20, 50, 100, 250, 500]"
-          :footer-title="t('iam.groups')"
+          :current-page="currentPage"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
           sorting="client"
           selection="multiple"
           filter-mode="client"
           :default-columns="false"
           show-index
           @update:selected-ids="handleSelectedIdsUpdate"
+          @update:page-size="pageSize = $event"
+          @update:current-page="currentPage = $event"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
         >
           <template #toolbar>
             <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
@@ -173,12 +180,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @action="(id) => (id === 'create' ? addGroup() : (filterQuery = ''))"
             />
           </template>
-          <template #bottom>
-            <span class="text-xs font-normal max-md:hidden"
-              >{{ rows.length }} {{ t("iam.groups") }}</span
-            >
+          <template #selection-actions>
             <OButton
-              v-if="selectedGroups.length > 0"
               data-test="iam-groups-bulk-delete-btn"
               variant="outline-destructive"
               size="sm"
@@ -251,6 +254,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { useListViewState } from "@/composables/useListViewState";
 
 const showAddGroup = ref(false);
 
@@ -336,7 +340,29 @@ const assignMemberToGroup = async (group: any) => {
   }
 };
 
-const filterQuery = ref("");
+const viewState = useListViewState("iam-groups", {
+  filterQuery: "",
+  pageSize: 20,
+  currentPage: 1,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const filterQuery = ref(viewState.filterQuery);
+const pageSize = ref(viewState.pageSize);
+const currentPage = ref(viewState.currentPage);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref(viewState.sortOrder);
+const oTableRef = ref<any>(null);
+
+watch([filterQuery, pageSize, currentPage, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filterQuery: filterQuery.value,
+    pageSize: pageSize.value,
+    currentPage: currentPage.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
 
 const deleteConformDialog = ref({
   show: false,
@@ -447,6 +473,15 @@ const groupsList = useQuery(() =>
 // Bound to the query rather than hand-managed: `isPending` is the cold read,
 // `isFetching` is any request in flight.
 const loading = groupsList.isPending;
+// setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
+watch(
+  loading,
+  (isLoading) => {
+    if (isLoading) return;
+    setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+  },
+  { once: true, immediate: true },
+);
 // A request in flight while rows stay on screen — the refresh button's spinner.
 // `loading` is the skeleton, which only a cold read wants.
 const fetching = groupsList.isFetching;

@@ -34,8 +34,10 @@ use datafusion::{
 use hashbrown::HashSet;
 
 use crate::datafusion::optimizer::physical_optimizer::{
-    index_optimizer::utils::is_complex_plan,
-    utils::{get_column_name, is_column, is_count_rows_aggregate},
+    index_optimizer::utils::{
+        aggregate_input_drops_rows, is_complex_plan, is_unfiltered_count_rows,
+    },
+    utils::{get_column_name, is_column},
 };
 
 #[rustfmt::skip]
@@ -89,8 +91,8 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
         if let Some(aggregate) = node.downcast_ref::<AggregateExec>() {
             // Check if the AggregateExec matches SimpleHistogram pattern
             if aggregate.group_expr().expr().len() == 1
-                && aggregate.aggr_expr().len() == 1
-                && is_count_rows_aggregate(&aggregate.aggr_expr()[0])
+                && is_unfiltered_count_rows(aggregate)
+                && !aggregate_input_drops_rows(aggregate)
             {
                 // Check group by field
                 if let Some((group_expr, _)) = aggregate.group_expr().expr().first()
@@ -242,8 +244,8 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
         if let Some(aggregate) = node.downcast_ref::<AggregateExec>() {
             // Exactly 2 group-by expressions (histogram + breakdown) and 1 aggregate (count(*))
             if aggregate.group_expr().expr().len() == 2
-                && aggregate.aggr_expr().len() == 1
-                && is_count_rows_aggregate(&aggregate.aggr_expr()[0])
+                && is_unfiltered_count_rows(aggregate)
+                && !aggregate_input_drops_rows(aggregate)
             {
                 let groups = aggregate.group_expr().expr();
                 // One must be date_bin (histogram), the other must be an index field column
@@ -386,6 +388,14 @@ mod tests {
                 "SELECT histogram(_timestamp) as ts, count(name) as cnt from t group by ts",
                 None,
             ),
+            (
+                "SELECT histogram(_timestamp) as ts, count(_timestamp) FILTER (WHERE name = 'a') as cnt from t group by ts",
+                None,
+            ),
+            (
+                "SELECT histogram(_timestamp) as ts, count(*) as cnt from (SELECT * from t limit 10) group by ts",
+                None,
+            ),
         ];
 
         for (sql, expected) in cases {
@@ -396,7 +406,8 @@ mod tests {
                 Arc::new(get_partial_aggregate_plan(physical_plan).unwrap()) as _;
             assert_eq!(
                 expected,
-                is_simple_histogram(partial_aggregate_plan, (start_time, end_time))
+                is_simple_histogram(partial_aggregate_plan, (start_time, end_time)),
+                "Failed for SQL: {sql}"
             );
         }
 
@@ -478,6 +489,14 @@ mod tests {
             // single group by (no breakdown) - should not match multi histogram
             (
                 "SELECT histogram(_timestamp) as ts, count(*) as cnt from t group by ts",
+                None,
+            ),
+            (
+                "SELECT histogram(_timestamp) as ts, level, count(_timestamp) FILTER (WHERE name = 'a') as cnt from t group by ts, level",
+                None,
+            ),
+            (
+                "SELECT histogram(_timestamp) as ts, level, count(*) as cnt from (SELECT * from t limit 10) group by ts, level",
                 None,
             ),
         ];

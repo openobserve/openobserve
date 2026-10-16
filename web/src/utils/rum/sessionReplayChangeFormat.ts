@@ -79,6 +79,7 @@ const ChangeType = {
 const IncrementalSource = {
   Mutation: 0,
   Scroll: 3,
+  Input: 5,
   MediaInteraction: 7,
 } as const;
 
@@ -109,6 +110,12 @@ function getValidTagName(tagName: string): string {
   return processedTagName;
 }
 
+// structuredClone is missing before Safari 15.4, and the emitted tree is plain JSON anyway.
+function cloneTree(node: any): any {
+  if (typeof structuredClone === "function") return structuredClone(node);
+  return JSON.parse(JSON.stringify(node));
+}
+
 // ---------------------------------------------------------------------------
 // Internal decoder state
 // ---------------------------------------------------------------------------
@@ -132,14 +139,25 @@ export interface RecordConverter {
    * Records that are already in the classic format are returned unchanged.
    */
   convert(record: any): any[];
+  /** A segment was skipped: drop Change records until the next Change-format full snapshot. */
+  markStale(): void;
+  /** Classic FullSnapshot data rebuilt from the tracked tree, or null before the first snapshot. */
+  snapshot(): { node: any; initialOffset: { left: number; top: number } } | null;
+  /** Grows on every decoded change, so a caller can reuse an earlier snapshot() result. */
+  version(): number;
 }
 
 export function createRecordConverter(): RecordConverter {
   let stringTable: string[] = [];
+  let stale = false;
   let nextNodeId = 0;
   let nodes = new Map<number, TrackedNode>();
   let styleSheets = new Map<number, StoredStyleSheet>();
   let nextStyleSheetId = 0;
+  let rootId: number | null = null;
+  let scrolls = new Map<number, { x: number; y: number }>();
+  let inputs = new Map<number, { text?: string; isChecked?: boolean }>();
+  let changeCount = 0;
 
   function reset() {
     stringTable = [];
@@ -147,6 +165,9 @@ export function createRecordConverter(): RecordConverter {
     nodes = new Map();
     styleSheets = new Map();
     nextStyleSheetId = 0;
+    rootId = null;
+    scrolls = new Map();
+    inputs = new Map();
   }
 
   // Resolve a value that may be a string literal or a numeric string-table reference.
@@ -223,18 +244,10 @@ export function createRecordConverter(): RecordConverter {
     }
   }
 
-  // Children of a tracked node, or null when that node cannot hold any.
-  //
-  // Node ids are positional, so a mutation can name a parent the stream never established
-  // — a segment dropped in transit, or a stream that opened without a FullSnapshot, both
-  // leave the counter pointing somewhere else. The id then lands on a text or comment
-  // node, which has no `childNodes`, and reading `.length` off it used to throw. That
-  // throw escaped through VideoPlayer's unawaited setupSession() and left the player with
-  // nothing at all, so one unresolvable reference cost the entire replay. Skipping the
-  // single placement degrades far more gracefully.
-  function childNodesOf(tracked: any): any[] | null {
+  // Text and CDATA nodes carry no childNodes, so every read of them must tolerate its absence.
+  function childrenOf(tracked: TrackedNode | undefined): any[] | undefined {
     const children = tracked?.node?.childNodes;
-    return Array.isArray(children) ? children : null;
+    return Array.isArray(children) ? children : undefined;
   }
 
   // Resolve where a node with the given id and insertion point sits in the tree.
@@ -250,28 +263,27 @@ export function createRecordConverter(): RecordConverter {
     if (insertionPoint > 0) {
       // appendChild to (id - insertionPoint)
       const parentId = id - insertionPoint;
-      const parent = nodes.get(parentId);
-      const index = childNodesOf(parent)?.length ?? 0;
-      return { parentId, index };
+      const children = childrenOf(nodes.get(parentId));
+      return { parentId, index: children ? children.length : 0 };
     }
     if (insertionPoint === 0) {
       // insert right after previously-added node (id - 1)
       const prevSiblingId = id - 1;
       const prevSibling = nodes.get(prevSiblingId);
       const parentId = prevSibling ? prevSibling.parentId : -1;
-      const siblings = childNodesOf(nodes.get(parentId));
-      if (!siblings) return { parentId, index: 0 };
-      const idx = siblings.findIndex((c: any) => c.id === prevSiblingId);
-      return { parentId, index: idx === -1 ? siblings.length : idx + 1 };
+      const children = childrenOf(nodes.get(parentId));
+      if (!children) return { parentId, index: 0 };
+      const idx = children.findIndex((c: any) => c.id === prevSiblingId);
+      return { parentId, index: idx === -1 ? children.length : idx + 1 };
     }
     // insertionPoint < 0 : insert before (id + insertionPoint)
     const nextSiblingId = id + insertionPoint;
     const nextSibling = nodes.get(nextSiblingId);
     const parentId = nextSibling ? nextSibling.parentId : -1;
-    const siblings = childNodesOf(nodes.get(parentId));
-    if (!siblings) return { parentId, index: 0 };
-    const idx = siblings.findIndex((c: any) => c.id === nextSiblingId);
-    return { parentId, index: idx === -1 ? siblings.length : idx };
+    const children = childrenOf(nodes.get(parentId));
+    if (!children) return { parentId, index: 0 };
+    const idx = children.findIndex((c: any) => c.id === nextSiblingId);
+    return { parentId, index: idx === -1 ? children.length : idx };
   }
 
   function applyStyleSheetToNode(nodeId: number, sheetIds: number[]) {
@@ -312,9 +324,72 @@ export function createRecordConverter(): RecordConverter {
     styleSheets.set(nextStyleSheetId++, stored);
   }
 
+  function forgetSubtree(node: any) {
+    nodes.delete(node.id);
+    scrolls.delete(node.id);
+    inputs.delete(node.id);
+    if (Array.isArray(node.childNodes)) node.childNodes.forEach(forgetSubtree);
+  }
+
+  // Classic scroll and input records reference converter ids, so their latest state belongs in a rebuilt snapshot.
+  function trackClassic(record: any) {
+    if (!record || record.type !== RecordType.IncrementalSnapshot || !record.data) return;
+    const d = record.data;
+    if (d.source === IncrementalSource.Scroll) {
+      scrolls.set(d.id, { x: d.x, y: d.y });
+      changeCount++;
+    }
+    if (d.source === IncrementalSource.Input) {
+      inputs.set(d.id, { text: d.text, isChecked: d.isChecked });
+      changeCount++;
+    }
+  }
+
+  function applyTracked(root: any) {
+    const byId = new Map<number, any>();
+    const index = (n: any) => {
+      byId.set(n.id, n);
+      if (Array.isArray(n.childNodes)) n.childNodes.forEach(index);
+    };
+    index(root);
+    let initialOffset = { left: 0, top: 0 };
+    scrolls.forEach((pos, id) => {
+      if (id === rootId) {
+        initialOffset = { left: pos.x, top: pos.y };
+        return;
+      }
+      const n = byId.get(id);
+      if (!n || !n.attributes) return;
+      if (pos.x) n.attributes.rr_scrollLeft = pos.x;
+      else delete n.attributes.rr_scrollLeft;
+      if (pos.y) n.attributes.rr_scrollTop = pos.y;
+      else delete n.attributes.rr_scrollTop;
+    });
+    inputs.forEach((value, id) => {
+      const n = byId.get(id);
+      if (!n || !n.attributes) return;
+      const checkable = n.attributes.type === "checkbox" || n.attributes.type === "radio";
+      if (value.isChecked !== undefined && checkable) {
+        if (value.isChecked) n.attributes.checked = true;
+        else delete n.attributes.checked;
+      } else if (value.text !== undefined) {
+        n.attributes.value = value.text;
+      }
+    });
+    return initialOffset;
+  }
+
+  function snapshot() {
+    if (rootId === null || !nodes.has(rootId)) return null;
+    const node = cloneTree(nodes.get(rootId)!.node);
+    const initialOffset = applyTracked(node);
+    return { node, initialOffset };
+  }
+
   // ---- Full snapshot (type 2, format 1) -> classic FullSnapshot ------------
 
   function convertFullSnapshot(record: any): any {
+    changeCount++;
     reset();
 
     let documentNode: any = null;
@@ -337,9 +412,13 @@ export function createRecordConverter(): RecordConverter {
             const placement = resolveInsertion(id, change[0]);
             if (placement === null) {
               documentNode = node;
+              rootId = id;
               nodes.set(id, { node, parentId: -1 });
             } else {
-              childNodesOf(nodes.get(placement.parentId))?.splice(placement.index, 0, node);
+              const children = childrenOf(nodes.get(placement.parentId));
+              if (children) {
+                children.splice(placement.index, 0, node);
+              }
               nodes.set(id, { node, parentId: placement.parentId });
             }
           }
@@ -348,6 +427,7 @@ export function createRecordConverter(): RecordConverter {
         case ChangeType.ScrollPosition:
           for (let i = 1; i < group.length; i++) {
             const [nodeId, x, y] = group[i];
+            scrolls.set(nodeId, { x, y });
             if (nodeId === 0) {
               initialOffset = { left: x, top: y };
             } else {
@@ -405,8 +485,11 @@ export function createRecordConverter(): RecordConverter {
     const out: any = { ...record };
     delete out.format;
     out.type = RecordType.FullSnapshot;
+    // rrweb rebuilds from this event on every seek, so it must not see the live tree later changes keep editing.
     out.data = {
-      node: documentNode ?? { type: NodeType.Document, childNodes: [], id: 0 },
+      node: documentNode
+        ? cloneTree(documentNode)
+        : { type: NodeType.Document, childNodes: [], id: 0 },
       initialOffset,
     };
     return out;
@@ -415,6 +498,7 @@ export function createRecordConverter(): RecordConverter {
   // ---- Change record (type 12) -> classic IncrementalSnapshot(s) -----------
 
   function convertChange(record: any): any[] {
+    changeCount++;
     const timestamp = record.timestamp;
     const adds: any[] = [];
     const removes: any[] = [];
@@ -441,16 +525,19 @@ export function createRecordConverter(): RecordConverter {
             let nextId: number | null = null;
             if (placement !== null) {
               parentId = placement.parentId;
-              const siblings = childNodesOf(nodes.get(parentId));
-              if (siblings) {
-                const sibling = siblings[placement.index];
+              const children = childrenOf(nodes.get(parentId));
+              if (children) {
+                const sibling = children[placement.index];
                 nextId = sibling ? sibling.id : null;
-                siblings.splice(placement.index, 0, node);
+                children.splice(placement.index, 0, node);
               }
             }
             nodes.set(id, { node, parentId });
-            // Emit the node with empty children; descendants arrive as their own adds.
-            const emitted = { ...node, childNodes: [] };
+            if (placement === null) rootId = id;
+            // Descendants arrive as their own adds, and attributes are copied because later changes edit the tracked node.
+            const emitted = node.attributes
+              ? { ...node, attributes: { ...node.attributes }, childNodes: [] }
+              : { ...node, childNodes: [] };
             adds.push({ parentId, nextId, node: emitted });
           }
           break;
@@ -462,12 +549,12 @@ export function createRecordConverter(): RecordConverter {
             const parentId = tracked ? tracked.parentId : -1;
             removes.push({ id: nodeId, parentId });
             if (tracked) {
-              const siblings = childNodesOf(nodes.get(parentId));
-              if (siblings) {
-                const idx = siblings.findIndex((c: any) => c.id === nodeId);
-                if (idx !== -1) siblings.splice(idx, 1);
+              const children = childrenOf(nodes.get(parentId));
+              if (children) {
+                const idx = children.findIndex((c: any) => c.id === nodeId);
+                if (idx !== -1) children.splice(idx, 1);
               }
-              nodes.delete(nodeId);
+              forgetSubtree(tracked.node);
             }
           }
           break;
@@ -510,12 +597,18 @@ export function createRecordConverter(): RecordConverter {
               id: nodeId,
               attributes: { rr_width: `${w}px`, rr_height: `${h}px` },
             });
+            const sized = nodes.get(nodeId);
+            if (sized && sized.node.attributes) {
+              sized.node.attributes.rr_width = `${w}px`;
+              sized.node.attributes.rr_height = `${h}px`;
+            }
           }
           break;
 
         case ChangeType.ScrollPosition:
           for (let i = 1; i < group.length; i++) {
             const [nodeId, x, y] = group[i];
+            scrolls.set(nodeId, { x, y });
             extraRecords.push({
               type: RecordType.IncrementalSnapshot,
               timestamp,
@@ -527,6 +620,11 @@ export function createRecordConverter(): RecordConverter {
         case ChangeType.MediaPlaybackState:
           for (let i = 1; i < group.length; i++) {
             const [nodeId, state] = group[i];
+            const media = nodes.get(nodeId);
+            if (media && media.node.attributes) {
+              media.node.attributes.rr_mediaState =
+                state === PlaybackState.Playing ? "played" : "paused";
+            }
             extraRecords.push({
               type: RecordType.IncrementalSnapshot,
               timestamp,
@@ -557,6 +655,7 @@ export function createRecordConverter(): RecordConverter {
             if (tracked && tracked.node.type === NodeType.Element) {
               const sheet = styleSheets.get(sheetIds[0]);
               if (sheet) {
+                tracked.node.attributes._cssText = rulesToCssText(sheet.rules);
                 attributes.push({
                   id: nodeId,
                   attributes: { _cssText: rulesToCssText(sheet.rules) },
@@ -618,13 +717,22 @@ export function createRecordConverter(): RecordConverter {
         record.format === SnapshotFormatChange &&
         Array.isArray(record.data)
       ) {
+        stale = false;
         return [convertFullSnapshot(record)];
       }
       if (record && record.type === RecordType.Change) {
-        return convertChange(record);
+        // String table and node ids are out of step after a skipped segment, so the frame freezes instead of corrupting.
+        return stale ? [] : convertChange(record);
       }
-      // Already classic (or a passthrough record like Meta/Focus/type-3/type-8).
+      trackClassic(record);
       return [record];
+    },
+    markStale() {
+      stale = true;
+    },
+    snapshot,
+    version() {
+      return changeCount;
     },
   };
 }
@@ -654,4 +762,13 @@ export function hasChangeFormatRecords(records: any[]): boolean {
       (r.type === RecordType.Change ||
         (r.type === RecordType.FullSnapshot && r.format === SnapshotFormatChange)),
   );
+}
+
+// A cold converter has no string table, so Change records before the first snapshot decode to empty strings; classic records are kept.
+export function dropChangesBeforeFirstSnapshot(records: any[]): any[] {
+  const snapshotIndex = records.findIndex(
+    (r) => r && r.type === RecordType.FullSnapshot && r.format === SnapshotFormatChange,
+  );
+  if (snapshotIndex <= 0) return records;
+  return records.filter((r, i) => i >= snapshotIndex || !r || r.type !== RecordType.Change);
 }

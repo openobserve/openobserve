@@ -28,7 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="dataTest"
   >
     <span :class="['size-2 shrink-0 rounded-full transition-colors duration-700', dotClass]" />
-    <span class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none">
+    <!-- Phones keep the staleness dot; the age stays in the title tooltip. -->
+    <span
+      class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none max-md:hidden"
+    >
       {{ relativeTime }}
     </span>
   </span>

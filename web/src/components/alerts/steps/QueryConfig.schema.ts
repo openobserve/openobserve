@@ -22,6 +22,11 @@
 import { z } from "zod";
 
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+import {
+  FORECAST_MAX_DAYS,
+  FORECAST_MIN_DAYS,
+  isForecastHorizonValid,
+} from "@/utils/alerts/forecastAlert";
 
 /** i18n translator injected by the component: `(key, namedParams?) => string`.
  *  Every user-facing validation message resolves through this against the
@@ -220,6 +225,23 @@ const isBelowOne = (v: unknown): boolean => {
   return Number.isNaN(n) || n < 1;
 };
 
+/** Forecast mode's own fields: the PromQL is generated from them, so they are what the user fixes. */
+const refineForecast = (ctx: z.RefinementCtx, forecast: any, t: Translator): void => {
+  if (!forecast) return;
+  const issue = (field: string, message: string) =>
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["_ui", "forecast", field], message });
+  if (!String(forecast.U ?? "").trim()) issue("U", t("alerts.validation.fieldRequired"));
+  if (isBlank(forecast.T) || !Number.isFinite(Number(forecast.T))) {
+    issue("T", t("alerts.validation.fieldRequired"));
+  }
+  if (isBlank(forecast.H) || !isForecastHorizonValid(Number(forecast.H))) {
+    issue(
+      "H",
+      t("alerts.forecast.horizonRange", { min: FORECAST_MIN_DAYS, max: FORECAST_MAX_DAYS }),
+    );
+  }
+};
+
 /**
  * The full QueryConfig form schema. `looseObject` throughout so the many bridged
  * runtime keys (aggregation.function, conditions ids, values[], etc.) pass
@@ -266,6 +288,8 @@ export const makeQueryConfigSchema = (t: Translator) =>
             .optional(),
           /** Optional PromQL-value WARNING (shares promql_condition.operator). */
           promql_warning_value: z.unknown().optional(),
+          promql_rule_mode: z.boolean().optional(),
+          promql_multi_alert: z.boolean().optional(),
         })
         .optional(),
       /** Logs/traces group-by lives on its own field (metrics group-by lives on
@@ -417,8 +441,12 @@ export const makeQueryConfigSchema = (t: Translator) =>
           });
         }
       }
-      // PromQL family: promql_warning_value vs promql_condition.
-      if (isPromql) {
+      // PromQL family: promql_warning_value vs promql_condition. Forecast mode has no warning.
+      if (
+        isPromql &&
+        !qc.promql_rule_mode &&
+        !(val._ui as Record<string, any> | undefined)?.forecast
+      ) {
         const pc = (qc.promql_condition ?? {}) as Record<string, unknown>;
         const msg = matrixIssue(qc.promql_warning_value, pc.value, pc.operator);
         if (msg) {
@@ -431,7 +459,21 @@ export const makeQueryConfigSchema = (t: Translator) =>
       }
 
       // ── PromQL branch ────────────────────────────────────────────────────────
-      if (isPromql) {
+      if (isPromql && qc.promql_rule_mode) {
+        if (
+          (Number(val.pending_period_sec ?? 0) > 0 && !qc.promql_multi_alert) ||
+          qc.promql_condition != null ||
+          !isBlank(qc.promql_warning_value) ||
+          !isBlank(tc.warning_threshold)
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["query_condition", "promql_rule_mode"],
+            message: t("alerts.promRuleModeConflict"),
+          });
+        }
+      }
+      if (isPromql && !qc.promql_rule_mode) {
         const pc = (qc.promql_condition ?? {}) as Record<string, unknown>;
         if (!pc.operator) {
           ctx.addIssue({
@@ -448,6 +490,7 @@ export const makeQueryConfigSchema = (t: Translator) =>
             message: t("alerts.validation.fieldRequired"),
           });
         }
+        refineForecast(ctx, (val._ui as Record<string, any> | undefined)?.forecast, t);
       }
 
       // ── Custom + measure aggregation ─────────────────────────────────────────
@@ -571,6 +614,8 @@ export const queryConfigDefaults = (args: {
       },
       aggregation: inputData.aggregation ?? null,
       promql_condition: inputData.promql_condition ?? null,
+      promql_rule_mode: inputData.promql_rule_mode ?? false,
+      promql_multi_alert: inputData.promql_multi_alert ?? false,
     },
     logGroupBy: [...args.logGroupBy],
     _meta: { ...args.meta },

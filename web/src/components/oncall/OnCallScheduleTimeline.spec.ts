@@ -13,14 +13,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 
 import OnCallScheduleTimeline from "@/components/oncall/OnCallScheduleTimeline.vue";
 import i18n from "@/locales";
+import usersService from "@/services/users";
+import store from "@/test/unit/helpers/store";
 import type { ResolvedSegment, Rotation } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+
+vi.mock("@/services/users", () => ({ default: { orgUsers: vi.fn() } }));
+
+// Mutable per case, so the phone tests can switch while every other test stays desktop.
+const mockViewport = vi.hoisted(() => ({ mdUp: true, lgUp: true }));
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => !mockViewport.mdUp),
+      isTablet: computed(() => mockViewport.mdUp && !mockViewport.lgUp),
+      isDesktop: computed(() => mockViewport.lgUp),
+      mdUp: computed(() => mockViewport.mdUp),
+      lgUp: computed(() => mockViewport.lgUp),
+    }),
+  };
+});
 
 const stubs = {
   OText: { name: "OText", template: "<span><slot /></span>" },
@@ -113,6 +132,41 @@ const tracksOf = (wrapper: any) =>
   wrapper.findComponent({ name: "OScheduleTimeline" }).props("tracks");
 
 describe("OnCallScheduleTimeline", () => {
+  afterEach(() => {
+    mockViewport.mdUp = true;
+    mockViewport.lgUp = true;
+  });
+
+  /// A phone's day column is narrower than "Wed · today", which ran into the next day's label.
+  it("labels today with the bare weekday on a phone, and keeps it emphasised", () => {
+    const todayOf = (wrapper: any) =>
+      wrapper
+        .findComponent({ name: "OScheduleTimeline" })
+        .props("axisTicks")
+        .find((tick: any) => tick.emphasis);
+
+    expect(String(todayOf(render()).sublabel)).toContain("today");
+    mockViewport.mdUp = false;
+    expect(String(todayOf(render()).sublabel)).not.toContain("today");
+  });
+
+  /// A phone row fits the range and one button, so the two rarer acts are mirrored in a menu that must emit the same events.
+  it("offers quick start and request cover from the phone menu", async () => {
+    const wrapper = render();
+
+    await wrapper.find('[data-test="oncall-timeline-presets-menu"]').trigger("click");
+    await wrapper.find('[data-test="oncall-timeline-request-cover-menu"]').trigger("click");
+
+    expect(wrapper.emitted("presets")).toHaveLength(1);
+    expect(wrapper.emitted("request-cover")).toHaveLength(1);
+    expect(wrapper.find('[data-test="oncall-timeline-presets"]').classes()).toContain(
+      "max-md:hidden",
+    );
+    expect(wrapper.find('[data-test="oncall-timeline-more-actions"]').classes()).toContain(
+      "md:hidden",
+    );
+  });
+
   it("draws one lane per rotation", () => {
     const wrapper = render({
       rotations: [rotation("Primary"), rotation("Secondary")],
@@ -562,5 +616,30 @@ describe("OnCallScheduleTimeline", () => {
         render({ canCover: false }).find('[data-test="oncall-timeline-request-cover"]').exists(),
       ).toBe(false);
     });
+  });
+
+  // The org's users are the IAM list's own cache entry, so a revisit of the Schedule tab costs nothing.
+  it("serves the org's users to a remount from the cache", async () => {
+    vi.mocked(usersService.orgUsers).mockResolvedValue({
+      data: { data: [{ email: "ana@o2.ai", first_name: "Ana" }] },
+    } as any);
+    const renderWithOrg = () =>
+      mount(OnCallScheduleTimeline, {
+        props: {
+          rotations: [rotation("Primary")],
+          segments: [seg()],
+          timezone: "UTC",
+          window: { from: 0, to: 0 },
+          "onUpdate:window": () => {},
+        } as any,
+        global: { plugins: [i18n, store], stubs },
+      });
+
+    renderWithOrg().unmount();
+    await flushPromises();
+    renderWithOrg();
+    await flushPromises();
+
+    expect(usersService.orgUsers).toHaveBeenCalledTimes(1);
   });
 });

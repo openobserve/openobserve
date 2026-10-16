@@ -33,7 +33,15 @@ use config::{
 };
 use vector_enrichment::{Table, TableRegistry};
 use vrl::{
-    compiler::{CompilationResult, TargetValueRef, runtime::Runtime},
+    compiler::{
+        CompilationResult, Function, Parameter, TargetValueRef,
+        function::{
+            ArgumentList, Compiled, Error as FunctionError, Example, FunctionCompileContext,
+            closure,
+        },
+        runtime::Runtime,
+        state::TypeState,
+    },
     prelude::NotNan,
 };
 
@@ -54,6 +62,99 @@ pub static QUERY_FUNCTIONS: LazyLock<RwHashMap<String, Transform>> =
 /// Organization-owned stream enrichment tables live in [`ENRICHMENT_TABLES`].
 static GLOBAL_ENRICHMENT_TABLES: LazyLock<RwHashMap<String, Box<dyn Table + Send + Sync>>> =
     LazyLock::new(Default::default);
+
+/// VRL functions that reach the network, the environment or host files.
+const DENIED_VRL_FUNCTIONS: &[&str] = &[
+    "http_request",
+    "dns_lookup",
+    "reverse_dns",
+    "get_env_var",
+    "get_hostname",
+    "parse_proto",
+    "encode_proto",
+    "validate_json_schema",
+];
+
+/// VRL function arguments that name a host file to read.
+const DENIED_VRL_FILE_ARGUMENTS: &[(&str, &str)] =
+    &[("parse_groks", "alias_sources"), ("parse_etld", "psl")];
+
+/// Rejects calls that pass `keyword`, delegating everything else to `inner`.
+#[derive(Debug)]
+struct WithoutFileArgument {
+    inner: Box<dyn Function>,
+    keyword: &'static str,
+}
+
+impl Function for WithoutFileArgument {
+    fn identifier(&self) -> &'static str {
+        self.inner.identifier()
+    }
+
+    fn summary(&self) -> &'static str {
+        self.inner.summary()
+    }
+
+    fn usage(&self) -> &'static str {
+        self.inner.usage()
+    }
+
+    fn category(&self) -> &'static str {
+        self.inner.category()
+    }
+
+    fn internal_failure_reasons(&self) -> &'static [&'static str] {
+        self.inner.internal_failure_reasons()
+    }
+
+    fn return_kind(&self) -> u16 {
+        self.inner.return_kind()
+    }
+
+    fn return_rules(&self) -> &'static [&'static str] {
+        self.inner.return_rules()
+    }
+
+    fn notices(&self) -> &'static [&'static str] {
+        self.inner.notices()
+    }
+
+    fn pure(&self) -> bool {
+        self.inner.pure()
+    }
+
+    fn examples(&self) -> &'static [Example] {
+        self.inner.examples()
+    }
+
+    fn compile(
+        &self,
+        state: &TypeState,
+        ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
+    ) -> Compiled {
+        if arguments.optional(self.keyword).is_some() {
+            return Err(Box::new(FunctionError::InvalidArgument {
+                keyword: self.keyword,
+                value: arguments
+                    .optional_literal(self.keyword, state)
+                    .ok()
+                    .flatten()
+                    .unwrap_or(vrl::value::Value::Null),
+                error: "reading host files is not supported",
+            }));
+        }
+        self.inner.compile(state, ctx, arguments)
+    }
+
+    fn parameters(&self) -> &'static [Parameter] {
+        self.inner.parameters()
+    }
+
+    fn closure(&self) -> Option<closure::Definition> {
+        self.inner.closure()
+    }
+}
 
 pub fn register_global_enrichment_table<T>(name: impl Into<String>, table: T)
 where
@@ -83,16 +184,10 @@ pub fn init_vrl_runtime() -> Runtime {
 }
 
 pub fn get_enrichment_tables(org_id: &str) -> HashMap<String, Box<dyn Table + Send + Sync>> {
-    let mut tables = HashMap::new();
-
-    for table in ENRICHMENT_TABLES.iter() {
-        if table.org_id == org_id || table.org_id == DEFAULT_ORG {
-            tables.insert(
-                table.stream_name.clone(),
-                Box::new(table.value().clone()) as Box<dyn Table + Send + Sync>,
-            );
-        }
-    }
+    let mut tables: HashMap<String, Box<dyn Table + Send + Sync>> = org_enrichment_tables(org_id)
+        .into_iter()
+        .map(|(name, table)| (name, Box::new(table) as Box<dyn Table + Send + Sync>))
+        .collect();
 
     for table in GLOBAL_ENRICHMENT_TABLES.iter() {
         tables.insert(table.key().clone(), table.value().clone());
@@ -102,7 +197,7 @@ pub fn get_enrichment_tables(org_id: &str) -> HashMap<String, Box<dyn Table + Se
 }
 
 pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
-    let mut functions = vrl::stdlib::all();
+    let mut functions = vrl_stdlib_functions();
     functions.append(&mut vector_enrichment::vrl_functions());
     let registry = TableRegistry::default();
     registry.load(get_enrichment_tables(org_id));
@@ -115,10 +210,6 @@ pub fn compile_vrl_function(
     source: &str,
     org_id: &str,
 ) -> Result<VRLRuntimeConfig, std::io::Error> {
-    if source.contains("get_env_var") {
-        return Err(std::io::Error::other("get_env_var is not supported"));
-    }
-
     let external = vrl::prelude::state::ExternalEnv::default();
     let vrl_config = get_vrl_compiler_config(org_id);
     match vrl::compiler::compile_with_external(
@@ -140,6 +231,41 @@ pub fn compile_vrl_function(
             vrl::diagnostic::Formatter::new(source, error).to_string(),
         )),
     }
+}
+
+/// Resolves names as [`get_enrichment_tables`] does; process-wide tables are not org streams.
+pub fn enrichment_tables_read(
+    source: &str,
+    org_id: &str,
+) -> Result<Vec<(String, String)>, std::io::Error> {
+    let reads = enrichment::TableReads::default();
+    let mut recorders: HashMap<String, Box<dyn Table + Send + Sync>> =
+        org_enrichment_tables(org_id)
+            .into_iter()
+            .map(|(name, table)| {
+                let recorder = reads.recorder(Some(table.org_id), name.clone());
+                (name, Box::new(recorder) as Box<dyn Table + Send + Sync>)
+            })
+            .collect();
+    for table in GLOBAL_ENRICHMENT_TABLES.iter() {
+        let recorder = reads.recorder(None, table.key().clone());
+        recorders.insert(table.key().clone(), Box::new(recorder));
+    }
+
+    let mut functions = vrl_stdlib_functions();
+    functions.append(&mut vector_enrichment::vrl_functions());
+    let registry = TableRegistry::default();
+    registry.load(recorders);
+    let mut config = vrl::compiler::CompileConfig::default();
+    config.set_custom(registry);
+    let external = vrl::prelude::state::ExternalEnv::default();
+    if let Err(error) = vrl::compiler::compile_with_external(source, &functions, &external, config)
+    {
+        return Err(std::io::Error::other(
+            vrl::diagnostic::Formatter::new(source, error).to_string(),
+        ));
+    }
+    Ok(reads.org_tables())
 }
 
 pub fn apply_vrl_fn(
@@ -261,6 +387,35 @@ pub fn convert_from_vrl(value: &vrl::value::Value) -> json::Value {
     }
 }
 
+fn org_enrichment_tables(org_id: &str) -> HashMap<String, enrichment::StreamTable> {
+    let mut tables = HashMap::new();
+    for table in ENRICHMENT_TABLES.iter() {
+        // ENRICHMENT_TABLES iterates in no fixed order, so the own-org table must win either way
+        if table.org_id == org_id
+            || (table.org_id == DEFAULT_ORG && !tables.contains_key(&table.stream_name))
+        {
+            tables.insert(table.stream_name.clone(), table.value().clone());
+        }
+    }
+    tables
+}
+
+fn vrl_stdlib_functions() -> Vec<Box<dyn Function>> {
+    vrl::stdlib::all()
+        .into_iter()
+        .filter(|f| !DENIED_VRL_FUNCTIONS.contains(&f.identifier()))
+        .map(|f| {
+            match DENIED_VRL_FILE_ARGUMENTS
+                .iter()
+                .find(|(name, _)| *name == f.identifier())
+            {
+                Some((_, keyword)) => Box::new(WithoutFileArgument { inner: f, keyword }),
+                None => f,
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -332,12 +487,197 @@ mod tests {
         QUERY_FUNCTIONS.remove(key);
     }
 
+    fn insert_table(org_id: &str, name: &str) -> String {
+        let key = format!("{org_id}/enrichment_tables/{name}");
+        ENRICHMENT_TABLES.insert(
+            key.clone(),
+            StreamTable {
+                org_id: org_id.to_string(),
+                stream_name: name.to_string(),
+                data: Arc::new(vec![]),
+            },
+        );
+        key
+    }
+
+    #[test]
+    fn own_org_table_wins_over_same_name_default_table() {
+        let names: Vec<String> = (0..12).map(|i| format!("prec_shared_{i}")).collect();
+        let mut keys = Vec::new();
+        for name in &names {
+            keys.push(insert_table(DEFAULT_ORG, name));
+            keys.push(insert_table("prec_org_a", name));
+        }
+
+        let tables = org_enrichment_tables("prec_org_a");
+        for name in &names {
+            assert_eq!(tables[name].org_id, "prec_org_a", "{name}");
+        }
+        let reads = enrichment_tables_read(
+            &format!(
+                "get_enrichment_table_record!(\"{}\", {{\"k\": .k}})",
+                names[0]
+            ),
+            "prec_org_a",
+        )
+        .unwrap();
+        assert_eq!(reads, vec![("prec_org_a".to_string(), names[0].clone())]);
+
+        for key in keys {
+            ENRICHMENT_TABLES.remove(&key);
+        }
+    }
+
+    #[test]
+    fn default_only_table_stays_visible_to_other_orgs() {
+        let key = insert_table(DEFAULT_ORG, "prec_default_only");
+
+        let tables = get_enrichment_tables("prec_org_b");
+        assert!(tables.contains_key("prec_default_only"));
+        let source = "get_enrichment_table_record!(\"prec_default_only\", {\"k\": .k})";
+        assert!(compile_vrl_function(source, "prec_org_b").is_ok());
+        assert_eq!(
+            enrichment_tables_read(source, "prec_org_b").unwrap(),
+            vec![(DEFAULT_ORG.to_string(), "prec_default_only".to_string())]
+        );
+
+        ENRICHMENT_TABLES.remove(&key);
+    }
+
+    #[test]
+    fn global_table_shadowing_an_org_table_is_not_reported() {
+        let key = insert_table("prec_org_c", "prec_global_shadow");
+        register_global_enrichment_table(
+            "prec_global_shadow",
+            StreamTable {
+                org_id: "global".to_string(),
+                stream_name: "prec_global_shadow".to_string(),
+                data: Arc::new(vec![]),
+            },
+        );
+
+        let source = "get_enrichment_table_record!(\"prec_global_shadow\", {\"k\": .k})";
+        assert_eq!(
+            enrichment_tables_read(source, "prec_org_c").unwrap(),
+            vec![]
+        );
+
+        remove_global_enrichment_table("prec_global_shadow");
+        ENRICHMENT_TABLES.remove(&key);
+    }
+
+    #[test]
+    fn records_every_literal_table_once_in_read_order() {
+        let first = insert_table("prec_org_d", "prec_first");
+        let second = insert_table("prec_org_d", "prec_second");
+
+        let source = r#"
+            a = get_enrichment_table_record!("prec_second", {"k": .k})
+            b = find_enrichment_table_records!("prec_first", {"k": .k})
+            c = get_enrichment_table_record!("prec_second", {"j": .j})
+            .
+        "#;
+        assert_eq!(
+            enrichment_tables_read(source, "prec_org_d").unwrap(),
+            vec![
+                ("prec_org_d".to_string(), "prec_second".to_string()),
+                ("prec_org_d".to_string(), "prec_first".to_string()),
+            ]
+        );
+        assert_eq!(
+            enrichment_tables_read(". = .", "prec_org_d").unwrap(),
+            vec![]
+        );
+
+        ENRICHMENT_TABLES.remove(&first);
+        ENRICHMENT_TABLES.remove(&second);
+    }
+
+    #[test]
+    fn unknown_table_or_bad_program_does_not_compile() {
+        let source = "get_enrichment_table_record!(\"prec_missing\", {\"k\": .k})";
+        assert!(enrichment_tables_read(source, "prec_org_e").is_err());
+        assert!(enrichment_tables_read("this is not vrl (", "prec_org_e").is_err());
+    }
+
+    fn compile_error(source: &str) -> String {
+        match compile_vrl_function(source, "vrl_crate_test") {
+            Ok(_) => panic!("{source} must not compile"),
+            Err(error) => error.to_string(),
+        }
+    }
+
     #[test]
     fn rejects_environment_access() {
-        let error = match compile_vrl_function("get_env_var!(\"HOME\")", "default") {
-            Ok(_) => panic!("get_env_var must be rejected"),
-            Err(error) => error,
-        };
-        assert_eq!(error.to_string(), "get_env_var is not supported");
+        let error = compile_error("get_env_var!(\"HOME\")");
+        assert!(error.contains("call to undefined function"), "{error}");
+    }
+
+    #[test]
+    fn rejects_network_and_host_functions() {
+        let sources = [
+            ".x = http_request!(\"http://127.0.0.1/\")",
+            ".x = dns_lookup!(\"localhost\")",
+            ".x = reverse_dns!(\"127.0.0.1\")",
+            ".x = get_env_var!(\"HOME\")",
+            ".x = get_hostname!()",
+            ".x = parse_proto!(.m, \"/etc/hosts\", \"a.B\")",
+            ".x = encode_proto!(.m, \"/etc/hosts\", \"a.B\")",
+            ".x = validate_json_schema!(.m, \"/etc/hosts\")",
+        ];
+        let allowed: Vec<&str> =
+            sources
+                .into_iter()
+                .filter(|source| {
+                    std::panic::catch_unwind(|| compile_vrl_function(source, "vrl_crate_test"))
+                        .map_or(true, |res| {
+                            res.map_or_else(
+                                |e| !e.to_string().contains("call to undefined function"),
+                                |_| true,
+                            )
+                        })
+                })
+                .collect();
+        assert!(allowed.is_empty(), "still callable: {allowed:?}");
+    }
+
+    #[test]
+    fn rejects_host_file_arguments() {
+        let dir = std::env::temp_dir().join(format!("vrl_crate_test_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let aliases = dir.join("aliases.json");
+        std::fs::write(&aliases, r#"{"secret": "s3cr3t"}"#).unwrap();
+        let psl = dir.join("psl.dat");
+        std::fs::write(&psl, "com\n").unwrap();
+        let sources = [
+            format!(
+                ".x = parse_groks!(.m, patterns: [\"%{{secret}}\"], alias_sources: [\"{}\"])",
+                aliases.display()
+            ),
+            format!(".x = parse_etld!(\"a.b.com\", psl: \"{}\")", psl.display()),
+        ];
+        let allowed: Vec<String> = sources
+            .into_iter()
+            .filter(|source| {
+                compile_vrl_function(source, "vrl_crate_test")
+                    .map_or_else(|e| !e.to_string().contains("host files"), |_| true)
+            })
+            .collect();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(allowed.is_empty(), "still reads host files: {allowed:?}");
+    }
+
+    #[test]
+    fn keeps_file_free_uses_of_guarded_functions() {
+        for source in [
+            ".x = parse_groks!(.m, patterns: [\"%{WORD:w}\"])",
+            ".x = parse_etld!(\"a.b.com\")",
+            ".x = parse_json!(.m)",
+        ] {
+            assert!(
+                compile_vrl_function(source, "vrl_crate_test").is_ok(),
+                "{source}"
+            );
+        }
     }
 }

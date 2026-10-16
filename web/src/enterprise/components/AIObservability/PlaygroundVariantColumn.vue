@@ -28,6 +28,7 @@
         @reset="emit('reset')"
         @remove="emit('remove')"
         @create-experiment="emit('create-experiment')"
+        @save-as-prompt="emit('save-as-prompt')"
       />
     </div>
 
@@ -214,5 +215,6 @@ const emit = defineEmits<{
   copy: [];
   "add-to-messages": [];
   "create-experiment": [];
+  "save-as-prompt": [];
 }>();
 </script>

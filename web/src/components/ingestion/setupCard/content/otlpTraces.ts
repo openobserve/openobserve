@@ -55,6 +55,25 @@ service:
     traces:
       exporters: [otlp/openobserve]`;
 
+// OpenObserve Cloud's public gRPC gateway — primary (US) region only, so this
+// is offered instead of the self-hosted variant, never alongside it. `otlp` is
+// the OTel Collector Contrib's real gRPC exporter type; unlike the self-hosted
+// port this is a TLS-terminated public endpoint, so insecure stays false.
+const GRPC_CLOUD_YAML = `exporters:
+  otlp/openobserve:
+    endpoint: grpc.openobserve.ai:443
+    headers:
+      Authorization: "Basic {token}"
+      organization: {org}
+      stream-name: {stream}
+    tls:
+      insecure: false
+
+service:
+  pipelines:
+    traces:
+      exporters: [otlp/openobserve]`;
+
 // Env vars for an SDK pointed straight at OpenObserve (no collector in between).
 const SDK_ENV = `export OTEL_EXPORTER_OTLP_ENDPOINT="{url}/api/{org}"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic {token},stream-name={stream}"
@@ -90,8 +109,17 @@ export default function otlpTracesCard(subs: CardSubstitutions, t: TranslateFn):
     },
   ];
 
-  // gRPC is self-hosted only.
-  if (!isCloud) {
+  // gRPC: the self-hosted port everywhere except cloud, and cloud's public
+  // gateway only on the primary (US) region — never both at once.
+  if (subs.isPrimaryCloud) {
+    variants.splice(1, 0, {
+      id: "grpc",
+      label: raw("Collector · OTLP gRPC"),
+      icon: getImageURL("images/ingestion/otlp.svg"),
+      code: { ...code(GRPC_CLOUD_YAML), filename: "config.yaml" },
+      note: t("ingestion.setupCard.otlpGrpcCloudNote"),
+    });
+  } else if (!isCloud) {
     variants.splice(1, 0, {
       id: "grpc",
       label: raw("Collector · OTLP gRPC"),
@@ -103,6 +131,7 @@ export default function otlpTracesCard(subs: CardSubstitutions, t: TranslateFn):
 
   return {
     provider: {
+      id: "otlpTraces",
       name: t("ingestion.setupCard.providerNameOtlpTraces"),
       tagline: t("ingestion.setupCard.taglineOtlpTraces"),
       logo: getImageURL("images/ingestion/otlp.svg"),

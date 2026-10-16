@@ -14,10 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { ref } from "vue";
-import { shallowMount, flushPromises } from "@vue/test-utils";
+import { defineComponent, ref } from "vue";
+import { mount, shallowMount, flushPromises } from "@vue/test-utils";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import DateTime from "@/components/DateTime.vue";
+import { useDashboardTimeGate } from "@/composables/dashboard/useDashboardTimeGate";
+import { toPickerSavedDate } from "@/utils/dashboard/panelTimeUtils";
+import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 
 describe("DateTimePickerDashboard", () => {
   let wrapper: any;
@@ -488,6 +492,108 @@ describe("DateTimePickerDashboard", () => {
       wrapper = createWrapper();
 
       expect(wrapper.vm.dateTimePicker).toBeDefined();
+    });
+
+    it("forwards a time zone change so a dashboard can apply it at once", () => {
+      wrapper = createWrapper();
+
+      wrapper.findComponent('[data-test="datetime-component"]').vm.$emit("on:timezone-change");
+
+      expect(wrapper.emitted("timezone-change")).toHaveLength(1);
+    });
+  });
+
+  describe("with the real picker behind a dashboard time gate", () => {
+    const Host = defineComponent({
+      components: { DateTimePickerDashboard },
+      props: {
+        autoApply: { type: Boolean, default: true },
+        initial: {
+          type: Object,
+          default: () => ({ valueType: "relative", relativeTimePeriod: "15m" }),
+        },
+      },
+      setup() {
+        const pickerRef = ref<any>(null);
+        const gate = useDashboardTimeGate({
+          isAutoRunOn: () => false,
+          showInPicker: (value) => pickerRef.value?.setSavedDate(toPickerSavedDate(value, "UTC")),
+        });
+        return { gate, pickerRef };
+      },
+      template: `<DateTimePickerDashboard
+        ref="pickerRef"
+        :model-value="gate.picked.value ?? initial"
+        :auto-apply-dashboard="autoApply"
+        @update:model-value="gate.onPick"
+        @show="gate.onShow"
+        @hide="gate.onHide"
+      />`,
+    });
+
+    const openPicker = async (host: any) => {
+      host.findComponent(DateTime).vm.menuOpen = true;
+      await flushPromises();
+    };
+    const inMenu = (dataTest: string) =>
+      document.body.querySelector<HTMLElement>(`[data-test="${dataTest}"]`);
+
+    beforeEach(() => {
+      store.state.timezone = "UTC";
+    });
+
+    it("has no Apply button, and a preset stays picked until it is applied", async () => {
+      wrapper = mount(Host, { attachTo: document.body, global: { plugins: [i18n, store] } });
+      await flushPromises();
+      const gate = (wrapper.vm as any).gate;
+      expect(gate.applied.value.relativeTimePeriod).toBe("15m");
+
+      await openPicker(wrapper);
+      expect(inMenu("date-time-apply-btn")).toBeNull();
+      inMenu("date-time-relative-1-h-btn")!.click();
+      await flushPromises();
+
+      expect(gate.picked.value.relativeTimePeriod).toBe("1h");
+      expect(gate.applied.value.relativeTimePeriod).toBe("15m");
+      expect(gate.needsRefresh.value).toBe(true);
+      expect(wrapper.find('[data-test="date-time-btn"]').text()).toContain("Past 1 Hour");
+    });
+
+    it("shows the applied range again after closing on a range that ends before it starts", async () => {
+      const start = Date.UTC(2026, 9, 13, 10, 0, 0) * 1000;
+      wrapper = mount(Host, {
+        props: { initial: { valueType: "absolute", startTime: start, endTime: start + 30 * 60e6 } },
+        attachTo: document.body,
+        global: { plugins: [i18n, store] },
+      });
+      await flushPromises();
+      const label = () => wrapper.find('[data-test="date-time-btn"]').text();
+      const realPicker = wrapper.findComponent(DateTime);
+      expect(label()).toContain("2026/10/13 10:00:00 - 2026/10/13 10:30:00");
+
+      realPicker.vm.onMenuOpenChange(true);
+      realPicker.vm.selectedTime = { startTime: "18:50:30", endTime: "18:25:22" };
+      await flushPromises();
+      expect(label()).toContain("2026/10/13 18:50:30 - 2026/10/13 18:25:22");
+
+      realPicker.vm.onMenuOpenChange(false);
+      await flushPromises();
+
+      expect(label()).toContain("2026/10/13 10:00:00 - 2026/10/13 10:30:00");
+      expect((wrapper.vm as any).gate.needsRefresh.value).toBe(false);
+    });
+
+    it("keeps the Apply button on a page that does not opt in", async () => {
+      wrapper = mount(Host, {
+        props: { autoApply: false },
+        attachTo: document.body,
+        global: { plugins: [i18n, store] },
+      });
+      await flushPromises();
+
+      await openPicker(wrapper);
+
+      expect(inMenu("date-time-apply-btn")).not.toBeNull();
     });
   });
 });

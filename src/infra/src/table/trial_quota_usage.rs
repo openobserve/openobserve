@@ -30,6 +30,13 @@ pub const SYNTHETICS_STATUS_FEATURE: &str = "synthetics_status_protocol";
 /// The `YYYYMM` a lifetime row carries, meaning the count belongs to no month.
 pub const LIFETIME_PERIOD: i32 = 0;
 
+/// What [`try_spend`] decided; `used` is the pool total after the spend or at refusal.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Spend {
+    Spent { used: i64, limit: i64 },
+    Exhausted { used: i64, limit: i64 },
+}
+
 /// One settled window's free steps per pool. `month` scopes the status pool alone.
 pub struct SyntheticsDeltas {
     pub browser: i64,
@@ -107,6 +114,95 @@ async fn get_total_usage_for_org_in<C: ConnectionTrait>(
     Ok(result.flatten().unwrap_or(0))
 }
 
+/// Check and spend a pool's limit in ONE transaction; the seed-row lock serializes spenders.
+pub async fn try_spend(
+    org_id: &str,
+    seed_feature: &str,
+    feature: &str,
+    features: &[&str],
+    cost: i64,
+    default_limit: i64,
+) -> Result<Spend, sea_orm::DbErr> {
+    try_spend_in(
+        get_orm_client_rw().await,
+        org_id,
+        seed_feature,
+        feature,
+        features,
+        cost,
+        default_limit,
+    )
+    .await
+}
+
+/// [`try_spend`] against a caller-supplied connection.
+async fn try_spend_in<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    seed_feature: &str,
+    feature: &str,
+    features: &[&str],
+    cost: i64,
+    default_limit: i64,
+) -> Result<Spend, sea_orm::DbErr> {
+    let txn = conn.begin().await?;
+    let now = config::utils::time::now_micros();
+    // A zero-cost increment: creates the row if missing and locks it either way.
+    increment_lifetime_row(&txn, org_id, seed_feature, 0, now).await?;
+
+    // A refund flushes as a negative delta, so a pool can sum below zero.
+    let used = get_total_usage_for_org_in(&txn, org_id, features)
+        .await?
+        .max(0);
+    let limit = trial_quota_usage::Entity::find()
+        .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
+        .select_only()
+        .column_as(trial_quota_usage::Column::UsageLimit.max(), "usage_limit")
+        .into_tuple::<Option<i64>>()
+        .one(&txn)
+        .await?
+        .flatten()
+        .unwrap_or(default_limit);
+
+    if used.saturating_add(cost) > limit {
+        txn.rollback().await?;
+        return Ok(Spend::Exhausted { used, limit });
+    }
+    increment_lifetime_row(&txn, org_id, feature, cost, now).await?;
+    txn.commit().await?;
+    Ok(Spend::Spent {
+        used: used + cost,
+        limit,
+    })
+}
+
+/// Each feature's usage for an org, for the per-feature breakdown.
+pub async fn get_usage_by_feature(
+    org_id: &str,
+    features: &[&str],
+) -> Result<Vec<(String, i64)>, sea_orm::DbErr> {
+    trial_quota_usage::Entity::find()
+        .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
+        .select_only()
+        .column(trial_quota_usage::Column::Feature)
+        .column(trial_quota_usage::Column::UsageCount)
+        .into_tuple()
+        .all(get_orm_client_ro().await)
+        .await
+}
+
+/// Every row of the given features, for refreshing a node's usage cache.
+pub async fn load_for_features(
+    features: &[&str],
+) -> Result<Vec<trial_quota_usage::Model>, sea_orm::DbErr> {
+    trial_quota_usage::Entity::find()
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
+        .all(get_orm_client_ro().await)
+        .await
+}
+
 /// Get the explicitly configured shared usage limit for an organization.
 /// A missing value means the deployment-wide default still applies.
 pub async fn get_usage_limit_for_org(org_id: &str) -> Result<Option<i64>, sea_orm::DbErr> {
@@ -180,6 +276,7 @@ async fn set_usage_limit_for_org_in<C: ConnectionTrait + TransactionTrait>(
         notified_checkpoint: sea_orm::ActiveValue::Set(0),
         // A raised limit belongs to no month; the monthly row keeps its own period.
         period: sea_orm::ActiveValue::Set(LIFETIME_PERIOD),
+        paid_overage_enabled: sea_orm::ActiveValue::Set(false),
     };
 
     trial_quota_usage::Entity::insert(active_model)
@@ -213,6 +310,72 @@ async fn set_usage_limit_for_org_in<C: ConnectionTrait + TransactionTrait>(
             .await?;
     }
     txn.commit().await
+}
+
+/// Set paid-overage consent on every exact backing row in one transaction.
+///
+/// Inserts missing rows with zero usage and updates only consent and `updated_at`
+/// on existing rows, so quota accounting and administrator limits survive.
+pub async fn set_paid_overage_enabled_for_features(
+    org_id: &str,
+    features: &[&str],
+    enabled: bool,
+) -> Result<(), sea_orm::DbErr> {
+    set_paid_overage_enabled_for_features_in(get_orm_client_rw().await, org_id, features, enabled)
+        .await
+}
+
+async fn set_paid_overage_enabled_for_features_in<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    features: &[&str],
+    enabled: bool,
+) -> Result<(), sea_orm::DbErr> {
+    if features.is_empty() {
+        return Ok(());
+    }
+    let txn = conn.begin().await?;
+    let now = config::utils::time::now_micros();
+    for feature in features {
+        let active_model = trial_quota_usage::ActiveModel {
+            org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
+            feature: sea_orm::ActiveValue::Set((*feature).to_string()),
+            usage_count: sea_orm::ActiveValue::Set(0),
+            usage_limit: sea_orm::ActiveValue::NotSet,
+            paid_overage_enabled: sea_orm::ActiveValue::Set(enabled),
+            updated_at: sea_orm::ActiveValue::Set(now),
+            notified_checkpoint: sea_orm::ActiveValue::Set(0),
+            period: sea_orm::ActiveValue::Set(LIFETIME_PERIOD),
+        };
+        trial_quota_usage::Entity::insert(active_model)
+            .on_conflict(
+                OnConflict::columns([
+                    trial_quota_usage::Column::OrgId,
+                    trial_quota_usage::Column::Feature,
+                ])
+                .value(
+                    trial_quota_usage::Column::PaidOverageEnabled,
+                    Expr::value(enabled),
+                )
+                .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
+                .to_owned(),
+            )
+            .exec(&txn)
+            .await?;
+    }
+    txn.commit().await
+}
+
+/// Load every exact consent row for startup and periodic reconciliation.
+pub async fn load_all_paid_overage() -> Result<Vec<(String, String, bool)>, sea_orm::DbErr> {
+    trial_quota_usage::Entity::find()
+        .select_only()
+        .column(trial_quota_usage::Column::OrgId)
+        .column(trial_quota_usage::Column::Feature)
+        .column(trial_quota_usage::Column::PaidOverageEnabled)
+        .into_tuple()
+        .all(get_orm_client_ro().await)
+        .await
 }
 
 /// Get quota record for a specific org and feature.
@@ -428,6 +591,7 @@ async fn increment_monthly_row<C: ConnectionTrait>(
         updated_at: sea_orm::ActiveValue::Set(now),
         notified_checkpoint: sea_orm::ActiveValue::Set(0),
         period: sea_orm::ActiveValue::Set(month),
+        paid_overage_enabled: sea_orm::ActiveValue::Set(false),
     };
 
     trial_quota_usage::Entity::insert(active_model)
@@ -461,6 +625,7 @@ async fn increment_lifetime_row<C: ConnectionTrait>(
         updated_at: sea_orm::ActiveValue::Set(now),
         notified_checkpoint: sea_orm::ActiveValue::Set(0),
         period: sea_orm::ActiveValue::Set(LIFETIME_PERIOD),
+        paid_overage_enabled: sea_orm::ActiveValue::Set(false),
     };
 
     trial_quota_usage::Entity::insert(active_model)
@@ -534,6 +699,7 @@ mod tests {
             feature: ActiveValue::Set(feature.to_string()),
             usage_count: ActiveValue::Set(usage_count),
             usage_limit: ActiveValue::Set(usage_limit),
+            paid_overage_enabled: ActiveValue::Set(false),
             updated_at: ActiveValue::Set(0),
             notified_checkpoint: ActiveValue::Set(notified_checkpoint),
             period: ActiveValue::Set(LIFETIME_PERIOD),
@@ -655,6 +821,71 @@ mod tests {
             .await
             .unwrap()
             .is_none()
+    }
+
+    #[tokio::test]
+    async fn paid_overage_bundle_is_atomic_and_preserves_quota_fields() {
+        let db = db().await;
+        seed_row(&db, ORG, AI, 340, Some(10_000)).await;
+
+        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, true)
+            .await
+            .unwrap();
+
+        for feature in AI_FEATURES {
+            assert!(row_of(&db, ORG, feature).await.paid_overage_enabled);
+        }
+        let ai = row_of(&db, ORG, AI).await;
+        assert_eq!(ai.usage_count, 340);
+        assert_eq!(ai.usage_limit, Some(10_000));
+    }
+
+    #[tokio::test]
+    async fn revoking_paid_overage_disables_every_backing_row_without_resetting_usage() {
+        let db = db().await;
+        seed_row(&db, ORG, AI, 340, Some(10_000)).await;
+        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, true)
+            .await
+            .unwrap();
+
+        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, false)
+            .await
+            .unwrap();
+
+        for feature in AI_FEATURES {
+            assert!(!row_of(&db, ORG, feature).await.paid_overage_enabled);
+        }
+        let ai = row_of(&db, ORG, AI).await;
+        assert_eq!(ai.usage_count, 340);
+        assert_eq!(ai.usage_limit, Some(10_000));
+    }
+    #[tokio::test]
+    async fn ordinary_usage_upsert_preserves_paid_overage() {
+        let db = db().await;
+        set_paid_overage_enabled_for_features_in(&db, ORG, &[AI], true)
+            .await
+            .unwrap();
+
+        increment_lifetime_row(&db, ORG, AI, 7, 42).await.unwrap();
+
+        let row = row_of(&db, ORG, AI).await;
+        assert_eq!(row.usage_count, 7);
+        assert!(row.paid_overage_enabled);
+    }
+
+    #[tokio::test]
+    async fn paid_overage_bundle_uses_one_transaction() {
+        let db = mock_db(DatabaseBackend::Sqlite, AI_FEATURES.len());
+
+        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, true)
+            .await
+            .unwrap();
+
+        assert_one_transaction(
+            &db.into_transaction_log(),
+            AI_FEATURES.len(),
+            "set_paid_overage_enabled_for_features_in",
+        );
     }
 
     /// A leaked org or a leaked feature is a grant spent against the wrong pool.
@@ -1031,5 +1262,82 @@ mod tests {
         apply_status(&db, ORG, 0, 202609).await;
 
         assert!(has_no_row(&db, ORG, STATUS).await);
+    }
+
+    async fn spend(db: &DatabaseConnection, feature: &str, cost: i64) -> Spend {
+        try_spend_in(db, ORG, AI, feature, AI_FEATURES, cost, 50)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn spend_is_capped_by_the_pool_total_across_features() {
+        let db = db().await;
+        assert_eq!(
+            spend(&db, "new_incident", 20).await,
+            Spend::Spent {
+                used: 20,
+                limit: 50
+            }
+        );
+        assert_eq!(
+            spend(&db, AI, 29).await,
+            Spend::Spent {
+                used: 49,
+                limit: 50
+            }
+        );
+        assert_eq!(
+            spend(&db, "new_incident", 20).await,
+            Spend::Exhausted {
+                used: 49,
+                limit: 50
+            },
+            "the incident row alone is under 50, the pool is not",
+        );
+        assert_eq!(
+            spend(&db, AI, 1).await,
+            Spend::Spent {
+                used: 50,
+                limit: 50
+            }
+        );
+        assert_eq!(
+            spend(&db, AI, 1).await,
+            Spend::Exhausted {
+                used: 50,
+                limit: 50
+            }
+        );
+        assert_eq!(row_of(&db, ORG, "new_incident").await.usage_count, 20);
+    }
+
+    #[tokio::test]
+    async fn spend_reads_an_explicit_limit_over_the_default() {
+        let db = db().await;
+        seed_row(&db, ORG, "new_incident", 50, Some(60)).await;
+
+        assert_eq!(
+            spend(&db, AI, 10).await,
+            Spend::Spent {
+                used: 60,
+                limit: 60
+            }
+        );
+        assert_eq!(
+            spend(&db, AI, 1).await,
+            Spend::Exhausted {
+                used: 60,
+                limit: 60
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn spend_ignores_rows_of_other_pools() {
+        let db = db().await;
+        seed(&db, ORG, BROWSER, 1_000).await;
+
+        assert_eq!(spend(&db, AI, 1).await, Spend::Spent { used: 1, limit: 50 });
     }
 }

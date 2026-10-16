@@ -229,6 +229,21 @@ pub struct Alert {
     #[serde(default)]
     #[schema(example = 10)]
     pub pending_period_sec: i64,
+
+    /// Send one notification when this alert recovers.
+    #[serde(default)]
+    pub notify_on_recovery: bool,
+
+    /// Where the recovery message goes. Empty = the firing's own destinations. Ticket closes are
+    /// unaffected: a resolve must reach whatever the firing opened.
+    #[serde(default)]
+    pub recovery_destinations: Vec<String>,
+
+    /// Seconds the condition must stay clear before the alert recovers.
+    /// 0 recovers on the first clear evaluation.
+    #[serde(default)]
+    #[schema(example = 0)]
+    pub keep_firing_for: i64,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -421,6 +436,9 @@ pub struct QueryCondition {
     /// `by (…)` clause.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub promql_multi_alert: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    /// Match returned PromQL series by presence without separate value thresholds.
+    pub promql_rule_mode: bool,
 
     /// Aggregation configuration for "custom" query type.
     pub aggregation: Option<Aggregation>,
@@ -598,6 +616,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             query_condition: alert.query_condition.into(),
             trigger_condition: alert.trigger_condition.into(),
             destinations: alert.destinations,
+            recovery_destinations: alert.recovery_destinations,
             template: alert.template,
             context_attributes: alert.context_attributes,
             row_template: alert.row_template,
@@ -619,6 +638,8 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             runbook_url: alert.runbook_url,
             scheduler_job_present: None,
             pending_period_sec: alert.pending_period_sec,
+            notify_on_recovery: alert.notify_on_recovery,
+            keep_firing_for: alert.keep_firing_for,
         }
     }
 }
@@ -670,6 +691,7 @@ impl From<meta_alerts::QueryCondition> for QueryCondition {
             promql_condition: value.promql_condition.map(|pc| pc.into()),
             promql_warning_value: value.promql_warning_value,
             promql_multi_alert: value.promql_multi_alert,
+            promql_rule_mode: value.promql_rule_mode,
             aggregation: value.aggregation.map(|a| a.into()),
             vrl_function: value.vrl_function,
             search_event_type: value.search_event_type.map(|t| t.into()),
@@ -824,6 +846,10 @@ impl From<Alert> for meta_alerts::alert::Alert {
         // sending "", and a stored "" would render as a link to nowhere.
         alert.runbook_url = value.runbook_url.filter(|u| !u.trim().is_empty());
         alert.pending_period_sec = value.pending_period_sec;
+        alert.notify_on_recovery = value.notify_on_recovery;
+        alert.recovery_destinations = value.recovery_destinations;
+        alert.keep_firing_for = value.keep_firing_for.max(0);
+        alert.normalize_promql_rule_mode();
 
         alert
     }
@@ -838,7 +864,8 @@ impl From<TriggerCondition> for meta_alerts::TriggerCondition {
             threshold: value.threshold_count,
             warning_threshold: value.warning_threshold_count,
             notify_on_warning: value.notify_on_warning,
-            frequency: value.frequency_minutes * 60,
+            // `From` cannot fail; `prepare_alert` rejects the saturated value
+            frequency: value.frequency_minutes.saturating_mul(60),
             cron: value.cron,
             frequency_type: value.frequency_type.unwrap_or_default().into(),
             silence: value.silence_minutes,
@@ -876,6 +903,7 @@ impl From<QueryCondition> for meta_alerts::QueryCondition {
             promql_condition: value.promql_condition.map(|pc| pc.into()),
             promql_warning_value: value.promql_warning_value,
             promql_multi_alert: value.promql_multi_alert,
+            promql_rule_mode: value.promql_rule_mode,
             aggregation: value.aggregation.map(|a| a.into()),
             vrl_function: value.vrl_function,
             search_event_type: value.search_event_type.map(|t| t.into()),
@@ -1496,6 +1524,7 @@ mod tests {
             promql_condition: None,
             promql_warning_value: None,
             promql_multi_alert: false,
+            promql_rule_mode: false,
             aggregation: None,
             vrl_function: None,
             search_event_type: None,
@@ -1522,6 +1551,7 @@ mod tests {
             promql_condition: None,
             promql_warning_value: None,
             promql_multi_alert: true,
+            promql_rule_mode: false,
             aggregation: None,
             vrl_function: None,
             search_event_type: None,
@@ -1547,6 +1577,7 @@ mod tests {
             promql_condition: None,
             promql_warning_value: None,
             promql_multi_alert: false,
+            promql_rule_mode: false,
             aggregation: None,
             vrl_function: None,
             search_event_type: None,
@@ -1578,6 +1609,7 @@ mod tests {
             promql_condition: None,
             promql_warning_value: None,
             promql_multi_alert: false,
+            promql_rule_mode: false,
             aggregation: None,
             vrl_function: Some("fn".to_string()),
             search_event_type: None,
@@ -1752,5 +1784,71 @@ mod tests {
         assert!(!meta.creates_incident);
         assert!(meta.id.is_none());
         assert!(meta.owner.is_none());
+    }
+
+    #[test]
+    fn an_out_of_range_frequency_saturates_instead_of_overflowing() {
+        let trigger = TriggerCondition {
+            frequency_minutes: i64::MAX,
+            ..Default::default()
+        };
+        assert_eq!(
+            meta_alerts::TriggerCondition::from(trigger).frequency,
+            i64::MAX
+        );
+    }
+    #[test]
+    fn rule_pending_is_normalized_at_the_api_boundary() {
+        for pending in [0, 240] {
+            let api: Alert = serde_json::from_value(serde_json::json!({
+                "query_condition": {
+                    "type": "promql",
+                    "promql": "up",
+                    "promql_rule_mode": true,
+                    "promql_multi_alert": false
+                },
+                "pending_period_sec": pending
+            }))
+            .unwrap();
+            let meta = meta_alerts::alert::Alert::from(api);
+            assert_eq!(meta.query_condition.promql_multi_alert, pending > 0);
+            assert_eq!(
+                meta.trigger_condition.operator,
+                meta_alerts::Operator::GreaterThanEquals
+            );
+            assert_eq!(meta.trigger_condition.threshold, 1);
+            assert!(
+                meta_alerts::grouping::validate_multi_alert(
+                    &meta.query_condition,
+                    &meta.trigger_condition,
+                    false,
+                )
+                .is_ok()
+            );
+            let response = Alert::from((meta, None));
+            assert_eq!(response.query_condition.promql_multi_alert, pending > 0);
+        }
+    }
+
+    #[test]
+    fn test_promql_rule_mode_survives_api_conversion() {
+        let meta = meta_alerts::QueryCondition {
+            promql_rule_mode: true,
+            promql_multi_alert: true,
+            query_type: meta_alerts::QueryType::PromQL,
+            ..Default::default()
+        };
+        let api = QueryCondition::from(meta);
+        assert!(api.promql_rule_mode);
+        let serialized = serde_json::to_value(&api).unwrap();
+        assert_eq!(
+            serialized.get("promql_rule_mode"),
+            Some(&serde_json::json!(true))
+        );
+        assert!(serialized.get("prom_rule_mode").is_none());
+        let api: QueryCondition = serde_json::from_value(serialized).unwrap();
+        let meta = meta_alerts::QueryCondition::from(api);
+        assert!(meta.promql_rule_mode);
+        assert!(meta.promql_condition.is_none());
     }
 }

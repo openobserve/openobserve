@@ -20,6 +20,7 @@ describe("navSection", () => {
     ["aiDatasets", "datasets"],
     ["aiDatasetDetail", "datasets"],
     ["aiPlayground", "playground"],
+    ["aiPrompts", "prompts"],
     ["aiExperiments", "experiments"],
     ["aiExperimentCreate", "experiments"],
     ["aiExperimentCompare", "experiments"],

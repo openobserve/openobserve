@@ -19,7 +19,8 @@ Prerequisites:
 - OpenFGA enabled for RBAC enforcement
 
 Note:
-- Tests marked with @pytest.mark.skip for OSS CI (enterprise-only feature)
+- Skipped at runtime by `_require_custom_roles` when the build has no custom
+  roles (GET /roles answers 403 on OSS); they run on enterprise
 - Tests must run serially due to shared module-scoped fixture
 - Uses session-based authentication (matches enterprise RBAC test pattern)
 """
@@ -28,16 +29,40 @@ import pytest
 import logging
 import requests
 
-# Mark all tests in this module to run serially and skip in OSS (enterprise-only feature)
 pytestmark = [
     pytest.mark.order(2),
-    pytest.mark.skip(reason="Sourcemaps is an enterprise feature and cannot be tested in CI with non-enterprise build")
 ]
 
 logger = logging.getLogger(__name__)
 
 # Test user credentials (created during test run)
 test_users = {}
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _require_custom_roles(create_session, base_url):
+    """Skip on builds without custom roles, rather than skipping everywhere.
+
+    These cases need viewer/editor/admin accounts. An OSS build has no custom
+    roles, so the users cannot exist and every case errors at login.
+
+    This replaces an unconditional `pytest.mark.skip`, which skipped the module
+    on EVERY build -- enterprise included -- so these cases had never run
+    anywhere. The capability is probed rather than assumed from the edition, in
+    the same way `test_anomaly_conditions.py` probes its endpoint.
+
+    The probe is deliberately READ-ONLY. Creating and deleting a probe user
+    would mutate the shared `default` org from an autouse fixture, in parallel
+    (xdist) with the RBAC suite that tests user permissions -- `GET /roles`
+    answers 403 "Not Supported" on OSS and lists roles on enterprise, which is
+    the same signal without touching anything.
+    """
+    probe = create_session.get(f"{base_url}api/default/roles")
+    if probe.status_code != 200:
+        pytest.skip(
+            f"custom roles are not available on this build "
+            f"(GET /roles -> {probe.status_code})"
+        )
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -61,7 +86,10 @@ def setup_rbac_users(create_session, base_url, org_id):
 
     for role in roles:
         email = f"{role}@sourcemap-test.local"
-        password = "TestPass123!"
+        # The enterprise password policy requires at least 15 characters; the
+        # previous 12-character value was rejected with HTTP 400, so every case
+        # then failed at login.
+        password = "TestPass123!Secure"
 
         logger.info(f"Creating user: {email} with role: {role}")
 
@@ -85,8 +113,18 @@ def setup_rbac_users(create_session, base_url, org_id):
             # Create authenticated session via login endpoint
             user_session = create_user_session(email, password, url)
             if not user_session:
+                # Fail loudly rather than skip. The module gate already
+                # established that this build supports custom roles, so failing
+                # to provision one here is a real defect -- skipping would hide
+                # it, which is how the 15-character password policy went
+                # unnoticed. The create response is included so the cause is
+                # visible without re-running.
                 logger.error(f"Failed to create session for {email}")
-                raise Exception(f"Login failed for {email}")
+                raise AssertionError(
+                    f"could not provision the {role} user ({email}) on a build that "
+                    f"reports custom-role support; create returned "
+                    f"{response.status_code}: {response.text[:200]}"
+                )
 
             # Store user info
             test_users[role] = {

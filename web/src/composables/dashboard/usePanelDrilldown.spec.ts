@@ -167,6 +167,38 @@ describe("usePanelDrilldown", () => {
     expect(deps.handleAddAnnotation).not.toHaveBeenCalled();
   });
 
+  it("hands an exemplar marker click to the exemplar handler and never opens the drilldown menu", async () => {
+    const deps = makeDeps();
+    const onExemplarClick = vi.fn();
+    const api = usePanelDrilldown({ ...deps, onExemplarClick } as any);
+    const params = {
+      componentType: "series",
+      seriesId: "__exemplars__",
+      event: { offsetX: 40, offsetY: 50 },
+      data: { exemplar: { id: "e1", traceId: "t1" } },
+    };
+
+    await api.onChartClick(params);
+
+    expect(onExemplarClick).toHaveBeenCalledWith(params);
+    expect(api.drilldownArray.value).toEqual([]);
+    expect(deps.drilldownPopUpRef.value.style.display).not.toBe("block");
+    expect(deps.router.push).not.toHaveBeenCalled();
+  });
+
+  it("does not treat an exemplar click as an annotation in add-annotation mode", async () => {
+    const deps = makeDeps();
+    deps.allowAnnotationsAdd.value = true;
+    deps.isAddAnnotationMode.value = true;
+    const onExemplarClick = vi.fn();
+    const api = usePanelDrilldown({ ...deps, onExemplarClick } as any);
+
+    await api.onChartClick({ seriesId: "__exemplars__", data: { exemplar: { id: "e1" } } });
+
+    expect(onExemplarClick).toHaveBeenCalledTimes(1);
+    expect(deps.handleAddAnnotation).not.toHaveBeenCalled();
+  });
+
   it("shows drilldown popup when panel drilldowns exist", async () => {
     const deps = makeDeps();
     const api = usePanelDrilldown(deps as any);

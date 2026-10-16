@@ -38,6 +38,7 @@ vi.mock("./illustrations", () => ({
 }));
 
 import OEmptyState from "./OEmptyState.vue";
+import { emptyStatePresets, presetNouns } from "./presets";
 
 // ── Child component stubs ──────────────────────────────────────────────────────
 // EmptyStateActionCard: renders a button with the translated label, emits click.
@@ -163,6 +164,14 @@ describe("OEmptyState", () => {
   // ── Preset rendering ────────────────────────────────────────────────────────
 
   describe("preset rendering", () => {
+    it("keeps every preset title, description and noun under emptyState", () => {
+      const keys = [
+        ...Object.values(emptyStatePresets).flatMap((p) => [p.titleKey, p.descriptionKey]),
+        ...Object.values(presetNouns),
+      ].filter(Boolean);
+      expect(keys.filter((k) => !String(k).startsWith("emptyState."))).toEqual([]);
+    });
+
     it("renders the root element with the o2-empty-state data-test", () => {
       // Arrange & Act
       wrapper = buildWrapper();
@@ -442,5 +451,10 @@ describe("OEmptyState", () => {
       const buttons = wrapper.findAll('[data-test="o-button-stub"]');
       expect(buttons).toHaveLength(2);
     });
+  });
+  it("uses compact spacing above an inline recovery form", () => {
+    wrapper = buildWrapper({ size: "compact" });
+    expect(wrapper.classes()).toContain("min-h-0");
+    expect(wrapper.classes()).toContain("py-4");
   });
 });

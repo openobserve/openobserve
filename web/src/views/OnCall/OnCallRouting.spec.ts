@@ -16,14 +16,22 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import OnCallRouting from "@/views/OnCall/OnCallRouting.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
-vi.mock("@/services/alerts", () => ({
-  default: { getSemanticGroups: vi.fn() },
+// The queries call these through the default export, so that is what is mocked.
+vi.mock("@/services/service_streams", () => ({
+  default: {
+    getSemanticGroups: vi.fn(),
+    getServicesList: vi.fn(),
+    getIdentityConfig: vi.fn(),
+    getDimensionAnalytics: vi.fn(),
+  },
 }));
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -44,14 +52,24 @@ vi.mock("@/services/oncall", () => ({
 // Hoisted so every useRouter() call shares ONE spy — a fresh vi.fn() per call
 // records the navigation onto an object the test can no longer see.
 const push = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push }),
 }));
 
-import alertsService from "@/services/alerts";
+import { queryClient } from "@/composables/query/queryClient";
+import { oncallKeys } from "@/services/oncall.querykeys";
+import serviceStreamsService from "@/services/service_streams";
 
 const service = vi.mocked(oncallService);
-const alerts = vi.mocked(alertsService);
+const correlation = vi.mocked(serviceStreamsService);
+const correlationReads = () => [
+  correlation.getSemanticGroups,
+  correlation.getServicesList,
+  correlation.getIdentityConfig,
+  correlation.getDimensionAnalytics,
+];
 const ORG = store.state.selectedOrganization.identifier;
 
 /// The sections are stubbed so this file is about the WIRING between them and
@@ -63,13 +81,14 @@ const stubs = {
   },
   OnCallRoutingSimulator: {
     name: "OnCallRoutingSimulator",
-    props: ["preview", "teams", "aliases", "loading", "sending"],
+    props: ["preview", "teams", "aliases", "loading", "sending", "canConfigure"],
     template: "<div />",
   },
+  // Both tables render the host's toolbar, which carries the tabs, search and refresh.
   OnCallOwnershipRules: {
     name: "OnCallOwnershipRules",
-    props: ["rules", "aliases", "loading", "showTeam"],
-    template: "<div />",
+    props: ["rules", "aliases", "loading", "showTeam", "search"],
+    template: "<div><slot name='toolbar' /><slot name='toolbar-trailing' /></div>",
   },
   OnCallRuleEditor: {
     name: "OnCallRuleEditor",
@@ -90,8 +109,8 @@ const stubs = {
   },
   OnCallUnroutedQueue: {
     name: "OnCallUnroutedQueue",
-    props: ["signals", "loading", "teams"],
-    template: "<div />",
+    props: ["signals", "loading", "teams", "search", "error"],
+    template: "<div><slot name='toolbar' /><slot name='toolbar-trailing' /></div>",
   },
   OnCallDefaultTeamCard: {
     name: "OnCallDefaultTeamCard",
@@ -196,6 +215,7 @@ describe("OnCallRouting", () => {
     // The catch-all is cached module-wide so one screen reads it once;
     // without this it survives into the next test.
     __resetOnCallRoutingConfig();
+    resetOnCallPermissions();
     vi.clearAllMocks();
     service.listTeams.mockResolvedValue({ data: TEAMS } as any);
     service.ownershipStats.mockResolvedValue({ data: { rules: [], total: 0 } } as any);
@@ -203,7 +223,11 @@ describe("OnCallRouting", () => {
     service.createOwnershipRule.mockResolvedValue({ data: {} } as any);
     service.updateOwnershipRule.mockResolvedValue({ data: {} } as any);
     service.teamOverview.mockResolvedValue({ data: { rungs: [] } } as any);
-    alerts.getSemanticGroups.mockResolvedValue({ data: [] } as any);
+    // Defined data, or nothing is cached and a remount re-reads anyway.
+    correlation.getSemanticGroups.mockResolvedValue({ data: [] } as any);
+    correlation.getServicesList.mockResolvedValue({ data: [] } as any);
+    correlation.getIdentityConfig.mockResolvedValue({ data: { sets: [] } } as any);
+    correlation.getDimensionAnalytics.mockResolvedValue({ data: { dimensions: [] } } as any);
   });
 
   /// The whole point of the org screen: no team_id, so shadowing is computed
@@ -281,6 +305,52 @@ describe("OnCallRouting", () => {
     expect(simulator(wrapper).exists()).toBe(true);
     // In a drawer, so opening it does not push the lists down the page.
     expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(true);
+  });
+
+  /// A10: Send test page renders for everyone; the server's 403 is what closes it for the org.
+  it("latches Send test page disabled after a 403 on the test page", async () => {
+    service.testPage.mockRejectedValue({ response: { status: 403, data: {} } });
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-routing-test-signal"]').trigger("click");
+    expect(simulator(wrapper).props("canConfigure")).toBe(true);
+
+    simulator(wrapper).vm.$emit("send-test", { team_id: "team_1", priority: "P1" });
+    await flushPromises();
+
+    expect(service.testPage).toHaveBeenCalled();
+    expect(simulator(wrapper).props("canConfigure")).toBe(false);
+  });
+
+  /// A test page that tried and failed everywhere was sent, so it must not say "Nothing was sent", and it must say why.
+  it("names the provider's error when every test delivery fails", async () => {
+    service.testPage.mockResolvedValue({
+      data: {
+        reached_anyone: false,
+        not_sent_because: null,
+        channels: ["sms"],
+        attempts: [
+          {
+            channel: "sms",
+            recipient: "ana@o2.ai",
+            reason: "on call now",
+            delivered: false,
+            detail: "Twilio 401: authenticate",
+          },
+        ],
+      },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-routing-test-signal"]').trigger("click");
+
+    simulator(wrapper).vm.$emit("send-test", { team_id: "team_1", priority: "P1" });
+    await flushPromises();
+
+    expect(vi.mocked(toast)).toHaveBeenCalledWith({
+      variant: "warning",
+      message: "Test page sent, but no delivery succeeded: Twilio 401: authenticate",
+    });
   });
 
   /// Nominating a catch-all is a one-time act, but whether one exists is a
@@ -392,6 +462,54 @@ describe("OnCallRouting", () => {
     expect(wrapper.find('[data-test="oncall-routing-content"]').exists()).toBe(true);
   });
 
+  /// A revisit pays for none of the three org reads; only the reader's Retry reaches the server.
+  it("serves a revisit from the cache and forces on retry", async () => {
+    service.ownershipStats.mockRejectedValueOnce(new Error("boom"));
+    const first = render();
+    await flushPromises();
+    expect(service.listTeams).toHaveBeenCalledTimes(1);
+    expect(service.ownershipStats).toHaveBeenCalledTimes(1);
+    expect(service.unroutedSignals).toHaveBeenCalledTimes(1);
+
+    for (const read of correlationReads()) expect(read).toHaveBeenCalledTimes(1);
+
+    // Forced, so the reads that SUCCEEDED are asked again rather than served.
+    first.findComponent('[data-test="oncall-routing-error"]').vm.$emit("action");
+    await flushPromises();
+    expect(service.listTeams).toHaveBeenCalledTimes(2);
+    expect(service.ownershipStats).toHaveBeenCalledTimes(2);
+    expect(service.unroutedSignals).toHaveBeenCalledTimes(2);
+    for (const read of correlationReads()) expect(read).toHaveBeenCalledTimes(2);
+    first.unmount();
+
+    const second = render();
+    await flushPromises();
+    expect(second.find('[data-test="oncall-routing-content"]').exists()).toBe(true);
+    expect(service.listTeams).toHaveBeenCalledTimes(2);
+    expect(service.ownershipStats).toHaveBeenCalledTimes(2);
+    expect(service.unroutedSignals).toHaveBeenCalledTimes(2);
+    for (const read of correlationReads()) expect(read).toHaveBeenCalledTimes(2);
+  });
+
+  // The page's Refresh reaches the server for everything it shows, including the header card's own read.
+  it("forces every read on Refresh and remounts the default-team card", async () => {
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const wrapper = render();
+    await flushPromises();
+    const cardBefore = wrapper.findComponent({ name: "OnCallDefaultTeamCard" }).vm;
+
+    await wrapper.find('[data-test="oncall-routing-refresh"]').trigger("click");
+    await flushPromises();
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: oncallKeys.all(ORG), refetchType: "none" });
+    expect(service.listTeams).toHaveBeenCalledTimes(2);
+    expect(service.ownershipStats).toHaveBeenCalledTimes(2);
+    expect(service.unroutedSignals).toHaveBeenCalledTimes(2);
+    for (const read of correlationReads()) expect(read).toHaveBeenCalledTimes(2);
+    expect(wrapper.findComponent({ name: "OnCallDefaultTeamCard" }).vm).not.toBe(cardBefore);
+    spy.mockRestore();
+  });
+
   /// The queue's failure must not read as "everything is routed" — that is
   /// this screen's core claim. The rest of the page keeps working.
   it("shows the queue's own error without taking down the page", async () => {
@@ -402,8 +520,48 @@ describe("OnCallRouting", () => {
     expect(rulesPanel(wrapper).exists()).toBe(true);
 
     await showSignals(wrapper);
-    expect(wrapper.find('[data-test="oncall-unrouted-error"]').exists()).toBe(true);
-    expect(unrouted(wrapper).exists()).toBe(false);
+    // Inside the queue, so its toolbar — and the way back to the rules — stays up.
+    expect(unrouted(wrapper).props("error")).toBeTruthy();
+    expect(wrapper.find('[data-test="oncall-routing-tabs"]').exists()).toBe(true);
+
+    service.unroutedSignals.mockResolvedValue({ data: [] } as any);
+    const before = service.unroutedSignals.mock.calls.length;
+    unrouted(wrapper).vm.$emit("retry");
+    await flushPromises();
+    expect(service.unroutedSignals.mock.calls.length).toBe(before + 1);
+    expect(unrouted(wrapper).props("error")).toBeFalsy();
+  });
+
+  // Every other table has these; the search reaches the table so filtering keeps the rules' precedence numbers.
+  it("hands the toolbar search to the open table, and clears it when the tab changes", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    const search = wrapper.findComponent({ name: "OSearchInput" });
+    expect(search.exists()).toBe(true);
+    await search.vm.$emit("update:modelValue", "payments");
+    expect(rulesPanel(wrapper).props("search")).toBe("payments");
+
+    await showSignals(wrapper);
+    expect(unrouted(wrapper).props("search")).toBe("");
+  });
+
+  // The tables' Clear filters asks the page, which owns the search box.
+  it("empties the search box when either table asks to clear it", async () => {
+    const wrapper = render();
+    await flushPromises();
+    const search = () => wrapper.findComponent({ name: "OSearchInput" });
+
+    await search().vm.$emit("update:modelValue", "nothing");
+    rulesPanel(wrapper).vm.$emit("clear-search");
+    await flushPromises();
+    expect(search().props("modelValue")).toBe("");
+
+    await showSignals(wrapper);
+    await search().vm.$emit("update:modelValue", "nothing");
+    unrouted(wrapper).vm.$emit("clear-search");
+    await flushPromises();
+    expect(search().props("modelValue")).toBe("");
   });
 
   /// §G.8.1: 404 = feature flag off, 403 "Not Supported" = OSS build. Both are
@@ -455,6 +613,28 @@ describe("OnCallRouting", () => {
       landing: "nobody",
       include_dismissed: true,
     });
+  });
+
+  /// The filter the reader returns to answers from the cache at once, so the
+  /// slower answer for the one they left lands last and must be ignored.
+  it("ignores a slower queue answer for a filter the reader has already left", async () => {
+    const wrapper = render();
+    await flushPromises();
+    await showSignals(wrapper);
+    let answerNobody: (value: unknown) => void = () => {};
+    service.unroutedSignals.mockImplementationOnce(
+      () => new Promise((resolve) => (answerNobody = resolve)),
+    );
+    const landing = wrapper.findAllComponents({ name: "OToggleGroup" })[1];
+
+    landing.vm.$emit("update:modelValue", "nobody");
+    await flushPromises();
+    landing.vm.$emit("update:modelValue", "both");
+    await flushPromises();
+    answerNobody({ data: [{ id: "sig_late", landing: "nobody", dimensions: {} }] });
+    await flushPromises();
+
+    expect(unrouted(wrapper).props("signals")).toEqual([]);
   });
 
   /// Reported from the browser: "add rule does nothing — there is no save and

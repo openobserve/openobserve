@@ -19,6 +19,8 @@ import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 import enLocale from "@/locales/languages/en-US.json";
+import { BREAKDOWN_EMPTY_VALUE } from "@/utils/logs/constants";
+import { getEmptyBreakdownFilter } from "@/utils/logs/breakdownFilter";
 
 // Create i18n instance. Uses the real `search` messages rather than a stub —
 // these tests pin the exact rendered en-US wording.
@@ -118,6 +120,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 });
 
 import { useHistogram } from "./useHistogram";
+import { convertStackedLogData } from "@/utils/logs/convertLogData";
 
 // Test wrapper — mounts the composable so `useStore()` resolves.
 const TestComponent = defineComponent({
@@ -163,6 +166,14 @@ describe("useHistogram Composable", () => {
 
     it("should have isHistogramEnabled function", () => {
       expect(typeof wrapper.vm.isHistogramEnabled).toBe("function");
+    });
+  });
+
+  describe("generateHistogramSkeleton", () => {
+    it("skips the skeleton instead of throwing when the run built no request", () => {
+      (mockState.searchObj.data as any).customDownloadQueryObj = {};
+      mockState.searchObj.data.queryResults.aggs = [{ zo_sql_key: "2026-04-24T10:00:00" }];
+      expect(() => wrapper.vm.generateHistogramSkeleton()).not.toThrow();
     });
   });
 
@@ -390,11 +401,63 @@ describe("useHistogram Composable", () => {
       expect(series.get("1")).toEqual([2]);
     });
 
-    it("filters out aggs rows with null/undefined zo_sql_breakdown", () => {
+    it("stacks rows with a null or undefined breakdown under the (empty) series without losing counts", () => {
       setAggs([
         { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 3 },
         { zo_sql_key: ts1, zo_sql_breakdown: null, zo_sql_num: 99 },
         { zo_sql_key: ts1, zo_sql_breakdown: undefined, zo_sql_num: 77 },
+      ]);
+
+      wrapper.vm.generateHistogramData();
+      const hist = mockState.searchObj.data.histogram;
+      const series = hist.breakdownSeries as unknown as Map<string, number[]>;
+
+      expect(hist.breakdownField).toBe("severity");
+      expect(series.get("info")).toEqual([3]);
+      expect(series.get("")).toEqual([176]);
+      expect(hist.yData).toEqual([179]);
+      expect(mockState.searchObj.data.queryResults.total).toBe(179);
+    });
+
+    it("stacks a lone zo_sql_breakdown: null row under (empty) without dropping its count", () => {
+      setAggs([
+        { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 3 },
+        { zo_sql_key: ts1, zo_sql_breakdown: null, zo_sql_num: 99 },
+      ]);
+
+      wrapper.vm.generateHistogramData();
+      const hist = mockState.searchObj.data.histogram;
+      const series = hist.breakdownSeries as unknown as Map<string, number[]>;
+
+      expect(hist.breakdownField).toBe("severity");
+      expect(series.get("info")).toEqual([3]);
+      expect(series.get("")).toEqual([99]);
+      expect(mockState.searchObj.data.queryResults.total).toBe(102);
+    });
+
+    it("renders empty-string and error rows as an (empty) series and an error series", () => {
+      setAggs([
+        { zo_sql_key: ts1, zo_sql_breakdown: "", zo_sql_num: 40 },
+        { zo_sql_key: ts1, zo_sql_breakdown: "error", zo_sql_num: 2 },
+        { zo_sql_key: ts2, zo_sql_breakdown: "", zo_sql_num: 8 },
+      ]);
+
+      wrapper.vm.generateHistogramData();
+      const hist = mockState.searchObj.data.histogram;
+      const series = hist.breakdownSeries as unknown as Map<string, number[]>;
+      const { options } = convertStackedLogData(hist.xData, series, hist.chartParams, false);
+
+      expect(options.series.map((s: any) => s.name).sort()).toEqual(["(empty)", "error"]);
+      expect(series.get("")).toEqual([40, 8]);
+      expect(series.get("error")).toEqual([2, 0]);
+      expect(mockState.searchObj.data.queryResults.total).toBe(50);
+    });
+
+    it("merges missing, null and empty-string breakdowns into one (empty) bucket", () => {
+      setAggs([
+        { zo_sql_key: ts1, zo_sql_breakdown: "", zo_sql_num: 1 },
+        { zo_sql_key: ts1, zo_sql_breakdown: null, zo_sql_num: 2 },
+        { zo_sql_key: ts1, zo_sql_num: 4 },
       ]);
 
       wrapper.vm.generateHistogramData();
@@ -403,10 +466,28 @@ describe("useHistogram Composable", () => {
         number[]
       >;
 
-      expect([...series.keys()]).toEqual(["info"]);
-      expect(series.get("info")).toEqual([3]);
-      // 99 and 77 should NOT leak into totals
-      expect(mockState.searchObj.data.queryResults.total).toBe(3);
+      expect([...series.keys()]).toEqual([""]);
+      expect(series.get("")).toEqual([7]);
+      expect(mockState.searchObj.data.queryResults.total).toBe(7);
+    });
+
+    it("sums a NULL row and an empty string row in one bucket and filters both on drilldown", () => {
+      setAggs([
+        { zo_sql_key: ts1, zo_sql_num: 11 },
+        { zo_sql_key: ts1, zo_sql_breakdown: "", zo_sql_num: 40 },
+      ]);
+
+      wrapper.vm.generateHistogramData();
+      const histogram = mockState.searchObj.data.histogram;
+      const series = histogram.breakdownSeries as unknown as Map<string, number[]>;
+
+      expect(series.get(BREAKDOWN_EMPTY_VALUE)).toEqual([51]);
+      expect(getEmptyBreakdownFilter(histogram.breakdownField, "include", (f) => f)).toBe(
+        `(${histogram.breakdownField} is null OR ${histogram.breakdownField} = '')`,
+      );
+      expect(getEmptyBreakdownFilter(histogram.breakdownField, "exclude", (f) => f)).toBe(
+        `(${histogram.breakdownField} is not null AND ${histogram.breakdownField} != '')`,
+      );
     });
 
     it("sums multiple aggs rows for the same (timestamp, category)", () => {
@@ -441,7 +522,7 @@ describe("useHistogram Composable", () => {
       expect(series.get("info")).toEqual([30]);
     });
 
-    it("merges prior-page breakdown state from histogramResults.value", () => {
+    it("takes only timestamps from histogramResults.value and counts from aggs", () => {
       mockState.histogramResults.value = [
         { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 5 },
         { zo_sql_key: ts1, zo_sql_breakdown: "error", zo_sql_num: 2 },
@@ -457,9 +538,8 @@ describe("useHistogram Composable", () => {
         number[]
       >;
 
-      // info at ts1 = 5 (seed) + 3 (page) = 8; error at ts2 = 4 (page only)
-      expect(series.get("info")).toEqual([8, 0]);
-      expect(series.get("error")).toEqual([2, 4]);
+      expect(series.get("info")).toEqual([3, 0]);
+      expect(series.get("error")).toEqual([0, 4]);
     });
 
     it("keeps skeleton timestamps on the x-axis even when they have no breakdown data", () => {
@@ -553,39 +633,54 @@ describe("useHistogram Composable", () => {
       expect(hist.breakdownSeries).toBeNull();
     });
 
-    it("falls through to flat path when no aggs row has zo_sql_breakdown", () => {
-      setAggs(
-        [
-          { zo_sql_key: ts1, zo_sql_num: 3 },
-          { zo_sql_key: ts2, zo_sql_num: 5 },
-        ],
-        "severity", // field present but aggs lack it
-      );
+    it("stacks under a single (empty) series when no aggs row has zo_sql_breakdown", () => {
+      setAggs([
+        { zo_sql_key: ts1, zo_sql_num: 3 },
+        { zo_sql_key: ts2, zo_sql_num: 5 },
+      ]);
 
       wrapper.vm.generateHistogramData();
       const hist = mockState.searchObj.data.histogram;
+      const series = hist.breakdownSeries as unknown as Map<string, number[]>;
 
-      expect(hist.breakdownField).toBeNull();
-      expect(hist.breakdownSeries).toBeNull();
+      expect(hist.breakdownField).toBe("severity");
+      expect([...series.keys()]).toEqual([""]);
+      expect(series.get("")).toEqual([3, 5]);
       expect(hist.yData).toEqual([3, 5]);
     });
 
-    it("enters breakdown path when at least one aggs row has breakdown", () => {
+    it("stacks an untagged row under (empty) beside a tagged row in the same bucket", () => {
       setAggs([
-        { zo_sql_key: ts1, zo_sql_num: 10 }, // no breakdown
+        { zo_sql_key: ts1, zo_sql_num: 10 },
         { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 3 },
       ]);
 
       wrapper.vm.generateHistogramData();
       const hist = mockState.searchObj.data.histogram;
+      const series = hist.breakdownSeries as unknown as Map<string, number[]>;
 
-      // hasBreakdown is true because .some() matches the second row.
+      expect(hist.breakdownField).toBe("severity");
+      expect(series.get("")).toEqual([10]);
+      expect(series.get("info")).toEqual([3]);
+      expect(hist.yData).toEqual([13]);
+      expect(mockState.searchObj.data.queryResults.total).toBe(13);
+    });
+
+    it("enters breakdown path when every aggs row has breakdown", () => {
+      setAggs([
+        { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 10 },
+        { zo_sql_key: ts1, zo_sql_breakdown: "error", zo_sql_num: 3 },
+      ]);
+
+      wrapper.vm.generateHistogramData();
+      const hist = mockState.searchObj.data.histogram;
+
       expect(hist.breakdownField).toBe("severity");
       expect(hist.breakdownSeries).toBeInstanceOf(Map);
       const series = hist.breakdownSeries as unknown as Map<string, number[]>;
-      // The non-breakdown row is skipped; only the info row contributes.
-      expect(series.get("info")).toEqual([3]);
-      expect(mockState.searchObj.data.queryResults.total).toBe(3);
+      expect(series.get("info")).toEqual([10]);
+      expect(series.get("error")).toEqual([3]);
+      expect(mockState.searchObj.data.queryResults.total).toBe(13);
     });
 
     it("writes chartParams.timezone from the store", () => {
@@ -609,16 +704,14 @@ describe("useHistogram Composable", () => {
       expect(hist.errorDetail).toBe("");
     });
 
-    it("handles empty aggs array — neither path sets histogram", () => {
+    it("writes an empty stacked histogram for empty aggs when the breakdown field is set", () => {
       mockState.searchObj.data.queryResults.aggs = [];
       mockState.searchObj.data.queryResults.histogram_breakdown_field = "severity";
 
       wrapper.vm.generateHistogramData();
-      // aggs is truthy (empty array) but .some() returns false → flat path,
-      // flat path loops over empty data and still writes a histogram.
       const hist = mockState.searchObj.data.histogram;
-      expect(hist.breakdownField).toBeNull();
-      expect(hist.breakdownSeries).toBeNull();
+      expect(hist.breakdownField).toBe("severity");
+      expect((hist.breakdownSeries as unknown as Map<string, number[]>).size).toBe(0);
       expect(hist.xData).toEqual([]);
       expect(hist.yData).toEqual([]);
     });

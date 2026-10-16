@@ -1,0 +1,329 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! The list endpoint's filters, counts and paging. Pure.
+
+use config::meta::downtimes::{Downtime, DowntimeListItem, DowntimeStatus, Repeat, TargetModule};
+pub use config::meta::downtimes::{
+    DowntimeStatusCounts as StatusCounts, ListDowntimesQuery as ListQuery,
+    ListDowntimesResponse as ListResponse,
+};
+use o2_enterprise::enterprise::downtimes::scope::{self, TargetItem};
+
+pub const DEFAULT_PAGE_SIZE: usize = 50;
+pub const MAX_PAGE_SIZE: usize = 500;
+
+/// Filters, counts and pages already-authorized rows. `alert` is the item behind `alert_id`.
+pub fn list_page(
+    items: Vec<DowntimeListItem>,
+    query: &ListQuery,
+    alert: Option<&TargetItem<'_>>,
+) -> ListResponse {
+    let mut kept: Vec<DowntimeListItem> = items
+        .into_iter()
+        .filter(|item| keep(item, query, alert))
+        .collect();
+    let counts = count(&kept);
+    kept.sort_by_key(|item| std::cmp::Reverse(item.downtime.updated_at));
+    let total = kept.len();
+    let size = query
+        .page_size
+        .unwrap_or(DEFAULT_PAGE_SIZE)
+        .clamp(1, MAX_PAGE_SIZE);
+    let page = query.page.unwrap_or(1).max(1);
+    let items = kept
+        .into_iter()
+        .skip((page - 1).saturating_mul(size))
+        .take(size)
+        .collect();
+    ListResponse {
+        items,
+        total,
+        counts,
+    }
+}
+
+fn keep(item: &DowntimeListItem, query: &ListQuery, alert: Option<&TargetItem<'_>>) -> bool {
+    let d = &item.downtime;
+    query.folder_id.as_ref().is_none_or(|f| *f == d.folder_id)
+        && query
+            .status
+            .as_deref()
+            .is_none_or(|s| status_name(item.status) == s)
+        && query
+            .repeat
+            .as_deref()
+            .is_none_or(|r| repeat_matches(d.schedule.repeat, r))
+        && query
+            .search
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .is_none_or(|s| mentions(d, s))
+        && (query.alert_id.is_none() || alert.is_some_and(|a| names_alert(d, a)))
+}
+
+fn count(items: &[DowntimeListItem]) -> StatusCounts {
+    let mut counts = StatusCounts::default();
+    for item in items {
+        match item.status {
+            DowntimeStatus::Active => counts.active += 1,
+            DowntimeStatus::Scheduled => counts.scheduled += 1,
+            DowntimeStatus::Ended => counts.ended += 1,
+            DowntimeStatus::Cancelled => counts.cancelled += 1,
+            DowntimeStatus::EndedEarly => counts.ended_early += 1,
+        }
+        if item.downtime.schedule.repeat != Repeat::None {
+            counts.recurring += 1;
+        }
+    }
+    counts
+}
+
+fn status_name(status: DowntimeStatus) -> &'static str {
+    match status {
+        DowntimeStatus::Scheduled => "scheduled",
+        DowntimeStatus::Active => "active",
+        DowntimeStatus::Ended => "ended",
+        DowntimeStatus::Cancelled => "cancelled",
+        DowntimeStatus::EndedEarly => "ended_early",
+    }
+}
+
+fn repeat_matches(repeat: Repeat, wanted: &str) -> bool {
+    match wanted {
+        "recurring" => repeat != Repeat::None,
+        "none" | "once" => repeat == Repeat::None,
+        "daily" => repeat == Repeat::Daily,
+        "weekly" => repeat == Repeat::Weekly,
+        _ => false,
+    }
+}
+
+fn mentions(d: &Downtime, search: &str) -> bool {
+    let needle = search.trim().to_lowercase();
+    d.name.to_lowercase().contains(&needle)
+        || d.reason
+            .as_deref()
+            .is_some_and(|r| r.to_lowercase().contains(&needle))
+}
+
+/// The send path's rule: folders, tags, ids and the condition over the alert's dimensions.
+fn names_alert(d: &Downtime, alert: &TargetItem<'_>) -> bool {
+    scope::target_for(&d.targets, TargetModule::Alerts)
+        .is_some_and(|target| scope::matches(target, d.condition.as_ref(), alert))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use config::meta::downtimes::{
+        DimensionCondition, DowntimeSchedule, DowntimeTarget, PairOperator, TargetFolders,
+    };
+
+    use super::*;
+
+    fn item(id: &str, status: DowntimeStatus, repeat: Repeat, updated_at: i64) -> DowntimeListItem {
+        DowntimeListItem {
+            downtime: Downtime {
+                id: id.to_string(),
+                org: "acme".to_string(),
+                folder_id: if id.starts_with('p') {
+                    "planned"
+                } else {
+                    "default"
+                }
+                .to_string(),
+                name: format!("{id} maintenance"),
+                reason: Some("CHG-4471".to_string()),
+                condition: Some(DimensionCondition::Pair {
+                    key: "service".to_string(),
+                    operator: PairOperator::Eq,
+                    value: "payments".to_string(),
+                }),
+                targets: vec![DowntimeTarget {
+                    module: TargetModule::Alerts,
+                    folders: TargetFolders::All,
+                    tags: vec![],
+                    ids: vec![],
+                    slo_mode: None,
+                    incident_mode: Default::default(),
+                }],
+                schedule: DowntimeSchedule {
+                    repeat,
+                    starts_at: 0,
+                    ends_at: None,
+                    timezone: "UTC".to_string(),
+                    start_time_local: None,
+                    duration_secs: 60,
+                    weekdays: vec![],
+                },
+                cancelled_at: None,
+                cancelled_by: None,
+                show_banner: true,
+                notifications: None,
+                origin_region: None,
+                version: 0,
+                created_by: "lin".to_string(),
+                created_at: 0,
+                updated_by: "lin".to_string(),
+                updated_at,
+            },
+            status,
+            current_window: None,
+            next_window: None,
+            matched_alerts: 0,
+            matched_anomalies: 0,
+            matched_synthetics: 0,
+            matched_slos: 0,
+        }
+    }
+
+    fn rows() -> Vec<DowntimeListItem> {
+        vec![
+            item("a", DowntimeStatus::Active, Repeat::None, 5),
+            item("p1", DowntimeStatus::Scheduled, Repeat::Weekly, 4),
+            item("p2", DowntimeStatus::Scheduled, Repeat::None, 3),
+            item("e", DowntimeStatus::Ended, Repeat::None, 2),
+            item("c", DowntimeStatus::Cancelled, Repeat::Daily, 1),
+            item("x", DowntimeStatus::EndedEarly, Repeat::None, 0),
+        ]
+    }
+
+    fn ids(resp: &ListResponse) -> Vec<&str> {
+        resp.items.iter().map(|i| i.downtime.id.as_str()).collect()
+    }
+
+    #[test]
+    fn counts_cover_the_filtered_rows_and_recurring_overlaps() {
+        let resp = list_page(rows(), &ListQuery::default(), None);
+        assert_eq!(resp.total, 6);
+        assert_eq!(
+            resp.counts,
+            StatusCounts {
+                active: 1,
+                scheduled: 2,
+                recurring: 2,
+                ended: 1,
+                cancelled: 1,
+                ended_early: 1,
+            }
+        );
+        assert_eq!(ids(&resp), ["a", "p1", "p2", "e", "c", "x"]);
+    }
+
+    #[test]
+    fn filters_by_folder_status_repeat_and_search() {
+        let q = |f: fn(&mut ListQuery)| {
+            let mut query = ListQuery::default();
+            f(&mut query);
+            list_page(rows(), &query, None)
+        };
+        assert_eq!(
+            ids(&q(|q| q.folder_id = Some("planned".into()))),
+            ["p1", "p2"]
+        );
+        assert_eq!(
+            ids(&q(|q| q.status = Some("scheduled".into()))),
+            ["p1", "p2"]
+        );
+        assert_eq!(ids(&q(|q| q.status = Some("ended_early".into()))), ["x"]);
+        assert_eq!(ids(&q(|q| q.status = Some("cancelled".into()))), ["c"]);
+        assert_eq!(
+            ids(&q(|q| q.repeat = Some("recurring".into()))),
+            ["p1", "c"]
+        );
+        assert_eq!(
+            ids(&q(|q| q.repeat = Some("none".into()))),
+            ["a", "p2", "e", "x"]
+        );
+        assert_eq!(ids(&q(|q| q.search = Some("P1 MAINT".into()))), ["p1"]);
+        assert_eq!(q(|q| q.search = Some("chg-4471".into())).total, 6);
+    }
+
+    #[test]
+    fn pages_are_one_based_and_capped() {
+        let query = ListQuery {
+            page: Some(2),
+            page_size: Some(2),
+            ..Default::default()
+        };
+        let resp = list_page(rows(), &query, None);
+        assert_eq!(ids(&resp), ["p2", "e"]);
+        assert_eq!(resp.total, 6);
+        let huge = ListQuery {
+            page_size: Some(10_000),
+            ..Default::default()
+        };
+        assert_eq!(list_page(rows(), &huge, None).items.len(), 6);
+    }
+
+    #[test]
+    fn the_alert_filter_reads_ids_and_the_condition() {
+        let dims = HashMap::from([("service".to_string(), "payments".to_string())]);
+        let alert = TargetItem {
+            id: "al1",
+            folder_id: "default",
+            dimensions: &dims,
+            tags: &[],
+        };
+        let query = ListQuery {
+            alert_id: Some("al1".into()),
+            ..Default::default()
+        };
+        assert_eq!(list_page(rows(), &query, Some(&alert)).total, 6);
+        let other = HashMap::from([("service".to_string(), "checkout".to_string())]);
+        let unrelated = TargetItem {
+            dimensions: &other,
+            ..alert
+        };
+        assert_eq!(list_page(rows(), &query, Some(&unrelated)).total, 0);
+        assert_eq!(list_page(rows(), &query, None).total, 0);
+    }
+
+    #[test]
+    fn a_folder_only_downtime_is_listed_for_an_alert_in_that_folder() {
+        let no_dims = HashMap::new();
+        let in_planned = TargetItem {
+            id: "al1",
+            folder_id: "planned",
+            dimensions: &no_dims,
+            tags: &[],
+        };
+        let elsewhere = TargetItem {
+            folder_id: "default",
+            ..in_planned
+        };
+        let folder_only = |folders: TargetFolders| {
+            let mut row = item("f", DowntimeStatus::Active, Repeat::None, 1);
+            row.downtime.condition = None;
+            row.downtime.targets[0].folders = folders;
+            row
+        };
+        let query = ListQuery {
+            alert_id: Some("al1".into()),
+            ..Default::default()
+        };
+        let planned = TargetFolders::Some {
+            folder_ids: vec!["planned".to_string()],
+        };
+        let rows = vec![folder_only(planned)];
+        assert_eq!(list_page(rows.clone(), &query, Some(&in_planned)).total, 1);
+        assert_eq!(list_page(rows, &query, Some(&elsewhere)).total, 0);
+        let all = vec![folder_only(TargetFolders::All)];
+        assert_eq!(list_page(all.clone(), &query, Some(&in_planned)).total, 1);
+        assert_eq!(list_page(all, &query, Some(&elsewhere)).total, 1);
+    }
+}

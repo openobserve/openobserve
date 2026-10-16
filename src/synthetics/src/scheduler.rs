@@ -301,7 +301,7 @@ pub async fn run() {
         // due checks instead — the replicas self-shard, which is what
         // `designs/synthetics/01-server-architecture.md` §4.2 specifies. Every
         // check returned here is already ours; nothing below needs to re-check.
-        let synthetics = match synthetics_checks::claim_due(db, now_us, FETCH_LIMIT, |c| {
+        let mut synthetics = match synthetics_checks::claim_due(db, now_us, FETCH_LIMIT, |c| {
             compute_next_run_at(
                 &c.frequency,
                 c.next_run_at,
@@ -323,6 +323,8 @@ pub async fn run() {
         if synthetics.is_empty() {
             continue;
         }
+
+        expand_step_counts(db, &mut synthetics).await;
 
         // Inside the fan-out these reads would run once per claimed check.
         #[cfg(feature = "cloud")]
@@ -622,6 +624,54 @@ pub(crate) fn distinct_org_ids(checks: &[synthetics_checks::DueCheck]) -> Vec<St
         .filter(|c| seen.insert(c.org_id.as_str()))
         .map(|c| c.org_id.clone())
         .collect()
+}
+
+/// The frozen ceiling must be the expanded count, or composed runs under-bill and clamp (§5.11).
+pub(crate) fn apply_expanded_counts(
+    due: &mut [synthetics_checks::DueCheck],
+    counts: &HashMap<String, usize>,
+) {
+    for check in due.iter_mut().filter(|c| !c.subtest_refs.is_empty()) {
+        let own = usize::try_from(check.steps_configured).unwrap_or(0);
+        let expanded = config::meta::synthetics_composition::expanded_step_count(
+            own,
+            &check.subtest_refs,
+            counts,
+        );
+        check.steps_configured = i32::try_from(expanded.max(1)).unwrap_or(i32::MAX);
+    }
+}
+
+/// One indexed read per tick, skipped entirely when no claimed check holds a reference.
+async fn expand_step_counts(
+    db: &sea_orm::DatabaseConnection,
+    due: &mut [synthetics_checks::DueCheck],
+) {
+    let child_ids: Vec<String> = due
+        .iter()
+        .flat_map(|c| c.subtest_refs.iter().cloned())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    if child_ids.is_empty() {
+        return;
+    }
+    let org_ids: HashSet<&str> = due
+        .iter()
+        .filter(|c| !c.subtest_refs.is_empty())
+        .map(|c| c.org_id.as_str())
+        .collect();
+    let mut counts = HashMap::new();
+    for org_id in org_ids {
+        match infra::table::synthetics_refs::child_step_counts(db, org_id, &child_ids).await {
+            Ok(c) => counts.extend(c),
+            Err(e) => {
+                config::metrics::SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.inc();
+                tracing::error!("[synthetics scheduler] child_step_counts for {org_id}: {e}");
+            }
+        }
+    }
+    apply_expanded_counts(due, &counts);
 }
 
 /// SPEC §6.6's table, pure and total over every input.
@@ -1008,7 +1058,7 @@ fn quota_trigger_record(
 /// A non-2xx is checked explicitly: `send()` resolves to `Ok` for a 401 as
 /// readily as for a 200, so treating the transport error as the only failure
 /// drops every record from a mis-scoped token and logs nothing.
-async fn post_json(
+pub(crate) async fn post_json(
     client: &reqwest::Client,
     url: &str,
     token: &str,
@@ -2187,6 +2237,8 @@ mod trial_gate_tests {
 /// SPEC §6 / §7.3 — the free step pool gate, items **2.3** and **2.4**.
 #[cfg(test)]
 mod pool_gate_tests {
+    use std::collections::HashMap;
+
     use config::meta::{
         self_reporting::usage::{RunOutcome, TriggerDataType},
         synthetics::{SyntheticFrequency, SyntheticFrequencyType, SyntheticType},
@@ -2194,8 +2246,8 @@ mod pool_gate_tests {
     use infra::table::synthetics_checks::DueCheck;
 
     use super::{
-        ERROR_SOURCE_QUOTA, GateContext, PoolExhaustionPolicy, PoolGate, gate_decision,
-        quota_result_record, quota_trigger_record, slot_verdict,
+        ERROR_SOURCE_QUOTA, GateContext, PoolExhaustionPolicy, PoolGate, apply_expanded_counts,
+        gate_decision, quota_result_record, quota_trigger_record, slot_verdict,
     };
     use crate::pool::StepRemaining;
 
@@ -2231,6 +2283,7 @@ mod pool_gate_tests {
             next_run_at: SLOT,
             browser_devices: Vec::new(),
             steps_configured: 14,
+            subtest_refs: Vec::new(),
             tags: vec!["checkout".to_string()],
         }
     }
@@ -2611,6 +2664,20 @@ mod pool_gate_tests {
             "an alert rule matches the SERIALIZED value, and `RunOutcome::Error` writes `error` \
              where this row writes `failed` today",
         );
+    }
+
+    #[test]
+    fn steps_configured_becomes_the_expanded_count_for_parents_only() {
+        let mut parent = due_check();
+        parent.steps_configured = 4;
+        parent.subtest_refs = vec!["login".to_string()];
+        let mut plain = due_check();
+        plain.steps_configured = 14;
+        let mut due = vec![parent, plain];
+        let counts = HashMap::from([("login".to_string(), 13usize)]);
+        apply_expanded_counts(&mut due, &counts);
+        assert_eq!(due[0].steps_configured, 16);
+        assert_eq!(due[1].steps_configured, 14);
     }
 }
 

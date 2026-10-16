@@ -41,6 +41,8 @@ vectorscan = [
     "promql-service/vectorscan",
     "stream/vectorscan",
 ]
+# Lets dependants' tests install a fake stream access checker; never enabled outside dev-dependencies.
+test-utils = []
 profiling = [
     "dep:jemalloc_pprof",
     "dep:pprof",
@@ -77,7 +79,6 @@ cron.workspace = true
 dashmap.workspace = true
 datafusion.workspace = true
 arrow.workspace = true
-arrow-json.workspace = true
 arrow-schema.workspace = true
 flate2.workspace = true
 futures.workspace = true
@@ -113,7 +114,9 @@ sea-orm.workspace = true
 serde.workspace = true
 sha2.workspace = true
 serde_json.workspace = true
+sqlparser.workspace = true
 snap.workspace = true
+strum.workspace = true
 svix-ksuid.workspace = true
 thiserror.workspace = true
 time.workspace = true
@@ -131,15 +134,19 @@ ingester.workspace = true
 openobserve-synthetics.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
-futures-util.workspace = true
 jemalloc_pprof = { workspace = true, optional = true }
 pprof = { workspace = true, optional = true }
 tikv-jemalloc-ctl = { workspace = true, optional = true }
 
 [dev-dependencies]
+infra = { workspace = true, features = ["test-utils"] }
 criterion = { version = "0.5", default-features = false, features = ["rayon"] }
 multer.workspace = true
 
 [[bench]]
 name = "db_enrich"
+harness = false
+
+[[bench]]
+name = "trace_enrich"
 harness = false

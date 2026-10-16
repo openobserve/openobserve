@@ -48,7 +48,7 @@ pub fn initialize_ua_parser() -> UserAgentParser {
 
 /// This is the custom data which is provided by `browser-sdk`
 /// in form of query-parameters.
-/// NOTE: the only condition is that the prefix of such params is `oo`.
+/// NOTE: the only condition is that the prefix of such params is `oo` or `o2`.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RumExtraData {
     pub data: HashMap<String, serde_json::Value>,
@@ -124,7 +124,7 @@ impl RumExtraData {
 
         // Merge body tags into data — query string takes precedence
         if let Some(tags_val) = body_tags {
-            data.entry("ootags".to_string()).or_insert(tags_val);
+            data.entry("o2tags".to_string()).or_insert(tags_val);
         }
 
         Self::filter_api_keys(&mut data);

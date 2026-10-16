@@ -330,7 +330,7 @@ pub async fn delete(Path((org_id, id)): Path<(String, String)>) -> Response {
                 "Cannot delete pattern, associated with {pattern_streams:?}{extra}",
             ));
         }
-        match db::re_pattern::remove(&id).await {
+        match db::re_pattern::remove(&org_id, &id).await {
             Ok(_) => {
                 remove_ownership(&org_id, "re_patterns", Authz::new(&id)).await;
                 MetaHttpResponse::ok("Pattern removed successfully")
@@ -411,6 +411,22 @@ pub async fn delete_bulk(
             {
                 return MetaHttpResponse::forbidden("Unauthorized Access");
             }
+
+            match mgr.get_pattern_org(id) {
+                None => {
+                    unsuccessful.push(id.to_string());
+                    err = Some(format!("pattern with id {id} not found in current org"));
+                    continue;
+                }
+                Some(v) => {
+                    if v != org_id {
+                        unsuccessful.push(id.to_string());
+                        err = Some(format!("pattern with id {id} not found in current org"));
+                        continue;
+                    }
+                }
+            }
+
             let pattern_usage = mgr.get_pattern_usage(id);
             let (pattern_streams, extra) = if pattern_usage.len() > 5 {
                 (
@@ -436,7 +452,7 @@ pub async fn delete_bulk(
         }
 
         for id in req.ids {
-            match db::re_pattern::remove(&id).await {
+            match db::re_pattern::remove(&org_id, &id).await {
                 Ok(_) => {
                     remove_ownership(&org_id, "re_patterns", Authz::new(&id)).await;
                     successful.push(id);
@@ -570,7 +586,11 @@ pub async fn test(Json(req): Json<PatternTestRequest>) -> Response {
         let inputs = req.test_records;
         // Default to Redact if policy not specified for backward compatibility
         let policy = req.policy.as_deref().unwrap_or("Redact");
-        let policy = PatternPolicy::from(policy);
+        // Strict here: a lossy coercion would preview a redaction the caller did not ask for.
+        let policy = match PatternPolicy::parse_strict(policy) {
+            Ok(policy) => policy,
+            Err(e) => return MetaHttpResponse::bad_request(format!("invalid policy: {e}")),
+        };
 
         let mut ret = Vec::with_capacity(inputs.len());
         for i in inputs {

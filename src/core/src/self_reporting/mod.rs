@@ -25,12 +25,24 @@ pub mod llm_scores_schema;
 #[cfg(feature = "enterprise")]
 pub mod llm_scores_writer;
 pub(crate) mod persistence;
+pub mod redaction_schema;
 pub mod search;
 mod triggers_schema;
 mod usage_schema;
 
 #[cfg(feature = "cloud")]
 pub use ingestion::ingest_data_retention_usages;
+pub use usage_reporting::redaction_evidence;
+
+/// Write records into an internal stream through the same path self-reporting
+/// uses: directly on an ingester, over gRPC to one otherwise. Returns once the
+/// ingester has accepted the batch. Used by server-side chat persistence.
+pub async fn ingest_internal_logs(
+    values: Vec<config::utils::json::Value>,
+    stream: config::meta::stream::StreamParams,
+) -> anyhow::Result<()> {
+    ingestion::ingest_reporting_data(values, stream).await
+}
 
 #[cfg(feature = "enterprise")]
 pub struct CoreAuditPublisher;

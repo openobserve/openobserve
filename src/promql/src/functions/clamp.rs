@@ -13,13 +13,59 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::Value;
-use datafusion::error::Result;
+use config::meta::promql::value::{LabelsExt, Value};
+use datafusion::error::{DataFusionError, Result};
+use rayon::prelude::*;
+
+use crate::scalar_param::ScalarParam;
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#clamp
-pub(crate) fn clamp(data: Value, min: f64, max: f64) -> Result<Value> {
-    // Apply clamp to all samples in this range
-    super::map_samples(data, "clamp", |sample| sample.value.clamp(min, max))
+pub(crate) fn clamp(data: Value, min: &ScalarParam, max: &ScalarParam) -> Result<Value> {
+    let mut matrix = match data {
+        Value::Matrix(matrix) => matrix,
+        Value::None => return Ok(Value::None),
+        _ => {
+            return Err(DataFusionError::Plan(format!(
+                "Invalid input for clamp, expected matrix but got: {:?}",
+                data.get_type()
+            )));
+        }
+    };
+    matrix.par_iter_mut().for_each(|series| {
+        series.labels = std::mem::take(&mut series.labels).without_metric_name();
+        series.samples.retain_mut(|sample| {
+            let (min, max) = (min.at(sample.timestamp), max.at(sample.timestamp));
+            // Prometheus answers an empty vector at a step whose bounds cross
+            if min > max {
+                return false;
+            }
+            sample.value = go_max(min, go_min(max, sample.value));
+            true
+        });
+    });
+    matrix.retain(|series| !series.samples.is_empty());
+    Ok(Value::Matrix(matrix))
+}
+
+// Go's math.Min, which Prometheus clamps with: -Inf wins over NaN, any other NaN propagates.
+fn go_min(left: f64, right: f64) -> f64 {
+    if left == f64::NEG_INFINITY || right == f64::NEG_INFINITY {
+        f64::NEG_INFINITY
+    } else if left.is_nan() || right.is_nan() {
+        f64::NAN
+    } else {
+        left.min(right)
+    }
+}
+
+fn go_max(left: f64, right: f64) -> f64 {
+    if left == f64::INFINITY || right == f64::INFINITY {
+        f64::INFINITY
+    } else if left.is_nan() || right.is_nan() {
+        f64::NAN
+    } else {
+        left.max(right)
+    }
 }
 
 #[cfg(test)]
@@ -49,13 +95,22 @@ mod tests {
 
     #[test]
     fn test_clamp_value_none_input() {
-        let result = clamp(Value::None, 0.0, 10.0).unwrap();
+        let result = clamp(
+            Value::None,
+            &ScalarParam::Const(0.0),
+            &ScalarParam::Const(10.0),
+        )
+        .unwrap();
         assert!(matches!(result, Value::None));
     }
 
     #[test]
     fn test_clamp_invalid_input_returns_err() {
-        let result = clamp(Value::Float(5.0), 0.0, 10.0);
+        let result = clamp(
+            Value::Float(5.0),
+            &ScalarParam::Const(0.0),
+            &ScalarParam::Const(10.0),
+        );
         assert!(result.is_err());
     }
 
@@ -63,7 +118,7 @@ mod tests {
     fn test_clamp_function() {
         let eval_ts = 1000;
         let matrix = create_matrix(eval_ts, vec![5.0, 15.0, 25.0]);
-        let result = clamp(matrix, 10.0, 20.0).unwrap();
+        let result = clamp(matrix, &ScalarParam::Const(10.0), &ScalarParam::Const(20.0)).unwrap();
 
         match result {
             Value::Matrix(m) => {
@@ -77,5 +132,33 @@ mod tests {
             }
             _ => panic!("Expected Matrix result"),
         }
+    }
+
+    #[test]
+    fn test_clamp_bounds_follow_go_min_max() {
+        let values = |min: f64, max: f64, input: f64| {
+            let Value::Matrix(m) = clamp(
+                create_matrix(1000, vec![input]),
+                &ScalarParam::Const(min),
+                &ScalarParam::Const(max),
+            )
+            .unwrap() else {
+                panic!("Expected Matrix result");
+            };
+            m.iter()
+                .map(|series| series.samples[0].value)
+                .collect::<Vec<_>>()
+        };
+        assert!(values(f64::NAN, 10.0, 5.0)[0].is_nan());
+        assert!(values(f64::NEG_INFINITY, f64::NAN, 5.0)[0].is_nan());
+        assert_eq!(
+            values(f64::NEG_INFINITY, f64::NAN, f64::NEG_INFINITY),
+            [f64::NEG_INFINITY]
+        );
+        assert_eq!(
+            values(f64::NAN, f64::INFINITY, f64::INFINITY),
+            [f64::INFINITY]
+        );
+        assert!(values(3.0, 1.0, 2.0).is_empty());
     }
 }

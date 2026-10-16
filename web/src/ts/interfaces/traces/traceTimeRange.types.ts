@@ -63,4 +63,6 @@ export interface TraceTimeRangeOptions {
   hint_ts?: number;
   /** Narrows the search to these trace streams. */
   streams?: string[];
+  /** Aborts the client request; a scan already running on the server continues. */
+  signal?: AbortSignal;
 }

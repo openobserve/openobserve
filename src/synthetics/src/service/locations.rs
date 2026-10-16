@@ -732,9 +732,7 @@ mod tests {
     /// stop flapping alerts would do nothing until a restart.
     #[test]
     fn agent_stale_secs_is_read_at_call_time_not_captured_at_boot() {
-        let _guard = crate::CONFIG_SWAP_LOCK
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::CONFIG_SWAP_LOCK.blocking_lock();
         let saved = config::CONFIG.load_full();
 
         let install = |secs: i64| {

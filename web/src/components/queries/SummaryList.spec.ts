@@ -83,7 +83,7 @@ describe("SummaryList.vue", () => {
             ],
             emits: ["update:selected-ids", "row-click"],
             template:
-              '<div data-test="o-table-stub"><slot name="cell-actions" :row="{}" /><slot name="cell-duration" :row="{}" /><slot name="cell-queryRange" :row="{}" /><slot name="empty" /><slot name="bottom" /></div>',
+              '<div data-test="o-table-stub"><slot name="cell-actions" :row="{}" /><slot name="cell-duration" :row="{}" /><slot name="cell-queryRange" :row="{}" /><slot name="empty" /><slot name="selection-actions" /></div>',
           },
         },
       },
@@ -193,10 +193,9 @@ describe("SummaryList.vue", () => {
 
   // Test 17: Test getAllUserQueries function
   it("should emit filter:queries when getAllUserQueries is called", () => {
-    const mockEvent = { type: "click" };
     const mockRow = { user_id: "test@example.com" };
 
-    wrapper.vm.getAllUserQueries(mockEvent, mockRow);
+    wrapper.vm.getAllUserQueries(mockRow);
 
     expect(wrapper.emitted("filter:queries")).toBeTruthy();
     expect(wrapper.emitted("filter:queries")[0]).toEqual([mockRow]);
@@ -327,7 +326,7 @@ describe("SummaryList.vue", () => {
   it("should handle multiple emit events correctly", () => {
     // Emit multiple events
     wrapper.vm.handleMultiQueryCancel();
-    wrapper.vm.getAllUserQueries({}, mockRows[0]);
+    wrapper.vm.getAllUserQueries(mockRows[0]);
     wrapper.vm.confirmDeleteAction({ row: mockRows[0] });
 
     expect(wrapper.emitted("delete:queries")).toHaveLength(2);

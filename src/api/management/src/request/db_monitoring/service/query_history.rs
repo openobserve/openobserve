@@ -175,6 +175,18 @@ pub(crate) fn split_backfill_windows(mut below: Vec<i64>, cap: usize) -> (Vec<i6
     (below, flag_only)
 }
 
+/// Keyed per trace stream: realign windows sharing an end can start at different points.
+pub(crate) fn window_starts(rows: &[Value]) -> HashMap<(&str, i64), i64> {
+    rows.iter()
+        .filter_map(|row| {
+            let stream = row.get("trace_stream_name")?.as_str()?;
+            let end = get_i64(row, "_timestamp");
+            let start = row.get("window_start")?.as_i64()?;
+            (start < end).then_some(((stream, end), start))
+        })
+        .collect()
+}
+
 /// The query-history endpoint's whole body, as a callable — the same handler/body
 /// split every other DBM read uses, so the handler stays a config guard plus a
 /// delegation. It returns [`HttpResponse`] rather than `Result<Value, _>` because
@@ -244,13 +256,14 @@ pub(crate) async fn read_query_history_response(
         &format!("{}{}", filters.sql_preds(), fingerprint_pred(fingerprint)),
     );
     // The history `db_totals` read feeds only window existence (distinct
-    // `_timestamp`s under the totals filters) and backfill-stream resolution —
-    // never the metrics — so it projects the four columns those consume
+    // `_timestamp`s under the totals filters), backfill ranges and backfill-stream
+    // resolution — never the metrics — so it projects the columns those consume
     // instead of dragging every stored column per row.
     let totals_projection = stats_projection(
         org_id,
         &[
             "_timestamp",
+            "window_start",
             "trace_stream_name",
             "db_system",
             "db_instance",
@@ -366,6 +379,7 @@ pub(crate) async fn read_query_history_response(
         resolve_backfill_stream(q.stream.as_ref(), &totals_rows, &readable_streams);
 
     let interval_micros = rollup::rollup_interval_secs() as i64 * 1_000_000;
+    let starts = window_starts(&totals_rows);
     let mut series: Vec<Value> = Vec::new();
     for (window_end, rows) in &fp_by_window {
         let mut point = merge_rows(rows.iter().copied());
@@ -377,6 +391,7 @@ pub(crate) async fn read_query_history_response(
     // collection, which depend on `totals_rows` but not on the backfill.
     let org = org_id;
     let backfill_stream_ref = backfill_stream.as_ref();
+    let starts = &starts;
     let backfill_fut = join_all(to_backfill.iter().map(|window_end| async move {
         let mut point = json!({ "timestamp": window_end, "below_top_n": true });
         if let Some(stream) = backfill_stream_ref {
@@ -385,7 +400,10 @@ pub(crate) async fn read_query_history_response(
                 org,
                 search_user,
                 sql,
-                window_end - interval_micros,
+                starts
+                    .get(&(stream.as_str(), *window_end))
+                    .copied()
+                    .unwrap_or(window_end - interval_micros),
                 *window_end,
                 true,
             )
@@ -554,6 +572,36 @@ mod tests {
     use serde_json::json;
 
     use super::{super::testutil::*, *};
+
+    /// A realigned (short) window must be backfilled over its real width, not one interval.
+    #[test]
+    fn window_starts_reads_the_stamped_start() {
+        let rows = vec![
+            json!({"trace_stream_name": "a", "_timestamp": 2_000, "window_start": 1_700}),
+            json!({"trace_stream_name": "b", "_timestamp": 2_000, "window_start": 1_100}),
+            json!({"trace_stream_name": "a", "_timestamp": 3_000, "window_start": 2_000}),
+            json!({"trace_stream_name": "a", "_timestamp": 4_000}),
+            json!({"trace_stream_name": "a", "_timestamp": 5_000, "window_start": 5_000}),
+        ];
+        let starts = window_starts(&rows);
+        assert_eq!(starts.get(&("a", 2_000)), Some(&1_700));
+        assert_eq!(
+            starts.get(&("b", 2_000)),
+            Some(&1_100),
+            "realign starts are per stream"
+        );
+        assert_eq!(starts.get(&("a", 3_000)), Some(&2_000));
+        assert_eq!(
+            starts.get(&("a", 4_000)),
+            None,
+            "pre-stamp rows fall back to one interval"
+        );
+        assert_eq!(
+            starts.get(&("a", 5_000)),
+            None,
+            "an empty window is not a start"
+        );
+    }
 
     /// The INFERRED backfill stream must be filtered to what the caller may read.
     ///

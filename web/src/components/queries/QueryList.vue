@@ -28,7 +28,12 @@
       pagination="none"
       dense
       data-test="queryList-table"
-    />
+    >
+      <template #cell-value="{ value }">
+        <div v-if="isWrappable(value)" class="wrap-anywhere whitespace-normal">{{ value }}</div>
+        <template v-else>{{ value }}</template>
+      </template>
+    </OTable>
   </OCard>
 </template>
 
@@ -44,6 +49,8 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+
+const WRAP_MAX_CHARS = 300;
 
 export default defineComponent({
   name: "QueryList",
@@ -166,7 +173,11 @@ export default defineComponent({
       },
     ];
 
+    const isWrappable = (value: unknown) =>
+      typeof value === "string" && value.length <= WRAP_MAX_CHARS;
+
     return {
+      isWrappable,
       queryData,
       t,
       getRows,

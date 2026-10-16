@@ -28,7 +28,7 @@ use common::meta::user::{InviteStatus, UserInvite, UserInviteList};
 #[cfg(feature = "enterprise")]
 use config::meta::ratelimit::CachedUserRoles;
 use config::{
-    DEFAULT_ORG, META_ORG_ID, get_config, ider,
+    DEFAULT_ORG, META_ORG_ID, ider,
     meta::user::{DBUser, User, UserOrg, UserRole},
     utils::rand::generate_random_string,
 };
@@ -81,7 +81,6 @@ pub async fn post_user(
     if !is_valid_email(&usr_req.email) {
         return Ok(MetaHttpResponse::bad_request("Invalid email"));
     }
-    let cfg = get_config();
     usr_req.email = usr_req.email.to_lowercase();
     if let Some(_custom_roles) = &usr_req.role.custom_role {
         #[cfg(not(feature = "enterprise"))]
@@ -165,7 +164,7 @@ pub async fn post_user(
             }
             let salt = ider::uuid();
             let password = get_hash(&usr_req.password, &salt);
-            let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
+            let password_ext = get_hash(&usr_req.password, &config::get_ext_auth_salt());
             let token = generate_random_string(16);
             let token_for_response = token.clone();
             let rum_token = format!("rum{}", generate_random_string(16));
@@ -309,8 +308,7 @@ pub async fn update_user(
 
     let mut old_role = None;
     let mut new_role = None;
-    let conf = get_config();
-    let password_ext_salt = conf.auth.ext_auth_salt.as_str();
+    let password_ext_salt = &config::get_ext_auth_salt();
 
     let Ok(existing_user) = existing_user else {
         return Ok(MetaHttpResponse::not_found("User not found"));
@@ -1062,6 +1060,14 @@ pub async fn remove_user_from_org(
                 if initiating_user.email == email_id {
                     return Ok(MetaHttpResponse::forbidden("Not Allowed"));
                 }
+                // Resolved now: the users row may be gone by the time shares are revoked.
+                let user_id = match infra::table::users::get_id_by_email(email_id).await {
+                    Ok(id) => id,
+                    Err(e) => {
+                        log::error!("error resolving the id of {email_id}: {e}");
+                        None
+                    }
+                };
 
                 if user
                     .organizations
@@ -1094,6 +1100,9 @@ pub async fn remove_user_from_org(
                         if orgs[0].role.eq(&UserRole::ServiceAccount) && user.is_external {
                             return Ok(MetaHttpResponse::forbidden("Not Allowed"));
                         }
+                        // The user row goes with the last org; their chats must not outlive it.
+                        #[cfg(feature = "enterprise")]
+                        delete_ai_chats(&[org_id.to_string()], email_id).await;
                         if let Err(e) = db::user::delete(email_id).await {
                             log::error!("error deleting user from db : {e}");
                             return Ok(MetaHttpResponse::internal_error(e.to_string()));
@@ -1170,28 +1179,8 @@ pub async fn remove_user_from_org(
                             }
                         }
                     }
-                    // G6. Until this call existed, removing somebody from an
-                    // org touched their invites, their user row and their
-                    // openfga tuples — and no on-call table at all. The leaver
-                    // stayed on every rotation, kept resolving as
-                    // `on_call_now`, and kept being paged; worse, the emailed
-                    // acknowledgement token is signed and session-free, so they
-                    // could still take a page belonging to whoever replaced
-                    // them. `service::ack_claims` refuses the token half; this
-                    // removes the data half.
-                    //
-                    // **After** the org membership is gone, not before: on-call
-                    // membership is derived from org membership, and clearing
-                    // the rotations first leaves a window in which anything
-                    // that syncs a team's roster could legitimately put them
-                    // back. The token check covers that window, which is why
-                    // this ordering is safe to choose on other grounds.
-                    //
-                    // Non-fatal. The user is out of the org whatever happens
-                    // here, and failing the request now would tell the caller
-                    // the removal did not happen when most of it did — so the
-                    // failure is logged loudly instead, because it means
-                    // somebody who has left is still on a rotation.
+                    // After the membership is gone: on-call rosters derive from it, so earlier is
+                    // racy.
                     #[cfg(feature = "enterprise")]
                     {
                         use o2_enterprise::enterprise::oncall::service as oncall_service;
@@ -1213,6 +1202,12 @@ pub async fn remove_user_from_org(
                             ),
                         }
                     }
+                    if let Err(e) =
+                        infra::table::query_history::delete_by_user(org_id, email_id).await
+                    {
+                        log::error!("error deleting query history of {email_id} in {org_id}: {e}");
+                    }
+                    revoke_ai_chat_shares(org_id, email_id, user_id.as_deref()).await;
                     Ok(MetaHttpResponse::ok("User removed from organization"))
                 } else {
                     Ok(MetaHttpResponse::not_found(
@@ -1230,9 +1225,26 @@ pub async fn remove_user_from_org(
 }
 
 pub async fn delete_user(email_id: &str) -> Result<Response, Error> {
+    if let Ok(Some(user_id)) = infra::table::users::get_id_by_email(email_id).await {
+        let now = config::utils::time::now_micros();
+        if let Err(e) = infra::table::ai_chat_shares::revoke_for_creator(None, &user_id, now).await
+        {
+            log::error!("error revoking AI chat shares of {email_id}: {e}");
+        }
+    }
+    #[cfg(feature = "enterprise")]
+    if let Ok(user) = db::user::get_db_user(email_id).await {
+        let orgs: Vec<String> = user.organizations.iter().map(|o| o.name.clone()).collect();
+        delete_ai_chats(&orgs, email_id).await;
+    }
     let result = db::user::delete(email_id).await;
     match result {
-        Ok(_) => Ok(MetaHttpResponse::ok("User deleted")),
+        Ok(_) => {
+            if let Err(e) = infra::table::query_history::delete_by_email(email_id).await {
+                log::error!("error deleting query history of {email_id}: {e}");
+            }
+            Ok(MetaHttpResponse::ok("User deleted"))
+        }
         Err(e) => Ok(MetaHttpResponse::not_found(e)),
     }
 }
@@ -1332,10 +1344,9 @@ pub async fn list_user_invites(user_id: &str, only_pending: bool) -> Result<Resp
 }
 
 pub async fn create_root_user(org_id: &str, user_req: UserRequest) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
     let salt = ider::uuid();
     let password = get_hash(&user_req.password, &salt);
-    let password_ext = get_hash(&user_req.password, &cfg.auth.ext_auth_salt);
+    let password_ext = get_hash(&user_req.password, &config::get_ext_auth_salt());
     let token = user_req
         .token
         .clone()
@@ -1432,6 +1443,40 @@ async fn update_cache(user_email: &str, roles: Vec<String>) {
     );
 }
 
+/// A member who left an org no longer vouches for the chats they shared there.
+async fn revoke_ai_chat_shares(org_id: &str, email_id: &str, user_id: Option<&str>) {
+    let Some(user_id) = user_id else {
+        return;
+    };
+    let now = config::utils::time::now_micros();
+    match infra::table::ai_chat_shares::revoke_for_creator(Some(org_id), user_id, now).await {
+        Ok(0) => {}
+        Ok(n) => log::info!("revoked {n} AI chat shares of {email_id}, who left {org_id}"),
+        // Reads re-check membership, so a missed revoke never serves a leaver's share.
+        Err(e) => log::error!("error revoking AI chat shares of {email_id} in {org_id}: {e}"),
+    }
+}
+
+/// Deletes the user's chats in `orgs` while their `users.id` still resolves (replicas: the sweep).
+#[cfg(feature = "enterprise")]
+async fn delete_ai_chats(orgs: &[String], email_id: &str) {
+    let user_id = match infra::table::users::get_id_by_email(email_id).await {
+        Ok(Some(id)) => id,
+        Ok(None) => return,
+        Err(e) => {
+            log::error!("error resolving {email_id} to delete their AI chats: {e}");
+            return;
+        }
+    };
+    for org_id in orgs {
+        match crate::ai_chat::delete_all_for_user(org_id, &user_id).await {
+            Ok(ids) if ids.is_empty() => {}
+            Ok(ids) => log::info!("deleted {} AI chats of {email_id} in {org_id}", ids.len()),
+            Err(e) => log::error!("error deleting AI chats of {email_id} in {org_id}: {e}"),
+        }
+    }
+}
+
 /// Creates a service account user record if it doesn't already exist
 /// This is used when creating organizations with a specified service account
 pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), anyhow::Error> {
@@ -1447,8 +1492,7 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
     let random_password = generate_random_string(32);
     let salt = ider::uuid();
     let password_hash = get_hash(&random_password, &salt);
-    let cfg = get_config();
-    let password_ext = get_hash(&random_password, &cfg.auth.ext_auth_salt);
+    let password_ext = get_hash(&random_password, &config::get_ext_auth_salt());
     let now = chrono::Utc::now().timestamp_micros();
     let user_record = infra::table::users::UserRecord {
         email: email.to_string(),
@@ -1796,6 +1840,108 @@ mod tests {
 
         let resp = delete_user("admin@zo.dev").await;
         assert!(resp.is_ok());
+    }
+
+    async fn create_query_history_table() {
+        use sea_orm::{ConnectionTrait, Schema};
+        let conn = get_orm_client_rw().await;
+        let backend = conn.get_database_backend();
+        let mut stmt = Schema::new(backend)
+            .create_table_from_entity(infra_table::entity::query_history::Entity);
+        conn.execute(backend.build(stmt.if_not_exists()))
+            .await
+            .unwrap();
+    }
+
+    async fn create_user_with_history(email: &str) {
+        create_query_history_table().await;
+        let user = DBUser {
+            email: email.to_string(),
+            password: "".to_string(),
+            salt: "".to_string(),
+            first_name: "History".to_string(),
+            last_name: "User".to_string(),
+            password_ext: None,
+            is_external: false,
+            organizations: vec![UserOrg {
+                name: "dummy".to_string(),
+                org_name: "Dummy Org".to_string(),
+                token: "".to_string(),
+                rum_token: None,
+                role: UserRole::User,
+            }],
+        };
+        create_new_user(user).await.unwrap();
+        for org in ["dummy", "other"] {
+            infra_table::query_history::record(org, email, "up", serde_json::json!({}), 1)
+                .await
+                .unwrap();
+        }
+    }
+
+    async fn history_count(org: &str, email: &str) -> usize {
+        infra_table::query_history::list(org, email, None, None, 10, 0)
+            .await
+            .unwrap()
+            .len()
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_from_org_deletes_their_query_history_in_that_org() {
+        let _guard = set_up().await;
+        let email = "history-leaver@example.com";
+        create_user_with_history(email).await;
+
+        let resp = remove_user_from_org("dummy", email, "admin@zo.dev")
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        assert_eq!(history_count("dummy", email).await, 0);
+        assert_eq!(history_count("other", email).await, 1);
+    }
+
+    #[tokio::test]
+    async fn test_delete_user_deletes_their_query_history() {
+        let _guard = set_up().await;
+        let email = "history-deleted@example.com";
+        create_user_with_history(email).await;
+
+        let resp = delete_user(email).await.unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        assert_eq!(history_count("dummy", email).await, 0);
+        assert_eq!(history_count("other", email).await, 0);
+    }
+
+    async fn drop_query_history_table() {
+        use sea_orm::ConnectionTrait;
+        get_orm_client_rw()
+            .await
+            .execute_unprepared("DROP TABLE query_history")
+            .await
+            .unwrap();
+    }
+
+    // History cleanup is non-fatal like the on-call offboarding beside it: the removal still lands.
+    #[tokio::test]
+    async fn test_user_removal_succeeds_when_query_history_cleanup_fails() {
+        let _guard = set_up().await;
+        let email = "history-cleanup-fails@example.com";
+        create_user_with_history(email).await;
+        drop_query_history_table().await;
+        assert!(
+            infra_table::query_history::delete_by_email(email)
+                .await
+                .is_err()
+        );
+
+        let removed = remove_user_from_org("dummy", email, "admin@zo.dev").await;
+        let deleted = delete_user(email).await;
+        create_query_history_table().await;
+
+        assert_eq!(removed.unwrap().status(), http::StatusCode::OK);
+        assert!(infra_table::org_users::get("dummy", email).await.is_err());
+        assert_eq!(deleted.unwrap().status(), http::StatusCode::OK);
+        assert!(infra_table::users::get(email).await.is_err());
     }
 
     #[tokio::test]

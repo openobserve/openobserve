@@ -14,11 +14,15 @@ export class SplunkHecPage {
         this.tlsNote = page.locator('[data-test="ingestion-logs-splunkhec-tls-note"]');
         this.tokensLink = page.locator('[data-test="ingestion-logs-splunkhec-tokens-link"]');
 
-        // Copyable snippet text (CopyContent exposes rum-content-text) and its buttons.
-        this.endpointContent = page.locator('[data-test="ingestion-logs-splunkhec-endpoint"] [data-test="rum-content-text"]');
-        this.payloadContent = page.locator('[data-test="ingestion-logs-splunkhec-payload"] [data-test="rum-content-text"]');
-        this.curlContent = page.locator('[data-test="ingestion-logs-splunkhec-example"] [data-test="rum-content-text"]');
-        this.copyButtons = page.locator('[data-test="rum-copy-btn"]');
+        // Copyable snippet text (OCodeBlock exposes <prefix>-pre) and its buttons.
+        this.endpointContent = page.locator('[data-test="ingestion-splunkhec-endpoint-code-block-pre"]');
+        this.payloadContent = page.locator('[data-test="ingestion-splunkhec-payload-code-block-pre"]');
+        this.curlContent = page.locator('[data-test="ingestion-splunkhec-example-code-block-pre"]');
+        this.healthContent = page.locator('[data-test="ingestion-splunkhec-health-code-block-pre"]');
+        this.copyButtons = page.locator('[data-test^="ingestion-splunkhec-"][data-test$="-code-block-copy-btn"]');
+
+        // Auth header is a plain OText (not a CopyContent block), so it has no rum-content-text.
+        this.authSection = page.locator('[data-test="ingestion-logs-splunkhec-auth"]');
 
         // Copy feedback toast (global success notification), kept local so this
         // spec does not depend on another page object's toast helper.
@@ -33,10 +37,6 @@ export class SplunkHecPage {
         await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
         // The intro paragraph is the page-loaded marker (no async data on this page).
         await expect(this.intro).toBeVisible({ timeout: 10000 });
-    }
-
-    async getOrigin() {
-        return await this.page.evaluate(() => window.location.origin);
     }
 
     // ==================== Window Warning Banner ====================
@@ -83,6 +83,10 @@ export class SplunkHecPage {
         return ((await this.curlContent.textContent()) ?? '').trim();
     }
 
+    async getHealthContent() {
+        return ((await this.healthContent.textContent()) ?? '').trim();
+    }
+
     async getPayloadJson() {
         return JSON.parse(await this.getPayloadContent());
     }
@@ -92,6 +96,12 @@ export class SplunkHecPage {
         const match = curl.match(/-d '([^']*)'/);
         expect(match, 'curl example carries a -d JSON payload').toBeTruthy();
         return JSON.parse(match[1]);
+    }
+
+    // ==================== Auth Section ====================
+
+    async getAuthText() {
+        return (await this.authSection.textContent()) ?? '';
     }
 
     // ==================== Copy Buttons ====================

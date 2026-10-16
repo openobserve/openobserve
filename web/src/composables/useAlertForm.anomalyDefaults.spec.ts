@@ -5,10 +5,210 @@
 // truncated server-side, so the alert reopens showing a number nobody chose.
 
 import { describe, it, expect } from "vitest";
-import { defaultAnomalyConfig } from "@/composables/useAlertForm";
+import {
+  anomalyBandPayload,
+  anomalyIntervalPayload,
+  anomalySensitivityPayload,
+  anomalyWindowSecondsToParts,
+  defaultAnomalyConfig,
+  parseAnomalyInterval,
+} from "@/composables/useAlertForm";
 
 describe("defaultAnomalyConfig", () => {
+  it("defaults the training window to 28 days", () => {
+    expect(defaultAnomalyConfig().training_window_days).toBe(28);
+  });
+
   it("defaults threshold to the 97th percentile", () => {
     expect(defaultAnomalyConfig().threshold).toBe(97);
+  });
+});
+
+// §4.5: ONE interval grammar (s/m/h/d) shared with the server's parse_interval.
+describe("parseAnomalyInterval", () => {
+  it("parses every unit of the s/m/h/d grammar", () => {
+    expect(parseAnomalyInterval("30s", 5, "m")).toEqual({ value: 30, unit: "s", parsed: true });
+    expect(parseAnomalyInterval("5m", 5, "m")).toEqual({ value: 5, unit: "m", parsed: true });
+    expect(parseAnomalyInterval("2h", 5, "m")).toEqual({ value: 2, unit: "h", parsed: true });
+    expect(parseAnomalyInterval("1d", 5, "m")).toEqual({ value: 1, unit: "d", parsed: true });
+  });
+
+  it("reads 90s as ninety SECONDS, not ninety minutes", () => {
+    expect(parseAnomalyInterval("90s", 5, "m")).toEqual({ value: 90, unit: "s", parsed: true });
+  });
+
+  it("falls back to the given default on anything off-grammar, flagged unparsed", () => {
+    expect(parseAnomalyInterval("90x", 5, "m")).toEqual({ value: 5, unit: "m", parsed: false });
+    expect(parseAnomalyInterval("", 1, "h")).toEqual({ value: 1, unit: "h", parsed: false });
+    expect(parseAnomalyInterval(undefined, 1, "h")).toEqual({ value: 1, unit: "h", parsed: false });
+    expect(parseAnomalyInterval("0m", 5, "m")).toEqual({ value: 5, unit: "m", parsed: false });
+    expect(parseAnomalyInterval("1.5h", 1, "h")).toEqual({ value: 1, unit: "h", parsed: false });
+  });
+});
+
+describe("anomalyWindowSecondsToParts", () => {
+  it("picks the largest lossless unit so the dirty check compares real values", () => {
+    expect(anomalyWindowSecondsToParts(86400)).toEqual({ value: 1, unit: "d" });
+    expect(anomalyWindowSecondsToParts(7200)).toEqual({ value: 2, unit: "h" });
+    expect(anomalyWindowSecondsToParts(600)).toEqual({ value: 10, unit: "m" });
+    expect(anomalyWindowSecondsToParts(90)).toEqual({ value: 90, unit: "s" });
+  });
+});
+
+// D4/N11: untouched stored fields round-trip VERBATIM; dirty is value comparison, not touched-flags.
+describe("anomalyIntervalPayload", () => {
+  // A legacy row on odd raw values, as parseAnomalyInterval seeds the form from them.
+  const stored = () => ({
+    histogram: { raw: "90s", value: 90, unit: "s", parsed: true },
+    schedule: { raw: "1h", value: 1, unit: "h", parsed: true },
+    window: { raw: 3990, value: 3990, unit: "s", parsed: true },
+  });
+  const untouchedForm = () => ({
+    histogram_interval_value: 90,
+    histogram_interval_unit: "s",
+    schedule_interval_value: 1,
+    schedule_interval_unit: "h",
+    detection_window_value: 3990,
+    detection_window_unit: "s",
+  });
+
+  it("a description-only edit round-trips the stored raw triple byte-identical", () => {
+    expect(anomalyIntervalPayload(untouchedForm(), stored())).toEqual({
+      histogram_interval: "90s",
+      schedule_interval: "1h",
+      detection_window_seconds: 3990,
+    });
+  });
+
+  it("an edit-and-revert saves byte-identical (value comparison, not touched-flags)", () => {
+    const form = untouchedForm();
+    form.detection_window_value = 7200;
+    form.detection_window_unit = "s";
+    form.detection_window_value = 3990;
+    expect(anomalyIntervalPayload(form, stored())).toEqual({
+      histogram_interval: "90s",
+      schedule_interval: "1h",
+      detection_window_seconds: 3990,
+    });
+  });
+
+  it("a touched field re-serializes from the form value; untouched fields stay verbatim", () => {
+    const form = untouchedForm();
+    form.detection_window_value = 2;
+    form.detection_window_unit = "h";
+    expect(anomalyIntervalPayload(form, stored())).toEqual({
+      histogram_interval: "90s",
+      schedule_interval: "1h",
+      detection_window_seconds: 7200,
+    });
+  });
+
+  it("an unparsable stored value the user replaced re-serializes; left alone it round-trips", () => {
+    const s = stored();
+    s.histogram = { raw: "90x", value: 5, unit: "m", parsed: false };
+    const form = untouchedForm();
+    form.histogram_interval_value = 5;
+    form.histogram_interval_unit = "m";
+    // Untouched (matches the seeded default) → the raw wire value survives.
+    expect(anomalyIntervalPayload(form, s).histogram_interval).toBe("90x");
+
+    form.histogram_interval_value = 10;
+    expect(anomalyIntervalPayload(form, s).histogram_interval).toBe("10m");
+  });
+
+  it("create mode (no stored triple) always serializes from the form", () => {
+    expect(anomalyIntervalPayload(untouchedForm(), null)).toEqual({
+      histogram_interval: "90s",
+      schedule_interval: "1h",
+      detection_window_seconds: 3990,
+    });
+  });
+});
+
+// Band width, direction and window share: each default is the value the server reads NULL as.
+describe("band and delivery defaults", () => {
+  it("creates at Auto, both directions and every out-of-band bucket alerting", () => {
+    const c = defaultAnomalyConfig();
+    expect(c.band_width).toBeNull();
+    // The percentile stays at its default, so the backend contract is unchanged.
+    expect(c.threshold).toBe(97);
+    expect(c.alert_direction).toBe("both");
+    expect(c.alert_window_buckets).toBe(1);
+    expect(c.alert_window_fire_pct).toBe(100);
+    expect(c.alert_window_recover_pct).toBeNull();
+  });
+});
+
+describe("anomalyBandPayload", () => {
+  it("sends the create defaults as they are, Auto as a null band width", () => {
+    expect(anomalyBandPayload(defaultAnomalyConfig(), false)).toEqual({
+      band_width: null,
+      alert_direction: "both",
+      alert_window_buckets: 1,
+      alert_window_fire_pct: 100,
+      alert_window_recover_pct: null,
+    });
+  });
+
+  it("sends a set band width and window share as numbers", () => {
+    expect(
+      anomalyBandPayload(
+        {
+          band_width: "4.5",
+          alert_direction: "above",
+          alert_window_buckets: 5,
+          alert_window_fire_pct: 80,
+          alert_window_recover_pct: 60,
+        },
+        false,
+      ),
+    ).toEqual({
+      band_width: 4.5,
+      alert_direction: "above",
+      alert_window_buckets: 5,
+      alert_window_fire_pct: 80,
+      alert_window_recover_pct: 60,
+    });
+  });
+
+  // The update path replaces every field, so a cleared input must go out as null, not be omitted.
+  it("sends cleared inputs as null and an unset direction as both", () => {
+    expect(
+      anomalyBandPayload(
+        {
+          band_width: "",
+          alert_direction: null,
+          alert_window_buckets: "",
+          alert_window_fire_pct: "",
+          alert_window_recover_pct: "",
+        },
+        false,
+      ),
+    ).toEqual({
+      band_width: null,
+      alert_direction: "both",
+      alert_window_buckets: null,
+      alert_window_fire_pct: null,
+      alert_window_recover_pct: null,
+    });
+  });
+
+  it("never sends a band width beside a budget, which the server rejects", () => {
+    expect(anomalyBandPayload({ band_width: 4 }, true).band_width).toBeNull();
+  });
+});
+
+describe("anomalySensitivityPayload", () => {
+  it("sends only the budget in budget mode", () => {
+    expect(anomalySensitivityPayload(2, 97)).toEqual({ alert_budget_per_day: 2 });
+  });
+
+  // The update endpoint's alert_budget_per_day is a double-Option: an absent key leaves a
+  // previously stored budget untouched, so switching to band mode must send an explicit null.
+  it("sends an explicit null budget alongside the threshold in band mode", () => {
+    expect(anomalySensitivityPayload(null, 97)).toEqual({
+      threshold: 97,
+      alert_budget_per_day: null,
+    });
   });
 });

@@ -19,6 +19,7 @@ pub mod agent;
 pub mod contact;
 pub mod policy;
 pub mod preset;
+pub mod rca;
 pub mod response;
 pub mod rotation;
 pub mod routing;
@@ -33,13 +34,17 @@ pub use agent::{
     metrics_for, parse_report, promotion_note, quieter_channels, ratchet, severity_pages,
     update_channels, verdict_lines,
 };
-pub use contact::{Contact, ContactError, normalize_phone};
+pub use contact::{
+    CODE_MAX_ATTEMPTS, CODE_TTL_MICROS, CodeCheck, CodeRow, Contact, ContactError, DAY_MICROS,
+    SEND_GAP_MICROS, SENDS_PER_NUMBER_PER_DAY, SENDS_PER_USER_PER_DAY, SendDecision, WaitLimit,
+    code_check, code_send_decision, next_counts, to_e164, wait_message,
+};
 pub use policy::{
-    AfterRung, BREAKER_OPEN_MICROS, BREAKER_WINDOW_MICROS, Channel, ChannelBreaker,
-    DEFAULT_PAGING_PRIORITY, EscalationPolicy, FALLBACK_ORDER, LadderAction, LadderStep,
+    Admission, AfterRung, BREAKER_OPEN_MICROS, BREAKER_WINDOW_MICROS, CHANNEL_ORDER, Channel,
+    ChannelBreaker, DEFAULT_PAGING_PRIORITY, EscalationPolicy, LadderAction, LadderStep,
     MAX_FANOUT_TEAMS, MAX_SEND_ATTEMPTS, MAX_TRANSPORT_ATTEMPTS, MAX_TRANSPORT_BACKOFF_MICROS,
-    PolicyError, PriorityRung, RungOutcome, TRANSPORT_BACKOFF_MICROS, after_rung, fallback_chain,
-    fanout_capped_note, fanout_note, plan, retry_delay_micros,
+    PolicyError, PriorityRung, RungOutcome, SEND_LIMIT_MICROS, TRANSPORT_BACKOFF_MICROS,
+    after_rung, fanout_capped_note, fanout_note, personal_channels, plan, retry_delay_micros,
 };
 pub use preset::{
     CATCH_ALL_PRIORITY, DEFAULT_HANDOVER_MICROS, Group, MAX_FOLLOW_THE_SUN_GROUPS,
@@ -47,6 +52,7 @@ pub use preset::{
     PresetDescriptor, PresetError, PresetId, PresetInput, PresetInputKind, PresetSpec,
     RESTRICTED_PRIORITY, RegionGroup, build as build_preset, catalogue as preset_catalogue,
 };
+pub use rca::RcaContext;
 pub use response::{
     DEFAULT_FLAP_DAMPENING_SECS, FIRST_LADDER_RUN, NoBlastRadius, PageDecision, ResolutionCause,
     ResponderRole, Response, ResponseEvent, ResponseEventKind, ResponseState, UpstreamRecovery,

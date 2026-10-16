@@ -3,7 +3,7 @@ const { waitUtils } = require('../../playwright-tests/utils/wait-helpers.js');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
-import { openNavFlyoutChild } from '../commonActions.js';
+import { openNavFlyoutChild, gotoStreamsViaNav } from '../commonActions.js';
 
 export class SanityPage {
     constructor(page) {
@@ -141,6 +141,11 @@ export class SanityPage {
         // ============================================================
         this.refreshStatsButton = page.locator('[data-test="log-stream-refresh-stats-btn"]');
         this.firstStreamRow = page.locator('[data-test="o2-table-row-0"]');
+        // Stats column cell on the first streams-table row. storage_size is a core
+        // stats column present on both OSS and cloud (only compressed_size /
+        // compression are dropped on cloud), so it is a reliable "stats rendered"
+        // signal after a refresh.
+        this.firstStreamStatsCell = page.locator('[data-test="o2-table-row-0"] [data-test="o2-table-cell-storage_size"]');
 
         // ============================================================
         // Schema Pagination locators
@@ -627,8 +632,7 @@ export class SanityPage {
 
         const uniqueStreamName = `sanitylogstream_${generateSuffix()}`;
 
-        await this.streamsMenuItem.click();
-        await this.page.waitForLoadState('domcontentloaded');
+        await gotoStreamsViaNav(this.page);
 
         await this.addStreamButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.addStreamButton.click();
@@ -730,13 +734,19 @@ export class SanityPage {
     // Stream Stats Methods
     // ================================================================
     async displayResultsOnRefreshStats() {
-        await this.streamsMenuItem.click();
+        await gotoStreamsViaNav(this.page);
         await this.refreshStatsButton.click();
         await this.page.reload();
         await this.page.waitForLoadState('domcontentloaded');
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        // Click the first stream row indicator (was the "01" cell in the legacy table).
+        // Real outcome: the refreshed streams-stats table actually rendered —
+        // row 0 is present with a populated stats column (storage size). Without
+        // this the test clicked through without verifying anything rendered.
         await this.firstStreamRow.waitFor({ state: 'visible', timeout: 15000 });
+        await expect(this.firstStreamRow).toBeVisible();
+        await expect(this.firstStreamStatsCell).toBeVisible({ timeout: 15000 });
+
+        // Click the first stream row indicator (was the "01" cell in the legacy table).
         await this.firstStreamRow.click();
     }
 

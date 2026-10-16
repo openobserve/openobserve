@@ -78,12 +78,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
             @click="handleNodeClick(data.span_id)"
           >
-            <div
-              class="text-compact text-info max-w-40 overflow-hidden leading-[1.3] font-semibold break-words text-ellipsis whitespace-nowrap"
+            <OTruncatedText
+              as="div"
+              class="text-compact text-info max-w-40 leading-[1.3] font-semibold break-words"
               :class="getObservationTypeTextClass(data.gen_ai_operation_name)"
             >
               {{ data.operation_name }}
-            </div>
+            </OTruncatedText>
             <OTag
               v-if="data.span_status === 'ERROR'"
               type="spanStatus"
@@ -122,6 +123,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export interface SpanNode {
   span_id: string;
@@ -156,6 +158,7 @@ export default defineComponent({
     OIcon,
     OTag,
     OBanner,
+    OTruncatedText,
   },
   props: {
     traceId: {

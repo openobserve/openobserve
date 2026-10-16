@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
+import { http, HttpResponse } from "msw";
 // Mock aws-exports so isEnterprise / isCloud can be controlled per-test
 vi.mock("@/aws-exports", () => ({
   default: {
@@ -23,6 +24,12 @@ vi.mock("@/aws-exports", () => ({
     isEnterprise: "false",
   },
 }));
+
+// Passthrough spy: real toasts still render, and specs can read what was raised.
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return { ...actual, toast: vi.fn((...args: unknown[]) => actual.toast(...args)) };
+});
 
 // Mock services before importing component (follow reference style)
 vi.mock("@/services/oncall", () => ({
@@ -70,8 +77,12 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import AlertService from "@/services/alerts";
+import { queryClient } from "@/composables/query/queryClient";
+import { alertKeys } from "@/services/alerts.querykeys";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -275,11 +286,7 @@ beforeEach(() => {
   ];
   (store.state as any).organizationData.allAlertsListByFolderId = {};
   // Reset alert list filters to prevent leaking between tests
-  (store.state as any).alertListFilters = {
-    searchQuery: "",
-    filterQuery: "",
-    searchAcrossFolders: false,
-  };
+  resetListViewState();
 
   alertsDB = [
     makeAlert(1, {
@@ -636,6 +643,27 @@ describe("AlertList - data fetching and columns", () => {
     expect(summary.text()).toContain(String(wrapper.vm.stateCounts.total));
   });
 
+  it("counts and filters firing alerts the same way the Last outcome badge shows them", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    wrapper.vm.filteredResults = [
+      { enabled: true, name: "firing", last_outcome: "firing" },
+      { enabled: true, name: "notify-failed", last_outcome: "notify_failed" },
+      { enabled: true, name: "normal", last_outcome: "normal" },
+      // A paused alert freezes its last outcome, so it never shows Firing.
+      { enabled: false, name: "paused-firing", last_outcome: "firing" },
+    ];
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.vm.stateCounts.firing).toBe(2);
+    expect(wrapper.find('[data-test="alert-summary-firing"]').exists()).toBe(true);
+
+    wrapper.vm.onStatSelect("firing");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.name)).toEqual(["firing", "notify-failed"]);
+  });
+
   it("dynamicQueryModel binds to filterQuery by default and to searchQuery when across-folders toggled", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -909,6 +937,23 @@ describe("AlertList - router query behaviors", () => {
     expect(pushedQuery.action).toBeUndefined();
     expect(pushedQuery.alert_id).toBeUndefined();
   });
+
+  // The editor opens an alert from its detail cache (getAlertById), and a save
+  // reaches the list through update:list → refreshList.
+  it("refreshList marks cached alert copies stale so reopening the editor shows the save", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const key = alertKeys.detail(store.state.selectedOrganization.identifier, "a1");
+    queryClient.setQueryData(key, { id: "a1", name: "Alert 1" });
+
+    try {
+      await wrapper.vm.refreshList("default");
+
+      expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    } finally {
+      queryClient.removeQueries({ queryKey: key, exact: true });
+    }
+  });
 });
 
 describe("AlertList - pagination restoration", () => {
@@ -918,13 +963,7 @@ describe("AlertList - pagination restoration", () => {
     // second, spurious autoResetPageIndex after the legitimate one has already settled.
     (store.state as any).organizationData.allAlertsListByFolderId = {};
     alertsDB = Array.from({ length: 15 }, (_, i) => makeAlert(i + 1));
-    (store.state as any).alertListFilters = {
-      searchQuery: "",
-      filterQuery: "",
-      searchAcrossFolders: false,
-      perPage: 5,
-      currentPage: 3,
-    };
+    Object.assign(useListViewState("alerts", {}), { perPage: 5, currentPage: 3 });
     const wrapper: any = await mountAlertList();
     await flushPromises();
     await wrapper.vm.$nextTick();
@@ -938,13 +977,7 @@ describe("AlertList - pagination restoration", () => {
   it("resets the persisted page on a folder switch so it is not restored onto the new folder", async () => {
     (store.state as any).organizationData.allAlertsListByFolderId = {};
     alertsDB = Array.from({ length: 15 }, (_, i) => makeAlert(i + 1));
-    (store.state as any).alertListFilters = {
-      searchQuery: "",
-      filterQuery: "",
-      searchAcrossFolders: false,
-      perPage: 5,
-      currentPage: 3,
-    };
+    Object.assign(useListViewState("alerts", {}), { perPage: 5, currentPage: 3 });
     const wrapper: any = await mountAlertList();
     await flushPromises();
     expect(wrapper.vm.currentPage).toBe(3);
@@ -953,7 +986,59 @@ describe("AlertList - pagination restoration", () => {
     await flushPromises();
 
     expect(wrapper.vm.currentPage).toBe(1);
-    expect((store.state as any).alertListFilters.currentPage).toBe(1);
+    expect(useListViewState("alerts", {}).currentPage).toBe(1);
+  });
+});
+
+describe("AlertList - view state restoration", () => {
+  it("restores the stat-tile chip, sort and page size saved before navigating away", async () => {
+    Object.assign(useListViewState("alerts", {}), {
+      stateFilter: "paused",
+      sortBy: "name",
+      sortOrder: "desc",
+      perPage: 50,
+    });
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+
+    expect(wrapper.vm.stateFilter).toBe("paused");
+    expect(wrapper.vm.sortBy).toBe("name");
+    expect(wrapper.vm.sortOrder).toBe("desc");
+    expect(wrapper.vm.pageSize).toBe(50);
+  });
+
+  it("saves chip, sort and page size changes for the next visit", async () => {
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+
+    wrapper.vm.stateFilter = "active";
+    wrapper.vm.sortBy = "name";
+    wrapper.vm.sortOrder = "asc";
+    wrapper.vm.pageSize = 100;
+    await flushPromises();
+
+    expect(useListViewState("alerts", {})).toMatchObject({
+      stateFilter: "active",
+      sortBy: "name",
+      sortOrder: "asc",
+      perPage: 100,
+    });
+  });
+
+  it("carries the active tab to the alert detail page so back lands on it", async () => {
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    const push = vi.spyOn(wrapper.vm.$router, "push");
+
+    wrapper.vm.activeTab = "scheduled";
+    wrapper.vm.triggerExpand({ alert_id: "a1", folder_id: "default" });
+
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertDetail",
+        query: expect.objectContaining({ tab: "scheduled" }),
+      }),
+    );
   });
 });
 
@@ -1276,14 +1361,15 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     expect(tabValues).toContain("anomalyDetection");
   });
 
-  it("should disable anomalyDetection tab when build_type=opensource even when enterprise flags are set", async () => {
+  it("should show anomalyDetection tab locked when build_type=opensource even when enterprise flags are set", async () => {
     (config as any).isEnterprise = "true";
     (config as any).isCloud = "false";
     (store.state as any).zoConfig.build_type = "opensource";
 
     const wrapper: any = await mountAlertList();
-    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
-    expect(tabValues).not.toContain("anomalyDetection");
+    const tab = wrapper.vm.alertTabs.find((t: any) => t.value === "anomalyDetection");
+    expect(tab).toBeTruthy();
+    expect(tab.locked).toBe(true);
   });
 
   it("should enable anomalyDetection tab when isCloud=true (cloud build)", async () => {
@@ -1297,21 +1383,23 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     expect(tabValues).toContain("anomalyDetection");
   });
 
-  it("should disable anomalyDetection tab when isEnterprise=false (opensource frontend)", async () => {
+  it("should show anomalyDetection tab locked when isEnterprise=false (opensource frontend)", async () => {
     (config as any).isEnterprise = "false";
     (config as any).isCloud = "false";
     (store.state as any).zoConfig.build_type = "enterprise";
 
     const wrapper: any = await mountAlertList();
-    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
-    expect(tabValues).not.toContain("anomalyDetection");
+    const tab = wrapper.vm.alertTabs.find((t: any) => t.value === "anomalyDetection");
+    expect(tab).toBeTruthy();
+    expect(tab.locked).toBe(true);
   });
 
-  it("should disable anomalyDetection tab by default (no env vars set)", async () => {
-    // isEnterprise defaults to "false" → feature disabled
+  it("should show anomalyDetection tab locked by default (no env vars set)", async () => {
+    // isEnterprise defaults to "false" → feature locked, not hidden
     const wrapper: any = await mountAlertList();
-    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
-    expect(tabValues).not.toContain("anomalyDetection");
+    const tab = wrapper.vm.alertTabs.find((t: any) => t.value === "anomalyDetection");
+    expect(tab).toBeTruthy();
+    expect(tab.locked).toBe(true);
   });
 
   it("should include anomalyDetection tab in alertTabs when enabled", async () => {
@@ -1325,13 +1413,14 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     expect(tabValues).toContain("anomalyDetection");
   });
 
-  it("should exclude anomalyDetection tab from alertTabs when disabled", async () => {
+  it("should show anomalyDetection tab locked in alertTabs when not entitled", async () => {
     (config as any).isEnterprise = "false";
     (config as any).isCloud = "false";
 
     const wrapper: any = await mountAlertList();
-    const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
-    expect(tabValues).not.toContain("anomalyDetection");
+    const tab = wrapper.vm.alertTabs.find((t: any) => t.value === "anomalyDetection");
+    expect(tab).toBeTruthy();
+    expect(tab.locked).toBe(true);
   });
 
   it("should fall back activeTab to 'all' when anomalyDetection tab requested but feature disabled", async () => {
@@ -1412,6 +1501,51 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     await cloneDialog.vm.$emit("click:secondary");
     await flushPromises();
     expect(wrapper.vm.showForm).toBe(false);
+  });
+
+  it("duplicateAlert pre-fills stream type and name from the source row", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    const row = wrapper.vm.filteredResults[0];
+    await wrapper.vm.duplicateAlert(row);
+    await flushPromises();
+
+    expect(wrapper.vm.toBeClonestreamType).toBe(row.stream_type);
+    expect(wrapper.vm.toBeClonestreamName).toBe(row.stream_name);
+  });
+
+  it("duplicateAlert leaves stream type and name blank for the '--' placeholder", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    const row = { ...wrapper.vm.filteredResults[0], stream_type: "--", stream_name: "--" };
+    await wrapper.vm.duplicateAlert(row);
+    await flushPromises();
+
+    expect(wrapper.vm.toBeClonestreamType).toBe("");
+    expect(wrapper.vm.toBeClonestreamName).toBe("");
+  });
+
+  it("duplicateAlert still fetches the alert to clone when the stream list fails to load", async () => {
+    global.server.use(
+      http.get(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/streams`,
+        () => HttpResponse.error(),
+      ),
+    );
+
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    const row = wrapper.vm.filteredResults[0];
+    await wrapper.vm.duplicateAlert(row);
+    await flushPromises();
+
+    // A failed stream-list load must not skip fetching the alert being
+    // cloned — otherwise Save would silently copy whatever alert was
+    // cloned previously instead of this one.
+    expect(alertsSvc.get_by_alert_id).toHaveBeenCalledWith(expect.anything(), row.alert_id);
   });
 
   it("clone dialog emits click:primary -> invokes submitForm", async () => {
@@ -1679,6 +1813,25 @@ describe("AlertList - ODialog/ODrawer migration", () => {
       );
     });
 
+    it("marks a firing row under an active downtime as a muted firing", async () => {
+      const downtime = { id: "dt-1", name: "Kafka upgrade", ends_at: 1_900_000_000_000_000 };
+      const { wrapper, row } = await anomalyRow({ active_downtime: downtime });
+
+      expect(row.last_outcome).toBe("firing");
+      expect(wrapper.vm.isMutedFiring(row)).toBe(true);
+      // Row cells render through the virtualised table, which jsdom does not lay out reliably.
+      expect(i18n.global.t("alerts.downtimes.mute.firingMuted")).toBe("Firing · muted");
+      expect(
+        i18n.global.t("alerts.downtimes.mute.firingMutedTooltip", { name: "Kafka upgrade" }),
+      ).toContain("Kafka upgrade");
+    });
+
+    it("keeps the plain outcome badge when no downtime is active", async () => {
+      const { wrapper, row } = await anomalyRow();
+
+      expect(wrapper.vm.isMutedFiring(row)).toBe(false);
+    });
+
     it("carries the priority and tags the API already sends", async () => {
       const { row } = await anomalyRow();
 
@@ -1764,3 +1917,145 @@ describe("AlertList - on-call owner column", () => {
     expect(String(wrapper.vm.oncallTeamName("t_gone"))).toBe("t_gone");
   });
 });
+
+describe("AlertList - trigger", () => {
+  const triggerWith = async (data: Record<string, unknown>) => {
+    const spy = vi.spyOn(AlertService, "trigger_alert").mockResolvedValue({ data } as any);
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    vi.mocked(toast).mockClear();
+    await wrapper.vm.triggerAlert(wrapper.vm.filteredResults[0]);
+    await flushPromises();
+    spy.mockRestore();
+    return vi.mocked(toast).mock.calls.map((call) => call[0]);
+  };
+
+  it("reports success when the run happened", async () => {
+    const calls = await triggerWith({ claim_lost: false, anomalies_found: 0 });
+    expect(calls).toEqual([
+      { variant: "success", message: i18n.global.t("alerts.alertTriggeredSuccess") },
+    ]);
+  });
+
+  it("warns with the server's reason when the detector may not run", async () => {
+    const message = "Anomaly detection config is not enabled";
+    const calls = await triggerWith({ claim_lost: false, ineligible: true, message });
+    expect(calls).toEqual([{ variant: "warning", message }]);
+  });
+
+  it("warns instead of claiming success when a detection run already holds the claim", async () => {
+    const calls = await triggerWith({ claim_lost: true, message: "already running" });
+    expect(calls).toEqual([
+      { variant: "warning", message: i18n.global.t("alerts.anomaly.detectionAlreadyRunning") },
+    ]);
+  });
+}, 15000);
+
+describe("AlertList - triggered in the last 15 minutes", () => {
+  const nowUs = () => Date.now() * 1000;
+
+  const loadRows = async () => {
+    const ranUs = nowUs() - 60_000_000;
+    const oldUs = nowUs() - 3 * 60 * 60 * 1_000_000;
+    const scheduled = { is_real_time: false };
+    alertsDB = [
+      makeAlert(1, { ...scheduled, name: "ran-not-fired", last_triggered_at: ranUs }),
+      makeAlert(2, {
+        ...scheduled,
+        name: "ran-and-fired",
+        last_triggered_at: ranUs,
+        last_satisfied_at: ranUs,
+      }),
+      makeAlert(3, {
+        ...scheduled,
+        name: "ran-fired-long-ago",
+        last_triggered_at: ranUs,
+        last_satisfied_at: oldUs,
+      }),
+      {
+        ...makeAlert(4, { ...scheduled, name: "anomaly-ran-not-fired", last_triggered_at: ranUs }),
+        alert_type: "anomaly_detection",
+        last_satisfied_at: null,
+      } as any,
+      {
+        ...makeAlert(5, {
+          ...scheduled,
+          name: "anomaly-fired",
+          last_triggered_at: ranUs,
+          last_satisfied_at: ranUs,
+        }),
+        alert_type: "anomaly_detection",
+      } as any,
+      {
+        ...makeAlert(6, {
+          ...scheduled,
+          name: "composite-ran-not-fired",
+          last_triggered_at: ranUs,
+        }),
+        alert_type: "composite",
+      } as any,
+      {
+        ...makeAlert(7, {
+          ...scheduled,
+          name: "composite-fired",
+          last_triggered_at: ranUs,
+          last_satisfied_at: ranUs,
+        }),
+        alert_type: "composite",
+      } as any,
+      makeAlert(8, {
+        is_real_time: true,
+        name: "realtime-fired",
+        last_triggered_at: ranUs,
+        last_satisfied_at: ranUs,
+      }),
+      makeAlert(9, {
+        is_real_time: true,
+        name: "realtime-fired-long-ago",
+        last_triggered_at: ranUs,
+        last_satisfied_at: oldUs,
+      }),
+      makeAlert(10, {
+        is_real_time: true,
+        name: "realtime-woke-not-fired",
+        last_triggered_at: ranUs,
+      }),
+    ];
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    await flushPromises();
+    return wrapper;
+  };
+
+  it("counts only alerts that fired recently, not ones that merely ran", async () => {
+    const wrapper = await loadRows();
+    expect(wrapper.vm.filteredResults).toHaveLength(10);
+    expect(wrapper.vm.stateCounts.recent).toBe(4);
+  });
+
+  it("filters the recent state down to alerts that fired recently", async () => {
+    const wrapper = await loadRows();
+    wrapper.vm.onStatSelect("recent");
+    await flushPromises();
+    expect(wrapper.vm.displayedAlerts.map((r: any) => r.name).sort()).toEqual([
+      "anomaly-fired",
+      "composite-fired",
+      "ran-and-fired",
+      "realtime-fired",
+    ]);
+  });
+
+  it("marks the Last Satisfied time of a recent firing, not a Never cell", async () => {
+    const wrapper = await loadRows();
+    // A stale ?action=update from an earlier spec's navigation can swap the table for the editor.
+    await wrapper.vm.handleActionQuery(undefined);
+    await flushPromises();
+    const cells = wrapper.findAll('[data-test="o2-table-cell-last_satisfied_at"]');
+    const never = cells.filter((c: any) => c.text().includes("Never"));
+    const fired = cells.filter((c: any) => !c.text().includes("Never"));
+    expect(never.length).toBeGreaterThan(0);
+    expect(never.every((c: any) => !c.find(".rounded-full").exists())).toBe(true);
+    expect(fired.filter((c: any) => c.find(".bg-warning-500").exists())).toHaveLength(4);
+  });
+}, 15000);

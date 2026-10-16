@@ -6,6 +6,7 @@ import { useId } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { CompositeAlertReference } from "@/ts/interfaces/alert";
 import { raw, useI18nTyped } from "@/types/i18n";
 
@@ -91,9 +92,9 @@ const titleId = `${hostId}-title`;
           :data-test="`alerts-composite-reference-parent-${reference.alert_id}`"
           @click="emit('navigate', reference)"
         >
-          <span class="min-w-0 truncate" :title="reference.name">
+          <OTruncatedText class="block">
             {{ raw(reference.name) }}
-          </span>
+          </OTruncatedText>
         </OButton>
 
         <div

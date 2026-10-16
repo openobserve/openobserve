@@ -117,7 +117,7 @@ interface UnitRule {
 }
 
 /** A panel's unit config: a formatter id plus an optional custom-unit label. */
-interface O2Unit {
+export interface O2Unit {
   unit: string;
   unitCustom: string | null;
 }
@@ -1415,6 +1415,193 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
     default:
       return [];
   }
+}
+
+/** At most this many labels get value counts: each one costs the server a scan. */
+export const BREAKDOWN_LABEL_LIMIT = 15;
+
+/** Labels a breakdown never groups by — the same set `resolveTopkLabel` skips. */
+const NON_BREAKDOWN_LABELS = new Set(["le", "quantile"]);
+
+/** Card kinds with no measure worth splitting: `_created` timestamps and `other`. */
+export function supportsBreakdown(cardKind: string): boolean {
+  return cardKind !== CARD_KIND.TIMESTAMP && cardKind !== CARD_KIND.OTHER;
+}
+
+/** Breakdown labels, alphabetical; `alsoOn` keeps only labels both operands carry. */
+export function breakdownLabelsOf(labels: string[] | undefined, alsoOn?: string[]): string[] {
+  if (!Array.isArray(labels)) return [];
+  const other = alsoOn ? new Set(alsoOn) : null;
+  return labels
+    .filter(
+      (l) =>
+        typeof l === "string" &&
+        LABEL_NAME_RE.test(l) &&
+        !l.startsWith("_") &&
+        !NON_BREAKDOWN_LABELS.has(l) &&
+        (!other || other.has(l)),
+    )
+    .sort();
+}
+
+const BREAKDOWN_TITLE_KEYS: Record<string, I18nKey> = {
+  [CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS]: "metrics.explorer.detail.breakdown.titleP90",
+  [CARD_KIND.COUNTER_RATE]: "metrics.explorer.detail.breakdown.titleRate",
+  [CARD_KIND.EXP_HISTOGRAM_FALLBACK]: "metrics.explorer.detail.breakdown.titleRate",
+  [CARD_KIND.GAUGE]: "metrics.explorer.detail.breakdown.titleAvg",
+  [CARD_KIND.MEAN_PAIR]: "metrics.explorer.detail.breakdown.titleAvg",
+  [CARD_KIND.SUMMARY_QUANTILES]: "metrics.explorer.detail.breakdown.titleMedian",
+  [CARD_KIND.INFO]: "metrics.explorer.detail.breakdown.titleCount",
+};
+
+/** The breakdown chart's title, naming the measure `buildBreakdownQuery` charts for the kind. */
+export function breakdownTitleKey(cardKind: string): I18nKey {
+  return BREAKDOWN_TITLE_KEYS[cardKind] ?? "metrics.explorer.detail.breakdown.titleAvg";
+}
+
+/** A classic histogram charts p90, as a heatmap per label value is unreadable; null if unbuildable. */
+export function buildBreakdownQuery(
+  cardKind: string,
+  ctx: {
+    metricName: string;
+    filters?: FiltersArg;
+    rateWindow?: string;
+    applyNanGuard?: boolean;
+  },
+  label: string,
+  opts?: { topk?: number },
+): string | null {
+  if (!supportsBreakdown(cardKind) || !LABEL_NAME_RE.test(label)) return null;
+
+  const { metricName, filters } = ctx;
+  const w = ctx.rateWindow || DEFAULT_RATE_WINDOW;
+  const guarded = !!ctx.applyNanGuard && RATE_FREE_KINDS.includes(cardKind);
+  const guard = guarded ? withNanGuard : (selector: string) => selector;
+  const sel = buildSelector(metricName, filters);
+  const countSel = () => buildSelector(`${baseNameOf(metricName)}_count`, filters);
+
+  let expr: string;
+  switch (cardKind) {
+    case CARD_KIND.GAUGE:
+      expr = `avg by (${label}) (${guard(sel)})`;
+      break;
+    case CARD_KIND.COUNTER_RATE:
+      expr = `sum by (${label}) (rate(${sel}[${w}]))`;
+      break;
+    case CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS:
+      expr = `histogram_quantile(0.9, sum by (le, ${label}) (rate(${sel}[${w}])))`;
+      break;
+    case CARD_KIND.MEAN_PAIR:
+      expr = `sum by (${label}) (rate(${sel}[${w}])) / sum by (${label}) (rate(${countSel()}[${w}]))`;
+      break;
+    case CARD_KIND.SUMMARY_QUANTILES:
+      expr = `avg by (${label}) (${guard(buildSelector(metricName, filters, { quantile: "0.5" }))})`;
+      break;
+    case CARD_KIND.INFO:
+      expr = `count by (${label}) (${sel})`;
+      break;
+    case CARD_KIND.EXP_HISTOGRAM_FALLBACK:
+      expr = `sum by (${label}) (rate(${countSel()}[${w}]))`;
+      break;
+    default:
+      return null;
+  }
+  return opts?.topk ? `topk(${opts.topk}, ${expr})` : expr;
+}
+
+interface HeatmapQueryContext {
+  metricName: string;
+  filters?: FilterInput[];
+  rateWindow?: string;
+}
+
+/** Seconds in a duration as `formatPromDuration` writes it ("1h4m"); 0 for anything else. */
+function promDurationSeconds(duration: string): number {
+  if (!/^(\d+[dhms])+$/.test(duration)) return 0;
+  const size: Record<string, number> = { d: 86400, h: 3600, m: 60, s: 1 };
+  return [...duration.matchAll(/(\d+)([dhms])/g)].reduce(
+    (sum, [, n, unit]) => sum + Number(n) * size[unit],
+    0,
+  );
+}
+
+/** A classic histogram's buckets split by `label`, one heatmap per value; `cap` keeps the values busiest over the window. */
+export function buildHeatmapBreakdownQuery(
+  ctx: HeatmapQueryContext,
+  label: string,
+  cap?: { topk: number; windowSeconds: number },
+): string | null {
+  if (!LABEL_NAME_RE.test(label)) return null;
+  const w = ctx.rateWindow || DEFAULT_RATE_WINDOW;
+  const expr = `sum by (le, ${label}) (rate(${buildSelector(ctx.metricName, ctx.filters)}[${w}]))`;
+  if (!cap) return expr;
+  // A character class, not `\+`: PromQL strings reject the escape. OTLP writes the bound as "inf".
+  const total = buildSelector(ctx.metricName, [
+    ...(ctx.filters ?? []),
+    { label: raw("le"), operator: "=~", value: "[+]?[Ii]nf" },
+    // Series without the label would otherwise take one of the slots as a group of their own.
+    { label: raw(label), operator: "!=", value: "" },
+  ]);
+  // `@ end()` ranks once over the whole window: a per-step topk lets rotating bursts in and steady values out.
+  // Never shorter than the rate window: a range holding one sample has no increase, and `and` would drop every value.
+  const window = formatPromDuration(Math.max(cap.windowSeconds, promDurationSeconds(w)));
+  const ranked = `topk(${cap.topk}, sum by (${label}) (increase(${total}[${window}] @ end())))`;
+  return `${expr} and on (${label}) ${ranked}`;
+}
+
+/** The heatmap of one value of `label`: the card's own heatmap, narrowed to that value. */
+export function buildHeatmapValueQuery(
+  ctx: HeatmapQueryContext,
+  label: string,
+  value: string,
+): string | null {
+  if (!LABEL_NAME_RE.test(label)) return null;
+  const w = ctx.rateWindow || DEFAULT_RATE_WINDOW;
+  const sel = buildSelector(ctx.metricName, ctx.filters, { [label]: value });
+  return `sum by (le) (rate(${sel}[${w}]))`;
+}
+
+const AGGREGATION_RE = /\b(sum|avg|min|max|count|stddev)\s*(?:by\s*\(([^)]*)\)\s*)?\(/g;
+
+/**
+ * One query of the configured function, split into one series per value of `label`.
+ *
+ * Its input is only the explorer's own variant queries (`getMetricDefaults`), which is why a
+ * regex suffices: aggregations there are always prefix `fn(…)` or `fn by (…) (…)`, never
+ * `without` or a trailing `by`; label values are double-quoted; and a `topk` only ever wraps the
+ * whole expression. Each such aggregation is regrouped by the label: `le` stays, since
+ * `histogram_quantile` needs it, and any other grouping goes, as does the `topk` — the breakdown
+ * IS the split. A query with no aggregation (`quantile_over_time`) is averaged per value. Null
+ * when `label` is not a label name.
+ */
+export function breakdownQueryOf(
+  expr: string,
+  label: string,
+  opts?: { topk?: number },
+): string | null {
+  if (!LABEL_NAME_RE.test(label)) return null;
+  const inner = /^topk\(\s*\d+\s*,\s*([\s\S]*)\)$/.exec(expr.trim())?.[1] ?? expr.trim();
+
+  let split = false;
+  // Odd parts are quoted strings, left as they are.
+  const parts = inner.split(/("(?:[^"\\]|\\.)*")/);
+  const regrouped = parts
+    .map((part, i) =>
+      i % 2
+        ? part
+        : part.replace(AGGREGATION_RE, (_, op: string, groups?: string) => {
+            split = true;
+            const keep = (groups ?? "")
+              .split(",")
+              .map((g) => g.trim())
+              .filter((g) => g === "le");
+            return `${op} by (${[...keep, label].join(", ")}) (`;
+          }),
+    )
+    .join("");
+
+  const result = split ? regrouped : `avg by (${label}) (${inner})`;
+  return opts?.topk ? `topk(${opts.topk}, ${result})` : result;
 }
 
 /** Footer label shown on the card — explorer UI only, never written to a panel. */

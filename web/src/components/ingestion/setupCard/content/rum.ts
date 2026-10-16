@@ -142,7 +142,7 @@ openobserveRum.startSessionReplayRecording();`;
 // never blocks parsing or first paint. Queued callbacks run when it lands.
 const cdnLoader = (globalName: string, src: string) => `  (function (h, o, u, n, d) {
     h = h[d] = h[d] || { q: [], onReady: function (c) { h.q.push(c); } };
-    d = o.createElement(u); d.async = 1; d.src = n;
+    d = o.createElement(u); d.async = 1; d.src = n; d.crossOrigin = 'anonymous';
     n = o.getElementsByTagName(u)[0]; n.parentNode.insertBefore(d, n);
   })(window, document, 'script', '${src}', '${globalName}');`;
 
@@ -232,6 +232,7 @@ export default function rumCard(subs: RumCardSubs, t: TranslateFn): RichCardCont
 
   return {
     provider: {
+      id: "rum",
       name: t("ingestion.setupCard.providerNameRum"),
       tagline: t("ingestion.setupCard.rumTagline"),
       logo: getImageURL("images/common/monitoring.svg"),

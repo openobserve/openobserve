@@ -15,7 +15,10 @@ vi.mock("vue-router", () => ({
 
 const OTableStub = defineComponent({
   name: "OTable",
-  props: { data: { type: Array, default: () => [] } },
+  props: {
+    data: { type: Array, default: () => [] },
+    columns: { type: Array, default: () => [] },
+  },
   template: `
     <div>
       <div v-for="row in data" :key="row.configId">
@@ -119,5 +122,40 @@ describe("QualityScoreConfigsTable", () => {
     expect(wrapper.text()).toContain("Set a healthy threshold");
     expect(wrapper.text()).toContain("No score data");
     expect(wrapper.text()).toContain("No scores in this window");
+  });
+
+  describe("column widths", () => {
+    const mountColumns = () => {
+      const i18n = createI18n({ legacy: false, locale: "en", messages: { en } });
+      const wrapper = mount(QualityScoreConfigsTable, {
+        props: { isLoading: false, rows: [] },
+        global: {
+          plugins: [i18n],
+          stubs: { OTable: OTableStub, OInput: true, OIcon: true, OEmptyState: true },
+        },
+      });
+      return wrapper.findComponent(OTableStub).props("columns") as any[];
+    };
+
+    it("gives every resizable column a minimum width", () => {
+      const missing = mountColumns()
+        .filter((column) => !column.minSize)
+        .map((column) => column.id);
+
+      expect(missing).toEqual([]);
+    });
+
+    it("keeps the Type column wide enough for the Categorical badge", () => {
+      const type = mountColumns().find((column) => column.id === "type");
+
+      expect(type.minSize).toBeGreaterThanOrEqual(104);
+    });
+
+    it("opens Total Scores wide enough that its header is not truncated", () => {
+      const totalScores = mountColumns().find((column) => column.id === "totalScores");
+
+      expect(totalScores.minSize).toBeGreaterThanOrEqual(112);
+      expect(totalScores.size).toBeGreaterThanOrEqual(totalScores.minSize);
+    });
   });
 });

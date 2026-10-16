@@ -19,6 +19,7 @@ use arrow_schema::{DataType, FieldRef, Schema};
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
+        db_monitoring::is_dbm_server_stream,
         promql::HASH_LABEL,
         stream::{StreamParams, StreamType},
     },
@@ -80,21 +81,24 @@ impl JsonColumnar {
         if settings.partition_keys.iter().any(|key| !key.disabled) {
             return None;
         }
-        let mut alerts = HashMap::new();
-        crate::ingestion::get_stream_alerts(
-            &[StreamParams::new(org_id, stream_name, StreamType::Logs)],
-            &mut alerts,
-        )
-        .await;
-        if alerts.values().any(|alerts| !alerts.is_empty()) {
-            return None;
+        // The protected chat stream evaluates no realtime alerts, so cached ones do not apply.
+        if !config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(stream_name) {
+            let mut alerts = HashMap::new();
+            crate::ingestion::get_stream_alerts(
+                &[StreamParams::new(org_id, stream_name, StreamType::Logs)],
+                &mut alerts,
+            )
+            .await;
+            if alerts.values().any(|alerts| !alerts.is_empty()) {
+                return None;
+            }
         }
         Self::for_schema(
             stream_name,
             &schema,
             flatten_level,
             time_range,
-            get_config().db_monitoring.enabled,
+            get_config().db_monitoring.enabled && is_dbm_server_stream(stream_name),
         )
     }
 

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import http from "./http";
+import analytics from "./product_analytics";
 import type {
   OwnershipRule,
   OwnershipStats,
@@ -27,6 +28,7 @@ import type {
   OnCallPolicy,
   OnCallResponse,
   OnCallResponseEvent,
+  OnCallResponseReport,
   OnCallSchedule,
   PresetDescriptor,
   OnCallPosition,
@@ -38,6 +40,7 @@ import type {
   Rotation,
   CauseAnalytics,
   ConfigRisks,
+  Contact,
   EscalationPreview,
   CauseGroup,
   ResolutionCause,
@@ -52,6 +55,9 @@ import type {
   Override,
   PromoteResult,
   PromoteSeverity,
+  PutTelephonyBody,
+  TelephonyView,
+  OrgTelephonyView,
   TestPageResult,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
@@ -75,7 +81,13 @@ const oncall = {
   }: {
     org_identifier: string;
     data: { name: string; timezone: string; description?: string | null };
-  }) => http().post<OnCallTeam>(`/api/${org_identifier}/oncall/teams`, data),
+  }) =>
+    http()
+      .post<OnCallTeam>(`/api/${org_identifier}/oncall/teams`, data)
+      .then((res) => {
+        analytics.track("oncall_team_created");
+        return res;
+      }),
 
   updateTeam: ({
     org_identifier,
@@ -145,10 +157,15 @@ const oncall = {
     team_id: string;
     data: Record<string, unknown> & { preset: string };
   }) =>
-    http().post<OnCallSchedule>(
-      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/schedule/from-preset`,
-      data,
-    ),
+    http()
+      .post<OnCallSchedule>(
+        `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/schedule/from-preset`,
+        data,
+      )
+      .then((res) => {
+        analytics.track("oncall_schedule_saved", { source: "preset", preset: data.preset });
+        return res;
+      }),
 
   getSchedule: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
     http().get<OnCallSchedule | null>(
@@ -211,10 +228,15 @@ const oncall = {
       l0?: L0Policy;
     };
   }) =>
-    http().put<OnCallPolicy>(
-      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/policy`,
-      data,
-    ),
+    http()
+      .put<OnCallPolicy>(
+        `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/policy`,
+        data,
+      )
+      .then((res) => {
+        analytics.track("oncall_escalation_policy_saved");
+        return res;
+      }),
 
   /// `include_resolved` is off by default: the home screen is what still needs
   /// somebody, and closed pages would bury it within a day.
@@ -306,7 +328,13 @@ const oncall = {
   }: {
     org_identifier: string;
     data: { team_id: string; dimensions: Record<string, string> };
-  }) => http().post<OwnershipRule>(`/api/${org_identifier}/oncall/ownership`, data),
+  }) =>
+    http()
+      .post<OwnershipRule>(`/api/${org_identifier}/oncall/ownership`, data)
+      .then((res) => {
+        analytics.track("oncall_ownership_rule_created");
+        return res;
+      }),
 
   /// Repoint an existing rule. Takes the same body as create; 404 on an
   /// unknown id, 409 when another team already owns the path.
@@ -536,6 +564,18 @@ const oncall = {
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/prior-causes`,
     ),
 
+  /// The full agent report this page carried. 404s when no agent ran.
+  responseReport: ({
+    org_identifier,
+    response_id,
+  }: {
+    org_identifier: string;
+    response_id: string;
+  }) =>
+    http().get<OnCallResponseReport>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/report`,
+    ),
+
   /// The individual past firings of the same subject, newest first, with the
   /// current one excluded by the server. Prior causes says what this usually
   /// turns out to be; this says how often it fires and whether anyone answered.
@@ -756,6 +796,61 @@ const oncall = {
     data: { event_ids?: string[]; all?: boolean; read?: boolean };
   }) => http().post<MyDeliveriesRead>(`/api/${org_identifier}/oncall/my/deliveries/read`, data),
 
+  /// The server refuses any email but the caller's own (403), so only the signed-in user's is passed.
+  getContact: ({ org_identifier, user_email }: { org_identifier: string; user_email: string }) =>
+    http().get<Contact>(`/api/${org_identifier}/oncall/contacts/${encodeURIComponent(user_email)}`),
+
+  setContact: ({
+    org_identifier,
+    user_email,
+    data,
+  }: {
+    org_identifier: string;
+    user_email: string;
+    data: { phone: string };
+  }) =>
+    http().put<Contact>(
+      `/api/${org_identifier}/oncall/contacts/${encodeURIComponent(user_email)}`,
+      data,
+    ),
+
+  /// 204 on a sent code; a refusal carries a `VerificationRefusalBody`.
+  sendContactCode: ({
+    org_identifier,
+    user_email,
+  }: {
+    org_identifier: string;
+    user_email: string;
+  }) =>
+    http().post<void>(
+      `/api/${org_identifier}/oncall/contacts/${encodeURIComponent(user_email)}/verify`,
+    ),
+
+  confirmContactCode: ({
+    org_identifier,
+    user_email,
+    code,
+  }: {
+    org_identifier: string;
+    user_email: string;
+    code: string;
+  }) =>
+    http().post<{ phone_verified_at: number }>(
+      `/api/${org_identifier}/oncall/contacts/${encodeURIComponent(user_email)}/verify/confirm`,
+      { code },
+    ),
+
+  /// A refusal carries a `TelephonyRefusalBody`; a 403 means the caller may not read Settings.
+  getTelephony: ({ org_identifier }: { org_identifier: string }) =>
+    http().get<TelephonyView>(`/api/${org_identifier}/telephony`),
+
+  /// Twilio is asked first; nothing is stored unless it reports the account active.
+  putTelephony: ({ org_identifier, data }: { org_identifier: string; data: PutTelephonyBody }) =>
+    http().put<OrgTelephonyView>(`/api/${org_identifier}/telephony`, data),
+
+  deleteTelephony: ({ org_identifier }: { org_identifier: string }) =>
+    http().delete<{ deleted: boolean }>(`/api/${org_identifier}/telephony`),
+
   /// Somebody stands in for the rotation over a window. Outside it the
   /// rotation resolves as normal, which is what makes an override safe.
   createOverride: ({
@@ -839,10 +934,17 @@ const oncall = {
     team_id: string;
     priority?: number;
   }) =>
-    http().post<TestPageResult>(
-      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/test-page`,
-      priority === undefined ? {} : { priority },
-    ),
+    http()
+      .post<TestPageResult>(
+        `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/test-page`,
+        priority === undefined ? {} : { priority },
+      )
+      .then((res) => {
+        analytics.track("oncall_test_page_sent", {
+          reached_anyone: res.data?.reached_anyone === true,
+        });
+        return res;
+      }),
 
   /// Cause counts over a window. The ONLY analytics endpoint that exists —
   /// there is no time-to-ack or time-to-resolve aggregate, by design.

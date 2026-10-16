@@ -123,13 +123,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Absolute only. A relative period is a question about the past — the
            picker resolves "Past 30 Minutes" against the moment it is read —
            and there is no forward-looking reading of it to offer here. -->
-      <OFormDateTimeRange
-        name="window"
-        :label="t('oncall.coverWhen')"
-        required
-        disable-relative
-        data-test="oncall-cover-window"
-      />
+      <!-- A plain block: straight in the form's flex column, the picker's border stretches past its buttons. -->
+      <div>
+        <OFormDateTimeRange
+          name="window"
+          :label="t('oncall.coverWhen')"
+          required
+          disable-relative
+          data-test="oncall-cover-window"
+        />
+      </div>
 
       <!-- What this will actually do, in the team's own clock, before saving. -->
       <OBanner v-if="summary" variant="info" data-test="oncall-cover-summary">

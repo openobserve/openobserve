@@ -276,11 +276,7 @@ pub(crate) async fn read_server_metrics_body(
     // Defaults, like `/query/plans`: these are server-vantage records in the
     // single shared LOGS stream. Requiring it would make the UI hardcode a
     // backend constant to reach its own endpoint.
-    let stream = q
-        .stream
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .unwrap_or(DEFAULT_SERVER_STREAM);
+    let stream = validate_server_stream(q.stream.as_deref())?.unwrap_or(DBM_SERVER_STREAM);
     // The shared prologue only applies to the stream it was computed for — see
     // `read_plans_body`.
     let shared = prologue.filter(|p| p.stream == stream);

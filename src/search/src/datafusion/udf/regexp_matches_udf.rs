@@ -207,12 +207,13 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
                 // Clean up the matched value:
                 // If the value is wrapped in quotes (like "hello"), remove them
                 // If it's not (like 123), keep as is
-                let cleaned = if matched.starts_with('"') && matched.ends_with('"') {
-                    // Remove the surrounding quotes
-                    &matched[1..matched.len() - 1]
-                } else {
-                    matched
-                };
+                let cleaned =
+                    if matched.len() >= 2 && matched.starts_with('"') && matched.ends_with('"') {
+                        // Remove the surrounding quotes
+                        &matched[1..matched.len() - 1]
+                    } else {
+                        matched
+                    };
                 list_builder.values().append_value(cleaned);
                 has_match = true;
             }
@@ -247,6 +248,17 @@ mod tests {
     fn test_regexp_matches_direct_finds_matches() {
         let values = StringArray::from(vec!["abc123def456"]);
         let pattern = StringArray::from(vec!["(\\d+)"]);
+        let args: Vec<ArrayRef> = vec![Arc::new(values), Arc::new(pattern)];
+        let result = regexp_matches::<i32>(&args).unwrap();
+        use arrow::array::{Array, ListArray};
+        let list = result.as_any().downcast_ref::<ListArray>().unwrap();
+        assert!(!list.is_null(0));
+    }
+
+    #[test]
+    fn test_regexp_matches_lone_quote_does_not_panic() {
+        let values = StringArray::from(vec![r#"""#]);
+        let pattern = StringArray::from(vec![r#"(")"#]);
         let args: Vec<ArrayRef> = vec![Arc::new(values), Arc::new(pattern)];
         let result = regexp_matches::<i32>(&args).unwrap();
         use arrow::array::{Array, ListArray};

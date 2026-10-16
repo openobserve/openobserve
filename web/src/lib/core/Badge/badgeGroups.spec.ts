@@ -27,6 +27,19 @@ describe("badgeGroups", () => {
     expect(r.icon).toBeUndefined();
   });
 
+  it("resolves downtimeStatus to dot mode with an amber active state", () => {
+    expect(resolveBadge("downtimeStatus", "active").variant).toBe("warning-soft");
+    expect(resolveBadge("downtimeStatus", "scheduled").variant).toBe("blue-soft");
+    expect(resolveBadge("downtimeStatus", "ended").variant).toBe("default-soft");
+    const cancelled = resolveBadge("downtimeStatus", "cancelled");
+    expect(cancelled.variant).toBe("default-outline");
+    expect(cancelled.dot).toBe(true);
+    expect(cancelled.labelKey).toBe("components.badge.downtimeStatus.cancelled");
+    const early = resolveBadge("downtimeStatus", "ended_early");
+    expect(early.variant).toBe("default-soft");
+    expect(early.labelKey).toBe("components.badge.downtimeStatus.endedEarly");
+  });
+
   it("resolves logLevel to plain mode (no dot, no icon)", () => {
     const r = resolveBadge("logLevel", "error");
     expect(r.mode).toBe("plain");
@@ -282,6 +295,20 @@ describe("badgeGroups", () => {
     expect(resolveBadge("countChip", "errorstrong").variant).toBe("error");
     expect(resolveBadge("logsResultChip", "error").variant).toBe("error-soft");
     expect(resolveBadge("logsResultChip", "error").shape).toBe("rounded");
+  });
+});
+
+describe("aiMode", () => {
+  it("renders consent-required as a warning instead of free usage", () => {
+    const result = resolveBadge("aiMode", "consent_required");
+    expect(result.variant).toBe("warning-soft");
+    expect(result.labelKey).toBe("paidUsage.modeConsentRequired");
+  });
+
+  it("does not label an unknown backend mode as free usage", () => {
+    const result = resolveBadge("aiMode", "future_mode");
+    expect(result.variant).toBe("default-soft");
+    expect(result.labelKey).toBe("paidUsage.modeUnknown");
   });
 });
 

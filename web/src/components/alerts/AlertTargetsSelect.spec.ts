@@ -23,11 +23,12 @@ import { mount } from "@vue/test-utils";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import AlertTargetsSelect from "./AlertTargetsSelect.vue";
 
 const OSelectStub = {
   name: "OSelect",
-  props: ["modelValue", "options", "multiple", "error", "collapsibleGroups"],
+  props: ["modelValue", "options", "multiple", "error", "collapsibleGroups", "pinSelectedInGroups"],
   emits: ["update:modelValue"],
   template: `<div class="o-select" :data-error="String(error)" :data-multiple="String(multiple)">
     <span class="o-select-empty"><slot name="empty" /></span>
@@ -120,6 +121,20 @@ describe("AlertTargetsSelect", () => {
       ]);
     });
 
+    it("locked: the Workflows header still shows with nothing selectable beneath it", () => {
+      const wrapper = createWrapper({
+        destinationOptions: ["slack"],
+        workflowOptions: [{ label: "Escalate", value: "wf-1" }],
+        workflowsEnabled: false,
+        workflowsLocked: true,
+      });
+      expect(select(wrapper).props("options")).toEqual([
+        { header: true, label: "Destinations" },
+        { label: "slack", value: "dest:slack" },
+        { header: true, label: "Workflows" },
+      ]);
+    });
+
     it("normalizes {label,value} destination options", () => {
       const wrapper = createWrapper({
         destinationOptions: [{ label: "Slack #ops", value: "slack" }],
@@ -145,6 +160,35 @@ describe("AlertTargetsSelect", () => {
         destinationOptions: [{ value: "slack" } as any],
       });
       expect(select(wrapper).props("options")).toEqual([{ label: "slack", value: "dest:slack" }]);
+    });
+
+    it("flags a selected destination absent from the options as Missing, not dropped", () => {
+      const wrapper = createWrapper({
+        destinations: ["slack", "deleted-dest"],
+        destinationOptions: ["slack"],
+      });
+      expect(select(wrapper).props("options")).toEqual([
+        { label: "slack", value: "dest:slack" },
+        {
+          label: "deleted-dest",
+          value: "dest:deleted-dest",
+          badge: "Missing",
+          badgeMuted: true,
+        },
+      ]);
+      // Not silently dropped: the missing name stays in the tagged model value too.
+      expect(select(wrapper).props("modelValue")).toContain("dest:deleted-dest");
+    });
+
+    it("flags a selected workflow absent from the options as Missing", () => {
+      const wrapper = createWrapper({
+        workflows: ["deleted-wf"],
+        workflowsEnabled: true,
+      });
+      const values = (select(wrapper).props("options") as any[])
+        .filter((o) => !o.header)
+        .map((o) => o.value);
+      expect(values).toEqual(["wf:deleted-wf"]);
     });
 
     it("tolerates null/undefined option lists", () => {
@@ -245,6 +289,15 @@ describe("AlertTargetsSelect", () => {
     });
   });
 
+  describe("selected-first ordering", () => {
+    it("floats the selection to the top of each group on open", () => {
+      // The stub declares untyped props, so a bare boolean attribute arrives as "".
+      expect(
+        select(createWrapper({ workflowsEnabled: true })).props("pinSelectedInGroups"),
+      ).not.toBe(undefined);
+    });
+  });
+
   describe("error state", () => {
     it("is not in error by default", () => {
       const wrapper = createWrapper();
@@ -294,6 +347,26 @@ describe("AlertTargetsSelect", () => {
       expect(btn.exists()).toBe(true);
       await btn.trigger("click");
       expect(wrapper.emitted("create-workflow")).toHaveLength(1);
+    });
+
+    // Discoverable instead of absent: the family supports workflow routing
+    // but this edition doesn't unlock it, so the button stays visible and
+    // clickable — clicking opens the upgrade dialog instead of creating one.
+    it("shows a clickable, locked Create Workflow button that opens the upgrade dialog", async () => {
+      const wrapper = createWrapper({
+        workflowsEnabled: false,
+        workflowsLocked: true,
+        workflowsLockMessage: "Upgrade to unlock workflows",
+      });
+      const btn = wrapper.find('[data-test="create-workflow-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("disabled")).toBeUndefined();
+
+      const { isOpen, close } = useEnterpriseUpgradeDialog();
+      close();
+      await btn.trigger("click");
+      expect(isOpen.value).toBe(true);
+      expect(wrapper.emitted("create-workflow")).toBeUndefined();
     });
   });
 

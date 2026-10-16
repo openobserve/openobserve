@@ -23,7 +23,11 @@ import store from "@/test/unit/helpers/store";
 import type { OnCallSchedule, OnCallTeamMember } from "@/ts/interfaces/oncall";
 import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 
-vi.mock("@/services/oncall", () => ({ default: { setSchedule: vi.fn() } }));
+vi.mock("@/services/oncall", () => ({
+  default: { setSchedule: vi.fn(), listUnavailability: vi.fn() },
+}));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 
 const service = vi.mocked(oncallService);
 
@@ -162,6 +166,7 @@ describe("OnCallScheduleEditor", () => {
     vi.setSystemTime(NOW);
     vi.clearAllMocks();
     service.setSchedule.mockResolvedValue({ data: {} } as any);
+    service.listUnavailability.mockResolvedValue({ data: [] } as any);
   });
 
   afterEach(() => {
@@ -358,6 +363,36 @@ describe("OnCallScheduleEditor", () => {
     expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(false);
   });
 
+  it("tracks oncall_schedule_saved from the editor once the schedule is saved", async () => {
+    service.setSchedule.mockResolvedValue({ data: {} } as any);
+    vi.mocked(analytics.track).mockClear();
+    const wrapper = render({ schedule: schedule([rota("On-call rotation")]) });
+    await flushPromises();
+    await openRotation(wrapper);
+
+    await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
+    await flushPromises();
+
+    expect(analytics.track).toHaveBeenCalledWith("oncall_schedule_saved", {
+      source: "editor",
+      rotation_count: 1,
+    });
+  });
+
+  it("does not track oncall_schedule_saved when the save is refused", async () => {
+    service.setSchedule.mockRejectedValue({ response: { data: { message: "no" } } });
+    vi.mocked(analytics.track).mockClear();
+    const wrapper = render({ schedule: schedule([rota("On-call rotation")]) });
+    await flushPromises();
+    await openRotation(wrapper);
+
+    await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
+    await flushPromises();
+
+    expect(service.setSchedule).toHaveBeenCalled();
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
   /// `addRotation` pushes the row into the draft before anybody has filled it
   /// in, and the ✕, Esc and the backdrop close through `v-model:open` without
   /// passing Cancel. The abandoned row stayed in the draft and then failed the
@@ -386,6 +421,23 @@ describe("OnCallScheduleEditor", () => {
 
     expect(service.setSchedule).toHaveBeenCalledTimes(1);
     expect((service.setSchedule.mock.calls[0][0] as any).data.rotations).toHaveLength(1);
+  });
+
+  /// The absence horizon is anchored on the clock, so an unbucketed key would
+  /// miss on every open and make a drawer somebody flicks in and out of cost a
+  /// request each time.
+  it("serves a reopened drawer's absences from the cache", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await flushPromises();
+
+    await openRotation(wrapper);
+    expect(service.listUnavailability).toHaveBeenCalledTimes(1);
+
+    wrapper.findComponent({ name: "ODrawer" }).vm.$emit("update:open", false);
+    await flushPromises();
+    await openRotation(wrapper);
+
+    expect(service.listUnavailability).toHaveBeenCalledTimes(1);
   });
 
   /// Closing is not undo. A rotation that already exists is edited in the
@@ -524,6 +576,7 @@ describe("OnCallScheduleEditor — retiring a shift rule", () => {
     vi.setSystemTime(NOW);
     vi.clearAllMocks();
     service.setSchedule.mockResolvedValue({ data: {} } as any);
+    service.listUnavailability.mockResolvedValue({ data: [] } as any);
   });
 
   afterEach(() => {

@@ -251,6 +251,28 @@ const HOST_STREAMS = new Set([
   "system_network_io",
 ]);
 
+describe("buildDbmSectionPanel — base scan grouping", () => {
+  // The shipped log recipes write a `ts` attribute; `GROUP BY ts` then binds that
+  // column instead of the histogram alias and the planner rejects the query.
+  const baseGroupBy = (q: string) =>
+    /FROM "_o2_dbm_server" WHERE [\s\S]*? GROUP BY ([\s\S]*?)(?:\) AS \w+\)| ORDER BY)/.exec(
+      q,
+    )?.[1];
+
+  it.each([
+    ["sql-rate, unbounded dim", panelDef("activity", "calls"), "query"],
+    ["sql-rate, bounded dim", panelDef("activity", "calls"), "database"],
+    ["sql-server, unbounded dim", panelDef("blocks", "blksHit"), "query"],
+    ["sql-server, bounded dim", panelDef("blocks", "blksRead"), "database"],
+  ])("%s groups by the histogram expression, not the `ts` alias", (_label, def, by) => {
+    const q = buildDbmSectionPanel(def, by, {}, t).schema.queries[0].query;
+    const groupBy = baseGroupBy(q);
+    expect(groupBy).toBeDefined();
+    expect(groupBy).toMatch(/^histogram\(_timestamp\), /);
+    expect(groupBy).not.toMatch(/(^|,\s*)(ts|segment)(\s*,|$)/);
+  });
+});
+
 describe("dbmHostSelector", () => {
   it("is empty when the scope names no instance", () => {
     expect(dbmHostSelector({})).toBe("");

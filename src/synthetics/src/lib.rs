@@ -32,15 +32,9 @@
 //! `openobserve-core` would have broken that — `super_cluster_queue` depends on
 //! core — and demoted a compile-time impossibility to a lint.
 
-/// Serialises the tests that swap the process-global `config::CONFIG`.
-///
-/// Two of them pin the same property from opposite ends of the crate — that the
-/// synthetics config is read at point of use, not captured at boot — and both
-/// have to install a config to prove it. Without this they race, and the loser
-/// reads the winner's value. Poisoning is ignored so one failed test does not
-/// cascade into `PoisonError`s.
+/// Tests that swap the global config race without this; tokio so async tests can hold it.
 #[cfg(test)]
-pub(crate) static CONFIG_SWAP_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+pub(crate) static CONFIG_SWAP_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// Whether THIS crate was compiled with the `cloud` feature — the fixture for
 /// the compile-time guard against SPEC §11 **F6**.

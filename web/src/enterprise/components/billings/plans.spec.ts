@@ -19,8 +19,13 @@ import Plans from "./plans.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import BillingService from "@/services/billings";
+import paidOverage from "@/services/paidOverage";
 import * as zincutils from "@/utils/zincutils";
 import { nextTick } from "vue";
+import analytics from "@/services/product_analytics";
+import config from "@/aws-exports";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock toast
 const { mockToast } = vi.hoisted(() => ({
@@ -44,9 +49,16 @@ vi.mock("@/services/billings", async (importOriginal) => {
       get_hosted_url: vi.fn(),
       get_session_url: vi.fn(),
       retrieve_hosted_page: vi.fn(),
+      get_ai_usage: vi.fn(),
     },
   });
 });
+
+vi.mock("@/services/paidOverage", () => ({
+  default: {
+    get: vi.fn(),
+  },
+}));
 
 // Mock zincutils
 vi.mock("@/utils/zincutils", () => ({
@@ -120,6 +132,24 @@ describe("Plans Component", () => {
     (BillingService.retrieve_hosted_page as any).mockResolvedValue({
       data: { data: { hosted_page: { state: "succeeded" } } },
     });
+    (BillingService.get_ai_usage as any).mockResolvedValue({
+      data: {
+        credits_used: 0,
+        credits_limit: 100,
+        credits_remaining: 100,
+        mode: "free",
+        requires_additional_credits: false,
+      },
+    });
+    (paidOverage.get as any).mockResolvedValue({
+      data: {
+        feature: "ai_credits",
+        organization: { org_id: "default", enabled: false, can_manage: true },
+        payer: null,
+        effective: false,
+        billing_status: "eligible",
+      },
+    });
 
     (zincutils.useLocalOrganization as any).mockReturnValue({
       value: {
@@ -152,6 +182,64 @@ describe("Plans Component", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("bounds the pricing request, so a host that never answers cannot leave Plans loading", async () => {
+    const fetchSpy = vi.fn(() => new Promise<Response>(() => {}));
+    vi.stubGlobal("fetch", fetchSpy);
+    const bounded = mount(Plans, {
+      global: { plugins: [i18n], provide: { store }, mocks: { $router: mockRouter } },
+    });
+    await flushPromises();
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    bounded.unmount();
+    vi.unstubAllGlobals();
+  });
+
+  it("fires billing_checkout_returned once with the plan when Stripe sends the user back", async () => {
+    vi.mocked(analytics.track).mockClear();
+    Object.defineProperty(document, "referrer", {
+      value: "https://checkout.stripe.com/c/pay/cs_test",
+      configurable: true,
+    });
+    const returned = mount(Plans, {
+      global: { plugins: [i18n], provide: { store }, mocks: { $router: mockRouter } },
+    });
+    await flushPromises();
+
+    expect(
+      vi
+        .mocked(analytics.track)
+        .mock.calls.filter(([name]) => name === "billing_checkout_returned"),
+    ).toEqual([["billing_checkout_returned", { plan: config.paidPlan }]]);
+    returned.unmount();
+    Object.defineProperty(document, "referrer", { value: "", configurable: true });
+  });
+
+  it.each([
+    "https://checkout.stripe.com.evil.test/c/pay/cs_test",
+    "https://evil.test/checkout.stripe.com",
+    "https://evil.test/?next=https://checkout.stripe.com",
+    "not a url checkout.stripe.com",
+  ])("does not fire billing_checkout_returned for the look-alike referrer %s", async (referrer) => {
+    vi.mocked(analytics.track).mockClear();
+    Object.defineProperty(document, "referrer", { value: referrer, configurable: true });
+    const returned = mount(Plans, {
+      global: { plugins: [i18n], provide: { store }, mocks: { $router: mockRouter } },
+    });
+    await flushPromises();
+
+    expect(
+      vi
+        .mocked(analytics.track)
+        .mock.calls.filter(([name]) => name === "billing_checkout_returned"),
+    ).toEqual([]);
+    returned.unmount();
+    Object.defineProperty(document, "referrer", { value: "", configurable: true });
   });
 
   // Test 1: Component mounting
@@ -236,7 +324,7 @@ describe("Plans Component", () => {
   });
 
   // Test 10: loadSubscription method - empty subscription type warning
-  it("should show warning when subscription type is empty", async () => {
+  it("never toasts or redirects when the org has no subscription yet", async () => {
     const response = {
       data: {
         subscription_type: "",
@@ -244,14 +332,13 @@ describe("Plans Component", () => {
       },
     };
     (BillingService.list_subscription as any).mockResolvedValue(response);
+    const pushSpy = vi.spyOn(wrapper.vm.$router, "push");
 
     await wrapper.vm.loadSubscription();
 
-    expect(mockToast).toHaveBeenCalledWith({
-      variant: "warning",
-      message: "Please subscribe to one of the plan.",
-      timeout: 5000,
-    });
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(pushSpy).not.toHaveBeenCalled();
+    expect(wrapper.vm.loading).toBe(false);
   });
 
   // Test 11: loadSubscription method - error handling
@@ -650,5 +737,43 @@ describe("Plans Component", () => {
     await flushPromises();
 
     expect(BillingService.resume_subscription).toHaveBeenCalledTimes(2);
+  });
+
+  it("hands the paid usage switch the card's current mode", async () => {
+    wrapper.vm.aiUsage = {
+      credits_used: 5,
+      credits_limit: 5,
+      credits_remaining: 0,
+      mode: "consent_required",
+      requires_additional_credits: false,
+    };
+    await nextTick();
+
+    expect(wrapper.findComponent({ name: "PaidAiUsageControl" }).props("mode")).toBe(
+      "consent_required",
+    );
+  });
+
+  it("keeps a full bar neutral while paid usage carries on, and red only when blocked", async () => {
+    const usage = { credits_used: 5, credits_limit: 5, credits_remaining: 0 };
+    wrapper.vm.aiUsage = { ...usage, mode: "pay_as_you_go", requires_additional_credits: false };
+    expect(wrapper.vm.aiUsageVariant).toBe("default");
+    wrapper.vm.aiUsage = { ...usage, mode: "exhausted", requires_additional_credits: false };
+    expect(wrapper.vm.aiUsageVariant).toBe("danger");
+  });
+
+  it("offers Contact Sales when a contract org runs out", async () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    wrapper.vm.aiUsage = {
+      credits_used: 5,
+      credits_limit: 5,
+      credits_remaining: 0,
+      mode: "exhausted",
+      requires_additional_credits: true,
+    };
+    await nextTick();
+    await wrapper.get('[data-test="billing-ai-contact-sales"]').trigger("click");
+    expect(open).toHaveBeenCalledWith("https://openobserve.ai/contactus/", "_blank");
+    open.mockRestore();
   });
 });

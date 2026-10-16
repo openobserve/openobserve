@@ -747,4 +747,134 @@ mod tests {
             );
         }
     }
+
+    /// `synthetics_checks::create` needs the migration's column defaults, which entities omit.
+    async fn db_for_applies() -> sea_orm::DatabaseConnection {
+        use sea_orm::{ConnectOptions, ConnectionTrait, Database, Schema};
+
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        db.execute_unprepared("PRAGMA foreign_keys = ON")
+            .await
+            .unwrap();
+        db.execute_unprepared(
+            "CREATE TABLE synthetics (
+                id TEXT NOT NULL PRIMARY KEY,
+                org_id TEXT NOT NULL,
+                folder_id TEXT NOT NULL,
+                tz_offset INTEGER NOT NULL DEFAULT 0,
+                name TEXT NOT NULL,
+                synthetics_type TEXT NOT NULL,
+                target TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                tags TEXT NOT NULL,
+                config TEXT NOT NULL,
+                frequency TEXT NOT NULL,
+                locations TEXT NOT NULL,
+                enabled BOOLEAN NOT NULL DEFAULT 1,
+                destinations TEXT NOT NULL,
+                settings TEXT NOT NULL,
+                secrets TEXT NOT NULL DEFAULT '{}',
+                next_run_at BIGINT NOT NULL DEFAULT 0,
+                last_triggered_at BIGINT NOT NULL DEFAULT 0,
+                last_check_status INTEGER NOT NULL DEFAULT 0,
+                consecutive_failures INTEGER NOT NULL DEFAULT 0,
+                last_alert_at BIGINT NOT NULL DEFAULT 0,
+                alerting BOOLEAN NOT NULL DEFAULT 0,
+                degraded_notified_at BIGINT NOT NULL DEFAULT 0,
+                owner TEXT NULL,
+                created_at BIGINT NOT NULL,
+                updated_at BIGINT NOT NULL
+            )",
+        )
+        .await
+        .unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(
+            &schema.create_table_from_entity(infra::table::entity::synthetics_refs::Entity),
+        ))
+        .await
+        .unwrap();
+        db
+    }
+
+    fn browser_check(id: &str, children: &[&str]) -> Synthetic {
+        let mut steps =
+            vec![serde_json::json!({ "id": "s0", "action": "navigate", "url": "https://x" })];
+        for (i, child) in children.iter().enumerate() {
+            steps.push(serde_json::json!({
+                "id": format!("r{i}"), "action": "subtest", "subtest": { "id": child }
+            }));
+        }
+        Synthetic {
+            id: id.to_string(),
+            org_id: "org1".to_string(),
+            folder_id: "folder-1".to_string(),
+            name: id.to_string(),
+            check_type: config::meta::synthetics::SyntheticType::Browser,
+            config: serde_json::json!({ "steps": steps }),
+            ..Synthetic::default()
+        }
+    }
+
+    async fn stored_refs(db: &sea_orm::DatabaseConnection, parent: &str) -> Vec<String> {
+        table::synthetics_refs::refs_for_parents(db, "org1", &[parent.to_string()])
+            .await
+            .unwrap()
+            .remove(parent)
+            .unwrap_or_default()
+    }
+
+    // The applies below call the same table functions `process_msg` calls, with its arguments.
+    #[tokio::test]
+    async fn a_replicated_composed_parent_writes_its_refs_rows() {
+        let db = db_for_applies().await;
+        table::synthetics_checks::create(&db, "org1", browser_check("child", &[]), true)
+            .await
+            .unwrap();
+        table::synthetics_checks::create(&db, "org1", browser_check("parent", &["child"]), true)
+            .await
+            .unwrap();
+        assert_eq!(stored_refs(&db, "parent").await, ["child"]);
+    }
+
+    #[tokio::test]
+    async fn a_replicated_parent_may_arrive_before_its_child() {
+        let db = db_for_applies().await;
+        table::synthetics_checks::create(&db, "org1", browser_check("parent", &["later"]), true)
+            .await
+            .expect("child_id has no foreign key, so the parent applies");
+        assert_eq!(stored_refs(&db, "parent").await, ["later"]);
+    }
+
+    #[tokio::test]
+    async fn a_replicated_delete_of_a_referenced_child_applies() {
+        let db = db_for_applies().await;
+        table::synthetics_checks::create(&db, "org1", browser_check("child", &[]), true)
+            .await
+            .unwrap();
+        table::synthetics_checks::create(&db, "org1", browser_check("parent", &["child"]), true)
+            .await
+            .unwrap();
+        assert!(
+            table::synthetics_checks::delete(&db, "org1", "child")
+                .await
+                .unwrap()
+        );
+        assert_eq!(stored_refs(&db, "parent").await, ["child"]);
+    }
+
+    #[tokio::test]
+    async fn a_replicated_update_that_drops_a_reference_removes_its_row() {
+        let db = db_for_applies().await;
+        table::synthetics_checks::create(&db, "org1", browser_check("parent", &["a", "b"]), true)
+            .await
+            .unwrap();
+        table::synthetics_checks::update(&db, "org1", "parent", browser_check("parent", &["a"]))
+            .await
+            .unwrap();
+        assert_eq!(stored_refs(&db, "parent").await, ["a"]);
+    }
 }

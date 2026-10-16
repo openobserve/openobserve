@@ -45,12 +45,13 @@ const OTableStub = {
           <slot name="cell-lastCheck" :row="row" />
           <slot name="cell-method" :row="row" />
           <slot name="cell-steps" :row="row" />
+          <slot name="cell-referencedBy" :row="row" />
           <slot name="cell-assertions" :row="row" />
           <slot name="cell-folder_name" :row="row" />
           <slot name="cell-actions" :row="row" />
         </div>
       </template>
-      <slot name="bottom" />
+      <slot v-if="selectedIds.length > 0" name="selection-actions" />
     </div>
   `,
   props: {
@@ -60,7 +61,6 @@ const OTableStub = {
     selectedIds: { type: Array, default: () => [] },
     rowKey: { type: String, default: "id" },
     dataTest: { type: String, default: "" },
-    footerTitle: { type: String, default: "" },
     emptyMessage: { type: String, default: "" },
   },
 };
@@ -171,7 +171,6 @@ function getOTableProps(wrapper: VueWrapper) {
     data: stub.props("data") as any[],
     loading: stub.props("loading") as boolean,
     selectedIds: stub.props("selectedIds") as string[],
-    footerTitle: stub.props("footerTitle") as string,
   };
 }
 
@@ -237,6 +236,7 @@ describe("MonitorTable", () => {
         "name",
         "url",
         "steps",
+        "referencedBy",
         "history",
         "responseTime",
         "uptime",
@@ -275,18 +275,6 @@ describe("MonitorTable", () => {
       const { columns } = getOTableProps(wrapper);
       const ids = columns.map((c) => c.id);
       expect(ids).not.toContain("folder_name");
-    });
-
-    it("should pass default footerTitle when not provided", () => {
-      wrapper = mountMonitorTable();
-      const { footerTitle } = getOTableProps(wrapper);
-      expect(footerTitle).toBe("Checks");
-    });
-
-    it("should pass custom footerTitle when provided", () => {
-      wrapper = mountMonitorTable({ footerTitle: "Monitors" });
-      const { footerTitle } = getOTableProps(wrapper);
-      expect(footerTitle).toBe("Monitors");
     });
   });
 
@@ -534,33 +522,6 @@ describe("MonitorTable", () => {
     });
   });
 
-  // ── Footer text ───────────────────────────────────────────────────────
-
-  describe("footer", () => {
-    it("should show selection count when rows are selected", () => {
-      wrapper = mountMonitorTable({
-        selectedIds: ["mon-http-1", "mon-tcp-1"],
-      });
-      const bottom = wrapper.find('[data-test="monitor-table"]');
-      expect(bottom.text()).toContain("2 of 4 selected");
-    });
-
-    it("should show total count when no rows are selected", () => {
-      wrapper = mountMonitorTable({ selectedIds: [] });
-      const bottom = wrapper.find('[data-test="monitor-table"]');
-      expect(bottom.text()).toContain("4 Checks");
-    });
-
-    it("should show custom footerTitle in total count", () => {
-      wrapper = mountMonitorTable({
-        selectedIds: [],
-        footerTitle: "HTTP Monitors",
-      });
-      const bottom = wrapper.find('[data-test="monitor-table"]');
-      expect(bottom.text()).toContain("4 HTTP Monitors");
-    });
-  });
-
   // ── Folder navigation ─────────────────────────────────────────────────
 
   describe("folder column", () => {
@@ -631,6 +592,74 @@ describe("MonitorTable", () => {
       expect(duplicateBtn.exists()).toBe(true);
       const moreBtn = wrapper.find('[data-test="monitor-table-more-btn"]');
       expect(moreBtn.exists()).toBe(true);
+    });
+  });
+
+  // `steps` is the server's expanded count; `referencedBy` counts checks using this one.
+  describe("steps and used-by cells", () => {
+    it("renders the expanded step count and the used-by count in browser mode", () => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [{ id: "a", name: "checkout", steps: 16, referencedBy: 3 }],
+      });
+      expect(wrapper.find('[data-test="monitor-table-cell-steps"]').text()).toContain("16");
+      expect(wrapper.find('[data-test="monitor-table-cell-referencedBy"]').text()).toBe("3 tests");
+    });
+
+    // The column header already says "Used by"; the cell has to agree with its count.
+    it("reads '1 test' for a single referrer", () => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [{ id: "a", name: "login", steps: 13, referencedBy: 1 }],
+      });
+      const cell = wrapper.find('[data-test="monitor-table-cell-referencedBy"]').text();
+      expect(cell).toBe("1 test");
+      expect(cell).not.toContain("tests");
+    });
+
+    it("renders a dash for a check nothing references", () => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [{ id: "a", name: "login", steps: 13, referencedBy: 0 }],
+      });
+      expect(wrapper.find('[data-test="monitor-table-cell-referencedBy"]').text()).toBe("—");
+    });
+
+    it.each([
+      ["missing", "Subtest missing"],
+      ["nested", "Subtest holds a subtest"],
+    ])("flags a %s reference with a warning badge beside the steps", (state, text) => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [{ id: "a", name: "checkout", steps: 16, referencedBy: 0, referenceState: state }],
+      });
+      const badge = wrapper.find('[data-test="monitor-table-reference-state"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toBe(text);
+      expect(wrapper.find('[data-test="monitor-table-cell-steps"]').text()).toContain("16");
+    });
+
+    it("renders no reference badge for an ok reference or a check with none", () => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [
+          { id: "a", name: "checkout", steps: 16, referencedBy: 0, referenceState: "ok" },
+          { id: "b", name: "plain", steps: 3, referencedBy: 0 },
+        ],
+      });
+      expect(wrapper.find('[data-test="monitor-table-reference-state"]').exists()).toBe(false);
+    });
+
+    // An unreadable journey is not zero steps, so null must not render as "0" or "NaN".
+    it("renders a dash, not 0, for a null steps count", () => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [{ id: "a", name: "unreadable", steps: null, referencedBy: 0 }],
+      });
+      const cell = wrapper.find('[data-test="monitor-table-cell-steps"]').text();
+      expect(cell).toBe("—");
+      expect(cell).not.toContain("0");
+      expect(cell).not.toContain("NaN");
     });
   });
 

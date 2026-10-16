@@ -70,7 +70,12 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import DependencyImpactDialog from "./DependencyImpactDialog.vue";
-import { focusSummary, depKindIcon, depKindColor } from "@/composables/alerts/useDependencyGraph";
+import {
+  focusSummary,
+  depKindIcon,
+  depKindColor,
+  consumerBadges,
+} from "@/composables/alerts/useDependencyGraph";
 import type { DepGraph, DepFocus, DepNodeKind } from "@/composables/alerts/useDependencyGraph";
 
 const props = defineProps<{ graph: DepGraph; focus: DepFocus }>();
@@ -106,6 +111,11 @@ const badges = computed(() => {
       count: c.alerts,
       label: t("alert_dependencies.usedBy", { count: c.alerts }, c.alerts),
     });
+  if (props.focus.kind === "destination") {
+    for (const b of consumerBadges(summary.value.node)) {
+      out.push({ kind: b.kind, count: b.count, label: t(b.labelKey, { count: b.count }, b.count) });
+    }
+  }
   return out;
 });
 

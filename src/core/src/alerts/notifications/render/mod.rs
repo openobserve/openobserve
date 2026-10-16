@@ -362,12 +362,16 @@ mod tests {
             alert_count: "3".into(),
             alert_agg_value: "92.5".into(),
             alert_level: "critical".into(),
+            alert_status: "firing".to_string(),
+            episode_id: None,
             alert_priority: "P1".into(),
             alert_tags: "infra, prod".into(),
             alert_threshold_crit: "90".into(),
             alert_threshold_warn: "80".into(),
             alert_start_time: "2026-08-01T10:00:00".into(),
             alert_end_time: "2026-08-01T10:10:00".into(),
+            alert_start_time_millis: "1785578400000".into(),
+            alert_end_time_millis: "1785579000000".into(),
             alert_url: "https://o2.example/short/abc".into(),
             alert_trigger_time: 1_754_000_000_000_000,
             alert_trigger_time_str: "2026-08-01T10:10:00".into(),
@@ -1520,5 +1524,38 @@ mod tests {
         );
         let (_, sns_message) = sns::render_sns(&c);
         w("sns.txt", &(sns_message + "\n"));
+    }
+
+    /// The trigger must carry the SAME key, or there is nothing for the resolve
+    /// to match. Without one PagerDuty invents a UUID per event, which is why
+    /// every re-firing opens a fresh incident today.
+    #[test]
+    fn a_pagerduty_trigger_carries_the_episode_key_when_recovery_is_on() {
+        let mut ctx = fixture_ctx();
+        ctx.episode_id = Some("ep_1".into());
+
+        let RenderedMessage::Http { body } =
+            render(ChannelFormat::PagerDuty, &hostile_content(), &ctx).unwrap()
+        else {
+            panic!("PagerDuty renders an HTTP body");
+        };
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(v["event_action"], "trigger");
+        assert_eq!(v["dedup_key"], "ep_1");
+        assert!(v.get("payload").is_some());
+    }
+
+    /// An alert that never opted into recovery keeps today's behaviour exactly:
+    /// no key, so PagerDuty's own dedup rules are untouched.
+    #[test]
+    fn a_pagerduty_trigger_without_an_episode_sends_no_key() {
+        let RenderedMessage::Http { body } =
+            render(ChannelFormat::PagerDuty, &hostile_content(), &fixture_ctx()).unwrap()
+        else {
+            panic!("PagerDuty renders an HTTP body");
+        };
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(v["event_action"], "trigger");
+        assert!(v.get("dedup_key").is_none());
     }
 }

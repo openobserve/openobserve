@@ -24,6 +24,9 @@ use super::{
     types::*,
 };
 
+/// Answer given to tool calls when the MCP tool registry was never built.
+const MCP_DISABLED_MESSAGE: &str = "MCP is disabled on this node (ZO_MCP_ENABLED=false)";
+
 /// Route an MCP request to the appropriate handler
 pub async fn route_request(
     org_id: &str,
@@ -72,10 +75,16 @@ pub async fn route_request(
         }
     };
 
+    // `ZO_MCP_ENABLED=false` skips building the tool registry at boot, so there
+    // is nothing to list or execute -- answer without touching it.
+    let mcp_enabled = config::get_config().common.mcp_enabled;
+
     // Route to handler
     let result = match method {
         MCPMethod::Initialize => handle_initialize(request.params),
         MCPMethod::Ping => handle_ping(),
+        MCPMethod::ToolsList if !mcp_enabled => Ok(json!({ "tools": [] })),
+        MCPMethod::ToolsCall if !mcp_enabled => Err(anyhow!(MCP_DISABLED_MESSAGE)),
         MCPMethod::ToolsList => handle_tools_list(),
         MCPMethod::ToolsCall => handle_tools_call(org_id, request.params, auth_token).await,
         MCPMethod::ServerDiscover => handle_server_discover(),
@@ -422,6 +431,49 @@ fn bind_organization(http_path: &str, arguments: &mut Value, org_id: &str) {
     arguments.insert("org_id".to_string(), Value::String(org_id.to_string()));
 }
 
+/// Percent-encode path arguments as single segments; rmcp-openapi substitutes them raw.
+fn encode_path_parameters(
+    metadata: &rmcp_openapi::ToolMetadata,
+    arguments: &mut Value,
+) -> Result<()> {
+    let Some(arguments) = arguments.as_object_mut() else {
+        return Ok(());
+    };
+    for (name, mapping) in &metadata.parameter_mappings {
+        if mapping.location != "path" {
+            continue;
+        }
+        let Some(value) = arguments.get_mut(name) else {
+            continue;
+        };
+        match value {
+            Value::String(s) if s.is_empty() || s == "." || s == ".." => {
+                return Err(anyhow!("Invalid path parameter '{name}'"));
+            }
+            Value::String(s) => *s = encode_path_segment(s),
+            Value::Array(_) | Value::Object(_) => {
+                return Err(anyhow!("Path parameter '{name}' must be a scalar"));
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+/// Encode only what can reroute or re-substitute a value; permission checks read the raw path.
+fn encode_path_segment(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for c in value.chars() {
+        // The URL parser drops tab/LF/CR and trailing spaces, which can leave a bare `..`.
+        if matches!(c, '%' | '/' | '\\' | '?' | '#' | ' ' | '{' | '}') || c.is_ascii_control() {
+            encoded.push_str(&format!("%{:02X}", c as u32));
+        } else {
+            encoded.push(c);
+        }
+    }
+    encoded
+}
+
 /// Execute a tool using the shared HTTP client
 async fn execute_tool(
     org_id: &str,
@@ -438,6 +490,7 @@ async fn execute_tool(
     // so the underlying HTTP API contract stays untouched.
     normalize_request_body_fields(&metadata.parameters, &mut arguments);
     bind_organization(&metadata.path, &mut arguments, org_id);
+    encode_path_parameters(metadata, &mut arguments)?;
 
     // Get the shared HTTP client
     let shared_client = get_shared_http_client();
@@ -590,6 +643,149 @@ mod tests {
         let mut arguments = json!({"request_body": {"org_id": "body-org"}});
         bind_organization("/api/organizations", &mut arguments, "acme");
         assert_eq!(arguments, json!({"request_body": {"org_id": "body-org"}}));
+    }
+
+    fn dashboard_tool() -> rmcp_openapi::ToolMetadata {
+        let mapping = |name: &str| {
+            (
+                name.to_string(),
+                rmcp_openapi::tool::ParameterMapping {
+                    sanitized_name: name.to_string(),
+                    original_name: name.to_string(),
+                    location: "path".to_string(),
+                    explode: false,
+                },
+            )
+        };
+        rmcp_openapi::ToolMetadata {
+            name: "GetDashboard".to_string(),
+            title: None,
+            description: None,
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "org_id": {"type": "string"},
+                    "dashboard_id": {"type": "string"}
+                }
+            }),
+            output_schema: None,
+            method: "GET".to_string(),
+            path: "/api/{org_id}/dashboards/{dashboard_id}".to_string(),
+            security: None,
+            parameter_mappings: [mapping("org_id"), mapping("dashboard_id")].into(),
+        }
+    }
+
+    async fn loopback_request_line(dashboard_id: &str) -> String {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = url::Url::parse(&format!("http://{}/", listener.local_addr().unwrap())).unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = Vec::new();
+            let mut chunk = [0u8; 1024];
+            while !buf.windows(2).any(|w| w == b"\r\n") {
+                let n = socket.read(&mut chunk).await.unwrap();
+                if n == 0 {
+                    break;
+                }
+                buf.extend_from_slice(&chunk[..n]);
+            }
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}")
+                .await
+                .unwrap();
+            String::from_utf8_lossy(&buf)
+                .lines()
+                .next()
+                .unwrap()
+                .to_string()
+        });
+
+        let metadata = dashboard_tool();
+        let mut arguments = json!({"org_id": "acme", "dashboard_id": dashboard_id});
+        encode_path_parameters(&metadata, &mut arguments).unwrap();
+        rmcp_openapi::HttpClient::new()
+            .with_base_url(base)
+            .unwrap()
+            .execute_tool_call(&metadata, &arguments)
+            .await
+            .unwrap();
+        server.await.unwrap()
+    }
+
+    #[test]
+    fn path_parameter_encodes_only_route_changing_characters() {
+        for (raw, expected) in [
+            ("job:http_requests:rate5m", "job:http_requests:rate5m"),
+            ("user@example.com", "user@example.com"),
+            ("../../other/x?y#z%2e", "..%2F..%2Fother%2Fx%3Fy%23z%252e"),
+            (".\t.", ".%09."),
+            ("\\..\\x", "%5C..%5Cx"),
+            (".. ", "..%20"),
+            ("{org_id}", "%7Borg_id%7D"),
+        ] {
+            let mut arguments = json!({"org_id": "acme", "dashboard_id": raw});
+            encode_path_parameters(&dashboard_tool(), &mut arguments).unwrap();
+            assert_eq!(
+                arguments,
+                json!({"org_id": "acme", "dashboard_id": expected}),
+                "{raw:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn empty_dot_segment_and_non_scalar_path_parameters_are_rejected() {
+        for dashboard_id in [
+            json!(""),
+            json!("."),
+            json!(".."),
+            json!(["../x"]),
+            json!({"a": "../x"}),
+        ] {
+            let mut arguments = json!({"org_id": "acme", "dashboard_id": dashboard_id});
+            assert!(
+                encode_path_parameters(&dashboard_tool(), &mut arguments).is_err(),
+                "{dashboard_id}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn traversal_argument_stays_on_its_route() {
+        for (raw, expected) in [
+            (
+                "../../other/secret",
+                "/api/acme/dashboards/..%2F..%2Fother%2Fsecret",
+            ),
+            (".\t.", "/api/acme/dashboards/.%09."),
+            ("\\..\\..\\other", "/api/acme/dashboards/%5C..%5C..%5Cother"),
+            (".. ", "/api/acme/dashboards/..%20"),
+            (
+                "job:http_requests:rate5m",
+                "/api/acme/dashboards/job:http_requests:rate5m",
+            ),
+            ("user@example.com", "/api/acme/dashboards/user@example.com"),
+            ("%2e%2e", "/api/acme/dashboards/%252e%252e"),
+            (".%2E", "/api/acme/dashboards/.%252E"),
+            ("x?y#z", "/api/acme/dashboards/x%3Fy%23z"),
+        ] {
+            assert_eq!(
+                loopback_request_line(raw).await,
+                format!("GET {expected} HTTP/1.1"),
+                "{raw:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn placeholder_argument_is_not_substituted_twice() {
+        assert_eq!(
+            loopback_request_line("{org_id}").await,
+            "GET /api/acme/dashboards/%7Borg_id%7D HTTP/1.1"
+        );
     }
 
     #[tokio::test]

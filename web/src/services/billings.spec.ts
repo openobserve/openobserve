@@ -16,6 +16,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import billings from "@/services/billings";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http");
 
@@ -480,6 +483,28 @@ describe("Billings Service", () => {
         `/api/${mockOrgId}/billing_group/invites/${token}/reject`,
       );
     });
+
+    it("remove_billing_group_member should DELETE the member endpoint", async () => {
+      mockHttp.mockReturnValue({
+        delete: vi.fn().mockResolvedValue({ data: "removed" }),
+      } as any);
+
+      await billings.remove_billing_group_member(mockOrgId, "child-org");
+
+      expect(mockHttp().delete).toHaveBeenCalledWith(
+        `/api/${mockOrgId}/billing_group/members/child-org`,
+      );
+    });
+
+    it("leave_billing_group should DELETE the membership endpoint", async () => {
+      mockHttp.mockReturnValue({
+        delete: vi.fn().mockResolvedValue({ data: "left" }),
+      } as any);
+
+      await billings.leave_billing_group(mockOrgId);
+
+      expect(mockHttp().delete).toHaveBeenCalledWith(`/api/${mockOrgId}/billing_group/membership`);
+    });
   });
 
   describe("submit_new_user_info", () => {
@@ -647,5 +672,23 @@ describe("Billings Service", () => {
       const attributionResult = await billings.submit_new_user_info(mockOrgId, userInfo);
       expect(attributionResult.data.message).toBe("Attribution saved");
     });
+  });
+});
+
+describe("billings product analytics", () => {
+  beforeEach(() => {
+    vi.mocked(analytics.track).mockClear();
+  });
+
+  it("tracks after resume_subscription succeeds", async () => {
+    (http as any).mockImplementation(() => ({ get: vi.fn().mockResolvedValue({ data: {} }) }));
+    await billings.resume_subscription("org1");
+    expect(analytics.track).toHaveBeenCalledWith("billing_plan_subscribed");
+  });
+
+  it("does not track when resume_subscription fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({ get: vi.fn().mockRejectedValue(new Error("boom")) }));
+    await expect(billings.resume_subscription("org1")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

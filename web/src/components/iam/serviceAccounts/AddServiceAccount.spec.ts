@@ -53,6 +53,9 @@ vi.mock("@/services/iam", async (importOriginal) => {
   });
 });
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
+
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),
 }));
@@ -279,6 +282,25 @@ describe("AddServiceAccount", () => {
   });
 
   describe("creation behavior", () => {
+    it("tracks service_account_created once the account is created", async () => {
+      vi.mocked(service_accounts.create).mockResolvedValue({ data: {} } as any);
+      await getNameInput(wrapper).setValue("new-bot");
+      await submitForm(wrapper);
+
+      expect(analytics.track).toHaveBeenCalledWith("service_account_created");
+    });
+
+    it("does not track service_account_created when creation fails", async () => {
+      vi.mocked(service_accounts.create).mockRejectedValue({
+        response: { status: 500, data: { message: "Server error" } },
+      });
+      await getNameInput(wrapper).setValue("fail-bot");
+      await submitForm(wrapper);
+
+      expect(service_accounts.create).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
     it("emits updated (with an access promise resolving to empty buckets) + update:open(false) after a successful create", async () => {
       vi.mocked(service_accounts.create).mockResolvedValue({ data: {} } as any);
       await getNameInput(wrapper).setValue("new-bot");

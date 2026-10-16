@@ -76,10 +76,9 @@
                     "
                     @click="handlePatternClick(row)"
                   >
-                    <span
-                      class="regex-pattern-name max-w-[10vw] truncate overflow-hidden whitespace-nowrap normal-case!"
-                      >{{ row.pattern_name }}</span
-                    >
+                    <OTruncatedText class="regex-pattern-name max-w-[10vw] normal-case!">{{
+                      row.pattern_name
+                    }}</OTruncatedText>
                     <OIcon name="check" size="xs" />
                   </li>
                 </ul>
@@ -109,10 +108,9 @@
                     "
                     @click="handlePatternClick(row)"
                   >
-                    <span
-                      class="regex-pattern-name max-w-[10vw] truncate overflow-hidden whitespace-nowrap normal-case!"
-                      >{{ row.pattern_name }}</span
-                    >
+                    <OTruncatedText class="regex-pattern-name max-w-[10vw] normal-case!">{{
+                      row.pattern_name
+                    }}</OTruncatedText>
                     <OIcon v-if="checkIfPatternIsApplied(row.pattern_id)" name="check" size="xs" />
                   </li>
                 </ul>
@@ -415,6 +413,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export interface PatternAssociation {
   field: string;
@@ -438,6 +437,7 @@ export default defineComponent({
     OCheckbox,
     OIcon,
     OCollapsible,
+    OTruncatedText,
   },
   props: {
     data: {

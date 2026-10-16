@@ -18,14 +18,22 @@
 //! Implements wait-and-collect logic to batch multiple alerts with the same
 //! fingerprint before sending a single grouped notification.
 
-use std::sync::{Arc, LazyLock as Lazy};
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use chrono::Utc;
-use config::{meta::alerts::alert::Alert, utils::json};
+use config::{
+    meta::{
+        alerts::alert::Alert,
+        self_reporting::usage::{RunOutcome, TriggerData},
+    },
+    utils::json,
+};
 use dashmap::DashMap;
 
-/// In-memory cache of pending alert batches
-/// Key: fingerprint, Value: PendingBatch
+/// Keyed by [`batch_key`]: a fingerprint carries no org, so it alone would merge two orgs' batches.
 static PENDING_BATCHES: Lazy<Arc<DashMap<String, PendingBatch>>> =
     Lazy::new(|| Arc::new(DashMap::new()));
 
@@ -54,6 +62,8 @@ pub struct BatchedAlert {
     pub alert: Alert,
     pub rows: Vec<json::Map<String, json::Value>>,
     pub timestamp: i64,
+    /// This evaluation's history row, held back until the flush knows whether the send landed.
+    pub trigger_data: TriggerData,
 }
 
 impl PendingBatch {
@@ -64,6 +74,7 @@ impl PendingBatch {
         org_id: String,
         alert: Alert,
         rows: Vec<json::Map<String, json::Value>>,
+        trigger_data: TriggerData,
         group_wait_seconds: i64,
         max_group_size: usize,
         level: Option<config::meta::alerts::level::AlertLevel>,
@@ -78,6 +89,7 @@ impl PendingBatch {
                 alert,
                 rows,
                 timestamp: now,
+                trigger_data,
             }],
             timer_started_at: now,
             group_wait_seconds,
@@ -87,7 +99,12 @@ impl PendingBatch {
     }
 
     /// Add an alert to this batch
-    pub fn add_alert(&mut self, alert: Alert, rows: Vec<json::Map<String, json::Value>>) -> bool {
+    pub fn add_alert(
+        &mut self,
+        alert: Alert,
+        rows: Vec<json::Map<String, json::Value>>,
+        trigger_data: TriggerData,
+    ) -> bool {
         if self.alerts.len() >= self.max_group_size {
             return false; // Batch full
         }
@@ -97,6 +114,7 @@ impl PendingBatch {
             alert,
             rows,
             timestamp: now,
+            trigger_data,
         });
         true
     }
@@ -114,14 +132,54 @@ impl PendingBatch {
     }
 }
 
-/// Add alert to pending batch or create new batch
-/// Returns true if batch is ready to send (expired or full)
+/// What the batcher did with an evaluation handed to [`add_to_batch`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BatchAdmission {
+    /// Collected into a batch that is still waiting; its flush publishes the row.
+    Queued,
+    /// Collected into a batch that is now full; the caller flushes it immediately.
+    Ready,
+    /// The batch was full and not yet taken, so this evaluation joined no batch at all.
+    Refused,
+}
+
+fn batch_key(org_id: &str, fingerprint: &str) -> String {
+    format!("{org_id}/{fingerprint}")
+}
+
+/// One history row per evaluation in the batch, built before the send consumes it.
+fn flush_rows(batch: &PendingBatch) -> Vec<TriggerData> {
+    let group_size = batch.alerts.len() as i32;
+    batch
+        .alerts
+        .iter()
+        .map(|batched| TriggerData {
+            dedup_enabled: Some(true),
+            grouped: Some(true),
+            group_size: Some(group_size),
+            ..batched.trigger_data.clone()
+        })
+        .collect()
+}
+
+/// A failed send is `NotifyFailed`, not `Error`: the evaluation itself succeeded.
+fn stamp_flush_error(rows: &mut [TriggerData], error: &anyhow::Error) {
+    let text = format!("error sending notification for alert: {error}");
+    for row in rows {
+        row.status = RunOutcome::NotifyFailed;
+        row.error = Some(text.clone());
+        row.delivery_attempted = Some(true);
+    }
+}
+
+/// Add alert to pending batch or create new batch, reporting whether it was collected at all.
 #[allow(clippy::too_many_arguments)]
 pub fn add_to_batch(
     fingerprint: String,
     org_id: String,
     alert: Alert,
     rows: Vec<json::Map<String, json::Value>>,
+    trigger_data: TriggerData,
     group_wait_seconds: i64,
     max_group_size: usize,
     level: Option<config::meta::alerts::level::AlertLevel>,
@@ -129,16 +187,12 @@ pub fn add_to_batch(
     // sharing a fingerprint shares a group, because the group is part of the
     // fingerprint — so this is set once, when the batch is created.
     group_labels: Option<std::collections::BTreeMap<String, String>>,
-) -> bool {
-    let mut batch_ready = false;
-    let mut is_new_batch = false;
-    let mut batch_size = 0;
-
-    PENDING_BATCHES
-        .entry(fingerprint.clone())
+) -> BatchAdmission {
+    let mut refused = false;
+    let full = PENDING_BATCHES
+        .entry(batch_key(&org_id, &fingerprint))
         .and_modify(|batch| {
-            if batch.add_alert(alert.clone(), rows.clone()) {
-                batch_size = batch.alerts.len();
+            if batch.add_alert(alert.clone(), rows.clone(), trigger_data.clone()) {
                 log::debug!(
                     "[grouping] Added alert '{}' to existing batch {} (count: {}/{})",
                     alert.name,
@@ -147,7 +201,6 @@ pub fn add_to_batch(
                     batch.max_group_size
                 );
                 if batch.is_full() {
-                    batch_ready = true;
                     log::info!(
                         "[grouping] Batch {} reached max size ({}), ready to send",
                         fingerprint,
@@ -155,16 +208,16 @@ pub fn add_to_batch(
                     );
                 }
             } else {
+                refused = true;
                 log::warn!(
-                    "[grouping] Failed to add alert '{}' to batch {} (already full)",
+                    "[grouping] Failed to add alert '{}' to batch {} (already full), org_id: {}",
                     alert.name,
-                    fingerprint
+                    fingerprint,
+                    org_id
                 );
             }
         })
         .or_insert_with(|| {
-            is_new_batch = true;
-            batch_size = 1;
             log::info!(
                 "[grouping] Created new batch for fingerprint {}, alert: '{}', org: {}, wait_seconds: {}, max_size: {}",
                 fingerprint,
@@ -178,67 +231,73 @@ pub fn add_to_batch(
                 org_id,
                 alert,
                 rows,
+                trigger_data,
                 group_wait_seconds,
                 max_group_size,
                 level,
                 group_labels,
             )
-        });
-
-    if is_new_batch {
-        let batch_count = PENDING_BATCHES.len();
-        log::debug!("[grouping] Current pending batches count: {batch_count}");
-
-        // Update gauge metric for pending batches
-        // Use org_id from the batch we just inserted
-        if let Some(batch) = PENDING_BATCHES.get(&fingerprint) {
-            config::metrics::ALERT_GROUPING_BATCHES_PENDING
-                .with_label_values(&[batch.org_id.as_str()])
-                .set(batch_count as i64);
-        }
+        })
+        .is_full();
+    if refused {
+        BatchAdmission::Refused
+    } else if full {
+        BatchAdmission::Ready
+    } else {
+        BatchAdmission::Queued
     }
-
-    batch_ready
 }
 
 /// Get and remove a batch if it's ready (expired or full)
-pub fn get_ready_batch(fingerprint: &str) -> Option<PendingBatch> {
-    if let Some(entry) = PENDING_BATCHES.get(fingerprint)
-        && (entry.is_expired() || entry.is_full())
-    {
-        let batch = PENDING_BATCHES.remove(fingerprint).map(|(_, batch)| batch);
-        if let Some(ref b) = batch {
+pub fn get_ready_batch(org_id: &str, fingerprint: &str) -> Option<PendingBatch> {
+    // Checked inside `remove_if`: a `get` guard held across `remove` deadlocks the shard.
+    PENDING_BATCHES
+        .remove_if(&batch_key(org_id, fingerprint), |_, batch| {
+            batch.is_expired() || batch.is_full()
+        })
+        .map(|(_, batch)| batch)
+        .inspect(|batch| {
             log::debug!(
                 "[grouping] Retrieved ready batch for fingerprint {} ({} alerts)",
                 fingerprint,
-                b.alerts.len()
+                batch.alerts.len()
             );
-        }
-        return batch;
-    }
-    None
+        })
 }
 
-/// Get all expired batches
+/// Take every expired batch out of the map, and report each org's remaining pending batches.
 pub fn get_expired_batches() -> Vec<PendingBatch> {
     let mut expired = Vec::new();
+    let mut pending_per_org: HashMap<String, i64> = HashMap::new();
     let now = Utc::now().timestamp_micros();
 
-    PENDING_BATCHES.retain(|fingerprint, batch| {
+    PENDING_BATCHES.retain(|key, batch| {
         if batch.is_expired() {
             let elapsed_seconds = (now - batch.timer_started_at) / 1_000_000;
             log::info!(
                 "[grouping] Batch {} expired after {}s with {} alerts",
-                fingerprint,
+                key,
                 elapsed_seconds,
                 batch.alerts.len()
             );
             expired.push(batch.clone());
             false // Remove from map
         } else {
+            if let Some(count) = pending_per_org.get_mut(&batch.org_id) {
+                *count += 1;
+            } else {
+                pending_per_org.insert(batch.org_id.clone(), 1);
+            }
             true // Keep in map
         }
     });
+    // Recounted here, off the scheduler path; reset drops orgs whose batches drained.
+    config::metrics::ALERT_GROUPING_BATCHES_PENDING.reset();
+    for (org_id, count) in &pending_per_org {
+        config::metrics::ALERT_GROUPING_BATCHES_PENDING
+            .with_label_values(&[org_id.as_str()])
+            .set(*count);
+    }
 
     if !expired.is_empty() {
         log::debug!(
@@ -259,11 +318,33 @@ pub fn get_pending_batch_count(org_id: &str) -> i64 {
         .count() as i64
 }
 
+/// The row of an evaluation no batch took: it fired, and no notification was sent for it.
+pub fn refused_row(trigger_data: &TriggerData) -> TriggerData {
+    TriggerData {
+        status: RunOutcome::NotifyFailed,
+        error: Some(
+            "alert grouping batch was already full; this evaluation joined no batch and no \
+             notification was sent"
+                .to_string(),
+        ),
+        delivery_attempted: Some(false),
+        ..trigger_data.clone()
+    }
+}
+
+/// Sends a batch and publishes its members' rows; false when nothing was delivered.
+#[cfg(feature = "enterprise")]
+pub async fn flush_batch(trace_id: &str, batch: PendingBatch) -> bool {
+    let decisions = entry_decisions(&batch).await;
+    flush_decided(trace_id, batch, decisions).await
+}
+
+/// Sends one batch's notification; `Ok` says whether any destination or workflow was tried.
 #[cfg(feature = "enterprise")]
 pub async fn send_grouped_notification(
     trace_id: &str,
     batch: crate::alerts::grouping::PendingBatch,
-) -> Result<(), anyhow::Error> {
+) -> Result<bool, anyhow::Error> {
     use config::meta::alerts::deduplication::SendStrategy;
 
     use crate::alerts::alert::AlertExt;
@@ -411,6 +492,7 @@ pub async fn send_grouped_notification(
             // part of that fingerprint, so the whole batch is one group.
             batch.group_labels.as_ref(),
             &[],
+            None,
         )
         .await
     {
@@ -418,7 +500,8 @@ pub async fn send_grouped_notification(
             let (success_msg, err_msg) = (outcome.success_message, outcome.error_message);
             if !err_msg.is_empty() {
                 log::error!(
-                    "[alert_grouping_worker] Some destinations failed for grouped notification (fingerprint: {}): {}",
+                    "[alert_grouping_worker] Some destinations failed for grouped notification (org_id: {}, fingerprint: {}): {}",
+                    batch.org_id,
                     batch.fingerprint,
                     err_msg
                 );
@@ -450,11 +533,12 @@ pub async fn send_grouped_notification(
                 batch.fingerprint,
                 success_msg
             );
-            Ok(())
+            Ok(outcome.attempted)
         }
         Err(e) => {
             log::error!(
-                "[alert_grouping_worker] Failed to send grouped notification (fingerprint: {}): {}",
+                "[alert_grouping_worker] Failed to send grouped notification (org_id: {}, fingerprint: {}): {}",
+                batch.org_id,
                 batch.fingerprint,
                 e
             );
@@ -467,12 +551,181 @@ pub async fn send_grouped_notification(
     }
 }
 
+/// A member muted at its own evaluation leaves with a `Suppressed` row and does not count.
+#[cfg(feature = "enterprise")]
+async fn flush_decided(
+    trace_id: &str,
+    mut batch: PendingBatch,
+    decisions: Vec<Option<config::meta::downtimes::ActiveDowntime>>,
+) -> bool {
+    drop_muted_entries(&mut batch, decisions);
+    if batch.alerts.is_empty() {
+        return false;
+    }
+    let mut rows = flush_rows(&batch);
+    let delivered = match send_grouped_notification(trace_id, batch).await {
+        Ok(attempted) => {
+            for row in &mut rows {
+                row.delivery_attempted = Some(attempted);
+            }
+            true
+        }
+        Err(e) => {
+            stamp_flush_error(&mut rows, &e);
+            false
+        }
+    };
+    for row in rows {
+        usage_reporting::publish_triggers_usage(row);
+    }
+    delivered
+}
+
+/// Judged at each entry's own timestamp, so a firing admitted before a window is still sent.
+#[cfg(feature = "enterprise")]
+async fn entry_decisions(
+    batch: &PendingBatch,
+) -> Vec<Option<config::meta::downtimes::ActiveDowntime>> {
+    if !crate::alerts::downtimes::any_since(
+        &batch.org_id,
+        config::meta::downtimes::TargetModule::Alerts,
+        oldest_entry(batch),
+    ) {
+        return vec![None; batch.alerts.len()];
+    }
+    let mut decisions = Vec::with_capacity(batch.alerts.len());
+    for (entry, at) in batch.alerts.iter().zip(judged_at(batch)) {
+        decisions.push(entry_downtime(entry, at).await);
+    }
+    decisions
+}
+
+/// The instant each entry is judged at: its own evaluation, never the flush.
+#[cfg(feature = "enterprise")]
+fn judged_at(batch: &PendingBatch) -> Vec<i64> {
+    batch.alerts.iter().map(|entry| entry.timestamp).collect()
+}
+
+/// The downtime gate looks back to here, so a window that ended before the flush still mutes.
+#[cfg(feature = "enterprise")]
+fn oldest_entry(batch: &PendingBatch) -> i64 {
+    judged_at(batch).into_iter().min().unwrap_or_default()
+}
+
+#[cfg(feature = "enterprise")]
+fn drop_muted_entries(
+    batch: &mut PendingBatch,
+    decisions: Vec<Option<config::meta::downtimes::ActiveDowntime>>,
+) {
+    for (entry, downtime) in take_muted(batch, decisions) {
+        log::info!(
+            "[alert_grouping_worker] alert {}/{} dropped from its batch by downtime {}",
+            entry.alert.org_id,
+            entry.alert.name,
+            downtime.id
+        );
+        crate::alerts::alert::count_suppressed_run(&entry.alert.org_id, "alerts");
+        usage_reporting::publish_triggers_usage(suppressed_entry_record(&entry, downtime));
+    }
+}
+
+/// Removes the muted entries from the batch and returns them with their downtime.
+#[cfg(feature = "enterprise")]
+fn take_muted(
+    batch: &mut PendingBatch,
+    decisions: Vec<Option<config::meta::downtimes::ActiveDowntime>>,
+) -> Vec<(BatchedAlert, config::meta::downtimes::ActiveDowntime)> {
+    let (kept, muted) = split_muted(std::mem::take(&mut batch.alerts), decisions);
+    batch.alerts = kept;
+    muted
+}
+
+/// The entries no downtime covers, in their order, and the others with their downtime.
+#[cfg(feature = "enterprise")]
+fn split_muted<T>(
+    entries: Vec<T>,
+    decisions: Vec<Option<config::meta::downtimes::ActiveDowntime>>,
+) -> (Vec<T>, Vec<(T, config::meta::downtimes::ActiveDowntime)>) {
+    let mut kept = Vec::with_capacity(entries.len());
+    let mut muted = Vec::new();
+    for (entry, decision) in entries.into_iter().zip(decisions) {
+        match decision {
+            Some(downtime) => muted.push((entry, downtime)),
+            None => kept.push(entry),
+        }
+    }
+    (kept, muted)
+}
+
+#[cfg(feature = "enterprise")]
+async fn entry_downtime(
+    entry: &BatchedAlert,
+    at: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    let alert_id = entry.alert.id.as_ref()?.to_string();
+    let (folder, _) =
+        crate::db::alerts::alert::get_alert_from_cache(&entry.alert.org_id, &alert_id).await?;
+    let identity =
+        crate::alerts::scheduler::handlers::downtime_identity(&entry.alert, &entry.rows).await;
+    crate::alerts::scheduler::handlers::muted_in_every_group(&identity, |dims| {
+        crate::alerts::downtimes::active_for_alert(
+            &entry.alert.org_id,
+            &alert_id,
+            &folder.folder_id,
+            dims,
+            at,
+        )
+    })
+}
+
+/// The held-back evaluation row of a dropped entry, recorded as suppressed by its downtime.
+#[cfg(feature = "enterprise")]
+fn suppressed_entry_record(
+    entry: &BatchedAlert,
+    downtime: config::meta::downtimes::ActiveDowntime,
+) -> TriggerData {
+    TriggerData {
+        status: RunOutcome::Suppressed,
+        downtime_id: Some(downtime.id),
+        delivery_attempted: Some(false),
+        error: None,
+        grouped: Some(true),
+        ..entry.trigger_data.clone()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn make_alert() -> Alert {
         serde_json::from_value(serde_json::json!({})).unwrap()
+    }
+
+    fn admit(fp: &str, org: &str, max_group_size: usize, row: TriggerData) -> BatchAdmission {
+        add_to_batch(
+            fp.to_string(),
+            org.to_string(),
+            make_alert(),
+            vec![],
+            row,
+            3600,
+            max_group_size,
+            None,
+            None,
+        )
+    }
+
+    fn add_one(fp: &str, org: &str, max_group_size: usize) -> bool {
+        admit(fp, org, max_group_size, TriggerData::default()) == BatchAdmission::Ready
+    }
+
+    fn evaluation_row(key: &str) -> TriggerData {
+        TriggerData {
+            key: key.to_string(),
+            status: RunOutcome::Firing,
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -482,6 +735,7 @@ mod tests {
             "myorg".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             30,
             10,
             None,
@@ -498,13 +752,14 @@ mod tests {
             "myorg".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             30,
             2,
             None,
             None,
         );
         assert!(!batch.is_full());
-        let added = batch.add_alert(make_alert(), vec![]);
+        let added = batch.add_alert(make_alert(), vec![], TriggerData::default());
         assert!(added);
         assert!(batch.is_full());
     }
@@ -516,13 +771,14 @@ mod tests {
             "myorg".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             30,
             1,
             None,
             None,
         );
         assert!(batch.is_full());
-        let added = batch.add_alert(make_alert(), vec![]);
+        let added = batch.add_alert(make_alert(), vec![], TriggerData::default());
         assert!(!added);
         assert_eq!(batch.alerts.len(), 1);
     }
@@ -534,6 +790,7 @@ mod tests {
             "myorg".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             3600, // 1 hour wait
             10,
             None,
@@ -544,112 +801,371 @@ mod tests {
 
     #[test]
     fn test_add_to_batch_creates_new_batch() {
-        let fp = "grouping_test_add_creates_new_batch_unique".to_string();
-        PENDING_BATCHES.remove(&fp);
+        let (fp, org) = ("grouping_test_add_creates_new_batch_unique", "org-test-add");
 
-        let ready = add_to_batch(
-            fp.clone(),
-            "org-test-add".to_string(),
-            make_alert(),
-            vec![],
-            3600,
-            10,
-            None,
-            None,
-        );
-        assert!(!ready);
-        assert!(PENDING_BATCHES.contains_key(&fp));
+        assert!(!add_one(fp, org, 10));
+        assert!(PENDING_BATCHES.contains_key(&batch_key(org, fp)));
 
-        PENDING_BATCHES.remove(&fp);
+        PENDING_BATCHES.remove(&batch_key(org, fp));
     }
 
     #[test]
     fn test_add_to_batch_returns_true_when_full() {
-        let fp = "grouping_test_add_batch_full_unique".to_string();
-        PENDING_BATCHES.remove(&fp);
+        let (fp, org) = ("grouping_test_add_batch_full_unique", "org-test-full");
 
-        let ready1 = add_to_batch(
-            fp.clone(),
-            "org-test-full".to_string(),
-            make_alert(),
-            vec![],
-            3600,
-            2,
-            None,
-            None,
-        );
-        assert!(!ready1); // new batch, 1 alert, not full
+        assert!(!add_one(fp, org, 2)); // new batch, 1 alert, not full
+        assert!(add_one(fp, org, 2)); // 2nd alert fills batch, ready=true
 
-        let ready2 = add_to_batch(
-            fp.clone(),
-            "org-test-full".to_string(),
-            make_alert(),
-            vec![],
-            3600,
-            2,
-            None,
-            None,
-        );
-        assert!(ready2); // 2nd alert fills batch, ready=true
-
-        PENDING_BATCHES.remove(&fp);
+        PENDING_BATCHES.remove(&batch_key(org, fp));
     }
 
     #[test]
     fn test_get_ready_batch_returns_none_when_not_expired() {
-        let fp = "grouping_test_get_ready_not_expired_unique".to_string();
-        PENDING_BATCHES.remove(&fp);
+        let (fp, org) = ("grouping_test_get_ready_not_expired_unique", "org-test-get");
+        add_one(fp, org, 10);
 
-        add_to_batch(
-            fp.clone(),
-            "org-test-get".to_string(),
-            make_alert(),
-            vec![],
-            3600,
-            10,
-            None,
-            None,
-        );
+        assert!(get_ready_batch(org, fp).is_none()); // 3600s wait, not expired
 
-        let batch = get_ready_batch(&fp);
-        assert!(batch.is_none()); // 3600s wait, not expired
-
-        PENDING_BATCHES.remove(&fp);
+        PENDING_BATCHES.remove(&batch_key(org, fp));
     }
 
     #[test]
     fn test_get_pending_batch_count_counts_org_batches() {
-        let fp1 = "grouping_count_fp1_unique_org".to_string();
-        let fp2 = "grouping_count_fp2_unique_org".to_string();
+        let (fp1, fp2) = (
+            "grouping_count_fp1_unique_org",
+            "grouping_count_fp2_unique_org",
+        );
         let org = "org-count-unique-test";
-        PENDING_BATCHES.remove(&fp1);
-        PENDING_BATCHES.remove(&fp2);
+        add_one(fp1, org, 10);
+        add_one(fp2, org, 10);
 
-        add_to_batch(
-            fp1.clone(),
-            org.to_string(),
-            make_alert(),
-            vec![],
-            3600,
-            10,
-            None,
-            None,
+        assert!(get_pending_batch_count(org) >= 2);
+
+        PENDING_BATCHES.remove(&batch_key(org, fp1));
+        PENDING_BATCHES.remove(&batch_key(org, fp2));
+    }
+
+    #[test]
+    fn test_add_to_batch_keeps_orgs_with_same_fingerprint_apart() {
+        let fp = "grouping_test_same_fp_two_orgs";
+        let (org_a, org_b) = ("org-isolation-a", "org-isolation-b");
+
+        assert!(!add_one(fp, org_a, 2));
+        assert!(!add_one(fp, org_b, 2));
+        for org in [org_a, org_b] {
+            let batch = PENDING_BATCHES.get(&batch_key(org, fp)).unwrap();
+            assert_eq!(batch.org_id, org);
+            assert_eq!(batch.alerts.len(), 1);
+        }
+
+        PENDING_BATCHES.remove(&batch_key(org_a, fp));
+        PENDING_BATCHES.remove(&batch_key(org_b, fp));
+    }
+
+    #[test]
+    fn test_get_ready_batch_takes_full_batch() {
+        let fp = "grouping_test_get_ready_full";
+        let org = "org-ready-full";
+        assert!(!add_one(fp, org, 2));
+        assert!(add_one(fp, org, 2));
+
+        // Run on another thread so a deadlock fails the test instead of hanging it.
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || tx.send(get_ready_batch(org, fp)));
+        let batch = rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("get_ready_batch deadlocked")
+            .expect("a full batch is ready");
+
+        assert_eq!(batch.alerts.len(), 2);
+        assert!(!PENDING_BATCHES.contains_key(&batch_key(org, fp)));
+    }
+
+    #[test]
+    fn test_get_ready_batch_ignores_other_org() {
+        let fp = "grouping_test_get_ready_other_org";
+        let (owner, other) = ("org-ready-owner", "org-ready-other");
+        assert!(!add_one(fp, owner, 2));
+        assert!(add_one(fp, owner, 2));
+
+        assert!(get_ready_batch(other, fp).is_none());
+        assert!(PENDING_BATCHES.contains_key(&batch_key(owner, fp)));
+
+        PENDING_BATCHES.remove(&batch_key(owner, fp));
+    }
+
+    #[test]
+    fn test_add_to_batch_ready_when_max_size_is_one() {
+        let fp = "grouping_test_max_size_one";
+        let org = "org-max-size-one";
+
+        assert!(add_one(fp, org, 1));
+        assert_eq!(get_ready_batch(org, fp).unwrap().alerts.len(), 1);
+    }
+
+    #[test]
+    fn test_flush_rows_carry_each_held_back_row_with_the_real_group_size() {
+        let (fp, org) = ("grouping_test_flush_rows", "org-flush-rows");
+        assert_eq!(
+            admit(fp, org, 10, evaluation_row("a/1")),
+            BatchAdmission::Queued
         );
-        add_to_batch(
-            fp2.clone(),
-            org.to_string(),
-            make_alert(),
-            vec![],
-            3600,
-            10,
-            None,
-            None,
+        assert_eq!(
+            admit(fp, org, 10, evaluation_row("b/2")),
+            BatchAdmission::Queued
         );
+        let batch = PENDING_BATCHES.remove(&batch_key(org, fp)).unwrap().1;
 
-        let count = get_pending_batch_count(org);
-        assert!(count >= 2);
+        let rows = flush_rows(&batch);
+        let keys: Vec<&str> = rows.iter().map(|row| row.key.as_str()).collect();
+        assert_eq!(keys, ["a/1", "b/2"]);
+        for row in &rows {
+            assert_eq!(row.status, RunOutcome::Firing);
+            assert_eq!(
+                (row.dedup_enabled, row.grouped, row.group_size),
+                (Some(true), Some(true), Some(2))
+            );
+        }
+    }
 
-        PENDING_BATCHES.remove(&fp1);
-        PENDING_BATCHES.remove(&fp2);
+    #[test]
+    fn test_stamp_flush_error_marks_every_member_notify_failed() {
+        let mut rows = vec![evaluation_row("a/1"), evaluation_row("b/2")];
+        stamp_flush_error(&mut rows, &anyhow::anyhow!("Send failed: http 500"));
+        for row in &rows {
+            assert_eq!(row.status, RunOutcome::NotifyFailed);
+            assert_eq!(
+                row.error.as_deref(),
+                Some("error sending notification for alert: Send failed: http 500")
+            );
+            // A failure must count as an attempt, or failures could outnumber attempts.
+            assert_eq!(row.delivery_attempted, Some(true));
+        }
+    }
+
+    #[test]
+    fn test_add_to_batch_refuses_an_evaluation_when_the_full_batch_was_not_taken() {
+        let (fp, org) = ("grouping_test_refused", "org-refused");
+        assert_eq!(
+            admit(fp, org, 1, evaluation_row("a/1")),
+            BatchAdmission::Ready
+        );
+        assert_eq!(
+            admit(fp, org, 1, evaluation_row("a/2")),
+            BatchAdmission::Refused
+        );
+        let batch = PENDING_BATCHES.remove(&batch_key(org, fp)).unwrap().1;
+        assert_eq!(batch.alerts.len(), 1);
+        assert_eq!(batch.alerts[0].trigger_data.key, "a/1");
+    }
+
+    #[test]
+    fn test_refused_row_is_notify_failed_and_not_shown_as_sent() {
+        let row = refused_row(&evaluation_row("a/2"));
+        assert_eq!(row.key, "a/2");
+        assert_eq!(row.status, RunOutcome::NotifyFailed);
+        assert!(
+            row.error
+                .is_some_and(|error| error.contains("no notification was sent"))
+        );
+        // The history page shows a dedup-enabled, ungrouped row as "notification sent".
+        assert_eq!((row.dedup_enabled, row.grouped), (None, None));
+        assert_eq!(row.delivery_attempted, Some(false));
+    }
+
+    #[test]
+    fn test_expiry_sweep_reports_pending_batches_per_org() {
+        let (busy, drained) = ("org-gauge-busy", "org-gauge-drained");
+        let (fp1, fp2) = ("grouping_gauge_fp1", "grouping_gauge_fp2");
+        let gauge = |org: &str| {
+            config::metrics::ALERT_GROUPING_BATCHES_PENDING
+                .with_label_values(&[org])
+                .get()
+        };
+        add_one(fp1, busy, 10);
+        add_one(fp2, busy, 10);
+        add_one(fp1, drained, 2);
+
+        get_expired_batches();
+        assert_eq!((gauge(busy), gauge(drained)), (2, 1));
+
+        assert!(add_one(fp1, drained, 2));
+        assert!(get_ready_batch(drained, fp1).is_some());
+        get_expired_batches();
+        assert_eq!((gauge(busy), gauge(drained)), (2, 0));
+
+        PENDING_BATCHES.remove(&batch_key(busy, fp1));
+        PENDING_BATCHES.remove(&batch_key(busy, fp2));
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn downtime(id: &str) -> config::meta::downtimes::ActiveDowntime {
+        config::meta::downtimes::ActiveDowntime {
+            id: id.to_string(),
+            name: id.to_string(),
+            ends_at: 0,
+            incident_mode: Default::default(),
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_flush_drops_the_muted_entries_and_keeps_the_rest_in_order() {
+        let (kept, muted) = split_muted(
+            vec!["a", "b", "c"],
+            vec![None, Some(downtime("dt-1")), None],
+        );
+        assert_eq!(kept, ["a", "c"]);
+        assert_eq!(muted.len(), 1);
+        assert_eq!((muted[0].0, muted[0].1.id.as_str()), ("b", "dt-1"));
+
+        let (kept, muted) = split_muted(vec!["a"], vec![Some(downtime("dt-1"))]);
+        assert!(kept.is_empty(), "an emptied batch sends nothing");
+        assert_eq!(muted.len(), 1);
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn queued_batch(fp: &str, org: &str, timestamps: &[i64]) -> PendingBatch {
+        for (i, _) in timestamps.iter().enumerate() {
+            admit(fp, org, 10, evaluation_row(&format!("a/{i}")));
+        }
+        let mut batch = PENDING_BATCHES.remove(&batch_key(org, fp)).unwrap().1;
+        for (entry, at) in batch.alerts.iter_mut().zip(timestamps) {
+            entry.timestamp = *at;
+        }
+        batch
+    }
+
+    // Dropping an entry publishes its row, and the usage queue starts on a Tokio runtime.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_entry_queued_before_the_window_stays_in_the_batch_at_flush() {
+        let window_opens = 100;
+        let mut batch = queued_batch("grouping_test_before_window", "org-before", &[50, 150]);
+        let decisions = judged_at(&batch)
+            .into_iter()
+            .map(|at| (at >= window_opens).then(|| downtime("dt-1")))
+            .collect();
+        drop_muted_entries(&mut batch, decisions);
+        let kept: Vec<_> = batch.alerts.iter().map(|e| e.timestamp).collect();
+        assert_eq!(kept, [50]);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_entry_inside_a_window_that_ended_before_the_flush_is_still_judged() {
+        use config::meta::downtimes::{
+            Downtime, DowntimeSchedule, DowntimeTarget, Repeat, TargetFolders, TargetModule,
+        };
+
+        use crate::alerts::downtimes::enterprise::{any_live_target, any_target_since};
+
+        const MINUTE: i64 = 60_000_000;
+        let (opens, closes) = (540 * MINUTE, 600 * MINUTE);
+        let only_window = Downtime {
+            id: "dt-1".to_string(),
+            org: "org-ended".to_string(),
+            folder_id: "default".to_string(),
+            name: "dt-1".to_string(),
+            reason: None,
+            condition: None,
+            targets: vec![DowntimeTarget {
+                module: TargetModule::Alerts,
+                folders: TargetFolders::All,
+                tags: vec![],
+                ids: vec![],
+                slo_mode: None,
+                incident_mode: Default::default(),
+            }],
+            schedule: DowntimeSchedule {
+                repeat: Repeat::None,
+                starts_at: opens,
+                ends_at: Some(closes),
+                timezone: "UTC".to_string(),
+                start_time_local: None,
+                duration_secs: 3_600,
+                weekdays: vec![],
+            },
+            cancelled_at: None,
+            cancelled_by: None,
+            show_banner: false,
+            notifications: None,
+            origin_region: None,
+            version: 1,
+            created_by: "lin".to_string(),
+            created_at: 0,
+            updated_by: "lin".to_string(),
+            updated_at: 0,
+        };
+        let rows = std::slice::from_ref(&only_window);
+        let batch = queued_batch("grouping_test_ended_window", "org-ended", &[598 * MINUTE]);
+        let flush = 602 * MINUTE;
+        assert!(!any_live_target(rows, TargetModule::Alerts, flush));
+        assert!(any_target_since(
+            rows,
+            TargetModule::Alerts,
+            oldest_entry(&batch),
+            flush
+        ));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_emptied_batch_records_no_delivery() {
+        let batch = queued_batch("grouping_test_emptied", "org-emptied", &[150, 160]);
+        let decisions = vec![Some(downtime("dt-1")), Some(downtime("dt-1"))];
+        assert!(!flush_decided("t", batch, decisions).await);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_dropped_entry_is_recorded_as_suppressed_with_its_downtime() {
+        let entry = BatchedAlert {
+            alert: make_alert(),
+            rows: vec![],
+            timestamp: 5,
+            trigger_data: TriggerData {
+                start_time: 5,
+                end_time: 9,
+                ..evaluation_row("a/1")
+            },
+        };
+        let record = suppressed_entry_record(&entry, downtime("dt-1"));
+        assert_eq!(record.key, "a/1");
+        assert_eq!(record.status, RunOutcome::Suppressed);
+        assert_eq!(record.downtime_id.as_deref(), Some("dt-1"));
+        assert_eq!((record.start_time, record.end_time), (5, 9));
+        assert_eq!(record.grouped, Some(true));
+        assert_eq!(record.delivery_attempted, Some(false));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_muted_entry_leaves_the_batch_before_its_rows_are_built() {
+        let (fp, org) = ("grouping_test_muted_flush", "org-muted-flush");
+        assert_eq!(
+            admit(fp, org, 10, evaluation_row("a/1")),
+            BatchAdmission::Queued
+        );
+        assert_eq!(
+            admit(fp, org, 10, evaluation_row("b/2")),
+            BatchAdmission::Queued
+        );
+        let mut batch = PENDING_BATCHES.remove(&batch_key(org, fp)).unwrap().1;
+
+        let muted = take_muted(&mut batch, vec![None, Some(downtime("dt-1"))]);
+        let suppressed: Vec<_> = muted
+            .into_iter()
+            .map(|(entry, downtime)| suppressed_entry_record(&entry, downtime))
+            .collect();
+        let sent = flush_rows(&batch);
+
+        // One row per evaluation: the muted one only as Suppressed, the rest as the batch.
+        assert_eq!(suppressed.len(), 1);
+        assert_eq!(suppressed[0].key, "b/2");
+        assert_eq!(suppressed[0].status, RunOutcome::Suppressed);
+        let keys: Vec<&str> = sent.iter().map(|row| row.key.as_str()).collect();
+        assert_eq!(keys, ["a/1"]);
+        assert_eq!(sent[0].group_size, Some(1));
     }
 }

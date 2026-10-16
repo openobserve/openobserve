@@ -17,6 +17,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import CheckDetails from "./CheckDetails.vue";
+import OTemplateInput from "@/lib/forms/TemplateInput/OTemplateInput.vue";
+import type { VariableSuggestion } from "../variables/suggestions";
 import { mockMonitorHttp } from "@/test/unit/mockData/synthetics";
 import type { BrowserCheck, SyntheticsFolder } from "@/types/synthetics";
 
@@ -31,6 +33,7 @@ const OInputStub = {
     "required",
     "type",
     "rows",
+    "helpText",
   ],
   emits: ["update:modelValue", "keydown", "blur", "focus"],
   template: `
@@ -44,6 +47,7 @@ const OInputStub = {
         @blur="$emit('blur', $event)"
       />
       <span v-if="error" class="o-input-error">{{ errorMessage }}</span>
+      <span v-else-if="helpText" class="o-input-help">{{ helpText }}</span>
     </div>
   `,
 };
@@ -109,6 +113,8 @@ function mountCheckDetails(
     validationErrors: Record<string, string>;
     targetLabel: string;
     targetPlaceholder: string;
+    targetHint: string;
+    variableSuggestions: VariableSuggestion[];
   }> = {},
 ) {
   return mount(CheckDetails, {
@@ -309,6 +315,27 @@ describe("CheckDetails", () => {
     });
   });
 
+  describe("URL variable suggestions", () => {
+    const urlField = '[data-test="synthetics-check-details-url-input"]';
+
+    it("renders the URL field as a plain input without the prop", () => {
+      wrapper = mountCheckDetails();
+      expect(wrapper.find(`${urlField} input`).exists()).toBe(true);
+      expect(wrapper.findComponent(OTemplateInput).props("suggestions")).toBeUndefined();
+    });
+
+    it("hands the rows to the URL field when the host passes them", () => {
+      const variableSuggestions: VariableSuggestion[] = [
+        { name: "BASE_URL", envs: ["prod"], global: false, secret: false, gap: [] },
+      ];
+      wrapper = mountCheckDetails({ variableSuggestions });
+      expect(wrapper.find(`${urlField} input`).exists()).toBe(true);
+      expect(wrapper.findComponent(OTemplateInput).props("suggestions")).toEqual(
+        variableSuggestions,
+      );
+    });
+  });
+
   describe("tags", () => {
     beforeEach(() => {
       wrapper = mountCheckDetails();
@@ -442,6 +469,26 @@ describe("CheckDetails", () => {
 
       const nameWrapper = wrapper.find('[data-test="synthetics-check-details-name-input"]');
       expect(nameWrapper.find(".o-input-error").exists()).toBe(false);
+    });
+  });
+
+  // The host decides whether the run opens the Starting URL; this field only says so.
+  describe("Starting URL hint", () => {
+    const HINT = "Not opened — the first Step navigates.";
+
+    it("should show the hint under the URL input when the host passes one", () => {
+      wrapper = mountCheckDetails({ targetHint: HINT });
+
+      const urlWrapper = wrapper.find('[data-test="synthetics-check-details-url-input"]');
+      expect(urlWrapper.find(".o-input-help").exists()).toBe(true);
+      expect(urlWrapper.find(".o-input-help").text()).toBe(HINT);
+    });
+
+    it("should show no hint when the host passes none", () => {
+      wrapper = mountCheckDetails();
+
+      const urlWrapper = wrapper.find('[data-test="synthetics-check-details-url-input"]');
+      expect(urlWrapper.find(".o-input-help").exists()).toBe(false);
     });
   });
 

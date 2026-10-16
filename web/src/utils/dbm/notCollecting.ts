@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The "not collecting" checklist the three server-vantage pages share.
+ * The "not collecting" checklist the server-vantage pages share.
  *
- * Activity, Blocked queries and Deadlocks all open their not-collecting empty
+ * Activity, Blocked queries, Deadlocks and Slowest calls all open their not-collecting empty
  * state with the same two diagnostics — is the rest of DBM answering (so the
  * problem is this feed, not the whole pipeline), and is the feature flag even
  * on — differing only in which i18n namespace phrases them. The third-and-on
@@ -29,7 +29,7 @@ import type { DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import type { TranslateFn } from "@/types/i18n";
 
 /** The pages that render this checklist, by their i18n namespace. */
-export type DbmNotCollectingNamespace = "activity" | "blocked" | "deadlocks";
+export type DbmNotCollectingNamespace = "activity" | "blocked" | "deadlocks" | "samples";
 
 export interface DbmNotCollectingSignals {
   /** Distinct statements the shared badge fan-out counted. `null` = unknown. */

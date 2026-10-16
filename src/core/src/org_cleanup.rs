@@ -373,6 +373,11 @@ async fn step_delete_file_list(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Delete every downtime through the db layer, so caches, regions and OpenFGA tuples drop it.
+async fn delete_org_downtimes(org_id: &str) -> Result<(), anyhow::Error> {
+    crate::db::downtimes::delete_by_org(org_id).await
+}
+
 /// Delete every alert in an org through the service layer so the ALERTS /
 /// STREAM_ALERTS caches evict cluster-wide (via the coordinator delete event) and
 /// each alert's scheduler trigger + OFGA ownership is removed — none of which a
@@ -449,9 +454,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // under #[cfg(not(feature = "enterprise"))] above. Importing it twice would
     // collide on the OSS build.
     use infra::table::{
-        alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards, destinations,
-        distinct_values, enrichment_table_urls, enrichment_tables, folders, incident_events,
-        kv_store, org_storage_providers, re_pattern, re_pattern_stream_map, reports, search_queue,
+        alert_calibration, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
+        destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
+        incident_events, kv_store, llm_prompts, org_storage_providers, org_telephony,
+        query_history, re_pattern, re_pattern_stream_map, reports, rum_pa, search_queue,
         short_urls, slo, slo_backfill_jobs, slo_budget, slos, system_settings, templates,
         timed_annotations,
     };
@@ -492,6 +498,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     delete_org_alerts(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alerts: {e}"))?;
+    // downtimes.folder_id has a FK (downtimes_folder_fk) → folders.id.
+    delete_org_downtimes(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/downtimes: {e}"))?;
     // timed_annotation_panels cascade from timed_annotations; both are deleted here
     // via the three-hop join: folders.org → dashboards.folder_id → timed_annotations.dashboard_id
     // Must run BEFORE dashboards::delete_by_org or the join finds no rows.
@@ -507,7 +517,12 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     reports::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/reports: {e}"))?;
-    // folders safe to delete after dashboards, timed_annotations, and reports are gone
+    // Prompt heads also reference folders with a restrictive FK. Delete the
+    // complete registry before folders so an org with prompts can be removed.
+    llm_prompts::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/llm_prompts: {e}"))?;
+    // folders are safe to delete after dashboards, annotations, reports, and prompts are gone
     folders::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/folders: {e}"))?;
@@ -523,6 +538,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     kv_store::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/kv_store: {e}"))?;
+    rum_pa::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/rum_pa: {e}"))?;
+    crate::rum_pa::service::emit_delete_org(org_id).await;
     // Delete cipher keys through the service layer so the in-memory key REGISTRY
     // evicts cluster-wide (via the coordinator delete + super-cluster propagation);
     // a raw table wipe would leave decrypted keys resident in every node's memory.
@@ -541,6 +560,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     search_queue::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_queue: {e}"))?;
+    query_history::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/query_history: {e}"))?;
     re_pattern::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/re_pattern: {e}"))?;
@@ -550,6 +572,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     org_storage_providers::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_storage_providers: {e}"))?;
+    org_telephony::delete(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_telephony: {e}"))?;
     #[cfg(feature = "cloud")]
     trial_quota_usage::delete_by_org(org_id)
         .await
@@ -621,6 +646,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     compactor_manual_jobs::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/compactor_manual_jobs: {e}"))?;
+    // Org ids are reused, and a leftover row would hand the next org the deleted org's settings.
+    alert_calibration::delete_by_org(get_orm_client_rw().await, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alert_calibration: {e}"))?;
     // Delete the S3 result objects backing this org's search jobs BEFORE dropping
     // the DB rows — the result paths are derived from each job's created_at/trace_id,
     // so once the rows are gone the objects can no longer be located and would leak.
@@ -1227,6 +1256,14 @@ mod tests {
     }
 
     #[test]
+    fn test_downtimes_are_deleted_before_their_folders() {
+        assert!(
+            position_of("delete_org_downtimes(org_id)")
+                < position_of("folders::delete_by_org(org_id)")
+        );
+    }
+
+    #[test]
     fn test_slos_are_deleted_before_alerts() {
         // An SLO reads from a source alert, and a later PR refuses to delete an
         // alert that a live SLO still depends on. Org teardown must never trip
@@ -1238,6 +1275,20 @@ mod tests {
                 "{call} must run before delete_org_alerts"
             );
         }
+    }
+
+    #[test]
+    fn test_db_resources_deletes_query_history() {
+        position_of("query_history::delete_by_org(org_id)");
+    }
+
+    #[test]
+    fn test_prompt_registry_is_deleted_before_folders() {
+        assert!(
+            position_of("llm_prompts::delete_by_org(org_id)")
+                < position_of("folders::delete_by_org(org_id)"),
+            "prompt rows must be deleted before the folders they reference"
+        );
     }
 
     #[test]

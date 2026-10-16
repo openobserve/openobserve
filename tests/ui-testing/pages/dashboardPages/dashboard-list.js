@@ -7,6 +7,10 @@ const { gotoWithRetry } = require("../../playwright-tests/utils/navigation.js");
 export default class DashboardListPage {
   constructor(page) {
     this.page = page;
+    // List-level pagination controls (OTable pagination bar) and the pagination
+    // info span that renders "Showing X - Y of Z".
+    this.nextPageBtn = page.locator('[data-test="o2-table-next-page-btn"]');
+    this.paginationInfo = page.locator('[data-test="o2-table-pagination-info"]');
   }
 
   // Duplicate dashboard
@@ -131,5 +135,62 @@ export default class DashboardListPage {
     }
     await nameCell.waitFor({ state: "visible", timeout: 15000 });
     await nameCell.click();
+  }
+
+  // Click the list's next-page button (OTable pagination bar). Disabled on the
+  // last page, so callers assert they are on a multi-page folder first.
+  async clickNextPage() {
+    await this.nextPageBtn.waitFor({ state: "visible", timeout: 15000 });
+    await this.nextPageBtn.click();
+  }
+
+  // Read the pagination info text ("Showing X - Y of Z"), whitespace-normalised.
+  // The span interpolates across template newlines, so collapse runs of
+  // whitespace to single spaces before returning.
+  async getPaginationInfoText() {
+    const text = await this.paginationInfo.textContent().catch(() => null);
+    return (text || "").replace(/\s+/g, " ").trim();
+  }
+
+  // Assert the pagination info matches a regex (auto-retrying). The span renders
+  // "Showing {from} - {to} of {count}", e.g. "Showing 21 - 25 of 25".
+  async expectPaginationInfoToMatch(pattern) {
+    await expect
+      .poll(async () => await this.getPaginationInfoText(), { timeout: 20000 })
+      .toMatch(pattern);
+  }
+
+  // Assert the current URL carries `page=<pageValue>`.
+  async expectUrlHasPageParam(pageValue) {
+    await expect.poll(() => this.page.url(), { timeout: 15000 }).toContain(`page=${pageValue}`);
+  }
+
+  // Assert the current URL no longer carries `page=<pageValue>`.
+  async expectUrlNotHasPageParam(pageValue) {
+    await expect.poll(() => this.page.url(), { timeout: 15000 }).not.toContain(`page=${pageValue}`);
+  }
+
+  // Assert the current URL carries no `page=` query param at all.
+  async expectUrlHasNoPageParam() {
+    await expect.poll(() => this.page.url(), { timeout: 15000 }).not.toMatch(/[?&]page=\d+/);
+  }
+
+  // Click the first visible dashboard name cell in the list (used to open a
+  // dashboard from the current page without searching, which would change the
+  // pagination state).
+  async clickFirstDashboardNameCell() {
+    const firstCell = this.page
+      .locator('[data-test^="dashboard-name-cell-"]')
+      .first();
+    await firstCell.waitFor({ state: "visible", timeout: 15000 });
+    await firstCell.click();
+  }
+
+  // Assert the list rendered at least one data row (not the empty state), which
+  // proves a page switch landed on a populated page rather than an empty flash.
+  async expectAtLeastOneRow() {
+    await expect(
+      this.page.locator('[data-test^="o2-table-row-"]').first(),
+    ).toBeVisible({ timeout: 20000 });
   }
 }

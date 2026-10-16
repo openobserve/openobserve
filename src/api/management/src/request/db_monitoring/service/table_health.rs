@@ -341,11 +341,7 @@ pub(crate) async fn read_table_health_body(
     user_id: &str,
     q: &TableHealthQuery,
 ) -> Result<Value, HttpResponse> {
-    let stream = q
-        .stream
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .unwrap_or(DEFAULT_SERVER_STREAM);
+    let stream = validate_server_stream(q.stream.as_deref())?.unwrap_or(DBM_SERVER_STREAM);
     // Same rule as `get_dbm_query_server_metrics`: Logs-stream auth, checked
     // BEFORE range parsing so stream existence cannot be probed.
     if !can_read_stream(

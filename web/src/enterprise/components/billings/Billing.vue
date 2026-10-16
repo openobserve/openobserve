@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ORouteTab
                 exact
                 name="plans"
+                data-test="billing-tab-plans"
                 :to="
                   '/billings/plans?org_identifier=' + store.state.selectedOrganization.identifier
                 "
@@ -53,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ORouteTab
                 exact
                 name="usage"
+                data-test="billing-tab-usage"
                 :to="
                   '/billings/usage?org_identifier=' +
                   store.state.selectedOrganization.identifier +
@@ -68,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="showInvoiceTab"
                 exact
                 name="invoice_history"
+                data-test="billing-tab-invoices"
                 :to="
                   '/billings/invoice_history?org_identifier=' +
                   store.state.selectedOrganization.identifier
@@ -79,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="config.isCloud == 'true'"
                 exact
                 name="billing_group"
+                data-test="billing-tab-group"
                 :to="
                   '/billings/billing_group?org_identifier=' +
                   store.state.selectedOrganization.identifier
@@ -153,6 +157,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <UsageMemberList v-model="usageMember.selected" :members="billingMembers" />
             </div>
             <div class="h-full min-w-0 flex-1 overflow-y-auto pb-3">
+              <TrialPeriod
+                v-if="isUsageRoute && billingInfoLoaded"
+                current-page="usage"
+                :provider="billingProvider"
+                class="ms-2 me-3 mb-3"
+              />
               <router-view title=""> </router-view>
             </div>
           </div>
@@ -185,6 +195,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import UsageMemberList from "./UsageMemberList.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import TrialPeriod from "./TrialPeriod.vue";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -199,6 +210,7 @@ export default defineComponent({
     OButton,
     UsageMemberList,
     DateTimePickerDashboard,
+    TrialPeriod,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -217,6 +229,13 @@ export default defineComponent({
     const billingProvider = ref(""); // empty until loaded
     const isPaidUser = ref(false);
     const billingInfoLoaded = ref(false);
+    // Same rule TrialPeriod uses to show its strip.
+    const isTrialOrg = computed(() => {
+      const expiry = store.state.organizationData?.organizationSettings?.free_trial_expiry;
+      return (
+        expiry !== undefined && expiry !== null && expiry !== "" && billingProvider.value !== "aws"
+      );
+    });
 
     // Billing-group members for the Usage member selector (rendered as a
     // sidebar beside the usage view). Shared with usage.vue via provide/inject.
@@ -244,9 +263,12 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
         );
         billingProvider.value = res.data?.provider || "";
-        isPaidUser.value = res.data?.customer_id.length > 0;
-      } catch (e) {
-        console.error("Failed to fetch billing info:", e);
+        isPaidUser.value = (res.data?.customer_id?.length ?? 0) > 0;
+      } catch (e: any) {
+        // 401 is handled globally (http.ts logs out); 403 means the user has no billing access.
+        if (e?.response?.status !== 401 && e?.response?.status !== 403) {
+          console.error("Failed to fetch billing info:", e);
+        }
         billingProvider.value = "";
       } finally {
         billingInfoLoaded.value = true;
@@ -307,7 +329,10 @@ export default defineComponent({
         selectUsageDate();
       }
 
-      if (
+      if (router.currentRoute.value.name == "billings" && isTrialOrg.value) {
+        billingtab.value = "usage";
+        selectUsageDate();
+      } else if (
         router.currentRoute.value.name == "billings" ||
         router.currentRoute.value.name == "plans"
       ) {
@@ -388,6 +413,7 @@ export default defineComponent({
     const orgGroupInvite = reactive({
       trigger: 0,
       canInvite: false,
+      refreshMembers: fetchBillingMembers,
     });
     provide("orgGroupInvite", orgGroupInvite);
     const selectUsageDate = () => {
@@ -444,6 +470,7 @@ export default defineComponent({
       showSidebar,
       lastSplitterPosition,
       showInvoiceTab,
+      billingInfoLoaded,
       billingProvider,
       isPaidUser,
       billingMembers,

@@ -138,6 +138,10 @@ const PG_DEADLOG_RECEIVER = `  filelog/pg_deadlocks:
         timestamp:
           parse_from: attributes.ts
           layout: "%Y-%m-%d %H:%M:%S.%L %Z"
+      # Already the record timestamp; left in place it lands as a stray ts column.
+      - type: remove
+        if: 'attributes.ts != nil'
+        field: attributes.ts
       - type: add
         field: attributes.o2_pg_event
         value: other
@@ -307,6 +311,10 @@ const MYSQL_DEADLOG_RECEIVER = `  filelog/mysql_deadlocks:
         timestamp:
           parse_from: attributes.ts
           layout: "%Y-%m-%dT%H:%M:%S.%fZ"
+      # Already the record timestamp; left in place it lands as a stray ts column.
+      - type: remove
+        if: 'attributes.ts != nil'
+        field: attributes.ts
       - type: add
         field: attributes.o2_my_event
         value: other
@@ -394,6 +402,10 @@ const MARIADB_DEADLOG_RECEIVER = `  filelog/mariadb_deadlocks:
         timestamp:
           parse_from: attributes.ts
           layout: "%Y-%m-%d %H:%M:%S"
+      # Already the record timestamp; left in place it lands as a stray ts column.
+      - type: remove
+        if: 'attributes.ts != nil'
+        field: attributes.ts
       - type: add
         field: attributes.o2_maria_event
         value: other

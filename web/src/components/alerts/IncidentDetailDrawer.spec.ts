@@ -41,6 +41,17 @@ vi.mock("@/composables/useConfirmDialog", () => ({
   }),
 }));
 
+const mockPromptForConsent = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/usePaidOverageConsent", () => ({
+  isPaidOverageConsentError: (status: number, body: unknown) =>
+    status === 412 &&
+    typeof body === "object" &&
+    body !== null &&
+    "error_type" in body &&
+    body.error_type === "paid_overage_consent_required",
+  usePaidOverageConsent: () => ({ promptForConsent: mockPromptForConsent }),
+}));
+
 // Mock incidents service
 vi.mock("@/services/incidents", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -583,6 +594,19 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(errCall).toBeTruthy();
     });
 
+    it("should keep the AI-credits remedy when Analyze Incident gets a 402", async () => {
+      (incidentsService.triggerRca as any).mockRejectedValue({
+        response: {
+          status: 402,
+          data: { error_type: "ai_credits_exhausted", remedy: "subscribe" },
+        },
+      });
+
+      await wrapper.vm.triggerRca();
+
+      expect(wrapper.vm.rcaError?.remedy).toBe("plans");
+    });
+
     it("should clear RCA content on error", async () => {
       (incidentsService.triggerRca as any).mockRejectedValue(new Error("RCA failed"));
 
@@ -598,6 +622,74 @@ describe("IncidentDetailDrawer.vue", () => {
       await wrapper.vm.triggerRca();
 
       expect(incidentsService.triggerRca).not.toHaveBeenCalled();
+    });
+
+    it("retries RCA exactly once after paid usage consent", async () => {
+      const consentError = {
+        isAxiosError: true,
+        response: {
+          status: 412,
+          data: {
+            error_type: "paid_overage_consent_required",
+            consent: {
+              feature: "ai_credits",
+              organization: { org_id: "default", enabled: false, can_manage: true },
+              payer: null,
+              effective: false,
+              billing_status: "eligible",
+            },
+          },
+        },
+      };
+      mockPromptForConsent.mockResolvedValue(true);
+      let loadingDuringRetry = false;
+      vi.mocked(incidentsService.triggerRca)
+        .mockRejectedValueOnce(consentError)
+        .mockImplementationOnce(async () => {
+          // The authorized run must show the in-progress banner again.
+          loadingDuringRetry = wrapper.vm.rcaLoading;
+          return { data: { rca_content: "Authorized RCA" } } as any;
+        });
+
+      await wrapper.vm.triggerRca();
+
+      expect(loadingDuringRetry).toBe(true);
+
+      expect(mockPromptForConsent).toHaveBeenCalledTimes(1);
+      expect(incidentsService.triggerRca).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(incidentsService.triggerRca).mock.calls[1]).toEqual(
+        vi.mocked(incidentsService.triggerRca).mock.calls[0],
+      );
+    });
+
+    it("does not retry RCA after paid usage is declined", async () => {
+      mockPromptForConsent.mockResolvedValue(false);
+      vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce({
+        isAxiosError: true,
+        response: {
+          status: 412,
+          data: {
+            error_type: "paid_overage_consent_required",
+            consent: {
+              feature: "ai_credits",
+              organization: { org_id: "default", enabled: false, can_manage: true },
+              payer: null,
+              effective: false,
+              billing_status: "eligible",
+            },
+          },
+        },
+      });
+
+      await wrapper.vm.triggerRca();
+
+      expect(incidentsService.triggerRca).toHaveBeenCalledTimes(1);
+      // Persisted in the panel with a way to turn paid usage on.
+      expect(wrapper.vm.rcaError).toEqual({
+        reason: "Paid AI usage is off, so this request wasn't sent.",
+        details: "",
+        remedy: "plans",
+      });
     });
   });
 
@@ -808,6 +900,85 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(formatted).toContain('<strong class="font-semibold">Issue</strong>');
       expect(formatted).toContain("font-bold");
       expect(formatted).toContain("rca-ul");
+    });
+
+    it("should build the TOC from standalone bold section lines", () => {
+      const content = [
+        "I've completed the investigation.",
+        "",
+        "---",
+        "",
+        "**Incident Details**",
+        "",
+        "| Attribute | Value |",
+        "|---|---|",
+        "| **Severity** | P2 |",
+        "",
+        "**Evidence:**",
+        "",
+        "**1. `stream_no_events_10m`** — false positive.",
+        "",
+        "- Restart the ingester",
+        "  **Note**",
+        "",
+        "The ingester restarted at 10:02.",
+        "**Inline label**",
+        "This was expected.",
+        "",
+        "** **",
+        "",
+        "**Evidence **",
+        "",
+        "__A__ and __B__",
+        "",
+        "```json",
+        "**not a heading**",
+        "```",
+        "",
+        "~~~",
+        "**tilde fence**",
+        "```",
+        "",
+        "**still code**",
+        "~~~",
+        "",
+        "__Executive Summary__",
+        "",
+        "Root cause: **three** miscalibrated alerts.",
+      ].join("\n");
+      const formatted = wrapper.vm.formatRcaContent(content);
+
+      expect(wrapper.vm.tableOfContents.map((item: any) => item.text)).toEqual([
+        "Incident Details",
+        "Evidence",
+        "Executive Summary",
+      ]);
+      // Rendered ids must match the TOC ids, or scroll-to-section finds nothing.
+      for (const item of wrapper.vm.tableOfContents) {
+        expect(formatted).toContain(`id="${item.id}"`);
+      }
+      expect(formatted).toContain("**not a heading**");
+      expect(formatted).toContain("**tilde fence**");
+      expect(formatted).toContain("**still code**");
+    });
+
+    it("should leave bold sub-labels alone when the report already has sections", () => {
+      const content = [
+        "## Root Cause",
+        "",
+        "**Timeline:**",
+        "",
+        "- 10:02 ingester restarted",
+        "",
+        "### Contributing factors",
+      ].join("\n");
+      const formatted = wrapper.vm.formatRcaContent(content);
+
+      expect(wrapper.vm.tableOfContents.map((item: any) => item.text)).toEqual(["Root Cause"]);
+      expect(wrapper.vm.tableOfContents[0].children.map((item: any) => item.text)).toEqual([
+        "Contributing factors",
+      ]);
+      expect(formatted).not.toContain('id="section-timeline"');
     });
   });
 
@@ -1447,6 +1618,45 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.analysisInFlight).toBe(true);
     });
 
+    it("drops a refused run's remedy banner when another incident opens in place", async () => {
+      wrapper.vm.incidentDetails = { ...wrapper.vm.incidentDetails, id: "1" };
+      wrapper.vm.rcaError = { reason: "out of credits", details: "", remedy: "plans" };
+      (incidentsService.get as any).mockResolvedValueOnce({
+        data: { ...wrapper.vm.incidentDetails, id: "2" },
+      });
+
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        params: { id: "2" },
+      } as any;
+      await flushPromises();
+
+      expect(wrapper.vm.rcaError).toBeNull();
+    });
+
+    it("keeps a refused run's remedy banner, which the event log never records", async () => {
+      const refused = { reason: "out of credits", details: "", remedy: "plans" };
+      wrapper.vm.rcaError = refused;
+      (incidentsService.getEvents as any).mockResolvedValue({ data: { events: [] } });
+
+      await wrapper.vm.checkAnalysisInFlight("1");
+      await flushPromises();
+
+      expect(wrapper.vm.rcaError).toEqual(refused);
+    });
+
+    it("clears a refused run's remedy banner once a run starts", async () => {
+      wrapper.vm.rcaError = { reason: "out of credits", details: "", remedy: "plans" };
+      (incidentsService.getEvents as any).mockResolvedValue({
+        data: { events: [{ type: "ai_analysis_begin", timestamp: 300 }] },
+      });
+
+      await wrapper.vm.checkAnalysisInFlight("1");
+      await flushPromises();
+
+      expect(wrapper.vm.rcaError).toBeNull();
+    });
+
     it("sets analysisInFlight false when lastComplete >= lastBegin", async () => {
       (incidentsService.getEvents as any).mockResolvedValue({
         data: {
@@ -1547,6 +1757,60 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.analysisInFlight).toBe(true);
     });
 
+    it("retries severity reanalysis exactly once after consent", async () => {
+      vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
+        data: { severity: "P2", analysis_in_flight: false },
+      });
+      mockPromptForConsent.mockResolvedValue(true);
+      vi.mocked(incidentsService.triggerRca)
+        .mockRejectedValueOnce({
+          isAxiosError: true,
+          response: {
+            status: 412,
+            data: {
+              error_type: "paid_overage_consent_required",
+              consent: {
+                feature: "ai_credits",
+                organization: { org_id: "default", enabled: false, can_manage: true },
+                payer: null,
+                effective: false,
+                billing_status: "eligible",
+              },
+            },
+          },
+        })
+        .mockResolvedValueOnce({ data: { message: "Analysis started" } });
+
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+
+      expect(mockPromptForConsent).toHaveBeenCalledTimes(1);
+      expect(incidentsService.triggerRca).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(incidentsService.triggerRca).mock.calls[0]?.[2]).toEqual({
+        reanalysis: true,
+      });
+      expect(vi.mocked(incidentsService.triggerRca).mock.calls[1]).toEqual(
+        vi.mocked(incidentsService.triggerRca).mock.calls[0],
+      );
+    });
+    it("keeps the AI-credits remedy when a severity reanalysis gets a 402", async () => {
+      vi.mocked(incidentsService.updateIncident).mockResolvedValueOnce({
+        data: { severity: "P2", analysis_in_flight: false },
+      });
+      vi.mocked(incidentsService.triggerRca).mockRejectedValueOnce({
+        isAxiosError: true,
+        response: {
+          status: 402,
+          data: { error_type: "ai_credits_exhausted", remedy: "contact_account_manager" },
+        },
+      });
+
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+
+      expect(wrapper.vm.rcaError?.remedy).toBe("contact");
+    });
+
     it("does not call updateIncident when no incidentDetails", async () => {
       wrapper.vm.incidentDetails = null;
       await wrapper.vm.updateSeverity("P3");
@@ -1595,6 +1859,22 @@ describe("IncidentDetailDrawer.vue", () => {
       await flushPromises();
       return w;
     };
+
+    /// The drawer is opened and closed over the same incident all day, and the
+    /// team catalogue behind it is read by nine other screens.
+    it("serves a reopened drawer's on-call panel from the cache", async () => {
+      wrapper = await withRecords([record()]);
+      expect(oncallService.listResponsesForIncident).toHaveBeenCalledTimes(1);
+      expect(oncallService.listTeams).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      expect(oncallService.listResponsesForIncident).toHaveBeenCalledTimes(1);
+      expect(oncallService.listTeams).toHaveBeenCalledTimes(1);
+      expect(wrapper.find('[data-test="incident-oncall-panel"]').text()).toContain("Payments");
+    });
 
     it("names the paged team rather than its id", async () => {
       wrapper = await withRecords([record()]);

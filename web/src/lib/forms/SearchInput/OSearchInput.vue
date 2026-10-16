@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import { computed, useAttrs } from "vue";
+import { computed, normalizeClass, useAttrs } from "vue";
 import type { SearchInputProps, SearchInputEmits } from "./OSearchInput.types";
 import type { InputSize } from "@/lib/forms/Input/OInput.types";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -19,6 +19,10 @@ const wrapperAttrs = computed(() => {
   const { tabindex: _tabindex, ...rest } = $attrs;
   return rest;
 });
+
+// Below md a flex-1 search would keep its input's ~13rem intrinsic width as its floor and push the toolbar controls onto a second row.
+const mobileFloorClass = (): string =>
+  /(^|[\s:])min-w-/.test(normalizeClass($attrs.class)) ? "" : "max-md:min-w-32";
 
 const props = withDefaults(defineProps<SearchInputProps>(), {
   modelValue: "",
@@ -45,6 +49,7 @@ const resolvedPlaceholder = computed(() => props.placeholder ?? t("common.search
 <template>
   <OInput
     v-bind="wrapperAttrs"
+    :class="mobileFloorClass()"
     :model-value="modelValue"
     :placeholder="resolvedPlaceholder"
     :size="inputSize"

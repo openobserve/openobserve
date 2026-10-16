@@ -84,7 +84,7 @@ impl MetricsOutput {
         if !with_index {
             return Ok(Blocks::NotRequested);
         }
-        if let Err(error) = metrics_block::identity_label_columns(schema) {
+        if let Err(error) = metrics_index::block::identity_label_columns(schema) {
             log::warn!("metrics schema cannot be indexed: {error}");
             return Ok(Blocks::SkippedUnsupported);
         }
@@ -653,7 +653,7 @@ mod tests {
 
     fn build_from_parquet(
         bytes: bytes::Bytes,
-        parent: metrics_block::ParentMetadata,
+        parent: metrics_index::block::ParentMetadata,
     ) -> anyhow::Result<Vec<u8>> {
         use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         anyhow::ensure!(
@@ -663,13 +663,13 @@ mod tests {
         let builder = ParquetRecordBatchReaderBuilder::try_new(bytes)?;
         let schema = builder.schema().clone();
         let metadata = builder.metadata().as_ref().clone();
-        let mut writer = metrics_block::BlockWriter::new_pending(
+        let mut writer = metrics_index::block::BlockWriter::new(
             Vec::new(),
             schema.clone(),
-            metrics_block::MAX_BLOCK_ROWS,
+            metrics_index::block::MAX_BLOCK_ROWS,
         )?;
         for batch in builder
-            .with_batch_size(metrics_block::MAX_BLOCK_ROWS)
+            .with_batch_size(metrics_index::block::MAX_BLOCK_ROWS)
             .build()?
         {
             let batch = batch?;
@@ -791,36 +791,23 @@ mod tests {
             let (data, meta, path) = file.into_upload_parts().await.unwrap();
             let data = bytes::Bytes::from(data);
             let encoded = tokio::fs::read(path.unwrap()).await.unwrap();
-            let parent = metrics_block::ParentMetadata {
+            let parent = metrics_index::block::ParentMetadata {
                 rows: meta.records as u64,
                 compressed_size: data.len() as u64,
             };
             let reference = build_from_parquet(data.clone(), parent.clone()).unwrap();
             assert_eq!(encoded, reference, "file {position}");
-            let footer = metrics_block::read_footer(
-                &encoded[encoded.len() - metrics_block::FOOTER_LEN..],
-                encoded.len() as u64,
-            )
-            .unwrap();
-            let index = metrics_block::decode_index(
-                bytes::Bytes::copy_from_slice(
-                    &encoded
-                        [footer.metadata_range.start as usize..footer.metadata_range.end as usize],
-                ),
-                &footer,
-                &parent,
-                &["tag".into()],
-            )
-            .unwrap();
-            assert_eq!(index.parent.rows, meta.records as u64);
+            let index =
+                metrics_index::block::decode_file(&encoded, &parent, &["tag".into()]).unwrap();
+            assert_eq!(index.header.parent.rows, meta.records as u64);
             assert_eq!(
-                index.row_group_size,
+                index.header.row_group_size,
                 Some(meta.records.min(PARQUET_MAX_ROW_GROUP_SIZE as i64) as u32)
             );
             let mut decoded = Vec::new();
             for block in &index.blocks {
                 let range = block.block_range();
-                let samples = metrics_block::decode_block(
+                let samples = metrics_index::block::decode_block(
                     &encoded[range.start as usize..range.end as usize],
                     &block,
                 )
@@ -926,7 +913,6 @@ mod tests {
 
         let schema = block_schema(None, false);
         let rows = [(1, 10, Some(1f64.to_bits())), (1, 20, Some(2f64.to_bits()))];
-        let enabled = config::get_config().compact.metrics_index_enabled;
         for configured_format in [FileFormat::Parquet, FileFormat::Vortex] {
             for (ingester, closed_hour) in [(false, true), (false, false), (true, false)] {
                 let (mode, output) = if ingester {
@@ -973,33 +959,21 @@ mod tests {
                 let mut actual = sample_rows_for(format, bytes::Bytes::from(data.clone())).await;
                 actual.sort_unstable();
                 assert_eq!(actual, rows);
-                assert_eq!(path.is_some(), enabled && closed_hour && !ingester);
+                assert_eq!(path.is_some(), closed_hour && !ingester);
                 if let Some(path) = path {
                     let encoded = tokio::fs::read(path).await.unwrap();
                     assert!(!encoded.starts_with(b"ARROW1"));
-                    let footer = metrics_block::read_footer(
-                        &encoded[encoded.len() - metrics_block::FOOTER_LEN..],
-                        encoded.len() as u64,
-                    )
-                    .unwrap();
-                    let parent = metrics_block::ParentMetadata {
+                    let parent = metrics_index::block::ParentMetadata {
                         rows: meta.records as u64,
                         compressed_size: data.len() as u64,
                     };
-                    let index = metrics_block::decode_index(
-                        bytes::Bytes::copy_from_slice(
-                            &encoded[footer.metadata_range.start as usize
-                                ..footer.metadata_range.end as usize],
-                        ),
-                        &footer,
-                        &parent,
-                        &["tag".into()],
-                    )
-                    .unwrap();
+                    let index =
+                        metrics_index::block::decode_file(&encoded, &parent, &["tag".into()])
+                            .unwrap();
                     let mut decoded_rows = Vec::new();
                     for block in &index.blocks {
                         let range = block.block_range();
-                        let decoded = metrics_block::decode_block(
+                        let decoded = metrics_index::block::decode_block(
                             &encoded[range.start as usize..range.end as usize],
                             &block,
                         )
@@ -1084,17 +1058,49 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn invalid_samples_fail_merge() {
+    async fn stale_marker_compacts_into_the_block() {
+        let stale = config::meta::promql::STALE_NAN_BITS;
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
             let schema = block_schema(None, false);
-            let rows = [(1, 10, Some(1f64.to_bits())), (2, 20, None)];
+            let rows = [(1, 10, Some(1f64.to_bits())), (1, 20, None), (2, 20, None)];
             let mut output = block_output();
             output.file_format = format;
-            let error = produce(&schema, vec![block_batch(&schema, &rows)], output)
+            let file = produce(&schema, vec![block_batch(&schema, &rows)], output)
                 .await
-                .err()
-                .expect("invalid samples must fail the merge");
-            assert!(error.to_string().contains("nullable samples unsupported"));
+                .unwrap()
+                .remove(0);
+            assert!(matches!(file, MergedFile::MetricsIndexed { .. }));
+            let (data, meta, path) = file.into_upload_parts().await.unwrap();
+            let data = bytes::Bytes::from(data);
+            assert_eq!(sample_rows_for(format, data.clone()).await, rows);
+            let encoded = tokio::fs::read(path.unwrap()).await.unwrap();
+            let parent = metrics_index::block::ParentMetadata {
+                rows: meta.records as u64,
+                compressed_size: data.len() as u64,
+            };
+            let index =
+                metrics_index::block::decode_file(&encoded, &parent, &["tag".into()]).unwrap();
+            let mut decoded = Vec::new();
+            for block in &index.blocks {
+                let range = block.block_range();
+                let samples = metrics_index::block::decode_block(
+                    &encoded[range.start as usize..range.end as usize],
+                    &block,
+                )
+                .unwrap();
+                decoded.extend(
+                    samples
+                        .timestamps
+                        .into_iter()
+                        .zip(samples.value_bits)
+                        .map(|(time, value)| (block.hash, time, value)),
+                );
+            }
+            assert_eq!(
+                decoded,
+                vec![(1, 10, 1f64.to_bits()), (1, 20, stale), (2, 20, stale)],
+                "{format:?}"
+            );
         }
     }
 
@@ -1137,30 +1143,17 @@ mod tests {
         .remove(0);
         let (data, _meta, path) = file.into_upload_parts().await.unwrap();
         let encoded = tokio::fs::read(path.unwrap()).await.unwrap();
-        let footer = metrics_block::read_footer(
-            &encoded[encoded.len() - metrics_block::FOOTER_LEN..],
-            encoded.len() as u64,
-        )
-        .unwrap();
-        let parent = metrics_block::ParentMetadata {
+        let parent = metrics_index::block::ParentMetadata {
             rows: rows.len() as u64,
             compressed_size: data.len() as u64,
         };
-        let index = metrics_block::decode_index(
-            bytes::Bytes::copy_from_slice(
-                &encoded[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
-            ),
-            &footer,
-            &parent,
-            &["tag".into()],
-        )
-        .unwrap();
-        assert_eq!(index.row_group_size, None);
-        assert_eq!(index.source_schema.as_ref(), schema.as_ref());
+        let index = metrics_index::block::decode_file(&encoded, &parent, &["tag".into()]).unwrap();
+        assert_eq!(index.header.row_group_size, None);
+        assert_eq!(index.header.source_schema.as_ref(), schema.as_ref());
         let mut native_rows = Vec::new();
         for block in &index.blocks {
             let range = block.block_range();
-            let decoded = metrics_block::decode_block(
+            let decoded = metrics_index::block::decode_block(
                 &encoded[range.start as usize..range.end as usize],
                 &block,
             )
@@ -1234,39 +1227,26 @@ mod tests {
             let stored =
                 sample_rows_for(FileFormat::Vortex, bytes::Bytes::from(data.clone())).await;
             let encoded = tokio::fs::read(path.unwrap()).await.unwrap();
-            let footer = metrics_block::read_footer(
-                &encoded[encoded.len() - metrics_block::FOOTER_LEN..],
-                encoded.len() as u64,
-            )
-            .unwrap();
-            let parent = metrics_block::ParentMetadata {
+            let parent = metrics_index::block::ParentMetadata {
                 rows: meta.records as u64,
                 compressed_size: data.len() as u64,
             };
-            let index = metrics_block::decode_index(
-                bytes::Bytes::copy_from_slice(
-                    &encoded
-                        [footer.metadata_range.start as usize..footer.metadata_range.end as usize],
-                ),
-                &footer,
-                &parent,
-                &["tag".into()],
-            )
-            .unwrap();
-            assert_eq!(index.row_group_size, None);
+            let index =
+                metrics_index::block::decode_file(&encoded, &parent, &["tag".into()]).unwrap();
+            assert_eq!(index.header.row_group_size, None);
             let mut native = Vec::new();
             for block in &index.blocks {
                 let range = block.block_range();
-                let payload = metrics_block::decode_block(
+                let decoded = metrics_index::block::decode_block(
                     &encoded[range.start as usize..range.end as usize],
                     &block,
                 )
                 .unwrap();
                 native.extend(
-                    payload
+                    decoded
                         .timestamps
                         .into_iter()
-                        .zip(payload.value_bits)
+                        .zip(decoded.value_bits)
                         .map(|(t, v)| (block.hash, t, Some(v))),
                 );
             }
@@ -1495,25 +1475,13 @@ mod tests {
 
             let metrics_index = tokio::fs::read(&metrics_index_path).await.unwrap();
             drop(metrics_index_path);
-            let footer = metrics_block::read_footer(
-                &metrics_index[metrics_index.len() - metrics_block::FOOTER_LEN..],
-                metrics_index.len() as u64,
-            )
-            .unwrap();
-            let parent = metrics_block::ParentMetadata {
+            let parent = metrics_index::block::ParentMetadata {
                 rows: meta.records as u64,
                 compressed_size: bytes.len() as u64,
             };
-            let index = metrics_block::decode_index(
-                bytes::Bytes::copy_from_slice(
-                    &metrics_index
-                        [footer.metadata_range.start as usize..footer.metadata_range.end as usize],
-                ),
-                &footer,
-                &parent,
-                &["path".into()],
-            )
-            .unwrap();
+            let index =
+                metrics_index::block::decode_file(&metrics_index, &parent, &["path".into()])
+                    .unwrap();
             assert_eq!(
                 index.blocks.row_counts().map(u64::from).sum::<u64>(),
                 meta.records as u64
