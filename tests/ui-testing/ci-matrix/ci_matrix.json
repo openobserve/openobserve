@@ -599,7 +599,9 @@
     "actual_folder": "assistant",
     "browser": "chrome",
     "run_files": [
-      "legacy-smoke.spec.js"
+      "legacy-smoke.spec.js",
+      "shell.spec.js",
+      "gates.spec.js"
     ],
     "disabled": []
   }

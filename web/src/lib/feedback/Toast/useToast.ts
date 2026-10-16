@@ -21,6 +21,8 @@ interface ToastRecord {
   details?: ToastDetail[];
   titleCount?: number;
   onDismiss?: () => void;
+  mask?: boolean;
+  live?: ToastOptions["live"];
 }
 
 // ── Default timeouts per variant ─────────────────────────────────────────────
@@ -160,6 +162,8 @@ function toast(options: ToastOptions): DismissFn {
     details: options.details,
     titleCount: options.titleCount,
     onDismiss: options.onDismiss,
+    ...(options.mask && { mask: true }),
+    ...(options.live && { live: options.live }),
   };
 
   // Loading variant is suppressed — callers use the returned dismiss fn to

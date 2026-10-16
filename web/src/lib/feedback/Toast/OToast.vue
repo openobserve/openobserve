@@ -150,6 +150,8 @@ onUnmounted(() => {
         : 'data-[state=closed]:slide-out-to-bottom-4',
     ]"
     :role="rootRole"
+    :aria-live="live"
+    :data-dd-privacy="mask ? 'mask' : undefined"
     :data-test="`o-toast-${id}`"
     :data-test-variant="variant ?? 'default'"
     :data-test-message="message"
@@ -171,7 +173,9 @@ onUnmounted(() => {
     >
 
     <!-- Inner shell: carries all visual styling + overflow-hidden to clip the progress bar -->
+    <!-- A silent toast also keeps its text out of reka's own announcer. -->
     <div
+      :data-reka-toast-announce-exclude="live === 'off' ? '' : undefined"
       :class="[
         'rounded-default shadow-toast relative flex w-full gap-2 overflow-hidden p-3',
         title ? 'items-start' : 'items-center',

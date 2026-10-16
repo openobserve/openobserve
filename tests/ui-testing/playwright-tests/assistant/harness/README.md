@@ -124,7 +124,8 @@ Working today: `historyStatus` (500 → history unavailable), `sharesStatus`,
 `expireNext` (set by `expireSession`), `role` (`admin` | `editor` | `viewer` | `user` |
 `custom`: anything but `admin` rewrites the login response's role and turns `rbac_enabled` on,
 and the access probe `POST …/ai/chats/{id}/cancel` answers 403 for `viewer`, 404 otherwise),
-`capabilitiesEnabled` (B-06 `GET …/ai/capabilities` and `POST …/capabilities/test`; 404 while
+`probeStatus` (overrides that answer, e.g. 403 for a custom role) and `probeDelayMs` (a delay
+past the probe's 5 s timeout leaves `canChat` unknown), `capabilitiesEnabled` (B-06 `GET …/ai/capabilities` and `POST …/capabilities/test`; 404 while
 off) and `capabilities` (fields merged over the role-derived answer).
 
 Read by the stream shim in the page (set at `installMocks`, changed later with
