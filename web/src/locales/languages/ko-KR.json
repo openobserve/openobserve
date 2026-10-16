@@ -11505,6 +11505,7 @@
     },
     "add": "추가",
     "runQuery": "쿼리 실행",
+    "runQueryOptions": "쿼리 실행 옵션",
     "explorer": {
       "detail": {
         "loading": "메트릭 상세 정보 불러오는 중...",

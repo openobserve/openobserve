@@ -11505,6 +11505,7 @@
     },
     "add": "Añadir",
     "runQuery": "Ejecutar consulta",
+    "runQueryOptions": "Opciones de ejecución de consulta",
     "explorer": {
       "detail": {
         "loading": "Cargando detalles de la métrica...",

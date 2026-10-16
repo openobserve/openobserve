@@ -39,6 +39,7 @@ export class MetricsExplorerPage {
         // Refresh exists only in the grid modes; Visualize runs its chart with Run query.
         this.refreshButton = '[data-test="metrics-explorer-refresh"]';
         this.runButton = '[data-test="metrics-explorer-run"]';
+        this.runOptionsButton = '[data-test="metrics-explorer-run-options"]';
         this.shareButton = '[data-test="metrics-explorer-share-btn"]';
         // Result-count label in the filter bar ("N" or "N of M").
         this.countLabel = '[data-test="metrics-explorer-count"]';

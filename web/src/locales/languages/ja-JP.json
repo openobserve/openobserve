@@ -11505,6 +11505,7 @@
     },
     "add": "追加",
     "runQuery": "クエリを実行",
+    "runQueryOptions": "クエリ実行オプション",
     "explorer": {
       "detail": {
         "loading": "メトリクスの詳細を読み込み中...",
