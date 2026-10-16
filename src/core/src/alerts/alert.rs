@@ -3481,12 +3481,15 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         Ok(v) => v,
         Err(e) => {
             log::error!("error sending request to {} with error {e:?}", endpoint.url);
-            return Err(anyhow::anyhow!("error sending request : {e:?}"));
+            return Err(anyhow::anyhow!(
+                "error sending request : {:?}",
+                e.without_url()
+            ));
         }
     };
     let resp_status = resp.status();
     let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
-    let resp_body = resp.text().await?;
+    let resp_body = resp.text().await.map_err(reqwest::Error::without_url)?;
 
     log::debug!(
         "Alert sent to destination {} with status: {}, body:\n{}",
@@ -3657,10 +3660,15 @@ async fn send_discord_with_attachment(
                 .mime_str("image/png")?,
         );
 
-    let resp = client.post(url).multipart(form).send().await?;
+    let resp = client
+        .post(url)
+        .multipart(form)
+        .send()
+        .await
+        .map_err(reqwest::Error::without_url)?;
     let resp_status = resp.status();
     let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
-    let resp_body = resp.text().await?;
+    let resp_body = resp.text().await.map_err(reqwest::Error::without_url)?;
     if !resp_status.is_success() {
         log::error!(
             "Alert discord notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
@@ -4877,7 +4885,7 @@ mod send_path_tests {
     };
     use crate::{
         alerts::notifications::platform::{Platform, send_resolve},
-        ssrf_test_support::{isolated, secret_server},
+        ssrf_test_support::{isolated, secret_server, truncated_server},
     };
 
     #[test]
@@ -5117,6 +5125,72 @@ mod send_path_tests {
                 for shown in &seen {
                     let (Ok(s) | Err(s)) = shown;
                     assert!(s.contains("secret"), "{s}");
+                }
+            },
+        );
+    }
+
+    #[test]
+    fn a_destination_that_cannot_be_reached_keeps_its_url_out_of_the_error() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_destination_that_cannot_be_reached_keeps_its_url_out_of_the_error"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let port = std::net::TcpListener::bind("127.0.0.1:0")
+                    .unwrap()
+                    .local_addr()
+                    .unwrap()
+                    .port();
+                let dest = endpoint(
+                    &format!("http://127.0.0.1:{port}"),
+                    "/hooks/T0/hooktoken?key=querytoken",
+                );
+                let png = std::sync::Arc::new(vec![0u8; 8]);
+                let seen = [
+                    send_http_notification(&dest, "{}".into()).await,
+                    send_discord_with_attachment(&dest, "{}".into(), png).await,
+                    send_resolve(Platform::PagerDuty, &dest, "ep-1").await,
+                ];
+                for (path, shown) in ["http", "discord", "resolve"].into_iter().zip(seen) {
+                    let shown = shown.expect_err("nothing listens on the port").to_string();
+                    assert!(
+                        !shown.contains("hooktoken") && !shown.contains("querytoken"),
+                        "{path}: {shown}"
+                    );
+                }
+            },
+        );
+    }
+
+    #[test]
+    fn a_destination_that_drops_its_body_keeps_its_url_out_of_the_error() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_destination_that_drops_its_body_keeps_its_url_out_of_the_error"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let dest = endpoint(
+                    &truncated_server().await,
+                    "/hooks/T0/hooktoken?key=querytoken",
+                );
+                let png = std::sync::Arc::new(vec![0u8; 8]);
+                let seen = [
+                    send_http_notification(&dest, "{}".into()).await,
+                    send_discord_with_attachment(&dest, "{}".into(), png).await,
+                ];
+                for (path, shown) in ["http", "discord"].into_iter().zip(seen) {
+                    let shown = shown.expect_err("the body is cut short").to_string();
+                    assert!(
+                        shown.contains("decoding response body")
+                            && !shown.contains("hooktoken")
+                            && !shown.contains("querytoken"),
+                        "{path}: {shown}"
+                    );
                 }
             },
         );
