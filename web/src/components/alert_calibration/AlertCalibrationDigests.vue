@@ -127,13 +127,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-coverage="{ row }">
-            <OBadge
-              :variant="COVERAGE_BADGE[coverageVerdict(row)].variant"
-              size="sm"
-              shape="rounded"
-            >
-              {{ t(COVERAGE_BADGE[coverageVerdict(row)].labelKey) }}
-            </OBadge>
+            <span class="relative inline-flex">
+              <OBadge
+                :variant="COVERAGE_BADGE[coverageVerdict(row)].variant"
+                size="sm"
+                shape="rounded"
+              >
+                {{ t(COVERAGE_BADGE[coverageVerdict(row)].labelKey) }}
+              </OBadge>
+              <OTooltip v-if="coverageNotes(t, row).length" side="left" max-width="25rem">
+                <template #content>
+                  <span v-for="note in coverageNotes(t, row)" :key="note" class="block">{{
+                    note
+                  }}</span>
+                </template>
+              </OTooltip>
+            </span>
           </template>
 
           <template #cell-generated="{ row }">
@@ -223,6 +232,7 @@ import AlertCalibrationActions from "./AlertCalibrationActions.vue";
 import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
 import {
+  coverageNotes,
   coverageVerdict,
   isClean,
   latestPerWindow,
