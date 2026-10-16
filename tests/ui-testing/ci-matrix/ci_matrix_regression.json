@@ -99,23 +99,14 @@
       "traces-6591-explorer-state.spec.js",
       "traces-6591-details-interactions.spec.js",
       "traces-14317-error-filter-pagination.spec.js",
-      "traces-15130-time-window-error-state.spec.js"
-    ],
-    "disabled": []
-  },
-  {
-    "testfolder": "Traces-Regression-2",
-    "actual_folder": "RegressionSet/Traces",
-    "browser": "chrome",
-    "run_files": [
+      "traces-15130-time-window-error-state.spec.js",
       "traces-15041-waterfall-axis-rum-view.spec.js",
       "traces-15189-saved-views-more-menu.spec.js",
       "traces-15222-string-replay-flag.spec.js",
       "traces-15248-llm-session-reply.spec.js",
       "traces-15269-services-catalog-state.spec.js"
     ],
-    "disabled": [],
-    "_comment": "Separate from Traces-Regression on purpose: these files sort before traces-regression.spec.js and would start it minutes later, and its Bug #9043 pagination test only finds its traces while global-setup's spans are about a minute old."
+    "disabled": []
   },
   {
     "testfolder": "Metrics-Regression",
