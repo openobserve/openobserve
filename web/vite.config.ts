@@ -299,8 +299,6 @@ export default defineConfig(({ mode }) => {
               // getContribution("editor.contrib.suggestController") is simply
               // null and Ctrl+Space does nothing. Keeping every monaco module in
               // one chunk keeps its own import order intact.
-              //
-              // Lazy only while no entry-graph module is grouped in here (see o2cs-node-polyfills).
               if (id.includes("node_modules/monaco-editor/")) return "monaco-editor";
 
               for (const [chunk, packages] of Object.entries(byPackage)) {

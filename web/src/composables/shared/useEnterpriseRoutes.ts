@@ -22,9 +22,6 @@ import {
 } from "@/utils/enterpriseFeatures";
 import { oncallRouteGuard } from "./oncallRouteGuard";
 
-const ServiceAccountsList = () =>
-  import("@/components/iam/serviceAccounts/ServiceAccountsList.vue");
-
 // "rbac" needs the backend `rbac_enabled` flag, which only `store.state.zoConfig`
 // carries — every other key here is edition-only and could use the default.
 const withFeatureGate: typeof withFeatureGateBase = (key, guard, getContext) =>
@@ -97,6 +94,9 @@ const EditGroup = () => import("@/components/iam/groups/EditGroup.vue");
 const Quota = () => import("@/components/iam/quota/Quota.vue");
 
 const Organizations = () => import("@/components/iam/organizations/AppOrganizations.vue");
+
+const ServiceAccountsList = () =>
+  import("@/components/iam/serviceAccounts/ServiceAccountsList.vue");
 
 const Invitations = () => import("@/views/Invitations.vue");
 
