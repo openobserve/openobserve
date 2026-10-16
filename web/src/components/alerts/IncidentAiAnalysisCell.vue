@@ -95,6 +95,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 
 const props = defineProps<{
   incident: Incident;
@@ -123,9 +124,14 @@ const BADGE_VARIANT: Record<RcaCellTone, BadgeVariant> = {
 const { t } = useI18nTyped();
 const store = useStore();
 const { requestRca } = useRcaTrigger();
+const timezone = useViewerTimezone();
 
 const model = computed(() =>
-  rcaCellModel(props.incident, { rcaEnabled: props.rcaEnabled, now: props.now }),
+  rcaCellModel(props.incident, {
+    rcaEnabled: props.rcaEnabled,
+    now: props.now,
+    timezone: timezone.value,
+  }),
 );
 
 const starting = ref(false);

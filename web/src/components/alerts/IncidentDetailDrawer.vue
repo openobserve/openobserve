@@ -217,6 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @trigger-rca="triggerRca"
               @cancel-rca="cancelRca"
               @view-run="viewRcaRun"
+              @steered="reloadRca"
             />
 
             <!-- Tab Content Area -->

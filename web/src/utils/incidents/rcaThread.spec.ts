@@ -23,13 +23,22 @@ import {
   RCA_STAGES,
   RCA_UNFINISHED_TOOL_ERROR,
   rcaStageLabel,
+  rcaThreadEntries,
   rcaThreadPlainText,
   rcaToolStatusLabel,
   rcaTriggerLabel,
   splitRcaNote,
   toolCallsDurationMs,
 } from "./rcaThread";
-import { RCA_T0, rcaStep, rcaThread, rcaToolCall } from "@/test/unit/fixtures/rcaThread";
+import {
+  RCA_T0,
+  rcaSteerRecord,
+  rcaStep,
+  rcaThread,
+  rcaThreadQuestion,
+  rcaToolCall,
+  sec,
+} from "@/test/unit/fixtures/rcaThread";
 
 describe("rcaThread utils", () => {
   describe("formatRcaDuration (TH37)", () => {
@@ -194,5 +203,54 @@ describe("rcaThread utils", () => {
       "2. Map the checkout dependencies · 08:53:41 UTC",
       "  - get_service_graph: checkout [Running]",
     ]);
+  });
+
+  describe("04 §10.6: one time order for steps, questions and messages", () => {
+    const thread = rcaThread({
+      questions: [
+        rcaThreadQuestion({ at: RCA_T0 + sec(10) }),
+        rcaThreadQuestion({ question_id: "q2", at: null }),
+      ],
+    });
+    const items = [
+      rcaSteerRecord({ steer_id: "late", created_at: RCA_T0 + sec(30) }),
+      rcaSteerRecord({ steer_id: "early", created_at: RCA_T0 + sec(1) }),
+    ];
+
+    it("rcaThreadEntries sorts by time; a question with no time goes last", () => {
+      expect(rcaThreadEntries(thread, items).map((entry) => entry.key)).toEqual([
+        "steer-early",
+        "step-1",
+        "question-call_7f",
+        "step-2",
+        "steer-late",
+        "question-q2",
+      ]);
+    });
+
+    it("Copy thread includes the questions and responder messages in that order", () => {
+      const text = rcaThreadPlainText(
+        rcaThread({ questions: [rcaThreadQuestion()] }),
+        "Investigation thread",
+        [
+          rcaSteerRecord({
+            status: "applied",
+            agent_note: "Checking the pool size.",
+          }),
+        ],
+      ).split("\n");
+
+      const steer = text.indexOf("a.rao · 08:56:40 UTC · Applied");
+      const question = text.findIndex((line) => line.startsWith("Needs input: Which change"));
+      expect(steer).toBeGreaterThan(
+        text.indexOf("2. Map the checkout dependencies · 08:53:41 UTC"),
+      );
+      expect(text.slice(steer + 1, steer + 3)).toEqual([
+        "We raised the orders pool to 150 on Oct 8",
+        "Agent: Checking the pool size.",
+      ]);
+      expect(question).toBeGreaterThan(steer);
+      expect(text[question]).toMatch(/· 08:57:20 UTC$/);
+    });
   });
 });

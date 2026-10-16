@@ -16,9 +16,12 @@
 //! The investigation thread of an RCA run, projected from its chat session (TH29, TH33).
 
 use config::{
-    meta::oncall::{
-        confidence::{KEY_ARG_MAX_BYTES, cut_bytes},
-        rca_run::summarize_result,
+    meta::{
+        alerts::rca_steering::SteerKind,
+        oncall::{
+            confidence::{KEY_ARG_MAX_BYTES, cut_bytes},
+            rca_run::summarize_result,
+        },
     },
     utils::json::{Map, Value},
 };
@@ -27,9 +30,12 @@ use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-use super::projection::{
-    Folded, HIDDEN_TOOLS, SESSION_ARG, coerce_tool_output, extract_error_message,
-    extract_mcp_response, is_injected, obj, strip_mcp_prefix, truthy,
+use super::{
+    projection::{
+        Folded, HIDDEN_TOOLS, SESSION_ARG, coerce_tool_output, extract_error_message,
+        extract_mcp_response, is_injected, obj, strip_mcp_prefix, truthy,
+    },
+    rca_ledger::{ASK_RESPONDERS, question_of, split_steers},
 };
 use crate::redact::redact_internal_details;
 
@@ -225,9 +231,8 @@ pub struct RcaThread {
     pub started: Option<ThreadStart>,
     pub steps: Vec<ThreadStep>,
     pub user_messages: Vec<ThreadUserMessage>,
-    /// Questions to responders; Phase 4 fills them.
-    #[schema(value_type = Vec<Object>)]
-    pub questions: Vec<Value>,
+    /// The run's questions to responders (SG25), in call order.
+    pub questions: Vec<ThreadQuestion>,
     pub report_submitted: bool,
     pub stats: ThreadStats,
 }
@@ -252,6 +257,7 @@ pub struct ThreadStep {
     pub note: Option<String>,
     pub note_truncated: bool,
     pub citations: Vec<String>,
+    /// The first step that starts after the agent read a steering message (§10.6).
     pub from_steering: bool,
     pub tool_calls: Vec<ThreadToolCall>,
 }
@@ -283,10 +289,44 @@ pub struct ThreadToolCall {
     pub output: Option<String>,
 }
 
+/// A user message after the first prompt: a turn prompt, or a steering message (SG19)
+/// with its header fields and the responder's text without the header lines.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct ThreadUserMessage {
     pub at: Option<i64>,
     pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub steer_id: Option<String>,
+    /// The responder's email.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<SteerKind>,
+    /// The question an answer replies to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub question_id: Option<String>,
+    /// µs: when the agent read the message (SG20).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub read_at: Option<i64>,
+}
+
+/// A question the agent asked the responders (SG25).
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
+pub struct ThreadQuestion {
+    /// The `ask_responders` call's `callID`.
+    pub question_id: String,
+    pub question: String,
+    pub need: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hypothesis_id: Option<String>,
+    /// µs.
+    pub at: Option<i64>,
+    /// The author of the first answer to it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub answered_by: Option<String>,
+    /// µs: when that answer reached the session.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub answered_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, ToSchema)]
@@ -370,6 +410,7 @@ pub fn project_rca_thread(
                 builder.user_message(time.and_then(|t| ms_to_us(t.get("created"))), parts)
             }
             Some("assistant") => {
+                builder.assistant_message(time.and_then(|t| ms_to_us(t.get("created"))));
                 for part in parts.values().filter_map(Value::as_object) {
                     builder.assistant_part(part);
                 }
@@ -386,6 +427,11 @@ struct Builder {
     show_tool_io: bool,
     started: Option<ThreadStart>,
     user_messages: Vec<ThreadUserMessage>,
+    /// Steering messages in `user_messages` the agent has not read yet (SG20).
+    unread: Vec<usize>,
+    /// The agent read a steering message, and no step has started since (§10.6).
+    steering_read: bool,
+    questions: Vec<ThreadQuestion>,
     steps: Vec<StepAcc>,
     report_submitted: bool,
     tokens: ThreadTokens,
@@ -409,21 +455,49 @@ impl Builder {
         self.last_ms = Some(self.last_ms.map_or(ms, |l| l.max(ms)));
     }
 
+    /// The first user message is the run's prompt; a later one is a turn prompt or one or
+    /// more steering messages (SG19).
     fn user_message(&mut self, at: Option<i64>, parts: &Map<String, Value>) {
-        let text = parts
-            .values()
-            .filter_map(Value::as_object)
-            .filter(|p| p.get("type").and_then(Value::as_str) == Some("text") && !is_injected(p))
-            .filter_map(|p| p.get("text").and_then(Value::as_str))
-            .filter(|t| !t.is_empty())
-            .collect::<Vec<_>>()
-            .join("\n\n");
-        let text = text.trim().to_string();
+        let (preamble, blocks) = split_steers(&user_text(parts));
         if self.started.is_none() {
-            self.started = Some(ThreadStart { at, prompt: text });
-        } else {
-            self.user_messages.push(ThreadUserMessage { at, text });
+            self.started = Some(ThreadStart {
+                at,
+                prompt: preamble,
+            });
+        } else if !preamble.is_empty() || blocks.is_empty() {
+            self.user_messages.push(ThreadUserMessage {
+                at,
+                text: preamble,
+                steer_id: None,
+                author: None,
+                kind: None,
+                question_id: None,
+                read_at: None,
+            });
         }
+        for block in blocks {
+            self.unread.push(self.user_messages.len());
+            self.user_messages.push(ThreadUserMessage {
+                at,
+                text: block.text,
+                steer_id: Some(block.header.steer_id),
+                author: Some(block.header.author),
+                kind: Some(block.header.kind),
+                question_id: block.header.question_id,
+                read_at: None,
+            });
+        }
+    }
+
+    /// SG20: an assistant message reads every steering message before it.
+    fn assistant_message(&mut self, created: Option<i64>) {
+        if self.unread.is_empty() {
+            return;
+        }
+        for i in self.unread.drain(..) {
+            self.user_messages[i].read_at = created;
+        }
+        self.steering_read = true;
     }
 
     fn assistant_part(&mut self, part: &Map<String, Value>) {
@@ -486,8 +560,23 @@ impl Builder {
             }
             ThreadPart::FailedStep => return,
             ThreadPart::Hidden => {
-                if call.tool == SUBMIT_REPORT && call.status == "completed" {
-                    self.report_submitted = true;
+                if call.status == "completed" {
+                    match call.tool {
+                        SUBMIT_REPORT => self.report_submitted = true,
+                        ASK_RESPONDERS => {
+                            let asked = question_of(&call);
+                            self.questions.push(ThreadQuestion {
+                                question_id: asked.question_id,
+                                question: asked.question,
+                                need: asked.need,
+                                hypothesis_id: asked.hypothesis_id,
+                                at: started_at,
+                                answered_by: None,
+                                answered_at: None,
+                            });
+                        }
+                        _ => {}
+                    }
                 }
                 return;
             }
@@ -573,7 +662,7 @@ impl Builder {
                 note: None,
                 note_truncated: false,
                 citations: Vec::new(),
-                from_steering: false,
+                from_steering: std::mem::take(&mut self.steering_read),
                 tool_calls: Vec::new(),
             },
             note: Vec::new(),
@@ -613,6 +702,16 @@ impl Builder {
             s.at = s.at.or_else(|| turns.first().map(|t| t.started_at));
             s
         });
+        let mut questions = self.questions;
+        for question in &mut questions {
+            if let Some(answer) = self.user_messages.iter().find(|m| {
+                m.kind == Some(SteerKind::Answer)
+                    && m.question_id.as_deref() == Some(question.question_id.as_str())
+            }) {
+                question.answered_by = answer.author.clone();
+                question.answered_at = answer.at;
+            }
+        }
         let duration_ms = self.first_ms.zip(self.last_ms).map_or(0, |(f, l)| l - f);
         RcaThread {
             run_id: String::new(),
@@ -622,7 +721,7 @@ impl Builder {
             transcript: Transcript::Available,
             started,
             user_messages: self.user_messages,
-            questions: Vec::new(),
+            questions,
             report_submitted: self.report_submitted,
             stats: ThreadStats {
                 steps: steps.len() as u32,
@@ -648,8 +747,22 @@ fn as_i64(v: &Value) -> Option<i64> {
 }
 
 /// Event times are epoch milliseconds; the thread uses microseconds.
-fn ms_to_us(v: Option<&Value>) -> Option<i64> {
+pub(crate) fn ms_to_us(v: Option<&Value>) -> Option<i64> {
     v.and_then(as_i64).map(|ms| ms * 1000)
+}
+
+/// A user message's text: its text parts that the server did not inject, trimmed.
+pub(crate) fn user_text(parts: &Map<String, Value>) -> String {
+    parts
+        .values()
+        .filter_map(Value::as_object)
+        .filter(|p| p.get("type").and_then(Value::as_str) == Some("text") && !is_injected(p))
+        .filter_map(|p| p.get("text").and_then(Value::as_str))
+        .filter(|t| !t.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n")
+        .trim()
+        .to_string()
 }
 
 /// `[eN]` references in a note, in order, without duplicates.
@@ -1465,5 +1578,121 @@ pub(crate) mod tests {
         assert_eq!(json["state_version"], "-1.0.5");
         assert_eq!(json["steps"], json!([]));
         assert_eq!(json["stats"]["tool_calls"], 0);
+    }
+
+    /// SG19, SG20, SG25, §10.6: a steering message is a user message with its header fields
+    /// and the responder's text without the header lines, read at the next assistant
+    /// message; the first step after that read is `from_steering`; an answer names its
+    /// question's responder.
+    #[test]
+    fn steering_messages_project_with_their_header_read_time_and_question() {
+        use config::meta::alerts::rca_steering::SteerKind;
+
+        use crate::ai_chat::rca_ledger::tests::{RESPONDER, S1, ask, steer_message, user_message};
+
+        let step = |s: &mut Session, msg: &str, id: &str, stage: &str, at: i64| {
+            s.tool(
+                msg,
+                id,
+                "record_step",
+                "completed",
+                json!({"stage": stage, "title": format!("Step {stage}")}),
+                json!({"output": "{}"}),
+                at,
+                at + 1,
+            );
+        };
+        let mut s = Session::new();
+        user_message(
+            &mut s,
+            "msg_01",
+            "Analyze incident inc_1. Trigger: manual.",
+            0,
+        );
+        s.message("msg_02", "assistant", json!({"created": T + 100}));
+        step(&mut s, "msg_02", "prt_s1", "context", 100);
+        ask(
+            &mut s,
+            "msg_02",
+            "prt_q1",
+            "When did checkout-api deploy?",
+            200,
+        );
+        user_message(
+            &mut s,
+            "msg_03",
+            &steer_message(
+                S1,
+                SteerKind::Answer,
+                Some("call_prt_q1"),
+                "Deployed at 10:02\nby the release bot",
+            ),
+            500,
+        );
+        user_message(&mut s, "msg_04", "Continue the investigation.", 550);
+        s.message("msg_05", "assistant", json!({"created": T + 600}));
+        step(&mut s, "msg_05", "prt_s2", "changes", 600);
+        step(&mut s, "msg_05", "prt_s3", "metrics", 700);
+
+        let thread = project_rca_thread(&s.events, &[], false, false);
+
+        assert_eq!(
+            thread.started.as_ref().unwrap().prompt,
+            "Analyze incident inc_1. Trigger: manual."
+        );
+        assert_eq!(
+            thread.user_messages,
+            [
+                ThreadUserMessage {
+                    at: us(500),
+                    text: "Deployed at 10:02\nby the release bot".to_string(),
+                    steer_id: Some(S1.to_string()),
+                    author: Some(RESPONDER.to_string()),
+                    kind: Some(SteerKind::Answer),
+                    question_id: Some("call_prt_q1".to_string()),
+                    read_at: us(600),
+                },
+                ThreadUserMessage {
+                    at: us(550),
+                    text: "Continue the investigation.".to_string(),
+                    steer_id: None,
+                    author: None,
+                    kind: None,
+                    question_id: None,
+                    read_at: None,
+                },
+            ]
+        );
+        let from_steering: Vec<(Option<&str>, bool)> = thread
+            .steps
+            .iter()
+            .map(|st| (st.stage.as_deref(), st.from_steering))
+            .collect();
+        assert_eq!(
+            from_steering,
+            [
+                (Some("context"), false),
+                (Some("changes"), true),
+                (Some("metrics"), false)
+            ]
+        );
+        assert_eq!(
+            thread.questions,
+            [ThreadQuestion {
+                question_id: "call_prt_q1".to_string(),
+                question: "When did checkout-api deploy?".to_string(),
+                need: "deploy time of checkout-api".to_string(),
+                hypothesis_id: Some("h1".to_string()),
+                at: us(200),
+                answered_by: Some(RESPONDER.to_string()),
+                answered_at: us(500),
+            }]
+        );
+        assert_eq!(thread.stats.tool_calls, 0, "sentinels are no tool rows");
+        let json = serde_json::to_value(&thread.user_messages[1]).unwrap();
+        assert!(
+            json.get("steer_id").is_none() && json.get("read_at").is_none(),
+            "a turn prompt carries no steering fields: {json}"
+        );
     }
 }

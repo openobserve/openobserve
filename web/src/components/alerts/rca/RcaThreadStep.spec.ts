@@ -149,4 +149,14 @@ describe("RcaThreadStep (02 TH38)", () => {
     expect(note.text()).toContain('<img src=x onerror="alert(1)">');
     expect(note.text()).toContain("logs (https://evil.example)");
   });
+
+  it("04 §10.6: a step that followed a message carries the 'from steering' tag", () => {
+    const steered = mountStep(rcaStep({ from_steering: true }));
+    expect(steered.find('[data-test="rca-thread-step-from-steering"]').text()).toBe(
+      "from steering",
+    );
+
+    const plain = mountStep(rcaStep({ from_steering: false }));
+    expect(plain.find('[data-test="rca-thread-step-from-steering"]').exists()).toBe(false);
+  });
 });

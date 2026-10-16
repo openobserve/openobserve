@@ -18,7 +18,15 @@
 import { gt, raw, type I18nText } from "@/types/i18n";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { userLocalPart } from "@/utils/incidents/rcaCell";
-import type { RcaStep, RcaThread, RcaToolCall, RcaTrigger } from "@/services/incidents";
+import { rcaSteerStatusLabel } from "@/utils/incidents/rcaSteering";
+import type {
+  RcaStep,
+  RcaSteerRecord,
+  RcaThread,
+  RcaThreadQuestion,
+  RcaToolCall,
+  RcaTrigger,
+} from "@/services/incidents";
 
 /** The seven stages of the RCA protocol, in order (02 TH18). `stage_index` is 1-based. */
 export const RCA_STAGES = [
@@ -193,11 +201,47 @@ export function rcaToolStatusLabel(call: RcaToolCall): I18nText {
   }
 }
 
+/** One entry of the thread column, in time order (04 §10.6). Times are µs. */
+export type RcaThreadEntry =
+  | { kind: "step"; key: string; at: number; step: RcaStep }
+  | { kind: "question"; key: string; at: number; question: RcaThreadQuestion }
+  | { kind: "steer"; key: string; at: number; item: RcaSteerRecord };
+
+/** Steps, "Needs input" questions and responder messages in time order. */
+export function rcaThreadEntries(thread: RcaThread, items: RcaSteerRecord[]): RcaThreadEntry[] {
+  const list = thread.steps.map((step): RcaThreadEntry => ({
+    kind: "step",
+    key: `step-${step.index}`,
+    at: step.started_at,
+    step,
+  }));
+  for (const question of thread.questions ?? []) {
+    list.push({
+      kind: "question",
+      key: `question-${question.question_id}`,
+      // A question with no recorded time goes last: it is the newest sentinel.
+      at: question.at ?? Number.MAX_SAFE_INTEGER,
+      question,
+    });
+  }
+  for (const item of items) {
+    list.push({ kind: "steer", key: `steer-${item.steer_id}`, at: item.created_at, item });
+  }
+  // Array sort is stable: equal times keep steps, questions, messages in that order.
+  return list.sort((a, b) => a.at - b.at);
+}
+
 /**
- * Plain-text transcript for "Copy thread" (02 TH38): the start, then each step
- * title, its note, and its tool names with their key arguments.
+ * Plain-text transcript for "Copy thread" (02 TH38): the start, then in the
+ * column's order each step (title, note, tool names with their key arguments),
+ * each question ("Needs input: …") and each responder message (author, time,
+ * status, text; 04 SG38).
  */
-export function rcaThreadPlainText(thread: RcaThread, title: string): string {
+export function rcaThreadPlainText(
+  thread: RcaThread,
+  title: string,
+  steering: RcaSteerRecord[] = [],
+): string {
   const lines: string[] = [title];
   if (thread.started) {
     lines.push(
@@ -206,7 +250,26 @@ export function rcaThreadPlainText(thread: RcaThread, title: string): string {
     );
     if (thread.started.prompt) lines.push(thread.started.prompt);
   }
-  for (const step of thread.steps) {
+  for (const entry of rcaThreadEntries(thread, steering)) {
+    if (entry.kind === "question") {
+      const { question } = entry;
+      const time = question.at !== null ? ` · ${formatRcaClock(question.at)} UTC` : "";
+      lines.push("", `${gt("alerts.incidents.rcaSteer.needsInput")}: ${question.question}${time}`);
+      continue;
+    }
+    if (entry.kind === "steer") {
+      const { item } = entry;
+      lines.push(
+        "",
+        `${userLocalPart(item.author_email)} · ${formatRcaClock(item.created_at)} UTC · ${rcaSteerStatusLabel(item)}`,
+        item.text,
+      );
+      if (item.agent_note) {
+        lines.push(gt("alerts.incidents.rcaSteer.agentNote", { note: item.agent_note }));
+      }
+      continue;
+    }
+    const { step } = entry;
     lines.push("", `${step.index}. ${step.title} · ${formatRcaClock(step.started_at)} UTC`);
     if (step.note) lines.push(step.note);
     for (const call of step.tool_calls) {

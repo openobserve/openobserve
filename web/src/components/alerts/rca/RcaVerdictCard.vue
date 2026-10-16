@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- Verdict card (03 VE21, VE22, VE32, VE33, VE35; contract F2): pill, headline,
      band and reason, suspect change and impact for a graded run; the live label
      and leading hypothesis while live; the stage stepper (02 TH37) and the banners
-     of TH40 (M, L, N, E). A legacy run keeps the Phase 2 card (VE42). No credits. -->
+     of TH40 (M, L, N, E); the paused banner (04 frame D) and "Unblocked by …"
+     (frame G, SG39). A legacy run keeps the Phase 2 card (VE42). No credits. -->
 <template>
   <section
     data-test="rca-verdict-card"
@@ -40,6 +41,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ qualifier }}
       </span>
     </div>
+
+    <!-- G: a completed run that a responder's answer unblocked (SG39). -->
+    <p
+      v-if="unblockedText"
+      data-test="rca-verdict-unblocked"
+      class="text-status-warning-text text-compact m-0 font-semibold"
+    >
+      {{ unblockedText }}
+    </p>
 
     <h2
       data-test="rca-verdict-headline"
@@ -146,9 +156,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </dl>
 
+    <!-- D: the run is paused for an answer (SG39); the deadline is local time. -->
+    <OBanner
+      v-if="cardState === 'investigating' && waitingInput"
+      data-test="rca-paused-banner"
+      variant="warning"
+      icon="pause-circle-filled"
+      inline-actions
+    >
+      <p data-test="rca-paused-title" class="text-banner-warning-text m-0 text-sm font-semibold">
+        {{
+          pausedStep
+            ? t("alerts.incidents.rcaSteer.paused.after", { step: pausedStep })
+            : t("alerts.incidents.rcaSteer.paused.title")
+        }}
+      </p>
+      <p
+        v-if="pausedQuestion"
+        data-test="rca-paused-question"
+        class="text-banner-warning-text m-0 mt-0.5 text-sm break-words"
+      >
+        {{ pausedQuestion }}
+      </p>
+      <p data-test="rca-paused-deadline" class="text-banner-warning-text m-0 mt-0.5 text-sm">
+        {{
+          deadlineText
+            ? t("alerts.incidents.rcaSteer.paused.waitsUntil", { time: deadlineText })
+            : t("alerts.incidents.rcaSteer.paused.waits")
+        }}
+      </p>
+      <p
+        v-if="earlierReportNote"
+        data-test="rca-earlier-report-note"
+        class="text-banner-warning-text m-0 mt-0.5 text-xs"
+      >
+        {{ earlierReportNote }}
+      </p>
+      <template #actions>
+        <OButton
+          v-if="canSteer"
+          data-test="rca-paused-tell-agent-btn"
+          variant="outline"
+          size="sm"
+          icon-left="chat"
+          @click="$emit('tell-agent')"
+        >
+          {{ t("alerts.incidents.rcaSteer.paused.tellAgent") }}
+        </OButton>
+        <OButton
+          v-if="connectToolsetRoute"
+          data-test="rca-paused-connect-btn"
+          variant="outline"
+          size="sm"
+          icon-left="link"
+          @click="openConnectToolset"
+        >
+          {{ t("alerts.incidents.rcaSummary.fix.connectToolset") }}
+        </OButton>
+      </template>
+    </OBanner>
+
     <!-- N: stale live run (01 RR-19); it can still be cancelled. -->
     <OBanner
-      v-if="cardState === 'investigating' && stale"
+      v-else-if="cardState === 'investigating' && stale"
       data-test="rca-stale-banner"
       variant="warning"
       icon="warning"
@@ -315,6 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, useId, watch } from "vue";
+import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -332,7 +403,9 @@ import {
   type RcaPillTone,
 } from "@/utils/incidents/rcaSummary";
 import { formatTimestampInTimezone } from "@/utils/date";
+import { rcaBlindSpotRoute } from "@/utils/incidents/rcaEvidenceLinks";
 import type { RcaCardState } from "@/utils/incidents/rcaThread";
+import type { RcaUnblockedLine } from "@/utils/incidents/rcaSteering";
 import RcaPill from "./RcaPill.vue";
 import RcaStageStepper from "./RcaStageStepper.vue";
 
@@ -364,6 +437,18 @@ const props = withDefaults(
     cancelledText?: I18nText | null;
     triggering?: boolean;
     cancelling?: boolean;
+    /** Organization of the incident, for the "Connect AI Toolset" link. */
+    org?: string;
+    /** The user can steer the run: the paused banner offers "Tell the agent". */
+    canSteer?: boolean;
+    /** Title of the step the paused run stopped after. */
+    pausedStep?: string | null;
+    /** The agent's open question. */
+    pausedQuestion?: string | null;
+    /** Answer deadline of the paused run in local "HH:mm". */
+    deadlineText?: string | null;
+    /** A completed run unblocked by an answer (SG39). */
+    unblocked?: RcaUnblockedLine | null;
   }>(),
   {
     waitingInput: false,
@@ -379,6 +464,12 @@ const props = withDefaults(
     cancelledText: null,
     triggering: false,
     cancelling: false,
+    org: "",
+    canSteer: false,
+    pausedStep: null,
+    pausedQuestion: null,
+    deadlineText: null,
+    unblocked: null,
   },
 );
 
@@ -390,9 +481,34 @@ defineEmits<{
   "show-unverified": [];
   /** "N blind spots below". */
   "show-blind-spots": [];
+  /** Frame D "Tell the agent": focus the steer box. */
+  "tell-agent": [];
 }>();
 
 const { t } = useI18nTyped();
+const router = useRouter();
+
+/** Frame D: "Connect AI Toolset" when a blind spot of the run asks for one. */
+const connectToolsetRoute = computed(() =>
+  props.summary?.blind_spots.some((spot) => spot.fix === "connect_toolset")
+    ? rcaBlindSpotRoute("connect_toolset", props.org)
+    : null,
+);
+const openConnectToolset = () => {
+  if (connectToolsetRoute.value) void router.push(connectToolsetRoute.value);
+};
+
+const unblockedText = computed<I18nText | null>(() => {
+  const line = props.unblocked;
+  if (!line || props.cardState !== "analyzed") return null;
+  return line.need
+    ? t("alerts.incidents.rcaSteer.unblockedWithNeed", {
+        author: line.author,
+        time: line.time,
+        need: line.need,
+      })
+    : t("alerts.incidents.rcaSteer.unblocked", { author: line.author, time: line.time });
+});
 
 /** Heights of the three band bars (redesign glyph). */
 const BAR_HEIGHT = ["h-1.5", "h-2.25", "h-3"] as const;

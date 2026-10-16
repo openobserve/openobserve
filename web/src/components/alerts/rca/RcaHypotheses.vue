@@ -16,8 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- "Hypotheses" (03 VE11, VE12, VE18, VE36; contract F8): grouped as the
      redesign draws them, ranked inside each group, each with its status, reason,
-     evidence numbers and status history. Read-only: the hypothesis actions are
-     Phase 4. -->
+     evidence numbers and status history. While the run takes messages each row
+     offers its actions (Disprove, Reopen, Test first) and shows "Pending ·
+     <author>" until the agent reads the action (04 SG31, H16). -->
 <template>
   <section data-test="rca-hypotheses" :aria-labelledby="headingId" class="flex flex-col">
     <div class="mb-1 flex items-baseline gap-2">
@@ -164,6 +165,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("alerts.incidents.rcaSummary.noEvidenceYet") }}
             </span>
+            <template v-if="canSteer">
+              <OButton
+                v-for="action in rcaHypothesisActions(hypothesis.status)"
+                :key="action"
+                :data-test="`rca-hypothesis-action-${action}`"
+                variant="outline"
+                size="xs"
+                :disabled="sending || pending.has(hypothesis.id)"
+                :aria-label="actionAriaLabel(action, hypothesis.statement)"
+                @click="$emit('steer-action', { hypothesisId: hypothesis.id, action })"
+              >
+                {{ ACTION_LABEL[action] }}
+              </OButton>
+            </template>
+            <span
+              v-if="pending.has(hypothesis.id)"
+              data-test="rca-hypothesis-pending"
+              class="text-text-secondary text-xs font-semibold"
+            >
+              {{
+                t("alerts.incidents.rcaSteer.action.pending", {
+                  author: pending.get(hypothesis.id) ?? "",
+                })
+              }}
+            </span>
           </div>
         </li>
       </ul>
@@ -173,9 +199,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, useId } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useI18nTyped } from "@/types/i18n";
-import type { RcaEvidenceEntry, RcaOutcome, RcaSummaryHypothesis } from "@/services/incidents";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+import type {
+  RcaEvidenceEntry,
+  RcaOutcome,
+  RcaSteerAction,
+  RcaSummaryHypothesis,
+} from "@/services/incidents";
 import {
   RCA_HYPOTHESIS_TONE,
   groupRcaHypotheses,
@@ -183,21 +215,52 @@ import {
   rcaHypothesisStatusLabel,
   rcaStatusHistoryLine,
 } from "@/utils/incidents/rcaSummary";
+import { rcaHypothesisActions } from "@/utils/incidents/rcaSteering";
 import RcaEvidenceCard from "./RcaEvidenceCard.vue";
 import RcaPill from "./RcaPill.vue";
 
-const props = defineProps<{
-  hypotheses: RcaSummaryHypothesis[];
-  outcome?: RcaOutcome;
-  evidence: RcaEvidenceEntry[];
-  org: string;
-  /** The run is live: the open group reads "Being tested". */
-  live: boolean;
+const props = withDefaults(
+  defineProps<{
+    hypotheses: RcaSummaryHypothesis[];
+    outcome?: RcaOutcome;
+    evidence: RcaEvidenceEntry[];
+    org: string;
+    /** The run is live: the open group reads "Being tested". */
+    live: boolean;
+    /** The run takes messages and the user may send them: rows offer actions (H16). */
+    canSteer?: boolean;
+    /** Hypothesis id → local part of the author of its unread action. */
+    pending?: Map<string, string>;
+    /** An action is being sent. */
+    sending?: boolean;
+  }>(),
+  { outcome: undefined, canSteer: false, pending: () => new Map(), sending: false },
+);
+
+defineEmits<{
+  "steer-action": [request: { hypothesisId: string; action: RcaSteerAction }];
 }>();
 
 const { t } = useI18nTyped();
 const headingId = useId();
 const baseId = useId();
+
+const ACTION_LABEL: Record<RcaSteerAction, I18nText> = {
+  disprove: t("alerts.incidents.rcaSteer.action.disprove"),
+  reopen: t("alerts.incidents.rcaSteer.action.reopen"),
+  test_first: t("alerts.incidents.rcaSteer.action.testFirst"),
+};
+
+const actionAriaLabel = (action: RcaSteerAction, statement: string): I18nText => {
+  switch (action) {
+    case "disprove":
+      return t("alerts.incidents.rcaSteer.action.disproveLabel", { statement });
+    case "reopen":
+      return t("alerts.incidents.rcaSteer.action.reopenLabel", { statement });
+    case "test_first":
+      return t("alerts.incidents.rcaSteer.action.testFirstLabel", { statement });
+  }
+};
 
 const groups = computed(() => groupRcaHypotheses(props.hypotheses, props.outcome));
 

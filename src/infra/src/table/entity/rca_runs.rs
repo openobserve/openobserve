@@ -43,6 +43,15 @@ pub struct Model {
     pub continuations: i16,
     /// Serialized `Vec<SubjectRef>` of an alert run's pending on-call records.
     pub oncall_subjects: Option<Json>,
+    /// Answer deadline of a `waiting_input` run, µs; NULL in every other state.
+    pub input_deadline_at: Option<i64>,
+    /// `callID` of the open `ask_responders` question while `waiting_input`.
+    pub pending_question_id: Option<String>,
+    /// Questions the run asked (at most 2 pause the run).
+    #[sea_orm(default_value = 0)]
+    pub questions_asked: i32,
+    /// When the sweeper closed the answer deadline, µs; steering is refused after it.
+    pub deadline_closed_at: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

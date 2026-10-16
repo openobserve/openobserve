@@ -1349,6 +1349,8 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs", get(alerts::incidents::list_incident_rca_runs))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}", get(alerts::incidents::get_incident_rca_run))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/thread", get(alerts::incidents::get_incident_rca_thread))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer", post(alerts::incidents::steer_incident_rca_run))
+        .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steering", get(alerts::incidents::get_incident_rca_steering))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/summary", get(alerts::incidents::get_incident_rca_summary))
         .route("/{org_id}/alerts/incidents/rca/backtest", post(alerts::incidents::run_incident_rca_backtest))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/update", patch(alerts::incidents::update_incident))
@@ -4404,6 +4406,39 @@ mod tests {
 
         let post = app.oneshot(request("POST")).await.unwrap();
         assert_eq!(post.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    /// SG2: no route edits or deletes a steering row. The steer path is registered for POST
+    /// only, and a router carrying that registration answers PUT and DELETE with 405.
+    #[tokio::test]
+    async fn rca_steer_route_refuses_put_and_delete() {
+        const STEER_PATH: &str =
+            "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer";
+        assert!(
+            service_routes_registrations().contains(&format!(
+                r#".route("{STEER_PATH}",post(alerts::incidents::steer_incident_rca_run))"#
+            )),
+            "the steer path must be registered in service_routes() for POST only"
+        );
+        let app = Router::new().route(STEER_PATH, post(alerts::incidents::steer_incident_rca_run));
+        for method in ["PUT", "DELETE"] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri("/v2/myorg/alerts/incidents/inc1/rca/runs/run1/steer")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::METHOD_NOT_ALLOWED,
+                "{method}"
+            );
+        }
     }
 
     fn node_request(user_id: &str) -> Request<Body> {

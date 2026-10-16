@@ -197,6 +197,52 @@ describe("incidents service", () => {
         { params: { reanalysis: true }, signal: controller.signal },
       );
     });
+
+    it("SG33: sends the guidance as the JSON body and keeps the query flags", () => {
+      mockHttp.post.mockResolvedValue({ data: { run_id: "run-1" } });
+
+      incidents.triggerRca("test-org", "incident-123", {
+        reanalysis: true,
+        build_on_previous: true,
+        guidance: "Check the orders pool",
+      });
+
+      expect(mockHttp.post).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/incident-123/rca",
+        { guidance: "Check the orders pool" },
+        { params: { reanalysis: true, build_on_previous: true }, signal: undefined },
+      );
+    });
+  });
+
+  describe("steering (04 §9.1, §9.2)", () => {
+    it("steerRca POSTs the request to the run's steer route", async () => {
+      mockHttp.post.mockResolvedValue({ data: { run_state: "running" } });
+      const body = {
+        text: "",
+        kind: "hypothesis_action" as const,
+        action: "disprove" as const,
+        hypothesis_id: "h1",
+      };
+
+      const res = await incidents.steerRca("test-org", "inc-1", "run-2", body);
+
+      expect(mockHttp.post).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/inc-1/rca/runs/run-2/steer",
+        body,
+      );
+      expect(res.data).toEqual({ run_state: "running" });
+    });
+
+    it("getRcaSteering GETs the run's steering view", () => {
+      mockHttp.get.mockResolvedValue({ data: { items: [], open_question: null, can_steer: true } });
+
+      incidents.getRcaSteering("test-org", "inc-1", "run-2");
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/inc-1/rca/runs/run-2/steering",
+      );
+    });
   });
 
   describe("listRcaRuns", () => {

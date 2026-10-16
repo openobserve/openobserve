@@ -17,6 +17,8 @@
 //! the hypotheses, the evidence and the blind spots of one run. The server sends
 //! data; the web app renders the labels (F10).
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -26,7 +28,7 @@ use super::{
     build_evidence, build_ledger, leading, leading_history, status_rank, subject,
 };
 use crate::meta::{
-    alerts::rca_runs::RunState,
+    alerts::{rca_runs::RunState, rca_steering::STEER_ID_PREFIX},
     oncall::{
         agent::{ChangeKind, Confidence},
         confidence::{SignalClass, ToolCallRecord, UnverifiedCitation},
@@ -128,7 +130,7 @@ pub struct SummarySuspectChange {
     /// Microseconds.
     pub occurred_at: i64,
     pub shown_state: ShownChangeState,
-    /// The subject hypothesis' steering lead (`stg_…`), when it has one.
+    /// The email of the author of the subject hypothesis' first steering lead (SG36).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lead_author: Option<String>,
 }
@@ -179,7 +181,8 @@ pub struct SummaryStatusChange {
     /// Microseconds.
     pub at: i64,
     pub status: HypothesisStatus,
-    /// The steering message that caused the change (`trigger_steer_id`), if any.
+    /// The email of the author of the steering message that caused the change
+    /// (`trigger_steer_id`), if any (SG36).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steered_by: Option<String>,
 }
@@ -227,10 +230,12 @@ pub(super) fn timeline_view(
 }
 
 /// Ranked by VE12 and `first_seen_seq`, then `symptom`, then `ruled_out` (VE36).
+/// `steer_authors` names the author of each steer id (SG36).
 fn hypotheses_view(
     ledger: &EvidenceLedger,
     evidence: &[EvidenceEntry],
     unverified: &[UnverifiedCitation],
+    steer_authors: &BTreeMap<String, String>,
 ) -> Vec<SummaryHypothesis> {
     let order = |status: HypothesisStatus| {
         status_rank(status).unwrap_or(match status {
@@ -268,7 +273,11 @@ fn hypotheses_view(
                     .map(|c| SummaryStatusChange {
                         at: c.at_us,
                         status: c.status,
-                        steered_by: c.trigger_steer_id.clone(),
+                        steered_by: c
+                            .trigger_steer_id
+                            .as_ref()
+                            .and_then(|id| steer_authors.get(id))
+                            .cloned(),
                     })
                     .collect(),
             }
@@ -314,12 +323,16 @@ pub(super) fn needs_title(blind_spots: &[BlindSpot]) -> Option<&str> {
         .map(|b| b.title.as_str())
 }
 
-/// The subject hypothesis' first steering lead.
-fn steering_lead(ledger: &EvidenceLedger) -> Option<String> {
+/// The email of the author of the subject hypothesis' first steering lead.
+fn steering_lead(
+    ledger: &EvidenceLedger,
+    steer_authors: &BTreeMap<String, String>,
+) -> Option<String> {
     subject(ledger)?
         .lead_ids
         .iter()
-        .find(|id| id.starts_with("stg_"))
+        .filter(|id| id.starts_with(STEER_ID_PREFIX))
+        .find_map(|id| steer_authors.get(id))
         .cloned()
 }
 
@@ -350,7 +363,7 @@ pub fn summary_from_record(
             author: c.author.clone(),
             occurred_at: c.occurred_at,
             shown_state: shown_change_state(state, ledger, &record.evidence),
-            lead_author: steering_lead(ledger),
+            lead_author: steering_lead(ledger, &record.steer_authors),
         });
     let card = SummaryCard {
         outcome: record.outcome,
@@ -374,7 +387,12 @@ pub fn summary_from_record(
         legacy: false,
         card,
         timeline: timeline_view(&record.timeline, &record.evidence),
-        hypotheses: hypotheses_view(ledger, &record.evidence, &record.unverified),
+        hypotheses: hypotheses_view(
+            ledger,
+            &record.evidence,
+            &record.unverified,
+            &record.steer_authors,
+        ),
         evidence: record.evidence.clone(),
         unverified: record.unverified.clone(),
         blind_spots: record.blind_spots.clone(),
@@ -383,12 +401,14 @@ pub fn summary_from_record(
 
 /// The summary of a live run, computed from its committed ledger calls and tool
 /// log: no grade, no outcome, no timeline (VE-D2, VE-D4, VE-D6, VE22).
+/// `steer_authors` maps the run's steer ids to their authors' emails (SG36).
 pub fn summary_live(
     run_id: &str,
     state: RunState,
     state_version: String,
     calls: &[LedgerCall],
     tool_log: &[ToolCallRecord],
+    steer_authors: &BTreeMap<String, String>,
 ) -> RcaRunSummary {
     let (ledger, blind_spots, _) = build_ledger(calls, false);
     let ledger = ledger.unwrap_or_default();
@@ -422,7 +442,7 @@ pub fn summary_live(
             ..Default::default()
         },
         timeline: Vec::new(),
-        hypotheses: hypotheses_view(&ledger, &evidence, &unverified),
+        hypotheses: hypotheses_view(&ledger, &evidence, &unverified, steer_authors),
         evidence,
         unverified,
         blind_spots,
@@ -474,6 +494,16 @@ mod tests {
         verdict: Option<crate::meta::oncall::rca_run::SubmittedVerdict>,
         completed: bool,
     ) -> RcaRunRecord {
+        record_steered(calls, verdict, completed, &BTreeMap::new())
+    }
+
+    /// [record] with the run's steer id → author email map (SG36).
+    fn record_steered(
+        calls: &[LedgerCall],
+        verdict: Option<crate::meta::oncall::rca_run::SubmittedVerdict>,
+        completed: bool,
+        steer_authors: &BTreeMap<String, String>,
+    ) -> RcaRunRecord {
         let log = log();
         let report = verdict.map(|v| submit(v, vec![]));
         record_run_end(&RunEndInput {
@@ -483,8 +513,13 @@ mod tests {
             stages_run: &[],
             ended_by: EndedBy::Agent,
             completed,
+            steer_authors,
         })
         .record
+    }
+
+    fn arao() -> BTreeMap<String, String> {
+        BTreeMap::from([("stg_arao".to_string(), "a.rao@acme.io".to_string())])
     }
 
     fn h(seq: i64, id: &str, status: &str) -> LedgerCall {
@@ -551,7 +586,12 @@ mod tests {
                 json!({"id": "h1", "statement": "s", "status": "root_cause", "reason": "r", "trigger_steer_id": "stg_arao"}),
             ),
         ];
-        let r = record(&calls, Some(submitted("pool", Confidence::High)), true);
+        let r = record_steered(
+            &calls,
+            Some(submitted("pool", Confidence::High)),
+            true,
+            &arao(),
+        );
         let s = summary_from_record("r", RunState::Completed, "v".into(), &r);
         let order: Vec<&str> = s.hypotheses.iter().map(|h| h.id.as_str()).collect();
         assert_eq!(order, ["h1", "h6", "h2", "h3", "h5", "h4"]);
@@ -566,10 +606,14 @@ mod tests {
                 SummaryStatusChange {
                     at: 9_000_000,
                     status: HypothesisStatus::RootCause,
-                    steered_by: Some("stg_arao".into())
+                    steered_by: Some("a.rao@acme.io".into())
                 },
             ]
         );
+        // SG36: a steer id with no known author names nobody.
+        let r = record(&calls, Some(submitted("pool", Confidence::High)), true);
+        let s = summary_from_record("r", RunState::Completed, "v".into(), &r);
+        assert_eq!(s.hypotheses[0].history[1].steered_by, None);
     }
 
     /// VE21/VE22: the live card has the leading statement and the label, no band.
@@ -581,7 +625,14 @@ mod tests {
             json!({"id": "h1", "statement": pool, "status": "likely", "reason": "r",
                                           "evidence": [item("e1", PROM, "pool_active", "supports", "decisive")]}),
         )];
-        let s = summary_live("r", RunState::Running, "v".into(), &first, &log());
+        let s = summary_live(
+            "r",
+            RunState::Running,
+            "v".into(),
+            &first,
+            &log(),
+            &BTreeMap::new(),
+        );
         assert_eq!(s.card.band, None);
         assert_eq!(s.card.band_reason, None);
         assert_eq!((s.card.outcome, s.card.headline.as_ref()), (None, None));
@@ -603,7 +654,14 @@ mod tests {
 
         let mut moved = first.to_vec();
         moved.push(hyp(2, "h2", "root_cause", vec![]));
-        let s = summary_live("r", RunState::Running, "v".into(), &moved, &log());
+        let s = summary_live(
+            "r",
+            RunState::Running,
+            "v".into(),
+            &moved,
+            &log(),
+            &BTreeMap::new(),
+        );
         assert_eq!(s.card.leading.as_ref().unwrap().id, "h2");
         assert_eq!(
             s.card.verdict_so_far,
@@ -619,6 +677,7 @@ mod tests {
             "v".into(),
             &[h(1, "h1", "testing")],
             &[],
+            &BTreeMap::new(),
         );
         assert_eq!(s.hypotheses[0].status, HypothesisStatus::Testing);
 
@@ -628,6 +687,7 @@ mod tests {
             "v".into(),
             &[spot(1, "b1", "logs", "none", "t")],
             &[],
+            &BTreeMap::new(),
         );
         assert_eq!((s.card.leading, s.card.verdict_so_far), (None, None));
         assert_eq!(s.blind_spots.len(), 1);
@@ -636,7 +696,10 @@ mod tests {
     /// VE35: the shown state of the suspect change is code-derived; the claim is ignored.
     #[test]
     fn the_suspect_change_state_is_derived() {
-        let shown = |evidence: Vec<serde_json::Value>, status: &str, leads: &[&str]| {
+        let shown_with = |evidence: Vec<serde_json::Value>,
+                          status: &str,
+                          leads: &[&str],
+                          authors: &BTreeMap<String, String>| {
             let calls = [hyp_input(
                 1,
                 json!({"id": "h1", "statement": "s", "status": status, "reason": "r",
@@ -644,11 +707,14 @@ mod tests {
             )];
             let mut v = submitted("pool", Confidence::High);
             v.suspect_change = Some(suspect(SuspectChangeState::Confirmed));
-            let r = record(&calls, Some(v), true);
+            let r = record_steered(&calls, Some(v), true, authors);
             summary_from_record("r", RunState::Completed, "v".into(), &r)
                 .card
                 .suspect_change
                 .unwrap()
+        };
+        let shown = |evidence: Vec<serde_json::Value>, status: &str, leads: &[&str]| {
+            shown_with(evidence, status, leads, &BTreeMap::new())
         };
         let diff = |q: &str, polarity: &str| item("e1", BASH, q, polarity, "decisive");
         let c = shown(vec![diff("gh pr diff 812", "supports")], "root_cause", &[]);
@@ -685,10 +751,14 @@ mod tests {
             ShownChangeState::NotRead
         );
         assert_eq!(
-            shown(vec![], "root_cause", &["past:inc_1", "stg_arao"])
+            shown_with(vec![], "root_cause", &["past:inc_1", "stg_arao"], &arao())
                 .lead_author
                 .as_deref(),
-            Some("stg_arao")
+            Some("a.rao@acme.io")
+        );
+        assert_eq!(
+            shown(vec![], "root_cause", &["past:inc_1", "stg_arao"]).lead_author,
+            None
         );
     }
 

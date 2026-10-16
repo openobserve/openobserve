@@ -17,6 +17,8 @@
 //! ledger, the outcome label, the numbered evidence list, the stored run record
 //! (§11) and the summary view (§12). Every function here is pure.
 
+use std::collections::BTreeMap;
+
 mod evidence;
 mod ledger;
 mod outcome;
@@ -507,6 +509,10 @@ pub struct RcaRunRecord {
     /// Only the calls that evidence entries use, in number order.
     #[serde(default)]
     pub cited_calls: Vec<ToolCallRecord>,
+    /// The author email of each steer id the ledger names (`lead_ids`,
+    /// `trigger_steer_id`), so the summary shows people, not ids (SG36).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub steer_authors: BTreeMap<String, String>,
 }
 
 /// What the finalizer read from the run's transcript.
@@ -521,6 +527,8 @@ pub struct RunEndInput<'a> {
     pub ended_by: EndedBy,
     /// `true` for a run that ends `completed`; `false` for failed or cancelled.
     pub completed: bool,
+    /// The run's steer ids and their authors' emails (SG36).
+    pub steer_authors: &'a BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -558,9 +566,8 @@ fn run_end_blind_spot(stages_run: &[String]) -> Option<BlindSpot> {
     })
 }
 
-/// VE44: "Needs: <title>" of the first blind spot with a fix, else "Needs input".
-/// The open question's `need` of an answer deadline comes with steering (04);
-/// until then that reason reads the blind spots too.
+/// VE44: "Needs: <title>" of the first blind spot with a fix, else "Needs input". The
+/// finalizer names the open question's `need` instead for an answer deadline (04 SG28).
 fn blocked_detail(blind_spots: &[BlindSpot]) -> String {
     match summary::needs_title(blind_spots) {
         Some(title) => format!("Needs: {title}"),
@@ -586,7 +593,13 @@ pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
 
     let (grade, outcome) = match submitted {
         Some(v) => {
-            let mut grade = grade_confidence(v, ledger.as_ref(), &blind_spots, input.tool_log);
+            let mut grade = grade_confidence(
+                v,
+                ledger.as_ref(),
+                &blind_spots,
+                input.tool_log,
+                input.steer_authors,
+            );
             let (outcome, reason) = derive_outcome(ledger.as_ref(), &grade, v, input.ended_by);
             apply_outcome(&mut grade, outcome, reason);
             (Some(grade), Some((outcome, reason)))
@@ -616,6 +629,20 @@ pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
         .filter_map(|e| input.tool_log.iter().find(|r| r.call_id == e.call_id))
         .cloned()
         .collect();
+    // SG36: the authors of the steer ids the ledger names.
+    let steer_authors: BTreeMap<String, String> = ledger
+        .iter()
+        .flat_map(|l| &l.hypotheses)
+        .flat_map(|h| {
+            h.lead_ids.iter().chain(
+                h.history
+                    .iter()
+                    .filter_map(|change| change.trigger_steer_id.as_ref()),
+            )
+        })
+        .filter_map(|id| input.steer_authors.get_key_value(id))
+        .map(|(id, author)| (id.clone(), author.clone()))
+        .collect();
 
     let record = RcaRunRecord {
         schema_version: RCA_RECORD_SCHEMA_VERSION,
@@ -638,6 +665,7 @@ pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
         unverified,
         leading_history: leading_history(input.calls),
         cited_calls,
+        steer_authors,
     };
     RunEndResult {
         record,
@@ -1357,6 +1385,7 @@ mod run_end_tests {
             stages_run: &stages,
             ended_by,
             completed,
+            steer_authors: &BTreeMap::new(),
         })
     }
 
@@ -1694,6 +1723,7 @@ mod run_end_tests {
             stages_run: &one,
             ended_by: EndedBy::Agent,
             completed: false,
+            steer_authors: &BTreeMap::new(),
         });
         assert_eq!(r.record.blind_spots[0].title, "1 stage did not run");
         // All seven stages ran: no run_end blind spot; a completed run never gets one.
@@ -1704,6 +1734,7 @@ mod run_end_tests {
             stages_run: &stages(7),
             ended_by: EndedBy::Agent,
             completed: false,
+            steer_authors: &BTreeMap::new(),
         });
         assert!(r.record.blind_spots.is_empty());
         let r = record_run_end(&RunEndInput {
@@ -1713,6 +1744,7 @@ mod run_end_tests {
             stages_run: &[],
             ended_by: EndedBy::Agent,
             completed: true,
+            steer_authors: &BTreeMap::new(),
         });
         assert!(r.record.blind_spots.iter().all(|b| b.id != "run_end"));
     }
@@ -1829,6 +1861,7 @@ mod run_end_tests {
             ledger.as_ref(),
             &[],
             &log,
+            &BTreeMap::new(),
         );
         let verdict = to_analysis_verdict(&submitted("x", Confidence::High), &grade, &entries);
         let numbers: Vec<u32> = verdict.evidence.iter().map(|e| e.number).collect();

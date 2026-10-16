@@ -16,6 +16,8 @@
 //! Evidence-graded confidence (CG §5.2–§5.4): code grades the band of an RCA
 //! verdict from the evidence the agent recorded and the tool calls that ran.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -26,6 +28,7 @@ use super::{
         Polarity, RcaOutcome, Strength, SubmittedVerdict, subject,
     },
 };
+use crate::meta::alerts::rca_steering::STEER_ID_PREFIX;
 
 /// Statements of ruled-out hypotheses in a grade are cut to this many chars.
 const RULED_OUT_MAX_CHARS: usize = 80;
@@ -255,15 +258,25 @@ impl GradeReason {
         }
     }
 
-    /// The text of a cap; `None` for every other reason.
-    fn cap_text(&self) -> Option<&'static str> {
-        match self {
-            Self::SuspectChangeNotRead => Some("suspect change not read"),
-            Self::ChangeHistoryUnreachable => Some("change history not reachable"),
-            Self::ContradictingEvidence => Some("contradicting evidence"),
-            Self::HumanLead => Some("lead from a person, not a tool"),
-            _ => None,
-        }
+    /// The text of a cap; `None` for every other reason. A `human_lead` cap names the
+    /// lead's author by the local part of the email (SG36).
+    fn cap_text(&self, lead_author: Option<&str>) -> Option<String> {
+        let text = match self {
+            Self::SuspectChangeNotRead => "suspect change not read",
+            Self::ChangeHistoryUnreachable => "change history not reachable",
+            Self::ContradictingEvidence => "contradicting evidence",
+            Self::HumanLead => {
+                return Some(match lead_author {
+                    Some(email) => {
+                        let name = email.split('@').next().unwrap_or(email);
+                        format!("lead from {name}")
+                    }
+                    None => "lead from a person, not a tool".to_string(),
+                });
+            }
+            _ => return None,
+        };
+        Some(text.to_string())
     }
 }
 
@@ -289,6 +302,10 @@ pub struct ConfidenceGrade {
     /// The VE13 subject hypothesis.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subject_id: Option<String>,
+    /// The email of the author of the cause hypothesis' first steering lead, which a
+    /// `human_lead` cap names (SG36).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lead_author: Option<String>,
 }
 
 impl ConfidenceGrade {
@@ -332,7 +349,12 @@ impl ConfidenceGrade {
             line.push_str(" · ruled out: ");
             line.push_str(&self.ruled_out.join(", "));
         }
-        let caps: Vec<&str> = self.reasons.iter().filter_map(|r| r.cap_text()).collect();
+        let lead_author = self.lead_author.as_deref();
+        let caps: Vec<String> = self
+            .reasons
+            .iter()
+            .filter_map(|r| r.cap_text(lead_author))
+            .collect();
         if !caps.is_empty() {
             line.push_str(" · capped: ");
             line.push_str(&caps.join(", "));
@@ -430,12 +452,14 @@ pub fn min_band(a: Confidence, b: Confidence) -> Confidence {
 }
 
 /// Grades the verdict from the ledger and the tool log (CG §5.3.1–§5.3.3).
-/// `ledger: None` means the agent never called `record_hypothesis`.
+/// `ledger: None` means the agent never called `record_hypothesis`. `steer_authors` maps
+/// the run's steer ids to their authors' emails, so a `human_lead` cap names one (SG36).
 pub fn grade_confidence(
     verdict: &SubmittedVerdict,
     ledger: Option<&EvidenceLedger>,
     blind_spots: &[BlindSpot],
     tool_log: &[ToolCallRecord],
+    steer_authors: &BTreeMap<String, String>,
 ) -> ConfidenceGrade {
     let hypotheses = ledger.map(|l| l.hypotheses.as_slice()).unwrap_or_default();
 
@@ -562,8 +586,12 @@ pub fn grade_confidence(
         let change_read = cause_items
             .iter()
             .any(|(_, _, signal)| *signal == SignalClass::Change);
-        let human_lead =
-            cause.is_some_and(|i| hypotheses[i].lead_ids.iter().any(|l| l.starts_with("stg_")));
+        let human_lead = cause.is_some_and(|i| {
+            hypotheses[i]
+                .lead_ids
+                .iter()
+                .any(|l| l.starts_with(STEER_ID_PREFIX))
+        });
         let caps = [
             (
                 verdict.suspect_change.is_some() && !change_read,
@@ -584,6 +612,14 @@ pub fn grade_confidence(
         }
     }
 
+    // SG36: the first steering lead of the cause whose author is known.
+    let lead_author = cause.and_then(|i| {
+        hypotheses[i]
+            .lead_ids
+            .iter()
+            .filter(|l| l.starts_with(STEER_ID_PREFIX))
+            .find_map(|l| steer_authors.get(l).cloned())
+    });
     let claimed = verdict.claimed_confidence;
     ConfidenceGrade {
         band: min_band(claimed, graded),
@@ -594,6 +630,7 @@ pub fn grade_confidence(
         ruled_out,
         unverified,
         subject_id,
+        lead_author,
     }
 }
 
@@ -767,7 +804,7 @@ mod tests {
 
     fn grade(calls: &[LedgerCall], verdict: &SubmittedVerdict) -> ConfidenceGrade {
         let (ledger, spots, _) = crate::meta::oncall::rca_run::build_ledger(calls, true);
-        grade_confidence(verdict, ledger.as_ref(), &spots, &log())
+        grade_confidence(verdict, ledger.as_ref(), &spots, &log(), &BTreeMap::new())
     }
 
     fn named(claimed: Confidence) -> SubmittedVerdict {
@@ -1172,6 +1209,7 @@ mod tests {
                 })
                 .collect(),
             subject_id: Some("h1".into()),
+            lead_author: None,
         };
         let cases = [
             (
@@ -1366,6 +1404,64 @@ mod tests {
         assert_eq!(
             min_band(Confidence::High, Confidence::High),
             Confidence::High
+        );
+    }
+
+    /// SG36 / frame G: a cause with decisive change + metrics evidence and a steering lead
+    /// grades medium, and the cap names the lead's author by the local part of the email.
+    #[test]
+    fn sg36_frame_g_human_lead_names_the_author() {
+        let steer_id = "stg_2NjLm8W3pXyZqR7tVbK9cDfGhJ1";
+        assert!(crate::meta::alerts::rca_steering::is_steer_id(steer_id));
+        let mut calls = high_calls();
+        calls[0] = hyp_input(
+            1,
+            json!({"id": "h1", "statement": "pool exhausted after PR #812", "status": "root_cause",
+                   "reason": "r", "lead_ids": [steer_id],
+                   "evidence": [item("e1", BASH, "gh pr diff 812", "supports", "decisive"),
+                                decisive("e2", PROM, "pool_active")]}),
+        );
+        let (ledger, spots, _) = crate::meta::oncall::rca_run::build_ledger(&calls, true);
+        let authors = BTreeMap::from([(steer_id.to_string(), "a.rao@acme.io".to_string())]);
+        let g = grade_confidence(
+            &named(Confidence::High),
+            ledger.as_ref(),
+            &spots,
+            &log(),
+            &authors,
+        );
+        assert_eq!(g.band, Confidence::Medium);
+        assert_eq!(g.graded, Confidence::Medium);
+        assert!(
+            g.reasons.contains(&GradeReason::HumanLead),
+            "{:?}",
+            g.reasons
+        );
+        assert_eq!(g.lead_author.as_deref(), Some("a.rao@acme.io"));
+        let line = g.reason_line();
+        assert!(line.starts_with("medium · "), "{line}");
+        assert!(
+            line.contains("change") && line.contains("metrics"),
+            "{line}"
+        );
+        assert!(line.contains("capped: lead from a.rao"), "{line}");
+        assert!(!line.contains("acme.io"), "{line}");
+
+        // Without an author map the cap keeps the generic text.
+        let g = grade_confidence(
+            &named(Confidence::High),
+            ledger.as_ref(),
+            &spots,
+            &log(),
+            &BTreeMap::new(),
+        );
+        assert_eq!(g.band, Confidence::Medium);
+        assert_eq!(g.lead_author, None);
+        assert!(
+            g.reason_line()
+                .ends_with("capped: lead from a person, not a tool"),
+            "{}",
+            g.reason_line()
         );
     }
 }

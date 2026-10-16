@@ -13,11 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
-import { mount, type VueWrapper } from "@vue/test-utils";
+import { describe, expect, it, vi } from "vitest";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import RcaThreadColumn from "./RcaThreadColumn.vue";
-import { rcaStep, rcaThread } from "@/test/unit/fixtures/rcaThread";
+import type { RcaSteerRecord } from "@/services/incidents";
+import type { RcaSteerSendResult } from "@/composables/useRcaSteering";
+import { raw } from "@/types/i18n";
+import {
+  RCA_T0,
+  rcaSteerRecord,
+  rcaSteering,
+  rcaSteeringLive,
+  rcaSteeringPaused,
+  rcaSteeringUnblocked,
+  rcaStep,
+  rcaThread,
+  rcaThreadQuestion,
+  sec,
+} from "@/test/unit/fixtures/rcaThread";
 
 const mountColumn = (props: Record<string, unknown> = {}) =>
   mount(RcaThreadColumn, {
@@ -195,11 +209,15 @@ describe("RcaThreadColumn", () => {
       );
     });
 
-    it("a cancelled run has no final note", () => {
-      const wrapper = mountColumn({ ...SAVED, runState: "cancelled" });
+    it.each(["cancelled", "failed"] as const)(
+      "SG37: a %s run shows the finished note too",
+      (runState) => {
+        const wrapper = mountColumn({ ...SAVED, runState });
 
-      expect(byTest(wrapper, "rca-thread-final-note").exists()).toBe(false);
-    });
+        expect(byTest(wrapper, "rca-thread-final-note").exists()).toBe(true);
+        expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
+      },
+    );
   });
 
   describe("transcript and load states", () => {
@@ -280,6 +298,238 @@ describe("RcaThreadColumn", () => {
 
       await step.find('[data-test="rca-citation-chip"]').trigger("click");
       expect(wrapper.emitted("open-evidence")).toEqual([[1]]);
+    });
+  });
+
+  describe("04 steering (SG37–SG40)", () => {
+    const send = vi.fn(async () => ({ ok: true as const, runState: "running" as const }));
+    const STEERABLE = {
+      steering: rcaSteeringLive(),
+      canSteer: true,
+      authorEmail: "a.rao@acme.io",
+      send,
+    };
+    const bubbles = (wrapper: VueWrapper) => wrapper.findAll('[data-test="rca-thread-steer"]');
+
+    it("SG37: the composer shows only with can_steer", () => {
+      const wrapper = mountColumn(STEERABLE);
+
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-thread-final-note").exists()).toBe(false);
+    });
+
+    it("SG37: a reader without RCA permission sees the thread and no composer", () => {
+      const wrapper = mountColumn({ ...STEERABLE, steering: null, canSteer: false });
+
+      expect(wrapper.findAll('[data-test="rca-thread-step"]').length).toBeGreaterThan(0);
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
+    });
+
+    it("SG37: a finished run shows the finished note even with a steering view", () => {
+      const wrapper = mountColumn({
+        ...SAVED,
+        steering: rcaSteeringLive({ can_steer: false }),
+        canSteer: false,
+        send,
+      });
+
+      expect(byTest(wrapper, "rca-thread-final-note").exists()).toBe(true);
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
+    });
+
+    it("SG37: the paused composer shows 'Agent asks …' and the answer note", () => {
+      const wrapper = mountColumn({
+        ...STEERABLE,
+        runState: "waiting_input",
+        steering: rcaSteeringPaused(),
+      });
+
+      expect(byTest(wrapper, "rca-steer-question").text()).toContain("Agent asks:");
+      expect(byTest(wrapper, "rca-steer-question").text()).toContain(
+        "Which change went out to checkout-api around 14:02?",
+      );
+      expect(byTest(wrapper, "rca-steer-answer-note").text()).toBe(
+        "Your answer is a lead, not evidence. It can move the hypothesis to Likely. Root cause needs a tool result.",
+      );
+    });
+
+    it("SG38: each status renders its exact pill label", () => {
+      const statuses: [Partial<RcaSteerRecord>, string][] = [
+        [{ status: "queued" }, "Queued · read after this turn"],
+        [{ status: "delivered" }, "Queued · read after this turn"],
+        [{ status: "read" }, "Read by the agent"],
+        [{ status: "applied" }, "Applied"],
+        [{ status: "declined", agent_note: "Out of scope." }, "Declined"],
+        [{ status: "not_read" }, "Not read · the run ended first"],
+        [{ status: "rejected", status_reason: "no_active_turn" }, "Not sent · no step was running"],
+        [{ status: "rejected" }, "Not sent"],
+      ];
+      const items = statuses.map(([overrides], idx) =>
+        rcaSteerRecord({
+          steer_id: `stg_${idx}`,
+          created_at: RCA_T0 + sec(100 + idx),
+          ...overrides,
+        }),
+      );
+      const wrapper = mountColumn({ steering: rcaSteering({ items }) });
+
+      expect(
+        bubbles(wrapper).map((bubble) => bubble.find('[data-test="rca-thread-steer-pill"]').text()),
+      ).toEqual(statuses.map(([, label]) => label));
+      expect(bubbles(wrapper)[4].find('[data-test="rca-thread-steer-note"]').text()).toBe(
+        "Agent: Out of scope.",
+      );
+    });
+
+    it("SG38: an answer adds 'Lead, not evidence'; a message does not", () => {
+      const wrapper = mountColumn({
+        steering: rcaSteering({
+          items: [
+            rcaSteerRecord({ steer_id: "a", kind: "answer", status: "read" }),
+            rcaSteerRecord({ steer_id: "m", created_at: RCA_T0 + sec(201) }),
+          ],
+        }),
+      });
+
+      const [answer, message] = bubbles(wrapper);
+      expect(answer.find('[data-test="rca-thread-steer-lead"]').text()).toBe("Lead, not evidence");
+      expect(message.find('[data-test="rca-thread-steer-lead"]').exists()).toBe(false);
+    });
+
+    it("the bubble shows author, plain text and sits after the earlier steps", () => {
+      const wrapper = mountColumn({
+        steering: rcaSteering({
+          items: [rcaSteerRecord({ text: "<b>raw</b> text" })],
+        }),
+      });
+
+      const bubble = bubbles(wrapper)[0];
+      expect(bubble.text()).toContain("a.rao");
+      expect(bubble.find('[data-test="rca-thread-steer-text"]').text()).toBe("<b>raw</b> text");
+      expect(bubble.find("b").exists()).toBe(false);
+      const steps = wrapper.findAll('[data-test="rca-thread-step"]');
+      expect(
+        steps[steps.length - 1].element.compareDocumentPosition(bubble.element) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it.each<[string, Partial<RcaSteerRecord>, boolean]>([
+      ["rejected · finalizing", { status: "rejected", status_reason: "finalizing" }, true],
+      ["not_read", { status: "not_read" }, true],
+      ["rejected · no_active_turn", { status: "rejected", status_reason: "no_active_turn" }, false],
+      ["applied", { status: "applied" }, false],
+    ])("SG40: %s offers Re-analyze with this message: %s", async (_name, overrides, offers) => {
+      const wrapper = mountColumn({
+        steering: rcaSteering({ items: [rcaSteerRecord({ text: "Check PR #812", ...overrides })] }),
+      });
+
+      const button = byTest(wrapper, "rca-thread-steer-reanalyze");
+      expect(button.exists()).toBe(offers);
+      if (!offers) return;
+      expect(button.text()).toBe("Re-analyze with this message");
+      await button.trigger("click");
+      expect(wrapper.emitted("reanalyze-with")).toEqual([["Check PR #812"]]);
+    });
+
+    it("SG39: an open question shows 'Needs input' and 'Waiting for an answer'", () => {
+      const wrapper = mountColumn({
+        thread: rcaThread({ questions: [rcaThreadQuestion()] }),
+        runState: "waiting_input",
+        steering: rcaSteeringPaused(),
+      });
+
+      const question = byTest(wrapper, "rca-thread-question");
+      expect(question.text()).toContain("Needs input");
+      expect(question.find('[data-test="rca-thread-question-status"]').text()).toBe(
+        "Waiting for an answer",
+      );
+    });
+
+    it("SG39: an answered question shows 'Answered by <author>'", () => {
+      const wrapper = mountColumn({
+        ...SAVED,
+        thread: rcaThread({
+          active: false,
+          questions: [rcaThreadQuestion({ answered_by: "a.rao@acme.io" })],
+        }),
+        steering: rcaSteeringUnblocked(),
+      });
+
+      expect(byTest(wrapper, "rca-thread-question-status").text()).toBe("Answered by a.rao");
+    });
+
+    it("frames F, G: the stats line adds 'steered N×' when > 0", () => {
+      const steered = mountColumn({ steering: rcaSteeringLive() });
+      expect(byTest(steered, "rca-thread-stats").text()).toBe(
+        "9 checks · 27 tool calls · 4m12s · steered 2×",
+      );
+
+      const none = mountColumn({ steering: rcaSteering() });
+      expect(byTest(none, "rca-thread-stats").text()).toBe("9 checks · 27 tool calls · 4m12s");
+    });
+
+    it("an answer does not make 'steered N×'", () => {
+      const wrapper = mountColumn({ steering: rcaSteeringUnblocked() });
+      expect(byTest(wrapper, "rca-thread-stats").text()).toBe("9 checks · 27 tool calls · 4m12s");
+    });
+
+    it("the run's stored steered count wins over the view's rows", () => {
+      const wrapper = mountColumn({
+        steering: rcaSteeringLive(),
+        runStats: { steps: 9, tool_calls: 27, duration_ms: 252_000, steered: 3 },
+      });
+      expect(byTest(wrapper, "rca-thread-stats").text()).toBe(
+        "9 checks · 27 tool calls · 4m12s · steered 3×",
+      );
+    });
+
+    it("SG40: a 409 run_closing keeps the text after the composer hides and offers Re-analyze", async () => {
+      const refuse = vi.fn(async () => ({
+        ok: false as const,
+        code: "run_closing",
+        message:
+          "The answer window has closed and the run is closing as Blocked. Re-analyze with your message instead.",
+      }));
+      const wrapper = mountColumn({ ...STEERABLE, send: refuse });
+      await wrapper.find("textarea").setValue("PR #812 went out at 14:02");
+      await wrapper.find("form").trigger("submit");
+      await flushPromises();
+
+      // The run closes: the composer goes, the refused text stays.
+      await wrapper.setProps({ canSteer: false, runLive: false, runState: "completed" });
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-thread-refusal").text()).toContain(
+        "The answer window has closed and the run is closing as Blocked.",
+      );
+      expect(byTest(wrapper, "rca-thread-refusal-text").text()).toBe("PR #812 went out at 14:02");
+
+      await byTest(wrapper, "rca-thread-refusal-reanalyze").trigger("click");
+      expect(wrapper.emitted("reanalyze-with")).toEqual([["PR #812 went out at 14:02"]]);
+      expect(byTest(wrapper, "rca-thread-refusal").exists()).toBe(false);
+    });
+
+    it("SG40 race: the composer hides before the refused send resolves; the panel still shows the text", async () => {
+      let refuse!: () => void;
+      const send = vi.fn(
+        () =>
+          new Promise<RcaSteerSendResult>((resolve) => {
+            refuse = () =>
+              resolve({ ok: false, code: "run_closing", message: raw("The run is closing.") });
+          }),
+      );
+      const wrapper = mountColumn({ ...STEERABLE, send });
+      await wrapper.find("textarea").setValue("PR #812 went out at 14:02");
+      await wrapper.find("form").trigger("submit");
+
+      // A steering read lands first and closes the box while the send still waits.
+      await wrapper.setProps({ canSteer: false, runLive: false, runState: "completed" });
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
+      refuse();
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-thread-refusal").text()).toContain("The run is closing.");
+      expect(byTest(wrapper, "rca-thread-refusal-text").text()).toBe("PR #812 went out at 14:02");
     });
   });
 });

@@ -160,12 +160,20 @@ pub struct RunPatch {
     pub context_used: Option<serde_json::Value>,
     /// Adds one to the run's `continuations`.
     pub continuations_inc: bool,
-    /// Writes only `stats`, the summary's `steps`/`tool_calls` and, once, the `result` of a
-    /// run that has none and did not complete, on a run in any state (TH22, TH42, VE34);
-    /// every other field is ignored.
+    /// Writes only `stats`, the summary's `steps`/`tool_calls`/`unblocked_by` and, once, the
+    /// `result` of a run that has none and did not complete, on a run in any state (TH22,
+    /// TH42, VE34, SG23); every other field is ignored.
     pub final_stats_only: bool,
     /// Timeline event committed with the write. Incident runs only; dropped for alert runs.
     pub event: Option<IncidentEvent>,
+    /// Answer deadline of a `waiting_input` run (SG26); `Some(None)` clears it.
+    pub input_deadline_at: Option<Option<i64>>,
+    /// The open question (SG26); `Some(None)` clears it.
+    pub pending_question_id: Option<Option<String>>,
+    /// Adds one to the run's `questions_asked`.
+    pub questions_asked_inc: bool,
+    /// When the answer deadline closed (SG27).
+    pub deadline_closed_at: Option<i64>,
 }
 
 /// Start a run when no live run holds the subject.
@@ -198,8 +206,24 @@ pub async fn start_run(req: StartRun) -> anyhow::Result<StartOutcome> {
         .as_ref()
         .map(|_| IncidentEvent::ai_analysis_begin());
 
+    let run_id = runs_table::new_run_id();
+    let now_us = now_micros();
+    // SG33: a run started with guidance commits its `guidance` row with the start.
+    let guidance_row = match (incident_id.as_deref(), guidance.as_deref()) {
+        (Some(incident_id), Some(text)) if subject_type == RunSubjectType::Incident => {
+            Some(super::rca_steering::guidance_row(
+                &org_id,
+                &run_id,
+                incident_id,
+                &started_by,
+                text,
+                now_us,
+            ))
+        }
+        _ => None,
+    };
     let new = NewRun {
-        run_id: runs_table::new_run_id(),
+        run_id,
         org_id: org_id.clone(),
         subject_type,
         subject_id,
@@ -211,17 +235,18 @@ pub async fn start_run(req: StartRun) -> anyhow::Result<StartOutcome> {
         oncall_subjects,
     };
     let guards = StartGuards {
-        now_us: now_micros(),
+        now_us,
         rca_timeout_secs: cfg.incidents.rca_timeout_secs,
         cooldown_us: (!skip_cooldown)
             .then(|| minutes_to_us(cfg.incidents.reanalysis_cooldown_minutes)),
         history_limit: cfg.incidents.rca_history_limit,
     };
 
-    match runs_table::start_run(new, guards, begin_event.clone()).await? {
+    match runs_table::start_run(new, guards, begin_event.clone(), guidance_row).await? {
         StartResult::Started {
             run_id,
             replaced_stale,
+            replaced_run_id,
         } => {
             // TH44: the stale run this start replaced ended `failed`/`stale` here.
             if let Some(stale_trigger) = replaced_stale {
@@ -231,6 +256,10 @@ pub async fn start_run(req: StartRun) -> anyhow::Result<StartOutcome> {
                     RunState::Failed,
                     runs_table::STALE_ERROR_CODE,
                 );
+            }
+            // SG23: its unread steering rows end with it.
+            if let Some(stale_run_id) = replaced_run_id {
+                super::rca_steering::close_unread(&org_id, &stale_run_id, RunState::Failed).await;
             }
             if let (Some(incident_id), Some(event)) = (notify_incident, begin_event) {
                 fire_workflows(&org_id, &incident_id, event).await;
@@ -443,6 +472,10 @@ async fn write_run(
         continuations_inc,
         final_stats_only,
         event,
+        input_deadline_at,
+        pending_question_id,
+        questions_asked_inc,
+        deadline_closed_at,
     } = patch;
     let update = RunUpdate {
         state,
@@ -462,6 +495,10 @@ async fn write_run(
         continuations_inc,
         final_stats_only,
         event,
+        input_deadline_at,
+        pending_question_id,
+        questions_asked_inc,
+        deadline_closed_at,
         now_us: now_micros(),
     };
 
@@ -584,6 +621,7 @@ pub(crate) mod tests {
                     schema.create_table_from_entity(alert_incident_alerts::Entity),
                     schema.create_table_from_entity(incident_events::Entity),
                     schema.create_table_from_entity(run_rows::Entity),
+                    schema.create_table_from_entity(infra::table::entity::rca_steering::Entity),
                     schema.create_table_from_entity(oncall_responses::Entity),
                     schema.create_table_from_entity(ai_chat_sessions::Entity),
                     schema.create_table_from_entity(ai_chat_turns::Entity),
@@ -1535,6 +1573,10 @@ pub(crate) mod tests {
                 context_used: None,
                 continuations: 0,
                 oncall_subjects: None,
+                input_deadline_at: None,
+                pending_question_id: None,
+                questions_asked: 0,
+                deadline_closed_at: None,
             })
             .reset_all()
         };

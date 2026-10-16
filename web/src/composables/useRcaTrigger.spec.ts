@@ -151,6 +151,19 @@ describe("useRcaTrigger (RR-33)", () => {
     expect(result).toMatchObject({ status: "started", runId: "run-2" });
   });
 
+  it("SG33: the consent retry sends the same guidance", async () => {
+    awsConfig.isCloud = "true";
+    triggerRca
+      .mockRejectedValueOnce(httpError(412, CONSENT_BODY))
+      .mockResolvedValueOnce({ data: { run_id: "run-2" } } as never);
+    promptForConsent.mockResolvedValue(true);
+    const params = { reanalysis: true, build_on_previous: false, guidance: "Check the pool" };
+
+    await useRcaTrigger().requestRca("org", "inc-1", params);
+
+    expect(triggerRca.mock.calls.map((call) => call[2])).toEqual([params, params]);
+  });
+
   it("Cloud: a second consent denial after accept propagates (no loop)", async () => {
     awsConfig.isCloud = "true";
     const second = httpError(412, CONSENT_BODY);

@@ -28,6 +28,7 @@ use config::meta::alerts::{
         RcaRun, RcaRunItem, RcaSummary, RunError, RunMode, RunState, RunStats, RunSubjectType,
         RunSummaryFields, RunTrigger, is_live_blocking, is_stale, next_previous,
     },
+    rca_steering::SteerRecord,
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DatabaseTransaction, DbErr,
@@ -40,7 +41,7 @@ use svix_ksuid::KsuidLike;
 pub use super::entity::rca_runs::Model;
 use super::{
     entity::{alert_incidents, rca_runs},
-    incident_events,
+    incident_events, rca_steering,
 };
 use crate::db::{get_orm_client_ro, get_orm_client_rw};
 
@@ -91,6 +92,8 @@ pub enum StartResult {
         /// The trigger of a stale run this start ended `failed`/`stale` (RR-6), so the
         /// caller counts that end (TH44).
         replaced_stale: Option<RunTrigger>,
+        /// The id of that stale run, so the caller closes its steering rows (SG23).
+        replaced_run_id: Option<String>,
     },
     /// The latest run is live and not stale (RR-9), or a concurrent start won (RR-5).
     InFlight,
@@ -123,10 +126,18 @@ pub struct RunUpdate {
     pub continuations_inc: bool,
     /// The final stats of a run in any state: writes only `stats`, `result` while the run
     /// has none and is not `completed` (VE34), and, while the incident still names the run,
-    /// `rca_summary.steps`/`tool_calls`. Every other field is ignored.
+    /// `rca_summary.steps`/`tool_calls`/`unblocked_by`. Every other field is ignored.
     pub final_stats_only: bool,
     /// Appended to the incident's timeline in the same transaction (incident subjects).
     pub event: Option<IncidentEvent>,
+    /// Answer deadline of a `waiting_input` run (SG26); `Some(None)` clears it.
+    pub input_deadline_at: Option<Option<i64>>,
+    /// The open question (SG26); `Some(None)` clears it.
+    pub pending_question_id: Option<Option<String>>,
+    /// Adds one to `questions_asked` in SQL.
+    pub questions_asked_inc: bool,
+    /// When the answer deadline closed (SG27).
+    pub deadline_closed_at: Option<i64>,
     pub now_us: i64,
 }
 
@@ -178,14 +189,22 @@ fn encode<T: serde::Serialize>(value: &T, what: &str) -> Result<serde_json::Valu
 /// Incident subject: lock the incident's run summary, return `InFlight` while the latest run
 /// blocks (RR-9) and `CoolingDown` when the newest completed run ended within the cooldown,
 /// compare-and-set the summary on the `rca_run_id` and `rca_state` that were read, fail the
-/// replaced run when it was stale, insert the run, append `begin_event`, prune. Alert subject:
-/// insert and prune only.
+/// replaced run when it was stale, insert the run and its `guidance_row` (SG33), append
+/// `begin_event`, prune. Alert subject: insert and prune only.
 pub async fn start_run(
     new: NewRun,
     guards: StartGuards,
     begin_event: Option<IncidentEvent>,
+    guidance_row: Option<SteerRecord>,
 ) -> Result<StartResult, DbErr> {
-    start_run_with(get_orm_client_rw().await, new, guards, begin_event).await
+    start_run_with(
+        get_orm_client_rw().await,
+        new,
+        guards,
+        begin_event,
+        guidance_row,
+    )
+    .await
 }
 
 /// [start_run] on a given connection.
@@ -194,11 +213,13 @@ pub async fn start_run_with<C: TransactionTrait>(
     new: NewRun,
     guards: StartGuards,
     begin_event: Option<IncidentEvent>,
+    guidance_row: Option<SteerRecord>,
 ) -> Result<StartResult, DbErr> {
     let txn = db.begin().await?;
     let now = guards.now_us;
 
     let mut replaced_stale = None;
+    let mut replaced_run_id = None;
     if new.subject_type == RunSubjectType::Incident {
         let query = alert_incidents::Entity::find_by_id(new.subject_id.as_str())
             .filter(alert_incidents::Column::OrgId.eq(new.org_id.as_str()))
@@ -313,6 +334,7 @@ pub async fn start_run_with<C: TransactionTrait>(
                 .is_some_and(|state| is_stale(state, seen_updated_at, now, guards.rca_timeout_secs))
         {
             replaced_stale = fail_stale_with(&txn, &new.org_id, seen_run_id, now).await?;
+            replaced_run_id = replaced_stale.is_some().then(|| seen_run_id.to_string());
         }
     }
 
@@ -343,9 +365,17 @@ pub async fn start_run_with<C: TransactionTrait>(
         context_used: Set(None),
         continuations: Set(0),
         oncall_subjects: Set(new.oncall_subjects.clone()),
+        input_deadline_at: Set(None),
+        pending_question_id: Set(None),
+        questions_asked: Set(0),
+        deadline_closed_at: Set(None),
     }
     .insert(&txn)
     .await?;
+
+    if let Some(row) = guidance_row.as_ref() {
+        rca_steering::insert_in(&txn, row).await?;
+    }
 
     if new.subject_type == RunSubjectType::Incident
         && let Some(event) = begin_event
@@ -366,6 +396,7 @@ pub async fn start_run_with<C: TransactionTrait>(
     Ok(StartResult::Started {
         run_id: new.run_id,
         replaced_stale,
+        replaced_run_id,
     })
 }
 
@@ -462,6 +493,8 @@ async fn prune_with(
     if doomed.is_empty() {
         return Ok(());
     }
+    // 04 §8.5: a pruned run's steering rows go with it.
+    rca_steering::delete_for_runs_in(txn, org_id, &doomed).await?;
     rca_runs::Entity::delete_many()
         .filter(rca_runs::Column::OrgId.eq(org_id))
         .filter(rca_runs::Column::RunId.is_in(doomed))
@@ -476,12 +509,12 @@ async fn prune_with(
 }
 
 /// The states a run may move from to reach `target` (01 §7). `None` is a progress write,
-/// allowed only while the run is `running`.
+/// allowed only while the run is `running`. `waiting_input → running` goes only through
+/// [resume_waiting] and [close_deadline].
 fn allowed_from(target: Option<RunState>) -> &'static [RunState] {
     match target {
         None | Some(RunState::Completed) | Some(RunState::Failed) => &[RunState::Running],
-        Some(RunState::WaitingInput) => &[RunState::Running],
-        Some(RunState::Running) => &[RunState::Running, RunState::WaitingInput],
+        Some(RunState::WaitingInput) | Some(RunState::Running) => &[RunState::Running],
         Some(RunState::Cancelled) => &[RunState::Running, RunState::WaitingInput],
     }
 }
@@ -517,6 +550,9 @@ fn merge_stats(
         }
         if p.steered.is_some() {
             stats.steered = p.steered;
+        }
+        if p.ignored_acks.is_some() {
+            stats.ignored_acks = p.ignored_acks;
         }
     }
     if duration_ms.is_some() {
@@ -743,6 +779,24 @@ pub async fn update_run_with<C: TransactionTrait>(
             Expr::col(rca_runs::Column::Continuations).add(1),
         );
     }
+    if let Some(deadline) = upd.input_deadline_at {
+        update = update.col_expr(rca_runs::Column::InputDeadlineAt, Expr::value(deadline));
+    }
+    if let Some(question_id) = upd.pending_question_id.as_ref() {
+        update = update.col_expr(
+            rca_runs::Column::PendingQuestionId,
+            Expr::value(question_id.clone()),
+        );
+    }
+    if upd.questions_asked_inc {
+        update = update.col_expr(
+            rca_runs::Column::QuestionsAsked,
+            Expr::col(rca_runs::Column::QuestionsAsked).add(1),
+        );
+    }
+    if let Some(closed_at) = upd.deadline_closed_at {
+        update = update.col_expr(rca_runs::Column::DeadlineClosedAt, Expr::value(closed_at));
+    }
     if update.exec(&txn).await?.rows_affected == 0 {
         txn.rollback().await?;
         return Ok(false);
@@ -833,6 +887,9 @@ async fn final_stats_with<C: TransactionTrait>(
             }
             if let Some(tool_calls) = p.tool_calls {
                 summary.tool_calls = tool_calls;
+            }
+            if p.unblocked_by.is_some() {
+                summary.unblocked_by = p.unblocked_by.clone();
             }
         }
         alert_incidents::Entity::update_many()
@@ -1011,6 +1068,161 @@ pub async fn list_running(limit: u64) -> Result<Vec<Model>, DbErr> {
         .await
 }
 
+/// `waiting_input` runs whose answer deadline is before `now_us`, oldest deadline first,
+/// `limit` at most (SG27).
+pub async fn list_waiting_past_deadline(now_us: i64, limit: u64) -> Result<Vec<Model>, DbErr> {
+    list_waiting_past_deadline_with(get_orm_client_rw().await, now_us, limit).await
+}
+
+/// [list_waiting_past_deadline] on a given connection.
+pub async fn list_waiting_past_deadline_with<C: ConnectionTrait>(
+    conn: &C,
+    now_us: i64,
+    limit: u64,
+) -> Result<Vec<Model>, DbErr> {
+    rca_runs::Entity::find()
+        .filter(rca_runs::Column::State.eq(RunState::WaitingInput.as_str()))
+        .filter(rca_runs::Column::InputDeadlineAt.lt(now_us))
+        .filter(rca_runs::Column::DeadlineClosedAt.is_null())
+        .order_by_asc(rca_runs::Column::InputDeadlineAt)
+        .limit(limit)
+        .all(conn)
+        .await
+}
+
+/// SG18: a steering message reopens a `waiting_input` run whose deadline is still open.
+/// Compare-and-set to `running`, clearing the deadline and the open question; the
+/// incident's run summary follows while it names the run. `Ok(false)`: another writer won,
+/// or the run is not waiting.
+pub async fn resume_waiting(org_id: &str, run_id: &str) -> Result<bool, DbErr> {
+    reopen_waiting_with(
+        get_orm_client_rw().await,
+        org_id,
+        run_id,
+        Reopen::Answer,
+        config::utils::time::now_micros(),
+    )
+    .await
+}
+
+/// SG27: the sweeper closes the answer deadline the run was listed with. Compare-and-set to
+/// `running` with `deadline_closed_at = now`, so exactly one sweeper starts the finalize
+/// turn and the steer route refuses from then on. `Ok(false)`: another writer won.
+pub async fn close_deadline(
+    org_id: &str,
+    run_id: &str,
+    input_deadline_at: i64,
+) -> Result<bool, DbErr> {
+    reopen_waiting_with(
+        get_orm_client_rw().await,
+        org_id,
+        run_id,
+        Reopen::Deadline(input_deadline_at),
+        config::utils::time::now_micros(),
+    )
+    .await
+}
+
+/// What moves a `waiting_input` run back to `running`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reopen {
+    /// A responder's message ([resume_waiting]).
+    Answer,
+    /// The sweeper, for the deadline the run was listed with ([close_deadline]).
+    Deadline(i64),
+}
+
+/// [resume_waiting] and [close_deadline] on a given connection.
+pub async fn reopen_waiting_with<C: TransactionTrait>(
+    db: &C,
+    org_id: &str,
+    run_id: &str,
+    reopen: Reopen,
+    now_us: i64,
+) -> Result<bool, DbErr> {
+    let txn = db.begin().await?;
+    let Some((subject_type, subject_id)) = rca_runs::Entity::find_by_id(run_id)
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .select_only()
+        .columns([rca_runs::Column::SubjectType, rca_runs::Column::SubjectId])
+        .into_tuple::<(String, String)>()
+        .one(&txn)
+        .await?
+    else {
+        txn.rollback().await?;
+        return Ok(false);
+    };
+
+    // Lock order as in every other write: the incident row before the run row.
+    let incident_summary = if subject_type == RunSubjectType::Incident.as_str() {
+        locked(
+            &txn,
+            alert_incidents::Entity::find_by_id(subject_id.as_str())
+                .filter(alert_incidents::Column::OrgId.eq(org_id))
+                .filter(alert_incidents::Column::RcaRunId.eq(run_id))
+                .select_only()
+                .column(alert_incidents::Column::RcaSummary),
+        )
+        .into_tuple::<Option<serde_json::Value>>()
+        .one(&txn)
+        .await?
+    } else {
+        None
+    };
+
+    let mut cas = rca_runs::Entity::update_many()
+        .col_expr(
+            rca_runs::Column::State,
+            Expr::value(RunState::Running.as_str()),
+        )
+        .col_expr(
+            rca_runs::Column::InputDeadlineAt,
+            Expr::value(Option::<i64>::None),
+        )
+        .col_expr(
+            rca_runs::Column::PendingQuestionId,
+            Expr::value(Option::<String>::None),
+        )
+        .col_expr(rca_runs::Column::UpdatedAt, Expr::value(now_us))
+        .filter(rca_runs::Column::RunId.eq(run_id))
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .filter(rca_runs::Column::State.eq(RunState::WaitingInput.as_str()))
+        .filter(rca_runs::Column::DeadlineClosedAt.is_null());
+    if let Reopen::Deadline(deadline) = reopen {
+        cas = cas
+            .col_expr(rca_runs::Column::DeadlineClosedAt, Expr::value(now_us))
+            .filter(rca_runs::Column::InputDeadlineAt.eq(deadline));
+    }
+    if cas.exec(&txn).await?.rows_affected == 0 {
+        txn.rollback().await?;
+        return Ok(false);
+    }
+
+    if let Some(stored) = incident_summary {
+        let mut summary = decode_summary(stored.as_ref());
+        summary.deadline_at = None;
+        summary.detail = None;
+        alert_incidents::Entity::update_many()
+            .col_expr(
+                alert_incidents::Column::RcaState,
+                Expr::value(RunState::Running.as_str()),
+            )
+            .col_expr(alert_incidents::Column::RcaUpdatedAt, Expr::value(now_us))
+            .col_expr(
+                alert_incidents::Column::RcaSummary,
+                Expr::value(encode(&summary, "rca_summary")?),
+            )
+            .filter(alert_incidents::Column::Id.eq(subject_id.as_str()))
+            .filter(alert_incidents::Column::OrgId.eq(org_id))
+            .filter(alert_incidents::Column::RcaRunId.eq(run_id))
+            .exec(&txn)
+            .await?;
+    }
+
+    txn.commit().await?;
+    Ok(true)
+}
+
 /// Deletes every run of the org (RR-26).
 pub async fn delete_by_org(org_id: &str) -> Result<(), DbErr> {
     rca_runs::Entity::delete_many()
@@ -1077,6 +1289,10 @@ pub fn to_run(m: Model) -> RcaRun {
         context_used: m.context_used,
         continuations: m.continuations,
         oncall_subjects: m.oncall_subjects,
+        input_deadline_at: m.input_deadline_at,
+        pending_question_id: m.pending_question_id,
+        questions_asked: m.questions_asked,
+        deadline_closed_at: m.deadline_closed_at,
     }
 }
 
@@ -1155,6 +1371,7 @@ mod tests {
             schema.create_table_from_entity(rca_runs::Entity),
             schema.create_table_from_entity(alert_incidents::Entity),
             schema.create_table_from_entity(events_entity::Entity),
+            schema.create_table_from_entity(crate::table::entity::rca_steering::Entity),
         ] {
             db.execute(backend.build(&stmt)).await.unwrap();
         }
@@ -1242,6 +1459,7 @@ mod tests {
             new_run(RunSubjectType::Incident, incident_id),
             guards(now),
             Some(IncidentEvent::ai_analysis_begin()),
+            None,
         )
         .await
         .unwrap()
@@ -1448,6 +1666,7 @@ mod tests {
             new_run(RunSubjectType::Incident, "inc-1"),
             guards(T0 + 60 * SEC),
             Some(IncidentEvent::ai_analysis_begin()),
+            None,
         )
         .await
         .unwrap();
@@ -1468,6 +1687,7 @@ mod tests {
             new_run(RunSubjectType::Incident, "inc-1"),
             guards(T0 + 9_999 * SEC),
             Some(IncidentEvent::ai_analysis_begin()),
+            None,
         )
         .await
         .unwrap();
@@ -1490,12 +1710,14 @@ mod tests {
                 new_run(RunSubjectType::Incident, "inc-1"),
                 guards(T0),
                 Some(IncidentEvent::ai_analysis_begin()),
+                None,
             ),
             start_run_with(
                 &db,
                 new_run(RunSubjectType::Incident, "inc-1"),
                 guards(T0),
                 Some(IncidentEvent::ai_analysis_begin()),
+                None,
             ),
         );
         let results = [a.unwrap(), b.unwrap()];
@@ -1524,6 +1746,7 @@ mod tests {
             new_run(RunSubjectType::Incident, "inc-1"),
             guards(T0 + 719 * SEC),
             None,
+            None,
         )
         .await
         .unwrap();
@@ -1535,6 +1758,7 @@ mod tests {
             new_run(RunSubjectType::Incident, "inc-1"),
             guards(now),
             Some(IncidentEvent::ai_analysis_begin()),
+            None,
         )
         .await
         .unwrap();
@@ -1542,6 +1766,7 @@ mod tests {
         let StartResult::Started {
             run_id: r2,
             replaced_stale,
+            ..
         } = replacing.clone()
         else {
             panic!("expected Started, got {replacing:?}");
@@ -1582,6 +1807,7 @@ mod tests {
                 ..guards(now)
             },
             Some(IncidentEvent::ai_analysis_begin()),
+            None,
         )
         .await
         .unwrap();
@@ -1608,6 +1834,7 @@ mod tests {
                 ..guards(T0 + 60 * SEC + 31 * 60 * SEC)
             },
             None,
+            None,
         )
         .await
         .unwrap();
@@ -1633,7 +1860,7 @@ mod tests {
     }
 
     /// RR-11 / 01 §7: every (from, to) pair; a refused write changes no run, summary or
-    /// event.
+    /// event. `waiting_input → running` is only for `resume_waiting`/`close_deadline` (04).
     #[tokio::test]
     async fn rr11_update_run_follows_the_transition_table() {
         use RunState::*;
@@ -1648,10 +1875,7 @@ mod tests {
             Some(Cancelled),
         ];
         let allowed = |from: RunState, to: Option<RunState>| {
-            matches!(
-                (from, to),
-                (Running, _) | (WaitingInput, Some(Running) | Some(Cancelled))
-            )
+            matches!((from, to), (Running, _) | (WaitingInput, Some(Cancelled)))
         };
 
         for (i, from) in states.into_iter().enumerate() {
@@ -1764,6 +1988,7 @@ mod tests {
             new_run(RunSubjectType::Incident, "inc-2"),
             guards(T0),
             Some(IncidentEvent::ai_analysis_begin()),
+            None,
         )
         .await;
         assert!(started.is_err());
@@ -1842,6 +2067,7 @@ mod tests {
                 ..guards(T0 + 1_000 * SEC)
             },
             None,
+            None,
         )
         .await
         .unwrap()
@@ -1905,7 +2131,7 @@ mod tests {
         for i in 0..3 {
             let new = new_run(RunSubjectType::Alert, "alert-1");
             live.push(new.run_id.clone());
-            let started = start_run_with(&db, new, guards(T0 + i * SEC), None)
+            let started = start_run_with(&db, new, guards(T0 + i * SEC), None, None)
                 .await
                 .unwrap();
             assert!(matches!(started, StartResult::Started { .. }));
@@ -1919,6 +2145,7 @@ mod tests {
                 history_limit: 0,
                 ..guards(T0 + 10 * SEC)
             },
+            None,
             None,
         )
         .await
@@ -2210,6 +2437,7 @@ mod tests {
                         new_run(RunSubjectType::Incident, "inc-1"),
                         guards(T0),
                         Some(IncidentEvent::ai_analysis_begin()),
+                        None,
                     )
                     .await
                 })
@@ -2254,5 +2482,478 @@ mod tests {
         let db = std::sync::Arc::try_unwrap(shared)
             .unwrap_or_else(|_| panic!("every spawned task has finished"));
         drop_postgres(db, &dsn, &name).await;
+    }
+
+    // ---- Phase 4: questions and steering (04 §8.3, SG18, SG26, SG27, SG42, §8.5) ----
+
+    const DEADLINE: i64 = T0 + 600 * SEC;
+
+    /// The SG26 `waiting_input` write of the finalizer, with its SG42 event.
+    fn waiting_update(now_us: i64, deadline: i64, question_id: &str) -> RunUpdate {
+        let mut upd = update(Some(RunState::WaitingInput), now_us);
+        upd.input_deadline_at = Some(Some(deadline));
+        upd.pending_question_id = Some(Some(question_id.to_string()));
+        upd.questions_asked_inc = true;
+        upd.summary = Some(RunSummaryPatch {
+            detail: Some(Some("orders pool size".to_string())),
+            deadline_at: Some(Some(deadline)),
+            ..Default::default()
+        });
+        upd.event = Some(IncidentEvent::ai_analysis_needs_input(
+            "run",
+            question_id,
+            "orders pool size",
+            "What is the pool size?",
+            deadline,
+        ));
+        upd
+    }
+
+    fn needs_input_count(types: &[IncidentEventType]) -> usize {
+        types
+            .iter()
+            .filter(|t| matches!(t, IncidentEventType::AiAnalysisNeedsInput { .. }))
+            .count()
+    }
+
+    /// A fresh incident whose only run waits for an answer until `deadline`.
+    async fn waiting_run(db: &DatabaseConnection, incident_id: &str, deadline: i64) -> String {
+        incident(db, incident_id).await;
+        let run_id = start(db, incident_id, T0).await;
+        assert!(
+            update_run_with(
+                db,
+                ORG,
+                &run_id,
+                waiting_update(T0 + SEC, deadline, "call_1")
+            )
+            .await
+            .unwrap()
+        );
+        run_id
+    }
+
+    /// SG26 / SG42: `running → waiting_input` writes the question columns, the summary and
+    /// the `ai_analysis_needs_input` event in one transaction; the event is present iff the
+    /// write wins.
+    #[tokio::test]
+    async fn sg26_sg42_waiting_input_write_carries_its_event_iff_it_wins() {
+        let db = db().await;
+        let run_id = waiting_run(&db, "inc-1", DEADLINE).await;
+        let r = run(&db, &run_id).await.unwrap();
+        assert_eq!(r.state, "waiting_input");
+        assert_eq!(r.input_deadline_at, Some(DEADLINE));
+        assert_eq!(r.pending_question_id.as_deref(), Some("call_1"));
+        assert_eq!(r.questions_asked, 1);
+        assert_eq!(r.deadline_closed_at, None);
+        let row = assert_summary_mirrors_run(&db, "inc-1").await;
+        assert_eq!(row.state, "waiting_input");
+        let summary = summary_of(&inc(&db, "inc-1").await);
+        assert_eq!(summary.detail.as_deref(), Some("orders pool size"));
+        assert_eq!(summary.deadline_at, Some(DEADLINE));
+        assert_eq!(needs_input_count(&event_types(&db, "inc-1").await), 1);
+
+        // A second waiting write on a waiting run loses and appends nothing.
+        let before = (
+            run(&db, &run_id).await,
+            inc(&db, "inc-1").await,
+            events(&db, "inc-1").await,
+        );
+        assert!(
+            !update_run_with(
+                &db,
+                ORG,
+                &run_id,
+                waiting_update(T0 + 2 * SEC, DEADLINE, "call_2")
+            )
+            .await
+            .unwrap()
+        );
+        assert_eq!(
+            (
+                run(&db, &run_id).await,
+                inc(&db, "inc-1").await,
+                events(&db, "inc-1").await
+            ),
+            before
+        );
+
+        // A terminal run refuses it too.
+        let done = run_in_state(&db, "inc-2", RunState::Completed).await;
+        let before = events(&db, "inc-2").await;
+        assert!(
+            !update_run_with(
+                &db,
+                ORG,
+                &done,
+                waiting_update(T0 + 2 * SEC, DEADLINE, "call_1")
+            )
+            .await
+            .unwrap()
+        );
+        assert_eq!(events(&db, "inc-2").await, before);
+        assert_eq!(needs_input_count(&event_types(&db, "inc-2").await), 0);
+
+        // A failing event append rolls the state write back.
+        incident(&db, "inc-3").await;
+        let r3 = start(&db, "inc-3", T0).await;
+        let run_before = run(&db, &r3).await;
+        db.execute_unprepared("DROP TABLE incident_events")
+            .await
+            .unwrap();
+        assert!(
+            update_run_with(&db, ORG, &r3, waiting_update(T0 + SEC, DEADLINE, "call_1"))
+                .await
+                .is_err()
+        );
+        assert_eq!(run(&db, &r3).await, run_before);
+    }
+
+    /// SG18: `resume_waiting` is a compare-and-set; the second caller loses; the summary
+    /// follows; it is refused after the deadline closed.
+    #[tokio::test]
+    async fn sg18_resume_waiting_is_a_compare_and_set() {
+        let db = db().await;
+        let run_id = waiting_run(&db, "inc-1", DEADLINE).await;
+        assert!(
+            reopen_waiting_with(&db, ORG, &run_id, Reopen::Answer, T0 + 5 * SEC)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !reopen_waiting_with(&db, ORG, &run_id, Reopen::Answer, T0 + 6 * SEC)
+                .await
+                .unwrap(),
+            "the second caller loses"
+        );
+        let r = run(&db, &run_id).await.unwrap();
+        assert_eq!(r.state, "running");
+        assert_eq!(r.input_deadline_at, None);
+        assert_eq!(r.pending_question_id, None);
+        assert_eq!(r.deadline_closed_at, None);
+        assert_eq!(r.questions_asked, 1, "the count stays");
+        assert_eq!(r.updated_at, T0 + 5 * SEC);
+        let i = inc(&db, "inc-1").await;
+        assert_eq!(i.rca_state.as_deref(), Some("running"));
+        assert_eq!(i.rca_updated_at, Some(T0 + 5 * SEC));
+        let summary = summary_of(&i);
+        assert_eq!((summary.detail, summary.deadline_at), (None, None));
+
+        // Other orgs, unknown runs and running runs lose.
+        assert!(
+            !reopen_waiting_with(&db, "other", &run_id, Reopen::Answer, T0)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !reopen_waiting_with(&db, ORG, "nope", Reopen::Answer, T0)
+                .await
+                .unwrap()
+        );
+
+        // Concurrent answers: exactly one wins.
+        let db = self::db().await;
+        let run_id = waiting_run(&db, "inc-1", DEADLINE).await;
+        let (a, b) = tokio::join!(
+            reopen_waiting_with(&db, ORG, &run_id, Reopen::Answer, T0 + 5 * SEC),
+            reopen_waiting_with(&db, ORG, &run_id, Reopen::Answer, T0 + 5 * SEC),
+        );
+        assert_eq!([a.unwrap(), b.unwrap()].iter().filter(|w| **w).count(), 1);
+    }
+
+    /// SG27: `close_deadline` is a compare-and-set on the listed deadline; it sets
+    /// `deadline_closed_at`; the second sweeper loses; an answer after it is refused.
+    #[tokio::test]
+    async fn sg27_close_deadline_is_a_compare_and_set() {
+        let db = db().await;
+        let run_id = waiting_run(&db, "inc-1", DEADLINE).await;
+        let now = DEADLINE + SEC;
+        assert!(
+            !reopen_waiting_with(&db, ORG, &run_id, Reopen::Deadline(DEADLINE - 1), now)
+                .await
+                .unwrap(),
+            "a different deadline loses"
+        );
+        assert!(
+            reopen_waiting_with(&db, ORG, &run_id, Reopen::Deadline(DEADLINE), now)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !reopen_waiting_with(&db, ORG, &run_id, Reopen::Deadline(DEADLINE), now)
+                .await
+                .unwrap(),
+            "the second sweeper loses"
+        );
+        assert!(
+            !reopen_waiting_with(&db, ORG, &run_id, Reopen::Answer, now)
+                .await
+                .unwrap(),
+            "an answer after the close loses"
+        );
+        let r = run(&db, &run_id).await.unwrap();
+        assert_eq!(r.state, "running");
+        assert_eq!(r.deadline_closed_at, Some(now));
+        assert_eq!((r.input_deadline_at, r.pending_question_id), (None, None));
+        let i = inc(&db, "inc-1").await;
+        assert_eq!(i.rca_state.as_deref(), Some("running"));
+        let summary = summary_of(&i);
+        assert_eq!((summary.detail, summary.deadline_at), (None, None));
+
+        // Even if the run waits again, a closed deadline refuses both reopenings.
+        assert!(
+            update_run_with(
+                &db,
+                ORG,
+                &run_id,
+                waiting_update(now + SEC, now + 600 * SEC, "c2")
+            )
+            .await
+            .unwrap()
+        );
+        assert!(
+            !reopen_waiting_with(&db, ORG, &run_id, Reopen::Answer, now + 2 * SEC)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !reopen_waiting_with(
+                &db,
+                ORG,
+                &run_id,
+                Reopen::Deadline(now + 600 * SEC),
+                now + 2 * SEC
+            )
+            .await
+            .unwrap()
+        );
+
+        // A sweeper racing an answer: exactly one wins.
+        let db = self::db().await;
+        let run_id = waiting_run(&db, "inc-1", DEADLINE).await;
+        let (a, b) = tokio::join!(
+            reopen_waiting_with(&db, ORG, &run_id, Reopen::Answer, now),
+            reopen_waiting_with(&db, ORG, &run_id, Reopen::Deadline(DEADLINE), now),
+        );
+        assert_eq!([a.unwrap(), b.unwrap()].iter().filter(|w| **w).count(), 1);
+    }
+
+    /// SG27: the sweeper lists waiting runs past their open deadline, oldest deadline
+    /// first, `limit` at most.
+    #[tokio::test]
+    async fn sg27_list_waiting_past_deadline() {
+        let db = db().await;
+        let late = waiting_run(&db, "inc-1", T0 + 100 * SEC).await;
+        let later = waiting_run(&db, "inc-2", T0 + 200 * SEC).await;
+        waiting_run(&db, "inc-3", T0 + 900 * SEC).await;
+        let closed = waiting_run(&db, "inc-4", T0 + 50 * SEC).await;
+        assert!(
+            reopen_waiting_with(
+                &db,
+                ORG,
+                &closed,
+                Reopen::Deadline(T0 + 50 * SEC),
+                T0 + 60 * SEC
+            )
+            .await
+            .unwrap()
+        );
+        assert!(
+            update_run_with(
+                &db,
+                ORG,
+                &closed,
+                waiting_update(T0 + 61 * SEC, T0 + 70 * SEC, "c2")
+            )
+            .await
+            .unwrap()
+        );
+        run_in_state(&db, "inc-5", RunState::Running).await;
+
+        let ids = |rows: Vec<Model>| rows.into_iter().map(|r| r.run_id).collect::<Vec<_>>();
+        let now = T0 + 300 * SEC;
+        assert_eq!(
+            ids(list_waiting_past_deadline_with(&db, now, 10).await.unwrap()),
+            [late.clone(), later.clone()]
+        );
+        assert_eq!(
+            ids(list_waiting_past_deadline_with(&db, now, 1).await.unwrap()),
+            std::slice::from_ref(&late)
+        );
+        assert!(
+            list_waiting_past_deadline_with(&db, T0 + 100 * SEC, 10)
+                .await
+                .unwrap()
+                .is_empty(),
+            "strictly past the deadline"
+        );
+    }
+
+    fn steer_row(steer_id: &str, run_id: &str) -> config::meta::alerts::rca_steering::SteerRecord {
+        use config::meta::alerts::rca_steering::*;
+        SteerRecord {
+            org_id: ORG.to_string(),
+            steer_id: steer_id.to_string(),
+            run_id: run_id.to_string(),
+            incident_id: "inc-a".to_string(),
+            author_email: "a.rao@acme.io".to_string(),
+            kind: SteerKind::Message,
+            action: None,
+            hypothesis_id: None,
+            question_id: None,
+            text: "t".to_string(),
+            status: SteerStatus::NotRead,
+            status_reason: Some(SteerStatusReason::RunCompleted),
+            created_at: T0,
+            delivered_at: None,
+            read_at: None,
+            acted_at: None,
+            agent_note: None,
+            opencode_message_id: None,
+        }
+    }
+
+    /// 04 §8.5: the prune deletes the steering rows of the pruned runs, and only those, in
+    /// the start transaction.
+    #[tokio::test]
+    async fn prune_deletes_the_steering_rows_of_pruned_runs() {
+        use RunState::*;
+        let db = db().await;
+        incident(&db, "inc-a").await;
+        let old = history(
+            &db,
+            "inc-a",
+            &[Failed, Completed, Failed, Cancelled, Failed, Failed],
+        )
+        .await;
+        for (i, run_id) in old.iter().enumerate() {
+            rca_steering::insert_with(&db, &steer_row(&format!("stg_{i}"), run_id))
+                .await
+                .unwrap();
+        }
+        let mut foreign = steer_row("stg_other_org", &old[0]);
+        foreign.org_id = "other".into();
+        rca_steering::insert_with(&db, &foreign).await.unwrap();
+
+        start_with_limit(&db, "inc-a", 3).await;
+        // Kept: old[1] (newest completed), old[3..6]; pruned: old[0], old[2].
+        let mut kept: Vec<String> = crate::table::entity::rca_steering::Entity::find()
+            .filter(crate::table::entity::rca_steering::Column::OrgId.eq(ORG))
+            .all(&db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|m| m.run_id)
+            .collect();
+        kept.sort();
+        let mut want = vec![
+            old[1].clone(),
+            old[3].clone(),
+            old[4].clone(),
+            old[5].clone(),
+        ];
+        want.sort();
+        assert_eq!(kept, want);
+        assert!(
+            rca_steering::get_with(&db, "other", "stg_other_org")
+                .await
+                .unwrap()
+                .is_some(),
+            "another org's rows stay"
+        );
+
+        // A prune whose transaction fails deletes no steering row.
+        incident(&db, "inc-b").await;
+        let old = history(&db, "inc-b", &[Failed, Failed, Failed]).await;
+        rca_steering::insert_with(&db, &steer_row("stg_b0", &old[0]))
+            .await
+            .unwrap();
+        db.execute_unprepared("DROP TABLE incident_events")
+            .await
+            .unwrap();
+        assert!(
+            start_run_with(
+                &db,
+                new_run(RunSubjectType::Incident, "inc-b"),
+                StartGuards {
+                    history_limit: 0,
+                    ..guards(T0 + 1_000 * SEC)
+                },
+                Some(IncidentEvent::ai_analysis_begin()),
+                None,
+            )
+            .await
+            .is_err()
+        );
+        assert!(
+            rca_steering::get_with(&db, ORG, "stg_b0")
+                .await
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    /// SG23: `replaced_run_id` names the stale run a start ended, and is `None` for every
+    /// other start (first run, after a terminal run, alert subjects).
+    #[tokio::test]
+    async fn sg23_replaced_run_id_is_set_only_on_stale_replacement() {
+        use RunState::*;
+        let db = db().await;
+        let replaced = |r: &StartResult| match r {
+            StartResult::Started {
+                replaced_run_id, ..
+            } => replaced_run_id.clone(),
+            other => panic!("expected Started, got {other:?}"),
+        };
+        let start_at = |subject_type, subject: &'static str, now| {
+            let db = &db;
+            async move {
+                start_run_with(db, new_run(subject_type, subject), guards(now), None, None)
+                    .await
+                    .unwrap()
+            }
+        };
+
+        incident(&db, "inc-1").await;
+        let first = start_at(RunSubjectType::Incident, "inc-1", T0).await;
+        assert_eq!(replaced(&first), None, "first run");
+        let StartResult::Started { run_id: r1, .. } = first else {
+            unreachable!()
+        };
+
+        // Live and not stale: in flight, nothing replaced.
+        assert_eq!(
+            start_at(RunSubjectType::Incident, "inc-1", T0 + 60 * SEC).await,
+            StartResult::InFlight
+        );
+
+        // Stale: replaced, and the id is the stale run's.
+        let r = start_at(RunSubjectType::Incident, "inc-1", T0 + 721 * SEC).await;
+        assert_eq!(replaced(&r), Some(r1.clone()));
+        assert_eq!(run(&db, &r1).await.unwrap().state, "failed");
+
+        // After a terminal run of each kind: nothing replaced.
+        for (i, state) in [Completed, Failed, Cancelled].into_iter().enumerate() {
+            let subject: &'static str = ["inc-c", "inc-f", "inc-x"][i];
+            incident(&db, subject).await;
+            let prev = start(&db, subject, T0).await;
+            finish(&db, &prev, state, T0 + SEC).await;
+            let r = start_at(RunSubjectType::Incident, subject, T0 + 10_000 * SEC).await;
+            assert_eq!(replaced(&r), None, "{state}");
+        }
+
+        // A waiting run never goes stale, so it is never replaced.
+        let waiting = waiting_run(&db, "inc-w", DEADLINE).await;
+        assert_eq!(
+            start_at(RunSubjectType::Incident, "inc-w", T0 + 99_999 * SEC).await,
+            StartResult::InFlight
+        );
+        assert_eq!(run(&db, &waiting).await.unwrap().state, "waiting_input");
+
+        // Alert subjects take no compare-and-set: never a replacement.
+        let a1 = start_at(RunSubjectType::Alert, "alert-1", T0).await;
+        assert_eq!(replaced(&a1), None);
+        let a2 = start_at(RunSubjectType::Alert, "alert-1", T0 + 99_999 * SEC).await;
+        assert_eq!(replaced(&a2), None);
     }
 }

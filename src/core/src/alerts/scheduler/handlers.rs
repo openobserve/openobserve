@@ -2310,6 +2310,7 @@ async fn trigger_rca_for_alert_firing(
                 name: alert_name.clone(),
                 stream: stream_name,
             },
+            guidance: None,
         };
         if let Err(e) = start_rca_turn(run, prompt).await {
             log::warn!(

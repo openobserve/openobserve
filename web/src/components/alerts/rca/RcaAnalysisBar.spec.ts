@@ -196,4 +196,18 @@ describe("RcaAnalysisBar (contract E5)", () => {
       }
     });
   });
+
+  describe("04 frame I: Re-analyze with guidance", () => {
+    it("the Re-analyze menu offers 'With guidance…', which emits reanalyze-guidance", async () => {
+      const wrapper = mountBar({ live: false });
+      const item = byTest(wrapper, "rca-reanalyze-guidance");
+
+      expect(item.text()).toContain("With guidance…");
+      expect(item.text()).toContain(
+        "Tell the agent what to check or ignore. Creates a new version",
+      );
+      await item.trigger("click");
+      expect(wrapper.emitted("reanalyze-guidance")).toHaveLength(1);
+    });
+  });
 });

@@ -19,7 +19,12 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 const { toastMock } = vi.hoisted(() => ({ toastMock: vi.fn() }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
 vi.mock("@/services/incidents", () => ({
-  default: { getRcaThread: vi.fn(), getRcaSummary: vi.fn() },
+  default: {
+    getRcaThread: vi.fn(),
+    getRcaSummary: vi.fn(),
+    getRcaSteering: vi.fn(),
+    steerRca: vi.fn(),
+  },
 }));
 
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
@@ -28,6 +33,7 @@ import store from "@/test/unit/helpers/store";
 import incidentsService from "@/services/incidents";
 import { formatTimestamp } from "@/utils/date";
 import { RCA_UNFINISHED_TOOL_ERROR, rcaThreadPlainText } from "@/utils/incidents/rcaThread";
+import { RCA_STEERING_POLL_MS } from "@/composables/useRcaSteering";
 import {
   RCA_T0,
   rcaEvidenceEntry,
@@ -39,8 +45,13 @@ import {
   rcaRunSummaryLegacy,
   rcaRunSummaryLive,
   rcaStep,
+  rcaSteerRecord,
+  rcaSteering,
+  rcaSteeringPaused,
+  rcaSteeringUnblocked,
   rcaSummary,
   rcaThread,
+  rcaThreadQuestion,
   rcaToolCall,
   sec,
 } from "@/test/unit/fixtures/rcaThread";
@@ -48,6 +59,8 @@ import type { RcaRunSummary } from "@/services/incidents";
 
 const getRcaThread = vi.mocked(incidentsService.getRcaThread);
 const getRcaSummary = vi.mocked(incidentsService.getRcaSummary);
+const getRcaSteering = vi.mocked(incidentsService.getRcaSteering);
+const steerRca = vi.mocked(incidentsService.steerRca);
 
 /** Every read of a run answers `summary` with that run's id. */
 const answerSummary = (summary: RcaRunSummary) =>
@@ -132,6 +145,8 @@ describe("IncidentRCAAnalysis", () => {
     getRcaSummary.mockReset();
     answerSummary(rcaRunSummaryLegacy());
     writeText.mockReset().mockResolvedValue(undefined);
+    getRcaSteering.mockReset().mockResolvedValue({ data: rcaSteering() } as never);
+    steerRca.mockReset().mockResolvedValue({ data: { run_state: "running" } } as never);
   });
 
   afterEach(() => {
@@ -964,6 +979,234 @@ describe("IncidentRCAAnalysis", () => {
       const list = byTest(wrapper, "rca-evidence-list");
       expect(list.find('[data-number="1"] [data-test="rca-evidence-card"]').exists()).toBe(true);
       expect(list.find('[data-number="2"] [data-test="rca-evidence-card"]').exists()).toBe(false);
+    });
+  });
+
+  describe("04 steering (SG37–SG40, H16)", () => {
+    // ODialog portals; the stub keeps the guidance dialog's body in the wrapper.
+    const ODialogStub = {
+      name: "ODialog",
+      props: ["open"],
+      emits: ["update:open", "click:primary", "click:secondary"],
+      // The dialog's own data-test falls through onto this root.
+      template: `<div v-if="open"><slot /></div>`,
+    };
+    const mountSteerable = (props: Record<string, unknown>) =>
+      mount(IncidentRCAAnalysis, {
+        props: { orgId: "default", incidentId: "inc-1", ...props },
+        global: { plugins: [i18n, store], stubs: { ...stubs, ODialog: ODialogStub } },
+        attachTo: document.body,
+      });
+    const pausedProps = () =>
+      liveProps({
+        rca: rcaSummary({
+          state: "waiting_input",
+          summary: { stage: "log_patterns", stage_index: 5, steps: 9, tool_calls: 27 },
+          current_run: rcaRun({ state: "waiting_input" }),
+        }),
+      });
+
+    it("SG37: reads the steering view of the thread's run; can_steer shows the composer", async () => {
+      wrapper = mountSteerable(liveProps());
+      await flushPromises();
+
+      expect(getRcaSteering).toHaveBeenCalledWith("default", "inc-1", "run-2");
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(true);
+    });
+
+    it("SG37: a reader without RCA permission (403) sees the thread and no composer", async () => {
+      getRcaSteering.mockRejectedValue({ isAxiosError: true, response: { status: 403, data: {} } });
+      wrapper = mountSteerable(liveProps());
+      await flushPromises();
+
+      expect(wrapper.findAll('[data-test="rca-thread-step"]')).toHaveLength(2);
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-thread-final-note").exists()).toBe(false);
+    });
+
+    it("SG37: can_steer false hides the composer on a live run", async () => {
+      getRcaSteering.mockResolvedValue({ data: rcaSteering({ can_steer: false }) } as never);
+      wrapper = mountSteerable(liveProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
+    });
+
+    it("send: POSTs the message, then re-reads the steering view at once", async () => {
+      wrapper = mountSteerable(liveProps());
+      await flushPromises();
+      const reads = getRcaSteering.mock.calls.length;
+
+      await wrapper.find('[data-test="rca-steer-composer"] textarea').setValue("Check the pool");
+      await wrapper.find('[data-test="rca-steer-composer"]').trigger("submit");
+      await flushPromises();
+
+      expect(steerRca).toHaveBeenCalledWith("default", "inc-1", "run-2", {
+        text: "Check the pool",
+        kind: "message",
+      });
+      expect(getRcaSteering.mock.calls.length).toBe(reads + 1);
+    });
+
+    it("SG40: a run_closing 409 keeps the text visible after the poll hides the composer", async () => {
+      vi.useFakeTimers();
+      wrapper = mountSteerable(pausedProps());
+      await vi.advanceTimersByTimeAsync(0);
+      steerRca.mockRejectedValue({
+        isAxiosError: true,
+        response: { status: 409, data: { error_code: "run_closing" } },
+      });
+
+      await wrapper.find('[data-test="rca-steer-composer"] textarea').setValue("PR #812 at 14:02");
+      await wrapper.find('[data-test="rca-steer-composer"]').trigger("submit");
+      await vi.advanceTimersByTimeAsync(0);
+      // A closed run is not re-read at once; the next 4 s poll closes the box.
+      getRcaSteering.mockResolvedValue({ data: rcaSteering({ can_steer: false }) } as never);
+      await vi.advanceTimersByTimeAsync(RCA_STEERING_POLL_MS);
+
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-thread-refusal-text").text()).toBe("PR #812 at 14:02");
+      await byTest(wrapper, "rca-thread-refusal-reanalyze").trigger("click");
+      expect(
+        (wrapper.find('[data-test="rca-guidance-dialog"] textarea').element as HTMLTextAreaElement)
+          .value,
+      ).toBe("PR #812 at 14:02");
+    });
+
+    it("SG40 race: a steering read hides the composer before the refused send settles; the text stays", async () => {
+      wrapper = mountSteerable(pausedProps());
+      await flushPromises();
+      let refuse!: () => void;
+      steerRca.mockReturnValue(
+        new Promise((_resolve, reject) => {
+          refuse = () =>
+            reject({
+              isAxiosError: true,
+              response: { status: 409, data: { error_code: "run_closing" } },
+            });
+        }) as never,
+      );
+      getRcaSteering.mockResolvedValue({ data: rcaSteering({ can_steer: false }) } as never);
+
+      await wrapper.find('[data-test="rca-steer-composer"] textarea').setValue("PR #812 at 14:02");
+      await wrapper.find('[data-test="rca-steer-composer"]').trigger("submit");
+      // The run stops being live: its final steering read closes the box first.
+      await wrapper.setProps({ threadLive: false });
+      await flushPromises();
+      expect(byTest(wrapper, "rca-steer-composer").exists()).toBe(false);
+
+      refuse();
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-thread-refusal-text").text()).toBe("PR #812 at 14:02");
+      expect(byTest(wrapper, "rca-thread-refusal").text()).toContain(
+        "The answer window has closed and the run is closing as Blocked.",
+      );
+    });
+
+    it("SG40: 'Re-analyze with this message' opens frame I with the text; Start sends {guidance}", async () => {
+      getRcaSteering.mockResolvedValue({
+        data: rcaSteering({
+          items: [
+            rcaSteerRecord({
+              text: "Check PR #812",
+              status: "rejected",
+              status_reason: "finalizing",
+            }),
+          ],
+        }),
+      } as never);
+      wrapper = mountSteerable(liveProps());
+      await flushPromises();
+      expect(byTest(wrapper, "rca-guidance-dialog").exists()).toBe(false);
+
+      await byTest(wrapper, "rca-thread-steer-reanalyze").trigger("click");
+
+      const dialog = byTest(wrapper, "rca-guidance-dialog");
+      expect((dialog.find("textarea").element as HTMLTextAreaElement).value).toBe("Check PR #812");
+      expect(dialog.text()).toContain("Creates a new report version. This one stays as is.");
+      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
+      expect(wrapper.emitted("trigger-rca")).toEqual([
+        [{ buildOnPrevious: false, guidance: "Check PR #812" }],
+      ]);
+    });
+
+    it("frame I: the Re-analyze menu's 'With guidance…' opens the dialog empty", async () => {
+      wrapper = mountSteerable(completedProps());
+      await flushPromises();
+
+      await byTest(wrapper, "rca-reanalyze-guidance").trigger("click");
+
+      const dialog = byTest(wrapper, "rca-guidance-dialog");
+      expect((dialog.find("textarea").element as HTMLTextAreaElement).value).toBe("");
+    });
+
+    it("SG39 frame D: paused banner with the step and the local deadline; 'Waiting for an answer'", async () => {
+      getRcaThread.mockResolvedValue({
+        data: rcaThread({ questions: [rcaThreadQuestion()] }),
+      } as never);
+      getRcaSteering.mockResolvedValue({ data: rcaSteeringPaused() } as never);
+      wrapper = mountSteerable(pausedProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-paused-title").text()).toBe(
+        "Paused after “Map the checkout dependencies”",
+      );
+      // RCA_T0 + 30 min in the store's UTC zone.
+      expect(byTest(wrapper, "rca-paused-deadline").text()).toBe(
+        "The agent waits until 09:23 for an answer, then closes the run as Blocked.",
+      );
+      expect(byTest(wrapper, "rca-thread-question-status").text()).toBe("Waiting for an answer");
+      expect(byTest(wrapper, "rca-steer-question").text()).toContain("Agent asks:");
+    });
+
+    it("SG39 frame G: 'Unblocked by <author> at <read_at>' and 'Answered by <author>'", async () => {
+      getRcaThread.mockResolvedValue({
+        data: rcaThread({
+          run_id: "run-1",
+          active: false,
+          steps: [rcaStep()],
+          questions: [rcaThreadQuestion()],
+        }),
+      } as never);
+      getRcaSteering.mockResolvedValue({ data: rcaSteeringUnblocked() } as never);
+      answerSummary(rcaRunSummary());
+      wrapper = mountSteerable(completedProps());
+      await flushPromises();
+
+      expect(byTest(wrapper, "rca-verdict-unblocked").text()).toBe(
+        "Unblocked by a.rao at 08:58 · change history from a human lead",
+      );
+      expect(byTest(wrapper, "rca-thread-question-status").text()).toBe("Answered by a.rao");
+    });
+
+    it("H16: a hypothesis action POSTs its body; the row shows 'Pending · <author>' until read", async () => {
+      answerSummary(rcaRunSummaryLive());
+      wrapper = mountSteerable(liveProps());
+      await flushPromises();
+      getRcaSteering.mockResolvedValue({
+        data: rcaSteering({
+          items: [
+            rcaSteerRecord({
+              kind: "hypothesis_action",
+              action: "disprove",
+              hypothesis_id: "h1",
+              text: "Disprove h1",
+            }),
+          ],
+        }),
+      } as never);
+
+      await wrapper.find('[data-test="rca-hypothesis-action-disprove"]').trigger("click");
+      await flushPromises();
+
+      expect(steerRca).toHaveBeenCalledWith("default", "inc-1", "run-2", {
+        text: "",
+        kind: "hypothesis_action",
+        action: "disprove",
+        hypothesis_id: "h1",
+      });
+      expect(byTest(wrapper, "rca-hypothesis-pending").text()).toBe("Pending · a.rao");
     });
   });
 });
