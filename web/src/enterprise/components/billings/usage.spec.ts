@@ -630,6 +630,17 @@ describe("Usage Component", () => {
     expect(rumSessionExists).toBe(false);
   });
 
+  it("counts only billable AI credits, as whole numbers", async () => {
+    wrapper.vm.usageData = { ai_credits: "2.00" };
+    wrapper.vm.dataLoading = false;
+    await nextTick();
+
+    expect(wrapper.vm.usageTiles.find((t: any) => t.key === "ai_credits")).toMatchObject({
+      label: "Billable AI credits",
+      value: "2",
+    });
+  });
+
   // Test 42: Usage tiles visibility logic
   it("should show usage tiles when data is available and not loading", async () => {
     wrapper.vm.usageData = { ingestion: "1.00", search: "1.00", functions: "1.00" };

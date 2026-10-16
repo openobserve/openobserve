@@ -112,7 +112,7 @@ import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { errorMessage, type AlertCalibrationConfig } from "@/services/alert_calibration";
 import { updateAlertCalibrationConfigMutation } from "@/services/alert_calibration.queries";
-import { formatMinutes } from "@/components/alert_calibration/format";
+import { formatMinutes } from "./format";
 import {
   CONFIG_DEFAULTS,
   makeAlertCalibrationSettingsSchema,
@@ -122,8 +122,8 @@ import { changedFields, scheduleWarnings } from "./alertCalibrationSettings";
 
 const props = defineProps<{ config: AlertCalibrationConfig | null }>();
 
-const FREQUENCY_PRESETS = [15, 60, 360, 720, 1440, 10_080, 43_200];
-const WINDOW_PRESETS = [1440, 10_080, 20_160, 43_200, 129_600, 525_600];
+const FREQUENCY_PRESETS = [60, 360, 720, 1440, 10_080, 43_200];
+const WINDOW_PRESETS = [1440, 10_080, 20_160, 43_200, 129_600];
 
 const { t } = useI18nTyped();
 const orgId = useOrgId();

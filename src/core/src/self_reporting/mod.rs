@@ -27,7 +27,7 @@ pub mod llm_scores_writer;
 pub(crate) mod persistence;
 pub mod redaction_schema;
 pub mod search;
-pub(crate) mod triggers_schema;
+mod triggers_schema;
 mod usage_schema;
 
 #[cfg(feature = "cloud")]

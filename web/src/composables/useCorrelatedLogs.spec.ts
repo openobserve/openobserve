@@ -414,6 +414,17 @@ describe("useCorrelatedLogs", () => {
       expect(composable.logStreamsCount.value).toBe(0);
     });
 
+    it("should show the no-log-stream message without logging an error", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const composable = useCorrelatedLogs({ ...props, logStreams: [] }, gt);
+
+      await composable.fetchCorrelatedLogs();
+
+      expect(composable.error.value).toBeTruthy();
+      expect(consoleError).not.toHaveBeenCalled();
+      consoleError.mockRestore();
+    });
+
     it("should handle missing ftsFields", () => {
       const propsWithoutFts = {
         ...props,
