@@ -201,7 +201,7 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { useQuery } from "@tanstack/vue-query";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
