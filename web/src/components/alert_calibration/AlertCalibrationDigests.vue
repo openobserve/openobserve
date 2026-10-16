@@ -334,8 +334,8 @@ const columns = computed<OTableColumnDef<RunRow>[]>(() => [
     header: t("alertCalibration.digests.colRun"),
     accessorFn: (row) => row.window_end,
     sortable: true,
-    size: COL.date,
     // The slack goes to the run, so the badge columns keep their width.
+    autoWidth: true,
     fillRemaining: true,
     meta: { align: "left", isName: true },
   },
