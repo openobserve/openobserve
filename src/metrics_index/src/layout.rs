@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Indexed metrics layout (`ZO_METRICS_INDEX_ENABLED`): when it
-//! applies to a stream, how the physical layout of a metrics file is encoded
-//! in its name, and the names of the `.midx` metrics-index columns.
+//! Indexed metrics layout: when it applies to a stream, how the physical
+//! layout of a metrics file is encoded in its name, and the names of the
+//! `.midx` metrics-index columns.
 
 use arrow_schema::{DataType, Schema};
 use config::{
-    FileFormat, get_config,
+    FileFormat,
     meta::{
         promql::HASH_LABEL,
         stream::{FileKey, StreamType},
@@ -27,20 +27,12 @@ use config::{
 };
 
 pub const METRICS_INDEX_ROW_COUNT: &str = "__oo_midx_row_count";
-/// [`metrics_index_enabled`] narrowed to one stream: the layout also
-/// needs a `__hash__` column of type `UInt64` (remote-write / OTLP metrics).
+/// True when a metrics stream has the `UInt64` `__hash__` column the index layout sorts by.
 pub fn metrics_index_stream(stream_type: StreamType, schema: &Schema) -> bool {
-    metrics_index_enabled(stream_type)
+    stream_type == StreamType::Metrics
         && schema
             .field_with_name(HASH_LABEL)
             .is_ok_and(|field| field.data_type() == &DataType::UInt64)
-}
-
-/// True when `stream_type` uses the metrics index layout
-/// (`ZO_METRICS_INDEX_ENABLED`): metrics files ordered by
-/// `(__hash__, _timestamp)`, so readers must not assume a `_timestamp` order.
-pub fn metrics_index_enabled(stream_type: StreamType) -> bool {
-    stream_type == StreamType::Metrics && get_config().compact.metrics_index_enabled
 }
 
 /// Metrics-specific physical layout encoded in a file-name prefix so readers

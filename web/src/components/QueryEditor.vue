@@ -418,8 +418,9 @@ const handleAIGenerate = async () => {
         currentSessionId.value,
       );
 
-      // Track assistant response in chat history
-      const generatedQuery = editorRef.value.getValue?.() || "";
+      // Track assistant response in chat history. A refused request (no AI credits, consent
+      // declined) left the editor unchanged, so its notice is the answer instead.
+      const generatedQuery = editorRef.value.refusalNotice || editorRef.value.getValue?.() || "";
       chatMessages.value.push({ role: "assistant", content: generatedQuery });
 
       // Save to IndexedDB (shared with O2AIChat history)

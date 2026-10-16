@@ -148,8 +148,9 @@ onMounted(async () => {
     const res = await BillingService.list_subscription(store.state.selectedOrganization.identifier);
     fetchedProvider.value = res.data?.provider ?? "";
   } catch (e: unknown) {
-    // A 401 is already handled globally (http.ts logs out), so only real failures are logged.
-    if ((e as { response?: { status?: number } })?.response?.status !== 401) {
+    // 401 is handled globally (http.ts logs out); 403 means the user has no billing access.
+    const status = (e as { response?: { status?: number } })?.response?.status;
+    if (status !== 401 && status !== 403) {
       console.error("Failed to fetch billing info:", e);
     }
   }

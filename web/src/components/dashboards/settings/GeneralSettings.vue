@@ -112,6 +112,7 @@ import { useRoute } from "vue-router";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -140,11 +141,8 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const generalSettingsSchema = makeGeneralSettingsSchema(t);
     const route = useRoute();
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
 
     const formRef = ref<any>(null);
     const closeBtn: Ref<any> = ref(null);
@@ -183,9 +181,10 @@ export default defineComponent({
     });
 
     const saveDashboard = async (value: GeneralSettingsForm) => {
+      let data: any;
       try {
         // get the latest dashboard data and update the title and description
-        const data = JSON.parse(
+        data = JSON.parse(
           JSON.stringify(
             await getDashboard(store, route.query.dashboard, route.query.folder ?? "default"),
           ),
@@ -225,13 +224,14 @@ export default defineComponent({
 
         emit("save");
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.generalSettingsPage.updationFailed"),
-            t,
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: route.query.dashboard as string,
+            folderId: (route?.query?.folder as string) ?? "default",
+            mine: data,
+            change: t("dashboard.saveConflict.change.changedSettings"),
+            onResolved: getDashboardData,
+          });
         } else {
           showErrorNotification(
             error?.message ?? t("dashboard.generalSettingsPage.updationFailed"),

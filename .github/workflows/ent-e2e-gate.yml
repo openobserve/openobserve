@@ -273,8 +273,17 @@ jobs:
           # and for specs list the failing files from the engine's failed-specs artifact.
           BUILD_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="build_binary")|.conclusion' 2>/dev/null || echo "")
           TEST_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="ent_gate_tests")|.conclusion' 2>/dev/null || echo "")
+          # A test job that failed with no failed step was killed from outside (runner lost), not by a spec.
+          TEST_FAILED_STEPS=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '[.jobs[]|select(.name=="ent_gate_tests")|.steps[]|select(.conclusion=="failure")]|length' 2>/dev/null || echo "")
 
-          if [ "$TEST_CONCL" = "failure" ]; then
+          if [ "$TEST_CONCL" = "failure" ] && [ "$TEST_FAILED_STEPS" = "0" ]; then
+          sticky "### ⚠️ Playwright E2E Crosscheck — runner lost, re-run needed
+
+          $MARKER
+          The enterprise test runner stopped before the specs finished (infra, not this PR). Re-run the failed job of this check.
+
+          $SISTER_NOTE · [ENT run]($RUN_URL)"
+          elif [ "$TEST_CONCL" = "failure" ]; then
             rm -rf /tmp/fs; SPEC_LIST=""
             if gh run download "$RUN_ID" --repo "$REPO" -n failed-specs -D /tmp/fs >/dev/null 2>&1 && [ -f /tmp/fs/failed-specs.txt ]; then
               SPEC_LIST=$(sed '/^[[:space:]]*$/d; s/^/- `/; s/$/`/' /tmp/fs/failed-specs.txt)
@@ -305,5 +314,5 @@ jobs:
 
           $SISTER_NOTE"
           fi
-          echo "::error::Enterprise gate failed (conclusion=$CONCL build=$BUILD_CONCL test=$TEST_CONCL)."
+          echo "::error::Enterprise gate failed (conclusion=$CONCL build=$BUILD_CONCL test=$TEST_CONCL failed_steps=$TEST_FAILED_STEPS)."
           exit 1

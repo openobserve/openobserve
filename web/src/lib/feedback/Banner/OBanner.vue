@@ -186,6 +186,8 @@ const barVariantClass = computed(() => {
         :class="[
           bar ? '' : inlineActions ? 'min-w-0 flex-1' : 'flex-1',
           textSize ? '' : bar ? 'text-compact' : 'text-sm',
+          // The base `p` rule sets its own colour, which would beat the variant's text colour.
+          '[&_p]:text-inherit',
           preserveWhitespace ? 'min-w-0 wrap-break-word whitespace-pre-wrap' : '',
         ]"
       >

@@ -17,12 +17,12 @@ import { onBeforeUnmount, ref, shallowRef } from "vue";
 import alertCalibration, {
   errorMessage,
   isAbort,
-  type DigestSearchRange,
+  type DigestRead,
 } from "@/services/alert_calibration";
 import { useOrgId } from "@/composables/query";
-import { isNotYetWritten, SEARCH_SIZE } from "./digests";
+import { SEARCH_SIZE } from "./digests";
 
-/** Digests are log searches, which are never cached, so each view reads them directly and aborts on leave. */
+/** Digest reads are never cached, so each view reads them directly and aborts on leave. */
 export function useDigestSearch() {
   const orgId = useOrgId();
   const controllers = new Set<AbortController>();
@@ -32,20 +32,19 @@ export function useDigestSearch() {
     controllers.clear();
   });
 
-  async function search<T>(sql: string, range: DigestSearchRange): Promise<T[]> {
+  async function search<T>(
+    read: DigestRead,
+    params: Record<string, string | number>,
+  ): Promise<T[]> {
     const controller = new AbortController();
     controllers.add(controller);
     try {
-      return await alertCalibration.searchDigests<T>(
+      return await alertCalibration.readDigests<T>(
         orgId.value,
-        sql,
-        range,
-        SEARCH_SIZE,
+        read,
+        { ...params, size: SEARCH_SIZE },
         controller.signal,
       );
-    } catch (error) {
-      if (isNotYetWritten(error)) return [];
-      throw error;
     } finally {
       controllers.delete(controller);
     }

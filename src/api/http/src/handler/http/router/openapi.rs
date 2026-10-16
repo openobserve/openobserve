@@ -721,6 +721,11 @@ pub struct ApiDoc;
     openobserve_api_management::request::alert_calibration::config::get_alert_calibration_config,
     openobserve_api_management::request::alert_calibration::config::update_alert_calibration_config,
     openobserve_api_management::request::alert_calibration::digests::run_alert_calibration,
+    openobserve_api_management::request::alert_calibration::digests::get_status,
+    openobserve_api_management::request::alert_calibration::digests::list_runs,
+    openobserve_api_management::request::alert_calibration::digests::list_runs_for_alert,
+    openobserve_api_management::request::alert_calibration::digests::get_run_records,
+    openobserve_api_management::request::alert_calibration::digests::count_findings_by_rule,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,

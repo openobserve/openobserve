@@ -84,8 +84,7 @@ pub async fn run() {
 /// rate, so there is no cost argument for gating it the way there is for
 /// `UsageData`.
 ///
-/// Where the record lands is still configurable: `ZO_USAGE_REPORT_TO_OWN_ORG`
-/// governs own-org delivery, and `_meta` always receives a copy.
+/// `_meta` always receives a copy; the originating org's own stream does unless the mode is remote.
 pub fn publish_triggers_usage(trigger: TriggerData) {
     log::debug!(
         "[SELF-REPORTING] Publishing trigger usage: org={}, module={:?}, key={}, status={:?}",

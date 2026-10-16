@@ -470,10 +470,6 @@ fn default_enable_streaming_search() -> bool {
 /// absent setting means the per-org `usage` stream is not written and the
 /// Usage tab shows only the billing-API cards plus an "Enable usage reporting"
 /// CTA.
-///
-/// The global `ZO_USAGE_REPORT_TO_OWN_ORG` remains the deploy-wide master
-/// switch for whether per-org self-reporting is available at all; it no longer
-/// flips the per-org default.
 fn default_usage_stream_enabled() -> bool {
     false
 }
@@ -1625,9 +1621,7 @@ mod tests {
     #[cfg(feature = "cloud")]
     #[test]
     fn test_usage_stream_enabled_defaults_off_in_cloud() {
-        // Own-org usage reporting is OFF by default on cloud; orgs opt in
-        // explicitly. The global ZO_USAGE_REPORT_TO_OWN_ORG stays the master
-        // switch but no longer flips the per-org default.
+        // Own-org usage reporting is OFF by default on cloud; orgs opt in explicitly.
         assert!(!default_usage_stream_enabled());
         assert!(!OrganizationSetting::default().usage_stream_enabled);
 

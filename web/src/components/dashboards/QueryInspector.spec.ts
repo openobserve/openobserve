@@ -1298,4 +1298,95 @@ describe("QueryInspector", () => {
       expect(wrapper.text()).toContain("1641081600000");
     });
   });
+
+  describe("query stats and notices", () => {
+    const diagnostics = {
+      serverPartial: true,
+      partialReasons: [],
+      functionErrors: ["parse_json failed"],
+      queries: [
+        {
+          took: 1240,
+          scanSizeMb: 340,
+          scanRecords: 1200000,
+          rowsReturned: 12400,
+          cacheRatio: 80,
+          serverPartial: false,
+          partialReasons: [],
+          functionErrors: [],
+        },
+        {
+          took: 20,
+          serverPartial: true,
+          partialReasons: ["Please be aware that the response is based on partial data"],
+          functionErrors: ["parse_json failed"],
+        },
+      ],
+    };
+
+    it("renders the stats row with formatted values", async () => {
+      wrapper = createWrapper({ diagnostics });
+      await flushPromises();
+      const stats = wrapper.find('[data-test="query-inspector-stats-0"]');
+      expect(stats.exists()).toBe(true);
+      expect(stats.text()).toContain("Took 1.24 sec");
+      expect(stats.text()).toContain("Scanned 340.00 MB");
+      expect(stats.text()).toContain("1.2M rows scanned");
+      expect(stats.text()).toContain("12,400 rows returned");
+      expect(stats.text()).toContain("80% from cache");
+    });
+
+    it("hides the values the server did not report", async () => {
+      wrapper = createWrapper({ diagnostics });
+      await flushPromises();
+      const stats = wrapper.find('[data-test="query-inspector-stats-1"]');
+      expect(stats.text()).toContain("Took 0.02 sec");
+      expect(wrapper.find('[data-test="query-inspector-stat-scanned-1"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="query-inspector-stat-cache-1"]').exists()).toBe(false);
+      expect(stats.text()).not.toContain("from cache");
+    });
+
+    it("shows each query's own partial and function error notices", async () => {
+      wrapper = createWrapper({ diagnostics });
+      await flushPromises();
+      expect(wrapper.find('[data-test="query-inspector-notice-partial-0"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="query-inspector-notice-partial-1"]').text()).toContain(
+        "based on partial data",
+      );
+      expect(
+        wrapper.find('[data-test="query-inspector-notice-function-error-1"]').text(),
+      ).toContain("parse_json failed");
+    });
+
+    it("shows the series cap with its counts on the first query", async () => {
+      wrapper = createWrapper({
+        diagnostics: { ...diagnostics, serverPartial: false },
+        seriesLimit: { shown: 100, total: 342, cap: 100 },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="query-inspector-notice-series-cap-0"]').text()).toContain(
+        "Showing 100 of 342 series. A chart draws at most 100 series.",
+      );
+      expect(wrapper.find('[data-test="query-inspector-notice-series-cap-1"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("words a capped series total as a lower bound", async () => {
+      wrapper = createWrapper({
+        diagnostics: { ...diagnostics, rowsCapped: true },
+        seriesLimit: { shown: 100, total: 1000, cap: 100 },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="query-inspector-notice-series-cap-0"]').text()).toContain(
+        "Showing 100 of at least 1,000 series. Results were capped at the row limit.",
+      );
+    });
+
+    it("renders no stats row without diagnostics", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="query-inspector-stats-0"]').exists()).toBe(false);
+    });
+  });
 });

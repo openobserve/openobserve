@@ -18,6 +18,7 @@ import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import alertCalibration, {
   httpStatus,
   type AlertCalibrationConfig,
+  type AlertCalibrationStatus,
   type UpdateAlertCalibrationConfig,
 } from "./alert_calibration";
 import { alertCalibrationKeys } from "./alert_calibration.querykeys";
@@ -29,6 +30,21 @@ export const alertCalibrationConfigQuery = (org: string) =>
     queryFn: async (): Promise<AlertCalibrationConfig | null> => {
       try {
         return (await alertCalibration.getConfig(org)).data;
+      } catch (error) {
+        if (httpStatus(error) === 404) return null;
+        throw error;
+      }
+    },
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+/** `null` while the org has no config, since there is no run to report on. */
+export const alertCalibrationStatusQuery = (org: string) =>
+  queryOptions({
+    queryKey: alertCalibrationKeys.status(org),
+    queryFn: async (): Promise<AlertCalibrationStatus | null> => {
+      try {
+        return (await alertCalibration.getStatus(org)).data;
       } catch (error) {
         if (httpStatus(error) === 404) return null;
         throw error;

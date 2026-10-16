@@ -957,6 +957,13 @@ const useRoutes = () => {
       beforeEnter: alertCalibrationRouteGuard,
     },
     {
+      path: "alert-calibration/settings",
+      name: "alertCalibrationSettings",
+      component: () => import("@/components/alert_calibration/AlertCalibrationSettings.vue"),
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
+    },
+    {
       path: "alert-calibration/digests/:windowStart/:windowEnd",
       name: "alertCalibrationDigest",
       component: () => import("@/components/alert_calibration/AlertCalibrationDigestDetail.vue"),
