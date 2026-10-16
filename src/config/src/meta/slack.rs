@@ -68,6 +68,7 @@ pub enum RevokedReason {
     Uninstalled,
     BotTokensRevoked,
     OrgDeleted,
+    OrgRemoved,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
@@ -105,6 +106,7 @@ pub enum DisabledReason {
     MasterKey,
     HomeRegionUnset,
     OtherRegion,
+    SuperCluster,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
@@ -133,6 +135,33 @@ pub enum LinkingSource {
     Mapping,
     #[default]
     Manual,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum InstallScope {
+    #[default]
+    Org,
+    Instance,
+}
+
+/// `""` on org workspaces; an instance workspace is `all` or `listed`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum OrgAccess {
+    #[default]
+    #[serde(rename = "")]
+    Unset,
+    All,
+    Listed,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionSource {
+    #[default]
+    Org,
+    Instance,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -164,6 +193,8 @@ pub struct SlackInstallation {
     pub auto_link_enabled: bool,
     pub auto_link_domains: Vec<String>,
     pub mode: Mode,
+    pub scope: InstallScope,
+    pub org_access: OrgAccess,
     pub home_region: String,
     pub installed_by: String,
     pub installed_org_id: String,
@@ -210,6 +241,12 @@ pub struct InstallationView {
     pub other_connected_orgs: u64,
     pub health: InstallationHealth,
     pub created_at: i64,
+    pub scope: InstallScope,
+    pub managed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub org_access: Option<OrgAccess>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instance_help_contact: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -292,6 +329,7 @@ pub struct SlackOrgConnection {
     pub org_id: String,
     pub connected_by: String,
     pub help_contact: Option<String>,
+    pub source: ConnectionSource,
     pub created_at: i64,
     pub updated_at: i64,
     pub origin_region: String,
@@ -348,4 +386,41 @@ pub struct SlackThread {
     pub updated_at: i64,
     pub origin_region: String,
     pub deleted_at: Option<i64>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn instance_scope_and_access_serialize_as_the_columns_store_them() {
+        assert_eq!(
+            serde_json::to_string(&InstallScope::Instance).unwrap(),
+            "\"instance\""
+        );
+        assert_eq!(serde_json::to_string(&OrgAccess::Unset).unwrap(), "\"\"");
+        assert_eq!(
+            serde_json::from_str::<OrgAccess>("\"listed\"").unwrap(),
+            OrgAccess::Listed
+        );
+        assert_eq!(ConnectionSource::default(), ConnectionSource::Org);
+        assert_eq!(
+            serde_json::to_string(&RevokedReason::OrgRemoved).unwrap(),
+            "\"org_removed\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DisabledReason::SuperCluster).unwrap(),
+            "\"super_cluster\""
+        );
+    }
+
+    #[test]
+    fn a_view_carries_org_access_and_the_instance_contact_only_when_set() {
+        let v = InstallationView::default();
+        let json = serde_json::to_value(&v).unwrap();
+        assert!(json.get("org_access").is_none());
+        assert!(json.get("instance_help_contact").is_none());
+        assert_eq!(json["scope"], "org");
+        assert_eq!(json["managed"], false);
+    }
 }

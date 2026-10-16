@@ -34,6 +34,7 @@ import type {
   SlackLinkingUpdateRequest,
   SlackManifestParams,
   SlackOidcCallbackRequest,
+  SlackOrgAccessRequest,
   SlackTestRequest,
 } from "@/types/slack";
 
@@ -110,6 +111,13 @@ export const slackHelpContactQuery = (org: string, id: string) =>
   queryOptions({
     queryKey: slackKeys.helpContact(org, id),
     queryFn: async () => (await slack.getHelpContact(org, id)).data,
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+export const slackOrgAccessQuery = (org: string, id: string) =>
+  queryOptions({
+    queryKey: slackKeys.orgAccess(org, id),
+    queryFn: async () => (await slack.getOrgAccess(org, id)).data,
     staleTime: NORMAL_STALE_TIME,
   });
 
@@ -251,6 +259,21 @@ export const putHelpContactMutation = (org: string, id: string) =>
     mutationFn: async (helpContact: string) =>
       (await slack.putHelpContact(org, id, { help_contact: helpContact })).data,
     meta: { invalidates: [slackKeys.helpContact(org, id)] },
+  });
+
+export const putOrgAccessMutation = (org: string, id: string) =>
+  mutationOptions({
+    mutationFn: async (body: SlackOrgAccessRequest) =>
+      (await slack.putOrgAccess(org, id, body)).data,
+    meta: { invalidates: [slackKeys.orgAccess(org, id), slackKeys.installations(org)] },
+  });
+
+// A preview writes nothing, so no cached entry goes stale.
+export const previewOrgAccessMutation = (org: string, id: string) =>
+  mutationOptions({
+    mutationFn: async (body: SlackOrgAccessRequest) =>
+      (await slack.previewOrgAccess(org, id, body)).data,
+    meta: {},
   });
 
 // The link pages map every refusal status to their own state message.

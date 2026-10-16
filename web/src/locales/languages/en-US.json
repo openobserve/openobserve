@@ -25071,7 +25071,8 @@
       "homeRegionTitle": "Slack needs a home region",
       "homeRegionDescription": "This super cluster has no region set for Slack. Set {variable} to the same region in every region, then restart.",
       "otherRegionTitle": "Slack runs in another region",
-      "otherRegionDescription": "Slack for this deployment runs in region {region}. Open OpenObserve in that region to manage it."
+      "otherRegionDescription": "Slack for this deployment runs in region {region}. Open OpenObserve in that region to manage it.",
+      "superClusterTitle": "Slack is not yet available on super-cluster deployments"
     },
     "prereq": {
       "title": "Step 0 · Server prerequisites",
@@ -25117,7 +25118,14 @@
       "alreadyInstalled": "{team} is already installed for another organization. Connect this org to use it.",
       "connectedTitle": "Connected to {team}",
       "connectedDestination": "Alerts post to #{channel} · each person gets one DM saying who they are linked as",
-      "continue": "Continue"
+      "continue": "Continue",
+      "notIncludedTitle": "{team} is set up for this server by your instance admin, but {org} is not included yet.",
+      "notIncludedDetail": "Ask {contact} to add {org}. You don't need to install anything.",
+      "notIncludedNoContact": "Ask your instance admin to add {org}. You don't need to install anything.",
+      "copyRequest": "Copy request",
+      "requestText": "Please add the OpenObserve organization {name} ({org}) to the Slack workspace {team}, in _meta › Settings › Slack › Organizations.",
+      "requestCopied": "Request copied",
+      "setupAppOtherTeam": "For a different Slack workspace than {team} · OpenObserve creates your own Slack app from one configuration token"
     },
     "wizard": {
       "title": "Set up the Slack app",
@@ -25196,7 +25204,13 @@
         "signIn": "Test Sign in with Slack",
         "signInPassed": "Sign in with Slack works",
         "signInHelp": "Proves the redirect URL, client ID and secret before anyone tries to link"
-      }
+      },
+      "instanceTeamRemoved": "{team} already has OpenObserve for this server. OpenObserve removed the app you just installed from {team}; Start over also deletes it from your Slack apps.",
+      "instanceAdminContact": "Your instance admin: {contact}",
+      "noAppCreated": "No Slack app was created.",
+      "takeOverTitle": "Use a workspace that is already installed",
+      "takeOverAction": "Make it the instance workspace",
+      "takeOverOrgs": "Used by {orgs}"
     },
     "linking": {
       "title": "Linking",
@@ -25223,7 +25237,9 @@
       "appHome": "App Home tab",
       "appHomeDescription": "Shows each person their link, example questions and Unlink",
       "enabled": "Enabled",
-      "saved": "Linking saved"
+      "saved": "Linking saved",
+      "setByInstanceAdmin": "Set by your instance admin",
+      "managedCounts": "{linked} of your members are linked: {auto} automatically, {manual} with Link your account"
     },
     "card": {
       "modeSocket": "Socket Mode",
@@ -25270,7 +25286,12 @@
       "disconnectThisOrg": "Disconnect this org",
       "disconnectDescription": "Stops Slack for {org} only; other orgs keep it and nobody relinks",
       "uninstall": "Uninstall from workspace",
-      "uninstallDescription": "Removes the app for every connected org. Needs Admin in each, and everyone must relink"
+      "uninstallDescription": "Removes the app for every connected org. Needs Admin in each, and everyone must relink",
+      "instanceTag": "Instance",
+      "managedBy": "managed by your instance admin",
+      "managedTitle": "Managed by your instance admin.",
+      "managedDetail": "Credentials, linking and which organizations use {team} are set in _meta.",
+      "managedQuestions": "Questions: {contact}"
     },
     "channels": {
       "title": "Channel defaults",
@@ -25302,7 +25323,10 @@
       "edit": "Edit",
       "remove": "Remove",
       "removeTitle": "Remove the default for #{channel}?",
-      "removeMessage": "Questions in #{channel} then go to the earliest connected org."
+      "removeMessage": "Questions in #{channel} then go to the earliest connected org.",
+      "instanceAdminOnly": "Instance admin only",
+      "ownOrgOnlyHint": "On an instance workspace you map channels to your own org",
+      "claimableHint": "Unclaimed channels and channels {org} owns"
     },
     "people": {
       "title": "Linked people",
@@ -25415,6 +25439,42 @@
       "emptyTitle": "No linked accounts",
       "emptyDetail": "Mention {'@'}OpenObserve in Slack and click Link your account to link one.",
       "loadFailed": "Couldn't load your linked accounts"
+    },
+    "workspaces": {
+      "addAnother": "Add another workspace"
+    },
+    "orgAccess": {
+      "title": "Organizations",
+      "description": "Which organizations on this server can use {team}",
+      "count": "{selected} of {total} organizations",
+      "all": "All organizations",
+      "selected": "Selected organizations",
+      "selectedHint": "New organizations are not added until you select them",
+      "allHint": "All {total} organizations can use {team}, and every organization created later.",
+      "ownChannels": "Each organization's Admin maps its own channels and alert destinations.",
+      "metaAlways": "_meta is always included",
+      "picker": "Organizations",
+      "members": "{count} member | {count} members",
+      "columnOrg": "Org",
+      "columnAdded": "Added",
+      "columnChannelDefaults": "Channel defaults",
+      "columnLinked": "Linked people",
+      "atInstall": "{date} · at install",
+      "addedBy": "{date} by {user}",
+      "joinedItself": "Joined itself before take-over",
+      "notSaved": "Not saved",
+      "onlyMetaTitle": "Only _meta can use {team} so far.",
+      "onlyMetaAction": "Choose the organizations that can.",
+      "otherAppTitle": "Another OpenObserve app is installed in {team}",
+      "otherAppDetail": "org {orgs} installed it before this became the instance workspace. It keeps working until its admin uninstalls it.",
+      "removeTitle": "Remove {org} from {team}?",
+      "removeLead": "People in {org} stop getting answers from {team}.",
+      "removeDefaults": "{count} channel default is removed ({channels}) | {count} channel defaults are removed ({channels})",
+      "removeLinks": "{count} linked people: {moved} move to another org they belong to, {unlinked} are unlinked",
+      "removeThreads": "Open threads in {org} get no more answers",
+      "removeDestinations": "Alert destinations in {org} are not changed.",
+      "remove": "Remove",
+      "saved": "Organizations saved"
     }
   }
 }

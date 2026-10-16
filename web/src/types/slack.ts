@@ -28,7 +28,8 @@ export type SlackRevokedReason =
   | "email_changed"
   | "uninstalled"
   | "bot_tokens_revoked"
-  | "org_deleted";
+  | "org_deleted"
+  | "org_removed";
 
 export type SlackAnswerMode = "thread" | "private";
 
@@ -37,13 +38,26 @@ export type SlackThreadKind = "question" | "link";
 export type SlackSetFrom = "settings" | "install" | "destination";
 
 export type SlackDisabledReason =
-  "edition" | "flag" | "allowlist" | "master_key" | "home_region_unset" | "other_region";
+  | "edition"
+  | "flag"
+  | "allowlist"
+  | "master_key"
+  | "home_region_unset"
+  | "other_region"
+  | "super_cluster";
 
 export type SlackInstallationStatus = "pending" | "revoked" | "degraded" | "healthy";
 
 export type SlackAppTokenState = "not_applicable" | "missing" | "ok" | "revoked";
 
 export type SlackLinkingSource = "mapping" | "manual";
+
+export type SlackInstallScope = "org" | "instance";
+
+/** `""` on org workspaces; an instance workspace is `all` or `listed`. */
+export type SlackOrgAccessMode = "" | "all" | "listed";
+
+export type SlackConnectionSource = "org" | "instance";
 
 /** `reinstall` refreshes the bot token and scopes only: no destination and no channel default. */
 export type SlackInstallSource = "destination_form" | "settings" | "upgrade_banner" | "reinstall";
@@ -63,6 +77,8 @@ export interface SlackOrgConfig {
 export interface SlackApiError {
   code: number;
   message: string;
+  error_detail?: string;
+  hint?: string;
 }
 
 export interface SlackThisOrgConnection {
@@ -96,6 +112,10 @@ export interface InstallationView {
   other_connected_orgs: number;
   health: SlackInstallationHealth;
   created_at: number;
+  scope: SlackInstallScope;
+  managed: boolean;
+  org_access?: SlackOrgAccessMode;
+  instance_help_contact?: string;
 }
 
 export interface SlackLinkingSummary {
@@ -288,10 +308,71 @@ export interface SlackUpgradeCandidate {
   destinations: SlackDestinationRef[];
 }
 
+/** The instance workspace that does not serve this org. */
+export interface SlackInstanceNotice {
+  installation_id: string;
+  team_name: string;
+  help_contact: string | null;
+}
+
 export interface SlackInstallationsResponse {
   installations: InstallationView[];
   available?: SlackAvailableInstallation[];
   upgrade_candidates?: SlackUpgradeCandidate[];
+  instance?: SlackInstanceNotice;
+}
+
+export interface SlackOrgAccessRow {
+  org_id: string;
+  org_name: string;
+  source: SlackConnectionSource;
+  added_by: string;
+  added_at: number;
+  channel_defaults: number;
+  links: number;
+  members: number;
+}
+
+export interface SlackOrgOption {
+  org_id: string;
+  org_name: string;
+  members: number;
+}
+
+/** What a save removes from one org; `channels` names its removed channel defaults. */
+export interface SlackOrgRemoval {
+  org_id: string;
+  org_name: string;
+  channels: string[];
+  links_moving: number;
+  links_unlinked: number;
+}
+
+export interface SlackOtherApp {
+  installation_id: string;
+  org_ids: string[];
+}
+
+/** Row 24; `organizations` is every org on the server, sorted by name. */
+export interface SlackOrgAccessView {
+  all: boolean;
+  orgs: SlackOrgAccessRow[];
+  other_apps_in_team: SlackOtherApp[];
+  organizations: SlackOrgOption[];
+  removed?: SlackOrgRemoval[];
+}
+
+/** Exactly one of `all: true` or `orgs`; `preview` writes nothing. */
+export interface SlackOrgAccessRequest {
+  all?: boolean;
+  orgs?: string[];
+  preview?: boolean;
+}
+
+export interface SlackTakeOverCandidate {
+  installation_id: string;
+  team_name: string;
+  org_ids: string[];
 }
 
 export interface SlackTestRequest {

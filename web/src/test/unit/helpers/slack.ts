@@ -16,7 +16,13 @@
 import { defineComponent } from "vue";
 import { createStore } from "vuex";
 import { vi } from "vitest";
-import type { InstallationView, LinkingView, SlackSettingsExchangeResponse } from "@/types/slack";
+import type {
+  InstallationView,
+  LinkingView,
+  SlackOrgAccessRow,
+  SlackOrgAccessView,
+  SlackSettingsExchangeResponse,
+} from "@/types/slack";
 
 // Shapes follow the ENT <-> OSS contract in docs/slack-app/PROGRESS-phase1.md (rows 9 and 11).
 export const installationView = (over: Partial<InstallationView> = {}): InstallationView => ({
@@ -46,6 +52,78 @@ export const installationView = (over: Partial<InstallationView> = {}): Installa
     as_of: 1_760_000_120_000_000,
   },
   created_at: 1_760_000_000_000_000,
+  scope: "org",
+  managed: false,
+  ...over,
+});
+
+/** The instance workspace as `_meta` sees it. */
+export const instanceView = (over: Partial<InstallationView> = {}): InstallationView =>
+  installationView({ scope: "instance", managed: false, org_access: "listed", ...over });
+
+/** The instance workspace as an org it serves sees it. */
+export const managedView = (over: Partial<InstallationView> = {}): InstallationView =>
+  installationView({
+    scope: "instance",
+    managed: true,
+    instance_help_contact: "#o2-platform",
+    ...over,
+  });
+
+const orgAccessRow = (over: Partial<SlackOrgAccessRow> = {}): SlackOrgAccessRow => ({
+  org_id: "prod",
+  org_name: "prod",
+  source: "instance",
+  added_by: "ashish@acme.example",
+  added_at: 1_760_600_000_000_000,
+  channel_defaults: 3,
+  links: 31,
+  members: 42,
+  ...over,
+});
+
+/** Row 24 in mockup M1: a listed instance workspace serving `_meta`, prod, staging and payments. */
+export const orgAccessView = (over: Partial<SlackOrgAccessView> = {}): SlackOrgAccessView => ({
+  all: false,
+  orgs: [
+    orgAccessRow({
+      org_id: "_meta",
+      org_name: "_meta",
+      source: "org",
+      added_at: 1_760_000_000_000_000,
+      channel_defaults: 0,
+      links: 2,
+      members: 4,
+    }),
+    orgAccessRow(),
+    orgAccessRow({
+      org_id: "staging",
+      org_name: "staging",
+      channel_defaults: 1,
+      links: 12,
+      members: 15,
+    }),
+    orgAccessRow({
+      org_id: "payments",
+      org_name: "payments",
+      source: "org",
+      added_by: "lee@acme.example",
+      channel_defaults: 2,
+      links: 7,
+      members: 9,
+    }),
+  ],
+  other_apps_in_team: [{ installation_id: "inst-labs", org_ids: ["labs"] }],
+  organizations: [
+    { org_id: "_meta", org_name: "_meta", members: 4 },
+    { org_id: "dev", org_name: "dev", members: 18 },
+    { org_id: "dev-sandbox", org_name: "dev-sandbox", members: 3 },
+    { org_id: "devops", org_name: "devops", members: 9 },
+    { org_id: "labs", org_name: "labs", members: 6 },
+    { org_id: "payments", org_name: "payments", members: 9 },
+    { org_id: "prod", org_name: "prod", members: 42 },
+    { org_id: "staging", org_name: "staging", members: 15 },
+  ],
   ...over,
 });
 

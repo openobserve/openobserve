@@ -153,6 +153,7 @@ fn from_model(model: Model) -> SlackOrgConnection {
         org_id: model.org_id,
         connected_by: model.connected_by,
         help_contact: model.help_contact,
+        source: Default::default(),
         created_at: model.created_at,
         updated_at: model.updated_at,
         origin_region: model.origin_region,
@@ -183,6 +184,7 @@ mod tests {
             updated_at: 200,
             origin_region: "default".to_string(),
             deleted_at: None,
+            ..Default::default()
         }
     }
 

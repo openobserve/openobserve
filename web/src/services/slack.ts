@@ -50,6 +50,8 @@ import type {
   SlackManifestParams,
   SlackMyLinksResponse,
   SlackOidcCallbackRequest,
+  SlackOrgAccessRequest,
+  SlackOrgAccessView,
   SlackPrerequisitesResponse,
   SlackServerManifest,
   SlackSignedRequest,
@@ -176,6 +178,18 @@ const slack = {
 
   putHelpContact: (org: string, id: string, body: { help_contact: string }) =>
     http().put<SlackHelpContact>(`${installation(org, id)}/help-contact`, body),
+
+  getOrgAccess: (org: string, id: string) =>
+    http().get<SlackOrgAccessView>(`${installation(org, id)}/org-access`),
+
+  putOrgAccess: (org: string, id: string, body: SlackOrgAccessRequest) =>
+    http().put<SlackOrgAccessView>(`${installation(org, id)}/org-access`, body),
+
+  previewOrgAccess: (org: string, id: string, body: SlackOrgAccessRequest) =>
+    http().put<SlackOrgAccessView>(`${installation(org, id)}/org-access`, {
+      ...body,
+      preview: true,
+    }),
 
   startLinkRequest: (org: string, requestId: string, body: SlackSignedRequest) =>
     http().post<SlackLinkRequestStartResponse>(

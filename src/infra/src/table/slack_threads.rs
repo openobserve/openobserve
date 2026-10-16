@@ -94,6 +94,13 @@ pub async fn delete_by_installation(installation_id: &str) -> Result<u64, Error>
     delete_by_installation_with(get_orm_client_rw().await, installation_id).await
 }
 
+pub async fn delete_by_installation_and_org(
+    installation_id: &str,
+    org_id: &str,
+) -> Result<u64, Error> {
+    delete_by_installation_and_org_with(get_orm_client_rw().await, installation_id, org_id).await
+}
+
 pub async fn put_with<C: ConnectionTrait>(conn: &C, row: &SlackThread) -> Result<(), Error> {
     let key = [Column::InstallationId, Column::ChannelId, Column::ThreadTs];
     Entity::insert(to_active(row)?)
@@ -199,6 +206,14 @@ pub async fn delete_by_installation_with<C: ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(result.rows_affected)
+}
+
+pub async fn delete_by_installation_and_org_with<C: ConnectionTrait>(
+    _conn: &C,
+    _installation_id: &str,
+    _org_id: &str,
+) -> Result<u64, Error> {
+    Err(Error::Message("slack iw: not implemented".into()))
 }
 
 async fn touch_columns<C: ConnectionTrait>(

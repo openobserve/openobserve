@@ -288,6 +288,8 @@ fn from_model(model: Model, key: Option<&[u8]>) -> Result<SlackInstallation, Err
         auto_link_enabled: model.auto_link_enabled,
         auto_link_domains: parse_json("auto_link_domains", Some(&model.auto_link_domains))?,
         mode: parse_enum("mode", &model.mode)?,
+        scope: Default::default(),
+        org_access: Default::default(),
         home_region: model.home_region,
         installed_by: model.installed_by,
         installed_org_id: model.installed_org_id,
@@ -353,6 +355,7 @@ mod tests {
             origin_region: "default".to_string(),
             deleted_at: None,
             credentials_readable: true,
+            ..Default::default()
         }
     }
 

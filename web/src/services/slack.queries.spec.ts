@@ -30,12 +30,15 @@ import {
   linkAllMutation,
   putChannelDefaultMutation,
   putHelpContactMutation,
+  putOrgAccessMutation,
+  previewOrgAccessMutation,
   slackChannelsQuery,
   slackInstallationsQuery,
   slackLinkMatchesQuery,
   slackLinksQuery,
   slackManifestQuery,
   slackMyLinksQuery,
+  slackOrgAccessQuery,
   uninstallInstallationMutation,
   updateCredentialsMutation,
   updateLinkingMutation,
@@ -68,6 +71,9 @@ vi.mock("./slack", () => {
     "deleteLink",
     "listLinks",
     "getManifest",
+    "getOrgAccess",
+    "putOrgAccess",
+    "previewOrgAccess",
   ];
   return { default: Object.fromEntries(names.map((name) => [name, vi.fn(ok)])) };
 });
@@ -183,6 +189,13 @@ describe("slack queries", () => {
     expect(slack.listLinks).toHaveBeenCalledWith(ORG, { installation_id: ID, cursor: "c3" });
   });
 
+  it("slackOrgAccessQuery reads the org-access path", async () => {
+    await (slackOrgAccessQuery(ORG, ID).queryFn as any)();
+    expect(slack.getOrgAccess).toHaveBeenCalledWith(ORG, ID);
+    expect(slackOrgAccessQuery(ORG, ID).queryKey).toEqual(slackKeys.orgAccess(ORG, ID));
+    expect(slackKeys.orgAccess(ORG, ID).slice(0, 5)).toEqual([...slackKeys.installation(ORG, ID)]);
+  });
+
   it("asks for the manifest with the chosen mode, name and history option", async () => {
     const params = { mode: "http" as const, name: "OpenObserve", channel_history: false };
     await (slackManifestQuery(ORG, params).queryFn as any)();
@@ -268,6 +281,26 @@ describe("slack mutations", () => {
       slackKeys.channelDefaults(ORG, ID),
       slackKeys.channelDefault(ORG, ID, "C1"),
     ]);
+  });
+
+  it("putOrgAccessMutation invalidates org access and installations", async () => {
+    queryClient.setQueryData(slackKeys.orgAccess(ORG, ID), {});
+    queryClient.setQueryData(slackKeys.orgAccess(ORG, ID2), {});
+    await run(putOrgAccessMutation(ORG, ID), { orgs: ["_meta", ORG] });
+
+    expect(slack.putOrgAccess).toHaveBeenCalledWith(ORG, ID, { orgs: ["_meta", ORG] });
+    expect(isInvalidated(slackKeys.orgAccess(ORG, ID))).toBe(true);
+    expect(isInvalidated(slackKeys.orgAccess(ORG, ID2))).toBe(false);
+    expect(invalidatedOf()).toEqual([slackKeys.installations(ORG)]);
+  });
+
+  it("previewOrgAccessMutation asks for the preview and invalidates nothing", async () => {
+    queryClient.setQueryData(slackKeys.orgAccess(ORG, ID), {});
+    await run(previewOrgAccessMutation(ORG, ID), { orgs: ["_meta"] });
+
+    expect(slack.previewOrgAccess).toHaveBeenCalledWith(ORG, ID, { orgs: ["_meta"] });
+    expect(isInvalidated(slackKeys.orgAccess(ORG, ID))).toBe(false);
+    expect(invalidatedOf()).toEqual([]);
   });
 
   it("help contact drops only that installation's help contact", async () => {
