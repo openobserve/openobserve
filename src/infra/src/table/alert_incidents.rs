@@ -73,6 +73,23 @@ fn new_incident(
     }
 }
 
+/// Inserts `incident` unless its id is taken, so a redelivered create is a no-op.
+async fn create_row_if_absent<C: ConnectionTrait>(
+    conn: &C,
+    incident: alert_incidents::ActiveModel,
+) -> Result<bool, errors::Error> {
+    let inserted = alert_incidents::Entity::insert(incident)
+        .on_conflict(
+            OnConflict::column(alert_incidents::Column::Id)
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec_without_returning(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(inserted == 1)
+}
+
 /// Get incident by ID
 pub async fn get(org_id: &str, id: &str) -> Result<Option<alert_incidents::Model>, errors::Error> {
     let client = get_orm_client_ro().await;
@@ -168,23 +185,6 @@ pub async fn create_with_id(
     );
     incident.id = Set(id.to_string());
     create_row_if_absent(get_orm_client_rw().await, incident).await
-}
-
-/// Inserts `incident` unless its id is taken, so a redelivered create is a no-op.
-async fn create_row_if_absent<C: ConnectionTrait>(
-    conn: &C,
-    incident: alert_incidents::ActiveModel,
-) -> Result<bool, errors::Error> {
-    let inserted = alert_incidents::Entity::insert(incident)
-        .on_conflict(
-            OnConflict::column(alert_incidents::Column::Id)
-                .do_nothing()
-                .to_owned(),
-        )
-        .exec_without_returning(conn)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    Ok(inserted == 1)
 }
 
 /// Opens an incident and points an on-call record at it, in one transaction.
@@ -419,7 +419,7 @@ pub async fn acknowledge(
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    get(org_id, id).await
+    get_rw(org_id, id).await
 }
 
 /// Clears the mute only while it names `downtime_id`, so one of two concurrent firings sees `true`.

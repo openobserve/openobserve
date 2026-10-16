@@ -1001,6 +1001,8 @@ impl IncidentEvent {
 mod tests {
     use super::*;
 
+    const MIN: i64 = 60_000_000;
+
     /// A node that predates an event type must still recover the whole timeline.
     ///
     /// Without the `Unknown` catch-all the array parse fails on the first unrecognized
@@ -1828,8 +1830,6 @@ mod tests {
             DimensionRelationship::NewIsSuperset
         );
     }
-
-    const MIN: i64 = 60_000_000;
 
     #[test]
     fn test_correlation_windows_from_minutes() {

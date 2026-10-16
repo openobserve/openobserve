@@ -289,6 +289,15 @@ describe("OInlineEdit", () => {
     });
   });
 
+  it("lets the value wrap below md only when asked", () => {
+    const value = (props: Record<string, unknown>) =>
+      mountInlineEdit(props).find('[data-test="name-value"]');
+
+    expect(value({ wrap: true }).classes()).toContain("max-md:whitespace-normal");
+    expect(value({ wrap: true, readonly: true }).classes()).toContain("max-md:whitespace-normal");
+    expect(value({}).classes()).not.toContain("max-md:whitespace-normal");
+  });
+
   it("shows the trail slot in display mode only", async () => {
     const wrapper = mount(OInlineEdit, {
       props: { modelValue: "Panel one", "data-test": "name" },

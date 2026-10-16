@@ -309,15 +309,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
             <OTooltip :content="t('alerts.alertSettings.createsIncidentTooltip')" side="right" />
           </div>
-          <div class="flex flex-col gap-1">
+          <div class="flex items-center gap-2">
             <OFormSwitch name="creates_incident" data-test="alert-creates-incident-toggle" />
-            <span
+            <OPopover
               v-if="perGroupIncidents"
-              class="text-text-secondary text-xs"
-              data-test="alert-creates-incident-per-group-hint"
+              v-model:open="perGroupHintOpen"
+              side="bottom"
+              align="start"
+              :aria-label="t('alerts.alertSettings.createsIncidentPerGroupAbout')"
             >
-              {{ t("alerts.alertSettings.createsIncidentPerGroupHint") }}
-            </span>
+              <template #trigger>
+                <OButton
+                  variant="ghost"
+                  size="xs"
+                  icon-left="info-outline"
+                  data-test="alert-creates-incident-per-group-hint-trigger"
+                >
+                  <span class="max-md:sr-only">{{
+                    t("alerts.alertSettings.createsIncidentPerGroupAbout")
+                  }}</span>
+                </OButton>
+              </template>
+              <p
+                class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
+                data-test="alert-creates-incident-per-group-hint"
+              >
+                <OText variant="meta">{{
+                  t("alerts.alertSettings.createsIncidentPerGroupHint")
+                }}</OText>
+              </p>
+            </OPopover>
           </div>
         </div>
 
@@ -418,6 +439,9 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OText from "@/lib/core/Typography/OText.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
@@ -433,6 +457,9 @@ export default defineComponent({
     OSelect,
     OTooltip,
     OIcon,
+    OButton,
+    OText,
+    OPopover,
     AlertDestinationsField,
   },
   props: {
@@ -551,13 +578,14 @@ export default defineComponent({
     const setFV = (name: string, value: any): void => {
       form?.setFieldValue?.(name, value);
     };
-    // Per-group alerting with incidents opens one incident per group, capped per evaluation.
+    // PromQL keeps its per-series flag outside `aggregation`, so both shapes are checked.
     const perGroupIncidents = computed(
       () =>
         !!fv("creates_incident") &&
         (!!fv("query_condition.aggregation.multi_alert") ||
           !!fv("query_condition.promql_multi_alert")),
     );
+    const perGroupHintOpen = ref(false);
 
     // Pending period — TWO values, same split as QueryConfig's Check every:
     //   • pendingPeriodUnit + `_ui.pendingPeriod` → the DISPLAY unit/value.
@@ -746,6 +774,7 @@ export default defineComponent({
       store,
       incidentsEnabled,
       perGroupIncidents,
+      perGroupHintOpen,
       handlePeriodChange,
       // Field refs for the parent focus manager
       periodFieldRef,

@@ -35,6 +35,7 @@ const props = withDefaults(defineProps<InlineEditProps>(), {
   disabled: false,
   readonly: false,
   error: false,
+  wrap: false,
   submitOnEnter: true,
 });
 
@@ -189,6 +190,10 @@ const textClasses = computed(() => {
   return `${scale} leading-[1.45] font-semibold tracking-[-0.02em]`;
 });
 
+const wrapClasses = computed(() =>
+  props.wrap ? "max-md:overflow-visible max-md:break-words max-md:whitespace-normal" : "",
+);
+
 /** Colour of a filled value — headings lead, meta values recede. */
 const valueToneClass = computed(() =>
   props.tone === "meta" ? "text-text-secondary" : "text-text-heading",
@@ -276,6 +281,7 @@ defineExpose({ focus: startEdit });
           'ring-transparent',
           BOX_CLASSES,
           textClasses,
+          wrapClasses,
           isEmpty ? 'text-text-placeholder' : valueToneClass,
         ]"
         :data-test="dataTest ? `${dataTest}-value` : undefined"
@@ -312,6 +318,7 @@ defineExpose({ focus: startEdit });
         <OTruncatedText
           :class="[
             textClasses,
+            wrapClasses,
             isEmpty ? 'text-text-placeholder' : error ? 'text-input-error-text' : valueToneClass,
           ]"
           :data-test="dataTest ? `${dataTest}-value` : undefined"

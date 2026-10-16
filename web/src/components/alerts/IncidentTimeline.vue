@@ -134,12 +134,12 @@ const isCommentEvent = (event: any): boolean => {
 // Get user ID from event. `SYSTEM_USER_ID` is a stable sentinel, never display
 // text — the guards below and getAvatarColor() compare against it.
 const SYSTEM_USER_ID = "System";
-// The account automatic changes are made as (stale sweep, recovery), never a person.
-const SYSTEM_ACTOR_EMAIL = "system@openobserve.ai";
+// The ids automatic changes are written as (stale sweep, recovery, a muted resolve's comment), never a person.
+const SYSTEM_ACTOR_IDS = new Set(["system@openobserve.ai", "system"]);
 
 const getUserId = (event: any): string => {
   const userId = event.data?.user_id;
-  return !userId || userId === SYSTEM_ACTOR_EMAIL ? SYSTEM_USER_ID : userId;
+  return !userId || SYSTEM_ACTOR_IDS.has(userId) ? SYSTEM_USER_ID : userId;
 };
 
 // Get current user ID

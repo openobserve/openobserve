@@ -18,9 +18,6 @@ import { getUUID } from "@/utils/uuid";
 
 export type IncidentViewAction = "ack" | "resolve" | "comment" | "analyze";
 
-/** How often the age of the shown data is sampled while the page is visible. */
-export const DATA_AGE_SAMPLE_MS = 5000;
-
 interface ViewedIncident {
   id: string;
   severity: string;
@@ -45,7 +42,6 @@ export function useIncidentViewSummary() {
   // The incident the drawer shows, kept across a hidden tab so the view can resume.
   let shown: ViewedIncident | null = null;
   let lastFetchAt = 0;
-  let sampler: ReturnType<typeof setInterval> | null = null;
 
   const sampleDataAge = () => {
     if (!view || document.visibilityState !== "visible") return;
@@ -68,8 +64,6 @@ export function useIncidentViewSummary() {
       data_age_max_s: view.dataAgeMaxS,
     });
     view = null;
-    if (sampler) clearInterval(sampler);
-    sampler = null;
   };
 
   const open = (incident: ViewedIncident) => {
@@ -84,7 +78,6 @@ export function useIncidentViewSummary() {
       firstAction: null,
       firstActionMs: null,
     };
-    sampler = setInterval(sampleDataAge, DATA_AGE_SAMPLE_MS);
   };
 
   const onVisibilityChange = () => {
@@ -94,6 +87,8 @@ export function useIncidentViewSummary() {
 
   // A reload of the same incident only refreshes the data clock; another incident is a new view.
   const start = (incident: ViewedIncident) => {
+    // Data age only grows between fetches, so the age before this one resets the clock is the max.
+    sampleDataAge();
     lastFetchAt = Date.now();
     if (shown?.id === incident.id && view) return;
     finish();

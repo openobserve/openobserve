@@ -99,6 +99,9 @@ import incidentsService, {
 } from "@/services/incidents";
 import serviceStreamsApi, { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import oncallService from "@/services/oncall";
+import { oncallKeys } from "@/services/oncall.querykeys";
+import { incidentKeys } from "@/services/incidents.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -1914,6 +1917,26 @@ describe("IncidentDetailDrawer.vue", () => {
       await wrapper.vm.resolveIncident();
       await flushPromises();
       expect(reads()).toBe(before + 2);
+
+      mockConfirm.mockResolvedValue(true);
+      (incidentsService.updateStatus as any).mockResolvedValue({ data: { status: "open" } });
+      await wrapper.vm.reopenIncident();
+      await flushPromises();
+      expect(reads()).toBe(before + 3);
+    });
+
+    // The server moves the incident's pages with its status, so the write itself expires both domains.
+    it("expires the incident and on-call scopes from the status write", async () => {
+      wrapper = await withRecords([record()]);
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+      (incidentsService.updateStatus as any).mockResolvedValue({ data: { status: "resolved" } });
+
+      await wrapper.vm.resolveIncident();
+      await flushPromises();
+
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: incidentKeys.all("default") });
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: oncallKeys.responsesAll("default") });
+      invalidate.mockRestore();
     });
   });
 
@@ -1936,12 +1959,15 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "open");
     });
 
-    it("asks the same confirm for the Open chip on an acknowledged incident", async () => {
+    it("asks to withdraw the acknowledgement for the Open chip on an acknowledged incident", async () => {
       wrapper.vm.incidentDetails.status = "acknowledged";
       wrapper.vm.editableStatus = "acknowledged";
       await wrapper.vm.handleStatusChange("open");
       expect(mockConfirm).toHaveBeenCalledTimes(1);
-      expect(mockConfirm.mock.calls[0][0].title).toBe("Reopen incident?");
+      expect(mockConfirm.mock.calls[0][0]).toMatchObject({
+        title: "Withdraw acknowledgement?",
+        confirmLabel: "Withdraw",
+      });
       expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "open");
     });
 

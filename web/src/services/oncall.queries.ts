@@ -589,11 +589,12 @@ const responseAndTeamScopes = (org: string) => [
   oncallKeys.teamsAll(org),
 ];
 
+/** The server carries the ack onto the page's incident, so the incident list and detail move too. */
 export const acknowledgeResponseMutation = (org: string) =>
   mutationOptions({
     mutationFn: (responseId: string) =>
       oncallService.acknowledgeResponse({ org_identifier: org, response_id: responseId }),
-    meta: { invalidates: responseWriteScopes(org), silentError: true },
+    meta: { invalidates: [...responseWriteScopes(org), incidentKeys.all(org)], silentError: true },
   });
 
 /** The ladder resumes on its own when the snooze lapses — see the live tier on the reads. */
@@ -608,6 +609,7 @@ export const snoozeResponseMutation = (org: string) =>
     meta: { invalidates: responseWriteScopes(org), silentError: true },
   });
 
+/** The server carries the resolve onto the page's incident, so the incident list and detail move too. */
 export const resolveResponseMutation = (org: string) =>
   mutationOptions({
     mutationFn: ({
@@ -625,7 +627,10 @@ export const resolveResponseMutation = (org: string) =>
         cause,
         cause_note: causeNote,
       }),
-    meta: { invalidates: responseAndTeamScopes(org), silentError: true },
+    meta: {
+      invalidates: [...responseAndTeamScopes(org), incidentKeys.all(org)],
+      silentError: true,
+    },
   });
 
 export const handoffResponseMutation = (org: string) =>

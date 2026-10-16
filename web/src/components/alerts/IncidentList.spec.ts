@@ -63,6 +63,8 @@ import IncidentList from "./IncidentList.vue";
 import incidentsService from "@/services/incidents";
 import downtimesService from "@/services/downtimes";
 import { queryClient } from "@/composables/query/queryClient";
+import { incidentKeys } from "@/services/incidents.querykeys";
+import { oncallKeys } from "@/services/oncall.querykeys";
 import type { Incident } from "@/services/incidents";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -454,6 +456,26 @@ describe("IncidentList.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", incident.id, "open");
     });
 
+    it("reopenIncident writes nothing when the confirm is cancelled", async () => {
+      const incident = (wrapper.vm as any).allIncidents[0];
+      mockConfirm.mockClear();
+      mockConfirm.mockResolvedValueOnce(false);
+      await (wrapper.vm as any).reopenIncident(incident);
+      await flushPromises();
+      expect(mockConfirm.mock.calls[0][0].title).toBe("Reopen incident?");
+      expect(incidentsService.updateStatus).not.toHaveBeenCalled();
+    });
+
+    it("reopenIncident writes once the confirm is accepted", async () => {
+      const incident = (wrapper.vm as any).allIncidents[0];
+      mockConfirm.mockClear();
+      mockConfirm.mockResolvedValueOnce(true);
+      await (wrapper.vm as any).reopenIncident(incident);
+      await flushPromises();
+      expect(mockConfirm).toHaveBeenCalledTimes(1);
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", incident.id, "open");
+    });
+
     it("reloads incidents after successful status update", async () => {
       const incident = (wrapper.vm as any).allIncidents[0];
       vi.clearAllMocks();
@@ -465,6 +487,20 @@ describe("IncidentList.vue", () => {
       await flushPromises();
       expect(incidentsService.list).toHaveBeenCalled();
     });
+
+    // A row action moves the incident's on-call pages server-side, the same as the drawer's buttons.
+    it.each(["acknowledgeIncident", "resolveIncident", "reopenIncident"])(
+      "%s expires the incident and on-call scopes",
+      async (action) => {
+        const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+        const incident = (wrapper.vm as any).allIncidents[0];
+        await (wrapper.vm as any)[action](incident);
+        await flushPromises();
+        expect(invalidate).toHaveBeenCalledWith({ queryKey: incidentKeys.all("default") });
+        expect(invalidate).toHaveBeenCalledWith({ queryKey: oncallKeys.responsesAll("default") });
+        invalidate.mockRestore();
+      },
+    );
 
     it("handles updateStatus error without crashing", async () => {
       (incidentsService.updateStatus as any).mockRejectedValue(new Error("Update failed"));

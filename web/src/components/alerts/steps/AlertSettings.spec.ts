@@ -377,20 +377,36 @@ describe("AlertSettings — Creates Incident toggle visibility", () => {
     ["a per-series PromQL alert", { promql_multi_alert: true }, true, true],
     ["a per-group alert without incidents", { aggregation: { multi_alert: true } }, false, false],
     ["an ordinary alert with incidents", {}, true, false],
-  ])("explains per-group incidents for %s", (_label, queryCondition, createsIncident, shown) => {
-    config.isEnterprise = "true";
-    config.isCloud = "false";
-    const host = mount(
-      makeDescendantHost("false", {
-        creates_incident: createsIncident,
-        query_condition: queryCondition,
-      }),
-      { global: { plugins: [makeStore({ incidents_enabled: true }), i18n] } },
-    );
-    const hint = host.find('[data-test="alert-creates-incident-per-group-hint"]');
-    expect(hint.exists()).toBe(shown);
-    if (shown) expect(hint.text()).toContain("One incident per group");
-  });
+  ])(
+    "offers the per-group explainer for %s",
+    async (_label, queryCondition, createsIncident, shown) => {
+      config.isEnterprise = "true";
+      config.isCloud = "false";
+      const host = mount(
+        makeDescendantHost("false", {
+          creates_incident: createsIncident,
+          query_condition: queryCondition,
+        }),
+        {
+          attachTo: document.body,
+          global: { plugins: [makeStore({ incidents_enabled: true }), i18n] },
+        },
+      );
+      const trigger = host.find('[data-test="alert-creates-incident-per-group-hint-trigger"]');
+      expect(trigger.exists()).toBe(shown);
+      // Reference copy, so it waits behind the "About" button rather than sitting under the switch.
+      const hint = () =>
+        document.body.querySelector('[data-test="alert-creates-incident-per-group-hint"]');
+      expect(hint()).toBeNull();
+      if (shown) {
+        expect(trigger.text()).toBe("About per-group incidents");
+        await trigger.trigger("click");
+        await flushPromises();
+        expect(hint()?.textContent).toContain("One incident per group");
+      }
+      host.unmount();
+    },
+  );
 
   it("appears once /config reports incidents enabled", async () => {
     config.isEnterprise = "true";

@@ -46,6 +46,7 @@ defineExpose({ focus: () => inlineEditRef.value?.focus() });
         :disabled="props.disabled"
         :readonly="props.readonly"
         :submit-on-enter="props.submitOnEnter"
+        :wrap="props.wrap"
         :error="field.state.meta.errors.length > 0"
         :error-message="
           field.state.meta.errors.length > 0

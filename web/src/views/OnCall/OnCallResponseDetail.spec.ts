@@ -957,6 +957,17 @@ describe("OnCallResponseDetail", () => {
       ).toBeDefined();
     });
 
+    /// An unrouted page has no team and so no policy to climb.
+    it("is disabled on an unrouted page and says why", async () => {
+      const wrapper = await renderWith({ team_id: null });
+      const button = wrapper.find('[data-test="oncall-response-escalate-btn"]');
+
+      expect(button.attributes("disabled")).toBeDefined();
+      await button.trigger("click");
+      expect(service.escalateNow).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain("Not routed to a team, so there is no policy");
+    });
+
     /// A disabled button that does not say why is a dead end.
     it("explains why escalate is disabled once the ladder is exhausted", async () => {
       service.escalationProgress.mockResolvedValue({
@@ -1466,6 +1477,14 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
       const item = wrapper.find('[data-test="oncall-response-escalate-btn-menu"]');
       expect(item.attributes("disabled")).toBeDefined();
       expect(item.text()).toContain("nobody left to escalate to");
+    });
+
+    it("disables escalate in the menu for an unrouted page and says why", async () => {
+      const wrapper = await renderWith({ team_id: null });
+
+      const item = wrapper.find('[data-test="oncall-response-escalate-btn-menu"]');
+      expect(item.attributes("disabled")).toBeDefined();
+      expect(item.text()).toContain("hand it off instead");
     });
 
     it("drops the menu when a closed page is already tied to an incident", async () => {

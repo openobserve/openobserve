@@ -404,8 +404,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- No team means nothing claimed it, which is a routing bug rather than
            a blank cell. -->
       <template #cell-team="{ row }">
-        <OTag v-if="!row.latest.team_id" variant="error-soft" size="sm">
-          {{ t("oncall.statUnrouted") }}
+        <OTag
+          v-if="!row.latest.team_id"
+          variant="error-soft"
+          size="sm"
+          :data-test="`oncall-row-unrouted-${row.rowKey}`"
+        >
+          {{ t("oncall.notRoutedToTeam") }}
         </OTag>
         <!-- The team is a destination, not a label: "who else is on this
              rotation" is the question after "who owns this page", and it lives
@@ -1222,7 +1227,9 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     header: t("oncall.team"),
     size: 160,
     accessorFn: (row: PageRow) =>
-      teamNameById.value[row.latest.team_id] ?? row.latest.team_id ?? "",
+      row.latest.team_id
+        ? (teamNameById.value[row.latest.team_id] ?? row.latest.team_id)
+        : t("oncall.notRoutedToTeam"),
     sortable: true,
     hideable: true,
   },
@@ -1354,7 +1361,7 @@ const mineScope = computed(() => mineOnly.value && !!viewerEmail.value);
 /// after handover.
 function isMine(record: OnCallResponse): boolean {
   return (
-    myTeamIds.value.has(record.team_id) ||
+    (!!record.team_id && myTeamIds.value.has(record.team_id)) ||
     (!!record.acked_by && record.acked_by.toLowerCase() === viewerEmail.value)
   );
 }
@@ -1461,17 +1468,15 @@ function ackedInMicros(record: OnCallResponse): number | null {
 
 /// The channels this record's priority pages on, per its team's policy.
 function channelsFor(record: OnCallResponse): Channel[] {
-  return (
-    policyByTeam.value[record.team_id]?.rungs.find((rung) => rung.priority === record.priority)
-      ?.channels ?? []
-  );
+  const policy = record.team_id ? policyByTeam.value[record.team_id] : undefined;
+  return policy?.rungs.find((rung) => rung.priority === record.priority)?.channels ?? [];
 }
 
 /// Rungs the team's policy defines for THIS record's priority — the "of 3" in
 /// "Level 2 of 3". Undefined when the policy could not be read, which the cell
 /// renders as a level with no denominator rather than a guessed total.
 function totalRungsFor(record: OnCallResponse): number | null {
-  const rungs = policyByTeam.value[record.team_id]?.rungs ?? [];
+  const rungs = (record.team_id ? policyByTeam.value[record.team_id]?.rungs : undefined) ?? [];
   return rungs.find((rung) => rung.priority === record.priority)?.steps.length ?? null;
 }
 

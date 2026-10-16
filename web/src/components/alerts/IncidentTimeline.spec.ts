@@ -209,6 +209,16 @@ describe("IncidentTimeline - getUserId", () => {
       "alice@example.com",
     );
   });
+
+  it("renders the bare system id a muted resolve comments as as a System row", async () => {
+    const w = await mountComp();
+    await flushPromises();
+    const vm = w.vm as any;
+    const muted = { type: "Comment", data: { user_id: "system", comment: "muted" } };
+    const unattributed = { type: "Comment", data: { comment: "muted" } };
+    expect(vm.getUserId(muted)).toBe("System");
+    expect(vm.getEventLayout(muted)).toBe(vm.getEventLayout(unattributed));
+  });
 });
 
 describe("IncidentTimeline - getEventIcon", () => {

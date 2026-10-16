@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInlineEdit
           v-if="incidentDetails"
           :model-value="incidentDetails.title ?? ''"
-          class="max-md:[&_.truncate]:overflow-visible max-md:[&_.truncate]:break-words max-md:[&_.truncate]:whitespace-normal"
+          wrap
           data-test="incident-detail-title"
           :aria-label="t('alerts.incidents.title_field')"
           :edit-hint="t('alerts.incidents.editIncidentTitleTooltip')"
@@ -1130,7 +1130,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                           </div>
 
-                          <!-- Group by, for a per-group alert -->
                           <div
                             v-if="!isSelectedComposite && selectedAlertFacts?.groupBy"
                             class="flex flex-col gap-0.5"
@@ -1660,9 +1659,9 @@ export default defineComponent({
 
     const loading = ref(false);
     const updating = ref(false);
-    // Backend also returns a top-level correlation_reason not declared on IncidentWithAlerts.
     const viewSummary = useIncidentViewSummary();
     const recordCommentPosted = () => viewSummary.recordAction("comment");
+    // Backend also returns a top-level correlation_reason not declared on IncidentWithAlerts.
     const incidentDetails = ref<(IncidentWithAlerts & { correlation_reason?: string }) | null>(
       null,
     );
@@ -1737,7 +1736,8 @@ export default defineComponent({
       }
     }
 
-    const oncallTeamNameFor = (teamId: string) => oncallTeamNames.value[teamId] ?? teamId;
+    const oncallTeamNameFor = (teamId: string | null) =>
+      teamId ? (oncallTeamNames.value[teamId] ?? teamId) : t("oncall.notRoutedToTeam");
 
     const oncallTeamName = computed(() =>
       oncallResponse.value ? oncallTeamNameFor(oncallResponse.value.team_id) : "",
@@ -2826,13 +2826,7 @@ export default defineComponent({
         // Mark data as stale so incident list will refresh when navigating back
         store.dispatch("incidents/setShouldRefresh", true);
         emit("status-updated");
-        // A status change acks, re-arms or closes the page server-side, so the panel must reread it.
-        await queryClient.invalidateQueries({
-          queryKey: responsesForIncidentQuery(
-            store.state.selectedOrganization.identifier,
-            incidentDetails.value.id,
-          ).queryKey,
-        });
+        // The panel holds a copy, not the query, so it must reread the pages the mutation expired.
         void loadOnCallResponse(
           store.state.selectedOrganization.identifier,
           incidentDetails.value.id,
@@ -2847,11 +2841,13 @@ export default defineComponent({
         if (newStatus === "open" && incidentDetails.value?.id) {
           await checkAnalysisInFlight(incidentDetails.value.id);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
         toast({
           variant: "error",
-          message: error?.response?.data?.message || t("alerts.incidents.statusUpdateFailed"),
+          message:
+            raw(isAxiosError(error) ? error.response?.data?.message : undefined) ||
+            t("alerts.incidents.statusUpdateFailed"),
         });
       } finally {
         updating.value = false;
@@ -2871,13 +2867,20 @@ export default defineComponent({
       return updateStatus("acknowledged");
     };
     const resolveIncident = () => updateStatus("resolved");
-    // Back to open re-pages the on-call team, from a reopen and from a withdrawn acknowledgement alike.
+    // Back to open re-pages the on-call team; an acknowledged incident is withdrawn, not reopened.
     const reopenIncident = async () => {
+      const withdrawing = incidentDetails.value?.status === "acknowledged";
       const ok = await confirm({
-        title: t("alerts.incidents.reopenConfirmTitle"),
-        message: t("alerts.incidents.reopenConfirmMessage"),
-        confirmLabel: t("alerts.incidents.reopenConfirmLabel"),
-        cancelLabel: t("alerts.incidents.acknowledgeConfirmCancelLabel"),
+        title: withdrawing
+          ? t("alerts.incidents.withdrawAckConfirmTitle")
+          : t("alerts.incidents.reopenConfirmTitle"),
+        message: withdrawing
+          ? t("alerts.incidents.withdrawAckConfirmMessage")
+          : t("alerts.incidents.reopenConfirmMessage"),
+        confirmLabel: withdrawing
+          ? t("alerts.incidents.withdrawAckConfirmLabel")
+          : t("alerts.incidents.reopenConfirmLabel"),
+        cancelLabel: t("common.cancel"),
         persistent: false,
       });
       if (!ok) return;

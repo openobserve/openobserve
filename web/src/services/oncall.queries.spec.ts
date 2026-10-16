@@ -16,16 +16,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { queryClient } from "@/composables/query/queryClient";
 import {
+  acknowledgeResponseMutation,
   createOwnershipRuleMutation,
   deleteOwnershipRuleMutation,
   oncallTeamsQuery,
   pagedResponsesQuery,
+  resolveResponseMutation,
   responsesQuery,
   routingConfigQuery,
   updateOwnershipRuleMutation,
   updateTeamMutation,
 } from "./oncall.queries";
 import { oncallKeys } from "./oncall.querykeys";
+import { incidentKeys } from "./incidents.querykeys";
 import oncallService from "./oncall";
 
 vi.mock("./oncall", () => ({
@@ -34,6 +37,8 @@ vi.mock("./oncall", () => ({
     listTeams: vi.fn().mockResolvedValue({ data: [{ id: "t1", name: "Payments" }] }),
     getRoutingConfig: vi.fn().mockResolvedValue({ data: { default_team_id: "t1" } }),
     listResponses: vi.fn().mockResolvedValue({ data: [{ id: "r1" }] }),
+    acknowledgeResponse: vi.fn().mockResolvedValue({ data: {} }),
+    resolveResponse: vi.fn().mockResolvedValue({ data: {} }),
   },
 }));
 
@@ -162,5 +167,23 @@ describe("the team page's pages and the Pages list", () => {
     expect(
       queryClient.getQueryState(pagedResponsesQuery(ORG, FILTERS).queryKey)?.isInvalidated,
     ).toBe(true);
+  });
+});
+
+describe("acknowledging or resolving a page", () => {
+  // The server carries the ack or resolve onto the page's incident.
+  it.each([
+    ["acknowledge", () => acknowledgeResponseMutation(ORG), "r1"],
+    ["resolve", () => resolveResponseMutation(ORG), { responseId: "r1" }],
+  ])("expires the incidents scope on %s", async (_name, options, vars) => {
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    await queryClient
+      .getMutationCache()
+      .build(queryClient, options() as any)
+      .execute(vars as any);
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: incidentKeys.all(ORG) });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: oncallKeys.responsesAll(ORG) });
+    invalidate.mockRestore();
   });
 });

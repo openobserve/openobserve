@@ -16,6 +16,7 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import incidents from "./incidents";
 import { incidentKeys } from "./incidents.querykeys";
+import { oncallKeys } from "./oncall.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const incidentsQuery = (org: string, status: string, limit: number, offset: number) =>
@@ -39,8 +40,17 @@ export const updateIncidentStatusMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { id: string; status: "open" | "acknowledged" | "resolved" }) =>
       incidents.updateStatus(org, vars.id, vars.status),
-    // The drawer reads the response to update its own header and toasts itself.
-    meta: { invalidates: [incidentKeys.all(org)], silentError: true },
+    // The server acks, re-arms or closes the incident's on-call pages with it; `meta` is static, so the whole responses scope drops.
+    meta: {
+      invalidates: [
+        incidentKeys.all(org),
+        oncallKeys.responsesAll(org),
+        oncallKeys.myAll(org),
+        oncallKeys.teamsAll(org),
+      ],
+      // The drawer reads the response to update its own header and toasts itself.
+      silentError: true,
+    },
   });
 
 export const updateIncidentMutation = (org: string) =>

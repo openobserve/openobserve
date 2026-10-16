@@ -359,9 +359,7 @@ pub async fn record_alert_with<C: TransactionTrait>(
     let model = lock_row(&txn, org_id, incident_id).await?;
     let mut events = decode_events(org_id, incident_id, &model.events);
 
-    // Scan backwards through the trailing block of Alert events.
-    // If a matching alert_id is found within that block, increment it.
-    // Stop (and append) as soon as a non-Alert event is encountered.
+    // Only the trailing run of Alert events compacts; any other event ends the run.
     let compacted = 'scan: {
         for event in events.iter_mut().rev() {
             if !event.is_alert() {

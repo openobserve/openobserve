@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { openobserveRum } from "@openobserve/browser-rum";
-import { DATA_AGE_SAMPLE_MS, useIncidentViewSummary } from "./useIncidentViewSummary";
+import { useIncidentViewSummary } from "./useIncidentViewSummary";
 
 vi.mock("@openobserve/browser-rum", () => ({
   openobserveRum: { addAction: vi.fn(), getInitConfiguration: vi.fn() },
@@ -83,12 +83,12 @@ describe("useIncidentViewSummary", () => {
     expect(summaries()[0]).toMatchObject({ first_action: "none", first_action_ms: null });
   });
 
-  it("samples the age of the shown data every few seconds while visible", () => {
+  it("reports the longest the shown data went without a refetch", () => {
     const view = useIncidentViewSummary();
     view.start(incident());
-    vi.advanceTimersByTime(DATA_AGE_SAMPLE_MS * 3);
+    vi.advanceTimersByTime(15_000);
     view.start(incident());
-    vi.advanceTimersByTime(DATA_AGE_SAMPLE_MS);
+    vi.advanceTimersByTime(5_000);
     view.end();
 
     expect(summaries()).toHaveLength(1);

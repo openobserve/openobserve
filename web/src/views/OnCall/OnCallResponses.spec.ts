@@ -1014,6 +1014,16 @@ describe("OnCallResponses", () => {
     );
   });
 
+  /// An unrouted page has no owner to name, so the cell says so instead of staying blank.
+  it("says an unrouted page is not routed to a team", async () => {
+    const wrapper = await withPages([page({ team_id: null })]);
+
+    const cell = wrapper.find('[data-test^="oncall-row-unrouted-"]');
+    expect(cell.exists()).toBe(true);
+    expect(cell.text()).toBe("Not routed to a team");
+    expect(wrapper.find('[data-test^="oncall-row-team-"]').exists()).toBe(false);
+  });
+
   describe("list view state", () => {
     const seed = () =>
       useListViewState("oncall-responses", {

@@ -1069,8 +1069,7 @@ async fn resolve_alert_firing_in(
     )
     .await?;
 
-    // Published even when this region updated no rows: the receiver runs the same idempotent update
-    // against its own replica, which may still be behind.
+    // Published even when no rows changed here: the receiver's replica may still be behind.
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
@@ -1100,14 +1099,7 @@ async fn resolve_alert_firing_in(
         return Ok(());
     }
 
-    update_status_as(
-        &event.org_id,
-        incident_id,
-        "resolved",
-        "system@openobserve.ai",
-        muted,
-    )
-    .await?;
+    update_status_as(&event.org_id, incident_id, "resolved", SYSTEM_ACTOR, muted).await?;
     log::info!(
         "[incidents] Auto-resolved incident {incident_id} — all {} contributing alert(s) recovered",
         links.len()
@@ -1924,7 +1916,6 @@ async fn join_correlated_incident(
     if matches!(relationship, DimensionRelationship::NewIsSuperset)
         && existing_key_type.can_upgrade_to(key_type)
     {
-        // Upgrade group_values AND key_type
         let old_key_type_str = existing.key_type.clone();
         let new_key_type_str = key_type.to_string();
         infra::table::alert_incidents::upgrade_incident_group_values(
@@ -2024,8 +2015,7 @@ async fn join_correlated_incident(
                             log::info!(
                                 "[INCIDENTS::RCA] Skipping new-alert reanalysis for {incident_id_rca}: {error}"
                             );
-                            // §6: no verdict is coming, so nothing may go on holding a page
-                            // for one.
+                            // §6: no verdict is coming, so no page may wait for one.
                             o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
                                 &org_id_rca,
                                 &incident_id_rca,
@@ -2052,8 +2042,7 @@ async fn join_correlated_incident(
                             true,
                             true,
                             "system@openobserve.ai".to_string(),
-                            // Fresh analysis: a new alert type changes the picture,
-                            // so the agent should reassess rather than extend.
+                            // A new alert type changes the picture, so reassess, not extend.
                             false,
                             usage_permit,
                         )
@@ -2128,12 +2117,13 @@ async fn pick_correlation_candidate(
         record_join_rule(org_id, &own, DimensionRelationship::NewIsSuperset, &windows);
         return Ok(Some((own, DimensionRelationship::NewIsSuperset)));
     }
-    let open = infra::table::alert_incidents::find_open_incidents_filtered(
+    let mut open = infra::table::alert_incidents::find_open_incidents_filtered(
         org_id,
         windows.active_since(triggered_at),
         windows.strict.then_some(CORRELATION_CANDIDATE_LIMIT),
     )
     .await?;
+    kill_switch_order(&mut open, &windows);
     let lenient_choice = lenient_choice(&open, group_values, &windows, triggered_at);
     let picked = best_candidate(open, group_values, &windows, triggered_at);
     if strict_rejected_empty(lenient_choice.as_ref(), picked.as_ref().map(|(m, _)| m)) {
@@ -2146,6 +2136,16 @@ async fn pick_correlation_candidate(
         record_join_rule(org_id, existing, *relationship, &windows);
     }
     Ok(picked)
+}
+
+/// With strict correlation off, candidates keep the old order: newest created first.
+fn kill_switch_order(
+    open: &mut [infra::table::entity::alert_incidents::Model],
+    windows: &config::meta::alerts::incidents::CorrelationWindows,
+) {
+    if !windows.strict {
+        open.sort_by_key(|m| std::cmp::Reverse(m.created_at));
+    }
 }
 
 /// The incident the old rules would pick, as (id, has no dimensions); `None` when not strict.
@@ -3523,7 +3523,7 @@ pub async fn acknowledge_from_page(
     if current.status != "open" {
         return Ok(());
     }
-    // Not `update_status_as`: that would acknowledge the pages again and loop back here.
+    // Not `update_status_as`: it records an acknowledgement even when another actor won the write.
     let Some(updated) =
         infra::table::alert_incidents::acknowledge(org_id, incident_id, actor).await?
     else {
@@ -3545,6 +3545,19 @@ pub async fn acknowledge_from_page(
         log::error!(
             "[Incidents] Failed to record page acknowledgement for {org_id}/{incident_id}: {e}"
         );
+    }
+    // The incident's other owner pages stop too; on-call never writes back here.
+    #[cfg(feature = "enterprise")]
+    if !muted
+        && o2_enterprise::enterprise::oncall::is_enabled()
+        && let Err(e) = o2_enterprise::enterprise::oncall::escalation::acknowledge_for_incident(
+            org_id,
+            incident_id,
+            actor,
+        )
+        .await
+    {
+        log::error!("[incidents] on-call acknowledgement failed for {org_id}/{incident_id}: {e}");
     }
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -4362,6 +4375,41 @@ mod tests {
             rel,
             config::meta::alerts::incidents::DimensionRelationship::NewIsSuperset
         );
+    }
+
+    #[test]
+    fn test_best_candidate_without_strict_goes_back_to_newest_created_first() {
+        let now = 1_000 * 60_000_000;
+        let strict = config::meta::alerts::incidents::CorrelationWindows::from_minutes(60, 30);
+        let lenient = strict.with_strict(false);
+        let firing: HashMap<String, String> =
+            [("namespace".to_string(), "prod".to_string())].into();
+        let active_but_older = open_incident(
+            "active-older",
+            serde_json::json!({"namespace": "prod"}),
+            now,
+            now - 2,
+        );
+        let quieter_but_newer = open_incident(
+            "quieter-newer",
+            serde_json::json!({"namespace": "prod"}),
+            now - 1,
+            now - 1,
+        );
+        let fetched = vec![active_but_older, quieter_but_newer];
+
+        let mut open = fetched.clone();
+        kill_switch_order(&mut open, &lenient);
+        let (chosen, _) = best_candidate(open, &firing, &lenient, now).unwrap();
+        assert_eq!(
+            chosen.id, "quieter-newer",
+            "off: created_at DESC, as before"
+        );
+
+        let mut open = fetched;
+        kill_switch_order(&mut open, &strict);
+        let (chosen, _) = best_candidate(open, &firing, &strict, now).unwrap();
+        assert_eq!(chosen.id, "active-older", "strict keeps the fetched order");
     }
 
     #[test]

@@ -527,7 +527,7 @@ export interface OnCallResponse {
   id: string;
   org_id: string;
   subject: SubjectRef;
-  team_id: string;
+  team_id: string | null;
   priority: number;
   state: ResponseState;
   opened_at: number;

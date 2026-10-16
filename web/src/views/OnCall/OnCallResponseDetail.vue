@@ -134,13 +134,13 @@
             variant="outline"
             size="sm-action"
             :loading="escalatingNow"
-            :disabled="escalation?.exhausted"
+            :disabled="!!escalateBlockedReason"
             data-test="oncall-response-escalate-btn"
             @click="escalateNow"
           >
             {{ t("oncall.escalate") }}
           </OButton>
-          <OTooltip v-if="escalation?.exhausted" :content="t('oncall.ladderExhausted')" />
+          <OTooltip v-if="escalateBlockedReason" :content="escalateBlockedReason" />
         </span>
 
         <OButton
@@ -222,15 +222,15 @@
         <ODropdownSeparator v-if="canAcknowledge" />
         <ODropdownItem
           v-if="isOpenState"
-          :disabled="escalation?.exhausted"
+          :disabled="!!escalateBlockedReason"
           data-test="oncall-response-escalate-btn-menu"
           @select="escalateNow"
         >
           <span class="flex max-w-56 flex-col">
             <span>{{ t("oncall.escalate") }}</span>
             <!-- Touch has no tooltip, so the reason the verb is greyed out rides on the item itself. -->
-            <span v-if="escalation?.exhausted" class="text-xs whitespace-normal">
-              {{ t("oncall.ladderExhausted") }}
+            <span v-if="escalateBlockedReason" class="text-xs whitespace-normal">
+              {{ escalateBlockedReason }}
             </span>
           </span>
         </ODropdownItem>
@@ -964,6 +964,10 @@ const title = computed(() =>
     : t("oncall.responseDetail"),
 );
 
+const escalateBlockedReason = computed<I18nText | null>(() => {
+  if (!response.value?.team_id) return t("oncall.escalateNoTeam");
+  return escalation.value?.exhausted ? t("oncall.ladderExhausted") : null;
+});
 // Every action hangs off this. It asks "is this still somebody's problem",
 // not "is the ladder running" — an acknowledged page still needs resolving.
 const isOpenState = computed(() => !!response.value && isUnresolved(response.value.state));
@@ -1221,7 +1225,7 @@ async function fetchTeamName() {
   if (!r) return;
   // A page nobody was routed to has no team to look up, and asking for one fetches `/teams/null`.
   if (!r.team_id) {
-    teamName.value = t("oncall.notRoutedToTeam");
+    teamName.value = "";
     return;
   }
   teamName.value = r.team_id;
@@ -1524,28 +1528,26 @@ function escalateOutcome(result: EscalateResult | undefined): {
   variant: "success" | "info";
   message: I18nText;
 } {
+  const team = teamName.value || response.value?.team_id || "";
   if (result?.escalated_to === "ladder_exhausted") {
-    return { variant: "info", message: t("oncall.escalateExhausted", { team: teamName.value }) };
+    return { variant: "info", message: t("oncall.escalateExhausted", { team }) };
   }
   const reached = result?.escalated_to === "rung" ? result.recipients : [];
   if (!reached.length) {
     // A rung that resolved to nobody is a real outcome and the one worth
     // saying loudest: the ladder moved and no phone rang.
-    return { variant: "success", message: t("oncall.escalatedNobody", { team: teamName.value }) };
+    return { variant: "success", message: t("oncall.escalatedNobody", { team }) };
   }
-  return {
-    variant: "success",
-    message: t("oncall.escalatedTo", {
-      team: teamName.value,
-      who: raw(reached.join(", ")),
-    }),
-  };
+  const who = raw(reached.join(", "));
+  return { variant: "success", message: t("oncall.escalatedTo", { team, who }) };
 }
 
 /// Wakes the next rung now instead of when the timer says so. Ownership does
 /// not move — this is asking for more hands, which is what separates it from
 /// a handoff.
 async function escalateNow() {
+  // An unrouted page has no policy; the reach alarm's button can still land here.
+  if (!response.value?.team_id) return;
   escalatingNow.value = true;
   try {
     const res = await escalateWrite.mutateAsync({ responseId: responseId.value });

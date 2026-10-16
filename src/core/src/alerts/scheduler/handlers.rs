@@ -2892,11 +2892,14 @@ async fn correlate_incident_groups(
                 );
                 out.record(correlated);
             }
-            Ok(None) => log::debug!(
-                "[SCHEDULER trace_id {trace_id}] No incident correlation for alert {}/{}",
-                alert.org_id,
-                alert.name,
-            ),
+            Ok(None) => {
+                log::debug!(
+                    "[SCHEDULER trace_id {trace_id}] No incident correlation for alert {}/{}, notifying its rows directly",
+                    alert.org_id,
+                    alert.name,
+                );
+                out.failed_rows.extend(group.iter().cloned());
+            }
             Err(e) => {
                 log::error!(
                     "[SCHEDULER trace_id {trace_id}] Error in incident correlation of one group of {}/{}, notifying its rows directly: {e}",

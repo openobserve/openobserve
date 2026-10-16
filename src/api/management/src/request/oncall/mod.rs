@@ -523,6 +523,74 @@ fn to_response(e: anyhow::Error) -> Response {
     MetaHttpResponse::error(status.as_u16(), e.to_string()).into_response()
 }
 
+/// The page's incident takes the page's acknowledgement, without syncing back; failures only log.
+#[cfg(feature = "enterprise")]
+async fn acknowledge_promoted_incident(record: &config::meta::oncall::Response, actor: &str) {
+    // Only the owner's page drives its incident; an impacted team's ack is their own.
+    if record.responder_role != config::meta::oncall::ResponderRole::Owner {
+        return;
+    }
+    let Some(incident_id) = o2_enterprise::enterprise::oncall::escalation::linked_incident(record)
+    else {
+        return;
+    };
+    // A caller who lost the page's ack race must not take the incident under their own name.
+    let actor = record.acked_by.as_deref().unwrap_or(actor);
+    if let Err(e) = openobserve_core::alerts::incidents::acknowledge_from_page(
+        &record.org_id,
+        incident_id,
+        actor,
+    )
+    .await
+    {
+        tracing::warn!(
+            "[oncall] {}/{}: could not acknowledge incident {incident_id}: {e}",
+            record.org_id,
+            record.id
+        );
+    }
+}
+
+/// The page's incident resolves through its own status path; failures only log.
+#[cfg(feature = "enterprise")]
+async fn resolve_promoted_incident(record: &config::meta::oncall::Response, actor: &str) {
+    // Only the owner's page drives its incident; an impacted team's resolve is their own.
+    if record.responder_role != config::meta::oncall::ResponderRole::Owner {
+        return;
+    }
+    let Some(incident_id) = o2_enterprise::enterprise::oncall::escalation::linked_incident(record)
+    else {
+        return;
+    };
+    match infra::table::alert_incidents::get(&record.org_id, incident_id).await {
+        Ok(Some(incident)) if incident.status != "resolved" => {}
+        Ok(_) => return,
+        Err(e) => {
+            tracing::warn!(
+                "[oncall] {}/{}: could not read incident {incident_id} to resolve it: {e}",
+                record.org_id,
+                record.id
+            );
+            return;
+        }
+    }
+    if let Err(e) = openobserve_core::alerts::incidents::update_status_as(
+        &record.org_id,
+        incident_id,
+        "resolved",
+        actor,
+        false,
+    )
+    .await
+    {
+        tracing::warn!(
+            "[oncall] {}/{}: could not resolve incident {incident_id}: {e}",
+            record.org_id,
+            record.id
+        );
+    }
+}
+
 #[utoipa::path(
     post,
     path = "/{org_id}/oncall/teams",
@@ -1863,71 +1931,6 @@ pub async fn resolve_response(
     {
         let _ = (org_id, response_id, body);
         MetaHttpResponse::forbidden("Not Supported")
-    }
-}
-
-/// The page's incident takes the page's acknowledgement, without syncing back; failures only log.
-#[cfg(feature = "enterprise")]
-async fn acknowledge_promoted_incident(record: &config::meta::oncall::Response, actor: &str) {
-    let Some(incident_id) = page_incident(record) else {
-        return;
-    };
-    if let Err(e) = openobserve_core::alerts::incidents::acknowledge_from_page(
-        &record.org_id,
-        incident_id,
-        actor,
-    )
-    .await
-    {
-        tracing::warn!(
-            "[oncall] {}/{}: could not acknowledge incident {incident_id}: {e}",
-            record.org_id,
-            record.id
-        );
-    }
-}
-
-/// The incident a page belongs to: the promoted link, else the incident it was paged for.
-#[cfg(feature = "enterprise")]
-fn page_incident(record: &config::meta::oncall::Response) -> Option<&str> {
-    record.incident_id.as_deref().or_else(|| {
-        (record.subject.subject_type == config::meta::oncall::SubjectType::Incident)
-            .then_some(record.subject.source_id.as_str())
-    })
-}
-
-/// The incident a page was promoted into resolves through its own status path; failures only log.
-#[cfg(feature = "enterprise")]
-async fn resolve_promoted_incident(record: &config::meta::oncall::Response, actor: &str) {
-    let Some(incident_id) = record.incident_id.as_deref() else {
-        return;
-    };
-    match infra::table::alert_incidents::get(&record.org_id, incident_id).await {
-        Ok(Some(incident)) if incident.status != "resolved" => {}
-        Ok(_) => return,
-        Err(e) => {
-            tracing::warn!(
-                "[oncall] {}/{}: could not read incident {incident_id} to resolve it: {e}",
-                record.org_id,
-                record.id
-            );
-            return;
-        }
-    }
-    if let Err(e) = openobserve_core::alerts::incidents::update_status_as(
-        &record.org_id,
-        incident_id,
-        "resolved",
-        actor,
-        false,
-    )
-    .await
-    {
-        tracing::warn!(
-            "[oncall] {}/{}: could not resolve incident {incident_id}: {e}",
-            record.org_id,
-            record.id
-        );
     }
 }
 
@@ -5079,48 +5082,5 @@ mod tests {
     fn test_the_absence_query_is_entirely_optional() {
         let q: UnavailabilityQuery = serde_json::from_str("{}").unwrap();
         assert!(q.user_email.is_none() && q.from.is_none() && q.to.is_none());
-    }
-
-    #[cfg(feature = "enterprise")]
-    #[test]
-    fn test_a_page_acknowledges_the_incident_it_belongs_to() {
-        use config::meta::oncall::{ResponderRole, ResponseState, SubjectRef, SubjectType};
-        let page =
-            |subject: SubjectRef, incident_id: Option<&str>| config::meta::oncall::Response {
-                id: "resp_1".into(),
-                org_id: "default".into(),
-                subject,
-                team_id: None,
-                title: None,
-                cause: None,
-                cause_note: None,
-                snoozed_until: None,
-                ladder_anchor: None,
-                ladder_run: None,
-                priority: 2,
-                responder_role: ResponderRole::Owner,
-                exhausted_at: None,
-                origin_response_id: None,
-                state: ResponseState::Triggered,
-                opened_at: 0,
-                acked_by: None,
-                acked_at: None,
-                closed_at: None,
-                incident_id: incident_id.map(str::to_string),
-                updated_at: 0,
-            };
-        let promoted = page(
-            SubjectRef::new(SubjectType::Alert, "al_1", 1),
-            Some("inc_1"),
-        );
-        assert_eq!(page_incident(&promoted), Some("inc_1"));
-        let correlated = page(SubjectRef::new(SubjectType::Incident, "inc_2", 1), None);
-        assert_eq!(page_incident(&correlated), Some("inc_2"));
-        let alert_only = page(SubjectRef::new(SubjectType::Alert, "al_1", 1), None);
-        assert_eq!(
-            page_incident(&alert_only),
-            None,
-            "a plain alert page has no incident"
-        );
     }
 }

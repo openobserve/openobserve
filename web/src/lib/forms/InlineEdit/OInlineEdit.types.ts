@@ -43,6 +43,8 @@ export interface InlineEditProps {
   error?: boolean;
   /** Message rendered below the control (absolutely, so the header never reflows). */
   errorMessage?: I18nText;
+  /** Below the md breakpoint the displayed value wraps instead of truncating. @default false */
+  wrap?: boolean;
   /** Whether Enter also submits the owning form; `false` makes Enter only commit. @default true */
   submitOnEnter?: boolean;
 }

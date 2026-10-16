@@ -17,11 +17,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   alertConditionText,
+  alertGroupBy,
   alertPeriodMinutes,
+  alertThresholdText,
   alertWarningConditionText,
   countCompleteConditions,
+  formatMinutesDuration,
   modesWithContent,
 } from "@/utils/alerts/alertCondition";
+import type { Translator } from "@/utils/alerts/alertValidation";
 
 describe("alertConditionText", () => {
   it("reads an aggregation as the sentence the alert screen prints", () => {
@@ -206,5 +210,114 @@ describe("modesWithContent", () => {
         streamType: "metrics",
       }),
     ).toEqual(["custom", "sql", "promql"]);
+  });
+});
+
+describe("formatMinutesDuration", () => {
+  const t = ((key: string, named?: Record<string, unknown>) =>
+    `${key}:${named?.count}`) as unknown as Translator;
+
+  it("prints a dash for an unknown duration", () => {
+    expect(formatMinutesDuration(null, t)).toBe("—");
+    expect(formatMinutesDuration(undefined, t)).toBe("—");
+  });
+
+  // Zero is a real setting (no silence), not an unknown one.
+  it("prints zero as 0 min", () => {
+    expect(formatMinutesDuration(0, t)).toBe("common.minShort:0");
+  });
+
+  it("prints a sub-minute duration in seconds", () => {
+    expect(formatMinutesDuration(0.5, t)).toBe("common.secShort:30");
+  });
+
+  it("prints a whole multiple of 60 in hours", () => {
+    expect(formatMinutesDuration(120, t)).toBe("common.hrShort:2");
+  });
+
+  it("keeps any other duration in minutes", () => {
+    expect(formatMinutesDuration(5, t)).toBe("common.minShort:5");
+    expect(formatMinutesDuration(90, t)).toBe("common.minShort:90");
+  });
+});
+
+describe("alertThresholdText", () => {
+  // The trigger's row gate on an aggregation is plumbing, not the user's threshold.
+  it("reads an aggregation's having clause, not the trigger's row count", () => {
+    expect(
+      alertThresholdText({
+        query_condition: {
+          aggregation: {
+            function: "avg",
+            having: { column: "latency", operator: ">", value: 500 },
+          },
+        },
+        trigger_condition: { operator: ">=", threshold: 1 },
+      }),
+    ).toBe("avg(latency) > 500");
+  });
+
+  it("reads a PromQL comparison", () => {
+    expect(
+      alertThresholdText({
+        query_condition: { type: "promql", promql_condition: { operator: ">", value: 0.9 } },
+        trigger_condition: { operator: ">=", threshold: 1 },
+      }),
+    ).toBe("> 0.9");
+  });
+
+  it("reads a plain alert's trigger threshold, 0 included", () => {
+    expect(
+      alertThresholdText({
+        query_condition: { type: "custom" },
+        trigger_condition: { operator: ">=", threshold: 3 },
+      }),
+    ).toBe(">= 3");
+    expect(
+      alertThresholdText({
+        query_condition: { type: "custom" },
+        trigger_condition: { operator: ">=", threshold: 0 },
+      }),
+    ).toBe(">= 0");
+  });
+
+  it("prints a dash when no threshold is set", () => {
+    expect(alertThresholdText({ query_condition: { type: "custom" } })).toBe("—");
+    expect(
+      alertThresholdText({
+        query_condition: { type: "custom" },
+        trigger_condition: { operator: ">=", threshold: "" },
+      }),
+    ).toBe("—");
+  });
+});
+
+describe("alertGroupBy", () => {
+  it("lists a per-group SQL alert's columns, without blanks", () => {
+    expect(
+      alertGroupBy({
+        query_condition: {
+          type: "sql",
+          aggregation: { multi_alert: true, group_by: ["host", "", "region"] },
+        },
+      }),
+    ).toEqual(["host", "region"]);
+  });
+
+  // PromQL splits per series, so there are no columns to name.
+  it("returns no columns for a per-series PromQL alert", () => {
+    expect(alertGroupBy({ query_condition: { type: "promql", promql_multi_alert: true } })).toEqual(
+      [],
+    );
+  });
+
+  it("returns null when the alert is not per-group", () => {
+    expect(
+      alertGroupBy({
+        query_condition: { type: "sql", aggregation: { group_by: ["host"] } },
+      }),
+    ).toBeNull();
+    expect(alertGroupBy({ query_condition: { type: "promql" } })).toBeNull();
+    expect(alertGroupBy({ query_condition: { type: "custom" } })).toBeNull();
   });
 });

@@ -303,14 +303,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
 import { useOrgId } from "@/composables/query/useOrgId";
-import { useQuery } from "@tanstack/vue-query";
-import { incidentsQuery } from "@/services/incidents.queries";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { incidentsQuery, updateIncidentStatusMutation } from "@/services/incidents.queries";
 import { defineComponent, ref, shallowRef, computed, onMounted, watch, nextTick } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
-import incidentsService, { Incident } from "@/services/incidents";
+import type { Incident } from "@/services/incidents";
 import { useListViewState } from "@/composables/useListViewState";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -700,8 +700,7 @@ export default defineComponent({
       console.error("Failed to load incidents:", error);
     });
 
-    // Only an explicit call reads: refresh, post-write reload, search. Mount and
-    // invalidation-driven repaints come from the query itself.
+    // Only refresh and search read explicitly; mount and post-write repaints come from the query itself.
     const loadIncidents = async (force = false) => {
       if (force) await incidentsList.refetch();
     };
@@ -746,19 +745,19 @@ export default defineComponent({
       filterByStatus("active");
     };
 
+    const updateIncidentStatus = useMutation(() =>
+      updateIncidentStatusMutation(orgIdForList.value),
+    );
     const updateStatus = async (
       incident: Incident,
       newStatus: "open" | "acknowledged" | "resolved",
     ) => {
       try {
-        const org = store.state.selectedOrganization.identifier;
-        await incidentsService.updateStatus(org, incident.id, newStatus);
+        await updateIncidentStatus.mutateAsync({ id: incident.id, status: newStatus });
         toast({
           variant: "success",
           message: t("alerts.incidents.statusUpdated"),
         });
-        // Post-write reload: must reach the server.
-        loadIncidents(true);
         store.dispatch("incidents/setShouldRefresh", true);
       } catch (error: any) {
         toast({
@@ -785,8 +784,17 @@ export default defineComponent({
       updateStatus(incident, "resolved");
     };
 
-    const reopenIncident = (incident: Incident) => {
-      updateStatus(incident, "open");
+    // Back to open re-pages the on-call team, so it asks first like the drawer does.
+    const reopenIncident = async (incident: Incident) => {
+      const ok = await confirm({
+        title: t("alerts.incidents.reopenConfirmTitle"),
+        message: t("alerts.incidents.reopenConfirmMessage"),
+        confirmLabel: t("alerts.incidents.reopenConfirmLabel"),
+        cancelLabel: t("common.cancel"),
+        persistent: false,
+      });
+      if (!ok) return;
+      return updateStatus(incident, "open");
     };
 
     const getStatusColorClass = (status: string) => {

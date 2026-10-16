@@ -171,29 +171,6 @@ impl From<Option<String>> for EpisodeIncidents {
     }
 }
 
-impl Serialize for EpisodeIncidents {
-    // The column form, a string or null, which an older node's `Option<String>` decodes.
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.to_stored().serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for EpisodeIncidents {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Stored {
-            One(String),
-            Many(Vec<String>),
-        }
-        Ok(match Option::<Stored>::deserialize(deserializer)? {
-            None => Self::default(),
-            Some(Stored::One(raw)) => Self::from_stored(Some(&raw)),
-            Some(Stored::Many(ids)) => Self::new(ids),
-        })
-    }
-}
-
 /// The keys [`AlertState`] carries its episode incidents under on the wire.
 #[derive(Default, Serialize, Deserialize)]
 struct EpisodeIncidentKeys {
@@ -312,15 +289,13 @@ pub fn serialize_episode_incident_keys<S: serde::Serializer>(
     .serialize(serializer)
 }
 
-/// Reads the list when present, else the single id (an intermediate build's array string too).
+/// Reads the list when present, else the single id.
 pub fn deserialize_episode_incident_keys<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<EpisodeIncidents, D::Error> {
     let keys = EpisodeIncidentKeys::deserialize(deserializer)?;
     if keys.episode_incident_ids.is_empty() {
-        return Ok(EpisodeIncidents::from_stored(
-            keys.episode_incident_id.as_deref(),
-        ));
+        return Ok(EpisodeIncidents::new(keys.episode_incident_id));
     }
     Ok(EpisodeIncidents::new(keys.episode_incident_ids))
 }
@@ -514,37 +489,6 @@ mod tests {
     }
 
     #[test]
-    fn episode_incidents_read_the_legacy_single_id_and_the_list() {
-        let legacy: EpisodeIncidents = serde_json::from_str("\"inc_1\"").unwrap();
-        assert_eq!(legacy.ids(), ["inc_1".to_string()]);
-        let none: EpisodeIncidents = serde_json::from_str("null").unwrap();
-        assert!(none.is_empty());
-        let many: EpisodeIncidents = serde_json::from_str("[\"a\",\"b\",\"a\"]").unwrap();
-        assert_eq!(many.ids(), ["a".to_string(), "b".to_string()]);
-    }
-
-    #[test]
-    fn one_episode_incident_serialises_as_the_old_option_string() {
-        let one = EpisodeIncidents::new(["inc_1".to_string()]);
-        assert_eq!(serde_json::to_string(&one).unwrap(), "\"inc_1\"");
-        let old: Option<String> =
-            serde_json::from_str(&serde_json::to_string(&one).unwrap()).unwrap();
-        assert_eq!(old.as_deref(), Some("inc_1"));
-        assert_eq!(
-            serde_json::to_string(&EpisodeIncidents::default()).unwrap(),
-            "null"
-        );
-        let many = EpisodeIncidents::new(["a".to_string(), "b".to_string()]);
-        let json = serde_json::to_string(&many).unwrap();
-        let old: Option<String> = serde_json::from_str(&json).expect("an older node reads a list");
-        assert_eq!(old.as_deref(), Some("[\"a\",\"b\"]"));
-        assert_eq!(
-            serde_json::from_str::<EpisodeIncidents>(&json).unwrap(),
-            many
-        );
-    }
-
-    #[test]
     fn episode_incidents_round_trip_through_the_column() {
         assert_eq!(EpisodeIncidents::default().to_stored(), None);
         let one = EpisodeIncidents::new(["inc_1".to_string()]);
@@ -655,7 +599,7 @@ mod tests {
         );
         assert_eq!(serde_json::from_value::<AlertState>(json).unwrap(), s);
 
-        // A row from before the field existed, and the array string an intermediate build wrote.
+        // A row from before the field existed.
         let mut legacy = serde_json::to_value(state()).unwrap();
         legacy
             .as_object_mut()
@@ -666,14 +610,6 @@ mod tests {
                 .unwrap()
                 .episode_incident_id
                 .is_empty()
-        );
-        let mut intermediate = serde_json::to_value(state()).unwrap();
-        intermediate["episode_incident_id"] = serde_json::json!("[\"a\",\"b\"]");
-        assert_eq!(
-            serde_json::from_value::<AlertState>(intermediate)
-                .unwrap()
-                .episode_incident_id,
-            EpisodeIncidents::new(["a".to_string(), "b".to_string()])
         );
     }
 
