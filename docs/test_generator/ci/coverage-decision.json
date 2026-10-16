@@ -1,9 +1,0 @@
-{
-  "action": "new",
-  "target_spec": "tests/ui-testing/playwright-tests/RUM/app-performance.spec.js",
-  "existing_tests_considered": [
-    "tests/ui-testing/playwright-tests/RUM/rum-page-dataflow.spec.js"
-  ],
-  "needs_registration": true,
-  "rationale": "rum-page-dataflow.spec.js only touches the Performance page incidentally (one test: gotoPerformance + clickRefresh + expectSummaryLoadingResolved). It is a heavyweight dataflow spec (serial CDN session generation in beforeAll) that does not cover the toolbar/toggle-group surface this feature is about (tab rendering, tab->route navigation, route->tab back-sync, deep-linking, auto-run gating, share link). This feature has its own dedicated spec_path in run-context, so it is its own area. A new lightweight spec avoids pulling the CDN dataflow dependency into pure toolbar assertions."
-}
