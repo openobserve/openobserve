@@ -22,13 +22,14 @@ import {
   latestEmission,
   latestPerWindow,
   latestRun,
-  parseAffectedAlerts,
+  parseLagRows,
   type DigestRecord,
   type RuleId,
   type RunRow,
   type Severity,
 } from "./digests";
 import { formatEvidence, formatMinutes } from "./format";
+import { rulesShownFor } from "./rules";
 
 const run = (overrides: Partial<RunRow> = {}): RunRow => ({
   window_start: 100,
@@ -169,36 +170,43 @@ describe("the formatting", () => {
   });
 });
 
-describe("an org-wide finding's affected alerts", () => {
-  it("reads the listed alerts back out of their one JSON column", () => {
-    const column = JSON.stringify([
+describe("a cluster finding's lag lists", () => {
+  it("reads each list back out of its one JSON column, keyed by org or by hour", () => {
+    const orgs = JSON.stringify([
+      { org_id: "globex", skipped_windows: 3, late_evaluations: 0, evaluations: 100 },
+      { org_id: "acme", skipped_windows: 0, late_evaluations: 40, evaluations: 120 },
+    ]);
+    expect(parseLagRows(orgs, "org_id").map((r) => [r.key, r.skipped_windows])).toEqual([
+      ["globex", 3],
+      ["acme", 0],
+    ]);
+    const hours = JSON.stringify([
       {
-        alert_id: "a2",
-        alert_name: "disk",
-        skipped_windows: 3,
-        late_evaluations: 0,
-        evaluations: 100,
-      },
-      {
-        alert_id: "a1",
-        alert_name: "cpu",
+        hour_start_micros: 3_600_000_000,
         skipped_windows: 0,
-        late_evaluations: 40,
-        evaluations: 100,
+        late_evaluations: 9,
+        evaluations: 50,
       },
     ]);
-    expect(parseAffectedAlerts(column).map((a) => [a.alert_name, a.skipped_windows])).toEqual([
-      ["disk", 3],
-      ["cpu", 0],
+    expect(parseLagRows(hours, "hour_start_micros")).toEqual([
+      { key: 3_600_000_000, skipped_windows: 0, late_evaluations: 9, evaluations: 50 },
     ]);
   });
 
-  it("lists nothing for a missing or malformed column, and drops entries without a usable name", () => {
+  it("lists nothing for a missing or malformed column, and drops rows without a usable key", () => {
     for (const value of [undefined, "", "not json", "{}", 42]) {
-      expect(parseAffectedAlerts(value)).toEqual([]);
+      expect(parseLagRows(value, "org_id")).toEqual([]);
     }
-    expect(
-      parseAffectedAlerts(JSON.stringify([{ alert_id: "a1" }, { alert_name: " " }, null, "x"])),
-    ).toEqual([]);
+    const rows = JSON.stringify([{ org_id: " " }, { hour_start_micros: "x" }, null, "x"]);
+    expect(parseLagRows(rows, "org_id")).toEqual([]);
+    expect(parseLagRows(rows, "hour_start_micros")).toEqual([]);
+  });
+});
+
+describe("the rules an org is shown", () => {
+  it("keeps the cluster-wide scheduler rule to the _meta org, where it runs", () => {
+    expect(rulesShownFor("default")).not.toContain("scheduler_health");
+    expect(rulesShownFor("_meta")).toContain("scheduler_health");
+    expect(rulesShownFor("default")).toContain("noise");
   });
 });

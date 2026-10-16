@@ -8081,7 +8081,8 @@
       "failureRatio": "Failure ratio",
       "history": "History",
       "deliveredThroughIncidents": "Delivered through incidents",
-      "affectedAlerts": "Affected alerts",
+      "affectedOrgs": "Affected orgs",
+      "congestedHours": "Congested hours",
       "skippedWindows": "Skipped windows",
       "lateEvaluations": "Late evaluations",
       "lateRatio": "Late share",
@@ -8104,12 +8105,8 @@
       "repairDestinationDesc": "Delivery fails on a destination the alert uses.",
       "attachDestination": "Attach destination",
       "attachDestinationDesc": "Give the alert somewhere to deliver to.",
-      "reduceEvaluationFrequency": "Evaluate less often",
-      "reduceEvaluationFrequencyDesc": "Lengthen the frequency of the listed alerts, so each one asks less of the scheduler.",
-      "consolidateAlerts": "Merge similar alerts",
-      "consolidateAlertsDesc": "Alerts that query the same stream on the same schedule can often become one alert.",
       "scaleAlertScheduler": "Scale the alert scheduler",
-      "scaleAlertSchedulerDesc": "Needs your operator: raise {concurrency}, add alert nodes, or raise {pullers}."
+      "scaleAlertSchedulerDesc": "Raise {concurrency}, add alert nodes, or raise {pullers}."
     },
     "severity": {
       "high": "High",
@@ -8207,8 +8204,9 @@
       "declinedNotWritten": "The per-alert reasons are not written to the stream, only this count.",
       "evidence": "Evidence",
       "alert": "Alert",
-      "affectedAlerts": "Most affected alerts",
-      "affectedAlertImpact": "{skipped} skipped, {late} of {evaluations} late",
+      "topOrgs": "Most affected orgs",
+      "worstHours": "Worst hours",
+      "lagImpact": "{skipped} skipped, {late} of {evaluations} late",
       "proposedActions": "Proposed actions"
     },
     "dashboard": {

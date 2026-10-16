@@ -71,10 +71,9 @@ export type FindingRecord = DigestRecord &
 
 export type CoverageVerdict = "none" | "gap" | "full";
 
-/** One alert an org-wide finding lists; the digest stores the list as one JSON column. */
-export interface AffectedAlert {
-  alert_id: string;
-  alert_name: string;
+/** One org or hour a cluster finding lists; the digest stores each list as one JSON column. */
+export interface LagRow {
+  key: string | number;
   skipped_windows: number;
   late_evaluations: number;
   evaluations: number;
@@ -181,8 +180,8 @@ export const latestRun = (rows: RunRow[]): RunRow | null =>
 export const isClean = (row: RunRow) =>
   row.finding_count === 0 && !row.coverage_gap && row.skip_count === 0;
 
-/** A missing or malformed column lists nothing, rather than failing the card. */
-export function parseAffectedAlerts(value: unknown): AffectedAlert[] {
+/** A missing or malformed column lists nothing, and a row without a usable key is dropped. */
+export function parseLagRows(value: unknown, keyField: "org_id" | "hour_start_micros"): LagRow[] {
   if (typeof value !== "string" || value === "") return [];
   let parsed: unknown;
   try {
@@ -192,16 +191,14 @@ export function parseAffectedAlerts(value: unknown): AffectedAlert[] {
   }
   if (!Array.isArray(parsed)) return [];
   return parsed
-    .filter(
-      (item): item is Record<string, unknown> =>
-        typeof item === "object" &&
-        item !== null &&
-        typeof item.alert_name === "string" &&
-        item.alert_name.trim() !== "",
+    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+    .filter((item) =>
+      keyField === "org_id"
+        ? typeof item.org_id === "string" && item.org_id.trim() !== ""
+        : Number.isFinite(item.hour_start_micros),
     )
     .map((item) => ({
-      alert_id: String(item.alert_id ?? ""),
-      alert_name: String(item.alert_name),
+      key: item[keyField] as string | number,
       skipped_windows: Number(item.skipped_windows) || 0,
       late_evaluations: Number(item.late_evaluations) || 0,
       evaluations: Number(item.evaluations) || 0,

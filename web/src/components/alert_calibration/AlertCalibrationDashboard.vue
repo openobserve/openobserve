@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #cell-alerts="{ row }">
-            <span v-if="RULE_META[row.rule_id].affectedAlertsColumn" class="text-text-muted">{{
+            <span v-if="RULE_META[row.rule_id].clusterWide" class="text-text-muted">{{
               raw("—")
             }}</span>
             <template v-else>{{ row.alerts_flagged }}</template>
@@ -167,7 +167,7 @@ import {
   type RunRow,
 } from "./digests";
 import { COVERAGE_BADGE } from "./format";
-import { RULE_IDS, RULE_META } from "./rules";
+import { RULE_META, rulesShownFor } from "./rules";
 
 interface RuleTally {
   rule_id: RuleId;
@@ -202,10 +202,10 @@ const blindRuns = computed(
   () => rows.value.filter((r) => r.coverage_stream_substrate_empty).length,
 );
 
-/** Every rule shows, so a rule that flagged nothing reads as zero rather than as missing. */
+/** Every rule the org runs shows, so a rule that flagged nothing reads as zero rather than as missing. */
 const tallies = computed<RuleTally[]>(() => {
   const byRule = new Map((data.data.value?.flagged ?? []).map((row) => [row.rule_id, row]));
-  return RULE_IDS.map((rule_id) => ({
+  return rulesShownFor(orgId.value).map((rule_id) => ({
     rule_id,
     alerts_flagged: Number(byRule.get(rule_id)?.alerts_flagged ?? 0),
     runs_flagging: Number(byRule.get(rule_id)?.runs_flagging ?? 0),

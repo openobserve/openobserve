@@ -25,15 +25,26 @@ export interface EvidenceField {
   format: EvidenceFormat;
 }
 
+export interface LagListField {
+  column: `evidence_${string}`;
+  labelKey: I18nKey;
+  /** The field naming each row: an org, or the start of an hour in microseconds. */
+  key: "org_id" | "hour_start_micros";
+}
+
 export interface RuleMeta {
   labelKey: I18nKey;
   icon: IconName;
   /** The rule's `min_history`: a window shorter than this makes every run decline the rule for every alert. */
   minHistoryMinutes: number;
   evidence: EvidenceField[];
-  /** Set on an org-wide rule: its finding names no alert and lists the affected ones in this column. */
-  affectedAlertsColumn?: `evidence_${string}`;
+  /** A cluster-wide finding names no alert, so per-alert counts do not apply to it. */
+  clusterWide?: true;
+  lagLists?: LagListField[];
 }
+
+/** Its stream receives every org's trigger rows, so only its runs can judge the whole cluster. */
+export const META_ORG_ID = "_meta";
 
 /** Ordered as the engine registers its default rules. */
 export const RULE_IDS: RuleId[] = [
@@ -142,11 +153,17 @@ export const RULE_META: Record<RuleId, RuleMeta> = {
   scheduler_health: {
     labelKey: "alertCalibration.rules.schedulerHealth",
     icon: "hourglass-empty",
-    minHistoryMinutes: 24 * 60,
+    minHistoryMinutes: 0,
+    clusterWide: true,
     evidence: [
       {
-        column: "evidence_schedulerhealth_affected_alerts",
-        labelKey: "alertCalibration.evidence.affectedAlerts",
+        column: "evidence_schedulerhealth_affected_orgs",
+        labelKey: "alertCalibration.evidence.affectedOrgs",
+        format: "count",
+      },
+      {
+        column: "evidence_schedulerhealth_congested_hours",
+        labelKey: "alertCalibration.evidence.congestedHours",
         format: "count",
       },
       {
@@ -175,7 +192,18 @@ export const RULE_META: Record<RuleId, RuleMeta> = {
         format: "seconds",
       },
     ],
-    affectedAlertsColumn: "evidence_schedulerhealth_top_alerts",
+    lagLists: [
+      {
+        column: "evidence_schedulerhealth_top_orgs",
+        labelKey: "alertCalibration.detail.topOrgs",
+        key: "org_id",
+      },
+      {
+        column: "evidence_schedulerhealth_worst_hours",
+        labelKey: "alertCalibration.detail.worstHours",
+        key: "hour_start_micros",
+      },
+    ],
   },
   silent: {
     labelKey: "alertCalibration.rules.silent",
@@ -209,8 +237,6 @@ export type ProposedAction =
   | "FixAlertQuery"
   | "RepairDestination"
   | "AttachDestination"
-  | "ReduceEvaluationFrequency"
-  | "ConsolidateAlerts"
   | "ScaleAlertScheduler";
 
 export interface ActionMeta {
@@ -249,14 +275,6 @@ export const ACTION_META: Record<ProposedAction, ActionMeta> = {
     labelKey: "alertCalibration.actions.attachDestination",
     descriptionKey: "alertCalibration.actions.attachDestinationDesc",
   },
-  ReduceEvaluationFrequency: {
-    labelKey: "alertCalibration.actions.reduceEvaluationFrequency",
-    descriptionKey: "alertCalibration.actions.reduceEvaluationFrequencyDesc",
-  },
-  ConsolidateAlerts: {
-    labelKey: "alertCalibration.actions.consolidateAlerts",
-    descriptionKey: "alertCalibration.actions.consolidateAlertsDesc",
-  },
   ScaleAlertScheduler: {
     labelKey: "alertCalibration.actions.scaleAlertScheduler",
     descriptionKey: "alertCalibration.actions.scaleAlertSchedulerDesc",
@@ -268,6 +286,10 @@ export const ACTION_META: Record<ProposedAction, ActionMeta> = {
 };
 
 export const isProposedAction = (name: string): name is ProposedAction => name in ACTION_META;
+
+/** A cluster-wide rule never runs for an ordinary org, so it is shown only in `_meta`. */
+export const rulesShownFor = (orgId: string): RuleId[] =>
+  RULE_IDS.filter((rule) => !RULE_META[rule].clusterWide || orgId === META_ORG_ID);
 
 /** Rules whose `min_history` the window cannot cover, so every run declines them for every alert. */
 export const rulesStarvedBy = (windowMinutes: number): RuleId[] =>

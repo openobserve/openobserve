@@ -41,26 +41,14 @@ const finding = (overrides: Partial<FindingRecord> = {}): FindingRecord => ({
   rule_id: "scheduler_health",
   severity: "Medium",
   confidence: "High",
-  title: "2 alerts skipped 3 evaluation windows",
-  actions: "ReduceEvaluationFrequency,ConsolidateAlerts,ScaleAlertScheduler",
-  evidence_schedulerhealth_affected_alerts: 2,
+  title: "In the last 24 hours the alert scheduler skipped 3 evaluation windows",
+  actions: "ScaleAlertScheduler",
+  evidence_schedulerhealth_affected_orgs: 2,
   evidence_schedulerhealth_skipped_windows: 3,
   evidence_schedulerhealth_late_ratio: 0.2,
-  evidence_schedulerhealth_top_alerts: JSON.stringify([
-    {
-      alert_id: "a2",
-      alert_name: "disk",
-      skipped_windows: 3,
-      late_evaluations: 0,
-      evaluations: 100,
-    },
-    {
-      alert_id: "a1",
-      alert_name: "cpu",
-      skipped_windows: 0,
-      late_evaluations: 40,
-      evaluations: 100,
-    },
+  evidence_schedulerhealth_top_orgs: JSON.stringify([
+    { org_id: "globex", skipped_windows: 3, late_evaluations: 0, evaluations: 100 },
+    { org_id: "acme", skipped_windows: 0, late_evaluations: 40, evaluations: 100 },
   ]),
   ...overrides,
 });
@@ -72,30 +60,50 @@ const mountCard = (record: FindingRecord) =>
   });
 
 describe("AlertCalibrationFindingCard", () => {
-  it("lists an org-wide finding's affected alerts in place of a single alert", () => {
+  it("lists a cluster finding's worst orgs in place of a single alert", () => {
     const wrapper = mountCard(finding());
-    const rows = wrapper.findAll('[data-test="alert-calibration-finding-affected-alert"]');
+    const rows = wrapper.findAll('[data-test="alert-calibration-finding-lag-row"]');
     expect(rows.map((row) => row.text())).toEqual([
-      "disk3 skipped, 0 of 100 late",
-      "cpu0 skipped, 40 of 100 late",
+      "globex3 skipped, 0 of 100 late",
+      "acme0 skipped, 40 of 100 late",
     ]);
-    expect(wrapper.text()).toContain("Scale the alert scheduler");
+    expect(wrapper.text()).toContain("Most affected orgs");
+    expect(
+      wrapper.find('[data-test="alert-calibration-finding-hour_start_micros-list"]').exists(),
+    ).toBe(false);
+  });
+
+  it("labels each worst hour by when it started", () => {
+    const hourStart = new Date(2026, 9, 15, 13, 0).getTime() * 1000;
+    const wrapper = mountCard(
+      finding({
+        evidence_schedulerhealth_worst_hours: JSON.stringify([
+          {
+            hour_start_micros: hourStart,
+            skipped_windows: 0,
+            late_evaluations: 9,
+            evaluations: 50,
+          },
+        ]),
+      }),
+    );
+    const list = wrapper.find('[data-test="alert-calibration-finding-hour_start_micros-list"]');
+    expect(list.text()).toContain("Worst hours");
+    expect(list.text()).toContain("Oct 15, 13:00");
   });
 
   it("names the operator's settings in the scheduler action's description verbatim", () => {
     const wrapper = mountCard(finding());
     const titles = wrapper.findAll("[title]").map((node) => node.attributes("title"));
     expect(titles).toContain(
-      "Needs your operator: raise ZO_ALERT_SCHEDULE_CONCURRENCY, add alert nodes, or raise ZO_SCHEDULER_PER_MODULE_PULLERS.",
+      "Raise ZO_ALERT_SCHEDULE_CONCURRENCY, add alert nodes, or raise ZO_SCHEDULER_PER_MODULE_PULLERS.",
     );
   });
 
-  it("lists no affected alerts for a rule that names its alert", () => {
+  it("lists nothing for a rule that names its alert", () => {
     const wrapper = mountCard(
       finding({ rule_id: "noise", alert_name: "cpu", actions: "RaiseThreshold" }),
     );
-    expect(wrapper.find('[data-test="alert-calibration-finding-affected-alert"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper.find('[data-test="alert-calibration-finding-lag-row"]').exists()).toBe(false);
   });
 });
