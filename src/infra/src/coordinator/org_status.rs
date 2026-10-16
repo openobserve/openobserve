@@ -25,6 +25,7 @@ pub const ORG_STATUS_KEY_PREFIX: &str = "/organization/status/";
 pub const STATUS_DELETING: &str = "deleting";
 pub const STATUS_PENDING_DELETION: &str = "pending_deletion";
 pub const STATUS_ACTIVE: &str = "active";
+pub const STATUS_DELETED: &str = "deleted";
 
 /// Sends a coordinator event indicating that an org has been marked for deletion.
 pub async fn emit_deleting_event(org_id: &str) -> Result<(), Error> {
@@ -34,6 +35,11 @@ pub async fn emit_deleting_event(org_id: &str) -> Result<(), Error> {
 /// Sends a coordinator event indicating that an org has entered pending_deletion (soft delete).
 pub async fn emit_pending_event(org_id: &str) -> Result<(), Error> {
     emit_status_event(org_id, STATUS_PENDING_DELETION).await
+}
+
+/// Sends a coordinator event indicating that an org finished deletion and is kept as a tombstone.
+pub async fn emit_deleted_event(org_id: &str) -> Result<(), Error> {
+    emit_status_event(org_id, STATUS_DELETED).await
 }
 
 async fn emit_status_event(org_id: &str, status: &str) -> Result<(), Error> {

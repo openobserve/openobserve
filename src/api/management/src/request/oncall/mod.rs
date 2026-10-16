@@ -46,6 +46,14 @@ const RESPONSES: &str = "oncall_responses";
 #[cfg(feature = "enterprise")]
 const SETTINGS: &str = "settings";
 
+#[cfg(feature = "enterprise")]
+const VOICE_ORG_INACTIVE: &str = "<Response><Say>This organization is no longer active. \
+     The page was not acknowledged.</Say><Hangup/></Response>";
+
+#[cfg(feature = "enterprise")]
+const VOICE_ORG_UNREADABLE: &str = "<Response><Say>The organization could not be checked. \
+     The page was not acknowledged.</Say><Hangup/></Response>";
+
 /// A second lock behind `route_permissions`, which is first-match-wins and silently shadowable.
 #[cfg(feature = "enterprise")]
 async fn allowed(org_id: &str, user_id: &str, resource: &str, permission: &str) -> bool {
@@ -1568,6 +1576,12 @@ pub async fn acknowledge(
     Path(org_id): Path<String>,
     axum::Form(form): axum::Form<AckQuery>,
 ) -> Response {
+    // The route sits outside the blocked-org gate, so a leaked link must die with its org here.
+    if let Some(refusal) =
+        crate::request::alerts::external_events::inactive_org_response(&org_id).await
+    {
+        return refusal;
+    }
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::oncall::{escalation, service, token};
@@ -1640,6 +1654,11 @@ fn ack_redirect(org_id: &str, response_id: &str) -> Response {
 )]
 /// GET must only look: mail gateways fetch URLs, so a scanner would take the page first.
 pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> Response {
+    if let Some(refusal) =
+        crate::request::alerts::external_events::inactive_org_response(&org_id).await
+    {
+        return refusal;
+    }
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::oncall::{service, token::TokenPurpose};
@@ -1694,24 +1713,57 @@ pub async fn voice_ack(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let twiml = o2_enterprise::enterprise::oncall::service::voice_acknowledge(
-            &org_id,
-            &token,
-            form.digits.as_deref().unwrap_or_default(),
-            config::utils::time::now_micros(),
-        )
-        .await;
-        axum::response::Response::builder()
-            .status(StatusCode::OK)
-            .header(axum::http::header::CONTENT_TYPE, "text/xml")
-            .body(axum::body::Body::from(twiml))
-            .unwrap()
-            .into_response()
+        let active = db::org_status::read_active(&org_id).await;
+        voice_ack_if_active(&org_id, &token, form, active).await
     }
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, token, form);
         MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// The route sits outside the blocked-org gate, so a page call out before the block must not ack.
+#[cfg(feature = "enterprise")]
+async fn voice_ack_if_active(
+    org_id: &str,
+    token: &str,
+    form: VoiceAckForm,
+    active: Result<bool, impl std::fmt::Display>,
+) -> Response {
+    let twiml = match voice_status_refusal(org_id, active) {
+        Some(refusal) => refusal.to_string(),
+        None => {
+            o2_enterprise::enterprise::oncall::service::voice_acknowledge(
+                org_id,
+                token,
+                form.digits.as_deref().unwrap_or_default(),
+                config::utils::time::now_micros(),
+            )
+            .await
+        }
+    };
+    axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header(axum::http::header::CONTENT_TYPE, "text/xml")
+        .body(axum::body::Body::from(twiml))
+        .unwrap()
+        .into_response()
+}
+
+/// TwiML refusal for an inactive or unreadable org, as `inactive_org_response` refuses email acks.
+#[cfg(feature = "enterprise")]
+fn voice_status_refusal(
+    org_id: &str,
+    active: Result<bool, impl std::fmt::Display>,
+) -> Option<&'static str> {
+    match active {
+        Ok(true) => None,
+        Ok(false) => Some(VOICE_ORG_INACTIVE),
+        Err(e) => {
+            log::error!("cannot read the status of org {org_id}: {e}");
+            Some(VOICE_ORG_UNREADABLE)
+        }
     }
 }
 
@@ -4671,6 +4723,90 @@ pub async fn delete_telephony(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_ack_routes_refuse_a_blocked_org() {
+        let org = "oncall-ack-blocked-org";
+        common::infra::config::ORG_STATUS_CACHE
+            .insert(org.into(), common::meta::organization::OrgStatus::Deleting);
+        let token = || AckQuery {
+            token: "leaked".to_string(),
+        };
+        let posted = acknowledge(Path(org.to_string()), axum::Form(token())).await;
+        let fetched = ack_page(Path(org.to_string()), Query(token())).await;
+        common::infra::config::ORG_STATUS_CACHE.remove(org);
+        for resp in [posted, fetched] {
+            assert_eq!(resp.status(), axum::http::StatusCode::FORBIDDEN);
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert!(
+                String::from_utf8_lossy(&body).contains("organization is not active"),
+                "{body:?}"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn voice_reply(resp: Response) -> String {
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        assert_eq!(
+            resp.headers()[axum::http::header::CONTENT_TYPE],
+            "text/xml",
+            "Twilio needs TwiML"
+        );
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        String::from_utf8_lossy(&body).to_string()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_voice_ack_refuses_a_blocked_org_with_twiml() {
+        let org = "oncall-voice-ack-blocked-org";
+        common::infra::config::ORG_STATUS_CACHE.insert(
+            org.into(),
+            common::meta::organization::OrgStatus::PendingDeletion,
+        );
+        let resp = voice_ack(
+            Path((org.to_string(), "leaked".to_string())),
+            axum::Form(VoiceAckForm {
+                digits: Some("1".to_string()),
+            }),
+        )
+        .await;
+        common::infra::config::ORG_STATUS_CACHE.remove(org);
+        assert_eq!(voice_reply(resp).await, VOICE_ORG_INACTIVE);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_voice_ack_refuses_an_unreadable_org_with_twiml() {
+        let form = VoiceAckForm {
+            digits: Some("1".to_string()),
+        };
+        let resp = voice_ack_if_active("voice-org", "tok", form, Err("db down")).await;
+        assert_eq!(voice_reply(resp).await, VOICE_ORG_UNREADABLE);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_voice_ack_of_an_active_org_reaches_the_ack_path() {
+        let form = VoiceAckForm { digits: None };
+        let resp = voice_ack_if_active("voice-org", "tok", form, Ok::<_, String>(true)).await;
+        let twiml = voice_reply(resp).await;
+        let expected = o2_enterprise::enterprise::oncall::service::voice_acknowledge(
+            "voice-org",
+            "tok",
+            "",
+            config::utils::time::now_micros(),
+        )
+        .await;
+        assert_eq!(twiml, expected);
+        assert_ne!(twiml, VOICE_ORG_INACTIVE);
+        assert_ne!(twiml, VOICE_ORG_UNREADABLE);
+    }
 
     #[test]
     fn test_create_team_defaults_to_utc() {

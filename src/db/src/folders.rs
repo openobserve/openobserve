@@ -417,6 +417,38 @@ pub async fn delete_folder(
     Ok(())
 }
 
+/// Org teardown: every folder without the emptiness checks, its ownership before its row.
+pub async fn delete_by_org(org_id: &str) -> Result<(), FolderError> {
+    let folder_types = [
+        FolderType::Dashboards,
+        FolderType::Alerts,
+        FolderType::Reports,
+        FolderType::Synthetics,
+        FolderType::Workflows,
+        FolderType::Prompts,
+        FolderType::Downtimes,
+    ];
+    for folder_type in folder_types {
+        for folder in table::folders::list_folders_rw(org_id, folder_type).await? {
+            let folder_type_ofga = folder_type_ofga_name(folder_type);
+            remove_ownership(org_id, folder_type_ofga, Authz::new(&folder.folder_id)).await;
+            #[cfg(feature = "enterprise")]
+            if publishes(folder_type) {
+                let _ = o2_enterprise::enterprise::super_cluster::queue::folders_delete(
+                    org_id,
+                    &folder.folder_id,
+                    folder_type,
+                )
+                .await;
+            }
+            table::folders::delete(org_id, &folder.folder_id, folder_type).await?;
+        }
+    }
+    // Catches rows whose type no variant above maps, which the typed listing cannot see.
+    table::folders::delete_by_org(org_id).await?;
+    Ok(())
+}
+
 /// A downtime folder travels with the rows filed in it, so it waits for downtime replication too.
 #[cfg(feature = "enterprise")]
 fn publishes(folder_type: FolderType) -> bool {

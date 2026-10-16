@@ -27,6 +27,13 @@ use infra::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
+pub const WORKFLOWS_PREFIX: &str = "/workflows/";
+/// No workflow id contains `/`, so this sub-prefix cannot collide with a per-workflow key.
+const ORG_EVICTION_PREFIX: &str = "org/";
+
+static CACHE: LazyLock<RwLock<HashMap<String, Workflow>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
 #[derive(Serialize, Deserialize)]
 pub enum AssociationDeleteEvent {
     Workflow {
@@ -106,10 +113,11 @@ impl std::fmt::Display for WorkflowTriggerType {
     }
 }
 
-pub const WORKFLOWS_PREFIX: &str = "/workflows/";
-
-static CACHE: LazyLock<RwLock<HashMap<String, Workflow>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
+#[derive(Debug, PartialEq)]
+enum CacheEviction<'a> {
+    Workflow(&'a str),
+    Org(&'a str),
+}
 
 pub async fn get_workflow(
     org_id: &str,
@@ -314,6 +322,16 @@ pub async fn notify_workflow_delete(id: &str) -> Result<(), anyhow::Error> {
             }
         }
     }
+    Ok(())
+}
+
+/// Drops every workflow of an org from all caches with one event, so it needs no workflow ids.
+pub async fn evict_org(org_id: &str) -> Result<(), anyhow::Error> {
+    evict_org_locally(org_id).await;
+    get_coordinator()
+        .await
+        .delete(&org_eviction_key(org_id), false, true, None)
+        .await?;
     Ok(())
 }
 
@@ -565,22 +583,86 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 };
                 CACHE.write().await.remove(&workflow.id);
             }
-            Event::Delete(event) => {
-                let id = event.key.strip_prefix(WORKFLOWS_PREFIX).unwrap();
-                if id.contains('/') {
-                    log::error!("watch_workflows: invalid key {id} for delete");
-                    continue;
+            Event::Delete(event) => match eviction_for(&event.key) {
+                Some(CacheEviction::Workflow(id)) => {
+                    CACHE.write().await.remove(id);
                 }
-                CACHE.write().await.remove(id);
-            }
+                Some(CacheEviction::Org(org_id)) => evict_org_locally(org_id).await,
+                None => log::error!("watch_workflows: invalid key {} for delete", event.key),
+            },
             Event::Empty => {}
         }
     }
 }
 
+fn org_eviction_key(org_id: &str) -> String {
+    format!("{WORKFLOWS_PREFIX}{ORG_EVICTION_PREFIX}{org_id}")
+}
+
+fn eviction_for(key: &str) -> Option<CacheEviction<'_>> {
+    let rest = key.strip_prefix(WORKFLOWS_PREFIX)?;
+    if let Some(org_id) = rest.strip_prefix(ORG_EVICTION_PREFIX) {
+        return (!org_id.is_empty() && !org_id.contains('/')).then_some(CacheEviction::Org(org_id));
+    }
+    (!rest.contains('/')).then_some(CacheEviction::Workflow(rest))
+}
+
+async fn evict_org_locally(org_id: &str) {
+    CACHE.write().await.retain(|_, w| w.org_id != org_id);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn cached(id: &str, org_id: &str) -> Workflow {
+        Workflow {
+            id: id.to_string(),
+            org_id: org_id.to_string(),
+            folder_id: String::new(),
+            created_at: 0,
+            updated_at: 0,
+            created_by: String::new(),
+            enabled: false,
+            name: id.to_string(),
+            description: String::new(),
+            nodes: vec![],
+            edges: vec![],
+        }
+    }
+
+    #[test]
+    fn test_delete_keys_map_to_their_eviction() {
+        assert_eq!(
+            eviction_for(&org_eviction_key("acme")),
+            Some(CacheEviction::Org("acme"))
+        );
+        assert_eq!(
+            eviction_for("/workflows/2iRXmH4pQ7bLtVzKcN9sYdFgWjE"),
+            Some(CacheEviction::Workflow("2iRXmH4pQ7bLtVzKcN9sYdFgWjE"))
+        );
+        assert_eq!(
+            eviction_for("/workflows/org"),
+            Some(CacheEviction::Workflow("org"))
+        );
+        assert_eq!(eviction_for("/workflows/org/"), None);
+        assert_eq!(eviction_for("/workflows/a/b"), None);
+        assert_eq!(eviction_for("/other/a"), None);
+    }
+
+    #[tokio::test]
+    async fn test_org_eviction_spares_other_orgs() {
+        {
+            let mut cache = CACHE.write().await;
+            cache.insert("wfevict_a".to_string(), cached("wfevict_a", "wfevict_gone"));
+            cache.insert("wfevict_b".to_string(), cached("wfevict_b", "wfevict_gone"));
+            cache.insert("wfevict_c".to_string(), cached("wfevict_c", "wfevict_kept"));
+        }
+        evict_org_locally("wfevict_gone").await;
+        let cache = CACHE.read().await;
+        assert!(!cache.contains_key("wfevict_a") && !cache.contains_key("wfevict_b"));
+        assert!(cache.contains_key("wfevict_c"));
+    }
 
     #[test]
     fn a_padded_slug_names_the_same_folder_as_the_trimmed_one() {

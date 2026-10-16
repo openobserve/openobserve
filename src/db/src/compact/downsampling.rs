@@ -111,6 +111,27 @@ pub async fn del_offset(
         .map_err(Into::into)
 }
 
+/// Evicts this node's cached offsets first, so a later sync cannot write them back.
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let prefix = format!("/compact/downsampling/{org_id}/");
+    CACHES
+        .write()
+        .await
+        .retain(|key, _| !key.starts_with(&prefix));
+    db::delete_if_exists(&prefix, true, db::NO_NEED_WATCH)
+        .await
+        .map_err(Into::into)
+}
+
+/// Evicts this node's cached offsets of every rule of a deleted stream.
+pub async fn evict_stream(org_id: &str, stream_type: StreamType, stream_name: &str) {
+    let prefix = format!("/compact/downsampling/{org_id}/{stream_type}/{stream_name}/");
+    CACHES
+        .write()
+        .await
+        .retain(|key, _| !key.starts_with(&prefix));
+}
+
 pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
     let mut items = Vec::new();
     let key = "/compact/downsampling/";

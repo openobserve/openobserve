@@ -445,6 +445,30 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
     Ok(())
 }
 
+/// Each report of the org with its folder's `folder_id`, including reports no dashboard joins.
+pub async fn list_ids_by_org<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<Vec<(String, String)>, Error> {
+    use sea_orm::{QuerySelect, RelationTrait};
+
+    use super::entity::folders;
+
+    let ids = reports::Entity::find()
+        .select_only()
+        .column(reports::Column::Id)
+        .column(folders::Column::FolderId)
+        .join(
+            sea_orm::JoinType::InnerJoin,
+            reports::Relation::Folders.def(),
+        )
+        .filter(reports::Column::Org.eq(org_id))
+        .into_tuple::<(String, String)>()
+        .all(conn)
+        .await?;
+    Ok(ids)
+}
+
 /// Lists the reports the satisfy the given parameters.
 pub async fn list_reports<C: ConnectionTrait>(
     conn: &C,

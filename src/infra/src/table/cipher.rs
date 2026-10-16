@@ -334,6 +334,24 @@ pub async fn list_filtered(
         .collect()
 }
 
+/// Names of the org's non-system entries of `kind`, read from the primary and never decrypted.
+pub async fn list_names_by_org_rw(
+    org: &str,
+    kind: EntryKind,
+) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let names = Entity::find()
+        .select_only()
+        .column(Column::Name)
+        .filter(Column::Org.eq(org))
+        .filter(Column::Kind.eq(kind.to_string()))
+        .filter(Column::IsSystem.eq(false))
+        .into_tuple::<String>()
+        .all(client)
+        .await?;
+    Ok(names)
+}
+
 pub async fn clear() -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
     Entity::delete_many().exec(client).await?;
@@ -404,13 +422,31 @@ pub async fn get_dek(org: &str) -> Result<Vec<u8>, errors::Error> {
     Ok(dek)
 }
 
-/// Deletes all cipher key entries belonging to the given org.
+/// The org's DEK if it has one; unlike [`get_dek`] it never mints one.
+pub async fn find_dek(org: &str) -> Result<Option<Vec<u8>>, errors::Error> {
+    if let Some(entry) = DEK_CACHE.get(org)
+        && entry.1.elapsed() < DEK_CACHE_TTL
+    {
+        return Ok(Some(entry.0.clone()));
+    }
+    let Some(b64) = get_data(org, EntryKind::CipherKey, DEFAULT_DEK_NAME).await? else {
+        return Ok(None);
+    };
+    let dek = BASE64_STANDARD
+        .decode(b64)
+        .map_err(|e| errors::Error::Message(format!("failed to decode DEK for org {org}: {e}")))?;
+    DEK_CACHE.insert(org.to_string(), (dek.clone(), Instant::now()));
+    Ok(Some(dek))
+}
+
+/// Deletes all cipher key entries belonging to the given org, the system DEK included.
 pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Org.eq(org))
         .exec(client)
         .await?;
+    DEK_CACHE.remove(org);
     Ok(())
 }
 

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
 
 pub use crate::table::entity::backfill_jobs::{ActiveModel, Column, Entity, Model, Relation};
@@ -73,6 +73,22 @@ pub async fn list_by_org(org: &str) -> Result<Vec<BackfillJob>, errors::Error> {
     match res {
         Ok(models) => Ok(models.into_iter().map(|model| model.into()).collect()),
         Err(e) => orm_err!(format!("list backfill jobs error: {e}")),
+    }
+}
+
+/// Job ids of the org, read from the primary.
+pub async fn list_ids_by_org_rw(org: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let res = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(Column::Org.eq(org))
+        .into_tuple::<String>()
+        .all(client)
+        .await;
+    match res {
+        Ok(ids) => Ok(ids),
+        Err(e) => orm_err!(format!("list backfill job ids error: {e}")),
     }
 }
 

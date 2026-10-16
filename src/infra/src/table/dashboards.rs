@@ -171,6 +171,14 @@ pub async fn list_skipping_invalid(
     Ok(convert_skipping_invalid(list_models(client, params).await?))
 }
 
+/// Like [`list_skipping_invalid`], but reads the primary.
+pub async fn list_skipping_invalid_rw(
+    params: ListDashboardsParams,
+) -> Result<Vec<(Folder, Dashboard)>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    Ok(convert_skipping_invalid(list_models(client, params).await?))
+}
+
 /// Lists all existing dashboards
 pub async fn list_all() -> Result<Vec<(String, Dashboard)>, errors::Error> {
     let client = get_orm_client_ro().await;

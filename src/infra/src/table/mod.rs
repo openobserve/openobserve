@@ -49,6 +49,7 @@ pub mod gen_ai_agents;
 pub mod incident_events;
 pub mod incident_integrations;
 pub mod kv_store;
+pub mod llm_eval;
 pub mod llm_prompts;
 pub mod llm_secrets;
 mod migration;

@@ -60,6 +60,11 @@ pub(crate) fn resolve_kind(
     }
 }
 
+/// The org a saved template's ownership tuple names, which org deletion looks up.
+pub(crate) fn ownership_of(saved: &Template) -> (&str, Authz) {
+    (&saved.org_id, Authz::new(&saved.name))
+}
+
 pub async fn save(
     name: &str,
     mut template: Template,
@@ -133,7 +138,8 @@ pub async fn save(
     template.is_default = template.org_id.eq(DEFAULT_ORG);
     let saved = db::alerts::templates::set(template).await?;
     if name.is_empty() {
-        set_ownership(&saved.name, "templates", Authz::new(&saved.name)).await;
+        let (owner, object) = ownership_of(&saved);
+        set_ownership(owner, "templates", object).await;
     }
     Ok(saved)
 }
@@ -167,8 +173,11 @@ pub async fn delete(org_id: &str, name: &str, is_root: bool) -> Result<(), Templ
     if !is_root && is_reserved_template_name(name) {
         return Err(TemplateError::PrebuiltReadOnly(name.to_string()));
     }
+    let owners = owners_to_disown(org_id, name).await?;
     db::alerts::templates::delete(org_id, name).await?;
-    remove_ownership(org_id, "templates", Authz::new(name)).await;
+    for owner in owners {
+        remove_ownership(&owner, "templates", Authz::new(name)).await;
+    }
     Ok(())
 }
 
@@ -382,6 +391,14 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Owners whose template tuple a delete removes; a legacy tuple a live org shares stays.
+async fn owners_to_disown(org_id: &str, name: &str) -> Result<Vec<String>, TemplateError> {
+    let name = name.to_string();
+    let mut owners =
+        db::alerts::templates::tuple_owners(org_id, std::slice::from_ref(&name)).await?;
+    Ok(owners.remove(&name).unwrap_or_default())
+}
+
 fn seeded_downtime_templates() -> Vec<Template> {
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -396,6 +413,82 @@ fn seeded_downtime_templates() -> Vec<Template> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The global meta store CI configures through `ZO_META_STORE`, migrated once per binary.
+    async fn meta_store() -> bool {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return false;
+        }
+        ONCE.get_or_init(|| async {
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+        true
+    }
+
+    #[tokio::test]
+    async fn test_single_delete_disowns_only_tracked_owners_and_an_unshared_legacy_tuple() {
+        if !meta_store().await {
+            return;
+        }
+        let suffix = config::utils::time::now_micros();
+        let (org, other) = (format!("t_sd_org_{suffix}"), format!("t_sd_other_{suffix}"));
+        let (solo, shared) = (
+            format!("t_sd_solo_{suffix}"),
+            format!("t_sd_shared_{suffix}"),
+        );
+        for (owner, name) in [(&org, &solo), (&org, &shared), (&other, &shared)] {
+            let [mut template, _] = downtime_templates();
+            template.org_id = owner.to_string();
+            template.name = name.to_string();
+            infra::table::templates::put(template).await.unwrap();
+        }
+        infra::table::organizations::add(
+            &other,
+            &other,
+            config::meta::organization::OrganizationType::Custom,
+        )
+        .await
+        .unwrap();
+        let solo_owners = owners_to_disown(&org, &solo).await.unwrap();
+        let shared_owners = owners_to_disown(&org, &shared).await.unwrap();
+        infra::table::templates::delete_by_org(&org).await.unwrap();
+        infra::table::templates::delete_by_org(&other)
+            .await
+            .unwrap();
+        infra::table::organizations::remove(&other).await.unwrap();
+
+        // Without OpenFGA there are no tuples, so the delete looks up no owners.
+        let tracked = |owners: &[&str]| -> Vec<String> {
+            if !db::authz::tracks_ownership() {
+                return vec![];
+            }
+            owners.iter().map(|o| o.to_string()).collect()
+        };
+        assert_eq!(solo_owners, tracked(&[org.as_str(), solo.as_str()]));
+        assert_eq!(shared_owners, tracked(&[org.as_str()]));
+    }
+
+    #[test]
+    fn test_new_template_ownership_names_its_org() {
+        let [mut template, _] = downtime_templates();
+        template.org_id = "acme".to_string();
+        template.name = "tpl_acme".to_string();
+        let (owner, object) = ownership_of(&template);
+        assert_eq!((owner, object.obj_id.as_str()), ("acme", "tpl_acme"));
+        #[cfg(feature = "enterprise")]
+        {
+            let tuples = db::authz::ownership_tuples(owner, "templates", &object);
+            let shapes: Vec<_> = tuples
+                .iter()
+                .map(|t| (t.user.as_str(), t.relation.as_str(), t.object.as_str()))
+                .collect();
+            assert_eq!(shapes, [("org:acme", "owningOrg", "template:tpl_acme")]);
+        }
+    }
 
     #[test]
     fn test_downtime_templates_are_reserved_and_use_only_downtime_variables() {

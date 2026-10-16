@@ -29,6 +29,7 @@ const KIND_SCHEDULE: &str = "schedule";
 /// rotation they are on, and the emitter has no team to name.
 const KIND_ABSENCE: &str = "absence";
 const KIND_ACK_SPENT: &str = "ack-spent";
+const KIND_ORG_DELETED: &str = "org-deleted";
 
 /// An org's ownership rules changed — created, deleted, or replicated in.
 pub async fn emit_ownership_changed(org_id: &str) -> Result<(), Error> {
@@ -81,6 +82,15 @@ pub async fn emit_schedule_changed(org_id: &str, team_id: &str) -> Result<(), Er
 pub async fn emit_absences_changed(org_id: &str) -> Result<(), Error> {
     emit(&format!(
         "{ONCALL_CACHE_WATCHER_PREFIX}{KIND_ABSENCE}/{org_id}"
+    ))
+    .await
+}
+
+/// The org was deleted: every org-keyed on-call cache of it drops.
+pub async fn emit_org_deleted(org_id: &str) -> Result<(), Error> {
+    // Transient: one key per deleted org would otherwise stay in the store forever.
+    emit_transient(&format!(
+        "{ONCALL_CACHE_WATCHER_PREFIX}{KIND_ORG_DELETED}/{org_id}"
     ))
     .await
 }
@@ -194,6 +204,10 @@ fn apply<F: Fn(&str, i64)>(key: &str, on_ack_token_spent: &F) {
             Some(org) => crate::table::oncall_schedules::invalidate_org(org),
             None => log::error!("watch_oncall_cache: malformed absence key {key}"),
         },
+        Some(KIND_ORG_DELETED) => match parts.get(2) {
+            Some(org) => crate::table::oncall_teams::invalidate_org(org),
+            None => log::error!("watch_oncall_cache: malformed org-deleted key {key}"),
+        },
         Some(KIND_ACK_SPENT) => match (parts.get(2), parts.get(3).and_then(|e| e.parse().ok())) {
             (Some(tag), Some(expires_at)) => on_ack_token_spent(tag, expires_at),
             // Refused, not guessed: an invented expiry either never lapses or lapses at once.
@@ -219,6 +233,7 @@ mod tests {
             format!("{ONCALL_CACHE_WATCHER_PREFIX}{KIND_SCHEDULE}/default/team_1"),
             format!("{ONCALL_CACHE_WATCHER_PREFIX}{KIND_ABSENCE}/default"),
             format!("{ONCALL_CACHE_WATCHER_PREFIX}{KIND_ACK_SPENT}/deadbeef/1700000000000000"),
+            format!("{ONCALL_CACHE_WATCHER_PREFIX}{KIND_ORG_DELETED}/default"),
         ] {
             assert!(k.starts_with(ONCALL_CACHE_WATCHER_PREFIX), "{k}");
         }
@@ -253,6 +268,7 @@ mod tests {
             "/oncall_cache/policy/onlyorg",
             "/oncall_cache/team",
             "/oncall_cache/members",
+            "/oncall_cache/org-deleted",
             "/oncall_cache/nonsense/a/b",
             "/oncall_cache/ack-spent/deadbeef",
             "/oncall_cache/ack-spent/deadbeef/not-a-number",

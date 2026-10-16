@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    DEFAULT_ORG, ider,
+    DEFAULT_ORG, META_ORG_ID, ider,
     meta::{
         alerts::alert::ListAlertsParams,
         dashboards::ListDashboardsParams,
@@ -757,10 +757,33 @@ fn validate_auto_created_org_id(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Refuses blocked or tombstoned ids, so auto-provisioning never revives a deleted org.
+async fn refuse_deleted_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let tombstoned = || async {
+        table::organizations::get(org_id)
+            .await
+            .is_ok_and(|org| org.status == "deleted")
+    };
+    if db::org_status::is_blocked(org_id) || tombstoned().await {
+        return Err(anyhow::anyhow!("Organization {org_id} is deleted"));
+    }
+    Ok(())
+}
+
+/// Refuses an invite into a missing org or one that is being deleted or deleted.
+#[cfg(any(feature = "cloud", test))]
+async fn refuse_inactive_invite_org(org_id: &str) -> Result<(), anyhow::Error> {
+    if !db::org_status::is_active(org_id).await {
+        return Err(anyhow::anyhow!("Organization is not active"));
+    }
+    Ok(())
+}
+
 /// Checks if the org exists, otherwise creates the org. Does not associate any user
 /// with the org, only saves the org in the meta and creates org tuples.
 pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::Error> {
     let org_id = org_id.trim();
+    refuse_deleted_org(org_id).await?;
     if let Some(org) = get_org(org_id).await {
         return Ok(org);
     }
@@ -819,6 +842,7 @@ pub async fn check_and_create_org_without_ofga(
     org_id: &str,
 ) -> Result<Organization, anyhow::Error> {
     let org_id = org_id.trim();
+    refuse_deleted_org(org_id).await?;
     if let Some(org) = get_org(org_id).await {
         return Ok(org);
     }
@@ -905,6 +929,9 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
     if org_id.eq(DEFAULT_ORG) {
         return Err(anyhow::anyhow!("Cannot delete default organization"));
     }
+    if org_id.eq(META_ORG_ID) {
+        return Err(anyhow::anyhow!("Cannot delete meta organization"));
+    }
 
     // Snapshot the org BEFORE deleting — the cloud OrgDeleted event needs its
     // name/type, and after delete_org the record is gone. (Previously this was
@@ -915,7 +942,8 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
 
     match db::organization::delete_org(org_id).await {
         Ok(_) => {
-            delete_org_tuples(org_id).await;
+            // Returned after the event: a retry finds no row, so it would never emit it.
+            let tuples = delete_org_tuples(org_id).await;
             crate::ingestion::rejections::clear_rejections(org_id).await;
             #[cfg(feature = "cloud")]
             if let Some(org) = org_snapshot {
@@ -930,13 +958,43 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
                 })
                 .await;
             }
-            Ok(())
+            tuples
         }
         Err(e) => {
             log::error!("Error deleting org: {e}");
             Err(anyhow::anyhow!("Error deleting org: {}", e))
         }
     }
+}
+
+/// Final org-delete step: keeps the row as a `deleted` tombstone; true only on the flipping call.
+pub async fn tombstone_org(org_id: &str) -> Result<bool, anyhow::Error> {
+    if org_id.eq(DEFAULT_ORG) || org_id.eq(META_ORG_ID) {
+        return Err(anyhow::anyhow!("Cannot delete this organization"));
+    }
+
+    #[cfg(feature = "cloud")]
+    let org_snapshot = get_org(org_id).await;
+
+    delete_org_tuples(org_id).await?;
+    // Only the call that flips the row emits OrgDeleted, so a step 900 retry does not repeat it.
+    let flipped = db::organization::tombstone_org(org_id).await?;
+    #[cfg(feature = "cloud")]
+    if flipped && let Some(org) = org_snapshot {
+        enqueue_cloud_event(CloudEvent {
+            org_id: org.identifier.clone(),
+            org_name: org.name.clone(),
+            org_type: org.org_type.clone(),
+            user: None,
+            subscription_type: None,
+            event: EventType::OrgDeleted,
+            stream_name: None,
+        })
+        .await;
+    }
+    db::organization::evict_org(org_id).await?;
+    crate::ingestion::rejections::clear_rejections(org_id).await;
+    Ok(flipped)
 }
 
 #[cfg(feature = "cloud")]
@@ -1100,6 +1158,7 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
         return Err(anyhow::anyhow!("Invalid token"));
     }
     let org_id = invite.org_id.clone();
+    refuse_inactive_invite_org(&org_id).await?;
 
     let org = match get_org(&org_id).await {
         Some(org) => org,
@@ -1510,6 +1569,41 @@ mod tests {
                 "expected {org_id} to be accepted"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_remove_org_refuses_meta_org() {
+        let err = remove_org(META_ORG_ID).await.unwrap_err();
+        assert_eq!(err.to_string(), "Cannot delete meta organization");
+    }
+
+    #[tokio::test]
+    async fn test_accept_invitation_rejects_non_active_org() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+
+        let org = "invitegateorg";
+        let _ = infra_db::create_table().await;
+        let _ = infra_table::create_user_tables().await;
+        check_and_create_org_without_ofga(org).await.unwrap();
+        refuse_inactive_invite_org(org).await.unwrap();
+        for status in [
+            OrgStatus::PendingDeletion,
+            OrgStatus::Deleting,
+            OrgStatus::Deleted,
+        ] {
+            ORG_STATUS_CACHE.insert(org.to_string(), status.clone());
+            let refused = refuse_inactive_invite_org(org).await;
+            ORG_STATUS_CACHE.remove(org);
+            assert!(
+                refused.is_err(),
+                "an invite into a {status:?} org was accepted"
+            );
+        }
+        assert!(
+            refuse_inactive_invite_org("invitegate-never-created")
+                .await
+                .is_err()
+        );
     }
 
     #[test]

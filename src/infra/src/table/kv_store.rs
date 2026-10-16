@@ -93,6 +93,19 @@ pub async fn list(org_id: &str, prefix: &str) -> Result<Vec<String>, errors::Err
     Ok(keys)
 }
 
+/// Every key of the org, read from the primary.
+pub async fn list_keys_by_org_rw(org_id: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let keys = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .select_only()
+        .column(Column::Key)
+        .into_tuple::<String>()
+        .all(client)
+        .await?;
+    Ok(keys)
+}
+
 /// Clears all KV entries from the table
 pub async fn clear() -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;

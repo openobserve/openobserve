@@ -20,7 +20,10 @@
 //! the incident events ingestion endpoint. `incident_integration_senders`
 //! tracks distinct upstream senders observed per integration for visibility.
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr, sea_query::Expr};
+use sea_orm::{
+    ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr,
+    sea_query::{Expr, Query},
+};
 
 use super::entity::{
     incident_integration_senders::{
@@ -466,6 +469,26 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     Ok(true)
+}
+
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    let client = get_orm_client_rw().await;
+    let integration_ids = Query::select()
+        .column(Column::Id)
+        .from(Entity)
+        .and_where(Column::OrgId.eq(org_id))
+        .to_owned();
+    SenderEntity::delete_many()
+        .filter(SenderColumn::IntegrationId.in_subquery(integration_ids))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(())
 }
 
 /// List all observed senders for an integration.

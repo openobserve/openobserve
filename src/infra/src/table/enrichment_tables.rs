@@ -351,6 +351,21 @@ pub async fn list() -> Result<Vec<(String, String)>, errors::Error> {
         .collect())
 }
 
+/// Table names of the org, read from the primary.
+pub async fn list_names_by_org_rw(org: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let records = Entity::find()
+        .select_only()
+        .column(Column::Org)
+        .column(Column::Name)
+        .filter(Column::Org.eq(org))
+        .distinct()
+        .into_model::<EnrichmentTableOrgName>()
+        .all(client)
+        .await?;
+    Ok(records.into_iter().map(|r| r.name).collect())
+}
+
 /// Deletes all enrichment table entries belonging to the given org.
 pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;

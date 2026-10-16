@@ -251,29 +251,32 @@ pub async fn remove(org_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn get(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
+    find(org_id)
+        .await?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Organization not found".to_string())))
+}
+
+/// Like `get`, but a missing row is `Ok(None)`, so only a failed read is an error.
+pub async fn find(org_id: &str) -> Result<Option<OrganizationRecord>, errors::Error> {
     {
         let cache = CACHE.read().await;
         if let Some(v) = cache.get(org_id) {
-            return Ok(v.clone());
+            return Ok(Some(v.clone()));
         }
     }
     let epoch = cache_epoch();
-    let org = get_from_db(org_id).await?;
+    let Some(org) = find_in_db(org_id).await? else {
+        return Ok(None);
+    };
     fill_cache(org_id, org.clone(), epoch).await;
-    Ok(org)
+    Ok(Some(org))
 }
 
 /// The org row read from the primary, bypassing the cache and leaving it untouched.
 pub async fn get_from_db(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
-    let record = Entity::find()
-        .filter(Column::Identifier.eq(org_id))
-        .one(get_orm_client_rw().await)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
-        .ok_or_else(|| {
-            Error::DbError(DbError::SeaORMError("Organization not found".to_string()))
-        })?;
-    Ok(OrganizationRecord::from(record))
+    find_in_db(org_id)
+        .await?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Organization not found".to_string())))
 }
 
 pub async fn list(filter: ListFilter) -> Result<Vec<OrganizationRecord>, errors::Error> {
@@ -455,6 +458,22 @@ pub async fn list_ids_by_status(status: &str) -> Result<Vec<String>, errors::Err
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// `list_ids_by_status` with each org's `deleted_at`.
+pub async fn list_ids_and_deleted_at_by_status(
+    status: &str,
+) -> Result<Vec<(String, Option<i64>)>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    Entity::find()
+        .select_only()
+        .column(Column::Identifier)
+        .column(Column::DeletedAt)
+        .filter(Column::Status.eq(status))
+        .into_tuple::<(String, Option<i64>)>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 /// Ids of tombstoned orgs whose deletion finished (`updated_at`) before `before`.
 pub async fn list_expired_tombstones(before: i64) -> Result<Vec<String>, errors::Error> {
     Ok(list_expired_tombstone_rows(before)
@@ -511,6 +530,15 @@ pub async fn invalidate_cache(org_id: Option<&str>) {
     } else {
         cache.drain();
     }
+}
+
+async fn find_in_db(org_id: &str) -> Result<Option<OrganizationRecord>, errors::Error> {
+    let record = Entity::find()
+        .filter(Column::Identifier.eq(org_id))
+        .one(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(record.map(OrganizationRecord::from))
 }
 
 fn cache_epoch() -> u64 {

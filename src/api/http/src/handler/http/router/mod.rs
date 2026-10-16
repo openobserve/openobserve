@@ -76,8 +76,8 @@ use crate::{
             validator_rum,
         },
         router::middlewares::{
-            blocked_orgs_middleware, ingest_rejections_middleware, password_policy_middleware,
-            root_only_middleware,
+            blocked_org_param, blocked_orgs_middleware, ingest_rejections_middleware,
+            password_policy_middleware, root_only_middleware,
         },
     },
 };
@@ -982,6 +982,7 @@ pub fn service_routes() -> Router {
         .route("/organizations", get(organization::org::organizations).post(organization::org::create_org))
         .route("/{org_id}/organizations/assume_service_account", post(organization::assume_service_account::assume_service_account))
         .route("/{org_id}/org_cleanup_tasks/{target_org_id}", get(organization::org::list_org_cleanup_tasks))
+        .route("/{org_id}/org_cleanup_tasks/{target_org_id}/retry", post(organization::org::retry_org_cleanup))
         .route(
             "/{org_id}/organizations/{target_org_id}/resurrect",
             post(organization::org::resurrect_org_deletion),
@@ -2204,6 +2205,7 @@ pub fn other_service_routes() -> Router {
             "/{org_id}/{stream_name}/_kinesis_firehose",
             post(logs::ingest::handle_kinesis_request),
         )
+        .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(aws_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
@@ -2212,6 +2214,7 @@ pub fn other_service_routes() -> Router {
             "/{org_id}/{stream_name}/_sub",
             post(logs::ingest::handle_gcp_request),
         )
+        .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(gcp_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
@@ -2219,6 +2222,7 @@ pub fn other_service_routes() -> Router {
         .route("/v1/{org_id}/logs", post(rum::ingest::log))
         .route("/v1/{org_id}/replay", post(rum::ingest::sessionreplay))
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
+        .route_layer(middleware::from_fn(blocked_org_param))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
         .layer(RequestDecompressionLayer::new());

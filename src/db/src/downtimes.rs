@@ -129,17 +129,19 @@ pub async fn delete(org: &str, id: &str, stored: table::RowVersion) -> Result<bo
 
 /// Org deletion: every row, every node cache, every region and every OpenFGA tuple.
 pub async fn delete_by_org(org: &str) -> Result<(), anyhow::Error> {
-    let rows = table::list(org, None).await?;
-    let ids = table::delete_by_org(org).await?;
-    for id in &ids {
-        coordinator::emit_delete_event(org, id).await?;
-        // Org deletion removes the rows outright, so no region may keep a tombstone for them.
-        #[cfg(feature = "enterprise")]
-        super_cluster::emit_delete(org, id, 0, 0).await;
-    }
-    remove_org(org);
+    let conn = infra::db::get_orm_client_rw().await;
+    // The primary, so a row a lagging replica hides still loses its ownership tuple.
+    let rows = table::list_with(conn, org, None).await?;
+    let ids = table::list_ids_by_org_with(conn, org).await?;
+    // A retry lists no deleted row, so every side effect runs while the rows still exist.
+    evict_org(org, &ids).await?;
     for row in &rows {
         crate::authz::remove_ownership(org, "downtimes", ownership(row)).await;
+    }
+    let removed = table::delete_by_org(org).await?;
+    // A cache reload before the delete can refill the caches, and no retry lists a deleted row.
+    if let Err(e) = evict_org(org, &with_removed(ids, removed)).await {
+        log::warn!("[DOWNTIMES] eviction of org {org} after the row delete failed: {e}");
     }
     Ok(())
 }
@@ -302,6 +304,31 @@ fn remove_org(org: &str) {
         .remove(org);
 }
 
+/// Drops this node's rows of the org, then every node's and region's copy of each id.
+async fn evict_org(org: &str, ids: &[String]) -> Result<(), anyhow::Error> {
+    let local = async { remove_org(org) };
+    let broadcast = async {
+        for id in ids {
+            coordinator::emit_delete_event(org, id).await?;
+            // Org deletion removes the rows outright, so no region may keep a tombstone for them.
+            #[cfg(feature = "enterprise")]
+            super_cluster::emit_delete(org, id, 0, 0).await;
+        }
+        Ok::<(), anyhow::Error>(())
+    };
+    crate::teardown::evict(local, broadcast).await
+}
+
+/// The listed ids plus any the delete removed that were written after the listing.
+fn with_removed(mut listed: Vec<String>, removed: Vec<String>) -> Vec<String> {
+    for id in removed {
+        if !listed.contains(&id) {
+            listed.push(id);
+        }
+    }
+    listed
+}
+
 /// Best effort: the local write happened, and the next edit repairs a lost message (`put` upserts).
 #[cfg(feature = "enterprise")]
 mod super_cluster {
@@ -461,6 +488,17 @@ mod tests {
             ]
         );
         assert!(ownership_backfill(&[]).is_empty());
+    }
+
+    #[test]
+    fn the_post_delete_eviction_also_names_rows_written_after_the_listing() {
+        let owned = |ids: &[&str]| ids.iter().map(|id| id.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            with_removed(owned(&["a", "b"]), owned(&["b", "late", "a"])),
+            ["a", "b", "late"]
+        );
+        assert_eq!(with_removed(owned(&["a"]), vec![]), ["a"]);
+        assert_eq!(with_removed(vec![], owned(&["late"])), ["late"]);
     }
 
     #[cfg(feature = "enterprise")]

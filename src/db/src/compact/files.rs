@@ -105,6 +105,18 @@ pub async fn del_offset(
         .map_err(Into::into)
 }
 
+/// Evicts this node's cached offsets first, so a later sync cannot write them back.
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let prefix = format!("/compact/files/{org_id}/");
+    CACHES
+        .write()
+        .await
+        .retain(|key, _| !key.starts_with(&prefix));
+    db::delete_if_exists(&prefix, true, db::NO_NEED_WATCH)
+        .await
+        .map_err(Into::into)
+}
+
 pub async fn reset_offset(time: i64, stream: Option<&str>) -> Result<u64, anyhow::Error> {
     let prefix = match stream {
         Some(s) => format!("/compact/files/{s}"),

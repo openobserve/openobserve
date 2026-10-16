@@ -220,6 +220,19 @@ pub static SYNTHETICS_ORPHANED_CHECKS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static ORG_CLEANUP_FAILED_STEPS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "org_cleanup_failed_steps",
+            "Org deletion steps that exhausted their attempts, per org.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org"],
+    )
+    .expect("Metric created")
+});
+
 /// Completed orphan-detection passes. A dead-man's switch, not a workload count.
 ///
 /// The detector runs only on scheduler nodes and reads only its own region's
@@ -2852,6 +2865,9 @@ pub(crate) fn register(registry: &Registry) {
         .register(Box::new(SYNTHETICS_ORPHANED_CHECKS.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(ORG_CLEANUP_FAILED_STEPS.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(SYNTHETICS_ORPHAN_SCANS_TOTAL.clone()))
         .expect("Metric registered");
     registry
@@ -3483,6 +3499,7 @@ mod tests {
         let _ = SYNTHETICS_PENDING_JOBS.clone();
         let _ = SYNTHETICS_OLDEST_PENDING_AGE_SECONDS.clone();
         let _ = SYNTHETICS_ORPHANED_CHECKS.clone();
+        let _ = ORG_CLEANUP_FAILED_STEPS.clone();
         let _ = SYNTHETICS_ORPHAN_SCANS_TOTAL.clone();
         let _ = SYNTHETICS_UNREADABLE_CHECKS_TOTAL.clone();
         let _ = O2_SERVICE_GRAPH_RESOLVED_TOTAL.clone();
@@ -3698,6 +3715,20 @@ mod tests {
                     .collect()
             };
             assert_eq!(labels, expected, "{}", family.name());
+        }
+    }
+
+    #[test]
+    fn test_org_cleanup_failed_steps_help_names_only_its_org_label() {
+        use prometheus::core::Collector;
+        let desc = ORG_CLEANUP_FAILED_STEPS.desc();
+        assert_eq!(desc[0].variable_labels, ["org"]);
+        let help = &desc[0].help;
+        for absent in ["'organization", "'stream type'", "'stream'"] {
+            assert!(
+                !help.contains(absent),
+                "help names a label it lacks: {help}"
+            );
         }
     }
 }

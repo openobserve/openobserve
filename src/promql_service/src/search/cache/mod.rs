@@ -379,6 +379,27 @@ pub async fn set(
     Ok(())
 }
 
+/// Removes this node's cached metrics results of an org: the disk files, then their index entries.
+pub async fn remove_org_results(org_id: &str) -> Result<()> {
+    let dirs = infra::cache::file_data::disk::get_dirs().await;
+    let files = org_result_files(&dirs, org_id)?;
+    let mut keys = Vec::with_capacity(files.len());
+    for (path, key) in files {
+        infra::cache::file_data::disk::remove(&key)
+            .await
+            .map_err(|e| Error::Message(format!("remove {key}: {e}")))?;
+        // The index removes only files it holds, so an unindexed one goes by path.
+        if let Err(e) = std::fs::remove_file(&path)
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            return Err(Error::Message(format!("remove {path}: {e}")));
+        }
+        keys.push(key);
+    }
+    remove_evicted_files(keys).await;
+    Ok(())
+}
+
 /// Adopt a cache file found on disk into the index; false means its name is not in this format.
 async fn load(cache_key: &str) -> bool {
     let Some((key, start, end)) = parse_cache_item_key(cache_key) else {
@@ -666,6 +687,28 @@ fn item_size(item: &MetricsIndexCacheItem) -> usize {
 
 fn key_size(key: &str, index: &MetricsIndexCache) -> usize {
     index_base_size(key, &index.query) + index.entries.iter().map(|v| item_size(v)).sum::<usize>()
+}
+
+/// `(path, cache key)` of each metrics result file of the org under any of the cache dirs.
+fn org_result_files(dirs: &[String], org_id: &str) -> Result<Vec<(String, String)>> {
+    let mut files = Vec::new();
+    for root in dirs {
+        let root = root.trim_end_matches('/');
+        let dir = format!("{root}/metrics_results/{org_id}");
+        let found = match config::utils::file::scan_files(&dir, "pb", None) {
+            Ok(found) => found,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => return Err(Error::Message(format!("scan {dir}: {e}"))),
+        };
+        let prefix = format!("{root}/");
+        for path in found {
+            if let Some(key) = path.strip_prefix(&prefix) {
+                let key = key.to_string();
+                files.push((path, key));
+            }
+        }
+    }
+    Ok(files)
 }
 
 #[cfg(test)]
@@ -1306,5 +1349,40 @@ mod tests {
         // All values should be non-negative (usize is always >= 0)
         // The function should complete without panicking
         assert!(len <= cap); // Length should not exceed capacity
+    }
+
+    #[test]
+    fn test_org_result_files_covers_every_cache_subdirectory() {
+        let root = std::env::temp_dir().join(format!(
+            "o2-metrics-org-files-{}-{}",
+            std::process::id(),
+            now_micros()
+        ));
+        let root = root.to_str().unwrap().to_string();
+        for file in [
+            "metrics_results/t1/2026/01/01/00/a.pb",
+            "d2/metrics_results/t1/2026/01/01/00/b.pb",
+            "d2/metrics_results/t10/2026/01/01/00/c.pb",
+        ] {
+            let path = std::path::Path::new(&root).join(file);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, b"x").unwrap();
+        }
+        let dirs = [
+            format!("{root}/"),
+            format!("{root}/d2/"),
+            format!("{root}/d3/"),
+        ];
+        let found = org_result_files(&dirs, "t1");
+        std::fs::remove_dir_all(&root).unwrap();
+        let mut keys: Vec<String> = found.unwrap().into_iter().map(|(_, key)| key).collect();
+        keys.sort();
+        assert_eq!(
+            keys,
+            [
+                "metrics_results/t1/2026/01/01/00/a.pb",
+                "metrics_results/t1/2026/01/01/00/b.pb"
+            ]
+        );
     }
 }

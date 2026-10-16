@@ -46,6 +46,7 @@ pub mod model_pricing;
 pub mod ofga;
 pub mod org_ingestion_tokens;
 pub mod org_status;
+pub mod org_storage;
 pub mod org_users;
 pub mod organization;
 pub mod password_policy;
@@ -62,6 +63,7 @@ pub mod session;
 pub mod short_url;
 pub mod sourcemaps;
 pub mod system_settings;
+pub mod teardown;
 pub mod user;
 #[cfg(feature = "enterprise")]
 pub mod workflows;

@@ -6,6 +6,8 @@ export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 export COVERAGE_FUNCTIONS=${COVERAGE_FUNCTIONS:-70}
 export COVERAGE_LINES=${COVERAGE_LINES:-71}
 export COVERAGE_REGIONS=${COVERAGE_REGIONS:-72}
+# 1 also runs the #[ignore]d integration e2e inside the same instrumented build.
+export COVERAGE_E2E=${COVERAGE_E2E:-0}
 
 usage() {
     cat <<EOF
@@ -38,6 +40,21 @@ _cov_test() {
         --no-fail-fast \
         --retries 1 \
         "$@"
+}
+
+# Same instrumented build (--workspace keeps its features); the e2e owns ./data, so no ZO_DATA_DIR.
+_cov_e2e() {
+    env -u ZO_DATA_DIR cargo llvm-cov nextest \
+        --no-report \
+        --workspace \
+        --verbose \
+        --no-cfg-coverage \
+        --no-cfg-coverage-nightly \
+        --test integration_test \
+        --run-ignored only \
+        -E 'test(e2e_test)' \
+        --test-threads=1 \
+        --no-fail-fast
 }
 
 cmd_html() {
@@ -149,7 +166,16 @@ main() {
         ;;
     run-cov)
         shift
-        _cov_test --json --summary-only --output-path report.json "$@"
+        if [ "$COVERAGE_E2E" = 1 ]; then
+            _cov_test --no-report "$@"
+            _cov_e2e
+            cargo llvm-cov report \
+                --workspace \
+                --ignore-filename-regex 'job|.*generated.*' \
+                --json --summary-only --output-path report.json
+        else
+            _cov_test --json --summary-only --output-path report.json "$@"
+        fi
         ;;
     show-env)
         cmd_show_env
