@@ -373,8 +373,7 @@ export function scopeClause(scope: AnalyticsScope, sample: SampleRatio = 1): str
 // Clicks, click pages, active users and identity tops filter identity rules row by row.
 const rowScope = (scope: AnalyticsScope): string => scopeWhere(scope, 1, true);
 
-// One `WHEN` per app, so a compared app's flag never reads another app's rules.
-// MAX flags a session on any matching row; MIN only when every row matches, as row filters drop it whole.
+// One WHEN per app keeps compared apps' rules apart; MIN flags only sessions whose every row matches, as row filters drop them whole.
 const appFlag = (
   scope: AnalyticsScope,
   cond: (ex: AppExclusions | undefined) => string[],
@@ -1255,15 +1254,20 @@ const stepFlags = (
 ): string => {
   const step = (s: StepRef) =>
     `${stepPredicateGrouped(s, scope, events)}${filterConds(s.f, scope)}`;
-  const near = (i: number) =>
+  const near = (i: number, except = 0) =>
     withinOf(def)
-      .filter((x) => x.e.a === i)
+      .filter((x) => x.e.a === i && x.j !== except)
       .map((x) => ` AND (nx${x.j} IS NULL OR nx${x.j} - t > ${x.e.withinMs})`)
       .join("");
   return [
     ...def.steps.map((s, i) => flag(`${step(s)}${near(i + 1)}`, `m${i + 1}`)),
     ...betweenOf(def).map((x) => flag(stepPredicateGrouped(x.e.step, scope, events), `mx${x.j}`)),
-    ...(ungated ? withinOf(def).map((x) => flag(step(def.steps[x.e.a - 1]), `ma${x.j}`)) : []),
+    // Each gate is lifted alone, so a unit removed by another within exclusion is not counted here.
+    ...(ungated
+      ? withinOf(def).map((x) =>
+          flag(`${step(def.steps[x.e.a - 1])}${near(x.e.a, x.j)}`, `ma${x.j}`),
+        )
+      : []),
   ].join(", ");
 };
 
@@ -1852,6 +1856,8 @@ export function dropoffHealthSql(
   def: FunnelDef,
   stepIndex: number,
   opts: BuildOpts,
+  // Paths counts its cohort as its Sankey does, which keeps new users whatever the funnel's unit.
+  newUsers = def.unit === "users",
 ): string {
   const k = stepIndex;
   const { ctes, unit, windowMs, frustration } = fullChainCtes(
@@ -1859,7 +1865,7 @@ export function dropoffHealthSql(
     id,
     def,
     opts.events,
-    { errors: true, label: false, sample: opts.sample, newUsers: def.unit === "users" },
+    { errors: true, label: false, sample: opts.sample, newUsers },
     k,
   );
   ctes.push(reachCte(unit, k, true));
@@ -2132,11 +2138,12 @@ export function branchSessionsSql(
   );
 }
 
-const periodCase = (boundariesUs: number[]): string => {
-  const whens = boundariesUs
-    .slice(1)
-    .map((b, i) => `WHEN _timestamp < ${Math.trunc(b)} THEN ${i}`)
-    .join(" ");
+// With `before`, rows ahead of the first column read as -1 rather than joining period 0.
+const periodCase = (boundariesUs: number[], before = false): string => {
+  const whens = [
+    ...(before ? [`WHEN _timestamp < ${Math.trunc(boundariesUs[0])} THEN -1`] : []),
+    ...boundariesUs.slice(1).map((b, i) => `WHEN _timestamp < ${Math.trunc(b)} THEN ${i}`),
+  ].join(" ");
   return `CASE ${whens} ELSE ${boundariesUs.length - 1} END`;
 };
 
@@ -2149,12 +2156,19 @@ const retentionCtes = (
   perSession: boolean,
 ): string[] => {
   const u = identityExpr(id);
-  const p = periodCase(boundariesUs);
+  // The first column can start before the range, and a user first seen in that gap is new too.
+  const newSince =
+    scope.newSince === undefined
+      ? null
+      : Math.min(scope.newSince, Math.trunc(boundariesUs[0] / 1000));
+  // New users read back before the first column only to find each user's first activity.
+  const p = periodCase(boundariesUs, newSince !== null);
   const pred = (step: StepRef | null) =>
     step ? stepPredicateRaw(step, scope, opts.events) : "1 = 1";
-  const sample = opts.sample > 1 ? ` AND ${samplePredicate(u, opts.sample)}` : "";
   const pass = sessionPass(scope);
-  const newSince = scope.newSince ?? null;
+  // Rows without the identity only flag their session for the rules, so sampling must not drop them.
+  const sampled = opts.sample > 1 ? samplePredicate(u, opts.sample) : "";
+  const sample = !sampled ? "" : pass ? ` AND (${u} IS NULL OR ${sampled})` : ` AND ${sampled}`;
   // The session pass needs each session's rows apart, so the first group keeps session_id and rolls up after.
   const bySession = perSession || !!pass;
   const anchors = [def.start, def.ret].filter((s): s is StepRef => !!s);
@@ -2194,7 +2208,7 @@ const retentionCtes = (
   }
   const from =
     newSince !== null
-      ? `(SELECT *, MIN(t0) OVER (PARTITION BY u) AS first_t FROM ${src}) an WHERE first_t >= ${newSince}`
+      ? `(SELECT *, MIN(t0) OVER (PARTITION BY u) AS first_t FROM ${src}) an WHERE first_t >= ${newSince} AND p >= 0`
       : src;
   ctes.push(
     `c AS (SELECT *, MIN(CASE WHEN s = 1 THEN p END) OVER (PARTITION BY u) AS cohort, MAX(CASE WHEN r = 1 THEN p END) OVER (PARTITION BY u) AS last_ret FROM ${from})`,

@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
     <div v-else class="flex min-h-0 flex-1 flex-col max-lg:h-80">
       <GroupedFieldList
+        keyboard
         :fields="listRows"
         :search="search"
         :search-placeholder="t('rum.analytics.funnel.searchStepAll')"
@@ -84,11 +85,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OFieldRow>
         </template>
         <template #empty>
-          <span
-            class="text-text-secondary py-2 text-xs"
-            data-test="rum-analytics-funnel-add-step-empty"
-            >{{ listEmpty }}</span
-          >
+          <span class="text-text-secondary flex items-center gap-1.5 py-2 text-xs">
+            <span data-test="rum-analytics-funnel-add-step-empty">{{ listEmpty }}</span>
+            <OButton
+              v-if="failed && !loading"
+              variant="ghost-primary"
+              size="xs"
+              data-test="rum-analytics-funnel-add-step-empty-retry"
+              @click="load"
+              >{{ t("common.retry") }}</OButton
+            >
+          </span>
         </template>
         <template v-if="note && listRows.length" #after-list>
           <span class="text-text-secondary flex items-center gap-1.5 pt-2 text-xs">

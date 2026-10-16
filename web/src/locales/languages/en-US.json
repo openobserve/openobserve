@@ -2144,7 +2144,8 @@
         "whyCaption": "Each session is counted once, at the first line that removed it.",
         "filterRejected": "These values cannot be used as a filter. Each value is 1 to 1024 characters, at most 20.",
         "whyEstimated": "Estimated: these lines may not add up exactly to the entry count.",
-        "tooLongForLink": "This step makes the funnel too long to keep in its link; shorten or remove a step first"
+        "tooLongForLink": "This step makes the funnel too long to keep in its link; shorten or remove a step first",
+        "editTooLongForLink": "This change makes the funnel too long to keep in its link; remove a step, filter or exclusion first"
       },
       "viewer": {
         "droppedAfter": "Dropped after step {step}: {label}",
@@ -2219,6 +2220,7 @@
         "cohortCount": "{count} session | {count} sessions",
         "cohortCountUsers": "{units} {unit} in {sessions} sessions",
         "cohortCounting": "Counting sessions…",
+        "cohortCountFailed": "The sessions could not be counted; Refresh to try again",
         "clearScope": "Clear funnel scope",
         "backToFunnel": "Back to funnel",
         "emptyCohortTitle": "No sessions dropped after {anchor} in this range",
@@ -2380,7 +2382,7 @@
       },
       "saved": {
         "stale": "App filters changed since this funnel was saved. The counts below already use the current rules. Save to refresh the stored SQL that API clients read.",
-        "rulesUnavailable": "This app's app filters could not be loaded, so the funnel cannot be saved",
+        "rulesUnavailable": "The app filters could not be loaded, so the funnel cannot be saved",
         "current": "Current",
         "unsaved": "Unsaved funnel",
         "edited": "Edited",
@@ -2412,6 +2414,7 @@
         "needsTwoSteps": "Add at least 2 steps to save a funnel",
         "noChanges": "No changes to save",
         "deletedStepFirst": "Remove the deleted event step first",
+        "eventsUnresolved": "This funnel's named events are not loaded yet, so it cannot be copied; try again in a moment",
         "usersUnavailable": "Users cannot be counted in this range, so this funnel cannot be saved with them; switch to Sessions to save it",
         "saveTitle": "Save funnel",
         "saveAsTitle": "Save funnel as",
@@ -2504,7 +2507,7 @@
         },
         "valuesInvalid": "Enter 1 to {max} values; a regex must be valid",
         "valueInvalid": "Enter a page; a regex must be valid",
-        "preview": "{remain} of {total} sessions remain",
+        "preview": "{remain} of {total} session remains | {remain} of {total} sessions remain",
         "auditNever": "Built-in default · never saved",
         "auditSaved": "Saved by {user}, {time}",
         "readOnly": "Your role can view but not change app filters.",

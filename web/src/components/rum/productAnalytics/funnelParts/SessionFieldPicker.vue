@@ -16,12 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
+    ref="root"
     class="flex h-104 flex-col gap-2 max-lg:h-auto lg:max-h-[calc(var(--reka-popper-available-height,26rem)-1.625rem)]"
     data-test="rum-analytics-funnel-field-picker"
   >
     <template v-if="!field">
       <div v-if="fields.length" class="flex min-h-0 flex-1 flex-col max-lg:h-72">
         <GroupedFieldList
+          keyboard
           :fields="listFields"
           :search="search"
           search-class="px-0"
@@ -158,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -265,11 +267,19 @@ const typedNew = computed(() => {
   return listed.value.some((r) => r.value === v) ? "" : v;
 });
 
+const root = ref<HTMLElement | null>(null);
+// Switching between the field list and its values unmounts the focused row, so focus moves to the new view's input.
+const focusIn = (testId: string) =>
+  void nextTick(() =>
+    root.value?.querySelector<HTMLInputElement>(`[data-test="${testId}"] input`)?.focus(),
+  );
+
 const pickField = (f: string) => {
   field.value = f;
   picked.value = [];
   typed.value = "";
   emit("load", f);
+  focusIn("rum-analytics-funnel-field-picker-typed");
 };
 
 const onRowClick = (row: { name: string; field?: unknown; isGroup?: boolean }) => {
@@ -279,6 +289,7 @@ const onRowClick = (row: { name: string; field?: unknown; isGroup?: boolean }) =
 const back = () => {
   field.value = null;
   search.value = "";
+  focusIn("o-field-list-search");
 };
 
 const setCondition = (id: unknown) => {

@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
     <div v-if="op !== 'regex'" class="flex min-h-0 flex-1 flex-col max-lg:h-72 max-lg:flex-none">
       <OFieldList
+        keyboard
         :fields="listRows"
         :search="value"
         :show-search="false"
@@ -52,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #field-row="{ row }">
           <OFieldRow :data-test="`rum-analytics-app-filter-page-picker-page-${row.value}`">
-            <span class="min-w-0 flex-1 truncate">{{ row.name }}</span>
+            <OTruncatedText as="span" class="min-w-0 flex-1">{{ row.name }}</OTruncatedText>
             <span v-if="row.sessions !== null" class="text-text-secondary text-xs tabular-nums">{{
               addCommasToNumber(Number(row.sessions))
             }}</span>
@@ -115,6 +116,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";

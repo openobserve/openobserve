@@ -2309,6 +2309,17 @@ describe("P5 gap fixes: SQL builders", () => {
       },
     );
 
+    it("two within exclusions on one step each lift only their own gate when counting removals", () => {
+      const other = { step: p("/web/settings"), a: 2, withinMs: 2000 };
+      const sql = funnelSql(s, null, fdef({ x: [WITHIN, other] }), opts);
+      expect(sql).toContain(
+        "CASE WHEN ty = 'view' AND k = '/web/logs' AND (nx2 IS NULL OR nx2 - t > 2000) THEN 1 ELSE 0 END AS ma1",
+      );
+      expect(sql).toContain(
+        "CASE WHEN ty = 'view' AND k = '/web/logs' AND (nx1 IS NULL OR nx1 - t > 1000) THEN 1 ELSE 0 END AS ma2",
+      );
+    });
+
     it("P5-R19: a within-N exclusion gates step a with a NULL-safe flag over a RANGE frame and adds a count column", () => {
       const sql = funnelSql(s, null, fdef({ x: [WITHIN] }), opts);
       expect(sql).toContain(
@@ -2661,14 +2672,40 @@ describe("P5 gap fixes: SQL builders", () => {
         opts,
       );
       expect(paths).toContain(`>= ${RS}`);
+      const WEEK_US = 7 * 86400000000;
+      const weeks = [0, 1, 2].map((i) => RS * 1000 + i * WEEK_US);
       const ret = retentionSql(
         sn,
+        id,
+        { start: null, ret: null, per: "week", mode: "on" },
+        weeks,
+        opts,
+      );
+      expect(ret).toContain(`>= ${RS}`);
+      expect(ret).toContain(`WHEN _timestamp < ${weeks[0]} THEN -1`);
+      expect(ret).toContain("p >= 0");
+      // A first column opening before the range start judges newness from that column.
+      const early = [RS * 1000 - WEEK_US / 2, RS * 1000 + WEEK_US / 2];
+      const retEarly = retentionSql(
+        sn,
+        id,
+        { start: null, ret: null, per: "week", mode: "on" },
+        early,
+        opts,
+      );
+      expect(retEarly).toContain(`first_t >= ${early[0] / 1000}`);
+    });
+
+    it("retention without new users keeps every row's period", () => {
+      const ret = retentionSql(
+        ruled({ bots: false }),
         id,
         { start: null, ret: null, per: "week", mode: "on" },
         [1000, 2000, 3000],
         opts,
       );
-      expect(ret).toContain(`>= ${RS}`);
+      expect(ret).not.toContain("THEN -1");
+      expect(ret).not.toContain("p >= 0");
     });
 
     it("P5-R34: namedEventPreviewSql applies the scope's exclusions", () => {

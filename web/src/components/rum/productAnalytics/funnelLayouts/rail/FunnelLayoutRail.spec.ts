@@ -730,7 +730,7 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
         /Did not see\s*Page\s*\/x between step 1 and step 2\s*and\s*Page\s*\/y between step 2 and step 3/,
       );
       expect(text.match(/Did not see/g)).toHaveLength(1);
-      expect(chip(w, 0).findComponent({ name: "OTooltip" }).props("content")).toBe(
+      expect(chip(w, 0).findComponent({ name: "OTruncatedText" }).text()).toBe(
         "/x between step 1 and step 2",
       );
       w.unmount();

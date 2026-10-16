@@ -160,11 +160,14 @@ export function useStepOptions(opts: StepOptionsInput) {
   };
 
   // The server is asked only for a list whose first rows did not already hold every key.
+  // Responses can arrive out of order, so only the latest search may write its rows.
+  let searchSeq = 0;
   const onSearch = async (term: string) => {
     failed.value = false;
     const more = count("rest") >= FULL_LIST;
     const moreErrors = withErrors.value && count("r") >= FULL_ERRORS;
     if (!term || (!more && !moreErrors)) return;
+    const seq = ++searchSeq;
     const scope = pa.scopeKey.value;
     loading.value = true;
     try {
@@ -172,11 +175,11 @@ export function useStepOptions(opts: StepOptionsInput) {
         ...(more ? [pa.searchPicker(term)] : []),
         ...(moreErrors ? [pa.loadErrorPicker(term)] : []),
       ]);
-      if (scope !== pa.scopeKey.value) return;
+      if (seq !== searchSeq || scope !== pa.scopeKey.value) return;
       failed.value = !ok(...all);
       searched.value = { scope, options: all.flatMap((r) => r.options) };
     } finally {
-      loading.value = false;
+      if (seq === searchSeq) loading.value = false;
     }
   };
 

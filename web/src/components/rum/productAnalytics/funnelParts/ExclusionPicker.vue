@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="current === null">
       <div class="flex min-h-0 flex-1 flex-col max-lg:h-72">
         <OFieldList
+          keyboard
           :fields="listRows"
           :search="search"
           :search-placeholder="t('rum.analytics.funnel.exclusionPick')"
@@ -35,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #field-row="{ row }">
             <OFieldRow :data-test="`rum-analytics-funnel-exclusion-picker-step-${row.value}`">
               <OTag :label="kindLabel(row.step)" :variant="kindVariant(row.step)" size="xs" />
-              <span class="min-w-0 truncate">{{ row.name }}</span>
+              <OTruncatedText as="span" class="min-w-0">{{ row.name }}</OTruncatedText>
               <OTag v-if="row.badge" :label="row.badge" variant="default-outline" size="xs" />
             </OFieldRow>
           </template>
@@ -200,6 +201,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";

@@ -634,7 +634,10 @@ const builtinOnlyApps = computed(() =>
 );
 
 // A NULL stored hash is a funnel saved before hashes existed, so it counts as changed.
-const stale = computed(() => funnelStale(pa.openedFunnel.value));
+// The notice asks for a Save, so a read-only viewer, who cannot save, is not shown it.
+const stale = computed(
+  () => funnelStale(pa.openedFunnel.value) && namedEvents.permission.value !== "read",
+);
 
 const needsNewer = computed(
   () => linkProblem.value === "unreadable" || pa.invalidParams.value.includes("funnel"),
@@ -899,7 +902,7 @@ const funnelKey = computed(() => {
 // The URL keeps the funnel, so any edit that would push it past a link's length is refused.
 const applyDef = (d: FunnelDef) => {
   if (!fitsLink(d)) {
-    toast({ variant: "error", message: t("rum.analytics.funnel.tooLongForLink") });
+    toast({ variant: "error", message: t("rum.analytics.funnel.editTooLongForLink") });
     return;
   }
   pa.funnel.value = d;

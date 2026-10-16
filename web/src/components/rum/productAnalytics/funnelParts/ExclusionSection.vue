@@ -44,8 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @remove="remove(j)"
       >
         <OTag :label="kindLabel(x.step)" :variant="kindVariant(x.step)" size="xs" />
-        <span class="min-w-0 truncate">{{ chipLabel(x) }}</span>
-        <OTooltip :content="chipLabel(x)" />
+        <OTruncatedText as="span" class="min-w-0">{{ chipLabel(x) }}</OTruncatedText>
       </OTag>
       <span
         v-if="removed[j] !== null && removed[j] !== undefined"
@@ -79,8 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-label="t('rum.analytics.funnel.addExclusionStep')"
               data-test="rum-analytics-funnel-add-exclusion-btn"
               @click="editing = null"
-              ><OTooltip :content="blocked ?? t('rum.analytics.funnel.addExclusionStep')"
-            /></OButton>
+            />
+            <OTooltip
+              v-if="stacked"
+              :content="blocked ?? t('rum.analytics.funnel.addExclusionStep')"
+            />
             <template v-else>
               <OButton
                 variant="ghost-primary"
@@ -118,6 +120,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import FunnelSectionRow from "@/components/rum/productAnalytics/funnelParts/FunnelSectionRow.vue";
 import ExclusionPicker from "@/components/rum/productAnalytics/funnelParts/ExclusionPicker.vue";
 import useStepLabels from "@/components/rum/productAnalytics/funnelParts/useStepLabels";

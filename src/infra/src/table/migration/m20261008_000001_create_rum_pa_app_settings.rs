@@ -17,7 +17,6 @@ use sea_orm_migration::prelude::*;
 
 const FUNNELS_TABLE: &str = "rum_pa_funnels";
 const RULES_HASH: &str = "rules_hash";
-const SETTINGS_APP_IDX: &str = "rum_pa_app_settings_org_app_idx";
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -141,13 +140,6 @@ fn settings_table() -> TableCreateStatement {
             ColumnDef::new(RumPaAppSettings::UpdatedAt)
                 .big_integer()
                 .not_null(),
-        )
-        .index(
-            Index::create()
-                .name(SETTINGS_APP_IDX)
-                .col(RumPaAppSettings::OrgId)
-                .col(RumPaAppSettings::App)
-                .unique(),
         )
         .to_owned()
 }
@@ -301,11 +293,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn p1_r1_one_settings_row_per_org_and_app() {
+    async fn one_settings_row_per_id_and_apps_differing_in_case_coexist() {
         let db = sqlite().await;
         Migration.up(&SchemaManager::new(&db)).await.unwrap();
         insert_settings(&db, "s1", "acme", "web").await.unwrap();
-        let err = insert_settings(&db, "s2", "acme", "web").await.unwrap_err();
+        let err = insert_settings(&db, "s1", "acme", "ios").await.unwrap_err();
         assert!(
             matches!(
                 err.sql_err(),
@@ -313,8 +305,8 @@ mod tests {
             ),
             "{err}"
         );
-        insert_settings(&db, "s3", "acme", "ios").await.unwrap();
-        insert_settings(&db, "s4", "other", "web").await.unwrap();
+        insert_settings(&db, "s2", "acme", "Web").await.unwrap();
+        insert_settings(&db, "s3", "other", "web").await.unwrap();
     }
 
     #[tokio::test]

@@ -949,10 +949,29 @@ fn validate_exclusions(def: &FunnelDef, event_ids: &mut Vec<String>) -> Result<(
     }
     let steps = def.s.len() as i64;
     for exclusion in exclusions {
+        // The queries match an exclusion by its step alone, so options on it would be ignored.
+        if exclusion.s.opts().is_some() {
+            return Err(invalid_def(
+                "an exclusion step takes no options".to_string(),
+            ));
+        }
         validate_step(&exclusion.s, event_ids)?;
         let a = exclusion.a;
         match (exclusion.b, exclusion.w) {
-            (Some(b), None) if 1 <= a && a < b && b <= steps => {}
+            (Some(b), None) if 1 <= a && a < b && b <= steps => {
+                // Every session reaching b passed each step inside the span, so excluding one
+                // removes all.
+                let inside = &def.s[a as usize..(b - 1) as usize];
+                if matches!(exclusion.s.kind(), "p" | "c")
+                    && inside
+                        .iter()
+                        .any(|s| s.kind() == exclusion.s.kind() && s.key() == exclusion.s.key())
+                {
+                    return Err(invalid_def(
+                        "a between exclusion cannot be a step inside its span".to_string(),
+                    ));
+                }
+            }
             (None, Some(w)) if (1..=steps).contains(&a) && (1..=MAX_STEP_MS).contains(&w) => {
                 let anchor = &def.s[(a - 1) as usize];
                 if exclusion.s.kind() == "p"
@@ -1537,6 +1556,21 @@ mod tests {
         ] {
             let def = serde_json::json!({"s": [["p", "/a", opts], ["p", "/b"]]});
             assert!(serde_json::from_value::<FunnelDef>(def).is_err());
+        }
+    }
+
+    #[test]
+    fn an_exclusion_inside_its_span_or_with_step_options_is_refused() {
+        let inside = serde_json::json!([{"s": ["p", "/b"], "a": 1, "b": 3}]);
+        assert_eq!(def_code(with_x(inside)), "invalid_definition");
+        let with_opts = serde_json::json!([{"s": ["p", "/z", {"min": 1000}], "a": 1, "b": 2}]);
+        assert_eq!(def_code(with_x(with_opts)), "invalid_definition");
+        for ok in [
+            serde_json::json!([{"s": ["p", "/b"], "a": 2, "b": 3}]),
+            serde_json::json!([{"s": ["c", "/b"], "a": 1, "b": 3}]),
+            serde_json::json!([{"s": ["p", "/a"], "a": 1, "b": 3}]),
+        ] {
+            assert_eq!(def_code(with_x(ok.clone())), "ok", "{ok}");
         }
     }
 

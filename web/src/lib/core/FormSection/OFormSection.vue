@@ -47,6 +47,7 @@
       <span
         v-if="info"
         tabindex="0"
+        role="img"
         class="text-text-secondary -ms-1 flex items-center"
         :aria-label="info"
         :data-test="dataTest ? `${dataTest}-info` : undefined"

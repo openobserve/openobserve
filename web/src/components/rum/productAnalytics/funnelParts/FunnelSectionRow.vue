@@ -18,8 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <section v-if="stacked" class="flex flex-col gap-1.5" :data-test="testId">
     <div class="flex min-h-6 items-center gap-1">
       <span class="text-text-secondary min-w-0 text-xs font-semibold">{{ title }}</span>
-      <span v-if="caption" class="text-text-secondary flex items-center">
-        <OIcon name="info-outline" size="xs" :aria-label="caption" />
+      <span
+        v-if="caption"
+        tabindex="0"
+        role="img"
+        :aria-label="caption"
+        class="text-text-secondary flex items-center"
+      >
+        <OIcon name="info-outline" size="xs" />
         <OTooltip :content="caption" />
       </span>
       <span class="ms-auto flex items-center gap-1"><slot name="action" /></span>

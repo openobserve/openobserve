@@ -116,7 +116,7 @@ const org = () => pa.toQuery().org_identifier as string;
 const app = () => pa.state.app;
 const opened = pa.openedFunnel;
 
-// A rename retry stores their def and sql, so only an Overwrite needs the funnel on screen to compile.
+// A rename retry compiles their stored def, so only an Overwrite needs the funnel on screen to compile.
 const overwriteBlocked = computed<I18nText | null>(() =>
   conflict.value && !conflict.value.renaming ? uncompiled.value : null,
 );
@@ -155,12 +155,26 @@ const draftOf = (name: string, description?: string): SavedFunnelDraft | null =>
     ? null
     : { name, description, def: pa.funnel.value, sql: sql.value, rulesHash: rulesHash() };
 
+const eventsResolved = (def: FunnelDef): boolean =>
+  props.eventsReady &&
+  [...def.steps, ...(def.x ?? []).map((x) => x.step)].every(
+    (s) => s.kind !== "e" || props.events.some((e) => e.id === s.key),
+  );
+
 // A stored def is recompiled, so its sql and hash describe the app's rules now, not when it was saved.
 const storedDraft = (
   def: FunnelDef,
   name: string,
   description?: string,
+  stored?: SavedFunnel,
 ): SavedFunnelDraft | null => {
+  // An event step that cannot be resolved would compile to a step nothing matches, so a rename keeps the stored sql.
+  if (!eventsResolved(def)) {
+    if (stored)
+      return { name, description, def, sql: stored.sql, rulesHash: stored.rulesHash ?? undefined };
+    toast({ variant: "error", message: t("rum.analytics.saved.eventsUnresolved") });
+    return null;
+  }
   const compiled = props.compileSql(def);
   if (compiled === null) {
     toast({
@@ -241,7 +255,7 @@ const duplicate = (f: SavedFunnel, asStored: boolean) =>
 
 // A rename changes only the name, so a retry after a conflict renames their version as it now stands.
 const submitRename = async (f: SavedFunnel, name: string): Promise<SaveFunnelOutcome> => {
-  const draft = storedDraft(f.def, name, f.description);
+  const draft = storedDraft(f.def, name, f.description, f);
   if (!draft) return "failed";
   const res = await sf.save(org(), app(), draft, { id: f.id, version: f.version });
   const retry = (c: SavedFunnel) => submitRename(c, name);

@@ -94,7 +94,8 @@ export default function useAppFilterCounts() {
       key,
     );
     if (loadingKey === key) loadingKey = "";
-    if (res.status === "aborted") return;
+    // Each caller has its own runner, so a late result for an older scope must not replace the current one.
+    if (res.status === "aborted" || key !== pa.scopeKey.value) return;
     if (res.status !== "ok") {
       hidden.value = { key, status: "failed" };
       return;

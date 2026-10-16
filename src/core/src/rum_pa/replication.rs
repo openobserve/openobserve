@@ -30,7 +30,7 @@ use sea_orm::{ConnectionTrait, DbErr, RuntimeErr, TransactionTrait, sqlx};
 use super::{
     RumPaError, is_id,
     service::{APP_SETTINGS_TABLE, EVENTS_TABLE, FUNNELS_TABLE, REPLICATION_MODULE},
-    settings_id, sql_state, validate_app, validate_name,
+    settings_id, sql_state, validate_app, validate_name, validate_rules_hash,
 };
 
 /// Tries per delivery for a deadlock, serialization failure, lock wait or unique-index race.
@@ -91,13 +91,15 @@ impl Replicated for FunnelRow {
             &self.name,
             &self.created_by,
             &self.updated_by,
-        )
+        )?;
+        validate_rules_hash(self.rules_hash.as_deref())
     }
 }
 
 /// Not `check_common`: an app name may be longer than a name, and the id must be the derived one.
 impl Replicated for AppSettingsRow {
     fn check(&self) -> Result<(), RumPaError> {
+        check_lengths(&self.org_id, &self.created_by, &self.updated_by)?;
         validate_app(Some(&self.app))?;
         if self.id != settings_id(&self.org_id, &self.app) {
             return Err(RumPaError::InvalidId(
@@ -355,14 +357,19 @@ fn check_common(
     created_by: &str,
     updated_by: &str,
 ) -> Result<(), RumPaError> {
+    check_lengths(org, created_by, updated_by)?;
+    validate_app(Some(app))?;
+    if validate_name(name)? != name {
+        return Err(RumPaError::InvalidName("name is not trimmed".into()));
+    }
+    Ok(())
+}
+
+fn check_lengths(org: &str, created_by: &str, updated_by: &str) -> Result<(), RumPaError> {
     if org.chars().count() > MAX_ORG_CHARS {
         return Err(RumPaError::InvalidBody(format!(
             "an org id is at most {MAX_ORG_CHARS} characters"
         )));
-    }
-    validate_app(Some(app))?;
-    if validate_name(name)? != name {
-        return Err(RumPaError::InvalidName("name is not trimmed".into()));
     }
     if [created_by, updated_by]
         .iter()
@@ -820,10 +827,7 @@ mod tests {
                 id: got,
             }) => {
                 assert_eq!((org.as_str(), got.as_str()), ("acme", id));
-                assert!(
-                    !matches!(table, Table::NamedEvents | Table::Funnels),
-                    "{table:?}"
-                );
+                assert!(matches!(table, Table::AppSettings), "{table:?}");
             }
             other => panic!("{other:?}"),
         }
@@ -913,6 +917,52 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(kept, 0);
+    }
+
+    #[tokio::test]
+    async fn a_settings_row_whose_editor_is_over_256_chars_is_dropped() {
+        let scope = Scope {
+            org: "acme",
+            app: "web",
+        };
+        let source = db().await;
+        let saved = put_settings(&source, scope, "a@x.io", serde_json::json!([])).await;
+        let mut row = stored_settings(&source).await;
+        row["updated_by"] = "u".repeat(257).into();
+        let value = serde_json::to_vec(&row).unwrap();
+        let target = db().await;
+        let key = settings_key("acme", saved["id"].as_str().unwrap());
+        apply(&target, &key, Op::Put(Some(&value))).await.unwrap();
+        let kept = infra::table::entity::rum_pa_app_settings::Entity::find()
+            .count(&target)
+            .await
+            .unwrap();
+        assert_eq!(kept, 0);
+    }
+
+    #[tokio::test]
+    async fn a_funnel_row_with_a_malformed_rules_hash_is_dropped() {
+        let db = db().await;
+        let row = serde_json::json!({
+            "id": ID, "org_id": "acme", "app": "web", "name": "Flow", "name_key": "flow",
+            "description": null, "definition": {"s": [["p", "/"], ["p", "/a"]]}, "sql": "SELECT 1",
+            "event_ids": [], "version": 1, "created_by": "a@x.io", "updated_by": "a@x.io",
+            "created_at": 1, "updated_at": 2, "rules_hash": "0123456789abcdef0"
+        });
+        let value = serde_json::to_vec(&row).unwrap();
+        apply(
+            &db,
+            &format!("/rum_analytics/acme/funnels/{ID}"),
+            Op::Put(Some(&value)),
+        )
+        .await
+        .unwrap();
+        assert!(
+            rum_pa::get::<Funnels, _>(&db, "acme", "web", ID)
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[tokio::test]

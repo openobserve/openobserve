@@ -15,7 +15,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- Cancels the page body's py-3 so the separator runs from the header to the bottom edge. -->
   <div
     ref="frame"
     class="flex flex-col lg:-my-3 lg:min-h-0 lg:flex-1"
