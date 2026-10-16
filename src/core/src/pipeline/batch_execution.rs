@@ -2093,7 +2093,7 @@ async fn process_function_node(
                     if !is_result_array {
                         // Single record processing with JS
                         let js_timer = Instant::now();
-                        let js_res = apply_js_fn(
+                        let js_res = apply_js_fn_off_worker(
                             js_config,
                             record,
                             &metadata.org_id,
@@ -2234,7 +2234,7 @@ async fn process_function_node(
             CompiledFunctionRuntime::JS(js_config, true) => {
                 // JS result array processing
                 let js_arr_timer = Instant::now();
-                let js_arr_res = apply_js_fn(
+                let js_arr_res = apply_js_fn_off_worker(
                     js_config,
                     json::Value::Array(result_array_records),
                     &metadata.org_id,
@@ -2302,6 +2302,16 @@ async fn process_function_node(
     );
 
     count
+}
+
+/// `apply_js_fn`, run where its synchronous eval cannot stall the other tasks on this worker.
+fn apply_js_fn_off_worker(
+    js_config: &JSRuntimeConfig,
+    record: json::Value,
+    org_id: &str,
+    stream_name: &[String],
+) -> (json::Value, Option<String>) {
+    tokio::task::block_in_place(|| apply_js_fn(js_config, record, org_id, stream_name))
 }
 
 async fn process_condition_node(
@@ -3271,7 +3281,13 @@ fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{
+        collections::HashMap,
+        sync::{
+            Arc,
+            atomic::{AtomicU64, Ordering},
+        },
+    };
 
     use config::{
         meta::pipeline::components::{Edge, Node},
@@ -5590,5 +5606,47 @@ mod tests {
         assert!(result_rx.try_recv().is_err());
         let (_, _, err, ..) = error_rx.try_recv().expect("the internal write is reported");
         assert!(err.contains("_o2_ai_chat_events"), "{err}");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn a_js_function_does_not_stall_the_other_tasks_on_its_worker() {
+        const BURN_MS: u64 = 600;
+        let js_config = compile_js_function(
+            &format!(
+                "var t = Date.now(); while (Date.now() - t < {BURN_MS}) {{}} row.done = true;"
+            ),
+            "off_worker_org",
+        )
+        .unwrap();
+
+        let start = Instant::now();
+        // Queued first on the only worker, so the eval holds it unless it declares the block.
+        let eval = tokio::spawn(async move {
+            apply_js_fn_off_worker(
+                &js_config,
+                json::json!({"a": 1}),
+                "off_worker_org",
+                std::slice::from_ref(&String::new()),
+            )
+        });
+        let woke_after = Arc::new(AtomicU64::new(0));
+        let ticker = {
+            let woke_after = woke_after.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                woke_after.store(start.elapsed().as_millis() as u64, Ordering::SeqCst);
+            })
+        };
+
+        let (record, error) = eval.await.unwrap();
+        assert_eq!(error, None);
+        assert_eq!(record["done"], json::json!(true));
+
+        ticker.await.unwrap();
+        let woke_after = woke_after.load(Ordering::SeqCst);
+        assert!(
+            woke_after < BURN_MS / 2,
+            "the sleeping task only woke after {woke_after}ms, so the JavaScript eval held the worker"
+        );
     }
 }
