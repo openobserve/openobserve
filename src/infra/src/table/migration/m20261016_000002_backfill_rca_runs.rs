@@ -523,12 +523,20 @@ mod tests {
     use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection, Schema};
 
     use super::*;
-    use crate::table::entity;
+    use crate::table::{
+        entity,
+        migration::{
+            m20261016_000001_create_rca_runs as create_rca_runs,
+            m20261017_000001_add_rca_run_progress_columns as progress_columns,
+            m20261018_000001_create_rca_steering as create_rca_steering,
+        },
+    };
 
     const SEC: i64 = 1_000_000;
     const T0: i64 = 1_700_000_000 * SEC;
 
-    /// The tables as they are after migration A.
+    /// The tables as they are after migration A: `rca_runs` comes from A itself, since the
+    /// current entity carries NOT NULL columns that later migrations add.
     async fn db() -> DatabaseConnection {
         let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
         opts.max_connections(1);
@@ -538,10 +546,13 @@ mod tests {
         for stmt in [
             schema.create_table_from_entity(entity::alert_incidents::Entity),
             schema.create_table_from_entity(entity::incident_events::Entity),
-            schema.create_table_from_entity(entity::rca_runs::Entity),
         ] {
             db.execute(backend.build(&stmt)).await.unwrap();
         }
+        create_rca_runs::Migration
+            .up(&SchemaManager::new(&db))
+            .await
+            .unwrap();
         db
     }
 
@@ -611,8 +622,13 @@ mod tests {
         })
     }
 
+    /// Runs the backfill, then the later migrations (as production does) so `rca_runs`
+    /// matches the current entity before the tests read it.
     async fn migrate(db: &DatabaseConnection) {
-        Migration.up(&SchemaManager::new(db)).await.unwrap();
+        let manager = SchemaManager::new(db);
+        Migration.up(&manager).await.unwrap();
+        progress_columns::Migration.up(&manager).await.unwrap();
+        create_rca_steering::Migration.up(&manager).await.unwrap();
     }
 
     async fn runs(db: &DatabaseConnection, id: &str) -> Vec<entity::rca_runs::Model> {

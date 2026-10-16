@@ -134,27 +134,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :stage="stage"
     />
 
-    <!-- Facts of a graded run (VE35); never while live (VE-D2). -->
-    <dl
-      v-if="graded"
-      data-test="rca-verdict-facts"
-      class="m-0 mt-0.5 flex flex-wrap items-end gap-8"
-    >
-      <div class="max-w-105 min-w-0">
-        <dt class="text-text-muted text-xs">
-          {{ t("alerts.incidents.rcaSummary.suspectChange") }}
-        </dt>
-        <dd data-test="rca-verdict-suspect" class="text-text-heading m-0 text-sm font-semibold">
-          {{ suspectText }}
-        </dd>
+    <!-- Facts of a graded run (VE35); never while live (VE-D2). The row wraps:
+         "Is this the cause?" (README §9) ends it, and its panels and saved
+         message take a full-width line below (template layout). -->
+    <div v-if="graded" class="mt-0.5 flex flex-wrap items-end gap-x-8 gap-y-3">
+      <dl data-test="rca-verdict-facts" class="m-0 flex min-w-0 flex-wrap items-end gap-8">
+        <div class="max-w-105 min-w-0">
+          <dt class="text-text-muted text-xs">
+            {{ t("alerts.incidents.rcaSummary.suspectChange") }}
+          </dt>
+          <dd data-test="rca-verdict-suspect" class="text-text-heading m-0 text-sm font-semibold">
+            {{ suspectText }}
+          </dd>
+        </div>
+        <div class="max-w-95 min-w-0">
+          <dt class="text-text-muted text-xs">{{ t("alerts.incidents.rcaSummary.impact") }}</dt>
+          <dd data-test="rca-verdict-impact" class="text-text-heading m-0 text-sm font-semibold">
+            {{ impactText }}
+          </dd>
+        </div>
+      </dl>
+      <!-- `contents`: the slot's control and panels are items of this wrapping row. -->
+      <div v-if="$slots.feedback" data-test="rca-verdict-feedback" class="contents">
+        <slot name="feedback" />
       </div>
-      <div class="max-w-95 min-w-0">
-        <dt class="text-text-muted text-xs">{{ t("alerts.incidents.rcaSummary.impact") }}</dt>
-        <dd data-test="rca-verdict-impact" class="text-text-heading m-0 text-sm font-semibold">
-          {{ impactText }}
-        </dd>
-      </div>
-    </dl>
+    </div>
 
     <!-- D: the run is paused for an answer (SG39); the deadline is local time. -->
     <OBanner
@@ -331,9 +335,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </p>
       </template>
       <template #actions>
+        <OButton
+          v-if="canResume"
+          data-test="rca-resume-btn"
+          variant="outline"
+          size="sm"
+          icon-left="play-arrow"
+          :loading="resuming"
+          :disabled="triggering"
+          @click="$emit('resume')"
+        >
+          {{ t("alerts.incidents.rcaResume.button") }}
+        </OButton>
         <ODropdown v-if="earlierReportNote" align="end">
           <template #trigger>
-            <OButton data-test="rca-retry-btn" variant="outline" size="sm" :loading="triggering">
+            <OButton
+              data-test="rca-retry-btn"
+              variant="outline"
+              size="sm"
+              :loading="triggering"
+              :disabled="resuming"
+            >
               <OIcon name="refresh" size="sm" class="me-1" />
               {{ t("alerts.incidents.rcaRetry") }}
               <OIcon name="keyboard-arrow-down" size="xs" class="ms-1" />
@@ -354,6 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm"
           :loading="triggering"
+          :disabled="resuming"
           @click="$emit('retry', { buildOnPrevious: false })"
         >
           <OIcon name="refresh" size="sm" class="me-1" />
@@ -368,6 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rca-cancelled-banner"
       variant="error-soft"
       icon="cancel"
+      inline-actions
     >
       <p data-test="rca-cancelled-message" class="text-banner-error-soft-text m-0 text-sm">
         {{ cancelledText }}
@@ -379,6 +403,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ earlierReportNote }}
       </p>
+      <template v-if="canResume" #actions>
+        <OButton
+          data-test="rca-resume-btn"
+          variant="outline"
+          size="sm"
+          icon-left="play-arrow"
+          :loading="resuming"
+          :disabled="triggering"
+          @click="$emit('resume')"
+        >
+          {{ t("alerts.incidents.rcaResume.button") }}
+        </OButton>
+      </template>
     </OBanner>
   </section>
 </template>
@@ -437,6 +474,9 @@ const props = withDefaults(
     cancelledText?: I18nText | null;
     triggering?: boolean;
     cancelling?: boolean;
+    /** The latest failed or cancelled run can be resumed (J9): L and E offer "Resume run". */
+    canResume?: boolean;
+    resuming?: boolean;
     /** Organization of the incident, for the "Connect AI Toolset" link. */
     org?: string;
     /** The user can steer the run: the paused banner offers "Tell the agent". */
@@ -464,6 +504,8 @@ const props = withDefaults(
     cancelledText: null,
     triggering: false,
     cancelling: false,
+    canResume: false,
+    resuming: false,
     org: "",
     canSteer: false,
     pausedStep: null,
@@ -483,6 +525,8 @@ defineEmits<{
   "show-blind-spots": [];
   /** Frame D "Tell the agent": focus the steer box. */
   "tell-agent": [];
+  /** "Resume run" on L or E (J9). */
+  resume: [];
 }>();
 
 const { t } = useI18nTyped();

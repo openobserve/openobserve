@@ -214,10 +214,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :thread-live="rcaThreadLive"
               :triggering="rcaTriggering"
               :cancelling="rcaCancelling"
+              :resume-run-id="rcaResumeRunId"
+              :resuming="rcaResuming"
+              :incident-title="incidentDetails?.title || ''"
               @trigger-rca="triggerRca"
               @cancel-rca="cancelRca"
               @view-run="viewRcaRun"
               @steered="reloadRca"
+              @resume-rca="resumeRca"
+              @ask-ai="askAboutRca"
             />
 
             <!-- Tab Content Area -->
@@ -1531,6 +1536,7 @@ import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useRcaTrigger } from "@/composables/useRcaTrigger";
 import { useIncidentRca } from "@/composables/useIncidentRca";
+import type { RcaAskPayload } from "@/utils/incidents/rcaAskAttachment";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1772,11 +1778,17 @@ export default defineComponent({
       threadLive: rcaThreadLive,
       triggering: rcaTriggering,
       cancelling: rcaCancelling,
+      resuming: rcaResuming,
+      resumeRunId: rcaResumeRunId,
       reload: reloadRca,
       viewRun: viewRcaRun,
       trigger: triggerRca,
       cancel: cancelRca,
+      resume: resumeRca,
     } = useIncidentRca(incidentOrgId, incidentDetails);
+
+    // J5: this routed page hands Ask to MainLayout; a new chat with the analysis attached.
+    const askAboutRca = (payload: RcaAskPayload) => emit("sendToAiChat", payload);
 
     // A run that starts or ends adds an AI event to the Activity timeline.
     watch([() => rcaSummary.value?.run_id, () => rcaSummary.value?.state], () => {
@@ -3004,9 +3016,13 @@ export default defineComponent({
       rcaThreadLive,
       rcaTriggering,
       rcaCancelling,
+      rcaResuming,
+      rcaResumeRunId,
       reloadRca,
       viewRcaRun,
       cancelRca,
+      resumeRca,
+      askAboutRca,
       isDarkMode,
       activeTab,
       timelineRefreshTrigger,

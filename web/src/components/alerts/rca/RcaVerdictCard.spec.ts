@@ -229,10 +229,76 @@ describe("RcaVerdictCard", () => {
       expect(buttonTexts(wrapper, "rca-cancelled-banner")).toEqual([]);
     });
 
-    it("no Resume run in Phase 2", () => {
-      const wrapper = mountCard({ cardState: "cancelled", cancelledText: "Cancelled." });
+    describe("J9: Resume run on L and E", () => {
+      const FAILED = {
+        cardState: "failed",
+        error: { code: "timeout", reason: "Timed out", details: null, trigger_type: null },
+      };
+      const CANCELLED = { cardState: "cancelled", cancelledText: "Cancelled." };
 
-      expect(wrapper.text()).not.toContain("Resume");
+      it.each([
+        ["L", "rca-error-banner", FAILED],
+        ["E", "rca-cancelled-banner", CANCELLED],
+      ])("%s offers Resume run with canResume and emits resume", async (_f, bannerId, props) => {
+        const wrapper = mountCard({ ...props, canResume: true });
+
+        const button = byTest(wrapper, bannerId).find('[data-test="rca-resume-btn"]');
+        expect(button.text()).toBe("Resume run");
+        await button.trigger("click");
+        expect(wrapper.emitted("resume")).toHaveLength(1);
+      });
+
+      it.each([
+        ["L", FAILED],
+        ["E", CANCELLED],
+      ])("%s without canResume has no Resume run", (_f, props) => {
+        const wrapper = mountCard(props);
+
+        expect(byTest(wrapper, "rca-resume-btn").exists()).toBe(false);
+        expect(wrapper.text()).not.toContain("Resume");
+      });
+
+      it("L: Retry stays next to Resume run", () => {
+        const wrapper = mountCard({ ...FAILED, canResume: true });
+
+        expect(buttonTexts(wrapper, "rca-error-banner")).toEqual(["Resume run", "Retry analysis"]);
+      });
+
+      it.each([
+        [
+          "a live run",
+          { cardState: "investigating", liveMode: "fresh", earlierReportNote: EARLIER },
+        ],
+        ["a stale run", { cardState: "investigating", stale: true, staleSince: "14:07:04" }],
+        ["an analyzed run", { cardState: "analyzed", summary: rcaRunSummary() }],
+      ])("never on %s, even with canResume", (_label, props) => {
+        const wrapper = mountCard({ ...props, canResume: true });
+
+        expect(byTest(wrapper, "rca-resume-btn").exists()).toBe(false);
+      });
+
+      it("while a trigger is in flight Resume is disabled; while resuming Retry is disabled", async () => {
+        const triggering = mountCard({ ...FAILED, canResume: true, triggering: true });
+        const resumeBtn = byTest(triggering, "rca-resume-btn");
+        expect(resumeBtn.attributes("disabled")).toBeDefined();
+        await resumeBtn.trigger("click");
+        expect(triggering.emitted("resume")).toBeUndefined();
+
+        const resuming = mountCard({ ...FAILED, canResume: true, resuming: true });
+        const retry = byTest(resuming, "rca-retry-btn");
+        expect(retry.attributes("disabled")).toBeDefined();
+        await retry.trigger("click");
+        expect(resuming.emitted("retry")).toBeUndefined();
+      });
+
+      it("E: Resume is disabled while a trigger is in flight", async () => {
+        const wrapper = mountCard({ ...CANCELLED, canResume: true, triggering: true });
+        const button = byTest(wrapper, "rca-resume-btn");
+
+        expect(button.attributes("disabled")).toBeDefined();
+        await button.trigger("click");
+        expect(wrapper.emitted("resume")).toBeUndefined();
+      });
     });
 
     // M1 (01 RR-47): the global `p` colour must not override the banner text token.
@@ -525,10 +591,40 @@ describe("RcaVerdictCard", () => {
       }
     });
 
-    it("no Phase 4/5 controls on a graded card (F2)", () => {
+    it("J4: the feedback slot renders only on a graded analyzed run", () => {
+      const slots = { feedback: '<div data-test="slot-feedback">fb</div>' };
+      const mountWithSlot = (props: Record<string, unknown>) =>
+        mount(RcaVerdictCard, {
+          props: { runId: "run-2", ...props },
+          slots,
+          global: { plugins: [i18n], stubs },
+        });
+      const base = rcaRunSummary();
+
+      const graded = mountWithSlot({ cardState: "analyzed", summary: base });
+      expect(byTest(graded, "slot-feedback").exists()).toBe(true);
+
+      for (const props of [
+        { cardState: "analyzed", summary: null },
+        { cardState: "analyzed", summary: rcaRunSummaryLegacy() },
+        {
+          cardState: "analyzed",
+          summary: rcaRunSummary({
+            card: { ...base.card, outcome: undefined, outcome_reason: undefined },
+          }),
+        },
+        { cardState: "investigating", summary: rcaRunSummaryLive() },
+        { cardState: "failed", summary: rcaRunSummaryCancelled({ state: "failed" }) },
+        { cardState: "cancelled", summary: rcaRunSummaryCancelled() },
+      ]) {
+        expect(byTest(mountWithSlot(props), "slot-feedback").exists()).toBe(false);
+      }
+    });
+
+    it("no Ask or Disprove on the card; Resume only with canResume (F2)", () => {
       const wrapper = mountCard({ cardState: "analyzed", summary: rcaRunSummary() });
 
-      for (const label of ["Is this the cause?", "Ask", "Resume", "Disprove"]) {
+      for (const label of ["Ask", "Resume", "Disprove"]) {
         expect(wrapper.text()).not.toContain(label);
       }
     });

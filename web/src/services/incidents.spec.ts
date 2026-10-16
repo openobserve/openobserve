@@ -35,6 +35,7 @@ describe("incidents service", () => {
     get: vi.fn(),
     post: vi.fn(),
     patch: vi.fn(),
+    put: vi.fn(),
     delete: vi.fn(),
   };
 
@@ -347,6 +348,59 @@ describe("incidents service", () => {
 
       expect(res.data).toEqual({ run_id: "run-1", cancelled: true });
       expect(res.data).not.toHaveProperty("aborted_local_task");
+    });
+  });
+
+  describe("feedback (J4)", () => {
+    const URL = "/api/v2/test-org/alerts/incidents/inc-1/rca/runs/run-2/feedback";
+
+    it("getRcaFeedback GETs the run's feedback and resolves {items, mine}", async () => {
+      mockHttp.get.mockResolvedValue({ data: { items: [], mine: null } });
+
+      const res = await incidents.getRcaFeedback("test-org", "inc-1", "run-2");
+
+      expect(mockHttp.get).toHaveBeenCalledWith(URL);
+      expect(res.data).toEqual({ items: [], mine: null });
+    });
+
+    it("putRcaFeedback PUTs the body as is to the same route", async () => {
+      const body = { verdict: "no" as const, reasons: ["wrong_service" as const], note: "x" };
+      mockHttp.put.mockResolvedValue({ data: { verdict: "no" } });
+
+      await incidents.putRcaFeedback("test-org", "inc-1", "run-2", body);
+
+      expect(mockHttp.put).toHaveBeenCalledWith(URL, body);
+    });
+
+    it("deleteRcaFeedback DELETEs the caller's row", async () => {
+      mockHttp.delete.mockResolvedValue({ status: 204 });
+
+      await incidents.deleteRcaFeedback("test-org", "inc-1", "run-2");
+
+      expect(mockHttp.delete).toHaveBeenCalledWith(URL);
+    });
+  });
+
+  describe("resumeRca (J7)", () => {
+    it("POSTs an empty body to the run's resume route with the abort signal", async () => {
+      const signal = new AbortController().signal;
+      const body = {
+        message: "ok",
+        run_id: "run-3",
+        resumed_from: "run-2",
+        reused_steps: 2,
+        from_step: { index: 3, stage: "metrics", title: "Check metrics" },
+      };
+      mockHttp.post.mockResolvedValue({ data: body });
+
+      const res = await incidents.resumeRca("test-org", "inc-1", "run-2", { signal });
+
+      expect(mockHttp.post).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/inc-1/rca/runs/run-2/resume",
+        null,
+        { signal },
+      );
+      expect(res.data).toEqual(body);
     });
   });
 

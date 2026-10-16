@@ -28,9 +28,13 @@ import {
   rcaRunSummaryCancelled,
 } from "@/test/unit/fixtures/rcaThread";
 
-const mountSpots = (blindSpots: RcaBlindSpot[], live = false) =>
+const mountSpots = (
+  blindSpots: RcaBlindSpot[],
+  live = false,
+  extra: Record<string, unknown> = {},
+) =>
   mount(RcaBlindSpots, {
-    props: { blindSpots, org: "default", live },
+    props: { blindSpots, org: "default", live, ...extra },
     global: { plugins: [i18n] },
   });
 
@@ -69,11 +73,46 @@ describe("RcaBlindSpots (03 VE8, VE34, VE37)", () => {
     expect(push).toHaveBeenCalledWith({ name, query: { org_identifier: "default" } });
   });
 
-  it.each(["resume_run", "none"] as const)("%s renders no button (VE37, Phase 5)", (fix) => {
-    const wrapper = mountSpots([rcaBlindSpot({ fix })]);
+  it.each(["resume_run", "none"] as const)(
+    "%s renders no button without canResume (VE37)",
+    (fix) => {
+      const wrapper = mountSpots([rcaBlindSpot({ fix })]);
 
-    expect(wrapper.find('[data-test="rca-blind-spot-action"]').exists()).toBe(false);
-    expect(wrapper.text()).not.toContain("Resume");
+      expect(wrapper.find('[data-test="rca-blind-spot-action"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Resume");
+    },
+  );
+
+  it("J9: resume_run with canResume shows 'Resume run', which emits resume and never navigates", async () => {
+    const wrapper = mountSpots([rcaBlindSpot({ fix: "resume_run" })], false, { canResume: true });
+    const button = wrapper.find('[data-test="rca-blind-spot-action"]');
+
+    expect(button.text()).toBe("Resume run");
+    await button.trigger("click");
+    expect(wrapper.emitted("resume")).toHaveLength(1);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("J9: canResume adds no button to other fixes", () => {
+    const wrapper = mountSpots(
+      [rcaBlindSpot({ id: "a", fix: "none" }), rcaBlindSpot({ id: "b", fix: "open_pipeline" })],
+      false,
+      { canResume: true },
+    );
+
+    expect(spots(wrapper).map(([, button]) => button)).toEqual([null, "Open pipeline"]);
+  });
+
+  it("J9: the resume button is disabled while a trigger is in flight", async () => {
+    const wrapper = mountSpots([rcaBlindSpot({ fix: "resume_run" })], false, {
+      canResume: true,
+      triggering: true,
+    });
+    const button = wrapper.find('[data-test="rca-blind-spot-action"]');
+
+    expect(button.attributes("disabled")).toBeDefined();
+    await button.trigger("click");
+    expect(wrapper.emitted("resume")).toBeUndefined();
   });
 
   it("frame E: the run_end blind spot names the stages that did not run, with no button", () => {

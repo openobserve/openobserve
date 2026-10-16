@@ -2875,6 +2875,7 @@ mod tests {
                 build_on_previous: false,
                 usage_permit: None,
                 guidance: Some("Check the deploy".to_string()),
+                resume: None,
             },
         )
         .await

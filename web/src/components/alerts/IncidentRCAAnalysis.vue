@@ -63,7 +63,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :has-report="!!reportText"
         :can-build-on-previous="!!reportRun"
         :has-thread="!!thread && thread.transcript === 'available'"
+        :can-ask="canAsk"
         :triggering="triggering"
+        :resuming="resuming"
         :cancelling="cancelling"
         @select-run="$emit('view-run', $event)"
         @reanalyze="$emit('trigger-rca', $event)"
@@ -72,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @copy-report="copyReport"
         @download-report="downloadReport"
         @copy-thread="copyThread"
+        @ask="ask"
       />
 
       <RcaVerdictCard
@@ -90,6 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :cancelled-text="cancelledText"
         :triggering="triggering"
         :cancelling="cancelling"
+        :can-resume="!!resumeRunId && !viewedRun"
+        :resuming="resuming"
         :org="orgId"
         :can-steer="canSteer"
         :paused-step="pausedStep"
@@ -102,7 +107,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @show-unverified="evidenceList?.showUnverified()"
         @show-blind-spots="showBlindSpots"
         @tell-agent="threadColumn?.focusComposer()"
-      />
+        @resume="resumeLatest"
+      >
+        <template v-if="cardRunId" #feedback>
+          <RcaFeedback
+            :key="cardRunId"
+            :org-id="orgId"
+            :incident-id="incidentId"
+            :run-id="cardRunId"
+          />
+        </template>
+      </RcaVerdictCard>
 
       <template v-if="recordSummary">
         <RcaWhatHappened
@@ -129,6 +144,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :blind-spots="recordSummary.blind_spots"
           :org="orgId"
           :live="cardState === 'investigating'"
+          :can-resume="!!resumeRunId && !viewedRun && threadRunId === rca.run_id"
+          :resuming="resuming"
+          :triggering="triggering"
+          @resume="resumeLatest"
         />
         <RcaEvidenceList
           ref="evidenceList"
@@ -197,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="guidanceOpen"
       :initial-guidance="guidanceText"
       :can-build-on-previous="!!reportRun"
-      :triggering="triggering"
+      :triggering="triggering || resuming"
       @start="$emit('trigger-rca', $event)"
     />
   </div>
@@ -252,6 +271,9 @@ import RcaVerdictCard from "./rca/RcaVerdictCard.vue";
 import RcaWhatHappened from "./rca/RcaWhatHappened.vue";
 import RcaReportContent from "./rca/RcaReportContent.vue";
 import { useTheme } from "@/composables/useTheme";
+import RcaFeedback from "./rca/RcaFeedback.vue";
+import { buildRcaAskAttachment, type RcaAskPayload } from "@/utils/incidents/rcaAskAttachment";
+import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 
 const props = withDefaults(
   defineProps<{
@@ -278,6 +300,14 @@ const props = withDefaults(
     threadLive?: boolean;
     triggering?: boolean;
     cancelling?: boolean;
+    /**
+     * The run "Resume run" resumes (J9): the latest failed or cancelled run, or
+     * the source of a resume that never ran; null offers no Resume.
+     */
+    resumeRunId?: string | null;
+    resuming?: boolean;
+    /** The incident's title, for the Ask attachment header. */
+    incidentTitle?: string;
   }>(),
   {
     reportRun: null,
@@ -291,6 +321,9 @@ const props = withDefaults(
     threadLive: false,
     triggering: false,
     cancelling: false,
+    resumeRunId: null,
+    resuming: false,
+    incidentTitle: "",
   },
 );
 
@@ -300,12 +333,23 @@ const emit = defineEmits<{
   "view-run": [runId: string | null];
   /** A message resumed the paused run: the run state changed (04 SG18). */
   steered: [];
+  /** "Resume run" on L, E or the `resume_run` blind spot (J9). */
+  "resume-rca": [runId: string];
+  /** "Ask about this analysis" (J5): the hand-off payload for a new AI chat. */
+  "ask-ai": [payload: RcaAskPayload];
 }>();
 
 const { t } = useI18nTyped();
 const { isDark } = useTheme();
 const store = useStore();
 const timezone = useViewerTimezone();
+
+/** AI chat is on for this user: the edition offers it and the server enabled it. */
+const aiEnabled = computed(
+  () =>
+    checkFeatureAccess("aiAssistant", buildFeatureGateContext(store.state.zoConfig)).allowed &&
+    Boolean(store.state.zoConfig?.ai_enabled),
+);
 
 const live = computed(() => isLiveRca(props.rca));
 const currentRun = computed(() => props.rca?.current_run ?? null);
@@ -640,5 +684,47 @@ const copyThread = () => {
     t("alerts.incidents.rcaThread.copied"),
     t("alerts.incidents.rcaThread.copyFailed"),
   );
+};
+
+// J9: the drawer owns the request and the toast; the target may be the latest
+// run's source when the latest is a resume that never ran.
+const resumeLatest = () => {
+  if (props.resumeRunId) emit("resume-rca", props.resumeRunId);
+};
+
+// J5: Ask is about the run whose record shows, else the run whose report shows.
+const displayedRunId = computed(() => props.viewedRun?.run_id ?? props.reportRun?.run_id ?? null);
+const askRun = computed<RcaRunItem | null>(() => {
+  if (recordSummary.value) return findRun(recordSummary.value.run_id);
+  return props.reportText ? findRun(displayedRunId.value) : null;
+});
+
+const canAsk = computed(() => aiEnabled.value && askRun.value !== null);
+
+const ask = () => {
+  const run = askRun.value;
+  if (!run) return;
+  const index = props.history.findIndex((item) => item.run_id === run.run_id);
+  const runLabel = t("alerts.incidents.rcaRun.runAt", {
+    number: props.history.length - index,
+    time: formatTimestampInTimezone(run.started_at, "MMM D, HH:mm", "UTC"),
+  });
+  const query = buildRcaAskAttachment({
+    incidentId: props.incidentId,
+    incidentTitle: props.incidentTitle || null,
+    runLabel,
+    run,
+    summary: recordSummary.value?.run_id === run.run_id ? recordSummary.value : null,
+    // The loaded report belongs to the displayed run only.
+    report: displayedRunId.value === run.run_id ? props.reportText : "",
+  });
+  emit("ask-ai", {
+    query,
+    chipName: t("alerts.incidents.rcaAsk.chip", { run: runLabel }),
+    newChat: true,
+    autoSend: false,
+    // No incident or run keys: they would route the chat to the RCA agent (J5).
+    context: { currentPage: "incidents", org_id: props.orgId },
+  });
 };
 </script>

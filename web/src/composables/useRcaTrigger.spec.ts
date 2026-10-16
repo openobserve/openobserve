@@ -25,7 +25,7 @@ const { awsConfig, promptForConsent, toastMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/aws-exports", () => ({ default: awsConfig }));
-vi.mock("@/services/incidents", () => ({ default: { triggerRca: vi.fn() } }));
+vi.mock("@/services/incidents", () => ({ default: { triggerRca: vi.fn(), resumeRca: vi.fn() } }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
 vi.mock("@/composables/usePaidOverageConsent", async (importOriginal) => ({
   ...(await importOriginal<typeof ConsentModule>()),
@@ -38,6 +38,7 @@ import {
   type RcaTriggerOptions,
   type RcaTriggerParams,
   type RcaTriggerResult,
+  type RcaResumeResult,
 } from "./useRcaTrigger";
 
 interface RcaTriggerApi {
@@ -47,6 +48,12 @@ interface RcaTriggerApi {
     params: RcaTriggerParams,
     opts?: RcaTriggerOptions,
   ) => Promise<RcaTriggerResult>;
+  requestResume: (
+    org: string,
+    incidentId: string,
+    runId: string,
+    opts?: RcaTriggerOptions,
+  ) => Promise<RcaResumeResult>;
 }
 
 // The composable calls useI18n and onScopeDispose, so it runs inside a mounted host.
@@ -64,6 +71,7 @@ function useRcaTrigger(): RcaTriggerApi {
 }
 
 const triggerRca = vi.mocked(incidentsService.triggerRca);
+const resumeRca = vi.mocked(incidentsService.resumeRca);
 
 const httpError = (status: number, data: unknown) => ({
   isAxiosError: true,
@@ -201,5 +209,90 @@ describe("useRcaTrigger (RR-33)", () => {
 
     expect(result).toEqual({ status: "declined" });
     expect(toastMock).not.toHaveBeenCalled();
+  });
+
+  describe("requestResume (J9)", () => {
+    const RESUMED = {
+      message: "resumed",
+      run_id: "run-3",
+      resumed_from: "run-2",
+      reused_steps: 3,
+      from_step: { index: 4, stage: "metrics", title: "Check the pool" },
+    };
+
+    it("POSTs the resume for the run and returns the new run with the 202 body", async () => {
+      resumeRca.mockResolvedValue({ data: RESUMED } as never);
+
+      const result = await useRcaTrigger().requestResume("org", "inc-1", "run-2");
+
+      expect(resumeRca).toHaveBeenCalledWith("org", "inc-1", "run-2", { signal: undefined });
+      expect(triggerRca).not.toHaveBeenCalled();
+      expect(result).toEqual({ status: "started", runId: "run-3", data: RESUMED });
+    });
+
+    it("non-Cloud 412 returns the server message, like a trigger", async () => {
+      resumeRca.mockRejectedValue(httpError(412, { message: "AI SRE is not configured" }));
+
+      const result = await useRcaTrigger().requestResume("org", "inc-1", "run-2");
+
+      expect(result).toEqual({ status: "unavailable", message: "AI SRE is not configured" });
+      expect(promptForConsent).not.toHaveBeenCalled();
+    });
+
+    it.each(["false", "true"])(
+      "402 and 409/410 refusals are rethrown (isCloud=%s)",
+      async (cloud) => {
+        awsConfig.isCloud = cloud;
+        for (const error of [
+          httpError(402, { message: "No credits" }),
+          httpError(409, { code: "not_resumable", message: "Not resumable" }),
+          httpError(410, { code: "transcript_expired", message: "Gone" }),
+        ]) {
+          resumeRca.mockRejectedValueOnce(error);
+          await expect(useRcaTrigger().requestResume("org", "inc-1", "run-2")).rejects.toBe(error);
+        }
+        expect(promptForConsent).not.toHaveBeenCalled();
+      },
+    );
+
+    it("Cloud 412 consent: prompts, then resends the same resume once", async () => {
+      awsConfig.isCloud = "true";
+      resumeRca
+        .mockRejectedValueOnce(httpError(412, CONSENT_BODY))
+        .mockResolvedValueOnce({ data: RESUMED } as never);
+      promptForConsent.mockResolvedValue(true);
+
+      const result = await useRcaTrigger().requestResume("org", "inc-1", "run-2");
+
+      expect(promptForConsent).toHaveBeenCalledTimes(1);
+      expect(resumeRca.mock.calls.map((call) => call.slice(0, 3))).toEqual([
+        ["org", "inc-1", "run-2"],
+        ["org", "inc-1", "run-2"],
+      ]);
+      expect(triggerRca).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ status: "started", runId: "run-3" });
+    });
+
+    it("Cloud decline does not resend and shows the declined notice", async () => {
+      awsConfig.isCloud = "true";
+      resumeRca.mockRejectedValue(httpError(412, CONSENT_BODY));
+      promptForConsent.mockResolvedValue(false);
+
+      const result = await useRcaTrigger().requestResume("org", "inc-1", "run-2");
+
+      expect(result).toEqual({ status: "declined" });
+      expect(resumeRca).toHaveBeenCalledTimes(1);
+      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "info" }));
+    });
+
+    it("Cloud: a second denial after accept propagates", async () => {
+      awsConfig.isCloud = "true";
+      const second = httpError(412, CONSENT_BODY);
+      resumeRca.mockRejectedValueOnce(httpError(412, CONSENT_BODY)).mockRejectedValueOnce(second);
+      promptForConsent.mockResolvedValue(true);
+
+      await expect(useRcaTrigger().requestResume("org", "inc-1", "run-2")).rejects.toBe(second);
+      expect(resumeRca).toHaveBeenCalledTimes(2);
+    });
   });
 });

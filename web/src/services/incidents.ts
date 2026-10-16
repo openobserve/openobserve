@@ -16,6 +16,7 @@
 import http from "./http";
 import analytics from "./product_analytics";
 import type { TranslateFn } from "@/types/i18n";
+import type { ResolutionCause } from "@/ts/interfaces/oncall";
 import serviceStreamsApi, {
   type CorrelationRequest,
   type CorrelationResponse,
@@ -190,6 +191,12 @@ export interface RcaContextUsed {
   past_causes?: { id: string; summary: string }[];
   skills?: string[];
   toolsets?: string[];
+  /** A resumed run (J8): the source run, the steps it reused and the step it redid first. */
+  resumed_from?: {
+    run_id: string;
+    steps: number;
+    from_step: { index: number; stage: string; title: string };
+  };
 }
 
 /** Whether a run's transcript can be read (02 §7.3). */
@@ -560,6 +567,51 @@ export interface CancelRcaResponse {
   cancelled: boolean;
 }
 
+/** A responder's verdict on a finished run (README §9). */
+export type RcaFeedbackVerdict = "yes" | "no" | "change";
+
+/** Why a run is not the cause (`no` only). */
+export type RcaFeedbackReason =
+  "wrong_service" | "symptom_not_cause" | "evidence_does_not_hold" | "missed_change";
+
+/** One `rca_feedback` row: one per run and author. Times are microseconds. */
+export interface RcaFeedback {
+  run_id: string;
+  author_email: string;
+  incident_id: string | null;
+  subject_type: RcaRunSubjectType;
+  subject_id: string;
+  verdict: RcaFeedbackVerdict;
+  cause: ResolutionCause | null;
+  note: string | null;
+  reasons: RcaFeedbackReason[];
+  created_at: number;
+  updated_at: number;
+}
+
+/** Body of `PUT …/rca/runs/{run_id}/feedback`. */
+export interface PutRcaFeedbackRequest {
+  verdict: RcaFeedbackVerdict;
+  cause?: ResolutionCause;
+  note?: string;
+  reasons?: RcaFeedbackReason[];
+}
+
+/** `GET …/rca/runs/{run_id}/feedback`: every author's row and the caller's own. */
+export interface ListRcaFeedbackResponse {
+  items: RcaFeedback[];
+  mine: RcaFeedback | null;
+}
+
+/** `POST …/rca/runs/{run_id}/resume`: 202 (J7). */
+export interface ResumeRcaResponse {
+  message: string;
+  run_id: string;
+  resumed_from: string;
+  reused_steps: number;
+  from_step: { index: number; stage: string; title: string };
+}
+
 export interface IncidentTopology {
   nodes: AlertNode[];
   edges: AlertEdge[];
@@ -847,6 +899,50 @@ const incidents = {
   getRcaSteering: (org_identifier: string, incident_id: string, run_id: string) => {
     return http().get<RcaSteering>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/steering`,
+    );
+  },
+
+  /** Read the feedback rows of one run; `mine` is the caller's (README §9). */
+  getRcaFeedback: (org_identifier: string, incident_id: string, run_id: string) => {
+    return http().get<ListRcaFeedbackResponse>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/feedback`,
+    );
+  },
+
+  /** Save the caller's feedback on a finished run; the latest write wins. */
+  putRcaFeedback: (
+    org_identifier: string,
+    incident_id: string,
+    run_id: string,
+    body: PutRcaFeedbackRequest,
+  ) => {
+    return http().put<RcaFeedback>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/feedback`,
+      body,
+    );
+  },
+
+  /** Undo: delete the caller's own feedback row (204). */
+  deleteRcaFeedback: (org_identifier: string, incident_id: string, run_id: string) => {
+    return http().delete(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/feedback`,
+    );
+  },
+
+  /**
+   * Resume a failed or cancelled run from its last finished step (J7): a new
+   * run that reuses the finished steps (202).
+   */
+  resumeRca: (
+    org_identifier: string,
+    incident_id: string,
+    run_id: string,
+    config: { signal?: AbortSignal } = {},
+  ) => {
+    return http().post<ResumeRcaResponse>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/resume`,
+      null,
+      { signal: config.signal },
     );
   },
 

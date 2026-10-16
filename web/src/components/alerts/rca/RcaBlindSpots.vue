@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!-- "Blind spots" (03 VE8, VE34, VE37): what the agent could not check, each
-     with the one action that closes the gap. Resume run is Phase 5: no button. -->
+     with the one action that closes the gap. "Resume run" emits instead of
+     opening a page, and shows only when the run can be resumed (J9). -->
 <template>
   <section data-test="rca-blind-spots" :aria-labelledby="headingId" class="flex flex-col">
     <div class="mb-2.5 flex flex-wrap items-baseline gap-2">
@@ -65,6 +66,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ actions[spot.id]!.label }}
         </OButton>
+        <OButton
+          v-else-if="spot.fix === 'resume_run' && canResume"
+          data-test="rca-blind-spot-action"
+          data-fix="resume_run"
+          variant="outline"
+          size="sm"
+          icon-left="play-arrow"
+          :loading="resuming"
+          :disabled="triggering"
+          @click="$emit('resume')"
+        >
+          {{ t("alerts.incidents.rcaSummary.fix.resumeRun") }}
+        </OButton>
       </li>
     </ul>
   </section>
@@ -80,11 +94,24 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type { RcaBlindSpot, RcaBlindSpotFix } from "@/services/incidents";
 import { rcaBlindSpotRoute } from "@/utils/incidents/rcaEvidenceLinks";
 
-const props = defineProps<{
-  blindSpots: RcaBlindSpot[];
-  org: string;
-  /** The run is live: gaps can still appear. */
-  live: boolean;
+const props = withDefaults(
+  defineProps<{
+    blindSpots: RcaBlindSpot[];
+    org: string;
+    /** The run is live: gaps can still appear. */
+    live: boolean;
+    /** The shown run is the latest and can be resumed (J9). */
+    canResume?: boolean;
+    resuming?: boolean;
+    /** A trigger is in flight: Resume waits for it. */
+    triggering?: boolean;
+  }>(),
+  { canResume: false, resuming: false, triggering: false },
+);
+
+defineEmits<{
+  /** The `resume_run` blind spot's button (VE37). */
+  resume: [];
 }>();
 
 const { t } = useI18nTyped();

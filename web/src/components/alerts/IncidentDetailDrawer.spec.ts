@@ -60,7 +60,9 @@ vi.mock("@/services/incidents", async (importOriginal) => {
       get: vi.fn(),
       updateStatus: vi.fn(),
       triggerRca: vi.fn(),
+      resumeRca: vi.fn(),
       cancelRca: vi.fn(),
+      getRcaFeedback: vi.fn(),
       getRcaRun: vi.fn(),
       getRcaThread: vi.fn(),
       getRcaSummary: vi.fn(),
@@ -106,6 +108,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { rcaRunSummaryLive } from "@/test/unit/fixtures/rcaThread";
+import awsConfig from "@/aws-exports";
 
 // Test data factory
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
@@ -1522,6 +1525,109 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.find('[data-test="rca-thread-column"]').exists()).toBe(false);
       expect(incidentsService.getRcaThread).not.toHaveBeenCalled();
       expect(incidentsService.getRcaSummary).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Phase 5: Ask hand-off and Resume", () => {
+    const reportRun = {
+      run_id: "run-2",
+      subject_type: "incident" as const,
+      trigger: "manual" as const,
+      mode: "fresh" as const,
+      started_by: "a.rao@acme.io",
+      state: "completed" as const,
+      started_at: 1700000000000000,
+      ended_at: 1700000060000000,
+      outcome: null,
+      confidence: null,
+      cancelled_by: null,
+      error_reason: null,
+    };
+    const completed = {
+      run_id: "run-2",
+      state: "completed" as const,
+      stale: false,
+      started_at: 1700000000000000,
+      updated_at: 1700000060000000,
+      outcome: null,
+      confidence: null,
+      summary: {
+        stage: null,
+        stage_index: null,
+        stage_count: 0,
+        steps: 4,
+        tool_calls: 0,
+        steered_by: [],
+        unblocked_by: null,
+        detail: null,
+        deadline_at: null,
+        previous: null,
+      },
+      report_run: reportRun,
+      history: [reportRun],
+    };
+    const original = { isEnterprise: awsConfig.isEnterprise, ai: store.state.zoConfig.ai_enabled };
+
+    beforeEach(() => {
+      awsConfig.isEnterprise = "true";
+      store.state.zoConfig.ai_enabled = true;
+      vi.mocked(incidentsService.getRcaFeedback).mockResolvedValue({
+        data: { items: [], mine: null },
+      } as never);
+      vi.mocked(incidentsService.get).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "1", title: "checkout 5xx", rca: completed }),
+      } as never);
+    });
+
+    afterEach(() => {
+      awsConfig.isEnterprise = original.isEnterprise;
+      store.state.zoConfig.ai_enabled = original.ai;
+    });
+
+    const openAnalysis = async () => {
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      wrapper.vm.activeTab = "incidentAnalysis";
+      await flushPromises();
+    };
+
+    it("J5: Ask emits sendToAiChat with a new, unsent chat and a context without incident or run keys", async () => {
+      await openAnalysis();
+
+      await wrapper.find('[data-test="rca-ask-btn"]').trigger("click");
+
+      const events = wrapper.emitted<[Record<string, unknown>]>("sendToAiChat") ?? [];
+      expect(events).toHaveLength(1);
+      const [payload] = events[0];
+      expect(payload).toMatchObject({ newChat: true, autoSend: false });
+      expect(payload.chipName).toMatch(/^Analysis · Run 1 · /);
+      expect(payload.context).toEqual({ currentPage: "incidents", org_id: "default" });
+      expect(String(payload.query)).toContain("checkout 5xx");
+      expect(String(payload.query)).toContain("Report of run-2");
+    });
+
+    it("J9: Resume from the panel POSTs the resume for that run and re-reads the incident", async () => {
+      vi.mocked(incidentsService.resumeRca).mockResolvedValue({
+        data: {
+          message: "resumed",
+          run_id: "run-3",
+          resumed_from: "run-2",
+          reused_steps: 2,
+          from_step: { index: 3, stage: "metrics", title: "Check metrics" },
+        },
+      } as never);
+      await openAnalysis();
+      const reads = vi.mocked(incidentsService.get).mock.calls.length;
+
+      wrapper.findComponent({ name: "IncidentRCAAnalysis" }).vm.$emit("resume-rca", "run-2");
+      await flushPromises();
+
+      expect(vi.mocked(incidentsService.resumeRca).mock.calls[0]?.slice(0, 3)).toEqual([
+        "default",
+        "1",
+        "run-2",
+      ]);
+      expect(vi.mocked(incidentsService.get).mock.calls.length).toBeGreaterThan(reads);
     });
   });
 

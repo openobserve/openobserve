@@ -26,6 +26,7 @@ vi.mock("@/services/incidents", () => ({
     get: vi.fn(),
     getRcaRun: vi.fn(),
     triggerRca: vi.fn(),
+    resumeRca: vi.fn(),
     cancelRca: vi.fn(),
   },
 }));
@@ -101,7 +102,11 @@ interface IncidentRcaApi {
   displayedRunId: Readonly<Ref<string | null>>;
   reportText: Readonly<Ref<string>>;
   currentError: Readonly<Ref<RcaRunError | null>>;
+  triggering: Readonly<Ref<boolean>>;
+  resuming: Readonly<Ref<boolean>>;
+  resumeRunId: Readonly<Ref<string | null>>;
   trigger: (options?: { buildOnPrevious?: boolean }) => Promise<void>;
+  resume: (runId: string) => Promise<void>;
   cancel: () => Promise<void>;
   reload: () => Promise<void>;
 }
@@ -321,5 +326,348 @@ describe("useIncidentRca (RR-35)", () => {
     expect(service.cancelRca).toHaveBeenCalledWith("default", "inc-1");
     expect(host.api.state.value).toBe("cancelled");
     expect(host.api.live.value).toBe(false);
+  });
+
+  describe("J9: resume", () => {
+    /** The latest run as `current_run`, resumable by default: failed with a session and 3 steps. */
+    const stopped = (run: Partial<RcaRun> = {}, history: RcaRunItem[] = []): RcaSummary => {
+      const base = rca(run.state ?? "failed", run.run_id ?? "run-2", null);
+      return {
+        ...base,
+        history,
+        current_run: {
+          run_id: base.run_id,
+          state: base.state,
+          trigger: "manual",
+          session_id: "ses-1",
+          report: null,
+          outcome: null,
+          stats: { steps: 3 },
+          error: { code: "timeout", reason: "Timed out", details: null, trigger_type: null },
+          ...run,
+        } as RcaRun,
+      };
+    };
+
+    const historyItem = (
+      runId: string,
+      state: RcaRunState,
+      outcome: RcaRunItem["outcome"] = null,
+    ) => ({ ...reportRun(runId), state, outcome }) as RcaRunItem;
+
+    describe("resumeRunId", () => {
+      it.each(["failed", "cancelled"] as const)(
+        "a %s latest run with finished steps",
+        async (state) => {
+          host = mountHost(stopped({ state, error: state === "cancelled" ? null : undefined }));
+
+          expect(host.api.resumeRunId.value).toBe("run-2");
+        },
+      );
+
+      it.each([
+        ["completed", { state: "completed" as const }],
+        ["running", { state: "running" as const }],
+        ["no session", { session_id: null }],
+        ["a report", { report: "# done" }],
+        ["an outcome", { outcome: "inconclusive" as const }],
+        ["only the open step", { stats: { steps: 1 } }],
+        ["no steps", { stats: { steps: 0 } }],
+      ])("null for %s", async (_label, run) => {
+        host = mountHost(stopped(run));
+
+        expect(host.api.resumeRunId.value).toBeNull();
+      });
+
+      it("two recorded steps (one finished plus the open one) are enough", () => {
+        host = mountHost(stopped({ stats: { steps: 2 } }));
+
+        expect(host.api.resumeRunId.value).toBe("run-2");
+      });
+
+      it("falls back to the summary step count without run stats", () => {
+        const summary = stopped({ stats: null });
+        summary.summary.steps = 4;
+        host = mountHost(summary);
+
+        expect(host.api.resumeRunId.value).toBe("run-2");
+      });
+
+      it.each([
+        "turn_limit",
+        "credentials",
+        "agent_unavailable",
+        "busy",
+        "usage_denied",
+        "rca_disabled",
+        "agent_not_configured",
+        "l0_off",
+        "transcript_deleted",
+        "persistence_failed",
+      ])("null for the start or lost-transcript code %s", (code) => {
+        host = mountHost(
+          stopped({ error: { code, reason: code, details: null, trigger_type: null } }),
+        );
+
+        expect(host.api.resumeRunId.value).toBeNull();
+      });
+
+      it("null when current_run is not the latest run", () => {
+        const summary = stopped();
+        summary.run_id = "run-9";
+        host = mountHost(summary);
+
+        expect(host.api.resumeRunId.value).toBeNull();
+      });
+
+      describe("a transparent Resume child (never ran a turn)", () => {
+        const child = (run: Partial<RcaRun>, source: RcaRunItem | null) =>
+          stopped(
+            {
+              run_id: "run-3",
+              trigger: "resume",
+              session_id: null,
+              stats: { steps: 0 },
+              context_used: {
+                resumed_from: {
+                  run_id: "run-2",
+                  steps: 2,
+                  from_step: { index: 3, stage: "metrics", title: "Check metrics" },
+                },
+              },
+              ...run,
+            },
+            [historyItem("run-3", "failed"), ...(source ? [source] : [])],
+          );
+
+        it.each(["resume_failed", "turn_limit", "credentials", "agent_unavailable", "busy"])(
+          "%s resumes the source run instead",
+          (code) => {
+            host = mountHost(
+              child(
+                {
+                  session_id: "ses-fork",
+                  error: { code, reason: code, details: null, trigger_type: null },
+                },
+                historyItem("run-2", "failed"),
+              ),
+            );
+
+            expect(host.api.resumeRunId.value).toBe("run-2");
+          },
+        );
+
+        it("a child without a session is transparent whatever the code", () => {
+          host = mountHost(child({}, historyItem("run-2", "cancelled")));
+
+          expect(host.api.resumeRunId.value).toBe("run-2");
+        });
+
+        it("a cancelled child with no session resumes the source run (E banner)", () => {
+          host = mountHost(
+            child({ state: "cancelled", error: null }, historyItem("run-2", "failed")),
+          );
+
+          expect(host.api.resumeRunId.value).toBe("run-2");
+        });
+
+        it("a cancelled child with a session is not redirected to the source", () => {
+          // A never-ran code means nothing on a cancel: the child is judged on its own.
+          const code = { code: "busy", reason: "busy", details: null, trigger_type: null };
+          host = mountHost(
+            child(
+              { state: "cancelled", session_id: "ses-fork", error: code, stats: { steps: 3 } },
+              historyItem("run-2", "failed"),
+            ),
+          );
+          expect(host.api.resumeRunId.value).not.toBe("run-2");
+          host.wrapper.unmount();
+
+          host = mountHost(
+            child(
+              { state: "cancelled", session_id: "ses-fork", error: null, stats: { steps: 1 } },
+              historyItem("run-2", "failed"),
+            ),
+          );
+          expect(host.api.resumeRunId.value).toBeNull();
+        });
+
+        it.each([
+          ["completed", historyItem("run-2", "completed")],
+          ["graded", historyItem("run-2", "failed", "inconclusive")],
+          ["missing from the history", null],
+        ])("null when the source is %s", (_label, source) => {
+          host = mountHost(child({}, source));
+
+          expect(host.api.resumeRunId.value).toBeNull();
+        });
+
+        it("a child that ran a turn (session, other code) is judged on its own", () => {
+          host = mountHost(
+            child({ session_id: "ses-fork", stats: { steps: 3 } }, historyItem("run-2", "failed")),
+          );
+
+          expect(host.api.resumeRunId.value).toBe("run-3");
+        });
+      });
+    });
+
+    const RESUMED = (steps: number) => ({
+      data: {
+        message: "resumed",
+        run_id: "run-3",
+        resumed_from: "run-2",
+        reused_steps: steps,
+        from_step: { index: steps + 1, stage: "metrics", title: "Check the pool" },
+      },
+    });
+
+    it.each([
+      [3, "Resuming from “Check the pool”. The 3 finished steps are reused."],
+      [1, "Resuming from “Check the pool”. The finished step is reused."],
+    ])(
+      "a started resume (%i steps) toasts '%s', invalidates the list and re-reads",
+      async (steps, text) => {
+        service.resumeRca.mockResolvedValue(RESUMED(steps) as never);
+        service.get.mockResolvedValue(detail(rca("running", "run-3", null)) as never);
+        const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+        host = mountHost(stopped());
+        await flushPromises();
+
+        await host.api.resume("run-2");
+
+        expect(service.resumeRca.mock.calls[0].slice(0, 3)).toEqual(["default", "inc-1", "run-2"]);
+        expect(toastMock).toHaveBeenCalledWith({ variant: "success", message: text });
+        expect(invalidate).toHaveBeenCalledWith({ queryKey: incidentKeys.all("default") });
+        expect(service.get).toHaveBeenCalledTimes(1);
+        expect(host.api.live.value).toBe(true);
+        expect(host.api.resuming.value).toBe(false);
+        invalidate.mockRestore();
+      },
+    );
+
+    it("a rejected resume that created a run shows the banner, not a toast (review fix)", async () => {
+      service.resumeRca.mockRejectedValue({
+        isAxiosError: true,
+        response: { status: 500, data: { message: "The earlier steps could not be reused" } },
+      });
+      service.get.mockResolvedValue(
+        detail(
+          stopped({
+            run_id: "run-3",
+            trigger: "resume",
+            error: {
+              code: "resume_failed",
+              reason: "The earlier steps could not be reused",
+              details: null,
+              trigger_type: null,
+            },
+          }),
+        ) as never,
+      );
+      host = mountHost(stopped());
+      await flushPromises();
+
+      await host.api.resume("run-2");
+
+      expect(service.get).toHaveBeenCalledTimes(1);
+      expect(host.api.currentError.value?.reason).toBe("The earlier steps could not be reused");
+      expect(toastMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        409,
+        { code: "not_resumable", message: "This run cannot be resumed" },
+        "This run cannot be resumed",
+      ],
+      [
+        410,
+        { code: "transcript_expired", message: "The transcript expired" },
+        "The transcript expired",
+      ],
+      [500, {}, "Could not resume the run."],
+    ])(
+      "a refused resume (%i) that created no run toasts the server message",
+      async (status, data, text) => {
+        service.resumeRca.mockRejectedValue({ isAxiosError: true, response: { status, data } });
+        service.get.mockResolvedValue(detail(stopped()) as never);
+        host = mountHost(stopped());
+        await flushPromises();
+
+        await host.api.resume("run-2");
+
+        expect(toastMock).toHaveBeenCalledWith({ variant: "error", message: text });
+        expect(host.api.resuming.value).toBe(false);
+      },
+    );
+
+    it("a 412 (AI not available) toasts the server message and re-reads nothing", async () => {
+      service.resumeRca.mockRejectedValue({
+        isAxiosError: true,
+        response: { status: 412, data: { message: "AI SRE is not configured" } },
+      });
+      host = mountHost(stopped());
+      await flushPromises();
+
+      await host.api.resume("run-2");
+
+      expect(toastMock).toHaveBeenCalledWith({
+        variant: "error",
+        message: "AI SRE is not configured",
+      });
+      expect(service.get).not.toHaveBeenCalled();
+    });
+
+    it("while a resume is in flight, a trigger or a second resume sends nothing", async () => {
+      const request = Promise.withResolvers<unknown>();
+      service.resumeRca.mockReturnValue(request.promise as never);
+      service.get.mockResolvedValue(detail(rca("running", "run-3", null)) as never);
+      host = mountHost(stopped());
+      await flushPromises();
+
+      const resuming = host.api.resume("run-2");
+      expect(host.api.resuming.value).toBe(true);
+      await host.api.trigger();
+      await host.api.resume("run-2");
+
+      expect(service.triggerRca).not.toHaveBeenCalled();
+      expect(service.resumeRca).toHaveBeenCalledTimes(1);
+      request.resolve(RESUMED(2));
+      await resuming;
+      expect(host.api.resuming.value).toBe(false);
+    });
+
+    it("while a trigger is in flight, Resume sends nothing", async () => {
+      const request = Promise.withResolvers<unknown>();
+      service.triggerRca.mockReturnValue(request.promise as never);
+      service.get.mockResolvedValue(detail(rca("running", "run-3", null)) as never);
+      host = mountHost(stopped());
+      await flushPromises();
+
+      const triggering = host.api.trigger();
+      await host.api.resume("run-2");
+
+      expect(service.resumeRca).not.toHaveBeenCalled();
+      request.resolve({ data: { run_id: "run-3" } });
+      await triggering;
+    });
+
+    it("an incident switch mid-resume drops the late toast and clears resuming", async () => {
+      const request = Promise.withResolvers<unknown>();
+      service.resumeRca.mockReturnValue(request.promise as never);
+      host = mountHost(stopped());
+      await flushPromises();
+
+      const resuming = host.api.resume("run-2");
+      host.incident.value = { id: "inc-2", rca: null } as IncidentWithAlerts;
+      await flushPromises();
+      request.resolve(RESUMED(2));
+      await resuming;
+
+      expect(toastMock).not.toHaveBeenCalled();
+      expect(host.api.resuming.value).toBe(false);
+      expect(service.get).not.toHaveBeenCalled();
+    });
   });
 });

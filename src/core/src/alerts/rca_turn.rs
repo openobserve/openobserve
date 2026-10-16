@@ -341,6 +341,22 @@ impl From<AdmitError> for RcaTurnError {
     }
 }
 
+/// A run's first turn on a session forked for it (J8).
+#[derive(Debug, Clone)]
+pub struct ForkedSession {
+    /// The fork, committed and bound to its own opencode session.
+    pub session_id: String,
+    /// `context_used.resumed_from`: `{run_id, steps, from_step}`, the value the run was
+    /// started with (`ResumeSeed::resumed_from`), kept when the first turn writes the whole
+    /// `context_used`.
+    pub resumed_from: Value,
+    /// The thread stats of the copied events: the run's live counts go on from them, as a
+    /// continuation's do (TH27).
+    pub reused: ThreadStats,
+    /// The stage of the last copied step.
+    pub stage: Option<String>,
+}
+
 /// Start one turn of a run as SysRcaAgent (TH1, TH2, TH5–TH8, TH10, TH11).
 ///
 /// A first turn gets a new session id and the run's `context_used`, written before
@@ -350,18 +366,64 @@ pub async fn start_rca_turn(
     run: RcaTurnRun,
     prompt: RcaPrompt,
 ) -> Result<TurnStarted, RcaTurnError> {
+    start_turn(run, prompt, None).await
+}
+
+/// Start the first turn of a resumed run (`run.session_id` is `None`) on the session forked
+/// for it, with [RcaPrompt::Continue]: the session id, the `context_used` with its
+/// `resumed_from`, and the counts and stage of the copied steps go on the run first, and
+/// the turn restores the copied events. A continuation of the run (TH25, SG18) stays on
+/// the fork.
+pub async fn start_forked_rca_turn(
+    run: RcaTurnRun,
+    fork: ForkedSession,
+) -> Result<TurnStarted, RcaTurnError> {
+    start_turn(run, RcaPrompt::Continue, Some(fork)).await
+}
+
+async fn start_turn(
+    run: RcaTurnRun,
+    prompt: RcaPrompt,
+    fork: Option<ForkedSession>,
+) -> Result<TurnStarted, RcaTurnError> {
     let prompt = prompt.render();
     let (mcps, clis, skills) = load_agent_tools(&run.org_id).await;
 
     let session_id = match run.session_id.clone() {
         Some(session_id) => session_id,
         None => {
-            let session_id = sea_orm::prelude::Uuid::new_v4().to_string();
-            let patch = RunPatch {
-                session_id: Some(session_id.clone()),
+            let mut patch = RunPatch {
                 context_used: Some(context_used(&run.context, &mcps, &clis, &skills)),
                 ..Default::default()
             };
+            let session_id = match fork {
+                Some(ForkedSession {
+                    session_id,
+                    resumed_from,
+                    reused,
+                    stage,
+                }) => {
+                    if let Some(used) = patch.context_used.as_mut() {
+                        used["resumed_from"] = resumed_from;
+                    }
+                    patch.stats = Some(RunStats {
+                        steps: Some(reused.steps),
+                        tool_calls: Some(reused.tool_calls),
+                        tokens: serde_json::to_value(&reused.tokens).ok(),
+                        ..Default::default()
+                    });
+                    patch.summary = Some(RunSummaryPatch {
+                        steps: Some(reused.steps),
+                        tool_calls: Some(reused.tool_calls),
+                        ..Default::default()
+                    });
+                    patch.stage_index = stage.as_deref().and_then(stage_index);
+                    patch.stage = stage;
+                    session_id
+                }
+                None => sea_orm::prelude::Uuid::new_v4().to_string(),
+            };
+            patch.session_id = Some(session_id.clone());
             match rca_runs::update_run(&run.org_id, &run.run_id, patch).await {
                 Ok(true) => session_id,
                 Ok(false) => {
@@ -479,7 +541,8 @@ async fn probe_health<T, E: std::fmt::Display>(
     }
 }
 
-/// TH7.1: what the run was given, `{past_causes: [{id, summary}], skills, toolsets}`.
+/// TH7.1: what the run was given, `{past_causes: [{id, summary}], skills, toolsets}`; a
+/// resumed run's also has `resumed_from` (J8).
 fn context_used(
     context: &Value,
     mcps: &[McpEntry],
@@ -3072,6 +3135,58 @@ mod tests {
         assert_eq!(run.continuations, 1);
     }
 
+    /// J8, TH27: a resumed run's live counts start from the copied steps, go on with the
+    /// resumed turn's, and end where the finalizer's count of the whole session does.
+    #[tokio::test]
+    async fn a_resumed_runs_live_counts_go_on_from_the_copied_steps() {
+        use crate::ai_chat::fork::tests::{THREE_STEPS_CUT, three_steps};
+
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Resume).await;
+        let events = three_steps();
+        let cut = THREE_STEPS_CUT as usize;
+        let copied = project_rca_thread(&events[..=cut], &[], false, false);
+        let fork = ForkedSession {
+            session_id: "0195a1b2-c3d4-7e5f-8a9b-f0e4ed000002".to_string(),
+            resumed_from: json!({"run_id": "source", "steps": 2}),
+            reused: copied.stats.clone(),
+            stage: copied.steps.last().and_then(|step| step.stage.clone()),
+        };
+        let run = RcaTurnRun {
+            trigger: RunTrigger::Resume,
+            session_id: None,
+            ..continuation(&org, &run_id, &inc)
+        };
+        // No agent here: the turn stops at its credentials, after its first write.
+        let started =
+            tokio::time::timeout(Duration::from_secs(60), start_forked_rca_turn(run, fork))
+                .await
+                .expect("the start ends");
+        assert!(started.is_err());
+
+        let row = runs_table::get_rw(&org, &run_id).await.unwrap().unwrap();
+        let before = Tally::resumed(&row).patch().stats.unwrap();
+        assert_eq!(
+            (before.steps, before.tool_calls),
+            (Some(2), Some(copied.stats.tool_calls))
+        );
+
+        // The resumed turn redoes the third step.
+        let mut tally = Tally::resumed(&row);
+        tally.apply(Progress::of(&events[cut + 1..]));
+        let live = tally.patch();
+        let total = project_rca_thread(&events, &[], false, false).stats;
+        let stats = live.stats.unwrap();
+        assert_eq!(total.steps, 3);
+        assert_eq!(
+            (stats.steps, stats.tool_calls),
+            (Some(total.steps), Some(total.tool_calls)),
+            "live counts are the final ones"
+        );
+        assert_eq!(live.stage.as_deref(), Some("changes"));
+    }
+
     // ---- TH14, D1: the health probe ----
 
     /// TH14, D1: a probe that never answers gives up after [HEALTH_CHECK_TIMEOUT].
@@ -4227,6 +4342,7 @@ mod tests {
             guidance: None,
             skip_cooldown: true,
             oncall_subjects: None,
+            context_used: None,
         })
         .await
         .unwrap() else {

@@ -230,6 +230,7 @@ mod m20261016_000002_backfill_rca_runs;
 mod m20261017_000001_add_rca_run_progress_columns;
 mod m20261018_000001_create_rca_steering;
 mod m20261018_000001_create_slack_tables;
+mod m20261019_000001_create_rca_feedback;
 mod m20261020_000001_create_eval_job_states_tables;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
@@ -600,6 +601,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261016_000002_backfill_rca_runs::Migration),
             Box::new(m20261017_000001_add_rca_run_progress_columns::Migration),
             Box::new(m20261018_000001_create_rca_steering::Migration),
+            Box::new(m20261019_000001_create_rca_feedback::Migration),
         ]
     }
 }
@@ -675,6 +677,7 @@ mod tests {
         (114, "m20261016_000002_backfill_rca_runs"),
         (115, "m20261017_000001_add_rca_run_progress_columns"),
         (116, "m20261018_000001_create_rca_steering"),
+        (117, "m20261019_000001_create_rca_feedback"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
