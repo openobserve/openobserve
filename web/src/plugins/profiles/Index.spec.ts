@@ -1,6 +1,6 @@
 import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { nextTick, reactive } from "vue";
+import { defineComponent, h, nextTick, reactive, ref, watch } from "vue";
 import Profiles from "@/plugins/profiles/Index.vue";
 import FlameGraphView from "@/components/common/FlameGraphView.vue";
 import i18n from "@/locales";
@@ -244,6 +244,20 @@ describe("Profiles page", () => {
     await flushPromises();
     await nextTick();
 
+    expect(mocks.meta).toHaveBeenCalledTimes(1);
+    expect(mocks.merge).toHaveBeenCalledTimes(1);
+    expect(mocks.series).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs the query once when the page opens with the real date picker", async () => {
+    // The real picker replays its value on mount, which must not start a second run.
+    const { DateTimePickerDashboard: _picker, ...stubs } = pageStubs;
+    const wrapper = mount(Profiles, { global: { plugins: [i18n], provide: { store }, stubs } });
+    await flushPromises();
+    await nextTick();
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "DateTime" }).exists()).toBe(true);
     expect(mocks.meta).toHaveBeenCalledTimes(1);
     expect(mocks.merge).toHaveBeenCalledTimes(1);
     expect(mocks.series).toHaveBeenCalledTimes(1);
@@ -529,50 +543,34 @@ describe("Profiles page", () => {
     ).toBe(true);
   });
 
-  it("sets the picker to the range dragged on the chart and runs the query", async () => {
-    mocks.series.mockResolvedValue({
-      data: { ...seriesResponse.data, series: [{ timestamp: 1_000_000, value: 5 }] },
-    });
-    mocks.merge.mockResolvedValue(mergeResponse);
-    // Like the real picker: setCustomDate only stores the range, refresh() emits it as the model.
-    const picker = {
+  // Like the real picker with auto-apply on: setCustomDate changes the range, a watcher emits it, and
+  // refresh() emits the current range at once.
+  const autoApplyPicker = () =>
+    defineComponent({
       props: ["modelValue"],
       emits: ["update:modelValue"],
-      data: () => ({ pending: null as { start: Date; end: Date } | null }),
-      methods: {
-        setCustomDate(
-          this: { pending: { start: Date; end: Date } | null },
-          _type: string,
-          range: { start: Date; end: Date },
-        ) {
-          this.pending = range;
-        },
-        refresh(this: {
-          pending: { start: Date; end: Date } | null;
-          $emit: (e: string, v: object) => void;
-        }) {
-          if (!this.pending) return;
-          this.$emit("update:modelValue", {
-            startTime: this.pending.start.getTime() * 1000,
-            endTime: this.pending.end.getTime() * 1000,
+      setup(_, { emit, expose }) {
+        const range = ref<{ start: Date; end: Date } | null>(null);
+        const emitRange = () => {
+          if (!range.value) return;
+          emit("update:modelValue", {
+            startTime: range.value.start.getTime() * 1000,
+            endTime: range.value.end.getTime() * 1000,
             relativeTimePeriod: "",
             valueType: "absolute",
           });
-        },
-      },
-      template: "<div />",
-    };
-    const wrapper = mount(Profiles, {
-      global: {
-        plugins: [i18n],
-        provide: { store },
-        stubs: { ...pageStubs, DateTimePickerDashboard: picker },
+        };
+        watch(range, emitRange, { deep: true });
+        expose({
+          setCustomDate: (_type: string, next: { start: Date; end: Date }) => (range.value = next),
+          refresh: emitRange,
+          setSavedDate: () => {},
+        });
+        return () => h("div");
       },
     });
-    await flushPromises();
-    await nextTick();
-    mocks.merge.mockClear();
 
+  const dragOnChart = async (wrapper: ReturnType<typeof mountPage>) => {
     // 10:00:20 to 10:03:40 on a whole-minute day; the page cuts it to 10:00 to 10:03.
     const minute = 60_000;
     const base = Date.UTC(2026, 9, 14, 10, 0, 0);
@@ -581,13 +579,61 @@ describe("Profiles page", () => {
       .vm.$emit("updated:dataZoom", { start: base + 20_000, end: base + 3 * minute + 40_000 });
     await flushPromises();
     await nextTick();
+    return { start_time: base * 1000, end_time: (base + 3 * minute) * 1000 };
+  };
 
+  it("sets the picker to the range dragged on the chart and runs the query once", async () => {
+    mocks.series.mockResolvedValue({
+      data: { ...seriesResponse.data, series: [{ timestamp: 1_000_000, value: 5 }] },
+    });
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mount(Profiles, {
+      global: {
+        plugins: [i18n],
+        provide: { store },
+        stubs: { ...pageStubs, DateTimePickerDashboard: autoApplyPicker() },
+      },
+    });
+    await flushPromises();
+    await nextTick();
+    mocks.merge.mockClear();
+    mocks.meta.mockClear();
+
+    const window = await dragOnChart(wrapper);
+
+    expect(mocks.merge).toHaveBeenCalledTimes(1);
+    expect(mocks.meta).toHaveBeenCalledTimes(1);
     expect(mocks.merge).toHaveBeenCalledWith(
       orgIdentifier,
       "profiles-a",
-      expect.objectContaining({ start_time: base * 1000, end_time: (base + 3 * minute) * 1000 }),
+      expect.objectContaining(window),
       expect.objectContaining({ signal: expect.anything() }),
     );
+  });
+
+  it("runs a chart drag with Auto Run off and leaves Run query not pending", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: false };
+    mocks.series.mockResolvedValue({
+      data: { ...seriesResponse.data, series: [{ timestamp: 1_000_000, value: 5 }] },
+    });
+    mocks.merge.mockResolvedValue(mergeResponse);
+    const wrapper = mount(Profiles, {
+      global: {
+        plugins: [i18n],
+        provide: { store },
+        stubs: { ...pageStubs, DateTimePickerDashboard: autoApplyPicker() },
+      },
+    });
+    await flushPromises();
+    await nextTick();
+    mocks.merge.mockClear();
+
+    await dragOnChart(wrapper);
+
+    expect(mocks.merge).toHaveBeenCalledTimes(1);
+    expect(
+      wrapper.find('[data-test="profiles-run-query"]').attributes("data-run-pending"),
+    ).toBeUndefined();
   });
 
   it("opens the flame graph with the function highlighted from a Top Table row menu", async () => {
