@@ -244,6 +244,8 @@ const { search: searchDigests, orgId } = useDigestSearch();
 const configQuery = useQuery(() => alertCalibrationConfigQuery(orgId.value));
 const config = computed(() => configQuery.data.value ?? null);
 
+const COVERAGE_COL = 170;
+
 const nowMicros = () => Date.now() * 1000;
 const windowMinutes = (row: RunRow) => Math.round((row.window_end - row.window_start) / 60_000_000);
 const formatAgo = (micros: number) =>
@@ -350,8 +352,9 @@ const columns = computed<OTableColumnDef<RunRow>[]>(() => [
     header: t("alertCalibration.digests.colCoverage"),
     accessorFn: (row) => coverageVerdict(row),
     sortable: true,
-    size: COL.status,
-    maxSize: COL.status,
+    // Wide enough for "Measured nothing", the longest of the three badges.
+    size: COVERAGE_COL,
+    maxSize: COVERAGE_COL,
     meta: { align: "left" },
   },
 ]);
