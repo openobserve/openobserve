@@ -246,6 +246,55 @@ test.describe("Users and Organizations", () => {
         testLogger.info('Test completed successfully');
     });
 
+    test("Reject a weak password when creating a user", { tag: ['@password-policy', '@all', '@P0'] }, async ({ page }, testInfo) => {
+        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
+        testLogger.testStart(testInfo.title, testInfo.file);
+        
+        await navigateToBase(page);
+        pageManager = new PageManager(page);
+        
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.addUser(uniqueEmail);
+        await pageManager.userPage.selectUserRole('Admin');
+        await page.waitForLoadState('domcontentloaded');
+        await pageManager.userPage.userCreate();
+        await page.waitForLoadState('domcontentloaded');
+        await pageManager.userPage.addUserPassword('abcdef12');
+        await pageManager.userPage.addUserFirstLast('a', 'b');
+        await pageManager.userPage.userCreate();
+        await pageManager.userPage.verifySuccessMessage('Password must be 8-128 characters and contain at least one lowercase letter, one uppercase letter, one digit, and one special character.');
+        
+        testLogger.info('Test completed successfully');
+    });
+
+    test("Reject a weak new password when updating a user", { tag: ['@password-policy', '@all', '@P1'] }, async ({ page }, testInfo) => {
+        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
+        testLogger.testStart(testInfo.title, testInfo.file);
+        
+        await navigateToBase(page);
+        pageManager = new PageManager(page);
+        
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.addUser(uniqueEmail);
+        await pageManager.userPage.selectUserRole('Admin');
+        await page.waitForLoadState('domcontentloaded');
+        await pageManager.userPage.userCreate();
+        await page.waitForLoadState('domcontentloaded');
+        await pageManager.userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
+        await pageManager.userPage.addUserFirstLast('a', 'b');
+        await pageManager.userPage.userCreate();
+        await page.waitForLoadState('domcontentloaded');
+        await pageManager.userPage.verifySuccessMessage('User added successfully.');
+        await page.waitForLoadState('domcontentloaded');
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.editUser(uniqueEmail);
+        await pageManager.userPage.addNewPassword('12345678');
+        await pageManager.userPage.userCreate();
+        await pageManager.userPage.verifySuccessMessage('Password must be 8-128 characters and contain at least one lowercase letter, one uppercase letter, one digit, and one special character.');
+        
+        testLogger.info('Test completed successfully');
+    });
+
     test('Add Organization Successfully', async ({ page }, testInfo) => {
         const uniqueOrgName = `Org${Date.now()}_${Math.floor(Math.random() * 10000)}`;
         testLogger.testStart(testInfo.title, testInfo.file);

@@ -1,0 +1,9 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/usersOrg.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/usersOrg.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The configurable password-policy UI (Settings > Password Policy tab, rotation/expiry/lockout enforcement, expiry banner, forced-reset dialog, login lockout) is enterprise-gated on BOTH sides: frontend `config.isEnterprise == 'true'` (web/src/components/settings/index.vue:96, web/src/composables/shared/useManagementRoutes.ts:70, web/src/layouts/MainLayout.vue:33) AND backend `#[cfg(feature = \"enterprise\")]` (src/handler/http/router/mod.rs:786-793, password_policy_middleware is a no-op without the feature). The OSS E2E CI in .github/workflows/playwright.yml builds the frontend WITHOUT VITE_OPENOBSERVE_ENTERPRISE and the binary WITHOUT `--features enterprise`, so none of that UI/routes/enforcement is reachable there. The one behavior that IS wired and testable in the OSS build is the static password-strength rule `config::utils::password::validate_password_strength` (8-128 chars, lower+upper+digit+special) enforced via `db::password_policy::validate_password` on native-user create/update — which is exactly what usersOrg.spec.js already exercises (its diff even had to swap the weak '1234567890' for ZO_ROOT_USER_PASSWORD). Therefore we append a negative test (weak password rejected) to usersOrg.spec.js and leave the enterprise-only UI as documented fixme placeholders rather than creating a new passwordPolicy.spec.js that would be empty of green tests in the OSS CI and would need registration."
+}

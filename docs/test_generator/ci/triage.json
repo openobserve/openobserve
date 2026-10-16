@@ -1,0 +1,36 @@
+{
+  "feature_slug": "password-policy",
+  "feature_title": "Password Policy (complexity, rotation, expiry, lockout)",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "passwordPolicy.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/passwordPolicy.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/PasswordPolicy.vue",
+    "web/src/components/settings/index.vue",
+    "web/src/components/common/UpdatePasswordDialog.vue",
+    "web/src/components/common/PasswordRequirementList.vue",
+    "web/src/components/common/PasswordExpiryBanner.vue",
+    "web/src/components/login/Login.vue",
+    "web/src/components/iam/users/AddUser.vue",
+    "web/src/composables/usePasswordComplexity.ts",
+    "web/src/composables/usePasswordExpiryWarning.ts",
+    "web/src/composables/usePasswordReset.ts",
+    "web/src/services/passwordPolicy.ts",
+    "web/src/utils/passwordComplexity.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The changed paths span OSS backend (src/handler/http/request/organization/password_policy.rs, src/handler/http/request/password_policy/password_rotation.rs, src/service/db/password_policy.rs, src/config/src/utils/password.rs, migrations under src/infra/src/table/migration/), OSS frontend (web/src/components/settings/PasswordPolicy.vue, login, add-user, common dialogs), and an enterprise-gated layer under o2_enterprise/src/enterprise/password_policy/ (enforcement.rs, history.rs, lockout.rs, meta.rs). Because it spans both the OSS implementation and the enterprise enforcement/UI, edition is 'both'. Keywords password_policy / password_rotation appear in both OSS and enterprise paths (and the settings tab is gated by config.isEnterprise == 'true').",
+    "skip": "Not skipped. There is no explicit opt-out (empty trigger_comment.txt, no tests-added label passed) and the change is user-facing, not docs/CI/comment-only — it adds a settings UI plus login/add-user/expiry flows.",
+    "e2e": "E2E is warranted: the diff adds a password policy settings tab (enterprise + meta org), password complexity requirements surfaced in Add User, a password expiry banner and Update Password dialog, and login-time lockout/expiry handling — all user-exercisable UI behavior that needs verification.",
+    "area": "GeneralTests: user/identity/org management E2E specs live here (usersOrg.spec.js, serviceAccount.spec.js), and the only E2E spec already touched by this diff is in GeneralTests. There is no dedicated Settings or Password shard, and password policy is an IAM/org-management concern.",
+    "group": "GeneralTests matrix shard, because it already carries usersOrg.spec.js and serviceAccount.spec.js; a new passwordPolicy.spec.js belongs alongside those user-management specs rather than a data-plane shard.",
+    "existing_tests": "The only Playwright E2E spec in the diff is tests/ui-testing/playwright-tests/GeneralTests/usersOrg.spec.js, and its change is a one-line maintenance fix (hardcoded weak password '1234567890' replaced with ZO_ROOT_USER_PASSWORD to satisfy the new policy) — it does NOT cover the new password policy UI, so the Architect should add/extend coverage. Vitest/unit specs (web/src/**/*.spec.ts, AddUser.spec.js) are not E2E and are ignored for this flag."
+  }
+}

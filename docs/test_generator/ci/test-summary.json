@@ -1,0 +1,4 @@
+[
+  { "title": "Reject a weak password when creating a user", "action": "append", "verifies": "server-side password-strength rule rejects a password that passes the frontend min-length but lacks uppercase/special characters" },
+  { "title": "Reject a weak new password when updating a user", "action": "append", "verifies": "the change-password (update) path rejects a digits-only password with the same strength hint" }
+]
