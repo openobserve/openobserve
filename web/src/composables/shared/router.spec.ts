@@ -23,6 +23,15 @@ import { isPaywalledDestination, shouldPaywallRoute } from "@/utils/auth";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import config from "@/aws-exports";
 import enLocale from "@/locales/languages/en-US.json";
+import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
+import { ref } from "vue";
+
+const assistantGate = ref("available");
+
+vi.mock("@/composables/assistant", () => ({
+  useAssistantCapability: () => ({ gate: assistantGate }),
+}));
+vi.mock("@/views/AssistantView.vue", () => ({ default: { name: "AssistantView" } }));
 
 // Routes store an i18n KEY in `meta.titleKey` (src/router/index.ts translates it
 // per navigation), so assert the English copy the key still resolves to — a typo'd
@@ -1719,6 +1728,79 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe("/ai/public/:token");
       expect(route.meta.public).toBe(true);
       expect(route.props({ params: { token: "t2" } })).toEqual({ token: "t2", isPublic: true });
+    });
+  });
+
+  describe("assistant full view route", () => {
+    const flagged = (on: boolean) => {
+      window.__O2_ASSISTANT_V2__ = on;
+      resetAssistantV2ForTests();
+      return useRoutes();
+    };
+    const resolveIn = (homeChildRoutes: any[], path: string) => {
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: homeChildRoutes.filter((r: any) => r !== catchAll),
+          },
+          catchAll,
+        ],
+      });
+      return router.resolve(path);
+    };
+
+    afterEach(() => {
+      delete window.__O2_ASSISTANT_V2__;
+      resetAssistantV2ForTests();
+      assistantGate.value = "available";
+    });
+
+    it("is not registered with the flag off, so /assistant stays not found", () => {
+      const { homeChildRoutes } = flagged(false);
+      expect(findRoute(homeChildRoutes, "assistant")).toBeUndefined();
+      expect(resolveIn(homeChildRoutes, "/assistant").name).toBeUndefined();
+    });
+
+    it("registers /assistant/:chatId? with its title and no keep-alive with the flag on", () => {
+      const { homeChildRoutes } = flagged(true);
+      const route = findRoute(homeChildRoutes, "assistant");
+      expect(route.path).toBe("assistant/:chatId?");
+      expect(enTitle(route.meta.titleKey)).toBe("O2 Assistant");
+      expect(route.meta.keepAlive).toBe(false);
+      expect(route.meta.public).toBeUndefined();
+      expect(resolveIn(homeChildRoutes, "/assistant").name).toBe("assistant");
+      expect(
+        resolveIn(homeChildRoutes, "/assistant/0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b").params,
+      ).toEqual({
+        chatId: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
+      });
+    });
+
+    it("leaves the /ai namespace and the share routes untouched", () => {
+      const { homeChildRoutes } = flagged(true);
+      expect(resolveIn(homeChildRoutes, "/ai/shared/t1").name).toBe("sharedChat");
+      const others = homeChildRoutes.filter(
+        (r: any) => r.name !== "assistant" && /^\/?assistant/.test(r.path ?? ""),
+      );
+      expect(others).toEqual([]);
+    });
+
+    it("waits for the gate to settle before entering", async () => {
+      const { homeChildRoutes } = flagged(true);
+      const route = findRoute(homeChildRoutes, "assistant");
+      assistantGate.value = "loading";
+      const next = vi.fn();
+      route.beforeEnter({ name: "assistant" }, {}, next);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(routeGuard).toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalled();
+      assistantGate.value = "not_entitled";
+      await vi.waitFor(() => expect(next).toHaveBeenCalledWith());
     });
   });
 

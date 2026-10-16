@@ -130,7 +130,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </ODrawer>
 
-      <div class="flex h-full min-h-0 min-w-0 flex-1">
+      <div v-if="assistantV2" class="flex h-full min-h-0 min-w-0 flex-1">
+        <!-- With the assistant on, <main> and the sidebar column are flex siblings, so pinning needs no inline width -->
+        <AssistantSkipLink />
+        <main
+          data-test="main-content"
+          tabindex="-1"
+          class="bg-surface-chrome-deeper flex min-h-0 min-w-0 flex-1 flex-col pe-2 pb-2 outline-none max-md:pe-0"
+        >
+          <div
+            class="bg-surface-base rounded-surface flex min-h-0 flex-1 flex-col overflow-hidden border shadow-md"
+            :class="isDark ? 'border-border-default' : 'border-transparent'"
+          >
+            <div
+              v-if="isLoading"
+              :key="store.state.selectedOrganization?.identifier"
+              :class="['o2-content-scroll h-full flex-1 overflow-y-auto', ASSISTANT_INSET_CLASSES]"
+            >
+              <FirstDataNotice
+                v-if="firstDataNotice.visible.value && router.currentRoute.value.name !== 'home'"
+                class="mx-3 mt-3"
+                :stream="firstDataNotice.stream.value"
+                :arrived-at="firstDataNotice.arrivedAt.value"
+                @open="firstDataNotice.open"
+                @dismiss="firstDataNotice.dismiss"
+              />
+              <router-view v-slot="{ Component }">
+                <keep-alive :include="KEPT_ALIVE_VIEWS">
+                  <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+                </keep-alive>
+              </router-view>
+            </div>
+          </div>
+        </main>
+        <AssistantSidebarHost />
+      </div>
+      <div v-else class="flex h-full min-h-0 min-w-0 flex-1">
         <!-- Main Panel -->
         <main
           data-test="main-content"
@@ -314,9 +349,18 @@ import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
 import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 
 // Product Analytics hands off to RUM's Session Viewer, and Back must land on the same panels without rerunning them.
 const KEPT_ALIVE_VIEWS = ["AppAnalytics"];
+
+// The assistant's sheet and floating card write their footprint here, so Tab never lands under them (`95` §6).
+const ASSISTANT_INSET_CLASSES = [
+  // eslint-disable-next-line local/no-hardcoded-px -- unit conversion of the unitless inset the sheet writes
+  "max-lg:pb-[calc(var(--o-assistant-inset-bottom,0)*1px)] max-lg:scroll-pb-[calc(var(--o-assistant-inset-bottom,0)*1px)]",
+  // eslint-disable-next-line local/no-hardcoded-px -- unit conversion of the unitless inset the floating card writes
+  "lg:scroll-pe-[calc(var(--o-assistant-inset-end,0)*1px)]",
+];
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -352,6 +396,13 @@ export default defineComponent({
     FirstDataNotice,
     DashboardSaveConflictDialog: defineAsyncComponent(
       () => import("@/components/dashboards/DashboardSaveConflictDialog.vue"),
+    ),
+    // Async, so the flag-off build never loads the assistant chunk.
+    AssistantSidebarHost: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantSidebarHost.vue"),
+    ),
+    AssistantSkipLink: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantSkipLink.vue"),
     ),
   },
   methods: {
@@ -428,6 +479,7 @@ export default defineComponent({
     const { isMobile, lgUp } = useBreakpoint();
     // Below lg no split leaves room for pages with a folder rail, so the chat overlays instead.
     const isChatOverlay = computed(() => !lgUp.value);
+    const assistantV2 = isAssistantV2();
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
 
@@ -1684,11 +1736,13 @@ export default defineComponent({
 
     // ── Global shortcuts: AI Chat ─────────────────────────────────────────
     // O2 AI is enterprise-only: on OSS the Ctrl+B binding must not exist at all.
-    if (config.isEnterprise == "true") {
+    if (config.isEnterprise == "true" && !assistantV2) {
       useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
     }
 
     return {
+      assistantV2,
+      ASSISTANT_INSET_CLASSES,
       isDark,
       t,
       raw,

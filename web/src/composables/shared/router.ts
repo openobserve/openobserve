@@ -20,6 +20,8 @@ import {
   invalidateLoginData,
   getPath,
 } from "@/utils/zincutils";
+import { watch } from "vue";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
@@ -206,6 +208,44 @@ const PipelineEditor = () => import("@/components/pipeline/PipelineEditor.vue");
 const PipelinesList = () => import("@/components/pipeline/PipelinesList.vue");
 
 const ImportPipeline = () => import("@/components/pipeline/ImportPipeline.vue");
+
+const AssistantView = () => import("@/views/AssistantView.vue");
+
+// The page shows its own skeleton, so the guard waits only briefly for the gate before it lets the route render.
+const ASSISTANT_GATE_WAIT_MS = 1_500;
+
+/** The full view; registered only with the flag on, so the legacy router is unchanged (`10` §2). */
+function assistantRoute() {
+  return {
+    path: "assistant/:chatId?",
+    name: "assistant",
+    component: AssistantView,
+    meta: { titleKey: "assistant.name", keepAlive: false, allowOnEmptyData: true },
+    // routeGuard reads the store through inject(), so it runs first, inside the guard's injection context.
+    beforeEnter(to: any, from: any, next: any) {
+      routeGuard(to, from, (target?: unknown) => {
+        if (target !== undefined) return next(target);
+        void assistantGateSettled().then(() => next());
+      });
+    },
+  };
+}
+
+// Dynamic, so the assistant chunk loads only when the route is entered with the flag on.
+async function assistantGateSettled(): Promise<void> {
+  const { useAssistantCapability } = await import("@/composables/assistant");
+  const { gate } = useAssistantCapability();
+  if (gate.value !== "loading") return;
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(done, ASSISTANT_GATE_WAIT_MS);
+    const stop = watch(gate, (value) => value !== "loading" && done());
+    function done() {
+      clearTimeout(timer);
+      stop();
+      resolve();
+    }
+  });
+}
 
 import useIngestionRoutes from "./useIngestionRoutes";
 import useEnterpriseRoutes from "./useEnterpriseRoutes";
@@ -1393,6 +1433,7 @@ const useRoutes = () => {
     },
     ...useIngestionRoutes(),
     ...useEnterpriseRoutes(),
+    ...(isAssistantV2() ? [assistantRoute()] : []),
     {
       path: "/:catchAll(.*)*",
       component: Error404,

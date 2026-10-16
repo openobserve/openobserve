@@ -17,6 +17,16 @@ export class AssistantPage {
       nlToggle: page.locator('[data-test="logs-search-bar-ai-toggle-btn"]'),
       nlInput: page.locator('[data-test="logs-search-bar-ai-input-field-field"]'),
     };
+    this.headerButton = page.locator('[data-test="menu-link-ai-item"]');
+    this.sidebar = page.locator('[data-test="assistant-shell-sidebar"]').filter({ visible: true });
+    this.full = page.locator('[data-test="assistant-shell-full"]');
+    this.sheet = page.locator('[data-test="assistant-shell-sheet"]');
+    this.welcome = page.locator('[data-test="assistant-welcome"]').filter({ visible: true });
+  }
+
+  /** The visible container root, whichever placement it is. */
+  container() {
+    return this.page.locator("[data-assistant-root]").filter({ visible: true });
   }
 
   /** Every v2 assistant id in the DOM; the legacy smoke asserts there are none with the flag off. */
@@ -35,8 +45,15 @@ export class AssistantPage {
     await this.legacy.composer.press("Enter");
   }
 
-  async open(_via) {
-    notYet("WP-04");
+  /** Opens the assistant by the header button or the chord and waits for its container. */
+  async open(via = "header") {
+    if (via === "chord") await this.page.keyboard.press("ControlOrMeta+i");
+    else await this.headerButton.click();
+    await this.container().first().waitFor({ state: "visible" });
+  }
+
+  async close() {
+    await this.container().locator('[data-test="assistant-shell-close"]').click();
   }
 
   async send(_text, _scenario) {
@@ -68,15 +85,15 @@ export class AssistantPage {
   }
 
   notice() {
-    return notYet("WP-04");
+    return this.page.locator('[data-test="assistant-shell-notice-row"]').filter({ visible: true });
   }
 
   gate() {
-    return notYet("WP-04");
+    return this.page.locator('[data-test="assistant-gate-state"]').filter({ visible: true }).first();
   }
 
   askAdmin() {
-    return notYet("WP-04");
+    return this.page.locator('[data-test="assistant-ask-admin"]').filter({ visible: true });
   }
 
   approval() {

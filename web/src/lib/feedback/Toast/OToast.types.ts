@@ -45,6 +45,10 @@ export interface ToastOptions {
   details?: ToastDetail[];
   /** Called once when this toast is dismissed (either by user or auto-timeout) */
   onDismiss?: () => void;
+  /** Masks the toast in session replay (`data-dd-privacy="mask"`), for text derived from a prompt. */
+  mask?: boolean;
+  /** `off` keeps screen readers quiet when another live region already speaks the same sentence. */
+  live?: "polite" | "off";
 }
 
 export interface ToastProps extends ToastOptions {
