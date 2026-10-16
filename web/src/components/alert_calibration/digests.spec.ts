@@ -19,6 +19,7 @@ import {
   coverageNotes,
   coverageVerdict,
   findingsByRule,
+  titleAfterName,
   isClean,
   latestEmission,
   latestPerWindow,
@@ -161,6 +162,16 @@ describe("the dashboard grouping", () => {
       ["noise", "Low", 2],
       ["silent", null, 0],
     ]);
+  });
+});
+
+describe("the dashboard row", () => {
+  it("drops the alert's name from the front of its title, and nothing else", () => {
+    const f = (title: string, alert_name?: string) => ({ title, alert_name }) as FindingRecord;
+    expect(titleAfterName(f("cpu fired 40 times", "cpu"))).toBe("fired 40 times");
+    expect(titleAfterName(f("cpu-high fired 40 times", "cpu"))).toBe("-high fired 40 times");
+    expect(titleAfterName(f("fired 40 times", "cpu"))).toBe("fired 40 times");
+    expect(titleAfterName(f("fired 40 times"))).toBe("fired 40 times");
   });
 });
 

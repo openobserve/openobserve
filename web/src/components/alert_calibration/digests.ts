@@ -182,6 +182,12 @@ export function findingsByRule(rules: RuleId[], findings: FindingRecord[]): Rule
     .sort((a, b) => rank(b.severity) - rank(a.severity) || b.findings.length - a.findings.length);
 }
 
+/** A title restates the alert's name, which a row that already shows the name can drop. */
+export const titleAfterName = (f: FindingRecord): string =>
+  f.alert_name && f.title.startsWith(f.alert_name)
+    ? f.title.slice(f.alert_name.length).trimStart()
+    : f.title;
+
 export const latestRun = (rows: RunRow[]): RunRow | null =>
   rows.reduce<RunRow | null>((a, b) => (!a || b.window_end > a.window_end ? b : a), null);
 

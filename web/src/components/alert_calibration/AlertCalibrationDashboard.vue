@@ -158,43 +158,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OText v-if="!group.findings.length" variant="meta" as="p" class="px-4 pb-3">
               {{ t("alertCalibration.dashboard.nothingFlagged") }}
             </OText>
-            <ul v-else class="divide-border-default flex flex-col divide-y px-4 pb-1">
-              <li
-                v-for="finding in group.findings"
-                :key="finding.alert_id ?? finding.alert_name"
-                class="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5"
-                :data-test="`alert-calibration-dashboard-alert-${finding.alert_id}`"
-              >
-                <OBadge :variant="SEVERITY_BADGE[finding.severity]" size="xs" shape="rounded">
-                  {{ t(SEVERITY_LABEL[finding.severity]) }}
-                </OBadge>
-                <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <OText variant="body-strong" as="div">{{ finding.alert_name }}</OText>
-                  <OText variant="meta" as="div">{{ finding.title }}</OText>
-                </div>
-                <div class="flex shrink-0 items-center gap-1.5">
+            <div v-else class="border-border-default bg-surface-subtle border-t">
+              <ul class="divide-border-default flex flex-col divide-y">
+                <li
+                  v-for="finding in group.findings"
+                  :key="finding.alert_id ?? finding.alert_name"
+                  class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2"
+                  :data-test="`alert-calibration-dashboard-alert-${finding.alert_id}`"
+                >
+                  <OBadge :variant="SEVERITY_BADGE[finding.severity]" size="xs" shape="rounded">
+                    {{ t(SEVERITY_LABEL[finding.severity]) }}
+                  </OBadge>
+                  <div class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+                    <OText variant="body-strong" as="span">{{ finding.alert_name }}</OText>
+                    <OText variant="meta" as="span" class="min-w-0">{{
+                      titleAfterName(finding)
+                    }}</OText>
+                  </div>
                   <OButton
                     v-if="finding.alert_id"
-                    variant="outline"
-                    size="sm"
+                    variant="ghost-muted"
+                    size="xs"
                     icon-left="open-in-new"
                     data-test="alert-calibration-dashboard-open-alert"
                     @click="openAlert(finding)"
                   >
                     {{ t("alertCalibration.dashboard.openAlert") }}
                   </OButton>
-                  <OButton
-                    variant="ghost"
-                    size="sm"
-                    icon-left="fact-check"
-                    data-test="alert-calibration-dashboard-view-evidence"
-                    @click="viewEvidence(group.rule_id)"
-                  >
-                    {{ t("alertCalibration.dashboard.viewEvidence") }}
-                  </OButton>
-                </div>
-              </li>
-            </ul>
+                </li>
+              </ul>
+              <div class="border-border-default flex justify-end border-t px-3 py-1.5">
+                <OButton
+                  variant="ghost-muted"
+                  size="xs"
+                  icon-left="fact-check"
+                  data-test="alert-calibration-dashboard-view-evidence"
+                  @click="viewEvidence(group.rule_id)"
+                >
+                  {{ t("alertCalibration.dashboard.viewEvidence") }}
+                </OButton>
+              </div>
+            </div>
           </OCollapsible>
         </OCard>
       </section>
@@ -235,6 +239,7 @@ import {
   latestRun,
   lookbackRange,
   RUNS_LOOKBACK_DAYS,
+  titleAfterName,
   type DigestRecord,
   type FindingRecord,
   type RuleId,
