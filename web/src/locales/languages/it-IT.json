@@ -10950,6 +10950,7 @@
     },
     "add": "Inserisci",
     "runQuery": "Esegui query",
+    "runQueryOptions": "Opzioni di esecuzione query",
     "explorer": {
       "detail": {
         "loading": "Caricamento dettagli metrica...",

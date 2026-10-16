@@ -10950,6 +10950,7 @@
     },
     "add": "Ekle",
     "runQuery": "Sorguyu Çalıştırma",
+    "runQueryOptions": "Sorgu çalıştırma seçenekleri",
     "explorer": {
       "detail": {
         "loading": "Metrik ayrıntıları yükleniyor...",

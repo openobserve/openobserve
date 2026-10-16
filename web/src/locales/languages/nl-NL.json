@@ -10950,6 +10950,7 @@
     },
     "add": "Toevoegen",
     "runQuery": "Query uitvoeren",
+    "runQueryOptions": "Opties voor query uitvoeren",
     "explorer": {
       "detail": {
         "loading": "Metriekdetails laden...",

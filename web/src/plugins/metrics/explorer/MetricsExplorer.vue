@@ -113,21 +113,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Only an explicit Run writes query history; Refresh does not. -->
         <template v-if="mode === 'visualize'">
           <QueryHistoryDrawer @load="onHistoryLoad" />
-          <OButton
-            :variant="isVisualizePending ? 'pending' : 'primary'"
-            size="sm-toolbar"
-            icon-left="play-arrow"
-            data-test="metrics-explorer-run"
-            :data-run-pending="isVisualizePending ? 'true' : undefined"
-            :aria-label="isVisualizePending ? t('search.runQueryPendingLabel') : undefined"
-            @click="onVisualizeRun"
-          >
-            <span class="max-md:hidden">{{ t("metrics.runQuery") }}</span>
-            <OTooltip
-              :content="isVisualizePending ? t('search.autoRunPendingDot') : t('metrics.runQuery')"
-              shortcut-id="metricsRunQuery"
-            />
-          </OButton>
+          <OButtonGroup>
+            <OButton
+              :variant="isVisualizePending ? 'pending' : 'primary'"
+              size="sm-toolbar"
+              icon-left="play-arrow"
+              data-test="metrics-explorer-run"
+              :data-run-pending="isVisualizePending ? 'true' : undefined"
+              :aria-label="isVisualizePending ? t('search.runQueryPendingLabel') : undefined"
+              @click="onVisualizeRun"
+            >
+              <span class="max-md:hidden">{{ t("metrics.runQuery") }}</span>
+              <OTooltip :content="visualizeRunTooltip" shortcut-id="metricsRunQuery" />
+            </OButton>
+            <ODropdown align="end" side="bottom">
+              <template #trigger>
+                <OButton
+                  :variant="isVisualizePending ? 'pending' : 'primary'"
+                  size="icon-toolbar"
+                  class="w-5"
+                  icon-left="arrow-drop-down"
+                  :aria-label="t('metrics.runQueryOptions')"
+                  data-test="metrics-explorer-run-options"
+                />
+              </template>
+              <ODropdownItem
+                icon-left="refresh"
+                data-test="metrics-explorer-refresh-cache-run"
+                @select="onVisualizeRunWithoutCache"
+              >
+                {{ t("search.refreshCacheAndRunQuery") }}
+              </ODropdownItem>
+              <template v-if="isAutoRunAvailable">
+                <ODropdownSeparator />
+                <ODropdownItem data-test="metrics-explorer-auto-run-toggle" @select="toggleAutoRun">
+                  <template #icon-left>
+                    <OIcon
+                      :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
+                      size="sm"
+                      :class="isAutoRunOn ? 'text-accent' : ''"
+                    />
+                  </template>
+                  <span>
+                    <div class="font-medium">
+                      {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+                    </div>
+                    <div class="text-text-secondary text-xs">
+                      {{ t("search.liveModeTooltip") }}
+                    </div>
+                  </span>
+                </ODropdownItem>
+              </template>
+            </ODropdown>
+          </OButtonGroup>
         </template>
         <!-- Visualize's Run query already re-runs the chart; the r shortcut and auto-refresh still refresh there. -->
         <OButton
@@ -691,6 +729,9 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import useBreakpoint from "@/composables/useBreakpoint";
 
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -779,6 +820,8 @@ export default defineComponent({
     OToggleGroupItem,
     ODropdown,
     ODropdownItem,
+    ODropdownSeparator,
+    OButtonGroup,
     ShareButton,
     MetricCard,
     MetricsVisualize,
@@ -1328,6 +1371,11 @@ export default defineComponent({
     const isVisualizePending = computed(
       () => mode.value === "visualize" && (visualizeRef.value?.isRunQueryPending ?? false),
     );
+    const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
+    const visualizeRunTooltip = computed(() => {
+      if (isVisualizePending.value) return t("search.autoRunPendingDot");
+      return isAutoRunOn.value ? t("search.autoRunEnabled") : t("metrics.runQuery");
+    });
 
     // The toolbar window as a CONSUMABLE absolute range (ms) for the Visualize
     // chart. The picker's v-model is a RELATIVE descriptor ({relativeTimePeriod:
@@ -2039,6 +2087,8 @@ export default defineComponent({
 
     /** An explicit Run in Visualize — the only Visualize run that writes history. */
     const onVisualizeRun = () => visualizeRef.value?.onUserRun?.(selectedDate.value);
+    const onVisualizeRunWithoutCache = () =>
+      visualizeRef.value?.onUserRun?.(selectedDate.value, true);
 
     const onHistoryLoad = (entry: { metricsData: string; timeRange: SelectedDate }) => {
       visualizeRef.value?.applyPanelData?.(entry.metricsData, entry.timeRange);
@@ -2288,6 +2338,10 @@ export default defineComponent({
       visualizeSeed,
       visualizeRef,
       isVisualizePending,
+      visualizeRunTooltip,
+      isAutoRunAvailable,
+      isAutoRunOn,
+      toggleAutoRun,
       visualizeDateTime,
       shareUrl,
       onDateChange,
@@ -2304,6 +2358,7 @@ export default defineComponent({
       onClearView,
       onViewSaved,
       onVisualizeRun,
+      onVisualizeRunWithoutCache,
       onHistoryLoad,
       onVisualizeTimeRange,
     };

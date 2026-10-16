@@ -10945,6 +10945,7 @@
     },
     "add": "新增",
     "runQuery": "執行查詢",
+    "runQueryOptions": "執行查詢選項",
     "explorer": {
       "detail": {
         "loading": "正在載入指標詳情...",

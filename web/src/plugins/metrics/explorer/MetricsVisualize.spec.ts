@@ -69,7 +69,12 @@ vi.mock("@/components/dashboards/PanelEditor", async () => {
           isLoading: ref(false),
           chartData: ref(undefined),
         };
-        expose({ runQuery: editorRunQuery, ...editorState.current });
+        // Like the real editor, a run snapshots the panel it ran with.
+        const runQuery = (...args: any[]) => {
+          editorRunQuery(...args);
+          editorState.current.chartData.value = JSON.parse(JSON.stringify(panelData.current.data));
+        };
+        expose({ runQuery, ...editorState.current });
         return {};
       },
       template:
@@ -96,14 +101,13 @@ vi.mock("@/utils/streamPersist", () => ({
 }));
 
 // partial: the panel seed path reaches @/stores, which needs the real createStore
+const storeState = vi.hoisted(() => ({
+  selectedOrganization: { identifier: "org1" },
+  zoConfig: { auto_query_enabled: false },
+}));
 vi.mock("vuex", async (importOriginal) => ({
   ...(await importOriginal<typeof import("vuex")>()),
-  useStore: () => ({
-    state: {
-      selectedOrganization: { identifier: "org1" },
-      zoConfig: { auto_query_enabled: false },
-    },
-  }),
+  useStore: () => ({ state: storeState }),
 }));
 
 const historyApi = vi.hoisted(() => ({
@@ -116,6 +120,7 @@ vi.mock("@/services/query_history", () => ({ default: historyApi }));
 
 import MetricsVisualize from "./MetricsVisualize.vue";
 import { encodeMetricsConfig } from "@/composables/metrics/metricsUrlState";
+import { LIVE_PREVIEW_DEBOUNCE_MS } from "@/composables/dashboard/usePanelLivePreview";
 
 const mountVisualize = (props: Record<string, any> = {}) =>
   mount(MetricsVisualize, {
@@ -131,6 +136,7 @@ describe("MetricsVisualize", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     panelData.current = makePanelData();
+    storeState.zoConfig.auto_query_enabled = false;
   });
 
   it("applies the metrics panel defaults on mount (line + promql + query bar)", async () => {
@@ -185,39 +191,82 @@ describe("MetricsVisualize", () => {
    * populated query bar above a blank chart and make them press Refresh to see
    * the thing they just clicked.
    */
-  describe("run-query staleness", () => {
-    it("is pending after a builder edit changes the query, and clears once that query has run", async () => {
+  describe("run-query staleness and Auto Run", () => {
+    const mountEdited = async (props: Record<string, any> = {}) => {
+      validatePanel.mockImplementation(() => {});
       panelData.current = reactive(makePanelData());
-      const wrapper = mountVisualize();
+      const wrapper = mountVisualize({
+        selectedDateTime: { startTime: 1000, endTime: 2000 },
+        ...props,
+      });
       await flushPromises();
-      const vm = wrapper.vm as any;
-      expect(vm.isRunQueryPending).toBe(false);
-
       panelData.current.data.queries[0].query = "avg(up)";
-      editorState.current.chartData.value = JSON.parse(JSON.stringify(panelData.current.data));
+      (wrapper.vm as any).runQuery();
       await flushPromises();
+      editorRunQuery.mockClear();
+      window.dispatchEvent(new Event("pointerdown"));
+      return wrapper;
+    };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("with Auto Run off, a builder edit turns Run pending without running, and a run clears it", async () => {
+      const wrapper = await mountEdited();
+      const vm = wrapper.vm as any;
       expect(vm.isRunQueryPending).toBe(false);
 
       panelData.current.data.queries[0].query = "up";
       await flushPromises();
       expect(vm.isRunQueryPending).toBe(true);
+      expect(editorRunQuery).not.toHaveBeenCalled();
 
-      editorState.current.isLoading.value = true;
+      vm.onUserRun({ valueType: "relative", relativeTimePeriod: "15m" });
       await flushPromises();
       expect(vm.isRunQueryPending).toBe(false);
-
-      editorState.current.isLoading.value = false;
-      editorState.current.chartData.value = JSON.parse(JSON.stringify(panelData.current.data));
-      await flushPromises();
-      expect(vm.isRunQueryPending).toBe(false);
+      expect(historyApi.record).toHaveBeenCalledTimes(1);
     });
 
-    it("follows the editor's own out-of-date flag", async () => {
-      const wrapper = mountVisualize();
+    it("with Auto Run on, a builder edit runs after the debounce, never shows pending and records nothing", async () => {
+      storeState.zoConfig.auto_query_enabled = true;
+      vi.useFakeTimers();
+      const wrapper = await mountEdited();
+      const vm = wrapper.vm as any;
+
+      panelData.current.data.queries[0].query = "up";
       await flushPromises();
-      editorState.current.isOutDated.value = true;
+      expect(vm.isRunQueryPending).toBe(false);
+      expect(editorRunQuery).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS);
       await flushPromises();
+      expect(editorRunQuery).toHaveBeenCalledTimes(1);
+      expect(vm.isRunQueryPending).toBe(false);
+      expect(historyApi.record).not.toHaveBeenCalled();
+    });
+
+    it("with Auto Run off, a new time range waits for Run; with it on, it re-runs at once", async () => {
+      const wrapper = await mountEdited();
+      await wrapper.setProps({ selectedDateTime: { startTime: 3000, endTime: 4000 } });
+      await flushPromises();
+      expect(editorRunQuery).not.toHaveBeenCalled();
       expect((wrapper.vm as any).isRunQueryPending).toBe(true);
+
+      storeState.zoConfig.auto_query_enabled = true;
+      const on = await mountEdited();
+      await on.setProps({ selectedDateTime: { startTime: 5000, endTime: 6000 } });
+      await flushPromises();
+      expect(editorRunQuery).toHaveBeenCalledTimes(1);
+      expect((on.vm as any).isRunQueryPending).toBe(false);
+    });
+
+    it("Refresh Cache & Run runs without cache and records like an explicit run", async () => {
+      const wrapper = await mountEdited();
+      (wrapper.vm as any).onUserRun({ valueType: "relative", relativeTimePeriod: "15m" }, true);
+      await flushPromises();
+      expect(editorRunQuery).toHaveBeenCalledWith(true);
+      expect(historyApi.record).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -360,6 +409,7 @@ describe("MetricsVisualize", () => {
     });
 
     it("the seed auto-run and the time-range watcher record nothing", async () => {
+      storeState.zoConfig.auto_query_enabled = true;
       const wrapper = mountVisualize({
         seed: { type: "line", queries: [{ query: "sum(up)", customQuery: true, fields: {} }] },
         selectedDateTime: { startTime: 1000, endTime: 2000 },

@@ -10950,6 +10950,7 @@
     },
     "add": "Hinzufügen",
     "runQuery": "Abfrage ausführen",
+    "runQueryOptions": "Optionen für Abfrage ausführen",
     "explorer": {
       "detail": {
         "loading": "Metrikdetails werden geladen...",

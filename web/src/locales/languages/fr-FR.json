@@ -10950,6 +10950,7 @@
     },
     "add": "Ajouter",
     "runQuery": "Exécuter une requête",
+    "runQueryOptions": "Options d'exécution de la requête",
     "explorer": {
       "detail": {
         "loading": "Chargement des détails de la métrique...",
