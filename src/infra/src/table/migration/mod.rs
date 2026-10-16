@@ -214,7 +214,6 @@ mod m20261007_000001_create_ai_chat_turns;
 mod m20261007_000001_scope_alert_dedup_state_by_org;
 mod m20261007_000002_add_redact_tools_to_ai_chat_shares;
 mod m20261008_000001_add_name_to_rum_pa_tombstones;
-mod m20261008_000001_create_rum_pa_app_settings;
 mod m20261009_000001_add_promql_rule_mode;
 mod m20261009_000001_create_downtimes;
 mod m20261009_000002_add_muted_by_downtime_id_to_alert_incidents;
@@ -224,6 +223,7 @@ mod m20261009_000005_create_downtime_notifications;
 mod m20261012_000001_create_alert_calibration_configs;
 mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
+mod m20261016_000001_create_rum_pa_app_settings;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -363,7 +363,7 @@ pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Re
     m20261008_000001_add_name_to_rum_pa_tombstones::Migration
         .up(&manager)
         .await?;
-    m20261008_000001_create_rum_pa_app_settings::Migration
+    m20261016_000001_create_rum_pa_app_settings::Migration
         .up(&manager)
         .await
 }
@@ -579,7 +579,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261007_000002_add_redact_tools_to_ai_chat_shares::Migration),
             Box::new(m20261013_000001_create_oncall_phone_verifications::Migration),
             Box::new(m20261013_000002_create_org_telephony::Migration),
-            Box::new(m20261008_000001_create_rum_pa_app_settings::Migration),
+            Box::new(m20261016_000001_create_rum_pa_app_settings::Migration),
         ]
     }
 }
@@ -647,7 +647,7 @@ mod tests {
         (106, "m20261007_000001_create_ai_chat_turns"),
         (107, "m20261007_000002_add_redact_tools_to_ai_chat_shares"),
         (108, "m20261013_000002_create_org_telephony"),
-        (109, "m20261008_000001_create_rum_pa_app_settings"),
+        (109, "m20261016_000001_create_rum_pa_app_settings"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -790,7 +790,7 @@ mod tests {
         }
     }
 
-    const APP_SETTINGS_MIGRATION: &str = "m20261008_000001_create_rum_pa_app_settings";
+    const APP_SETTINGS_MIGRATION: &str = "m20261016_000001_create_rum_pa_app_settings";
 
     #[test]
     fn p1_r4_app_settings_migration_is_registered_after_alert_dedup_scope() {
