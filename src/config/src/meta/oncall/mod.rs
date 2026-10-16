@@ -16,6 +16,7 @@
 //! On-call shared types — in `config` because `infra` and `o2_enterprise` both name them.
 
 pub mod agent;
+pub mod confidence;
 pub mod contact;
 pub mod policy;
 pub mod preset;
@@ -34,6 +35,11 @@ pub use agent::{
     SeverityDecision, VerdictOutcome, analysis_status_for_start, apply_verdict, confidence_refusal,
     gate_plan, metrics_for, promotion_note, quieter_channels, ratchet, severity_pages,
     update_channels, verdict_lines,
+};
+pub use confidence::{
+    ConfidenceGrade, GradeReason, SignalClass, ToolCallRecord, UnverifiedCitation,
+    UnverifiedReason, apply_outcome, grade_confidence, match_citation, min_band, normalize_key_arg,
+    signal_class, stream_type,
 };
 pub use contact::{
     CODE_MAX_ATTEMPTS, CODE_TTL_MICROS, CodeCheck, CodeRow, Contact, ContactError, DAY_MICROS,

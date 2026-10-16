@@ -179,6 +179,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="step.index"
           :step="step"
           :run-live="runLive"
+          :evidence-numbers="evidenceNumbers"
+          @open-evidence="$emit('open-evidence', $event)"
         />
 
         <!-- Live with no running step yet (before the first step, or between steps). -->
@@ -232,11 +234,13 @@ const props = withDefaults(
     contextUsed?: RcaContextUsed | null;
     /** The run's stored stats; the stats line uses them when the thread has none (TH37). */
     runStats?: RcaRunStats | null;
+    /** Evidence id → entry number from the run's summary (03 VE24); null shows raw ids. */
+    evidenceNumbers?: Map<string, number> | null;
   }>(),
-  { triggerLabel: null, contextUsed: null, runStats: null },
+  { triggerLabel: null, contextUsed: null, runStats: null, evidenceNumbers: null },
 );
 
-defineEmits<{ retry: [] }>();
+defineEmits<{ retry: []; "open-evidence": [number: number] }>();
 
 const { t } = useI18nTyped();
 

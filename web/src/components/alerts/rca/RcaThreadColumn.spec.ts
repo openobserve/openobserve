@@ -267,4 +267,19 @@ describe("RcaThreadColumn", () => {
       expect(byTest(wrapper, "rca-thread-retry-btn").exists()).toBe(false);
     });
   });
+
+  describe("F9: evidence numbers on the note chips", () => {
+    it("passes the summary's numbers to the steps and re-emits a chip click as open-evidence", async () => {
+      const wrapper = mountColumn({ ...SAVED, evidenceNumbers: new Map([["e3", 1]]) });
+
+      const step = wrapper.findAll('[data-test="rca-thread-step"]')[0];
+      expect(step.findAll('[data-test="rca-citation-chip"]').map((chip) => chip.text())).toEqual([
+        "1",
+      ]);
+      expect(step.find('[data-test="rca-citation-unverified"]').text()).toBe("e7 · not verified");
+
+      await step.find('[data-test="rca-citation-chip"]').trigger("click");
+      expect(wrapper.emitted("open-evidence")).toEqual([[1]]);
+    });
+  });
 });

@@ -1021,6 +1021,252 @@ fn read_error_response(
         .into_response()
 }
 
+#[cfg(feature = "enterprise")]
+/// GetIncidentRcaSummary
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/summary",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentRcaSummary",
+    summary = "Get the verdict, hypotheses and evidence of an analysis run",
+    description = "Returns the summary of one analysis run of the incident: the verdict card, the causal timeline, the hypotheses, the verified evidence and the blind spots. A live run returns what the agent recorded so far. Pass the last `state_version` as `known_version` to get `not_modified` when nothing changed.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID"),
+        RcaThreadQuery,
+    ),
+    responses(
+        (status = 200, description = "Run summary, or `{run_id, state_version, not_modified: true}`", content_type = "application/json", body = config::meta::oncall::rca_run::RcaRunSummary),
+        (status = 404, description = "Run not found", content_type = "application/json", body = ()),
+        (status = 410, description = "The run's transcript expired (`error_code: transcript_expired`)", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal error", content_type = "application/json", body = ()),
+        (status = 503, description = "The transcript could not be read in full (`error_code: history_unavailable`)", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+    )
+)]
+pub async fn get_incident_rca_summary(
+    Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
+    Query(query): Query<RcaThreadQuery>,
+) -> Response {
+    use axum::{http::StatusCode, response::IntoResponse};
+    use config::meta::{
+        alerts::rca_runs::RunState,
+        oncall::rca_run::{self, RcaRunRecord},
+    };
+    use openobserve_core::{
+        ai_chat::{rca_ledger, rca_thread},
+        alerts::rca_turn::RcaTurnError,
+    };
+
+    let run = match infra::table::rca_runs::get(&org_id, &run_id).await {
+        Ok(Some(run)) if run.incident_id.as_deref() == Some(incident_id.as_str()) => run,
+        Ok(_) => return MetaHttpResponse::not_found("Run not found"),
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+    let state = match run.state.parse::<RunState>() {
+        Ok(state) => state,
+        Err(_) => {
+            return MetaHttpResponse::internal_error(format!(
+                "run {run_id} has an unknown state {}",
+                run.state
+            ));
+        }
+    };
+    let not_modified = |version: &str| query.known_version.as_deref() == Some(version);
+    let not_modified_body = |version: String| {
+        MetaHttpResponse::json(serde_json::json!({
+            "run_id": run_id,
+            "state_version": version,
+            "not_modified": true,
+        }))
+    };
+
+    if state.is_terminal() {
+        // A cancel (or a failure written by another node) commits the terminal state before
+        // the finalizer stores the partial record (VE34). Until then, build the same record
+        // from the transcript, versioned by the session so the stored record replaces it.
+        let awaiting_record =
+            run.result.is_none() && matches!(state, RunState::Failed | RunState::Cancelled);
+        if awaiting_record && let Some(session_id) = run.session_id.as_deref() {
+            match infra::table::ai_chat_sessions::get(&org_id, session_id).await {
+                Ok(Some(session)) => {
+                    let version = rca_thread::state_version(
+                        session.last_committed_seq,
+                        session.updated_at,
+                        run.updated_at,
+                        false,
+                    );
+                    if not_modified(&version) {
+                        return not_modified_body(version);
+                    }
+                    let events = match openobserve_core::ai_chat::read_committed_events(
+                        &session, -1,
+                    )
+                    .await
+                    {
+                        Ok(events) => events,
+                        Err(e) => return read_error_response(&run_id, session_id, true, &e),
+                    };
+                    return MetaHttpResponse::json(partial_summary(
+                        &run_id, state, version, &events,
+                    ));
+                }
+                // No session to read: the run stays legacy.
+                Ok(None) => {}
+                Err(e) => return MetaHttpResponse::internal_error(e),
+            }
+        }
+
+        let version = rca_thread::state_version(-1, 0, run.updated_at, false);
+        if not_modified(&version) {
+            return not_modified_body(version);
+        }
+        let summary = match run.result.clone() {
+            Some(result) => match serde_json::from_value::<RcaRunRecord>(result) {
+                Ok(record) => rca_run::summary_from_record(&run_id, state, version, &record),
+                Err(e) => {
+                    log::warn!(
+                        "[INCIDENTS::RCA] run {run_id} has an unreadable result record, serving it as legacy: {e}"
+                    );
+                    rca_run::summary_legacy(&run_id, state, version)
+                }
+            },
+            None => rca_run::summary_legacy(&run_id, state, version),
+        };
+        return MetaHttpResponse::json(summary);
+    }
+
+    let empty_live = || {
+        let version = rca_thread::state_version(-1, 0, run.updated_at, false);
+        if not_modified(&version) {
+            return not_modified_body(version);
+        }
+        MetaHttpResponse::json(rca_run::summary_live(&run_id, state, version, &[], &[]))
+    };
+    let Some(session_id) = run.session_id.as_deref() else {
+        return empty_live();
+    };
+    let session = match infra::table::ai_chat_sessions::get(&org_id, session_id).await {
+        Ok(Some(session)) => session,
+        Ok(None) => {
+            // A run whose turn never started has its session id but never had a session.
+            let start_failure = run
+                .error
+                .as_ref()
+                .and_then(|error| error.get("code"))
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(RcaTurnError::is_start_code);
+            if start_failure {
+                return empty_live();
+            }
+            let status = StatusCode::GONE;
+            return (
+                status,
+                Json(serde_json::json!({
+                    "code": status.as_u16(),
+                    "message": "This analysis transcript has expired",
+                    "error_code": "transcript_expired",
+                })),
+            )
+                .into_response();
+        }
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+
+    let version = rca_thread::state_version(
+        session.last_committed_seq,
+        session.updated_at,
+        run.updated_at,
+        false,
+    );
+    if not_modified(&version) {
+        return not_modified_body(version);
+    }
+    let events = match openobserve_core::ai_chat::read_committed_events(&session, -1).await {
+        Ok(events) => events,
+        Err(e) => return read_error_response(&run_id, session_id, false, &e),
+    };
+    let transcript = rca_ledger::decode_run(&events);
+    MetaHttpResponse::json(rca_run::summary_live(
+        &run_id,
+        state,
+        version,
+        &transcript.calls,
+        &transcript.tool_log,
+    ))
+}
+
+/// The summary of a failed or cancelled run whose partial record is not stored yet: the
+/// record the finalizer will store, built from the committed events (VE34).
+#[cfg(feature = "enterprise")]
+fn partial_summary(
+    run_id: &str,
+    state: config::meta::alerts::rca_runs::RunState,
+    version: String,
+    events: &[o2_enterprise::enterprise::ai::chat::batcher::DurableEvent],
+) -> config::meta::oncall::rca_run::RcaRunSummary {
+    use config::meta::oncall::rca_run;
+
+    let transcript = openobserve_core::ai_chat::rca_ledger::decode_run(events);
+    let end = rca_run::record_run_end(&rca_run::RunEndInput {
+        submit: None,
+        calls: &transcript.calls,
+        tool_log: &transcript.tool_log,
+        stages_run: &transcript.stages_run,
+        ended_by: rca_run::EndedBy::Agent,
+        completed: false,
+    });
+    rca_run::summary_from_record(run_id, state, version, &end.record)
+}
+
+#[cfg(feature = "enterprise")]
+/// RunIncidentRcaBacktest
+#[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/incidents/rca/backtest",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "RunIncidentRcaBacktest",
+    summary = "Backtest incident analysis over past incidents",
+    description = "Re-grades the stored analysis runs of the incidents in `[from, to)` (microseconds) and returns a report that compares the graded verdicts with how each incident was resolved.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = o2_enterprise::enterprise::alerts::rca_backtest::BacktestRequest, description = "Backtest window and options", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Backtest report", content_type = "application/json", body = o2_enterprise::enterprise::alerts::rca_backtest::BacktestReport),
+        (status = 400, description = "Invalid request", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+    )
+)]
+pub async fn run_incident_rca_backtest(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<o2_enterprise::enterprise::alerts::rca_backtest::BacktestRequest>,
+) -> Response {
+    use o2_enterprise::enterprise::alerts::rca_backtest;
+
+    match rca_backtest::run_backtest(&org_id, &user_email.user_id, body).await {
+        Ok(report) => MetaHttpResponse::json(report),
+        Err(e @ rca_backtest::BacktestError::Invalid(_)) => {
+            MetaHttpResponse::bad_request(e.to_string())
+        }
+        Err(rca_backtest::BacktestError::Internal(err)) => {
+            log::error!("[INCIDENTS::RCA] backtest for org {org_id} failed: {err:#}");
+            MetaHttpResponse::internal_error("The backtest failed; see the server log")
+        }
+    }
+}
+
 /// Get incident events timeline
 #[cfg(feature = "enterprise")]
 pub async fn get_incident_events(Path((org_id, incident_id)): Path<(String, String)>) -> Response {
@@ -1385,6 +1631,65 @@ pub async fn get_incident_rca_run(_path: Path<(String, String, String)>) -> Resp
 pub async fn get_incident_rca_thread(
     _path: Path<(String, String, String)>,
     _query: Query<RcaThreadQuery>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/summary",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentRcaSummary",
+    summary = "Get the verdict, hypotheses and evidence of an analysis run",
+    description = "Returns the summary of one analysis run. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID"),
+        RcaThreadQuery,
+    ),
+    responses(
+        (status = 403, description = "Not supported without enterprise features", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+    )
+)]
+pub async fn get_incident_rca_summary(
+    _path: Path<(String, String, String)>,
+    _query: Query<RcaThreadQuery>,
+) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/incidents/rca/backtest",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "RunIncidentRcaBacktest",
+    summary = "Backtest incident analysis over past incidents",
+    description = "Re-grades past analysis runs. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = Object, description = "Backtest window and options", content_type = "application/json"),
+    responses(
+        (status = 403, description = "Not supported without enterprise features", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+    )
+)]
+pub async fn run_incident_rca_backtest(
+    _path: Path<String>,
+    _headers: Headers<UserEmail>,
+    _body: Json<serde_json::Value>,
 ) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
@@ -1978,6 +2283,486 @@ mod tests {
             body,
             serde_json::json!({"not_modified": true, "state_version": "41.1500.2000.io"})
         );
+    }
+
+    /// A record as the finalizer stores it: `h1` recorded twice (the second after steering
+    /// `stg_1`) with one verified decisive logs item and one citation that never ran, one
+    /// blind spot, and a report with one confirmed timeline entry.
+    #[cfg(feature = "enterprise")]
+    fn stored_record() -> serde_json::Value {
+        use config::meta::oncall::{
+            confidence::{ToolCallRecord, signal_class, stream_type},
+            rca_run::{
+                EndedBy, LedgerCall, LedgerTool, RunEndInput, evidence_target, parse_submit,
+                record_run_end, summarize_result,
+            },
+        };
+        use serde_json::json;
+
+        const SQL: &str = "SELECT count(*) FROM app_logs WHERE level = 'error'";
+        let e1 = json!({"id": "e1", "tool": "SearchSQL", "query": SQL, "polarity": "supports", "strength": "decisive", "observation": "errors began at 10:02"});
+        let e9 = json!({"id": "e9", "tool": "SearchSQL", "query": "SELECT 2", "polarity": "supports", "strength": "supporting", "observation": "never ran"});
+        let calls = [
+            LedgerCall {
+                seq: 3,
+                at_us: 1_000,
+                tool: LedgerTool::Hypothesis,
+                input: json!({"id": "h1", "statement": "The pool ran dry", "status": "testing", "reason": "r1", "evidence": [e1.clone()]}),
+            },
+            LedgerCall {
+                seq: 7,
+                at_us: 2_000,
+                tool: LedgerTool::Hypothesis,
+                input: json!({"id": "h1", "statement": "The pool ran dry", "status": "root_cause", "reason": "r2", "evidence": [e1, e9], "trigger_steer_id": "stg_1"}),
+            },
+            LedgerCall {
+                seq: 9,
+                at_us: 3_000,
+                tool: LedgerTool::BlindSpot,
+                input: json!({"id": "b1", "axis": "other", "title": "Feature-flag history", "why": "w", "fix": "connect_toolset"}),
+            },
+        ];
+        let input =
+            json!({"org_id": "default", "type": "logs", "request_body": {"query": {"sql": SQL}}});
+        let (result_summary, result_count) = summarize_result(
+            "SearchSQL",
+            &json!({"took": 3, "hits": [{}, {}], "total": 2}),
+        );
+        let tool_log = [ToolCallRecord {
+            call_id: "call_1".to_string(),
+            tool: "SearchSQL".to_string(),
+            key_arg: SQL.to_string(),
+            stream_type: stream_type("SearchSQL", &input),
+            success: true,
+            result_count,
+            started_at_us: 900,
+            duration_ms: 41,
+            error_type: None,
+            signal: signal_class("SearchSQL", &input),
+            target: evidence_target("SearchSQL", &input),
+            result_summary,
+        }];
+        let submit = parse_submit(&json!({
+            "markdown": "report",
+            "verdict": {
+                "probable_cause": "The pool ran dry",
+                "claimed_confidence": "high",
+                "claimed_outcome": "root_cause_identified",
+                "page_recommendation": {"action": "page", "reason": "r"},
+                "report_ref": "report",
+            },
+            "timeline": [{"at": 500, "text": "Errors began", "status": "confirmed", "evidence_ids": ["e1"]}],
+        }))
+        .unwrap();
+        let end = record_run_end(&RunEndInput {
+            submit: Some(&submit),
+            calls: &calls,
+            tool_log: &tool_log,
+            stages_run: &[],
+            ended_by: EndedBy::Agent,
+            completed: true,
+        });
+        serde_json::to_value(end.record).unwrap()
+    }
+
+    /// 03 §12, VE42: the summary route answers 404 for a run of another incident or an
+    /// unknown run; a finished run with a record from the record, with the contract keys;
+    /// a finished run with no result or an unreadable one as legacy; `not_modified` for a
+    /// current `known_version`; a live run without a session with an empty live summary; a
+    /// live run whose session is gone with 410, unless its turn never started.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_the_summary_route_answers_by_run_record_and_session() {
+        use axum::http::StatusCode;
+        use infra::table::entity::{ai_chat_sessions, rca_runs};
+        use sea_orm::{ActiveModelTrait, EntityTrait};
+        use serde_json::json;
+
+        let conn = thread_tables().await;
+        let org = format!(
+            "summary_{}",
+            infra::table::rca_runs::new_run_id().to_lowercase()
+        );
+        let live = |run_id: &str, session: Option<&str>| {
+            let mut run = thread_run(&org, run_id, "inc_1", session);
+            run.state = "running".to_string();
+            run.ended_at = None;
+            run.report = None;
+            run
+        };
+        let mut recorded = thread_run(&org, "run_recorded", "inc_1", Some("ses_gone"));
+        recorded.result = Some(stored_record());
+        let mut unreadable = thread_run(&org, "run_unreadable", "inc_1", None);
+        unreadable.result = Some(json!({"schema_version": "one", "ledger": 5}));
+        let mut never_started = live("run_live_never", Some("ses_never"));
+        never_started.error = Some(json!({"code": "turn_limit", "reason": "r"}));
+        for run in [
+            recorded,
+            unreadable,
+            thread_run(&org, "run_sum_legacy", "inc_1", None),
+            live("run_live_bare", None),
+            live("run_live_gone", Some("ses_gone")),
+            live("run_sum_live", Some("ses_live")),
+            never_started,
+        ] {
+            rca_runs::Entity::insert(rca_runs::ActiveModel::from(run).reset_all())
+                .exec(conn)
+                .await
+                .unwrap();
+        }
+        let session = ai_chat_sessions::Model {
+            org_id: org.clone(),
+            session_id: "ses_live".to_string(),
+            user_id: "sys".to_string(),
+            user_email: "sys@acme.io".to_string(),
+            opencode_session_id: None,
+            agent_type: "sre-rca".to_string(),
+            title: "Analyze incident inc_1".to_string(),
+            title_source: "prompt".to_string(),
+            status: "active".to_string(),
+            created_at: 1_000,
+            updated_at: 1_500,
+            first_event_at: None,
+            last_event_at: None,
+            last_committed_seq: 41,
+            session_epoch: 1,
+            last_turn_id: None,
+            forked_from_share: None,
+            fork_seed_seq: None,
+            replica_purged_at: None,
+        };
+        ai_chat_sessions::Entity::insert(ai_chat_sessions::ActiveModel::from(session).reset_all())
+            .exec(conn)
+            .await
+            .unwrap();
+
+        let read = |incident: &str, run: &str, known: Option<&str>| {
+            get_incident_rca_summary(
+                Path((org.clone(), incident.to_string(), run.to_string())),
+                Query(RcaThreadQuery {
+                    known_version: known.map(str::to_string),
+                }),
+            )
+        };
+
+        let (status, _) = status_and_body(read("inc_2", "run_recorded", None).await).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "another incident's run");
+        let (status, _) = status_and_body(read("inc_1", "run_unknown", None).await).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "an unknown run");
+
+        // A finished run with a record: the summary comes from the record, whatever
+        // happened to its transcript.
+        let (status, body) = status_and_body(read("inc_1", "run_recorded", None).await).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["run_id"], "run_recorded");
+        assert_eq!(body["state"], "completed");
+        assert_eq!(body["state_version"], "-1.0.2000");
+        assert_eq!(body["not_modified"], false);
+        assert_eq!(body["legacy"], false);
+        let card = &body["card"];
+        assert_eq!(card["outcome"], "root_cause_identified");
+        assert_eq!(card["outcome_reason"], "root_cause_graded");
+        assert_eq!(card["headline"], "The pool ran dry");
+        assert_eq!(card["band"], "medium");
+        assert_eq!(
+            card["band_reason"],
+            "medium · claimed high · decisive: logs"
+        );
+        assert!(card["leading"].is_null() && card["verdict_so_far"].is_null());
+        assert_eq!(
+            body["timeline"],
+            json!([{"at": 500, "text": "Errors began", "status": "confirmed", "evidence_numbers": [1]}])
+        );
+        let h1 = &body["hypotheses"][0];
+        assert_eq!(h1["id"], "h1");
+        assert_eq!(h1["status"], "root_cause");
+        assert_eq!(h1["reason"], "r2");
+        assert_eq!(h1["evidence_numbers"], json!([1]));
+        assert_eq!(h1["unverified_ids"], json!(["e9"]));
+        assert_eq!(h1["first_seen_seq"], 3);
+        assert!(h1.get("label").is_none(), "F10: no server label");
+        assert_eq!(
+            h1["history"],
+            json!([
+                {"at": 1_000, "status": "testing"},
+                {"at": 2_000, "status": "root_cause", "steered_by": "stg_1"},
+            ])
+        );
+        let e = &body["evidence"][0];
+        assert_eq!(e["number"], 1);
+        assert_eq!(e["ids"], json!(["e1"]));
+        assert_eq!(e["target"], "logs");
+        assert_eq!(e["decisive"], true);
+        assert_eq!(e["link"]["signal"], "logs");
+        assert_eq!(e["link"]["streams"], json!(["app_logs"]));
+        assert_eq!(
+            e["link"]["sql"],
+            "SELECT count(*) FROM app_logs WHERE level = 'error'"
+        );
+        assert_eq!(e["result_summary"], "2 rows · took 3 ms");
+        assert_eq!(
+            e["citations"],
+            json!([{"hypothesis_id": "h1", "evidence_id": "e1", "polarity": "supports", "strength": "decisive", "observation": "errors began at 10:02"}])
+        );
+        assert_eq!(body["unverified"][0]["evidence_id"], "e9");
+        assert_eq!(body["unverified"][0]["reason"], "not_run");
+        assert_eq!(
+            body["blind_spots"],
+            json!([{"id": "b1", "axis": "other", "title": "Feature-flag history", "why": "w", "fix": "connect_toolset"}])
+        );
+
+        // VE42: no result, or one that does not read, is a legacy run.
+        for run_id in ["run_sum_legacy", "run_unreadable"] {
+            let (status, body) = status_and_body(read("inc_1", run_id, None).await).await;
+            assert_eq!(status, StatusCode::OK, "{run_id}");
+            assert_eq!(body["legacy"], true, "{run_id}");
+            assert_eq!(body["state"], "completed", "{run_id}");
+            assert!(body["card"]["outcome"].is_null(), "{run_id}");
+            assert!(body["card"]["band"].is_null(), "{run_id}");
+            assert_eq!(body["hypotheses"], json!([]), "{run_id}");
+        }
+
+        let (status, body) =
+            status_and_body(read("inc_1", "run_recorded", Some("-1.0.2000")).await).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            body,
+            json!({"run_id": "run_recorded", "state_version": "-1.0.2000", "not_modified": true})
+        );
+
+        // A live run with no session yet: an empty live summary, no grade or outcome.
+        let (status, body) = status_and_body(read("inc_1", "run_live_bare", None).await).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["state"], "running");
+        assert_eq!(body["legacy"], false);
+        assert_eq!(body["state_version"], "-1.0.2000");
+        assert!(body["card"]["band"].is_null() && body["card"]["outcome"].is_null());
+        assert_eq!(body["hypotheses"], json!([]));
+        assert_eq!(body["timeline"], json!([]));
+
+        let (status, body) = status_and_body(read("inc_1", "run_live_gone", None).await).await;
+        assert_eq!(status, StatusCode::GONE);
+        assert_eq!(body["error_code"], "transcript_expired");
+        let (status, body) = status_and_body(read("inc_1", "run_live_never", None).await).await;
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "a turn that never started had no transcript"
+        );
+        assert_eq!(body["legacy"], false);
+        assert_eq!(body["hypotheses"], json!([]));
+
+        // A live run's version is the thread's, without the tool output setting.
+        let (status, body) =
+            status_and_body(read("inc_1", "run_sum_live", Some("41.1500.2000")).await).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            body,
+            json!({"run_id": "run_sum_live", "state_version": "41.1500.2000", "not_modified": true})
+        );
+    }
+
+    /// VE34, 03 §12: a failed or cancelled run whose partial record is not stored yet is
+    /// read from its session, versioned like a live run; with no session row or no session
+    /// id it is legacy. A completed run without a result is legacy even with a session.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_an_ended_run_without_its_record_reads_its_session() {
+        use axum::http::StatusCode;
+        use infra::table::entity::{ai_chat_sessions, rca_runs};
+        use sea_orm::{ActiveModelTrait, EntityTrait};
+        use serde_json::json;
+
+        let conn = thread_tables().await;
+        let org = format!(
+            "partial_{}",
+            infra::table::rca_runs::new_run_id().to_lowercase()
+        );
+        let ended = |run_id: &str, state: &str, session: Option<&str>| {
+            let mut run = thread_run(&org, run_id, "inc_1", session);
+            run.state = state.to_string();
+            run.report = None;
+            run
+        };
+        for run in [
+            ended("run_part_cancelled", "cancelled", Some("ses_partial")),
+            ended("run_part_failed", "failed", Some("ses_partial")),
+            ended("run_part_completed", "completed", Some("ses_partial")),
+            ended("run_part_gone", "cancelled", Some("ses_missing")),
+            ended("run_part_bare", "cancelled", None),
+        ] {
+            rca_runs::Entity::insert(rca_runs::ActiveModel::from(run).reset_all())
+                .exec(conn)
+                .await
+                .unwrap();
+        }
+        let session = ai_chat_sessions::Model {
+            org_id: org.clone(),
+            session_id: "ses_partial".to_string(),
+            user_id: "sys".to_string(),
+            user_email: "sys@acme.io".to_string(),
+            opencode_session_id: None,
+            agent_type: "sre-rca".to_string(),
+            title: "Analyze incident inc_1".to_string(),
+            title_source: "prompt".to_string(),
+            status: "active".to_string(),
+            created_at: 1_000,
+            updated_at: 1_700,
+            first_event_at: None,
+            last_event_at: None,
+            last_committed_seq: 7,
+            session_epoch: 1,
+            last_turn_id: None,
+            forked_from_share: None,
+            fork_seed_seq: None,
+            replica_purged_at: None,
+        };
+        ai_chat_sessions::Entity::insert(ai_chat_sessions::ActiveModel::from(session).reset_all())
+            .exec(conn)
+            .await
+            .unwrap();
+        let read = |run: &str, known: Option<&str>| {
+            get_incident_rca_summary(
+                Path((org.clone(), "inc_1".to_string(), run.to_string())),
+                Query(RcaThreadQuery {
+                    known_version: known.map(str::to_string),
+                }),
+            )
+        };
+
+        // The session path: the version is the live formula over the session.
+        for run_id in ["run_part_cancelled", "run_part_failed"] {
+            let (status, body) = status_and_body(read(run_id, Some("7.1700.2000")).await).await;
+            assert_eq!(status, StatusCode::OK, "{run_id}");
+            assert_eq!(
+                body,
+                json!({"run_id": run_id, "state_version": "7.1700.2000", "not_modified": true}),
+                "{run_id}"
+            );
+        }
+
+        for run_id in ["run_part_completed", "run_part_gone", "run_part_bare"] {
+            let (status, body) = status_and_body(read(run_id, None).await).await;
+            assert_eq!(status, StatusCode::OK, "{run_id}");
+            assert_eq!(body["legacy"], true, "{run_id}");
+            assert_eq!(body["state_version"], "-1.0.2000", "{run_id}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn tool_event(
+        seq: i64,
+        id: &str,
+        tool: &str,
+        input: serde_json::Value,
+        output: &str,
+    ) -> o2_enterprise::enterprise::ai::chat::batcher::DurableEvent {
+        o2_enterprise::enterprise::ai::chat::batcher::DurableEvent {
+            id: format!("evt_{seq}"),
+            aggregate_id: "ses_partial".to_string(),
+            seq,
+            event_type: "message.part.updated.1".to_string(),
+            data: serde_json::json!({"sessionID": "ses_partial", "part": {
+                "id": id, "type": "tool", "callID": format!("call_{id}"), "tool": tool,
+                "sessionID": "ses_partial", "messageID": "msg_a1",
+                "state": {"status": "completed", "input": input, "output": output,
+                          "time": {"start": 1_000 + seq, "end": 1_010 + seq}},
+            }}),
+        }
+    }
+
+    /// VE34, VE16: the summary of an ended run built from its transcript is the partial
+    /// record: the hypotheses (testing left as untested), the evidence and the `run_end`
+    /// blind spot, with no outcome or band; not legacy.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_partial_summary_is_the_partial_record_of_the_transcript() {
+        use config::meta::alerts::rca_runs::RunState;
+        use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
+        use serde_json::json;
+
+        const SQL: &str = "SELECT count(*) FROM app_logs WHERE level = 'error'";
+        let events: Vec<DurableEvent> = vec![
+            DurableEvent {
+                id: "evt_0".to_string(),
+                aggregate_id: "ses_partial".to_string(),
+                seq: 0,
+                event_type: "message.updated.1".to_string(),
+                data: json!({"sessionID": "ses_partial", "info": {"id": "msg_a1", "sessionID": "ses_partial", "role": "assistant", "time": {"created": 1_000}}}),
+            },
+            tool_event(
+                1,
+                "prt_s1",
+                "record_step",
+                json!({"stage": "context", "title": "Context"}),
+                "{}",
+            ),
+            tool_event(
+                2,
+                "prt_s2",
+                "record_step",
+                json!({"stage": "topology", "title": "Topology"}),
+                "{}",
+            ),
+            tool_event(
+                3,
+                "prt_t1",
+                "o2_SearchSQL",
+                json!({"org_id": "default", "type": "logs", "request_body": {"query": {"sql": SQL}}}),
+                r#"{"took": 3, "hits": [{}, {}], "total": 2}"#,
+            ),
+            tool_event(
+                4,
+                "prt_h1",
+                "record_hypothesis",
+                json!({"id": "h1", "statement": "The pool ran dry", "status": "testing", "reason": "r", "evidence": [
+                    {"id": "e1", "tool": "SearchSQL", "query": SQL, "polarity": "supports", "strength": "decisive", "observation": "errors rose"}
+                ]}),
+                "{}",
+            ),
+            tool_event(
+                5,
+                "prt_h2",
+                "record_hypothesis",
+                json!({"id": "h2", "statement": "A node ran hot", "status": "likely", "reason": "r"}),
+                "{}",
+            ),
+        ];
+
+        let summary = partial_summary(
+            "run_1",
+            RunState::Cancelled,
+            "5.1700.2000".to_string(),
+            &events,
+        );
+        let body = serde_json::to_value(&summary).unwrap();
+        assert_eq!(body["legacy"], false);
+        assert_eq!(body["state"], "cancelled");
+        assert_eq!(body["state_version"], "5.1700.2000");
+        assert!(body["card"]["outcome"].is_null() && body["card"]["band"].is_null());
+        assert!(body["card"]["headline"].is_null());
+        let hypotheses: Vec<(&str, &str)> = body["hypotheses"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|h| (h["id"].as_str().unwrap(), h["status"].as_str().unwrap()))
+            .collect();
+        assert_eq!(hypotheses, [("h2", "likely"), ("h1", "untested")]);
+        assert_eq!(body["evidence"][0]["ids"], json!(["e1"]));
+        assert_eq!(body["evidence"][0]["result_summary"], "2 rows · took 3 ms");
+        assert_eq!(body["timeline"], json!([]));
+        let run_end = body["blind_spots"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|b| b["id"] == "run_end")
+            .expect("the run_end blind spot");
+        assert_eq!(run_end["title"], "5 stages did not run");
+        assert_eq!(
+            run_end["why"],
+            "Changes, Traces, Log patterns, Metrics, Converge"
+        );
+        assert_eq!(run_end["fix"], "resume_run");
     }
 
     /// TH30, D5: an ended run whose committed history has a gap, a divergence or a corrupt

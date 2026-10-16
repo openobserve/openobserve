@@ -158,7 +158,7 @@ const cases: [string, Row, boolean, Expected][] = [
     },
   ],
   [
-    "Analyzed · 3m ago",
+    "Analyzed · 3m ago (outcome null: Phase 1 behaviour)",
     { rca: rca({ state: "completed", updated_at: minutesAgoMicros(3) }), severity: "P2" },
     true,
     { kind: "state", label: "Analyzed", tone: "ok", detail: "3m ago", rerunNote: "" },
@@ -211,9 +211,120 @@ const cases: [string, Row, boolean, Expected][] = [
       rerunNote: "re-run cancelled by a.rao",
     },
   ],
+  // 03 VE14, VE16, VE44: outcome labels with the band; blocked names what it needs.
+  [
+    "Root cause identified · High",
+    {
+      rca: rca({ state: "completed", outcome: "root_cause_identified", confidence: "high" }),
+      severity: "P2",
+    },
+    true,
+    { kind: "state", label: "Root cause identified", tone: "ok", detail: "High", rerunNote: "" },
+  ],
+  [
+    "Contributing factor · Medium",
+    {
+      rca: rca({ state: "completed", outcome: "contributing_factor", confidence: "medium" }),
+      severity: "P2",
+    },
+    true,
+    { kind: "state", label: "Contributing factor", tone: "warn", detail: "Medium", rerunNote: "" },
+  ],
+  [
+    "Inconclusive · Low",
+    {
+      rca: rca({ state: "completed", outcome: "inconclusive", confidence: "low" }),
+      severity: "P2",
+    },
+    true,
+    { kind: "state", label: "Inconclusive", tone: "warn", detail: "Low", rerunNote: "" },
+  ],
+  [
+    "an outcome with no band shows no detail",
+    { rca: rca({ state: "completed", outcome: "inconclusive", confidence: null }), severity: "P2" },
+    true,
+    { kind: "state", label: "Inconclusive", tone: "warn", detail: "", rerunNote: "" },
+  ],
+  [
+    "Blocked · Needs: Change history (VE44 detail, not the band)",
+    {
+      rca: rca({
+        state: "completed",
+        outcome: "blocked",
+        confidence: "low",
+        summary: { detail: "Needs: Change history" },
+      }),
+      severity: "P2",
+    },
+    true,
+    {
+      kind: "state",
+      label: "Blocked",
+      tone: "warn-strong",
+      detail: "Needs: Change history",
+      rerunNote: "",
+    },
+  ],
+  [
+    "waiting_input · Blocked with the question's need",
+    {
+      rca: rca({ state: "waiting_input", summary: { detail: "Needs change history" } }),
+      severity: "P2",
+    },
+    true,
+    {
+      kind: "state",
+      label: "Blocked",
+      tone: "warn-strong",
+      detail: "Needs change history",
+      rerunNote: "",
+    },
+  ],
+  [
+    "RR-42: the previous outcome and band stay when a re-run fails",
+    {
+      rca: rca({
+        state: "failed",
+        summary: {
+          detail: "Agent unavailable",
+          previous: { ...PREVIOUS, outcome: "root_cause_identified", confidence: "high" },
+        },
+      }),
+      severity: "P2",
+    },
+    true,
+    {
+      kind: "state",
+      label: "Root cause identified",
+      tone: "ok",
+      detail: "High",
+      rerunNote: "re-run failed",
+    },
+  ],
+  [
+    "RR-42: the previous outcome and band stay when a re-run is cancelled",
+    {
+      rca: rca({
+        state: "cancelled",
+        summary: {
+          cancelled_by: "a.rao@acme.io",
+          previous: { ...PREVIOUS, outcome: "inconclusive", confidence: "low" },
+        },
+      }),
+      severity: "P2",
+    },
+    true,
+    {
+      kind: "state",
+      label: "Inconclusive",
+      tone: "warn",
+      detail: "Low",
+      rerunNote: "re-run cancelled by a.rao",
+    },
+  ],
 ];
 
-describe("rcaCellModel (01 §12.1 Phase 1)", () => {
+describe("rcaCellModel (01 §12.1, RR-42, 03 VE14/VE44)", () => {
   it.each(cases)("%s", (_name, row, rcaEnabled, expected) => {
     const model = rcaCellModel(row, { rcaEnabled, now: NOW });
     expect(model).toMatchObject(expected);

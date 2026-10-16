@@ -16,10 +16,14 @@
 // Fixtures for the RCA investigation thread (02 TH29–TH38). Times are microseconds.
 
 import type {
+  RcaBlindSpot,
+  RcaEvidenceEntry,
   RcaRun,
   RcaRunItem,
+  RcaRunSummary,
   RcaStep,
   RcaSummary,
+  RcaSummaryHypothesis,
   RcaThread,
   RcaToolCall,
 } from "@/services/incidents";
@@ -181,3 +185,325 @@ export function rcaSummary(
     },
   };
 }
+
+// Summary views (03 §12), one for each redesign frame plus a legacy run.
+
+export function rcaEvidenceEntry(overrides: Partial<RcaEvidenceEntry> = {}): RcaEvidenceEntry {
+  return {
+    number: 1,
+    ids: ["e1"],
+    call_id: "call-1",
+    kind: "SQL",
+    target: "logs",
+    link: {
+      signal: "logs",
+      streams: ["checkout_api"],
+      sql: "SELECT count(*) FROM \"checkout_api\" WHERE level = 'error'",
+      start_us: RCA_T0 - sec(1_800),
+      end_us: RCA_T0 + sec(1_800),
+    },
+    result_summary: "2 rows · took 41 ms",
+    duration_ms: 41,
+    decisive: true,
+    citations: [
+      {
+        hypothesis_id: "h1",
+        evidence_id: "e1",
+        polarity: "supports",
+        strength: "decisive",
+        observation: "Errors begin 116 s after the rollout.",
+      },
+    ],
+    ...overrides,
+  };
+}
+
+export function rcaHypothesis(overrides: Partial<RcaSummaryHypothesis> = {}): RcaSummaryHypothesis {
+  return {
+    id: "h1",
+    statement: "Deploy 4f2c1e opens one orders-db connection per line item",
+    status: "root_cause",
+    reason: "Pool hits 100/100 within 2 min of rollout.",
+    evidence_numbers: [1],
+    unverified_ids: [],
+    lead_ids: [],
+    first_seen_seq: 3,
+    history: [
+      { at: RCA_T0 + sec(60), status: "testing" },
+      { at: RCA_T0 + sec(200), status: "root_cause" },
+    ],
+    ...overrides,
+  };
+}
+
+export function rcaBlindSpot(overrides: Partial<RcaBlindSpot> = {}): RcaBlindSpot {
+  return {
+    id: "b1",
+    axis: "other",
+    title: "Feature-flag history",
+    why: "No toolset in this org provides flag changes.",
+    fix: "connect_toolset",
+    ...overrides,
+  };
+}
+
+const PROMQL_ENTRY = rcaEvidenceEntry({
+  number: 2,
+  ids: ["e2"],
+  call_id: "call-2",
+  kind: "PromQL",
+  target: "metrics",
+  link: {
+    signal: "metrics",
+    streams: [],
+    promql: 'max(db_pool_in_use{db="orders"})',
+    start_us: RCA_T0 - sec(1_800),
+    end_us: RCA_T0 + sec(1_800),
+  },
+  result_summary: "6 series · 240 points",
+  duration_ms: 230,
+  decisive: false,
+  citations: [
+    {
+      hypothesis_id: "h2",
+      evidence_id: "e2",
+      polarity: "supports",
+      strength: "supporting",
+      observation: "orders pool at 100/100 on all 6 pods from 14:04:05",
+    },
+  ],
+});
+
+/** Frame B: completed, root cause identified, high band. */
+export function rcaRunSummary(overrides: Partial<RcaRunSummary> = {}): RcaRunSummary {
+  return {
+    run_id: "run-2",
+    state: "completed",
+    state_version: "-1.0.1760000000000000.0",
+    not_modified: false,
+    legacy: false,
+    card: {
+      outcome: "root_cause_identified",
+      outcome_reason: "root_cause_graded",
+      headline: "checkout-api deploy 4f2c1e exhausted the orders-db connection pool",
+      band: "high",
+      band_reason: "high · decisive: traces + change · ruled out: node CPU",
+      suspect_change: {
+        kind: "deploy",
+        reference: "4f2c1e",
+        occurred_at: RCA_T0,
+        shown_state: "confirmed",
+      },
+      impact: {
+        summary: "3 services",
+        peak: "4.1% 5xx",
+        window: { start: RCA_T0 + sec(120), end: RCA_T0 + sec(1_740) },
+      },
+    },
+    timeline: [
+      {
+        at: RCA_T0 + sec(234),
+        text: "Pool saturated; requests wait 2 s for a connection and time out",
+        status: "confirmed",
+        evidence_numbers: [2],
+      },
+      {
+        at: RCA_T0,
+        text: "Deploy 4f2c1e (PR #812) rolls out to checkout-api",
+        status: "confirmed",
+        evidence_numbers: [1],
+      },
+      {
+        at: RCA_T0 + sec(379),
+        text: "cart-api errors follow through calls to checkout-api",
+        status: "likely",
+        evidence_numbers: [],
+      },
+    ],
+    hypotheses: [
+      rcaHypothesis(),
+      rcaHypothesis({
+        id: "h2",
+        statement: "Pool sized at 100 with a 2 s acquire timeout",
+        status: "contributing",
+        reason: "The pool has no headroom for the new query pattern.",
+        evidence_numbers: [2],
+        first_seen_seq: 5,
+      }),
+      rcaHypothesis({
+        id: "h3",
+        statement: "Feature flag flip at about 14:00",
+        status: "blocked",
+        reason: "No flag history is reachable.",
+        evidence_numbers: [],
+        first_seen_seq: 7,
+        history: [],
+      }),
+      rcaHypothesis({
+        id: "h4",
+        statement: "Node CPU saturation",
+        status: "ruled_out",
+        reason: "CPU flat at 34–41% across 9 nodes.",
+        evidence_numbers: [],
+        unverified_ids: ["e7"],
+        first_seen_seq: 4,
+        history: [
+          { at: RCA_T0 + sec(60), status: "testing" },
+          { at: RCA_T0 + sec(180), status: "ruled_out", steered_by: "a.rao@acme.io" },
+        ],
+      }),
+    ],
+    evidence: [rcaEvidenceEntry(), PROMQL_ENTRY],
+    unverified: [
+      {
+        hypothesis_id: "h4",
+        evidence_id: "e7",
+        tool: "PrometheusRangeQuery",
+        query: "avg(node_cpu)",
+        reason: "not_run",
+      },
+    ],
+    blind_spots: [
+      rcaBlindSpot(),
+      rcaBlindSpot({
+        id: "b2",
+        axis: "logs",
+        title: "payments-worker logs are sampled",
+        why: "Pipeline drop-debug keeps 10% of payments_worker logs.",
+        fix: "open_pipeline",
+      }),
+    ],
+    ...overrides,
+  };
+}
+
+/** Frame A: live, the leading hypothesis was revised; no band, no timeline. */
+export const rcaRunSummaryLive = (overrides: Partial<RcaRunSummary> = {}): RcaRunSummary =>
+  rcaRunSummary({
+    state: "running",
+    state_version: "12.100.200",
+    card: {
+      leading: { id: "h1", statement: "Deploy 4f2c1e exhausted the orders-db pool" },
+      verdict_so_far: {
+        label: "revised",
+        was: "Pool too small for the load after deploy 4f2c1e",
+      },
+    },
+    timeline: [],
+    hypotheses: [
+      rcaHypothesis({ status: "testing", history: [] }),
+      rcaHypothesis({
+        id: "h2",
+        statement: "checkout-api 5xx on POST /api/orders",
+        status: "symptom",
+        evidence_numbers: [2],
+        first_seen_seq: 5,
+        history: [],
+      }),
+    ],
+    unverified: [],
+    blind_spots: [],
+    ...overrides,
+  });
+
+/** Frame C: completed, inconclusive, low band, suspect change not read. */
+export const rcaRunSummaryInconclusive = (
+  overrides: Partial<RcaRunSummary> = {},
+): RcaRunSummary => {
+  const base = rcaRunSummary();
+  return rcaRunSummary({
+    card: {
+      ...base.card,
+      outcome: "inconclusive",
+      outcome_reason: "no_confirmed_cause",
+      headline: "orders-db connection pool exhaustion after checkout-api deploy 4f2c1e",
+      band: "low",
+      band_reason: "low · no confirmed cause",
+      suspect_change: { ...base.card.suspect_change!, shown_state: "not_read" },
+    },
+    hypotheses: [
+      rcaHypothesis({ status: "inconclusive" }),
+      rcaHypothesis({
+        id: "h2",
+        statement: "Traffic surge on POST /api/orders",
+        status: "inconclusive",
+        first_seen_seq: 6,
+      }),
+      rcaHypothesis({
+        id: "h5",
+        statement: "Old root cause claim",
+        status: "root_cause",
+        first_seen_seq: 9,
+      }),
+    ],
+    evidence: base.evidence.map((entry) => ({ ...entry, decisive: false })),
+    ...overrides,
+  });
+};
+
+/** Frame D: completed, blocked on change history. */
+export const rcaRunSummaryBlocked = (overrides: Partial<RcaRunSummary> = {}): RcaRunSummary => {
+  const base = rcaRunSummary();
+  return rcaRunSummary({
+    card: {
+      ...base.card,
+      outcome: "blocked",
+      outcome_reason: "leading_blocked",
+      headline: "orders-db pool saturated at 14:04. The change behind it can't be checked",
+      band: "low",
+      band_reason: "low · no confirmed cause",
+      suspect_change: undefined,
+      needs: "Change history",
+    },
+    blind_spots: [
+      rcaBlindSpot({
+        id: "b1",
+        axis: "change",
+        title: "Change history",
+        why: "No toolset provides deploys, PRs or config changes.",
+      }),
+    ],
+    ...overrides,
+  });
+};
+
+/** Frame E: cancelled with a partial record (VE34); no verdict, no grade, no timeline. */
+export const rcaRunSummaryCancelled = (overrides: Partial<RcaRunSummary> = {}): RcaRunSummary =>
+  rcaRunSummary({
+    state: "cancelled",
+    card: {},
+    timeline: [],
+    hypotheses: [
+      rcaHypothesis({ status: "untested", evidence_numbers: [1, 2] }),
+      rcaHypothesis({
+        id: "h2",
+        statement: "Traffic surge on POST /api/orders",
+        status: "untested",
+        evidence_numbers: [],
+        first_seen_seq: 6,
+        history: [],
+      }),
+    ],
+    unverified: [],
+    blind_spots: [
+      rcaBlindSpot({
+        id: "run_end",
+        axis: "other",
+        title: "3 stages did not run",
+        why: "Log patterns, Metrics, Converge",
+        fix: "resume_run",
+      }),
+    ],
+    ...overrides,
+  });
+
+/** A run that finished with no stored record (VE42). */
+export const rcaRunSummaryLegacy = (overrides: Partial<RcaRunSummary> = {}): RcaRunSummary =>
+  rcaRunSummaryCancelled({
+    state: "completed",
+    legacy: true,
+    hypotheses: [],
+    evidence: [],
+    blind_spots: [],
+    ...overrides,
+  });

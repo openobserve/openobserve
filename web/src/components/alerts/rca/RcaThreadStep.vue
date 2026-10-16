@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!-- One agent step of the thread (02 TH38): status icon, title, time, the note
-     with its [eN] citation chips, and the collapsible tool calls. -->
+     with its citation chips (03 VE24, VE30), and the collapsible tool calls. -->
 <template>
   <li data-test="rca-thread-step" class="grid grid-cols-[1.25rem_minmax(0,1fr)] gap-2.5">
     <span class="flex h-5 items-center justify-center" data-test="rca-thread-step-status">
@@ -42,7 +42,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-text-body text-compact m-0 [text-wrap:pretty] break-words"
       >
         <template v-for="(segment, idx) in noteSegments" :key="idx">
-          <span v-if="segment.kind === 'text'">{{ segment.text }}</span>
+          <template v-if="segment.kind === 'text'">
+            <code
+              v-if="segment.code"
+              class="rounded-default bg-surface-subtle text-text-code px-1 font-mono text-xs"
+              :class="{ 'font-bold': segment.bold, italic: segment.italic }"
+              >{{ segment.text }}</code
+            >
+            <strong
+              v-else-if="segment.bold"
+              class="font-bold"
+              :class="{ italic: segment.italic }"
+              >{{ segment.text }}</strong
+            >
+            <em v-else-if="segment.italic">{{ segment.text }}</em>
+            <span v-else>{{ segment.text }}</span>
+          </template>
+          <button
+            v-else-if="evidenceNumbers?.has(segment.id)"
+            type="button"
+            data-test="rca-citation-chip"
+            class="rounded-default border-border-control text-text-heading bg-surface-base hover:bg-surface-subtle-hover text-3xs mx-0.5 inline-flex h-4.5 min-w-5 cursor-pointer items-center justify-center border px-1 align-baseline font-mono font-semibold"
+            :aria-label="
+              t('alerts.incidents.rcaSummary.openEvidence', {
+                number: evidenceNumbers.get(segment.id),
+              })
+            "
+            @click="$emit('open-evidence', evidenceNumbers.get(segment.id) as number)"
+          >
+            {{ evidenceNumbers.get(segment.id) }}
+          </button>
+          <span
+            v-else-if="evidenceNumbers"
+            data-test="rca-citation-unverified"
+            class="rounded-default border-status-warning-text text-status-warning-text bg-surface-base text-3xs mx-0.5 inline-flex h-4.5 items-center border border-dashed px-1 align-baseline font-mono font-semibold"
+          >
+            {{ t("alerts.incidents.rcaSummary.notVerifiedId", { id: segment.id }) }}
+          </span>
           <span
             v-else
             data-test="rca-citation-chip"
@@ -103,10 +139,23 @@ import {
 } from "@/utils/incidents/rcaThread";
 import RcaToolCallRow from "./RcaToolCallRow.vue";
 
-const props = defineProps<{
-  step: RcaStep;
-  /** The run is live: an unfinished step is the running one. */
-  runLive: boolean;
+const props = withDefaults(
+  defineProps<{
+    step: RcaStep;
+    /** The run is live: an unfinished step is the running one. */
+    runLive: boolean;
+    /**
+     * Evidence id → entry number from the run's summary (03 VE24); null when no
+     * summary is loaded, so chips show the raw id.
+     */
+    evidenceNumbers?: Map<string, number> | null;
+  }>(),
+  { evidenceNumbers: null },
+);
+
+defineEmits<{
+  /** A citation chip was clicked: open evidence entry `number`. */
+  "open-evidence": [number: number];
 }>();
 
 const { t } = useI18nTyped();

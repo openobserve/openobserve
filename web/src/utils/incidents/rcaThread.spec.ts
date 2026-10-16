@@ -90,6 +90,37 @@ describe("rcaThread utils", () => {
     ]);
   });
 
+  describe("splitRcaNote inline markdown (F9, VE43)", () => {
+    it("marks bold, italics and inline code, and keeps citations inside bold", () => {
+      expect(splitRcaNote("**Pool full [e2]** then *retries* and `max_conns=100`")).toEqual([
+        { kind: "text", text: "Pool full ", bold: true },
+        { kind: "cite", id: "e2" },
+        { kind: "text", text: " then " },
+        { kind: "text", text: "retries", italic: true },
+        { kind: "text", text: " and " },
+        { kind: "text", text: "max_conns=100", code: true },
+      ]);
+      expect(splitRcaNote("_flag_ off")).toEqual([
+        { kind: "text", text: "flag", italic: true },
+        { kind: "text", text: " off" },
+      ]);
+    });
+
+    it("a link shows as its text and URL in plain text", () => {
+      expect(splitRcaNote("see [logs](https://evil.example/x) now")).toEqual([
+        { kind: "text", text: "see " },
+        { kind: "text", text: "logs (https://evil.example/x)" },
+        { kind: "text", text: " now" },
+      ]);
+    });
+
+    it("HTML stays text, and snake_case or a*b are not italics", () => {
+      expect(splitRcaNote('<img src=x onerror="alert(1)"> db_pool_in_use 2*3*4')).toEqual([
+        { kind: "text", text: '<img src=x onerror="alert(1)"> db_pool_in_use 2*3*4' },
+      ]);
+    });
+  });
+
   it("sums tool durations, counting a running call as 0", () => {
     expect(
       toolCallsDurationMs([

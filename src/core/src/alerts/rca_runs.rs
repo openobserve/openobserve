@@ -160,8 +160,9 @@ pub struct RunPatch {
     pub context_used: Option<serde_json::Value>,
     /// Adds one to the run's `continuations`.
     pub continuations_inc: bool,
-    /// Writes only `stats` and the summary's `steps`/`tool_calls`, on a run in any state
-    /// (TH22, TH42); every other field is ignored.
+    /// Writes only `stats`, the summary's `steps`/`tool_calls` and, once, the `result` of a
+    /// run that has none and did not complete, on a run in any state (TH22, TH42, VE34);
+    /// every other field is ignored.
     pub final_stats_only: bool,
     /// Timeline event committed with the write. Incident runs only; dropped for alert runs.
     pub event: Option<IncidentEvent>,
@@ -1493,5 +1494,94 @@ pub(crate) mod tests {
             unreachable!()
         };
         assert_eq!(error_details.as_deref(), Some(stored_details.as_str()));
+    }
+
+    /// CG §7 backtest input: `list_completed_between` returns the org's `completed` runs
+    /// with a `result` that ended in `[from, to)`, newest first (then run id), `limit` at
+    /// most; other states, other orgs, runs without a result and runs outside the window
+    /// are left out.
+    #[tokio::test]
+    async fn completed_runs_with_a_record_list_by_end_time_in_a_half_open_window() {
+        let _db = db().await;
+        let org = format!("rca_{}", runs_table::new_run_id().to_lowercase());
+        let other_org = format!("{org}_other");
+        let from = 1_700_000_000_000_000_i64;
+        let to = from + 30;
+        let row = |org: &str, run_id: &str, state: &str, ended: i64, result: bool| {
+            run_rows::ActiveModel::from(run_rows::Model {
+                run_id: run_id.to_string(),
+                org_id: org.to_string(),
+                subject_type: "incident".to_string(),
+                subject_id: "inc_1".to_string(),
+                incident_id: Some("inc_1".to_string()),
+                trigger: "manual".to_string(),
+                mode: "fresh".to_string(),
+                started_by: "a.rao@acme.io".to_string(),
+                guidance: None,
+                state: state.to_string(),
+                started_at: ended - 10,
+                updated_at: ended,
+                ended_at: Some(ended),
+                cancelled_by: None,
+                outcome: None,
+                confidence: None,
+                report: None,
+                result: result.then(|| serde_json::json!({"schema_version": 1})),
+                error: None,
+                session_id: None,
+                stats: None,
+                stage: None,
+                stage_index: None,
+                context_used: None,
+                continuations: 0,
+                oncall_subjects: None,
+            })
+            .reset_all()
+        };
+        let conn = infra::db::get_orm_client_rw().await;
+        for model in [
+            row(&org, &format!("{org}_a"), "completed", from + 10, true),
+            row(&org, &format!("{org}_h"), "completed", from + 10, true),
+            row(&org, &format!("{org}_b"), "completed", from + 20, true),
+            row(&org, &format!("{org}_d"), "completed", from, true),
+            row(&org, &format!("{org}_to"), "completed", to, true),
+            row(&org, &format!("{org}_before"), "completed", from - 1, true),
+            row(&org, &format!("{org}_bare"), "completed", from + 15, false),
+            row(&org, &format!("{org}_failed"), "failed", from + 12, true),
+            row(
+                &org,
+                &format!("{org}_cancelled"),
+                "cancelled",
+                from + 13,
+                true,
+            ),
+            row(
+                &other_org,
+                &format!("{other_org}_x"),
+                "completed",
+                from + 11,
+                true,
+            ),
+        ] {
+            run_rows::Entity::insert(model).exec(conn).await.unwrap();
+        }
+        let ids = |runs: Vec<run_rows::Model>| -> Vec<String> {
+            runs.into_iter()
+                .map(|r| r.run_id.trim_start_matches(&format!("{org}_")).to_string())
+                .collect()
+        };
+
+        let all = runs_table::list_completed_between(&org, from, to, 100)
+            .await
+            .unwrap();
+        assert_eq!(ids(all), ["b", "h", "a", "d"]);
+        let two = runs_table::list_completed_between(&org, from, to, 2)
+            .await
+            .unwrap();
+        assert_eq!(ids(two), ["b", "h"]);
+        let narrow = runs_table::list_completed_between(&org, from + 11, from + 20, 100)
+            .await
+            .unwrap();
+        assert!(narrow.is_empty(), "the window is half-open at its end");
     }
 }

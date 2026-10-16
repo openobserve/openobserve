@@ -15,7 +15,13 @@
 
 //! The investigation thread of an RCA run, projected from its chat session (TH29, TH33).
 
-use config::utils::json::{Map, Value};
+use config::{
+    meta::oncall::{
+        confidence::{KEY_ARG_MAX_BYTES, cut_bytes},
+        rca_run::summarize_result,
+    },
+    utils::json::{Map, Value},
+};
 use infra::table::ai_chat_turns;
 use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
 use serde::Serialize;
@@ -28,7 +34,9 @@ use super::projection::{
 use crate::redact::redact_internal_details;
 
 const RECORD_STEP: &str = "record_step";
-const SUBMIT_REPORT: &str = "submit_report";
+pub(crate) const SUBMIT_REPORT: &str = "submit_report";
+/// The durable event type of a part change; stored types carry a `.N` version suffix.
+const PART_UPDATED: &str = "message.part.updated";
 const IMPLICIT_STEP_TITLE: &str = "Investigation";
 /// The seven stages of the RCA protocol, in order; `stage_index` is the 1-based position (TH18).
 pub(crate) const RCA_STAGES: [&str; 7] = [
@@ -84,9 +92,115 @@ impl ThreadPart {
     }
 }
 
+/// A tool part as the thread reads it (TH29, TH33): the bare tool name (MCP prefix
+/// stripped, `tools_call` unwrapped), its arguments and its state. The thread, the live
+/// observer and the run decoder (`rca_ledger`) all read tool parts through this.
+pub(crate) struct ToolPart<'a> {
+    part: &'a Map<String, Value>,
+    /// Empty when a `tools_call` names no tool.
+    pub(crate) tool: &'a str,
+    /// `tools_call`'s `args`, else the part's input.
+    input: Option<&'a Map<String, Value>>,
+    pub(crate) state: Option<&'a Map<String, Value>>,
+    /// `state.status`: `pending`, `running`, `completed` or `error`.
+    pub(crate) status: &'a str,
+}
+
+impl<'a> ToolPart<'a> {
+    /// `None` for a part that is not a tool part.
+    pub(crate) fn of(part: &'a Map<String, Value>) -> Option<Self> {
+        if part.get("type").and_then(Value::as_str) != Some("tool") {
+            return None;
+        }
+        let state = obj(part.get("state"));
+        let status = state
+            .and_then(|s| s.get("status"))
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let mut input = state.and_then(|s| obj(s.get("input")));
+        let mut tool =
+            strip_mcp_prefix(part.get("tool").and_then(Value::as_str).unwrap_or_default());
+        if tool == "tools_call" {
+            tool = strip_mcp_prefix(
+                input
+                    .and_then(|i| i.get("tool"))
+                    .and_then(Value::as_str)
+                    .unwrap_or_default(),
+            );
+            input = input.and_then(|i| obj(i.get("args")));
+        }
+        Some(Self {
+            part,
+            tool,
+            input,
+            state,
+            status,
+        })
+    }
+
+    /// How the part counts in the thread.
+    pub(crate) fn kind(&self) -> ThreadPart {
+        ThreadPart::of(self.tool, self.status, self.arg("stage"))
+    }
+
+    /// One argument.
+    pub(crate) fn arg(&self, key: &str) -> Option<&'a Value> {
+        self.input.and_then(|i| i.get(key))
+    }
+
+    /// The arguments without the session argument the server adds.
+    pub(crate) fn args(&self) -> Map<String, Value> {
+        self.input
+            .map(|i| {
+                i.iter()
+                    .filter(|(k, _)| k.as_str() != SESSION_ARG)
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// `state.time`: `start` and `end`, epoch milliseconds.
+    pub(crate) fn time(&self) -> Option<&'a Map<String, Value>> {
+        self.state.and_then(|s| obj(s.get("time")))
+    }
+
+    /// Microseconds.
+    pub(crate) fn started_at(&self) -> Option<i64> {
+        self.time().and_then(|t| ms_to_us(t.get("start")))
+    }
+
+    /// Microseconds.
+    pub(crate) fn ended_at(&self) -> Option<i64> {
+        self.time().and_then(|t| ms_to_us(t.get("end")))
+    }
+
+    /// The first non-empty of `callID` and the part id.
+    pub(crate) fn call_id(&self) -> String {
+        [self.part.get("callID"), self.part.get("id")]
+            .into_iter()
+            .flatten()
+            .find_map(|v| v.as_str().filter(|s| !s.is_empty()))
+            .unwrap_or_default()
+            .to_string()
+    }
+}
+
+/// The part a `message.part.updated` event carries.
+pub(crate) fn updated_part(event: &DurableEvent) -> Option<&Map<String, Value>> {
+    let version = event.event_type.strip_prefix(PART_UPDATED)?;
+    let versioned = version.is_empty()
+        || version
+            .strip_prefix('.')
+            .is_some_and(|v| v.bytes().all(|b| b.is_ascii_digit()));
+    if !versioned {
+        return None;
+    }
+    event.data.get("part").and_then(Value::as_object)
+}
+
 const NOTE_MAX_CHARS: usize = 1_000;
 const STEP_TITLE_MAX_CHARS: usize = 80;
-const KEY_ARG_MAX_BYTES: usize = 4 * 1024;
 const OUTPUT_MAX_BYTES: usize = 16 * 1024;
 const ERROR_MAX_CHARS: usize = 200;
 const UNFINISHED_TOOL_ERROR: &str = "The run ended before this tool call finished";
@@ -353,48 +467,26 @@ impl Builder {
     }
 
     fn tool_part(&mut self, part: &Map<String, Value>) {
+        let Some(call) = ToolPart::of(part) else {
+            return;
+        };
         let empty = Map::new();
-        let state = obj(part.get("state")).unwrap_or(&empty);
-        let time = obj(state.get("time"));
+        let state = call.state.unwrap_or(&empty);
+        let time = call.time();
         self.observe(time.and_then(|t| t.get("start")));
         self.observe(time.and_then(|t| t.get("end")));
-        let started_at = time.and_then(|t| ms_to_us(t.get("start")));
-        let ended_at = time.and_then(|t| ms_to_us(t.get("end")));
-        let status = state
-            .get("status")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
+        let started_at = call.started_at();
+        let ended_at = call.ended_at();
 
-        let raw_name = part.get("tool").and_then(Value::as_str).unwrap_or_default();
-        let mut input: Map<String, Value> = obj(state.get("input"))
-            .map(|i| {
-                i.iter()
-                    .filter(|(k, _)| k.as_str() != SESSION_ARG)
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect()
-            })
-            .unwrap_or_default();
-        let mut tool = strip_mcp_prefix(raw_name).to_string();
-        if tool == "tools_call" {
-            tool = strip_mcp_prefix(
-                input
-                    .get("tool")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default(),
-            )
-            .to_string();
-            input = obj(input.get("args")).cloned().unwrap_or_default();
-        }
-
-        let kind = ThreadPart::of(&tool, status, input.get("stage"));
+        let kind = call.kind();
         match kind {
             ThreadPart::Step(stage) => {
-                self.open_step(stage, input.get("title"), started_at, ended_at);
+                self.open_step(stage, call.arg("title"), started_at, ended_at);
                 return;
             }
             ThreadPart::FailedStep => return,
             ThreadPart::Hidden => {
-                if tool == SUBMIT_REPORT && status == "completed" {
+                if call.tool == SUBMIT_REPORT && call.status == "completed" {
                     self.report_submitted = true;
                 }
                 return;
@@ -402,8 +494,12 @@ impl Builder {
             ThreadPart::Row => {}
         }
 
-        let (status, result_summary, error) = match status {
-            "completed" => (ToolCallStatus::Ok, Some(result_summary(state)), None),
+        let (status, result_summary, error) = match call.status {
+            "completed" => (
+                ToolCallStatus::Ok,
+                Some(summarize_result(call.tool, &tool_body(state)).0),
+                None,
+            ),
             "error" => (
                 ToolCallStatus::Error,
                 None,
@@ -416,12 +512,9 @@ impl Builder {
                 Some(UNFINISHED_TOOL_ERROR.to_string()),
             ),
         };
-        let call_id = [part.get("callID"), part.get("id")]
-            .into_iter()
-            .flatten()
-            .find_map(|v| v.as_str().filter(|s| !s.is_empty()))
-            .unwrap_or_default()
-            .to_string();
+        let input = call.args();
+        let tool = call.tool.to_string();
+        let call_id = call.call_id();
         let (input_out, output) = if self.show_tool_io {
             (Some(Value::Object(input.clone())), raw_output(state))
         } else {
@@ -559,18 +652,6 @@ fn ms_to_us(v: Option<&Value>) -> Option<i64> {
     v.and_then(as_i64).map(|ms| ms * 1000)
 }
 
-/// The longest prefix of `s` within `max` bytes that ends on a char boundary.
-fn cut_bytes(s: &str, max: usize) -> &str {
-    if s.len() <= max {
-        return s;
-    }
-    let mut end = max;
-    while !s.is_char_boundary(end) {
-        end -= 1;
-    }
-    &s[..end]
-}
-
 /// `[eN]` references in a note, in order, without duplicates.
 fn citations(note: &str) -> Vec<String> {
     let mut found: Vec<String> = Vec::new();
@@ -590,7 +671,7 @@ fn citations(note: &str) -> Vec<String> {
 }
 
 /// The one argument that says what a tool call did (TH33).
-fn key_arg(tool: &str, input: &Map<String, Value>) -> Option<String> {
+pub(crate) fn key_arg(tool: &str, input: &Map<String, Value>) -> Option<String> {
     let request_body = obj(input.get("request_body"));
     let text = match tool {
         "SearchSQL" => request_body
@@ -615,86 +696,23 @@ fn key_arg(tool: &str, input: &Map<String, Value>) -> Option<String> {
     Some(cut_bytes(&text, KEY_ARG_MAX_BYTES).to_string())
 }
 
-/// Counts only, never data from the output (TH33).
-fn result_summary(state: &Map<String, Value>) -> String {
+/// A tool call's response body: the payload inside an MCP content wrapper, else the output
+/// as an object (JSON output parsed; text output as `{"output": text, "metadata": ..}`).
+pub(crate) fn tool_body(state: &Map<String, Value>) -> Value {
     let metadata = state
         .get("metadata")
         .filter(|v| truthy(v))
         .cloned()
         .unwrap_or_else(|| Value::Object(Map::new()));
     let coerced = coerce_tool_output(state.get("output"), metadata);
-    let body = match extract_mcp_response(&coerced) {
+    match extract_mcp_response(&coerced) {
         Value::Null => Value::Object(coerced),
         body => body,
-    };
-    count_summary(&body).unwrap_or_else(|| byte_size(output_len(state)))
-}
-
-fn count_summary(body: &Value) -> Option<String> {
-    let body = body.as_object()?;
-    let len = |key: &str| body.get(key).and_then(Value::as_array).map(Vec::len);
-    if let Some(n) = len("hits") {
-        return Some(plural(n, "row"));
-    }
-    let series = body
-        .get("result")
-        .or_else(|| obj(body.get("data")).and_then(|d| d.get("result")))
-        .and_then(Value::as_array);
-    if let Some(series) = series {
-        let points: usize = series
-            .iter()
-            .map(|s| match s.get("values").and_then(Value::as_array) {
-                Some(values) => values.len(),
-                None => usize::from(s.get("value").is_some()),
-            })
-            .sum();
-        return Some(format!(
-            "{} · {}",
-            plural(series.len(), "series"),
-            plural(points, "point")
-        ));
-    }
-    if let Some(n) = len("patterns") {
-        return Some(plural(n, "pattern"));
-    }
-    if let Some(n) = len("spans") {
-        return Some(plural(n, "span"));
-    }
-    if let Some(n) = len("traces") {
-        return Some(plural(n, "trace"));
-    }
-    None
-}
-
-fn plural(n: usize, noun: &str) -> String {
-    if n == 1 || noun == "series" {
-        format!("{n} {noun}")
-    } else {
-        format!("{n} {noun}s")
     }
 }
 
-fn output_len(state: &Map<String, Value>) -> usize {
-    match state.get("output") {
-        Some(Value::String(s)) => s.len(),
-        None | Some(Value::Null) => 0,
-        Some(other) => other.to_string().len(),
-    }
-}
-
-fn byte_size(bytes: usize) -> String {
-    const KB: f64 = 1024.0;
-    let b = bytes as f64;
-    if b < KB {
-        format!("{bytes} B")
-    } else if b < KB * KB {
-        format!("{:.1} KB", b / KB)
-    } else {
-        format!("{:.1} MB", b / (KB * KB))
-    }
-}
-
-fn error_text(error: Option<&Value>) -> String {
+/// A failed tool call's error, redacted and at most 200 characters (TH33).
+pub(crate) fn error_text(error: Option<&Value>) -> String {
     let message = match error.filter(|e| truthy(e)) {
         Some(error) => redact_internal_details(&extract_error_message(error)),
         None => "Tool execution failed".to_string(),
@@ -1048,7 +1066,7 @@ pub(crate) mod tests {
         );
         assert_eq!(get[0].status, ToolCallStatus::Ok);
         let output_len = "{\"id\":\"inc_1\",\"title\":\"checkout errors\"}".len();
-        assert_eq!(get[0].result_summary, Some(format!("{output_len} B")));
+        assert_eq!(get[0].result_summary, Some(format!("OK · {output_len} B")));
 
         let context = &thread.steps[1];
         assert_eq!(context.started_at, us(1_000));
@@ -1061,7 +1079,7 @@ pub(crate) mod tests {
         );
         assert_eq!(sql.started_at, us(1_100), "ms become µs");
         assert_eq!(sql.duration_ms, Some(42));
-        assert_eq!(sql.result_summary.as_deref(), Some("42 rows"));
+        assert_eq!(sql.result_summary.as_deref(), Some("42 rows · took 3 ms"));
         assert_eq!(sql.error, None);
         assert_eq!(
             context.note.as_deref(),
@@ -1169,6 +1187,41 @@ pub(crate) mod tests {
                 assert!(row.result_summary.is_some(), "{row:?}");
             }
         }
+    }
+
+    /// TH33, VE27: a SearchSQL row whose rows came back as a markdown table
+    /// (`agent_options.output_format = md_table`, `hits` emptied) counts the table rows,
+    /// as the evidence summary does; it never reads "0 rows".
+    #[test]
+    fn an_md_table_search_row_counts_the_table_rows() {
+        let mut table = String::from("| level | n |\n| --- | --- |");
+        for i in 0..40 {
+            table.push_str(&format!("\n| error | {i} |"));
+        }
+        let output =
+            json!({"took": 45, "hits": [], "total": 40, "format": "md_table", "data": table});
+        let mut s = Session::new();
+        s.message("msg_a1", "assistant", json!({"created": T}));
+        s.tool(
+            "msg_a1",
+            "prt_t1",
+            "o2_SearchSQL",
+            "completed",
+            search_sql("SELECT level, count(*) AS n FROM app_logs GROUP BY level"),
+            json!({"output": output.to_string()}),
+            100,
+            145,
+        );
+
+        let thread = project_rca_thread(&s.events, &[], false, false);
+        let row = &thread.steps[0].tool_calls[0];
+        assert_eq!(row.tool, "SearchSQL");
+        assert_eq!(row.result_summary.as_deref(), Some("40 rows · took 45 ms"));
+        let (summary, count) = summarize_result("SearchSQL", &output);
+        assert_eq!(
+            (summary.as_str(), count),
+            ("40 rows · took 45 ms", Some(40))
+        );
     }
 
     /// TH33: without the org setting no row carries `input` or `output`, not even as null.
