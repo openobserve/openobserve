@@ -68,18 +68,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </dl>
 
-      <div v-if="actions.length" class="flex flex-wrap items-center gap-1.5">
-        <OText variant="label" as="span" class="me-1">{{
-          t("alertCalibration.detail.proposedActions")
-        }}</OText>
-        <span
-          v-for="(action, i) in actions"
+      <div
+        v-if="actions.length"
+        class="rounded-default bg-surface-subtle border-s-border-strong flex flex-col gap-1 border-s-4 px-3 py-2"
+        data-test="alert-calibration-finding-actions"
+      >
+        <OText variant="label" as="div">{{ t("alertCalibration.detail.proposedActions") }}</OText>
+        <div
+          v-for="action in actions"
           :key="action.name"
-          class="text-text-body text-sm"
-          :title="action.description"
+          class="flex min-w-0 flex-wrap items-baseline gap-x-2"
         >
-          {{ action.label }}<span v-if="i < actions.length - 1" class="text-text-secondary">,</span>
-        </span>
+          <span class="text-text-body text-xs font-medium">{{ action.label }}</span>
+          <OText v-if="action.description" variant="meta" as="span">{{ action.description }}</OText>
+        </div>
       </div>
     </OCardSection>
   </OCard>
