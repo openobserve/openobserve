@@ -95,7 +95,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OText variant="card-title" as="h2">{{
               t("alertCalibration.detail.findingsHeading")
             }}</OText>
-            <OText variant="meta" as="p">{{ t("alertCalibration.detail.suggestionsOnly") }}</OText>
+            <OText variant="meta" as="p" class="flex items-center gap-1">
+              <OIcon name="lightbulb-outline" size="xs" class="shrink-0" />
+              <span>{{ t("alertCalibration.detail.suggestionsOnly") }}</span>
+            </OText>
           </div>
           <OToggleGroup
             v-if="presentRules.length > 1"
@@ -189,6 +192,7 @@ import { format, formatDistanceToNowStrict } from "date-fns";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
