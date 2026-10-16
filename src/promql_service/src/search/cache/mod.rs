@@ -223,6 +223,9 @@ pub async fn get(
         }
     }
 
+    // a series whose readings all fall before the window would reach callers with no samples
+    resp.series.retain(|series| !series.samples.is_empty());
+
     // if new_start == start, it means we have no data in cache, so we need to return None
     if new_start == start {
         return Ok(None);
