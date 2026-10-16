@@ -606,30 +606,6 @@ pub async fn check_for_schema(
     Ok((ret, Some(inferred_schema)))
 }
 
-pub async fn get_merged_schema(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    inferred_schema: &Schema,
-) -> Option<(Vec<Field>, Schema)> {
-    let mut db_schema = infra::schema::get_from_db(org_id, stream_name, stream_type)
-        .await
-        .unwrap();
-
-    let (is_schema_changed, field_datatype_delta, merged_fields) =
-        infra::schema::get_merge_schema_changes(&db_schema, inferred_schema);
-
-    if !is_schema_changed {
-        return None;
-    }
-
-    let metadata = std::mem::take(&mut db_schema.metadata);
-    Some((
-        field_datatype_delta,
-        Schema::new(merged_fields).with_metadata(metadata),
-    ))
-}
-
 // handle_diff_schema is a slow path, it acquires a lock to update schema
 // steps:
 // 1. get schema from db, if schema is empty, set schema and return

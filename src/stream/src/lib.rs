@@ -1185,16 +1185,6 @@ pub async fn update_fields_type(
     Ok(())
 }
 
-pub async fn get_stream_retention(
-    org_id: &str,
-    stream_type: StreamType,
-    stream: &str,
-) -> Option<i64> {
-    infra::schema::get_settings(org_id, stream, stream_type)
-        .await
-        .map(|s| s.data_retention)
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;

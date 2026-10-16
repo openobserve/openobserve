@@ -945,14 +945,14 @@ const useRoutes = () => {
     {
       path: "alert-calibration",
       name: "alertCalibration",
-      component: () => import("@/components/alert_calibration/AlertCalibrationDigests.vue"),
+      component: () => import("@/components/alert_calibration/AlertCalibrationDashboard.vue"),
       meta: { titleKey: "menu.alertCalibration" },
       beforeEnter: alertCalibrationRouteGuard,
     },
     {
-      path: "alert-calibration/dashboard",
-      name: "alertCalibrationDashboard",
-      component: () => import("@/components/alert_calibration/AlertCalibrationDashboard.vue"),
+      path: "alert-calibration/runs",
+      name: "alertCalibrationRuns",
+      component: () => import("@/components/alert_calibration/AlertCalibrationDigests.vue"),
       meta: { titleKey: "menu.alertCalibration" },
       beforeEnter: alertCalibrationRouteGuard,
     },

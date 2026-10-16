@@ -36,6 +36,8 @@ export interface RuleMeta {
 /** Ordered as the engine registers its default rules. */
 export const RULE_IDS: RuleId[] = ["failure", "no_destination", "noise", "notify_failed", "silent"];
 
+export const isRuleId = (value: string): value is RuleId => (RULE_IDS as string[]).includes(value);
+
 export const RULE_META: Record<RuleId, RuleMeta> = {
   failure: {
     labelKey: "alertCalibration.rules.failure",
