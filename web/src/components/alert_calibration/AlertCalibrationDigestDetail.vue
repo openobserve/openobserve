@@ -90,13 +90,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OText>
 
       <div v-if="run.finding_count > 0" class="flex flex-col gap-3">
-        <div class="flex flex-wrap items-center gap-2">
-          <OText variant="card-title" as="h2">{{
-            t("alertCalibration.detail.findingsHeading")
-          }}</OText>
-          <OBadge variant="default-outline" size="xs" shape="rounded" icon="lightbulb-outline">
-            {{ t("alertCalibration.detail.suggestionsOnly") }}
-          </OBadge>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex min-w-0 flex-wrap items-center gap-2">
+            <OText variant="card-title" as="h2">{{
+              t("alertCalibration.detail.findingsHeading")
+            }}</OText>
+            <OBadge variant="default-outline" size="xs" shape="rounded" icon="lightbulb-outline">
+              {{ t("alertCalibration.detail.suggestionsOnly") }}
+            </OBadge>
+          </div>
           <OToggleGroup
             v-if="presentRules.length > 1"
             :model-value="ruleFilter"
