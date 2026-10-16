@@ -1,0 +1,145 @@
+# O2 Assistant mock harness
+
+Runs the real OpenObserve frontend against a real (open-source) backend and fakes every
+AI endpoint with Playwright, so every assistant surface can be tested end to end without
+o2-ai, an LLM or an enterprise backend. It is the CI baseline for the assistant: every PR
+runs `SMOKE-01` (the legacy path with the `assistant_v2` flag off) and its own flows here.
+
+The design folder's `capture.mjs` and `gap1-multitab.mjs` import these modules by path, so
+`createMockState`, `installMocks`, `nextScenario`, `login` and `forceCloudBuild` keep their
+signatures.
+
+## Layout
+
+| File | What it is |
+|---|---|
+| `mocks.mjs` | Every mock payload: config patch, SSE scenarios (`SCENARIOS`), HTTP refusal scenarios (`HTTP_SCENARIOS`), chats, shares, toolsets, paid-overage status |
+| `stream-shim.js` | Browser init script; answers `fetch` for `/ai/chat_stream`, `/ai/confirm/*` and `/ai/chats/*/cancel` with a real, incrementally delivered SSE `ReadableStream` |
+| `setup.mjs` | `ENV`, `createMockState()`, `installMocks(context, state)`, `nextScenario(page, name)`, `login(page)` and the helpers below |
+| `../*.spec.js` | The assistant flows; every flow uses `tests/ui-testing/pages/assistantPage.js` |
+| `../fixme.spec.js` | One `test.fixme` per state the harness cannot reach yet, naming the WP that adds it |
+
+Specs load the harness with `await import("./harness/setup.mjs")`: Playwright compiles a
+static `import` in a `.spec.js` to `require()`, which would evaluate the `.mjs` modules as
+CommonJS and fail. Node ≥ 22.12 (CI uses 24).
+
+## Run locally
+
+The suite needs a running OpenObserve server (any debug build) because only AI routes are
+mocked. Credentials come from the same variables as every `tests/ui-testing` suite.
+
+```bash
+# 1. Start a server (repo root). Use the credentials you keep in tests/ui-testing/.env.
+ZO_ROOT_USER_EMAIL=$ZO_ROOT_USER_EMAIL ZO_ROOT_USER_PASSWORD=$ZO_ROOT_USER_PASSWORD \
+  ZO_LOCAL_MODE=true ZO_DATA_DIR=./data-assistant cargo run
+
+# 2a. Use the UI the binary embeds (what CI does).
+cd web && npm run test:assistant          # reads ZO_BASE_URL from tests/ui-testing/.env
+
+# 2b. Or the Vite dev server, needed by @edition flows (forceOssBuild / forceCloudBuild).
+cd web && npm ci && npx vite --base /web/ --port 8093 --strictPort &
+cd tests/ui-testing && O2_VITE_DEV=1 O2_APP_URL=http://localhost:8093/web \
+  O2_BACKEND=http://localhost:5080 npx playwright test playwright-tests/assistant
+```
+
+`re2js` is declared in `web/package.json`, so `npm ci` installs it and the dev server boots
+without the wrapper config the design folder used.
+
+## Environment
+
+| Var | Meaning |
+|---|---|
+| `ZO_BASE_URL` | Same-origin UI (`/web`) and API, as in CI. Wins unless `O2_VITE_DEV` is set; no backend rewrite |
+| `ZO_ROOT_USER_EMAIL`, `ZO_ROOT_USER_PASSWORD` | Login (fallback `O2_USER`, `O2_PASS`); there are no built-in credentials |
+| `ORGNAME` | Org (fallback `O2_ORG`, then `default`) |
+| `O2_VITE_DEV` | Set when the app is served by the Vite dev server; enables the edition rewrite |
+| `O2_APP_URL` | Where Vite serves the app (default `http://localhost:8093/web`) |
+| `O2_API_ORIGIN` | API origin baked into the bundle (default `http://localhost:5080`); every request to it is routed |
+| `O2_BACKEND` | If set, non-mocked API calls are re-sent here and CORS headers normalised |
+
+## Scenario selection
+
+The next `chat_stream` call picks, in order: `window.__o2mock.next` (one-shot, set with
+`nextScenario(page, name, { speed })`), `window.__o2mock.sticky`, natural-language query
+calls (caller stack contains `useNLQuery`) → `window.__o2mock.nlScenario` or `nl_sql`, a
+`[scenario]` tag in the prompt (`"why? [error]"`), prompts mentioning `promql` / `vrl`, then
+`complete`. `window.__o2mock.speed` divides every delay; `window.__o2mock.requests` and
+`window.__o2mock.confirmations` record what the UI sent.
+
+## Scenarios
+
+Present today (`mocks.mjs`):
+
+| Name | Kind | What it streams or answers |
+|---|---|---|
+| `complete` | SSE | status → title → StreamList, StreamSchema, SearchSQL calls and results → ~60 Markdown deltas → usage → complete |
+| `slow` | SSE | `complete` at 450 ms per frame |
+| `hang_tool` | SSE | a SearchSQL `tool_call`, then held open |
+| `error` | SSE | failed `tool_result` → `error` (`llm_overload`) |
+| `confirmation` | SSE | `confirmation_required` (`o2_delete`) → waits for `/ai/confirm` → result → complete |
+| `navigation` | SSE | `navigation_action` (logs, `load_query`) → waits → complete |
+| `nl_sql` | SSE | a fenced SQL block for the NL bar |
+| `promql`, `vrl` | SSE | short answers with a PromQL / VRL block |
+| `consent` | HTTP 412 | `paid_overage_consent_required` with a `consent` status |
+| `credits_exhausted`, `subscription_required` | HTTP 402 | credit refusals |
+| `turn_limit` | HTTP 429 | `error_code: "turn_limit"` |
+
+Named by the specs and added by the WP that first needs them (`99` §5, honest-turns §0.4):
+`drop_mid_stream`, `drop_before_first_byte`, `keepalive_stall`, `tool_interrupted_by_error`,
+`persistence_failed`, `empty_turn`, `owner_race_no_code`, `cancelled_frame`, `long_answer`,
+`long_answer_fenced` (SSE); `offline`, `unauthorized_401`, `forbidden_403`,
+`not_enabled_400`, `lease_409`, `already_submitted_409`, `upstream_429`, `agent_503`,
+`authz_503` (HTTP); `consent_twice`, `permission_denied_frame`, `data_level_frame`,
+`stale_epoch`, `confirm_500`, `oversized_frame`, `garbage_body`, `update_card`, `cli_card`,
+`permission_card`, `resource_changed_unreviewed`, `findings_inconclusive`, `multi_window`,
+`nl_needs_chat`, `nl_parse_error`, `rca_stream`, `delimiter_breakout`,
+`cloud_401_mid_stream`, `payloads/*`; fixture `chat_300`. The wire shapes they replay are
+the golden fixtures in `web/src/composables/assistant/__fixtures__/`.
+
+### Adding a scenario
+
+`SCENARIOS` and `HTTP_SCENARIOS` are append-only named maps (`00` §17.1): add a new name,
+never change an existing scenario's frames (another PR's flow asserts on them). Build SSE
+frames from the `f.*` builders or copy a fixture from `__fixtures__/frames/`; an HTTP
+refusal is `{ status, body }` copied from `__fixtures__/errors/wire/`. Select it with
+`nextScenario(page, "<name>")` or a `[<name>]` tag in the prompt, and list it in the table
+above in the same PR.
+
+## Knobs (`createMockState(overrides)`)
+
+Working today: `historyStatus` (500 → history unavailable), `sharesStatus`,
+`sharedChatStatus` (404 → not available), `overage`, `configPatch`, `chats`, `shares`, `log`
+(every AI request seen), `persistence`, `publicLinks`, `aiEnabled` (config patches),
+`expireNext` (set by `expireSession`).
+
+Declared with a no-op default, filled in by the WP that owns the behaviour: `role`,
+`capabilitiesEnabled`, `capabilities`, `envelopeEnabled`, `lifecycleFramesEnabled`,
+`tailEnabled`, `decisionFramesEnabled`, `policyEnforced`, `ephemeralEnabled`, `usage`,
+`usageStatus`, `overageStatus`, `consentPutStatus`, `settingsEnabled`, `settings`,
+`toolsetHealthEnabled`, `grantsEnabled`, `activityEnabled`, `secretMergeEnabled`,
+`importEnabled`, `orgs`, `cancelDelayMs`, `cancelStatus`.
+
+## Helpers (`setup.mjs`)
+
+| Helper | Does |
+|---|---|
+| `setFlag(context, on)` | `window.__O2_ASSISTANT_V2__ = on` on every page (init script), so a spec runs either path |
+| `forceCloudBuild(context)`, `forceOssBuild(context)` | Rewrite the served `/web/src/aws-exports.ts`; it exists only on the Vite dev server, so they skip unless `O2_VITE_DEV` is set. Flows that use them carry `@edition` in their title and run in the `assistant_editions` CI job (`legacy-smoke.spec.js` holds the first two: OSS locks the header button, Cloud opens the sidebar) |
+| `setOnline(page, online)` | `context.setOffline(!online)` |
+| `expireSession(state)` | The next AI request answers 401 once |
+| `twoTabs(context)` | Two pages in one context (shared storage, shared mocks) |
+| `captureTelemetry(page)` | The events `trackAssistant` copied into `window.__o2telemetry` (`installMocks` enables the sink) |
+| `readAnnouncements(page)` | Text of every `role="status"` region |
+
+## Useful selectors (legacy UI, flag off)
+
+Header toggle `[data-test=menu-link-ai-item]` (also reused by the alert dialog, pipeline
+query node, functions toolbar and JSON editor); regex drawer
+`[data-test=add-regex-pattern-open-close-ai-btn]`; chat root `.chat-container`; composer
+`.chat-container [contenteditable=true]`; logs NL toggle
+`[data-test=logs-search-bar-ai-toggle-btn]`, NL input
+`[data-test=logs-search-bar-ai-input-field-field]`; row add-to-context
+`[data-test=logs-search-result-ai-btn]`; Home tab `[data-test=home-tab-ai]`.
+
+Known limits: the NL-bar stack check depends on unminified module names (Vite dev server
+only); `GET /ai/chats/{sid}` replays the scenario frames regardless of what was typed.

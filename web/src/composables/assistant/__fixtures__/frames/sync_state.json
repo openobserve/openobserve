@@ -1,0 +1,8 @@
+{
+  "_source": "opencode durable sync state forwarded for OpenObserve persistence; dropped by the UI",
+  "_item": "today",
+  "frame": {
+    "type": "sync_state",
+    "seq": 12
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chats.rs:832-834 MetaHttpResponse::conflict",
+  "shape": "A",
+  "status": 409,
+  "body": {
+    "code": 409,
+    "message": "This turn was already submitted; reload the conversation to see its result"
+  }
+}

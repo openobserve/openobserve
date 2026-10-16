@@ -1,0 +1,11 @@
+{
+  "_source": "B-01 error envelope contract (00 §18); not produced until B-01 lands",
+  "shape": "B-01",
+  "status": 402,
+  "body": {
+    "code": "credits_exhausted",
+    "message": "B-01 envelope for credits_exhausted",
+    "retryable": false,
+    "action": "upgrade"
+  }
+}

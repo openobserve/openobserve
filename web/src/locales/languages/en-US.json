@@ -7808,6 +7808,39 @@
       }
     }
   },
+  "assistant": {
+    "beta": "Beta",
+    "name": "O2 Assistant"
+  },
+  "llmObservability": {
+    "playground": {
+      "progress": {
+        "almostThere": "Almost there...",
+        "analyzing": "Analyzing...",
+        "checkingDetails": "Checking details...",
+        "connectingTheDots": "Connecting the dots...",
+        "crunchingNumbers": "Crunching numbers...",
+        "divingDeeper": "Diving deeper...",
+        "evaluatingOptions": "Evaluating options...",
+        "examiningData": "Examining data...",
+        "exploringPossibilities": "Exploring possibilities...",
+        "formulatingResponse": "Formulating response...",
+        "gatheringInsights": "Gathering insights...",
+        "makingProgress": "Making progress...",
+        "piecingTogether": "Piecing together...",
+        "processing": "Processing...",
+        "refiningAnswer": "Refining answer...",
+        "reviewingContext": "Reviewing context...",
+        "stillThinking": "Still thinking...",
+        "synthesizingInformation": "Synthesizing information...",
+        "thinking": "Thinking...",
+        "workingOnIt": "Working on it..."
+      }
+    },
+    "threadView": {
+      "assistant": "Assistant"
+    }
+  },
   "billing": {
     "trialStrip": {
       "title": "Trial period",
