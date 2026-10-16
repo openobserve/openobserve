@@ -38,58 +38,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</OBadge>
         </div>
       </div>
+      <OButton
+        v-if="finding.alert_id"
+        variant="ghost-muted"
+        size="xs"
+        icon-left="open-in-new"
+        class="shrink-0"
+        data-test="alert-calibration-finding-open-alert"
+        @click="openAlert"
+      >
+        {{ t("alertCalibration.detail.openAlert") }}
+      </OButton>
     </OCardSection>
 
     <OSeparator />
 
-    <OCardSection role="body" class="flex flex-col gap-3 pt-3">
-      <div class="flex flex-col gap-1.5">
-        <OText variant="label" as="div">{{ t("alertCalibration.detail.evidence") }}</OText>
-        <dl class="grid grid-cols-1 gap-x-10 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3">
-          <div v-for="row in evidence" :key="row.column" class="flex min-w-0 items-baseline gap-2">
-            <dt class="text-text-secondary shrink-0 text-xs">{{ row.label }}</dt>
-            <OTruncatedText as="dd" class="text-text-body min-w-0 text-xs font-medium tabular-nums">
-              {{ row.value }}
-            </OTruncatedText>
-          </div>
-        </dl>
-      </div>
-
-      <div v-if="finding.alert_name" class="flex flex-col gap-1.5">
-        <OText variant="label" as="div">{{ t("alertCalibration.detail.alert") }}</OText>
-        <div class="flex flex-wrap items-center gap-2">
-          <OTag
-            icon="notifications"
-            variant="default-soft"
-            size="sm"
-            :label="raw(finding.alert_name)"
-          />
-          <OButton
-            v-if="finding.alert_id"
-            variant="outline"
-            size="sm"
-            icon-left="open-in-new"
-            data-test="alert-calibration-finding-open-alert"
-            @click="openAlert"
-          >
-            {{ t("alertCalibration.detail.openAlert") }}
-          </OButton>
+    <OCardSection role="body" class="flex flex-col gap-2 pt-3">
+      <dl class="flex flex-wrap gap-x-6 gap-y-1">
+        <div
+          v-for="row in evidence"
+          :key="row.column"
+          class="flex min-w-0 items-baseline gap-1.5"
+          :class="row.wide ? 'basis-full' : ''"
+        >
+          <dt class="text-text-secondary shrink-0 text-xs">{{ row.label }}</dt>
+          <OTruncatedText as="dd" class="text-text-body min-w-0 text-xs font-medium tabular-nums">
+            {{ row.value }}
+          </OTruncatedText>
         </div>
-      </div>
+      </dl>
 
-      <div v-if="actions.length" class="flex flex-col gap-1.5">
-        <OText variant="label" as="div">{{ t("alertCalibration.detail.proposedActions") }}</OText>
-        <div class="flex flex-wrap gap-1.5">
-          <OTag
-            v-for="action in actions"
-            :key="action.name"
-            icon="lightbulb-outline"
-            variant="default-outline"
-            size="sm"
-            :label="action.label"
-            :title="action.description"
-          />
-        </div>
+      <div v-if="actions.length" class="flex flex-wrap items-center gap-1.5">
+        <OText variant="label" as="span" class="me-1">{{
+          t("alertCalibration.detail.proposedActions")
+        }}</OText>
+        <OTag
+          v-for="action in actions"
+          :key="action.name"
+          icon="lightbulb-outline"
+          variant="default-outline"
+          size="sm"
+          :label="action.label"
+          :title="action.description"
+        />
       </div>
     </OCardSection>
   </OCard>
@@ -139,6 +130,8 @@ const evidence = computed(() =>
     column: field.column,
     label: t(field.labelKey),
     value: formatEvidence(t, props.finding[field.column], field.format),
+    // Free text runs long, so it takes its own line instead of squeezing the numbers beside it.
+    wide: field.format === "text",
   })),
 );
 
