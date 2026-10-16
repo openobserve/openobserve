@@ -21,6 +21,9 @@ import { useLocalUserInfo, useLocalCurrentUser } from "@/utils/zincutils";
 import { addUnauthorizedError } from "@/composables/useUnauthorizedErrorGrouper";
 import { usePasswordReset } from "@/composables/usePasswordReset";
 import { isPasswordResetError } from "@/utils/passwordResetErrors";
+import { ASSISTANT_DRAFT_KEY, clearSessionStorageExcept } from "@/utils/clearSessionStorage";
+
+export { clearSessionStorageExcept } from "@/utils/clearSessionStorage";
 
 declare module "axios" {
   interface AxiosRequestConfig {
@@ -57,6 +60,19 @@ const sharedDexRefresh = (): Promise<void> => {
   return dexRefreshPromise;
 };
 
+/** Refreshes the session for an assistant call; never logs out, clears storage or reloads (`00` §5.1). */
+export const refreshSession = (): Promise<"refreshed" | "expired"> => {
+  const sso =
+    config.isCloud != "true" &&
+    config.isEnterprise == "true" &&
+    (store.state as any).zoConfig?.sso_enabled;
+  if (!sso) return Promise.resolve("expired");
+  return (refreshPromise ?? sharedDexRefresh()).then(
+    () => "refreshed" as const,
+    () => "expired" as const,
+  );
+};
+
 // Exported so streaming (fetch-based) requests that bypass the axios interceptor
 // can participate in the same token-refresh flow.
 export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
@@ -73,7 +89,7 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
     store.dispatch("logout");
     useLocalCurrentUser("", true);
     useLocalUserInfo("", true);
-    sessionStorage.clear();
+    clearSessionStorageExcept(ASSISTANT_DRAFT_KEY);
     window.location.reload();
     return Promise.reject(new Error("Cloud environment: direct logout"));
   }
@@ -92,7 +108,7 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
               store.dispatch("logout");
               useLocalCurrentUser("", true);
               useLocalUserInfo("", true);
-              sessionStorage.clear();
+              clearSessionStorageExcept(ASSISTANT_DRAFT_KEY);
               window.location.reload();
             })
             .then(() => Promise.reject(new Error("Refresh failed")));
@@ -108,7 +124,7 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
   store.dispatch("logout");
   useLocalCurrentUser("", true);
   useLocalUserInfo("", true);
-  sessionStorage.clear();
+  clearSessionStorageExcept(ASSISTANT_DRAFT_KEY);
   window.location.reload();
   return Promise.reject(new Error("Not SSO: cannot refresh"));
 };
@@ -159,7 +175,7 @@ const http = ({ headers } = {} as any) => {
               store.dispatch("logout");
               useLocalCurrentUser("", true);
               useLocalUserInfo("", true);
-              sessionStorage.clear();
+              clearSessionStorageExcept(ASSISTANT_DRAFT_KEY);
               window.location.reload();
             }
             // Delegate to the shared refresh helper — it owns the URL exclusion
@@ -174,7 +190,7 @@ const http = ({ headers } = {} as any) => {
                 store.dispatch("logout");
                 useLocalCurrentUser("", true);
                 useLocalUserInfo("", true);
-                sessionStorage.clear();
+                clearSessionStorageExcept(ASSISTANT_DRAFT_KEY);
                 window.location.reload();
               }
             }

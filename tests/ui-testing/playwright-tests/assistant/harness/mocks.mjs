@@ -212,7 +212,74 @@ export const SCENARIOS = {
     ],
     delayMs: 20,
   },
+  // WP-03 (honest-turns §0.4, 99 §5). `tailFrames` is what the B-03 tail resumes with when `tailEnabled` is on.
+  drop_mid_stream: {
+    frames: [f.status(), ...chunk(ANSWER_MD).slice(0, 3).map(f.delta)],
+    tailFrames: [...chunk(ANSWER_MD).slice(3).map(f.delta), f.complete()],
+    delayMs: 40,
+  },
+  drop_before_first_byte: { frames: [], delayMs: 10 },
+  // Keepalive comments only, for 35 s after one tool call: no progress, but alive.
+  keepalive_stall: {
+    frames: [f.status(), f.toolCall("SearchSQL", "Querying logs", { stream_name: "default" }, "call_k"), ...Array(7).fill({ keepalive: true })],
+    delayMs: 5000,
+    holdOpen: true,
+  },
+  tool_interrupted_by_error: {
+    frames: [
+      f.status(),
+      f.toolCall("SearchSQL", "Querying logs", { stream_name: "default", sql: SQL_CTX.sql }, "call_i"),
+      f.error("The AI service is experiencing high load. Please try again.", { error_type: "llm_overload" }),
+    ],
+    delayMs: 60,
+  },
+  persistence_failed: {
+    frames: [
+      f.status(),
+      ...chunk("Between 12:40 and 12:55 the checkout service returned 214 errors.").map(f.delta),
+      { ...f.complete(), persisted: false },
+      { type: "error", code: "persistence_failed", reason: "write_failed", error: "This response could not be saved to the chat history.", message: "This response could not be saved to the chat history.", recoverable: false },
+    ],
+    delayMs: 40,
+  },
+  empty_turn: { frames: [f.status(), { type: "complete", history: [], compacted: false }], delayMs: 40 },
+  owner_race_no_code: {
+    frames: [
+      f.status(),
+      { type: "error", message: "This conversation is being served by another o2-ai replica and cannot be continued here.", recoverable: true, category: "session_owner_unavailable" },
+    ],
+    delayMs: 40,
+  },
+  cancelled_frame: {
+    frames: [f.status(), ...chunk("Looking at the checkout errors now.").map(f.delta), { type: "cancelled" }],
+    delayMs: 60,
+  },
+  long_answer: { frames: [f.status(), ...longAnswerDeltas(), f.complete()], delayMs: 8 },
+  stale_epoch: {
+    frames: [f.status(), { type: "error", message: "A newer turn of this conversation has started.", recoverable: false, category: "stale_epoch", code: "stale_epoch" }],
+    delayMs: 40,
+  },
+  // A single line over the client's 1 MiB guard (99 T8).
+  oversized_frame: { frames: [f.status(), { oversized: true }], delayMs: 40 },
+  // Lines that are not JSON or not a known frame: counted and ignored, the answer still lands.
+  garbage_body: {
+    frames: [f.status(), { raw: "data: this is not json" }, { raw: 'data: {"type":"made_up_frame"}' }, ...chunk("Still answered.").map(f.delta), f.complete()],
+    delayMs: 40,
+  },
 };
+
+/** 400 deltas carrying three tables and two code blocks (HT-08, `00` §14). */
+function longAnswerDeltas() {
+  const table = (n) => `\n\n| Service | Errors ${n} |\n|---|---:|\n| checkout | ${100 + n} |\n| cart | ${20 + n} |\n\n`;
+  const code = (n) => `\n\n\`\`\`sql\nSELECT service_name, count(*) FROM "default" -- block ${n}\nGROUP BY service_name\n\`\`\`\n\n`;
+  const deltas = [];
+  for (let i = 0; i < 400; i++) {
+    if (i === 80 || i === 200 || i === 320) deltas.push(f.delta(table(i)));
+    else if (i === 140 || i === 260) deltas.push(f.delta(code(i)));
+    else deltas.push(f.delta(`word${i} `));
+  }
+  return deltas;
+}
 
 // HTTP-level scenarios: the chat_stream request itself is refused before streaming.
 export const HTTP_SCENARIOS = {
@@ -237,6 +304,27 @@ export const HTTP_SCENARIOS = {
   },
   // 429 turn limit (useChatStream.ts:103-108)
   turn_limit: { status: 429, body: { code: 429, error_code: "turn_limit", message: "Too many chats are running. Wait for one to finish." } },
+  // WP-03: the request never reaches the server (`networkError`), or each wire shape of `__fixtures__/errors/wire`; `envelope` is the B-01 body (`envelopeEnabled`).
+  offline: { networkError: true },
+  unauthorized_401: { status: 401, body: { code: 401, message: "Unauthorized Access" }, envelope: { code: "session_expired", message: "Session expired", retryable: false } },
+  forbidden_403: { status: 403, body: { code: 403, message: "Unauthorized Access" }, envelope: { code: "permission_denied", message: "Forbidden", retryable: false, action: "contact_admin" } },
+  not_enabled_400: { status: 400, body: { code: 400, message: "AI is not enabled" }, envelope: { code: "not_enabled", message: "AI is not enabled", retryable: false, action: "contact_admin" } },
+  lease_409: { status: 409, body: { code: 409, message: "Another turn is already running in this conversation" }, envelope: { code: "turn_busy", message: "Another turn is already running", retryable: false, action: "wait", active_turn_id: "0199e7b2-7000-7a3e-a1b2-c3d4e5f60799" } },
+  already_submitted_409: { status: 409, body: { code: 409, message: "This turn was already submitted; reload the conversation to see its result" }, envelope: { code: "already_submitted", message: "Already submitted", retryable: false, action: "reload" } },
+  upstream_429: { status: 429, body: { code: 429, error: "upstream returned 429 Too Many Requests" }, envelope: { code: "rate_limited", message: "Rate limited", retryable: true, retry_after: 30, action: "wait" } },
+  agent_503: { status: 503, body: { code: 503, error: "error sending request for url (http://o2-ai:8000/api/v1/chat/stream)" }, envelope: { code: "agent_unavailable", message: "Agent unavailable", retryable: true } },
+  authz_503: { status: 503, body: { code: 503, message: "redis connection timed out" }, envelope: { code: "authorization_unavailable", message: "Authorization unavailable", retryable: true } },
+  // The same-turn retry after Enable answers 412 again (consent_still_required).
+  consent_twice: {
+    status: 412,
+    repeat: 2,
+    body: {
+      code: 412,
+      message: "Paid usage requires organization consent.",
+      error_type: "paid_overage_consent_required",
+      consent: overageStatus({ effective: false, billing_status: "eligible" }),
+    },
+  },
 };
 
 export function overageStatus({ effective = false, billing_status = "eligible", can_manage = true, enabled = false } = {}) {

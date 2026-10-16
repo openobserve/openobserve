@@ -52,7 +52,7 @@ vi.mock("@/composables/useUnauthorizedErrorGrouper", () => ({ addUnauthorizedErr
 import config from "../aws-exports";
 import store from "../stores";
 import axios from "axios";
-import http, { attemptTokenRefresh } from "./http";
+import http, { attemptTokenRefresh, clearSessionStorageExcept, refreshSession } from "./http";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -373,5 +373,124 @@ describe("401 handling", () => {
     };
     await expect(onRejected(error)).rejects.toBe(error);
     expect(store.dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("refreshSession (round 1 E-01)", () => {
+  let reloadMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    (config as any).isCloud = "false";
+    (config as any).isEnterprise = "false";
+    (store.state as any).zoConfig.sso_enabled = false;
+    vi.mocked(store.dispatch).mockClear();
+    reloadMock = vi.fn();
+    Object.defineProperty(window, "location", {
+      value: { ...window.location, reload: reloadMock },
+      writable: true,
+      configurable: true,
+    });
+    sessionStorage.setItem("o2.assistant.draft:k1:s1", "draft");
+    sessionStorage.setItem("other", "x");
+  });
+
+  afterEach(() => {
+    sessionStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  const untouched = () => {
+    expect(store.dispatch).not.toHaveBeenCalled();
+    expect(reloadMock).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("other")).toBe("x");
+  };
+
+  it("answers expired at once on Cloud, without the logout attemptTokenRefresh does", async () => {
+    (config as any).isCloud = "true";
+    const instance = buildAxiosMock(() => Promise.resolve({ status: 200 }));
+    await expect(refreshSession()).resolves.toBe("expired");
+    expect(instance.get).not.toHaveBeenCalled();
+    untouched();
+  });
+
+  it("answers expired at once without SSO", async () => {
+    (config as any).isEnterprise = "true";
+    await expect(refreshSession()).resolves.toBe("expired");
+    untouched();
+  });
+
+  it("refreshes through dex_refresh on SSO", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    const instance = buildAxiosMock(() => Promise.resolve({ status: 200 }));
+    await expect(refreshSession()).resolves.toBe("refreshed");
+    expect(instance.get).toHaveBeenCalledWith("/config/dex_refresh");
+    untouched();
+  });
+
+  it("answers expired on a failed SSO refresh and never calls /config/logout", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    const instance = buildAxiosMock(() => Promise.reject(new Error("rotated")));
+    await expect(refreshSession()).resolves.toBe("expired");
+    expect(instance.get).not.toHaveBeenCalledWith("/config/logout");
+    untouched();
+  });
+
+  it("shares the refresh attemptTokenRefresh already started", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    let finish!: (res: { status: number }) => void;
+    const instance = buildAxiosMock(() => new Promise((r) => (finish = r)));
+    const normal = attemptTokenRefresh("/api/acme/streams");
+    const assistant = refreshSession();
+    finish({ status: 200 });
+    await expect(Promise.all([normal, assistant])).resolves.toEqual([undefined, "refreshed"]);
+    expect(instance.get.mock.calls.filter(([url]) => url === "/config/dex_refresh")).toHaveLength(
+      1,
+    );
+  });
+});
+
+describe("clearSessionStorageExcept", () => {
+  afterEach(() => sessionStorage.clear());
+
+  it("keeps the assistant drafts and removes everything else", () => {
+    sessionStorage.setItem("o2.assistant.draft:k1:s1", "a");
+    sessionStorage.setItem("o2.assistant.draft:k2:s2", "b");
+    sessionStorage.setItem("o2.assistant.tab:k1", "t");
+    sessionStorage.setItem("searchState", "s");
+    clearSessionStorageExcept(/^o2\.assistant\.draft:/);
+    expect(Object.keys(sessionStorage).sort()).toEqual([
+      "o2.assistant.draft:k1:s1",
+      "o2.assistant.draft:k2:s2",
+    ]);
+  });
+
+  it("does nothing when storage is blocked", () => {
+    const spy = vi.spyOn(Storage.prototype, "key").mockImplementation(() => {
+      throw new Error("SecurityError");
+    });
+    sessionStorage.setItem("a", "1");
+    expect(() => clearSessionStorageExcept(/^x/)).not.toThrow();
+    spy.mockRestore();
+  });
+
+  it("keeps drafts when a non-assistant 401 still logs out (the logout path stays)", async () => {
+    (config as any).isCloud = "false";
+    (config as any).isEnterprise = "false";
+    (store.state as any).zoConfig.sso_enabled = false;
+    sessionStorage.setItem("o2.assistant.draft:k1:s1", "a");
+    sessionStorage.setItem("searchState", "s");
+    const reloadMock = vi.fn();
+    Object.defineProperty(window, "location", {
+      value: { ...window.location, reload: reloadMock },
+      writable: true,
+      configurable: true,
+    });
+    await expect(attemptTokenRefresh("/api/acme/streams")).rejects.toThrow();
+    expect(store.dispatch).toHaveBeenCalledWith("logout");
+    expect(reloadMock).toHaveBeenCalled();
+    expect(Object.keys(sessionStorage)).toEqual(["o2.assistant.draft:k1:s1"]);
   });
 });

@@ -83,14 +83,25 @@ Present today (`mocks.mjs`):
 | `consent` | HTTP 412 | `paid_overage_consent_required` with a `consent` status |
 | `credits_exhausted`, `subscription_required` | HTTP 402 | credit refusals |
 | `turn_limit` | HTTP 429 | `error_code: "turn_limit"` |
+| `drop_mid_stream` | SSE | 3 deltas, then EOF without `complete`; with `tailEnabled` the tail resumes with the rest and `complete` |
+| `drop_before_first_byte` | SSE | a 200 whose body closes before any frame |
+| `keepalive_stall` | SSE | one SearchSQL `tool_call`, then `: keepalive` comments for 35 s, held open |
+| `tool_interrupted_by_error` | SSE | a SearchSQL `tool_call` cut by an `error` (`llm_overload`) |
+| `persistence_failed` | SSE | an answer, `complete{persisted:false}`, then the `persistence_failed` error frame |
+| `empty_turn` | SSE | `complete` with no text, step or card |
+| `owner_race_no_code` | SSE | the M2 frame: `category: "session_owner_unavailable"`, no `code` |
+| `cancelled_frame` | SSE | a partial answer, then `cancelled` this tab did not cause |
+| `long_answer` | SSE | 400 deltas with three tables and two code blocks |
+| `stale_epoch` | SSE | the M1 `stale_epoch` frame |
+| `oversized_frame` | SSE | one `data:` line over 1 MiB |
+| `garbage_body` | SSE | a non-JSON line and an unknown frame type, then a normal answer |
+| `offline` | HTTP | the request rejects (`TypeError: Failed to fetch`) |
+| `unauthorized_401`, `forbidden_403`, `not_enabled_400`, `lease_409`, `already_submitted_409`, `upstream_429`, `agent_503`, `authz_503` | HTTP | today's wire body of each shape; the B-01 envelope instead with `envelopeEnabled` |
+| `consent_twice` | HTTP 412 | the 412 again on the same-turn retry after Enable |
 
 Named by the specs and added by the WP that first needs them (`99` §5, honest-turns §0.4):
-`drop_mid_stream`, `drop_before_first_byte`, `keepalive_stall`, `tool_interrupted_by_error`,
-`persistence_failed`, `empty_turn`, `owner_race_no_code`, `cancelled_frame`, `long_answer`,
-`long_answer_fenced` (SSE); `offline`, `unauthorized_401`, `forbidden_403`,
-`not_enabled_400`, `lease_409`, `already_submitted_409`, `upstream_429`, `agent_503`,
-`authz_503` (HTTP); `consent_twice`, `permission_denied_frame`, `data_level_frame`,
-`stale_epoch`, `confirm_500`, `oversized_frame`, `garbage_body`, `update_card`, `cli_card`,
+`long_answer_fenced` (SSE); `permission_denied_frame`, `data_level_frame`,
+`confirm_500`, `update_card`, `cli_card`,
 `permission_card`, `resource_changed_unreviewed`, `findings_inconclusive`, `multi_window`,
 `nl_needs_chat`, `nl_parse_error`, `rca_stream`, `delimiter_breakout`,
 `cloud_401_mid_stream`, `payloads/*`; fixture `chat_300`. The wire shapes they replay are
@@ -116,11 +127,19 @@ and the access probe `POST …/ai/chats/{id}/cancel` answers 403 for `viewer`, 4
 `capabilitiesEnabled` (B-06 `GET …/ai/capabilities` and `POST …/capabilities/test`; 404 while
 off) and `capabilities` (fields merged over the role-derived answer).
 
-Declared with a no-op default, filled in by the WP that owns the behaviour: `envelopeEnabled`, `lifecycleFramesEnabled`,
-`tailEnabled`, `decisionFramesEnabled`, `policyEnforced`, `ephemeralEnabled`, `usage`,
+Read by the stream shim in the page (set at `installMocks`, changed later with
+`setKnobs(page, knobs)`): `envelopeEnabled` (B-01 bodies for the HTTP scenarios that carry an
+`envelope`), `lifecycleFramesEnabled` (B-02 `turn_started` first and a `step` before each
+`tool_call`), `tailEnabled` (B-03: `id:` lines on every frame and the tail route
+`GET …/ai/chats/{sid}/turns/{tid}/stream?from_seq=`, 404 while off), `cancelDelayMs` and
+`cancelStatus` (the `POST …/cancel` answer, also on the Node-side XHR route;
+`window.__o2mock.cancels` records each cancel).
+
+Declared with a no-op default, filled in by the WP that owns the behaviour:
+`decisionFramesEnabled`, `policyEnforced`, `ephemeralEnabled`, `usage`,
 `usageStatus`, `overageStatus`, `consentPutStatus`, `settingsEnabled`, `settings`,
 `toolsetHealthEnabled`, `grantsEnabled`, `activityEnabled`, `secretMergeEnabled`,
-`importEnabled`, `orgs`, `cancelDelayMs`, `cancelStatus`.
+`importEnabled`, `orgs`.
 
 ## Helpers (`setup.mjs`)
 
@@ -129,6 +148,7 @@ Declared with a no-op default, filled in by the WP that owns the behaviour: `env
 | `setFlag(context, on)` | `window.__O2_ASSISTANT_V2__ = on` on every page (init script), so a spec runs either path |
 | `forceCloudBuild(context)`, `forceOssBuild(context)` | Rewrite the served `/web/src/aws-exports.ts`; it exists only on the Vite dev server, so they skip unless `O2_VITE_DEV` is set. Flows that use them carry `@edition` in their title and run in the `assistant_editions` CI job (`legacy-smoke.spec.js` holds the first two: OSS locks the header button, Cloud opens the sidebar) |
 | `setOnline(page, online)` | `context.setOffline(!online)` |
+| `setKnobs(page, knobs)` | Changes the browser-side knobs above on a loaded page |
 | `expireSession(state)` | The next AI request answers 401 once |
 | `twoTabs(context)` | Two pages in one context (shared storage, shared mocks) |
 | `captureTelemetry(page)` | The events `trackAssistant` copied into `window.__o2telemetry` (`installMocks` enables the sink) |

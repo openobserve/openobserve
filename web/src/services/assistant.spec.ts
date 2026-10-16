@@ -32,6 +32,7 @@ describe("assistant service", () => {
     api = {
       get: vi.fn().mockResolvedValue({ data: { can_chat: true } }),
       post: vi.fn().mockResolvedValue({ data: { ok: true, duration_ms: 12 } }),
+      delete: vi.fn().mockResolvedValue({ data: {} }),
     };
     (http as any).mockReturnValue(api);
   });
@@ -96,5 +97,59 @@ describe("assistant service", () => {
     await expect(assistant.probeChatAccess("org1")).resolves.toBe("unknown");
     api.post.mockRejectedValueOnce(httpError(401));
     await expect(assistant.probeChatAccess("org1")).resolves.toBe("unknown");
+  });
+
+  it("cancels a turn with keepalive and a JSON body carrying turn_id (constraint 15)", async () => {
+    await assistant.cancelTurn("org 1", "sid/1", "turn-1");
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/org%201/ai/chats/sid%2F1/cancel",
+      { turn_id: "turn-1" },
+      {
+        ...managed,
+        adapter: "fetch",
+        fetchOptions: { keepalive: true },
+        headers: { "x-o2-assistant-session-id": "sid/1" },
+      },
+    );
+  });
+
+  it("cancels an incident analysis on its own route, with keepalive (round 1 E-10)", async () => {
+    await assistant.cancelIncidentAnalysis("org1", "inc-7");
+    expect(api.delete).toHaveBeenCalledWith("/api/v2/org1/alerts/incidents/inc-7/rca", {
+      ...managed,
+      adapter: "fetch",
+      fetchOptions: { keepalive: true },
+    });
+  });
+
+  it("rejects when the cancel fails, so the caller can report it unconfirmed", async () => {
+    api.post.mockRejectedValue(httpError(503));
+    await expect(assistant.cancelTurn("org1", "s", "t")).rejects.toBeDefined();
+  });
+
+  it("posts a decision on the originating session and returns the result", async () => {
+    api.post.mockResolvedValue({ data: { deleted: 1, count: 1, total: 1, results: [] } });
+    await expect(
+      assistant.confirm("org1", "sid-1", { approved: true, scope: "once" }),
+    ).resolves.toEqual({
+      deleted: 1,
+      count: 1,
+      total: 1,
+      results: [],
+    });
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/org1/ai/confirm/sid-1",
+      { approved: true, scope: "once" },
+      managed,
+    );
+  });
+
+  it("posts feedback with the session header and the managed flags", async () => {
+    const body = { feedback_type: "thumbs_up", query_index: 2, trace_id: "tr" };
+    await assistant.feedback("org1", "sid-1", body);
+    expect(api.post).toHaveBeenCalledWith("/api/org1/ai/feedback", body, {
+      ...managed,
+      headers: { "x-o2-assistant-session-id": "sid-1" },
+    });
   });
 });
