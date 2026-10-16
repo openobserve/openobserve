@@ -18,15 +18,23 @@ import type { ContextChip } from "./context/types";
 
 export const RECALL_CAP = 10;
 
+/** How often a live tab refreshes its marker, so a copied marker can be told from one a crash left behind. */
+export const TAB_HEARTBEAT_MS = 5_000;
+
+/** A marker older than this is a crashed or discarded tab, never a live one being duplicated. */
+export const TAB_STALE_MS = 15_000;
+
 const SESSION_PREFIX = "o2.assistant.";
 
 const LEGACY_HOME_ORDER = "o2_home_tab_order";
 
 const LEGACY_HOME_ACTIVE = "o2_home_active_tab";
 
+// The legacy composer reads `string[]` here, so v2 only reads it, until its own key exists.
+const LEGACY_RECALL = (k: string) => `ai-chat-query-history:${k}`;
+
 const LOCAL_KEYS = {
-  // The legacy name is kept so recall survives the switch to the new composer.
-  recall: (k: string) => `ai-chat-query-history:${k}`,
+  recall: (k: string) => `o2.assistant.recall:${k}`,
   sidebar: (k: string) => `o2.assistant.sidebar:${k}`,
   home: (k: string) => `o2.assistant.home:${k}`,
   hints: (k: string) => `o2.assistant.hints:${k}`,
@@ -48,6 +56,8 @@ const restoredSelections = new Set<string>();
 const markedTabs = new Map<string, boolean>();
 
 let tabListenersAttached = false;
+
+let heartbeat: ReturnType<typeof setInterval> | null = null;
 
 /** One recalled prompt (`40` §7); images are never recalled. */
 export interface RecallEntry {
@@ -82,9 +92,12 @@ export type PrefName = "recall" | "sidebar" | "home" | "hints" | "creditNotice" 
 
 type Area = "local" | "session";
 
+/** The v2 entries, else the legacy prompts as chipless entries; malformed items are dropped. */
 export function readRecall(userOrgKey: string): RecallEntry[] {
-  const entries = readJson<RecallEntry[]>("local", LOCAL_KEYS.recall(userOrgKey));
-  return Array.isArray(entries) ? entries : [];
+  const own = readJson<unknown>("local", LOCAL_KEYS.recall(userOrgKey));
+  const stored = Array.isArray(own) ? own : readJson<unknown>("local", LEGACY_RECALL(userOrgKey));
+  if (!Array.isArray(stored)) return [];
+  return stored.flatMap(toRecallEntry).slice(0, RECALL_CAP);
 }
 
 /** Re-reads, dedupes by text and chip refs, prepends and caps, so two tabs never drop each other's prompts. */
@@ -94,8 +107,10 @@ export function pushRecall(userOrgKey: string, entry: RecallEntry): void {
   writeJson("local", LOCAL_KEYS.recall(userOrgKey), [entry, ...rest].slice(0, RECALL_CAP));
 }
 
+/** Both keys, so a sign-out leaves no prompt of the user+org (`99` LIFE-03). */
 export function removeRecall(userOrgKey: string): void {
   removeKey("local", LOCAL_KEYS.recall(userOrgKey));
+  removeKey("local", LEGACY_RECALL(userOrgKey));
 }
 
 export function readSidebar(userOrgKey: string): SidebarPrefs {
@@ -205,12 +220,30 @@ export function removeAllSessionKeys(userOrgKey: string): void {
 export function markTabAlive(userOrgKey: string): { duplicated: boolean } {
   const known = markedTabs.get(userOrgKey);
   if (known !== undefined) return { duplicated: known };
+  const marker = readJson<{ live?: boolean; at?: unknown }>(
+    "session",
+    SESSION_KEYS.tab(userOrgKey),
+  );
   const duplicated =
-    readJson<{ live?: boolean }>("session", SESSION_KEYS.tab(userOrgKey))?.live === true;
-  writeJson("session", SESSION_KEYS.tab(userOrgKey), { live: true });
+    marker?.live === true && typeof marker.at === "number" && Date.now() - marker.at < TAB_STALE_MS;
+  writeTabMarker(userOrgKey, true);
   markedTabs.set(userOrgKey, duplicated);
   attachTabListeners();
+  startHeartbeat();
   return { duplicated };
+}
+
+/** Every user+org this page load marked, for the sign-out purge. */
+export function markedUserOrgKeys(): string[] {
+  return [...markedTabs.keys()];
+}
+
+/** Sign-out: stops writing these keys' markers, so the purge is not undone by the heartbeat or `pagehide`. */
+export function forgetTabs(userOrgKeys: Iterable<string>): void {
+  for (const userOrgKey of userOrgKeys) markedTabs.delete(userOrgKey);
+  if (markedTabs.size > 0 || heartbeat === null) return;
+  clearInterval(heartbeat);
+  heartbeat = null;
 }
 
 /** Calls `onChange` when another tab writes one of this user+org's prefs; returns the unsubscribe. */
@@ -228,27 +261,61 @@ export function watchPrefs(userOrgKey: string, onChange: (name: PrefName) => voi
 export function resetPrefsForTests(): void {
   restoredSelections.clear();
   markedTabs.clear();
+  if (heartbeat !== null) clearInterval(heartbeat);
+  heartbeat = null;
 }
 
-// A reload fires pagehide first, so only a marker copied from a live tab still says live.
+// A reload fires pagehide first; a crash or discard does not, so the heartbeat's age decides.
 function attachTabListeners(): void {
   if (tabListenersAttached || typeof window === "undefined") return;
   tabListenersAttached = true;
   const mark = (live: boolean) => () => {
-    for (const userOrgKey of markedTabs.keys())
-      writeJson("session", SESSION_KEYS.tab(userOrgKey), { live });
+    for (const userOrgKey of markedTabs.keys()) writeTabMarker(userOrgKey, live);
   };
   window.addEventListener("pagehide", mark(false));
+  window.addEventListener("freeze", mark(false));
   window.addEventListener("pageshow", mark(true));
+  window.addEventListener("resume", mark(true));
+}
+
+function startHeartbeat(): void {
+  if (heartbeat !== null || typeof window === "undefined") return;
+  heartbeat = setInterval(() => {
+    for (const userOrgKey of markedTabs.keys()) writeTabMarker(userOrgKey, true);
+  }, TAB_HEARTBEAT_MS);
+}
+
+function writeTabMarker(userOrgKey: string, live: boolean): void {
+  writeJson("session", SESSION_KEYS.tab(userOrgKey), { live, at: Date.now() });
 }
 
 function prefNameOf(userOrgKey: string, key: string): PrefName | null {
-  if (key === LOCAL_KEYS.recall(userOrgKey)) return "recall";
+  if (key === LOCAL_KEYS.recall(userOrgKey) || key === LEGACY_RECALL(userOrgKey)) return "recall";
   if (key === LOCAL_KEYS.sidebar(userOrgKey)) return "sidebar";
   if (key === LOCAL_KEYS.home(userOrgKey)) return "home";
   if (key === LOCAL_KEYS.hints(userOrgKey)) return "hints";
   if (key === LOCAL_KEYS.importDismissed(userOrgKey)) return "importDismissed";
   return key.startsWith(`o2.assistant.creditNotice:${userOrgKey}:`) ? "creditNotice" : null;
+}
+
+// Legacy prompts are bare strings; anything else without a string `text` is dropped.
+function toRecallEntry(item: unknown): RecallEntry[] {
+  if (typeof item === "string") return item.trim() ? [{ text: item, chips: [], at: 0 }] : [];
+  if (!item || typeof item !== "object") return [];
+  const { text, chips, at } = item as Partial<Record<keyof RecallEntry, unknown>>;
+  if (typeof text !== "string" || !text.trim()) return [];
+  const valid = Array.isArray(chips) ? chips.filter(isChip) : [];
+  return [{ text, chips: valid, at: typeof at === "number" ? at : 0 }];
+}
+
+function isChip(value: unknown): value is ContextChip {
+  const chip = value as Partial<ContextChip> | null;
+  return (
+    !!chip &&
+    typeof chip === "object" &&
+    typeof chip.id === "string" &&
+    typeof chip.kind === "string"
+  );
 }
 
 function recallIdentity(entry: RecallEntry): string {

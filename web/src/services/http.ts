@@ -117,9 +117,11 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
 const retryAssistantAfterRefresh = (instance: AxiosInstance, error: any): Promise<unknown> => {
   const sso = config.isEnterprise == "true" && (store.state as any).zoConfig.sso_enabled;
   if (!sso || error.config.assistantRetried) return Promise.reject(error);
-  return sharedDexRefresh()
-    .then(() => instance.request({ ...error.config, assistantRetried: true }))
-    .catch(() => Promise.reject(error));
+  // A failed refresh rejects with the original 401; the retry settles with its own result.
+  return sharedDexRefresh().then(
+    () => instance.request({ ...error.config, assistantRetried: true }),
+    () => Promise.reject(error),
+  );
 };
 
 const http = ({ headers } = {} as any) => {

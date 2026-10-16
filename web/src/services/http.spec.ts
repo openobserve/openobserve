@@ -321,6 +321,16 @@ describe("401 handling", () => {
     expect(store.dispatch).not.toHaveBeenCalled();
   });
 
+  it("rejects with the retry's own error when the refresh worked but the retry failed", async () => {
+    (config as any).isEnterprise = "true";
+    (store.state as any).zoConfig.sso_enabled = true;
+    const retryError = { response: { status: 403, data: {} }, config: {} };
+    instance.request.mockRejectedValueOnce(retryError);
+    const first = unauthorized();
+    await expect(onRejected(first)).rejects.toBe(retryError);
+    expect(store.dispatch).not.toHaveBeenCalled();
+  });
+
   it("sends one dex_refresh for concurrent assistant and normal 401s", async () => {
     (config as any).isEnterprise = "true";
     (store.state as any).zoConfig.sso_enabled = true;

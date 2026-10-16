@@ -49,10 +49,10 @@ export interface CapabilityDeps {
   /** `orgAdminFlag` of the selected org; `undefined` when unknown. */
   isOrgAdmin(): boolean | undefined;
   probe(org: string): Promise<Tri>;
-  /** `onResult(null)` means B-06 is absent (404) or failed with nothing cached; returns the unsubscribe. */
+  /** `onResult(null)` means B-06 is absent (404) or failed with nothing cached; `at` is when the data was fetched. */
   watchCapabilities(
     org: string,
-    onResult: (data: AssistantCapabilitiesResponse | null) => void,
+    onResult: (data: AssistantCapabilitiesResponse | null, at?: number) => void,
   ): () => void;
   invalidateCapabilities(org: string): void;
   storage?(): Storage | null;
@@ -96,6 +96,8 @@ export type UseAssistantCapability = Readonly<Ref<AssistantCapability>> &
 interface AccessState {
   value: "yes" | "no";
   source: "probe" | "cached_403";
+  /** When this page load learned it; a 403 at or after the last capabilities read wins over its `can_chat`. */
+  at: number;
 }
 
 interface CapabilityInput {
@@ -105,6 +107,7 @@ interface CapabilityInput {
   isOrgAdmin: boolean | undefined;
   identified: boolean;
   b06: AssistantCapabilitiesResponse | null;
+  b06At: number;
   access: AccessState | null;
   health: AssistantCapability["health"];
 }
@@ -130,6 +133,7 @@ export function createAssistantCapability(deps: CapabilityDeps): AssistantCapabi
   const identity = shallowRef<CapabilityIdentity | null>(null);
   const b06 = shallowRef<AssistantCapabilitiesResponse | null>(null);
   const b06Settled = ref(false);
+  const b06At = ref(0);
   const access = shallowRef<AccessState | null>(null);
   const health = ref<AssistantCapability["health"]>("unknown");
   let probed = false;
@@ -143,8 +147,8 @@ export function createAssistantCapability(deps: CapabilityDeps): AssistantCapabi
     }
   };
 
-  const persistAccess = (next: AccessState) => {
-    access.value = next;
+  const persistAccess = (next: Omit<AccessState, "at">) => {
+    access.value = { ...next, at: Date.now() };
     const key = identity.value?.userOrgKey;
     if (!key) return;
     try {
@@ -158,8 +162,9 @@ export function createAssistantCapability(deps: CapabilityDeps): AssistantCapabi
     try {
       const raw = store()?.getItem(DENIED_PREFIX + userOrgKey);
       const parsed = raw ? (JSON.parse(raw) as Partial<AccessState>) : null;
-      if (parsed?.value === "no") return { value: "no", source: "cached_403" };
-      return parsed?.value === "yes" ? { value: "yes", source: "probe" } : null;
+      // A state from an earlier page load is older than any capabilities read of this one.
+      if (parsed?.value === "no") return { value: "no", source: "cached_403", at: 0 };
+      return parsed?.value === "yes" ? { value: "yes", source: "probe", at: 0 } : null;
     } catch {
       return null;
     }
@@ -183,6 +188,7 @@ export function createAssistantCapability(deps: CapabilityDeps): AssistantCapabi
       isOrgAdmin: deps.isOrgAdmin(),
       identified: identity.value !== null,
       b06: b06.value,
+      b06At: b06At.value,
       access: access.value,
       health: health.value,
     }));
@@ -197,11 +203,13 @@ export function createAssistantCapability(deps: CapabilityDeps): AssistantCapabi
       ([id, ready], _old, onCleanup) => {
         if (!id || !ready) return;
         deps.invalidateCapabilities(id.org);
-        const stop = deps.watchCapabilities(id.org, (data) => {
-          b06.value = data ?? b06.value;
+        const stop = deps.watchCapabilities(id.org, (data, at) => {
           b06Settled.value = true;
-          if (data?.health?.status) health.value = data.health.status;
-          if (data?.can_chat === true) clearAccess();
+          if (!data) return;
+          b06.value = data;
+          b06At.value = at ?? Date.now();
+          if (data.health?.status) health.value = data.health.status;
+          if (data.can_chat === true && (access.value?.at ?? 0) < b06At.value) clearAccess();
         });
         onCleanup(stop);
       },
@@ -220,9 +228,10 @@ export function createAssistantCapability(deps: CapabilityDeps): AssistantCapabi
       );
     });
 
+    // Identity too, so a new org is probed even if `needsProbe` reads true on both sides of the switch.
     watch(
-      needsProbe,
-      (need) => {
+      [needsProbe, identity],
+      ([need]) => {
         const id = identity.value;
         if (!need || !id || probed) return;
         probed = true;
@@ -256,13 +265,17 @@ export function createAssistantCapability(deps: CapabilityDeps): AssistantCapabi
       generation += 1;
       probed = false;
       b06.value = null;
+      b06At.value = 0;
       b06Settled.value = false;
       health.value = "unknown";
       access.value = next ? readAccess(next.userOrgKey) : null;
       identity.value = next;
     },
     noteForbidden() {
-      if (identity.value) persistAccess({ value: "no", source: "cached_403" });
+      if (!identity.value) return;
+      persistAccess({ value: "no", source: "cached_403" });
+      // A 403 after `can_chat: true` holds "no" until a newer capabilities read says otherwise.
+      deps.invalidateCapabilities(identity.value.org);
     },
     noteAgentUnavailable() {
       health.value = "down";
@@ -324,7 +337,8 @@ function resolveChat(input: CapabilityInput): {
   source: AssistantCapability["source"];
 } {
   const b06Chat = input.b06?.can_chat;
-  if (typeof b06Chat === "boolean")
+  const deniedSince = input.access?.value === "no" && input.access.at >= input.b06At;
+  if (typeof b06Chat === "boolean" && !deniedSince)
     return { canChat: b06Chat ? "yes" : "no", source: "capabilities" };
   if (input.access?.value === "no") return { canChat: "no", source: input.access.source };
   if (input.config && !input.config.rbacEnabled) return { canChat: "yes", source: "config" };
@@ -343,8 +357,8 @@ function resolveShare(input: CapabilityInput): Tri {
 
 function resolveWrite(input: CapabilityInput, canChat: Tri): Tri {
   const b06Write = input.b06?.can_write;
-  if (typeof b06Write === "boolean") return b06Write ? "yes" : "no";
   if (canChat === "no") return "no";
+  if (typeof b06Write === "boolean") return b06Write ? "yes" : "no";
   return input.config && !input.config.rbacEnabled ? "yes" : "unknown";
 }
 

@@ -15,7 +15,7 @@
 
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { computed, isReactive } from "vue";
+import { computed, isReactive, ref } from "vue";
 
 import { raw } from "@/types/i18n";
 import type { ImageAttachment } from "@/ts/interfaces/chat";
@@ -31,6 +31,7 @@ import {
   useAssistantPlacement,
   useAssistantSession,
   type AssistantStoreInternal,
+  type AssistantStoreOptions,
 } from "./assistantStore";
 import type {
   AssistantCapability,
@@ -41,7 +42,7 @@ import type {
 } from "./assistantStore.types";
 import type { ContextChip } from "./context/types";
 import { createDraftStore, type DraftStore } from "./drafts";
-import { resetPrefsForTests } from "./prefs";
+import { TAB_HEARTBEAT_MS, markTabAlive, pushRecall, resetPrefsForTests } from "./prefs";
 import type { TurnTerminal } from "./turnStates";
 
 const ORIGIN: SessionOrigin = {
@@ -106,6 +107,7 @@ const approval = (sessionId: string): PendingApproval => ({
 function makeStore(
   overrides: Partial<AssistantStoreDeps> = {},
   gate: AssistantCapability["gate"] = "available",
+  options: AssistantStoreOptions = {},
 ) {
   let n = 0;
   const clock = { now: 1_000_000 };
@@ -118,7 +120,7 @@ function makeStore(
   });
   const drafts = createDraftStore({ delayMs: 0 });
   draftStores.push(drafts);
-  const store = createAssistantStore(deps, { drafts, viewportRem: () => 80 });
+  const store = createAssistantStore(deps, { drafts, viewportRem: () => 80, ...options });
   store.setIdentity({ userOrgKey: "k1", org: "org1" });
   store.syncCapability(capability(gate));
   return { store, deps, clock, drafts };
@@ -154,6 +156,31 @@ describe("sessions", () => {
     expect(newSession(store)).toBe(first);
     store.setDraft(first, { text: "draft" });
     expect(newSession(store)).not.toBe(first);
+  });
+
+  it("applies the new door's origin, title and hand-off messages to a reused blank session", () => {
+    const { store } = makeStore();
+    const first = store.createSession({ origin: ORIGIN, title: raw("Alert · cpu"), thread: "new" });
+    const docked: SessionOrigin = {
+      entryKind: "editor_button",
+      objectKind: "alert",
+      container: "docked.alert",
+    };
+    const messages = [{ role: "assistant" as const, content: raw("Here is the query") }];
+    expect(store.createSession({ origin: docked, thread: "new", messages })).toBe(first);
+    expect(store.state.sessions[first]).toMatchObject({
+      origin: docked,
+      title: null,
+      titleSource: "generated",
+      messages,
+    });
+    store.state.sessions[first].messages = [];
+    store.createSession({ origin: ORIGIN, title: raw("Dashboard · api"), thread: "new" });
+    expect(store.state.sessions[first]).toMatchObject({
+      origin: ORIGIN,
+      title: "Dashboard · api",
+      titleSource: "object",
+    });
   });
 
   it("opens a known session without a load and loads an unknown one through history", async () => {
@@ -321,6 +348,40 @@ describe("placement", () => {
     expect(view.isVisible.value).toBe(true);
     expect(view.sidebarForcedFloating.value).toBe(false);
   });
+
+  it("forces floating at 1024–1279 px only while the width would squeeze <main>, and follows a resize", () => {
+    const viewportPx = ref(1279);
+    const { store } = makeStore({}, "available", { viewportRem: () => viewportPx.value / 16 });
+    const view = useAssistantPlacement(store);
+    store.setSidebarWidth(32);
+    expect(view.sidebarForcedFloating.value).toBe(false);
+    viewportPx.value = 1024;
+    expect(view.sidebarForcedFloating.value).toBe(true);
+    store.setSidebarWidth(22);
+    expect(view.sidebarForcedFloating.value).toBe(false);
+    store.setSidebarWidth(27);
+    expect(view.sidebarForcedFloating.value).toBe(true);
+    viewportPx.value = 1180;
+    expect(view.sidebarForcedFloating.value).toBe(false);
+  });
+
+  it("pins for one open without writing pinned into the stored placement", () => {
+    const { store } = makeStore();
+    const view = useAssistantPlacement(store);
+    store.open({ kind: "sidebar", mode: "floating" }, { focus: "none", forcePinned: true });
+    expect(view.sidebarForcedPinned.value).toBe(true);
+    expect(store.state.shell.placement).toEqual({ kind: "sidebar", mode: "floating" });
+    expect(JSON.parse(sessionStorage.getItem("o2.assistant.placement:k1")!).placement).toEqual({
+      kind: "sidebar",
+      mode: "floating",
+    });
+    store.open({ kind: "sidebar", mode: "floating" }, { focus: "composer" });
+    expect(view.sidebarForcedPinned.value).toBe(true);
+    store.close("close");
+    expect(view.sidebarForcedPinned.value).toBe(false);
+    store.open({ kind: "sidebar", mode: "floating" }, { focus: "none" });
+    expect(view.sidebarForcedPinned.value).toBe(false);
+  });
 });
 
 describe("composer", () => {
@@ -331,6 +392,20 @@ describe("composer", () => {
     store.stage(sid, { chips: [chip("a")], text: "and this", mode: "append" });
     expect(store.state.sessions[sid].composer).toMatchObject({ text: "Explain\nand this" });
     expect(store.state.sessions[sid].composer.chips).toHaveLength(1);
+  });
+
+  it("never appends a prompt identical to the composer's last line", () => {
+    const { store } = makeStore();
+    const sid = newSession(store);
+    store.stage(sid, { text: "Explain this row", mode: "replace" });
+    store.stage(sid, { text: "Explain this row", mode: "append" });
+    store.stage(sid, { text: " Explain this row ", mode: "append" });
+    expect(store.state.sessions[sid].composer.text).toBe("Explain this row");
+    store.setDraft(sid, { text: "Explain this row\nand the next" });
+    store.stage(sid, { text: "Explain this row", mode: "append" });
+    expect(store.state.sessions[sid].composer.text).toBe(
+      "Explain this row\nand the next\nExplain this row",
+    );
   });
 
   it("caps chips at 20 rows and 32 KB, and refuses images as chips", () => {
@@ -352,7 +427,7 @@ describe("composer", () => {
     for (const name of ["1", "2", "3", "4"])
       expect(store.addImage(sid, image(name))).toEqual({ ok: true });
     expect(store.addImage(sid, image("5"))).toEqual({ ok: false, cap: "images" });
-    store.removeImage(sid, "4");
+    store.removeImage(sid, store.state.sessions[sid].composer.images[3].id!);
     expect(store.addImage(sid, image("gif", { mimeType: "image/gif" as "image/png" }))).toEqual({
       ok: false,
       cap: "type",
@@ -361,6 +436,22 @@ describe("composer", () => {
       ok: false,
       cap: "size",
     });
+  });
+
+  it("keys images by a generated id, so two pastes named alike are both kept", () => {
+    const { store } = makeStore();
+    const sid = newSession(store);
+    expect(store.addImage(sid, image("image.png"))).toEqual({ ok: true });
+    expect(store.addImage(sid, image("image.png", { data: "BBBB" }))).toEqual({ ok: true });
+    const [first, second] = store.state.sessions[sid].composer.images;
+    expect(first.id).toBeTruthy();
+    expect(second.id).not.toBe(first.id);
+    expect(store.addImage(sid, { ...first })).toEqual({ ok: true });
+    expect(store.state.sessions[sid].composer.images).toHaveLength(2);
+    store.removeImage(sid, "image.png");
+    expect(store.state.sessions[sid].composer.images).toHaveLength(2);
+    store.removeImage(sid, first.id!);
+    expect(store.state.sessions[sid].composer.images.map((i) => i.data)).toEqual(["BBBB"]);
   });
 
   it("turns a removed page chip into an add-back key and clears it when re-added", () => {
@@ -528,6 +619,44 @@ describe("turn actions", () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
+  it("shares one in-flight guard between send and retry", async () => {
+    let finish!: (t: TurnTerminal) => void;
+    const deps = inertAssistantDeps();
+    const send = vi.fn(() => new Promise<TurnTerminal>((r) => (finish = r)));
+    const retry = vi.fn().mockResolvedValue(DONE);
+    const { store } = makeStore({ engine: { ...deps.engine, send, retry } });
+    const sid = newSession(store);
+    const first = store.send(sid);
+    expect(store.retry(sid)).toBe(first);
+    finish(DONE);
+    await first;
+    const again = store.retry(sid);
+    expect(store.retry(sid)).toBe(again);
+    expect(store.send(sid)).toBe(again);
+    await again;
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears the sent draft when the turn ends but keeps one typed while it ran", async () => {
+    let finish!: (t: TurnTerminal) => void;
+    const deps = inertAssistantDeps();
+    const send = vi.fn(() => new Promise<TurnTerminal>((r) => (finish = r)));
+    const { store, drafts } = makeStore({ engine: { ...deps.engine, send } });
+    const sid = newSession(store);
+    store.setDraft(sid, { text: "why 5xx" });
+    const sent = store.send(sid);
+    finish(DONE);
+    await sent;
+    expect(drafts.read("k1", sid)).toBeNull();
+    store.setDraft(sid, { text: "second question" });
+    const next = store.send(sid);
+    store.setDraft(sid, { text: "typed while it ran" });
+    finish(DONE);
+    await next;
+    expect(drafts.read("k1", sid)?.text).toBe("typed while it ran");
+  });
+
   it("records a new turn's terminal over the previous turn's", async () => {
     const deps = inertAssistantDeps();
     const send = vi
@@ -596,6 +725,9 @@ describe("turn actions", () => {
 });
 
 describe("idle-session release (rule 10)", () => {
+  const reloadable = (over: Partial<AssistantStoreDeps["history"]> = {}) => ({
+    history: { ...inertAssistantDeps().history, canReload: computed(() => true), ...over },
+  });
   const fill = (store: AssistantStoreInternal, count: number): Sid[] =>
     Array.from({ length: count }, () => {
       const sid = store.createSession({ origin: ORIGIN, thread: "new" });
@@ -604,7 +736,7 @@ describe("idle-session release (rule 10)", () => {
     });
 
   it("keeps at most ten idle transcripts, releasing the least recently used", () => {
-    const { store } = makeStore();
+    const { store } = makeStore(reloadable());
     const sids = fill(store, IDLE_SESSION_LIMIT + 3);
     store.setActive(null);
     const holding = sids.filter((sid) => store.state.sessions[sid].messages.length > 0);
@@ -614,8 +746,15 @@ describe("idle-session release (rule 10)", () => {
     expect(store.state.sessions[sids.at(-1)!].messages).toHaveLength(1);
   });
 
-  it("never releases an active, running, drafted or carded session", () => {
+  it("releases nothing while history cannot reload a transcript", () => {
     const { store } = makeStore();
+    const sids = fill(store, IDLE_SESSION_LIMIT + 3);
+    store.setActive(null);
+    for (const sid of sids) expect(store.state.sessions[sid].messages).toHaveLength(1);
+  });
+
+  it("never releases an active, running, drafted or carded session", () => {
+    const { store } = makeStore(reloadable());
     const [running, drafted, carded] = fill(store, 3);
     store.state.sessions[running].turn = { state: "connecting" };
     store.state.sessions[drafted].composer.text = "half typed";
@@ -627,7 +766,7 @@ describe("idle-session release (rule 10)", () => {
   });
 
   it("never evicts an unsaved answer and waits for an in-flight save", async () => {
-    const { store } = makeStore();
+    const { store } = makeStore(reloadable());
     const [unsaved, saving] = fill(store, 2);
     store.state.sessions[unsaved].turn = { state: "done", saved: "not_saved" };
     let flush!: () => void;
@@ -642,7 +781,7 @@ describe("idle-session release (rule 10)", () => {
 
   it("re-reads a released session through history when it is opened", async () => {
     const open = vi.fn(async ({ sid }: { sid: Sid }) => sid);
-    const { store } = makeStore({ history: { ...inertAssistantDeps().history, open } });
+    const { store } = makeStore(reloadable({ open }));
     const [oldest] = fill(store, IDLE_SESSION_LIMIT + 2);
     await store.openSession({ sid: oldest });
     expect(open).toHaveBeenCalledWith({ sid: oldest });
@@ -701,7 +840,7 @@ describe("derived views", () => {
 });
 
 describe("gates and isolation", () => {
-  it.each(["loading", "not_entitled", "not_configured"] as const)(
+  it.each(["loading", "not_entitled", "not_configured", "no_permission"] as const)(
     "is inert on %s: not ready, no session, no key written",
     (gate) => {
       const { store } = makeStore({}, gate);
@@ -710,6 +849,7 @@ describe("gates and isolation", () => {
       store.open({ kind: "sidebar", mode: "pinned" }, { focus: "composer" });
       store.setSidebarWidth(30);
       store.setSidebarMode("floating");
+      store.setActive(null);
       expect(store.state.shell.placement).toEqual({ kind: "hidden" });
       expect(localStorage.length).toBe(0);
       expect(sessionStorage.length).toBe(0);
@@ -750,10 +890,42 @@ describe("lifecycle seams", () => {
     store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
     await expect(store.onSignOut()).resolves.toBe("proceed");
     expect(Object.keys(sessionStorage).filter((k) => k.includes(":k1"))).toEqual([]);
+    expect(localStorage.getItem("o2.assistant.recall:k1")).toBeNull();
     expect(localStorage.getItem("ai-chat-query-history:k1")).toBeNull();
     expect(post).toHaveBeenCalledWith(expect.objectContaining({ type: "signed_out" }));
     expect(store.state.sessions).toEqual({});
     expect(store.state.shell.placement).toEqual({ kind: "hidden" });
+  });
+
+  it("purges every org this tab used and every org's recall on sign-out", async () => {
+    vi.useFakeTimers();
+    const signOutKeys = vi.fn().mockResolvedValue(["k1", "k2", "k3"]);
+    const { store, drafts } = makeStore({}, "available", { signOutKeys });
+    const first = newSession(store);
+    store.setDraft(first, { text: "org 1 draft" });
+    store.setIdentity({ userOrgKey: "k2", org: "org2" });
+    const second = newSession(store);
+    store.setDraft(second, { text: "org 2 draft" });
+    store.open({ kind: "sidebar", mode: "pinned" }, { focus: "none" });
+    markTabAlive("k4");
+    sessionStorage.setItem("o2.assistant.selected:k4", "sid-4");
+    for (const key of ["k1", "k2", "k3"]) pushRecall(key, { text: "secret", chips: [], at: 1 });
+    localStorage.setItem("ai-chat-query-history:k3", JSON.stringify(["legacy secret"]));
+    localStorage.setItem("ai-chat-query-history:other", JSON.stringify(["someone else"]));
+    drafts.flush();
+    await store.onSignOut();
+    expect(Object.keys(sessionStorage).filter((k) => /:k[1-4](:|$)/.test(k))).toEqual([]);
+    expect(Object.keys(localStorage).filter((k) => /recall|query-history/.test(k))).toEqual([
+      "ai-chat-query-history:other",
+    ]);
+    expect(drafts.read("k1", first)).toBeNull();
+    expect(drafts.read("k2", second)).toBeNull();
+    // Neither the heartbeat nor a later pagehide writes a purged org's tab marker back.
+    vi.advanceTimersByTime(TAB_HEARTBEAT_MS * 2);
+    window.dispatchEvent(new Event("pagehide"));
+    expect(Object.keys(sessionStorage).filter((k) => k.startsWith("o2.assistant.tab:"))).toEqual(
+      [],
+    );
   });
 
   it("queues announcements for the turn region and reloads prefs on a prefs hint", () => {

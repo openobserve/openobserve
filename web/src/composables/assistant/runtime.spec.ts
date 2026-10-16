@@ -19,9 +19,11 @@ import { ref } from "vue";
 
 import { queryClient } from "@/composables/query/queryClient";
 import assistantService from "@/services/assistant";
+import { computeUserOrgKey } from "@/utils/userOrgKey";
 
 import * as storeModule from "./assistantStore";
 import { assistantStore, openAssistant, useAssistantCapability } from "./index";
+import { pushRecall, readRecall } from "./prefs";
 import { getAssistantRuntime, resetAssistantRuntimeForTests } from "./runtime";
 
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
@@ -115,7 +117,8 @@ describe("assistant runtime", () => {
 
   it("stamps the telemetry envelope from the runtime", async () => {
     assistantStore.init(context("sre-oncall"));
-    await vi.waitFor(() => expect(assistantStore.state.ready).toBe(true));
+    await vi.waitFor(() => expect(assistantStore.state.capability.gate).toBe("no_permission"));
+    expect(assistantStore.state.ready).toBe(false);
     const getters = assistantStore.telemetryContext("abc123");
     expect(getters.getGate()).toBe(assistantStore.state.capability.gate);
     expect(getters.getRole()).toBe("custom");
@@ -124,5 +127,27 @@ describe("assistant runtime", () => {
     expect(getters.getRoute()).toBe("logs");
     expect(getters.getContainer()).toBe("home");
     expect(getters.uiVersion).toBe("abc123");
+  });
+
+  it("writes a debounced draft at once when the page is left", async () => {
+    assistantStore.init(context("admin"));
+    await vi.waitFor(() => expect(assistantStore.state.ready).toBe(true));
+    const sid = assistantStore.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    assistantStore.setDraft(sid, { text: "half typed" });
+    const key = `o2.assistant.draft:${assistantStore.state.userOrgKey}:${sid}`;
+    expect(sessionStorage.getItem(key)).toBeNull();
+    window.dispatchEvent(new Event("pagehide"));
+    expect(sessionStorage.getItem(key)).toContain("half typed");
+  });
+
+  it("drops the recall of every org of the user on sign-out", async () => {
+    assistantStore.init({ ...context("admin"), getOrganizations: () => ["org1", "org2"] });
+    await vi.waitFor(() => expect(assistantStore.state.ready).toBe(true));
+    const other = await computeUserOrgKey("dev@example.com", "org2");
+    pushRecall(other, { text: "token=abc", chips: [], at: 1 });
+    await assistantStore.onSignOut();
+    expect(readRecall(other)).toEqual([]);
   });
 });

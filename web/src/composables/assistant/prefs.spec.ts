@@ -18,6 +18,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ContextChip } from "./context/types";
 import {
   RECALL_CAP,
+  TAB_HEARTBEAT_MS,
+  TAB_STALE_MS,
   dismissCreditNotice,
   dismissImport,
   isCreditNoticeDismissed,
@@ -25,6 +27,7 @@ import {
   markHintSeen,
   markTabAlive,
   migrateHome,
+  markedUserOrgKeys,
   pushRecall,
   readHints,
   readHistoryFilter,
@@ -35,6 +38,7 @@ import {
   recallSelection,
   rememberSelection,
   removeAllSessionKeys,
+  removeRecall,
   resetPrefsForTests,
   watchPrefs,
   writeHistoryFilter,
@@ -59,13 +63,54 @@ afterEach(() => {
   sessionStorage.clear();
   resetPrefsForTests();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe("prompt recall", () => {
-  it("keys recall by user+org under the legacy name", () => {
+  it("keys recall by user+org on its own key, never writing objects where the legacy reader reads strings", () => {
     pushRecall(KEY, { text: "why 5xx?", chips: [], at: 1 });
-    expect(localStorage.getItem(`ai-chat-query-history:${KEY}`)).toContain("why 5xx?");
+    expect(localStorage.getItem(`o2.assistant.recall:${KEY}`)).toContain("why 5xx?");
+    expect(localStorage.getItem(`ai-chat-query-history:${KEY}`)).toBeNull();
     expect(readRecall("other")).toEqual([]);
+  });
+
+  it("reads the legacy string list as chipless entries and copies it once on the first push", () => {
+    localStorage.setItem(`ai-chat-query-history:${KEY}`, '["why 5xx"]');
+    expect(readRecall(KEY)).toEqual([{ text: "why 5xx", chips: [], at: 0 }]);
+    expect(() => pushRecall(KEY, { text: "and 4xx?", chips: [chip("a")], at: 5 })).not.toThrow();
+    expect(readRecall(KEY).map((e) => e.text)).toEqual(["and 4xx?", "why 5xx"]);
+    expect(localStorage.getItem(`ai-chat-query-history:${KEY}`)).toBe('["why 5xx"]');
+    localStorage.setItem(`ai-chat-query-history:${KEY}`, '["later legacy prompt"]');
+    expect(readRecall(KEY).map((e) => e.text)).toEqual(["and 4xx?", "why 5xx"]);
+  });
+
+  it("drops malformed entries instead of throwing", () => {
+    localStorage.setItem(
+      `o2.assistant.recall:${KEY}`,
+      JSON.stringify([
+        null,
+        7,
+        "",
+        "bare string",
+        { text: 3 },
+        { text: "no chips" },
+        { text: "bad chips", chips: [null, { id: "x" }, chip("ok")], at: "soon" },
+      ]),
+    );
+    expect(readRecall(KEY)).toEqual([
+      { text: "bare string", chips: [], at: 0 },
+      { text: "no chips", chips: [], at: 0 },
+      { text: "bad chips", chips: [chip("ok")], at: 0 },
+    ]);
+    expect(() => pushRecall(KEY, { text: "next", chips: [], at: 1 })).not.toThrow();
+  });
+
+  it("removes both the v2 and the legacy key", () => {
+    pushRecall(KEY, { text: "secret", chips: [], at: 1 });
+    localStorage.setItem(`ai-chat-query-history:${KEY}`, '["secret"]');
+    removeRecall(KEY);
+    expect(localStorage.length).toBe(0);
+    expect(readRecall(KEY)).toEqual([]);
   });
 
   it("dedupes by text and chip refs, prepends and caps at ten", () => {
@@ -84,7 +129,7 @@ describe("prompt recall", () => {
     pushRecall(KEY, { text: "mine", chips: [], at: 1 });
     // The second tab writes straight to the shared localStorage.
     const other = [{ text: "theirs", chips: [], at: 2 }, ...readRecall(KEY)];
-    localStorage.setItem(`ai-chat-query-history:${KEY}`, JSON.stringify(other));
+    localStorage.setItem(`o2.assistant.recall:${KEY}`, JSON.stringify(other));
     pushRecall(KEY, { text: "mine again", chips: [], at: 3 });
     expect(readRecall(KEY).map((e) => e.text)).toEqual(["mine again", "theirs", "mine"]);
   });
@@ -188,6 +233,31 @@ describe("per-tab session keys", () => {
     window.dispatchEvent(new Event("pagehide"));
     resetPrefsForTests();
     expect(markTabAlive(KEY).duplicated).toBe(false);
+  });
+
+  it("reads a marker a crash or discard left behind as a reload once it is stale", () => {
+    vi.useFakeTimers();
+    expect(markTabAlive(KEY).duplicated).toBe(false);
+    // The tab dies without pagehide; the next load finds its marker still live but no longer beating.
+    resetPrefsForTests();
+    vi.advanceTimersByTime(TAB_STALE_MS);
+    expect(markTabAlive(KEY).duplicated).toBe(false);
+  });
+
+  it("keeps a live tab's marker fresh, so a duplicate taken any time later is caught", () => {
+    vi.useFakeTimers();
+    expect(markTabAlive(KEY).duplicated).toBe(false);
+    vi.advanceTimersByTime(TAB_STALE_MS * 4);
+    const marker = JSON.parse(sessionStorage.getItem(`o2.assistant.tab:${KEY}`)!);
+    expect(Date.now() - marker.at).toBeLessThan(TAB_HEARTBEAT_MS + 1);
+    resetPrefsForTests();
+    expect(markTabAlive(KEY).duplicated).toBe(true);
+  });
+
+  it("lists every user+org this page load marked", () => {
+    markTabAlive("org-a");
+    markTabAlive("org-b");
+    expect(markedUserOrgKeys()).toEqual(["org-a", "org-b"]);
   });
 
   it("never reads an earlier org of the same tab as a duplicate, across a reload too", () => {

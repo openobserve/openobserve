@@ -19436,7 +19436,7 @@
       "runningQueries": "Running Queries",
       "oncall": "On-Call",
       "synthetics": "Synthetics",
-      "assistant": "O2 Assistant"
+      "assistant": "{product}"
     },
     "pages": {
       "global": "Global",
@@ -19490,8 +19490,8 @@
       "oncallDetail": "On-Call Page",
       "syntheticsJourney": "Synthetics journey",
       "downtimes": "Downtimes",
-      "assistant": "O2 Assistant",
-      "assistantComposer": "O2 Assistant composer",
+      "assistant": "{product}",
+      "assistantComposer": "{product} composer",
       "queryEditor": "Query editor"
     },
     "actions": {
@@ -19570,14 +19570,14 @@
       "syntheticsTokensRefresh": "Refresh token list",
       "aiChatToggle": "Toggle AI chat",
       "aiChatClose": "Close AI chat",
-      "assistantClose": "Close O2 Assistant",
+      "assistantClose": "Close {product}",
       "assistantComposerNewline": "New line",
       "assistantComposerRecall": "Recall previous prompt",
       "assistantComposerSend": "Send message",
       "assistantGoToAnswer": "Go to the latest answer",
       "assistantHelper": "Ask AI to write this query",
       "assistantHistory": "Open chats",
-      "assistantOpen": "Open O2 Assistant",
+      "assistantOpen": "Open {product}",
       "editorTabFocusMode": "Let Tab leave the editor",
       "logsSaveView": "Save as saved view",
       "logsExport": "Export results as CSV",

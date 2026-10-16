@@ -33,7 +33,7 @@ import {
   type ChatMessage,
   type ImageAttachment,
 } from "@/ts/interfaces/chat";
-import type { I18nKey, I18nText } from "@/types/i18n";
+import type { I18nKey } from "@/types/i18n";
 import { getUUIDv7 } from "@/utils/uuid";
 
 import type {
@@ -49,13 +49,14 @@ import type {
   HistoryRow,
   HistoryService,
   Placement,
-  SessionOrigin,
   ShellState,
   Sid,
 } from "./assistantStore.types";
 import type { ContextChip } from "./context/types";
-import { createDraftStore, type DraftStore } from "./drafts";
+import { createDraftStore, type DraftPayload, type DraftStore } from "./drafts";
 import {
+  forgetTabs,
+  markedUserOrgKeys,
   markTabAlive,
   pushRecall,
   readPlacement,
@@ -91,14 +92,19 @@ export const SIDEBAR_MAX_REM = 32;
 /** `<main>` never drops below this beside a pinned sidebar (`20` §2.1). */
 export const MAIN_MIN_REM = 32;
 
+/** Must match `ONavbar`'s rail (`w-[5.5rem]`), which `<main>` also gives up at `md` and up. */
+export const NAV_RAIL_REM = 5.5;
+
 const SIDEBAR_DEFAULT_MIN_REM = 22;
 
 const ROW_KINDS: ReadonlySet<ContextChip["kind"]> = new Set(["log_row", "cell", "span"]);
 
+// G0–G2: no placement, selection or draft key is written (`00` §4.2 rule 8).
 const INERT_GATES: ReadonlySet<AssistantCapability["gate"]> = new Set([
   "loading",
   "not_entitled",
   "not_configured",
+  "no_permission",
 ]);
 
 const TITLE_RANK: Record<AssistantSession["titleSource"], number> = {
@@ -106,6 +112,11 @@ const TITLE_RANK: Record<AssistantSession["titleSource"], number> = {
   object: 1,
   renamed: 2,
 };
+
+// One resize listener per page, shared by every store that reads the window's width.
+const windowWidthRem = /* @__PURE__ */ ref(80);
+
+let windowWidthTracked = false;
 
 export type HeaderLightState = "needs_you" | "working" | "unread" | "open" | "idle";
 
@@ -146,12 +157,26 @@ export interface AssistantAnnouncement {
   params?: Record<string, unknown>;
 }
 
+/** `createSession`'s init; `messages` seeds a hand-off transcript on a new or reused blank session. */
+export type SessionInit = Parameters<AssistantStoreApi["createSession"]>[0] & {
+  messages?: ChatMessage[];
+};
+
+/** `open`'s options; `forcePinned` pins this open only, without touching `placement.mode`. */
+export type OpenOptions = Parameters<AssistantStoreApi["open"]>[1] & { forcePinned?: boolean };
+
 /** The store as the runtime and the doors see it: the binding API plus the seams later packages fill. */
 export interface AssistantStoreInternal extends AssistantStoreApi {
   readonly drafts: DraftStore;
   readonly headerLight: ComputedRef<HeaderLight>;
+  /** Below 20 rem beside 32 rem of `<main>` the sidebar cannot pin (`20` §2.1). */
+  readonly sidebarForcedFloating: ComputedRef<boolean>;
+  /** The open that pinned a floating sidebar so it would not cover its source (`20` §2.1). */
+  readonly sidebarForcedPinned: Readonly<Ref<boolean>>;
   readonly focusRequest: Readonly<Ref<FocusRequest | null>>;
   readonly announcement: Readonly<Ref<AssistantAnnouncement | null>>;
+  createSession(init: SessionInit): Sid;
+  open(target: Placement, opts: OpenOptions): void;
   setIdentity(identity: AssistantStoreIdentity | null): void;
   syncCapability(capability: AssistantCapability): void;
   /** The helper line a door left on the composer (`assistant.entry.*`); cleared by the next edit or send. */
@@ -169,8 +194,10 @@ export interface AssistantStoreInternal extends AssistantStoreApi {
 
 export interface AssistantStoreOptions {
   drafts?: DraftStore;
-  /** Viewport width in rem; defaults to the window's. */
+  /** Viewport width in rem, read reactively; defaults to the window's. */
   viewportRem?: () => number;
+  /** The `userOrgKey` of every org of the signed-in user, so sign-out drops each org's recall. */
+  signOutKeys?: () => Promise<string[]>;
 }
 
 export interface AssistantSessionView {
@@ -204,8 +231,9 @@ export interface AssistantPlacementView {
   isVisible: ComputedRef<boolean>;
   container: ComputedRef<Container | null>;
   sidebarForcedFloating: ComputedRef<boolean>;
+  sidebarForcedPinned: ComputedRef<boolean>;
   focusRequest: Readonly<Ref<FocusRequest | null>>;
-  open: AssistantStoreApi["open"];
+  open: AssistantStoreInternal["open"];
   close: AssistantStoreApi["close"];
   moveTo: AssistantStoreApi["moveTo"];
 }
@@ -230,6 +258,10 @@ interface StoreCore {
   notices: Record<Sid, I18nKey>;
   focusRequest: Ref<FocusRequest | null>;
   sidebarModeStored: Ref<boolean>;
+  forcedPinned: Ref<boolean>;
+  /** Every user+org this store was bound to, for the sign-out purge. */
+  identities: Set<string>;
+  signOutKeys(): Promise<string[]>;
   session(sid: Sid | null | undefined): AssistantSession | undefined;
   writable(session: AssistantSession): boolean;
   persistDraft(session: AssistantSession): void;
@@ -250,6 +282,10 @@ export function createAssistantStore(
     state,
     drafts: core.drafts,
     headerLight: computed(() => headerLightOf(state)),
+    sidebarForcedFloating: computed(
+      () => core.viewportRem() - NAV_RAIL_REM - state.shell.sidebarWidthRem < MAIN_MIN_REM,
+    ),
+    sidebarForcedPinned: core.forcedPinned,
     focusRequest: core.focusRequest,
     announcement: lifecycle.announcement,
     ...sessions,
@@ -360,9 +396,9 @@ export function useAssistantPlacement(
     placement,
     isVisible: computed(() => placement.value.kind !== "hidden"),
     container: computed(() => containerOf(placement.value, lgUp.value)),
-    // Derived from the viewport only: below 20 + 32 rem a pinned sidebar would squeeze <main> (`20` §2.1).
-    sidebarForcedFloating: computed(
-      () => lgUp.value && windowRem() < SIDEBAR_MIN_REM + MAIN_MIN_REM,
+    sidebarForcedFloating: computed(() => lgUp.value && store.sidebarForcedFloating.value),
+    sidebarForcedPinned: computed(
+      () => placement.value.kind === "sidebar" && store.sidebarForcedPinned.value,
     ),
     focusRequest: store.focusRequest,
     open: store.open,
@@ -429,6 +465,9 @@ function createCore(
     notices: reactive<Record<Sid, I18nKey>>({}),
     focusRequest: shallowRef<FocusRequest | null>(null),
     sidebarModeStored: ref(false),
+    forcedPinned: ref(false),
+    identities: new Set(),
+    signOutKeys: options.signOutKeys ?? (async () => []),
     session: (sid) => (sid ? state.sessions[sid] : undefined),
     // Rule 7: a write under another user+org than the session's captured key is refused.
     writable: (session) => state.ready && session.userOrgKey === state.userOrgKey,
@@ -458,6 +497,8 @@ function createCore(
       core.releaseIdle();
     },
     releaseIdle() {
+      // A released transcript is re-read from history, so nothing is released while it cannot be.
+      if (!deps.history.canReload.value) return;
       const holding = state.recent.filter((sid) => {
         const session = state.sessions[sid];
         return session && session.messages.length > 0 && isIdle(core, session);
@@ -488,8 +529,10 @@ function createSessionSlice(core: StoreCore) {
     createSession(init) {
       if (!state.ready || !state.userOrgKey) throw new Error("The assistant store is inert here");
       const active = core.session(state.shell.activeSid);
-      if (active && active.userOrgKey === state.userOrgKey && isEmptySession(active))
+      if (active && active.userOrgKey === state.userOrgKey && isEmptySession(active)) {
+        applyInit(active, init);
         return active.sid;
+      }
       const sid = deps.uuid();
       state.sessions[sid] = blankSession(sid, state.userOrgKey, deps, init);
       core.setActive(sid);
@@ -587,6 +630,10 @@ function createPlacementSlice(core: StoreCore) {
     open(target, opts) {
       if (!state.ready) return;
       if (target.kind === "hidden") return api.close("close");
+      const wasSidebar = state.shell.placement.kind === "sidebar";
+      core.forcedPinned.value =
+        target.kind === "sidebar" &&
+        (!!opts.forcePinned || (wasSidebar && core.forcedPinned.value));
       if (opts.sid) core.setActive(opts.sid);
       const sid = state.shell.activeSid;
       if (opts.invoker && sid) {
@@ -605,10 +652,13 @@ function createPlacementSlice(core: StoreCore) {
       state.shell.placement =
         restore && previousPlacement ? { ...previousPlacement } : { kind: "hidden" };
       state.shell.previousPlacement = null;
+      core.forcedPinned.value = false;
       core.persistPlacement();
     },
     moveTo(target) {
-      if (state.ready) apply(target);
+      if (!state.ready) return;
+      core.forcedPinned.value = false;
+      apply(target);
     },
     setSidebarWidth(rem) {
       const max = Math.max(SIDEBAR_MIN_REM, core.viewportRem() / 2);
@@ -618,6 +668,7 @@ function createPlacementSlice(core: StoreCore) {
     },
     setSidebarMode(mode) {
       state.shell.sidebarMode = mode;
+      core.forcedPinned.value = false;
       core.sidebarModeStored.value = true;
       if (state.ready && state.userOrgKey) writeSidebar(state.userOrgKey, { mode });
     },
@@ -666,6 +717,8 @@ function createComposerSlice(core: StoreCore) {
         for (const chip of payload.chips ?? []) addChipTo(composer, chip);
         if (!payload.text) return;
         const keep = payload.mode === "append" && composer.text.trim() !== "";
+        // A repeated door never doubles its prompt (`40` §4).
+        if (keep && lastLine(composer.text) === payload.text.trim()) return;
         composer.text = keep ? `${composer.text}\n${payload.text}` : payload.text;
       });
     },
@@ -677,7 +730,7 @@ function createComposerSlice(core: StoreCore) {
       edit(sid, (composer) => {
         composer.text = snapshot.text;
         composer.chips = snapshot.chips.map((chip) => ({ ...chip }));
-        composer.images = [...snapshot.images];
+        composer.images = snapshot.images.map((image) => withImageId(image, deps.uuid));
         composer.timeOverride = snapshot.timeOverride ? { ...snapshot.timeOverride } : null;
       });
     },
@@ -705,16 +758,16 @@ function createComposerSlice(core: StoreCore) {
     addImage(sid, image) {
       const composer = core.session(sid)?.composer;
       if (!composer) return { ok: false, cap: "type" };
-      if (composer.images.some((i) => i.filename === image.filename)) return { ok: true };
+      if (image.id && composer.images.some((i) => i.id === image.id)) return { ok: true };
       if (composer.images.length >= MAX_IMAGES) return { ok: false, cap: "images" };
       if (!ALLOWED_IMAGE_TYPES.includes(image.mimeType)) return { ok: false, cap: "type" };
       if (image.size > MAX_IMAGE_SIZE_BYTES) return { ok: false, cap: "size" };
-      composer.images.push(image);
+      composer.images.push(withImageId(image, deps.uuid));
       return { ok: true };
     },
     removeImage(sid, id) {
       const composer = core.session(sid)?.composer;
-      if (composer) composer.images = composer.images.filter((i) => i.filename !== id);
+      if (composer) composer.images = composer.images.filter((i) => i.id !== id);
     },
     setTimeOverride(sid, range) {
       edit(sid, (composer) => {
@@ -796,7 +849,12 @@ function createComposerSlice(core: StoreCore) {
 function createTurnSlice(core: StoreCore) {
   const { state, deps } = core;
   const inFlight = new Map<Sid, Promise<TurnTerminal>>();
-  const settle = (sid: Sid, before: TurnState | undefined, terminal: TurnTerminal) => {
+  const settle = (
+    sid: Sid,
+    before: TurnState | undefined,
+    sent: DraftPayload | null,
+    terminal: TurnTerminal,
+  ) => {
     const session = core.session(sid);
     core.endedAt.set(sid, deps.now());
     if (!session) return terminal;
@@ -805,9 +863,24 @@ function createTurnSlice(core: StoreCore) {
     // Completed blocks are immutable; later changes go to `annotations` (`00` §4.2 rule 10).
     session.messages = session.messages.map((message) => markRaw(toRaw(message)));
     if (!sessionView(session, state.shell).visible) session.unread = true;
-    if (terminal.state !== "refused") core.drafts.remove(session.userOrgKey, sid);
+    // A draft typed while the turn ran is not the one that was sent, so it stays.
+    const stored = core.drafts.read(session.userOrgKey, sid);
+    if (terminal.state !== "refused" && (!stored || isSentDraft(stored, sent)))
+      core.drafts.remove(session.userOrgKey, sid);
     core.releaseIdle();
     return terminal;
+  };
+  // `send` and `retry` share one guard, so a second start of either joins the running one.
+  const track = (sid: Sid, sent: DraftPayload | null, start: () => Promise<TurnTerminal>) => {
+    const running = inFlight.get(sid);
+    if (running) return running;
+    const turn = core.session(sid)?.turn;
+    const before = turn && toRaw(turn);
+    const run = start()
+      .then((terminal) => settle(sid, before, sent, terminal))
+      .finally(() => inFlight.delete(sid));
+    inFlight.set(sid, run);
+    return run;
   };
   const api: Pick<
     AssistantStoreInternal,
@@ -828,19 +901,14 @@ function createTurnSlice(core: StoreCore) {
       if (running) return running;
       delete core.notices[sid];
       rememberPrompt(core, session);
-      const before = toRaw(session.turn);
-      const run = deps.engine
-        .send(sid, opts)
-        .then((terminal) => settle(sid, before, terminal))
-        .finally(() => inFlight.delete(sid));
-      inFlight.set(sid, run);
-      return run;
+      const { text, chips, timeOverride, removedPageKeys } = toRaw(session.composer);
+      const sent = { text, chips: [...chips], timeOverride, removedPageKeys: [...removedPageKeys] };
+      return track(sid, sent, () => deps.engine.send(sid, opts));
     },
     stop: (sid) => deps.engine.stop(sid),
     retry(sid) {
-      const turn = core.session(sid)?.turn;
-      const before = turn && toRaw(turn);
-      return deps.engine.retry(sid).then((terminal) => settle(sid, before, terminal));
+      if (!core.session(sid)) return Promise.resolve(refusedUnknown());
+      return track(sid, null, () => deps.engine.retry(sid));
     },
     continueTurn: (sid) => deps.engine.continueTurn(sid),
     retrySave: (sid, turnId) => deps.engine.retrySave(sid, turnId),
@@ -910,6 +978,7 @@ function createLifecycleSlice(core: StoreCore, openSession: AssistantStoreApi["o
       stopPrefsWatch = null;
       state.userOrgKey = identity?.userOrgKey ?? null;
       if (identity) {
+        core.identities.add(identity.userOrgKey);
         loadSidebarPrefs();
         stopPrefsWatch = watchPrefs(identity.userOrgKey, (name) => {
           if (name === "sidebar" && state.shell.placement.kind !== "sidebar") loadSidebarPrefs();
@@ -938,12 +1007,16 @@ function createLifecycleSlice(core: StoreCore, openSession: AssistantStoreApi["o
       return "proceed";
     },
     async onSignOut() {
-      const userOrgKey = state.userOrgKey;
-      if (userOrgKey) {
+      const orgKeys = await core.signOutKeys().catch(() => []);
+      const keys = new Set([...core.identities, ...markedUserOrgKeys(), ...orgKeys]);
+      forgetTabs(keys);
+      restored.clear();
+      for (const userOrgKey of keys) {
         core.drafts.clearAllForUser(userOrgKey);
         removeAllSessionKeys(userOrgKey);
         removeRecall(userOrgKey);
       }
+      core.identities.clear();
       deps.hints.post({ v: 1, type: "signed_out", at: deps.now() });
       api.reset();
       return "proceed";
@@ -1014,7 +1087,7 @@ function blankSession(
   sid: Sid,
   userOrgKey: string,
   deps: AssistantStoreDeps,
-  init: { origin: SessionOrigin; title?: I18nText },
+  init: SessionInit,
 ): AssistantSession {
   return {
     sid,
@@ -1024,7 +1097,7 @@ function blankSession(
     title: init.title ?? null,
     titleSource: init.title ? "object" : "generated",
     origin: { ...init.origin },
-    messages: [],
+    messages: init.messages ? [...init.messages] : [],
     record: {
       serverBacked: false,
       cachedLastSeq: null,
@@ -1059,6 +1132,14 @@ function blankSession(
     ledger: [],
     unread: false,
   };
+}
+
+// A reused blank session takes the new door's origin and title, as a new one would.
+function applyInit(session: AssistantSession, init: SessionInit): void {
+  session.origin = { ...init.origin };
+  session.title = init.title ?? null;
+  session.titleSource = init.title ? "object" : "generated";
+  if (init.messages?.length) session.messages = [...init.messages];
 }
 
 function emptyComposer(sendId: string): ComposerState {
@@ -1106,6 +1187,21 @@ function sameChip(a: ContextChip, b: ContextChip): boolean {
   if (a.id === b.id) return true;
   if (a.kind !== b.kind || !a.ref?.id || !b.ref?.id) return false;
   return a.ref.type === b.ref.type && a.ref.id === b.ref.id && a.ref.org === b.ref.org;
+}
+
+function withImageId(image: ImageAttachment, uuid: () => string): ImageAttachment {
+  return image.id ? { ...image } : { ...image, id: uuid() };
+}
+
+function lastLine(text: string): string {
+  return text.slice(text.lastIndexOf("\n") + 1).trim();
+}
+
+function isSentDraft(stored: DraftPayload, sent: DraftPayload | null): boolean {
+  const empty = !stored.text.trim() && stored.chips.length === 0;
+  if (empty || !sent) return empty;
+  const ids = (draft: DraftPayload) => draft.chips.map((chip) => chip.id).join("\n");
+  return stored.text === sent.text && ids(stored) === ids(sent);
 }
 
 function rowsOf(chips: ContextChip[]): number {
@@ -1212,7 +1308,16 @@ function defaultSidebarWidth(viewportRem: number): number {
 }
 
 function windowRem(): number {
-  return typeof window === "undefined" ? 80 : window.innerWidth / 16;
+  if (typeof window === "undefined") return windowWidthRem.value;
+  if (!windowWidthTracked) {
+    windowWidthTracked = true;
+    const read = () => {
+      windowWidthRem.value = window.innerWidth / 16;
+    };
+    read();
+    window.addEventListener("resize", read, { passive: true });
+  }
+  return windowWidthRem.value;
 }
 
 function refusedUnknown(): TurnTerminal {
@@ -1224,14 +1329,12 @@ function refusedUnknown(): TurnTerminal {
 
 function inertHistory(): HistoryService {
   const none = computed<HistoryRow[]>(() => []);
-  // `HistoryService.new` is declared as a construct signature (WP-01), which an object literal cannot carry.
-  const ctor = function () {
+  const unavailable = () => {
     throw new Error("History is not available yet");
-  } as unknown as new () => Sid;
-  return Object.assign(ctor, {
-    open: async () => {
-      throw new Error("History is not available yet");
-    },
+  };
+  return {
+    open: async () => unavailable(),
+    create: () => unavailable(),
     recent: () => none,
     save: async () => "not_saved" as const,
     rename: async () => ({ ok: true }) as const,
@@ -1242,8 +1345,9 @@ function inertHistory(): HistoryService {
       yield* [];
     },
     rows: none,
+    canReload: computed(() => false),
     mode: computed<"server" | "local">(() => "local"),
     hasMore: computed(() => false),
     loadOlder: async () => undefined,
-  });
+  };
 }

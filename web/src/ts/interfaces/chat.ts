@@ -63,6 +63,8 @@ export interface ContentBlock {
 
 // Image attachment for multimodal chat
 export interface ImageAttachment {
+  /** The assistant composer's key for the image; filenames repeat across pastes. */
+  id?: string;
   data: string; // Base64-encoded image data
   mimeType: "image/png" | "image/jpeg";
   filename: string;

@@ -259,6 +259,14 @@ describe("assistant repo guards", () => {
     expect(locale.assistant.name).toBe("O2 Assistant");
   });
 
+  it("names the product in shortcut copy only through {product}", () => {
+    const literal = leaves(locale.shortcuts, "shortcuts").filter(([, value]) =>
+      value.includes("O2 Assistant"),
+    );
+    expect(literal).toEqual([]);
+    expect(locale.shortcuts.actions.assistantOpen).toBe("Open {product}");
+  });
+
   it("keeps the product literal in code only in useAssistantName.ts", () => {
     expect(
       offenders(

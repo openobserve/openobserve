@@ -43,6 +43,8 @@ interface Setup {
   isOrgAdmin?: boolean;
   probe?: Tri | (() => Promise<Tri>);
   b06?: AssistantCapabilitiesResponse | null;
+  /** Answer B-06 synchronously, as vue-query does from its cache. */
+  cachedB06?: boolean;
   identity?: boolean;
 }
 
@@ -51,6 +53,7 @@ const handles: AssistantCapabilityHandle[] = [];
 afterEach(() => {
   handles.splice(0).forEach((h) => h.dispose());
   sessionStorage.clear();
+  vi.restoreAllMocks();
 });
 
 function setup(options: Setup = {}) {
@@ -61,7 +64,7 @@ function setup(options: Setup = {}) {
   const role = ref<string | null>(options.role === undefined ? "admin" : options.role);
   const isOrgAdmin = ref<boolean | undefined>(options.isOrgAdmin);
   const b06 = { current: options.b06 ?? null };
-  const listeners: ((data: AssistantCapabilitiesResponse | null) => void)[] = [];
+  const listeners: ((data: AssistantCapabilitiesResponse | null, at?: number) => void)[] = [];
   const probe = vi.fn((_org: string) => {
     const answer = options.probe ?? "yes";
     return typeof answer === "function" ? answer() : Promise.resolve(answer);
@@ -74,7 +77,8 @@ function setup(options: Setup = {}) {
     probe,
     watchCapabilities: vi.fn((_org, onResult) => {
       listeners.push(onResult);
-      queueMicrotask(() => onResult(b06.current));
+      if (options.cachedB06) onResult(b06.current);
+      else queueMicrotask(() => onResult(b06.current));
       return () => listeners.splice(listeners.indexOf(onResult), 1);
     }),
     invalidateCapabilities: vi.fn(),
@@ -83,7 +87,8 @@ function setup(options: Setup = {}) {
   const handle = createAssistantCapability(deps);
   handles.push(handle);
   if (options.identity !== false) handle.setIdentity({ userOrgKey: "k1", org: "org1" });
-  const emitB06 = (data: AssistantCapabilitiesResponse | null) => listeners.forEach((l) => l(data));
+  const emitB06 = (data: AssistantCapabilitiesResponse | null, at?: number) =>
+    listeners.forEach((l) => l(data, at));
   return { handle, deps, probe, config, role, isOrgAdmin, emitB06 };
 }
 
@@ -264,6 +269,22 @@ describe("B-06 capabilities", () => {
     expect(sessionStorage.getItem("o2.assistant.denied:k1")).toBeNull();
   });
 
+  it("lets a 403 newer than the last read win over can_chat true until a newer read", async () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    const { handle, deps, emitB06 } = setup({ role: "viewer", b06: { can_chat: true } });
+    await flushPromises();
+    expect(cap(handle)).toMatchObject({ canChat: "yes", source: "capabilities" });
+    now.mockReturnValue(2_000);
+    handle.noteForbidden();
+    expect(cap(handle)).toMatchObject({ gate: "no_permission", canChat: "no", canWrite: "no" });
+    expect(deps.invalidateCapabilities).toHaveBeenLastCalledWith("org1");
+    emitB06({ can_chat: true }, 1_000);
+    expect(cap(handle).canChat).toBe("no");
+    emitB06({ can_chat: true }, 3_000);
+    expect(cap(handle)).toMatchObject({ canChat: "yes", source: "capabilities" });
+    expect(sessionStorage.getItem("o2.assistant.denied:k1")).toBeNull();
+  });
+
   it("keeps the last good values when a later read fails", async () => {
     const { handle, emitB06 } = setup({ role: "viewer", b06: { can_chat: true } });
     await flushPromises();
@@ -299,6 +320,16 @@ describe("org switch", () => {
     handle.setIdentity({ userOrgKey: "k1", org: "org1" });
     await flushPromises();
     expect(cap(handle).canChat).toBe("no");
+  });
+
+  it("probes the new org when the probe is still needed across the switch", async () => {
+    const { handle, probe } = setup({ role: "viewer", probe: "unknown", cachedB06: true });
+    await flushPromises();
+    expect(probe).toHaveBeenCalledWith("org1");
+    handle.setIdentity({ userOrgKey: "k2", org: "org2" });
+    await flushPromises();
+    expect(probe).toHaveBeenCalledTimes(2);
+    expect(probe).toHaveBeenLastCalledWith("org2");
   });
 
   it("drops a probe answer that arrives after the switch", async () => {
