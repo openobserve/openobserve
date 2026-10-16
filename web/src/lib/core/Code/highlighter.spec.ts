@@ -22,6 +22,8 @@ describe("highlighter", () => {
     "text",
     "swift",
     "kotlin",
+    "rust",
+    "properties",
     "ruby",
     "css",
     "scss",
