@@ -177,6 +177,28 @@ describe("PublicDashboard viewer", () => {
     expect(has(w, "dashboards-public-dashboard-error")).toBe(false);
   });
 
+  it("hands each query's result metadata to the charts as one partition", async () => {
+    (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
+    (service.getData as any).mockResolvedValue({
+      status: 200,
+      data: {
+        panels: {
+          p1: {
+            state: { state: "ok" },
+            data: [[{ y: 1 }], [{ y: 2 }]],
+            resultMetaData: [{ histogram_interval: 60 }, null],
+          },
+        },
+      },
+    });
+    const w = buildWrapper();
+    await flushPromises();
+    expect(grid(w).props("injectedPanelData").p1.resultMetaData).toEqual([
+      [{ histogram_interval: 60 }],
+      [],
+    ]);
+  });
+
   it("polls at the Retry-After hint while refreshing, through a 304 that repeats it", async () => {
     // The server sends Retry-After on every refreshing 304.
     const notModified = { etag: '"a"', "retry-after": "5" };
