@@ -8055,6 +8055,7 @@
     "refresh": "Làm mới",
     "retry": "Thử lại",
     "tabs": {
+      "runs": "Lượt chạy",
       "dashboard": "Bảng điều khiển"
     },
     "duration": {
@@ -8063,6 +8064,12 @@
       "hours": "{count} giờ | {count} giờ",
       "days": "{count} ngày | {count} ngày",
       "years": "{count} năm | {count} năm"
+    },
+    "unit": {
+      "minutes": "phút | phút",
+      "hours": "giờ | giờ",
+      "days": "ngày | ngày",
+      "years": "năm | năm"
     },
     "rules": {
       "failure": "Thất bại",
@@ -8136,6 +8143,7 @@
       "schedule": "Lịch trình",
       "off": "Tắt",
       "notConfigured": "Chưa cấu hình",
+      "noScheduledRun": "Không có lượt chạy nào được lên lịch",
       "window": "Cửa sổ phân tích",
       "latestFindings": "Kết quả phát hiện của lần chạy mới nhất",
       "trend": "Xu hướng phát hiện",
@@ -8175,6 +8183,7 @@
       "statAlertsInScope": "Cảnh báo trong phạm vi",
       "statDeclined": "Bị từ chối",
       "statDeclinedSub": "Bị từ chối, không phải đã sạch",
+      "statDeclinedTooltip": "Các cặp quy tắc và cảnh báo mà quy tắc không đánh giá, vì cảnh báo có quá ít lịch sử hoặc quá ít mẫu. Đây là một rào chắn, không phải sự thông qua; lý do cho từng cảnh báo không được ghi vào stream.",
       "statWindow": "Cửa sổ",
       "findingsHeading": "Phát hiện",
       "suggestionsOnly": "Chỉ là gợi ý, không có gì được áp dụng tự động",
@@ -8189,12 +8198,23 @@
       "noneFoundNotClearance": "Không có phát hiện nào ở đây không phải là xác nhận đã sạch.",
       "evidence": "Bằng chứng",
       "alert": "Cảnh báo",
-      "proposedActions": "Hành động đề xuất"
+      "proposedActions": "Hành động đề xuất",
+      "openAlert": "Mở cảnh báo"
     },
     "dashboard": {
+      "latestRunAgo": "Lượt chạy gần nhất {time}",
       "findings": "Phát hiện",
       "alertsInScope": "Cảnh báo trong phạm vi",
       "coverage": "Bao phủ",
+      "attention": "Những gì cần chú ý",
+      "attentionCaption": "Từ lượt chạy gần nhất. Mở một quy tắc để xem các cảnh báo mà nó đã đánh dấu.",
+      "alertsFlagged": "{count} cảnh báo | {count} cảnh báo",
+      "nothingFlagged": "Không có cảnh báo nào bị quy tắc này đánh dấu trong lượt chạy gần nhất.",
+      "allClear": "Lượt chạy gần nhất không tìm thấy vấn đề nào cần khắc phục.",
+      "openAlert": "Mở cảnh báo",
+      "viewEvidence": "Xem bằng chứng",
+      "notEnabledTitle": "Hiệu chỉnh cảnh báo không chạy cho tổ chức này",
+      "notEnabledDescription": "Bật nó trong Cài đặt. Lượt chạy đầu tiên sẽ diễn ra ngay khi được bật.",
       "emptyTitle": "Không có lần chạy nào trong {days} ngày qua",
       "emptyDescription": "Bảng điều khiển sẽ hiển thị dữ liệu sau khi hiệu chuẩn cảnh báo chạy."
     },
@@ -8209,7 +8229,9 @@
       "enabled": "Chạy hiệu chuẩn cảnh báo cho tổ chức này",
       "enabledHelp": "Khi tắt, tổ chức không có lần chạy theo lịch nào. Bật lên sẽ khiến lần chạy đầu tiên đến hạn ngay lập tức.",
       "frequency": "Chạy mỗi",
+      "frequencyHelp": "Từ 1 giờ đến 30 ngày.",
       "window": "Cửa sổ phân tích",
+      "windowHelp": "Khoảng thời gian mỗi lượt chạy truy ngược, từ 1 phút đến 90 ngày. Cửa sổ dài hơn tần suất khiến các lượt chạy liên tiếp chồng lấn và báo cáo lại cùng một phát hiện.",
       "noConfig": "Tổ chức này chưa có cài đặt hiệu chuẩn cảnh báo. Các giá trị bên dưới là mặc định mà lần lưu đầu tiên của bạn sẽ ghi lại.",
       "warnGap": "Chạy mỗi {every} nhưng chỉ xem lại {window}, nên khoảng thời gian giữa các cửa sổ không bao giờ được phân tích.",
       "warnStarved": "Cửa sổ {window} quá ngắn đối với {rules}, nên mọi lần chạy đều bỏ qua chúng cho mọi cảnh báo.",
@@ -8223,7 +8245,10 @@
       "saveFailed": "Không thể lưu cài đặt: {message}",
       "loadFailed": "Không thể tải cài đặt: {message}",
       "lastSaved": "Lưu lần cuối {time}",
-      "runNowHeading": "Chạy ngay"
+      "runNowHeading": "Chạy ngay",
+      "findingsDesc": "Các phát hiện được ghi vào stream {stream} của tổ chức này và được lưu theo thời gian lưu trữ của stream đó. Hiệu chỉnh cảnh báo không gửi thông báo nào.",
+      "frequencyRange": "Chọn tần suất từ 1 giờ đến 30 ngày.",
+      "windowRange": "Chọn cửa sổ từ 1 phút đến 90 ngày."
     }
   },
   "alerts": {

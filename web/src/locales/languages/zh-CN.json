@@ -8055,6 +8055,7 @@
     "refresh": "刷新",
     "retry": "重试",
     "tabs": {
+      "runs": "运行记录",
       "dashboard": "仪表盘"
     },
     "duration": {
@@ -8063,6 +8064,12 @@
       "hours": "{count} 小时 | {count} 小时",
       "days": "{count} 天 | {count} 天",
       "years": "{count} 年 | {count} 年"
+    },
+    "unit": {
+      "minutes": "分钟 | 分钟",
+      "hours": "小时 | 小时",
+      "days": "天 | 天",
+      "years": "年 | 年"
     },
     "rules": {
       "failure": "失败",
@@ -8136,6 +8143,7 @@
       "schedule": "调度",
       "off": "关",
       "notConfigured": "未配置",
+      "noScheduledRun": "无计划运行",
       "window": "分析窗口",
       "latestFindings": "最近一次运行的发现",
       "trend": "发现趋势",
@@ -8175,6 +8183,7 @@
       "statAlertsInScope": "范围内的告警",
       "statDeclined": "未判定",
       "statDeclinedSub": "未判定，非已排除",
+      "statDeclinedTooltip": "规则未能评估的规则与告警组合，因为该告警的历史记录太少或样本数量不足。这是一道门槛，而非放行；每个告警的具体原因不会写入数据流。",
       "statWindow": "窗口",
       "findingsHeading": "发现项",
       "suggestionsOnly": "仅为建议，不会自动应用任何更改",
@@ -8189,12 +8198,23 @@
       "noneFoundNotClearance": "此处零发现项并不代表已排除。",
       "evidence": "证据",
       "alert": "告警",
-      "proposedActions": "建议的操作"
+      "proposedActions": "建议的操作",
+      "openAlert": "打开告警"
     },
     "dashboard": {
+      "latestRunAgo": "最近一次运行 {time}",
       "findings": "发现项",
       "alertsInScope": "范围内的告警",
       "coverage": "覆盖率",
+      "attention": "需要关注的内容",
+      "attentionCaption": "来自最近一次运行。打开规则即可查看其标记的告警。",
+      "alertsFlagged": "{count} 条告警 | {count} 条告警",
+      "nothingFlagged": "最近一次运行中，该规则未标记任何告警。",
+      "allClear": "最近一次运行未发现需要修复的问题。",
+      "openAlert": "打开告警",
+      "viewEvidence": "查看证据",
+      "notEnabledTitle": "该组织的告警校准未运行",
+      "notEnabledDescription": "请在设置中开启。开启后即会进行首次运行。",
       "emptyTitle": "过去 {days} 天内没有运行记录",
       "emptyDescription": "告警校准运行后，仪表盘才会填充数据。"
     },
@@ -8209,7 +8229,9 @@
       "enabled": "为此组织运行告警校准",
       "enabledHelp": "关闭时，该组织没有计划运行。开启后会立即到期执行首次运行。",
       "frequency": "运行频率",
+      "frequencyHelp": "介于 1 小时到 30 天之间。",
       "window": "分析窗口",
+      "windowHelp": "每次运行回溯的时间范围，介于 1 分钟到 90 天之间。窗口长于运行周期会导致相邻运行重叠，并重复报告相同的发现。",
       "noConfig": "此组织尚无告警校准设置。下面的值是首次保存时存储的默认值。",
       "warnGap": "每 {every} 运行一次，但仅回溯 {window}，因此窗口之间的时间永远不会被分析。",
       "warnStarved": "{window} 的窗口对 {rules} 来说太短，因此每次运行都会对每个告警跳过它们。",
@@ -8223,7 +8245,10 @@
       "saveFailed": "无法保存设置：{message}",
       "loadFailed": "无法加载设置：{message}",
       "lastSaved": "上次保存于 {time}",
-      "runNowHeading": "立即运行"
+      "runNowHeading": "立即运行",
+      "findingsDesc": "发现结果会写入该组织的 {stream} 数据流，并按该数据流的保留期保存。告警校准不会发送任何通知。",
+      "frequencyRange": "请选择介于 1 小时到 30 天之间的运行周期。",
+      "windowRange": "请选择介于 1 分钟到 90 天之间的窗口。"
     }
   },
   "alerts": {

@@ -8055,6 +8055,7 @@
     "refresh": "Actualiser",
     "retry": "Réessayer",
     "tabs": {
+      "runs": "Exécutions",
       "dashboard": "Tableau de bord"
     },
     "duration": {
@@ -8063,6 +8064,12 @@
       "hours": "{count} heure | {count} heures",
       "days": "{count} jour | {count} jours",
       "years": "{count} an | {count} ans"
+    },
+    "unit": {
+      "minutes": "minute | minutes",
+      "hours": "heure | heures",
+      "days": "jour | jours",
+      "years": "an | ans"
     },
     "rules": {
       "failure": "Échec",
@@ -8136,6 +8143,7 @@
       "schedule": "Planification",
       "off": "Désactivé",
       "notConfigured": "Non configuré",
+      "noScheduledRun": "Aucune exécution planifiée",
       "window": "Fenêtre d'analyse",
       "latestFindings": "Constats de la dernière exécution",
       "trend": "Tendance des constats",
@@ -8175,6 +8183,7 @@
       "statAlertsInScope": "Alertes dans le périmètre",
       "statDeclined": "Refusées",
       "statDeclinedSub": "Refusées, non validées",
+      "statDeclinedTooltip": "Paires règle/alerte que la règle n'a pas jugées, faute d'historique ou d'échantillons suffisants pour l'alerte. Un filtre, pas une validation ; les raisons par alerte ne sont pas écrites dans le flux.",
       "statWindow": "Fenêtre",
       "findingsHeading": "Constats",
       "suggestionsOnly": "Suggestions uniquement, rien n'est appliqué automatiquement",
@@ -8189,12 +8198,23 @@
       "noneFoundNotClearance": "Zéro constat ici ne vaut pas validation.",
       "evidence": "Preuves",
       "alert": "Alerte",
-      "proposedActions": "Actions proposées"
+      "proposedActions": "Actions proposées",
+      "openAlert": "Ouvrir l'alerte"
     },
     "dashboard": {
+      "latestRunAgo": "Dernière exécution {time}",
       "findings": "Constats",
       "alertsInScope": "Alertes dans le périmètre",
       "coverage": "Couverture",
+      "attention": "Ce qui nécessite attention",
+      "attentionCaption": "D'après la dernière exécution. Ouvrez une règle pour voir les alertes qu'elle a signalées.",
+      "alertsFlagged": "{count} alerte | {count} alertes",
+      "nothingFlagged": "Aucune alerte signalée par cette règle lors de la dernière exécution.",
+      "allClear": "La dernière exécution n'a rien trouvé à corriger.",
+      "openAlert": "Ouvrir l'alerte",
+      "viewEvidence": "Voir les preuves",
+      "notEnabledTitle": "La calibration des alertes n'est pas active pour cette organisation",
+      "notEnabledDescription": "Activez-la dans les réglages. La première exécution a lieu dès son activation.",
       "emptyTitle": "Aucune exécution au cours des {days} derniers jours",
       "emptyDescription": "Le tableau de bord se remplit dès que la calibration des alertes s'est exécutée."
     },
@@ -8209,7 +8229,9 @@
       "enabled": "Exécuter la calibration des alertes pour cette organisation",
       "enabledHelp": "Lorsqu'elle est désactivée, l'organisation n'a aucune exécution planifiée. L'activer rend la première exécution due immédiatement.",
       "frequency": "Exécuter toutes les",
+      "frequencyHelp": "Entre 1 heure et 30 jours.",
       "window": "Fenêtre d'analyse",
+      "windowHelp": "Période remontée par chaque exécution, entre 1 minute et 90 jours. Une fenêtre plus longue que la cadence fait se chevaucher les exécutions consécutives, qui signalent alors à nouveau les mêmes constats.",
       "noConfig": "Cette organisation n'a pas encore de réglages de calibration des alertes. Les valeurs ci-dessous sont les valeurs par défaut enregistrées lors de votre première sauvegarde.",
       "warnGap": "S'exécute toutes les {every} mais ne remonte que sur {window} : la période entre les fenêtres n'est jamais analysée.",
       "warnStarved": "Une fenêtre de {window} est trop courte pour {rules} ; chaque exécution les écarte donc pour toutes les alertes.",
@@ -8223,7 +8245,10 @@
       "saveFailed": "Les réglages n'ont pas pu être enregistrés : {message}",
       "loadFailed": "Les réglages n'ont pas pu être chargés : {message}",
       "lastSaved": "Dernier enregistrement {time}",
-      "runNowHeading": "Exécuter maintenant"
+      "runNowHeading": "Exécuter maintenant",
+      "findingsDesc": "Les constats sont écrits dans le flux {stream} de cette organisation et conservés selon la rétention de ce flux. La calibration des alertes n'envoie aucune notification.",
+      "frequencyRange": "Choisissez une cadence entre 1 heure et 30 jours.",
+      "windowRange": "Choisissez une fenêtre entre 1 minute et 90 jours."
     }
   },
   "alerts": {
