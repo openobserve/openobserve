@@ -2384,115 +2384,6 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     })
 }
 
-pub async fn trigger_by_name(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    name: &str,
-) -> Result<ManualTrigger, AlertError> {
-    let (_folder, alert) =
-        match db::alerts::alert::get_by_name_with_folder(org_id, stream_type, stream_name, name)
-            .await
-        {
-            Ok(Some(found)) => found,
-            _ => {
-                return Err(AlertError::AlertNotFound);
-            }
-        };
-    let now = Utc::now().timestamp_micros();
-    #[cfg(feature = "enterprise")]
-    if let Some(downtime) = suppressed_manual_trigger(&alert, &_folder.folder_id, now).await {
-        return Ok(ManualTrigger::Suppressed(downtime));
-    }
-
-    // For creates_incident=true alerts the incident correlation path handles
-    // the notification. For all other cases send the direct notification.
-    #[cfg(feature = "enterprise")]
-    let (incident_notified, incident_notify_error) = if alert.creates_incident
-        && o2_enterprise::enterprise::common::config::get_config()
-            .incidents
-            .enabled
-    {
-        let synthetic_row = manual_trigger_row(&alert);
-        let notify = std::slice::from_ref(&synthetic_row);
-
-        match crate::alerts::incidents::correlate_alert_to_incident(
-            &alert,
-            &synthetic_row,
-            notify,
-            now,
-            // Manual triggers evaluate nothing; no level to map.
-            None,
-            None,
-        )
-        .await
-        {
-            Ok(Some(correlated)) => {
-                log::info!(
-                    "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
-                    alert.name,
-                    correlated.outcome.incident_id(),
-                    correlated.outcome.service_name(),
-                );
-                (
-                    incident_path_notified(&correlated.outcome),
-                    correlated.notify_error,
-                )
-            }
-            Ok(None) => {
-                log::debug!(
-                    "No incident correlation for manually triggered alert {org_id}/{}",
-                    alert.name
-                );
-                (false, None)
-            }
-            Err(e) => {
-                log::error!(
-                    "Error correlating manual trigger to incident, falling back to direct notification: {e}"
-                );
-                (false, None)
-            }
-        }
-    } else {
-        (false, None)
-    };
-
-    #[cfg(not(feature = "enterprise"))]
-    let (incident_notified, incident_notify_error) = (false, None);
-
-    let trace_id = config::ider::generate_trace_id();
-    let trace_id = format!("trig_name_{trace_id}");
-    // Always sent: alert-attached workflows dispatch only from here. When the
-    // incident path already notified the destinations, they are skipped so the
-    // same manual trigger cannot page them twice.
-    let skip_destinations: &[String] = if incident_notified {
-        &alert.destinations
-    } else {
-        &[]
-    };
-    let rows = vec![manual_trigger_row(&alert)];
-    let outcome = alert
-        .send_notification(
-            &trace_id,
-            &rows,
-            now,
-            None,
-            now,
-            None,
-            None,
-            None,
-            skip_destinations,
-            None,
-        )
-        .await?;
-    let error_message = with_incident_notify_error(outcome.error_message, incident_notify_error);
-
-    Ok(ManualTrigger::Sent {
-        success_message: outcome.success_message,
-        error_message,
-    })
-}
-
 /// A manual trigger inside a window is suppressed like a scheduled run: no page, no un-mute.
 #[cfg(feature = "enterprise")]
 async fn suppressed_manual_trigger(
@@ -2678,8 +2569,8 @@ impl AlertExt for Alert {
         // every surface below (each destination's template, and the workflow
         // trigger metadata). An SLO alert reports its SLO where an ordinary
         // alert reports its stream, and the SLO's NAME is on the evaluation
-        // row rather than on the alert — so the rowless paths
-        // (`trigger_by_id`, `trigger_by_name`) need one primary-key read to
+        // row rather than on the alert — so the rowless path
+        // (`trigger_by_id`) needs one primary-key read to
         // say the same thing a firing says. Resolving it here rather than
         // inside the renderer is what keeps that at one read per notification
 
