@@ -1478,7 +1478,7 @@
     "runQuery": "Executar consulta",
     "runOptions": "Opções de execução",
     "timeSeriesTitle": "Valores de perfil ao longo do tempo",
-    "viewTop": "Tabela top",
+    "viewTop": "Tabela Top",
     "viewFlame": "Gráfico de chamas",
     "viewTree": "Árvore de chamadas",
     "childCount": "{count} filho | {count} filhos",
