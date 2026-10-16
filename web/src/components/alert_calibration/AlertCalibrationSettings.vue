@@ -55,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OFormSection :title="t('alertCalibration.settings.runNowHeading')">
           <div class="flex flex-col gap-3">
             <OText variant="body" as="p">{{ t("alertCalibration.runNowHint") }}</OText>
-            <AlertCalibrationLastRun v-if="config" />
             <div class="flex flex-wrap items-center gap-3">
               <OButton
                 variant="outline"
@@ -72,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("alertCalibration.runNeedsConfig") }}
               </OText>
             </div>
+            <AlertCalibrationLastRun v-if="config" />
             <OText variant="meta" as="p">
               {{ t("alertCalibration.settings.findingsDesc", { stream: DIGEST_STREAM }) }}
             </OText>
