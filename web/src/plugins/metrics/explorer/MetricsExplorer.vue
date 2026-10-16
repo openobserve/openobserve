@@ -117,13 +117,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               :variant="isVisualizePending ? 'pending' : 'primary'"
               size="sm-toolbar"
-              icon-left="play-arrow"
+              class="w-[5.875rem]! px-1!"
               data-test="metrics-explorer-run"
               :data-run-pending="isVisualizePending ? 'true' : undefined"
               :aria-label="isVisualizePending ? t('search.runQueryPendingLabel') : undefined"
               @click="onVisualizeRun"
             >
-              <span class="max-md:hidden">{{ t("metrics.runQuery") }}</span>
+              {{ t("metrics.runQuery") }}
               <OTooltip :content="visualizeRunTooltip" shortcut-id="metricsRunQuery" />
             </OButton>
             <ODropdown align="end" side="bottom">
