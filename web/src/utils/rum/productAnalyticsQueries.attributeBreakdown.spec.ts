@@ -60,8 +60,8 @@ const cte = (sql: string, name: string): string => {
 };
 const tail = (sql: string): string => sql.slice(sql.lastIndexOf("\n") + 1);
 const DIM_COL = `MIN(NULLIF(CAST("${PAY}" AS VARCHAR), '')) AS dim`;
-const AUTO =
-  "first_value(dim ORDER BY CASE WHEN dim IS NOT NULL AND (m1 = 1 OR m2 = 1 OR m3 = 1) THEN 0 ELSE 1 END, t) AS dim";
+const ANY = "m1 = 1 OR m2 = 1 OR m3 = 1";
+const AUTO = `first_value(CASE WHEN ${ANY} THEN dim END ORDER BY CASE WHEN dim IS NOT NULL AND (${ANY}) THEN 0 ELSE 1 END, t) AS dim`;
 const PINNED_2 =
   "first_value(CASE WHEN m2 = 1 THEN dim END ORDER BY CASE WHEN m2 = 1 AND dim IS NOT NULL THEN 0 ELSE 1 END, t) AS dim";
 const H = [1, 2, 3].map(
@@ -117,6 +117,12 @@ describe("attribute breakdown SQL", () => {
     expect(cte(sql, "su")).toContain(`${PINNED_2}, ${H.join(", ")}`);
     expect(cte(sql, "pu")).toContain("dim, h1, h2, h3");
     expect(sql).toMatchSnapshot();
+  });
+
+  it("reads a pin past the last step as automatic", () => {
+    const sql = funnelSql(s, null, def({ breakdown: { f: PAY, s: 4 } }), opts);
+    expect(cte(sql, "s")).toContain(AUTO);
+    expect(sql).not.toContain("m4");
   });
 
   it("drops the breakdown when the stream lacks the column", () => {
@@ -188,7 +194,10 @@ describe("step property conditions (pc) SQL", () => {
     );
     const why = whyEnteredSql(s, d, opts);
     assertJoinFree(why);
-    expect(why).toContain(`AND ${MATCH})`);
+    expect(cte(why, "g0")).toContain(`MAX(CASE WHEN ${MATCH} THEN 1 ELSE 0 END) AS p1`);
+    expect(cte(why, "g0")).toContain("GROUP BY session_id, type, CASE WHEN type = 'view'");
+    expect(cte(why, "g")).toContain("MAX(CASE WHEN o0 = 1 AND p1 = 1 THEN 1 ELSE 0 END) AS o1");
+    expect(cte(why, "g")).toContain("MAX(CASE WHEN k0 = 1 AND p1 = 1 THEN 1 ELSE 0 END) AS k1");
     expect(why).toMatchSnapshot();
   });
 });

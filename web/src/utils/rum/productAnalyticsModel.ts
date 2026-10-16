@@ -1000,6 +1000,8 @@ const parseExclusion = (raw: unknown, steps: StepRef[]): ExclusionStep | null =>
   // The queries match an exclusion by its step alone, so options on it would be ignored.
   if (step?.f) return null;
   if (!step || typeof a !== "number" || !Number.isInteger(a) || a < 1) return null;
+  // Mirrors the server: the exclusion SQL matches its step without options, so a condition would be ignored.
+  if (step.f?.pc) return null;
   if ((b === undefined) === (w === undefined)) return null;
   let x: ExclusionStep | null = null;
   if (b !== undefined)
@@ -1049,6 +1051,16 @@ export function parseFunnelDef(raw: unknown): FunnelDef | null {
     x: x as ExclusionStep[],
     ...(f.length ? { f: f as FunnelFilter[] } : {}),
   };
+}
+
+/** The breakdown with its pinned step at its new number; a pinned step that is gone falls back to automatic. */
+export function pinnedAfter(
+  b: Breakdown | null,
+  pos: (k: number) => number | null,
+): Breakdown | null {
+  if (!isAttributeBreakdown(b) || b.s === undefined) return b;
+  const s = pos(b.s);
+  return s === null ? { f: b.f } : { f: b.f, s };
 }
 
 export function funnelParam(def: FunnelDef): Record<string, unknown> {
