@@ -283,6 +283,21 @@ const stats = computed<StatItem[]>(() => {
   const run = latest.value;
   return [
     {
+      key: "latest",
+      label: t("alertCalibration.digests.latestFindings"),
+      value: run ? run.finding_count : raw("—"),
+      sub: run ? t(COVERAGE_BADGE[coverageVerdict(run)].labelKey) : undefined,
+      icon: "fact-check",
+      tone: run && run.finding_count > 0 ? "warning" : "neutral",
+    },
+    {
+      key: "window",
+      label: t("alertCalibration.digests.window"),
+      value: c ? formatMinutes(t, c.window_minutes) : raw("—"),
+      sub: t("alertCalibration.digests.currentSettings"),
+      icon: "calendar-month",
+    },
+    {
       key: "schedule",
       label: t("alertCalibration.digests.schedule"),
       value: c
@@ -295,21 +310,6 @@ const stats = computed<StatItem[]>(() => {
         : t("alertCalibration.digests.notConfigured"),
       icon: "schedule",
       tone: c?.enabled ? "success" : "neutral",
-    },
-    {
-      key: "window",
-      label: t("alertCalibration.digests.window"),
-      value: c ? formatMinutes(t, c.window_minutes) : raw("—"),
-      sub: t("alertCalibration.digests.currentSettings"),
-      icon: "calendar-month",
-    },
-    {
-      key: "latest",
-      label: t("alertCalibration.digests.latestFindings"),
-      value: run ? run.finding_count : raw("—"),
-      sub: run ? t(COVERAGE_BADGE[coverageVerdict(run)].labelKey) : undefined,
-      icon: "fact-check",
-      tone: run && run.finding_count > 0 ? "warning" : "neutral",
     },
   ];
 });
