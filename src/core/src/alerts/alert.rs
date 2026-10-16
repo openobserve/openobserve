@@ -2849,7 +2849,7 @@ impl AlertExt for Alert {
                 }
             }
 
-            match send_to_destination(self, destination_type, template, ctx).await {
+            match send_to_destination(&self.name, destination_type, template, ctx).await {
                 Ok(resp) => {
                     outcome.succeeded.push(dest_name.clone());
                     success_message = format!("{success_message} destination {dest_name} {resp};");
@@ -3009,7 +3009,7 @@ fn all_workflows_failed(
 /// Build the notification context for a send, resolving the row template
 /// first. Metadata is left empty — the caller swaps in each destination's.
 #[allow(clippy::too_many_arguments)]
-async fn build_send_context(
+pub(crate) async fn build_send_context(
     alert: &Alert,
     rows: &[Map<String, Value>],
     rows_end_time: i64,
@@ -3156,7 +3156,14 @@ pub async fn send_recovery_notification(
         .await;
         // Logged because a resolve nobody sees land is the hard one to debug — a vendor can answer
         // 202 to one it drops. Body at debug only: it can carry recipient data.
-        match send_to_destination(alert, &destination_type, effective.template(), &mut ctx).await {
+        match send_to_destination(
+            &alert.name,
+            &destination_type,
+            effective.template(),
+            &mut ctx,
+        )
+        .await
+        {
             Ok(resp) => {
                 log::info!(
                     "[RECOVERY] {}/{} episode {} destination {dest_name} sent",
@@ -3255,7 +3262,7 @@ fn stamp_platform_key(
 /// `ctx` is the notification-wide context; this function swaps in the
 /// destination's metadata before rendering (§5.1).
 async fn send_to_destination(
-    alert: &Alert,
+    sns_subject: &str,
     dest_type: &DestinationType,
     template: &Template,
     ctx: &mut NotificationContext,
@@ -3289,7 +3296,7 @@ async fn send_to_destination(
                     send_email_notification(&email_subject, email, msg.clone(), msg).await
                 }
                 DestinationType::Sns(aws_sns) => {
-                    send_sns_notification(&alert.name, aws_sns, msg).await
+                    send_sns_notification(sns_subject, aws_sns, msg).await
                 }
             }
         }
@@ -3338,7 +3345,7 @@ async fn send_to_destination(
                         message,
                     },
                     DestinationType::Sns(aws_sns),
-                ) => send_sns_notification(&alert.name, aws_sns, message).await,
+                ) => send_sns_notification(sns_subject, aws_sns, message).await,
                 (rendered, dest_type) => Err(anyhow::anyhow!(
                     "Rendered message {rendered:?} does not match destination type {dest_type:?}"
                 )),
@@ -3347,10 +3354,34 @@ async fn send_to_destination(
     }
 }
 
+/// Render `ctx` with the alert's template, else the destination's, else the org default, and send
+/// it.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn send_templated_to_destination(
+    org_id: &str,
+    sns_subject: &str,
+    dest_name: &str,
+    alert_template: Option<&Template>,
+    ctx: &mut NotificationContext,
+) -> Result<String, anyhow::Error> {
+    let (dest, dest_template) = destinations::get_with_template(org_id, dest_name).await?;
+    let Module::Alert {
+        destination_type, ..
+    } = dest.module
+    else {
+        anyhow::bail!("not an alert destination");
+    };
+    let explicit = choose_template(alert_template, dest_template.as_ref()).cloned();
+    let effective =
+        crate::alerts::notifications::org_default::resolve_effective_template(org_id, explicit)
+            .await;
+    send_to_destination(sns_subject, &destination_type, effective.template(), ctx).await
+}
+
 /// Send a pre-built message string to a single destination type.
 ///
-/// Used by incident notifications, which build their own payload rather than
-/// going through the alert template system.
+/// Used by synthetics and downtime notifications, which build their own
+/// payload rather than going through the alert template system.
 #[cfg(feature = "enterprise")]
 pub(crate) async fn dispatch_notification(
     dest_type: &DestinationType,

@@ -346,54 +346,59 @@ async fn collect_incident_destinations(
     destinations
 }
 
-/// Build an incident-specific notification payload and send to all given destinations.
-///
-/// Loads severity, title, and service from the incident record. Constructs an
-/// incident-centric JSON body (not the alert row template) and dispatches to each
-/// destination using the raw transport (HTTP/email/SNS).
+/// Send an incident notification rendered with the template `alert`'s own notification would use.
 #[cfg(feature = "enterprise")]
 async fn send_incident_notifications(
     alert: &Alert,
+    notify_rows: &[Map<String, Value>],
+    level: Option<config::meta::alerts::level::AlertLevel>,
     incident_id: &str,
     event: &str,
     triggered_at: i64,
     dest_names: &[String],
 ) -> Option<String> {
-    // Preserve the alert/stream sub-object emitted for the internal alert path.
-    let alert_block = config::utils::json::json!({
-        "name": alert.name,
-        "stream": {
-            "name": alert.stream_name,
-            "type": alert.stream_type.to_string(),
-        }
-    });
+    if dest_names.is_empty() {
+        return None;
+    }
+    let ctx = crate::alerts::alert::build_send_context(
+        alert,
+        notify_rows,
+        triggered_at,
+        None,
+        triggered_at,
+        level,
+        None,
+        None,
+        None,
+        false,
+    )
+    .await;
+    let alert_template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
+        Some(name) => crate::db::alerts::templates::get(&alert.org_id, name)
+            .await
+            .ok(),
+        None => None,
+    };
     send_incident_notifications_inner(
         &alert.org_id,
-        &alert.name,
         incident_id,
         event,
-        triggered_at,
         dest_names,
-        Some(alert_block),
+        ctx,
+        alert_template.as_ref(),
     )
     .await
 }
 
-/// Build an incident-specific notification payload and send to all given destinations.
-///
-/// Identity-agnostic core of [`send_incident_notifications`]. `alert_block`, when
-/// present, is emitted verbatim as the payload's `incident.alert` sub-object (used
-/// by the internal alert path to carry alert/stream metadata).
+/// Render the incident into `ctx` and send it through each destination's template.
 #[cfg(feature = "enterprise")]
-#[allow(clippy::too_many_arguments)]
 async fn send_incident_notifications_inner(
     org_id: &str,
-    subject_name: &str,
     incident_id: &str,
     event: &str,
-    triggered_at: i64,
     dest_names: &[String],
-    alert_block: Option<Value>,
+    mut ctx: crate::alerts::notifications::NotificationContext,
+    alert_template: Option<&config::meta::destinations::Template>,
 ) -> Option<String> {
     if dest_names.is_empty() {
         return None;
@@ -421,71 +426,34 @@ async fn send_incident_notifications_inner(
         "{}/web/alerts/incidents/{incident_id}?org_identifier={org_id}",
         cfg.common.web_url
     );
-    let time_str = chrono::DateTime::from_timestamp_micros(triggered_at)
-        .map(|dt: chrono::DateTime<chrono::Utc>| dt.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string())
-        .unwrap_or_default();
-
-    // Internal path supplies a full alert/stream block; other subjects fall back to
-    // a name-only block derived from `subject_name`.
-    let alert_block =
-        alert_block.unwrap_or_else(|| config::utils::json::json!({ "name": subject_name }));
-
-    let payload = config::utils::json::json!({
-        "incident": {
-            "id": incident_id,
-            "title": title,
-            "event": event,
-            "service": service_name,
-            "severity": severity,
-            "alert": alert_block,
-            "time": time_str,
-            "url": incident_url,
-        }
-    });
-    let msg = match serde_json::to_string(&payload) {
-        Ok(s) => s,
-        Err(e) => {
-            log::error!(
-                "[incidents] Failed to serialize notification payload for {org_id}/{incident_id}: {e}"
-            );
-            return Some(format!("failed to serialize incident notification: {e}"));
-        }
-    };
-
     let subject = format!("[{event}] {title}");
+    apply_incident_to_context(
+        &mut ctx,
+        incident_id,
+        event,
+        title,
+        severity,
+        service_name,
+        incident_url,
+    );
+
     let mut success_parts: Vec<String> = Vec::new();
     let mut err_parts: Vec<String> = Vec::new();
 
     for dest_name in dest_names {
-        match crate::db::alerts::destinations::get(org_id, dest_name).await {
-            Ok(dest) => {
-                use config::meta::destinations::Module;
-                let Module::Alert {
-                    destination_type, ..
-                } = dest.module
-                else {
-                    err_parts.push(format!("{dest_name}: not an alert destination"));
-                    continue;
-                };
-                match crate::alerts::alert::dispatch_notification(
-                    &destination_type,
-                    &subject,
-                    msg.clone(),
-                )
-                .await
-                {
-                    Ok(resp) => success_parts.push(format!("{dest_name}: {resp}")),
-                    Err(e) => {
-                        log::error!(
-                            "[incidents] Failed to notify {dest_name} for incident {org_id}/{incident_id}: {e}"
-                        );
-                        err_parts.push(format!("{dest_name}: {e}"));
-                    }
-                }
-            }
+        match crate::alerts::alert::send_templated_to_destination(
+            org_id,
+            &subject,
+            dest_name,
+            alert_template,
+            &mut ctx,
+        )
+        .await
+        {
+            Ok(resp) => success_parts.push(format!("{dest_name}: {resp}")),
             Err(e) => {
                 log::error!(
-                    "[incidents] Destination {dest_name} not found for incident {org_id}/{incident_id}: {e}"
+                    "[incidents] Failed to notify {dest_name} for incident {org_id}/{incident_id}: {e}"
                 );
                 err_parts.push(format!("{dest_name}: {e}"));
             }
@@ -504,6 +472,68 @@ async fn send_incident_notifications_inner(
             "[incidents] Notification partially failed for incident {org_id}/{incident_id} ({event}): {error}"
         );
         Some(error)
+    }
+}
+
+/// Point `ctx` at the incident: its link, and the `incident_*` template variables.
+#[cfg(feature = "enterprise")]
+fn apply_incident_to_context(
+    ctx: &mut crate::alerts::notifications::NotificationContext,
+    incident_id: &str,
+    event: &str,
+    title: String,
+    severity: String,
+    service_name: String,
+    incident_url: String,
+) {
+    // The alert's own link points at its search; an incident notification must open the incident.
+    ctx.alert_url = incident_url.clone();
+    ctx.context_attributes.extend([
+        ("incident_id".to_string(), incident_id.to_string()),
+        ("incident_title".to_string(), title),
+        ("incident_event".to_string(), event.to_string()),
+        ("incident_severity".to_string(), severity),
+        ("incident_service".to_string(), service_name),
+        ("incident_url".to_string(), incident_url),
+    ]);
+}
+
+/// Notification context for an incident subject with no alert behind it.
+#[cfg(feature = "enterprise")]
+async fn subject_notification_context(
+    org_id: &str,
+    subject_name: &str,
+    triggered_at: i64,
+) -> crate::alerts::notifications::NotificationContext {
+    use chrono::TimeZone;
+
+    let org_name = match crate::common::infra::config::ORGANIZATIONS
+        .read()
+        .await
+        .get(org_id)
+    {
+        Some(org) => org.name.clone(),
+        None => org_id.to_string(),
+    };
+    let trigger_time_str = if triggered_at > 0 {
+        chrono::Local
+            .timestamp_nanos(triggered_at * 1000)
+            .format("%Y-%m-%dT%H:%M:%S")
+            .to_string()
+    } else {
+        String::from("N/A")
+    };
+    crate::alerts::notifications::NotificationContext {
+        org_name,
+        alert_name: subject_name.to_string(),
+        alert_status: "firing".to_string(),
+        alert_start_time: String::from("N/A"),
+        alert_end_time: String::from("N/A"),
+        alert_start_time_millis: String::from("N/A"),
+        alert_end_time_millis: String::from("N/A"),
+        alert_trigger_time: triggered_at,
+        alert_trigger_time_str: trigger_time_str,
+        ..Default::default()
     }
 }
 
@@ -546,6 +576,8 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
 
     send_incident_notifications(
         &first_alert,
+        &[],
+        None,
         incident_id,
         "severity_changed",
         chrono::Utc::now().timestamp_micros(),
@@ -802,6 +834,8 @@ pub async fn correlate_alert_to_incident(
                 notify_attempted = !merged_destinations.is_empty();
                 notify_error = send_incident_notifications(
                     alert,
+                    notify_rows,
+                    eval_level,
                     incident_id,
                     event,
                     triggered_at,
@@ -930,13 +964,13 @@ pub async fn correlate_external_event(
             let merged_destinations =
                 collect_incident_destinations(org_id, incident_id, &subject.base_destinations)
                     .await;
+            let ctx = subject_notification_context(org_id, &subject.name, triggered_at).await;
             send_incident_notifications_inner(
                 org_id,
-                &subject.name,
                 incident_id,
                 event,
-                triggered_at,
                 &merged_destinations,
+                ctx,
                 None,
             )
             .await;
@@ -3836,5 +3870,59 @@ mod tests {
                 if incident_id == "inc-1"
         ));
         assert_eq!(paged, 1, "the delayed opened message goes out once");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn incident_notification_renders_through_slack_and_custom_templates() {
+        use crate::alerts::notifications::{
+            ChannelFormat, NotificationContext, RenderedMessage, apply_custom_template,
+            default_template::compiled_default_content, render, resolve_content,
+        };
+
+        let incident_url = "https://o2.example/web/alerts/incidents/inc-1?org_identifier=default";
+        let mut ctx = NotificationContext {
+            alert_name: "go_gc_rate_high".into(),
+            stream_name: "go_gc_duration_seconds".into(),
+            alert_status: "firing".into(),
+            alert_url: "https://o2.example/short/alert".into(),
+            ..Default::default()
+        };
+        super::apply_incident_to_context(
+            &mut ctx,
+            "inc-1",
+            "new_incident_created",
+            "go_gc_rate_high on coredns".into(),
+            "P2".into(),
+            "coredns".into(),
+            incident_url.into(),
+        );
+        assert_eq!(ctx.alert_url, incident_url);
+
+        let content = resolve_content(
+            &compiled_default_content(),
+            &ctx,
+            ChannelFormat::Slack.channel_family(),
+        );
+        let Ok(RenderedMessage::Http { body }) = render(ChannelFormat::Slack, &content, &ctx)
+        else {
+            panic!("slack renders an http body");
+        };
+        let slack: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert!(slack.get("incident").is_none(), "{body}");
+        assert!(slack["attachments"].is_array(), "{body}");
+        assert!(body.contains("incidents/inc-1"), "{body}");
+
+        let custom = apply_custom_template(
+            r#"{"text":"{incident_title} [{incident_severity}] {incident_event} {incident_url}"}"#,
+            &ctx,
+            false,
+        );
+        assert_eq!(
+            custom,
+            format!(
+                r#"{{"text":"go_gc_rate_high on coredns [P2] new_incident_created {incident_url}"}}"#
+            )
+        );
     }
 }
