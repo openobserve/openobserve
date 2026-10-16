@@ -8217,6 +8217,7 @@
       "attentionCaption": "來自最近一次執行。開啟規則即可查看它標記的警示。",
       "alertsFlagged": "{count} 個警示 | {count} 個警示",
       "nothingFlagged": "最近一次執行中，此規則未標記任何警示。",
+      "nothingCongested": "警示排程器在最近一次執行中跟上了進度。",
       "allClear": "最近一次執行未發現任何需要修正的問題。",
       "openAlert": "開啟警示",
       "viewEvidence": "檢視佐證",

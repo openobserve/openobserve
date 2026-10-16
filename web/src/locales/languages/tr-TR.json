@@ -8222,6 +8222,7 @@
       "attentionCaption": "Son çalıştırmadan. İşaretlediği uyarıları görmek için bir kural açın.",
       "alertsFlagged": "{count} uyarı | {count} uyarı",
       "nothingFlagged": "Son çalıştırmada bu kural tarafından işaretlenen uyarı yok.",
+      "nothingCongested": "Uyarı zamanlayıcısı en son çalıştırmada geri kalmadı.",
       "allClear": "Son çalıştırma düzeltilecek bir şey bulamadı.",
       "openAlert": "Uyarıyı aç",
       "viewEvidence": "Kanıtı görüntüle",

@@ -8222,6 +8222,7 @@
       "attentionCaption": "Z ostatniego uruchomienia. Otwórz regułę, aby zobaczyć alerty, które oznaczyła.",
       "alertsFlagged": "{count} alert | {count} alertów",
       "nothingFlagged": "Ta reguła nie oznaczyła żadnego alertu w ostatnim uruchomieniu.",
+      "nothingCongested": "Harmonogram alertów nadążał w ostatnim uruchomieniu.",
       "allClear": "Ostatnie uruchomienie nie znalazło nic do poprawy.",
       "openAlert": "Otwórz alert",
       "viewEvidence": "Zobacz dowody",

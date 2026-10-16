@@ -8222,6 +8222,7 @@
       "attentionCaption": "De la última ejecución. Abre una regla para ver las alertas que marcó.",
       "alertsFlagged": "{count} alerta | {count} alertas",
       "nothingFlagged": "Ninguna alerta marcada por esta regla en la última ejecución.",
+      "nothingCongested": "El programador de alertas se mantuvo al día en la última ejecución.",
       "allClear": "La última ejecución no encontró nada que corregir.",
       "openAlert": "Abrir alerta",
       "viewEvidence": "Ver evidencia",

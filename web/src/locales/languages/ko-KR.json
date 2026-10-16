@@ -8222,6 +8222,7 @@
       "attentionCaption": "최근 실행 기준입니다. 규칙을 열어 플래그된 알림을 확인하세요.",
       "alertsFlagged": "{count}개 알림 | {count}개 알림",
       "nothingFlagged": "최근 실행에서 이 규칙이 플래그한 알림이 없습니다.",
+      "nothingCongested": "알림 스케줄러가 최근 실행에서 지연 없이 처리되었습니다.",
       "allClear": "최근 실행에서 수정할 항목을 찾지 못했습니다.",
       "openAlert": "알림 열기",
       "viewEvidence": "증거 보기",

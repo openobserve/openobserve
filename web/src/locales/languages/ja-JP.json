@@ -8222,6 +8222,7 @@
       "attentionCaption": "最新の実行に基づきます。ルールを開くと、フラグが付けられたアラートを確認できます。",
       "alertsFlagged": "{count} 件のアラート | {count} 件のアラート",
       "nothingFlagged": "最新の実行でこのルールによってフラグが付けられたアラートはありません。",
+      "nothingCongested": "最新の実行では、アラートスケジューラが追いついていました。",
       "allClear": "最新の実行では修正が必要な項目は見つかりませんでした。",
       "openAlert": "アラートを開く",
       "viewEvidence": "エビデンスを表示",

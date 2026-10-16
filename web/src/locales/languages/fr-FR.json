@@ -8222,6 +8222,7 @@
       "attentionCaption": "D'après la dernière exécution. Ouvrez une règle pour voir les alertes qu'elle a signalées.",
       "alertsFlagged": "{count} alerte | {count} alertes",
       "nothingFlagged": "Aucune alerte signalée par cette règle lors de la dernière exécution.",
+      "nothingCongested": "Le planificateur d'alertes a tenu le rythme lors de la dernière exécution.",
       "allClear": "La dernière exécution n'a rien trouvé à corriger.",
       "openAlert": "Ouvrir l'alerte",
       "viewEvidence": "Voir les preuves",

@@ -8222,6 +8222,7 @@
       "attentionCaption": "Van de laatste uitvoering. Open een regel om de alarmen te zien die erdoor zijn gemarkeerd.",
       "alertsFlagged": "{count} alarm | {count} alarmen",
       "nothingFlagged": "Geen alarm gemarkeerd door deze regel in de laatste uitvoering.",
+      "nothingCongested": "De alarmplanner bleef bij in de laatste uitvoering.",
       "allClear": "De laatste uitvoering vond niets om op te lossen.",
       "openAlert": "Alarm openen",
       "viewEvidence": "Bewijs bekijken",

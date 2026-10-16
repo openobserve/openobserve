@@ -8222,6 +8222,7 @@
       "attentionCaption": "Aus dem letzten Lauf. Öffnen Sie eine Regel, um die von ihr markierten Alarme zu sehen.",
       "alertsFlagged": "{count} Alarm | {count} Alarme",
       "nothingFlagged": "Kein Alarm wurde von dieser Regel im letzten Lauf markiert.",
+      "nothingCongested": "Der Alarm-Scheduler blieb beim letzten Durchlauf auf dem Laufenden.",
       "allClear": "Der letzte Lauf hat nichts zu beheben gefunden.",
       "openAlert": "Alarm öffnen",
       "viewEvidence": "Belege ansehen",

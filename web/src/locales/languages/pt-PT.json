@@ -8222,6 +8222,7 @@
       "attentionCaption": "Da última execução. Abra uma regra para ver os alertas que ela sinalizou.",
       "alertsFlagged": "{count} alerta | {count} alertas",
       "nothingFlagged": "Nenhum alerta sinalizado por esta regra na última execução.",
+      "nothingCongested": "O agendador de alertas acompanhou o ritmo na execução mais recente.",
       "allClear": "A última execução não encontrou nada a corrigir.",
       "openAlert": "Abrir alerta",
       "viewEvidence": "Ver evidências",

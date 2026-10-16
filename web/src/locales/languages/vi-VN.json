@@ -8222,6 +8222,7 @@
       "attentionCaption": "Từ lượt chạy gần nhất. Mở một quy tắc để xem các cảnh báo mà nó đã đánh dấu.",
       "alertsFlagged": "{count} cảnh báo | {count} cảnh báo",
       "nothingFlagged": "Không có cảnh báo nào bị quy tắc này đánh dấu trong lượt chạy gần nhất.",
+      "nothingCongested": "Bộ lập lịch cảnh báo đã theo kịp trong lần chạy gần nhất.",
       "allClear": "Lượt chạy gần nhất không tìm thấy vấn đề nào cần khắc phục.",
       "openAlert": "Mở cảnh báo",
       "viewEvidence": "Xem bằng chứng",

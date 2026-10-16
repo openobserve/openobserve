@@ -8222,6 +8222,7 @@
       "attentionCaption": "来自最近一次运行。打开规则即可查看其标记的告警。",
       "alertsFlagged": "{count} 条告警 | {count} 条告警",
       "nothingFlagged": "最近一次运行中，该规则未标记任何告警。",
+      "nothingCongested": "在最近一次运行中，告警调度器保持了同步。",
       "allClear": "最近一次运行未发现需要修复的问题。",
       "openAlert": "打开告警",
       "viewEvidence": "查看证据",
