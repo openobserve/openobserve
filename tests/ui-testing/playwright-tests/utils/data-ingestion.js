@@ -2,6 +2,11 @@ const testLogger = require('./test-logger.js');
 const logsdata = require("../../../test-data/logs_data.json");
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 
+// Rows are stamped at ingest, so a 5-min refresh keeps them inside every 15-min test window.
+const SHARED_STREAM = 'e2e_automate';
+const SHARED_STREAM_REFRESH_MS = 5 * 60 * 1000;
+const lastSharedIngest = new Map();
+
 /**
  * Ingest test data into a stream via API using Node.js context (secure)
  * @param {import('@playwright/test').Page} page - Playwright page object
@@ -15,11 +20,19 @@ async function ingestTestData(page, streamName = "e2e_automate") {
     ? process.env.INGESTION_URL.slice(0, -1)
     : process.env.INGESTION_URL;
 
+  const sharedKey = `${orgId}:${streamName}`;
+  const lastIngest = streamName === SHARED_STREAM ? lastSharedIngest.get(sharedKey) : undefined;
+  if (lastIngest && Date.now() - lastIngest < SHARED_STREAM_REFRESH_MS) {
+    testLogger.debug('Test data ingestion skipped — this worker refreshed the shared stream recently', { streamName, ageMs: Date.now() - lastIngest });
+    return { skipped: true };
+  }
+
   try {
     const response = await page.request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
       headers: headers,
       data: logsdata
     });
+    if (response.ok() && streamName === SHARED_STREAM) lastSharedIngest.set(sharedKey, Date.now());
 
     const responseData = await response.json().catch(() => ({ error: 'Failed to parse JSON' }));
     testLogger.debug('Test data ingestion response', { response: responseData, streamName });
