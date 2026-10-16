@@ -1132,8 +1132,6 @@
     "regionTitle": "地域を選択",
     "userDefinedSchemaLabel": "ユーザー定義スキーマ",
     "allFieldsLabel": "すべてのフィールド",
-    "generateQuery": "AI に聞く",
-    "generateQueryTooltip": "AIに問い合わせを依頼する",
     "nlQueryGenerationFailed": "クエリを生成できませんでした。もう一度試してください。",
     "askAIPlaceholder": "AIに問い合わせて...",
     "askAIFunctionPlaceholder": "AIに機能の支援を依頼してください...",
@@ -13346,7 +13344,6 @@
   },
   "nlMode": {
     "toggle": "自然言語モード",
-    "noAdditionalOptions": "追加オプションなし",
     "executingTool": "{tool} を実行中...",
     "toolFailed": "ツール失敗: {message}",
     "processing": "処理中..."

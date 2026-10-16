@@ -1132,8 +1132,6 @@
     "regionTitle": "Chọn vùng",
     "userDefinedSchemaLabel": "Lược đồ do người dùng xác định",
     "allFieldsLabel": "Tất cả trường",
-    "generateQuery": "Hỏi AI",
-    "generateQueryTooltip": "Hỏi AI để giúp đỡ với truy vấn của bạn",
     "nlQueryGenerationFailed": "Không thể tạo truy vấn. Vui lòng thử lại.",
     "askAIPlaceholder": "Hỏi AI để giúp đỡ với truy vấn của bạn...",
     "askAIFunctionPlaceholder": "Hỏi AI để giúp đỡ với hàm của bạn...",
@@ -13346,7 +13344,6 @@
   },
   "nlMode": {
     "toggle": "Chế độ ngôn ngữ tự nhiên",
-    "noAdditionalOptions": "Không có tùy chọn bổ sung",
     "executingTool": "Đang thực thi {tool}...",
     "toolFailed": "Công cụ thất bại: {message}",
     "processing": "Đang xử lý..."

@@ -627,7 +627,7 @@ vrl = { version = "0.31", features = [
     "test",
 ] }
 x509-parser = "0.18.0"
-zip = "8.0"
+zip = "9.0"
 zstd = "0.13"
 
 [patch.crates-io]

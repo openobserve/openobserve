@@ -1132,8 +1132,6 @@
     "regionTitle": "اختر منطقة",
     "userDefinedSchemaLabel": "مخطط معرف من قبل المستخدم",
     "allFieldsLabel": "جميع الحقول",
-    "generateQuery": "اسأل الذكاء الاصطناعي",
-    "generateQueryTooltip": "اطلب من الذكاء الاصطناعي مساعدتك في استعلامك",
     "nlQueryGenerationFailed": "فشل في توليد استعلام. يرجى المحاولة مرة أخرى.",
     "askAIPlaceholder": "اطلب من الذكاء الاصطناعي مساعدتك في استعلامك...",
     "askAIFunctionPlaceholder": "اطلب من الذكاء الاصطناعي مساعدتك في وظيفتك...",
@@ -13346,7 +13344,6 @@
   },
   "nlMode": {
     "toggle": "وضع اللغة الطبيعية",
-    "noAdditionalOptions": "لا توجد خيارات إضافية",
     "executingTool": "تنفيذ {tool}...",
     "toolFailed": "الأداة فشلت: {message}",
     "processing": "قيد المعالجة..."
