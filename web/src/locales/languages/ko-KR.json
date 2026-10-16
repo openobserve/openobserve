@@ -8055,6 +8055,7 @@
     "refresh": "새로 고침",
     "retry": "다시 시도",
     "tabs": {
+      "runs": "실행",
       "dashboard": "대시보드"
     },
     "duration": {
@@ -8063,6 +8064,12 @@
       "hours": "{count}시간 | {count}시간",
       "days": "{count}일 | {count}일",
       "years": "{count}년 | {count}년"
+    },
+    "unit": {
+      "minutes": "분 | 분",
+      "hours": "시간 | 시간",
+      "days": "일 | 일",
+      "years": "년 | 년"
     },
     "rules": {
       "failure": "실패",
@@ -8133,7 +8140,7 @@
       "noneShort": "없음",
       "substrateEmpty": "조직에 알림이 있지만, 해당 실행의 기간에 트리거 행을 찾지 못해 아무것도 측정하지 못했습니다.",
       "unreadableDefinitions": "{count}개의 알림 정의를 읽을 수 없습니다. | {count}개의 알림 정의를 읽을 수 없습니다.",
-      "factsWithoutDefinition": "{count}개의 알림에 트리거 행이 있지만 정의가 없습니다. | {count}개의 알림에 트리거 행이 있지만 정의가 없습니다.",
+      "factsWithoutDefinition": "{count}개 알림에 트리거 행이 있었지만 정의가 없습니다. 보통 해당 기간 중 삭제된 항목이며, 공백으로 집계되지 않습니다. | {count}개 알림에 트리거 행이 있었지만 정의가 없습니다. 보통 해당 기간 중 삭제된 항목이며, 공백으로 집계되지 않습니다.",
       "errorClustersUnattributed": "{count}개의 오류 행을 알림에 귀속할 수 없습니다. | {count}개의 오류 행을 알림에 귀속할 수 없습니다.",
       "definitionsWithoutFacts": "{count}개의 알림은 해당 기간에 트리거 행이 없으며, 이는 공백으로 계산되지 않습니다. | {count}개의 알림은 해당 기간에 트리거 행이 없으며, 이는 공백으로 계산되지 않습니다.",
       "transitionsTruncated": "상태 전환이 잘렸습니다.",
@@ -8145,6 +8152,7 @@
       "schedule": "일정",
       "off": "꺼짐",
       "notConfigured": "구성되지 않음",
+      "noScheduledRun": "예약된 실행 없음",
       "window": "분석 기간",
       "latestFindings": "최근 실행 발견 사항",
       "trend": "발견 사항 추세",
@@ -8184,6 +8192,7 @@
       "statAlertsInScope": "범위 내 알림",
       "statDeclined": "판정 제외",
       "statDeclinedSub": "판정 제외, 이상 없음이 아님",
+      "statDeclinedTooltip": "규칙이 판단하지 않은 규칙-알림 쌍입니다. 해당 알림의 이력이 너무 적거나 샘플이 너무 부족했기 때문입니다. 통과가 아닌 게이트이며, 알림별 사유는 스트림에 기록되지 않습니다.",
       "statWindow": "기간",
       "findingsHeading": "발견 사항",
       "suggestionsOnly": "제안일 뿐이며 자동으로 적용되는 것은 없습니다",
@@ -8201,12 +8210,23 @@
       "topOrgs": "영향을 가장 많이 받은 조직",
       "worstHours": "최악의 시간대",
       "lagImpact": "{skipped}건 건너뜀, {evaluations}건 중 {late}건 지연",
-      "proposedActions": "제안된 작업"
+      "proposedActions": "제안된 작업",
+      "openAlert": "알림 열기"
     },
     "dashboard": {
+      "latestRunAgo": "최근 실행 {time}",
       "findings": "발견 사항",
       "alertsInScope": "범위 내 알림",
       "coverage": "커버리지",
+      "attention": "주의가 필요한 항목",
+      "attentionCaption": "최근 실행 기준입니다. 규칙을 열어 플래그된 알림을 확인하세요.",
+      "alertsFlagged": "{count}개 알림 | {count}개 알림",
+      "nothingFlagged": "최근 실행에서 이 규칙이 플래그한 알림이 없습니다.",
+      "allClear": "최근 실행에서 수정할 항목을 찾지 못했습니다.",
+      "openAlert": "알림 열기",
+      "viewEvidence": "증거 보기",
+      "notEnabledTitle": "이 조직에서는 알림 캘리브레이션이 실행되고 있지 않습니다",
+      "notEnabledDescription": "설정에서 켜세요. 켜면 바로 첫 실행이 예정됩니다.",
       "emptyTitle": "최근 {days}일 동안 실행 없음",
       "emptyDescription": "알림 캘리브레이션이 실행되면 대시보드가 채워집니다."
     },
@@ -8221,7 +8241,9 @@
       "enabled": "이 조직에 대해 알림 캘리브레이션 실행",
       "enabledHelp": "꺼져 있으면 이 조직에는 예약된 실행이 없습니다. 켜면 첫 실행이 즉시 예정됩니다.",
       "frequency": "실행 주기",
+      "frequencyHelp": "1시간에서 30일 사이입니다.",
       "window": "분석 기간",
+      "windowHelp": "각 실행이 되돌아보는 범위로, 1분에서 90일 사이입니다. 주기보다 긴 기간을 설정하면 연속된 실행이 겹쳐 동일한 발견 사항을 다시 보고합니다.",
       "noConfig": "이 조직에는 아직 알림 캘리브레이션 설정이 없습니다. 아래 값은 첫 저장 시 저장되는 기본값입니다.",
       "warnGap": "{every}마다 실행하지만 {window}만 조회하므로 기간 사이의 시간은 분석되지 않습니다.",
       "warnStarved": "{window} 기간은 {rules}에 너무 짧아, 모든 실행이 모든 알림에 대해 해당 규칙을 제외합니다.",
@@ -8235,7 +8257,10 @@
       "saveFailed": "설정을 저장할 수 없습니다: {message}",
       "loadFailed": "설정을 불러올 수 없습니다: {message}",
       "lastSaved": "마지막 저장 {time}",
-      "runNowHeading": "지금 실행"
+      "runNowHeading": "지금 실행",
+      "findingsDesc": "발견 사항은 이 조직의 {stream} 스트림에 기록되며 해당 스트림의 보존 기간 동안 유지됩니다. 알림 캘리브레이션은 알림을 전송하지 않습니다.",
+      "frequencyRange": "1시간에서 30일 사이의 주기를 선택하세요.",
+      "windowRange": "1분에서 90일 사이의 기간을 선택하세요."
     }
   },
   "alerts": {

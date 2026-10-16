@@ -2346,7 +2346,7 @@
       "definitionsWithoutFacts": "75b29ed5ee168509",
       "errorClustersTruncated": "16f91b7a7f510f7a",
       "errorClustersUnattributed": "adc7eb7c7f236982",
-      "factsWithoutDefinition": "461ffd6b39e00723",
+      "factsWithoutDefinition": "6095252a1537d412",
       "full": "4e5ee32632668b6e",
       "fullShort": "008dacb6d1e85bd8",
       "gap": "6cac1f2492db043f",
@@ -2359,11 +2359,21 @@
       "unreadableDefinitions": "164f5a3138fe4993"
     },
     "dashboard": {
+      "alertsFlagged": "42c0f3db6ef90f50",
       "alertsInScope": "462d229c0e8e094e",
+      "allClear": "43692bfb3d02d93d",
+      "attention": "31bbad770444838b",
+      "attentionCaption": "6b8f996043d9821f",
       "coverage": "523487a5de21adb5",
       "emptyDescription": "e51e640c98092596",
       "emptyTitle": "9fafe7d2bc89815b",
-      "findings": "e171c2ff25b55e5a"
+      "findings": "e171c2ff25b55e5a",
+      "latestRunAgo": "765da715ec692f38",
+      "notEnabledDescription": "11350ca4f93f0939",
+      "notEnabledTitle": "027584a88a1748cd",
+      "nothingFlagged": "31b3106f36b0c08f",
+      "openAlert": "5fd56f8cb8c56fc0",
+      "viewEvidence": "2ed9337dcc8cf799"
     },
     "detail": {
       "alert": "44a57b22e03d9a66",
@@ -2381,6 +2391,7 @@
       "noneFoundTitle": "66d2c65a4ede53f7",
       "nothingDescription": "07d3dcac80da7a03",
       "nothingTitle": "f5a637211cc64316",
+      "openAlert": "5fd56f8cb8c56fc0",
       "partialCoverage": "60fd12418e25d554",
       "partialCoverageDesc": "8ce8cc7880e9dd0d",
       "perSubjectNote": "408316bcb1ec66c6",
@@ -2389,6 +2400,7 @@
       "statAlertsInScope": "462d229c0e8e094e",
       "statDeclined": "dce083a2c47ffdc4",
       "statDeclinedSub": "0be22b0c3e76aa0c",
+      "statDeclinedTooltip": "3fa27aa182695dae",
       "statFindings": "e171c2ff25b55e5a",
       "statWindow": "19734a1b58cabc22",
       "subtitle": "0bd8662a663a1894",
@@ -2413,6 +2425,7 @@
       "filteredTitle": "aa7ce3f73a5a9a05",
       "findings": "e171c2ff25b55e5a",
       "latestFindings": "2508018a3bcdbf65",
+      "noScheduledRun": "5c84496a8ad7bf20",
       "noneFound": "66d2c65a4ede53f7",
       "notConfigured": "dd1841d295024256",
       "off": "ca7981b46ecf2c17",
@@ -2481,9 +2494,10 @@
       "discard": "eb1a70e39274bb76",
       "enabled": "dc4090a859eb0e69",
       "enabledHelp": "23040e0358c3bbbe",
+      "findingsDesc": "daa9818916359088",
       "frequency": "24947227759d0aca",
-      "frequencyHelp": "59f1cbd7d5b180f1",
-      "frequencyRange": "cf148d5c02f8e457",
+      "frequencyHelp": "2f3f9e5db13386ba",
+      "frequencyRange": "321ad339193ce23e",
       "lastSaved": "b23ddd9bf648f2a8",
       "loadFailed": "ee0abd5ca4637d00",
       "noConfig": "80dd684679ba56dc",
@@ -2500,8 +2514,8 @@
       "warnGap": "ab3f7fcd58348e4a",
       "warnStarved": "36e38e49225f0a36",
       "window": "0fb4558d2246b859",
-      "windowHelp": "672954b6897a73e0",
-      "windowRange": "27fac41a150474ca"
+      "windowHelp": "2920ebacc193feb7",
+      "windowRange": "738bcdded760328a"
     },
     "severity": {
       "high": "c4ebc6d4a5832cd9",
@@ -2511,9 +2525,16 @@
     },
     "subtitle": "affbdaef7359664c",
     "tabs": {
-      "dashboard": "67b696468610b879"
+      "dashboard": "67b696468610b879",
+      "runs": "848f54e89660cea4"
     },
-    "title": "7eaddf684d3764dc"
+    "title": "7eaddf684d3764dc",
+    "unit": {
+      "days": "6ac0d345e93ddb83",
+      "hours": "f4fef91b70d7ba97",
+      "minutes": "08d71a9f0b627a32",
+      "years": "66aac6c498da87a0"
+    }
   },
   "alert_dependencies": {
     "actionDelete": "e2d0a54968ead24e",

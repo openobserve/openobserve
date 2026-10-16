@@ -8055,6 +8055,7 @@
     "refresh": "Vernieuwen",
     "retry": "Opnieuw proberen",
     "tabs": {
+      "runs": "Uitvoeringen",
       "dashboard": "Dashboard"
     },
     "duration": {
@@ -8063,6 +8064,12 @@
       "hours": "{count} uur | {count} uur",
       "days": "{count} dag | {count} dagen",
       "years": "{count} jaar | {count} jaar"
+    },
+    "unit": {
+      "minutes": "minuut | minuten",
+      "hours": "uur | uur",
+      "days": "dag | dagen",
+      "years": "jaar | jaar"
     },
     "rules": {
       "failure": "Fout",
@@ -8133,7 +8140,7 @@
       "noneShort": "Geen",
       "substrateEmpty": "De organisatie heeft alarmen, maar de run vond geen triggerrijen voor het venster, dus er is niets gemeten.",
       "unreadableDefinitions": "{count} alarmdefinitie kon niet worden gelezen. | {count} alarmdefinities konden niet worden gelezen.",
-      "factsWithoutDefinition": "{count} alarm had triggerrijen maar geen definitie. | {count} alarmen hadden triggerrijen maar geen definitie.",
+      "factsWithoutDefinition": "{count} alarm had triggerrijen maar geen definitie, meestal een alarm dat tijdens het venster is verwijderd; telt niet als gat. | {count} alarmen hadden triggerrijen maar geen definitie, meestal alarmen die tijdens het venster zijn verwijderd; telt niet als gat.",
       "errorClustersUnattributed": "{count} foutrij kon niet aan een alarm worden toegewezen. | {count} foutrijen konden niet aan een alarm worden toegewezen.",
       "definitionsWithoutFacts": "{count} alarm had geen triggerrijen in het venster, wat niet als een gat wordt geteld. | {count} alarmen hadden geen triggerrijen in het venster, wat niet als een gat wordt geteld.",
       "transitionsTruncated": "Statusovergangen zijn afgekapt.",
@@ -8145,6 +8152,7 @@
       "schedule": "Planning",
       "off": "Uit",
       "notConfigured": "Niet geconfigureerd",
+      "noScheduledRun": "Geen geplande uitvoering",
       "window": "Analysevenster",
       "latestFindings": "Bevindingen van de laatste run",
       "trend": "Trend van bevindingen",
@@ -8184,6 +8192,7 @@
       "statAlertsInScope": "Alarmen binnen bereik",
       "statDeclined": "Afgewezen",
       "statDeclinedSub": "Afgewezen, niet vrijgegeven",
+      "statDeclinedTooltip": "Regel- en alarmparen die een regel niet zou beoordelen, omdat het alarm te weinig geschiedenis of te weinig samples had. Een poort, geen vrijgave; de redenen per alarm worden niet naar de stream geschreven.",
       "statWindow": "Venster",
       "findingsHeading": "Bevindingen",
       "suggestionsOnly": "Alleen suggesties, er wordt niets automatisch toegepast",
@@ -8201,12 +8210,23 @@
       "topOrgs": "Meest getroffen organisaties",
       "worstHours": "Slechtste uren",
       "lagImpact": "{skipped} overgeslagen, {late} van {evaluations} te laat",
-      "proposedActions": "Voorgestelde acties"
+      "proposedActions": "Voorgestelde acties",
+      "openAlert": "Alarm openen"
     },
     "dashboard": {
+      "latestRunAgo": "Laatste uitvoering {time}",
       "findings": "Bevindingen",
       "alertsInScope": "Alarmen binnen bereik",
       "coverage": "Dekking",
+      "attention": "Wat aandacht nodig heeft",
+      "attentionCaption": "Van de laatste uitvoering. Open een regel om de alarmen te zien die erdoor zijn gemarkeerd.",
+      "alertsFlagged": "{count} alarm | {count} alarmen",
+      "nothingFlagged": "Geen alarm gemarkeerd door deze regel in de laatste uitvoering.",
+      "allClear": "De laatste uitvoering vond niets om op te lossen.",
+      "openAlert": "Alarm openen",
+      "viewEvidence": "Bewijs bekijken",
+      "notEnabledTitle": "Alarmkalibratie is niet actief voor deze organisatie",
+      "notEnabledDescription": "Zet het aan in de instellingen. De eerste uitvoering volgt zodra het aanstaat.",
       "emptyTitle": "Geen uitvoeringen in de afgelopen {days} dagen",
       "emptyDescription": "Het dashboard wordt gevuld zodra de alarmkalibratie is uitgevoerd."
     },
@@ -8221,7 +8241,9 @@
       "enabled": "Alarmkalibratie uitvoeren voor deze organisatie",
       "enabledHelp": "Als dit uit staat, heeft de organisatie geen geplande uitvoering. Als je het aanzet, is de eerste uitvoering onmiddellijk aan de beurt.",
       "frequency": "Uitvoeren elke",
+      "frequencyHelp": "Tussen 1 uur en 30 dagen.",
       "window": "Analysevenster",
+      "windowHelp": "Hoe ver elke uitvoering terugkijkt, tussen 1 minuut en 90 dagen. Een venster langer dan de cadans laat opeenvolgende uitvoeringen overlappen en dezelfde bevindingen opnieuw rapporteren.",
       "noConfig": "Deze organisatie heeft nog geen instellingen voor alarmkalibratie. De onderstaande waarden zijn de standaardwaarden die bij de eerste opslag worden bewaard.",
       "warnGap": "Voert elke {every} uit, maar kijkt slechts {window} terug, zodat de tijd tussen vensters nooit wordt geanalyseerd.",
       "warnStarved": "Een venster van {window} is te kort voor {rules}, dus elke uitvoering wijst ze af voor elk alarm.",
@@ -8235,7 +8257,10 @@
       "saveFailed": "De instellingen konden niet worden opgeslagen: {message}",
       "loadFailed": "De instellingen konden niet worden geladen: {message}",
       "lastSaved": "Laatst opgeslagen {time}",
-      "runNowHeading": "Nu uitvoeren"
+      "runNowHeading": "Nu uitvoeren",
+      "findingsDesc": "Bevindingen worden naar de stream {stream} van deze organisatie geschreven en bewaard volgens de retentie van die stream. Alarmkalibratie verstuurt geen meldingen.",
+      "frequencyRange": "Kies een cadans tussen 1 uur en 30 dagen.",
+      "windowRange": "Kies een venster tussen 1 minuut en 90 dagen."
     }
   },
   "alerts": {

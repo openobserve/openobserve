@@ -8055,6 +8055,7 @@
     "refresh": "更新",
     "retry": "再試行",
     "tabs": {
+      "runs": "実行",
       "dashboard": "ダッシュボード"
     },
     "duration": {
@@ -8063,6 +8064,12 @@
       "hours": "{count} 時間 | {count} 時間",
       "days": "{count} 日 | {count} 日",
       "years": "{count} 年 | {count} 年"
+    },
+    "unit": {
+      "minutes": "分 | 分",
+      "hours": "時間 | 時間",
+      "days": "日 | 日",
+      "years": "年 | 年"
     },
     "rules": {
       "failure": "失敗",
@@ -8133,7 +8140,7 @@
       "noneShort": "なし",
       "substrateEmpty": "組織にはアラートがありますが、実行はそのウィンドウにトリガー行が見つからなかったため、何も測定されませんでした。",
       "unreadableDefinitions": "{count} 件のアラート定義を読み取れませんでした。 | {count} 件のアラート定義を読み取れませんでした。",
-      "factsWithoutDefinition": "{count} 件のアラートにトリガー行がありましたが、定義がありませんでした。 | {count} 件のアラートにトリガー行がありましたが、定義がありませんでした。",
+      "factsWithoutDefinition": "{count} 件のアラートにトリガー行がありましたが定義がありませんでした。通常、ウィンドウ中に削除されたもので、ギャップとしてはカウントされません。 | {count} 件のアラートにトリガー行がありましたが定義がありませんでした。通常、ウィンドウ中に削除されたもので、ギャップとしてはカウントされません。",
       "errorClustersUnattributed": "{count} 件のエラー行をアラートに紐付けられませんでした。 | {count} 件のエラー行をアラートに紐付けられませんでした。",
       "definitionsWithoutFacts": "{count} 件のアラートにはウィンドウ内にトリガー行がありませんでしたが、これはギャップとしてカウントされません。 | {count} 件のアラートにはウィンドウ内にトリガー行がありませんでしたが、これはギャップとしてカウントされません。",
       "transitionsTruncated": "状態遷移が切り捨てられました。",
@@ -8145,6 +8152,7 @@
       "schedule": "スケジュール",
       "off": "オフ",
       "notConfigured": "未設定",
+      "noScheduledRun": "スケジュールされた実行はありません",
       "window": "分析ウィンドウ",
       "latestFindings": "最新の実行の検出結果",
       "trend": "検出結果の推移",
@@ -8184,6 +8192,7 @@
       "statAlertsInScope": "対象範囲のアラート",
       "statDeclined": "判断対象外",
       "statDeclinedSub": "判断対象外であり、問題なしではない",
+      "statDeclinedTooltip": "アラートの履歴が少なすぎる、またはサンプルが不足しているため、ルールが判定を行わなかったルールとアラートのペアです。これはゲートであり、問題なしの判定ではありません。アラートごとの理由はストリームには書き込まれません。",
       "statWindow": "ウィンドウ",
       "findingsHeading": "検出結果",
       "suggestionsOnly": "提案のみで、自動的に適用されるものはありません",
@@ -8201,12 +8210,23 @@
       "topOrgs": "最も影響を受けた組織",
       "worstHours": "最も深刻な時間帯",
       "lagImpact": "{skipped} 件スキップ、{evaluations} 件中 {late} 件が遅延",
-      "proposedActions": "提案されたアクション"
+      "proposedActions": "提案されたアクション",
+      "openAlert": "アラートを開く"
     },
     "dashboard": {
+      "latestRunAgo": "最新の実行 {time}",
       "findings": "検出結果",
       "alertsInScope": "対象範囲のアラート",
       "coverage": "カバレッジ",
+      "attention": "注意が必要な項目",
+      "attentionCaption": "最新の実行に基づきます。ルールを開くと、フラグが付けられたアラートを確認できます。",
+      "alertsFlagged": "{count} 件のアラート | {count} 件のアラート",
+      "nothingFlagged": "最新の実行でこのルールによってフラグが付けられたアラートはありません。",
+      "allClear": "最新の実行では修正が必要な項目は見つかりませんでした。",
+      "openAlert": "アラートを開く",
+      "viewEvidence": "エビデンスを表示",
+      "notEnabledTitle": "この組織ではアラートキャリブレーションが実行されていません",
+      "notEnabledDescription": "設定で有効にしてください。有効にするとすぐに最初の実行が行われます。",
       "emptyTitle": "過去 {days} 日間に実行はありません",
       "emptyDescription": "アラートキャリブレーションが実行されると、ダッシュボードに表示されます。"
     },
@@ -8221,7 +8241,9 @@
       "enabled": "この組織でアラートキャリブレーションを実行する",
       "enabledHelp": "オフの間、この組織にはスケジュールされた実行がありません。オンにすると、最初の実行が即時に予定されます。",
       "frequency": "実行間隔",
+      "frequencyHelp": "1 時間から 30 日までの範囲です。",
       "window": "分析ウィンドウ",
+      "windowHelp": "各実行がさかのぼって参照する期間は、1 分から 90 日までです。ウィンドウが実行間隔より長いと、連続する実行が重複し、同じ検出事項が再度レポートされます。",
       "noConfig": "この組織にはまだアラートキャリブレーション設定がありません。以下の値は、最初の保存で保存されるデフォルト値です。",
       "warnGap": "{every} ごとに実行されますが、さかのぼるのは {window} のみのため、ウィンドウ間の時間は分析されません。",
       "warnStarved": "{window} のウィンドウは {rules} には短すぎるため、毎回の実行ですべてのアラートにおいてこれらが対象外となります。",
@@ -8235,7 +8257,10 @@
       "saveFailed": "設定を保存できませんでした: {message}",
       "loadFailed": "設定を読み込めませんでした: {message}",
       "lastSaved": "最終保存 {time}",
-      "runNowHeading": "今すぐ実行"
+      "runNowHeading": "今すぐ実行",
+      "findingsDesc": "検出事項はこの組織の {stream} ストリームに書き込まれ、そのストリームの保持期間に従って保持されます。アラートキャリブレーションは通知を送信しません。",
+      "frequencyRange": "1 時間から 30 日の間で実行間隔を選択してください。",
+      "windowRange": "1 分から 90 日の間でウィンドウを選択してください。"
     }
   },
   "alerts": {

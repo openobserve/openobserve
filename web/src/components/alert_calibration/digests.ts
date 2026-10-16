@@ -234,7 +234,7 @@ export function coverageVerdict(row: RunRow): CoverageVerdict {
   return row.coverage_gap ? "gap" : "full";
 }
 
-/** Every coverage column off its default, including the two `coverage_gap` does not count. */
+/** Every coverage column off its default, including the ones `coverage_gap` does not count. */
 export function coverageNotes(t: TranslateFn, row: RunRow): I18nText[] {
   const notes: I18nText[] = [];
   if (row.coverage_stream_substrate_empty)
