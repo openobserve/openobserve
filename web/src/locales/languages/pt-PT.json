@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} alerta não tinha linhas de gatilho na janela, o que não é contado como lacuna. | {count} alertas não tinham linhas de gatilho na janela, o que não é contado como lacuna.",
       "transitionsTruncated": "As transições de estado foram truncadas.",
       "countersTruncated": "Os contadores foram truncados, então os alertas além do corte não foram avaliados.",
-      "errorClustersTruncated": "Os clusters de erro foram truncados.",
-      "metaFallbackUsed": "Lido do stream de gatilhos da organização _meta, o que não é contado como lacuna."
+      "errorClustersTruncated": "Os clusters de erro foram truncados."
     },
     "digests": {
       "schedule": "Agendamento",

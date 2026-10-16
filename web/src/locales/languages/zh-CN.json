@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} 个告警在该窗口内没有触发记录，不计为覆盖缺口。 | {count} 个告警在该窗口内没有触发记录，不计为覆盖缺口。",
       "transitionsTruncated": "状态转换被截断。",
       "countersTruncated": "计数器被截断，因此截断之后的告警未被判定。",
-      "errorClustersTruncated": "错误聚类被截断。",
-      "metaFallbackUsed": "从 _meta 组织的 triggers 数据流读取，不计为覆盖缺口。"
+      "errorClustersTruncated": "错误聚类被截断。"
     },
     "digests": {
       "schedule": "调度",

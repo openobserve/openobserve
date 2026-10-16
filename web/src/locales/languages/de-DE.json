@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} Alarm hatte keine Auslösezeilen im Fenster, was nicht als Lücke gezählt wird. | {count} Alarme hatten keine Auslösezeilen im Fenster, was nicht als Lücke gezählt wird.",
       "transitionsTruncated": "Zustandsübergänge wurden abgeschnitten.",
       "countersTruncated": "Zähler wurden abgeschnitten, daher wurden Alarme jenseits der Grenze nicht bewertet.",
-      "errorClustersTruncated": "Fehlercluster wurden abgeschnitten.",
-      "metaFallbackUsed": "Aus dem triggers-Stream der Organisation _meta gelesen, was nicht als Lücke gezählt wird."
+      "errorClustersTruncated": "Fehlercluster wurden abgeschnitten."
     },
     "digests": {
       "schedule": "Zeitplan",

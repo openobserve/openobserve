@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} uyarının pencerede tetikleyici satırı yoktu, bu bir boşluk olarak sayılmaz. | {count} uyarının pencerede tetikleyici satırı yoktu, bu bir boşluk olarak sayılmaz.",
       "transitionsTruncated": "Durum geçişleri kısaltıldı.",
       "countersTruncated": "Sayaçlar kısaltıldı, bu nedenle kesme noktasından sonraki uyarılar değerlendirilmedi.",
-      "errorClustersTruncated": "Hata kümeleri kısaltıldı.",
-      "metaFallbackUsed": "_meta organizasyonunun triggers akışından okundu, bu bir boşluk olarak sayılmaz."
+      "errorClustersTruncated": "Hata kümeleri kısaltıldı."
     },
     "digests": {
       "schedule": "Zamanlama",

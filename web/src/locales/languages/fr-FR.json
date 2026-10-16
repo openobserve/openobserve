@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} alerte n'avait aucune ligne de déclenchement dans la fenêtre, ce qui n'est pas compté comme une lacune. | {count} alertes n'avaient aucune ligne de déclenchement dans la fenêtre, ce qui n'est pas compté comme une lacune.",
       "transitionsTruncated": "Les transitions d'état ont été tronquées.",
       "countersTruncated": "Les compteurs ont été tronqués, donc les alertes au-delà de la coupure n'ont pas été évaluées.",
-      "errorClustersTruncated": "Les clusters d'erreurs ont été tronqués.",
-      "metaFallbackUsed": "Lu depuis le flux des déclencheurs de l'organisation _meta, ce qui n'est pas compté comme une lacune."
+      "errorClustersTruncated": "Les clusters d'erreurs ont été tronqués."
     },
     "digests": {
       "schedule": "Planification",

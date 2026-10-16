@@ -8138,8 +8138,7 @@
       "definitionsWithoutFacts": "{count} 個警示在時間範圍內沒有觸發資料列，這不計為缺口。 | {count} 個警示在時間範圍內沒有觸發資料列，這不計為缺口。",
       "transitionsTruncated": "狀態轉換已被截斷。",
       "countersTruncated": "計數器已被截斷，因此超過截斷點的警示未被評估。",
-      "errorClustersTruncated": "錯誤叢集已被截斷。",
-      "metaFallbackUsed": "讀取自 _meta 組織的 triggers 串流，這不計為缺口。"
+      "errorClustersTruncated": "錯誤叢集已被截斷。"
     },
     "digests": {
       "schedule": "排程",

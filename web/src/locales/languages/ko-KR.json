@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count}개의 알림은 해당 기간에 트리거 행이 없으며, 이는 공백으로 계산되지 않습니다. | {count}개의 알림은 해당 기간에 트리거 행이 없으며, 이는 공백으로 계산되지 않습니다.",
       "transitionsTruncated": "상태 전환이 잘렸습니다.",
       "countersTruncated": "카운터가 잘렸으므로, 잘린 이후의 알림은 판정되지 않았습니다.",
-      "errorClustersTruncated": "오류 클러스터가 잘렸습니다.",
-      "metaFallbackUsed": "_meta 조직의 트리거 스트림에서 읽었으며, 이는 공백으로 계산되지 않습니다."
+      "errorClustersTruncated": "오류 클러스터가 잘렸습니다."
     },
     "digests": {
       "schedule": "일정",

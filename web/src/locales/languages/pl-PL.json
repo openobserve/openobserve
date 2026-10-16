@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} alert nie miał wierszy wyzwalaczy w oknie, co nie jest liczone jako luka. | {count} alertów nie miało wierszy wyzwalaczy w oknie, co nie jest liczone jako luka.",
       "transitionsTruncated": "Przejścia stanów zostały obcięte.",
       "countersTruncated": "Liczniki zostały obcięte, więc alerty poza punktem odcięcia nie zostały ocenione.",
-      "errorClustersTruncated": "Klastry błędów zostały obcięte.",
-      "metaFallbackUsed": "Odczytano ze strumienia wyzwalaczy organizacji _meta, co nie jest liczone jako luka."
+      "errorClustersTruncated": "Klastry błędów zostały obcięte."
     },
     "digests": {
       "schedule": "Harmonogram",

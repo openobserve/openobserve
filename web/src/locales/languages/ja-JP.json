@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} 件のアラートにはウィンドウ内にトリガー行がありませんでしたが、これはギャップとしてカウントされません。 | {count} 件のアラートにはウィンドウ内にトリガー行がありませんでしたが、これはギャップとしてカウントされません。",
       "transitionsTruncated": "状態遷移が切り捨てられました。",
       "countersTruncated": "カウンターが切り捨てられたため、カットオフ以降のアラートは判定されませんでした。",
-      "errorClustersTruncated": "エラークラスターが切り捨てられました。",
-      "metaFallbackUsed": "_meta 組織のトリガーストリームから読み取られました。これはギャップとしてカウントされません。"
+      "errorClustersTruncated": "エラークラスターが切り捨てられました。"
     },
     "digests": {
       "schedule": "スケジュール",

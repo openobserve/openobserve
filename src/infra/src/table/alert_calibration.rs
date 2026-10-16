@@ -87,7 +87,7 @@ fn upsert_statement(org: &str, patch: &ConfigPatch, now: i64) -> sea_orm::Insert
     let row = ActiveModel {
         id: Set(ider::uuid()),
         org: Set(org.to_string()),
-        enabled: Set(patch.enabled.unwrap_or(false)),
+        enabled: Set(patch.enabled.unwrap_or(true)),
         frequency_minutes: Set(patch.frequency_minutes.unwrap_or(DEFAULT_FREQUENCY_MINUTES)),
         window_minutes: Set(patch.window_minutes.unwrap_or(DEFAULT_WINDOW_MINUTES)),
         created_at: Set(now),
@@ -235,6 +235,6 @@ mod tests {
         let fresh = patch_config(&db, ORG, ConfigPatch::default())
             .await
             .unwrap();
-        assert!(!fresh.enabled);
+        assert!(fresh.enabled);
     }
 }

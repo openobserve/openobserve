@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} alerta no tenía filas de activación en la ventana, lo que no se cuenta como una brecha. | {count} alertas no tenían filas de activación en la ventana, lo que no se cuenta como una brecha.",
       "transitionsTruncated": "Las transiciones de estado se truncaron.",
       "countersTruncated": "Los contadores se truncaron, por lo que las alertas posteriores al corte no se evaluaron.",
-      "errorClustersTruncated": "Los clústeres de errores se truncaron.",
-      "metaFallbackUsed": "Leído desde el stream de activaciones de la organización _meta, lo que no se cuenta como una brecha."
+      "errorClustersTruncated": "Los clústeres de errores se truncaron."
     },
     "digests": {
       "schedule": "Programación",

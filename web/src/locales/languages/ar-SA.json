@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "لم يكن لدى {count} تنبيه صفوف تشغيل في النافذة، وهو ما لا يُحتسب فجوة. | لم يكن لدى {count} تنبيهات صفوف تشغيل في النافذة، وهو ما لا يُحتسب فجوة.",
       "transitionsTruncated": "تم اقتطاع انتقالات الحالة.",
       "countersTruncated": "تم اقتطاع العدادات، لذا لم يتم تقييم التنبيهات التي تجاوزت حد القطع.",
-      "errorClustersTruncated": "تم اقتطاع مجموعات الأخطاء.",
-      "metaFallbackUsed": "تمت القراءة من جدول triggers الخاص بمؤسسة _meta، وهو ما لا يُحتسب فجوة."
+      "errorClustersTruncated": "تم اقتطاع مجموعات الأخطاء."
     },
     "digests": {
       "schedule": "الجدولة",

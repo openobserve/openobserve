@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} cảnh báo không có dòng kích hoạt nào trong cửa sổ, điều này không được tính là lỗ hổng. | {count} cảnh báo không có dòng kích hoạt nào trong cửa sổ, điều này không được tính là lỗ hổng.",
       "transitionsTruncated": "Các chuyển đổi trạng thái đã bị cắt bớt.",
       "countersTruncated": "Các bộ đếm đã bị cắt bớt, nên các cảnh báo vượt qua mốc cắt không được đánh giá.",
-      "errorClustersTruncated": "Các cụm lỗi đã bị cắt bớt.",
-      "metaFallbackUsed": "Đọc từ stream triggers của tổ chức _meta, điều này không được tính là lỗ hổng."
+      "errorClustersTruncated": "Các cụm lỗi đã bị cắt bớt."
     },
     "digests": {
       "schedule": "Lịch trình",

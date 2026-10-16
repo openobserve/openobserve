@@ -27,7 +27,9 @@ use config::{
         stream::StreamType,
     },
 };
-use o2_enterprise::enterprise::alert_calibration_collect::collector::AlertCalibrationSearchPort;
+use o2_enterprise::enterprise::{
+    alert_calibration_collect::collector::AlertCalibrationSearchPort, alert_calibration_service,
+};
 use search_service::grpc_search::grpc_search;
 
 /// Enterprise cannot depend on `search_service`, so its collector's search is injected from here.
@@ -54,4 +56,39 @@ impl AlertCalibrationSearchPort for SearchAdapter {
             .map_err(Into::into)
         })
     }
+}
+
+/// Best effort: the startup backfill covers an org this misses.
+pub async fn ensure_org_config(org: &str) {
+    if !alert_calibration_service::is_enabled() {
+        return;
+    }
+    if let Err(e) = alert_calibration_service::ensure_config(org).await {
+        log::warn!("[alert_calibration] could not create the default config for org '{org}': {e}");
+    }
+}
+
+/// Every org gets a config, so the default cadence runs without anyone opening the settings.
+pub async fn backfill_org_configs() -> Result<(), anyhow::Error> {
+    if !alert_calibration_service::is_enabled() {
+        return Ok(());
+    }
+    let locker = infra::dist_lock::lock("/alert_calibration/org_config_backfill", 0).await?;
+    let orgs = crate::organization::list_all_orgs(None)
+        .await
+        .unwrap_or_default();
+    for org in &orgs {
+        if let Err(e) = alert_calibration_service::ensure_config(&org.identifier).await {
+            log::error!(
+                "[alert_calibration] default config backfill failed for org '{}': {e}",
+                org.identifier
+            );
+        }
+    }
+    infra::dist_lock::unlock(&locker).await?;
+    log::info!(
+        "[alert_calibration] default config backfill covered {} orgs",
+        orgs.len()
+    );
+    Ok(())
 }

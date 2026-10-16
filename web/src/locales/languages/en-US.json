@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} alert had no trigger rows in the window, which is not counted as a gap. | {count} alerts had no trigger rows in the window, which is not counted as a gap.",
       "transitionsTruncated": "State transitions were truncated.",
       "countersTruncated": "Counters were truncated, so alerts past the cut were not judged.",
-      "errorClustersTruncated": "Error clusters were truncated.",
-      "metaFallbackUsed": "Read from the triggers stream of the _meta organization, which is not counted as a gap."
+      "errorClustersTruncated": "Error clusters were truncated."
     },
     "digests": {
       "schedule": "Schedule",

@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} alarm had geen triggerrijen in het venster, wat niet als een gat wordt geteld. | {count} alarmen hadden geen triggerrijen in het venster, wat niet als een gat wordt geteld.",
       "transitionsTruncated": "Statusovergangen zijn afgekapt.",
       "countersTruncated": "Tellers zijn afgekapt, dus alarmen na de afkap zijn niet beoordeeld.",
-      "errorClustersTruncated": "Foutclusters zijn afgekapt.",
-      "metaFallbackUsed": "Gelezen uit de triggers-stream van de _meta-organisatie, wat niet als een gat wordt geteld."
+      "errorClustersTruncated": "Foutclusters zijn afgekapt."
     },
     "digests": {
       "schedule": "Planning",

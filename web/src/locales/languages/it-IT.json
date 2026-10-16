@@ -8143,8 +8143,7 @@
       "definitionsWithoutFacts": "{count} avviso non aveva righe di attivazione nella finestra, il che non è conteggiato come lacuna. | {count} avvisi non avevano righe di attivazione nella finestra, il che non è conteggiato come lacuna.",
       "transitionsTruncated": "Le transizioni di stato sono state troncate.",
       "countersTruncated": "I contatori sono stati troncati, quindi gli avvisi oltre il taglio non sono stati valutati.",
-      "errorClustersTruncated": "I cluster di errori sono stati troncati.",
-      "metaFallbackUsed": "Letto dallo stream dei trigger dell'organizzazione _meta, il che non è conteggiato come lacuna."
+      "errorClustersTruncated": "I cluster di errori sono stati troncati."
     },
     "digests": {
       "schedule": "Pianificazione",
