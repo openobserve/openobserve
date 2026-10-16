@@ -8181,11 +8181,6 @@
       "noneFoundGap": "To uruchomienie miało lukę w pokryciu, więc nie mogło ocenić każdego alertu.",
       "noneFoundDeclined": "{count} para reguła–alert została odrzucona, nie oceniona. | {count} par reguła–alert zostało odrzuconych, nie ocenionych.",
       "noneFoundNotClearance": "Zero ustaleń tutaj nie jest potwierdzeniem poprawności.",
-      "declinedHeading": "Odrzucone",
-      "declinedHint": "Alerty, których reguła nie oceni: bramka, a nie potwierdzenie poprawności",
-      "nothingDeclined": "Każdy alert w zakresie został oceniony i nic nie zostało odrzucone.",
-      "declinedPairs": "Odrzucone pary reguła–alert",
-      "declinedNotWritten": "Powody dla poszczególnych alertów nie są zapisywane w strumieniu, tylko ta liczba.",
       "evidence": "Dowody",
       "alert": "Alert",
       "proposedActions": "Proponowane działania"

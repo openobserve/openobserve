@@ -8181,11 +8181,6 @@
       "noneFoundGap": "Lượt chạy này có khoảng trống bao phủ, nên nó không thể đánh giá mọi cảnh báo.",
       "noneFoundDeclined": "{count} cặp quy tắc và cảnh báo đã bị từ chối, không được đánh giá. | {count} cặp quy tắc và cảnh báo đã bị từ chối, không được đánh giá.",
       "noneFoundNotClearance": "Không có phát hiện nào ở đây không phải là xác nhận đã sạch.",
-      "declinedHeading": "Bị từ chối",
-      "declinedHint": "Các cảnh báo mà quy tắc sẽ không đánh giá: một cổng chặn, không phải xác nhận đã sạch",
-      "nothingDeclined": "Mọi cảnh báo trong phạm vi đều đã được đánh giá và không có gì bị từ chối.",
-      "declinedPairs": "Cặp quy tắc và cảnh báo bị từ chối",
-      "declinedNotWritten": "Lý do cho từng cảnh báo không được ghi vào stream, chỉ có số đếm này.",
       "evidence": "Bằng chứng",
       "alert": "Cảnh báo",
       "proposedActions": "Hành động đề xuất"

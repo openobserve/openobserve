@@ -8181,11 +8181,6 @@
       "noneFoundGap": "此次运行存在覆盖缺口，因此无法判定每个告警。",
       "noneFoundDeclined": "{count} 个规则与告警对未判定，未予评判。 | {count} 个规则与告警对未判定，未予评判。",
       "noneFoundNotClearance": "此处零发现项并不代表已排除。",
-      "declinedHeading": "未判定",
-      "declinedHint": "规则不予判定的告警：这是一道门槛，而非排除",
-      "nothingDeclined": "范围内的每个告警都已判定，没有任何未判定项。",
-      "declinedPairs": "未判定的规则与告警对",
-      "declinedNotWritten": "每个告警的具体原因不会写入数据流，仅记录此计数。",
       "evidence": "证据",
       "alert": "告警",
       "proposedActions": "建议的操作"

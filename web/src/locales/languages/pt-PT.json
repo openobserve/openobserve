@@ -8181,11 +8181,6 @@
       "noneFoundGap": "Esta execução teve uma lacuna de cobertura, portanto não conseguiu julgar todos os alertas.",
       "noneFoundDeclined": "{count} par de regra e alerta foi recusado, não julgado. | {count} pares de regra e alerta foram recusados, não julgados.",
       "noneFoundNotClearance": "Zero achados aqui não é uma liberação.",
-      "declinedHeading": "Recusados",
-      "declinedHint": "Alertas que uma regra não julgaria: uma barreira, não uma liberação",
-      "nothingDeclined": "Todos os alertas no escopo foram julgados e nada foi recusado.",
-      "declinedPairs": "Pares de regra e alerta recusados",
-      "declinedNotWritten": "Os motivos por alerta não são gravados no stream, apenas esta contagem.",
       "evidence": "Evidências",
       "alert": "Alerta",
       "proposedActions": "Ações propostas"

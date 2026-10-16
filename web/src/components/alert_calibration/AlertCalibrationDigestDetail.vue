@@ -154,30 +154,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         hide-action
         data-test="alert-calibration-digest-none-found"
       />
-
-      <OSeparator />
-
-      <div class="flex flex-col gap-2">
-        <div class="flex flex-wrap items-baseline gap-2">
-          <OText variant="card-title" as="h2">{{
-            t("alertCalibration.detail.declinedHeading")
-          }}</OText>
-          <OText variant="meta" as="span">{{ t("alertCalibration.detail.declinedHint") }}</OText>
-        </div>
-        <OText v-if="run.skip_count === 0" variant="meta" as="div">
-          {{ t("alertCalibration.detail.nothingDeclined") }}
-        </OText>
-        <template v-else>
-          <div>
-            <OBadge variant="default-soft" size="sm" shape="rounded" :count="run.skip_count">
-              {{ t("alertCalibration.detail.declinedPairs") }}
-            </OBadge>
-          </div>
-          <OText variant="meta" as="div">{{
-            t("alertCalibration.detail.declinedNotWritten")
-          }}</OText>
-        </template>
-      </div>
     </div>
   </OPageLayout>
 </template>
@@ -188,9 +164,7 @@ import { useRoute, useRouter } from "vue-router";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -308,6 +282,7 @@ const stats = computed<StatItem[]>(() => {
       label: t("alertCalibration.detail.statDeclined"),
       value: r.skip_count,
       sub: t("alertCalibration.detail.statDeclinedSub"),
+      subTooltip: t("alertCalibration.detail.statDeclinedTooltip"),
       icon: "block",
     },
     {

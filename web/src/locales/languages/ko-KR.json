@@ -8181,11 +8181,6 @@
       "noneFoundGap": "이 실행에는 커버리지 공백이 있어 모든 알림을 판정할 수 없었습니다.",
       "noneFoundDeclined": "{count}개의 규칙 및 알림 쌍이 판정되지 않고 제외되었습니다. | {count}개의 규칙 및 알림 쌍이 판정되지 않고 제외되었습니다.",
       "noneFoundNotClearance": "여기서 발견 사항이 0이라고 해서 이상 없음이 아닙니다.",
-      "declinedHeading": "판정 제외",
-      "declinedHint": "규칙이 판정하지 않은 알림: 이상 없음이 아니라 게이트입니다",
-      "nothingDeclined": "범위 내 모든 알림이 판정되었으며, 제외된 항목은 없습니다.",
-      "declinedPairs": "제외된 규칙 및 알림 쌍",
-      "declinedNotWritten": "알림별 사유는 스트림에 기록되지 않으며, 이 개수만 기록됩니다.",
       "evidence": "증거",
       "alert": "알림",
       "proposedActions": "제안된 작업"

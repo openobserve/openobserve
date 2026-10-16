@@ -8181,11 +8181,6 @@
       "noneFoundGap": "Esta ejecución tuvo una brecha de cobertura, por lo que no pudo evaluar todas las alertas.",
       "noneFoundDeclined": "{count} par de regla y alerta se rechazó, no se evaluó. | {count} pares de regla y alerta se rechazaron, no se evaluaron.",
       "noneFoundNotClearance": "Cero hallazgos aquí no es una confirmación.",
-      "declinedHeading": "Rechazadas",
-      "declinedHint": "Alertas que una regla no evaluaría: una barrera, no una confirmación",
-      "nothingDeclined": "Todas las alertas en alcance se evaluaron y nada se rechazó.",
-      "declinedPairs": "Pares de regla y alerta rechazados",
-      "declinedNotWritten": "Los motivos por alerta no se escriben en el stream, solo este recuento.",
       "evidence": "Evidencia",
       "alert": "Alerta",
       "proposedActions": "Acciones propuestas"

@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="action in actions"
           :key="action.name"
           icon="lightbulb-outline"
-          variant="default-outline"
+          variant="default-soft"
           size="sm"
           :label="action.label"
           :title="action.description"

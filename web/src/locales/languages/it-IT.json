@@ -8181,11 +8181,6 @@
       "noneFoundGap": "Questa esecuzione ha avuto una lacuna di copertura, quindi non ha potuto valutare ogni avviso.",
       "noneFoundDeclined": "{count} coppia regola-avviso è stata rifiutata, non valutata. | {count} coppie regola-avviso sono state rifiutate, non valutate.",
       "noneFoundNotClearance": "Zero riscontri qui non è un via libera.",
-      "declinedHeading": "Rifiutati",
-      "declinedHint": "Avvisi che una regola non giudica: una barriera, non un via libera",
-      "nothingDeclined": "Ogni avviso nell'ambito è stato giudicato e nulla è stato rifiutato.",
-      "declinedPairs": "Coppie regola-avviso rifiutate",
-      "declinedNotWritten": "I motivi per singolo avviso non vengono scritti nello stream, solo questo conteggio.",
       "evidence": "Evidenze",
       "alert": "Avviso",
       "proposedActions": "Azioni proposte"

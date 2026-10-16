@@ -8181,11 +8181,6 @@
       "noneFoundGap": "Bu çalıştırmada kapsam boşluğu vardı, bu nedenle her uyarıyı değerlendiremedi.",
       "noneFoundDeclined": "{count} kural ve uyarı çifti reddedildi, değerlendirilmedi. | {count} kural ve uyarı çifti reddedildi, değerlendirilmedi.",
       "noneFoundNotClearance": "Burada sıfır bulgu olması temiz olduğu anlamına gelmez.",
-      "declinedHeading": "Reddedildi",
-      "declinedHint": "Bir kuralın değerlendirmeyeceği uyarılar: bir kapı, temizlik değil",
-      "nothingDeclined": "Kapsamdaki her uyarı değerlendirildi ve hiçbiri reddedilmedi.",
-      "declinedPairs": "Reddedilen kural ve uyarı çiftleri",
-      "declinedNotWritten": "Uyarı başına nedenler akışa yazılmaz, yalnızca bu sayı yazılır.",
       "evidence": "Kanıt",
       "alert": "Uyarı",
       "proposedActions": "Önerilen eylemler"

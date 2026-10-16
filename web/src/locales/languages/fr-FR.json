@@ -8181,11 +8181,6 @@
       "noneFoundGap": "Cette exécution présentait une lacune de couverture ; elle n'a donc pas pu juger toutes les alertes.",
       "noneFoundDeclined": "{count} paire de règle et d'alerte a été refusée, non jugée. | {count} paires de règle et d'alerte ont été refusées, non jugées.",
       "noneFoundNotClearance": "Zéro constat ici ne vaut pas validation.",
-      "declinedHeading": "Refusées",
-      "declinedHint": "Alertes qu'une règle ne jugerait pas : un garde-fou, pas une validation",
-      "nothingDeclined": "Toutes les alertes du périmètre ont été jugées et aucune n'a été refusée.",
-      "declinedPairs": "Paires de règle et d'alerte refusées",
-      "declinedNotWritten": "Les raisons par alerte ne sont pas écrites dans le flux, seul ce comptage l'est.",
       "evidence": "Preuves",
       "alert": "Alerte",
       "proposedActions": "Actions proposées"

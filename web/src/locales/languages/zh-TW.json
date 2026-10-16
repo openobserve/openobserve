@@ -8176,11 +8176,6 @@
       "noneFoundGap": "此次執行有涵蓋缺口，因此無法判定每個警示。",
       "noneFoundDeclined": "有 {count} 組規則與警示配對被拒絕，未進行判定。 | 有 {count} 組規則與警示配對被拒絕，未進行判定。",
       "noneFoundNotClearance": "這裡零發現並不代表已排除。",
-      "declinedHeading": "已拒絕",
-      "declinedHint": "規則不予判定的警示：這是關卡，而非已排除",
-      "nothingDeclined": "範圍內的每個警示都已判定，且沒有任何項目被拒絕。",
-      "declinedPairs": "被拒絕的規則與警示配對",
-      "declinedNotWritten": "各警示的原因不會寫入串流，只會寫入此計數。",
       "evidence": "證據",
       "alert": "警示",
       "proposedActions": "建議動作"

@@ -8181,11 +8181,6 @@
       "noneFoundGap": "Dieser Lauf hatte eine Abdeckungslücke, daher konnte er nicht jeden Alarm bewerten.",
       "noneFoundDeclined": "{count} Regel-Alarm-Paar wurde abgelehnt, nicht bewertet. | {count} Regel-Alarm-Paare wurden abgelehnt, nicht bewertet.",
       "noneFoundNotClearance": "Null Befunde hier sind keine Freigabe.",
-      "declinedHeading": "Abgelehnt",
-      "declinedHint": "Alarme, die eine Regel nicht bewerten würde: eine Sperre, keine Freigabe",
-      "nothingDeclined": "Jeder Alarm im Geltungsbereich wurde bewertet, und nichts wurde abgelehnt.",
-      "declinedPairs": "Abgelehnte Regel-Alarm-Paare",
-      "declinedNotWritten": "Die Gründe pro Alarm werden nicht in den Stream geschrieben, nur diese Anzahl.",
       "evidence": "Nachweise",
       "alert": "Alarm",
       "proposedActions": "Vorgeschlagene Aktionen"

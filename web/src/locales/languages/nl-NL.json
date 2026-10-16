@@ -8181,11 +8181,6 @@
       "noneFoundGap": "Deze run had een dekkingsgat en kon dus niet elk alarm beoordelen.",
       "noneFoundDeclined": "{count} regel- en alarmpaar werd afgewezen, niet beoordeeld. | {count} regel- en alarmparen werden afgewezen, niet beoordeeld.",
       "noneFoundNotClearance": "Nul bevindingen hier is geen vrijgave.",
-      "declinedHeading": "Afgewezen",
-      "declinedHint": "Alarmen die een regel niet zou beoordelen: een poort, geen vrijgave",
-      "nothingDeclined": "Elk alarm binnen bereik werd beoordeeld en niets werd afgewezen.",
-      "declinedPairs": "Afgewezen regel- en alarmparen",
-      "declinedNotWritten": "De redenen per alarm worden niet naar de stream geschreven, alleen dit aantal.",
       "evidence": "Bewijs",
       "alert": "Alarm",
       "proposedActions": "Voorgestelde acties"
