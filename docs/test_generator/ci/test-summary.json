@@ -1,8 +1,0 @@
-[
-  { "title": "P0: Cached run drawer shows the cached tile and hides Edit recipients", "action": "append", "verifies": "a cached report run renders the cached status tile and the drawer hides the Edit recipients button" },
-  { "title": "P1: A fresh report shows the 'No runs yet' empty state with a Run now action", "action": "append", "verifies": "a freshly created cached report shows the 'No runs yet' empty state with a Run now action" },
-  { "title": "P1: Filtering to the skipped tile shows 'No runs in this range' and Widen the range resets it", "action": "append", "verifies": "selecting a no-match status tile shows the filtered-empty state and Widen the range resets it" },
-  { "title": "P1: The 'scheduled' trigger filter empties a manual-only history", "action": "append", "verifies": "selecting the scheduled trigger source empties a history that only has manual runs" },
-  { "title": "P2: A malformed run deep-link shows the linked-run banner", "action": "append", "verifies": "a malformed ?run= deep-link renders the linked-run invalid banner" },
-  { "title": "history disabled empty state — not wired: disabled_reason only in remote reporting mode (reports_history.rs:714-742)", "action": "append", "verifies": "the disabled empty state renders when the backend returns disabled_reason (backend-gated; test.fixme)" }
-]

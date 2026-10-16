@@ -8,6 +8,8 @@ const timestamp = Date.now();
 const DASH_PREFIX = 'report_history_dash_';
 const DASHBOARD_NAME = `${DASH_PREFIX}${timestamp}`;
 const REPORT_NAME = `report_history_${timestamp}`;
+// Pin the "once" report's first run a week out — unset `start` = epoch = fires immediately and pollutes the clean history with a failed scheduled run.
+const FUTURE_START_US = Date.now() * 1000 + 7 * 24 * 3600 * 1_000_000;
 // Per-test unique reports (each test builds its own cached report + dashboard).
 const REPORT_CACHED_DRAWER_NAME = `report_history_${timestamp}_cached_drawer`;
 const REPORT_EMPTY_NAME = `report_history_${timestamp}_empty`;
@@ -35,6 +37,7 @@ test.describe("Report History", () => {
       dashboardId: dash.dashboard.dashboard_id,
       tabId: dash.dashboard.tabs?.[0]?.tab_id || 'default',
       cached: true,
+      start: FUTURE_START_US,
     });
     if (!report.success) throw new Error(`Setup: failed to create report: ${report.error}`);
 
@@ -75,6 +78,7 @@ test.describe("Report History", () => {
       dashboardId: dash.dashboard.dashboard_id,
       tabId: dash.dashboard.tabs?.[0]?.tab_id || 'default',
       cached: true,
+      start: FUTURE_START_US,
     });
     if (!report.success) throw new Error(`Setup: failed to create report: ${report.error}`);
 
@@ -101,6 +105,7 @@ test.describe("Report History", () => {
       dashboardId: dash.dashboard.dashboard_id,
       tabId: dash.dashboard.tabs?.[0]?.tab_id || 'default',
       cached: true,
+      start: FUTURE_START_US,
     });
     if (!report.success) throw new Error(`Setup: failed to create report: ${report.error}`);
 
@@ -121,6 +126,7 @@ test.describe("Report History", () => {
       dashboardId: dash.dashboard.dashboard_id,
       tabId: dash.dashboard.tabs?.[0]?.tab_id || 'default',
       cached: true,
+      start: FUTURE_START_US,
     });
     if (!report.success) throw new Error(`Setup: failed to create report: ${report.error}`);
 
@@ -146,6 +152,7 @@ test.describe("Report History", () => {
       dashboardId: dash.dashboard.dashboard_id,
       tabId: dash.dashboard.tabs?.[0]?.tab_id || 'default',
       cached: true,
+      start: FUTURE_START_US,
     });
     if (!report.success) throw new Error(`Setup: failed to create report: ${report.error}`);
 
