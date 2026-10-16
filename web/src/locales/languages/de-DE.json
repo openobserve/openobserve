@@ -8141,7 +8141,6 @@
       "colRun": "Lauf",
       "colFindings": "Ergebnisse",
       "colCoverage": "Abdeckung",
-      "colGenerated": "Erstellt",
       "clean": "Sauber",
       "noneFound": "Keine gefunden",
       "findings": "Ergebnisse",

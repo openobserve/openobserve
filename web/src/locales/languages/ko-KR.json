@@ -8141,7 +8141,6 @@
       "colRun": "실행",
       "colFindings": "발견 사항",
       "colCoverage": "커버리지",
-      "colGenerated": "생성됨",
       "clean": "정상",
       "noneFound": "찾을 수 없음",
       "findings": "발견 사항",

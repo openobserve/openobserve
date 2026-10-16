@@ -8141,7 +8141,6 @@
       "colRun": "运行",
       "colFindings": "发现",
       "colCoverage": "覆盖",
-      "colGenerated": "生成时间",
       "clean": "无问题",
       "noneFound": "未找到",
       "findings": "发现",

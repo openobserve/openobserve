@@ -8141,7 +8141,6 @@
       "colRun": "実行",
       "colFindings": "検出結果",
       "colCoverage": "カバレッジ",
-      "colGenerated": "生成",
       "clean": "クリーン",
       "noneFound": "見つかりません",
       "findings": "検出結果",

@@ -100,7 +100,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-window="{ row }">
-            <span class="truncate">{{ formatWindow(row.window_start, row.window_end) }}</span>
+            <span class="relative inline-flex min-w-0 items-baseline gap-2">
+              <OTimeCell :value="row.window_end" unit="us" mode="absolute" />
+              <span class="text-text-secondary truncate text-xs">
+                {{ formatMinutes(t, windowMinutes(row)) }}
+              </span>
+              <OTooltip side="right" :content="formatAgo(row.emitted_at)" />
+            </span>
           </template>
 
           <template #cell-findings="{ row }">
@@ -143,10 +149,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OTooltip>
             </span>
-          </template>
-
-          <template #cell-generated="{ row }">
-            <OTimeCell :value="row.emitted_at" unit="us" />
           </template>
 
           <template #cell-actions="{ row }">
@@ -209,6 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { formatDistanceToNowStrict } from "date-fns";
 import { useQuery } from "@tanstack/vue-query";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -243,7 +246,7 @@ import {
   SEARCH_SIZE,
   type RunRow,
 } from "./digests";
-import { COVERAGE_BADGE, formatWindow, splitMinutes } from "./format";
+import { COVERAGE_BADGE, formatMinutes, splitMinutes } from "./format";
 
 type Scope = "all" | "findings" | "gaps";
 
@@ -256,6 +259,9 @@ const configQuery = useQuery(() => alertCalibrationConfigQuery(orgId.value));
 const config = computed(() => configQuery.data.value ?? null);
 
 const nowMicros = () => Date.now() * 1000;
+const windowMinutes = (row: RunRow) => Math.round((row.window_end - row.window_start) / 60_000_000);
+const formatAgo = (micros: number) =>
+  raw(formatDistanceToNowStrict(micros / 1000, { addSuffix: true }));
 
 const runs = useLatestRead(async () => {
   const emissions = await searchDigests<RunRow>("", lookbackRange(nowMicros()));
@@ -359,14 +365,6 @@ const columns = computed<OTableColumnDef<RunRow>[]>(() => [
     accessorFn: (row) => coverageVerdict(row),
     sortable: true,
     size: COL.status,
-    meta: { align: "left" },
-  },
-  {
-    id: "generated",
-    header: t("alertCalibration.digests.colGenerated"),
-    accessorKey: "emitted_at",
-    sortable: true,
-    size: COL.dateAbsolute,
     meta: { align: "left" },
   },
   {

@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { format } from "date-fns";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { Confidence, CoverageVerdict, Severity } from "./digests";
 import type { EvidenceFormat } from "./rules";
@@ -34,10 +33,6 @@ export function formatMinutes(t: TranslateFn, minutes: number): I18nText {
     return count("alertCalibration.duration.hours", minutes / 60);
   return count("alertCalibration.duration.minutes", minutes);
 }
-
-/** A run as one line: its window, ending at the run's time, as "Sep 15 → Oct 15, 23:14". */
-export const formatWindow = (startMicros: number, endMicros: number): I18nText =>
-  raw(`${format(startMicros / 1000, "MMM d")} → ${format(endMicros / 1000, "MMM d, HH:mm")}`);
 
 /** The number and its unit apart, for a tile whose value is the number alone. */
 export function splitMinutes(t: TranslateFn, minutes: number): { count: number; unit: I18nText } {
