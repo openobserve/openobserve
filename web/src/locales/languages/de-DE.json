@@ -8144,7 +8144,6 @@
       "clean": "Sauber",
       "noneFound": "Keine gefunden",
       "findings": "Ergebnisse",
-      "openDigest": "Digest öffnen",
       "emptyTitle": "Keine Läufe in den letzten {days} Tagen",
       "emptyDescription": "Die Alarmkalibrierung schreibt bei jedem Lauf einen Digest. Führen Sie sie jetzt aus, um zu sehen, was sie findet.",
       "filteredTitle": "Keine Läufe entsprechen diesem Filter",

@@ -151,20 +151,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
 
-          <template #cell-actions="{ row }">
-            <div class="flex items-center justify-center">
-              <OButton
-                variant="ghost"
-                size="icon-sm"
-                icon-left="chevron-right"
-                :aria-label="t('alertCalibration.digests.openDigest')"
-                @click.stop="open(row)"
-              >
-                <OTooltip side="left" :content="t('alertCalibration.digests.openDigest')" />
-              </OButton>
-            </div>
-          </template>
-
           <template #empty>
             <OEmptyState
               size="hero"
@@ -366,14 +352,6 @@ const columns = computed<OTableColumnDef<RunRow>[]>(() => [
     sortable: true,
     size: COL.status,
     meta: { align: "left" },
-  },
-  {
-    id: "actions",
-    header: raw(""),
-    sortable: false,
-    isAction: true,
-    size: 64,
-    meta: { align: "center" },
   },
 ]);
 

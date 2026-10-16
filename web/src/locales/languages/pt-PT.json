@@ -8144,7 +8144,6 @@
       "clean": "Limpo",
       "noneFound": "Nenhuma encontrada",
       "findings": "Descobertas",
-      "openDigest": "Abrir resumo",
       "emptyTitle": "Nenhuma execução nos últimos {days} dias",
       "emptyDescription": "A calibração de alertas grava um resumo toda vez que é executada. Execute-a agora para ver o que ela encontra.",
       "filteredTitle": "Nenhuma execução corresponde a este filtro",

@@ -8144,7 +8144,6 @@
       "clean": "Temiz",
       "noneFound": "Hiçbiri bulunamadı",
       "findings": "Bulgular",
-      "openDigest": "Özeti aç",
       "emptyTitle": "Son {days} günde çalıştırma yok",
       "emptyDescription": "Uyarı kalibrasyonu her çalıştığında bir özet yazar. Ne bulduğunu görmek için şimdi çalıştırın.",
       "filteredTitle": "Bu filtreyle eşleşen çalıştırma yok",

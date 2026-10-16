@@ -8144,7 +8144,6 @@
       "clean": "Schoon",
       "noneFound": "Geen gevonden",
       "findings": "Bevindingen",
-      "openDigest": "Digest openen",
       "emptyTitle": "Geen runs in de laatste {days} dagen",
       "emptyDescription": "Alarmkalibratie schrijft een digest telkens wanneer het draait. Voer het nu uit om te zien wat het vindt.",
       "filteredTitle": "Geen runs komen overeen met dit filter",

@@ -8144,7 +8144,6 @@
       "clean": "Sạch",
       "noneFound": "Không tìm thấy",
       "findings": "Phát hiện",
-      "openDigest": "Mở bản tóm tắt",
       "emptyTitle": "Không có lần chạy nào trong {days} ngày qua",
       "emptyDescription": "Hiệu chuẩn cảnh báo ghi một bản tóm tắt mỗi lần chạy. Chạy ngay bây giờ để xem nó phát hiện được gì.",
       "filteredTitle": "Không có lần chạy nào khớp với bộ lọc này",

@@ -8144,7 +8144,6 @@
       "clean": "Sain",
       "noneFound": "Aucun résultat",
       "findings": "Constats",
-      "openDigest": "Ouvrir la synthèse",
       "emptyTitle": "Aucune exécution au cours des {days} derniers jours",
       "emptyDescription": "La calibration des alertes écrit une synthèse à chaque exécution. Exécutez-la maintenant pour voir ce qu'elle trouve.",
       "filteredTitle": "Aucune exécution ne correspond à ce filtre",

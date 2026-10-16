@@ -8144,7 +8144,6 @@
       "clean": "无问题",
       "noneFound": "未找到",
       "findings": "发现",
-      "openDigest": "打开摘要",
       "emptyTitle": "最近 {days} 天内没有运行",
       "emptyDescription": "告警校准每次运行都会写入一份摘要。立即运行以查看其发现。",
       "filteredTitle": "没有运行匹配此过滤器",

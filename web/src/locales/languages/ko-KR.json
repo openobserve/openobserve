@@ -8144,7 +8144,6 @@
       "clean": "정상",
       "noneFound": "찾을 수 없음",
       "findings": "발견 사항",
-      "openDigest": "다이제스트 열기",
       "emptyTitle": "최근 {days}일 동안 실행 없음",
       "emptyDescription": "알림 캘리브레이션은 실행될 때마다 다이제스트를 기록합니다. 지금 실행하여 무엇을 발견하는지 확인하세요.",
       "filteredTitle": "이 필터와 일치하는 실행이 없습니다",

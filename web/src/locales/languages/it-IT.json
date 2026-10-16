@@ -8144,7 +8144,6 @@
       "clean": "Pulito",
       "noneFound": "Nessuno trovato",
       "findings": "Riscontri",
-      "openDigest": "Apri digest",
       "emptyTitle": "Nessuna esecuzione negli ultimi {days} giorni",
       "emptyDescription": "La calibrazione degli avvisi scrive un digest a ogni esecuzione. Eseguila ora per vedere cosa rileva.",
       "filteredTitle": "Nessuna esecuzione corrisponde a questo filtro",

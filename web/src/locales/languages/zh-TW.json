@@ -8139,7 +8139,6 @@
       "clean": "無異常",
       "noneFound": "未找到",
       "findings": "發現",
-      "openDigest": "開啟摘要",
       "emptyTitle": "過去 {days} 天內沒有執行",
       "emptyDescription": "警示校準每次執行時都會寫入摘要。立即執行以查看它發現了什麼。",
       "filteredTitle": "沒有符合此篩選條件的執行",

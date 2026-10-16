@@ -8152,7 +8152,6 @@
       "clean": "Clean",
       "noneFound": "None found",
       "findings": "Findings",
-      "openDigest": "Open digest",
       "emptyTitle": "No runs in the last {days} days",
       "emptyDescription": "Alert calibration writes a digest every time it runs. Run it now to see what it finds.",
       "filteredTitle": "No runs match this filter",

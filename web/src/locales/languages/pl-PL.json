@@ -8144,7 +8144,6 @@
       "clean": "Bez zastrzeżeń",
       "noneFound": "Nie znaleziono",
       "findings": "Ustalenia",
-      "openDigest": "Otwórz podsumowanie",
       "emptyTitle": "Brak uruchomień w ciągu ostatnich {days} dni",
       "emptyDescription": "Kalibracja alertów zapisuje podsumowanie przy każdym uruchomieniu. Uruchom ją teraz, aby zobaczyć, co wykryje.",
       "filteredTitle": "Żadne uruchomienie nie pasuje do tego filtra",
