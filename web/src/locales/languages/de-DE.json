@@ -8128,12 +8128,9 @@
     },
     "digests": {
       "schedule": "Zeitplan",
-      "on": "Ein",
       "off": "Aus",
       "notConfigured": "Nicht konfiguriert",
-      "every": "Alle {duration}",
       "window": "Analysefenster",
-      "currentSettings": "Aktuelle Einstellungen",
       "latestFindings": "Ergebnisse des letzten Laufs",
       "trend": "Trend der Ergebnisse",
       "trendAria": "Ergebnisse pro Lauf, gedämpft, wenn der Lauf eine Abdeckungslücke hatte",

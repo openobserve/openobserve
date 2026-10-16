@@ -8128,12 +8128,9 @@
     },
     "digests": {
       "schedule": "الجدولة",
-      "on": "مفعّل",
       "off": "معطّل",
       "notConfigured": "غير مُهيأ",
-      "every": "كل {duration}",
       "window": "نافذة التحليل",
-      "currentSettings": "الإعدادات الحالية",
       "latestFindings": "نتائج آخر تشغيل",
       "trend": "اتجاه النتائج",
       "trendAria": "النتائج لكل تشغيل، باهتة حيث كان لدى التشغيل فجوة تغطية",

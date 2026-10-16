@@ -8128,12 +8128,9 @@
     },
     "digests": {
       "schedule": "スケジュール",
-      "on": "オン",
       "off": "オフ",
       "notConfigured": "未設定",
-      "every": "{duration} ごと",
       "window": "分析ウィンドウ",
-      "currentSettings": "現在の設定",
       "latestFindings": "最新の実行の検出結果",
       "trend": "検出結果の推移",
       "trendAria": "実行ごとの検出結果。カバレッジギャップがあった実行はミュートされます。",

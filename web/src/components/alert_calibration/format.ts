@@ -39,6 +39,19 @@ export function formatMinutes(t: TranslateFn, minutes: number): I18nText {
 export const formatWindow = (startMicros: number, endMicros: number): I18nText =>
   raw(`${format(startMicros / 1000, "MMM d")} → ${format(endMicros / 1000, "MMM d, HH:mm")}`);
 
+/** The number and its unit apart, for a tile whose value is the number alone. */
+export function splitMinutes(t: TranslateFn, minutes: number): { count: number; unit: I18nText } {
+  const unit = (key: I18nKey, n: number) => ({ count: n, unit: t(key, { count: n }, n) });
+  if (minutes > 0 && minutes % MINUTES_PER_YEAR === 0) {
+    return unit("alertCalibration.unit.years", minutes / MINUTES_PER_YEAR);
+  }
+  if (minutes > 0 && minutes % MINUTES_PER_DAY === 0) {
+    return unit("alertCalibration.unit.days", minutes / MINUTES_PER_DAY);
+  }
+  if (minutes > 0 && minutes % 60 === 0) return unit("alertCalibration.unit.hours", minutes / 60);
+  return unit("alertCalibration.unit.minutes", minutes);
+}
+
 export function formatSeconds(t: TranslateFn, secs: number): I18nText {
   const rounded = Math.round(secs);
   if (rounded < 60) return t("alertCalibration.duration.seconds", { count: rounded }, rounded);

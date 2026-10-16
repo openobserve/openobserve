@@ -8128,12 +8128,9 @@
     },
     "digests": {
       "schedule": "Agendamento",
-      "on": "Ativado",
       "off": "Desativado",
       "notConfigured": "Não configurado",
-      "every": "A cada {duration}",
       "window": "Janela de análise",
-      "currentSettings": "Configurações atuais",
       "latestFindings": "Descobertas da execução mais recente",
       "trend": "Tendência de descobertas",
       "trendAria": "Descobertas por execução, esmaecidas onde a execução teve uma lacuna de cobertura",

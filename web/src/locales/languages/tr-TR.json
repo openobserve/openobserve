@@ -8128,12 +8128,9 @@
     },
     "digests": {
       "schedule": "Zamanlama",
-      "on": "Açık",
       "off": "Kapalı",
       "notConfigured": "Yapılandırılmadı",
-      "every": "Her {duration}",
       "window": "Analiz penceresi",
-      "currentSettings": "Geçerli ayarlar",
       "latestFindings": "Son çalıştırma bulguları",
       "trend": "Bulgu eğilimi",
       "trendAria": "Çalıştırma başına bulgular, çalıştırmada kapsam boşluğu olduğunda soluk.",

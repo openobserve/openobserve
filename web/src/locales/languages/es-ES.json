@@ -8128,12 +8128,9 @@
     },
     "digests": {
       "schedule": "Programación",
-      "on": "Activado",
       "off": "Desactivado",
       "notConfigured": "No configurado",
-      "every": "Cada {duration}",
       "window": "Ventana de análisis",
-      "currentSettings": "Ajustes actuales",
       "latestFindings": "Hallazgos de la última ejecución",
       "trend": "Tendencia de hallazgos",
       "trendAria": "Hallazgos por ejecución, atenuados donde la ejecución tuvo una brecha de cobertura",

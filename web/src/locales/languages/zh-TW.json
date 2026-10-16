@@ -8123,12 +8123,9 @@
     },
     "digests": {
       "schedule": "排程",
-      "on": "開啟",
       "off": "關閉",
       "notConfigured": "未設定",
-      "every": "每 {duration}",
       "window": "分析時間範圍",
-      "currentSettings": "目前設定",
       "latestFindings": "最新執行的發現",
       "trend": "發現趨勢",
       "trendAria": "每次執行的發現數，若該次執行有覆蓋缺口則以淡色顯示",

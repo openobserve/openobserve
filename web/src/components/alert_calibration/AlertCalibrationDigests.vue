@@ -233,7 +233,7 @@ import {
   SEARCH_SIZE,
   type RunRow,
 } from "./digests";
-import { COVERAGE_BADGE, formatMinutes, formatWindow } from "./format";
+import { COVERAGE_BADGE, formatWindow, splitMinutes } from "./format";
 
 type Scope = "all" | "findings" | "gaps";
 
@@ -281,6 +281,8 @@ const latest = computed(() => latestRun(rows.value));
 const stats = computed<StatItem[]>(() => {
   const c = config.value;
   const run = latest.value;
+  const cadence = splitMinutes(t, c?.frequency_minutes ?? 0);
+  const window = splitMinutes(t, c?.window_minutes ?? 0);
   return [
     {
       key: "latest",
@@ -293,22 +295,17 @@ const stats = computed<StatItem[]>(() => {
     {
       key: "window",
       label: t("alertCalibration.digests.window"),
-      value: c ? formatMinutes(t, c.window_minutes) : raw("—"),
-      sub: t("alertCalibration.digests.currentSettings"),
+      value: c ? window.count : raw("—"),
+      sub: c ? window.unit : t("alertCalibration.digests.notConfigured"),
       icon: "calendar-month",
     },
     {
       key: "schedule",
       label: t("alertCalibration.digests.schedule"),
-      // The value carries the cadence, so the tile still reads once a narrow screen hides its label.
-      value: c
-        ? c.enabled
-          ? t("alertCalibration.digests.every", { duration: formatMinutes(t, c.frequency_minutes) })
-          : t("alertCalibration.digests.off")
-        : raw("—"),
+      value: c ? (c.enabled ? cadence.count : t("alertCalibration.digests.off")) : raw("—"),
       sub: c
         ? c.enabled
-          ? t("alertCalibration.digests.on")
+          ? cadence.unit
           : t("alertCalibration.digests.noScheduledRun")
         : t("alertCalibration.digests.notConfigured"),
       icon: "schedule",

@@ -8128,12 +8128,9 @@
     },
     "digests": {
       "schedule": "Planification",
-      "on": "Activé",
       "off": "Désactivé",
       "notConfigured": "Non configuré",
-      "every": "Toutes les {duration}",
       "window": "Fenêtre d'analyse",
-      "currentSettings": "Réglages actuels",
       "latestFindings": "Constats de la dernière exécution",
       "trend": "Tendance des constats",
       "trendAria": "Constats par exécution, atténués lorsque l'exécution présentait une lacune de couverture",

@@ -8128,12 +8128,9 @@
     },
     "digests": {
       "schedule": "Lịch trình",
-      "on": "Bật",
       "off": "Tắt",
       "notConfigured": "Chưa cấu hình",
-      "every": "Mỗi {duration}",
       "window": "Cửa sổ phân tích",
-      "currentSettings": "Cài đặt hiện tại",
       "latestFindings": "Kết quả phát hiện của lần chạy mới nhất",
       "trend": "Xu hướng phát hiện",
       "trendAria": "Số phát hiện mỗi lần chạy, được làm mờ ở những lần chạy có lỗ hổng bao phủ",

@@ -8059,6 +8059,12 @@
       "days": "{count} day | {count} days",
       "years": "{count} year | {count} years"
     },
+    "unit": {
+      "minutes": "minute | minutes",
+      "hours": "hour | hours",
+      "days": "day | days",
+      "years": "year | years"
+    },
     "rules": {
       "failure": "Failure",
       "noDestination": "No destination",
@@ -8129,13 +8135,10 @@
     },
     "digests": {
       "schedule": "Schedule",
-      "on": "On",
       "off": "Off",
       "notConfigured": "Not configured",
       "noScheduledRun": "No scheduled run",
-      "every": "Every {duration}",
       "window": "Analysis window",
-      "currentSettings": "Current settings",
       "latestFindings": "Latest run findings",
       "trend": "Findings trend",
       "trendAria": "Findings per run, muted where the run had a coverage gap",

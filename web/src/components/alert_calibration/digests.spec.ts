@@ -30,7 +30,7 @@ import {
   type RunRow,
   type Severity,
 } from "./digests";
-import { formatEvidence, formatMinutes } from "./format";
+import { formatEvidence, formatMinutes, splitMinutes } from "./format";
 
 const run = (overrides: Partial<RunRow> = {}): RunRow => ({
   window_start: 100,
@@ -176,6 +176,12 @@ describe("the dashboard row", () => {
 });
 
 describe("the formatting", () => {
+  it("splits a duration into the number a tile shows large and the unit beside it", () => {
+    expect(splitMinutes(gt, 43_200)).toEqual({ count: 30, unit: "days" });
+    expect(splitMinutes(gt, 1440)).toEqual({ count: 1, unit: "day" });
+    expect(splitMinutes(gt, 90)).toEqual({ count: 90, unit: "minutes" });
+  });
+
   it("names a duration in its largest whole unit", () => {
     expect([15, 60, 1440, 10_080, 525_600].map((m) => formatMinutes(gt, m))).toEqual([
       "15 minutes",

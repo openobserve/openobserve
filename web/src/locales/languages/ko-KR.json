@@ -8128,12 +8128,9 @@
     },
     "digests": {
       "schedule": "일정",
-      "on": "켜짐",
       "off": "꺼짐",
       "notConfigured": "구성되지 않음",
-      "every": "{duration}마다",
       "window": "분석 기간",
-      "currentSettings": "현재 설정",
       "latestFindings": "최근 실행 발견 사항",
       "trend": "발견 사항 추세",
       "trendAria": "실행당 발견 사항, 커버리지 공백이 있는 실행은 흐리게 표시",

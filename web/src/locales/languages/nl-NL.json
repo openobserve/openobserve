@@ -8128,12 +8128,9 @@
     },
     "digests": {
       "schedule": "Planning",
-      "on": "Aan",
       "off": "Uit",
       "notConfigured": "Niet geconfigureerd",
-      "every": "Elke {duration}",
       "window": "Analysevenster",
-      "currentSettings": "Huidige instellingen",
       "latestFindings": "Bevindingen van de laatste run",
       "trend": "Trend van bevindingen",
       "trendAria": "Bevindingen per run, gedempt waar de run een dekkingsgat had",

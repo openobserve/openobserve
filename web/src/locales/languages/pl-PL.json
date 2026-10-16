@@ -8128,12 +8128,9 @@
     },
     "digests": {
       "schedule": "Harmonogram",
-      "on": "Wł.",
       "off": "Wył.",
       "notConfigured": "Nie skonfigurowano",
-      "every": "Co {duration}",
       "window": "Okno analizy",
-      "currentSettings": "Bieżące ustawienia",
       "latestFindings": "Ustalenia z ostatniego uruchomienia",
       "trend": "Trend ustaleń",
       "trendAria": "Ustalenia na uruchomienie, przygaszone tam, gdzie uruchomienie miało lukę w pokryciu",

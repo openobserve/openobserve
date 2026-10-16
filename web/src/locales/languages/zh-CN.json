@@ -8128,12 +8128,9 @@
     },
     "digests": {
       "schedule": "调度",
-      "on": "开",
       "off": "关",
       "notConfigured": "未配置",
-      "every": "每 {duration}",
       "window": "分析窗口",
-      "currentSettings": "当前设置",
       "latestFindings": "最近一次运行的发现",
       "trend": "发现趋势",
       "trendAria": "每次运行的发现数，存在覆盖缺口的运行以弱化显示",
