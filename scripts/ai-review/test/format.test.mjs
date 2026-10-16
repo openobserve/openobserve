@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   dropUnmatchedDetailsClose,
   normalizeReviewersRow,
+  separateAlerts,
   stripEmoji,
 } from "../format.mjs";
 
@@ -52,4 +53,14 @@ test("normalizeReviewersRow rewrites the row from the reviewers that ran", () =>
     "| **Risk tier** | lite |\n| **Reviewers** | Code Quality Reviewer, QA / Test Reviewer |\n",
   );
   assert.equal(normalizeReviewersRow(input, []), input);
+});
+
+test("separateAlerts splits alert boxes the model ran together", () => {
+  const input = "> [!CAUTION]\n> **Blockers (1)**\n> - a\n> [!WARNING]\n> **Warnings (1)**\n> - b";
+
+  assert.equal(
+    separateAlerts(input),
+    "> [!CAUTION]\n> **Blockers (1)**\n> - a\n\n> [!WARNING]\n> **Warnings (1)**\n> - b",
+  );
+  assert.equal(separateAlerts(separateAlerts(input)), separateAlerts(input));
 });

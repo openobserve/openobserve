@@ -23,6 +23,11 @@ export function dropUnmatchedDetailsClose(text) {
   });
 }
 
+// Two alert boxes without a blank line between them merge, and the second `[!TYPE]` shows as text.
+export function separateAlerts(text) {
+  return text.replace(/^(>[^\n]*)\n(>[ \t]*\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\])/gim, "$1\n\n$2");
+}
+
 // The runner, not the model, knows which reviewers ran; the model drops, invents or re-punctuates them.
 export function normalizeReviewersRow(text, reviewerNames) {
   if (reviewerNames.length === 0) return text;

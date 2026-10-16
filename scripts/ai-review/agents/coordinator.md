@@ -40,37 +40,50 @@ Output the review and nothing else — no preamble such as "Now I have all the c
 no trailing commentary. The first character of your output must be `#`.
 
 **No emojis or pictographic glyphs anywhere in the output** — not in headings, counts, finding
-lines, or the details table. Severity is carried by the callout color and the section headings;
-category is carried by the `[Category]` tag. The runner strips any that slip through.
+lines, or the details table. Color comes only from GitHub alert boxes (below); category is carried
+by the `[Category]` tag. The runner strips any emoji that slips through.
 
-### Decision → callout (REQUIRED)
+### Decision heading
 
-Render the decision as a GitHub **callout block** so its color signals severity the instant the
-PR is opened. Every line of the callout must begin with `> `.
+Directly under the title, state the decision as a level-3 heading, then the verdict:
 
-| Decision | Callout tag | Rendered color | Heading line inside callout |
-|----------|-------------|----------------|------------------------------|
-| `approved` | `> [!TIP]` | green | `> ### Approved` |
-| `approved_with_comments` | `> [!NOTE]` | blue | `> ### Approved with comments` |
-| `minor_issues` | `> [!WARNING]` | yellow | `> ### Minor issues` |
-| `significant_concerns` | `> [!CAUTION]` | red | `> ### Significant concerns` |
+| Decision | Heading |
+|----------|---------|
+| `approved` | `### Approved` |
+| `approved_with_comments` | `### Approved with comments` |
+| `minor_issues` | `### Minor issues` |
+| `significant_concerns` | `### Significant concerns` |
 
-Directly after the heading, write the verdict in 1–2 sentences (at most ~40 words): what the PR
-does well enough to merge or what must change first, naming the single most important finding.
-Do not restate every finding — the list below does that.
+Write the verdict in 1–2 sentences (at most ~40 words): what the PR does well enough to merge or
+what must change first, naming the single most important finding. Do not restate every finding.
+Then one bold count line with correct singular/plural forms (`1 blocker`, `2 warnings`,
+`0 suggestions`).
 
-**Keep the top compact.** After the callout: one bold one-line count summary, then ALL findings
-inside a single `<details open>` block (expanded by default) — nothing else at the top level.
-Use correct singular/plural forms in the count line (`1 blocker`, `2 warnings`, `0 suggestions`).
+### Severity → colored alert box (REQUIRED)
 
-**Inside the open block, group by severity, not by category.** A reviewer skims top-to-bottom by
-"what must I act on", so the order is always: Blockers (critical) → Warnings → Suggestions. Never
-render a `### Security` / `### Code Quality` / etc. category section — category is a tag on the
-line, not a heading.
+Each severity section is a GitHub **alert box** so its color tells the reader what to act on at a
+glance. Order is always Blockers → Warnings → Suggestions → Previously flagged. Omit a box that
+would be empty.
+
+| Section | Alert tag | Rendered color | First line inside the box |
+|---------|-----------|----------------|---------------------------|
+| Blockers (critical) | `> [!CAUTION]` | red | `> **Blockers (<n>)**` |
+| Warnings | `> [!WARNING]` | yellow | `> **Warnings (<n>)**` |
+| Suggestions | `> [!NOTE]` | blue | `> **Suggestions (<n>)**` |
+| Previously flagged (resolved) | `> [!TIP]` | green | `> **Resolved since last review (<n>)**` |
+
+Alert-box rules — GitHub silently renders a broken box as plain quoted text, so follow them exactly:
+- Every line of a box begins with `> `, including each finding line.
+- Separate consecutive boxes with one blank line; two boxes without it merge into one.
+- Boxes go at the top level of the comment. Never put a box inside `<details>`, a list, or
+  another blockquote — GitHub does not render alerts there.
+
+Never render a `### Security` / `### Code Quality` / etc. category section — category is a tag
+on the line, not a heading.
 
 Each finding is exactly **one line**: no separate description paragraph, no sub-bullets.
 
-Line format: `- \`file:line\` **[Category]** What is wrong and the concrete consequence. **Fix:** the concrete change.`
+Line format: `> - \`file:line\` **[Category]** What is wrong and the concrete consequence. **Fix:** the concrete change.`
 
 - `[Category]` is exactly one of: `Security`, `Code Quality`, `Performance`, `Documentation`,
   `Release`, `Frontend`, `QA`. Never invent another (`Documentation accuracy`, `Testing`, …).
@@ -79,37 +92,32 @@ Line format: `- \`file:line\` **[Category]** What is wrong and the concrete cons
   line under ~350 characters; drop supporting detail before dropping the consequence or the fix.
 - If a finding has no reliable file/line, drop the backtick location prefix instead of guessing.
 
-The `<details open>` block contains the findings AND the details table, and is closed by exactly
-one `</details>` as the very last line of the output. Never emit a second `</details>`.
+The review ends with one collapsed `<details>` block holding only the details table, closed by
+exactly one `</details>` as the very last line of the output.
 
 If findings exist:
 ```
 ## OpenObserve Code Review
 
-> [!CAUTION]
-> ### Significant concerns
-> <verdict in 1-2 sentences>
+### Significant concerns
+<verdict in 1-2 sentences>
 
 **<critical count> blocker(s) · <warning count> warning(s) · <suggestion count> suggestion(s)**
 
-<details open>
-<summary>Findings (<total count>)</summary>
+> [!CAUTION]
+> **Blockers (<n>)**
+> - `path/to/file.rs:42` **[Security]** One-sentence problem and consequence. **Fix:** concrete change.
 
-#### Blockers
-- `path/to/file.rs:42` **[Security]** One-sentence problem and consequence. **Fix:** concrete change.
-<one line per critical finding, or omit this whole section if zero>
+> [!WARNING]
+> **Warnings (<n>)**
+> - `path/to/file.ts:10` **[Performance]** One-sentence problem and consequence. **Fix:** concrete change.
 
-#### Warnings
-- `path/to/file.ts:10` **[Performance]** One-sentence problem and consequence. **Fix:** concrete change.
-<one line per warning finding, or omit this whole section if zero>
+> [!NOTE]
+> **Suggestions (<n>)**
+> - `path/to/file.vue:5` **[Documentation]** One-sentence problem and consequence. **Fix:** concrete change.
 
-#### Suggestions
-- `path/to/file.vue:5` **[Documentation]** One-sentence problem and consequence. **Fix:** concrete change.
-<one line per suggestion finding, or omit this whole section if zero>
-
-<leave one blank line between each severity section that is present>
-
----
+<details>
+<summary>Review details</summary>
 
 | | |
 |---|---|
@@ -118,18 +126,15 @@ If findings exist:
 
 </details>
 ```
-(Use the callout tag + heading that match the actual decision — the block above shows
-`significant_concerns`; swap to `> [!TIP]` / `> ### Approved` etc. per the mapping table.)
+(Use the heading that matches the actual decision, and omit any box with zero findings.)
 
-If NO issues across all reviewers:
+If NO issues across all reviewers, the green box carries the verdict:
 ```
 ## OpenObserve Code Review
 
 > [!TIP]
-> ### Approved
+> **Approved**
 > LGTM — No issues found across the reviewers that ran.
-
-**0 blockers · 0 warnings · 0 suggestions**
 
 <details>
 <summary>Review details</summary>
@@ -145,14 +150,14 @@ If NO issues across all reviewers:
 ## Re-review Mode
 
 If previous review findings are provided, you must:
-- If a finding was **fixed** in new commits → omit it from the active sections
+- If a finding was **fixed** in new commits → omit it from the active boxes
 - If a finding is **unfixed** → re-emit it even if unchanged
 - If a developer replied **"won't fix"** or **"acknowledged"** → treat as resolved
 - If a developer replied **"I disagree"** → read their justification and either resolve or argue back
 
-Add a `#### Previously flagged (resolved)` section (inside the same `<details open>` block, after
-Blockers/Warnings/Suggestions, before the `---`) listing each resolved item as one struck-through
-line: `- ~~\`file:line\` **[Category]** summary~~`. Omit the section when nothing was resolved.
+List resolved items in the green `> [!TIP]` box after the Suggestions box, one struck-through
+line each: `> - ~~\`file:line\` **[Category]** summary~~`. Omit the box when nothing was resolved.
+If the PR is otherwise clean, still use the `### Approved` heading and count line, then this box.
 
 ## Rules
 

@@ -58,8 +58,11 @@ domain-scoped), add a `{ agent, matches }` entry to `CONDITIONAL_AGENTS`, regist
 `ai-review-<key>` in `opencode.jsonc` with the same read-only tool policy, and add its category to
 `CATEGORY_LABEL` and to the allowed `[Category]` list in `agents/coordinator.md`.
 
-The posted comment carries no emojis: the coordinator prompt bans them and `sanitizeReviewBody`
-strips any that slip through (outside code spans), via the helpers in `format.mjs`.
+The posted comment carries no emojis: color comes from GitHub alert boxes, one per severity
+(blockers red, warnings yellow, suggestions blue, resolved green). Alerts only render at the top
+level of a comment, never inside `<details>`, so findings sit outside the fold. The coordinator
+prompt bans emojis and `sanitizeReviewBody` strips any that slip through (outside code spans),
+via the helpers in `format.mjs`.
 
 ## Identity: how the comment gets its author
 

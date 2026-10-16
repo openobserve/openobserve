@@ -18,6 +18,7 @@ import {
 import {
   dropUnmatchedDetailsClose,
   normalizeReviewersRow,
+  separateAlerts,
   stripEmoji,
 } from "./format.mjs";
 
@@ -1020,6 +1021,7 @@ function sanitizeReviewBody(body) {
   // The prompt bans emojis, but models drift and re-reviews echo older emoji-laden comments.
   cleaned = stripEmoji(cleaned);
   cleaned = dropUnmatchedDetailsClose(cleaned);
+  cleaned = separateAlerts(cleaned);
 
   // Drop any preamble the model emitted before the review proper ("Now I have all the
   // context. Let me produce the consolidated review."). Runs after marker stripping so a
@@ -1169,10 +1171,8 @@ function buildFallbackReview(agentResults, tier, failedAgents) {
 ${REVIEW_HEADING}
 
 > [!TIP]
-> ### Approved
+> **Approved**
 > LGTM — No issues found by automated reviewers.
-
-**0 blockers · 0 warnings · 0 suggestions**
 
 <details>
 <summary>Review details</summary>
@@ -1189,7 +1189,7 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
       || (f.category ? f.category.charAt(0).toUpperCase() + f.category.slice(1) : "");
     const cat = label ? `**[${label}]** ` : "";
     const fix = f.suggestion ? ` **Fix:** ${f.suggestion.replace(/\s+/g, " ").trim()}` : "";
-    return `- ${loc}${cat}${f.summary}${fix}`;
+    return `> - ${loc}${cat}${f.summary}${fix}`;
   };
   const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -1199,40 +1199,34 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
     (bySeverity[sev in bySeverity ? sev : "suggestion"]).push(f);
   }
 
-  const sections = [];
-  if (bySeverity.critical.length > 0) {
-    sections.push(`#### Blockers`, ...bySeverity.critical.map(findingLine), "");
-  }
-  if (bySeverity.warning.length > 0) {
-    sections.push(`#### Warnings`, ...bySeverity.warning.map(findingLine), "");
-  }
-  if (bySeverity.suggestion.length > 0) {
-    sections.push(`#### Suggestions`, ...bySeverity.suggestion.map(findingLine), "");
-  }
+  const boxes = [
+    ["CAUTION", "Blockers", bySeverity.critical],
+    ["WARNING", "Warnings", bySeverity.warning],
+    ["NOTE", "Suggestions", bySeverity.suggestion],
+  ]
+    .filter(([, , items]) => items.length > 0)
+    .map(([tag, title, items]) => [`> [!${tag}]`, `> **${title} (${items.length})**`, ...items.map(findingLine)].join("\n"));
 
   const failureNote = failedAgents.length > 0
-    ? `\n> Note: ${failedAgents.map(r => r.agentName).join(", ")} failed to complete. Findings are from available reviewers only.`
+    ? ` ${failedAgents.map(r => r.agentName).join(", ")} failed to complete, so findings are from the available reviewers only.`
     : "";
 
   const dedupNote = allFindings.length > sorted.length
-    ? `\n> Deduplicated: ${allFindings.length} raw findings → ${sorted.length} unique (${allFindings.length - sorted.length} duplicates removed).`
+    ? ` Deduplicated ${allFindings.length} raw findings to ${sorted.length}.`
     : "";
 
   return `${REVIEW_MARKER}
 ${REVIEW_HEADING}
 
-> [!NOTE]
-> ### Approved with comments
-> Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : ""}coordinator consolidation was skipped. Findings below are deduplicated but un-judged.${failureNote}${dedupNote}
+### Approved with comments
+Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : ""}coordinator consolidation was skipped. Findings below are deduplicated but un-judged.${failureNote}${dedupNote}
 
 **${plural(bySeverity.critical.length, "blocker")} · ${plural(bySeverity.warning.length, "warning")} · ${plural(bySeverity.suggestion.length, "suggestion")}**
 
-<details open>
-<summary>Findings (${sorted.length})</summary>
+${boxes.join("\n\n")}
 
-${sections.join("\n")}
-
----
+<details>
+<summary>Review details</summary>
 
 - Risk tier: ${tier}
 - Reviewers completed: ${agentResults.filter(r => !r.error && !r.skipped).map(r => r.agentName).join(", ") || "none"}
