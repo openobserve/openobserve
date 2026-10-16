@@ -883,6 +883,91 @@ describe("Profiles page", () => {
     const shareUrl = (wrapper: ReturnType<typeof mountPage>) =>
       new URL(String(wrapper.findComponent({ name: "ShareButton" }).props("url")));
 
+    // A flame graph that reports focus, as the real one does, and records focus calls from the page.
+    const focusCalls = vi.fn();
+    const flameStub = {
+      name: "FlameGraphStub",
+      props: [
+        "root",
+        "summaryLabel",
+        "summaryValue",
+        "unitLabel",
+        "emptyLabel",
+        "valueFormatter",
+        "searchQuery",
+        "initialRootAtBottom",
+      ],
+      emits: ["search", "sandwich", "details", "focus"],
+      methods: { focus: (path: string) => focusCalls(path) },
+      template: "<div />",
+    };
+    const mountWithFlame = () =>
+      mount(Profiles, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: { ...pageStubs, CommonFlameGraph: flameStub },
+        },
+      });
+
+    it("keeps the Sandwich function, search, focus and open details in the URL and the share link", async () => {
+      mocks.merge.mockResolvedValue(mergeResponse);
+      const wrapper = mountWithFlame();
+      await settle();
+
+      await wrapper.find('[data-test="profiles-view-flame"]').trigger("click");
+      await nextTick();
+      const graph = wrapper.findComponent({ name: "FlameGraphStub" });
+      graph.vm.$emit("focus", "root/0");
+      graph.vm.$emit("details", "fn-b");
+      await wrapper.find('[data-test="profiles-search-functions"]').setValue("fn");
+      graph.vm.$emit("sandwich", "fn-c");
+      await flushPromises();
+
+      const expected = {
+        view: "sandwich",
+        fn: "fn-c",
+        search: "fn",
+        focus: "root/0",
+        details: "fn-b",
+      };
+      expect(router.replace.mock.lastCall?.[0].query).toMatchObject(expected);
+      expect(Object.fromEntries(shareUrl(wrapper).searchParams)).toMatchObject(expected);
+    });
+
+    it("opens a shared link with its Sandwich function, search, focus and open details", async () => {
+      mocks.merge.mockResolvedValue(mergeResponse);
+      route.query = {
+        org_identifier: orgIdentifier,
+        stream: "profiles-a",
+        period: "15m",
+        view: "sandwich",
+        fn: "fn-c",
+        search: "fn",
+        focus: "root/0",
+        details: "fn-b",
+      };
+      focusCalls.mockClear();
+      const wrapper = mountWithFlame();
+      await settle();
+
+      expect(
+        (wrapper.find('[data-test="profiles-search-functions"]').element as HTMLInputElement).value,
+      ).toBe("fn");
+      expect(
+        (
+          wrapper.find('[data-test="profiles-sandwich-function"] select')
+            .element as HTMLSelectElement
+        ).value,
+      ).toBe("fn-c");
+      expect(wrapper.find('[data-test="profiles-function-details"]').exists()).toBe(true);
+
+      await wrapper.find('[data-test="profiles-view-flame"]').trigger("click");
+      await nextTick();
+      await nextTick();
+      expect(focusCalls).toHaveBeenCalledWith("root/0");
+    });
+
     it("shares the window of the last run, not of the first one", async () => {
       const wrapper = mountPage();
       await flushPromises();

@@ -195,6 +195,42 @@ describe("FlameGraphView frame menu", () => {
   });
 });
 
+describe("FlameGraphView focus", () => {
+  it("tells the page the focused frame, and null after a reset", async () => {
+    const wrapper = mount(FlameGraphView, {
+      props: {
+        root: { name: "main", self: 0, total: 4, children: [{ name: "child", self: 4, total: 4 }] },
+        unitLabel: "ns",
+        summaryLabel: "total",
+        summaryValue: "4",
+      },
+      global: {
+        plugins: [i18n],
+        stubs: {
+          ChartRenderer: ChartRendererStub,
+          OButton: { template: "<button><slot /></button>" },
+          OSwitch: true,
+          OTooltip: true,
+          OTruncatedText: { template: "<span><slot /></span>" },
+        },
+      },
+    });
+    await flushPromises();
+    wrapper.findComponent({ name: "ChartRenderer" }).vm.$emit("click", {
+      data: { block: { id: "root/0", name: "child", grouped: false } },
+      event: { offsetX: 1, offsetY: 1, event: { clientX: 10, clientY: 10 } },
+    });
+    await nextTick();
+
+    await wrapper.get('[data-test="flame-graph-focus-block"]').trigger("click");
+    await nextTick();
+    await wrapper.get('[data-test="flame-graph-focus-reset"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.emitted("focus")).toEqual([["root/0"], [null]]);
+  });
+});
+
 describe("FlameGraphView copy feedback", () => {
   it("confirms Copy function name with a toast", async () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
