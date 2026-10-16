@@ -2366,6 +2366,33 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("profiles route guard", () => {
+    const enter = (zoConfig: Record<string, unknown>) => {
+      const previous = store.state.zoConfig;
+      store.state.zoConfig = zoConfig;
+      try {
+        const route: any = useRoutes().homeChildRoutes.find((r: any) => r.name === "profiles");
+        const next = vi.fn();
+        route.beforeEnter({ query: { org_identifier: "acme" } }, {}, next);
+        return next;
+      } finally {
+        store.state.zoConfig = previous;
+      }
+    };
+
+    it("sends a typed /profiles URL home when profiling is off", () => {
+      expect(enter({ build_type: "enterprise", profiling_enabled: false })).toHaveBeenCalledWith({
+        name: "home",
+        query: { org_identifier: "acme" },
+      });
+    });
+
+    it("opens the page when profiling is on, or while /config is still loading", () => {
+      expect(enter({ profiling_enabled: true })).toHaveBeenCalledWith();
+      expect(enter({})).toHaveBeenCalledWith();
+    });
+  });
+
   // the paywall predicate treats a matched beforeEnter as proof that routeGuard runs there.
   describe("paywall guard proxy (A-27)", () => {
     const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
