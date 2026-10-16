@@ -36,6 +36,8 @@ export interface StepFilters {
   frustrated?: true;
   errored?: true;
   vc?: ViewCond[];
+  /** Property conditions: one of the step's own rows must match every rule. */
+  pc?: FunnelFilter[];
 }
 export interface StepRef {
   kind: StepKind;
@@ -68,11 +70,17 @@ export interface IdentitySql {
 export type FunnelUnit = "sessions" | "users";
 export type FunnelWindow = "session" | "1h" | "1d" | "7d";
 export type BreakdownDim = "browser" | "os" | "device" | "country" | "version" | "env" | "app";
+/** An attribute breakdown: column `f`, read at 1-based step `s`, or at the first step that carries it when absent. */
+export interface AttributeBreakdown {
+  f: string;
+  s?: number;
+}
+export type Breakdown = BreakdownDim | AttributeBreakdown;
 export interface FunnelDef {
   steps: StepRef[];
   unit: FunnelUnit;
   window: FunnelWindow;
-  breakdown: BreakdownDim | null;
+  breakdown: Breakdown | null;
   x?: ExclusionStep[];
   f?: FunnelFilter[];
 }
@@ -223,6 +231,10 @@ const pathsIncludeExpr = (scope: AnalyticsScope, include: PathsInclude): string 
 
 const passSql = (x: string, p: RegexPass): string =>
   `regexp_replace(${x}, '${p.pattern}', '${p.replacement}'${p.global ? ", 'g'" : ""})`;
+
+export function isAttributeBreakdown(b: Breakdown | null): b is AttributeBreakdown {
+  return typeof b === "object" && b !== null;
+}
 
 export function pageKeyExpr(
   col: string,
@@ -1242,13 +1254,25 @@ export function viewCondRaw(c: ViewCond, scope: AnalyticsScope): string {
   return `(${anyOf(hits)})`;
 }
 
+const propFlag = (i: number, j: number): string => `pc${i}_${j + 1}`;
+
+// A step's group of rows matches a property rule when one of its own rows does.
+const propCols = (scope: AnalyticsScope, def: FunnelDef): string[] =>
+  def.steps.flatMap((s, i) =>
+    (s.f?.pc ?? []).map(
+      (r, j) =>
+        `MAX(CASE WHEN ${filterMatch(scope, r)} THEN 1 ELSE 0 END) AS ${propFlag(i + 1, j)}`,
+    ),
+  );
+
 // view_time_spent is in nanoseconds.
-const filterConds = (f: StepFilters | undefined, scope: AnalyticsScope): string =>
+const filterConds = (f: StepFilters | undefined, scope: AnalyticsScope, i: number): string =>
   [
     ...(f?.minMs !== undefined ? [`vts >= ${f.minMs * 1000000}`] : []),
     ...(f?.frustrated ? ["vf = 1"] : []),
     ...(f?.errored ? ["ve = 1"] : []),
     ...(f?.vc ?? []).map((c) => viewCondGrouped(c, scope)),
+    ...(f?.pc ?? []).map((r, j) => sessionFilterKeep(r, propFlag(i, j))),
   ]
     .map((c) => ` AND ${c}`)
     .join("");
@@ -1259,17 +1283,19 @@ const stepFlags = (
   events: NamedEvent[],
   ungated: boolean,
 ): string => {
-  const step = (s: StepRef) =>
-    `${stepPredicateGrouped(s, scope, events)}${filterConds(s.f, scope)}`;
+  const step = (s: StepRef, i: number) =>
+    `${stepPredicateGrouped(s, scope, events)}${filterConds(s.f, scope, i)}`;
   const near = (i: number) =>
     withinOf(def)
       .filter((x) => x.e.a === i)
       .map((x) => ` AND (nx${x.j} IS NULL OR nx${x.j} - t > ${x.e.withinMs})`)
       .join("");
   return [
-    ...def.steps.map((s, i) => flag(`${step(s)}${near(i + 1)}`, `m${i + 1}`)),
+    ...def.steps.map((s, i) => flag(`${step(s, i + 1)}${near(i + 1)}`, `m${i + 1}`)),
     ...betweenOf(def).map((x) => flag(stepPredicateGrouped(x.e.step, scope, events), `mx${x.j}`)),
-    ...(ungated ? withinOf(def).map((x) => flag(step(def.steps[x.e.a - 1]), `ma${x.j}`)) : []),
+    ...(ungated
+      ? withinOf(def).map((x) => flag(step(def.steps[x.e.a - 1], x.e.a), `ma${x.j}`))
+      : []),
   ].join(", ");
 };
 
@@ -1292,6 +1318,7 @@ const scanCols = (scope: AnalyticsScope, def: FunnelDef, events: NamedEvent[]): 
       : []),
     ...(errorRowPredicates(scope, all, events).length ? [`MIN(${errorCol(scope)}) AS em`] : []),
     ...(needsRef(all, events) ? [`MIN(${viewCol(scope, "view_referrer", "VARCHAR")}) AS ref`] : []),
+    ...propCols(scope, def),
   ];
 };
 
@@ -1394,6 +1421,12 @@ const chainShape = (id: IdentitySql | null, def: FunnelDef): ChainShape => {
   return { users, windowMs, partition: users && windowMs ? "COALESCE(uid, 's:' || sid)" : "sid" };
 };
 
+interface DimSql {
+  col: string;
+  attr: boolean;
+  step: number | null;
+}
+
 interface FunnelParts {
   n1: number[];
   between: Exclusion[];
@@ -1440,7 +1473,7 @@ const funnelCtes = (
   id: IdentitySql | null,
   def: FunnelDef,
   events: NamedEvent[],
-  dim: string | null,
+  dim: DimSql | null,
   entry: number | null = null,
 ): { ctes: string[]; users: boolean } => {
   const { users, windowMs, partition } = chainShape(id, def);
@@ -1466,7 +1499,7 @@ const funnelCtes = (
     "MIN(view_url) AS url",
     atnCol(scope),
     ...(users && id ? identityGroupCols(id) : []),
-    ...(dim ? [`MIN(${dim}) AS dim`] : []),
+    ...(dim ? [`MIN(${dim.col}) AS dim`] : []),
     ...(vnAvail ? ["MIN(view_name) AS vn"] : []),
     ...extra,
     ...(newSince !== null ? ["MIN(date) AS t0"] : []),
@@ -1535,7 +1568,9 @@ const funnelCtes = (
   const f = `sequence_step_times(${windowMs ?? 0}, t, ${stepConds(n)}) AS f`;
   const exs = p.between.map((x) => `${exAgg(x.j)} AS ex${x.j}`);
   const seen = p.n1.map((i) => `SUM(m${i}) AS seen${i}`);
-  const firstDim = "first_value(dim ORDER BY CASE WHEN m1 = 1 THEN 0 ELSE 1 END, t) AS dim";
+  const firstDim = dim ? sessionDim(dim, n) : "";
+  const covered = dim?.attr ? coverageCols(n) : [];
+  const h = covered.map(colAlias);
   // A later step counts from the unit's first step 1 on, so a stray earlier event cannot move its bucket.
   if (entry !== null && entry > 1) {
     ctes.push(
@@ -1561,18 +1596,19 @@ const funnelCtes = (
       ...seen,
       "COUNT(DISTINCT CASE WHEN m1 = 1 THEN sid END) AS s1s",
       ...(dim ? [firstDim] : []),
+      ...covered,
       ...entryCols,
     ];
     ctes.push(
       `su AS (SELECT ${su.join(", ")} FROM ${source} GROUP BY ${partition}, CASE WHEN uid IS NULL THEN 1 ELSE 0 END)`,
-      `pu AS (SELECT anon, ${[...fromStepTimes(p, true), "s1s", ...(dim ? ["dim"] : []), ...entryCarry].join(", ")} FROM su)`,
+      `pu AS (SELECT anon, ${[...fromStepTimes(p, true), "s1s", ...(dim ? ["dim"] : []), ...h, ...entryCarry].join(", ")} FROM su)`,
     );
     return { ctes, users };
   }
-  const dimCols = dim ? [firstDim, "MIN(CASE WHEN m1 = 1 THEN t END) AS t1"] : [];
+  const dimCols = dim ? [firstDim, "MIN(CASE WHEN m1 = 1 THEN t END) AS t1", ...covered] : [];
   ctes.push(
     `s AS (SELECT ${["sid", "MAX(uid) AS uid", f, ...ungatedTimes(p), ...exs, ...seen, ...dimCols, ...entryCols].join(", ")} FROM ${source} GROUP BY sid)`,
-    `ps AS (SELECT ${["sid", "uid", ...fromStepTimes(p, false), ...(dim ? ["dim", "t1"] : []), ...entryCarry].join(", ")} FROM s)`,
+    `ps AS (SELECT ${["sid", "uid", ...fromStepTimes(p, false), ...(dim ? ["dim", "t1", ...h] : []), ...entryCarry].join(", ")} FROM s)`,
   );
   if (users) {
     const pu = [
@@ -1585,7 +1621,8 @@ const funnelCtes = (
       ...exclusionsOf(def).map(
         ({ j, e }) => `CASE WHEN MAX(r${e.b ?? e.a}) = 0 THEN MAX(xr${j}) ELSE 0 END AS xr${j}`,
       ),
-      ...(dim ? ["first_value(dim ORDER BY t1) AS dim"] : []),
+      ...(dim ? [userDim(dim)] : []),
+      ...h.map((c) => `MAX(${c}) AS ${c}`),
       // A user enters at the earliest session that reached the pair's first step.
       ...(entry !== null ? [`MIN(CASE WHEN r${entry} = 1 THEN entry_ts END) AS entry_ts`] : []),
     ];
@@ -1596,11 +1633,49 @@ const funnelCtes = (
   return { ctes, users };
 };
 
-const breakdownField = (scope: AnalyticsScope, def: FunnelDef): string | null => {
-  if (!def.breakdown) return null;
-  const field = DIMENSIONS[def.breakdown];
+const breakdownField = (scope: AnalyticsScope, def: FunnelDef): DimSql | null => {
+  const b = def.breakdown;
+  if (!b) return null;
+  if (isAttributeBreakdown(b)) {
+    if (!has(scope, b.f)) return null;
+    // Empty text reads as no value, and MIN would otherwise pick it over a real one.
+    return { col: `NULLIF(${filterValue(b.f)}, '')`, attr: true, step: b.s ?? null };
+  }
+  const field = DIMENSIONS[b];
   // Every scope already filters on application_id, so the stream always has it.
-  return field && (field === "application_id" || has(scope, field)) ? field : null;
+  return field && (field === "application_id" || has(scope, field))
+    ? { col: field, attr: false, step: null }
+    : null;
+};
+
+// Auto reads the first value on any step's row; a pinned step reads only its own rows, NULL when never matched.
+const sessionDim = (dim: DimSql, n: number): string => {
+  if (!dim.attr) return "first_value(dim ORDER BY CASE WHEN m1 = 1 THEN 0 ELSE 1 END, t) AS dim";
+  if (dim.step === null) {
+    const any = range1(n)
+      .map((i) => `m${i} = 1`)
+      .join(" OR ");
+    return `first_value(dim ORDER BY CASE WHEN dim IS NOT NULL AND (${any}) THEN 0 ELSE 1 END, t) AS dim`;
+  }
+  const k = dim.step;
+  return `first_value(CASE WHEN m${k} = 1 THEN dim END ORDER BY CASE WHEN m${k} = 1 AND dim IS NOT NULL THEN 0 ELSE 1 END, t) AS dim`;
+};
+
+const userDim = (dim: DimSql): string =>
+  dim.attr
+    ? "first_value(dim ORDER BY CASE WHEN dim IS NULL THEN 1 ELSE 0 END, t1) AS dim"
+    : "first_value(dim ORDER BY t1) AS dim";
+
+// Whether the unit's step-i rows carry a value, so the page can find the step the field is first set at.
+const coverageCols = (n: number): string[] =>
+  range1(n).map((i) => `MAX(CASE WHEN m${i} = 1 AND dim IS NOT NULL THEN 1 ELSE 0 END) AS h${i}`);
+
+// Time from start step k to the last step, for each k the page may pick; d_i counts from step 1.
+const breakdownTimes = (dim: DimSql, n: number): string[] => {
+  const starts = dim.step === null ? range1(n - 1) : dim.step < n ? [dim.step] : [];
+  return starts.map(
+    (k) => `approx_percentile_cont(${k === 1 ? `d${n}` : `d${n} - d${k}`}, 0.5) AS mt${k}`,
+  );
 };
 
 export function funnelSql(
@@ -1617,6 +1692,12 @@ export function funnelSql(
     const cnt = [
       ...range1(n).map((i) => `SUM(r${i}) AS c${i}`),
       ...xr.map((j) => `SUM(xr${j}) AS xr${j}`),
+      ...(dim.attr
+        ? [
+            ...range1(n).map((i) => `SUM(CASE WHEN r${i} = 1 THEN h${i} ELSE 0 END) AS dc${i}`),
+            ...breakdownTimes(dim, n),
+          ]
+        : []),
     ];
     return withCtes(
       ctes,
@@ -1744,7 +1825,12 @@ export function funnelAlertSql(
 /** Sessions that opened step 1 (`opened`) and those of them inside Filter all steps (`kept`), for "Why N?". */
 export function whyEnteredSql(scope: AnalyticsScope, def: FunnelDef, opts: BuildOpts): string {
   const s1 = def.steps[0];
-  const conds = (s1.f?.vc ?? []).map((c) => ` AND ${viewCondRaw(c, scope)}`).join("");
+  const conds = [
+    ...(s1.f?.vc ?? []).map((c) => viewCondRaw(c, scope)),
+    ...(s1.f?.pc ?? []).map((r) => rowFilterMatch(scope, r)),
+  ]
+    .map((c) => ` AND ${c}`)
+    .join("");
   const opened = `(${stepPredicateRaw(s1, scope, opts.events)}${conds})`;
   const keeps = funnelFilters(def, false).map((r) => rowFilterMatch(scope, r));
   const kept = [opened, ...keeps].join(" AND ");

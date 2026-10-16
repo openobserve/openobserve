@@ -59,6 +59,20 @@ const WINDOWS: [&str; 4] = ["session", "1h", "1d", "7d"];
 const BREAKDOWNS: [&str; 7] = [
     "browser", "os", "device", "country", "version", "env", "app",
 ];
+/// `SessionField` names; a breakdown or step condition never names one as an attribute column.
+const SESSION_FIELDS: [&str; 10] = [
+    "user_agent_user_agent_family",
+    "user_agent_os_family",
+    "user_agent_device_family",
+    "geo_info_country",
+    "geo_info_city",
+    "usr_id",
+    "usr_email",
+    "usr_anonymous_id",
+    "env",
+    "version",
+];
+const MAX_STEP_CONDS: usize = 10;
 /// A rule must never select on a URL parameter that carries a credential.
 const CREDENTIAL_PARAMS: [&str; 4] = ["id_token", "access_token", "code", "token"];
 
@@ -261,6 +275,9 @@ pub struct FunnelDef {
     pub w: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub b: Option<String>,
+    /// 1-based step an attribute `b` reads its value at; absent lets the data pick it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bs: Option<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<Vec<Object>>)]
     pub x: Option<Vec<Exclusion>>,
@@ -298,7 +315,7 @@ impl Step {
     }
 }
 
-/// A page step's filters: time on page (ms), `fr: 1`, `er: 1` and view conditions.
+/// Step filters; only `pc`, the property conditions, applies to non-page steps.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StepOpts {
@@ -310,6 +327,14 @@ pub struct StepOpts {
     pub er: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vc: Option<Vec<ViewCond>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pc: Vec<FunnelFilter>,
+}
+
+impl StepOpts {
+    fn page_only(&self) -> bool {
+        self.min.is_some() || self.fr.is_some() || self.er.is_some() || self.vc.is_some()
+    }
 }
 
 /// A page step's view condition: a URL parameter, or the referrer host, equals one of `values`.
@@ -714,14 +739,7 @@ pub fn validate_def(def: &FunnelDef) -> Result<(serde_json::Value, Vec<String>),
             WINDOWS.join(", ")
         )));
     }
-    if let Some(b) = def.b.as_deref()
-        && !BREAKDOWNS.contains(&b)
-    {
-        return Err(invalid_def(format!(
-            "b must be one of {}",
-            BREAKDOWNS.join(", ")
-        )));
-    }
+    validate_breakdown(def)?;
     let stored = FunnelDef {
         s: def.s.clone(),
         u: Some(unit.to_string()),
@@ -734,6 +752,7 @@ pub fn validate_def(def: &FunnelDef) -> Result<(serde_json::Value, Vec<String>),
             .to_string(),
         ),
         b: def.b.clone(),
+        bs: def.bs,
         x: def.x.clone(),
         f: def.f.clone(),
     };
@@ -839,11 +858,12 @@ fn validate_step(step: &Step, event_ids: &mut Vec<String>) -> Result<(), RumPaEr
     let Some(opts) = step.opts() else {
         return Ok(());
     };
-    if kind != "p" {
+    if kind != "p" && (opts.page_only() || opts.pc.is_empty()) {
         return Err(invalid_def(
-            "step options apply only to p steps".to_string(),
+            "only property conditions apply to c, e and r steps".to_string(),
         ));
     }
+    validate_step_conds(&opts.pc)?;
     if opts
         .min
         .is_some_and(|min| !(0..=MAX_STEP_MS).contains(&min))
@@ -926,6 +946,61 @@ fn validate_filters(filters: Option<&[FunnelFilter]>) -> Result<(), RumPaError> 
         }
     }
     Ok(())
+}
+
+// A column named like a dimension reads as the dimension, as on the web.
+fn validate_breakdown(def: &FunnelDef) -> Result<(), RumPaError> {
+    let attribute = match def.b.as_deref() {
+        None => false,
+        Some(b) if BREAKDOWNS.contains(&b) => false,
+        Some(b) if is_attribute_column(b) => true,
+        Some(_) => {
+            return Err(invalid_def(format!(
+                "b is one of {} or a stream column name",
+                BREAKDOWNS.join(", ")
+            )));
+        }
+    };
+    match def.bs {
+        None => Ok(()),
+        Some(_) if !attribute => Err(invalid_def(
+            "bs applies only to a stream column breakdown".to_string(),
+        )),
+        Some(bs) if bs >= 1 && usize::from(bs) <= def.s.len() => Ok(()),
+        Some(_) => Err(invalid_def(format!(
+            "bs is 1 to {} for this funnel",
+            def.s.len()
+        ))),
+    }
+}
+
+fn validate_step_conds(conds: &[FunnelFilter]) -> Result<(), RumPaError> {
+    if conds.len() > MAX_STEP_CONDS {
+        return Err(invalid_def(format!(
+            "a step has at most {MAX_STEP_CONDS} property conditions"
+        )));
+    }
+    for cond in conds {
+        if !matches!(&cond.field, FilterField::Attribute(name) if is_attribute_column(name)) {
+            return Err(invalid_def(
+                "a property condition field is a stream column name".to_string(),
+            ));
+        }
+        if cond.values.is_empty() || cond.values.len() > MAX_RULE_VALUES {
+            return Err(invalid_def(format!(
+                "a property condition has 1 to {MAX_RULE_VALUES} values"
+            )));
+        }
+        for value in &cond.values {
+            validate_match_value(value, cond.op == MatchOp::Regex).map_err(as_def)?;
+        }
+    }
+    Ok(())
+}
+
+/// A stream column that is not a built-in session field, as the web's `isFilterColumn` allows it.
+fn is_attribute_column(name: &str) -> bool {
+    is_filter_column(name) && !SESSION_FIELDS.contains(&name)
 }
 
 // The name is quoted into SQL, so only what ingest writes passes; `_` columns are internal.
@@ -1294,7 +1369,8 @@ mod tests {
             let (stored, _) = validate_def(&def(&steps, None, None, Some(b))).unwrap();
             assert_eq!(stored["b"], b);
         }
-        assert!(validate_def(&def(&steps, None, None, Some("city"))).is_err());
+        assert!(validate_def(&def(&steps, None, None, Some("geo_info_city"))).is_err());
+        assert!(validate_def(&def(&steps, None, None, Some("City"))).is_err());
     }
 
     #[test]
@@ -1367,19 +1443,6 @@ mod tests {
             (&"action".into(), &serde_json::json!(["a"]), &"/p".into())
         );
     }
-
-    const SESSION_FIELDS: [&str; 10] = [
-        "user_agent_user_agent_family",
-        "user_agent_os_family",
-        "user_agent_device_family",
-        "geo_info_country",
-        "geo_info_city",
-        "usr_id",
-        "usr_email",
-        "usr_anonymous_id",
-        "env",
-        "version",
-    ];
 
     fn settings_body(sessions: serde_json::Value, pages: serde_json::Value) -> serde_json::Value {
         serde_json::json!({"bots": true, "sessions": sessions, "pages": pages, "version": 0})
@@ -1929,5 +1992,173 @@ mod tests {
             let vc = serde_json::json!([{"t": "param", "key": key, "op": "eq", "values": ["x"]}]);
             assert_eq!(def_code(with_vc(vc)), "invalid_definition", "{key}");
         }
+    }
+
+    fn p8_def(extra: serde_json::Value) -> Result<(serde_json::Value, Vec<String>), RumPaError> {
+        let mut def = serde_json::json!({"s": [["c", "product_viewed"], ["c", "payment_info_submitted"], ["c", "order_completed"]]});
+        for (k, v) in extra.as_object().unwrap() {
+            def[k] = v.clone();
+        }
+        validate_def(&fdef(def))
+    }
+
+    /// Steps `/a`, then `step`, with the given property conditions on `step`.
+    fn with_pc(
+        step: (&str, &str),
+        pc: serde_json::Value,
+    ) -> Result<(serde_json::Value, Vec<String>), RumPaError> {
+        validate_def(&fdef(
+            serde_json::json!({"s": [["p", "/a"], [step.0, step.1, {"pc": pc}]]}),
+        ))
+    }
+
+    fn pc_rule(field: &str, op: &str, values: serde_json::Value) -> serde_json::Value {
+        serde_json::json!({"field": field, "op": op, "values": values})
+    }
+
+    #[test]
+    fn p8_an_attribute_breakdown_is_a_stream_column_that_is_not_a_session_field() {
+        let (stored, _) = p8_def(serde_json::json!({"b": "context_payment_method"})).unwrap();
+        assert_eq!(stored["b"], "context_payment_method", "{stored}");
+        assert!(stored.get("bs").is_none(), "{stored}");
+        for b in ["Context_plan", "context-plan", "_timestamp", "", "a\"b"] {
+            assert_eq!(
+                def_code(p8_def(serde_json::json!({"b": b}))),
+                "invalid_definition",
+                "{b}"
+            );
+        }
+        // env and version are also dimension names, so they read as the dimension.
+        for b in SESSION_FIELDS.iter().filter(|f| !BREAKDOWNS.contains(f)) {
+            assert_eq!(
+                def_code(p8_def(serde_json::json!({"b": b}))),
+                "invalid_definition",
+                "{b}"
+            );
+        }
+        for b in BREAKDOWNS {
+            assert_eq!(def_code(p8_def(serde_json::json!({"b": b}))), "ok", "{b}");
+        }
+    }
+
+    #[test]
+    fn p8_bs_pins_a_step_of_an_attribute_breakdown() {
+        let (stored, _) =
+            p8_def(serde_json::json!({"b": "context_payment_method", "bs": 2})).unwrap();
+        assert_eq!(stored["bs"], 2, "{stored}");
+        assert_eq!(
+            def_code(p8_def(
+                serde_json::json!({"b": "context_payment_method", "bs": 3})
+            )),
+            "ok"
+        );
+        for bad in [
+            serde_json::json!({"bs": 1}),
+            serde_json::json!({"b": "browser", "bs": 1}),
+            serde_json::json!({"b": "context_payment_method", "bs": 0}),
+            serde_json::json!({"b": "context_payment_method", "bs": 4}),
+        ] {
+            assert_eq!(def_code(p8_def(bad.clone())), "invalid_definition", "{bad}");
+        }
+        let def = serde_json::json!({"s": [["p", "/a"], ["p", "/b"]], "b": "context_x", "bs": 256});
+        assert!(serde_json::from_value::<FunnelDef>(def).is_err());
+    }
+
+    #[test]
+    fn p8_a_property_condition_rides_on_any_step_kind() {
+        let pc = serde_json::json!([pc_rule(
+            "context_payment_method",
+            "in",
+            serde_json::json!(["upi"])
+        )]);
+        for step in [("p", "/b"), ("c", "Buy"), ("e", ID_A), ("r", "Boom")] {
+            let (stored, _) = with_pc(step, pc.clone()).unwrap();
+            assert_eq!(stored["s"][1][2], serde_json::json!({"pc": pc}), "{stored}");
+        }
+        let not = serde_json::json!([{"field": "context_plan", "op": "regex", "values": ["^pro"], "not": true}]);
+        let (stored, _) = with_pc(("c", "Buy"), not.clone()).unwrap();
+        assert_eq!(stored["s"][1][2]["pc"], not, "{stored}");
+        let page = fdef(serde_json::json!({"s": [["p", "/a", {"min": 1, "pc": pc}], ["p", "/b"]]}));
+        assert_eq!(def_code(validate_def(&page)), "ok");
+    }
+
+    #[test]
+    fn p8_other_options_stay_on_page_steps() {
+        let pc = serde_json::json!([pc_rule("context_plan", "eq", serde_json::json!(["pro"]))]);
+        for opts in [
+            serde_json::json!({"pc": pc, "min": 1}),
+            serde_json::json!({"pc": pc, "fr": 1}),
+            serde_json::json!({"pc": pc, "er": 1}),
+            serde_json::json!({"pc": []}),
+            serde_json::json!({}),
+        ] {
+            let def = fdef(serde_json::json!({"s": [["p", "/a"], ["c", "Buy", opts]]}));
+            assert_eq!(def_code(validate_def(&def)), "invalid_definition", "{opts}");
+        }
+    }
+
+    #[test]
+    fn p8_property_conditions_are_bounded_like_filters() {
+        let rule = pc_rule("context_plan", "eq", serde_json::json!(["pro"]));
+        let twenty: Vec<String> = (0..20).map(|i| format!("v{i}")).collect();
+        let too_many: Vec<String> = (0..21).map(|i| format!("v{i}")).collect();
+        assert_eq!(
+            def_code(with_pc(
+                ("c", "Buy"),
+                serde_json::json!(vec![rule.clone(); 10])
+            )),
+            "ok"
+        );
+        assert_eq!(
+            def_code(with_pc(
+                ("c", "Buy"),
+                serde_json::json!([pc_rule("context_plan", "in", twenty.into())])
+            )),
+            "ok"
+        );
+        for pc in [
+            serde_json::json!(vec![rule.clone(); 11]),
+            serde_json::json!([pc_rule("context_plan", "in", serde_json::json!([]))]),
+            serde_json::json!([pc_rule("context_plan", "in", too_many.into())]),
+            serde_json::json!([pc_rule("context_plan", "eq", serde_json::json!([""]))]),
+            serde_json::json!([pc_rule("context_plan", "regex", serde_json::json!(["(a"]))]),
+            serde_json::json!([pc_rule("Context_plan", "eq", serde_json::json!(["x"]))]),
+            serde_json::json!([pc_rule("geo_info_country", "eq", serde_json::json!(["x"]))]),
+            serde_json::json!([pc_rule("env", "eq", serde_json::json!(["x"]))]),
+            serde_json::json!([pc_rule("version", "eq", serde_json::json!(["x"]))]),
+        ] {
+            assert_eq!(
+                def_code(with_pc(("c", "Buy"), pc.clone())),
+                "invalid_definition",
+                "{pc}"
+            );
+        }
+        let unknown = serde_json::json!({"s": [["p", "/a"], ["c", "Buy", {"pc": [{"field": "context_plan", "op": "eq", "values": ["x"], "y": 1}]}]]});
+        assert!(serde_json::from_value::<FunnelDef>(unknown).is_err());
+    }
+
+    #[test]
+    fn p8_a_definition_without_new_keys_serializes_unchanged() {
+        let def = serde_json::json!({
+            "s": [["p", "/a", {"min": 1000, "fr": 1, "er": 1, "vc": [{"t": "ref", "op": "eq", "values": ["google.com"]}]}], ["c", "Buy"], ["e", ID_A]],
+            "u": "users",
+            "w": "1d",
+            "b": "browser",
+            "x": [{"s": ["p", "/z"], "a": 1, "b": 2}],
+            "f": [{"field": "context_plan", "op": "in", "values": ["pro"]}]
+        });
+        let (stored, _) = validate_def(&fdef(def.clone())).unwrap();
+        assert_eq!(stored.to_string(), def.to_string());
+        let text = format!(
+            r#"{{"s":[["p","/a",{{"min":1000,"fr":1,"er":1,"vc":[{{"t":"ref","op":"eq","values":["google.com"]}}]}}],["c","Buy"],["e","{ID_A}"]],"u":"users","w":"1d","b":"browser","x":[{{"s":["p","/z"],"a":1,"b":2}}],"f":[{{"field":"context_plan","op":"in","values":["pro"]}}]}}"#
+        );
+        let parsed: FunnelDef = serde_json::from_str(&text).unwrap();
+        assert_eq!(serde_json::to_string(&parsed).unwrap(), text);
+        let plain = serde_json::json!({"s": [["p", "/a"], ["p", "/b"]]});
+        let (stored, _) = validate_def(&fdef(plain)).unwrap();
+        assert_eq!(
+            stored.to_string(),
+            r#"{"s":[["p","/a"],["p","/b"]],"u":"sessions","w":"session"}"#
+        );
     }
 }

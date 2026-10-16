@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { defineComponent, h } from "vue";
 import { mount, type VueWrapper } from "@vue/test-utils";
 const toastSpy = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastSpy }));
@@ -22,6 +23,7 @@ import SessionFieldPicker from "./SessionFieldPicker.vue";
 import FunnelFilterBar from "./FunnelFilterBar.vue";
 import StepConditionPopover from "./StepConditionPopover.vue";
 import WhyEnteredPopover from "./WhyEnteredPopover.vue";
+import useStepLabels from "./useStepLabels";
 import { whyLines } from "./whyEntered";
 import type { FilterValuesState } from "./funnelFilters";
 import type { FunnelDef, StepRef } from "@/utils/rum/productAnalyticsQueries";
@@ -336,6 +338,45 @@ describe("StepConditionPopover, Only when", () => {
       .trigger("click");
     const [[step]] = w.emitted("update") as [StepRef][];
     expect(step.f).toEqual({ errored: true, vc: [c] });
+  });
+
+  it("other step filters keep a property condition from a link", async () => {
+    const pc = [{ field: "context_payment_method", op: "in" as const, values: ["upi"] }];
+    const w = mountPopover({ kind: "p", key: "/a", f: { pc } });
+    await open(w);
+    await w
+      .find(dt("rum-analytics-funnel-step-0-filter-errored"))
+      .find('[role="checkbox"], input[type="checkbox"]')
+      .trigger("click");
+    const [[step]] = w.emitted("update") as [StepRef][];
+    expect(step.f).toEqual({ errored: true, pc });
+  });
+});
+
+describe("useStepLabels, property conditions", () => {
+  it("names each property condition on the step", () => {
+    let chips: string[] = [];
+    const Probe = defineComponent({
+      setup() {
+        const { filterChips } = useStepLabels(() => []);
+        chips = filterChips({
+          kind: "c",
+          key: "payment_info_submitted",
+          f: {
+            pc: [
+              { field: "context_payment_method", op: "in", values: ["upi", "card"] },
+              { field: "context_plan", op: "contains", values: ["pro"], not: true },
+            ],
+          },
+        }).map(String);
+        return () => h("div");
+      },
+    });
+    wrapper = mount(Probe);
+    expect(chips).toEqual([
+      "context_payment_method is one of upi, card",
+      "context_plan does not contain pro",
+    ]);
   });
 });
 
