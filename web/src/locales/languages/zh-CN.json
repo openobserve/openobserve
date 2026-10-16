@@ -1132,8 +1132,6 @@
     "regionTitle": "选择地区",
     "userDefinedSchemaLabel": "用户定义的架构",
     "allFieldsLabel": "所有字段",
-    "generateQuery": "向 AI 提问",
-    "generateQueryTooltip": "让 AI 帮你完成查询",
     "nlQueryGenerationFailed": "无法生成查询。请再试一次。",
     "askAIPlaceholder": "让 AI 帮你完成查询...",
     "askAIFunctionPlaceholder": "让 AI 帮你完成任务...",
@@ -13346,7 +13344,6 @@
   },
   "nlMode": {
     "toggle": "自然语言模式",
-    "noAdditionalOptions": "没有其他选项",
     "executingTool": "正在执行{tool}...",
     "toolFailed": "工具失败：{message}",
     "processing": "处理中..."
