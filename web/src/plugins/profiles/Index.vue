@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
 
       <div class="ms-auto flex shrink-0 items-center gap-2">
-        <DateTimePickerDashboard v-model="dateState" />
+        <DateTimePickerDashboard ref="dateTimeRef" v-model="dateState" />
         <OButton
           variant="primary"
           size="sm-toolbar"
@@ -183,14 +183,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OContent v-else class="flex flex-col gap-2.5 py-2.5">
         <section class="bg-surface-panel border-border-default rounded-default border">
-          <header class="border-border-default border-b px-3 py-2 text-sm font-semibold">
-            {{ t("profiles.timeSeriesTitle") }}
+          <header
+            class="border-border-default flex flex-wrap items-center gap-2 border-b px-3 py-2 text-sm font-semibold"
+          >
+            <span>{{ t("profiles.timeSeriesTitle") }}</span>
           </header>
-          <div class="h-36 p-3">
+          <div class="relative h-36 p-3" data-test="profiles-series-chart-host">
             <ChartRenderer
               v-if="seriesPoints.length"
               :data="seriesChartData"
               class="h-full w-full"
+              @updated:dataZoom="onSeriesDataZoom"
             />
             <div
               v-else
@@ -206,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <header
             class="border-border-default flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2"
           >
-            <div class="text-sm font-semibold">{{ t("profiles.resultTitle") }}</div>
+            <div class="text-sm font-semibold">{{ resultHeading }}</div>
             <div class="flex flex-wrap items-center gap-2">
               <div class="w-56">
                 <OSearchInput
@@ -243,150 +246,240 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </header>
-          <div class="p-3">
-            <div v-if="activeView === 'top'" class="overflow-auto">
-              <table class="w-full table-fixed text-sm">
-                <thead class="bg-surface-page text-left">
-                  <tr>
-                    <th class="min-w-0 px-2 py-1">{{ t("function.header") }}</th>
-                    <th class="w-40 px-2 py-1 text-right">
-                      <button
-                        type="button"
-                        class="hover:text-text-body inline-flex cursor-pointer items-center gap-1"
-                        :aria-label="t('profiles.sortBySelf')"
-                        data-test="profiles-sort-self"
-                        @click="toggleTopSort('self')"
-                      >
-                        {{ valueColumnLabel(t("profiles.self")) }}
-                        <span v-if="topSortKey === 'self'" class="text-text-secondary">{{
-                          topSortAsc ? "↑" : "↓"
-                        }}</span>
-                      </button>
-                    </th>
-                    <th class="w-40 px-2 py-1 text-right">
-                      <button
-                        type="button"
-                        class="hover:text-text-body inline-flex cursor-pointer items-center gap-1"
-                        :aria-label="t('profiles.sortByTotal')"
-                        data-test="profiles-sort-total"
-                        @click="toggleTopSort('total')"
-                      >
-                        {{ valueColumnLabel(t("profiles.total")) }}
-                        <span v-if="topSortKey === 'total'" class="text-text-secondary">{{
-                          topSortAsc ? "↑" : "↓"
-                        }}</span>
-                      </button>
-                    </th>
-                    <th class="w-16 px-2 py-1 text-right">{{ t("profiles.percent") }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="row in topRows"
-                    :key="row.name"
-                    class="border-border-default hover:bg-table-row-hover-bg border-t"
-                  >
-                    <td class="max-w-0 px-2 py-1 font-mono text-xs">
-                      <span class="block truncate" v-html="highlightName(row.name)" />
-                      <OTooltip
-                        :content="raw(row.name)"
-                        side="top"
-                        align="start"
-                        hoverable
-                        max-width="40rem"
-                        content-class="font-mono text-xs break-all"
-                      />
-                    </td>
-                    <td class="px-2 py-1 text-right whitespace-nowrap">
-                      {{ formatTableValue(row.self) }}
-                    </td>
-                    <td class="px-2 py-1 text-right whitespace-nowrap">
-                      {{ formatTableValue(row.total) }}
-                    </td>
-                    <td class="px-2 py-1 text-right whitespace-nowrap">
-                      {{ formatPercent(row.total, mergeResult?.total ?? 0) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div v-else-if="activeView === 'flame'" class="overflow-auto">
-              <CommonFlameGraph
-                :root="mergeResult?.root ?? null"
-                :summary-label="t('profiles.total')"
-                :summary-value="formatTableValue(mergeResult?.total ?? 0)"
-                :unit-label="tableUnitLabel"
-                :empty-label="t('profiles.noProfilesFound')"
-                :value-formatter="formatTableValue"
-                :search-query="searchQuery"
-              />
-            </div>
-
-            <div v-else class="overflow-auto">
-              <table class="w-full table-fixed text-sm">
-                <thead class="bg-surface-page text-left">
-                  <tr>
-                    <th class="min-w-0 px-2 py-1">{{ t("function.header") }}</th>
-                    <th class="w-40 px-2 py-1 text-right">
-                      {{ valueColumnLabel(t("profiles.self")) }}
-                    </th>
-                    <th class="w-40 px-2 py-1 text-right">
-                      {{ valueColumnLabel(t("profiles.total")) }}
-                    </th>
-                    <th class="w-16 px-2 py-1 text-right">{{ t("profiles.percent") }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="row in visibleStackRows"
-                    :key="row.id"
-                    class="border-border-default hover:bg-table-row-hover-bg border-t"
-                    :data-test="`profiles-stack-row-${row.id}`"
-                  >
-                    <td class="max-w-0 px-2 py-1 font-mono text-xs">
-                      <button
-                        type="button"
-                        class="inline-flex max-w-full min-w-0 items-center gap-1 text-start"
-                        :class="row.hasChildren ? 'cursor-pointer' : 'cursor-default'"
-                        :style="{ paddingInlineStart: `${row.depth}rem` }"
-                        :aria-expanded="
-                          row.hasChildren ? expandedStackNodeIds.has(row.id) : undefined
-                        "
-                        @click="row.hasChildren && toggleStackNode(row.id)"
-                      >
-                        <span
-                          class="text-text-secondary inline-flex h-4 w-4 shrink-0 items-center justify-center text-xs"
-                          aria-hidden="true"
+          <div class="flex min-h-0 items-stretch">
+            <div
+              class="min-w-0 flex-1 p-3"
+              data-test="profiles-result-main"
+              @click="closeFunctionDetails"
+            >
+              <div v-if="activeView === 'top'" class="overflow-auto">
+                <table class="w-full table-fixed text-sm">
+                  <thead class="bg-surface-page text-left">
+                    <tr>
+                      <th class="w-8 px-1 py-1" />
+                      <th class="min-w-0 px-2 py-1">{{ t("function.header") }}</th>
+                      <th class="w-28 px-2 py-1 text-right">
+                        <button
+                          type="button"
+                          class="hover:text-text-body inline-flex cursor-pointer items-center gap-1"
+                          :aria-label="t('profiles.sortBySelf')"
+                          data-test="profiles-sort-self"
+                          @click="toggleTopSort('self')"
                         >
-                          <template v-if="row.hasChildren">
-                            {{ expandedStackNodeIds.has(row.id) ? "▾" : "▸" }}
-                          </template>
-                        </span>
-                        <span class="min-w-0 truncate" v-html="highlightName(row.name)" />
-                      </button>
-                      <OTooltip
-                        :content="raw(row.name)"
-                        side="top"
-                        align="start"
-                        hoverable
-                        max-width="40rem"
-                        content-class="font-mono text-xs break-all"
-                      />
-                    </td>
-                    <td class="px-2 py-1 text-right whitespace-nowrap">
-                      {{ formatTableValue(row.self) }}
-                    </td>
-                    <td class="px-2 py-1 text-right whitespace-nowrap">
-                      {{ formatTableValue(row.total) }}
-                    </td>
-                    <td class="px-2 py-1 text-right whitespace-nowrap">
-                      {{ formatPercent(row.total, mergeResult?.total ?? 0) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                          {{ t("profiles.self") }}
+                          <span v-if="topSortKey === 'self'" class="text-text-secondary">{{
+                            topSortAsc ? "↑" : "↓"
+                          }}</span>
+                        </button>
+                      </th>
+                      <th class="w-28 px-2 py-1 text-right">
+                        <button
+                          type="button"
+                          class="hover:text-text-body inline-flex cursor-pointer items-center gap-1"
+                          :aria-label="t('profiles.sortByTotal')"
+                          data-test="profiles-sort-total"
+                          @click="toggleTopSort('total')"
+                        >
+                          {{ t("profiles.total") }}
+                          <span v-if="topSortKey === 'total'" class="text-text-secondary">{{
+                            topSortAsc ? "↑" : "↓"
+                          }}</span>
+                        </button>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="row in topRows"
+                      :key="row.name"
+                      class="border-border-default hover:bg-table-row-hover-bg border-t"
+                    >
+                      <td class="px-1 py-1" @click.stop>
+                        <ProfilesSymbolRowMenu
+                          test-id="profiles-top-row"
+                          :show-focus="false"
+                          @copy="copyFunctionName(row.name)"
+                          @details="openFunctionDetailsFromValues(row.name, row.self, row.total)"
+                        />
+                      </td>
+                      <td class="max-w-0 px-2 py-1 font-mono text-xs">
+                        <span class="block truncate" v-html="highlightName(row.name)" />
+                        <OTooltip
+                          :content="raw(row.name)"
+                          side="top"
+                          align="start"
+                          hoverable
+                          max-width="40rem"
+                          content-class="font-mono text-xs break-all"
+                        />
+                      </td>
+                      <td class="px-2 py-1 text-right whitespace-nowrap">
+                        {{ formatTableValue(row.self) }}
+                      </td>
+                      <td class="px-2 py-1 text-right whitespace-nowrap">
+                        {{ formatTableValue(row.total) }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div v-else-if="activeView === 'flame'" class="overflow-auto" @click.stop>
+                <ProfilesSandwichView
+                  v-if="sandwichPath"
+                  :root="mergeResult?.root ?? null"
+                  :path="sandwichPath"
+                  :format-value="formatTableValue"
+                  @close="sandwichPath = null"
+                  @select-path="sandwichPath = $event"
+                />
+                <CommonFlameGraph
+                  v-else
+                  :root="mergeResult?.root ?? null"
+                  :summary-label="t('profiles.total')"
+                  :summary-value="formatTableValue(mergeResult?.total ?? 0)"
+                  :unit-label="tableUnitLabel"
+                  :empty-label="t('profiles.noProfilesFound')"
+                  :value-formatter="formatTableValue"
+                  :search-query="searchQuery"
+                  :external-focus-path="flameFocusPath"
+                  :external-focus-nonce="flameFocusNonce"
+                  @function-details="openFunctionDetailsFromFlame"
+                  @sandwich-view="openSandwichView"
+                />
+              </div>
+
+              <div v-else class="overflow-auto">
+                <table class="w-full table-fixed text-sm">
+                  <thead class="bg-surface-page text-left">
+                    <tr>
+                      <th class="w-8 px-1 py-1" />
+                      <th class="min-w-0 px-2 py-1">{{ t("function.header") }}</th>
+                      <th class="w-40 px-2 py-1" />
+                      <th class="w-24 px-2 py-1 text-right">
+                        <button
+                          type="button"
+                          class="hover:text-text-body inline-flex cursor-pointer items-center gap-1"
+                          :aria-label="t('profiles.sortBySelf')"
+                          data-test="profiles-tree-sort-self"
+                          @click="toggleTreeSort('self')"
+                        >
+                          {{ t("profiles.self") }}
+                          <span v-if="treeSortKey === 'self'" class="text-text-secondary">{{
+                            treeSortAsc ? "↑" : "↓"
+                          }}</span>
+                        </button>
+                      </th>
+                      <th class="w-20 px-2 py-1 text-right">{{ t("profiles.selfPercent") }}</th>
+                      <th class="w-24 px-2 py-1 text-right">
+                        <button
+                          type="button"
+                          class="hover:text-text-body inline-flex cursor-pointer items-center gap-1"
+                          :aria-label="t('profiles.sortByTotal')"
+                          data-test="profiles-tree-sort-total"
+                          @click="toggleTreeSort('total')"
+                        >
+                          {{ t("profiles.total") }}
+                          <span v-if="treeSortKey === 'total'" class="text-text-secondary">{{
+                            treeSortAsc ? "↑" : "↓"
+                          }}</span>
+                        </button>
+                      </th>
+                      <th class="w-20 px-2 py-1 text-right">{{ t("profiles.totalPercent") }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="row in visibleStackRows"
+                      :key="row.id"
+                      class="border-border-default hover:bg-table-row-hover-bg border-t"
+                      :data-test="`profiles-stack-row-${row.id}`"
+                    >
+                      <td class="px-1 py-1" @click.stop>
+                        <ProfilesSymbolRowMenu
+                          :test-id="`profiles-tree-row-${row.id}`"
+                          @copy="copyFunctionName(row.name)"
+                          @focus="focusFunctionByPath(row.id)"
+                          @details="openFunctionDetailsFromValues(row.name, row.self, row.total)"
+                        />
+                      </td>
+                      <td class="max-w-0 px-2 py-1 font-mono text-xs">
+                        <button
+                          type="button"
+                          class="flex w-full max-w-full min-w-0 items-center gap-1 text-start"
+                          :class="row.hasChildren ? 'cursor-pointer' : 'cursor-default'"
+                          :style="{ paddingInlineStart: `${row.depth}rem` }"
+                          :aria-expanded="
+                            row.hasChildren ? expandedStackNodeIds.has(row.id) : undefined
+                          "
+                          @click.stop="row.hasChildren && toggleStackNode(row.id)"
+                        >
+                          <span
+                            class="text-text-secondary inline-flex h-4 w-4 shrink-0 items-center justify-center text-xs"
+                            aria-hidden="true"
+                          >
+                            <template v-if="row.hasChildren">
+                              {{ expandedStackNodeIds.has(row.id) ? "▾" : "▸" }}
+                            </template>
+                          </span>
+                          <span class="min-w-0 truncate" v-html="highlightName(row.name)" />
+                          <span
+                            v-if="row.childCount > 0"
+                            class="text-text-secondary text-2xs shrink-0 whitespace-nowrap"
+                            data-test="profiles-stack-meta"
+                          >
+                            {{ treeMetaLabel(row) }}
+                          </span>
+                        </button>
+                        <OTooltip
+                          :content="raw(row.name)"
+                          side="top"
+                          align="start"
+                          hoverable
+                          max-width="40rem"
+                          content-class="font-mono text-xs break-all"
+                        />
+                      </td>
+                      <td class="px-2 py-1">
+                        <ProfilesPercentBar
+                          :value="row.total"
+                          :total="mergeResult?.total ?? 0"
+                          :show-label="false"
+                          data-test="profiles-tree-share-bar"
+                        />
+                      </td>
+                      <td class="px-2 py-1 text-right whitespace-nowrap">
+                        {{ formatTableValue(row.self) }}
+                      </td>
+                      <td class="px-2 py-1">
+                        <ProfilesPercentBar
+                          :value="row.self"
+                          :total="mergeResult?.total ?? 0"
+                          :show-bar="false"
+                        />
+                      </td>
+                      <td class="px-2 py-1 text-right whitespace-nowrap">
+                        {{ formatTableValue(row.total) }}
+                      </td>
+                      <td class="px-2 py-1">
+                        <ProfilesPercentBar
+                          :value="row.total"
+                          :total="mergeResult?.total ?? 0"
+                          :show-bar="false"
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
+
+            <ProfilesFunctionDetailsPanel
+              v-if="functionDetails"
+              :target="functionDetails"
+              :format-value="formatTableValue"
+              @close="closeFunctionDetails"
+            />
           </div>
         </section>
       </OContent>
@@ -410,8 +503,16 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import CommonFlameGraph from "@/components/common/FlameGraphView.vue";
+import ProfilesFunctionDetailsPanel, {
+  type ProfileFunctionDetailsTarget,
+} from "@/plugins/profiles/ProfilesFunctionDetailsPanel.vue";
+import ProfilesPercentBar from "@/plugins/profiles/ProfilesPercentBar.vue";
+import ProfilesSandwichView from "@/plugins/profiles/ProfilesSandwichView.vue";
+import ProfilesSymbolRowMenu from "@/plugins/profiles/ProfilesSymbolRowMenu.vue";
+import { countTreeNodes } from "@/plugins/profiles/profilesSandwich";
 import streamService from "@/services/stream";
 import profilesService, {
+  compareProfilesNodesByTotal,
   parseProfileFilters,
   type ProfileFilter,
   type ProfilesMergeResponse,
@@ -420,6 +521,7 @@ import profilesService, {
   type ProfilesTreeNode,
 } from "@/services/profiles";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { dataZoomBrushStyle } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
@@ -437,6 +539,8 @@ type StackRow = {
   self: number;
   total: number;
   hasChildren: boolean;
+  childCount: number;
+  nodeCount: number;
 };
 type RouteSeed = {
   stream: string;
@@ -461,6 +565,10 @@ const defaultDateState = () => ({
   valueType: "relative",
 });
 const dateState = ref(defaultDateState());
+const dateTimeRef = ref<{
+  setCustomDate: (type: string, dateObj: { start: number; end: number }) => void;
+  getConsumableDateTime: () => { startTime: number; endTime: number };
+} | null>(null);
 const streamOptions = ref<SelectOption[]>([]);
 const selectedStream = ref<string | null>(null);
 const selectedService = ref<string | null>(null);
@@ -473,8 +581,14 @@ const appliedFilters = ref<ProfileFilter[]>([]);
 const searchQuery = ref("");
 const topSortKey = ref<TopSortKey>("total");
 const topSortAsc = ref(false);
+const treeSortKey = ref<TopSortKey>("total");
+const treeSortAsc = ref(false);
 const activeView = ref<ProfileView>("top");
 const expandedStackNodeIds = ref<Set<string>>(new Set());
+const functionDetails = ref<ProfileFunctionDetailsTarget | null>(null);
+const sandwichPath = ref<string | null>(null);
+const flameFocusPath = ref<string | null>(null);
+const flameFocusNonce = ref(0);
 
 const metaResponse = ref<{
   services: string[];
@@ -540,10 +654,21 @@ const isCpuMetric = computed(
 
 const seriesChartData = computed(() => {
   const unit = seriesUnitLabel(currentType.value, currentUnit.value);
+  const range = resolveTimeRange();
   const seriesData = seriesPoints.value.map((point) => [
     Math.floor(point.timestamp / 1000),
     seriesDisplayValue(point.value),
   ]);
+  const stepMs = seriesStepSecs.value * 1000;
+  let xMin = range ? Math.floor(range.startTime / 1000) : undefined;
+  let xMax = range ? Math.floor(range.endTime / 1000) : undefined;
+  if (xMin != null && xMax != null && seriesData.length) {
+    const earliest = Math.min(...seriesData.map((point) => point[0]));
+    const latest = Math.max(...seriesData.map((point) => point[0]));
+    // Bucket time is the bin start, which can sit one step before the window.
+    if (earliest >= xMin - stepMs) xMin = Math.min(xMin, earliest);
+    if (latest <= xMax + stepMs) xMax = Math.max(xMax, latest);
+  }
   return {
     options: {
       tooltip: {
@@ -551,17 +676,37 @@ const seriesChartData = computed(() => {
         valueFormatter: (v: number) => formatSeriesValue(v as number),
       },
       grid: { left: 36, right: 16, top: 24, bottom: 30 },
-      xAxis: { type: "time" },
+      xAxis: {
+        type: "time",
+        min: xMin,
+        max: xMax,
+      },
       yAxis: {
         type: "value",
         name: unit,
         axisLabel: { formatter: (v: number) => formatSeriesAxisLabel(v) },
       },
+      toolbox: {
+        orient: "vertical",
+        show: true,
+        showTitle: false,
+        itemSize: 0,
+        itemGap: 0,
+        bottom: "100%",
+        feature: {
+          dataZoom: {
+            brushStyle: dataZoomBrushStyle(),
+            show: true,
+            yAxisIndex: "none",
+          },
+        },
+      },
       series: [
         {
           type: "line",
           smooth: true,
-          showSymbol: false,
+          // One histogram bucket has no line segment, so the point has to be drawn.
+          showSymbol: seriesData.length < 2,
           lineStyle: { width: 2 },
           areaStyle: { opacity: 0.12 },
           data: seriesData,
@@ -584,21 +729,34 @@ const topRows = computed(() => {
   });
   return rows.slice(0, 200);
 });
+const stackSortCompare = (a: ProfilesTreeNode, b: ProfilesTreeNode) => {
+  const key = treeSortKey.value;
+  const direction = treeSortAsc.value ? 1 : -1;
+  const delta = a[key] - b[key];
+  if (delta !== 0) return delta * direction;
+  return a.name.localeCompare(b.name);
+};
+
 const stackRows = computed<StackRow[]>(() => {
   const root = mergeResult.value?.root;
   if (!root) return [];
   const rows: StackRow[] = [];
   const walk = (node: ProfilesTreeNode, depth: number, nodeId: string) => {
-    const children = [...(node.children ?? [])].sort((a, b) => b.total - a.total);
+    const stableChildren = [...(node.children ?? [])].sort(compareProfilesNodesByTotal);
+    const displayChildren = [...stableChildren].sort(stackSortCompare);
+    const descendants = Math.max(0, countTreeNodes(node) - 1);
     rows.push({
       id: nodeId,
       depth,
       name: node.name,
       self: node.self,
       total: node.total,
-      hasChildren: children.length > 0,
+      hasChildren: stableChildren.length > 0,
+      childCount: stableChildren.length,
+      nodeCount: descendants,
     });
-    for (const [index, child] of children.entries()) {
+    for (const child of displayChildren) {
+      const index = stableChildren.indexOf(child);
       walk(child, depth + 1, `${nodeId}/${index}`);
     }
   };
@@ -627,11 +785,18 @@ const seriesUnitLabel = (profileType: string, unit: string) => {
   return unit;
 };
 
-const valueColumnLabel = (title: string) => `${title} (${tableUnitLabel.value})`;
-
 const tableUnitLabel = computed(() => {
   if (isCpuMetric.value) return t("profiles.cpuDuration");
   return seriesUnitLabel(currentType.value, currentUnit.value);
+});
+
+const resultHeading = computed(() => {
+  const type = currentType.value;
+  if (!type) return t("profiles.resultTitleEmpty");
+  return t("profiles.resultTitle", {
+    type,
+    unit: seriesUnitLabel(type, currentUnit.value),
+  });
 });
 
 const formatBytes = (value: number) => {
@@ -701,9 +866,6 @@ const formatSeriesValue = (value: number) => {
   return `${Number(value).toLocaleString()} ${seriesUnitLabel(currentType.value, currentUnit.value)}`.trim();
 };
 
-const formatPercent = (value: number, total: number) =>
-  total > 0 ? `${((value / total) * 100).toFixed(2)}%` : "0.00%";
-
 const highlightName = (name: string) => {
   const query = searchQuery.value.trim();
   if (!query) return escapeHtml(name);
@@ -733,6 +895,91 @@ const toggleTopSort = (key: TopSortKey) => {
   }
   topSortKey.value = key;
   topSortAsc.value = false;
+};
+
+const toggleTreeSort = (key: TopSortKey) => {
+  if (treeSortKey.value === key) {
+    treeSortAsc.value = !treeSortAsc.value;
+    return;
+  }
+  treeSortKey.value = key;
+  treeSortAsc.value = false;
+};
+
+const treeMetaLabel = (row: StackRow) =>
+  t("profiles.childNodeMeta", {
+    children: t("profiles.childCountLabel", { count: row.childCount }, row.childCount),
+    nodes: t("profiles.nodeCountLabel", { count: row.nodeCount }, row.nodeCount),
+  });
+
+const copyFunctionName = async (name: string) => {
+  try {
+    await navigator.clipboard.writeText(name);
+  } catch {
+    // Clipboard may be unavailable; ignore.
+  }
+};
+
+const openFunctionDetailsFromValues = (name: string, self: number, total: number) => {
+  functionDetails.value = { name, self, total };
+};
+
+const openFunctionDetailsFromFlame = (payload: {
+  name: string;
+  self: number;
+  total: number;
+  path: string;
+}) => {
+  functionDetails.value = {
+    name: payload.name,
+    self: payload.self,
+    total: payload.total,
+  };
+};
+
+const closeFunctionDetails = () => {
+  functionDetails.value = null;
+};
+
+const focusFunctionByPath = (path: string) => {
+  activeView.value = "flame";
+  sandwichPath.value = null;
+  flameFocusPath.value = path;
+  flameFocusNonce.value += 1;
+};
+
+const openSandwichView = (path: string) => {
+  activeView.value = "flame";
+  sandwichPath.value = path;
+  functionDetails.value = null;
+};
+
+const onSeriesDataZoom = async (payload: { start: number; end: number }) => {
+  const start = Number(payload.start);
+  const end = Number(payload.end);
+  const picker = dateTimeRef.value;
+  if (!picker || !Number.isFinite(start) || !Number.isFinite(end) || start === end) return;
+  picker.setCustomDate("absolute", {
+    start: Math.min(start, end),
+    end: Math.max(start, end),
+  });
+  const range = picker.getConsumableDateTime();
+  if (!range.startTime || !range.endTime || range.startTime >= range.endTime) return;
+  const current = dateState.value;
+  if (
+    current.valueType === "absolute" &&
+    Math.abs(range.startTime - current.startTime) < 1_000_000 &&
+    Math.abs(range.endTime - current.endTime) < 1_000_000
+  ) {
+    return;
+  }
+  dateState.value = {
+    startTime: range.startTime,
+    endTime: range.endTime,
+    relativeTimePeriod: "",
+    valueType: "absolute",
+  };
+  await runQuery();
 };
 
 const toggleStackNode = (nodeId: string) => {
@@ -809,12 +1056,17 @@ const resetProfilesState = () => {
   searchQuery.value = "";
   topSortKey.value = "total";
   topSortAsc.value = false;
+  treeSortKey.value = "total";
+  treeSortAsc.value = false;
   clearDraftTag();
   seriesResponse.value = null;
   mergeResult.value = null;
   expandedStackNodeIds.value = new Set();
   activeView.value = "top";
   errorMessage.value = "";
+  functionDetails.value = null;
+  sandwichPath.value = null;
+  flameFocusPath.value = null;
 };
 
 const addFilter = async () => {
@@ -964,6 +1216,8 @@ const runQuery = async () => {
     if (requestSeq !== queryRequestSeq || isStaleRun(run, org)) return;
     seriesResponse.value = seriesResult.data;
     mergeResult.value = mergeResponseValue.data;
+    sandwichPath.value = null;
+    flameFocusPath.value = null;
     resetStackExpansion(mergeResponseValue.data.root);
   } catch (error) {
     if (requestSeq !== queryRequestSeq || isStaleRun(run, org)) return;

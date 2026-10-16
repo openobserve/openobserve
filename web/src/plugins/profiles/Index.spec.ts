@@ -104,6 +104,10 @@ describe("Profiles page", () => {
   const pageStubs = {
     ChartRenderer: true,
     CommonFlameGraph: true,
+    ProfilesSymbolRowMenu: true,
+    ProfilesPercentBar: true,
+    ProfilesFunctionDetailsPanel: true,
+    ProfilesSandwichView: true,
     DateTimePickerDashboard: true,
     OButton: {
       template: "<button><slot /></button>",
@@ -401,20 +405,45 @@ describe("Profiles page", () => {
     await wrapper.find('[data-test="profiles-view-top"]').trigger("click");
     await nextTick();
 
-    const namesBefore = wrapper
-      .findAll("tbody tr")
-      .map((row) => row.find("td").text())
-      .filter(Boolean);
+    const rowName = (row: ReturnType<typeof wrapper.findAll>[number]) =>
+      row.findAll("td")[1]?.text() ?? "";
+
+    const namesBefore = wrapper.findAll("tbody tr").map(rowName).filter(Boolean);
     expect(namesBefore[0]).toBe("fn-b");
 
     await wrapper.find('[data-test="profiles-sort-self"]').trigger("click");
     await nextTick();
 
-    const namesAfter = wrapper
-      .findAll("tbody tr")
-      .map((row) => row.find("td").text())
-      .filter(Boolean);
+    const namesAfter = wrapper.findAll("tbody tr").map(rowName).filter(Boolean);
     expect(namesAfter[0]).toBe("fn-c");
+  });
+
+  it("places child and node counts after the symbol on the tree row", async () => {
+    mocks.merge.mockResolvedValue({
+      data: {
+        ...mergeResponse.data,
+        root: {
+          name: "main.main",
+          self: 0,
+          total: 30,
+          children: [
+            { name: "child-a", self: 10, total: 10, children: [] },
+            { name: "child-b", self: 20, total: 20, children: [] },
+          ],
+        },
+      },
+    });
+    const wrapper = mountPage();
+    await flushPromises();
+    await nextTick();
+
+    await wrapper.find('[data-test="profiles-view-tree"]').trigger("click");
+    await nextTick();
+
+    const button = wrapper.find('[data-test="profiles-stack-row-root"] button');
+    const label = button.text();
+    expect(label.indexOf("2 children · 2 nodes")).toBeGreaterThan(label.indexOf("main.main"));
+    expect(button.find('[data-test="profiles-stack-meta"]').exists()).toBe(true);
   });
 
   describe("seeded from the route", () => {

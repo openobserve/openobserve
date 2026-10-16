@@ -176,6 +176,11 @@ export default defineComponent({
       type: String,
       default: "100%",
     },
+    // A sibling panel can change this chart's box without a window resize.
+    trackContainerSize: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup(props: any, { emit }) {
     const chartRef: any = ref(null);
@@ -682,7 +687,7 @@ export default defineComponent({
       };
       // Coalesced to one resize per frame: drawer and splitter animations notify every frame.
       containerResizeObserver = new ResizeObserver(() => {
-        if (lgUp.value) return;
+        if (lgUp.value && !props.trackContainerSize) return;
         if (!containerResizeRaf) containerResizeRaf = requestAnimationFrame(resizeToContainer);
       });
       containerResizeObserver.observe(chartRef.value);
