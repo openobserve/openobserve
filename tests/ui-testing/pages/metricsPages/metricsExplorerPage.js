@@ -36,9 +36,9 @@ export class MetricsExplorerPage {
         this.modeWorkspace = '[data-test="metrics-explorer-mode-workspace"]';
 
         // ===== TOOLBAR ACTIONS =====
-        // In Visualize the Refresh button re-runs the built chart's query; in the
-        // grid modes it refreshes the card grid.
+        // Refresh exists only in the grid modes; Visualize runs its chart with Run query.
         this.refreshButton = '[data-test="metrics-explorer-refresh"]';
+        this.runButton = '[data-test="metrics-explorer-run"]';
         this.shareButton = '[data-test="metrics-explorer-share-btn"]';
         // Result-count label in the filter bar ("N" or "N of M").
         this.countLabel = '[data-test="metrics-explorer-count"]';
@@ -409,9 +409,9 @@ export class MetricsExplorerPage {
             .toContain(expected);
     }
 
-    /** In Visualize the toolbar Refresh button runs the chart's query. */
+    /** In Visualize the toolbar Run query button runs the chart's query. */
     async runVisualizeQuery() {
-        await this.page.locator(this.refreshButton).click();
+        await this.page.locator(this.runButton).click();
     }
 
     /* ----------------------------------------------------------------- cards */
