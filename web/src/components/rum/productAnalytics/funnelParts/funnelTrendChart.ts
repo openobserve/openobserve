@@ -52,7 +52,6 @@ const stillConvertingData = (
       : null;
   });
 
-// Buckets sit on whole numbers of a value axis, so a band can span a bucket's full width.
 // A bucket is a gap only when no series has entrants there; before-data is the same for every series.
 const bands = (input: TrendChartInput) =>
   (input.series[0]?.data.buckets ?? []).flatMap((b, i) => {
