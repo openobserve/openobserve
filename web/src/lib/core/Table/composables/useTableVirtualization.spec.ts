@@ -19,8 +19,7 @@ import type { Row } from "@tanstack/vue-table";
 import { useTableVirtualization } from "./useTableVirtualization";
 
 describe("useTableVirtualization", () => {
-  // An empty window makes OTableBody fall back to rendering every row, then swap them out:
-  // on a 116-row Profiles table that cost about 450 ms per view switch.
+  // An empty window makes OTableBody render every row, then swap them for the window.
   it("gives a window of rows before the scroll element is measured", () => {
     const rows = ref(
       Array.from({ length: 500 }, (_, index) => ({ index, original: {} }) as Row<any>),

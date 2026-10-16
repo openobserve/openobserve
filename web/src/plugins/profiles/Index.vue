@@ -24,7 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     title-data-test="profiles-page-title"
     bleed
   >
-    <!-- The Beta tag sits inside the title line, as on Workflows. -->
     <template #title>
       <span class="inline-flex items-center gap-2">
         {{ t("profiles.title") }}
@@ -51,10 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <!-- Run, Cancel and the Auto Run switch, as on RUM Performance and Dashboards (shared useAutoRunToggle). -->
       <OButtonGroup>
-        <!-- One button for Run and Cancel. All labels share one grid cell, so it keeps the width of the
-             widest in every language and does not jump when it switches (Logs uses a fixed width).
-             The border is pinned too: each variant sets its own (Cancel 0, amber 1px all round),
-             and the group's divider is a 1px end border. -->
+        <!-- All labels share one grid cell, so the button keeps the widest label's width in every language. -->
         <OButton
           :variant="queryLoading ? 'cancel-query' : runPending ? 'warning' : 'primary'"
           size="sm-toolbar"
@@ -123,7 +119,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #subnav>
-      <!-- Below lg the bar wraps, with the selects two-up on phones. -->
       <OContent class="flex flex-nowrap items-center gap-1.5 py-1.5 max-lg:flex-wrap">
         <div
           class="max-w-36 min-w-0 flex-1 max-lg:min-w-32 max-md:max-w-none max-md:basis-[calc(50%-0.1875rem)]"
@@ -400,7 +395,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </span>
                 </template>
-                <!-- pt-1.5 keeps the value on the row line when a bar hangs under it (no bar at 0%). -->
                 <template v-for="cell in VALUE_CELLS" :key="cell.id" #[`cell-${cell.id}`]="{ row }">
                   <ODataBarCell
                     v-if="cell.bar"
@@ -552,7 +546,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                   </span>
                 </template>
-                <!-- pt-1.5 keeps the value on the row line when a bar hangs under it (no bar at 0%). -->
                 <template v-for="cell in VALUE_CELLS" :key="cell.id" #[`cell-${cell.id}`]="{ row }">
                   <ODataBarCell
                     v-if="cell.bar"
@@ -718,10 +711,7 @@ const sandwichFunction = ref<string | null>(null);
 // The function in the Function Details panel; null hides the panel.
 const detailsName = ref<string | null>(null);
 
-/**
- * How much the search matched: functions from the full Top list, share of samples from the call tree.
- * A match inside a match counts once, so nested calls of one function are not added twice.
- */
+/** Matching functions from the Top list, and their share of samples from the tree, with nested matches counted once. */
 const searchSummary = computed(() => {
   const needle = searchQuery.value.trim().toLowerCase();
   const result = mergeResult.value;
@@ -952,10 +942,7 @@ const sandwichCallers = computed(() =>
 const sandwichCallees = computed(() =>
   sandwichName.value ? calleesOf(mergeResult.value?.root ?? null, sandwichName.value) : null,
 );
-/**
- * Share of a function's samples that the drawn call tree holds, or "" when it holds them all.
- * The server folds part of the tree into other frames to keep it small; the Top list stays exact.
- */
+/** Share of a function's samples that the cut call tree still holds, or "" when it holds them all. */
 const treeCoverage = (name: string | null, drawn: number) => {
   const exact = mergeResult.value?.top.find((row) => row.name === name)?.total ?? 0;
   if (exact <= 0 || drawn / exact >= 0.995) return "";
@@ -1272,11 +1259,7 @@ const resetProfilesState = () => {
   errorMessage.value = "";
 };
 
-/** Adds the draft filter, or replaces the one being edited, then closes the menu and re-runs. */
-/**
- * Stops waiting for the running query; the last results stay. The server finishes its own work.
- * Its inputs were not applied, so Run query shows them as pending.
- */
+/** Stops waiting for the query: the last results stay, and Run query shows the inputs as pending. */
 const cancelQuery = () => {
   queryAbort?.abort();
   queryAbort = null;
@@ -1295,6 +1278,7 @@ const runOrMarkPending = async () => {
   runPending.value = true;
 };
 
+/** Adds the draft filter, or replaces the one being edited, then closes the menu and re-runs. */
 const applyDraftFilter = async () => {
   const key = draftTagKey.value;
   const value = draftTagValue.value;

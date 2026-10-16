@@ -13,18 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Sandwich view trees, built from the merged call tree in the browser.
- *
- *   root ─ main ─ a ─ F ─ x          callers of F:  F ─ a ─ main
- *        └ b ─ F ─ y                                 └ b
- *                                    callees of F:  F ─ x
- *                                                     └ y
- *
- * Only the outermost call of F on a path counts, so a recursive F is not added twice.
- * ponytail: the merged tree is capped (max_nodes), so calls folded into "other" are missing;
- * the page shows the coverage. A server-side sandwich endpoint would give exact numbers.
- */
+// Sandwich trees from the merged call tree: only the outermost call of a function counts, so recursion is not added twice.
 
 export type CallNode = { name: string; self: number; total: number; children?: CallNode[] };
 

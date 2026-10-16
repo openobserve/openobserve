@@ -13,16 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * The package part of a frame name, so frames from one package share a colour.
- *
- *   "crypto/sha256.(*Digest).Sum" → "crypto/sha256"
- *   "main.handleCheckout"         → "main"
- *   "std::vec::Vec::push"         → "std"
- *
- * ponytail: cuts at the first "." or "::" after the last "/", which is exact for Go and
- * coarse for Java or Rust (whole top-level namespace); use frame metadata from ingest if that matters.
- */
+/** The package of a frame name ("crypto/sha256.(*Digest).Sum" is "crypto/sha256"), so its frames share a colour. */
 export const packageOf = (name: string): string => {
   const start = name.lastIndexOf("/") + 1;
   const cut = name.slice(start).search(/\.|::/);
