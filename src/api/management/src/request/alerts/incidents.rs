@@ -463,16 +463,17 @@ pub struct TriggerRcaQuery {
     tag = "Incidents",
     operation_id = "TriggerIncidentRca",
     summary = "Trigger RCA analysis for an incident",
-    description = "Starts a root cause analysis run for an incident and returns 202 with the run id as soon as its investigation turn is spawned. Follow the run through the run list and its thread.",
+    description = "Starts a root cause analysis run for an incident and returns 202 with the run id as soon as its investigation turn is spawned. Follow the run through the run list and its thread. An optional JSON body `{guidance}` (1 to 2000 characters) is given to the agent with the first prompt.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("incident_id" = String, Path, description = "Incident ID"),
         TriggerRcaQuery,
     ),
+    request_body(content = TriggerRcaBody, description = "Optional guidance for the new run", content_type = "application/json"),
     responses(
         (status = 202, description = "Analysis started", content_type = "application/json", body = RcaStartedResponse),
-        (status = 400, description = "RCA not enabled, or an analysis is already in progress", content_type = "application/json", body = ()),
+        (status = 400, description = "RCA not enabled, an analysis is already in progress, or invalid guidance (`error_code: invalid_guidance`)", content_type = "application/json", body = ()),
         (status = 402, description = "AI credits exhausted", content_type = "application/json", body = ()),
         (status = 412, description = "Paid usage requires organization consent", content_type = "application/json", body = ()),
         (status = 404, description = "Not found", content_type = "application/json", body = ()),
@@ -489,12 +490,37 @@ pub async fn trigger_incident_rca(
     Path((org_id, incident_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
     Query(query): Query<TriggerRcaQuery>,
+    body: axum::body::Bytes,
 ) -> Response {
     use config::meta::alerts::rca_runs::{RunMode, RunTrigger};
     #[cfg(feature = "cloud")]
     use o2_enterprise::enterprise::alerts::rca_service;
     use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
     use openobserve_core::alerts::rca_runs;
+
+    // The body is optional; when present it is `{guidance}` (SG33).
+    let guidance = if body.iter().all(u8::is_ascii_whitespace) {
+        None
+    } else {
+        let body: TriggerRcaBody = match serde_json::from_slice(&body) {
+            Ok(body) => body,
+            Err(e) => {
+                return rca_error_response(
+                    axum::http::StatusCode::BAD_REQUEST,
+                    &format!("Invalid request body: {e}"),
+                    Some("invalid_body"),
+                    None,
+                );
+            }
+        };
+        match body.guidance {
+            None => None,
+            Some(text) => match openobserve_core::alerts::rca_steering::validate_guidance(&text) {
+                Ok(text) => Some(text),
+                Err(e) => return steer_error_response(&e, "Failed to start the analysis"),
+            },
+        }
+    };
 
     let o2_cfg = get_o2_config();
 
@@ -571,7 +597,7 @@ pub async fn trigger_incident_rca(
             RunMode::Fresh
         },
         started_by: user_email.user_id.clone(),
-        guidance: None,
+        guidance: guidance.clone(),
         skip_cooldown: true,
         oncall_subjects: None,
     })
@@ -631,10 +657,13 @@ pub async fn trigger_incident_rca(
             org_id,
             incident_id,
             run_id.clone(),
-            trigger,
-            user_email.user_id,
-            query.build_on_previous,
-            usage_permit,
+            openobserve_core::alerts::incidents::RcaLaunch {
+                trigger,
+                user_email: user_email.user_id,
+                build_on_previous: query.build_on_previous,
+                usage_permit,
+                guidance,
+            },
         )
         .await
         {
@@ -976,6 +1005,211 @@ pub async fn get_incident_rca_thread(
     MetaHttpResponse::json(thread)
 }
 
+/// Optional body of `POST …/rca`: guidance for the new run (SG33).
+#[derive(Debug, Default, Deserialize, ToSchema)]
+pub struct TriggerRcaBody {
+    /// What the responder wants this analysis to look at; 1 to 2000 characters.
+    #[serde(default)]
+    pub guidance: Option<String>,
+}
+
+/// Body of `POST …/rca/runs/{run_id}/steer` (§9.1). The author is the authenticated user,
+/// so the body has no author field and any unknown field is refused (SG11).
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SteerRequestBody {
+    /// The message; ignored for `hypothesis_action`, where the server writes the text.
+    #[serde(default)]
+    pub text: String,
+    /// `message` or `hypothesis_action`.
+    pub kind: String,
+    /// For `hypothesis_action`: `disprove`, `reopen` or `test_first`.
+    #[serde(default)]
+    pub action: Option<String>,
+    /// For `hypothesis_action`: the hypothesis id in the run's ledger.
+    #[serde(default)]
+    pub hypothesis_id: Option<String>,
+}
+
+/// `{code, message, error_code[, retry_after_secs]}`, the RCA routes' error body.
+#[cfg(feature = "enterprise")]
+fn rca_error_response(
+    status: axum::http::StatusCode,
+    message: &str,
+    error_code: Option<&str>,
+    retry_after_secs: Option<u64>,
+) -> Response {
+    let mut body = serde_json::json!({
+        "code": status.as_u16(),
+        "message": message,
+    });
+    if let Some(error_code) = error_code {
+        body["error_code"] = error_code.into();
+    }
+    if let Some(secs) = retry_after_secs {
+        body["retry_after_secs"] = secs.into();
+    }
+    let mut response = json_status_response(status, body);
+    if let Some(secs) = retry_after_secs {
+        response
+            .headers_mut()
+            .insert(axum::http::header::RETRY_AFTER, secs.into());
+    }
+    response
+}
+
+#[cfg(feature = "enterprise")]
+/// A steering error as a response; a server error answers `server_message` and logs the
+/// cause.
+fn steer_error_response(
+    error: &openobserve_core::alerts::rca_steering::SteerError,
+    server_message: &str,
+) -> Response {
+    let status = axum::http::StatusCode::from_u16(error.status())
+        .unwrap_or(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+    if status.is_server_error() {
+        log::error!("[INCIDENTS::RCA] {server_message}: {error}");
+        return rca_error_response(status, server_message, None, None);
+    }
+    rca_error_response(
+        status,
+        &error.to_string(),
+        error.code(),
+        error.retry_after_secs(),
+    )
+}
+
+#[cfg(feature = "enterprise")]
+/// SteerIncidentRcaRun
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "SteerIncidentRcaRun",
+    summary = "Send a message to a live analysis run",
+    description = "Saves a responder message for the incident's live analysis run and hands it to the agent, which reads it after its current step. A `hypothesis_action` asks the agent to disprove, reopen or test one hypothesis first; the server writes its text. The author is the authenticated user. A 201 can carry a `rejected` record: it was saved but not sent.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID"),
+    ),
+    request_body(content = SteerRequestBody, description = "The message", content_type = "application/json"),
+    responses(
+        (status = 201, description = "Message saved; `{steer, run_state}`", content_type = "application/json", body = openobserve_core::alerts::rca_steering::SteerOutcome),
+        (status = 400, description = "Invalid body (`error_code`: `invalid_body`, `invalid_text`, `invalid_kind`, `invalid_action`, `unknown_hypothesis`)", content_type = "application/json", body = Object),
+        (status = 403, description = "The user cannot run an analysis on this incident", content_type = "application/json", body = Object),
+        (status = 404, description = "Unknown incident or run", content_type = "application/json", body = Object),
+        (status = 409, description = "`error_code`: `run_not_steerable`, `run_closing` or `duplicate_action`", content_type = "application/json", body = Object),
+        (status = 429, description = "`error_code: rate_limited` with `retry_after_secs`", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+    )
+)]
+pub async fn steer_incident_rca_run(
+    Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    body: axum::body::Bytes,
+) -> Response {
+    use axum::http::StatusCode;
+    use openobserve_core::alerts::rca_steering;
+
+    // Parsed here, not by the `Json` extractor, so an unknown field (an author) is a 400
+    // like every other invalid body (SG11).
+    let body: SteerRequestBody = match serde_json::from_slice(&body) {
+        Ok(body) => body,
+        Err(e) => {
+            return rca_error_response(
+                StatusCode::BAD_REQUEST,
+                &format!("Invalid request body: {e}"),
+                Some("invalid_body"),
+                None,
+            );
+        }
+    };
+
+    // The permission of starting an analysis (SG7). The route middleware checks the
+    // OpenFGA part; this also covers the RCA flags.
+    if !crate::request::ai::chat::can_run_incident_rca(&org_id, &user_email.user_id, &incident_id)
+        .await
+    {
+        return match infra::table::alert_incidents::get(&org_id, &incident_id).await {
+            Ok(None) => MetaHttpResponse::not_found("Incident not found"),
+            Err(e) => MetaHttpResponse::internal_error(e),
+            Ok(Some(_)) => rca_error_response(
+                StatusCode::FORBIDDEN,
+                "You cannot run an analysis on this incident",
+                None,
+                None,
+            ),
+        };
+    }
+
+    match rca_steering::steer(
+        &org_id,
+        &incident_id,
+        &run_id,
+        &user_email.user_id,
+        rca_steering::SteerRequest {
+            text: body.text,
+            kind: body.kind,
+            action: body.action,
+            hypothesis_id: body.hypothesis_id,
+        },
+    )
+    .await
+    {
+        Ok(outcome) => json_status_response(
+            StatusCode::CREATED,
+            serde_json::to_value(outcome).unwrap_or_default(),
+        ),
+        Err(e) => steer_error_response(&e, "Failed to steer the analysis"),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+/// GetIncidentRcaSteering
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steering",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentRcaSteering",
+    summary = "Get the responder messages and the open question of an analysis run",
+    description = "Returns the run's responder messages with their delivery state (queued, delivered, read, applied, declined, not read, rejected), the question the agent is waiting on, if any, and whether the caller can send a message now.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID"),
+    ),
+    responses(
+        (status = 200, description = "Steering state", content_type = "application/json", body = openobserve_core::alerts::rca_steering::SteeringView),
+        (status = 404, description = "Run not found", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+    )
+)]
+pub async fn get_incident_rca_steering(
+    Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    use openobserve_core::alerts::rca_steering;
+
+    let can_steer =
+        crate::request::ai::chat::can_run_incident_rca(&org_id, &user_email.user_id, &incident_id)
+            .await;
+    match rca_steering::steering_view(&org_id, &incident_id, &run_id, can_steer).await {
+        Ok(view) => MetaHttpResponse::json(view),
+        Err(e) => steer_error_response(&e, "Failed to read the steering messages"),
+    }
+}
+
 /// The answer for a thread whose committed events could not be read. A partial thread is
 /// never presented as whole. An ended run's history never grows again, so a missing or
 /// bad event there is final (410 `transcript_incomplete`), not worth a retry; anything
@@ -1112,8 +1346,9 @@ pub async fn get_incident_rca_summary(
                         Ok(events) => events,
                         Err(e) => return read_error_response(&run_id, session_id, true, &e),
                     };
+                    let authors = steer_authors(&org_id, &run_id).await;
                     return MetaHttpResponse::json(partial_summary(
-                        &run_id, state, version, &events,
+                        &run_id, state, version, &events, &authors,
                     ));
                 }
                 // No session to read: the run stays legacy.
@@ -1146,7 +1381,14 @@ pub async fn get_incident_rca_summary(
         if not_modified(&version) {
             return not_modified_body(version);
         }
-        MetaHttpResponse::json(rca_run::summary_live(&run_id, state, version, &[], &[]))
+        MetaHttpResponse::json(rca_run::summary_live(
+            &run_id,
+            state,
+            version,
+            &[],
+            &[],
+            &std::collections::BTreeMap::new(),
+        ))
     };
     let Some(session_id) = run.session_id.as_deref() else {
         return empty_live();
@@ -1192,13 +1434,31 @@ pub async fn get_incident_rca_summary(
         Err(e) => return read_error_response(&run_id, session_id, false, &e),
     };
     let transcript = rca_ledger::decode_run(&events);
+    let authors = steer_authors(&org_id, &run_id).await;
     MetaHttpResponse::json(rca_run::summary_live(
         &run_id,
         state,
         version,
         &transcript.calls,
         &transcript.tool_log,
+        &authors,
     ))
+}
+
+/// The run's steer ids and their authors' emails, to name a lead's author (SG36). A read
+/// failure only drops the names, so it does not fail the summary.
+#[cfg(feature = "enterprise")]
+async fn steer_authors(org_id: &str, run_id: &str) -> std::collections::BTreeMap<String, String> {
+    match infra::table::rca_steering::list_for_run(org_id, run_id).await {
+        Ok(rows) => rows
+            .into_iter()
+            .map(|row| (row.steer_id, row.author_email))
+            .collect(),
+        Err(e) => {
+            log::warn!("[INCIDENTS::RCA] steering rows of run {run_id} could not be read: {e}");
+            std::collections::BTreeMap::new()
+        }
+    }
 }
 
 /// The summary of a failed or cancelled run whose partial record is not stored yet: the
@@ -1209,6 +1469,7 @@ fn partial_summary(
     state: config::meta::alerts::rca_runs::RunState,
     version: String,
     events: &[o2_enterprise::enterprise::ai::chat::batcher::DurableEvent],
+    steer_authors: &std::collections::BTreeMap<String, String>,
 ) -> config::meta::oncall::rca_run::RcaRunSummary {
     use config::meta::oncall::rca_run;
 
@@ -1220,6 +1481,7 @@ fn partial_summary(
         stages_run: &transcript.stages_run,
         ended_by: rca_run::EndedBy::Agent,
         completed: false,
+        steer_authors,
     });
     rca_run::summary_from_record(run_id, state, version, &end.record)
 }
@@ -1668,6 +1930,65 @@ pub async fn get_incident_rca_summary(
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     post,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steer",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "SteerIncidentRcaRun",
+    summary = "Send a message to a live analysis run",
+    description = "Sends a responder message to a live analysis run. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID"),
+    ),
+    request_body(content = SteerRequestBody, description = "The message", content_type = "application/json"),
+    responses(
+        (status = 403, description = "Not supported without enterprise features", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+    )
+)]
+pub async fn steer_incident_rca_run(
+    _path: Path<(String, String, String)>,
+    _headers: Headers<UserEmail>,
+) -> Response {
+    MetaHttpResponse::forbidden("Steering an analysis is only available in enterprise")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/steering",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentRcaSteering",
+    summary = "Get the responder messages and the open question of an analysis run",
+    description = "Returns the steering state of one analysis run. This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+        ("run_id" = String, Path, description = "Run ID"),
+    ),
+    responses(
+        (status = 403, description = "Not supported without enterprise features", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+    )
+)]
+pub async fn get_incident_rca_steering(
+    _path: Path<(String, String, String)>,
+    _headers: Headers<UserEmail>,
+) -> Response {
+    MetaHttpResponse::forbidden("Steering an analysis is only available in enterprise")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
     path = "/{org_id}/alerts/incidents/rca/backtest",
     context_path = "/api",
     tag = "Incidents",
@@ -1908,6 +2229,25 @@ mod tests {
         );
     }
 
+    /// SG11: the author is the authenticated user; a body that names one is refused.
+    #[test]
+    fn test_steer_body_refuses_an_author_field() {
+        let body: SteerRequestBody = serde_json::from_str(
+            r#"{"kind":"hypothesis_action","action":"disprove","hypothesis_id":"h3"}"#,
+        )
+        .unwrap();
+        assert_eq!(body.text, "");
+        assert_eq!(body.action.as_deref(), Some("disprove"));
+        assert!(
+            serde_json::from_str::<SteerRequestBody>(
+                r#"{"text":"hi","kind":"message","author_email":"x@y.z"}"#
+            )
+            .is_err()
+        );
+        let trigger: TriggerRcaBody = serde_json::from_str(r#"{"guidance":"look at db"}"#).unwrap();
+        assert_eq!(trigger.guidance.as_deref(), Some("look at db"));
+    }
+
     /// TH41: the cancel answer names the run it ended.
     #[test]
     fn test_cancel_rca_response_shape() {
@@ -2137,6 +2477,10 @@ mod tests {
             context_used: None,
             continuations: 0,
             oncall_subjects: None,
+            input_deadline_at: None,
+            pending_question_id: None,
+            questions_asked: 0,
+            deadline_closed_at: None,
         }
     }
 
@@ -2285,9 +2629,9 @@ mod tests {
         );
     }
 
-    /// A record as the finalizer stores it: `h1` recorded twice (the second after steering
-    /// `stg_1`) with one verified decisive logs item and one citation that never ran, one
-    /// blind spot, and a report with one confirmed timeline entry.
+    /// A record as the finalizer stores it: `h1` recorded twice (the second after a.rao's
+    /// steer `stg_1`) with one verified decisive logs item and one citation that never ran,
+    /// one blind spot, and a report with one confirmed timeline entry.
     #[cfg(feature = "enterprise")]
     fn stored_record() -> serde_json::Value {
         use config::meta::oncall::{
@@ -2361,6 +2705,10 @@ mod tests {
             stages_run: &[],
             ended_by: EndedBy::Agent,
             completed: true,
+            steer_authors: &std::collections::BTreeMap::from([(
+                "stg_1".to_string(),
+                "a.rao@acme.io".to_string(),
+            )]),
         });
         serde_json::to_value(end.record).unwrap()
     }
@@ -2485,7 +2833,7 @@ mod tests {
             h1["history"],
             json!([
                 {"at": 1_000, "status": "testing"},
-                {"at": 2_000, "status": "root_cause", "steered_by": "stg_1"},
+                {"at": 2_000, "status": "root_cause", "steered_by": "a.rao@acme.io"},
             ])
         );
         let e = &body["evidence"][0];
@@ -2734,6 +3082,7 @@ mod tests {
             RunState::Cancelled,
             "5.1700.2000".to_string(),
             &events,
+            &std::collections::BTreeMap::new(),
         );
         let body = serde_json::to_value(&summary).unwrap();
         assert_eq!(body["legacy"], false);
@@ -2812,6 +3161,725 @@ mod tests {
             assert!(
                 !message.contains("hash") && !message.contains("seq"),
                 "{label}: {message}"
+            );
+        }
+    }
+
+    /// Passes the steer route's permission: the RCA flags are on and a root user passes
+    /// `check_permissions` (SG7).
+    #[cfg(feature = "enterprise")]
+    const STEER_ROOT: &str = "root@steering.incidents.test";
+    /// Fails it while the incident exists: `check_permissions` finds no user record (SG7).
+    #[cfg(feature = "enterprise")]
+    const STEER_READER: &str = "reader@steering.incidents.test";
+
+    /// The SQLite meta store with the incident, run, steering and chat tables, incident
+    /// analysis switched on with an agent URL that refuses connections, and [STEER_ROOT] as a
+    /// root user. No agent client is initialized, so every relay ends `rejected` with
+    /// `agent_unreachable`, the answer of a node that cannot reach the agent (SG17).
+    #[cfg(feature = "enterprise")]
+    async fn steering_tables() -> &'static sea_orm::DatabaseConnection {
+        use infra::table::entity::{
+            ai_chat_sessions, ai_chat_turns, alert_incident_alerts, alert_incidents,
+            incident_events, rca_runs, rca_steering,
+        };
+        use sea_orm::{ConnectionTrait, Schema};
+
+        static TABLES: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        TABLES
+            .get_or_init(|| async {
+                // SAFETY: set once, inside the `OnceCell` initializer, before the refresh
+                // reads them.
+                unsafe {
+                    std::env::set_var("O2_INCIDENTS_ENABLED", "true");
+                    std::env::set_var("O2_INCIDENTS_RCA_ENABLED", "true");
+                    std::env::set_var("O2_AGENT_URL", "http://127.0.0.1:1");
+                }
+                o2_enterprise::enterprise::common::config::refresh_config().unwrap();
+                let cfg = config::get_config();
+                assert!(
+                    cfg.common.meta_store.is_empty() || cfg.common.meta_store == "sqlite",
+                    "the steering route tests need the default SQLite meta store, found {:?}",
+                    cfg.common.meta_store
+                );
+                std::fs::create_dir_all(&cfg.common.data_db_dir).unwrap();
+                let conn = infra::db::get_orm_client_rw().await;
+                let backend = conn.get_database_backend();
+                let schema = Schema::new(backend);
+                for mut table in [
+                    schema.create_table_from_entity(alert_incidents::Entity),
+                    schema.create_table_from_entity(alert_incident_alerts::Entity),
+                    schema.create_table_from_entity(incident_events::Entity),
+                    schema.create_table_from_entity(rca_runs::Entity),
+                    schema.create_table_from_entity(rca_steering::Entity),
+                    schema.create_table_from_entity(ai_chat_sessions::Entity),
+                    schema.create_table_from_entity(ai_chat_turns::Entity),
+                ] {
+                    conn.execute(backend.build(table.if_not_exists()))
+                        .await
+                        .unwrap();
+                }
+                // A start's triage hold lives on `scheduled_jobs`.
+                infra::scheduler::init().await.unwrap();
+                common::infra::config::ORG_USERS.insert(
+                    format!("{}/{STEER_ROOT}", config::DEFAULT_ORG),
+                    infra::table::org_users::OrgUserRecord::new(
+                        config::DEFAULT_ORG,
+                        STEER_ROOT,
+                        config::meta::user::UserRole::Root,
+                        "token",
+                        None,
+                    ),
+                );
+            })
+            .await;
+        infra::db::get_orm_client_rw().await
+    }
+
+    /// A fresh org name for one test.
+    #[cfg(feature = "enterprise")]
+    fn steering_org(prefix: &str) -> String {
+        format!(
+            "{prefix}_{}",
+            infra::table::rca_runs::new_run_id().to_lowercase()
+        )
+    }
+
+    /// Incident and run ids are primary keys across orgs: each test's names are scoped to its
+    /// org.
+    #[cfg(feature = "enterprise")]
+    fn sid(org_id: &str, name: &str) -> String {
+        format!("{name}.{org_id}")
+    }
+
+    /// An open incident whose latest run is `rca_run_id`.
+    #[cfg(feature = "enterprise")]
+    async fn steering_incident(
+        conn: &sea_orm::DatabaseConnection,
+        org_id: &str,
+        incident_id: &str,
+        rca_run_id: Option<&str>,
+    ) {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ActiveModelTrait, EntityTrait};
+
+        let now = config::utils::time::now_micros();
+        let row = alert_incidents::Model {
+            id: sid(org_id, incident_id),
+            org_id: org_id.to_string(),
+            status: "open".to_string(),
+            severity: "P2".to_string(),
+            group_values: serde_json::json!({}),
+            key_type: "alert_id".to_string(),
+            topology_context: None,
+            first_alert_at: now,
+            last_alert_at: now,
+            resolved_at: None,
+            alert_count: 1,
+            title: Some("checkout errors".to_string()),
+            assigned_to: None,
+            acknowledged_by: None,
+            acknowledged_at: None,
+            created_at: now,
+            updated_at: now,
+            muted_by_downtime_id: None,
+            rca_run_id: rca_run_id.map(|run_id| sid(org_id, run_id)),
+            rca_state: None,
+            rca_started_at: None,
+            rca_updated_at: None,
+            rca_outcome: None,
+            rca_confidence: None,
+            rca_summary: None,
+            rca_off_reason: None,
+        };
+        alert_incidents::Entity::insert(alert_incidents::ActiveModel::from(row).reset_all())
+            .exec(conn)
+            .await
+            .unwrap();
+    }
+
+    /// A run of `incident_id` in `state`, with no session (so no transcript and no ledger).
+    #[cfg(feature = "enterprise")]
+    async fn steering_run(
+        conn: &sea_orm::DatabaseConnection,
+        org_id: &str,
+        run_id: &str,
+        incident_id: &str,
+        state: &str,
+    ) {
+        use infra::table::entity::rca_runs;
+        use sea_orm::{ActiveModelTrait, EntityTrait};
+
+        let mut run = thread_run(
+            org_id,
+            &sid(org_id, run_id),
+            &sid(org_id, incident_id),
+            None,
+        );
+        run.state = state.to_string();
+        if matches!(state, "running" | "waiting_input") {
+            run.ended_at = None;
+            run.report = None;
+        }
+        rca_runs::Entity::insert(rca_runs::ActiveModel::from(run).reset_all())
+            .exec(conn)
+            .await
+            .unwrap();
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn steer_as(
+        org_id: &str,
+        incident_id: &str,
+        run_id: &str,
+        user: &str,
+        body: &str,
+    ) -> Response {
+        steer_incident_rca_run(
+            Path((
+                org_id.to_string(),
+                sid(org_id, incident_id),
+                sid(org_id, run_id),
+            )),
+            Headers(UserEmail {
+                user_id: user.to_string(),
+            }),
+            axum::body::Bytes::from(body.to_string()),
+        )
+        .await
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn steering_as(
+        org_id: &str,
+        incident_id: &str,
+        run_id: &str,
+        user: &str,
+    ) -> (axum::http::StatusCode, serde_json::Value) {
+        status_and_body(
+            get_incident_rca_steering(
+                Path((
+                    org_id.to_string(),
+                    sid(org_id, incident_id),
+                    sid(org_id, run_id),
+                )),
+                Headers(UserEmail {
+                    user_id: user.to_string(),
+                }),
+            )
+            .await,
+        )
+        .await
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn steer_rows(
+        org_id: &str,
+        run_id: &str,
+    ) -> Vec<config::meta::alerts::rca_steering::SteerRecord> {
+        infra::table::rca_steering::list_for_run(org_id, &sid(org_id, run_id))
+            .await
+            .unwrap()
+    }
+
+    /// §9.1: a message to the incident's live run is saved and answered 201 `{steer,
+    /// run_state}`; the author is the caller and the text is trimmed. Without a reachable
+    /// agent the row is `rejected` (`agent_unreachable`) and still a 201.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_steer_to_a_live_run_answers_201_with_the_row_and_run_state() {
+        use axum::http::StatusCode;
+
+        let conn = steering_tables().await;
+        let org = steering_org("steer201");
+        steering_incident(conn, &org, "inc_1", Some("run_live")).await;
+        steering_run(conn, &org, "run_live", "inc_1", "running").await;
+
+        let (status, body) = status_and_body(
+            steer_as(
+                &org,
+                "inc_1",
+                "run_live",
+                STEER_ROOT,
+                r#"{"text":"  We raised the orders pool to 150 on Oct 8  ","kind":"message"}"#,
+            )
+            .await,
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{body}");
+        let mut keys: Vec<&str> = body
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(keys, ["run_state", "steer"]);
+        assert_eq!(body["run_state"], "running");
+        let steer = &body["steer"];
+        let steer_id = steer["steer_id"].as_str().unwrap();
+        assert!(
+            regex::Regex::new(r"^stg_[0-9A-Za-z]{27}$")
+                .unwrap()
+                .is_match(steer_id),
+            "{steer_id}"
+        );
+        assert_eq!(steer["org_id"], org.as_str());
+        assert_eq!(steer["run_id"], sid(&org, "run_live"));
+        assert_eq!(steer["incident_id"], sid(&org, "inc_1"));
+        assert_eq!(steer["author_email"], STEER_ROOT);
+        assert_eq!(steer["kind"], "message");
+        assert!(steer["action"].is_null() && steer["hypothesis_id"].is_null());
+        assert_eq!(steer["text"], "We raised the orders pool to 150 on Oct 8");
+        assert_eq!(steer["status"], "rejected");
+        assert_eq!(steer["status_reason"], "agent_unreachable");
+        assert!(steer["created_at"].as_i64().unwrap() > 0);
+        assert!(steer["delivered_at"].is_null());
+
+        let rows = steer_rows(&org, "run_live").await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].steer_id, steer_id);
+        assert_eq!(
+            serde_json::to_value(&rows[0]).unwrap(),
+            *steer,
+            "the answer is the stored row"
+        );
+    }
+
+    /// SG8, SG11, SG31: an author field, an unknown field or a body that does not parse is
+    /// 400 `invalid_body`; a blank text or 2,001 characters `invalid_text` (counted in
+    /// Unicode scalar values: 2,000 two-byte characters pass); `kind` other than `message` or
+    /// `hypothesis_action` (the server's own `answer` and `guidance` too) `invalid_kind`; a
+    /// message with an action, or a hypothesis action without a valid action or hypothesis,
+    /// `invalid_action`; a hypothesis the run's ledger lacks `unknown_hypothesis`. A refused
+    /// body inserts no row.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_an_invalid_steer_body_is_400_with_its_code() {
+        use axum::http::StatusCode;
+
+        let conn = steering_tables().await;
+        let org = steering_org("steer400");
+        steering_incident(conn, &org, "inc_1", Some("run_live")).await;
+        steering_run(conn, &org, "run_live", "inc_1", "running").await;
+
+        let too_long = serde_json::json!({"text": "é".repeat(2001), "kind": "message"}).to_string();
+        for (body, code) in [
+            (
+                r#"{"text":"hi","kind":"message","author_email":"x@acme.io"}"#,
+                "invalid_body",
+            ),
+            (
+                r#"{"text":"hi","kind":"message","priority":1}"#,
+                "invalid_body",
+            ),
+            ("not json", "invalid_body"),
+            (r#"{"text":"   ","kind":"message"}"#, "invalid_text"),
+            (r#"{"kind":"message"}"#, "invalid_text"),
+            (too_long.as_str(), "invalid_text"),
+            (r#"{"text":"hi","kind":"answer"}"#, "invalid_kind"),
+            (r#"{"text":"hi","kind":"guidance"}"#, "invalid_kind"),
+            (r#"{"text":"hi","kind":"shout"}"#, "invalid_kind"),
+            (
+                r#"{"text":"hi","kind":"message","action":"disprove"}"#,
+                "invalid_action",
+            ),
+            (
+                r#"{"text":"hi","kind":"message","hypothesis_id":"h1"}"#,
+                "invalid_action",
+            ),
+            (
+                r#"{"kind":"hypothesis_action","hypothesis_id":"h1"}"#,
+                "invalid_action",
+            ),
+            (
+                r#"{"kind":"hypothesis_action","action":"explode","hypothesis_id":"h1"}"#,
+                "invalid_action",
+            ),
+            (
+                r#"{"kind":"hypothesis_action","action":"disprove"}"#,
+                "invalid_action",
+            ),
+            (
+                r#"{"kind":"hypothesis_action","action":"disprove","hypothesis_id":"h9"}"#,
+                "unknown_hypothesis",
+            ),
+        ] {
+            let label: String = body.chars().take(80).collect();
+            let (status, answer) =
+                status_and_body(steer_as(&org, "inc_1", "run_live", STEER_ROOT, body).await).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{label}: {answer}");
+            assert_eq!(answer["code"], 400, "{label}");
+            assert_eq!(answer["error_code"], code, "{label}: {answer}");
+            assert!(answer.get("retry_after_secs").is_none(), "{label}");
+        }
+        assert!(steer_rows(&org, "run_live").await.is_empty());
+
+        // SG8 counts scalar values, not bytes: 2,000 two-byte characters are 4,000 bytes.
+        let longest = serde_json::json!({"text": "é".repeat(2000), "kind": "message"}).to_string();
+        let (status, answer) =
+            status_and_body(steer_as(&org, "inc_1", "run_live", STEER_ROOT, &longest).await).await;
+        assert_eq!(status, StatusCode::CREATED, "{answer}");
+        assert_eq!(
+            answer["steer"]["text"].as_str().unwrap().chars().count(),
+            2000
+        );
+    }
+
+    /// SG7: a user who can read the incident but cannot start its analysis gets 403 and no
+    /// row; an unknown incident is 404 for anyone, and an unknown run (or another incident's
+    /// run) 404 for a user who may steer.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_steering_needs_the_rca_permission_and_a_known_run() {
+        use axum::http::StatusCode;
+
+        let conn = steering_tables().await;
+        let org = steering_org("steer403");
+        steering_incident(conn, &org, "inc_1", Some("run_live")).await;
+        steering_incident(conn, &org, "inc_2", None).await;
+        steering_run(conn, &org, "run_live", "inc_1", "running").await;
+        let message = r#"{"text":"Check the orders pool","kind":"message"}"#;
+
+        let (status, body) =
+            status_and_body(steer_as(&org, "inc_1", "run_live", STEER_READER, message).await).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+        assert!(steer_rows(&org, "run_live").await.is_empty());
+
+        for user in [STEER_ROOT, STEER_READER] {
+            let (status, body) =
+                status_and_body(steer_as(&org, "inc_unknown", "run_live", user, message).await)
+                    .await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "{user}: {body}");
+        }
+        for (incident, run) in [("inc_1", "run_unknown"), ("inc_2", "run_live")] {
+            let (status, body) =
+                status_and_body(steer_as(&org, incident, run, STEER_ROOT, message).await).await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "{incident}/{run}: {body}");
+        }
+        assert!(steer_rows(&org, "run_live").await.is_empty());
+    }
+
+    /// SG9: only the incident's latest run, `running` or `waiting_input`, with no closed
+    /// answer deadline takes messages. A completed run and an older live run are 409
+    /// `run_not_steerable`, a run past its answer deadline 409 `run_closing`, and none of them
+    /// gets a row.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_run_that_takes_no_messages_is_409_and_gets_no_row() {
+        use axum::http::StatusCode;
+        use infra::table::entity::rca_runs;
+        use sea_orm::{ActiveModelTrait, EntityTrait};
+
+        let conn = steering_tables().await;
+        let org = steering_org("steer409");
+        steering_incident(conn, &org, "inc_done", Some("run_done")).await;
+        steering_run(conn, &org, "run_done", "inc_done", "completed").await;
+        steering_incident(conn, &org, "inc_newer", Some("run_newer")).await;
+        steering_run(conn, &org, "run_older", "inc_newer", "running").await;
+        steering_run(conn, &org, "run_newer", "inc_newer", "running").await;
+        steering_incident(conn, &org, "inc_closing", Some("run_closing")).await;
+        let mut closing = thread_run(
+            &org,
+            &sid(&org, "run_closing"),
+            &sid(&org, "inc_closing"),
+            None,
+        );
+        closing.state = "running".to_string();
+        closing.ended_at = None;
+        closing.report = None;
+        closing.deadline_closed_at = Some(config::utils::time::now_micros());
+        rca_runs::Entity::insert(rca_runs::ActiveModel::from(closing).reset_all())
+            .exec(conn)
+            .await
+            .unwrap();
+
+        let message = r#"{"text":"Check the orders pool","kind":"message"}"#;
+        for (incident, run, code) in [
+            ("inc_done", "run_done", "run_not_steerable"),
+            ("inc_newer", "run_older", "run_not_steerable"),
+            ("inc_closing", "run_closing", "run_closing"),
+        ] {
+            let (status, body) =
+                status_and_body(steer_as(&org, incident, run, STEER_ROOT, message).await).await;
+            assert_eq!(status, StatusCode::CONFLICT, "{run}: {body}");
+            assert_eq!(body["code"], 409, "{run}");
+            assert_eq!(body["error_code"], code, "{run}");
+            assert!(steer_rows(&org, run).await.is_empty(), "{run}");
+        }
+    }
+
+    /// SG10: one author sends one message each 5 seconds; a second message 1 second later is
+    /// 429 `rate_limited` with `retry_after_secs` of 4 or 5, the same `Retry-After` header,
+    /// and no row.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_second_message_within_5_seconds_is_429_with_retry_after() {
+        use axum::http::StatusCode;
+
+        let conn = steering_tables().await;
+        let org = steering_org("steer429");
+        steering_incident(conn, &org, "inc_1", Some("run_live")).await;
+        steering_run(conn, &org, "run_live", "inc_1", "running").await;
+        let message = r#"{"text":"Check the orders pool","kind":"message"}"#;
+
+        let first = steer_as(&org, "inc_1", "run_live", STEER_ROOT, message).await;
+        assert_eq!(first.status(), StatusCode::CREATED);
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+        let second = steer_as(&org, "inc_1", "run_live", STEER_ROOT, message).await;
+        let header = second
+            .headers()
+            .get(axum::http::header::RETRY_AFTER)
+            .map(|value| value.to_str().unwrap().to_string());
+        let (status, body) = status_and_body(second).await;
+        assert_eq!(status, StatusCode::TOO_MANY_REQUESTS, "{body}");
+        assert_eq!(body["code"], 429);
+        assert_eq!(body["error_code"], "rate_limited");
+        let retry_after = body["retry_after_secs"].as_u64().unwrap();
+        assert!((4..=5).contains(&retry_after), "{retry_after}");
+        assert_eq!(header, Some(retry_after.to_string()));
+        assert_eq!(steer_rows(&org, "run_live").await.len(), 1);
+    }
+
+    /// SG22, SG37, §9.2: the steering view lists the run's rows in send order with their
+    /// stored state (no transcript here, so nothing to merge), `open_question: null` without
+    /// one, and `can_steer` only for a user with the RCA permission on a steerable run. A
+    /// reader without it sees the same rows and `can_steer: false`. The route writes nothing.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_the_steering_view_lists_rows_and_who_can_steer() {
+        use axum::http::StatusCode;
+        use config::meta::alerts::rca_steering::{
+            SteerKind, SteerRecord, SteerStatus, SteerStatusReason,
+        };
+        use infra::table::entity::rca_runs;
+        use sea_orm::{ActiveModelTrait, EntityTrait};
+
+        let conn = steering_tables().await;
+        let org = steering_org("steering");
+        steering_incident(conn, &org, "inc_1", Some("run_live")).await;
+        steering_run(conn, &org, "run_done", "inc_1", "completed").await;
+        steering_run(conn, &org, "run_live", "inc_1", "running").await;
+        steering_incident(conn, &org, "inc_wait", Some("run_wait")).await;
+        steering_run(conn, &org, "run_wait", "inc_wait", "waiting_input").await;
+        steering_incident(conn, &org, "inc_closing", Some("run_closing")).await;
+        let mut closing = thread_run(
+            &org,
+            &sid(&org, "run_closing"),
+            &sid(&org, "inc_closing"),
+            None,
+        );
+        closing.state = "running".to_string();
+        closing.ended_at = None;
+        closing.report = None;
+        closing.deadline_closed_at = Some(config::utils::time::now_micros());
+        rca_runs::Entity::insert(rca_runs::ActiveModel::from(closing).reset_all())
+            .exec(conn)
+            .await
+            .unwrap();
+
+        let row = |steer_id: &str, created_at: i64, status: SteerStatus| SteerRecord {
+            org_id: org.clone(),
+            steer_id: steer_id.to_string(),
+            run_id: sid(&org, "run_live"),
+            incident_id: sid(&org, "inc_1"),
+            author_email: "a.rao@acme.io".to_string(),
+            kind: SteerKind::Message,
+            action: None,
+            hypothesis_id: None,
+            question_id: None,
+            text: format!("message {steer_id}"),
+            status,
+            status_reason: None,
+            created_at,
+            delivered_at: None,
+            read_at: None,
+            acted_at: None,
+            agent_note: None,
+            opencode_message_id: None,
+        };
+        let mut applied = row("stg_applied", 2_000, SteerStatus::Applied);
+        applied.delivered_at = Some(2_100);
+        applied.read_at = Some(2_200);
+        applied.acted_at = Some(2_300);
+        applied.agent_note = Some("checked the pool first".to_string());
+        let mut rejected = row("stg_rejected", 1_000, SteerStatus::Rejected);
+        rejected.status_reason = Some(SteerStatusReason::AgentUnreachable);
+        for record in [&applied, &rejected] {
+            infra::table::rca_steering::insert(record).await.unwrap();
+        }
+        let stored = steer_rows(&org, "run_live").await;
+
+        let (status, root_view) = steering_as(&org, "inc_1", "run_live", STEER_ROOT).await;
+        assert_eq!(status, StatusCode::OK, "{root_view}");
+        assert_eq!(
+            root_view,
+            serde_json::json!({
+                "items": [
+                    serde_json::to_value(&rejected).unwrap(),
+                    serde_json::to_value(&applied).unwrap(),
+                ],
+                "open_question": null,
+                "can_steer": true,
+            })
+        );
+
+        // SG37: the reader sees the thread's messages but no steer box.
+        let (status, reader_view) = steering_as(&org, "inc_1", "run_live", STEER_READER).await;
+        assert_eq!(status, StatusCode::OK, "{reader_view}");
+        assert_eq!(reader_view["items"], root_view["items"]);
+        assert_eq!(reader_view["can_steer"], false);
+
+        for (incident, run, can_steer) in [
+            ("inc_1", "run_done", false),
+            ("inc_wait", "run_wait", true),
+            ("inc_closing", "run_closing", false),
+        ] {
+            let (status, view) = steering_as(&org, incident, run, STEER_ROOT).await;
+            assert_eq!(status, StatusCode::OK, "{run}: {view}");
+            assert_eq!(view["can_steer"], can_steer, "{run}");
+            assert_eq!(view["items"], serde_json::json!([]), "{run}");
+            assert!(view["open_question"].is_null(), "{run}");
+        }
+
+        for (incident, run) in [
+            ("inc_1", "run_unknown"),
+            ("inc_wait", "run_live"),
+            ("inc_unknown", "run_live"),
+        ] {
+            let (status, _) = steering_as(&org, incident, run, STEER_ROOT).await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "{incident}/{run}");
+        }
+        assert_eq!(
+            steer_rows(&org, "run_live").await,
+            stored,
+            "the view writes nothing"
+        );
+    }
+
+    /// SG33: `POST …/rca` refuses blank guidance or guidance over 2,000 characters with 400
+    /// `invalid_guidance` (and a body that does not parse with `invalid_body`) before starting
+    /// a run. Valid guidance is trimmed into the new run's `guidance` and a `guidance` row of
+    /// the caller; no body starts a run with neither.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_guidance_on_a_reanalysis_reaches_the_run_and_its_row() {
+        use axum::http::StatusCode;
+        use config::meta::alerts::rca_steering::SteerKind;
+        use infra::table::entity::rca_runs;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+        let conn = steering_tables().await;
+        let org = steering_org("guidance");
+        steering_incident(conn, &org, "inc_1", None).await;
+        steering_incident(conn, &org, "inc_2", None).await;
+        let trigger = |incident: &'static str, body: String| {
+            trigger_incident_rca(
+                Path((org.clone(), sid(&org, incident))),
+                Headers(UserEmail {
+                    user_id: STEER_ROOT.to_string(),
+                }),
+                Query(TriggerRcaQuery {
+                    reanalysis: false,
+                    build_on_previous: false,
+                }),
+                axum::body::Bytes::from(body),
+            )
+        };
+        let runs_of = async |incident: &str| {
+            rca_runs::Entity::find()
+                .filter(rca_runs::Column::OrgId.eq(org.as_str()))
+                .filter(rca_runs::Column::IncidentId.eq(sid(&org, incident)))
+                .all(conn)
+                .await
+                .unwrap()
+        };
+
+        for (body, code) in [
+            (r#"{"guidance":"   "}"#.to_string(), "invalid_guidance"),
+            (r#"{"guidance":""}"#.to_string(), "invalid_guidance"),
+            (
+                serde_json::json!({"guidance": "é".repeat(2001)}).to_string(),
+                "invalid_guidance",
+            ),
+            ("guidance please".to_string(), "invalid_body"),
+        ] {
+            let label: String = body.chars().take(40).collect();
+            let (status, answer) = status_and_body(trigger("inc_1", body).await).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{label}: {answer}");
+            assert_eq!(answer["error_code"], code, "{label}");
+        }
+        assert!(
+            runs_of("inc_1").await.is_empty(),
+            "a refused body starts no run"
+        );
+
+        let response = trigger(
+            "inc_1",
+            serde_json::json!({"guidance": "  Check the orders pool first  "}).to_string(),
+        )
+        .await;
+        let status = response.status();
+        assert!(
+            status != StatusCode::BAD_REQUEST && status != StatusCode::NOT_FOUND,
+            "{status}"
+        );
+        let runs = runs_of("inc_1").await;
+        assert_eq!(runs.len(), 1);
+        let run = &runs[0];
+        assert_eq!(run.guidance.as_deref(), Some("Check the orders pool first"));
+        assert_eq!(run.started_by, STEER_ROOT);
+        let rows = infra::table::rca_steering::list_for_run(&org, &run.run_id)
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].kind, SteerKind::Guidance);
+        assert_eq!(rows[0].text, "Check the orders pool first");
+        assert_eq!(rows[0].author_email, STEER_ROOT);
+        assert_eq!(rows[0].incident_id, sid(&org, "inc_1"));
+
+        let response = trigger("inc_2", String::new()).await;
+        assert_ne!(response.status(), StatusCode::BAD_REQUEST);
+        let runs = runs_of("inc_2").await;
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].guidance, None);
+        assert!(
+            infra::table::rca_steering::list_for_run(&org, &runs[0].run_id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    /// §9.1: without enterprise features both steering routes answer 403.
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_the_oss_steering_routes_are_403() {
+        let path = || {
+            Path((
+                "default".to_string(),
+                "inc_1".to_string(),
+                "run_1".to_string(),
+            ))
+        };
+        let user = || {
+            Headers(UserEmail {
+                user_id: "a.rao@acme.io".to_string(),
+            })
+        };
+        for response in [
+            steer_incident_rca_run(path(), user()).await,
+            get_incident_rca_steering(path(), user()).await,
+        ] {
+            assert_eq!(response.status(), axum::http::StatusCode::FORBIDDEN);
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(
+                body["message"],
+                "Steering an analysis is only available in enterprise"
             );
         }
     }

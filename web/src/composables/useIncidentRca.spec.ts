@@ -214,6 +214,21 @@ describe("useIncidentRca (RR-35)", () => {
     expect(host.api.live.value).toBe(true);
   });
 
+  it("SG33: trigger passes the trimmed guidance with the mode", async () => {
+    service.triggerRca.mockResolvedValue({ data: { run_id: "run-2" } } as never);
+    service.get.mockResolvedValue(detail(rca("running", "run-2", "run-1")) as never);
+    host = mountHost(rca("completed", "run-1", "run-1"));
+    await flushPromises();
+
+    await host.api.trigger({ buildOnPrevious: false, guidance: "  Check the pool  " });
+
+    expect(service.triggerRca.mock.calls[0][2]).toEqual({
+      reanalysis: true,
+      build_on_previous: false,
+      guidance: "Check the pool",
+    });
+  });
+
   it("RR-34: a started run invalidates the incidents list", async () => {
     service.triggerRca.mockResolvedValue({ data: { run_id: "run-2" } } as never);
     service.get.mockResolvedValue(detail(rca("running", "run-2", "run-1")) as never);

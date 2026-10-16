@@ -20,7 +20,7 @@ vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 import i18n from "@/locales";
 import RcaHypotheses from "./RcaHypotheses.vue";
-import type { RcaRunSummary } from "@/services/incidents";
+import type { RcaHypothesisStatus, RcaRunSummary } from "@/services/incidents";
 import {
   rcaHypothesis,
   rcaRunSummary,
@@ -169,10 +169,74 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
     expect(chip.attributes("aria-expanded")).toBe("true");
   });
 
-  it("no Phase 4 hypothesis actions", () => {
-    const text = mountList(rcaRunSummary()).text();
+  it("no hypothesis actions without can_steer", () => {
+    const text = mountList(rcaRunSummary(), true).text();
 
     for (const action of ["Disprove", "Reopen", "Test first"]) expect(text).not.toContain(action);
+  });
+
+  describe("04 H16, SG31: hypothesis actions on a steerable run", () => {
+    const mountOne = (
+      status: RcaHypothesisStatus,
+      extra: { pending?: Map<string, string>; sending?: boolean } = {},
+    ) =>
+      mount(RcaHypotheses, {
+        props: {
+          hypotheses: [rcaHypothesis({ status })],
+          outcome: undefined,
+          evidence: rcaRunSummary().evidence,
+          org: "default",
+          live: true,
+          canSteer: true,
+          ...extra,
+        },
+        global: { plugins: [i18n] },
+      });
+    const actionLabels = (wrapper: VueWrapper) =>
+      wrapper.findAll('[data-test^="rca-hypothesis-action-"]').map((button) => button.text());
+
+    it.each<[RcaHypothesisStatus, string[]]>([
+      ["untested", ["Disprove", "Test first"]],
+      ["testing", ["Disprove", "Test first"]],
+      ["likely", ["Disprove", "Test first"]],
+      ["root_cause", ["Disprove"]],
+      ["contributing", ["Disprove"]],
+      ["ruled_out", ["Reopen"]],
+    ])("%s offers %o", (status, labels) => {
+      expect(actionLabels(mountOne(status))).toEqual(labels);
+    });
+
+    it("each action has an aria-label naming the hypothesis", () => {
+      const button = mountOne("testing").find('[data-test="rca-hypothesis-action-test_first"]');
+      expect(button.attributes("aria-label")).toBe(
+        "Ask the agent to test first: Deploy 4f2c1e opens one orders-db connection per line item",
+      );
+    });
+
+    it.each([
+      ["disprove", "testing"],
+      ["test_first", "untested"],
+      ["reopen", "ruled_out"],
+    ] as const)("%s emits the steer-action request", async (action, status) => {
+      const wrapper = mountOne(status);
+
+      await wrapper.find(`[data-test="rca-hypothesis-action-${action}"]`).trigger("click");
+
+      expect(wrapper.emitted("steer-action")).toEqual([[{ hypothesisId: "h1", action }]]);
+    });
+
+    it("an unread action shows 'Pending · <author>' and disables the actions", () => {
+      const wrapper = mountOne("testing", { pending: new Map([["h1", "a.rao"]]) });
+
+      expect(wrapper.find('[data-test="rca-hypothesis-pending"]').text()).toBe("Pending · a.rao");
+      for (const button of wrapper.findAll('[data-test^="rca-hypothesis-action-"]')) {
+        expect(button.attributes("disabled")).toBeDefined();
+      }
+    });
+
+    it("no pending line once the action is read", () => {
+      expect(mountOne("testing").find('[data-test="rca-hypothesis-pending"]').exists()).toBe(false);
+    });
   });
 
   it("no hypotheses: the empty line", () => {

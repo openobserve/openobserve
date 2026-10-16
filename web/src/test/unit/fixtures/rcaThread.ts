@@ -22,9 +22,12 @@ import type {
   RcaRunItem,
   RcaRunSummary,
   RcaStep,
+  RcaSteerRecord,
+  RcaSteering,
   RcaSummary,
   RcaSummaryHypothesis,
   RcaThread,
+  RcaThreadQuestion,
   RcaToolCall,
 } from "@/services/incidents";
 
@@ -505,5 +508,107 @@ export const rcaRunSummaryLegacy = (overrides: Partial<RcaRunSummary> = {}): Rca
     hypotheses: [],
     evidence: [],
     blind_spots: [],
+    ...overrides,
+  });
+
+/** One steering row (04 §8.1): a queued message from a.rao. */
+export function rcaSteerRecord(overrides: Partial<RcaSteerRecord> = {}): RcaSteerRecord {
+  return {
+    org_id: "default",
+    steer_id: "stg_2QaRao000000000000000000001",
+    run_id: "run-2",
+    incident_id: "inc-1",
+    author_email: "a.rao@acme.io",
+    kind: "message",
+    action: null,
+    hypothesis_id: null,
+    question_id: null,
+    text: "We raised the orders pool to 150 on Oct 8",
+    status: "queued",
+    status_reason: null,
+    created_at: RCA_T0 + sec(200),
+    delivered_at: null,
+    read_at: null,
+    acted_at: null,
+    agent_note: null,
+    ...overrides,
+  };
+}
+
+/** The steering view (04 §9.2) of a live run the user can steer, with no rows. */
+export function rcaSteering(overrides: Partial<RcaSteering> = {}): RcaSteering {
+  return { items: [], open_question: null, can_steer: true, ...overrides };
+}
+
+/** The question of frames D and G: change history no connected tool provides. */
+export function rcaThreadQuestion(overrides: Partial<RcaThreadQuestion> = {}): RcaThreadQuestion {
+  return {
+    question_id: "call_7f",
+    question:
+      "Which change went out to checkout-api around 14:02? " +
+      "No connected AI Toolset has deploy or PR history.",
+    need: "change history",
+    hypothesis_id: "h1",
+    at: RCA_T0 + sec(240),
+    answered_by: null,
+    answered_at: null,
+    ...overrides,
+  };
+}
+
+/** Frame F: live and steered twice, the newest message applied. */
+export const rcaSteeringLive = (overrides: Partial<RcaSteering> = {}): RcaSteering =>
+  rcaSteering({
+    items: [
+      rcaSteerRecord({
+        steer_id: "stg_2QjOkafor000000000000000001",
+        author_email: "j.okafor@acme.io",
+        text: "Ignore the payments 5xx, that is the canary.",
+        status: "read",
+        created_at: RCA_T0 + sec(150),
+        delivered_at: RCA_T0 + sec(151),
+        read_at: RCA_T0 + sec(170),
+      }),
+      rcaSteerRecord({
+        status: "applied",
+        delivered_at: RCA_T0 + sec(201),
+        read_at: RCA_T0 + sec(220),
+        acted_at: RCA_T0 + sec(221),
+        agent_note: "Checking the pool size against the connection errors.",
+      }),
+    ],
+    ...overrides,
+  });
+
+/** Frame D: paused on the change-history question until 14:40. */
+export const rcaSteeringPaused = (overrides: Partial<RcaSteering> = {}): RcaSteering => {
+  const question = rcaThreadQuestion();
+  return rcaSteering({
+    open_question: {
+      question_id: question.question_id,
+      question: question.question,
+      need: question.need,
+      hypothesis_id: question.hypothesis_id ?? null,
+      deadline_at: RCA_T0 + sec(1_800),
+    },
+    ...overrides,
+  });
+};
+
+/** Frame G: the answer was read; the run then finished. */
+export const rcaSteeringUnblocked = (overrides: Partial<RcaSteering> = {}): RcaSteering =>
+  rcaSteering({
+    can_steer: false,
+    items: [
+      rcaSteerRecord({
+        kind: "answer",
+        question_id: "call_7f",
+        text: "PR #812 in acme/checkout, deployed around 14:02.",
+        status: "read",
+        created_at: RCA_T0 + sec(300),
+        delivered_at: RCA_T0 + sec(301),
+        read_at: RCA_T0 + sec(310),
+      }),
+    ],
     ...overrides,
   });

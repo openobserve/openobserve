@@ -19,6 +19,7 @@
 
 import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 import type { Incident, RcaBand, RcaOutcome, RcaSummary } from "@/services/incidents";
+import { formatTimestampInTimezone } from "@/utils/date";
 
 export type RcaCellTone = "muted" | "warn" | "warn-strong" | "ok" | "err";
 
@@ -41,6 +42,8 @@ export interface RcaCellOptions {
   rcaEnabled: boolean;
   /** Epoch milliseconds. */
   now: number;
+  /** Zone of the "until HH:mm" answer deadline (04 SG26); UTC when not given. */
+  timezone?: string;
 }
 
 const EMPTY = raw("");
@@ -101,9 +104,20 @@ const BAND_KEY: Record<RcaBand, I18nKey> = {
 /** The band as list detail ("High"), or empty when the run has none. */
 const bandDetail = (band: RcaBand | null): I18nText => (band ? gt(BAND_KEY[band]) : EMPTY);
 
+/** Joins the non-empty detail parts with " · ". */
+const joinDetail = (...parts: I18nText[]): I18nText => raw(parts.filter(Boolean).join(" · "));
+
+/** "steered by j.okafor, a.rao" (04 SG6, frame F), or empty. */
+const steeredByDetail = (rca: RcaSummary): I18nText =>
+  rca.summary.steered_by.length > 0
+    ? gt("alerts.incidents.aiAnalysis.steeredBy", {
+        names: rca.summary.steered_by.map(userLocalPart).join(", "),
+      })
+    : EMPTY;
+
 export function rcaCellModel(
   incident: Pick<Incident, "rca" | "rca_off_reason" | "severity">,
-  { rcaEnabled, now }: RcaCellOptions,
+  { rcaEnabled, now, timezone = "UTC" }: RcaCellOptions,
 ): RcaCellModel {
   const rca = incident.rca;
 
@@ -150,16 +164,29 @@ export function rcaCellModel(
       return state(
         investigating,
         "muted",
-        previous ? gt("alerts.incidents.aiAnalysis.rerunElapsed", { elapsed }) : raw(elapsed),
+        joinDetail(
+          previous ? gt("alerts.incidents.aiAnalysis.rerunElapsed", { elapsed }) : raw(elapsed),
+          steeredByDetail(rca),
+        ),
         { spinner: true },
       );
     }
-    case "waiting_input":
+    case "waiting_input": {
+      // "Blocked · Needs change history · until 14:40" (04 SG26, frame D).
+      const deadline = rca.summary.deadline_at;
       return state(
         gt("alerts.incidents.aiAnalysis.blocked"),
         "warn-strong",
-        raw(rca.summary.detail),
+        joinDetail(
+          raw(rca.summary.detail),
+          deadline
+            ? gt("alerts.incidents.aiAnalysis.until", {
+                time: formatTimestampInTimezone(deadline, "HH:mm", timezone),
+              })
+            : EMPTY,
+        ),
       );
+    }
     case "completed": {
       if (!rca.outcome) {
         // A run with no outcome (legacy, before Phase 3) reads "Analyzed".
@@ -173,7 +200,13 @@ export function rcaCellModel(
       // A blocked run names what it needs (VE44); the others show the band.
       const detail =
         rca.outcome === "blocked" ? raw(rca.summary.detail) : bandDetail(rca.confidence);
-      return state(gt(outcome.key), outcome.tone, detail);
+      // "Root cause identified · Medium · unblocked by a.rao" (frame G).
+      const unblockedBy = rca.summary.unblocked_by
+        ? gt("alerts.incidents.aiAnalysis.unblockedBy", {
+            user: userLocalPart(rca.summary.unblocked_by),
+          })
+        : EMPTY;
+      return state(gt(outcome.key), outcome.tone, joinDetail(detail, unblockedBy));
     }
     case "failed":
     case "cancelled": {
@@ -195,8 +228,9 @@ export function rcaCellModel(
         });
       }
       // A cancelled run reads "Failed"; the detail tells it apart from a broken run.
+      // A run the server stopped names why ("Stopped: incident resolved", 04 SG41).
       const detail =
-        rca.state === "failed"
+        rca.state === "failed" || rca.summary.detail
           ? raw(rca.summary.detail)
           : cancelledBy
             ? gt("alerts.incidents.aiAnalysis.cancelledBy", { user: cancelledBy })

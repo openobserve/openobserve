@@ -160,6 +160,32 @@ async fn get_event_metadata(
             metadata.push(("event_type", "ai_analysis_cancelled".into()));
             metadata.push(("user_id", user_id.into()));
         }
+        IncidentEventType::AiAnalysisSteered {
+            run_id,
+            steer_id,
+            user_id,
+            kind,
+        } => {
+            metadata.push(("event_type", "ai_analysis_steered".into()));
+            metadata.push(("run_id", run_id.into()));
+            metadata.push(("steer_id", steer_id.into()));
+            metadata.push(("user_id", user_id.into()));
+            metadata.push(("kind", kind.into()));
+        }
+        IncidentEventType::AiAnalysisNeedsInput {
+            run_id,
+            question_id,
+            need,
+            question,
+            deadline_at,
+        } => {
+            metadata.push(("event_type", "ai_analysis_needs_input".into()));
+            metadata.push(("run_id", run_id.into()));
+            metadata.push(("question_id", question_id.into()));
+            metadata.push(("need", need.into()));
+            metadata.push(("question", question.into()));
+            metadata.push(("deadline_at", deadline_at.into()));
+        }
         IncidentEventType::Unknown(value) => {
             metadata.push(("event_type", "unknown".into()));
             metadata.push(("value", value));

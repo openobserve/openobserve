@@ -14,8 +14,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- One agent step of the thread (02 TH38): status icon, title, time, the note
-     with its citation chips (03 VE24, VE30), and the collapsible tool calls. -->
+<!-- One agent step of the thread (02 TH38): status icon, title with the "from
+     steering" tag (04 §10.6), time, the note with its citation chips (03 VE24,
+     VE30), and the collapsible tool calls. -->
 <template>
   <li data-test="rca-thread-step" class="grid grid-cols-[1.25rem_minmax(0,1fr)] gap-2.5">
     <span class="flex h-5 items-center justify-center" data-test="rca-thread-step-status">
@@ -30,6 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-heading text-compact min-w-0 flex-1 font-bold"
         >
           {{ step.title }}
+          <span
+            v-if="step.from_steering"
+            data-test="rca-thread-step-from-steering"
+            class="text-accent text-2xs ms-1 font-bold"
+          >
+            {{ t("alerts.incidents.rcaSteer.fromSteering") }}
+          </span>
         </span>
         <span class="text-text-secondary text-2xs shrink-0 font-mono">
           {{ startedClock }}

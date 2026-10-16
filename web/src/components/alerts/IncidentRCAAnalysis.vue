@@ -67,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :cancelling="cancelling"
         @select-run="$emit('view-run', $event)"
         @reanalyze="$emit('trigger-rca', $event)"
+        @reanalyze-guidance="openGuidance('')"
         @cancel="$emit('cancel-rca')"
         @copy-report="copyReport"
         @download-report="downloadReport"
@@ -89,11 +90,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :cancelled-text="cancelledText"
         :triggering="triggering"
         :cancelling="cancelling"
+        :org="orgId"
+        :can-steer="canSteer"
+        :paused-step="pausedStep"
+        :paused-question="pausedQuestion"
+        :deadline-text="deadlineText"
+        :unblocked="unblocked"
         @cancel="$emit('cancel-rca')"
         @follow-thread="followThread"
         @retry="$emit('trigger-rca', $event)"
         @show-unverified="evidenceList?.showUnverified()"
         @show-blind-spots="showBlindSpots"
+        @tell-agent="threadColumn?.focusComposer()"
       />
 
       <template v-if="recordSummary">
@@ -111,6 +119,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :evidence="recordSummary.evidence"
           :org="orgId"
           :live="cardState === 'investigating'"
+          :can-steer="canSteer"
+          :pending="pendingActions"
+          :sending="steerSending"
+          @steer-action="sendHypothesisAction"
         />
         <RcaBlindSpots
           ref="blindSpots"
@@ -171,14 +183,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :context-used="threadContextUsed"
       :run-stats="threadRunStats"
       :evidence-numbers="evidenceNumbers"
+      :steering="steering"
+      :can-steer="canSteer"
+      :author-email="authorEmail"
+      :sending="steerSending"
+      :send="sendMessage"
       @retry="retryThread"
       @open-evidence="evidenceList?.openEntry($event)"
+      @reanalyze-with="openGuidance"
+    />
+
+    <RcaGuidanceDialog
+      v-model:open="guidanceOpen"
+      :initial-guidance="guidanceText"
+      :can-build-on-previous="!!reportRun"
+      :triggering="triggering"
+      @start="$emit('trigger-rca', $event)"
     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, toRef, watch } from "vue";
+import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -189,10 +216,13 @@ import type {
   RcaRunItem,
   RcaRunState,
   RcaRunStats,
+  RcaSteerAction,
   RcaSummary,
 } from "@/services/incidents";
 import { useRcaThread } from "@/composables/useRcaThread";
 import { useRcaSummary } from "@/composables/useRcaSummary";
+import { useRcaSteering } from "@/composables/useRcaSteering";
+import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { humanizeElapsed, isLiveRca, userLocalPart } from "@/utils/incidents/rcaCell";
 import { renderRcaReport } from "@/utils/incidents/rcaReportMarkdown";
@@ -206,11 +236,18 @@ import {
   type RcaCardState,
 } from "@/utils/incidents/rcaThread";
 import { rcaEvidenceNumbers } from "@/utils/incidents/rcaSummary";
+import {
+  rcaNeedSubject,
+  rcaPendingHypothesisActions,
+  rcaUnblockingAnswer,
+  type RcaUnblockedLine,
+} from "@/utils/incidents/rcaSteering";
 import RcaAnalysisBar from "./rca/RcaAnalysisBar.vue";
 import RcaBlindSpots from "./rca/RcaBlindSpots.vue";
 import RcaEvidenceList from "./rca/RcaEvidenceList.vue";
 import RcaHypotheses from "./rca/RcaHypotheses.vue";
 import RcaThreadColumn from "./rca/RcaThreadColumn.vue";
+import RcaGuidanceDialog from "./rca/RcaGuidanceDialog.vue";
 import RcaVerdictCard from "./rca/RcaVerdictCard.vue";
 import RcaWhatHappened from "./rca/RcaWhatHappened.vue";
 import RcaReportContent from "./rca/RcaReportContent.vue";
@@ -257,14 +294,18 @@ const props = withDefaults(
   },
 );
 
-defineEmits<{
-  "trigger-rca": [options: { buildOnPrevious: boolean }];
+const emit = defineEmits<{
+  "trigger-rca": [options: { buildOnPrevious: boolean; guidance?: string }];
   "cancel-rca": [];
   "view-run": [runId: string | null];
+  /** A message resumed the paused run: the run state changed (04 SG18). */
+  steered: [];
 }>();
 
 const { t } = useI18nTyped();
 const { isDark } = useTheme();
+const store = useStore();
+const timezone = useViewerTimezone();
 
 const live = computed(() => isLiveRca(props.rca));
 const currentRun = computed(() => props.rca?.current_run ?? null);
@@ -460,6 +501,103 @@ const threadRunStats = computed<RcaRunStats | null>(() => {
 const threadColumn = ref<InstanceType<typeof RcaThreadColumn> | null>(null);
 const followThread = () => void threadColumn.value?.scrollToLatest();
 
+// Steering (04 SG37–SG40, H16): the rows, the open question and `can_steer` of
+// the thread's run, polled with the thread.
+const {
+  steering,
+  sending: steerSending,
+  send: steer,
+} = useRcaSteering(
+  toRef(props, "orgId"),
+  toRef(props, "incidentId"),
+  toRef(props, "threadRunId"),
+  toRef(props, "threadLive"),
+);
+
+const authorEmail = computed<string>(() => store.state.userInfo?.email ?? "");
+
+/** The latest run is shown and live, and the server lets this user steer it (SG37). */
+const canSteer = computed(
+  () =>
+    !props.viewedRun &&
+    live.value &&
+    props.threadRunId === props.rca?.run_id &&
+    steering.value?.can_steer === true,
+);
+
+const afterSend = (runState: RcaRunState) => {
+  // An answer resumes a paused run: re-read the detail so the card leaves frame D.
+  if (runState !== props.rca?.state) emit("steered");
+};
+
+const sendMessage = async (text: string) => {
+  const result = await steer({ text, kind: "message" });
+  if (result.ok) afterSend(result.runState);
+  return result;
+};
+
+const sendHypothesisAction = async (request: { hypothesisId: string; action: RcaSteerAction }) => {
+  // The server writes the text of an action (SG31).
+  const result = await steer({
+    text: "",
+    kind: "hypothesis_action",
+    action: request.action,
+    hypothesis_id: request.hypothesisId,
+  });
+  if (result.ok) afterSend(result.runState);
+  else toast({ variant: "error", message: result.message });
+};
+
+const pendingActions = computed(() => rcaPendingHypothesisActions(steering.value?.items ?? []));
+
+/** The thread of the latest run, when that is the thread shown. */
+const latestThread = computed(() =>
+  thread.value && thread.value.run_id === props.rca?.run_id ? thread.value : null,
+);
+
+/** Frame D: the step the paused run stopped after. */
+const pausedStep = computed(() =>
+  waitingInput.value ? (latestThread.value?.steps.at(-1)?.title ?? null) : null,
+);
+
+const pausedQuestion = computed(() => {
+  if (!waitingInput.value) return null;
+  return (
+    steering.value?.open_question?.question ??
+    latestThread.value?.questions?.at(-1)?.question ??
+    null
+  );
+});
+
+/** SG39: the answer deadline in the viewer's local time. */
+const deadlineText = computed(() => {
+  if (!waitingInput.value) return null;
+  const deadline = steering.value?.open_question?.deadline_at ?? props.rca?.summary.deadline_at;
+  return deadline ? formatTimestampInTimezone(deadline, "HH:mm", timezone.value) : null;
+});
+
+/** Frame G: "Unblocked by <author> at <time>" from the newest read answer (SG39). */
+const unblocked = computed<RcaUnblockedLine | null>(() => {
+  if (cardState.value !== "analyzed") return null;
+  const answer = rcaUnblockingAnswer(steering.value?.items ?? []);
+  if (!answer?.read_at) return null;
+  const author = (props.viewedRun ? null : props.rca?.summary.unblocked_by) ?? answer.author_email;
+  const question = thread.value?.questions?.find((q) => q.question_id === answer.question_id);
+  return {
+    author: userLocalPart(author),
+    time: formatTimestampInTimezone(answer.read_at, "HH:mm", timezone.value),
+    need: rcaNeedSubject(question?.need),
+  };
+});
+
+// Frame I: "Re-analyze with guidance", from the menu or a message the run did not take (SG40).
+const guidanceOpen = ref(false);
+const guidanceText = ref("");
+const openGuidance = (text: string) => {
+  guidanceText.value = text;
+  guidanceOpen.value = true;
+};
+
 const copyText = async (text: string, success: I18nText, failure: I18nText) => {
   try {
     await navigator.clipboard.writeText(text);
@@ -492,12 +630,13 @@ const downloadReport = () => {
   URL.revokeObjectURL(url);
 };
 
-// Copy thread (02 TH38): step titles, notes, tool names and key arguments as plain text.
+// Copy thread (02 TH38): steps, questions and responder messages as plain text.
 const copyThread = () => {
   const current = thread.value;
   if (!current || current.transcript !== "available") return;
+  const items = (steering.value?.items ?? []).filter((item) => item.run_id === current.run_id);
   void copyText(
-    rcaThreadPlainText(current, t("alerts.incidents.rcaThread.title")),
+    rcaThreadPlainText(current, t("alerts.incidents.rcaThread.title"), items),
     t("alerts.incidents.rcaThread.copied"),
     t("alerts.incidents.rcaThread.copyFailed"),
   );

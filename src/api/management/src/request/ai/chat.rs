@@ -189,7 +189,7 @@ async fn chat_agent_and_context(
 
 /// Matches the RCA endpoint: RCA enabled, incident in this org, and its `POST .../rca` permission.
 #[cfg(feature = "enterprise")]
-async fn can_run_incident_rca(org_id: &str, user_id: &str, incident_id: &str) -> bool {
+pub(crate) async fn can_run_incident_rca(org_id: &str, user_id: &str, incident_id: &str) -> bool {
     let incidents = &get_o2_config().incidents;
     if !incidents.enabled || !incidents.rca_enabled {
         return false;

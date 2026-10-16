@@ -64,6 +64,7 @@ vi.mock("@/services/incidents", async (importOriginal) => {
       getRcaRun: vi.fn(),
       getRcaThread: vi.fn(),
       getRcaSummary: vi.fn(),
+      getRcaSteering: vi.fn(),
       getCorrelatedStreams: vi.fn(),
       getEvents: vi.fn(),
       updateIncident: vi.fn(),
@@ -273,6 +274,9 @@ describe("IncidentDetailDrawer.vue", () => {
       Promise.resolve({ data: rcaRunSummaryLive({ run_id: runId }) } as never),
     );
 
+    vi.mocked(incidentsService.getRcaSteering).mockResolvedValue({
+      data: { items: [], open_question: null, can_steer: true },
+    } as never);
     vi.mocked(incidentsService.cancelRca).mockResolvedValue({
       data: { run_id: "run-2", cancelled: true },
     } as never);

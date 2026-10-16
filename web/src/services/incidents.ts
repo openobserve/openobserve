@@ -236,6 +236,32 @@ export interface RcaThreadStats {
   tokens?: { input: number; output: number; reasoning: number; cache_read: number };
 }
 
+/** A responder message the thread decoded from the transcript (04 §10.6); text without the header lines. */
+export interface RcaThreadUserMessage {
+  /** Microseconds since epoch. */
+  at: number | null;
+  text: string;
+  steer_id?: string | null;
+  author?: string | null;
+  kind?: RcaSteerKind | null;
+  question_id?: string | null;
+  read_at?: number | null;
+}
+
+/** An `ask_responders` call of the run: a "Needs input" entry (04 SG25). */
+export interface RcaThreadQuestion {
+  /** The tool call's `callID`. */
+  question_id: string;
+  question: string;
+  need: string;
+  hypothesis_id?: string | null;
+  /** Microseconds since epoch; null when the transcript has no time for it. */
+  at: number | null;
+  /** Email of the first answer's author. */
+  answered_by?: string | null;
+  answered_at?: number | null;
+}
+
 /** `GET …/rca/runs/{run_id}/thread` (02 TH29–TH31). */
 export interface RcaThread {
   run_id: string;
@@ -245,10 +271,79 @@ export interface RcaThread {
   transcript: RcaTranscriptState;
   started: { at: number; prompt: string } | null;
   steps: RcaStep[];
-  user_messages: unknown[];
-  questions: unknown[];
+  user_messages: RcaThreadUserMessage[];
+  questions: RcaThreadQuestion[];
   report_submitted: boolean;
   stats: RcaThreadStats;
+}
+
+export type RcaSteerKind = "message" | "answer" | "hypothesis_action" | "guidance";
+
+/** Status of a steering row (04 §8.2). */
+export type RcaSteerStatus =
+  "queued" | "delivered" | "read" | "applied" | "declined" | "not_read" | "rejected";
+
+export type RcaSteerAction = "disprove" | "reopen" | "test_first";
+
+export type RcaSteerStatusReason =
+  | "finalizing"
+  | "no_active_turn"
+  | "agent_unreachable"
+  | "run_completed"
+  | "run_cancelled"
+  | "run_failed";
+
+/** One `rca_steering` row with the transcript state merged in (04 §8.1, SG22). Times are µs. */
+export interface RcaSteerRecord {
+  org_id: string;
+  steer_id: string;
+  run_id: string;
+  incident_id: string;
+  author_email: string;
+  kind: RcaSteerKind;
+  action?: RcaSteerAction | null;
+  hypothesis_id?: string | null;
+  question_id?: string | null;
+  text: string;
+  status: RcaSteerStatus;
+  status_reason?: RcaSteerStatusReason | null;
+  created_at: number;
+  delivered_at?: number | null;
+  read_at?: number | null;
+  acted_at?: number | null;
+  agent_note?: string | null;
+  opencode_message_id?: string | null;
+}
+
+/** The question a paused run waits on (04 §9.2). */
+export interface RcaOpenQuestion {
+  question_id: string;
+  question: string;
+  need: string;
+  hypothesis_id?: string | null;
+  /** Answer deadline, microseconds since epoch. */
+  deadline_at: number | null;
+}
+
+/** `GET …/rca/runs/{run_id}/steering` (04 §9.2, SG22, SG37). */
+export interface RcaSteering {
+  items: RcaSteerRecord[];
+  open_question: RcaOpenQuestion | null;
+  /** The run takes messages and the user may send them (SG37). */
+  can_steer: boolean;
+}
+
+/** Body of `POST …/rca/runs/{run_id}/steer` (04 §9.1). */
+export interface RcaSteerRequest {
+  text: string;
+  kind: "message" | "hypothesis_action";
+  action?: RcaSteerAction;
+  hypothesis_id?: string;
+}
+
+export interface RcaSteerResponse {
+  steer: RcaSteerRecord;
+  run_state: RcaRunState;
 }
 
 /** The thread route's answer when `known_version` still matches (02 TH31). */
@@ -640,19 +735,21 @@ const incidents = {
   },
 
   /**
-   * Start an RCA run; the run itself runs in the background (202).
+   * Start an RCA run; the run itself runs in the background (202). `guidance`
+   * goes in the JSON body and becomes the run's first message (04 SG33).
    */
   triggerRca: (
     org_identifier: string,
     incident_id: string,
-    params: { reanalysis?: boolean; build_on_previous?: boolean } = {},
+    params: { reanalysis?: boolean; build_on_previous?: boolean; guidance?: string } = {},
     config: { signal?: AbortSignal } = {},
   ) => {
+    const { guidance, ...query } = params;
     return http()
       .post<TriggerRcaResponse>(
         `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca`,
-        null,
-        { params, signal: config.signal },
+        guidance ? { guidance } : null,
+        { params: query, signal: config.signal },
       )
       .then((res) => {
         analytics.track("incident_rca_requested", {
@@ -724,6 +821,32 @@ const incidents = {
   cancelRca: (org_identifier: string, incident_id: string) => {
     return http().delete<CancelRcaResponse>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca`,
+    );
+  },
+
+  /**
+   * Send a steering message or a hypothesis action to a live run (04 §9.1).
+   * A 201 can carry a `rejected` row.
+   */
+  steerRca: (
+    org_identifier: string,
+    incident_id: string,
+    run_id: string,
+    body: RcaSteerRequest,
+  ) => {
+    return http().post<RcaSteerResponse>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/steer`,
+      body,
+    );
+  },
+
+  /**
+   * Read the steering rows of one run with their merged state, the open
+   * question and whether the user can steer it (04 §9.2).
+   */
+  getRcaSteering: (org_identifier: string, incident_id: string, run_id: string) => {
+    return http().get<RcaSteering>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/runs/${run_id}/steering`,
     );
   },
 

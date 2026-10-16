@@ -18,6 +18,8 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use super::rca_steering::SteerKind;
+
 /// Incident status lifecycle: Open → Acknowledged → Resolved
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
@@ -666,6 +668,32 @@ pub enum IncidentEventType {
         user_id: Option<String>,
     },
 
+    /// A responder's steering message reached the live run (04 SG5). Never starts a
+    /// reanalysis.
+    #[serde(rename = "ai_analysis_steered")]
+    AiAnalysisSteered {
+        run_id: String,
+        /// `stg_` + KSUID.
+        steer_id: String,
+        /// The responder who sent the message.
+        user_id: String,
+        /// `message` | `answer` | `hypothesis_action` | `guidance`.
+        kind: String,
+    },
+
+    /// The run asked the responders a question and paused (04 SG42). Never starts a
+    /// reanalysis.
+    #[serde(rename = "ai_analysis_needs_input")]
+    AiAnalysisNeedsInput {
+        run_id: String,
+        /// `callID` of the `ask_responders` call.
+        question_id: String,
+        need: String,
+        question: String,
+        /// Answer deadline, µs.
+        deadline_at: i64,
+    },
+
     /// Forward-compatibility catch-all for event types this binary does not know.
     ///
     /// During a rolling deploy an old node reads rows written by a newer node. Without
@@ -707,6 +735,8 @@ impl IncidentEventType {
         "ai_analysis_complete",
         "ai_analysis_failed",
         "ai_analysis_cancelled",
+        "ai_analysis_steered",
+        "ai_analysis_needs_input",
     ];
 
     /// True when `raw` carries a `type` tag this binary recognizes.
@@ -836,6 +866,36 @@ impl IncidentEvent {
 
     pub fn ai_analysis_cancelled(user_id: Option<String>) -> Self {
         Self::now(IncidentEventType::AIAnalysisCancelled { user_id })
+    }
+
+    pub fn ai_analysis_steered(
+        run_id: impl Into<String>,
+        steer_id: impl Into<String>,
+        user_id: impl Into<String>,
+        kind: SteerKind,
+    ) -> Self {
+        Self::now(IncidentEventType::AiAnalysisSteered {
+            run_id: run_id.into(),
+            steer_id: steer_id.into(),
+            user_id: user_id.into(),
+            kind: kind.as_str().to_string(),
+        })
+    }
+
+    pub fn ai_analysis_needs_input(
+        run_id: impl Into<String>,
+        question_id: impl Into<String>,
+        need: impl Into<String>,
+        question: impl Into<String>,
+        deadline_at: i64,
+    ) -> Self {
+        Self::now(IncidentEventType::AiAnalysisNeedsInput {
+            run_id: run_id.into(),
+            question_id: question_id.into(),
+            need: need.into(),
+            question: question.into(),
+            deadline_at,
+        })
     }
 
     /// Increment alert count if this is an Alert event for the given alert_id.
@@ -996,6 +1056,19 @@ mod tests {
                 error_details: None,
             },
             IncidentEventType::AIAnalysisCancelled { user_id: None },
+            IncidentEventType::AiAnalysisSteered {
+                run_id: "r".into(),
+                steer_id: "s".into(),
+                user_id: "u".into(),
+                kind: "message".into(),
+            },
+            IncidentEventType::AiAnalysisNeedsInput {
+                run_id: "r".into(),
+                question_id: "q".into(),
+                need: "n".into(),
+                question: "?".into(),
+                deadline_at: 1,
+            },
         ];
 
         let mut actual: Vec<String> = variants
@@ -1017,6 +1090,45 @@ mod tests {
             actual, expected,
             "KNOWN_TAGS is out of sync with the enum variants"
         );
+    }
+
+    /// SG5 / SG42: the steering and question events serialize with their tag and fields,
+    /// round-trip to their own variant (not `Unknown`), and their tags are known.
+    #[test]
+    fn sg5_sg42_steering_events_round_trip() {
+        use crate::meta::alerts::rca_steering::SteerKind;
+        let steered =
+            IncidentEvent::ai_analysis_steered("r1", "stg_x", "a.rao@acme.io", SteerKind::Answer);
+        let v = serde_json::to_value(&steered).unwrap();
+        assert_eq!(v["type"], "ai_analysis_steered");
+        assert_eq!(
+            v["data"],
+            serde_json::json!({"run_id": "r1", "steer_id": "stg_x",
+                               "user_id": "a.rao@acme.io", "kind": "answer"})
+        );
+        assert!(IncidentEventType::is_known_tag(&v));
+        let back: IncidentEvent = serde_json::from_value(v.clone()).unwrap();
+        assert!(matches!(
+            back.event_type,
+            IncidentEventType::AiAnalysisSteered { .. }
+        ));
+        assert_eq!(serde_json::to_value(&back).unwrap(), v);
+
+        let asked = IncidentEvent::ai_analysis_needs_input("r1", "call_7f", "pool size", "q?", 42);
+        let v = serde_json::to_value(&asked).unwrap();
+        assert_eq!(v["type"], "ai_analysis_needs_input");
+        assert_eq!(
+            v["data"],
+            serde_json::json!({"run_id": "r1", "question_id": "call_7f", "need": "pool size",
+                               "question": "q?", "deadline_at": 42})
+        );
+        assert!(IncidentEventType::is_known_tag(&v));
+        let back: IncidentEvent = serde_json::from_value(v.clone()).unwrap();
+        assert!(matches!(
+            back.event_type,
+            IncidentEventType::AiAnalysisNeedsInput { .. }
+        ));
+        assert_eq!(serde_json::to_value(&back).unwrap(), v);
     }
 
     /// Known variants must still win over the untagged catch-all.

@@ -320,6 +320,12 @@ describe("IncidentTimeline - getSeverityColor", () => {
   });
 });
 
+/** The label helpers the template uses, read off the instance. */
+type TimelineLabels = {
+  getInlineEventText: (event: { type: string; data: Record<string, unknown> }) => string;
+  getEventBadgeText: (event: { type: string }) => string;
+};
+
 describe("IncidentTimeline - getInlineEventText", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -359,6 +365,36 @@ describe("IncidentTimeline - getInlineEventText", () => {
     await flushPromises();
     const text = (w.vm as any).getInlineEventText({ type: "ai_analysis_complete", data: {} });
     expect(text).toContain("analysis");
+  });
+
+  it("04 SG5: ai_analysis_steered reads 'steered' or, for an answer, 'answered'", async () => {
+    const w = await mountComp();
+    await flushPromises();
+    const vm = w.vm as unknown as TimelineLabels;
+    expect(vm.getInlineEventText({ type: "ai_analysis_steered", data: { kind: "message" } })).toBe(
+      "steered the analysis",
+    );
+    expect(vm.getInlineEventText({ type: "ai_analysis_steered", data: { kind: "answer" } })).toBe(
+      "answered the analysis",
+    );
+    expect(vm.getEventBadgeText({ type: "ai_analysis_steered" })).toBe("AI Steered");
+  });
+
+  it("04 SG42: ai_analysis_needs_input names the need, escaped", async () => {
+    const w = await mountComp();
+    await flushPromises();
+    const vm = w.vm as unknown as TimelineLabels;
+    const text = vm.getInlineEventText({
+      type: "ai_analysis_needs_input",
+      data: { need: "<img src=x onerror=alert(1)>" },
+    });
+    expect(text).toContain("Analysis needs input:");
+    expect(text).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(text).not.toContain("<img");
+    expect(vm.getInlineEventText({ type: "ai_analysis_needs_input", data: {} })).toBe(
+      "Analysis needs input",
+    );
+    expect(vm.getEventBadgeText({ type: "ai_analysis_needs_input" })).toBe("AI Needs Input");
   });
 
   it("returns empty string for unknown type", async () => {

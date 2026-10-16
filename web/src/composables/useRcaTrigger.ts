@@ -24,7 +24,12 @@ import {
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
-export type RcaTriggerParams = { reanalysis?: boolean; build_on_previous?: boolean };
+/** Query flags of `POST …/rca`; `guidance` is sent as the JSON body (04 SG33). */
+export type RcaTriggerParams = {
+  reanalysis?: boolean;
+  build_on_previous?: boolean;
+  guidance?: string;
+};
 
 export interface RcaTriggerOptions {
   /** Aborts the request and any consent prompt it waits on. */

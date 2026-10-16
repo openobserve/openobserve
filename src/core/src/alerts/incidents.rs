@@ -2462,12 +2462,16 @@ async fn start_automatic_rca(
             org_id_rca,
             incident_id_rca.clone(),
             run_id.clone(),
-            trigger,
-            SYSTEM_USER_EMAIL.to_string(),
-            // Automatic runs stand on their own.
-            false,
-            // Metered inside, right before the turn starts.
-            None,
+            RcaLaunch {
+                trigger,
+                user_email: SYSTEM_USER_EMAIL.to_string(),
+                // Automatic runs stand on their own.
+                build_on_previous: false,
+                // Metered inside, right before the turn starts.
+                usage_permit: None,
+                // Automatic runs carry no guidance.
+                guidance: None,
+            },
         )
         .await
         {
@@ -2594,6 +2598,23 @@ pub const TURN_LIMIT_REASON: &str = "Too many analyses running";
 #[cfg(feature = "enterprise")]
 const TURN_BUSY_REASON: &str = "The analysis session is busy";
 
+/// How a started run's first turn is launched.
+#[cfg(feature = "enterprise")]
+pub struct RcaLaunch {
+    pub trigger: config::meta::alerts::rca_runs::RunTrigger,
+    /// Email of the user who triggered the analysis, used for AI usage tracking.
+    /// For automated/system-initiated calls, use "system@openobserve.ai".
+    pub user_email: String,
+    /// When true, the newest completed report is sent so the agent extends it (RR-27).
+    pub build_on_previous: bool,
+    /// A permit the caller already holds; `None` meters right before the turn
+    /// starts, after every guard, so the spawned task cannot meter twice.
+    pub usage_permit: Option<crate::AiUsagePermit>,
+    /// SG33: the run was started with this guidance; its queued `guidance` row, written
+    /// with the start, rides on the first turn's prompt.
+    pub guidance: Option<String>,
+}
+
 /// Start a started run's investigation turn (TH12, TH16).
 ///
 /// Returns once the turn is spawned: the turn's finalizer ends the run. A guard
@@ -2605,18 +2626,16 @@ pub async fn trigger_rca_for_incident(
     org_id: String,
     incident_id: String,
     run_id: String,
-    trigger: config::meta::alerts::rca_runs::RunTrigger,
-    // Email of the user who triggered the analysis, used for AI usage tracking.
-    // For automated/system-initiated calls, use "system@openobserve.ai".
-    #[cfg_attr(not(feature = "cloud"), allow(unused_variables))] user_email: String,
-    // When true, the newest completed report is sent so the agent extends it (RR-27).
-    build_on_previous: bool,
-    // A permit the caller already holds; `None` meters right before the turn
-    // starts, after every guard, so the spawned task cannot meter twice.
-    #[cfg_attr(not(feature = "cloud"), allow(unused_variables))] usage_permit: Option<
-        crate::AiUsagePermit,
-    >,
+    launch: RcaLaunch,
 ) -> Result<(), super::rca_turn::RcaTurnError> {
+    #[cfg_attr(not(feature = "cloud"), allow(unused_variables))]
+    let RcaLaunch {
+        trigger,
+        user_email,
+        build_on_previous,
+        usage_permit,
+        guidance,
+    } = launch;
     use config::meta::alerts::rca_runs::RunMode;
     use o2_enterprise::enterprise::{
         alerts::rca_service, common::config::get_config as get_o2_config,
@@ -2632,9 +2651,19 @@ pub async fn trigger_rca_for_incident(
     };
 
     // Ends the run as failed and releases any triage hold: no verdict is coming (§6).
+    let has_guidance = guidance.is_some();
     let end_failed = async |code: &str, reason: &str, details: Option<String>| {
         if let Err(e) = fail_run(&org_id, &run_id, trigger, code, reason, details).await {
             log::error!("[INCIDENTS::RCA] Could not end run {run_id} as failed: {e}");
+        }
+        // SG23: the guidance no turn read ends `not_read`.
+        if has_guidance {
+            super::rca_steering::close_unread(
+                &org_id,
+                &run_id,
+                config::meta::alerts::rca_runs::RunState::Failed,
+            )
+            .await;
         }
         rca_service::skip_analysis_for_incident(&org_id, &incident_id).await;
     };
@@ -2752,6 +2781,18 @@ pub async fn trigger_rca_for_incident(
         debug_assert_eq!(usage_permit.feature(), feature);
     }
 
+    // SG33: the guidance goes after the initial prompt, with its header.
+    let guidance_row = if has_guidance {
+        let row = super::rca_steering::queued_guidance(&org_id, &run_id).await;
+        if row.is_none() {
+            log::error!(
+                "[INCIDENTS::RCA] Run {run_id} was started with guidance but has no guidance row"
+            );
+        }
+        row
+    } else {
+        None
+    };
     let prompt = RcaPrompt::Initial {
         trigger,
         subject: RcaPromptSubject::Incident {
@@ -2763,6 +2804,7 @@ pub async fn trigger_rca_for_incident(
             alerts: u32::try_from(incident.alert_count).unwrap_or(0),
             severity: incident.severity.clone(),
         },
+        guidance: guidance_row.as_ref().map(super::rca_steering::render_row),
     };
     let run = RcaTurnRun {
         org_id: org_id.clone(),
@@ -2784,6 +2826,10 @@ pub async fn trigger_rca_for_incident(
                 started.turn_id,
                 started.session_id
             );
+            // SG33: the guidance row is delivered once the turn is admitted.
+            if let Some(row) = guidance_row {
+                super::rca_steering::guidance_admitted(row).await;
+            }
             Ok(())
         }
         Err(e) => end_turn_failed(e).await,
@@ -2974,6 +3020,17 @@ pub async fn update_status_as(
         && let Err(e) = append_event_unless_muted(org_id, incident_id, evt, muted).await
     {
         log::error!("[Incidents] Failed to record status event: org_id: {org_id}, error: {e}");
+    }
+
+    // SG41: a resolve cancels a run that waits for an answer; a working run finishes (RR-44).
+    #[cfg(feature = "enterprise")]
+    if status == "resolved"
+        && let Err(e) =
+            super::rca_steering::cancel_waiting_on_resolve(org_id, incident_id, user_id).await
+    {
+        log::error!(
+            "[INCIDENTS::RCA] Could not stop the paused run of {org_id}/{incident_id}: {e}"
+        );
     }
 
     // A reopened incident gets a fresh automatic run (RR-7).
@@ -3617,10 +3674,13 @@ mod tests {
             org.clone(),
             inc.clone(),
             run_id.clone(),
-            RunTrigger::Manual,
-            "a.rao@acme.io".to_string(),
-            false,
-            None,
+            RcaLaunch {
+                trigger: RunTrigger::Manual,
+                user_email: "a.rao@acme.io".to_string(),
+                build_on_previous: false,
+                usage_permit: None,
+                guidance: None,
+            },
         )
         .await
         .unwrap();

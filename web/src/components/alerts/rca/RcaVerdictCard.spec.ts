@@ -18,6 +18,7 @@ import { mount, type VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import RcaVerdictCard from "./RcaVerdictCard.vue";
 import {
+  rcaBlindSpot,
   rcaRunSummary,
   rcaRunSummaryBlocked,
   rcaRunSummaryCancelled,
@@ -530,6 +531,82 @@ describe("RcaVerdictCard", () => {
       for (const label of ["Is this the cause?", "Ask", "Resume", "Disprove"]) {
         expect(wrapper.text()).not.toContain(label);
       }
+    });
+  });
+
+  describe("04 SG39: paused banner (frame D) and unblocked line (frame G)", () => {
+    const text = (wrapper: VueWrapper, id: string) => byTest(wrapper, id).text();
+    const PAUSED = {
+      cardState: "investigating",
+      waitingInput: true,
+      summary: rcaRunSummaryLive(),
+      pausedStep: "Check recent deploys",
+      pausedQuestion: "Which change went out to checkout-api around 14:02?",
+      deadlineText: "14:40",
+    };
+
+    it("frame D: 'Paused after …', the question and the deadline", () => {
+      const wrapper = mountCard(PAUSED);
+
+      expect(text(wrapper, "rca-paused-title")).toBe("Paused after “Check recent deploys”");
+      expect(text(wrapper, "rca-paused-question")).toBe(
+        "Which change went out to checkout-api around 14:02?",
+      );
+      expect(text(wrapper, "rca-paused-deadline")).toBe(
+        "The agent waits until 14:40 for an answer, then closes the run as Blocked.",
+      );
+    });
+
+    it("frame D without a step or deadline uses the plain strings", () => {
+      const wrapper = mountCard({ ...PAUSED, pausedStep: null, deadlineText: null });
+
+      expect(text(wrapper, "rca-paused-title")).toBe("Paused for an answer");
+      expect(text(wrapper, "rca-paused-deadline")).toBe(
+        "The agent waits for an answer, then closes the run as Blocked.",
+      );
+    });
+
+    it("'Tell the agent' shows with can_steer and emits tell-agent", async () => {
+      const reader = mountCard(PAUSED);
+      expect(byTest(reader, "rca-paused-tell-agent-btn").exists()).toBe(false);
+
+      const steerer = mountCard({ ...PAUSED, canSteer: true });
+      await byTest(steerer, "rca-paused-tell-agent-btn").trigger("click");
+      expect(steerer.emitted("tell-agent")).toHaveLength(1);
+    });
+
+    it("'Connect AI Toolset' shows only when a blind spot asks for it", () => {
+      const withSpot = mountCard({
+        ...PAUSED,
+        summary: rcaRunSummaryLive({ blind_spots: [rcaBlindSpot()] }),
+      });
+      expect(byTest(withSpot, "rca-paused-connect-btn").text()).toBe("Connect AI Toolset");
+
+      const without = mountCard({ ...PAUSED, summary: rcaRunSummaryLive({ blind_spots: [] }) });
+      expect(byTest(without, "rca-paused-connect-btn").exists()).toBe(false);
+    });
+
+    it("no paused banner while running", () => {
+      const wrapper = mountCard({ ...PAUSED, waitingInput: false });
+      expect(byTest(wrapper, "rca-paused-banner").exists()).toBe(false);
+    });
+
+    it("frame G: 'Unblocked by <author> at <time>'", () => {
+      const plain = mountCard({
+        cardState: "analyzed",
+        summary: rcaRunSummary(),
+        unblocked: { author: "a.rao", time: "14:13", need: null },
+      });
+      expect(text(plain, "rca-verdict-unblocked")).toBe("Unblocked by a.rao at 14:13");
+
+      const withNeed = mountCard({
+        cardState: "analyzed",
+        summary: rcaRunSummary(),
+        unblocked: { author: "a.rao", time: "14:13", need: "change history" },
+      });
+      expect(text(withNeed, "rca-verdict-unblocked")).toBe(
+        "Unblocked by a.rao at 14:13 · change history from a human lead",
+      );
     });
   });
 });

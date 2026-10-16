@@ -1,0 +1,146 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<!-- "Re-analyze with guidance" (04 §3 frame I, SG33, SG40): the mode and the
+     guidance text; the guidance becomes the first message of the new run. -->
+<template>
+  <ODialog
+    v-model:open="isOpen"
+    size="md"
+    data-test="rca-guidance-dialog"
+    :title="t('alerts.incidents.rcaSteer.guidanceDialog.title')"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('alerts.incidents.rcaSteer.guidanceDialog.start')"
+    :primary-button-disabled="!canStart"
+    :primary-button-loading="triggering"
+    @click:secondary="isOpen = false"
+    @click:primary="start"
+  >
+    <div class="flex flex-col gap-4">
+      <ORadioGroup
+        v-model="mode"
+        orientation="horizontal"
+        :label="t('alerts.incidents.rcaSteer.guidanceDialog.mode')"
+        data-test="rca-guidance-mode"
+      >
+        <ORadio value="fresh" variant="card" data-test="rca-guidance-mode-fresh">
+          <template #label>
+            <span class="flex flex-col gap-0.5">
+              <span class="text-text-heading text-sm font-semibold">
+                {{ t("alerts.incidents.rcaSteer.guidanceDialog.freshTitle") }}
+              </span>
+              <span class="text-text-secondary text-xs">
+                {{ t("alerts.incidents.rcaSteer.guidanceDialog.freshHint") }}
+              </span>
+            </span>
+          </template>
+        </ORadio>
+        <ORadio
+          value="build"
+          variant="card"
+          :disabled="!canBuildOnPrevious"
+          data-test="rca-guidance-mode-build"
+        >
+          <template #label>
+            <span class="flex flex-col gap-0.5">
+              <span class="text-text-heading text-sm font-semibold">
+                {{ t("alerts.incidents.rcaSteer.guidanceDialog.buildTitle") }}
+              </span>
+              <span class="text-text-secondary text-xs">
+                {{ t("alerts.incidents.rcaSteer.guidanceDialog.buildHint") }}
+              </span>
+            </span>
+          </template>
+        </ORadio>
+      </ORadioGroup>
+
+      <OTextarea
+        v-model="guidance"
+        data-test="rca-guidance-input"
+        :label="t('alerts.incidents.rcaSteer.guidanceDialog.guidanceLabel')"
+        :placeholder="t('alerts.incidents.rcaSteer.guidanceDialog.guidancePlaceholder')"
+        :rows="5"
+        :maxlength="MAX_GUIDANCE_CHARS"
+      />
+
+      <p
+        data-test="rca-guidance-note"
+        class="text-text-secondary m-0 flex items-start gap-1.5 text-xs"
+      >
+        <OIcon name="history" size="sm" class="shrink-0" />
+        {{ t("alerts.incidents.rcaSteer.guidanceDialog.note") }}
+      </p>
+    </div>
+  </ODialog>
+</template>
+
+<script setup lang="ts">
+import { computed, ref, watch } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { useI18nTyped } from "@/types/i18n";
+
+/** SG33: 1 to 2,000 characters. */
+const MAX_GUIDANCE_CHARS = 2_000;
+
+const props = withDefaults(
+  defineProps<{
+    /** The text the dialog opens with (SG40: the message the run did not take). */
+    initialGuidance?: string;
+    /** A completed run exists to build on. */
+    canBuildOnPrevious: boolean;
+    triggering?: boolean;
+  }>(),
+  { initialGuidance: "", triggering: false },
+);
+
+const isOpen = defineModel<boolean>("open", { default: false });
+
+const emit = defineEmits<{
+  start: [options: { buildOnPrevious: boolean; guidance: string }];
+}>();
+
+const { t } = useI18nTyped();
+
+// ORadioGroup's v-model carries a RadioValue: "fresh" or "build".
+const mode = ref<string | number | boolean>("fresh");
+const guidance = ref("");
+
+// Each opening starts from the given text; Build on previous when there is a report.
+watch(
+  isOpen,
+  (open) => {
+    if (!open) return;
+    guidance.value = props.initialGuidance;
+    mode.value = props.canBuildOnPrevious ? "build" : "fresh";
+  },
+  { immediate: true },
+);
+
+const canStart = computed(() => {
+  const text = guidance.value.trim();
+  return text.length > 0 && text.length <= MAX_GUIDANCE_CHARS && !props.triggering;
+});
+
+const start = () => {
+  if (!canStart.value) return;
+  emit("start", { buildOnPrevious: mode.value === "build", guidance: guidance.value.trim() });
+  isOpen.value = false;
+};
+</script>

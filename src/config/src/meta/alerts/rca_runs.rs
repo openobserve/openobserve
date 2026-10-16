@@ -64,6 +64,7 @@ macro_rules! string_enum {
         }
     };
 }
+pub(super) use string_enum;
 
 string_enum! {
     /// State of one analysis run (README §6.1). `stale` is computed, not a state.
@@ -162,6 +163,9 @@ pub struct RunStats {
     pub credits: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steered: Option<u32>,
+    /// Acks after the first for the same steering row (SG23).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ignored_acks: Option<u32>,
 }
 
 /// The newest usable result of an earlier run (RR-41).
@@ -300,6 +304,18 @@ pub struct RcaRun {
     /// Serialized `Vec<SubjectRef>` of an alert run's pending on-call records.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oncall_subjects: Option<serde_json::Value>,
+    /// Answer deadline of a `waiting_input` run, µs.
+    #[serde(default)]
+    pub input_deadline_at: Option<i64>,
+    /// `callID` of the open question of a `waiting_input` run.
+    #[serde(default)]
+    pub pending_question_id: Option<String>,
+    /// Questions the run asked (SG25, SG26).
+    #[serde(default)]
+    pub questions_asked: i32,
+    /// When the sweeper closed the answer deadline, µs (SG27).
+    #[serde(default)]
+    pub deadline_closed_at: Option<i64>,
 }
 
 /// `GET .../rca/runs` response.

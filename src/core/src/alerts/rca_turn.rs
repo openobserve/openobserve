@@ -13,16 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The investigation turns of an RCA run (02 TH1–TH28, TH41–TH44).
+//! The investigation turns of an RCA run (02 TH1–TH28, TH41–TH44; 04 SG23–SG28, SG30).
 //!
 //! Every run is a persisted chat session that SysRcaAgent owns. [start_rca_turn] admits
 //! and spawns a turn, [observer] mirrors its progress onto the run, and the turn's end
-//! runs the finalizer, the only writer of `completed` and the only caller of the on-call
-//! delivery and no-verdict release for a run that ran a turn. [sweep_rca_runs] finalizes
-//! the runs whose node was lost, and [cancel_rca_run] stops a run wherever its turn runs.
+//! runs the finalizer, the only writer of `completed` and `waiting_input` and the only
+//! caller of the on-call delivery and no-verdict release for a run that ran a turn.
+//! [sweep_rca_runs] finalizes the runs whose node was lost and closes the answer deadline
+//! of paused runs, and [cancel_rca_run] stops a run wherever its turn runs.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     future::Future,
     pin::Pin,
     sync::Arc,
@@ -46,11 +47,11 @@ use config::{
         },
     },
     metrics::{
-        RCA_CONFIDENCE_GRADE_TOTAL, RCA_HYPOTHESIS_LEFT_TESTING_TOTAL,
+        RCA_ANSWER_WAIT_SECONDS, RCA_CONFIDENCE_GRADE_TOTAL, RCA_HYPOTHESIS_LEFT_TESTING_TOTAL,
         RCA_LEDGER_INVALID_CALL_TOTAL, RCA_LEDGER_TRUNCATED_TOTAL, RCA_OUTCOME_CLAIM_TOTAL,
-        RCA_OUTCOME_TOTAL, RCA_RUN_CONTINUATIONS_TOTAL, RCA_RUN_DURATION_SECONDS, RCA_RUN_STEPS,
-        RCA_RUN_TOOL_CALLS, RCA_RUNS_WITHOUT_REPORT_TOTAL, RCA_TIMELINE_UNVERIFIED_TOTAL,
-        RCA_UNVERIFIED_CITATIONS_TOTAL, RCA_VERDICT_REVISED_TOTAL,
+        RCA_OUTCOME_TOTAL, RCA_QUESTIONS_TOTAL, RCA_RUN_CONTINUATIONS_TOTAL,
+        RCA_RUN_DURATION_SECONDS, RCA_RUN_STEPS, RCA_RUN_TOOL_CALLS, RCA_RUNS_WITHOUT_REPORT_TOTAL,
+        RCA_TIMELINE_UNVERIFIED_TOTAL, RCA_UNVERIFIED_CITATIONS_TOTAL, RCA_VERDICT_REVISED_TOTAL,
     },
     utils::time::now_micros,
 };
@@ -74,18 +75,21 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use tokio::{sync::mpsc, time::Instant};
 
-use super::rca_runs::{
-    self, AGENT_ERROR_REASON, ERROR_AGENT_ERROR, ERROR_AGENT_UNAVAILABLE, ERROR_CREDENTIALS,
-    ERROR_INTERRUPTED, ERROR_NO_REPORT, ERROR_PERSISTENCE_FAILED, ERROR_SAVE_FAILED, ERROR_TIMEOUT,
-    ERROR_TRANSCRIPT_DELETED, INTERRUPTED_REASON, NO_REPORT_REASON, PERSISTENCE_FAILED_REASON,
-    RunPatch, RunSubject, SAVE_FAILED_REASON, TIMEOUT_REASON, TRANSCRIPT_DELETED_REASON,
-    count_run_end,
+use super::{
+    rca_runs::{
+        self, AGENT_ERROR_REASON, ERROR_AGENT_ERROR, ERROR_AGENT_UNAVAILABLE, ERROR_CREDENTIALS,
+        ERROR_INTERRUPTED, ERROR_NO_REPORT, ERROR_PERSISTENCE_FAILED, ERROR_SAVE_FAILED,
+        ERROR_TIMEOUT, ERROR_TRANSCRIPT_DELETED, INTERRUPTED_REASON, NO_REPORT_REASON,
+        PERSISTENCE_FAILED_REASON, RunPatch, RunSubject, SAVE_FAILED_REASON, TIMEOUT_REASON,
+        TRANSCRIPT_DELETED_REASON, count_run_end,
+    },
+    rca_steering::reconcile_steering,
 };
 use crate::ai_chat::{
     StreamChatStore,
     admission::{self, AdmitError, AdmittedTurn},
     cancel::cancel_chat_turn,
-    rca_ledger::{RunTranscript, decode_run},
+    rca_ledger::{RunTranscript, TranscriptQuestion, decode_run},
     rca_thread::{
         RCA_STAGES, SUBMIT_REPORT, ThreadPart, ThreadStats, ToolPart, project_rca_thread,
         updated_part,
@@ -115,6 +119,10 @@ const CONTINUATION_RETRY_BACKOFF: [Duration; 4] = [
 ];
 /// Running runs one sweep looks at; the next pass picks up the rest.
 const SWEEP_BATCH: u64 = 500;
+/// SG25: a run pauses for at most this many questions; a third one closes the deadline.
+const MAX_QUESTIONS: i32 = 2;
+/// `rca_questions_total{result}` of a wait the deadline ended (§12).
+const QUESTION_DEADLINE: &str = "deadline";
 
 /// The user text of an RCA turn (TH6).
 #[derive(Debug, Clone, PartialEq)]
@@ -122,9 +130,20 @@ pub enum RcaPrompt {
     Initial {
         trigger: RunTrigger,
         subject: RcaPromptSubject,
+        /// The rendered guidance message of a re-analysis (SG33), after a blank line.
+        guidance: Option<String>,
     },
     /// The one continuation after an interrupted turn (TH25).
     Continue,
+    /// The turn that resumes a paused run (SG18): the rendered steering messages, joined
+    /// by a blank line.
+    Steer { messages: Vec<String> },
+    /// The finalize turn after the answer deadline (SG27, §10.4).
+    Deadline {
+        question_id: String,
+        /// µs; shown as `HH:MM UTC`.
+        deadline_us: i64,
+    },
 }
 
 /// What the first turn of a run names.
@@ -145,37 +164,98 @@ pub enum RcaPromptSubject {
 impl RcaPrompt {
     /// The turn's user text and the session title; never blank (TH6).
     pub fn render(&self) -> String {
-        let (trigger, subject) = match self {
-            Self::Continue => return CONTINUE_PROMPT.to_string(),
-            Self::Initial { trigger, subject } => (trigger_label(*trigger), subject),
-        };
-        match subject {
-            RcaPromptSubject::Incident {
-                id,
-                title,
-                alerts,
-                severity,
+        match self {
+            Self::Continue => CONTINUE_PROMPT.to_string(),
+            Self::Steer { messages } => messages.join("\n\n"),
+            Self::Deadline {
+                question_id,
+                deadline_us,
             } => {
-                let title = match title.trim() {
-                    "" => id.as_str(),
-                    title => title,
-                };
-                let noun = if *alerts == 1 { "alert" } else { "alerts" };
-                match severity.trim() {
-                    "" => format!(
-                        "Analyze incident {id} \"{title}\" ({alerts} {noun}). Trigger: {trigger}."
-                    ),
-                    severity => format!(
-                        "Analyze incident {id} \"{title}\" ({alerts} {noun}, {severity}). \
-                         Trigger: {trigger}."
-                    ),
-                }
+                let at = chrono::DateTime::<chrono::Utc>::from_timestamp_micros(*deadline_us)
+                    .unwrap_or_default()
+                    .format("%H:%M");
+                // The id comes from the agent's tool call; it stays inside the header.
+                let question_id = one_line(question_id);
+                format!(
+                    "[o2-run event=answer_deadline question={question_id}]\n\
+                     No responder answered by {at} UTC. Do not wait. Record the open \
+                     hypothesis as blocked with record_hypothesis.\n\
+                     Record what you could not check with record_blind_spot. Then call \
+                     submit_report."
+                )
             }
-            RcaPromptSubject::Alert { name, stream } => {
-                format!("Analyze alert \"{name}\" on stream \"{stream}\". Trigger: {trigger}.")
+            Self::Initial {
+                trigger,
+                subject,
+                guidance,
+            } => {
+                let text = subject_prompt(trigger_label(*trigger), subject);
+                match guidance.as_deref().filter(|g| !g.trim().is_empty()) {
+                    Some(guidance) => format!("{text}\n\n{guidance}"),
+                    None => text,
+                }
             }
         }
     }
+}
+
+/// The first turn's text without guidance: the subject and the trigger. Every field is
+/// collapsed to one line ([one_line]), so none can start a line of the prompt and pass
+/// as a server-written `[o2-…]` line (SG19).
+fn subject_prompt(trigger: &str, subject: &RcaPromptSubject) -> String {
+    match subject {
+        RcaPromptSubject::Incident {
+            id,
+            title,
+            alerts,
+            severity,
+        } => {
+            let id = one_line(id);
+            let title = match one_line(title) {
+                title if title.is_empty() => id.clone(),
+                title => title,
+            };
+            let noun = if *alerts == 1 { "alert" } else { "alerts" };
+            match one_line(severity).as_str() {
+                "" => format!(
+                    "Analyze incident {id} \"{title}\" ({alerts} {noun}). Trigger: {trigger}."
+                ),
+                severity => format!(
+                    "Analyze incident {id} \"{title}\" ({alerts} {noun}, {severity}). \
+                     Trigger: {trigger}."
+                ),
+            }
+        }
+        RcaPromptSubject::Alert { name, stream } => {
+            let (name, stream) = (one_line(name), one_line(stream));
+            format!("Analyze alert \"{name}\" on stream \"{stream}\". Trigger: {trigger}.")
+        }
+    }
+}
+
+/// Free text put into a prompt line: every run of whitespace (newlines included) becomes
+/// one space, trimmed, so the text stays inside the line it is put in.
+fn one_line(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// SG28: the list detail of a run its answer deadline closed, in the VE44 "Needs: <x>"
+/// shape. The agent is told to start its need with "Needs" (§10.1), so a leading "Needs"
+/// word is dropped instead of doubled; an empty need has no detail.
+fn needs_detail(need: &str) -> Option<String> {
+    let need = need.trim();
+    let rest = match need.get(..5) {
+        Some(head) if head.eq_ignore_ascii_case("needs") => {
+            let tail = &need[5..];
+            if tail.is_empty() || tail.starts_with(|c: char| c == ':' || c.is_whitespace()) {
+                tail.trim_start_matches(':').trim()
+            } else {
+                need
+            }
+        }
+        _ => need,
+    };
+    (!rest.is_empty()).then(|| format!("Needs: {rest}"))
 }
 
 /// How the prompt names what started the run.
@@ -560,20 +640,53 @@ struct RunEnd {
 
 impl RunEnd {
     /// How the transcript ends the run: an ended run (a cancel) keeps its state and gets
-    /// its counts (TH22, TH42); a committed report completes it whatever ended the turn
-    /// (TH23); an interrupted turn continues once (TH25); else it fails (TH24).
+    /// its counts (TH22, TH42); an open question pauses an incident run (SG26); a
+    /// committed report completes it whatever ended the turn (TH23); a deadline turn with
+    /// no report completes it blocked (SG28); an interrupted turn continues once (TH25);
+    /// else it fails (TH24). The steering rows follow at every turn end (SG23).
     async fn end(&self, result: TurnResult, turn_id: &str, resume: Option<RcaTurnRun>) -> bool {
         if self.item.state.is_terminal() {
             // TH22, TH42: counts only. The run's end was counted and observed by the write
             // that ended it (a cancel observes its last progress counts), so a repeat
             // finalize observes nothing more (TH44).
             self.write_final_stats().await;
+            self.reconcile(Some(self.item.state)).await;
             return false;
         }
-        if let Some(transcript) = self.transcript.as_ref()
+        let ended = self.end_live(result, turn_id, resume).await;
+        self.reconcile(ended).await;
+        ended.is_some()
+    }
+
+    /// [Self::end] of a live run: the state this call ended it in; `None` when the run
+    /// goes on (a pause, a next turn) or another write ended it first.
+    async fn end_live(
+        &self,
+        result: TurnResult,
+        turn_id: &str,
+        resume: Option<RcaTurnRun>,
+    ) -> Option<RunState> {
+        let transcript = self.transcript.as_ref();
+        let deadline_closed = self.run.deadline_closed_at.is_some();
+        // SG26, SG30: only an incident run waits; once its deadline closed it never waits
+        // again.
+        if self.item.subject_type == RunSubjectType::Incident
+            && !deadline_closed
+            && let Some(question) = transcript.and_then(|t| t.open_question.as_ref())
+        {
+            if self.run.questions_asked < MAX_QUESTIONS {
+                self.wait_for_answer(question).await;
+                return None;
+            }
+            return self.close_deadline_now(question, resume).await;
+        }
+        if let Some(transcript) = transcript
             && let Some(submit) = transcript.submit.as_ref()
         {
             return self.complete(transcript, submit).await;
+        }
+        if deadline_closed {
+            return self.complete_at_deadline().await;
         }
         if result == TurnResult::Interrupted
             && self.run.continuations == 0
@@ -581,11 +694,148 @@ impl RunEnd {
             && let Some(resume) = resume
             && let Some(ended) = self.resume(resume, turn_id).await
         {
-            return ended;
+            // A continuation ends the run only by failing it.
+            return ended.then_some(RunState::Failed);
         }
         let (code, reason) = no_report_error(result);
         self.fail_without_report(code, reason, self.turn_details(result))
             .await
+    }
+
+    /// SG23, SG24: the steering rows follow the run; `terminal` is the state this call
+    /// ended it in (or the state of a run already ended).
+    async fn reconcile(&self, terminal: Option<RunState>) {
+        reconcile_steering(&self.org_id, &self.run, self.transcript.as_ref(), terminal).await;
+    }
+
+    /// SG26, SG42: pause the run on its open question until an answer or the deadline,
+    /// with the `ai_analysis_needs_input` event in the same write. No end is counted.
+    async fn wait_for_answer(&self, question: &TranscriptQuestion) {
+        let wait_minutes =
+            i64::try_from(get_o2_config().incidents.rca_answer_wait_minutes).unwrap_or(i64::MAX);
+        let deadline = now_micros().saturating_add(wait_minutes.saturating_mul(60_000_000));
+        let mut patch = self.counts();
+        let mut summary = patch.summary.take().unwrap_or_default();
+        summary.detail = Some(Some(question.need.clone()));
+        summary.deadline_at = Some(Some(deadline));
+        let patch = RunPatch {
+            state: Some(RunState::WaitingInput),
+            input_deadline_at: Some(Some(deadline)),
+            pending_question_id: Some(Some(question.question_id.clone())),
+            questions_asked_inc: true,
+            summary: Some(summary),
+            event: Some(IncidentEvent::ai_analysis_needs_input(
+                &self.run.run_id,
+                &question.question_id,
+                &question.need,
+                &question.question,
+                deadline,
+            )),
+            ..patch
+        };
+        match rca_runs::update_run(&self.org_id, &self.run.run_id, patch).await {
+            Ok(true) => log::info!(
+                "[RCA_TURN] run {} waits for an answer to question {} until {deadline}",
+                self.run.run_id,
+                question.question_id
+            ),
+            // Ended meanwhile (a cancel): it keeps its counts.
+            Ok(false) => self.write_final_stats().await,
+            // The run stays `running` with its turn ended; the sweeper finalizes it again.
+            Err(e) => log::warn!(
+                "[RCA_TURN] could not pause run {} on its question: {e}",
+                self.run.run_id
+            ),
+        }
+    }
+
+    /// SG26: a third question closes the answer deadline at once and starts the
+    /// finalize turn (SG27); a turn that cannot start ends the run at the deadline (SG28).
+    async fn close_deadline_now(
+        &self,
+        question: &TranscriptQuestion,
+        resume: Option<RcaTurnRun>,
+    ) -> Option<RunState> {
+        self.close_deadline_now_with(question, resume, start_rca_turn, || {
+            get_agent_client().is_some()
+        })
+        .await
+    }
+
+    /// [Self::close_deadline_now] with the turn start and the "an agent client exists"
+    /// check given.
+    async fn close_deadline_now_with<S, F>(
+        &self,
+        question: &TranscriptQuestion,
+        resume: Option<RcaTurnRun>,
+        mut start: S,
+        can_retry: impl Fn() -> bool,
+    ) -> Option<RunState>
+    where
+        S: FnMut(RcaTurnRun, RcaPrompt) -> F,
+        F: Future<Output = Result<TurnStarted, RcaTurnError>>,
+    {
+        let now = now_micros();
+        let patch = RunPatch {
+            deadline_closed_at: Some(now),
+            ..self.counts()
+        };
+        match rca_runs::update_run(&self.org_id, &self.run.run_id, patch).await {
+            Ok(true) => {}
+            Ok(false) => {
+                self.write_final_stats().await;
+                return None;
+            }
+            Err(e) => {
+                log::warn!(
+                    "[RCA_TURN] could not close the answer deadline of run {}: {e}",
+                    self.run.run_id
+                );
+                return None;
+            }
+        }
+        let run = match resume {
+            Some(run) => run,
+            None => match turn_run_of(&self.run).await {
+                Ok(run) => run,
+                Err(e) => {
+                    log::error!(
+                        "[RCA_TURN] run {} cannot start its finalize turn: {e:#}",
+                        self.run.run_id
+                    );
+                    return self.complete_at_deadline().await;
+                }
+            },
+        };
+        let prompt = RcaPrompt::Deadline {
+            question_id: question.question_id.clone(),
+            deadline_us: now,
+        };
+        let started = self
+            .start_continuation(run, |run| start(run, prompt.clone()), can_retry)
+            .await;
+        match started {
+            Ok(Some(started)) => {
+                log::info!(
+                    "[RCA_TURN] run {} asked a third question; finalize turn {} started",
+                    self.run.run_id,
+                    started.turn_id
+                );
+                None
+            }
+            Ok(None) => {
+                self.write_final_stats().await;
+                None
+            }
+            Err(e) => {
+                log::error!(
+                    "[RCA_TURN] run {} could not start its finalize turn ({}): {e:?}",
+                    self.run.run_id,
+                    e.error_code()
+                );
+                self.complete_at_deadline().await
+            }
+        }
     }
 
     /// The ended turn's own error code (`restore_failed`, …) as the run error's details,
@@ -633,7 +883,8 @@ impl RunEnd {
             return;
         };
         let result = if self.run.result.is_none() {
-            record_json(&self.run.run_id, &partial_end(transcript).record)
+            let authors = self.steer_authors().await;
+            record_json(&self.run.run_id, &partial_end(transcript, &authors).record)
         } else {
             None
         };
@@ -650,18 +901,54 @@ impl RunEnd {
         }
     }
 
+    /// SG36: the run's steer ids and their authors' emails; none for an alert run, which
+    /// has no steering.
+    async fn steer_authors(&self) -> BTreeMap<String, String> {
+        if self.item.subject_type != RunSubjectType::Incident {
+            return BTreeMap::new();
+        }
+        match infra::table::rca_steering::list_for_run(&self.org_id, &self.run.run_id).await {
+            Ok(rows) => rows
+                .into_iter()
+                .map(|row| (row.steer_id, row.author_email))
+                .collect(),
+            Err(e) => {
+                log::warn!(
+                    "[RCA_TURN] cannot read the steering of run {}; its record names no \
+                     authors: {e}",
+                    self.run.run_id
+                );
+                BTreeMap::new()
+            }
+        }
+    }
+
+    /// SG28: "Needs: <need>" of the run's last question, for a run its answer deadline
+    /// closed.
+    fn deadline_detail(&self) -> Option<String> {
+        needs_detail(&self.transcript.as_ref()?.questions.last()?.need)
+    }
+
     /// TH23: grade the submitted verdict, derive the outcome and complete the run with its
     /// report and record (VE14–VE16, VE34, VE44, F6), then deliver the graded verdict
-    /// and its grade (VE38, F3).
-    async fn complete(&self, transcript: &RunTranscript, submit: &RcaSubmit) -> bool {
+    /// and its grade (VE38, F3). A run its answer deadline closed ends `answer_deadline`
+    /// (SG27).
+    async fn complete(&self, transcript: &RunTranscript, submit: &RcaSubmit) -> Option<RunState> {
         let submit = &self.with_report_ref(submit);
+        let ended_by = if self.run.deadline_closed_at.is_some() {
+            EndedBy::AnswerDeadline
+        } else {
+            EndedBy::Agent
+        };
+        let authors = self.steer_authors().await;
         let end = record_run_end(&RunEndInput {
             submit: Some(submit),
             calls: &transcript.calls,
             tool_log: &transcript.tool_log,
             stages_run: &transcript.stages_run,
-            ended_by: EndedBy::Agent,
+            ended_by,
             completed: true,
+            steer_authors: &authors,
         });
         let record = &end.record;
         let mut patch = RunPatch {
@@ -670,10 +957,19 @@ impl RunEnd {
             result: record_json(&self.run.run_id, record),
             ..self.counts()
         };
-        // VE44: a blocked run's list cell names what it needs.
-        if let Some(detail) = end.summary_detail.clone() {
+        // VE44: a blocked run's list cell names what it needs; at the answer deadline,
+        // the need of the unanswered question (SG28).
+        let detail = match end.summary_detail.clone() {
+            Some(_) if ended_by == EndedBy::AnswerDeadline => {
+                self.deadline_detail().or(end.summary_detail.clone())
+            }
+            detail => detail,
+        };
+        // A run that waited on a question carries its need until it ends; a completed run
+        // that is not blocked clears it.
+        if detail.is_some() || self.run.questions_asked > 0 {
             let summary = patch.summary.get_or_insert_with(RunSummaryPatch::default);
-            summary.detail = Some(Some(detail));
+            summary.detail = Some(detail);
         }
         match rca_runs::complete_run(&self.org_id, &self.run.run_id, &submit.markdown, patch).await
         {
@@ -682,37 +978,13 @@ impl RunEnd {
                 count_record(&self.org_id, self.item.trigger, &end);
                 self.report_defects(submit);
                 self.observe(RunState::Completed);
-                let verdict = end.verdict.as_ref();
-                let grade = record.grade.as_ref();
-                match self.item.subject_type {
-                    RunSubjectType::Incident => {
-                        rca_service::deliver_incident_result(
-                            &self.org_id,
-                            &self.run.subject_id,
-                            &submit.markdown,
-                            verdict,
-                            grade,
-                        )
-                        .await;
-                    }
-                    RunSubjectType::Alert => {
-                        rca_service::deliver_alert_result(
-                            &self.org_id,
-                            &self.subjects(),
-                            &submit.markdown,
-                            verdict,
-                            grade,
-                            None,
-                        )
-                        .await;
-                    }
-                }
-                true
+                self.deliver(&submit.markdown, &end).await;
+                Some(RunState::Completed)
             }
             // Ended meanwhile (a cancel wins over a report): it keeps its counts.
             Ok(false) => {
                 self.write_final_stats().await;
-                false
+                None
             }
             Err(e) => {
                 log::error!(
@@ -725,6 +997,88 @@ impl RunEnd {
                     Some(format!("{e:#}")),
                 )
                 .await
+            }
+        }
+    }
+
+    /// SG28: a run whose answer deadline closed and that has no report completes
+    /// `blocked` (`answer_deadline`) with no verdict; the server writes the report from
+    /// the question, its need and the ledger.
+    async fn complete_at_deadline(&self) -> Option<RunState> {
+        let empty = RunTranscript::default();
+        let transcript = self.transcript.as_ref().unwrap_or(&empty);
+        let authors = self.steer_authors().await;
+        let end = record_run_end(&RunEndInput {
+            submit: None,
+            calls: &transcript.calls,
+            tool_log: &transcript.tool_log,
+            stages_run: &transcript.stages_run,
+            ended_by: EndedBy::AnswerDeadline,
+            completed: true,
+            steer_authors: &authors,
+        });
+        let report = deadline_report(transcript.questions.last(), &end.record);
+        let mut patch = RunPatch {
+            outcome: end.record.outcome.as_ref().map(|o| o.as_str().to_string()),
+            result: record_json(&self.run.run_id, &end.record),
+            ..self.counts()
+        };
+        if let Some(detail) = self.deadline_detail().or(end.summary_detail.clone()) {
+            let summary = patch.summary.get_or_insert_with(RunSummaryPatch::default);
+            summary.detail = Some(Some(detail));
+        }
+        match rca_runs::complete_run(&self.org_id, &self.run.run_id, &report, patch).await {
+            Ok(true) => {
+                count_run_end(&self.org_id, self.item.trigger, RunState::Completed, "");
+                count_record(&self.org_id, self.item.trigger, &end);
+                self.observe(RunState::Completed);
+                self.deliver(&report, &end).await;
+                Some(RunState::Completed)
+            }
+            Ok(false) => {
+                self.write_final_stats().await;
+                None
+            }
+            Err(e) => {
+                log::error!(
+                    "[RCA_TURN] could not save the deadline report of run {}: {e:#}",
+                    self.run.run_id
+                );
+                self.fail(
+                    ERROR_SAVE_FAILED,
+                    SAVE_FAILED_REASON,
+                    Some(format!("{e:#}")),
+                )
+                .await
+            }
+        }
+    }
+
+    /// VE38, F3: hand a completed run's report, verdict and grade to the on-call path.
+    async fn deliver(&self, report: &str, end: &RunEndResult) {
+        let verdict = end.verdict.as_ref();
+        let grade = end.record.grade.as_ref();
+        match self.item.subject_type {
+            RunSubjectType::Incident => {
+                rca_service::deliver_incident_result(
+                    &self.org_id,
+                    &self.run.subject_id,
+                    report,
+                    verdict,
+                    grade,
+                )
+                .await;
+            }
+            RunSubjectType::Alert => {
+                rca_service::deliver_alert_result(
+                    &self.org_id,
+                    &self.subjects(),
+                    report,
+                    verdict,
+                    grade,
+                    None,
+                )
+                .await;
             }
         }
     }
@@ -829,7 +1183,8 @@ impl RunEnd {
                 let (reason, details) = super::incidents::rca_turn_failure(&e);
                 Some(
                     self.fail_without_report(e.error_code(), reason, details)
-                        .await,
+                        .await
+                        .is_some(),
                 )
             }
         }
@@ -882,9 +1237,14 @@ impl RunEnd {
     }
 
     /// A run that ends with no submitted report (TH24, TH44).
-    async fn fail_without_report(&self, code: &str, reason: &str, details: Option<String>) -> bool {
+    async fn fail_without_report(
+        &self,
+        code: &str,
+        reason: &str,
+        details: Option<String>,
+    ) -> Option<RunState> {
         let ended = self.fail(code, reason, details).await;
-        if ended {
+        if ended.is_some() {
             RCA_RUNS_WITHOUT_REPORT_TOTAL
                 .with_label_values(&[self.org_id.as_str()])
                 .inc();
@@ -893,9 +1253,13 @@ impl RunEnd {
     }
 
     /// Fail the run with its counts and, when the transcript was read, its partial record
-    /// (VE16, VE34); only the write that won releases the on-call holds.
-    async fn fail(&self, code: &str, reason: &str, details: Option<String>) -> bool {
-        let end = self.transcript.as_ref().map(partial_end);
+    /// (VE16, VE34); only the write that won releases the on-call holds. `Some(Failed)`
+    /// when this call ended the run.
+    async fn fail(&self, code: &str, reason: &str, details: Option<String>) -> Option<RunState> {
+        let end = match self.transcript.as_ref() {
+            Some(transcript) => Some(partial_end(transcript, &self.steer_authors().await)),
+            None => None,
+        };
         let extra = RunPatch {
             result: end
                 .as_ref()
@@ -919,18 +1283,18 @@ impl RunEnd {
                 }
                 self.observe(RunState::Failed);
                 self.release_without_verdict().await;
-                true
+                Some(RunState::Failed)
             }
             Ok(false) => {
                 self.write_final_stats().await;
-                false
+                None
             }
             Err(e) => {
                 log::error!(
                     "[RCA_TURN] could not end run {} as failed: {e}",
                     self.run.run_id
                 );
-                false
+                None
             }
         }
     }
@@ -972,7 +1336,12 @@ impl RunEnd {
     }
 }
 
-fn observe_end(org_id: &str, state: RunState, started_at_us: i64, thread: Option<&ThreadStats>) {
+pub(crate) fn observe_end(
+    org_id: &str,
+    state: RunState,
+    started_at_us: i64,
+    thread: Option<&ThreadStats>,
+) {
     let seconds = now_micros().saturating_sub(started_at_us).max(0) as f64 / 1_000_000.0;
     RCA_RUN_DURATION_SECONDS
         .with_label_values(&[org_id, state.as_str()])
@@ -994,7 +1363,10 @@ fn observe_counts(org_id: &str, thread: &ThreadStats) {
 /// The partial record of a run that ended without completing: no verdict, grade or
 /// outcome, the ledger with `testing` left as `untested`, and the stages that did not run
 /// as a blind spot (VE7, VE16, VE34).
-fn partial_end(transcript: &RunTranscript) -> RunEndResult {
+fn partial_end(
+    transcript: &RunTranscript,
+    steer_authors: &BTreeMap<String, String>,
+) -> RunEndResult {
     record_run_end(&RunEndInput {
         submit: None,
         calls: &transcript.calls,
@@ -1002,7 +1374,44 @@ fn partial_end(transcript: &RunTranscript) -> RunEndResult {
         stages_run: &transcript.stages_run,
         ended_by: EndedBy::Agent,
         completed: false,
+        steer_authors,
     })
+}
+
+/// SG28: the report of a run its answer deadline closed with no `submit_report`: the
+/// unanswered question, what it needed, and the ledger the run recorded.
+fn deadline_report(question: Option<&TranscriptQuestion>, record: &RcaRunRecord) -> String {
+    let mut report = String::from(
+        "## Blocked: no answer by the deadline\n\nThe analysis asked the responders a question \
+         and stopped when no answer came in time. It names no cause.\n",
+    );
+    if let Some(question) = question {
+        report.push_str(&format!("\n**Question:** {}\n", question.question));
+        if !question.need.is_empty() {
+            report.push_str(&format!("\n**Needed:** {}\n", question.need));
+        }
+    }
+    if !record.ledger.hypotheses.is_empty() {
+        report.push_str("\n### Hypotheses\n\n");
+        for hypothesis in &record.ledger.hypotheses {
+            report.push_str(&format!(
+                "- **{}** ({})",
+                hypothesis.statement,
+                hypothesis.status.as_str().replace('_', " ")
+            ));
+            if !hypothesis.reason.is_empty() {
+                report.push_str(&format!(": {}", hypothesis.reason));
+            }
+            report.push('\n');
+        }
+    }
+    if !record.blind_spots.is_empty() {
+        report.push_str("\n### Not checked\n\n");
+        for spot in &record.blind_spots {
+            report.push_str(&format!("- **{}**: {}\n", spot.title, spot.why));
+        }
+    }
+    report
 }
 
 /// `rca_runs.result`; `None` (logged) when the record does not serialize.
@@ -1338,11 +1747,12 @@ where
     }
 }
 
-/// Cancel the incident's live run (TH41, TH42).
+/// Cancel the incident's live run (TH41, TH42), `running` or `waiting_input`.
 ///
 /// The run ends `cancelled` first; only the winner of that write stops its turn, through
-/// o2-ai, so the turn ends on whichever node runs it. `Ok(None)` when no live run holds
-/// the incident or another write ended it first.
+/// o2-ai, so the turn ends on whichever node runs it (a paused run has none), and closes
+/// the run's steering rows (SG24). `Ok(None)` when no live run holds the incident or
+/// another write ended it first.
 pub async fn cancel_rca_run(
     org_id: &str,
     incident_id: &str,
@@ -1369,6 +1779,12 @@ pub async fn cancel_rca_run(
         event: Some(IncidentEvent::ai_analysis_cancelled(Some(
             user_id.to_string(),
         ))),
+        // A paused run's need and answer deadline no longer apply.
+        summary: Some(RunSummaryPatch {
+            detail: Some(None),
+            deadline_at: Some(None),
+            ..Default::default()
+        }),
         ..Default::default()
     };
     if !rca_runs::update_run(org_id, &run_id, cancel).await? {
@@ -1399,10 +1815,83 @@ pub async fn cancel_rca_run(
     {
         stop_turn(org_id, session_id).await;
     }
+    // SG24: what the transcript shows read stays read; every other row is not read.
+    let transcript = match read_session(org_id, run.session_id.as_deref()).await {
+        Ok((events, _)) => Some(decode_run(&events)),
+        Err(e) => {
+            log::warn!("[RCA_TURN] cannot read the transcript of cancelled run {run_id}: {e:#}");
+            None
+        }
+    };
+    reconcile_steering(org_id, &run, transcript.as_ref(), Some(RunState::Cancelled)).await;
     // §6: no verdict is coming, so nothing may go on holding a page for one.
     rca_service::skip_analysis_for_incident(org_id, incident_id).await;
     log::info!("[RCA_TURN] cancelled run {run_id} of incident {incident_id}");
     Ok(Some(run_id))
+}
+
+/// The turn run of an incident run that goes on after a pause (SG18, SG27): its session,
+/// and the context its first turn got, built again.
+pub async fn turn_run_of(run: &RunRow) -> anyhow::Result<RcaTurnRun> {
+    let item = runs_table::to_item(run);
+    if item.subject_type != RunSubjectType::Incident {
+        anyhow::bail!("run {} is not an incident run", run.run_id);
+    }
+    let Some(session_id) = run.session_id.clone() else {
+        anyhow::bail!("run {} has no session", run.run_id);
+    };
+    let incident_id = run.subject_id.clone();
+    // RR-27: "Build on previous" extends the newest completed report, as at the start.
+    let previous = if item.mode == RunMode::BuildOnPrevious {
+        rca_runs::newest_completed_report(&run.org_id, &incident_id)
+            .await
+            .unwrap_or_else(|e| {
+                log::warn!("[RCA_TURN] could not read the previous report of {incident_id}: {e}");
+                None
+            })
+    } else {
+        None
+    };
+    let context = rca_service::build_incident_context(&run.org_id, &incident_id, previous).await;
+    Ok(RcaTurnRun {
+        org_id: run.org_id.clone(),
+        run_id: run.run_id.clone(),
+        subject: RunSubject::Incident(incident_id),
+        trigger: item.trigger,
+        mode: item.mode,
+        context: rca_service::rca_context_json(&context),
+        session_id: Some(session_id),
+    })
+}
+
+/// Start the next turn of a paused incident run (SG18, SG27) with `prompt`.
+pub(crate) async fn start_resumed_turn(
+    run: &RunRow,
+    prompt: RcaPrompt,
+) -> Result<TurnStarted, RcaTurnError> {
+    let turn_run = turn_run_of(run)
+        .await
+        .map_err(|e| RcaTurnError::Other(format!("{e:#}")))?;
+    start_rca_turn(turn_run, prompt).await
+}
+
+/// §12: a paused run's wait ended, by an answer (`answered`) or the deadline
+/// (`deadline`); `run` is the row as listed while it waited. The wait began at the
+/// deadline less the configured wait.
+pub(crate) fn count_question_end(org_id: &str, result: &str, run: &RunRow) {
+    RCA_QUESTIONS_TOTAL
+        .with_label_values(&[org_id, result])
+        .inc();
+    let Some(deadline) = run.input_deadline_at else {
+        return;
+    };
+    let wait_us = i64::try_from(get_o2_config().incidents.rca_answer_wait_minutes)
+        .unwrap_or(i64::MAX)
+        .saturating_mul(60_000_000);
+    let waited_us = now_micros().saturating_sub(deadline.saturating_sub(wait_us));
+    RCA_ANSWER_WAIT_SECONDS
+        .with_label_values(&[org_id])
+        .observe(waited_us.max(0) as f64 / 1_000_000.0);
 }
 
 /// Ask o2-ai to end the run's turn; a failure only leaves the turn to its deadline.
@@ -1430,7 +1919,8 @@ async fn stop_turn(org_id: &str, session_id: &str) {
 }
 
 /// TH28: finalize the runs whose turn ended without its node finalizing it, and end the
-/// runs that never got a turn and stopped writing (RR-40). Returns how many runs it ended.
+/// runs that never got a turn and stopped writing (RR-40); SG27: close the answer
+/// deadline of the paused runs past it. Returns how many runs it ended.
 pub async fn sweep_rca_runs() -> anyhow::Result<usize> {
     let timeout = get_o2_config().incidents.rca_timeout_secs;
     let now = now_micros();
@@ -1443,13 +1933,112 @@ pub async fn sweep_rca_runs() -> anyhow::Result<usize> {
             Err(e) => log::warn!("[RCA_TURN] could not sweep run {run_id}: {e:#}"),
         }
     }
+    for run in runs_table::list_waiting_past_deadline(now, SWEEP_BATCH).await? {
+        let run_id = run.run_id.clone();
+        match close_deadline(run).await {
+            Ok(true) => ended += 1,
+            Ok(false) => {}
+            Err(e) => log::warn!("[RCA_TURN] could not close the deadline of run {run_id}: {e:#}"),
+        }
+    }
     Ok(ended)
+}
+
+/// SG27: close the answer deadline the run was listed with; only the winner of that
+/// write starts the finalize turn (§10.4). `true` when the turn could not start and the
+/// run ended at the deadline here (SG28).
+async fn close_deadline(run: RunRow) -> anyhow::Result<bool> {
+    close_deadline_with(run, |run, prompt| async move {
+        start_resumed_turn(&run, prompt).await
+    })
+    .await
+}
+
+/// [close_deadline] with the finalize turn's start given.
+async fn close_deadline_with<S, F>(run: RunRow, start: S) -> anyhow::Result<bool>
+where
+    S: FnOnce(RunRow, RcaPrompt) -> F,
+    F: Future<Output = Result<TurnStarted, RcaTurnError>>,
+{
+    let Some(deadline) = run.input_deadline_at else {
+        return Ok(false);
+    };
+    if !runs_table::close_deadline(&run.org_id, &run.run_id, deadline).await? {
+        return Ok(false);
+    }
+    count_question_end(&run.org_id, QUESTION_DEADLINE, &run);
+    let prompt = RcaPrompt::Deadline {
+        question_id: run.pending_question_id.clone().unwrap_or_default(),
+        deadline_us: deadline,
+    };
+    let (org_id, run_id) = (run.org_id.clone(), run.run_id.clone());
+    let started = start(run, prompt)
+        .await
+        .map_err(|e| format!("{} ({e:?})", e.error_code()));
+    match started {
+        Ok(started) => {
+            log::info!(
+                "[RCA_TURN] run {run_id} passed its answer deadline; finalize turn {} started",
+                started.turn_id
+            );
+            Ok(false)
+        }
+        Err(e) => {
+            log::error!(
+                "[RCA_TURN] run {run_id} could not start its finalize turn: {e}; it ends at the \
+                 deadline"
+            );
+            Ok(end_at_deadline(&org_id, &run_id).await)
+        }
+    }
+}
+
+/// SG28 for a run whose finalize turn never started: completed `blocked` from its
+/// transcript. An unreadable transcript leaves the run to the stale rule of the sweep.
+async fn end_at_deadline(org_id: &str, run_id: &str) -> bool {
+    let run = match runs_table::get_rw(org_id, run_id).await {
+        Ok(Some(run)) => run,
+        Ok(None) => return false,
+        Err(e) => {
+            log::warn!("[RCA_TURN] cannot read run {run_id}: {e}; the sweeper retries");
+            return false;
+        }
+    };
+    let item = runs_table::to_item(&run);
+    if item.state.is_terminal() {
+        return false;
+    }
+    let (events, turns) = match read_session(org_id, run.session_id.as_deref()).await {
+        Ok(read) => read,
+        Err(e) => {
+            log::warn!(
+                "[RCA_TURN] cannot read the transcript of run {run_id}: {e:#}; the sweeper retries"
+            );
+            return false;
+        }
+    };
+    let ending = RunEnd {
+        org_id: org_id.to_string(),
+        thread: Some(project_rca_thread(&events, &turns, false, false).stats),
+        transcript: Some(decode_run(&events)),
+        turn_error: None,
+        run,
+        item,
+    };
+    let ended = ending.complete_at_deadline().await;
+    ending.reconcile(ended).await;
+    ended.is_some()
 }
 
 async fn sweep_run(run: RunRow, now: i64, timeout_secs: u64) -> anyhow::Result<bool> {
     if let Some(session_id) = run.session_id.clone() {
         let turns = ai_chat_turns::list_for_session(&run.org_id, &session_id).await?;
-        if let Some(turn) = turns.last() {
+        // SG18, SG27: a run that went back to `running` after its last turn ended (an
+        // answer, the answer deadline) is starting its next turn, so only the stale rule
+        // below ends it before that turn has a row.
+        if let Some(turn) = turns.last()
+            && !resumed_after(turn, run.updated_at)
+        {
             let Some(result) = lost_turn_result(turn, now, timeout_secs) else {
                 return Ok(false);
             };
@@ -1494,13 +2083,30 @@ async fn sweep_run(run: RunRow, now: i64, timeout_secs: u64) -> anyhow::Result<b
         transcript: None,
         turn_error: None,
     };
-    Ok(ending
+    let ended = ending
         .fail(
             runs_table::STALE_ERROR_CODE,
             runs_table::STALE_ERROR_REASON,
             None,
         )
-        .await)
+        .await;
+    // SG24: the stale run's rows are not read.
+    ending.reconcile(ended).await;
+    Ok(ended.is_some())
+}
+
+/// Whether the run was written (its pause ended) more than the grace period after its
+/// last turn ended: its next turn is starting, and the ended turn is not its end.
+fn resumed_after(turn: &ai_chat_turns::Model, run_updated_at: i64) -> bool {
+    let grace_us = i64::try_from(STALE_GRACE_SECS)
+        .unwrap_or(i64::MAX)
+        .saturating_mul(1_000_000);
+    turn.status != ai_chat_turns::TURN_RUNNING
+        && run_updated_at
+            > turn
+                .ended_at
+                .unwrap_or(turn.started_at)
+                .saturating_add(grace_us)
 }
 
 /// How a turn whose node never finalized it ended; `None` while its node may still do so.
@@ -1578,7 +2184,14 @@ mod tests {
     /// TH6: the design's samples, word for word.
     #[test]
     fn the_prompt_reads_as_the_design_samples() {
-        let render = |trigger, subject| RcaPrompt::Initial { trigger, subject }.render();
+        let render = |trigger, subject| {
+            RcaPrompt::Initial {
+                trigger,
+                subject,
+                guidance: None,
+            }
+            .render()
+        };
         assert_eq!(
             render(
                 RunTrigger::AutoNewIncident,
@@ -1628,6 +2241,7 @@ mod tests {
                 let text = RcaPrompt::Initial {
                     trigger,
                     subject: subject.clone(),
+                    guidance: None,
                 }
                 .render();
                 assert!(!text.trim().is_empty());
@@ -2015,6 +2629,7 @@ mod tests {
             stages_run: &transcript.stages_run,
             ended_by: EndedBy::Agent,
             completed,
+            steer_authors: &BTreeMap::new(),
         })
     }
 
@@ -2323,6 +2938,7 @@ mod tests {
             stages_run: &transcript.stages_run,
             ended_by: EndedBy::Agent,
             completed: true,
+            steer_authors: &BTreeMap::new(),
         })
         .verdict
         .expect("a graded verdict");
@@ -3188,6 +3804,8 @@ mod tests {
         let ended_inc = crate::alerts::rca_runs::tests::add_incident(&org, None).await;
         let ended_run = start(&org, &ended_inc, RunTrigger::Manual).await;
         with_session(&org, &ended_run, "ses-ended").await;
+        // The run's last write came during its turn; a later one reads as a resume (SG18).
+        crate::alerts::rca_runs::tests::age(&org, &ended_inc, &ended_run, 200).await;
         add_turn(
             &org,
             turn(
@@ -3302,6 +3920,8 @@ mod tests {
         let ended_inc = crate::alerts::rca_runs::tests::add_incident(&org, None).await;
         let ended_run = start(&org, &ended_inc, RunTrigger::Manual).await;
         with_session(&org, &ended_run, "ses-d4-ended").await;
+        // The run's last write came during its turn; a later one reads as a resume (SG18).
+        crate::alerts::rca_runs::tests::age(&org, &ended_inc, &ended_run, 300).await;
         let mut ended = turn(
             "ses-d4-ended",
             "t1",
@@ -3474,6 +4094,391 @@ mod tests {
                 details,
                 "{label}: the event carries them too"
             );
+        }
+    }
+
+    // ---- SG26–SG28, SG30, SG42: questions and the answer deadline ----
+
+    const NEED: &str = "deploy time of checkout-api";
+    const QUESTION_TEXT: &str = "When did checkout-api deploy?";
+    const QUESTION_ID: &str = "call_prt_q1";
+
+    /// A turn whose last sentinel is an `ask_responders` call: an open question.
+    fn asking() -> Vec<DurableEvent> {
+        let mut s = ledger_session(&["changes"]);
+        crate::ai_chat::rca_ledger::tests::ask(&mut s, "msg_a1", "prt_q1", QUESTION_TEXT, 3_500);
+        s.events
+    }
+
+    /// The `ai_analysis_needs_input` events: run, question, need, question text, deadline.
+    async fn needs_input(org: &str, inc: &str) -> Vec<(String, String, String, String, i64)> {
+        timeline(org, inc)
+            .await
+            .into_iter()
+            .filter_map(|e| match e {
+                config::meta::alerts::incidents::IncidentEventType::AiAnalysisNeedsInput {
+                    run_id,
+                    question_id,
+                    need,
+                    question,
+                    deadline_at,
+                } => Some((run_id, question_id, need, question, deadline_at)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    async fn ask_twice_before(org: &str, run_id: &str) {
+        for _ in 0..2 {
+            let asked = RunPatch {
+                questions_asked_inc: true,
+                ..Default::default()
+            };
+            assert!(rca_runs::update_run(org, run_id, asked).await.unwrap());
+        }
+    }
+
+    /// Pause the run with an answer deadline `deadline`, as SG26 does.
+    async fn pause_until(org: &str, run_id: &str, deadline: i64) {
+        let patch = RunPatch {
+            state: Some(RunState::WaitingInput),
+            input_deadline_at: Some(Some(deadline)),
+            pending_question_id: Some(Some(QUESTION_ID.to_string())),
+            questions_asked_inc: true,
+            ..Default::default()
+        };
+        assert!(rca_runs::update_run(org, run_id, patch).await.unwrap());
+    }
+
+    /// SG26, SG42: an open question at turn end pauses an incident run: `waiting_input`
+    /// until the turn end plus the configured wait (30 min by default), the open question,
+    /// one more question asked, the need and the deadline in the list summary, and one
+    /// `ai_analysis_needs_input` in the same write. A repeat finalize changes nothing.
+    #[tokio::test]
+    async fn sg26_an_open_question_pauses_the_run_once() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        let events = asking();
+        let wait_minutes = get_o2_config().incidents.rca_answer_wait_minutes;
+        assert_eq!(wait_minutes, 30, "the default wait");
+        let wait_us = wait_minutes as i64 * 60_000_000;
+
+        let before = now_micros();
+        assert!(!end(&org, &run_id, &events, TurnResult::Persisted).await);
+        let after = now_micros();
+
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::WaitingInput);
+        let deadline = run.input_deadline_at.expect("a deadline");
+        assert!(
+            (before + wait_us..=after + wait_us).contains(&deadline),
+            "turn end + {wait_minutes} min"
+        );
+        assert_eq!(run.pending_question_id.as_deref(), Some(QUESTION_ID));
+        assert_eq!(run.questions_asked, 1);
+        assert_eq!((run.report, run.error, run.ended_at), (None, None, None));
+        assert!(run.stats.unwrap().steps.is_some(), "the turn's counts");
+        let incident = incident_row(&org, &inc).await;
+        assert_eq!(incident.rca_state.as_deref(), Some("waiting_input"));
+        let summary = incident.rca_summary.unwrap();
+        assert_eq!(summary["detail"], NEED);
+        assert_eq!(summary["deadline_at"], deadline);
+        let expected = vec![(
+            run_id.clone(),
+            QUESTION_ID.to_string(),
+            NEED.to_string(),
+            QUESTION_TEXT.to_string(),
+            deadline,
+        )];
+        assert_eq!(needs_input(&org, &inc).await, expected);
+
+        assert!(!end(&org, &run_id, &events, TurnResult::Persisted).await);
+        let again = stored(&org, &run_id).await;
+        assert_eq!(again.state, RunState::WaitingInput);
+        assert_eq!(
+            (again.input_deadline_at, again.questions_asked),
+            (Some(deadline), 1)
+        );
+        assert_eq!(
+            needs_input(&org, &inc).await,
+            expected,
+            "the event is appended once"
+        );
+        let events = timeline(&org, &inc).await;
+        assert_eq!(completes(&events), 0);
+        assert!(failures(&events).is_empty());
+    }
+
+    /// SG30: an alert run never waits; a question with no report ends it as 02 says.
+    #[tokio::test]
+    async fn sg30_an_alert_run_never_waits_for_an_answer() {
+        let _db = db().await;
+        let org = format!("rca_{}", runs_table::new_run_id().to_lowercase());
+        let rca_runs::StartOutcome::Started { run_id } = rca_runs::start_run(rca_runs::StartRun {
+            org_id: org.clone(),
+            subject: RunSubject::Alert {
+                alert_id: "al_1".to_string(),
+                incident_id: None,
+            },
+            trigger: RunTrigger::OncallPage,
+            mode: RunMode::Fresh,
+            started_by: "system".to_string(),
+            guidance: None,
+            skip_cooldown: true,
+            oncall_subjects: None,
+        })
+        .await
+        .unwrap() else {
+            panic!("the alert run did not start");
+        };
+
+        assert!(end(&org, &run_id, &asking(), TurnResult::Persisted).await);
+
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Failed);
+        assert_eq!(run.error.unwrap().code, ERROR_NO_REPORT);
+        assert_eq!(
+            (
+                run.questions_asked,
+                run.input_deadline_at,
+                run.pending_question_id
+            ),
+            (0, None, None)
+        );
+    }
+
+    /// SG25, SG26: a third question closes the answer deadline at once and starts the
+    /// finalize turn with the deadline prompt; the run never pauses again.
+    #[tokio::test]
+    async fn sg26_a_third_question_closes_the_deadline_and_starts_the_finalize_turn() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        ask_twice_before(&org, &run_id).await;
+        let events = asking();
+        let ending = ending(&org, &run_id, &events).await;
+        let question = ending
+            .transcript
+            .as_ref()
+            .and_then(|t| t.open_question.clone())
+            .unwrap();
+        let prompts: Arc<Mutex<Vec<RcaPrompt>>> = Arc::default();
+        let log = prompts.clone();
+
+        let ended = ending
+            .close_deadline_now_with(
+                &question,
+                Some(continuation(&org, &run_id, &inc)),
+                move |_run, prompt| {
+                    log.lock().push(prompt);
+                    std::future::ready(Ok(started()))
+                },
+                || true,
+            )
+            .await;
+
+        assert_eq!(ended, None, "the finalize turn ends the run");
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Running);
+        let closed = run.deadline_closed_at.expect("the deadline is closed");
+        assert_eq!(run.questions_asked, 2, "a third question is not counted");
+        let prompts = prompts.lock().clone();
+        assert_eq!(
+            prompts,
+            [RcaPrompt::Deadline {
+                question_id: QUESTION_ID.to_string(),
+                deadline_us: closed,
+            }]
+        );
+        assert!(prompts[0].render().starts_with(&format!(
+            "[o2-run event=answer_deadline question={QUESTION_ID}]\n"
+        )));
+        assert!(needs_input(&org, &inc).await.is_empty(), "no pause");
+    }
+
+    /// SG26, SG28: through the finalizer, a third question with no turn to start ends the
+    /// run at the deadline: `completed`, `blocked`, with the deadline closed.
+    #[tokio::test]
+    async fn sg26_a_third_question_whose_finalize_turn_cannot_start_ends_blocked() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        ask_twice_before(&org, &run_id).await;
+        let ending = ending(&org, &run_id, &asking()).await;
+
+        let ended = tokio::time::timeout(
+            Duration::from_secs(60),
+            ending.end(
+                TurnResult::Persisted,
+                "turn-1",
+                Some(continuation(&org, &run_id, &inc)),
+            ),
+        )
+        .await
+        .expect("the finalize attempt ends");
+
+        assert!(ended);
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Completed);
+        assert_eq!(run.outcome.as_deref(), Some("blocked"));
+        assert!(run.deadline_closed_at.is_some());
+        assert_eq!(run.questions_asked, 2);
+        assert!(needs_input(&org, &inc).await.is_empty());
+    }
+
+    /// SG27: two sweepers that list the same paused run past its deadline: one wins the
+    /// compare-and-set and starts the one finalize turn.
+    #[tokio::test]
+    async fn sg27_two_sweeps_start_one_finalize_turn() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        let deadline = now_micros() - 1_000_000;
+        pause_until(&org, &run_id, deadline).await;
+        let listed: Vec<RunRow> = runs_table::list_waiting_past_deadline(now_micros(), 10_000)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|r| r.run_id == run_id)
+            .collect();
+        assert_eq!(listed.len(), 1, "the run is past its deadline");
+        let row = listed[0].clone();
+        let prompts: Arc<Mutex<Vec<RcaPrompt>>> = Arc::default();
+        let sweep = |row: RunRow| {
+            let log = prompts.clone();
+            close_deadline_with(row, move |_run, prompt| {
+                log.lock().push(prompt);
+                std::future::ready(Ok(started()))
+            })
+        };
+
+        let (a, b) = tokio::join!(sweep(row.clone()), sweep(row));
+
+        assert_eq!((a.unwrap(), b.unwrap()), (false, false));
+        assert_eq!(
+            *prompts.lock(),
+            [RcaPrompt::Deadline {
+                question_id: QUESTION_ID.to_string(),
+                deadline_us: deadline,
+            }],
+            "one finalize turn"
+        );
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Running);
+        assert!(run.deadline_closed_at.is_some());
+        assert_eq!(
+            (run.input_deadline_at, run.pending_question_id),
+            (None, None)
+        );
+        assert_eq!(
+            RCA_QUESTIONS_TOTAL
+                .with_label_values(&[org.as_str(), QUESTION_DEADLINE])
+                .get(),
+            1
+        );
+        assert!(
+            runs_table::list_waiting_past_deadline(now_micros(), 10_000)
+                .await
+                .unwrap()
+                .iter()
+                .all(|r| r.run_id != run_id)
+        );
+    }
+
+    /// Pause the run and close its deadline, as the SG27 sweeper's winner does.
+    async fn deadline_closed(org: &str, run_id: &str) {
+        let deadline = now_micros() - 1_000_000;
+        pause_until(org, run_id, deadline).await;
+        assert!(
+            runs_table::close_deadline(org, run_id, deadline)
+                .await
+                .unwrap()
+        );
+    }
+
+    /// SG28: the finalize turn ends with no report: the run still completes, `blocked`
+    /// (`answer_deadline`), with no verdict and a server report from the question, its need
+    /// and the ledger.
+    #[tokio::test]
+    async fn sg28_a_deadline_turn_without_a_report_completes_blocked() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        deadline_closed(&org, &run_id).await;
+
+        assert!(end(&org, &run_id, &asking(), TurnResult::Persisted).await);
+
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Completed);
+        assert_eq!(run.outcome.as_deref(), Some("blocked"));
+        assert_eq!(run.error, None);
+        let report = run.report.clone().unwrap();
+        assert!(
+            report.starts_with("## Blocked: no answer by the deadline"),
+            "{report}"
+        );
+        assert!(report.contains(&format!("**Question:** {QUESTION_TEXT}")));
+        assert!(report.contains(&format!("**Needed:** {NEED}")));
+        assert!(
+            report.contains("### Hypotheses") && report.contains(H1),
+            "the ledger"
+        );
+        let record = record_of(&run);
+        assert!(record.verdict.is_none(), "no verdict");
+        assert_eq!(
+            record.outcome_reason,
+            Some(config::meta::oncall::rca_run::OutcomeReason::AnswerDeadline)
+        );
+        assert_eq!(list_detail(&org, &inc).await, format!("Needs: {NEED}"));
+        assert_eq!(completes(&timeline(&org, &inc).await), 1);
+        assert!(
+            needs_input(&org, &inc).await.is_empty(),
+            "it never pauses again"
+        );
+    }
+
+    /// 03 rule 1, SG27: a report the finalize turn submits after the deadline closed ends
+    /// the run `blocked` (`answer_deadline`), keeping the agent's report.
+    #[tokio::test]
+    async fn sg27_a_report_after_the_deadline_is_blocked() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run_id = start(&org, &inc, RunTrigger::Manual).await;
+        deadline_closed(&org, &run_id).await;
+        let events = reported(
+            &["context", "changes", "metrics"],
+            verdict(H1, "high", "root_cause_identified"),
+        );
+
+        assert!(end(&org, &run_id, &events, TurnResult::Persisted).await);
+
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Completed);
+        assert_eq!(run.outcome.as_deref(), Some("blocked"));
+        assert_eq!(run.report.as_deref(), Some(SECOND_REPORT));
+        assert_eq!(
+            record_of(&run).outcome_reason,
+            Some(config::meta::oncall::rca_run::OutcomeReason::AnswerDeadline)
+        );
+    }
+
+    /// SG28: the agent writes its need as "Needs …" (§10.1); the deadline detail names
+    /// it once, in the VE44 "Needs: <x>" shape.
+    #[test]
+    fn sg28_the_deadline_detail_says_needs_once() {
+        for (need, detail) in [
+            ("Needs change history", Some("Needs: change history")),
+            ("needs: deploy history ", Some("Needs: deploy history")),
+            (
+                "deploy time of checkout-api",
+                Some("Needs: deploy time of checkout-api"),
+            ),
+            ("Needsless words", Some("Needs: Needsless words")),
+            ("Needs", None),
+            ("  ", None),
+        ] {
+            assert_eq!(needs_detail(need).as_deref(), detail, "{need:?}");
         }
     }
 }

@@ -322,12 +322,94 @@ const cases: [string, Row, boolean, Expected][] = [
       rerunNote: "re-run cancelled by a.rao",
     },
   ],
+  // 04 SG26, SG6, SG39, SG41: the steering details of a list row.
+  [
+    "SG26: waiting_input · Blocked · <need> · until <deadline>",
+    {
+      rca: rca({
+        state: "waiting_input",
+        summary: { detail: "Needs change history", deadline_at: minutesAgoMicros(-30) },
+      }),
+      severity: "P2",
+    },
+    true,
+    {
+      kind: "state",
+      label: "Blocked",
+      tone: "warn-strong",
+      detail: "Needs change history · until 12:30",
+      rerunNote: "",
+    },
+  ],
+  [
+    "SG6: running · steered by the authors' local parts",
+    {
+      rca: rca({ summary: { steered_by: ["j.okafor@acme.io", "a.rao@acme.io"] } }),
+      severity: "P2",
+    },
+    true,
+    {
+      kind: "state",
+      label: "Investigating",
+      tone: "muted",
+      detail: "4m · steered by j.okafor, a.rao",
+      rerunNote: "",
+    },
+  ],
+  [
+    "SG39: completed · unblocked by the answer's author",
+    {
+      rca: rca({
+        state: "completed",
+        outcome: "root_cause_identified",
+        confidence: "medium",
+        summary: { unblocked_by: "a.rao@acme.io" },
+      }),
+      severity: "P2",
+    },
+    true,
+    {
+      kind: "state",
+      label: "Root cause identified",
+      tone: "ok",
+      detail: "Medium · unblocked by a.rao",
+      rerunNote: "",
+    },
+  ],
+  [
+    "SG41: a run stopped on resolve shows its detail",
+    {
+      rca: rca({ state: "cancelled", summary: { detail: "Stopped: incident resolved" } }),
+      severity: "P2",
+    },
+    true,
+    {
+      kind: "state",
+      label: "Failed",
+      tone: "err",
+      detail: "Stopped: incident resolved",
+      rerunNote: "",
+    },
+  ],
 ];
 
 describe("rcaCellModel (01 §12.1, RR-42, 03 VE14/VE44)", () => {
   it.each(cases)("%s", (_name, row, rcaEnabled, expected) => {
     const model = rcaCellModel(row, { rcaEnabled, now: NOW });
     expect(model).toMatchObject(expected);
+  });
+
+  it("SG26: the until time is in the viewer's zone", () => {
+    const row = {
+      rca: rca({
+        state: "waiting_input",
+        summary: { detail: "Needs change history", deadline_at: minutesAgoMicros(-30) },
+      }),
+      rca_off_reason: null,
+      severity: "P2",
+    } as Row;
+    const model = rcaCellModel(row, { rcaEnabled: true, now: NOW, timezone: "Asia/Kolkata" });
+    expect(model.detail).toBe("Needs change history · until 18:00");
   });
 });
 

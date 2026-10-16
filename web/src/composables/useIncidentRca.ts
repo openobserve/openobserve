@@ -220,13 +220,15 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
    * not a toast (RR-47). The server can commit the run and then fail it before
    * answering (credentials, agent checks: 500/503), so a failed request re-reads
    * the detail first; only a request that created no run keeps the error toast.
+   * `guidance` becomes the new run's first message (04 SG33).
    */
-  const trigger = async (options: { buildOnPrevious?: boolean } = {}) => {
+  const trigger = async (options: { buildOnPrevious?: boolean; guidance?: string } = {}) => {
     const incident = incidentRef.value;
     if (!incident || triggering.value) return;
     const org = orgRef.value;
     const incidentId = incident.id;
     const previousRunId = currentRun.value?.run_id ?? null;
+    const guidance = options.guidance?.trim();
 
     triggering.value = true;
     viewedRunId.value = null;
@@ -234,7 +236,11 @@ export function useIncidentRca(orgRef: Ref<string>, incidentRef: Ref<IncidentWit
       const result = await requestRca(
         org,
         incidentId,
-        { reanalysis: true, build_on_previous: options.buildOnPrevious === true },
+        {
+          reanalysis: true,
+          build_on_previous: options.buildOnPrevious === true,
+          ...(guidance ? { guidance } : {}),
+        },
         {
           signal: lifecycle.signal,
           isStillActive: () => isCurrentIncident(org, incidentId),
