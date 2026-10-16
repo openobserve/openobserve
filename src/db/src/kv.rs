@@ -103,6 +103,29 @@ pub async fn list_keys(org_id: &str, prefix: &str) -> Result<Vec<String>, anyhow
     Ok(keys)
 }
 
+/// Org teardown: each key's eviction goes before its row, so a failed one leaves the row to retry.
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let keys = infra::table::kv_store::list_keys_by_org_rw(org_id).await?;
+    db::teardown::evict_then_delete(
+        keys,
+        |key: String| async move {
+            KVS.remove(&mk_cache_key(org_id, &key));
+        },
+        |key: String| async move {
+            #[cfg(feature = "enterprise")]
+            super_cluster::emit_delete_event(org_id, &key).await?;
+            let cache_key = mk_cache_key(org_id, &key);
+            delete_from_db_coordinator(&format!("/kv/{cache_key}"), false, true, None).await?;
+            Ok::<(), anyhow::Error>(())
+        },
+        |key: String| async move {
+            infra::table::kv_store::delete(org_id, &key).await?;
+            Ok(())
+        },
+    )
+    .await
+}
+
 /// Watch function for KV changes
 ///
 /// This function watches the `/kv/` path in the coordinator for event notifications.

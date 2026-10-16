@@ -555,12 +555,26 @@ pub async fn get_by_status(
     Ok(records)
 }
 
+/// Skips jobs of an org that is being deleted or has no organizations row.
 pub async fn get_active_trace_session() -> Result<Vec<OnlineEvalJob>, errors::Error> {
+    use sea_orm::sea_query::{Expr, Query};
+
+    use crate::table::entity::organizations;
+
     let client = get_orm_client_ro().await;
 
     let records = Entity::find()
         .filter(Column::Status.eq("active"))
         .filter(Column::TargetScope.is_in(["trace", "session"]))
+        .filter(
+            Column::OrgId.in_subquery(
+                Query::select()
+                    .column(organizations::Column::Identifier)
+                    .from(organizations::Entity)
+                    .and_where(Expr::col(organizations::Column::Status).eq("active"))
+                    .to_owned(),
+            ),
+        )
         .order_by(Column::CreatedAt, Order::Desc)
         .all(client)
         .await?

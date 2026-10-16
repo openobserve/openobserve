@@ -651,17 +651,25 @@ pub async fn move_to_folder_with<C: ConnectionTrait>(
     Ok(res.rows_affected)
 }
 
-pub async fn delete_by_org_with<C: ConnectionTrait>(
+/// Every id of the org, tombstones included, as [delete_by_org_with] removes them.
+pub async fn list_ids_by_org_with<C: ConnectionTrait>(
     conn: &C,
     org: &str,
 ) -> Result<Vec<String>, errors::Error> {
-    let ids: Vec<String> = Entity::find()
+    Ok(Entity::find()
         .filter(Column::Org.eq(org))
         .all(conn)
         .await?
         .into_iter()
         .map(|m| m.id)
-        .collect();
+        .collect())
+}
+
+pub async fn delete_by_org_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+) -> Result<Vec<String>, errors::Error> {
+    let ids = list_ids_by_org_with(conn, org).await?;
     notifications::Entity::delete_many()
         .filter(notifications::Column::Org.eq(org))
         .exec(conn)
@@ -1507,6 +1515,29 @@ mod tests {
         assert_eq!(delete_by_org_with(&db, "acme").await.unwrap(), ["d1"]);
         assert_eq!(ids(&list_all_with(&db).await.unwrap()), ["d2"]);
         assert_eq!(logged(&db).await, ["d2"]);
+    }
+
+    #[tokio::test]
+    async fn the_org_id_listing_keeps_tombstones_the_row_listing_skips() {
+        let db = db().await;
+        for id in ["d1", "d2"] {
+            put_with(&db, &downtime(id, Repeat::None, Some(11 * DAY)))
+                .await
+                .unwrap();
+        }
+        let mut foreign = downtime("d3", Repeat::None, Some(11 * DAY));
+        foreign.org = "other".to_string();
+        put_with(&db, &foreign).await.unwrap();
+        delete_with(&db, "acme", "d2").await.unwrap().unwrap();
+
+        let mut listed = list_ids_by_org_with(&db, "acme").await.unwrap();
+        listed.sort();
+        assert_eq!(
+            listed,
+            ["d1", "d2"],
+            "a tombstone still needs its cross-region delete"
+        );
+        assert_eq!(ids(&list_with(&db, "acme", None).await.unwrap()), ["d1"]);
     }
 
     /// The test schema with `downtimes_folder_fk` enforced, as the migration creates it.

@@ -355,6 +355,15 @@ SELECT * FROM pipeline
         }
     }
 
+    async fn list_by_org_rw(&self, org: &str) -> Result<Vec<Pipeline>> {
+        let pool = CLIENT_RW.clone();
+        let query = "SELECT * FROM pipeline WHERE org = $1 ORDER BY id;";
+        Ok(sqlx::query_as::<_, Pipeline>(query)
+            .bind(org)
+            .fetch_all(&pool)
+            .await?)
+    }
+
     async fn list_streams_with_pipeline(&self, org: &str) -> Result<Vec<Pipeline>> {
         let pool = CLIENT_RO.clone();
         let query = r#"

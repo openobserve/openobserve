@@ -1351,6 +1351,19 @@ pub async fn get_dir() -> String {
     FILES[0].read().await.root_dir.clone()
 }
 
+/// Every directory a cache key can live under: the root, then each `multi_dir` subdirectory.
+pub async fn get_dirs() -> Vec<String> {
+    let files = FILES[0].read().await;
+    let mut dirs = vec![files.root_dir.clone()];
+    dirs.extend(
+        files
+            .multi_dir
+            .iter()
+            .map(|dir| format!("{}{dir}/", files.root_dir)),
+    );
+    dirs
+}
+
 pub async fn download(
     account: &str,
     file: &str,

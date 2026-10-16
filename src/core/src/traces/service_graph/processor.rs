@@ -79,6 +79,9 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
     );
 
     for (org_id, stream_name) in discovered {
+        if super::org_being_deleted(&org_id) {
+            continue;
+        }
         log::info!("[ServiceGraph] Processing stream {org_id}/{stream_name}");
         if let Err(e) =
             process_stream(&org_id, &stream_name, last_updated_at, next_updated_at).await

@@ -18,7 +18,7 @@ use std::str::FromStr;
 use config::{ider, meta::destinations, utils::json};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
+    ModelTrait, QueryFilter, QueryOrder, QuerySelect, Set, TryIntoModel,
 };
 
 use crate::{
@@ -224,6 +224,37 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
         .exec(client)
         .await?;
     Ok(())
+}
+
+/// Names of the org's destinations, read from the primary.
+pub async fn list_names_by_org_rw(org_id: &str) -> Result<Vec<String>, Error> {
+    let client = get_orm_client_rw().await;
+    let names = Entity::find()
+        .select_only()
+        .column(Column::Name)
+        .filter(Column::Org.eq(org_id))
+        .into_tuple::<String>()
+        .all(client)
+        .await?;
+    Ok(names)
+}
+
+/// Orgs other than `except_org` with a destination on this template, read from the primary.
+pub async fn orgs_using_template(
+    template_id: &str,
+    except_org: &str,
+) -> Result<Vec<String>, Error> {
+    let client = get_orm_client_rw().await;
+    let orgs = Entity::find()
+        .select_only()
+        .column(Column::Org)
+        .filter(Column::TemplateId.eq(template_id))
+        .filter(Column::Org.ne(except_org))
+        .distinct()
+        .into_tuple::<String>()
+        .all(client)
+        .await?;
+    Ok(orgs)
 }
 
 #[cfg(test)]

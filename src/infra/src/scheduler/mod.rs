@@ -88,6 +88,12 @@ pub trait Scheduler: Sync + Send + 'static {
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger>;
     async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>>;
     async fn list_by_org(&self, org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>>;
+    /// `list_by_org` on the primary.
+    async fn list_by_org_rw(
+        &self,
+        org: &str,
+        module: Option<TriggerModule>,
+    ) -> Result<Vec<Trigger>>;
     async fn clean_complete(&self) -> Result<()>;
     async fn watch_timeout(&self) -> Result<()>;
     async fn len_module(&self, module: TriggerModule) -> usize;
@@ -294,6 +300,12 @@ pub async fn list(module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
 #[inline]
 pub async fn list_by_org(org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
     CLIENT.list_by_org(org, module).await
+}
+
+/// List the jobs for the given module from the primary
+#[inline]
+pub async fn list_by_org_rw(org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
+    CLIENT.list_by_org_rw(org, module).await
 }
 
 #[inline]

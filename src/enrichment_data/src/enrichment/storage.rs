@@ -24,6 +24,7 @@ use config::{
     utils::{
         enrichment_local_cache::{
             get_key, get_metadata_content, get_metadata_path, get_table_dir, get_table_path,
+            update_metadata,
         },
         json::Value,
         record_batch_ext::{convert_json_to_record_batch, convert_vrl_to_record_batch},
@@ -378,7 +379,6 @@ pub mod local {
         let key = get_key(org_id, table_name);
         let table_dir = get_table_dir(&key);
         let file_path = get_table_path(table_dir.to_str().unwrap(), updated_at);
-        let metadata_path = get_metadata_path();
 
         // Ensure directory exists
         if let Some(parent) = file_path.parent() {
@@ -408,22 +408,11 @@ pub mod local {
             .await
             .map_err(|e| anyhow!("Failed to write enrichment table file: {}", e))?;
 
-        // metadata content is key -value pairs, where key is org_id/table_name
-        // first check if the metadata file exists, if it does, read it and merge the new metadata
-        // with the existing one if it doesn't exist, create a new metadata file
-        let mut metadata_content = get_metadata_content().await?;
-
-        // merge the new metadata with the existing one
-        metadata_content.insert(key.to_string(), updated_at);
-
-        // Serialize the metadata content
-        let metadata_json = serde_json::to_string_pretty(&metadata_content)
-            .map_err(|e| anyhow!("Failed to serialize metadata: {}", e))?;
-
-        // Serialize and write metadata
-        tokio::fs::write(&metadata_path, metadata_json)
-            .await
-            .map_err(|e| anyhow!("Failed to write metadata file: {}", e))?;
+        update_metadata(|metadata| {
+            metadata.insert(key.to_string(), updated_at);
+            true
+        })
+        .await?;
 
         log::debug!("Stored enrichment table {key} to local storage");
         Ok(())
@@ -495,24 +484,7 @@ pub mod local {
         }
 
         log::debug!("enrichment table {org_id}/{table_name} to be deleted file dir removed");
-        let mut metadata_content = get_metadata_content().await?;
-        metadata_content.remove(&key);
-
-        log::debug!(
-            "enrichment table {org_id}/{table_name} to be deleted, metadata_content: {:?}",
-            metadata_content
-        );
-        // Serialize the metadata content
-        let metadata_json = serde_json::to_string_pretty(&metadata_content)
-            .map_err(|e| anyhow!("Failed to serialize metadata: {}", e))?;
-
-        log::debug!(
-            "enrichment table {org_id}/{table_name} to be deleted metadata_json updated: {metadata_json}"
-        );
-        // Serialize and write metadata
-        tokio::fs::write(&metadata_path, metadata_json)
-            .await
-            .map_err(|e| anyhow!("Failed to write metadata file: {}", e))?;
+        update_metadata(|metadata| metadata.remove(&key).is_some()).await?;
 
         log::debug!("Deleted enrichment table {key} from local storage");
         Ok(())

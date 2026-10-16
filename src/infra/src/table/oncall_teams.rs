@@ -89,6 +89,16 @@ pub fn invalidate_members_cache(team_id: &str) {
     MEMBERS_CACHE.remove(team_id);
 }
 
+/// Drops every org-keyed on-call cache of a deleted org; rosters are keyed by team alone.
+pub fn invalidate_org(org_id: &str) {
+    let prefix = format!("{org_id}/");
+    TEAM_CACHE.retain(|key, _| !key.starts_with(&prefix));
+    ORG_HAS_TEAMS_CACHE.remove(org_id);
+    super::oncall_schedules::invalidate_org(org_id);
+    super::oncall_policies::invalidate_org(org_id);
+    super::oncall_ownership::invalidate_cache(org_id);
+}
+
 /// Invalidates locally and tells every other node to do the same.
 ///
 /// Write paths call this; the coordinator watcher calls the plain
@@ -509,6 +519,100 @@ pub async fn remove_member(team_id: &str, user_email: &str) -> Result<bool, erro
     Ok(deleted > 0)
 }
 
+/// Deletes all fourteen on-call tables of an org, children first, and evicts their caches.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    use sea_orm::sea_query::{Expr, Query};
+
+    use super::entity::{
+        oncall_delivery_reads, oncall_overrides, oncall_ownership_rules, oncall_policies,
+        oncall_response_events, oncall_response_reports, oncall_responses, oncall_routing_config,
+        oncall_schedules, oncall_unavailability, oncall_unrouted_signals,
+    };
+
+    let client = get_orm_client_rw().await;
+    let team_ids: Vec<String> = oncall_teams::Entity::find()
+        .select_only()
+        .column(oncall_teams::Column::Id)
+        .filter(oncall_teams::Column::OrgId.eq(org_id))
+        .into_tuple()
+        .all(client)
+        .await?;
+    // Sent before the rows go: a retry after the commit can no longer find these team ids.
+    for team_id in &team_ids {
+        crate::coordinator::oncall::emit_members_changed(team_id).await?;
+    }
+    let org_team_ids = Query::select()
+        .column(oncall_teams::Column::Id)
+        .from(oncall_teams::Entity)
+        .and_where(Expr::col(oncall_teams::Column::OrgId).eq(org_id))
+        .to_owned();
+    let org_response_ids = Query::select()
+        .column(oncall_responses::Column::Id)
+        .from(oncall_responses::Entity)
+        .and_where(Expr::col(oncall_responses::Column::OrgId).eq(org_id))
+        .to_owned();
+    let txn = client.begin().await?;
+    oncall_response_events::Entity::delete_many()
+        .filter(oncall_response_events::Column::ResponseId.in_subquery(org_response_ids))
+        .exec(&txn)
+        .await?;
+    oncall_delivery_reads::Entity::delete_many()
+        .filter(oncall_delivery_reads::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_response_reports::Entity::delete_many()
+        .filter(oncall_response_reports::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_responses::Entity::delete_many()
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_unrouted_signals::Entity::delete_many()
+        .filter(oncall_unrouted_signals::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_overrides::Entity::delete_many()
+        .filter(oncall_overrides::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_schedules::Entity::delete_many()
+        .filter(oncall_schedules::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_policies::Entity::delete_many()
+        .filter(oncall_policies::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_ownership_rules::Entity::delete_many()
+        .filter(oncall_ownership_rules::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_routing_config::Entity::delete_many()
+        .filter(oncall_routing_config::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_unavailability::Entity::delete_many()
+        .filter(oncall_unavailability::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    oncall_team_members::Entity::delete_many()
+        .filter(oncall_team_members::Column::TeamId.in_subquery(org_team_ids))
+        .exec(&txn)
+        .await?;
+    super::oncall_user_contacts::delete_by_org(&txn, org_id).await?;
+    oncall_teams::Entity::delete_many()
+        .filter(oncall_teams::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
+    txn.commit().await?;
+    for team_id in &team_ids {
+        invalidate_members_cache(team_id);
+    }
+    invalidate_org(org_id);
+    crate::coordinator::oncall::emit_org_deleted(org_id).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -581,5 +685,31 @@ mod tests {
             ids.iter().all(|i| i.len() == 27),
             "ksuids are fixed width, so lexical and byte order agree"
         );
+    }
+
+    #[test]
+    fn test_invalidate_org_drops_only_that_orgs_teams() {
+        let team = |org: &str| {
+            to_team(oncall_teams::Model {
+                id: "team_1".into(),
+                org_id: org.into(),
+                name: "Platform".into(),
+                timezone: "UTC".into(),
+                description: None,
+                channel_destinations: None,
+                created_at: 0,
+                updated_at: 0,
+            })
+        };
+        for org in ["inv_team_a", "inv_team_ab"] {
+            TEAM_CACHE.insert(team_cache_key(org, "team_1"), (team(org), Instant::now()));
+            ORG_HAS_TEAMS_CACHE.insert(org.to_string(), (true, Instant::now()));
+        }
+        invalidate_org("inv_team_a");
+        assert!(!TEAM_CACHE.contains_key(&team_cache_key("inv_team_a", "team_1")));
+        assert!(!ORG_HAS_TEAMS_CACHE.contains_key("inv_team_a"));
+        assert!(TEAM_CACHE.contains_key(&team_cache_key("inv_team_ab", "team_1")));
+        assert!(ORG_HAS_TEAMS_CACHE.contains_key("inv_team_ab"));
+        invalidate_org("inv_team_ab");
     }
 }

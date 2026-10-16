@@ -215,6 +215,19 @@ pub async fn len() -> usize {
     }
 }
 
+/// Short ids of the org, read from the primary.
+pub async fn list_ids_by_org_rw(org_id: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let records = Entity::find()
+        .select_only()
+        .column(Column::ShortId)
+        .filter(Column::OrgId.eq(org_id))
+        .into_model::<ShortId>()
+        .all(client)
+        .await?;
+    Ok(records.into_iter().map(|r| r.short_id).collect())
+}
+
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
     Entity::delete_many()

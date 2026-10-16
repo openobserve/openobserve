@@ -596,6 +596,46 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
     Ok(())
 }
 
+/// Org teardown: deletes each listed dashboard by its primary row, then drops the unparsable rows.
+pub async fn delete_by_org(org_id: &str) -> Result<(), DashboardError> {
+    let dashboards: Vec<(String, String)> =
+        table::dashboards::list_skipping_invalid_rw(ListDashboardsParams::new(org_id))
+            .await?
+            .into_iter()
+            .filter_map(|(folder, dashboard)| {
+                Some((dashboard.dashboard_id()?.to_string(), folder.folder_id))
+            })
+            .collect();
+    db::teardown::evict_then_delete(
+        dashboards,
+        |(dashboard_id, _): (String, String)| async move {
+            common::infra::config::DASHBOARD_ID_TO_ORG
+                .write()
+                .await
+                .remove(&dashboard_id);
+        },
+        |(dashboard_id, _): (String, String)| async move {
+            infra::coordinator::dashboards::emit_delete_event(org_id, &dashboard_id).await?;
+            Ok::<(), DashboardError>(())
+        },
+        |(dashboard_id, folder_id): (String, String)| async move {
+            distinct_values::batch_remove(OriginType::Dashboard, &dashboard_id).await?;
+            let dashboard = Authz {
+                obj_id: dashboard_id.clone(),
+                parent_type: "folders".to_owned(),
+                parent: folder_id.clone(),
+            };
+            remove_ownership(org_id, "dashboards", dashboard).await;
+            table::dashboards::delete_from_folder(org_id, &folder_id, &dashboard_id).await?;
+            reconcile_home_dashboard_on_delete(org_id, &dashboard_id).await;
+            Ok(())
+        },
+    )
+    .await?;
+    table::dashboards::delete_by_org(org_id).await?;
+    Ok(())
+}
+
 #[tracing::instrument]
 pub async fn move_dashboard(
     org_id: &str,

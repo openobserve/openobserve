@@ -92,6 +92,29 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Org teardown: each primary-listed key is evicted before the delete and again after it.
+pub async fn delete_by_org(org_id: &str) -> Result<(), anyhow::Error> {
+    let prefix = format!("/function/{org_id}/");
+    let keys = infra::db::get_db()
+        .await
+        .list_keys_from_primary(&prefix)
+        .await?;
+    for key in &keys {
+        evict_function(key).await?;
+    }
+    // Watched, so the super-cluster delete makes other regions evict; the store lists the primary.
+    db::delete_if_exists(&prefix, true, db::NEED_WATCH).await?;
+    // A watcher's reload before the delete can refill the cache, and no retry lists a deleted key.
+    for key in &keys {
+        if let Err(e) = evict_function(key).await {
+            log::warn!("[FUNCTIONS] eviction of {key} after the delete failed: {e}");
+        }
+    }
+    let owned = format!("{org_id}/");
+    QUERY_FUNCTIONS.retain(|key, _| !key.starts_with(&owned));
+    Ok(())
+}
+
 pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
     Ok(db::list(&format!("/function/{org_id}/"))
         .await?
@@ -148,4 +171,14 @@ pub async fn reset() -> Result<(), anyhow::Error> {
     let key = "/transform/";
     db::delete(key, true, db::NO_NEED_WATCH, None).await?;
     Ok(())
+}
+
+async fn evict_function(key: &str) -> Result<(), infra::errors::Error> {
+    let local = async {
+        if let Some(item_key) = key.strip_prefix("/function/") {
+            QUERY_FUNCTIONS.remove(item_key);
+        }
+    };
+    let broadcast = infra::db::delete_from_db_coordinator(key, false, db::NEED_WATCH, None);
+    db::teardown::evict(local, broadcast).await
 }

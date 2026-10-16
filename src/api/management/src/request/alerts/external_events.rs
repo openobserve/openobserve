@@ -48,6 +48,28 @@ pub(crate) fn extract_token(auth_header: Option<&str>, path_token: Option<&str>)
         .map(|t| t.to_string())
 }
 
+/// 403 when the org is blocked or gone (a leaked token dies with it, D-11), 500 when unreadable.
+pub async fn inactive_org_response(org_id: &str) -> Option<Response> {
+    org_status_refusal(org_id, db::org_status::read_active(org_id).await)
+}
+
+/// 403 for an inactive org, 500 when its status could not be read; None lets the request on.
+pub fn org_status_refusal(
+    org_id: &str,
+    active: Result<bool, impl std::fmt::Display>,
+) -> Option<Response> {
+    match active {
+        Ok(true) => None,
+        Ok(false) => Some(MetaHttpResponse::forbidden("organization is not active")),
+        Err(e) => {
+            log::error!("cannot read the status of org {org_id}: {e}");
+            Some(MetaHttpResponse::internal_error(
+                "cannot read the organization status",
+            ))
+        }
+    }
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn ingest_events(
     Path(org_id): Path<String>,
@@ -86,6 +108,9 @@ async fn handle_events(
         Ok(_) => return MetaHttpResponse::not_found("not found"),
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
+    if let Some(resp) = inactive_org_response(&integration.org_id).await {
+        return resp;
+    }
 
     let now = chrono::Utc::now().timestamp_micros();
     let ua = headers.get("user-agent").and_then(|v| v.to_str().ok());
@@ -241,5 +266,38 @@ mod tests {
         assert_eq!(extract_token(Some("Basic xyz"), None), None); // wrong scheme
         assert_eq!(extract_token(Some("Bearer nope_prefix"), None), None); // wrong prefix
         assert_eq!(extract_token(None, None), None);
+    }
+
+    #[tokio::test]
+    async fn test_inactive_org_response_refuses_blocked_and_missing_orgs() {
+        let blocked = "ext-events-blocked-org";
+        common::infra::config::ORG_STATUS_CACHE.insert(
+            blocked.into(),
+            common::meta::organization::OrgStatus::Deleting,
+        );
+        let resp = inactive_org_response(blocked).await;
+        common::infra::config::ORG_STATUS_CACHE.remove(blocked);
+        assert_eq!(
+            resp.map(|r| r.status()),
+            Some(axum::http::StatusCode::FORBIDDEN)
+        );
+        let resp = inactive_org_response("ext-events-never-created").await;
+        assert_eq!(
+            resp.map(|r| r.status()),
+            Some(axum::http::StatusCode::FORBIDDEN)
+        );
+    }
+
+    #[test]
+    fn test_an_unreadable_org_status_is_a_server_error_not_a_refusal() {
+        let status = |active: Result<bool, &str>| {
+            org_status_refusal("ext-events-org", active).map(|r| r.status())
+        };
+        assert_eq!(status(Ok(true)), None);
+        assert_eq!(status(Ok(false)), Some(axum::http::StatusCode::FORBIDDEN));
+        assert_eq!(
+            status(Err("db down")),
+            Some(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
+        );
     }
 }

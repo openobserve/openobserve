@@ -150,18 +150,21 @@ pub async fn save_org_tuples(org_id: &str) {
 pub async fn save_org_tuples(_org_id: &str) {}
 
 #[cfg(feature = "enterprise")]
-pub async fn delete_org_tuples(org_id: &str) {
+pub async fn delete_org_tuples(org_id: &str) -> Result<(), anyhow::Error> {
     use o2_openfga::config::get_config as get_openfga_config;
 
-    if get_openfga_config().enabled
-        && let Err(e) = o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
-    {
-        log::error!("[auth] failed to delete org tuples for {org_id}: {e}");
+    if get_openfga_config().enabled {
+        o2_openfga::authorizer::authz::delete_org_tuples(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to delete org tuples for {org_id}: {e}"))?;
     }
+    Ok(())
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub async fn delete_org_tuples(_org_id: &str) {}
+pub async fn delete_org_tuples(_org_id: &str) -> Result<(), anyhow::Error> {
+    Ok(())
+}
 
 #[cfg(feature = "enterprise")]
 pub fn get_role(role: &UserOrgRole) -> UserRole {
@@ -1068,7 +1071,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_org_tuples_non_enterprise() {
         // In non-enterprise mode, this should not panic and return immediately
-        delete_org_tuples("test_org").await;
+        assert!(delete_org_tuples("test_org").await.is_ok());
         // If we reach here, the function completed successfully
     }
 

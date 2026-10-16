@@ -504,43 +504,23 @@ pub async fn get_user_by_rum_token(
 }
 
 pub async fn list_users_by_org(org_id: &str) -> Result<Vec<OrgUserRecord>, errors::Error> {
-    let client = get_orm_client_ro().await;
-    let records = Entity::find()
-        .filter(Column::OrgId.eq(org_id))
-        .all(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
-        .into_iter()
-        .map(OrgUserRecord::from)
-        .collect();
+    list_users_by_org_on(get_orm_client_ro().await, org_id).await
+}
 
-    Ok(records)
+/// `list_users_by_org` on the primary.
+pub async fn list_users_by_org_rw(org_id: &str) -> Result<Vec<OrgUserRecord>, errors::Error> {
+    list_users_by_org_on(get_orm_client_rw().await, org_id).await
 }
 
 pub async fn list_orgs_by_user(email: &str) -> Result<Vec<UserOrgExpandedRecord>, errors::Error> {
-    let client = get_orm_client_ro().await;
-    let records = Entity::find()
-        .filter(
-            Expr::expr(Func::lower(Expr::col((Entity, Column::Email)))).eq(email.to_lowercase()),
-        )
-        .order_by(Column::CreatedAt, Order::Desc)
-        .inner_join(super::entity::organizations::Entity)
-        .select_only()
-        .column(Column::Email)
-        .column(Column::OrgId)
-        .column(Column::Role)
-        .column(Column::Token)
-        .column(Column::RumToken)
-        .column(Column::CreatedAt)
-        .column(organizations::Column::OrgName)
-        .column(organizations::Column::OrgType)
-        .column(Column::AllowStaticToken)
-        .into_model::<UserOrgExpandedRecord>()
-        .all(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    list_orgs_by_user_on(get_orm_client_ro().await, email).await
+}
 
-    Ok(records)
+/// `list_orgs_by_user` on the primary.
+pub async fn list_orgs_by_user_rw(
+    email: &str,
+) -> Result<Vec<UserOrgExpandedRecord>, errors::Error> {
+    list_orgs_by_user_on(get_orm_client_rw().await, email).await
 }
 
 pub async fn list(limit: Option<i64>) -> Result<Vec<OrgUserRecord>, errors::Error> {
@@ -585,6 +565,50 @@ pub async fn clear() -> Result<(), errors::Error> {
 
 pub async fn is_empty() -> bool {
     len().await == 0
+}
+
+async fn list_users_by_org_on(
+    client: &DatabaseConnection,
+    org_id: &str,
+) -> Result<Vec<OrgUserRecord>, errors::Error> {
+    let records = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .into_iter()
+        .map(OrgUserRecord::from)
+        .collect();
+
+    Ok(records)
+}
+
+async fn list_orgs_by_user_on(
+    client: &DatabaseConnection,
+    email: &str,
+) -> Result<Vec<UserOrgExpandedRecord>, errors::Error> {
+    let records = Entity::find()
+        .filter(
+            Expr::expr(Func::lower(Expr::col((Entity, Column::Email)))).eq(email.to_lowercase()),
+        )
+        .order_by(Column::CreatedAt, Order::Desc)
+        .inner_join(super::entity::organizations::Entity)
+        .select_only()
+        .column(Column::Email)
+        .column(Column::OrgId)
+        .column(Column::Role)
+        .column(Column::Token)
+        .column(Column::RumToken)
+        .column(Column::CreatedAt)
+        .column(organizations::Column::OrgName)
+        .column(organizations::Column::OrgType)
+        .column(Column::AllowStaticToken)
+        .into_model::<UserOrgExpandedRecord>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(records)
 }
 
 #[cfg(test)]

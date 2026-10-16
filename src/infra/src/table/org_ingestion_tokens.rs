@@ -401,26 +401,14 @@ pub async fn find_token_any_state(
 
 /// List all tokens for an org (token values masked).
 pub async fn list_by_org(org_id: &str) -> Result<Vec<OrgIngestionTokenListRecord>, errors::Error> {
-    let client = get_orm_client_ro().await;
-    let records = Entity::find()
-        .filter(Column::OrgId.eq(org_id))
-        .order_by(Column::IsDefault, Order::Desc)
-        .order_by(Column::CreatedAt, Order::Desc)
-        .select_only()
-        .column(Column::Name)
-        .column(Column::Token)
-        .column(Column::Description)
-        .column(Column::IsDefault)
-        .column(Column::Enabled)
-        .column(Column::CreatedBy)
-        .column(Column::CreatedAt)
-        .column(Column::SplunkToken)
-        .into_model::<OrgIngestionTokenListRecord>()
-        .all(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    list_by_org_on(get_orm_client_ro().await, org_id).await
+}
 
-    Ok(records)
+/// `list_by_org` on the primary, for org deletion.
+pub async fn list_by_org_rw(
+    org_id: &str,
+) -> Result<Vec<OrgIngestionTokenListRecord>, errors::Error> {
+    list_by_org_on(get_orm_client_rw().await, org_id).await
 }
 
 /// Get a single token record by org_id and name.
@@ -550,6 +538,31 @@ pub async fn list_all_enabled() -> Result<Vec<(String, String, String)>, errors:
         .column(Column::Token)
         .column(Column::Name)
         .into_tuple::<(String, String, String)>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(records)
+}
+
+async fn list_by_org_on(
+    client: &DatabaseConnection,
+    org_id: &str,
+) -> Result<Vec<OrgIngestionTokenListRecord>, errors::Error> {
+    let records = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .order_by(Column::IsDefault, Order::Desc)
+        .order_by(Column::CreatedAt, Order::Desc)
+        .select_only()
+        .column(Column::Name)
+        .column(Column::Token)
+        .column(Column::Description)
+        .column(Column::IsDefault)
+        .column(Column::Enabled)
+        .column(Column::CreatedBy)
+        .column(Column::CreatedAt)
+        .column(Column::SplunkToken)
+        .into_model::<OrgIngestionTokenListRecord>()
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;

@@ -169,14 +169,12 @@ jobs:
             sleep 2
           done
 
-      - name: Run PostgreSQL unit tests
+      # COVERAGE_E2E adds the #[ignore]d e2e_test (org deletion end to end) to the same build.
+      - name: Run PostgreSQL unit tests and integration e2e
         run: ./coverage.sh run-cov
         env:
           ZO_DATA_DIR: ${{ runner.temp }}/openobserve-postgres/
-
-      # coverage.sh skips the #[ignore]d e2e_test, so it runs here on its own.
-      - name: Run PostgreSQL integration e2e
-        run: cargo test --test integration_test -- --ignored e2e_test
+          COVERAGE_E2E: "1"
 
       - name: Check PostgreSQL coverage
         run: ./coverage.sh check
@@ -224,14 +222,12 @@ jobs:
       - name: Simulate building frontend code
         run: mkdir -p web/dist && touch web/dist/index.html
 
-      - name: Run SQLite unit tests
+      # COVERAGE_E2E adds the #[ignore]d e2e_test (org deletion end to end) to the same build.
+      - name: Run SQLite unit tests and integration e2e
         run: ./coverage.sh run-cov
         env:
           ZO_DATA_DIR: ${{ runner.temp }}/openobserve-sqlite/
-
-      # coverage.sh skips the #[ignore]d e2e_test, so it runs here on its own.
-      - name: Run SQLite integration e2e
-        run: cargo test --test integration_test -- --ignored e2e_test
+          COVERAGE_E2E: "1"
 
       - name: Check SQLite coverage
         run: ./coverage.sh check

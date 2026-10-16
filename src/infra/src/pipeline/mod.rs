@@ -48,6 +48,8 @@ pub trait PipelineTable: Sync + Send + 'static {
     async fn get_with_same_source_stream(&self, pipeline: &Pipeline) -> Result<Vec<Pipeline>>;
     async fn list(&self) -> Result<Vec<Pipeline>>;
     async fn list_by_org(&self, org: &str) -> Result<Vec<Pipeline>>;
+    /// `list_by_org` on the primary; reports a failed read instead of returning no pipelines.
+    async fn list_by_org_rw(&self, org: &str) -> Result<Vec<Pipeline>>;
     async fn list_streams_with_pipeline(&self, org: &str) -> Result<Vec<Pipeline>>;
     async fn delete(&self, pipeline_id: &str) -> Result<Pipeline>;
 }
@@ -116,6 +118,12 @@ pub async fn list() -> Result<Vec<Pipeline>> {
 #[inline]
 pub async fn list_by_org(org: &str) -> Result<Vec<Pipeline>> {
     CLIENT.list_by_org(org).await
+}
+
+/// Lists all pipelines within an organization from the primary
+#[inline]
+pub async fn list_by_org_rw(org: &str) -> Result<Vec<Pipeline>> {
+    CLIENT.list_by_org_rw(org).await
 }
 
 /// Deletes the pipeline by id

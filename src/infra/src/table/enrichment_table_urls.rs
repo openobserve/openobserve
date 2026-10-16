@@ -183,6 +183,20 @@ pub async fn list_by_org(org: &str) -> Result<Vec<EnrichmentTableUrlRecord>, err
     Ok(records.into_iter().map(|model| model.into()).collect())
 }
 
+/// Distinct table names with a URL job in the org, read from the primary.
+pub async fn list_names_by_org_rw(org: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let names = Entity::find()
+        .select_only()
+        .column(Column::Name)
+        .filter(Column::Org.eq(org))
+        .distinct()
+        .into_tuple::<String>()
+        .all(client)
+        .await?;
+    Ok(names)
+}
+
 /// Get all URL jobs for a specific table, ordered by created_at DESC
 ///
 /// # Arguments

@@ -246,6 +246,11 @@ pub async fn process_token(
 
             // Add the user to the newly added organizations
             for org in orgs_added {
+                // A missing org is still created here, so only blocked orgs are skipped.
+                if db::org_status::is_blocked(&org.name) {
+                    log::warn!("Skipping SSO membership in blocked org {}", org.name);
+                    continue;
+                }
                 let _ = organization::check_and_create_org(&org.name).await;
 
                 match users::add_user_to_org(
@@ -357,6 +362,7 @@ pub async fn process_token(
             Ok(None)
         } else {
             log::info!("User does not exist in the database");
+            source_orgs.retain(|org| !db::org_status::is_blocked(&org.name));
 
             if openfga_cfg.enabled {
                 for (index, org) in source_orgs.iter().enumerate() {
@@ -794,7 +800,10 @@ async fn validate_and_filter_custom_orgs(
     let mut valid_orgs: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new();
     for (org_id, roles) in custom_orgs {
-        if org_id == default_org || organization::get_org(&org_id).await.is_some() {
+        if org_id == default_org
+            || (!db::org_status::is_blocked(&org_id)
+                && organization::get_org(&org_id).await.is_some())
+        {
             valid_orgs.insert(org_id, roles);
         } else {
             log::error!(
@@ -869,6 +878,23 @@ pub async fn process_domain_org_mapping(
             }
 
             log::info!("found domain org mapping for user {user_email}, processing");
+            match db::org_status::read_active(&mapped.org_id).await {
+                Ok(true) => {}
+                Ok(false) => {
+                    log::warn!(
+                        "domain org mapping for user {user_email} points at inactive org {}, skipping",
+                        mapped.org_id
+                    );
+                    return Ok(false);
+                }
+                Err(e) => {
+                    log::warn!(
+                        "domain org mapping for user {user_email}: cannot read the status of org {}, skipping: {e}",
+                        mapped.org_id
+                    );
+                    return Ok(false);
+                }
+            }
             let base_role = UserRole::from_str(&mapped.base_role).map_err(|e| {
                 anyhow::anyhow!(
                     "error parsing domain org role {} to user role : {e:?}",

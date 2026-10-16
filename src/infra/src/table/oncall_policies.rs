@@ -58,6 +58,12 @@ pub fn invalidate_cache(org_id: &str, team_id: &str) {
     POLICY_CACHE.remove(&policy_cache_key(org_id, team_id));
 }
 
+/// Drops every policy an org holds, for when the org itself is deleted.
+pub fn invalidate_org(org_id: &str) {
+    let prefix = format!("{org_id}/");
+    POLICY_CACHE.retain(|key, _| !key.starts_with(&prefix));
+}
+
 pub(super) async fn invalidate_and_publish(org_id: &str, team_id: &str) {
     invalidate_cache(org_id, team_id);
     if let Err(e) = crate::coordinator::oncall::emit_policy_changed(org_id, team_id).await {
@@ -414,5 +420,22 @@ mod tests {
             "the team's edit stands"
         );
         assert!(back.pages_anyone(AlertPriority::P1));
+    }
+
+    #[test]
+    fn test_invalidate_org_drops_only_that_orgs_policies() {
+        let policy = |org: &str| {
+            EscalationPolicy::default_for_team("pol_1", org, "team_1", "rot_primary", None)
+        };
+        for org in ["inv_pol_a", "inv_pol_ab"] {
+            POLICY_CACHE.insert(
+                policy_cache_key(org, "team_1"),
+                (policy(org), Instant::now()),
+            );
+        }
+        invalidate_org("inv_pol_a");
+        assert!(!POLICY_CACHE.contains_key(&policy_cache_key("inv_pol_a", "team_1")));
+        assert!(POLICY_CACHE.contains_key(&policy_cache_key("inv_pol_ab", "team_1")));
+        invalidate_org("inv_pol_ab");
     }
 }

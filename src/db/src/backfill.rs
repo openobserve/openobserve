@@ -96,6 +96,14 @@ pub async fn delete(org: &str, job_id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Org teardown: per job, so each delete sends its super-cluster event.
+pub async fn delete_by_org(org: &str) -> Result<()> {
+    for job_id in infra::table::backfill_jobs::list_ids_by_org_rw(org).await? {
+        delete(org, &job_id).await?;
+    }
+    Ok(())
+}
+
 /// Update an existing backfill job
 pub async fn update(job: &BackfillJob) -> Result<()> {
     infra::table::backfill_jobs::update(job).await?;

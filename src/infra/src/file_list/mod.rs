@@ -35,6 +35,9 @@ pub mod pending_delete;
 pub mod postgres;
 pub mod sqlite;
 
+const STREAM_SCAN_WINDOW_MICROS: i64 = 3600 * 1_000_000;
+const STREAMS_PER_QUERY: usize = 1000;
+
 static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect_default);
 pub static LOCAL_CACHE: Lazy<Box<dyn FileList>> = Lazy::new(connect_local_cache);
 
@@ -63,6 +66,22 @@ pub fn connect_local_cache() -> Box<dyn FileList> {
     Box::<sqlite::SqliteFileList>::default()
 }
 
+/// The two file tables an org deletion empties stream by stream.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StreamRowsTable {
+    FileList,
+    History,
+}
+
+impl StreamRowsTable {
+    fn name(self) -> &'static str {
+        match self {
+            Self::FileList => "file_list",
+            Self::History => "file_list_history",
+        }
+    }
+}
+
 #[async_trait]
 pub trait FileList: Sync + Send + 'static {
     async fn health_check(&self) -> Result<()>;
@@ -88,6 +107,7 @@ pub trait FileList: Sync + Send + 'static {
         files: &[FileListDeleted],
     ) -> Result<()>;
     async fn batch_remove_deleted(&self, files: &[FileKey]) -> Result<()>;
+    async fn release_deleted(&self, ids: &[i64], created_at: i64) -> Result<()>;
     async fn get(&self, file: &str) -> Result<FileMeta>;
     async fn contains(&self, file: &str) -> Result<bool>;
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
@@ -171,6 +191,7 @@ pub trait FileList: Sync + Send + 'static {
         limit: i64,
     ) -> Result<Vec<FileListDeleted>>;
     async fn list_deleted(&self) -> Result<Vec<FileListDeleted>>;
+    async fn has_deleted_by_org(&self, org_id: &str) -> Result<bool>;
     async fn get_min_date(
         &self,
         org_id: &str,
@@ -254,11 +275,79 @@ pub trait FileList: Sync + Send + 'static {
         date_range: (String, String),
     ) -> Result<StreamStats>;
     async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)>;
-    async fn delete_by_org(&self, org_id: &str) -> Result<()>;
+    async fn list_stats_streams_by_org(&self, org_id: &str) -> Result<Vec<String>>;
+    async fn list_streams_updated_between(
+        &self,
+        org_id: &str,
+        time_range: (i64, i64),
+    ) -> Result<Vec<String>>;
+    async fn list_org_streams_by_scan(&self, org_id: &str) -> Result<Vec<String>>;
+    async fn remove_stream_batch(
+        &self,
+        table: StreamRowsTable,
+        org_id: &str,
+        stream: &str,
+        limit: i64,
+        to_deleted: bool,
+    ) -> Result<u64>;
+    async fn delete_stream_stats_by_org(&self, org_id: &str) -> Result<()>;
+    async fn delete_jobs_by_streams(&self, org_id: &str, streams: &[String]) -> Result<()>;
 }
 
-pub async fn delete_by_org(org_id: &str) -> Result<()> {
-    CLIENT.delete_by_org(org_id).await
+/// The streams of the org's `stream_stats` rows, an indexed read.
+pub async fn list_stats_streams_by_org(org_id: &str) -> Result<Vec<String>> {
+    CLIENT.list_stats_streams_by_org(org_id).await
+}
+
+/// Streams of the org with a `file_list` or history row updated in `[since, until)`.
+pub async fn list_streams_updated_since(
+    org_id: &str,
+    since: i64,
+    until: i64,
+) -> Result<Vec<String>> {
+    let mut streams = std::collections::BTreeSet::new();
+    let mut start = since;
+    // Hour windows keep each read an index range on `updated_at`, however long ago `since` is.
+    while start < until {
+        let end = until.min(start.saturating_add(STREAM_SCAN_WINDOW_MICROS));
+        streams.extend(
+            CLIENT
+                .list_streams_updated_between(org_id, (start, end))
+                .await?,
+        );
+        start = end;
+    }
+    Ok(streams.into_iter().collect())
+}
+
+/// Every stream with a file, history or job row of the org; scans each table once (no org index).
+pub async fn list_org_streams_by_scan(org_id: &str) -> Result<Vec<String>> {
+    CLIENT.list_org_streams_by_scan(org_id).await
+}
+
+/// Removes up to `limit` of the stream's rows; `to_deleted` first queues their objects.
+pub async fn remove_stream_batch(
+    table: StreamRowsTable,
+    org_id: &str,
+    stream: &str,
+    limit: i64,
+    to_deleted: bool,
+) -> Result<u64> {
+    CLIENT
+        .remove_stream_batch(table, org_id, stream, limit.max(1), to_deleted)
+        .await
+}
+
+pub async fn delete_stream_stats_by_org(org_id: &str) -> Result<()> {
+    CLIENT.delete_stream_stats_by_org(org_id).await
+}
+
+/// Deletes the org's `file_list_jobs` rows of these streams, through the stream-led index.
+pub async fn delete_jobs_by_streams(org_id: &str, streams: &[String]) -> Result<()> {
+    for chunk in streams.chunks(STREAMS_PER_QUERY) {
+        CLIENT.delete_jobs_by_streams(org_id, chunk).await?;
+    }
+    Ok(())
 }
 
 pub async fn health_check() -> Result<()> {
@@ -320,6 +409,12 @@ pub async fn batch_add_deleted(
 #[inline]
 pub async fn batch_remove_deleted(files: &[FileKey]) -> Result<()> {
     CLIENT.batch_remove_deleted(files).await
+}
+
+/// Re-stamps claimed `file_list_deleted` rows, undoing the claim `query_deleted` stamped on them.
+#[inline]
+pub async fn release_deleted(ids: &[i64], created_at: i64) -> Result<()> {
+    CLIENT.release_deleted(ids, created_at).await
 }
 
 #[inline]
@@ -524,6 +619,12 @@ pub async fn query_deleted(
 #[inline]
 pub async fn list_deleted() -> Result<Vec<FileListDeleted>> {
     CLIENT.list_deleted().await
+}
+
+/// Whether the org has any row in `file_list_deleted`, read from the primary.
+#[inline]
+pub async fn has_deleted_by_org(org_id: &str) -> Result<bool> {
+    CLIENT.has_deleted_by_org(org_id).await
 }
 
 #[inline]

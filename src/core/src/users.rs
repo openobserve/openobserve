@@ -713,6 +713,10 @@ pub async fn add_user_to_org(
                 }
             }
         };
+        // Checked after the root branch above may have created a missing org.
+        if !db::org_status::is_active(org_id).await {
+            return Err(Error::other("organization is not active"));
+        }
         let base_role = get_role(&role);
         let is_allowed =
             initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin);
@@ -1120,7 +1124,13 @@ pub async fn remove_user_from_org(
                             };
                             if get_openfga_config().enabled {
                                 log::debug!("delete user single org, role: {user_fga_role}");
-                                delete_user_from_org(org_id, email_id, &user_fga_role).await;
+                                if let Err(e) =
+                                    delete_user_from_org(org_id, email_id, &user_fga_role).await
+                                {
+                                    log::error!(
+                                        "error deleting openfga tuples of {email_id} in {org_id} : {e}"
+                                    );
+                                }
                                 if user_role.eq(&UserRole::ServiceAccount) {
                                     delete_service_account_from_org(org_id, email_id).await;
                                 }
@@ -1161,12 +1171,17 @@ pub async fn remove_user_from_org(
                                     if get_openfga_config().enabled
                                         && let Some(_user_fga_role) = _user_fga_role
                                     {
-                                        delete_user_from_org(
+                                        if let Err(e) = delete_user_from_org(
                                             org_id,
                                             email_id,
                                             _user_fga_role.as_str(),
                                         )
-                                        .await;
+                                        .await
+                                        {
+                                            log::error!(
+                                                "error deleting openfga tuples of {email_id} in {org_id} : {e}"
+                                            );
+                                        }
                                         if is_service_account {
                                             delete_service_account_from_org(org_id, email_id).await;
                                         }
@@ -2441,6 +2456,51 @@ mod tests {
         assert!(resp.is_ok());
         let response = resp.unwrap();
         assert_eq!(response.status(), 422);
+    }
+
+    #[tokio::test]
+    async fn test_add_user_to_org_refuses_blocked_org() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+
+        let _guard = set_up().await;
+        let org = "blockedaddorg";
+        organization::check_and_create_org_without_ofga(org)
+            .await
+            .unwrap();
+        create_new_user(DBUser {
+            email: "joiner@example.com".to_string(),
+            password: String::new(),
+            salt: String::new(),
+            first_name: "Joiner".to_string(),
+            last_name: String::new(),
+            password_ext: None,
+            is_external: false,
+            organizations: vec![UserOrg {
+                name: "dummy".to_string(),
+                org_name: "dummy".to_string(),
+                token: String::new(),
+                rum_token: None,
+                role: UserRole::User,
+            }],
+        })
+        .await
+        .unwrap();
+        let mut admin = ORG_USERS.get("dummy/admin@zo.dev").unwrap().clone();
+        admin.org_id = org.to_string();
+        ORG_USERS.insert(format!("{org}/admin@zo.dev"), admin);
+        let role = || UserOrgRole {
+            base_role: UserRole::User,
+            custom_role: None,
+        };
+
+        ORG_STATUS_CACHE.insert(org.to_string(), OrgStatus::Deleting);
+        let blocked = add_user_to_org(org, "joiner@example.com", role(), "admin@zo.dev").await;
+        ORG_STATUS_CACHE.remove(org);
+        assert!(blocked.is_err(), "a deleting org must refuse new members");
+        let active = add_user_to_org(org, "joiner@example.com", role(), "admin@zo.dev")
+            .await
+            .unwrap();
+        assert_eq!(active.status(), 200);
     }
 
     #[cfg(feature = "enterprise")]

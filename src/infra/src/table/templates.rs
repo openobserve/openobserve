@@ -21,7 +21,7 @@ use config::{
 };
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
+    ModelTrait, QueryFilter, QueryOrder, QuerySelect, Set, TryIntoModel,
 };
 
 use crate::{
@@ -31,6 +31,8 @@ use crate::{
 };
 
 const DEFAULT_ORG: &str = "default";
+/// Names per `IN` list, well under every backend's bind-parameter limit.
+const NAMES_PER_QUERY: usize = 500;
 
 impl TryFrom<Model> for Template {
     type Error = TemplateError;
@@ -155,6 +157,67 @@ async fn list_models(
 pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
     let client = get_orm_client_rw().await;
     Entity::delete_many()
+        .filter(Column::Org.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+/// `(id, name)` of each template of exactly this org, read from the primary.
+pub async fn list_ids_by_org_rw(org_id: &str) -> Result<Vec<(String, String)>, Error> {
+    let client = get_orm_client_rw().await;
+    let ids = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .column(Column::Name)
+        .filter(Column::Org.eq(org_id))
+        .into_tuple::<(String, String)>()
+        .all(client)
+        .await?;
+    Ok(ids)
+}
+
+/// The `names` another org holds while not deleting or deleted (no row = live), once per name.
+pub async fn names_held_by_live_orgs_rw(
+    org_id: &str,
+    names: &[String],
+) -> Result<Vec<String>, Error> {
+    use sea_orm::sea_query::Query;
+
+    use crate::{
+        coordinator::org_status::{STATUS_DELETED, STATUS_DELETING},
+        table::entity::organizations,
+    };
+
+    let client = get_orm_client_rw().await;
+    let mut held = Vec::new();
+    for chunk in names.chunks(NAMES_PER_QUERY) {
+        // The inverse set is small: only orgs being deleted, never every live org.
+        let gone = Query::select()
+            .column(organizations::Column::Identifier)
+            .from(organizations::Entity)
+            .and_where(organizations::Column::Status.is_in([STATUS_DELETING, STATUS_DELETED]))
+            .to_owned();
+        let found = Entity::find()
+            .select_only()
+            .column(Column::Name)
+            .filter(Column::Name.is_in(chunk.iter().cloned()))
+            .filter(Column::Org.ne(org_id))
+            .filter(Column::Org.not_in_subquery(gone))
+            .distinct()
+            .into_tuple::<String>()
+            .all(client)
+            .await?;
+        held.extend(found);
+    }
+    Ok(held)
+}
+
+/// Unlike [`delete`], never falls back to a same-named `default` org template.
+pub async fn delete_by_id(org_id: &str, id: &str) -> Result<(), Error> {
+    let client = get_orm_client_rw().await;
+    Entity::delete_many()
+        .filter(Column::Id.eq(id))
         .filter(Column::Org.eq(org_id))
         .exec(client)
         .await?;

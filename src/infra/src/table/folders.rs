@@ -114,6 +114,20 @@ pub async fn list_folders(
     Ok(folders)
 }
 
+/// Like [`list_folders`], but reads the primary.
+pub async fn list_folders_rw(
+    org_id: &str,
+    folder_type: FolderType,
+) -> Result<Vec<Folder>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let folders = list_models(client, org_id, folder_type)
+        .await?
+        .into_iter()
+        .map(Folder::from)
+        .collect();
+    Ok(folders)
+}
+
 /// Creates a new folder or updates an existing folder in the database. Returns
 /// the new or updated folder.
 pub async fn put(

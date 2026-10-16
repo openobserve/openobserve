@@ -848,26 +848,15 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
 
     /// List all the jobs for the given module and organization
     async fn list_by_org(&self, org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
-        let pool = CLIENT_RO.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "scheduled_jobs"])
-            .inc();
-        let jobs: Vec<Trigger> = if let Some(module) = module {
-            let query =
-                r#"SELECT * FROM scheduled_jobs WHERE org = $1 AND module = $2 ORDER BY id;"#;
-            sqlx::query_as::<_, Trigger>(query)
-                .bind(org)
-                .bind(module)
-                .fetch_all(&pool)
-                .await?
-        } else {
-            let query = r#"SELECT * FROM scheduled_jobs WHERE org = $1 ORDER BY id;"#;
-            sqlx::query_as::<_, Trigger>(query)
-                .bind(org)
-                .fetch_all(&pool)
-                .await?
-        };
-        Ok(jobs)
+        list_by_org_in(&CLIENT_RO.clone(), org, module).await
+    }
+
+    async fn list_by_org_rw(
+        &self,
+        org: &str,
+        module: Option<TriggerModule>,
+    ) -> Result<Vec<Trigger>> {
+        list_by_org_in(&CLIENT_RW.clone(), org, module).await
     }
 
     /// Background job that frequently (30 secs interval) cleans "Completed" jobs or jobs with
@@ -962,6 +951,31 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
 
         Ok(())
     }
+}
+
+async fn list_by_org_in(
+    pool: &sqlx::Pool<sqlx::Postgres>,
+    org: &str,
+    module: Option<TriggerModule>,
+) -> Result<Vec<Trigger>> {
+    DB_QUERY_NUMS
+        .with_label_values(&["select", "scheduled_jobs"])
+        .inc();
+    let jobs: Vec<Trigger> = if let Some(module) = module {
+        let query = r#"SELECT * FROM scheduled_jobs WHERE org = $1 AND module = $2 ORDER BY id;"#;
+        sqlx::query_as::<_, Trigger>(query)
+            .bind(org)
+            .bind(module)
+            .fetch_all(pool)
+            .await?
+    } else {
+        let query = r#"SELECT * FROM scheduled_jobs WHERE org = $1 ORDER BY id;"#;
+        sqlx::query_as::<_, Trigger>(query)
+            .bind(org)
+            .fetch_all(pool)
+            .await?
+    };
+    Ok(jobs)
 }
 
 #[cfg(test)]

@@ -86,10 +86,14 @@ enum Cached {
     /// Unknown, draft, or feature off — negative-cached so a slug spray can't turn misses into DB
     /// hits.
     Missing,
+    /// The page or its org's status could not be read; never cached, so the next request retries.
+    Unavailable,
 }
 
 struct CacheEntry {
     kind: Cached,
+    /// The owning org, re-checked on every hit; `None` only for slugs that resolved to no page.
+    org_id: Option<String>,
     at: Instant,
 }
 
@@ -140,6 +144,7 @@ pub async fn snapshot(
         Cached::Password => serve_password_page(&slug, &headers).await,
         Cached::Unbuilt => building(),
         Cached::Missing => not_found(),
+        Cached::Unavailable => unavailable(),
     }
 }
 
@@ -155,6 +160,7 @@ pub async fn page(Path(slug): Path<String>, ip: Option<Extension<RealIp>>) -> Re
         Cached::Public(_) | Cached::Unbuilt => "public, max-age=30",
         Cached::Password => "no-store, private",
         Cached::Missing => return not_found(),
+        Cached::Unavailable => return unavailable(),
     };
     Response::builder()
         .status(StatusCode::OK)
@@ -191,8 +197,10 @@ pub async fn auth(
     }
     let conn = get_orm_client_ro().await;
     // Unknown slug and wrong password are the same 401.
-    let Some(page) = table::get_page_by_slug(conn, &slug).await.ok().flatten() else {
-        return unauthorized();
+    let page = match active_page_by_slug(conn, &slug).await {
+        Ok(Some(page)) => page,
+        Ok(None) => return unauthorized(),
+        Err(()) => return unavailable(),
     };
     let (Some(hash), true) = (page.password_hash.as_deref(), page.visibility == 2) else {
         return unauthorized();
@@ -230,8 +238,10 @@ pub async fn badge(Path(slug): Path<String>, ip: Option<Extension<RealIp>>) -> R
     if read_rate_limited(ip.map(|e| e.0)) {
         return too_many();
     }
-    let Cached::Public(e) = resolve(&slug).await else {
-        return not_found();
+    let e = match resolve(&slug).await {
+        Cached::Public(e) => e,
+        Cached::Unavailable => return unavailable(),
+        _ => return not_found(),
     };
     #[derive(serde::Deserialize)]
     struct Cur {
@@ -271,8 +281,10 @@ pub async fn feed(Path(slug): Path<String>, ip: Option<Extension<RealIp>>) -> Re
     if read_rate_limited(ip.map(|e| e.0)) {
         return too_many();
     }
-    let Cached::Public(e) = resolve(&slug).await else {
-        return not_found();
+    let e = match resolve(&slug).await {
+        Cached::Public(e) => e,
+        Cached::Unavailable => return unavailable(),
+        _ => return not_found(),
     };
     #[derive(serde::Deserialize)]
     struct Notice {
@@ -388,14 +400,14 @@ fn shard_for(slug: &str) -> &'static Shard {
     &CACHE[h % CACHE_SHARDS]
 }
 
-/// A fresh entry's kind, or None on a miss/expiry; a hit is a read lock and an Arc clone, no await.
-fn cache_get(slug: &str) -> Option<Cached> {
+/// A fresh entry's kind and org, or None on a miss/expiry; a hit is a read lock and an Arc clone.
+fn cache_get(slug: &str) -> Option<(Cached, Option<String>)> {
     let guard = shard_for(slug).read().ok()?;
     let e = guard.get(slug)?;
-    (e.at.elapsed() < CACHE_TTL).then(|| e.kind.clone())
+    (e.at.elapsed() < CACHE_TTL).then(|| (e.kind.clone(), e.org_id.clone()))
 }
 
-fn cache_put(slug: &str, kind: Cached) {
+fn cache_put(slug: &str, kind: Cached, org_id: Option<String>) {
     let Ok(mut guard) = shard_for(slug).write() else {
         return;
     };
@@ -406,6 +418,7 @@ fn cache_put(slug: &str, kind: Cached) {
         slug.to_owned(),
         CacheEntry {
             kind,
+            org_id,
             at: Instant::now(),
         },
     );
@@ -428,30 +441,101 @@ fn make_room(shard: &mut HashMap<String, CacheEntry>) {
 
 /// The cache's answer for a slug, doing the miss-time DB reads at most once per TTL.
 async fn resolve(slug: &str) -> Cached {
-    if let Some(kind) = cache_get(slug) {
-        return kind;
+    resolve_with(
+        slug,
+        |slug| async move { load(&slug).await },
+        |org_id| async move { db::org_status::read_active(&org_id).await },
+    )
+    .await
+}
+
+/// `resolve` over injectable reads; a failed read answers `Unavailable` and caches nothing.
+async fn resolve_with<L, LF, A, AF, E>(slug: &str, load: L, read_active: A) -> Cached
+where
+    L: FnOnce(String) -> LF,
+    LF: Future<Output = Result<(Cached, Option<String>), ()>>,
+    A: FnOnce(String) -> AF,
+    AF: Future<Output = Result<bool, E>>,
+    E: std::fmt::Display,
+{
+    if let Some((kind, org_id)) = cache_get(slug) {
+        let Some(org_id) = org_id else {
+            return kind;
+        };
+        // A page cached before its org was blocked or deleted must stop being served at once.
+        return match read_active(org_id.clone()).await {
+            Ok(true) => kind,
+            Ok(false) => Cached::Missing,
+            Err(e) => {
+                log::error!("[status_pages] cannot read the status of org {org_id}: {e}");
+                Cached::Unavailable
+            }
+        };
     }
-    let kind = load(slug).await;
-    cache_put(slug, kind.clone());
+    let Ok((kind, org_id)) = load(slug.to_string()).await else {
+        return Cached::Unavailable;
+    };
+    cache_put(slug, kind.clone(), org_id);
     kind
 }
 
 /// The two point-reads behind a miss: the page by slug, then its snapshot for a public page.
-async fn load(slug: &str) -> Cached {
+async fn load(slug: &str) -> Result<(Cached, Option<String>), ()> {
     if !config::get_config().synthetics.enabled {
-        return Cached::Missing;
+        return Ok((Cached::Missing, None));
     }
     let conn = get_orm_client_ro().await;
-    let Some(page) = table::get_page_by_slug(conn, slug).await.ok().flatten() else {
-        return Cached::Missing;
+    let Some(page) = active_page_by_slug(conn, slug).await? else {
+        return Ok((Cached::Missing, None));
     };
-    match page.visibility {
+    let kind = match page.visibility {
         2 => Cached::Password,
-        1 => match table::get_snapshot(conn, &page.id).await.ok().flatten() {
-            Some(snap) => Cached::Public(Arc::new(PublicEntry::new(&page, snap))),
-            None => Cached::Unbuilt,
-        },
+        1 => public_kind(&page, table::get_snapshot(conn, &page.id).await)?,
         _ => Cached::Missing,
+    };
+    Ok((kind, Some(page.org_id)))
+}
+
+/// A public page's kind; a failed snapshot read is `Err`, so it is never cached as `Unbuilt`.
+fn public_kind(
+    page: &entity::status_pages::Model,
+    snap: Result<Option<entity::status_page_snapshots::Model>, impl std::fmt::Display>,
+) -> Result<Cached, ()> {
+    match snap {
+        Ok(Some(snap)) => Ok(Cached::Public(Arc::new(PublicEntry::new(page, snap)))),
+        Ok(None) => Ok(Cached::Unbuilt),
+        Err(e) => {
+            log::error!(
+                "[status_pages] cannot read the snapshot of page {}: {e}",
+                page.id
+            );
+            Err(())
+        }
+    }
+}
+
+/// The page when it exists and its org is active; `Err` when either read failed, already logged.
+async fn active_page_by_slug(
+    conn: &sea_orm::DatabaseConnection,
+    slug: &str,
+) -> Result<Option<entity::status_pages::Model>, ()> {
+    let page = match table::get_page_by_slug(conn, slug).await {
+        Ok(Some(page)) => page,
+        Ok(None) => return Ok(None),
+        Err(e) => {
+            log::error!("[status_pages] cannot read page {slug}: {e}");
+            return Err(());
+        }
+    };
+    match db::org_status::read_active(&page.org_id).await {
+        Ok(active) => Ok(active.then_some(page)),
+        Err(e) => {
+            log::error!(
+                "[status_pages] cannot read the status of org {}: {e}",
+                page.org_id
+            );
+            Err(())
+        }
     }
 }
 
@@ -464,8 +548,10 @@ async fn serve_password_page(slug: &str, headers: &HeaderMap) -> Response {
         return not_found();
     };
     let conn = get_orm_client_ro().await;
-    let Some(page) = table::get_page_by_slug(conn, slug).await.ok().flatten() else {
-        return not_found();
+    let page = match active_page_by_slug(conn, slug).await {
+        Ok(Some(page)) => page,
+        Ok(None) => return not_found(),
+        Err(()) => return unavailable(),
     };
     let (Some(hash), true) = (page.password_hash.as_deref(), page.visibility == 2) else {
         return not_found();
@@ -474,8 +560,24 @@ async fn serve_password_page(slug: &str, headers: &HeaderMap) -> Response {
     if !openobserve_core::status_pages::verify_unlock_cookie(cookie, slug, &pwv).await {
         return not_found();
     }
-    let Some(snap) = table::get_snapshot(conn, &page.id).await.ok().flatten() else {
-        return not_found();
+    password_page_response(&page, table::get_snapshot(conn, &page.id).await)
+}
+
+/// An unlocked password page's answer; a failed snapshot read is a 503, never the uniform 404.
+fn password_page_response(
+    page: &entity::status_pages::Model,
+    snap: Result<Option<entity::status_page_snapshots::Model>, impl std::fmt::Display>,
+) -> Response {
+    let snap = match snap {
+        Ok(Some(snap)) => snap,
+        Ok(None) => return not_found(),
+        Err(e) => {
+            log::error!(
+                "[status_pages] cannot read the snapshot of page {}: {e}",
+                page.id
+            );
+            return unavailable();
+        }
     };
     let body = format!(
         "{{\"name\":{},\"current\":{},\"history\":{}}}",
@@ -629,6 +731,16 @@ fn building() -> Response {
         .unwrap_or_else(|_| not_found())
 }
 
+/// A transient 503 for a failed read; never shared-cached, so the next visit reads again.
+fn unavailable() -> Response {
+    Response::builder()
+        .status(StatusCode::SERVICE_UNAVAILABLE)
+        .header(header::CACHE_CONTROL, "no-store")
+        .header(header::RETRY_AFTER, "30")
+        .body(Body::from("This page is temporarily unavailable."))
+        .unwrap_or_default()
+}
+
 /// One uniform 404 for unknown/draft/locked/disabled — existence is not distinguishable from the
 /// outside.
 fn not_found() -> Response {
@@ -696,10 +808,14 @@ mod tests {
     }
 
     fn prime(slug: &str, kind: Cached, at: Instant) {
-        shard_for(slug)
-            .write()
-            .unwrap()
-            .insert(slug.to_owned(), CacheEntry { kind, at });
+        shard_for(slug).write().unwrap().insert(
+            slug.to_owned(),
+            CacheEntry {
+                kind,
+                org_id: None,
+                at,
+            },
+        );
     }
 
     fn public_entry(body: &str) -> Cached {
@@ -791,6 +907,120 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_unreadable_org_status_is_unavailable_and_keeps_the_cached_page() {
+        cache_put("t-unreadable-org", public_entry("{}"), Some("t-org".into()));
+        let kind = resolve_with(
+            "t-unreadable-org",
+            |_| async { Ok((Cached::Missing, None)) },
+            |_| async { Err::<bool, _>("db down") },
+        )
+        .await;
+        assert!(matches!(kind, Cached::Unavailable));
+        assert!(matches!(
+            cache_get("t-unreadable-org"),
+            Some((Cached::Public(_), Some(_)))
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_failed_read_on_a_miss_caches_nothing() {
+        let kind = resolve_with(
+            "t-failed-miss",
+            |_| async { Err(()) },
+            |_| async { Ok::<_, String>(true) },
+        )
+        .await;
+        assert!(matches!(kind, Cached::Unavailable));
+        assert!(
+            cache_get("t-failed-miss").is_none(),
+            "a failed read was cached"
+        );
+    }
+
+    fn page_model(id: &str) -> entity::status_pages::Model {
+        entity::status_pages::Model {
+            id: id.to_owned(),
+            org_id: "t-snap-org".to_owned(),
+            name: "Acme".to_owned(),
+            slug: id.to_owned(),
+            description: None,
+            visibility: 1,
+            password_hash: None,
+            noindex: false,
+            show_uptime_percent: true,
+            show_timeline_bars: true,
+            show_response_time: true,
+            confirm_failures: 1,
+            confirm_recovery: 1,
+            confirm_after_secs: None,
+            brand_name: None,
+            accent_color: None,
+            logo_img: None,
+            tracking_since: None,
+            owner: None,
+            created_at: 1,
+            updated_at: 1,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_failed_snapshot_read_is_unavailable_and_caches_nothing() {
+        let slug = "t-failed-snapshot";
+        let page = page_model(slug);
+        let kind = resolve_with(
+            slug,
+            |_| async move {
+                public_kind(&page, Err::<Option<_>, _>("db down")).map(|k| (k, Some(page.org_id)))
+            },
+            |_| async { Ok::<_, String>(true) },
+        )
+        .await;
+        assert!(matches!(kind, Cached::Unavailable));
+        assert!(
+            cache_get(slug).is_none(),
+            "a failed snapshot read was cached"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_failed_snapshot_read_of_an_unlocked_password_page_is_an_unstored_503() {
+        let page = entity::status_pages::Model {
+            visibility: 2,
+            ..page_model("t-password-snapshot")
+        };
+        let failed = password_page_response(&page, Err::<Option<_>, _>("db down"));
+        let unbuilt = password_page_response(&page, Ok::<_, String>(None));
+        let built = password_page_response(
+            &page,
+            Ok::<_, String>(Some(entity::status_page_snapshots::Model {
+                status_page_id: page.id.clone(),
+                org_id: page.org_id.clone(),
+                history: "[]".to_owned(),
+                current: "{}".to_owned(),
+                history_generated_at: 1,
+                current_generated_at: 1,
+            })),
+        );
+
+        assert_eq!(failed.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(cache_control(&failed), Some("no-store"));
+        assert_eq!(unbuilt.status(), StatusCode::NOT_FOUND);
+        assert_eq!(built.status(), StatusCode::OK);
+        assert_eq!(cache_control(&built), Some("no-store, private"));
+        assert_eq!(
+            body_text(built).await,
+            "{\"name\":\"Acme\",\"current\":{},\"history\":[]}"
+        );
+    }
+
+    #[test]
+    fn a_page_with_no_snapshot_yet_is_unbuilt() {
+        let page = page_model("t-no-snapshot");
+        let kind = public_kind(&page, Ok::<_, String>(None));
+        assert!(matches!(kind, Ok(Cached::Unbuilt)));
+    }
+
+    #[tokio::test]
     async fn badge_and_feed_are_served_from_the_shard_cache() {
         prime("t-badge", public_entry("{}"), Instant::now());
         let badge = badge(Path("t-badge".into()), None).await;
@@ -809,7 +1039,26 @@ mod tests {
         assert!(cache_get(slug).is_none());
         let resp = snapshot(Path(slug.into()), None, HeaderMap::new()).await;
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-        assert!(matches!(cache_get(slug), Some(Cached::Missing)));
+        assert!(matches!(cache_get(slug), Some((Cached::Missing, None))));
+    }
+
+    #[tokio::test]
+    async fn a_cached_page_of_a_blocked_org_is_not_served() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+
+        let (slug, org) = ("t-cached-blocked", "cachedblockedorg");
+        shard_for(slug).write().unwrap().insert(
+            slug.to_owned(),
+            CacheEntry {
+                kind: public_entry("{}"),
+                org_id: Some(org.to_owned()),
+                at: Instant::now(),
+            },
+        );
+        ORG_STATUS_CACHE.insert(org.to_owned(), OrgStatus::Deleting);
+        let resp = snapshot(Path(slug.into()), None, HeaderMap::new()).await;
+        ORG_STATUS_CACHE.remove(org);
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
     #[test]
@@ -820,6 +1069,7 @@ mod tests {
                 format!("s{i}"),
                 CacheEntry {
                     kind: Cached::Missing,
+                    org_id: None,
                     at: Instant::now(),
                 },
             );

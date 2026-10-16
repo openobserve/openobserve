@@ -234,6 +234,19 @@ pub async fn list_files(
     Ok(res)
 }
 
+/// Every source map of the org, read from the primary.
+pub async fn list_by_org_rw(org: &str) -> Result<Vec<SourceMap>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let res = Entity::find()
+        .filter(Column::Org.eq(org))
+        .all(client)
+        .await?
+        .into_iter()
+        .map(|model| model.into())
+        .collect();
+    Ok(res)
+}
+
 pub async fn update_cluster(entry: SourceMap) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
 

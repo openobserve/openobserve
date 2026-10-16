@@ -160,6 +160,17 @@ pub async fn list(
     Ok(results.into_iter().map(model_to_setting).collect())
 }
 
+/// Every setting row of the org, at any scope, read from the primary.
+pub async fn list_by_org_rw(org_id: &str) -> Result<Vec<SystemSetting>, anyhow::Error> {
+    let client = get_orm_client_rw().await;
+    let results = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .all(client)
+        .await
+        .map_err(|e| anyhow!("DbError# {e}"))?;
+    Ok(results.into_iter().map(model_to_setting).collect())
+}
+
 /// List all resolved settings for org/user (merging all levels)
 pub async fn list_resolved(
     org_id: Option<&str>,

@@ -538,7 +538,17 @@ async fn apply_event(ev: db::Event) {
                     }
                 }
             } else {
-                json::from_slice(&ev.value.unwrap()).unwrap()
+                match ev.value.as_deref().map(json::from_slice::<Organization>) {
+                    Some(Ok(val)) => val,
+                    Some(Err(e)) => {
+                        log::error!("[ORGANIZATION] bad value for {item_key}: {e}");
+                        return;
+                    }
+                    None => {
+                        log::error!("[ORGANIZATION] put event for {item_key} has no value");
+                        return;
+                    }
+                }
             };
             ORGANIZATIONS
                 .clone()
@@ -754,6 +764,23 @@ mod tests {
             start_dt: None,
         }))
         .await;
+        assert!(!ORGANIZATIONS.read().await.contains_key(org_id));
+    }
+
+    #[tokio::test]
+    async fn test_org_watch_put_without_a_readable_value_is_skipped() {
+        if !config::get_config().common.local_mode {
+            return;
+        }
+        let org_id = "watchbadputorg";
+        for value in [None, Some(Bytes::from_static(b"not json"))] {
+            apply_event(db::Event::Put(infra::db::EventData {
+                key: format!("{ORG_KEY_PREFIX}{org_id}"),
+                value,
+                start_dt: None,
+            }))
+            .await;
+        }
         assert!(!ORGANIZATIONS.read().await.contains_key(org_id));
     }
 
