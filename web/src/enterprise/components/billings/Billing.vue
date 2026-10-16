@@ -90,18 +90,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon="groups"
                 :label="t('billing.billingGroup.tabLabel')"
               />
-              <ORouteTab
-                v-if="config.isCloud == 'true'"
-                exact
-                name="paid_usage"
-                :to="
-                  '/billings/paid_usage?org_identifier=' +
-                  store.state.selectedOrganization.identifier
-                "
-                icon="paid"
-                :label="t('paidUsage.settingsTitle')"
-                data-test="paid-usage-billing-tab"
-              />
             </OTabs>
             <!-- <OButton
               data-test="logs-search-field-list-collapse-btn"
@@ -277,10 +265,8 @@ export default defineComponent({
         billingProvider.value = res.data?.provider || "";
         isPaidUser.value = (res.data?.customer_id?.length ?? 0) > 0;
       } catch (e: any) {
-        // A 401 here is already handled globally (http.ts logs the user out
-        // and reloads) — logging it too just adds noise for an expected
-        // session-expiry race, not a real failure.
-        if (e?.response?.status !== 401) {
+        // 401 is handled globally (http.ts logs out); 403 means the user has no billing access.
+        if (e?.response?.status !== 401 && e?.response?.status !== 403) {
           console.error("Failed to fetch billing info:", e);
         }
         billingProvider.value = "";
@@ -367,8 +353,6 @@ export default defineComponent({
         return t("billing.invoiceHistoryLabel");
       } else if (router.currentRoute.value.name == "billing_group") {
         return t("billing.billingGroup.tabLabel");
-      } else if (router.currentRoute.value.name == "paidUsage") {
-        return t("paidUsage.settingsTitle");
       }
       return "";
     };

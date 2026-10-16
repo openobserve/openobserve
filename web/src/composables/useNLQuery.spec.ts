@@ -367,6 +367,31 @@ describe("useNLQuery", () => {
       expect(result).toBeNull();
     });
 
+    it("explains an AI-credits 402 instead of failing silently", async () => {
+      mockFetchAiChat.mockResolvedValue({
+        ok: false,
+        status: 402,
+        bodyUsed: true,
+        json: vi.fn().mockResolvedValue({
+          error_type: "ai_credits_exhausted",
+          remedy: "subscribe",
+          message: "quota exhausted",
+        }),
+      } as unknown as Response);
+
+      const nlq = useNLQuery(gt);
+      expect(await nlq.generateSQL("query", "default")).toBeNull();
+      expect(nlq.streamingResponse.value).toBe(
+        "Your organization has used all of its AI credits. Subscribe to keep using AI. Further usage is billed on this organization's invoice.",
+      );
+      // The editor shows refusalNotice; streamingResponse alone never reaches the user.
+      expect(nlq.refusalNotice.value).toBe(nlq.streamingResponse.value);
+
+      mockFetchAiChat.mockResolvedValue({ cancelled: true });
+      await nlq.generateSQL("query", "default");
+      expect(nlq.refusalNotice.value).toBe("");
+    });
+
     it("retries exactly once with the same request after consent", async () => {
       const denialBody = {
         error_type: "paid_overage_consent_required",
@@ -425,6 +450,7 @@ describe("useNLQuery", () => {
       expect(result).toBeNull();
       expect(mockFetchAiChat).toHaveBeenCalledTimes(1);
       expect(nlq.streamingResponse.value).toBe(gt("paidUsage.declinedNotice"));
+      expect(nlq.refusalNotice.value).toBe(gt("paidUsage.declinedNotice"));
     });
 
     it("returns null when fetchAiChat returns cancelled flag", async () => {

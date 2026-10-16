@@ -210,7 +210,6 @@ import {
   DIGEST_STREAM,
   isClean,
   latestEmission,
-  runRange,
   runRecordsSql,
   SEARCH_SIZE,
   type DigestRecord,
@@ -239,8 +238,10 @@ const formatAgo = (micros: number) =>
   raw(formatDistanceToNowStrict(micros / 1000, { addSuffix: true }));
 
 const records = useLatestRead(async () => {
-  const sql = runRecordsSql(windowStart.value, windowEnd.value);
-  const hits = await search<DigestRecord>(sql, runRange(windowEnd.value, Date.now() * 1000));
+  const hits = await search<DigestRecord>("/records", {
+    window_start: windowStart.value,
+    window_end: windowEnd.value,
+  });
   return { hits: hits.length, ...latestEmission(hits) };
 });
 
