@@ -580,6 +580,10 @@ async function performGlobalIngestion(page) {
           break;
         }
         testLogger.debug(`[alpha1] e2e_automate not yet indexed, waiting...`);
+      } else if (streamsResult.status === 401 || streamsResult.status === 403) {
+        // The ingestion passcode is not authorized for the streams list; retrying cannot succeed.
+        testLogger.warn(`[alpha1] Streams API returned ${streamsResult.status} — cannot verify e2e_automate here; tests wait for their own streams`);
+        return;
       } else {
         testLogger.debug(`[alpha1] Streams API returned ${streamsResult.status}, retrying...`);
       }
@@ -717,6 +721,11 @@ async function performGlobalIngestionWithFetch() {
     try {
       const r = await fetch(`${baseUrl}/api/${orgId}/streams?type=logs&keyword=e2e_automate`, { headers });
       lastSeen = `HTTP ${r.status}`;
+      if (r.status === 401 || r.status === 403) {
+        // The ingestion passcode is not authorized for the streams list; retrying cannot succeed.
+        testLogger.warn(`[alpha1] Streams API returned ${r.status} — cannot verify e2e_automate here; tests wait for their own streams`);
+        return;
+      }
       if (r.ok) {
         const data = await r.json();
         const names = (data.list || []).map(s => s.name);
