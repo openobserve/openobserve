@@ -41,6 +41,8 @@ export interface AlertSourceDefinition {
   showQueryPreview: boolean;
   /** With several queries to choose from, the confirm dialog asks only which one. */
   pickQueryOnly?: boolean;
+  /** Its aggregation is a Builder-tab seed, not a threshold, so it must not set the trigger on its own. */
+  aggregationIsSeed?: boolean;
 }
 
 export const DEFAULT_ALERT_SOURCE: AlertSourceDefinition = {
@@ -90,6 +92,7 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     defaultThreshold: "matching-rows",
     showQueryPreview: true,
     pickQueryOnly: true,
+    aggregationIsSeed: true,
   },
   explorer: {
     id: "explorer",
@@ -99,6 +102,7 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     defaultThreshold: "matching-rows",
     showQueryPreview: true,
     pickQueryOnly: true,
+    aggregationIsSeed: true,
   },
   dbm: {
     id: "dbm",

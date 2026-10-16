@@ -267,4 +267,65 @@ describe("AddAlert — a threshold right-clicked on a builder query", () => {
       wrapper.find('[data-test="add-alert-prefill-warning-thresholdNotCarried"]').exists(),
     ).toBe(true);
   });
+
+  describe("a builder query with no threshold placed in its SQL", () => {
+    const savedState = (mounted: ReturnType<typeof mount>) => {
+      const form = formOf(mounted).formData;
+      const saved = formOf(mounted).getAlertPayload();
+      return {
+        type: form.query_condition.type,
+        hasHaving: /HAVING/.test(form.query_condition.sql),
+        formAggregation: form.query_condition.aggregation?.having ?? null,
+        formTrigger: form.trigger_condition,
+        savedAggregation: saved.query_condition.aggregation,
+        savedTrigger: saved.trigger_condition,
+      };
+    };
+    const fromPanelMenu = (picked: boolean) =>
+      mountWithPrefill(
+        buildPrefillFromPanel({
+          panelTitle: "Retries",
+          panelType: "line",
+          queryType: "sql",
+          queries: picked ? [builtQuery, builtQuery] : [builtQuery],
+          queryIndex: 0,
+          ...(picked
+            ? {
+                queryChoices: [
+                  { index: 0, query: builtQuery.query },
+                  { index: 1, query: builtQuery.query },
+                ],
+              }
+            : {}),
+          executedQuery: builtQuery.query,
+          timeRange: { value_type: "relative", relative_value: 15, relative_period: "Minutes" },
+        }),
+      );
+
+    it("keeps the form's default trigger from the panel menu and the right-click alike", async () => {
+      const states = [];
+      for (const open of [
+        () => fromPanelMenu(false),
+        () => fromPanelMenu(true),
+        openAfterPickingAnotherQuery,
+      ]) {
+        wrapper = await open();
+        states.push(savedState(wrapper));
+        wrapper.unmount();
+        wrapper = null;
+        sessionStorage.clear();
+      }
+
+      expect(states[0]).toEqual({
+        type: "sql",
+        hasHaving: false,
+        formAggregation: { column: "y_axis_1", operator: ">=", value: 1 },
+        formTrigger: expect.objectContaining({ operator: ">=", threshold: 3 }),
+        savedAggregation: null,
+        savedTrigger: expect.objectContaining({ operator: ">=", threshold: 3 }),
+      });
+      expect(states[1]).toEqual(states[0]);
+      expect(states[2]).toEqual(states[0]);
+    });
+  });
 });

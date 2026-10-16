@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
+import { setLanguage } from "@/utils/cookies";
 import { gt } from "@/types/i18n";
 import { wrapCsvValue, usePanelAlertCreation, usePanelDownload } from "./usePanelActions";
 import { downloadFile } from "@/utils/dom";
@@ -598,7 +599,39 @@ describe("usePanelActions", () => {
       api.handleCreateAlert({ condition: "above", threshold: 5, panelQueryIndex: 0 });
 
       expect(alertCreationDialog.value).toBeNull();
-      expect(readAlertPrefill()?.promql).toBe("sum(rate(io_ops[1m]))");
+      const stored = readAlertPrefill();
+      expect(stored?.promql).toBe("sum(rate(io_ops[1m]))");
+      expect(stored?.promqlCondition).toBeUndefined();
+      expect(stored?.warnings).toContainEqual({
+        key: "thresholdNotCarried",
+        level: "warning",
+        params: { value: "5" },
+      });
+    });
+
+    describe("the not-carried threshold in the form's banner", () => {
+      afterEach(() => {
+        setLanguage("");
+        vi.restoreAllMocks();
+      });
+
+      const shownValue = () => {
+        closeAlertCreationDialog();
+        const api = usePanelAlertCreation(makePromql());
+        api.handleCreateAlert({ condition: "above", threshold: 1234.5678, panelQueryIndex: 1 });
+        rebuildAlertPrefill({ queryIndex: 0 });
+        return alertCreationDialog.value?.prefill.warnings.find(
+          (w) => w.key === "thresholdNotCarried",
+        )?.params?.value;
+      };
+
+      it("is written in the app's language, not the browser's", () => {
+        vi.spyOn(navigator, "language", "get").mockReturnValue("de-DE");
+        setLanguage("en-us");
+        expect(shownValue()).toBe("1,234.57");
+        setLanguage("de");
+        expect(shownValue()).toBe("1.234,57");
+      });
     });
 
     it("skips the dialog for a clicked series when only its query is visible", () => {

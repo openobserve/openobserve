@@ -46,6 +46,13 @@ describe("alertSourceRegistry", () => {
     expect(DEFAULT_ALERT_SOURCE.pickQueryOnly).toBeFalsy();
   });
 
+  it("treats only the panel flows' aggregation as a Builder seed rather than a trigger", () => {
+    const seeds = Object.values(ALERT_SOURCES)
+      .filter((definition) => definition.aggregationIsSeed)
+      .map((definition) => definition.id);
+    expect(seeds).toEqual(["panel", "explorer"]);
+  });
+
   it("names the Metrics Explorer in an Explorer alert's toast", () => {
     expect(getAlertSource("explorer").toastKey).toBe("alerts.prefill.sources.explorer.toast");
     expect(i18n.global.t(getAlertSource("explorer").toastKey)).toBe(

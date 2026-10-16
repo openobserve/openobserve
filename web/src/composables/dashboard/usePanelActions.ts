@@ -37,6 +37,7 @@ import {
 } from "@/utils/alerts/forecastAlert";
 import { ref } from "vue";
 import { downloadFile } from "@/utils/dom";
+import { getNumberLocale } from "@/locales/numberFormat";
 import type { TranslateFn } from "@/types/i18n";
 
 const PERIOD_WARNINGS = ["absoluteToRolling", "periodClamped"];
@@ -246,8 +247,6 @@ export function usePanelAlertCreation({
 
     const executedQueryOf = (index: number) =>
       executedPanelQuery(metadata.value?.queries, index) || queries[index]?.query;
-    // A series clicked on a multi-query panel ties its value to that series' own query.
-    const pickedSeriesQuery = offerChoice && clicked !== undefined && visible.includes(clicked);
     const clickedYField = contextMenuData.value?.yField;
     // Single-query series carry no query index, so the lone query owns the click.
     const clickOwner = clicked ?? (offerChoice ? undefined : queryIndex);
@@ -273,13 +272,13 @@ export function usePanelAlertCreation({
           : null) ?? ownYAxisColumnOf(queries[index], executedQueryOf(index))
       );
     };
-    // The clicked value is on that series' scale, so another query gets the form's own default.
-    const carriesThreshold = (index: number) => !pickedSeriesQuery || index === clicked;
+    // The clicked value is on that series' scale, so another query, a hidden one's fallback included, gets the form's default.
+    const carriesThreshold = (index: number) => clicked === undefined || index === clicked;
     const thresholdFor = (index: number) =>
       carriesThreshold(index)
         ? { threshold: selection.threshold, condition: selection.condition as "above" | "below" }
         : {};
-    const shownThreshold = selection.threshold.toLocaleString(undefined, {
+    const shownThreshold = selection.threshold.toLocaleString(getNumberLocale(), {
       maximumFractionDigits: 2,
     });
     // Both cases change what the chart click asked for, so the form's banner has to say so.
@@ -313,8 +312,6 @@ export function usePanelAlertCreation({
         metadataQueries: metadata.value?.queries,
       });
       prefill.warnings.push(...thresholdWarnings(prefill, index));
-      // SQL save drops the aggregation, yet the form would read it as a threshold and force ">= 1 row".
-      if (!carriesThreshold(index)) prefill.aggregation = null;
       return alertSource?.value ? { ...prefill, source: alertSource.value } : prefill;
     };
 
