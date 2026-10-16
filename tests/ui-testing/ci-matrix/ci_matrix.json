@@ -28,7 +28,8 @@
       "alertTemplatesPagination.spec.js",
       "alertDestinationsPagination.spec.js",
       "alerts-destinations-usage.spec.js",
-      "alerts-save-query-mode.spec.js"
+      "alerts-save-query-mode.spec.js",
+      "alerts-no-destination.spec.js"
     ],
     "disabled": [
       {
@@ -106,8 +107,10 @@
       "crossLinkMultiStream.spec.js",
       "dashboards-form-validation.spec.js",
       "dashboard-panel-unsaved-changes.spec.js",
+      "dashboard-panel-live-preview.spec.js",
       "dashboard-refresh-without-cache.spec.js",
       "dashboard-print-layout.spec.js",
+      "dashboard-layout-edit-mode.spec.js",
       "dashboardPagination.spec.js"
     ],
     "disabled": [
@@ -199,7 +202,8 @@
       "dashboard-variables-custom-parents.spec.js",
       "dashboard-variables-stream-field.spec.js",
       "dashboard-mustache-variables.spec.js",
-      "dashboard-variable-select-all.spec.js"
+      "dashboard-variable-select-all.spec.js",
+      "dashboard-variables-auto-run.spec.js"
     ],
     "disabled": []
   },
@@ -351,7 +355,8 @@
       "timezoneDisplay.spec.js",
       "searchPatternsMultiStream.spec.js",
       "logsActionReasons.spec.js",
-      "logsSearchCancelled.spec.js"
+      "logsSearchCancelled.spec.js",
+      "logsToolbarPins.spec.js"
     ],
     "disabled": [
       {
@@ -551,6 +556,26 @@
       "slo-form-validation.spec.js",
       "slo-required-fields.spec.js",
       "slo-alert-sli.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Synthetics",
+    "_comment": "Own shard because the synthetics routes only exist when the server runs with ZO_SYNTHETICS_ENABLED=true (router registers /api/{org}/synthetics* conditionally). The flag is read once at process start, so it cannot vary between tests sharing a backend — each shard gets its own OpenObserve process; every other shard omits synthetics_enabled and keeps the default (false). Pinned to 3 workers: every create/list test writes a check and 5 concurrent writers trip SQLite's 'database is locked' (SLO shard precedent). Results/run-detail pages are fed by seeding the synthetics_results streams in beforeAll — no probe runs on CI. status-pages-enterprise-gating lives here because the status-page routes sit inside the same gate.",
+    "actual_folder": "Synthetics",
+    "browser": "chrome",
+    "synthetics_enabled": "true",
+    "workers": 3,
+    "run_files": [
+      "synthetics-list.spec.js",
+      "synthetics-create-http.spec.js",
+      "synthetics-create-protocol.spec.js",
+      "synthetics-create-browser.spec.js",
+      "synthetics-results.spec.js",
+      "synthetics-run-detail.spec.js",
+      "synthetics-settings.spec.js",
+      "synthetics-oss-gating.spec.js",
+      "status-pages-enterprise-gating.spec.js"
     ],
     "disabled": []
   },

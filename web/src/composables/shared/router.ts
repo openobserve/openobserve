@@ -149,6 +149,20 @@ const downtimesRouteGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
+// `=== false`, not falsy: a cold load with `/config` still in flight must not bounce.
+const alertCalibrationRouteGuard = (to: any, from: any, next: any) => {
+  const zoConfig = store.state.zoConfig;
+  if (
+    zoConfig?.build_type === "opensource" ||
+    (config.isEnterprise !== "true" && config.isCloud !== "true") ||
+    zoConfig?.alert_calibration_enabled === false
+  ) {
+    next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
@@ -927,6 +941,35 @@ const useRoutes = () => {
         }
         routeGuard(to, from, next);
       },
+    },
+    {
+      path: "alert-calibration",
+      name: "alertCalibration",
+      component: () => import("@/components/alert_calibration/AlertCalibrationDashboard.vue"),
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
+    },
+    {
+      path: "alert-calibration/runs",
+      name: "alertCalibrationRuns",
+      component: () => import("@/components/alert_calibration/AlertCalibrationDigests.vue"),
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
+    },
+    {
+      path: "alert-calibration/settings",
+      name: "alertCalibrationSettings",
+      component: () => import("@/components/alert_calibration/AlertCalibrationSettings.vue"),
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
+    },
+    {
+      path: "alert-calibration/digests/:windowStart/:windowEnd",
+      name: "alertCalibrationDigest",
+      component: () => import("@/components/alert_calibration/AlertCalibrationDigestDetail.vue"),
+      props: true,
+      meta: { titleKey: "menu.alertCalibration" },
+      beforeEnter: alertCalibrationRouteGuard,
     },
     {
       path: "downtimes",

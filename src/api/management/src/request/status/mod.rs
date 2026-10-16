@@ -225,6 +225,7 @@ struct ConfigResponse<'a> {
     alert_preview_timerange_minutes: i64,
     incidents_enabled: bool,
     downtimes_enabled: bool,
+    alert_calibration_enabled: bool,
     service_streams_enabled: bool,
     model_pricing_enabled: bool,
     online_evals_enabled: bool,
@@ -234,7 +235,6 @@ struct ConfigResponse<'a> {
     oncall_enabled: bool,
     /// Enterprise-only private locations; the UI gates their views on this flag.
     synthetics_private_locations_enabled: bool,
-    synthetics_subtests_enabled: bool,
     /// Server-side step cap (`ZO_SYNTHETICS_BROWSER_MAX_STEPS`); the UI budget must follow it.
     synthetics_browser_max_steps: usize,
     /// Chrome Web Store URL of the Recorder extension (`ZO_SYNTHETICS_RECORDER_EXTENSION_URL`).
@@ -476,13 +476,13 @@ pub async fn zo_config(
     );
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
     let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
+    let alert_calibration_enabled = enterprise_value!(false, o2cfg.alert_calibration.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
     // Composite alerts are not available in super-cluster mode (§18, §19.2).
     let composite_alerts_available =
         config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
-    let synthetics_subtests_enabled = cfg.synthetics.subtests_enabled;
     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
     let synthetics_enabled = cfg.synthetics.enabled;
     // Private agents stay enterprise, so an OSS build shows synthetics without them.
@@ -604,6 +604,7 @@ pub async fn zo_config(
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         incidents_enabled,
         downtimes_enabled,
+        alert_calibration_enabled,
         service_streams_enabled,
         model_pricing_enabled: cfg.common.model_pricing_enabled,
         online_evals_enabled,
@@ -612,7 +613,6 @@ pub async fn zo_config(
         synthetics_enabled,
         oncall_enabled,
         synthetics_private_locations_enabled,
-        synthetics_subtests_enabled,
         synthetics_browser_max_steps,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,

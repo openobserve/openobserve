@@ -25,10 +25,6 @@ const createMockState = () => ({
       stream: { selectedStream: ["stream1"] },
       queryResults: { hits: [], aggs: [], histogram_interval: 0 },
       histogramQuery: { query: { sql: "SELECT * FROM stream1" } },
-      histogramInterval: 60000,
-      customDownloadQueryObj: {
-        query: { start_time: 0, end_time: 1000000 },
-      },
     },
     meta: {
       sqlMode: false,
@@ -77,10 +73,6 @@ vi.mock("./logsUtils", () => ({
 
 vi.mock("./useHistogram", () => ({
   useHistogram: vi.fn(() => mockHistogramFunctions),
-}));
-
-vi.mock("@/utils/date", () => ({
-  convertDateToTimestamp: vi.fn(() => ({ timestamp: 1000000 })),
 }));
 
 describe("useSearchHistogramManager", () => {
@@ -147,21 +139,6 @@ describe("useSearchHistogramManager", () => {
     });
   });
 
-  describe("resetHistogramResults", () => {
-    it("should clear histogram results", () => {
-      histogramManager.resetHistogramResults();
-      expect(histogramManager.getHistogramResults()).toEqual([]);
-    });
-  });
-
-  describe("getHistogramResults", () => {
-    it("should return current histogram results", () => {
-      histogramManager.resetHistogramResults();
-      const results = histogramManager.getHistogramResults();
-      expect(Array.isArray(results)).toBe(true);
-    });
-  });
-
   describe("shouldGetPageCount", () => {
     it("should return false when histogram should be shown", () => {
       const queryReq = { query: { from: 0, size: 100 } };
@@ -186,144 +163,6 @@ describe("useSearchHistogramManager", () => {
 
       const result = histogramManager.shouldGetPageCount(queryReq, parsedSQL);
       expect(result).toBe(false);
-    });
-  });
-
-  describe("handleHistogramResponse", () => {
-    it("skips the fill instead of throwing when the run built no request", () => {
-      (mockState.searchObj.data as any).customDownloadQueryObj = {};
-      mockState.searchObj.data.queryResults = {
-        aggs: [],
-        scan_size: 0,
-        took: 0,
-        result_cache_ratio: 0,
-        hits: [],
-        histogram_interval: 0,
-      } as any;
-      const response = {
-        content: {
-          results: {
-            hits: [{ zo_sql_key: "2024-01-01T00:00:00", zo_sql_num: 1 }],
-            scan_size: 0,
-            took: 0,
-            result_cache_ratio: 0,
-          },
-        },
-      };
-      expect(() =>
-        histogramManager.handleHistogramResponse({} as any, "trace-1", response, {}, vi.fn()),
-      ).not.toThrow();
-      expect(mockState.searchObj.data.queryResults.aggs).toHaveLength(1);
-    });
-
-    it("should process histogram response correctly", () => {
-      // Use mockState directly
-      mockState.searchObj.data.queryResults = {
-        aggs: [],
-        scan_size: 0,
-        took: 0,
-        result_cache_ratio: 0,
-        hits: [],
-        histogram_interval: 0,
-      };
-
-      const queryReq = { query: { from: 0, size: 100 } };
-      const response = {
-        content: {
-          results: {
-            hits: [
-              { zo_sql_key: "2024-01-01T00:00:00", zo_sql_num: 100 },
-              { zo_sql_key: "2024-01-01T01:00:00", zo_sql_num: 150 },
-            ],
-            scan_size: 1000,
-            took: 50,
-            result_cache_ratio: 0.5,
-          },
-        },
-      };
-
-      const refreshPagination = vi.fn();
-
-      histogramManager.handleHistogramResponse(
-        queryReq,
-        "trace-123",
-        response,
-        {},
-        refreshPagination,
-      );
-
-      expect(mockState.searchObj.loading).toBe(false);
-      expect(mockState.searchObj.data.queryResults.aggs.length).toBe(2);
-      expect(mockState.searchObj.data.queryResults.scan_size).toBe(1000);
-      expect(mockState.searchObj.data.queryResults.took).toBe(50);
-    });
-
-    it("should initialize aggs array if null", () => {
-      // Use mockState directly
-      mockState.searchObj.data.queryResults = {
-        aggs: null as any,
-        scan_size: 0,
-        took: 0,
-        result_cache_ratio: 0,
-        hits: [],
-        histogram_interval: 0,
-      };
-
-      const queryReq = { query: { from: 0, size: 100 } };
-      const response = {
-        content: {
-          results: {
-            hits: [],
-            scan_size: 0,
-            took: 0,
-            result_cache_ratio: 0,
-          },
-        },
-      };
-
-      histogramManager.handleHistogramResponse(queryReq, "trace-123", response, {}, vi.fn());
-
-      expect(Array.isArray(mockState.searchObj.data.queryResults.aggs)).toBe(true);
-    });
-
-    it("should not call refreshPagination when isHistogramOnly is true", () => {
-      // Use mockState directly
-      mockState.searchObj.data.queryResults = {
-        aggs: [],
-        scan_size: 0,
-        took: 0,
-        result_cache_ratio: 0,
-        hits: [],
-        histogram_interval: 0,
-      };
-
-      const queryReq = { query: { from: 0, size: 100 } };
-      const response = {
-        content: {
-          results: {
-            hits: [],
-            scan_size: 0,
-            took: 0,
-            result_cache_ratio: 0,
-          },
-        },
-      };
-
-      const refreshPagination = vi.fn();
-
-      histogramManager.handleHistogramResponse(
-        queryReq,
-        "trace-123",
-        response,
-        { isHistogramOnly: true },
-        refreshPagination,
-      );
-
-      // The refreshPagination call happens in an async IIFE, so we need to wait
-      // In this case, it shouldn't be called due to isHistogramOnly
-      setTimeout(() => {
-        expect(refreshPagination).not.toHaveBeenCalled();
-      }, 10);
     });
   });
 

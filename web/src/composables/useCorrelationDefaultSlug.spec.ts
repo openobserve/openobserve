@@ -44,7 +44,11 @@ import { loadIdentityConfig } from "@/utils/identityConfig";
 import {
   clearSemanticGroupsCache,
   clearSemanticGroupsCacheForOrg,
+  loadSemanticGroups,
+  SEMANTIC_GROUPS_CACHE_TTL_MS,
 } from "@/utils/semanticGroupsCache";
+import { queryClient } from "@/composables/query/queryClient";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import serviceStreamsApi from "@/services/service_streams";
 
 // ── localStorage helpers ──────────────────────────────────────────────────────
@@ -251,6 +255,58 @@ describe("getCorrelationFieldNames", () => {
     await getCorrelationFieldNames("org1", "logs", "cached-stream", [{ name: "host" }]);
     await getCorrelationFieldNames("org1", "logs", "cached-stream", [{ name: "host" }]);
     expect(loadIdentityConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it("recomputes a cached stream once the entry outlives the semantic-groups TTL", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["host"] });
+      vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({ data: [] });
+      const schema = [{ name: "host" }, { name: "pod" }];
+      expect(await getCorrelationFieldNames("org1", "logs", "ttl", schema)).toEqual(["host"]);
+
+      vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["pod"] });
+      vi.setSystemTime(Date.now() + SEMANTIC_GROUPS_CACHE_TTL_MS - 1000);
+      expect(await getCorrelationFieldNames("org1", "logs", "ttl", schema)).toEqual(["host"]);
+
+      vi.setSystemTime(Date.now() + 2000);
+      expect(await getCorrelationFieldNames("org1", "logs", "ttl", schema)).toEqual(["pod"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("recomputes a cached stream after its semantic groups are invalidated", async () => {
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["machine"] });
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({
+      data: [{ id: "machine", fields: ["host"] }],
+    });
+    const schema = [{ name: "host" }, { name: "hostname" }];
+    expect(await getCorrelationFieldNames("org1", "logs", "edit", schema)).toEqual(["host"]);
+
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({
+      data: [{ id: "machine", fields: ["hostname"] }],
+    });
+    await queryClient.invalidateQueries({ queryKey: serviceStreamKeys.semanticGroups("org1") });
+    expect(await getCorrelationFieldNames("org1", "logs", "edit", schema)).toEqual(["hostname"]);
+  });
+
+  it("recomputes a cached stream after another consumer refetches its semantic groups", async () => {
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["machine"] });
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({
+      data: [{ id: "machine", fields: ["host"] }],
+    });
+    const schema = [{ name: "host" }, { name: "hostname" }];
+    expect(await getCorrelationFieldNames("org1", "logs", "refetch", schema)).toEqual(["host"]);
+
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({
+      data: [{ id: "machine", fields: ["hostname"] }],
+    });
+    clearSemanticGroupsCacheForOrg("org1");
+    await loadSemanticGroups("org1");
+    const requests = vi.mocked(serviceStreamsApi.getSemanticGroups).mock.calls.length;
+    expect(await getCorrelationFieldNames("org1", "logs", "refetch", schema)).toEqual(["hostname"]);
+    expect(serviceStreamsApi.getSemanticGroups).toHaveBeenCalledTimes(requests);
   });
 
   it("does not cache an empty match from a call made before the schema loaded", async () => {

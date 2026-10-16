@@ -17,7 +17,6 @@ use std::sync::LazyLock as Lazy;
 
 use anyhow::Result;
 use config::{
-    get_config,
     meta::{
         self_reporting::usage::{self},
         stream::StreamType,
@@ -41,20 +40,12 @@ static INITIALIZED_ORGS: Lazy<DashSet<String>> = Lazy::new(DashSet::new);
 /// * `org_id` - The organization ID to initialize the triggers stream for
 ///
 /// # Behavior
-/// - Only applies when ZO_USAGE_REPORT_TO_OWN_ORG is enabled
 /// - Uses lock-free per-org tracking to ensure initialization happens only once per restart
 /// - Auto-generates field list from TriggerData struct via reflection
 /// - Creates schema directly without ingesting sample data
 /// - Does NOT manipulate defined_schema_fields (no UDS filtering for system streams)
 /// - Never blocks ingestion even if initialization fails
 pub async fn ensure_triggers_stream_initialized(org_id: &str) -> Result<()> {
-    let cfg = get_config();
-
-    // Only initialize when usage_report_to_own_org is enabled
-    if !cfg.common.usage_report_to_own_org {
-        return Ok(());
-    }
-
     // Check if already initialized (lock-free read)
     if INITIALIZED_ORGS.contains(org_id) {
         return Ok(());
@@ -196,13 +187,6 @@ mod tests {
             .collect::<std::collections::HashSet<_>>()
             .len();
         assert_eq!(unique_count, field_names.len());
-    }
-
-    #[tokio::test]
-    async fn test_ensure_triggers_stream_initialized_meta_org() {
-        // Should return Ok immediately for META org
-        let result = ensure_triggers_stream_initialized(config::META_ORG_ID).await;
-        assert!(result.is_ok());
     }
 
     #[tokio::test]

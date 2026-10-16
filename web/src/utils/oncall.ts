@@ -36,6 +36,9 @@ import type {
   PriorityRung,
   PromoteSeverity,
   ResponseEventKind,
+  Contact,
+  RefusalReason,
+  VerificationRefusalBody,
 } from "@/ts/interfaces/oncall";
 import { PROMOTE_SEVERITIES } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
@@ -284,16 +287,11 @@ export function priorityTone(priority: number): RowRailTone {
   return PRIORITY_TONE[priority as AlertPriorityValue] ?? "neutral";
 }
 
-/**
- * Whether a channel survives a locked, silenced phone.
- *
- * Mirrors the delivery reality rather than the intent: both current channels land
- * in an app that a night-mode phone will not ring for, so a P1 whose only channel
- * is one of these is deliverable but not wake-able. The policy editor says so out
- * loud instead of letting a team discover it at 3 a.m.
- */
+/** Whether a channel reaches a locked, silenced phone: texts and calls do; email and webhook land in apps a night-mode phone does not ring for. */
 export const CHANNEL_WAKES: Record<Channel, boolean> = {
   email: false,
+  sms: true,
+  voice: true,
   webhook: false,
 };
 
@@ -663,10 +661,20 @@ export function dimensionsSentence(dimensions: Record<string, string>): string {
 }
 
 /** Mirrors `Channel::deliverable()` on the server — add to this list only when a new channel's provider actually sends. */
-export const DELIVERABLE_CHANNELS: Channel[] = ["email", "webhook"];
+export const DELIVERABLE_CHANNELS: Channel[] = ["email", "sms", "voice", "webhook"];
 
 export function isDeliverableChannel(channel: Channel): boolean {
   return DELIVERABLE_CHANNELS.includes(channel);
+}
+
+/** D13: a rung that texts or calls without Email leaves phoneless people with nothing; a stepless rung pages nobody, so the server accepts it. [pure] */
+export function phoneWithoutEmail(rung: PriorityRung): boolean {
+  const { channels } = rung;
+  return (
+    rung.steps.length > 0 &&
+    !channels.includes("email") &&
+    (channels.includes("sms") || channels.includes("voice"))
+  );
 }
 
 /** Priorities in the order the policy editor shows them. */
@@ -1484,3 +1492,96 @@ export const DEFAULT_ACTIVITY_KINDS: ResponseEventKind[] = [
   "severity_promoted",
   "flapped",
 ];
+
+/** What the Phone card shows; `empty` is also the form that Change reopens. */
+export type PhoneCardState = "empty" | "codeSent" | "verified" | "noProvider" | "changed";
+
+/** The Phone card's state from the contact read and the session's own progress. [pure] */
+export function phoneCardState(
+  contact: Contact,
+  codeSent: boolean,
+  editing: boolean,
+): PhoneCardState {
+  if (!contact.phone_provider_available) return "noProvider";
+  if (editing || !contact.phone) return "empty";
+  if (contact.phone_is_pageable) return "verified";
+  // The server keeps no record of the previously verified number, so any saved unverified one reads as changed.
+  return codeSent ? "codeSent" : "changed";
+}
+
+const REFUSAL_REASONS: ReadonlySet<string> = new Set<RefusalReason>([
+  "wrong_code",
+  "expired",
+  "too_many_tries",
+  "no_code",
+  "too_soon",
+  "user_daily_limit",
+  "number_daily_limit",
+  "no_provider",
+  "no_phone",
+  "number_rejected",
+  "provider_unavailable",
+]);
+
+/** The refusal body of a failed send or confirm, or null when the error is anything else. [pure] */
+export function refusalOf(err: unknown): VerificationRefusalBody | null {
+  const data = (err as { response?: { data?: Partial<VerificationRefusalBody> } })?.response?.data;
+  return typeof data?.reason === "string" && REFUSAL_REASONS.has(data.reason)
+    ? (data as VerificationRefusalBody)
+    : null;
+}
+
+/** A wait rounded up, so the user is never told to come back too early. [pure] */
+function waitText(t: TranslateFn, secs: number): I18nText {
+  if (secs < 3600) {
+    const count = Math.max(1, Math.ceil(secs / 60));
+    return t("oncall.phoneWaitMinutes", { count });
+  }
+  return t("oncall.phoneWaitHours", { count: Math.ceil(secs / 3600) });
+}
+
+/** A limit's text, or the API's own when it carries no wait to show. [pure] */
+function limitText(t: TranslateFn, key: I18nKey, body: VerificationRefusalBody): I18nText {
+  if (body.retry_after_secs === undefined) return raw(body.message);
+  return t(key, { wait: waitText(t, body.retry_after_secs) });
+}
+
+/** The translated sentence for a refusal; no limit's text names the number or the count. [pure] */
+export function phoneRefusalText(t: TranslateFn, body: VerificationRefusalBody): I18nText {
+  switch (body.reason) {
+    case "wrong_code": {
+      const count = body.tries_left ?? 0;
+      return t("oncall.phoneRefusalWrongCode", { count }, count);
+    }
+    case "expired":
+      return t("oncall.phoneRefusalExpired");
+    case "too_many_tries":
+      return t("oncall.phoneRefusalTooManyTries");
+    case "no_code":
+      return t("oncall.phoneRefusalNoCode");
+    case "too_soon":
+      return limitText(t, "oncall.phoneRefusalTooSoon", body);
+    case "user_daily_limit":
+      return limitText(t, "oncall.phoneRefusalUserDailyLimit", body);
+    case "number_daily_limit":
+      return limitText(t, "oncall.phoneRefusalNumberDailyLimit", body);
+    case "no_provider":
+      return t("oncall.phoneRefusalNoProvider");
+    case "no_phone":
+      return t("oncall.phoneRefusalNoPhone");
+    case "number_rejected":
+      return t("oncall.phoneRefusalNumberRejected");
+    case "provider_unavailable":
+      return t("oncall.phoneRefusalProviderUnavailable");
+  }
+}
+
+/** Seconds as `m:ss`, or `h:mm:ss` from an hour up. [pure] */
+export function formatCountdown(secs: number): string {
+  const s = Math.max(0, Math.ceil(secs));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const hours = Math.floor(s / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  if (hours > 0) return `${hours}:${pad(minutes)}:${pad(s % 60)}`;
+  return `${minutes}:${pad(s % 60)}`;
+}

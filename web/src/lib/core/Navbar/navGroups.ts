@@ -57,6 +57,8 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   databaseMonitoring: (c) => c.databaseMonitoring,
   // Enterprise/cloud plus `/config` `downtimes_enabled`, the same rule as the route guard.
   downtimes: (c) => (c.isEnterprise || c.isCloud) && c.downtimesEnabled,
+  // Enterprise/cloud plus `/config` `alert_calibration_enabled`, the same rule as the route guard.
+  alertCalibration: (c) => (c.isEnterprise || c.isCloud) && c.alertCalibrationEnabled,
 };
 
 /**
@@ -205,6 +207,19 @@ export const NAV_GROUPS: NavGroupDef[] = [
         requires: "downtimes",
         gate: "downtimes",
         activeOnRoutes: ["addDowntime", "editDowntime", "downtimeDetail"],
+        beta: true,
+      },
+      {
+        titleKey: "menu.alertCalibration",
+        icon: "tune",
+        name: "alertCalibration",
+        requires: "alertList",
+        gate: "alertCalibration",
+        activeOnRoutes: [
+          "alertCalibrationRuns",
+          "alertCalibrationDigest",
+          "alertCalibrationSettings",
+        ],
         beta: true,
       },
       // A page is where an alert escalates to a person, so On-Call sits in the

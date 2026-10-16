@@ -23,6 +23,8 @@ import { searchState } from "./searchState";
 import { restoreLogsSelectedStreams, saveLogsSelectedStreams } from "@/utils/streamPersist";
 import { useLocalLogFilterField } from "@/utils/zincutils";
 import { columnsFromUrl } from "./useLogPermalink";
+import { CancelledError } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
 
 // Create i18n instance
 const i18n = createI18n({
@@ -79,6 +81,21 @@ describe("useStreamFields Composable", () => {
 
     it("should have getStreamList function", () => {
       expect(typeof wrapper.vm.getStreamList).toBe("function");
+    });
+
+    it("should not log a superseded stream-list fetch that was cancelled", async () => {
+      queryClient.clear();
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const fetchQuery = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockRejectedValueOnce(new CancelledError());
+
+      await wrapper.vm.getStreamList(false);
+
+      expect(fetchQuery).toHaveBeenCalled();
+      expect(consoleError).not.toHaveBeenCalled();
+      fetchQuery.mockRestore();
+      consoleError.mockRestore();
     });
 
     it("should have loadStreamFields function", () => {

@@ -25,6 +25,8 @@ function keysOf(entries: RailEntry[]): string[] {
  */
 const oncallOff = (gate: string) => gate !== "oncall";
 const oncallOn = () => true;
+// OSS serves neither on-call nor alert calibration, which are both enterprise-gated.
+const ossGates = (gate: string) => gate !== "oncall" && gate !== "alertCalibration";
 
 /**
  * `keysOf` minus the Infra tile. Infra is `standalone` — it absorbs nothing and
@@ -245,6 +247,7 @@ describe("groupNavLinks", () => {
       "alertLibrary",
       "sloList",
       "incidentList",
+      "alertCalibration",
       "alertSources",
     ]);
   });
@@ -284,14 +287,14 @@ describe("groupNavLinks", () => {
         e.type === "linkGroup" && e.item.name === "reliability",
     );
     const outside = reliability?.children.filter((c) => !c.categoryKey).map((c) => c.name);
-    expect(outside).toEqual(["sloList", "incidentList", "alertSources"]);
+    expect(outside).toEqual(["sloList", "incidentList", "alertCalibration", "alertSources"]);
   });
 
   it("drops Incidents from Reliability on OSS (no incidents route)", () => {
     const entries = groupNavLinks(
       [link("home"), link("alertList"), link("sloList")],
       undefined,
-      oncallOff,
+      ossGates,
     );
     expect(keysWithoutInfra(entries)).toEqual(["link:home", "linkGroup:reliability"]);
     const reliability = entries.find(
@@ -319,6 +322,7 @@ describe("groupNavLinks", () => {
       "alertDestinations",
       "alertTemplates",
       "alertLibrary",
+      "alertCalibration",
     ]);
   });
 
@@ -783,6 +787,7 @@ describe("ship guards (AC-15, AC-22, D-27)", () => {
       "sloList",
       "incidentList",
       "downtimes",
+      "alertCalibration",
       "onCallResponses",
       "onCallTeams",
       "onCallRouting",
@@ -855,10 +860,10 @@ describe("GATE_PREDICATES", () => {
     expect(GATE_PREDICATES.downtimes(ctx({ isEnterprise: true }))).toBe(false);
   });
 
-  it("marks Downtimes as Beta in the Reliability flyout, and nothing else there", () => {
+  it("marks Downtimes and Alert Calibration as Beta in the Reliability flyout, and nothing else there", () => {
     const reliability = NAV_GROUPS.find((g) => g.children.some((c) => c.name === "downtimes"))!;
     const beta = reliability.children.filter((c) => c.beta).map((c) => c.name);
-    expect(beta).toEqual(["downtimes"]);
+    expect(beta).toEqual(["downtimes", "alertCalibration"]);
   });
 
   it("puts Downtimes after Incidents when the rail carries a downtimes item", () => {

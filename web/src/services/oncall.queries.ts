@@ -24,6 +24,7 @@ import {
 } from "@/composables/query/cachePolicy";
 import type {
   CauseGroup,
+  Contact,
   CoverageGaps,
   EscalationProgress,
   MyDeliveries,
@@ -41,8 +42,10 @@ import type {
   PresetDescriptor,
   ResolvedSegment,
   Rotation,
+  PutTelephonyBody,
   RoutingConfig,
   TeamLoad,
+  TelephonyView,
   TeamOverview,
   Unavailability,
 } from "@/ts/interfaces/oncall";
@@ -398,6 +401,24 @@ export const myDeliveriesQuery = (org: string, filters: MyDeliveriesFilters = {}
     queryFn: async (): Promise<MyDeliveries | null> =>
       (await oncallService.myDeliveries({ org_identifier: org, ...filters })).data ?? null,
     staleTime: LIVE_STALE_TIME,
+  });
+
+/** The caller's own phone; live, as provider presence and other orgs' verification move it with no write here. */
+export const contactQuery = (org: string, userEmail: string) =>
+  queryOptions({
+    queryKey: oncallKeys.contact(org, userEmail),
+    queryFn: async (): Promise<Contact | null> =>
+      (await oncallService.getContact({ org_identifier: org, user_email: userEmail })).data ?? null,
+    staleTime: LIVE_STALE_TIME,
+  });
+
+/** The org's phone provider; a settings read, and a 403 here is an answer the page shows. */
+export const telephonyQuery = (org: string) =>
+  queryOptions({
+    queryKey: oncallKeys.telephony(org),
+    queryFn: async (): Promise<TelephonyView | null> =>
+      (await oncallService.getTelephony({ org_identifier: org })).data ?? null,
+    staleTime: NORMAL_STALE_TIME,
   });
 
 export const unavailabilityQuery = (org: string, userEmail?: string, from?: number, to?: number) =>
@@ -808,4 +829,53 @@ export const setRoutingConfigMutation = (org: string) =>
       ],
       silentError: true,
     },
+  });
+
+/** Reachability keys sit under each team id, so only the teams scope reaches all of them. */
+const phoneWriteScopes = (org: string, userEmail: string) => [
+  oncallKeys.contact(org, userEmail),
+  oncallKeys.teamsAll(org),
+];
+
+/** A changed number comes back unverified, so the card and every team's reachability re-read. */
+export const setContactMutation = (org: string, userEmail: string) =>
+  mutationOptions({
+    mutationFn: (phone: string) =>
+      oncallService.setContact({ org_identifier: org, user_email: userEmail, data: { phone } }),
+    meta: { invalidates: phoneWriteScopes(org, userEmail), silentError: true },
+  });
+
+export const sendCodeMutation = (org: string, userEmail: string) =>
+  mutationOptions({
+    mutationFn: () => oncallService.sendContactCode({ org_identifier: org, user_email: userEmail }),
+    meta: { invalidates: [oncallKeys.contact(org, userEmail)], silentError: true },
+  });
+
+export const confirmCodeMutation = (org: string, userEmail: string) =>
+  mutationOptions({
+    mutationFn: (code: string) =>
+      oncallService.confirmContactCode({ org_identifier: org, user_email: userEmail, code }),
+    meta: { invalidates: phoneWriteScopes(org, userEmail), silentError: true },
+  });
+
+/** Every contact's `phone_provider_available` and every team's reachability ride on the provider. */
+const telephonyWriteScopes = (org: string) => [
+  oncallKeys.telephony(org),
+  oncallKeys.contactsAll(org),
+  oncallKeys.teamsAll(org),
+];
+
+export const saveTelephonyMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (data: PutTelephonyBody) =>
+      oncallService.putTelephony({ org_identifier: org, data }),
+    // The variables hold the plaintext token, so the cache drops them once the dialog unmounts.
+    gcTime: 0,
+    meta: { invalidates: telephonyWriteScopes(org), silentError: true },
+  });
+
+export const deleteTelephonyMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: () => oncallService.deleteTelephony({ org_identifier: org }),
+    meta: { invalidates: telephonyWriteScopes(org), silentError: true },
   });

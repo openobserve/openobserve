@@ -27,7 +27,15 @@ jobs:
       # `--peer` cannot catch this: vue-tsc declares `typescript: >=5.0.0`, which
       # 7.x satisfies. Bump TypeScript by hand, together with a vue-tsc release
       # that supports it (5.x and 6.x are both fine today).
-      NCU_ARGS: --target latest --peer --reject typescript
+      #
+      # The other rejected packages have majors that break the build; bump them by hand:
+      # monaco-editor (restricted import paths), @tanstack/vue-table (v9 drops useVueTable),
+      # eslint (v10 drops @eslint/js, plugins need eslint 9), js-yaml (v5 drops the default export),
+      # vite (v8 swaps esbuild for rolldown), jsdom (v30 needs a newer Node),
+      # gridstack (13.1+ reorders widget DOM nodes that Vue's v-for owns), vue-router (v5), marked (v18), msw (v3),
+      # js-beautify (v2), cypress (v16), @cypress/vue (v7), happy-dom (v21), c8 (v12), @types/node (v26), sass-loader (v17): unverified majors.
+      # vue-tsc (3.3.10+ crashes type-check:app with RangeError: Map maximum size exceeded).
+      NCU_ARGS: --target latest --peer --reject typescript,monaco-editor,@tanstack/vue-table,eslint,js-yaml,vite,jsdom,@types/jsdom,@eslint/css,eslint-plugin-cypress,vite-plugin-istanbul,unplugin-icons,vue-tsc,gridstack,vue-router,marked,msw,js-beautify,cypress,@cypress/vue,happy-dom,c8,@types/node,sass-loader
 
     steps:
       - name: Clone the current repo
@@ -50,6 +58,10 @@ jobs:
         run: |
           # Commit as the PAT owner so the commit and the PR share one author.
           read -r LOGIN ID < <(gh api user --jq '"\(.login) \(.id)"')
+          if [ -z "$LOGIN" ] || [ -z "$ID" ]; then
+            echo "::error::gh api user returned no identity; check that ORG_ADMIN_TOKEN is valid"
+            exit 1
+          fi
           git config user.name "$LOGIN"
           git config user.email "${ID}+${LOGIN}@users.noreply.github.com"
 
