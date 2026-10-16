@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="w-28 shrink-0">
             <OSelect
               :model-value="d.cond"
-              :options="propConds"
+              :options="propConds(d.cond)"
               size="sm"
               :data-test="`rum-analytics-funnel-step-${index}-prop-${i}-op`"
               @update:model-value="(v) => setProp(i, { cond: condId(v) })"
@@ -237,6 +237,7 @@ import {
   condOf,
   condProblem,
   draftOf,
+  FILTER_CONDITIONS,
   PROP_CONDITIONS,
   propDraftOf,
   propOf,
@@ -329,17 +330,17 @@ const propRows = ref<PropDraft[]>(
 const appliedProps = (rows: PropDraft[]): FunnelFilter[] =>
   rows.map(propOf).filter((r): r is FunnelFilter => r !== null);
 
-const propConds = computed(() =>
-  PROP_CONDITIONS.map((c) => ({
-    label: t(
-      `rum.analytics.funnel.propConditions.${c.id as "in" | "notIn" | "contains" | "regex"}`,
-    ),
+// A linked rule's condition outside the four offered stays listed, so the row shows what it holds.
+const propConds = (current: FilterConditionId) =>
+  FILTER_CONDITIONS.filter((c) => PROP_CONDITIONS.includes(c) || c.id === current).map((c) => ({
+    label: PROP_CONDITIONS.includes(c)
+      ? t(`rum.analytics.funnel.propConditions.${c.id as "in" | "notIn" | "contains" | "regex"}`)
+      : t(`rum.analytics.funnel.conditions.${c.id}`),
     value: c.id,
-  })),
-);
+  }));
 
 const condId = (v: unknown): FilterConditionId =>
-  PROP_CONDITIONS.find((c) => c.id === v)?.id ?? "in";
+  FILTER_CONDITIONS.find((c) => c.id === v)?.id ?? "in";
 
 // A field from a link that the sample missed stays offered, so the row never loses its own field.
 const fieldOptions = (current: string) =>
@@ -385,7 +386,7 @@ watch(
   () => JSON.stringify(savedProps()),
   (pc) => {
     if (pc !== JSON.stringify(appliedProps(propRows.value)))
-      propRows.value = savedProps().map(propDraftOf);
+      propRows.value = savedProps().length ? savedProps().map(propDraftOf) : [blankProp()];
   },
 );
 

@@ -79,10 +79,6 @@ export function isSampledField(name: string): boolean {
 const text = (v: unknown): string | null =>
   v === null || v === undefined || v === "" ? null : String(v);
 
-// Steps with the same event share one sample, since the query tags a row with the first step it matches.
-const sampleStep = (steps: StepRef[], i: number): number =>
-  steps.findIndex((s) => s.kind === steps[i].kind && s.key === steps[i].key) + 1;
-
 const valueCounts = (rows: Record<string, unknown>[], field: string): Map<string, number> => {
   const counts = new Map<string, number>();
   for (const r of rows) {
@@ -98,15 +94,10 @@ export function foldFieldSample(
   steps: StepRef[],
   fields: readonly string[],
 ): FieldSample {
-  const byStep = new Map<number, Record<string, unknown>[]>();
-  for (const r of rows) {
-    const st = Number(r.st);
-    byStep.set(st, [...(byStep.get(st) ?? []), r]);
-  }
-  const rowsOf = (i: number) => byStep.get(sampleStep(steps, i)) ?? [];
+  const stepRows = steps.map((_, i) => rows.filter((r) => Number(r[`s${i + 1}`]) === 1));
   const seen: SeenField[] = [];
   for (const field of fields) {
-    const per = steps.map((_, i) => valueCounts(rowsOf(i), field));
+    const per = steps.map((_, i) => valueCounts(stepRows[i], field));
     const at = per.map((c, i) => (c.size ? i + 1 : 0)).filter((s) => s > 0);
     if (!at.length) continue;
     const first = per[at[0] - 1];

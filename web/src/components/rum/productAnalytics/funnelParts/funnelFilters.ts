@@ -205,7 +205,8 @@ export function propDraftOf(r: FunnelFilter): PropDraft {
 /** A Property row as the server would accept it, or null while it is incomplete or invalid. */
 export function propOf(d: PropDraft): FunnelFilter | null {
   if (!d.field || !d.values.length) return null;
-  const c = PROP_CONDITIONS.find((x) => x.id === d.cond) ?? PROP_CONDITIONS[0];
+  // A rule from a link may use any Filter all steps condition, and it must come back unchanged.
+  const c = FILTER_CONDITIONS.find((x) => x.id === d.cond) ?? PROP_CONDITIONS[0];
   const r = parseFunnelFilter({
     field: d.field,
     op: c.op,
@@ -235,7 +236,8 @@ export function filterNoticeOf(
   const ids = (def.f ?? []).filter(isSessionFilter);
   for (const [i, r] of ids.entries()) {
     const carry = Number(row[`carry${i + 1}`]) || 0;
-    if (isFilterColumn(r.field) && carry / opened < NOTICE_SHARE)
+    // A negated filter keeps the sessions that never set the field, so it drops nobody for lacking it.
+    if (!r.not && isFilterColumn(r.field) && carry / opened < NOTICE_SHARE)
       return { field: r.field, kept: Number(row.kept) || 0, opened, carry };
   }
   return null;

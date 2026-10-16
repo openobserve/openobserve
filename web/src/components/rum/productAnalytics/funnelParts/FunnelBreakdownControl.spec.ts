@@ -175,6 +175,29 @@ describe("FunnelBreakdownControl", () => {
     expect(lastDef(w).breakdown).toBeNull();
   });
 
+  it("opened for a step, lists only that step's fields and pins the pick to it", async () => {
+    const w = mountControl();
+    (w.vm as unknown as { openForStep: (k: number) => void }).openForStep(3);
+    await w.vm.$nextTick();
+    const text = w.find(dt("rum-analytics-funnel-field-picker")).text();
+    expect(text).toContain("On step 3 (1)");
+    expect(text).not.toContain("Key fields");
+    expect(row(w, `field-${PAY}`).text()).toContain("card, upi, cod +1");
+    await row(w, `field-${PAY}`).trigger("click");
+    expect(lastDef(w).breakdown).toEqual({ f: PAY, s: 3 });
+    await openPicker(w);
+    expect(w.find(dt("rum-analytics-funnel-field-picker")).text()).toContain("Key fields");
+  });
+
+  it("opened for a step the sample saw nothing on, says so", async () => {
+    const w = mountControl();
+    (w.vm as unknown as { openForStep: (k: number) => void }).openForStep(1);
+    await w.vm.$nextTick();
+    expect(w.find(dt("rum-analytics-funnel-field-picker-note")).text()).toBe(
+      "No fields seen on this step",
+    );
+  });
+
   it("says while the step fields are still being read", async () => {
     const w = mountControl({ sample: null, sampleState: "loading" });
     await openPicker(w);

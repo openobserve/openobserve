@@ -102,7 +102,7 @@ import type {
 } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
 import type { FieldSampleState } from "@/composables/rum/useFunnelFieldSample";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import type { FieldSample, SeenField } from "@/utils/rum/funnelFields";
+import { fieldsOnStep, type FieldSample, type SeenField } from "@/utils/rum/funnelFields";
 import { formatPct, isFilterColumn, type BreakdownStart } from "@/utils/rum/productAnalyticsModel";
 import {
   isAttributeBreakdown,
@@ -130,6 +130,8 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 const open = ref(false);
+// Set while the picker was opened from a step's menu: it lists that step's fields and pins the pick to it.
+const limitStep = ref<number | null>(null);
 const idleValues: FilterValuesState = { field: null, status: "idle", rows: [] };
 const DIM_ID = "dim-";
 const FIELD_ID = "field-";
@@ -168,7 +170,26 @@ const seenHint = (f: SeenField): I18nText => {
 
 const isUser = (f: string) => f.startsWith("usr_");
 
+const stepHint = (f: SeenField): I18nText => {
+  if (f.many) return t("rum.analytics.funnel.stepFieldMany");
+  const values = raw(f.top.join(", "));
+  return f.more ? t("rum.analytics.funnel.stepFieldValues", { values, more: f.more }) : values;
+};
+
 const groups = computed<PickerGroup[]>(() => {
+  const k = limitStep.value;
+  if (k !== null)
+    return [
+      {
+        id: "step",
+        label: t("rum.analytics.funnel.pickerOnStep", { step: k }),
+        fields: fieldsOnStep(props.sample, k).map((f) => ({
+          id: `${FIELD_ID}${f.field}`,
+          name: f.field,
+          hint: stepHint(f),
+        })),
+      },
+    ];
   const seen = props.sample?.fields ?? [];
   const onSteps = new Set(seen.map((f) => f.field));
   const fieldRow = (field: string, extra: Partial<PickerField> = {}): PickerField => ({
@@ -207,21 +228,31 @@ const groups = computed<PickerGroup[]>(() => {
 const note = computed<I18nText | null>(() => {
   if (props.sampleState === "loading") return t("rum.analytics.funnel.pickerSampling");
   if (props.sampleState === "error") return t("rum.analytics.funnel.pickerSampleFailed");
+  if (limitStep.value !== null && !groups.value[0].fields.length)
+    return t("rum.analytics.funnel.propertyNoFields");
   return null;
 });
 
 const setOpen = (v: boolean) => {
   open.value = v;
   if (v) emit("load-fields");
+  else limitStep.value = null;
+};
+
+const openForStep = (step: number) => {
+  limitStep.value = step;
+  setOpen(true);
 };
 
 const pick = (id: string) => {
+  const k = limitStep.value;
   setOpen(false);
   if (id.startsWith(DIM_ID)) {
     emit("update:def", { ...props.def, breakdown: id.slice(DIM_ID.length) as BreakdownDim });
     return;
   }
-  emit("update:def", { ...props.def, breakdown: { f: id.slice(FIELD_ID.length) } });
+  const f = id.slice(FIELD_ID.length);
+  emit("update:def", { ...props.def, breakdown: k === null ? { f } : { f, s: k } });
 };
 
 const setStep = (s: number | null) => {
@@ -229,4 +260,6 @@ const setStep = (s: number | null) => {
   if (!a) return;
   emit("update:def", { ...props.def, breakdown: s === null ? { f: a.f } : { f: a.f, s } });
 };
+
+defineExpose({ openForStep });
 </script>
