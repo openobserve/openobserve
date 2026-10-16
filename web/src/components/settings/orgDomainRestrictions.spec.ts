@@ -14,190 +14,58 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { blockEmailsInConfig, cardsToConfig, configToCards } from "./orgDomainRestrictions";
+import {
+  blockEmailsInConfig,
+  configToBlocklists,
+  setDomainBlocklist,
+} from "./orgDomainRestrictions";
+
+const apiConfig = {
+  domains: [{ domain: "corp.io", allow_all_users: false, allowed_emails: ["a@corp.io"] }],
+  enabled: false,
+  blocked_emails: ["X@acme.com", "y@corp.io"],
+  blocked_domains: ["spam.net"],
+  updated_at: 5,
+};
 
 describe("orgDomainRestrictions", () => {
-  it("returns no cards for a missing config", () => {
-    expect(configToCards(undefined)).toEqual([]);
+  it("returns no blocklists for a missing config", () => {
+    expect(configToBlocklists(undefined)).toEqual([]);
   });
 
-  it("splits the flat config into one card per domain", () => {
-    const cards = configToCards({
-      domains: [
-        { domain: "Acme.com", allow_all_users: true, allowed_emails: [] },
-        { domain: "corp.io", allow_all_users: false, allowed_emails: ["a@corp.io"] },
-      ],
-      blocked_emails: ["X@evil.com"],
-      blocked_domains: ["spam.net"],
-    });
-    expect(cards).toEqual([
-      { name: "acme.com", policy: "allow_all", allowedEmails: [], blockedEmails: [] },
-      {
-        name: "corp.io",
-        policy: "allow_specific",
-        allowedEmails: ["a@corp.io"],
-        blockedEmails: [],
-      },
-      {
-        name: "evil.com",
-        policy: "block_specific",
-        allowedEmails: [],
-        blockedEmails: ["x@evil.com"],
-      },
-      { name: "spam.net", policy: "block_all", allowedEmails: [], blockedEmails: [] },
+  it("groups blocked emails by domain and ignores the API-only rules", () => {
+    expect(configToBlocklists(apiConfig)).toEqual([
+      { name: "acme.com", blockedEmails: ["x@acme.com"] },
+      { name: "corp.io", blockedEmails: ["y@corp.io"] },
     ]);
   });
 
-  it("lets a whole-domain block win over an allow rule for the same domain", () => {
-    const cards = configToCards({
-      domains: [{ domain: "acme.com", allow_all_users: true, allowed_emails: [] }],
-      blocked_domains: ["acme.com"],
+  describe("setDomainBlocklist", () => {
+    it("replaces one domain's emails and keeps allow rules and blocked domains", () => {
+      const next = setDomainBlocklist(apiConfig, "Acme.com", ["bob@acme.com"], 1_000);
+      expect(next).toEqual({
+        domains: apiConfig.domains,
+        enabled: true,
+        blocked_emails: ["y@corp.io", "bob@acme.com"],
+        blocked_domains: ["spam.net"],
+        updated_at: 1_000_000,
+      });
     });
-    expect(cards).toHaveLength(1);
-    expect(cards[0].policy).toBe("block_all");
-  });
 
-  it("builds an enabled config with microsecond timestamp from the cards", () => {
-    const config = cardsToConfig(
-      [
-        {
-          name: "acme.com",
-          policy: "allow_all",
-          allowedEmails: ["stale@acme.com"],
-          blockedEmails: [],
-        },
-        {
-          name: "corp.io",
-          policy: "allow_specific",
-          allowedEmails: ["a@corp.io"],
-          blockedEmails: [],
-        },
-        {
-          name: "evil.com",
-          policy: "block_specific",
-          allowedEmails: [],
-          blockedEmails: ["x@evil.com"],
-        },
-        { name: "spam.net", policy: "block_all", allowedEmails: [], blockedEmails: [] },
-      ],
-      1_000,
-    );
-    expect(config).toEqual({
-      domains: [
-        { domain: "acme.com", allow_all_users: true, allowed_emails: [] },
-        { domain: "corp.io", allow_all_users: false, allowed_emails: ["a@corp.io"] },
-      ],
-      enabled: true,
-      blocked_emails: ["x@evil.com"],
-      blocked_domains: ["spam.net"],
-      updated_at: 1_000_000,
+    it("clears a domain's emails when given an empty list", () => {
+      const next = setDomainBlocklist(apiConfig, "acme.com", []);
+      expect(next.blocked_emails).toEqual(["y@corp.io"]);
     });
-  });
-
-  it("round-trips cards through the backend shape", () => {
-    const cards = configToCards({
-      domains: [{ domain: "corp.io", allow_all_users: false, allowed_emails: ["a@corp.io"] }],
-      blocked_emails: ["x@evil.com"],
-      blocked_domains: ["spam.net"],
-    });
-    expect(configToCards(cardsToConfig(cards))).toEqual(cards);
-  });
-
-  it("keeps the allow policy when an allowed domain also has blocked emails", () => {
-    const config = {
-      domains: [
-        { domain: "acme.com", allow_all_users: true, allowed_emails: [] },
-        { domain: "corp.io", allow_all_users: false, allowed_emails: ["a@corp.io"] },
-      ],
-      blocked_emails: ["Bob@acme.com", "c@corp.io"],
-      blocked_domains: [],
-    };
-    const cards = configToCards(config);
-    expect(cards).toEqual([
-      { name: "acme.com", policy: "allow_all", allowedEmails: [], blockedEmails: ["bob@acme.com"] },
-      {
-        name: "corp.io",
-        policy: "allow_specific",
-        allowedEmails: ["a@corp.io"],
-        blockedEmails: ["c@corp.io"],
-      },
-    ]);
-    const next = cardsToConfig(cards);
-    expect(next.domains).toEqual(config.domains);
-    expect(next.blocked_emails).toEqual(["bob@acme.com", "c@corp.io"]);
-  });
-
-  it("round-trips an allow-specific domain with no allowed emails", () => {
-    const config = {
-      domains: [{ domain: "corp.io", allow_all_users: false, allowed_emails: [] }],
-    };
-    const next = cardsToConfig(configToCards(config));
-    expect(next.domains).toEqual(config.domains);
-  });
-
-  it("drops blocked emails from a whole-domain block", () => {
-    const next = cardsToConfig([
-      { name: "spam.net", policy: "block_all", allowedEmails: [], blockedEmails: ["x@spam.net"] },
-    ]);
-    expect(next.blocked_emails).toEqual([]);
-    expect(next.blocked_domains).toEqual(["spam.net"]);
   });
 
   describe("blockEmailsInConfig", () => {
-    it("drops the email from an allow-specific domain instead of adding a block", () => {
-      const next = blockEmailsInConfig(
-        {
-          domains: [
-            {
-              domain: "corp.io",
-              allow_all_users: false,
-              allowed_emails: ["A@corp.io", "b@corp.io"],
-            },
-          ],
-          blocked_emails: [],
-          blocked_domains: [],
-        },
-        ["a@CORP.io"],
-        1,
-      );
-      expect(next.domains[0].allowed_emails).toEqual(["b@corp.io"]);
-      expect(next.blocked_emails).toEqual([]);
+    it("adds a block without touching an allow list", () => {
+      const next = blockEmailsInConfig(apiConfig, ["A@corp.io"], 1);
+      expect(next.domains).toEqual(apiConfig.domains);
+      expect(next.blocked_emails).toEqual(["X@acme.com", "y@corp.io", "a@corp.io"]);
+      expect(next.blocked_domains).toEqual(["spam.net"]);
       expect(next.enabled).toBe(true);
       expect(next.updated_at).toBe(1000);
-    });
-
-    it("adds a block for an allow-all domain and keeps the allow entry", () => {
-      const next = blockEmailsInConfig(
-        {
-          domains: [{ domain: "acme.com", allow_all_users: true, allowed_emails: [] }],
-          blocked_emails: ["x@evil.com"],
-          blocked_domains: ["spam.net"],
-        },
-        ["Bob@Acme.com"],
-      );
-      expect(next.domains).toEqual([
-        { domain: "acme.com", allow_all_users: true, allowed_emails: [] },
-      ]);
-      expect(next.blocked_emails).toEqual(["x@evil.com", "bob@acme.com"]);
-      expect(next.blocked_domains).toEqual(["spam.net"]);
-    });
-
-    it("applies every email in one pass across policies", () => {
-      const next = blockEmailsInConfig(
-        {
-          domains: [
-            {
-              domain: "corp.io",
-              allow_all_users: false,
-              allowed_emails: ["a@corp.io", "b@corp.io"],
-            },
-            { domain: "acme.com", allow_all_users: true, allowed_emails: [] },
-          ],
-        },
-        ["a@corp.io", "b@corp.io", "bob@acme.com"],
-      );
-      expect(next.domains[0].allowed_emails).toEqual([]);
-      expect(next.blocked_emails).toEqual(["bob@acme.com"]);
     });
 
     it("does not duplicate an email that is already blocked", () => {

@@ -1043,17 +1043,17 @@ export const emptyStatePresets = {
       },
     ],
   },
-  "no-access-rules": {
+  "no-blocked-users": {
     illustration: "users",
     variant: "create",
-    titleKey: "emptyState.noAccessRules.title",
-    descriptionKey: "emptyState.noAccessRules.description",
+    titleKey: "emptyState.noBlockedUsers.title",
+    descriptionKey: "emptyState.noBlockedUsers.description",
     actions: [
       {
         id: "create",
-        icon: "add",
-        titleKey: "emptyState.noAccessRules.action",
-        descriptionKey: "emptyState.noAccessRules.actionDesc",
+        icon: "block",
+        titleKey: "emptyState.noBlockedUsers.action",
+        descriptionKey: "emptyState.noBlockedUsers.actionDesc",
       },
     ],
   },
@@ -1124,5 +1124,5 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-linked-domains": "emptyState.nouns.linkedDomains",
   "no-domain-mappings": "emptyState.nouns.domainMappings",
   "no-domain-requests": "emptyState.nouns.domainRequests",
-  "no-access-rules": "emptyState.nouns.accessRules",
+  "no-blocked-users": "emptyState.nouns.blockedUsers",
 };

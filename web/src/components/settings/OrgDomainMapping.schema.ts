@@ -72,51 +72,32 @@ export const makeRequestDecisionSchema = (t: Translate, isReasonRequired: () => 
 
 export type RequestDecisionForm = z.infer<ReturnType<typeof makeRequestDecisionSchema>>;
 
-export const RULE_POLICIES = [
-  "allow_all",
-  "allow_specific",
-  "block_specific",
-  "block_all",
-] as const;
-export type RulePolicy = (typeof RULE_POLICIES)[number];
-
-/** Which email list a rule keeps. Allow-specific denies everyone not listed, so it needs no block list. */
-export const ruleEmailKinds = (policy: RulePolicy): ("allowed" | "blocked")[] => {
-  if (policy === "allow_specific") return ["allowed"];
-  if (policy === "block_all") return [];
-  return ["blocked"];
-};
-
-export const makeDomainRuleSchema = (t: Translate) =>
+export const makeDomainBlocklistSchema = (t: Translate) =>
   z
     .object({
       domain: z.string().min(1, t("settings.domainRequired")),
-      policy: z.enum(RULE_POLICIES),
-      allowedEmails: z.array(z.string()),
       blockedEmails: z.array(z.string()),
     })
     .superRefine((value, ctx) => {
-      const kinds = ruleEmailKinds(value.policy);
-      if (value.policy === "block_specific" && value.blockedEmails.length === 0) {
+      if (value.blockedEmails.length === 0) {
         ctx.addIssue({
           code: "custom",
           path: ["blockedEmails"],
           message: t("settings.orgDomainMapping.ruleBlockedRequired"),
         });
       }
-      for (const kind of kinds) {
-        const field = kind === "allowed" ? "allowedEmails" : "blockedEmails";
-        if (value[field].some((email) => !isValidEmail(email.trim(), value.domain))) {
-          ctx.addIssue({ code: "custom", path: [field], message: t("settings.invalidEmail") });
-        }
+      if (value.blockedEmails.some((email) => !isValidEmail(email.trim(), value.domain))) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["blockedEmails"],
+          message: t("settings.invalidEmail"),
+        });
       }
     });
 
-export type DomainRuleForm = z.infer<ReturnType<typeof makeDomainRuleSchema>>;
+export type DomainBlocklistForm = z.infer<ReturnType<typeof makeDomainBlocklistSchema>>;
 
-export const domainRuleDefaults = (domain = ""): DomainRuleForm => ({
+export const domainBlocklistDefaults = (domain = ""): DomainBlocklistForm => ({
   domain,
-  policy: "allow_all",
-  allowedEmails: [],
   blockedEmails: [],
 });

@@ -39,9 +39,9 @@ vi.mock("@/services/organizations", async (importOriginal) => {
 import organizations from "@/services/organizations";
 const api = organizations as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
-const RuleDialogStub = defineComponent({
-  name: "OrgDomainRuleDialog",
-  props: ["open", "rule", "domainOptions", "submit"],
+const BlocklistDialogStub = defineComponent({
+  name: "OrgDomainBlocklistDialog",
+  props: ["open", "blocklist", "domainOptions", "submit"],
   template: "<div />",
 });
 
@@ -59,11 +59,13 @@ const link = (domain: string, state = 1) => ({
   meta_mapped: false,
 });
 
+const apiRule = { domain: "acme.com", allow_all_users: true, allowed_emails: [] };
+
 const config = {
-  domains: [],
+  domains: [apiRule],
   enabled: true,
   blocked_emails: ["bob@acme.com"],
-  blocked_domains: [],
+  blocked_domains: ["spam.net"],
   updated_at: 0,
 };
 
@@ -80,7 +82,7 @@ const mountRules = async () => {
     props: { orgId: "acme", config },
     global: {
       plugins: [i18n, withQueryClient()],
-      stubs: { OrgDomainRuleDialog: RuleDialogStub, OTooltip: true },
+      stubs: { OrgDomainBlocklistDialog: BlocklistDialogStub, OTooltip: true },
     },
   });
   await settle();
@@ -89,9 +91,9 @@ const mountRules = async () => {
 
 type RulesWrapper = Awaited<ReturnType<typeof mountRules>>;
 
-const dialog = (wrapper: RulesWrapper) => wrapper.findComponent(RuleDialogStub);
+const dialog = (wrapper: RulesWrapper) => wrapper.findComponent(BlocklistDialogStub);
 
-describe("OrgDomainRestrictions: domain rules table", () => {
+describe("OrgDomainRestrictions: blocked users table", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfirm.mockResolvedValue(true);
@@ -101,25 +103,23 @@ describe("OrgDomainRestrictions: domain rules table", () => {
     });
   });
 
-  it("lists one row per rule with its policy and email count", async () => {
+  it("lists one row per domain with its blocked email count", async () => {
     const wrapper = await mountRules();
 
-    expect(
-      wrapper.find('[data-test="settings-org-domain-restrictions-rule-acme.com"]').text(),
-    ).toBe("Block listed");
     expect(
       wrapper.find('[data-test="settings-org-domain-restrictions-emails-acme.com"]').text(),
     ).toContain("1 blocked");
+    expect(
+      wrapper.find('[data-test="settings-org-domain-restrictions-emails-spam.net"]').exists(),
+    ).toBe(false);
   });
 
-  it("offers only verified domains that have no rule yet", async () => {
+  it("offers only verified domains that have no blocked users yet", async () => {
     const wrapper = await mountRules();
 
-    await wrapper
-      .find('[data-test="settings-org-domain-restrictions-add-rule-btn"]')
-      .trigger("click");
+    await wrapper.find('[data-test="settings-org-domain-restrictions-add-btn"]').trigger("click");
     expect(dialog(wrapper).props("open")).toBe(true);
-    expect(dialog(wrapper).props("rule")).toBeNull();
+    expect(dialog(wrapper).props("blocklist")).toBeNull();
     expect(
       dialog(wrapper)
         .props("domainOptions")
@@ -127,50 +127,44 @@ describe("OrgDomainRestrictions: domain rules table", () => {
     ).toEqual(["acme.io"]);
   });
 
-  it("saves a new rule as soon as the dialog submits", async () => {
+  it("saves new blocked users and keeps the API-only rules", async () => {
     const wrapper = await mountRules();
 
     const saved = await dialog(wrapper).props("submit")({
       name: "acme.io",
-      policy: "block_all",
-      allowedEmails: [],
-      blockedEmails: [],
+      blockedEmails: ["eve@acme.io"],
     });
 
     expect(saved).toBe(true);
     expect(api.post_organization_settings).toHaveBeenCalledWith("acme", {
       domain_management_config: expect.objectContaining({
-        blocked_domains: ["acme.io"],
-        blocked_emails: ["bob@acme.com"],
+        domains: [apiRule],
+        blocked_domains: ["spam.net"],
+        blocked_emails: ["bob@acme.com", "eve@acme.io"],
       }),
     });
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
   });
 
-  it("saves an edited rule in place of the old one", async () => {
+  it("replaces a domain's blocked users on edit", async () => {
     const wrapper = await mountRules();
 
     await wrapper
       .find('[data-test="settings-org-domain-restrictions-edit-acme.com"]')
       .trigger("click");
-    expect(dialog(wrapper).props("rule").name).toBe("acme.com");
+    expect(dialog(wrapper).props("blocklist").name).toBe("acme.com");
     expect(
       dialog(wrapper)
         .props("domainOptions")
         .map((o: { value: string }) => o.value),
     ).toEqual(["acme.com"]);
 
-    await dialog(wrapper).props("submit")({
-      name: "acme.com",
-      policy: "allow_specific",
-      allowedEmails: ["amy@acme.com"],
-      blockedEmails: [],
-    });
+    await dialog(wrapper).props("submit")({ name: "acme.com", blockedEmails: ["amy@acme.com"] });
 
     expect(api.post_organization_settings).toHaveBeenCalledWith("acme", {
       domain_management_config: expect.objectContaining({
-        domains: [{ domain: "acme.com", allow_all_users: false, allowed_emails: ["amy@acme.com"] }],
-        blocked_emails: [],
+        domains: [apiRule],
+        blocked_emails: ["amy@acme.com"],
       }),
     });
   });
@@ -181,16 +175,14 @@ describe("OrgDomainRestrictions: domain rules table", () => {
 
     const saved = await dialog(wrapper).props("submit")({
       name: "acme.io",
-      policy: "block_all",
-      allowedEmails: [],
-      blockedEmails: [],
+      blockedEmails: ["eve@acme.io"],
     });
 
     expect(saved).toBe(false);
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
   });
 
-  it("saves the removal after confirming", async () => {
+  it("unblocks the domain's users after confirming", async () => {
     const wrapper = await mountRules();
 
     await wrapper
@@ -200,11 +192,15 @@ describe("OrgDomainRestrictions: domain rules table", () => {
 
     expect(mockConfirm).toHaveBeenCalledTimes(1);
     expect(api.post_organization_settings).toHaveBeenCalledWith("acme", {
-      domain_management_config: expect.objectContaining({ blocked_emails: [], domains: [] }),
+      domain_management_config: expect.objectContaining({
+        blocked_emails: [],
+        domains: [apiRule],
+        blocked_domains: ["spam.net"],
+      }),
     });
   });
 
-  it("does not save when the removal is declined", async () => {
+  it("does not save when the unblock is declined", async () => {
     mockConfirm.mockResolvedValue(false);
     const wrapper = await mountRules();
 

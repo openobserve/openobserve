@@ -13,12 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export type RestrictionPolicy = "allow_all" | "allow_specific" | "block_specific" | "block_all";
-
-export interface RestrictionCard {
+export interface DomainBlocklist {
   name: string;
-  policy: RestrictionPolicy;
-  allowedEmails: string[];
   blockedEmails: string[];
 }
 
@@ -30,88 +26,57 @@ export interface DomainManagementConfig {
   updated_at: number;
 }
 
-export const isAllowPolicy = (policy: RestrictionPolicy) =>
-  policy === "allow_all" || policy === "allow_specific";
+const emailDomain = (email: string) => email.split("@")[1]?.toLowerCase() ?? "";
 
-// A whole-domain block wins over an allow rule, matching the backend; blocked emails on an allowed domain keep its allow policy.
-export function configToCards(
+export function configToBlocklists(
   config: Partial<DomainManagementConfig> | undefined,
-): RestrictionCard[] {
-  const byDomain = new Map<string, RestrictionCard>();
-  const ensure = (name: string): RestrictionCard => {
-    const key = name.toLowerCase();
-    let card = byDomain.get(key);
-    if (!card) {
-      card = { name: key, policy: "allow_all", allowedEmails: [], blockedEmails: [] };
-      byDomain.set(key, card);
-    }
-    return card;
-  };
-
-  for (const d of config?.domains ?? []) {
-    if (!d?.domain) continue;
-    const card = ensure(d.domain);
-    card.policy = d.allow_all_users ? "allow_all" : "allow_specific";
-    card.allowedEmails = [...(d.allowed_emails ?? [])];
-  }
-  const allowed = new Set(byDomain.keys());
+): DomainBlocklist[] {
+  const byDomain = new Map<string, string[]>();
   for (const email of config?.blocked_emails ?? []) {
-    const domain = email?.split("@")[1]?.toLowerCase();
+    const domain = emailDomain(email ?? "");
     if (!domain) continue;
-    const card = ensure(domain);
-    if (!allowed.has(domain)) card.policy = "block_specific";
-    card.blockedEmails.push(email.toLowerCase());
+    byDomain.set(domain, [...(byDomain.get(domain) ?? []), email.toLowerCase()]);
   }
-  for (const domain of config?.blocked_domains ?? []) {
-    if (domain) ensure(domain).policy = "block_all";
-  }
-  return [...byDomain.values()];
+  return [...byDomain].map(([name, blockedEmails]) => ({ name, blockedEmails }));
 }
 
-export function cardsToConfig(cards: RestrictionCard[], now = Date.now()): DomainManagementConfig {
-  return {
-    domains: cards
-      .filter((c) => isAllowPolicy(c.policy))
-      .map((c) => ({
-        domain: c.name,
-        allow_all_users: c.policy === "allow_all",
-        allowed_emails: c.policy === "allow_specific" ? c.allowedEmails : [],
-      })),
-    enabled: true,
-    blocked_emails: cards.filter((c) => c.policy !== "block_all").flatMap((c) => c.blockedEmails),
-    blocked_domains: cards.filter((c) => c.policy === "block_all").map((c) => c.name),
-    // The backend stores timestamps in microseconds.
-    updated_at: now * 1000,
-  };
+export function setDomainBlocklist(
+  config: Partial<DomainManagementConfig> | undefined,
+  domain: string,
+  emails: string[],
+  now = Date.now(),
+): DomainManagementConfig {
+  const target = domain.toLowerCase();
+  const others = (config?.blocked_emails ?? []).filter((e) => emailDomain(e) !== target);
+  return withBlockedEmails(config, [...others, ...emails], now);
 }
 
-// An allow-specific domain is narrowed by dropping the email from its allow list; any other domain needs an explicit block.
 export function blockEmailsInConfig(
   config: Partial<DomainManagementConfig> | undefined,
   emails: string[],
   now = Date.now(),
 ): DomainManagementConfig {
-  let domains = (config?.domains ?? []).map((d) => ({ ...d }));
   const blocked = [...(config?.blocked_emails ?? [])];
   for (const email of emails) {
     const target = email.toLowerCase();
-    const domain = target.split("@")[1] ?? "";
-    let narrowed = false;
-    domains = domains.map((d) => {
-      if (d.domain?.toLowerCase() !== domain || d.allow_all_users) return d;
-      narrowed = true;
-      return {
-        ...d,
-        allowed_emails: (d.allowed_emails ?? []).filter((e) => e.toLowerCase() !== target),
-      };
-    });
-    if (!narrowed && !blocked.some((e) => e.toLowerCase() === target)) blocked.push(target);
+    if (!blocked.some((e) => e.toLowerCase() === target)) blocked.push(target);
   }
+  return withBlockedEmails(config, blocked, now);
+}
+
+// The UI edits only the blocklist; allow rules and blocked domains are API-only and pass through untouched.
+function withBlockedEmails(
+  config: Partial<DomainManagementConfig> | undefined,
+  blocked: string[],
+  now: number,
+): DomainManagementConfig {
   return {
-    domains,
+    domains: [...(config?.domains ?? [])],
+    // The backend skips every block while restrictions are disabled.
     enabled: true,
     blocked_emails: blocked,
     blocked_domains: [...(config?.blocked_domains ?? [])],
+    // The backend stores timestamps in microseconds.
     updated_at: now * 1000,
   };
 }

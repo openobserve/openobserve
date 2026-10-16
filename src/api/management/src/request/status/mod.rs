@@ -1220,11 +1220,11 @@ pub async fn redirect(
                         Ok(v) => v.map(|(new_user, pending_invites)| {
                             format!("&new_user_login={new_user}&pending_invites={pending_invites}")
                         }),
-                        Err(_) => {
+                        Err(e) => {
                             return Response::builder()
                                 .status(StatusCode::UNAUTHORIZED)
                                 .header(header::CONTENT_TYPE, "application/json")
-                                .body(Body::from("\"Email Domain not allowed\""))
+                                .body(Body::from(e.to_string()))
                                 .unwrap();
                         }
                     };
