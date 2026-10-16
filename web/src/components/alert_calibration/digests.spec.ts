@@ -135,7 +135,7 @@ describe("a run's verdict", () => {
       }),
     );
     expect(notes).toEqual([
-      "2 alerts had trigger rows but no definition.",
+      "2 alerts had trigger rows but no definition, usually ones deleted during the window; not counted as a gap.",
       "1 alert had no trigger rows in the window, which is not counted as a gap.",
       "Read from the triggers stream of the _meta organization, which is not counted as a gap.",
     ]);
