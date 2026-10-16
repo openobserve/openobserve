@@ -15,12 +15,13 @@
 
 //! The extra rules for a feature that can silence what a user cannot see (WP6).
 
-use std::collections::HashSet;
+use std::{collections::HashSet, future::Future};
 
 use config::meta::{
     downtimes::{Downtime, DowntimeTarget, TargetFolders, TargetModule},
     folder::FolderType,
 };
+use futures::{StreamExt, stream};
 use o2_openfga::authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation};
 
 use super::{
@@ -72,12 +73,29 @@ pub async fn check_targets(
     Ok(())
 }
 
-/// The folders whose items the user may see, per folder type.
-pub async fn visibility(org: &str, user_id: &str) -> Result<Visibility, DowntimeError> {
-    Ok(Visibility {
-        alert_folders: Some(listable_folders(org, user_id, FolderType::Alerts).await?),
-        synthetics_folders: Some(listable_folders(org, user_id, FolderType::Synthetics).await?),
+/// GET checks preserve folder inheritance and individual grants regardless of list filtering.
+pub async fn visibility(
+    org: &str,
+    user_id: &str,
+    candidates: Vec<(TargetModule, &str, &str)>,
+) -> Result<Visibility, DowntimeError> {
+    if db::user::is_root_user(user_id) || !crate::authz::rbac_enforced().await {
+        return Ok(Visibility::default());
+    }
+    Ok(readable_candidates(candidates, |module, id, folder_id| {
+        check_permissions(
+            id,
+            org,
+            user_id,
+            resource_kind(module),
+            "GET",
+            Some(folder_id),
+            false,
+            true,
+            false,
+        )
     })
+    .await)
 }
 
 /// The downtime folders the user may list; the list route is org-level, so each folder is checked.
@@ -172,6 +190,37 @@ pub async fn reparent(id: &str, from: &str, to: &str) {
     remove_parent_relation(id, &downtime, from, &folder).await;
 }
 
+async fn readable_candidates<'a, F, Fut>(
+    candidates: Vec<(TargetModule, &'a str, &'a str)>,
+    check: F,
+) -> Visibility
+where
+    F: Fn(TargetModule, &'a str, &'a str) -> Fut + Sync,
+    Fut: Future<Output = bool> + Send,
+{
+    let mut seen = HashSet::new();
+    let mut checks = stream::iter(
+        candidates
+            .into_iter()
+            .filter(|(module, id, _)| seen.insert((*module, *id)))
+            .map(|(module, id, folder)| {
+                let permitted = check(module, id, folder);
+                async move { permitted.await.then_some((module, id.to_string())) }
+            }),
+    )
+    .buffer_unordered(16)
+    .boxed();
+    let mut readable = std::collections::HashMap::<_, HashSet<_>>::new();
+    while let Some(result) = checks.next().await {
+        if let Some((module, id)) = result {
+            readable.entry(module).or_default().insert(id);
+        }
+    }
+    Visibility {
+        readable: Some(readable),
+    }
+}
+
 async fn listable_folders(
     org: &str,
     user_id: &str,
@@ -232,10 +281,7 @@ async fn check_target_ids(
     target: &DowntimeTarget,
     inventory: &Inventory,
 ) -> Result<(), DowntimeError> {
-    let object_type = match target.module {
-        TargetModule::Synthetics => "synthetics",
-        _ => "alerts",
-    };
+    let object_type = resource_kind(target.module);
     for id in &target.ids {
         let Some(item) = inventory.find(target.module, id) else {
             return Err(DowntimeError::BadRequest(format!(
@@ -269,6 +315,13 @@ async fn check_target_ids(
         }
     }
     Ok(())
+}
+
+fn resource_kind(module: TargetModule) -> &'static str {
+    match module {
+        TargetModule::Synthetics => "synthetics",
+        _ => "alerts",
+    }
 }
 
 /// Named ids narrow All to those items, and [check_target_ids] reads each of them.
@@ -326,7 +379,198 @@ fn verb(method: &str) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{super::matching::Item, *};
+
+    fn visibility_inventory() -> Inventory {
+        let items = || {
+            [
+                ("hidden", "list-only"),
+                ("individual", "list-only"),
+                ("folder-read", "readable"),
+            ]
+            .map(|(id, folder)| Item {
+                id: id.to_string(),
+                name: format!("{id}-name"),
+                folder_id: folder.to_string(),
+                dims: std::collections::HashMap::from([("host".to_string(), format!("{id}-host"))]),
+                ..Default::default()
+            })
+            .to_vec()
+        };
+        Inventory {
+            alerts: items(),
+            anomalies: items(),
+            synthetics: items(),
+            slos: items(),
+        }
+    }
+
+    fn inventory_candidates(inventory: &Inventory) -> Vec<(TargetModule, &str, &str)> {
+        [
+            TargetModule::Alerts,
+            TargetModule::AnomalyDetections,
+            TargetModule::Synthetics,
+            TargetModule::Slos,
+        ]
+        .into_iter()
+        .flat_map(|module| {
+            inventory
+                .items(module)
+                .iter()
+                .map(move |item| (module, item.id.as_str(), item.folder_id.as_str()))
+        })
+        .collect()
+    }
+
+    #[tokio::test]
+    async fn resource_reads_filter_every_preview_branch_affected_items_and_values() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        use super::super::matching::{Matches, ModuleMatch, to_preview};
+
+        let inventory = visibility_inventory();
+        let module_match = |module| {
+            let entries = inventory
+                .items(module)
+                .iter()
+                .map(|item| config::meta::downtimes::PreviewMatch {
+                    id: item.id.clone(),
+                    name: item.name.clone(),
+                    folder_id: item.folder_id.clone(),
+                    matched_by: Some(format!("{}-metadata", item.id)),
+                    missing: Some(format!("{}-dimension", item.id)),
+                    applies: Some(true),
+                })
+                .collect::<Vec<_>>();
+            ModuleMatch {
+                matched: entries.clone(),
+                at_fire_time: entries.clone(),
+                undecidable: entries,
+            }
+        };
+        let matches = Matches {
+            alerts: module_match(TargetModule::Alerts),
+            anomalies: module_match(TargetModule::AnomalyDetections),
+            synthetics: module_match(TargetModule::Synthetics),
+            slos: module_match(TargetModule::Slos),
+        };
+        let checks = AtomicUsize::new(0);
+        let visibility = readable_candidates(matches.read_candidates(), |module, id, folder| {
+            checks.fetch_add(1, Ordering::SeqCst);
+            assert_eq!(
+                resource_kind(module),
+                if module == TargetModule::Synthetics {
+                    "synthetics"
+                } else {
+                    "alerts"
+                }
+            );
+            std::future::ready(folder == "readable" || id == "individual")
+        })
+        .await;
+        assert_eq!(checks.load(Ordering::SeqCst), 12);
+        let preview = to_preview(&matches, &visibility);
+        assert_eq!(
+            (
+                preview.alerts_total,
+                preview.anomalies_total,
+                preview.synthetics_total,
+                preview.slos_total
+            ),
+            (3, 3, 3, 3)
+        );
+        for entries in [
+            &preview.alerts,
+            &preview.anomalies,
+            &preview.synthetics,
+            &preview.slos,
+            &preview.resolved_at_fire_time,
+        ]
+        .into_iter()
+        .chain(preview.undecidable.values())
+        {
+            assert_eq!(
+                entries
+                    .iter()
+                    .map(|entry| entry.id.as_str())
+                    .collect::<Vec<_>>(),
+                ["individual", "folder-read"]
+            );
+        }
+        assert!(!serde_json::to_string(&preview).unwrap().contains("hidden"));
+        let affected = super::super::affected(&matches, &visibility);
+        assert!(!serde_json::to_string(&affected).unwrap().contains("hidden"));
+        for entries in [
+            &affected.alerts,
+            &affected.anomalies,
+            &affected.synthetics,
+            &affected.slos,
+            &affected.resolved_at_fire_time,
+        ] {
+            assert_eq!(entries.len(), 2);
+        }
+        let values = super::super::values::inventory_values(&inventory, &visibility, "host", &[]);
+        assert_eq!(values.len(), 2);
+        assert!(
+            values
+                .iter()
+                .all(|value| value.items == 3 && !value.value.contains("hidden"))
+        );
+    }
+
+    #[tokio::test]
+    async fn readable_candidates_bounds_checks_and_keeps_modules_separate() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let mut inventory = visibility_inventory();
+        inventory.alerts = (0..64)
+            .map(|id| Item {
+                id: id.to_string(),
+                ..Default::default()
+            })
+            .collect();
+        let active = AtomicUsize::new(0);
+        let peak = AtomicUsize::new(0);
+        let visibility = readable_candidates(inventory_candidates(&inventory), |module, _, _| {
+            let (active, peak) = (&active, &peak);
+            async move {
+                let count = active.fetch_add(1, Ordering::SeqCst) + 1;
+                peak.fetch_max(count, Ordering::SeqCst);
+                tokio::task::yield_now().await;
+                active.fetch_sub(1, Ordering::SeqCst);
+                module == TargetModule::Slos
+            }
+        })
+        .await;
+        assert!(peak.load(Ordering::SeqCst) > 1);
+        assert!(peak.load(Ordering::SeqCst) <= 16);
+        assert!(visibility.sees(TargetModule::Slos, "individual"));
+        assert!(!visibility.sees(TargetModule::AnomalyDetections, "individual"));
+        assert!(!visibility.sees(TargetModule::Synthetics, "individual"));
+        assert!(!visibility.sees(TargetModule::Slos, "unknown"));
+    }
+
+    #[tokio::test]
+    async fn an_unrestricted_authorizer_keeps_all_inventory_items_visible() {
+        let inventory = visibility_inventory();
+        let visibility = readable_candidates(inventory_candidates(&inventory), |_, _, _| {
+            std::future::ready(true)
+        })
+        .await;
+        for module in [
+            TargetModule::Alerts,
+            TargetModule::AnomalyDetections,
+            TargetModule::Synthetics,
+            TargetModule::Slos,
+        ] {
+            assert!(
+                inventory
+                    .items(module)
+                    .iter()
+                    .all(|item| visibility.sees(module, &item.id))
+            );
+        }
+    }
 
     fn rows() -> Vec<(String, String)> {
         [("d1", "ops"), ("d2", "ops"), ("d3", "db")]
