@@ -222,6 +222,10 @@ struct HistoryFilter {
 }
 
 impl HistoryFilter {
+    fn selected_report_id(&self) -> Option<&Ksuid> {
+        self.report_id.as_ref().or(self.run_report_id.as_ref())
+    }
+
     /// The WHERE shared by the page and the counts: range, report and trigger source.
     fn base_where(&self) -> String {
         let mut sql = format!(
@@ -233,13 +237,18 @@ impl HistoryFilter {
         );
         if let Some(id) = &self.report_id {
             sql.push_str(&format!(" AND key LIKE '%/{id}'"));
-        } else if let Some(ids) = &self.permitted {
+        }
+        if let Some(ids) = &self.permitted {
             let any = ids
                 .iter()
                 .map(|id| format!("key LIKE '%/{id}'"))
                 .collect::<Vec<_>>()
                 .join(" OR ");
-            sql.push_str(&format!(" AND ({any})"));
+            if ids.is_empty() {
+                sql.push_str(" AND FALSE");
+            } else {
+                sql.push_str(&format!(" AND ({any})"));
+            }
         }
         if let Some(id) = &self.run_report_id {
             sql.push_str(&format!(" AND key LIKE '%/{id}'"));
@@ -361,10 +370,13 @@ pub async fn get_report_history(
     )
     .await;
 
-    match permitted_report_ids(&org_id, &user_email.user_id, filter.report_id.as_ref()).await {
+    match permitted_report_ids(&org_id, &user_email.user_id, filter.selected_report_id()).await {
         Ok(None) => {}
         Ok(Some(ids)) => {
-            if filter.report_id.is_some_and(|id| !ids.contains(&id)) {
+            if filter
+                .selected_report_id()
+                .is_some_and(|id| !ids.contains(id))
+            {
                 return MetaHttpResponse::forbidden("Access denied to this report");
             }
             filter.permitted = Some(ids);
@@ -570,10 +582,10 @@ async fn permitted_report_ids(
     if db::user::is_root_user(user_id) || !o2_openfga::config::get_config().enabled {
         return Ok(None);
     }
+    let user = openobserve_core::users::get_user(Some(org_id), user_id)
+        .await
+        .ok_or_else(|| MetaHttpResponse::forbidden("User not found"))?;
     if let Some(id) = report_id {
-        let user = openobserve_core::users::get_user(Some(org_id), user_id)
-            .await
-            .ok_or_else(|| MetaHttpResponse::forbidden("User not found"))?;
         let folder_id =
             match openobserve_core::dashboards::reports::get_by_id(org_id, &id.to_string()).await {
                 Ok((folder, _)) => folder.folder_id,
@@ -600,21 +612,24 @@ async fn permitted_report_ids(
         }
         return Ok(None);
     }
-    let permitted = openobserve_api_common::auth::validator::list_objects_for_user(
-        org_id, user_id, "GET", "report",
+    // History is an authorization boundary independent of list visibility preferences.
+    let permitted = o2_openfga::authorizer::authz::list_objects(
+        user_id,
+        "GET",
+        "report",
+        org_id,
+        &user.role.to_string(),
     )
     .await
     .map_err(|e| MetaHttpResponse::forbidden(e.to_string()))?;
-    let Some(permitted) = permitted else {
-        return Ok(None);
-    };
     if permitted.contains(&format!("report:_all_{org_id}")) {
         return Ok(None);
     }
     let reports = if permitted.iter().any(|entry| {
         entry
             .strip_prefix("report:")
-            .is_some_and(|id| id.parse::<Ksuid>().is_err())
+            .and_then(|id| id.rsplit_once('/'))
+            .is_some_and(|(_, id)| id.parse::<Ksuid>().is_ok())
     }) {
         openobserve_core::dashboards::reports::list(
             org_id,
@@ -633,20 +648,16 @@ async fn permitted_report_ids(
     };
     Ok(Some(resolve_permitted_ids(
         &permitted,
-        reports.iter().map(|r| {
-            (
-                r.report_name.as_str(),
-                r.report_id.as_str(),
-                r.folder_id.as_str(),
-            )
-        }),
+        reports
+            .iter()
+            .map(|r| (r.report_id.as_str(), r.folder_id.as_str())),
     )))
 }
 
 #[cfg(any(feature = "enterprise", test))]
 fn resolve_permitted_ids<'a>(
     permitted: &[String],
-    reports: impl Iterator<Item = (&'a str, &'a str, &'a str)>,
+    reports: impl Iterator<Item = (&'a str, &'a str)>,
 ) -> Vec<Ksuid> {
     let entries = permitted
         .iter()
@@ -657,7 +668,7 @@ fn resolve_permitted_ids<'a>(
         .filter_map(|id| id.parse::<Ksuid>().ok())
         .collect::<Vec<_>>();
     // Scoped grants require the current folder; deleted reports have no match.
-    for (name, raw_id, folder) in reports {
+    for (raw_id, folder) in reports {
         let Ok(id) = raw_id.parse::<Ksuid>() else {
             continue;
         };
@@ -670,7 +681,7 @@ fn resolve_permitted_ids<'a>(
             {
                 return grant_folder == folder && grant_id == raw_id;
             }
-            *entry == name
+            false
         }) {
             ids.push(id);
         }
@@ -895,16 +906,17 @@ mod tests {
     }
 
     #[test]
-    fn report_filter_wins_over_permitted_list() {
+    fn selected_report_intersects_permission_boundary_for_facets_and_page() {
         let id = ksuid();
         let f = HistoryFilter {
             report_id: Some(id),
             permitted: Some(vec![ksuid(), ksuid()]),
             ..filter()
         };
-        let sql = f.base_where();
-        assert!(sql.contains(&format!("key LIKE '%/{id}'")));
-        assert_eq!(sql.matches("key LIKE").count(), 1);
+        for sql in [f.base_where(), f.page_where()] {
+            assert!(sql.contains(&format!("key LIKE '%/{id}'")));
+            assert_eq!(sql.matches("key LIKE").count(), 3);
+        }
     }
 
     #[test]
@@ -1035,25 +1047,20 @@ mod tests {
     }
 
     #[test]
-    fn permitted_ids_keep_direct_and_deleted_ids_without_name_collision() {
+    fn permitted_ids_keep_direct_and_deleted_ids_without_name_grants() {
         let granted = ksuid();
         let collision = ksuid();
         let legacy = ksuid();
-        let granted_string = granted.to_string();
         let collision_string = collision.to_string();
         let legacy_string = legacy.to_string();
         let permitted = vec![format!("report:{granted}"), "report:daily".to_string()];
         let reports = [
-            (
-                granted_string.as_str(),
-                collision_string.as_str(),
-                "default",
-            ),
-            ("daily", legacy_string.as_str(), "default"),
+            (collision_string.as_str(), "default"),
+            (legacy_string.as_str(), "default"),
         ];
         let ids = resolve_permitted_ids(&permitted, reports.into_iter());
         assert!(ids.contains(&granted));
-        assert!(ids.contains(&legacy));
+        assert!(!ids.contains(&legacy));
         assert!(!ids.contains(&collision));
         assert_eq!(
             resolve_permitted_ids(&[format!("report:{granted}")], std::iter::empty()),
@@ -1079,11 +1086,10 @@ mod tests {
             format!("report:folder/{allowed}"),
             format!("report:old/{moved}"),
         ];
-        let collision_name = format!("folder/{allowed}");
         let reports = [
-            ("daily", allowed.as_str(), "folder"),
-            ("moved", moved.as_str(), "new"),
-            (collision_name.as_str(), collision.as_str(), "folder"),
+            (allowed.as_str(), "folder"),
+            (moved.as_str(), "new"),
+            (collision.as_str(), "folder"),
         ];
         assert_eq!(
             resolve_permitted_ids(&permitted, reports.into_iter()),
@@ -1093,7 +1099,7 @@ mod tests {
     }
 
     #[test]
-    fn org_run_selector_intersects_permitted_ids_without_selecting_get_policy() {
+    fn exact_run_selector_intersects_permission_boundary_for_facets_and_page() {
         let allowed = ksuid();
         let denied = ksuid();
         let q = ReportHistoryQuery {
@@ -1102,12 +1108,34 @@ mod tests {
         };
         let mut f = parse_filter("org", &q).unwrap();
         assert!(f.report_id.is_none());
+        assert_eq!(f.selected_report_id(), Some(&denied));
         f.permitted = Some(vec![allowed]);
-        let sql = f.base_where();
-        assert!(sql.contains(&format!(
-            "AND (key LIKE '%/{allowed}') AND key LIKE '%/{denied}'"
-        )));
-        assert_eq!(sql.matches("key LIKE").count(), 2);
+        for sql in [f.base_where(), f.page_where()] {
+            assert!(sql.contains(&format!(
+                "AND (key LIKE '%/{allowed}') AND key LIKE '%/{denied}'"
+            )));
+            assert_eq!(sql.matches("key LIKE").count(), 2);
+        }
+    }
+
+    #[test]
+    fn global_history_keeps_permission_boundary_for_facets_and_page() {
+        let allowed = ksuid();
+        let mut f = filter();
+        assert_eq!(f.selected_report_id(), None);
+        f.permitted = Some(vec![allowed]);
+        for sql in [f.base_where(), f.page_where()] {
+            assert!(sql.contains(&format!("AND (key LIKE '%/{allowed}')")));
+        }
+        f.permitted = Some(Vec::new());
+        for sql in [f.base_where(), f.page_where()] {
+            assert!(sql.contains("AND FALSE"));
+        }
+        f.permitted = None;
+        for sql in [f.base_where(), f.page_where()] {
+            assert!(!sql.contains("key LIKE"));
+            assert!(!sql.contains("AND FALSE"));
+        }
     }
 
     #[test]
@@ -1124,7 +1152,8 @@ mod tests {
             run_report_id: Some(id),
             ..Default::default()
         };
-        assert!(parse_filter("org", &q).unwrap().report_id.is_some());
+        let parsed = parse_filter("org", &q).unwrap();
+        assert_eq!(parsed.selected_report_id(), parsed.report_id.as_ref());
         let q = ReportHistoryQuery {
             run_report_id: Some("invalid".to_string()),
             ..Default::default()

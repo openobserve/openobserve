@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useMutation } from "@tanstack/vue-query";
 import { useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -60,22 +60,29 @@ const router = useRouter();
 const orgId = useOrgId();
 const recipients = ref<string[] | null>(null);
 const recipientsFailed = ref(false);
-const trigger = useMutation(() => triggerReportMutation(orgId.value));
+const trigger = useMutation(triggerReportMutation(orgId.value));
+let viewVersion = 0;
+watch([orgId, () => props.reportId], () => viewVersion++, { flush: "sync" });
+onBeforeUnmount(() => viewVersion++);
 
 watch(
-  () => props.open,
-  async (open) => {
+  [() => props.open, orgId, () => props.reportId],
+  async ([open], _previous, onCleanup) => {
     if (!open) return;
+    let current = true;
+    onCleanup(() => (current = false));
     recipients.value = null;
     recipientsFailed.value = false;
     try {
       const report: any = await queryClient.fetchQuery(
         reportByIdQuery(orgId.value, props.reportId),
       );
+      if (!current) return;
       recipients.value = (report?.destinations ?? [])
         .map((d: { email?: string }) => d.email)
         .filter((e: string | undefined): e is string => !!e);
     } catch {
+      if (!current) return;
       // Unknown recipients are not "no recipients": the send still emails everyone configured.
       recipientsFailed.value = true;
     }
@@ -105,40 +112,47 @@ const warning = computed(() =>
     : undefined,
 );
 
-const openRun = (run: ReportRunHit) =>
+const openRun = (org: string, run: ReportRunHit) =>
   router.push({
     name: "reportDetail",
     params: { report_id: run.report_id },
-    query: { org_identifier: orgId.value, tab: "history", run: runKey(run) },
+    query: { org_identifier: org, tab: "history", run: runKey(run) },
   });
 
 const runNow = async () => {
+  if (trigger.isPending.value) return;
+  const operation = Object.freeze({ org: orgId.value, reportId: props.reportId });
+  const version = viewVersion;
+  const isCurrentView = () => version === viewVersion;
   emit("update:open", false);
   emit("update:running", true);
   try {
-    const data = await trigger.mutateAsync(props.reportId);
-    rememberManualRun(orgId.value, data.run);
-    emit("ran", data.run);
+    const data = await trigger.mutateAsync(operation);
+    rememberManualRun(operation.org, data.run);
+    if (isCurrentView()) emit("ran", data.run);
     const count = data.run.recipient_count ?? 0;
     toast({
       variant: "success",
       message: data.run.is_cached
         ? t("reports.history.runNowCached")
         : t("reports.history.runNowSent", { count }, count),
-      action: { label: t("reports.history.viewRun"), handler: () => openRun(data.run) },
+      action: {
+        label: t("reports.history.viewRun"),
+        handler: () => openRun(operation.org, data.run),
+      },
     });
   } catch (err: any) {
     const body: TriggerReportResponse | undefined = err?.response?.data;
     if (err?.response?.status === 403) return;
     if (body?.run) {
-      rememberManualRun(orgId.value, body.run);
-      emit("ran", body.run);
+      rememberManualRun(operation.org, body.run);
+      if (isCurrentView()) emit("ran", body.run);
     }
     toast({
       variant: "error",
       message: raw(body?.message) || t("reports.history.runNowFailed"),
       action: body?.run
-        ? { label: t("reports.history.viewRun"), handler: () => openRun(body.run) }
+        ? { label: t("reports.history.viewRun"), handler: () => openRun(operation.org, body.run) }
         : undefined,
     });
   } finally {

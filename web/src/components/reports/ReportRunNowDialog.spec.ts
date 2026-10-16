@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -23,9 +23,11 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { pendingManualRuns } from "@/utils/reports/reportRun";
 import ReportRunNowDialog from "./ReportRunNowDialog.vue";
 
+const { push } = vi.hoisted(() => ({ push: vi.fn() }));
+
 vi.mock("vue-router", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push }),
 }));
 
 vi.mock("@/services/reports", async (importOriginal) => {
@@ -51,17 +53,30 @@ const RUN = {
   retries: 0,
 };
 
-const mountDialog = (props: Record<string, unknown> = {}) =>
-  mount(ReportRunNowDialog, {
+const wrappers: ReturnType<typeof mount>[] = [];
+const originalOrg = store.state.selectedOrganization.identifier;
+
+const mountDialog = (props: Record<string, unknown> = {}) => {
+  const wrapper = mount(ReportRunNowDialog, {
     props: { open: true, reportId: "r-dialog", reportName: "Exec KPI digest", ...props },
     global: {
       plugins: [i18n, store, withQueryClient()],
       stubs: { ConfirmDialog: { template: "<div />" } },
     },
   });
+  wrappers.push(wrapper);
+  return wrapper;
+};
+
+afterEach(() => {
+  wrappers.splice(0).forEach((wrapper) => wrapper.unmount());
+  store.state.selectedOrganization.identifier = originalOrg;
+});
 
 describe("ReportRunNowDialog", () => {
   beforeEach(() => {
+    push.mockClear();
+    vi.mocked(toast).mockClear();
     vi.mocked(reports.getReportById).mockResolvedValue({
       data: { destinations: [{ email: "lin@acme.io" }, { email: "cfo@acme.io" }] },
     } as any);
@@ -134,5 +149,92 @@ describe("ReportRunNowDialog", () => {
       variant: "error",
       message: "SMTP 550",
     });
+  });
+
+  it.each(["success", "error"])(
+    "pins %s to the starting org/report and delays toast navigation safely",
+    async (outcome) => {
+      const orgA = `dialog-${outcome}-a`;
+      const orgB = `dialog-${outcome}-b`;
+      store.state.selectedOrganization.identifier = orgA;
+      let settle!: () => void;
+      const hit = {
+        ...RUN,
+        timestamp: Date.now() * 1000,
+        status: outcome === "error" ? "error" : "succeeded",
+      };
+      vi.mocked(reports.triggerReportById).mockImplementation(
+        () =>
+          new Promise((resolve, reject) => {
+            settle = () =>
+              outcome === "success"
+                ? resolve({ data: { run: hit } } as any)
+                : reject({ response: { status: 500, data: { message: "SMTP 550", run: hit } } });
+          }),
+      );
+      const w = mountDialog();
+      await flushPromises();
+      const pending = (w.vm as any).runNow();
+      await flushPromises();
+      expect(reports.triggerReportById).toHaveBeenLastCalledWith(orgA, RUN.report_id);
+      store.state.selectedOrganization.identifier = orgB;
+      await w.setProps({ reportId: "another-report" });
+      await flushPromises();
+      settle();
+      await pending;
+      await flushPromises();
+      expect(pendingManualRuns(orgA, RUN.report_id, [])).toEqual([hit]);
+      expect(pendingManualRuns(orgB, undefined, [])).toEqual([]);
+      expect(w.emitted("ran")).toBeUndefined();
+      expect(w.emitted("update:running")).toEqual([[true], [false]]);
+      store.state.selectedOrganization.identifier = `dialog-${outcome}-c`;
+      await flushPromises();
+      const action = vi.mocked(toast).mock.calls.at(-1)![0].action!;
+      action.handler();
+      expect(push).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          params: { report_id: RUN.report_id },
+          query: expect.objectContaining({ org_identifier: orgA }),
+        }),
+      );
+    },
+  );
+
+  it("does not refresh a different report in the same organization", async () => {
+    let resolveRun!: (value: any) => void;
+    vi.mocked(reports.triggerReportById).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRun = resolve;
+        }),
+    );
+    const w = mountDialog();
+    await flushPromises();
+    const pending = (w.vm as any).runNow();
+    await flushPromises();
+    await w.setProps({ reportId: "another-report" });
+    resolveRun({ data: { run: RUN } });
+    await pending;
+    expect(w.emitted("ran")).toBeUndefined();
+  });
+
+  it("ignores recipient metadata that finishes after the report changes", async () => {
+    let resolveOld!: (value: any) => void;
+    vi.mocked(reports.getReportById)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveOld = resolve;
+          }),
+      )
+      .mockResolvedValue({ data: { destinations: [{ email: "new@acme.io" }] } } as any);
+    const w = mountDialog();
+    await flushPromises();
+    await w.setProps({ reportId: "new-recipient-report" });
+    await flushPromises();
+    resolveOld({ data: { destinations: [{ email: "old@acme.io" }] } });
+    await flushPromises();
+    expect((w.vm as any).message).toContain("new@acme.io");
+    expect((w.vm as any).message).not.toContain("old@acme.io");
   });
 });

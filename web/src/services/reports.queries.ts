@@ -16,7 +16,12 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import { quantizeRange } from "@/composables/query/queryClient";
 import reports from "./reports";
-import type { ReportHistoryQuery, ReportHistoryResponse, ReportListFilters } from "./reports";
+import type {
+  ReportHistoryQuery,
+  ReportHistoryResponse,
+  ReportListFilters,
+  TriggerReportResponse,
+} from "./reports";
 import { reportKeys } from "./reports.querykeys";
 import { LIVE_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
@@ -99,12 +104,22 @@ export const saveReportMutation = (org: string) =>
     meta: { invalidates: [reportKeys.all(org)], silentError: true },
   });
 
-/** A failed send answers 500 with the run row too, so the caller reads `run` off either branch. */
+type ReportRunOperation = Readonly<{ org: string; reportId: string }>;
+
+/** A recorded error changes metadata too; variables pin settlement across option changes. */
 export const triggerReportMutation = (org: string) =>
   mutationOptions({
-    mutationFn: async (reportId: string) => (await reports.triggerReportById(org, reportId)).data,
-    meta: {
-      invalidates: [reportKeys.historyAll(org), reportKeys.all(org)],
-      silentError: true,
+    onMutate: (variables: string | ReportRunOperation): ReportRunOperation =>
+      typeof variables === "string" ? { org, reportId: variables } : { ...variables },
+    mutationFn: async (variables: string | ReportRunOperation) => {
+      const operation = typeof variables === "string" ? { org, reportId: variables } : variables;
+      return (await reports.triggerReportById(operation.org, operation.reportId)).data;
     },
+    onSettled: (_data, error, _variables, operation, context) => {
+      const recorded = (error as { response?: { data?: TriggerReportResponse } } | null)?.response
+        ?.data?.run;
+      if (!operation || (error && !recorded)) return;
+      void context.client.invalidateQueries({ queryKey: reportKeys.all(operation.org) });
+    },
+    meta: { silentError: true },
   });
