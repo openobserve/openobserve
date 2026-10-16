@@ -1,0 +1,6 @@
+{
+  "group": "Reports",
+  "spec_filename": "reportHistory.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}
