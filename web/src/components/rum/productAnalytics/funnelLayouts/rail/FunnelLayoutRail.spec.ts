@@ -107,7 +107,8 @@ describe("FunnelLayoutRail", () => {
         stubs: {
           VueDraggableNext: draggableStub,
           OPopover: popoverStub,
-          ODropdown: popoverStub,
+          ODropdown: { ...popoverStub },
+          ODropdownSub: { template: '<div><slot name="trigger" /><slot /></div>' },
           StepPicker: true,
         },
       },
@@ -160,10 +161,11 @@ describe("FunnelLayoutRail", () => {
     expect(def.steps[0].f).toEqual({ frustrated: true, errored: true });
   });
 
-  it("a click step has no condition editor", () => {
-    expect(mountRail().find('[data-test="rum-analytics-funnel-step-1-filters"]').exists()).toBe(
-      false,
-    );
+  it("a click step's condition editor offers only its Property rows", async () => {
+    const w = mountRail();
+    await w.find('[data-test="rum-analytics-funnel-step-1-filters"]').trigger("click");
+    expect(w.find('[data-test="rum-analytics-funnel-step-1-property"]').exists()).toBe(true);
+    expect(w.find('[data-test="rum-analytics-funnel-step-1-filter-min"]').exists()).toBe(false);
   });
 
   it("table rows drag by their handle, and a drop reorders the funnel", async () => {
@@ -423,7 +425,7 @@ describe("FunnelLayoutRail", () => {
       await w.vm.$nextTick();
       expect(separatorOf(w).attributes("aria-valuemax")).toBe("480");
       await w.setProps({ hideTime: false });
-      expect(separatorOf(w).attributes("aria-valuemax")).toBe("382");
+      expect(separatorOf(w).attributes("aria-valuemax")).toBe("350");
     });
 
     it("gives the table its compare columns before the rail grows", async () => {
@@ -440,7 +442,7 @@ describe("FunnelLayoutRail", () => {
           prevRangeExact: "",
         },
       });
-      expect(separatorOf(w).attributes("aria-valuemax")).toBe("318");
+      expect(separatorOf(w).attributes("aria-valuemax")).toBe("286");
     });
   });
 });
@@ -498,7 +500,8 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
         stubs: {
           VueDraggableNext: draggableStub,
           OPopover: popoverStub,
-          ODropdown: popoverStub,
+          ODropdown: { ...popoverStub },
+          ODropdownSub: { template: '<div><slot name="trigger" /><slot /></div>' },
           StepPicker: true,
         },
       },
@@ -618,7 +621,7 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
     expect(w.text()).toMatch(/\b5\s?s\b/);
   });
 
-  it("a page step's options offer time on page, frustrated and errored; a click step has none", async () => {
+  it("a page step's options offer time on page, frustrated and errored; a click step only a property", async () => {
     const w = mountLayout(
       defWith(
         [],
@@ -632,7 +635,10 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
     const page = w.find('[data-test="rum-analytics-funnel-step-0-filters-popover"]').text();
     expect(page).toMatch(/time on page/i);
     expect(page).toMatch(/frustrat/i);
-    expect(w.find('[data-test="rum-analytics-funnel-step-1-filters"]').exists()).toBe(false);
+    await w.find('[data-test="rum-analytics-funnel-step-1-filters"]').trigger("click");
+    const click = w.find('[data-test="rum-analytics-funnel-step-1-filters-popover"]').text();
+    expect(click).not.toMatch(/time on page/i);
+    expect(click).toMatch(/property/i);
   });
 
   it("choosing the frustrated filter on a page step emits a def whose step carries it", async () => {

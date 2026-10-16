@@ -22,6 +22,8 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastSpy }));
 import SessionFieldPicker from "./SessionFieldPicker.vue";
 import FunnelFilterBar from "./FunnelFilterBar.vue";
 import StepConditionPopover from "./StepConditionPopover.vue";
+import FunnelStepsTable from "./FunnelStepsTable.vue";
+import { filterNoticeOf, type PickerGroup } from "./funnelFilters";
 import WhyEnteredPopover from "./WhyEnteredPopover.vue";
 import useStepLabels from "./useStepLabels";
 import { whyLines } from "./whyEntered";
@@ -374,7 +376,7 @@ describe("useStepLabels, property conditions", () => {
     });
     wrapper = mount(Probe);
     expect(chips).toEqual([
-      "context_payment_method is one of upi, card",
+      "context_payment_method is upi, card",
       "context_plan does not contain pro",
     ]);
   });
@@ -440,5 +442,260 @@ describe("WhyEnteredPopover", () => {
     await w.setProps({ state: "error", lines: null });
     await w.find(dt("rum-analytics-funnel-why-retry")).trigger("click");
     expect(w.emitted("retry")).toHaveLength(1);
+  });
+});
+
+describe("SessionFieldPicker with fixed bands", () => {
+  const GROUPS = [
+    {
+      id: "steps",
+      label: "On these steps" as never,
+      fields: [
+        {
+          id: "field-context_payment_method",
+          name: "context_payment_method",
+          hint: "Step 5 · card" as never,
+        },
+      ],
+    },
+    { id: "key", label: "Key fields" as never, fields: [{ id: "dim-browser", name: "Browser" }] },
+    {
+      id: "user",
+      label: "User" as never,
+      fields: [{ id: "field-usr_id", name: "usr_id", reason: "For filters only" as never }],
+    },
+    { id: "empty", label: "Nothing" as never, fields: [] },
+  ] as PickerGroup[];
+  const mountBands = () => {
+    wrapper = mount(SessionFieldPicker, {
+      props: { fields: [], values: { field: null, status: "idle", rows: [] }, groups: GROUPS },
+      attachTo: document.body,
+    });
+    return wrapper;
+  };
+  const row = (w: VueWrapper, id: string) => w.find(dt(`rum-analytics-funnel-field-picker-${id}`));
+
+  it("lists each band with its count, skips an empty one, and shows a field's step hint", () => {
+    const w = mountBands();
+    expect(w.text()).toContain("On these steps (1)");
+    expect(w.text()).toContain("Key fields (1)");
+    expect(w.text()).toContain("User (1)");
+    expect(w.text()).not.toContain("Nothing");
+    expect(row(w, "field-context_payment_method").text()).toContain("Step 5 · card");
+  });
+
+  it("search narrows the bands to matching fields", async () => {
+    const w = mountBands();
+    await w.find(`${dt("o-field-list-search")} input`).setValue("pay");
+    expect(row(w, "field-context_payment_method").exists()).toBe(true);
+    expect(row(w, "dim-browser").exists()).toBe(false);
+  });
+
+  it("a row click picks its id; a disabled row picks nothing", async () => {
+    const w = mountBands();
+    await row(w, "field-usr_id").trigger("click");
+    expect(w.emitted("pick")).toBeUndefined();
+    await row(w, "field-context_payment_method").trigger("click");
+    await row(w, "dim-browser").trigger("click");
+    expect(w.emitted("pick")).toEqual([["field-context_payment_method"], ["dim-browser"]]);
+    expect(w.emitted("load")).toBeUndefined();
+  });
+});
+
+describe("StepConditionPopover, Property", () => {
+  const PAY = "context_payment_method";
+  const VALUES: FilterValuesState = {
+    field: PAY,
+    status: "ok",
+    rows: [
+      { value: "upi", sessions: 8 },
+      { value: "card", sessions: 17 },
+    ],
+  };
+  const mountClick = (step: StepRef = { kind: "c", key: "payment_info_submitted" }) => {
+    wrapper = mount(StepConditionPopover, {
+      props: { step, index: 4, fields: [PAY], fieldsState: "ok", values: VALUES },
+      global: { stubs },
+      attachTo: document.body,
+    });
+    return wrapper;
+  };
+  const select = (w: VueWrapper, id: string) =>
+    w.findAllComponents({ name: "OSelect" }).find((c) => c.attributes("data-test") === id)!;
+  const lastStep = (w: VueWrapper) => (w.emitted("update") as [StepRef][]).at(-1)![0];
+
+  it("a click step offers only the Property row, and picking a field then a value writes pc at once", async () => {
+    const w = mountClick();
+    await w.find(dt("rum-analytics-funnel-step-4-filters")).trigger("click");
+    expect(w.emitted("load-fields")).toHaveLength(1);
+    expect(w.find(dt("rum-analytics-funnel-step-4-filter-min")).exists()).toBe(false);
+    expect(w.find(dt("rum-analytics-funnel-step-4-property")).text()).toContain("Property");
+    select(w, "rum-analytics-funnel-step-4-prop-0-field").vm.$emit("update:modelValue", PAY);
+    await w.vm.$nextTick();
+    expect(w.emitted("update")).toBeUndefined();
+    select(w, "rum-analytics-funnel-step-4-prop-0-add-value").vm.$emit("open");
+    expect(w.emitted("filter-values")).toEqual([[PAY]]);
+    select(w, "rum-analytics-funnel-step-4-prop-0-add-value").vm.$emit("update:modelValue", "upi");
+    await w.vm.$nextTick();
+    expect(lastStep(w)).toEqual({
+      kind: "c",
+      key: "payment_info_submitted",
+      f: { pc: [{ field: PAY, op: "in", values: ["upi"] }] },
+    });
+    expect(w.find(dt("rum-analytics-funnel-step-4-prop-0-value-upi")).text()).toBe("upi · 8");
+  });
+
+  it("is not and matches rewrite the rule, and removing its last value drops pc", async () => {
+    const w = mountClick({
+      kind: "c",
+      key: "payment_info_submitted",
+      f: { pc: [{ field: PAY, op: "in", values: ["upi"] }] },
+    });
+    await w.find(dt("rum-analytics-funnel-step-4-filters")).trigger("click");
+    select(w, "rum-analytics-funnel-step-4-prop-0-op").vm.$emit("update:modelValue", "notIn");
+    await w.vm.$nextTick();
+    expect(lastStep(w).f?.pc).toEqual([{ field: PAY, op: "in", values: ["upi"], not: true }]);
+    select(w, "rum-analytics-funnel-step-4-prop-0-op").vm.$emit("update:modelValue", "regex");
+    await w.vm.$nextTick();
+    expect(lastStep(w).f?.pc).toEqual([{ field: PAY, op: "regex", values: ["upi"] }]);
+    await w.find(`${dt("rum-analytics-funnel-step-4-prop-0-value-upi")} button`).trigger("click");
+    await w.vm.$nextTick();
+    expect(lastStep(w)).toEqual({ kind: "c", key: "payment_info_submitted" });
+  });
+
+  it("says when the sample saw no field on this step", async () => {
+    wrapper = mount(StepConditionPopover, {
+      props: { step: { kind: "c", key: "x" }, index: 0, fields: [], fieldsState: "ok" },
+      global: { stubs },
+      attachTo: document.body,
+    });
+    await wrapper.find(dt("rum-analytics-funnel-step-0-filters")).trigger("click");
+    expect(wrapper.find(dt("rum-analytics-funnel-step-0-prop-fields-note")).text()).toBe(
+      "No fields seen on this step",
+    );
+  });
+});
+
+describe("FunnelStepsTable step menu", () => {
+  const PAY = "context_payment_method";
+  const def: FunnelDef = {
+    steps: [
+      { kind: "c", key: "product_viewed" },
+      { kind: "c", key: "payment_info_submitted" },
+    ],
+    unit: "sessions",
+    window: "session",
+    breakdown: null,
+  };
+  const mountTable = (state: "ok" | "loading") => {
+    wrapper = mount(FunnelStepsTable, {
+      props: {
+        def,
+        result: null,
+        removedAt: [],
+        state: { status: "idle", rows: [], error: null, partial: null, key: null, sampled: 1 },
+        sampled: 1,
+        events: [],
+        eventsStatus: "ready",
+        unitLabel: "Sessions" as never,
+        unitNoun: "sessions" as never,
+        hideTime: true,
+        fieldSample: {
+          fields: [{ field: PAY, steps: [2], top: ["card", "upi"], more: 0, many: false }],
+        },
+        fieldSampleState: state,
+      },
+      global: {
+        stubs: {
+          ...stubs,
+          VueDraggableNext: { template: "<div><slot /></div>" },
+          ODropdown: {
+            emits: ["update:open"],
+            template: `<div><div @click="$emit('update:open', true)"><slot name="trigger" /></div><slot /></div>`,
+          },
+          ODropdownSub: { template: '<div><slot name="trigger" /><slot /></div>' },
+          ODropdownItem: {
+            props: ["disabled"],
+            emits: ["select"],
+            template: '<button :disabled="disabled" @click="$emit(\'select\')"><slot /></button>',
+          },
+        },
+      },
+      attachTo: document.body,
+    });
+    return wrapper;
+  };
+
+  it("breaks the funnel down by a property of that step, pinned to it", async () => {
+    const w = mountTable("ok");
+    await w.find(dt("rum-analytics-funnel-step-1-menu")).trigger("click");
+    expect(w.emitted("load-fields")).toHaveLength(1);
+    expect(w.find(dt("rum-analytics-funnel-step-0-break-down-state")).text()).toBe(
+      "No fields seen on this step",
+    );
+    await w.find(dt(`rum-analytics-funnel-step-1-break-down-${PAY}`)).trigger("click");
+    const [[next]] = w.emitted("update:def") as [FunnelDef][];
+    expect(next.breakdown).toEqual({ f: PAY, s: 2 });
+  });
+
+  it("says it is still reading the step's fields", () => {
+    const w = mountTable("loading");
+    expect(w.find(dt("rum-analytics-funnel-step-1-break-down-state")).text()).toBe(
+      "Reading this step's fields…",
+    );
+  });
+});
+
+describe("Filter all steps notice", () => {
+  const PAY = "context_payment_method";
+  const def = (f: FunnelDef["f"]): FunnelDef => ({ ...DEF, f });
+  const UPI = { field: PAY, op: "in" as const, values: ["upi"] };
+
+  it("flags an attribute filter fewer than half of step 1's sessions carry", () => {
+    const row = { opened: 84, kept: 8, carry1: 41 };
+    expect(filterNoticeOf(def([UPI]), row)).toEqual({ field: PAY, kept: 8, opened: 84, carry: 41 });
+    expect(filterNoticeOf(def([UPI]), { ...row, carry1: 42 })).toBeNull();
+  });
+
+  it("indexes carry counts over session filters only, and never flags a built-in field", () => {
+    const country = { field: "geo_info_country", op: "in" as const, values: ["IN"] };
+    const email = { field: "usr_email", op: "in" as const, values: ["a@b.c"] };
+    const row = { opened: 10, kept: 2, carry1: 1, carry2: 2 };
+    expect(filterNoticeOf(def([country, email, UPI]), row)).toMatchObject({ field: PAY, carry: 2 });
+    expect(filterNoticeOf(def([country]), { opened: 10, kept: 1 })).toBeNull();
+    expect(filterNoticeOf(def([UPI]), null)).toBeNull();
+    expect(filterNoticeOf(def([UPI]), { opened: 0, kept: 0, carry1: 0 })).toBeNull();
+  });
+
+  it("shows the kept count with one way out, and the reason behind an info link", async () => {
+    wrapper = mount(FunnelFilterBar, {
+      props: {
+        def: def([UPI]),
+        fields: [PAY],
+        values: { field: null, status: "idle", rows: [] },
+        stacked: true,
+        notice: { field: PAY, kept: 8, opened: 84, carry: 36 },
+        unitNoun: "sessions" as never,
+      },
+      global: { stubs },
+      attachTo: document.body,
+    });
+    expect(wrapper.find(dt("rum-analytics-funnel-filter-notice")).text()).toContain(
+      "Keeps 8 of 84 sessions.",
+    );
+    await wrapper.find(dt("rum-analytics-funnel-filter-notice-break-down")).trigger("click");
+    expect(wrapper.emitted("break-down")).toEqual([[PAY]]);
+    await wrapper.find(dt("rum-analytics-funnel-filter-notice-why")).trigger("click");
+    expect(wrapper.find(dt("rum-analytics-funnel-filter-notice-reason")).text()).toContain(
+      "48 of the 84 sessions that opened step 1 never set context_payment_method",
+    );
+  });
+
+  it("shows no notice without one", () => {
+    wrapper = mount(FunnelFilterBar, {
+      props: { def: def([UPI]), fields: [PAY], values: { field: null, status: "idle", rows: [] } },
+      global: { stubs },
+    });
+    expect(wrapper.find(dt("rum-analytics-funnel-filter-notice")).exists()).toBe(false);
   });
 });

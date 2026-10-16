@@ -187,8 +187,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :failed="funnelFailed"
         :compare="compareView"
         :trend="trend.shown.value"
+        :field-sample="fieldSample.sample.value"
+        :field-sample-state="fieldSample.state.value"
+        :filter-notice="filterNotice"
         @update:def="applyDef"
         @filter-values="loadFilterValues"
+        @load-fields="fieldSample.load()"
+        @break-down="breakDownBy"
         @dropoff="openDropoff"
         @suggestions-retry="retrySuggestions"
         @include-hidden="appFilters.setIncludeHidden(router, true)"
@@ -335,19 +340,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rum-analytics-funnel-window-fixed"
           />
           <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
-          <label
-            for="rum-analytics-funnel-breakdown"
-            class="text-text-secondary text-xs font-semibold"
-            >{{ t("rum.analytics.funnel.breakdownLabel") }}</label
-          >
-          <OSelect
-            id="rum-analytics-funnel-breakdown"
-            :model-value="breakdownValue"
-            :options="breakdownOptions"
-            size="xs"
-            width="xs"
-            data-test="rum-analytics-funnel-breakdown-select"
-            @update:model-value="pickBreakdown"
+          <FunnelBreakdownControl
+            :def="def"
+            :dims="breakdownDims"
+            :fields="filterFields"
+            :sample="fieldSample.sample.value"
+            :sample-state="fieldSample.state.value"
+            :start="breakdown?.start ?? null"
+            :step-names="stepNames"
+            @update:def="applyDef"
+            @load-fields="fieldSample.load()"
           />
           <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
           <template v-if="trend.shown.value">
@@ -408,6 +410,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #notices>
+          <span
+            v-if="breakdownSummary"
+            class="text-text-secondary flex flex-wrap items-center gap-x-1.5 px-4 text-xs"
+            :aria-label="t('rum.analytics.funnel.breakdownBy', { field: dimLabel })"
+            data-test="rum-analytics-funnel-breakdown-summary"
+          >
+            <template v-for="(item, i) in breakdownSummary.items" :key="i">
+              <span v-if="i > 0" aria-hidden="true">{{ separator }}</span>
+              <span
+                ><span class="text-text-body" :class="breakdownSummary.mono ? 'font-mono' : ''">{{
+                  item.value
+                }}</span>
+                {{ item.pct }}</span
+              >
+            </template>
+            <template v-if="breakdownSummary.from">
+              <span aria-hidden="true">{{ separator }}</span>
+              <span>{{
+                t("rum.analytics.funnel.summaryFromStep", { step: breakdownSummary.from })
+              }}</span>
+            </template>
+          </span>
           <span
             v-if="usersMode && result && result.step1Sessions !== null"
             class="text-text-secondary flex items-center gap-1 px-4 text-xs"
@@ -525,14 +549,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template
             v-if="!trend.shown.value && def.breakdown && breakdown && funnelPanel.status === 'ok'"
           >
-            <span class="text-text-secondary px-4 text-xs">{{
-              t("rum.analytics.funnel.breakdownTimeHidden")
-            }}</span>
             <span
-              v-if="breakdownStartNote"
+              v-if="breakdownMissingNote"
               class="text-text-secondary px-4 text-xs"
               data-test="rum-analytics-funnel-breakdown-start"
-              >{{ breakdownStartNote }}</span
+              >{{ breakdownMissingNote }}</span
             >
             <span
               v-if="def.breakdown === 'app'"
@@ -543,7 +564,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <FunnelBreakdown
               :rows="breakdownCompare?.rows ?? breakdown.rows"
               :total="breakdown.total"
-              :start-step="breakdown.start && !breakdown.start.anyStep ? breakdown.start.step : 1"
+              :start="breakdown.start"
               :steps="def.steps"
               :dim-label="dimLabel"
               :events="events"
@@ -612,8 +633,13 @@ import NamedEventsNotice from "@/components/rum/productAnalytics/NamedEventsNoti
 import SavedFunnelBar from "@/components/rum/productAnalytics/SavedFunnelBar.vue";
 import WhyEnteredPopover from "@/components/rum/productAnalytics/funnelParts/WhyEnteredPopover.vue";
 import FunnelChangeCell from "@/components/rum/productAnalytics/funnelParts/FunnelChangeCell.vue";
+import FunnelBreakdownControl from "@/components/rum/productAnalytics/funnelParts/FunnelBreakdownControl.vue";
 import { fitsLink } from "@/components/rum/productAnalytics/funnelParts/funnelEdits";
-import type { FilterValuesState } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
+import {
+  filterNoticeOf,
+  removeFilter,
+  type FilterValuesState,
+} from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
 import { whyLines, type WhyLines } from "@/components/rum/productAnalytics/funnelParts/whyEntered";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import FunnelQuickStarts from "@/components/rum/productAnalytics/FunnelQuickStarts.vue";
@@ -627,6 +653,7 @@ import useFunnelDraft, {
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
 import useAppFilterCounts from "@/composables/rum/useAppFilterCounts";
 import useFunnelTrend from "@/composables/rum/useFunnelTrend";
+import useFunnelFieldSample from "@/composables/rum/useFunnelFieldSample";
 import FunnelLayoutRail from "@/components/rum/productAnalytics/funnelLayouts/rail/FunnelLayoutRail.vue";
 import type { FunnelLayoutSetting } from "@/components/rum/productAnalytics/funnelLayouts/types";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
@@ -653,6 +680,7 @@ import {
   DIMENSIONS,
   filterValuesSql,
   isAttributeBreakdown,
+  isSessionFilter,
   funnelSql,
   nextStepsSql,
   storedFunnelScope,
@@ -772,29 +800,13 @@ const dimLabels = computed<Record<BreakdownDim, I18nText>>(() => ({
   app: t("rum.analytics.funnel.dims.app"),
 }));
 
-// Not a column name, so an attribute breakdown opened from a link never collides with an option.
-const ATTRIBUTE_OPTION = ":attribute";
+const breakdownDims = computed(() =>
+  (Object.keys(DIMENSIONS) as BreakdownDim[])
+    .filter((d) => (d === "app" ? !!pa.scope.value.apps?.length : pa.schema.value[DIMENSIONS[d]]))
+    .map((d) => ({ dim: d, label: dimLabels.value[d] })),
+);
 
-const breakdownOptions = computed(() => {
-  const b = def.value.breakdown;
-  return [
-    { label: t("rum.analytics.funnel.breakdownNone"), value: "none" },
-    ...(Object.keys(DIMENSIONS) as BreakdownDim[])
-      .filter((d) => (d === "app" ? !!pa.scope.value.apps?.length : pa.schema.value[DIMENSIONS[d]]))
-      .map((d) => ({ label: dimLabels.value[d], value: d })),
-    ...(isAttributeBreakdown(b) ? [{ label: raw(b.f), value: ATTRIBUTE_OPTION }] : []),
-  ];
-});
-
-const breakdownValue = computed(() => {
-  const b = def.value.breakdown;
-  return isAttributeBreakdown(b) ? ATTRIBUTE_OPTION : (b ?? "none");
-});
-
-const pickBreakdown = (v: unknown) => {
-  if (v === ATTRIBUTE_OPTION) return;
-  update({ breakdown: v === "none" ? null : (v as BreakdownDim) });
-};
+const separator = raw("·");
 
 const dimLabel = computed(() => {
   const b = def.value.breakdown;
@@ -832,26 +844,30 @@ const breakdown = computed(() => {
   return foldBreakdown(funnelPanel.value.rows, def.value.steps.length, BREAKDOWN_TOP, attribute);
 });
 
-const breakdownStartNote = computed<I18nText | null>(() => {
-  const start = breakdown.value?.start;
-  if (!start) return null;
+const breakdownMissingNote = computed<I18nText | null>(() => {
   const b = def.value.breakdown;
-  if (isAttributeBreakdown(b) && !pa.schema.value[b.f])
-    return t("rum.analytics.funnel.breakdownFieldMissing", {
-      field: dimLabel.value,
-      unit: unitNoun.value,
-    });
-  const args = {
+  if (!breakdown.value?.start || !isAttributeBreakdown(b) || pa.schema.value[b.f]) return null;
+  return t("rum.analytics.funnel.breakdownFieldMissing", {
     field: dimLabel.value,
-    covered: raw(addCommasToNumber(start.covered)),
-    reached: raw(addCommasToNumber(start.reached)),
     unit: unitNoun.value,
-    step: start.step,
-  };
-  return start.anyStep
-    ? t("rum.analytics.funnel.breakdownFromAnyStep", args)
-    : t("rum.analytics.funnel.breakdownFromStep", args);
+  });
 });
+
+// The values' conversion in one line under the toolbar, so the answer shows before the table is scrolled to.
+const breakdownSummary = computed(() => {
+  const fold = breakdown.value;
+  if (!fold || trend.shown.value) return null;
+  const items = fold.rows
+    .filter((r) => r.value !== null)
+    .map((r) => ({ value: r.value as string, pct: pct(r.conversion) }));
+  if (!items.length) return null;
+  const from = fold.start && !fold.start.anyStep && fold.start.step > 1 ? fold.start.step : null;
+  return { items, from, mono: !!fold.start };
+});
+
+const stepNames = computed(() =>
+  def.value.steps.map((s) => stepLabel(s, events.value, namedEvents.deletedNames.value)),
+);
 
 // The previous period goes through the same fold, so turning compare on never touches these numbers.
 const result = computed<FunnelResult | null>(() =>
@@ -926,6 +942,17 @@ const breakdownCompareState = computed<BreakdownCompareState | null>(() => {
   };
 });
 
+// Trend lines rank attribute values from the table's start step, which an automatic pick learns from the funnel run.
+const trendRank = computed<number | null>(() => {
+  const b = def.value.breakdown;
+  if (!isAttributeBreakdown(b)) return 1;
+  if (b.s !== undefined && b.s <= def.value.steps.length) return b.s;
+  if (funnelFailed.value) return 1;
+  const start = breakdown.value?.start;
+  if (!start || funnelPanel.value.key !== funnelKey.value) return null;
+  return start.anyStep ? 1 : start.step;
+});
+
 const trend = useFunnelTrend({
   pa,
   runner,
@@ -937,7 +964,10 @@ const trend = useFunnelTrend({
   timezone,
   funnelKey: computed(() => funnelKey.value),
   compareActive,
+  rankStep: trendRank,
 });
+
+const fieldSample = useFunnelFieldSample({ pa, runner, def, events });
 
 const filterFields = computed(() => [
   ...FILTER_FIELDS.filter((f) => pa.schema.value[f]),
@@ -1257,6 +1287,7 @@ const compute = async (force = false) => {
   const res = await current;
   if (res.status !== "ok" || key !== lastKey) return;
   runSuggestions(d, key, cur, opts);
+  loadWhy(force);
 };
 
 // The same query over the window before, so a slow or failed run only blanks the compare cells.
@@ -1349,10 +1380,16 @@ const loadFilterValues = (field: string) => {
   );
 };
 
-// Runs only while the popover is open, and never inside the funnel query, so the funnel keeps its row pruning.
+// An attribute filter that few sessions carry needs the counts for its notice, so it runs the query too.
+const noticeWanted = computed(() =>
+  (def.value.f ?? []).some((r) => isSessionFilter(r) && isFilterColumn(r.field)),
+);
+
+// Runs only while the popover or a notice needs it, and never inside the funnel query, so the funnel keeps its row pruning.
 const loadWhy = (force = false) => {
   const d = effectiveDef.value;
-  if (!whyOpen.value || usersMode.value || d.steps.length < 2) return;
+  if (usersMode.value || !d.steps.length) return;
+  if (!(whyOpen.value && d.steps.length > 1) && !noticeWanted.value) return;
   const key = funnelKey.value;
   const p = whyPanel.value;
   if (!force && p.key === key && (p.status === "ok" || p.status === "loading")) return;
@@ -1367,6 +1404,16 @@ const loadWhy = (force = false) => {
     key,
   );
 };
+
+const filterNotice = computed(() =>
+  whyState.value === "ok" && !usersMode.value
+    ? filterNoticeOf(def.value, whyPanel.value.rows[0] ?? null)
+    : null,
+);
+
+// The notice's way out: the filter goes and the field becomes the breakdown, so no session is dropped.
+const breakDownBy = (field: string) =>
+  applyDef({ ...removeFilter(def.value, field), breakdown: { f: field } });
 
 const onWhyOpen = (open: boolean) => {
   whyOpen.value = open;

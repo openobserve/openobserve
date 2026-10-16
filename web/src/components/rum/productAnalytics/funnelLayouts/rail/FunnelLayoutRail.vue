@@ -46,9 +46,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :fields="filterFields"
             :field-types="filterFieldTypes"
             :values="filterValues"
+            :notice="filterNotice"
+            :unit-noun="unitNoun"
             stacked
             @update:def="(d) => emit('update:def', d)"
             @filter-values="(f) => emit('filter-values', f)"
+            @break-down="(f) => emit('break-down', f)"
           />
           <ExclusionSection
             :def="def"
@@ -184,8 +187,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :unit-noun="unitNoun"
                   :hide-time="hideTime"
                   :compare="compare"
+                  :field-sample="fieldSample"
+                  :field-sample-state="fieldSampleState"
+                  :filter-values="filterValues"
                   @update:def="(d) => emit('update:def', d)"
                   @dropoff="(k) => emit('dropoff', k)"
+                  @filter-values="(f) => emit('filter-values', f)"
+                  @load-fields="emit('load-fields')"
                 />
               </div>
               <slot name="footer" />
@@ -233,8 +241,8 @@ const RAIL_MIN_REM = 17;
 const RAIL_DEFAULT_REM = 22;
 const RAIL_MAX_REM = 30;
 // The table's fixed columns plus a Step column that keeps a typical step name on one or two lines.
-const TABLE_MIN_REM = 56.5;
-const TABLE_MIN_NO_TIME_REM = 47.5;
+const TABLE_MIN_REM = 58.5;
+const TABLE_MIN_NO_TIME_REM = 49.5;
 // The previous-period and change columns; past the rail's minimum the table scrolls inside the card.
 const TABLE_COMPARE_EXTRA_REM = 13;
 const TREND_MIN_REM = 40;

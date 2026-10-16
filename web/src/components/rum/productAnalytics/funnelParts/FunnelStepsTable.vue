@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="flex flex-col"
-    :class="compare ? (hideTime ? 'md:min-w-[58rem]' : 'md:min-w-[67rem]') : ''"
+    :class="compare ? (hideTime ? 'md:min-w-[60rem]' : 'md:min-w-[69rem]') : ''"
     data-test="rum-analytics-funnel-steps-table"
   >
     <div
@@ -240,11 +240,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <span class="flex items-center justify-end gap-0.5">
             <StepConditionPopover
-              v-if="step.kind === 'p'"
               :step="step"
               :index="i"
+              :fields="stepFields(i).map((f) => f.field)"
+              :fields-state="fieldSampleState"
+              :values="filterValues"
               @update="(s) => replaceStep(i, s)"
+              @filter-values="(f) => emit('filter-values', f)"
+              @load-fields="emit('load-fields')"
             />
+            <ODropdown align="end" @update:open="(o) => o && emit('load-fields')">
+              <template #trigger>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="more-vert"
+                  :aria-label="t('rum.analytics.funnel.stepMenu')"
+                  :data-test="`rum-analytics-funnel-step-${i}-menu`"
+                  ><OTooltip :content="t('rum.analytics.funnel.stepMenu')"
+                /></OButton>
+              </template>
+              <ODropdownSub
+                :text-value="t('rum.analytics.funnel.breakDownByStep')"
+                :data-test="`rum-analytics-funnel-step-${i}-break-down`"
+              >
+                <template #trigger>{{ t("rum.analytics.funnel.breakDownByStep") }}</template>
+                <ODropdownItem
+                  v-if="fieldSampleState !== 'ok'"
+                  disabled
+                  :data-test="`rum-analytics-funnel-step-${i}-break-down-state`"
+                  >{{
+                    fieldSampleState === "error"
+                      ? t("rum.analytics.funnel.stepFieldsFailed")
+                      : t("rum.analytics.funnel.stepFieldsLoading")
+                  }}</ODropdownItem
+                >
+                <ODropdownItem
+                  v-else-if="!stepFields(i).length"
+                  disabled
+                  :data-test="`rum-analytics-funnel-step-${i}-break-down-state`"
+                  >{{ t("rum.analytics.funnel.stepFieldsNone") }}</ODropdownItem
+                >
+                <ODropdownItem
+                  v-for="f in stepFields(i)"
+                  v-else
+                  :key="f.field"
+                  :description="fieldHint(f)"
+                  :data-test="`rum-analytics-funnel-step-${i}-break-down-${f.field}`"
+                  @select="breakDownAt(i, f.field)"
+                  ><span class="font-mono">{{ f.field }}</span></ODropdownItem
+                >
+              </ODropdownSub>
+            </ODropdown>
             <OButton
               variant="ghost"
               size="icon-sm"
@@ -332,6 +379,9 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import FunnelStepBar from "@/components/rum/productAnalytics/funnelParts/FunnelStepBar.vue";
 import FunnelChangeCell from "@/components/rum/productAnalytics/funnelParts/FunnelChangeCell.vue";
 import StepConditionPopover from "@/components/rum/productAnalytics/funnelParts/StepConditionPopover.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import useStepLabels from "@/components/rum/productAnalytics/funnelParts/useStepLabels";
 import {
   removeStep,
@@ -339,7 +389,10 @@ import {
   stepOrder,
   type FunnelEdit,
 } from "@/components/rum/productAnalytics/funnelParts/funnelEdits";
+import type { FilterValuesState } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
 import type { PanelState } from "@/composables/rum/useAnalyticsSearch";
+import type { FieldSampleState } from "@/composables/rum/useFunnelFieldSample";
+import { fieldsOnStep, type FieldSample, type SeenField } from "@/utils/rum/funnelFields";
 import type { NamedEventsStatus } from "@/composables/rum/useNamedEvents";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
@@ -364,10 +417,15 @@ const props = defineProps<{
   unitNoun: I18nText;
   hideTime: boolean;
   compare?: FunnelCompareView | null;
+  fieldSample?: FieldSample | null;
+  fieldSampleState?: FieldSampleState;
+  filterValues?: FilterValuesState;
 }>();
 const emit = defineEmits<{
   "update:def": [FunnelDef];
   dropoff: [number];
+  "filter-values": [string];
+  "load-fields": [];
 }>();
 const { t } = useI18nTyped();
 const { labelOf, kindLabel, kindVariant, filterChips } = useStepLabels(
@@ -378,11 +436,11 @@ const { labelOf, kindLabel, kindVariant, filterChips } = useStepLabels(
 const dash = raw("—");
 
 const GRID = {
-  plain: "grid-cols-[3rem_minmax(0,3fr)_5.5rem_7rem_7rem_minmax(6rem,2fr)_4rem]",
-  plainTime: "grid-cols-[3rem_minmax(0,3fr)_5.5rem_7rem_8rem_7rem_minmax(6rem,2fr)_4rem]",
-  compare: "grid-cols-[3rem_minmax(0,3fr)_5.5rem_6rem_6rem_6.5rem_7rem_minmax(6rem,2fr)_4rem]",
+  plain: "grid-cols-[3rem_minmax(0,3fr)_5.5rem_7rem_7rem_minmax(6rem,2fr)_6rem]",
+  plainTime: "grid-cols-[3rem_minmax(0,3fr)_5.5rem_7rem_8rem_7rem_minmax(6rem,2fr)_6rem]",
+  compare: "grid-cols-[3rem_minmax(0,3fr)_5.5rem_6rem_6rem_6.5rem_7rem_minmax(6rem,2fr)_6rem]",
   compareTime:
-    "grid-cols-[3rem_minmax(0,3fr)_5.5rem_6rem_6rem_6.5rem_8rem_7rem_minmax(6rem,2fr)_4rem]",
+    "grid-cols-[3rem_minmax(0,3fr)_5.5rem_6rem_6rem_6.5rem_8rem_7rem_minmax(6rem,2fr)_6rem]",
 } as const;
 
 const gridClass = computed(() => {
@@ -501,6 +559,18 @@ const apply = (edit: FunnelEdit | null) => {
   }
   emit("update:def", edit.def);
 };
+
+const stepFields = (i: number): SeenField[] => fieldsOnStep(props.fieldSample ?? null, i + 1);
+
+const fieldHint = (f: SeenField): I18nText => {
+  if (f.many) return t("rum.analytics.funnel.stepFieldMany");
+  const values = raw(f.top.join(", "));
+  return f.more ? t("rum.analytics.funnel.stepFieldValues", { values, more: f.more }) : values;
+};
+
+// Breaking down from a step's menu pins the value to that step.
+const breakDownAt = (i: number, field: string) =>
+  emit("update:def", { ...props.def, breakdown: { f: field, s: i + 1 } });
 
 const replaceStep = (i: number, step: StepRef) =>
   emit("update:def", { ...props.def, steps: props.def.steps.map((s, j) => (j === i ? step : s)) });

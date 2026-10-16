@@ -20,6 +20,7 @@ import {
   foldBreakdown,
   funnelParam,
   parseFunnelDef,
+  parseSavedFunnelDraft,
   parseStepRef,
   pinnedAfter,
   stepRefParam,
@@ -153,7 +154,14 @@ const HITS = [
 describe("foldBreakdown for an attribute", () => {
   it("starts at the first step where half the units carry a value", () => {
     const { rows, total, start } = foldBreakdown(HITS, 3, 5, { f: PAY });
-    expect(start).toEqual({ step: 2, pinned: false, anyStep: false, covered: 12, reached: 16 });
+    expect(start).toEqual({
+      step: 2,
+      pinned: false,
+      anyStep: false,
+      covered: 12,
+      reached: 16,
+      auto: 2,
+    });
     expect(rows.map((r) => [r.value, r.counts, r.conversion, r.medianMs])).toEqual([
       ["card", [8, 8, 6], 0.75, 1500],
       ["upi", [4, 4, 1], 0.25, 900],
@@ -171,7 +179,14 @@ describe("foldBreakdown for an attribute", () => {
       { dim: null, c1: 30, c2: 10, c3: 3, dc1: 0, dc2: 0, dc3: 0 },
     ];
     const { rows, total, start } = foldBreakdown(hits, 3, 5, { f: PAY });
-    expect(start).toEqual({ step: 1, pinned: false, anyStep: true, covered: 10, reached: 40 });
+    expect(start).toEqual({
+      step: 1,
+      pinned: false,
+      anyStep: true,
+      covered: 10,
+      reached: 40,
+      auto: null,
+    });
     expect(rows.map((r) => [r.value, r.counts])).toEqual([
       ["card", [10, 5, 2]],
       [null, [30, 10, 3]],
@@ -183,7 +198,14 @@ describe("foldBreakdown for an attribute", () => {
 
   it("uses a pinned step even when few units carry the value there", () => {
     const { rows, total, start } = foldBreakdown(HITS, 3, 5, { f: PAY, s: 3 });
-    expect(start).toEqual({ step: 3, pinned: true, anyStep: false, covered: 7, reached: 9 });
+    expect(start).toEqual({
+      step: 3,
+      pinned: true,
+      anyStep: false,
+      covered: 7,
+      reached: 9,
+      auto: 2,
+    });
     expect(rows.map((r) => [r.value, r.counts, r.medianMs])).toEqual([
       ["card", [6, 6, 6], null],
       ["upi", [1, 1, 1], null],
@@ -191,6 +213,13 @@ describe("foldBreakdown for an attribute", () => {
       [null, [26, 7, 0], null],
     ]);
     expect(total).toEqual([35, 16, 9]);
+  });
+
+  it("reads a pin past the last step as automatic, as the SQL does", () => {
+    const { rows, total, start } = foldBreakdown(HITS, 3, 5, { f: PAY, s: 4 });
+    expect(start).toMatchObject({ step: 2, pinned: false, anyStep: false, auto: 2 });
+    expect(total).toEqual([35, 16, 9]);
+    expect(rows.every((r) => r.counts.every((c) => Number.isFinite(c)))).toBe(true);
   });
 
   it("puts a value nobody carried to step k in Left before, not in its own row", () => {
@@ -218,13 +247,13 @@ describe("foldBreakdown for an attribute", () => {
     expect(rows[7]).toMatchObject({ leftBefore: true });
   });
 
-  it("leaves a built-in breakdown as before", () => {
+  it("leaves a built-in breakdown as before, with each value's median from step 1", () => {
     const { rows, start } = foldBreakdown(HITS, 3);
     expect(start).toBeNull();
-    expect(rows.map((r) => [r.value, r.counts, r.notSet])).toEqual([
-      ["card", [10, 8, 6], false],
-      ["upi", [5, 4, 1], false],
-      [null, [20, 4, 2], true],
+    expect(rows.map((r) => [r.value, r.counts, r.notSet, r.medianMs])).toEqual([
+      ["card", [10, 8, 6], false, 3000],
+      ["upi", [5, 4, 1], false, 2000],
+      [null, [20, 4, 2], true, null],
     ]);
   });
 
@@ -234,11 +263,39 @@ describe("foldBreakdown for an attribute", () => {
       { dim: "card", c1: 20, c2: 10, c3: 5 },
       { dim: null, c1: 9, c2: 3, c3: 3 },
     ];
-    const { rows } = compareBreakdown(cur, HITS, prev, 3);
+    const { rows, total } = compareBreakdown(cur, HITS, prev, 3);
     expect(rows[0].prev).toMatchObject({ first: 10, last: 5, conversion: 0.5 });
     expect(rows[1].prev).toBeNull();
     expect(rows[2].prev).toMatchObject({ first: 3, last: 3, conversion: 1 });
     expect(rows[3].prev).toBeNull();
+    // The total compares conversion from step k too, as the table's Total row reads it.
+    expect(total).toMatchObject({ first: 13, last: 8 });
+    expect(total?.change?.pts).toBeCloseTo((9 / 16 - 8 / 13) * 100, 6);
+  });
+
+  it("decides attribute mode from the start step, so unset previous units never join Other", () => {
+    const named = ["a", "b", "c", "d", "e", "f"].map((dim, i) => ({
+      dim,
+      c1: 10 - i,
+      c2: 5,
+      c3: 2,
+      dc1: 10 - i,
+      dc2: 5,
+      dc3: 2,
+    }));
+    const cur = foldBreakdown(named, 3, 5, { f: PAY });
+    expect(cur.start).toMatchObject({ step: 1, anyStep: false });
+    expect(cur.rows.some((r) => r.noValue || r.leftBefore)).toBe(false);
+    const prev = [
+      { dim: "f", c1: 6, c2: 3, c3: 1 },
+      { dim: null, c1: 8, c2: 4, c3: 4 },
+    ];
+    const { rows } = compareBreakdown(cur, named, prev, 3);
+    const other = rows.find((r) => r.other && !r.prevOnly)!;
+    expect(other.prev).toMatchObject({ first: 6, last: 1 });
+    const unset = rows[rows.length - 1];
+    expect(unset).toMatchObject({ prevOnly: true, notSet: true });
+    expect(unset.prev).toMatchObject({ first: 8, last: 4 });
   });
 
   it("shows a previous value with no units at step k now as previous-only, read from step k", () => {
@@ -251,5 +308,22 @@ describe("foldBreakdown for an attribute", () => {
     const last = rows[rows.length - 1];
     expect(last).toMatchObject({ value: "cod", prevOnly: true });
     expect(last.prev).toMatchObject({ first: 4, last: 2, conversion: 0.5 });
+  });
+});
+
+describe("saving a funnel with an attribute breakdown or a step property condition", () => {
+  it("keeps b, bs and pc in the saved definition", () => {
+    const def = parseFunnelDef({
+      s: [S[0], [...S[1], { pc: [{ field: PAY, op: "in", values: ["upi"] }] }], S[2]],
+      b: PAY,
+      bs: 2,
+    })!;
+    const body = parseSavedFunnelDraft({ name: "Pay", def, sql: "SELECT 1" });
+    expect(body?.def).toMatchObject({
+      b: PAY,
+      bs: 2,
+      s: [S[0], [...S[1], { pc: [{ field: PAY, op: "in", values: ["upi"] }] }], S[2]],
+    });
+    expect(parseFunnelDef(body!.def)).toEqual(def);
   });
 });

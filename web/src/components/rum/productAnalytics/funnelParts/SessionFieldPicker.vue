@@ -20,16 +20,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="rum-analytics-funnel-field-picker"
   >
     <template v-if="!field">
-      <div v-if="fields.length" class="flex min-h-0 flex-1 flex-col max-lg:h-72">
+      <span
+        v-if="note"
+        class="text-text-secondary text-xs"
+        data-test="rum-analytics-funnel-field-picker-note"
+        >{{ note }}</span
+      >
+      <div v-if="hasFields" class="flex min-h-0 flex-1 flex-col max-lg:h-72">
         <GroupedFieldList
           :fields="listFields"
           :search="search"
           search-class="px-0"
+          :row-key="groups ? 'rowId' : 'name'"
           @update:search="(v: string) => (search = v)"
           @row-click="onRowClick"
         >
           <template #field-row="{ row }">
-            <OFieldRow :data-test="`rum-analytics-funnel-field-picker-field-${row.field}`">
+            <OFieldRow v-if="groups" :data-test="`rum-analytics-funnel-field-picker-${row.rowId}`">
+              <span
+                class="flex min-w-0 flex-1 items-center justify-between gap-2"
+                :aria-disabled="row.reason ? 'true' : undefined"
+              >
+                <OTruncatedText
+                  as="span"
+                  class="min-w-0 font-mono"
+                  :class="row.reason ? 'text-text-muted' : 'text-text-body'"
+                  >{{ row.name }}</OTruncatedText
+                >
+                <OTruncatedText
+                  v-if="row.hint"
+                  as="span"
+                  class="text-text-secondary text-2xs max-w-[55%] min-w-0 shrink-0"
+                  >{{ row.hint }}</OTruncatedText
+                >
+              </span>
+              <OTooltip v-if="row.reason" :content="row.reason" />
+            </OFieldRow>
+            <OFieldRow v-else :data-test="`rum-analytics-funnel-field-picker-field-${row.field}`">
               <OFieldLabel :field="{ name: row.name }" />
             </OFieldRow>
           </template>
@@ -42,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </GroupedFieldList>
       </div>
-      <span v-else class="text-text-secondary text-xs">{{
+      <span v-else-if="!note" class="text-text-secondary text-xs">{{
         t("rum.analytics.funnel.filterNoFields")
       }}</span>
     </template>
@@ -164,6 +191,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import GroupedFieldList from "@/components/common/GroupedFieldList.vue";
@@ -175,8 +203,9 @@ import {
   filterFieldLabel,
   type FilterCondition,
   type FilterValuesState,
+  type PickerGroup,
 } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { addCommasToNumber } from "@/utils/formatters";
 import { isFilterColumn, MAX_FILTER_VALUES } from "@/utils/rum/productAnalyticsModel";
 import type { FunnelFilter } from "@/utils/rum/productAnalyticsQueries";
@@ -190,11 +219,16 @@ const props = defineProps<{
   initial?: FunnelFilter;
   lockField?: boolean;
   conditions?: readonly FilterCondition[];
+  /** Fixed bands in place of the Logs grouping; a row click then emits `pick` with the row's id. */
+  groups?: readonly PickerGroup[];
+  /** One line above the list, e.g. while a band is still loading. */
+  note?: I18nText | null;
 }>();
 const emit = defineEmits<{
   load: [string];
   apply: [FunnelFilter];
   cancel: [];
+  pick: [string];
 }>();
 const { t } = useI18nTyped();
 const { semanticIndex, keyFieldSet, keyGroupSet, loadGroupingContext } = useFieldGrouping();
@@ -207,8 +241,28 @@ const condition = ref<FilterCondition>(conditionOf(props.initial ?? { op: "in" }
 const typed = ref("");
 const search = ref("");
 
+// Ids are unique across bands, so a field listed in two bands keeps two rows.
+const bandRows = (groups: readonly PickerGroup[]) =>
+  groups
+    .filter((g) => g.fields.length)
+    .flatMap((g) => [
+      { name: g.label, label: true, group: g.id, rowId: `band-${g.id}` },
+      ...g.fields.map((f) => ({
+        name: f.name,
+        group: g.id,
+        rowId: f.id,
+        hint: f.hint,
+        reason: f.reason,
+      })),
+    ]);
+
+const hasFields = computed(() =>
+  props.groups ? props.groups.some((g) => g.fields.length) : props.fields.length > 0,
+);
+
 // Built-in fields are listed under their readable names, so the search finds "Browser family" too.
 const listFields = computed(() => {
+  if (props.groups) return bandRows(props.groups);
   const rows = props.fields.map((field): FieldObj => ({
     name: filterFieldLabel(t, field),
     field,
@@ -272,8 +326,19 @@ const pickField = (f: string) => {
   emit("load", f);
 };
 
-const onRowClick = (row: { name: string; field?: unknown; isGroup?: boolean }) => {
-  if (!row.isGroup) pickField(typeof row.field === "string" ? row.field : row.name);
+const onRowClick = (row: {
+  name: string;
+  field?: unknown;
+  isGroup?: boolean;
+  rowId?: string;
+  reason?: unknown;
+}) => {
+  if (row.isGroup) return;
+  if (props.groups) {
+    if (!row.reason && row.rowId) emit("pick", row.rowId);
+    return;
+  }
+  pickField(typeof row.field === "string" ? row.field : row.name);
 };
 
 const back = () => {
@@ -310,6 +375,6 @@ const apply = () => {
 onMounted(() => {
   if (field.value) emit("load", field.value);
   // Grouping is best effort; without it the list stays flat, as in the Logs field list.
-  loadGroupingContext("logs").catch(() => undefined);
+  if (!props.groups) loadGroupingContext("logs").catch(() => undefined);
 });
 </script>
