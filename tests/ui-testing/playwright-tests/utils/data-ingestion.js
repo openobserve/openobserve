@@ -11,7 +11,7 @@ const lastSharedIngest = new Map();
  * Ingest test data into a stream via API using Node.js context (secure)
  * @param {import('@playwright/test').Page} page - Playwright page object
  * @param {string} streamName - Name of the stream to ingest data into (default: "e2e_automate")
- * @returns {Promise<object>} - API response
+ * @returns {Promise<object>} - API response, or `{ skipped: true }` when this worker refreshed the shared stream within the last 5 min
  */
 async function ingestTestData(page, streamName = "e2e_automate") {
   const orgId = getOrgIdentifier();
