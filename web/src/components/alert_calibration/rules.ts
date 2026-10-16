@@ -56,6 +56,8 @@ export const RULE_IDS: RuleId[] = [
   "silent",
 ];
 
+export const isRuleId = (value: string): value is RuleId => (RULE_IDS as string[]).includes(value);
+
 export const RULE_META: Record<RuleId, RuleMeta> = {
   failure: {
     labelKey: "alertCalibration.rules.failure",

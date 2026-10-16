@@ -8055,7 +8055,6 @@
     "refresh": "Vernieuwen",
     "retry": "Opnieuw proberen",
     "tabs": {
-      "digests": "Samenvattingen",
       "dashboard": "Dashboard"
     },
     "duration": {
@@ -8144,12 +8143,9 @@
     },
     "digests": {
       "schedule": "Planning",
-      "on": "Aan",
       "off": "Uit",
       "notConfigured": "Niet geconfigureerd",
-      "every": "Elke {duration}",
       "window": "Analysevenster",
-      "currentSettings": "Huidige instellingen",
       "latestFindings": "Bevindingen van de laatste run",
       "trend": "Trend van bevindingen",
       "trendAria": "Bevindingen per run, gedempt waar de run een dekkingsgat had",
@@ -8159,13 +8155,10 @@
       "searchPlaceholder": "Zoek runs op alarmnaam",
       "colRun": "Run",
       "colFindings": "Bevindingen",
-      "colDeclined": "Afgewezen",
       "colCoverage": "Dekking",
-      "colGenerated": "Gegenereerd",
       "clean": "Schoon",
       "noneFound": "Geen gevonden",
       "findings": "Bevindingen",
-      "openDigest": "Digest openen",
       "emptyTitle": "Geen runs in de laatste {days} dagen",
       "emptyDescription": "Alarmkalibratie schrijft een digest telkens wanneer het draait. Voer het nu uit om te zien wat het vindt.",
       "filteredTitle": "Geen runs komen overeen met dit filter",
@@ -8203,11 +8196,6 @@
       "noneFoundGap": "Deze run had een dekkingsgat en kon dus niet elk alarm beoordelen.",
       "noneFoundDeclined": "{count} regel- en alarmpaar werd afgewezen, niet beoordeeld. | {count} regel- en alarmparen werden afgewezen, niet beoordeeld.",
       "noneFoundNotClearance": "Nul bevindingen hier is geen vrijgave.",
-      "declinedHeading": "Afgewezen",
-      "declinedHint": "Alarmen die een regel niet zou beoordelen: een poort, geen vrijgave",
-      "nothingDeclined": "Elk alarm binnen bereik werd beoordeeld en niets werd afgewezen.",
-      "declinedPairs": "Afgewezen regel- en alarmparen",
-      "declinedNotWritten": "De redenen per alarm worden niet naar de stream geschreven, alleen dit aantal.",
       "evidence": "Bewijs",
       "alert": "Alarm",
       "topOrgs": "Meest getroffen organisaties",
@@ -8216,20 +8204,9 @@
       "proposedActions": "Voorgestelde acties"
     },
     "dashboard": {
-      "lastDays": "Afgelopen {days} dagen",
-      "latestRun": "Laatste run",
-      "latestRunCaption": "Venster {start} tot {end}, geschreven {time}",
       "findings": "Bevindingen",
-      "thisRunOnly": "Alleen deze run",
       "alertsInScope": "Alarmen binnen bereik",
-      "declined": "Afgewezen",
       "coverage": "Dekking",
-      "byRule": "Alarmen gemarkeerd per regel",
-      "byRuleCaption": "Afzonderlijke alarmen, geen bevindingen. Runs in hetzelfde bereik: {runs}, met een dekkingsgat: {gaps}, die niets maten: {blind}.",
-      "colRule": "Regel",
-      "colAlertsFlagged": "Gemarkeerde alarmen",
-      "colRunsFlagging": "Uitvoeringen die er een markeren",
-      "panelQuery": "Paneelquery",
       "emptyTitle": "Geen uitvoeringen in de afgelopen {days} dagen",
       "emptyDescription": "Het dashboard wordt gevuld zodra de alarmkalibratie is uitgevoerd."
     },
@@ -8244,9 +8221,7 @@
       "enabled": "Alarmkalibratie uitvoeren voor deze organisatie",
       "enabledHelp": "Als dit uit staat, heeft de organisatie geen geplande uitvoering. Als je het aanzet, is de eerste uitvoering onmiddellijk aan de beurt.",
       "frequency": "Uitvoeren elke",
-      "frequencyHelp": "Tussen 1 minuut en 30 dagen.",
       "window": "Analysevenster",
-      "windowHelp": "Hoe ver elke uitvoering terugkijkt, tussen 1 minuut en 1 jaar. Een venster dat langer is dan de cadans zorgt ervoor dat opeenvolgende uitvoeringen elkaar overlappen en dezelfde bevindingen opnieuw rapporteren.",
       "noConfig": "Deze organisatie heeft nog geen instellingen voor alarmkalibratie. De onderstaande waarden zijn de standaardwaarden die bij de eerste opslag worden bewaard.",
       "warnGap": "Voert elke {every} uit, maar kijkt slechts {window} terug, zodat de tijd tussen vensters nooit wordt geanalyseerd.",
       "warnStarved": "Een venster van {window} is te kort voor {rules}, dus elke uitvoering wijst ze af voor elk alarm.",
@@ -8260,12 +8235,7 @@
       "saveFailed": "De instellingen konden niet worden opgeslagen: {message}",
       "loadFailed": "De instellingen konden niet worden geladen: {message}",
       "lastSaved": "Laatst opgeslagen {time}",
-      "runNowHeading": "Nu uitvoeren",
-      "findingsHeading": "Bevindingen en toegang",
-      "findingsDesc": "Elke uitvoering schrijft zijn bevindingen als logrecords naar de {stream}-stream van deze organisatie, bewaard volgens de retentie van die stream.",
-      "accessNote": "De machtiging Alarmkalibratie in een rol bepaalt de toegang: Get om bevindingen te lezen, Update om deze instellingen te wijzigen en Create om een uitvoering aan te vragen. Bevindingen omvatten elk alarm in de organisatie, inclusief alarmen die de lezer niet kan openen. Alarmkalibratie verstuurt geen meldingen.",
-      "frequencyRange": "Kies een cadans tussen 1 minuut en 30 dagen.",
-      "windowRange": "Kies een venster tussen 1 minuut en 1 jaar."
+      "runNowHeading": "Nu uitvoeren"
     }
   },
   "alerts": {

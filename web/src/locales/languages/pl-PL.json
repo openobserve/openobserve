@@ -8055,7 +8055,6 @@
     "refresh": "Odśwież",
     "retry": "Ponów",
     "tabs": {
-      "digests": "Podsumowania",
       "dashboard": "Pulpit"
     },
     "duration": {
@@ -8144,12 +8143,9 @@
     },
     "digests": {
       "schedule": "Harmonogram",
-      "on": "Wł.",
       "off": "Wył.",
       "notConfigured": "Nie skonfigurowano",
-      "every": "Co {duration}",
       "window": "Okno analizy",
-      "currentSettings": "Bieżące ustawienia",
       "latestFindings": "Ustalenia z ostatniego uruchomienia",
       "trend": "Trend ustaleń",
       "trendAria": "Ustalenia na uruchomienie, przygaszone tam, gdzie uruchomienie miało lukę w pokryciu",
@@ -8159,13 +8155,10 @@
       "searchPlaceholder": "Szukaj uruchomień według nazwy alertu",
       "colRun": "Uruchomienie",
       "colFindings": "Ustalenia",
-      "colDeclined": "Odrzucone",
       "colCoverage": "Pokrycie",
-      "colGenerated": "Wygenerowano",
       "clean": "Bez zastrzeżeń",
       "noneFound": "Nie znaleziono",
       "findings": "Ustalenia",
-      "openDigest": "Otwórz podsumowanie",
       "emptyTitle": "Brak uruchomień w ciągu ostatnich {days} dni",
       "emptyDescription": "Kalibracja alertów zapisuje podsumowanie przy każdym uruchomieniu. Uruchom ją teraz, aby zobaczyć, co wykryje.",
       "filteredTitle": "Żadne uruchomienie nie pasuje do tego filtra",
@@ -8203,11 +8196,6 @@
       "noneFoundGap": "To uruchomienie miało lukę w pokryciu, więc nie mogło ocenić każdego alertu.",
       "noneFoundDeclined": "{count} para reguła–alert została odrzucona, nie oceniona. | {count} par reguła–alert zostało odrzuconych, nie ocenionych.",
       "noneFoundNotClearance": "Zero ustaleń tutaj nie jest potwierdzeniem poprawności.",
-      "declinedHeading": "Odrzucone",
-      "declinedHint": "Alerty, których reguła nie oceni: bramka, a nie potwierdzenie poprawności",
-      "nothingDeclined": "Każdy alert w zakresie został oceniony i nic nie zostało odrzucone.",
-      "declinedPairs": "Odrzucone pary reguła–alert",
-      "declinedNotWritten": "Powody dla poszczególnych alertów nie są zapisywane w strumieniu, tylko ta liczba.",
       "evidence": "Dowody",
       "alert": "Alert",
       "topOrgs": "Najbardziej dotknięte organizacje",
@@ -8216,20 +8204,9 @@
       "proposedActions": "Proponowane działania"
     },
     "dashboard": {
-      "lastDays": "Ostatnie {days} dni",
-      "latestRun": "Najnowsze uruchomienie",
-      "latestRunCaption": "Okno od {start} do {end}, zapisano {time}",
       "findings": "Ustalenia",
-      "thisRunOnly": "Tylko to uruchomienie",
       "alertsInScope": "Alerty w zakresie",
-      "declined": "Odrzucone",
       "coverage": "Pokrycie",
-      "byRule": "Alerty oznaczone przez regułę",
-      "byRuleCaption": "Unikalne alerty, nie ustalenia. Uruchomienia w tym samym zakresie: {runs}, z luką w pokryciu: {gaps}, nic nie zmierzyły: {blind}.",
-      "colRule": "Reguła",
-      "colAlertsFlagged": "Oznaczone alerty",
-      "colRunsFlagging": "Uruchomienia, które coś oznaczyły",
-      "panelQuery": "Zapytanie panelu",
       "emptyTitle": "Brak uruchomień w ciągu ostatnich {days} dni",
       "emptyDescription": "Pulpit wypełni się po uruchomieniu kalibracji alertów."
     },
@@ -8244,9 +8221,7 @@
       "enabled": "Uruchamiaj kalibrację alertów dla tej organizacji",
       "enabledHelp": "Gdy opcja jest wyłączona, organizacja nie ma zaplanowanego uruchomienia. Włączenie jej sprawia, że pierwsze uruchomienie ma nastąpić natychmiast.",
       "frequency": "Uruchamiaj co",
-      "frequencyHelp": "Od 1 minuty do 30 dni.",
       "window": "Okno analizy",
-      "windowHelp": "Jak daleko wstecz sięga każde uruchomienie — od 1 minuty do 1 roku. Okno dłuższe niż częstotliwość powoduje, że kolejne uruchomienia nakładają się i ponownie raportują te same ustalenia.",
       "noConfig": "Ta organizacja nie ma jeszcze ustawień kalibracji alertów. Poniższe wartości to ustawienia domyślne, które zostaną zapisane przy pierwszym zapisie.",
       "warnGap": "Uruchamia się co {every}, ale analizuje tylko {window} wstecz, więc czas między oknami nigdy nie jest analizowany.",
       "warnStarved": "Okno {window} jest zbyt krótkie dla {rules}, więc każde uruchomienie odrzuca je dla każdego alertu.",
@@ -8260,12 +8235,7 @@
       "saveFailed": "Nie udało się zapisać ustawień: {message}",
       "loadFailed": "Nie udało się wczytać ustawień: {message}",
       "lastSaved": "Ostatnio zapisano {time}",
-      "runNowHeading": "Uruchom teraz",
-      "findingsHeading": "Ustalenia i dostęp",
-      "findingsDesc": "Każde uruchomienie zapisuje swoje ustalenia jako rekordy logów w strumieniu {stream} tej organizacji, przechowywane zgodnie z okresem retencji tego strumienia.",
-      "accessNote": "Uprawnienie Kalibracja alertów w roli decyduje o dostępie: Get umożliwia odczyt ustaleń, Update — zmianę tych ustawień, a Create — zlecenie uruchomienia. Ustalenia obejmują każdy alert w organizacji, w tym alerty, których czytelnik nie może otworzyć. Kalibracja alertów nie wysyła żadnych powiadomień.",
-      "frequencyRange": "Wybierz częstotliwość od 1 minuty do 30 dni.",
-      "windowRange": "Wybierz okno od 1 minuty do 1 roku."
+      "runNowHeading": "Uruchom teraz"
     }
   },
   "alerts": {

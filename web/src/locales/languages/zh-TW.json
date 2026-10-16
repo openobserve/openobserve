@@ -8050,7 +8050,6 @@
     "refresh": "重新整理",
     "retry": "重試",
     "tabs": {
-      "digests": "摘要",
       "dashboard": "儀表板"
     },
     "duration": {
@@ -8139,12 +8138,9 @@
     },
     "digests": {
       "schedule": "排程",
-      "on": "開啟",
       "off": "關閉",
       "notConfigured": "未設定",
-      "every": "每 {duration}",
       "window": "分析時間範圍",
-      "currentSettings": "目前設定",
       "latestFindings": "最新執行的發現",
       "trend": "發現趨勢",
       "trendAria": "每次執行的發現數，若該次執行有覆蓋缺口則以淡色顯示",
@@ -8154,13 +8150,10 @@
       "searchPlaceholder": "依警示名稱搜尋執行",
       "colRun": "執行",
       "colFindings": "發現",
-      "colDeclined": "已拒絕",
       "colCoverage": "覆蓋",
-      "colGenerated": "產生時間",
       "clean": "無異常",
       "noneFound": "未找到",
       "findings": "發現",
-      "openDigest": "開啟摘要",
       "emptyTitle": "過去 {days} 天內沒有執行",
       "emptyDescription": "警示校準每次執行時都會寫入摘要。立即執行以查看它發現了什麼。",
       "filteredTitle": "沒有符合此篩選條件的執行",
@@ -8198,11 +8191,6 @@
       "noneFoundGap": "此次執行有涵蓋缺口，因此無法判定每個警示。",
       "noneFoundDeclined": "有 {count} 組規則與警示配對被拒絕，未進行判定。 | 有 {count} 組規則與警示配對被拒絕，未進行判定。",
       "noneFoundNotClearance": "這裡零發現並不代表已排除。",
-      "declinedHeading": "已拒絕",
-      "declinedHint": "規則不予判定的警示：這是關卡，而非已排除",
-      "nothingDeclined": "範圍內的每個警示都已判定，且沒有任何項目被拒絕。",
-      "declinedPairs": "被拒絕的規則與警示配對",
-      "declinedNotWritten": "各警示的原因不會寫入串流，只會寫入此計數。",
       "evidence": "證據",
       "alert": "警示",
       "topOrgs": "受影響最嚴重的組織",
@@ -8211,20 +8199,9 @@
       "proposedActions": "建議動作"
     },
     "dashboard": {
-      "lastDays": "最近 {days} 天",
-      "latestRun": "最新執行",
-      "latestRunCaption": "時間範圍 {start} 至 {end}，寫入於 {time}",
       "findings": "發現項目",
-      "thisRunOnly": "僅限此次執行",
       "alertsInScope": "範圍內的警示",
-      "declined": "已拒絕",
       "coverage": "涵蓋範圍",
-      "byRule": "依規則標記的警示",
-      "byRuleCaption": "不重複的警示數，而非發現項目數。同一範圍內的執行次數：{runs}，有涵蓋缺口：{gaps}，未量測到任何內容：{blind}。",
-      "colRule": "規則",
-      "colAlertsFlagged": "已標記的警示",
-      "colRunsFlagging": "標記任一項目的執行",
-      "panelQuery": "面板查詢",
       "emptyTitle": "過去 {days} 天沒有執行",
       "emptyDescription": "警示校準執行後，儀表板就會填入資料。"
     },
@@ -8239,9 +8216,7 @@
       "enabled": "為此組織執行警示校準",
       "enabledHelp": "關閉時，此組織沒有排程執行。開啟後，首次執行會立即到期。",
       "frequency": "執行頻率",
-      "frequencyHelp": "介於 1 分鐘到 30 天之間。",
       "window": "分析時間範圍",
-      "windowHelp": "每次執行往回查看的範圍，介於 1 分鐘到 1 年之間。時間範圍長於執行週期時，連續執行會重疊並再次回報相同的結果。",
       "noConfig": "此組織尚無警示校準設定。下列值是您首次儲存時所儲存的預設值。",
       "warnGap": "每 {every} 執行一次，但只往回查看 {window}，因此兩次時間範圍之間的時間永遠不會被分析。",
       "warnStarved": "對 {rules} 而言，{window} 的時間範圍太短，因此每次執行都會對每個警示略過它們。",
@@ -8255,12 +8230,7 @@
       "saveFailed": "無法儲存設定：{message}",
       "loadFailed": "無法載入設定：{message}",
       "lastSaved": "上次儲存 {time}",
-      "runNowHeading": "立即執行",
-      "findingsHeading": "結果與存取權限",
-      "findingsDesc": "每次執行會將其結果以日誌記錄形式寫入此組織的 {stream} 串流，並依該串流的保留期保存。",
-      "accessNote": "角色中的警示校準權限決定存取權：Get 可讀取發現項目，Update 可變更這些設定，Create 可要求執行。發現項目涵蓋組織中的所有警示，包括讀取者無法開啟的警示。警示校準不會傳送任何通知。",
-      "frequencyRange": "請選擇介於 1 分鐘到 30 天之間的執行週期。",
-      "windowRange": "請選擇介於 1 分鐘到 1 年之間的時間範圍。"
+      "runNowHeading": "立即執行"
     }
   },
   "alerts": {

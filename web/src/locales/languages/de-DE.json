@@ -8055,7 +8055,6 @@
     "refresh": "Aktualisieren",
     "retry": "Wiederholen",
     "tabs": {
-      "digests": "Zusammenfassungen",
       "dashboard": "Dashboard"
     },
     "duration": {
@@ -8144,12 +8143,9 @@
     },
     "digests": {
       "schedule": "Zeitplan",
-      "on": "Ein",
       "off": "Aus",
       "notConfigured": "Nicht konfiguriert",
-      "every": "Alle {duration}",
       "window": "Analysefenster",
-      "currentSettings": "Aktuelle Einstellungen",
       "latestFindings": "Ergebnisse des letzten Laufs",
       "trend": "Trend der Ergebnisse",
       "trendAria": "Ergebnisse pro Lauf, gedämpft, wenn der Lauf eine Abdeckungslücke hatte",
@@ -8159,13 +8155,10 @@
       "searchPlaceholder": "Läufe nach Alarmname durchsuchen",
       "colRun": "Lauf",
       "colFindings": "Ergebnisse",
-      "colDeclined": "Abgelehnt",
       "colCoverage": "Abdeckung",
-      "colGenerated": "Erstellt",
       "clean": "Sauber",
       "noneFound": "Keine gefunden",
       "findings": "Ergebnisse",
-      "openDigest": "Digest öffnen",
       "emptyTitle": "Keine Läufe in den letzten {days} Tagen",
       "emptyDescription": "Die Alarmkalibrierung schreibt bei jedem Lauf einen Digest. Führen Sie sie jetzt aus, um zu sehen, was sie findet.",
       "filteredTitle": "Keine Läufe entsprechen diesem Filter",
@@ -8203,11 +8196,6 @@
       "noneFoundGap": "Dieser Lauf hatte eine Abdeckungslücke, daher konnte er nicht jeden Alarm bewerten.",
       "noneFoundDeclined": "{count} Regel-Alarm-Paar wurde abgelehnt, nicht bewertet. | {count} Regel-Alarm-Paare wurden abgelehnt, nicht bewertet.",
       "noneFoundNotClearance": "Null Befunde hier sind keine Freigabe.",
-      "declinedHeading": "Abgelehnt",
-      "declinedHint": "Alarme, die eine Regel nicht bewerten würde: eine Sperre, keine Freigabe",
-      "nothingDeclined": "Jeder Alarm im Geltungsbereich wurde bewertet, und nichts wurde abgelehnt.",
-      "declinedPairs": "Abgelehnte Regel-Alarm-Paare",
-      "declinedNotWritten": "Die Gründe pro Alarm werden nicht in den Stream geschrieben, nur diese Anzahl.",
       "evidence": "Nachweise",
       "alert": "Alarm",
       "topOrgs": "Am stärksten betroffene Organisationen",
@@ -8216,20 +8204,9 @@
       "proposedActions": "Vorgeschlagene Aktionen"
     },
     "dashboard": {
-      "lastDays": "Letzte {days} Tage",
-      "latestRun": "Letzter Lauf",
-      "latestRunCaption": "Fenster {start} bis {end}, geschrieben {time}",
       "findings": "Befunde",
-      "thisRunOnly": "Nur dieser Lauf",
       "alertsInScope": "Alarme im Geltungsbereich",
-      "declined": "Abgelehnt",
       "coverage": "Abdeckung",
-      "byRule": "Von Regeln markierte Alarme",
-      "byRuleCaption": "Eindeutige Alarme, keine Befunde. Läufe im selben Bereich: {runs}, mit einer Abdeckungslücke: {gaps}, haben nichts gemessen: {blind}.",
-      "colRule": "Regel",
-      "colAlertsFlagged": "Markierte Alarme",
-      "colRunsFlagging": "Läufe mit Markierungen",
-      "panelQuery": "Panel-Abfrage",
       "emptyTitle": "Keine Läufe in den letzten {days} Tagen",
       "emptyDescription": "Das Dashboard füllt sich, sobald die Alarmkalibrierung gelaufen ist."
     },
@@ -8244,9 +8221,7 @@
       "enabled": "Alarmkalibrierung für diese Organisation ausführen",
       "enabledHelp": "Im ausgeschalteten Zustand hat die Organisation keinen geplanten Lauf. Beim Einschalten ist der erste Lauf sofort fällig.",
       "frequency": "Ausführen alle",
-      "frequencyHelp": "Zwischen 1 Minute und 30 Tagen.",
       "window": "Analysefenster",
-      "windowHelp": "Wie weit jeder Lauf zurückblickt, zwischen 1 Minute und 1 Jahr. Ein Fenster, das länger als das Intervall ist, lässt aufeinanderfolgende Läufe überlappen und dieselben Befunde erneut melden.",
       "noConfig": "Diese Organisation hat noch keine Einstellungen für die Alarmkalibrierung. Die folgenden Werte sind die Standardwerte, die beim ersten Speichern gespeichert werden.",
       "warnGap": "Läuft alle {every}, blickt aber nur {window} zurück, sodass die Zeit zwischen den Fenstern nie analysiert wird.",
       "warnStarved": "Ein Fenster von {window} ist zu kurz für {rules}, sodass jeder Lauf sie für jeden Alarm ablehnt.",
@@ -8260,12 +8235,7 @@
       "saveFailed": "Die Einstellungen konnten nicht gespeichert werden: {message}",
       "loadFailed": "Die Einstellungen konnten nicht geladen werden: {message}",
       "lastSaved": "Zuletzt gespeichert {time}",
-      "runNowHeading": "Jetzt ausführen",
-      "findingsHeading": "Befunde und Zugriff",
-      "findingsDesc": "Jeder Lauf schreibt seine Befunde als Log-Datensätze in den Stream {stream} dieser Organisation, die gemäß der Aufbewahrung dieses Streams aufbewahrt werden.",
-      "accessNote": "Die Berechtigung „Alarmkalibrierung“ in einer Rolle entscheidet über den Zugriff: Get zum Lesen der Befunde, Update zum Ändern dieser Einstellungen und Create zum Anfordern eines Laufs. Befunde umfassen jeden Alarm in der Organisation, einschließlich Alarmen, die der Leser nicht öffnen kann. Die Alarmkalibrierung sendet keine Benachrichtigungen.",
-      "frequencyRange": "Wählen Sie ein Intervall zwischen 1 Minute und 30 Tagen.",
-      "windowRange": "Wählen Sie ein Fenster zwischen 1 Minute und 1 Jahr."
+      "runNowHeading": "Jetzt ausführen"
     }
   },
   "alerts": {

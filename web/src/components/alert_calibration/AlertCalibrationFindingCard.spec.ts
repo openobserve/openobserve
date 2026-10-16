@@ -94,8 +94,7 @@ describe("AlertCalibrationFindingCard", () => {
 
   it("names the operator's settings in the scheduler action's description verbatim", () => {
     const wrapper = mountCard(finding());
-    const titles = wrapper.findAll("[title]").map((node) => node.attributes("title"));
-    expect(titles).toContain(
+    expect(wrapper.find('[data-test="alert-calibration-finding-actions"]').text()).toContain(
       "Raise ZO_ALERT_SCHEDULE_CONCURRENCY, add alert nodes, or raise ZO_SCHEDULER_PER_MODULE_PULLERS.",
     );
   });

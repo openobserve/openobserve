@@ -67,11 +67,11 @@ const mountPage = async () => {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: "/alert-calibration", name: "alertCalibration", component: AlertCalibrationDigests },
+      { path: "/alert-calibration", name: "alertCalibration", component: { template: "<div />" } },
       {
-        path: "/alert-calibration/dashboard",
-        name: "alertCalibrationDashboard",
-        component: { template: "<div />" },
+        path: "/alert-calibration/runs",
+        name: "alertCalibrationRuns",
+        component: AlertCalibrationDigests,
       },
       {
         path: "/alert-calibration/digests/:windowStart/:windowEnd",
@@ -86,7 +86,7 @@ const mountPage = async () => {
       { path: "/alerts", name: "alertList", component: { template: "<div />" } },
     ],
   });
-  await router.push({ name: "alertCalibration", query: { org_identifier: "default" } });
+  await router.push({ name: "alertCalibrationRuns", query: { org_identifier: "default" } });
   await router.isReady();
   const wrapper = mount(AlertCalibrationDigests, {
     global: { plugins: [store, router] },
