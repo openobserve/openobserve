@@ -24,6 +24,7 @@ import {
   latestEmission,
   latestPerWindow,
   latestRun,
+  parseLagRows,
   type DigestRecord,
   type FindingRecord,
   type RuleId,
@@ -31,6 +32,7 @@ import {
   type Severity,
 } from "./digests";
 import { formatEvidence, formatMinutes, splitMinutes } from "./format";
+import { rulesShownFor } from "./rules";
 
 const run = (overrides: Partial<RunRow> = {}): RunRow => ({
   window_start: 100,
@@ -200,5 +202,46 @@ describe("the formatting", () => {
     expect(formatEvidence(gt, true, "boolean")).toBe("Yes");
     expect(formatEvidence(gt, false, "boolean")).toBe("No");
     expect(formatEvidence(gt, undefined, "boolean")).toBe("—");
+  });
+});
+
+describe("a cluster finding's lag lists", () => {
+  it("reads each list back out of its one JSON column, keyed by org or by hour", () => {
+    const orgs = JSON.stringify([
+      { org_id: "globex", skipped_windows: 3, late_evaluations: 0, evaluations: 100 },
+      { org_id: "acme", skipped_windows: 0, late_evaluations: 40, evaluations: 120 },
+    ]);
+    expect(parseLagRows(orgs, "org_id").map((r) => [r.key, r.skipped_windows])).toEqual([
+      ["globex", 3],
+      ["acme", 0],
+    ]);
+    const hours = JSON.stringify([
+      {
+        hour_start_micros: 3_600_000_000,
+        skipped_windows: 0,
+        late_evaluations: 9,
+        evaluations: 50,
+      },
+    ]);
+    expect(parseLagRows(hours, "hour_start_micros")).toEqual([
+      { key: 3_600_000_000, skipped_windows: 0, late_evaluations: 9, evaluations: 50 },
+    ]);
+  });
+
+  it("lists nothing for a missing or malformed column, and drops rows without a usable key", () => {
+    for (const value of [undefined, "", "not json", "{}", 42]) {
+      expect(parseLagRows(value, "org_id")).toEqual([]);
+    }
+    const rows = JSON.stringify([{ org_id: " " }, { hour_start_micros: "x" }, null, "x"]);
+    expect(parseLagRows(rows, "org_id")).toEqual([]);
+    expect(parseLagRows(rows, "hour_start_micros")).toEqual([]);
+  });
+});
+
+describe("the rules an org is shown", () => {
+  it("keeps the cluster-wide scheduler rule to the _meta org, where it runs", () => {
+    expect(rulesShownFor("default")).not.toContain("scheduler_health");
+    expect(rulesShownFor("_meta")).toContain("scheduler_health");
+    expect(rulesShownFor("default")).toContain("noise");
   });
 });

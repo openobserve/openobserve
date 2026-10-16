@@ -1132,8 +1132,6 @@
     "regionTitle": "Wählen Sie eine Region",
     "userDefinedSchemaLabel": "Benutzerdefiniertes Schema",
     "allFieldsLabel": "Alle Felder",
-    "generateQuery": "Frag KI",
-    "generateQueryTooltip": "Bitten Sie KI um Hilfe bei Ihrer Anfrage",
     "nlQueryGenerationFailed": "Die Abfrage konnte nicht generiert werden. Bitte versuchen Sie es erneut.",
     "askAIPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Anfrage...",
     "askAIFunctionPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Funktion...",
@@ -8076,6 +8074,7 @@
       "noDestination": "Kein Ziel",
       "noise": "Rauschen",
       "notifyFailed": "Benachrichtigung fehlgeschlagen",
+      "schedulerHealth": "Scheduler-Verzögerung",
       "silent": "Stumm"
     },
     "evidence": {
@@ -8092,6 +8091,12 @@
       "failureRatio": "Ausfallquote",
       "history": "Verlauf",
       "deliveredThroughIncidents": "Über Vorfälle zugestellt",
+      "affectedOrgs": "Betroffene Organisationen",
+      "congestedHours": "Überlastete Stunden",
+      "skippedWindows": "Übersprungene Fenster",
+      "lateEvaluations": "Verspätete Auswertungen",
+      "lateRatio": "Verspätungsanteil",
+      "longestDelay": "Längste Verzögerung",
       "yes": "Ja",
       "no": "Nein"
     },
@@ -8109,7 +8114,9 @@
       "repairDestination": "Ziel reparieren",
       "repairDestinationDesc": "Die Zustellung an ein vom Alarm verwendetes Ziel schlägt fehl.",
       "attachDestination": "Ziel anhängen",
-      "attachDestinationDesc": "Geben Sie dem Alarm ein Ziel für die Zustellung."
+      "attachDestinationDesc": "Geben Sie dem Alarm ein Ziel für die Zustellung.",
+      "scaleAlertScheduler": "Alarm-Scheduler skalieren",
+      "scaleAlertSchedulerDesc": "{concurrency} erhöhen, Alarm-Knoten hinzufügen oder {pullers} erhöhen."
     },
     "severity": {
       "high": "Hoch",
@@ -8189,7 +8196,7 @@
       "suggestionsOnly": "Nur Vorschläge, nichts wird automatisch angewendet",
       "filterAll": "Alle",
       "showingCapped": "Zeige {shown} von {total} Befunden: Die Suche endete bei {count} Datensätzen.",
-      "perAlertNote": "Der Stream enthält einen Datensatz pro Befund und benanntem Alarm, daher hat ein Befund ohne Alarmnamen keine Karte.",
+      "perSubjectNote": "Ein Befund, der mehrere Alarme benennt, hat für jeden eine Karte, sodass die Karten die Befunde zahlenmäßig übertreffen.",
       "nothingTitle": "Nichts zu berichten",
       "nothingDescription": "Keine Abdeckungslücke und nichts abgelehnt: Über {count} Alarme im Geltungsbereich hat die Alarmkalibrierung nichts gefunden.",
       "noneFoundTitle": "Nichts gefunden",
@@ -8198,6 +8205,9 @@
       "noneFoundNotClearance": "Null Befunde hier sind keine Freigabe.",
       "evidence": "Nachweise",
       "alert": "Alarm",
+      "topOrgs": "Am stärksten betroffene Organisationen",
+      "worstHours": "Schlimmste Stunden",
+      "lagImpact": "{skipped} übersprungen, {late} von {evaluations} verspätet",
       "proposedActions": "Vorgeschlagene Aktionen",
       "openAlert": "Alarm öffnen"
     },
@@ -8210,6 +8220,7 @@
       "attentionCaption": "Aus dem letzten Lauf. Öffnen Sie eine Regel, um die von ihr markierten Alarme zu sehen.",
       "alertsFlagged": "{count} Alarm | {count} Alarme",
       "nothingFlagged": "Kein Alarm wurde von dieser Regel im letzten Lauf markiert.",
+      "nothingCongested": "Der Alarm-Scheduler blieb beim letzten Durchlauf auf dem Laufenden.",
       "allClear": "Der letzte Lauf hat nichts zu beheben gefunden.",
       "openAlert": "Alarm öffnen",
       "viewEvidence": "Belege ansehen",
@@ -9725,6 +9736,7 @@
         "continue": "Weiter zum Alarm",
         "queryChoiceLabel": "Warnmeldung für Abfrage",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "Es gibt mehrere Abfragen. Wählen Sie aus, aus welcher der Alarm erstellt werden soll.",
         "streamLabel": "Stream",
         "thresholdLabel": "Alarm bei",
         "thresholdMatchingRows": "Übereinstimmende Zeilen",
@@ -9806,7 +9818,9 @@
         "rumFunnelSnapshot": "Diese Warnmeldung behält eine Kopie des SQL des Funnels. Spätere Änderungen am Funnel oder an seinen benannten Events ändern sie nicht.",
         "rumFunnelSteps": "Ein Funnel benötigt mindestens zwei Schritte, bevor er bei Konversionen eine Warnmeldung auslösen kann.",
         "textFilterDropped": "Ihr Suchfilter wurde nicht übernommen, da dieser Stream keine Volltextsuchfelder (FTS) hat. Fügen Sie ihn der Alarmabfrage hinzu, wenn Sie ihn benötigen.",
-        "heldFilterDropped": "Ihr Suchfilter wurde nicht übernommen, da dafür zuerst eine Auswahl unter „Ausführen als“ auf der Logs-Seite erforderlich ist. Fügen Sie ihn der Alarmabfrage hinzu, wenn Sie ihn benötigen."
+        "heldFilterDropped": "Ihr Suchfilter wurde nicht übernommen, da dafür zuerst eine Auswahl unter „Ausführen als“ auf der Logs-Seite erforderlich ist. Fügen Sie ihn der Alarmabfrage hinzu, wenn Sie ihn benötigen.",
+        "thresholdColumnGuessed": "Der Schwellenwert wurde auf {column} angewendet; prüfen Sie, ob das der gemeinte Wert ist.",
+        "thresholdNotCarried": "Der Schwellenwert {value} aus dem Diagramm wurde nicht übernommen, weil Sie eine andere Abfrage gewählt haben."
       }
     },
     "saveFailed": "Der Alert konnte nicht gespeichert werden.",
@@ -13447,7 +13461,6 @@
   },
   "nlMode": {
     "toggle": "Modus für natürliche Sprache",
-    "noAdditionalOptions": "Keine zusätzlichen Optionen",
     "executingTool": "Ausführung von {tool}...",
     "toolFailed": "Tool fehlgeschlagen: {message}",
     "processing": "Verarbeitung..."
