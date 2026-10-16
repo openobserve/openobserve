@@ -113,6 +113,9 @@ mod m20260402_000001_reports_add_image_fields;
 mod m20260414_000001_add_is_system_to_cipher_keys;
 mod m20260414_000002_create_org_ai_toolsets;
 mod m20260504_000001_add_anomaly_detection_config_folder_fk;
+mod m20260922_000001_add_password_policy_columns_to_users;
+mod m20260922_000002_create_user_password_history_table;
+mod m20260922_000003_create_user_auth_state_table;
 
 pub struct Migrator;
 
@@ -215,6 +218,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20260414_000001_add_is_system_to_cipher_keys::Migration),
             Box::new(m20260414_000002_create_org_ai_toolsets::Migration),
             Box::new(m20260504_000001_add_anomaly_detection_config_folder_fk::Migration),
+            Box::new(m20260922_000001_add_password_policy_columns_to_users::Migration),
+            Box::new(m20260922_000002_create_user_password_history_table::Migration),
+            Box::new(m20260922_000003_create_user_auth_state_table::Migration),
         ]
     }
 }

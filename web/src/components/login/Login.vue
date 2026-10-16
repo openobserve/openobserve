@@ -127,6 +127,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
           class="o2-input login-inputs"
         >
+          <!-- Only retry_after is shown, never the attempt counters or the thresholds behind them. -->
+          <q-banner
+            v-if="lockoutSecondsLeft > 0"
+            dense
+            class="bg-negative text-white tw:mb-3 tw:rounded"
+            data-test="login-lockout-banner"
+          >
+            <template #avatar><q-icon name="error" /></template>
+            {{ t("login.lockedOut", { duration: durationFormatter(lockoutSecondsLeft) }) }}
+          </q-banner>
           <q-form ref="loginform"
   class="q-gutter-md" @submit.prevent="">
             <q-input
@@ -167,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 padding="sm lg"
                 :label="t('login.login')"
                 :loading="submitting"
+                :disable="lockoutSecondsLeft > 0"
                 no-caps
                 @click="onSignIn()"
               />
@@ -179,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, onBeforeMount } from "vue";
+import { defineComponent, ref, type Ref, onBeforeMount, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
@@ -194,7 +205,9 @@ import {
   useLocalCurrentUser,
   useLocalOrganization,
   getImageURL,
+  durationFormatter,
 } from "@/utils/zincutils";
+import { usePasswordExpiryWarning } from "@/composables/usePasswordExpiryWarning";
 import { redirectUser } from "@/utils/common";
 import { computed } from "vue";
 import config from "@/aws-exports";
@@ -209,6 +222,25 @@ export default defineComponent({
     const router = useRouter();
     const $q = useQuasar();
     const { t } = useI18n();
+    const expiryWarning = usePasswordExpiryWarning();
+
+    // A countdown reaching zero is not "unlocked"; it only lets the server answer again.
+    const lockoutSecondsLeft = ref(0);
+    let lockoutTimer: ReturnType<typeof setInterval> | null = null;
+    const startLockoutCountdown = (secs: number) => {
+      lockoutSecondsLeft.value = Math.ceil(secs);
+      if (lockoutTimer) clearInterval(lockoutTimer);
+      lockoutTimer = setInterval(() => {
+        lockoutSecondsLeft.value -= 1;
+        if (lockoutSecondsLeft.value <= 0 && lockoutTimer) {
+          clearInterval(lockoutTimer);
+          lockoutTimer = null;
+        }
+      }, 1000);
+    };
+    onBeforeUnmount(() => {
+      if (lockoutTimer) clearInterval(lockoutTimer);
+    });
     const name = ref("");
     const password = ref("");
     const confirmpassword = ref("");
@@ -280,6 +312,9 @@ export default defineComponent({
             .then(async (res: any) => {
               //if user is authorized, get user info
               if (res.data.status == true) {
+                // Absent when there is nothing to warn about; clearing covers a previous user of this tab.
+                expiryWarning.dismiss();
+                expiryWarning.remember(res.data.password_rotation_warning);
                 //get user info from backend and extract auth token and set it into localstorage
                 const authToken = getBasicAuth(name.value, password.value);
                 const userInfo = {
@@ -298,7 +333,7 @@ export default defineComponent({
                 );
                 //set user info into localstorage & store
                 useLocalUserInfo(encodedUserInfo);
-                store.dispatch("setUserInfo", encodedUserInfo);
+                store.dispatch("setUserInfo", userInfo);
 
                 useLocalCurrentUser(JSON.stringify(userInfo));
                 store.dispatch("setCurrentUser", userInfo);
@@ -419,9 +454,14 @@ export default defineComponent({
                 });
               }
             })
-            .catch((e: Error) => {
-              //if any error occurs, show error message and reset form.
+            .catch((e: any) => {
               submitting.value = false;
+              const retryAfter = e?.response?.data?.lockout_retry_after_secs;
+              if (retryAfter > 0) {
+                startLockoutCountdown(retryAfter);
+                return;
+              }
+              //if any error occurs, show error message and reset form.
               loginform.value.resetValidation();
               $q.notify({
                 color: "negative",
@@ -444,6 +484,8 @@ export default defineComponent({
 
     return {
       t,
+      durationFormatter,
+      lockoutSecondsLeft,
       name,
       password,
       confirmpassword,

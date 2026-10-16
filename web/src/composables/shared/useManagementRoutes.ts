@@ -143,6 +143,18 @@ const useManagementRoutes = () => {
           },
         },
         {
+          path: "password_policy",
+          name: "passwordPolicy",
+          component: () => import("@/components/settings/PasswordPolicy.vue"),
+          meta: {
+            keepAlive: true,
+            title: "Password Policy",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
           path: "announcements",
           children: [
             {

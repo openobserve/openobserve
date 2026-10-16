@@ -19,6 +19,8 @@ import axios from "axios";
 import config from "../aws-exports";
 import { Notify } from "quasar";
 import { useLocalUserInfo, useLocalCurrentUser } from "@/utils/zincutils";
+import { usePasswordReset } from "@/composables/usePasswordReset";
+import { isPasswordResetError } from "@/utils/passwordResetErrors";
 
 // Shared refresh state — ensures only one dex_refresh request is in-flight
 // at a time across all axios instances and streaming fetch requests. All
@@ -109,6 +111,12 @@ const http = ({ headers } = {} as any) => {
       return response;
     },
     function (error) {
+      // Ahead of the status switch: a reset-required 403 is a policy state, not an authorization failure.
+      if (isPasswordResetError(error)) {
+        usePasswordReset().open(error.response.data.reason);
+        // A blocked page fires many requests behind an undismissable dialog; one toast per rejection would stack.
+        return new Promise(() => {});
+      }
       if (error && error.response && error.response.status) {
         switch (error.response.status) {
           case 400:

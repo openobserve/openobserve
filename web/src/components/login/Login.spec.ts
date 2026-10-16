@@ -57,6 +57,7 @@ vi.mock("@/utils/zincutils", () => ({
   useLocalCurrentUser: vi.fn(),
   useLocalOrganization: vi.fn(() => ({ value: null })),
   getImageURL: vi.fn().mockReturnValue("image-url"),
+  durationFormatter: vi.fn((secs: number) => `${secs}s`),
 }));
 
 vi.mock("@/utils/common", () => ({
@@ -517,7 +518,12 @@ describe("Login", () => {
     wrapper.vm.password = "password123";
     
     await wrapper.vm.onSignIn();
-    expect(mockDispatch).toHaveBeenCalledWith("setUserInfo", "encoded-data");
+    // The store must hold the decoded object: the dialog and MainLayout read `.email` off it directly.
+    expect(mockDispatch).toHaveBeenCalledWith(
+      "setUserInfo",
+      expect.objectContaining({ email: "testuser", name: "testuser" }),
+    );
+    expect(mockDispatch).not.toHaveBeenCalledWith("setUserInfo", "encoded-data");
   });
 
   // Test 21: successful sign in dispatches setCurrentUser

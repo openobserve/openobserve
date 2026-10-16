@@ -15,5 +15,7 @@
 pub mod assume_service_account;
 pub mod es;
 pub mod org;
+#[cfg(feature = "enterprise")]
+pub mod password_policy;
 pub mod settings;
 pub mod system_settings;

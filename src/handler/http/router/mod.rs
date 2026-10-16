@@ -53,7 +53,7 @@ use crate::{
             RequestData, oo_validator, validator_aws, validator_gcp, validator_proxy_url,
             validator_rum,
         },
-        router::middlewares::blocked_orgs_middleware,
+        router::middlewares::{blocked_orgs_middleware, password_policy_middleware},
     },
 };
 
@@ -156,7 +156,10 @@ pub(crate) fn is_origin_allowed(request_origin: &[u8], web_url: &str) -> bool {
     request_origin == allowed_origin.as_bytes()
 }
 
-/// Authentication middleware for API routes
+/// Authentication middleware for API routes.
+///
+/// Pair it with `password_policy_middleware` layered inside it on every router that uses it: this
+/// one answers who the caller is, that one whether their password still entitles them to be here.
 pub async fn auth_middleware(request: Request, next: Next) -> Response {
     // Extract request data FIRST, before any async calls
     // This ensures the future is Send because RequestData is Send + Sync
@@ -499,6 +502,8 @@ pub fn basic_routes() -> Router {
         .route("/consistent_hash", post(status::consistent_hash))
         .route("/refresh_nodes_list", get(status::refresh_nodes_list))
         .route("/refresh_user_sessions", get(status::refresh_user_sessions))
+        // Listed first, so it wraps closer to the route and runs after authentication.
+        .layer(middleware::from_fn(password_policy_middleware))
         .layer(middleware::from_fn(auth_middleware));
 
     router = router.nest("/node", node_routes);
@@ -510,6 +515,7 @@ pub fn basic_routes() -> Router {
             .route("/profile/memory", get(profiling::memory_profile))
             .route("/profile/stats", get(profiling::jemalloc_stats))
             .route("/profile/cpu", get(profiling::cpu_profile))
+            .layer(middleware::from_fn(password_policy_middleware))
             .layer(middleware::from_fn(auth_middleware));
 
         router = router.nest("/debug", debug_routes);
@@ -531,6 +537,7 @@ pub fn basic_routes() -> Router {
 pub fn config_routes() -> Router {
     Router::new()
         .route("/reload", get(status::config_reload))
+        .route_layer(middleware::from_fn(password_policy_middleware))
         .route_layer(middleware::from_fn(auth_middleware))
         .route("/", get(status::zo_config))
         .route("/logout", get(status::logout))
@@ -540,6 +547,7 @@ pub fn config_routes() -> Router {
 pub fn config_routes() -> Router {
     Router::new()
         .route("/reload", get(status::config_reload))
+        .route_layer(middleware::from_fn(password_policy_middleware))
         .route_layer(middleware::from_fn(auth_middleware))
         .route("/", get(status::zo_config))
         .route("/logout", get(status::logout))
@@ -565,8 +573,28 @@ pub fn service_routes() -> Router {
 
     let mut router = Router::new();
     // Users
+    // Reading one member returns their lockout counters, which only an enterprise build has.
+    #[cfg(not(feature = "enterprise"))]
+    {
+        router = router.route(
+            "/{org_id}/users/{email_id}",
+            post(users::add_user_to_org)
+                .put(users::update)
+                .delete(users::delete),
+        );
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        router = router.route(
+            "/{org_id}/users/{email_id}",
+            post(users::add_user_to_org)
+                .put(users::update)
+                .delete(users::delete)
+                .get(users::get),
+        );
+    }
+
     router = router.route("/{org_id}/users", get(users::list).post(users::save))
-        .route("/{org_id}/users/{email_id}", post(users::add_user_to_org).put(users::update).delete(users::delete))
         .route("/{org_id}/users/bulk", delete(users::delete_bulk))
         .route("/{org_id}/users/roles", get(users::list_roles))
         .route("/invites", get(users::list_invitations))
@@ -758,6 +786,12 @@ pub fn service_routes() -> Router {
     #[cfg(feature = "enterprise")]
     {
         router = router
+            // Instance-wide native-user auth policy: authored on the meta org, enforced everywhere
+            .route("/{org_id}/settings/password_policy", get(organization::password_policy::get_policy).put(organization::password_policy::set_policy))
+            // Complexity requirements only: readable by any authenticated user, including one the
+            // policy middleware has blocked, who needs to know what password will satisfy it
+            .route("/{org_id}/password_complexity", get(organization::password_policy::get_password_complexity))
+
             // Anomaly Detection
             .route("/{org_id}/anomaly_detection", get(anomaly_detection::list_configs).post(anomaly_detection::create_config))
             .route("/{org_id}/anomaly_detection/{config_id}", get(anomaly_detection::get_config).put(anomaly_detection::update_config).delete(anomaly_detection::delete_config))
@@ -986,6 +1020,9 @@ pub fn service_routes() -> Router {
     router
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
+        // Between auth and audit: it needs the email authentication resolves, and a request it
+        // refuses never reached a handler, so there is nothing for the audit trail to record.
+        .layer(middleware::from_fn(password_policy_middleware))
         .layer(middleware::from_fn(auth_middleware))
         .layer(RequestDecompressionLayer::new())
         .layer(middleware::from_fn(
@@ -1167,6 +1204,183 @@ mod tests {
                 .get("sql_reserved_keywords")
                 .and_then(Value::as_array)
                 .is_some_and(|keywords| !keywords.is_empty())
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn password_policy_read_is_refused_outside_the_meta_org() {
+        // The full policy carries lockout thresholds and history depth. Gating only the write
+        // would leave those readable by any org-level settings holder — and in an OSS build,
+        // where check_permissions is a no-op, by any authenticated user at all.
+        let app = Router::new().route(
+            "/{org_id}/settings/password_policy",
+            get(organization::password_policy::get_policy),
+        );
+
+        // auth_middleware injects this header before the handler runs; the minimal router here
+        // bypasses that, so the test supplies it.
+        let refused = app
+            .oneshot(
+                Request::builder()
+                    .uri("/acme/settings/password_policy")
+                    .header("user_id", "someone@example.com")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        // Returns before touching the database, which is what makes this assertable here.
+        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn password_policy_read_is_refused_for_a_non_admin_on_the_meta_org() {
+        // Belonging to _meta is not enough. With OpenFGA off — or in an OSS build, where
+        // check_permissions is an unconditional true — membership would otherwise be the only
+        // gate, so the role check has to hold on its own.
+        let app = Router::new().route(
+            "/{org_id}/settings/password_policy",
+            get(organization::password_policy::get_policy),
+        );
+
+        let refused = app
+            .oneshot(
+                Request::builder()
+                    .uri("/_meta/settings/password_policy")
+                    // Not present in ORG_USERS, so the role lookup finds nothing to admit.
+                    .header("user_id", "not-a-meta-admin@example.invalid")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+    }
+
+    /// axum resolves the route table when the `Router` is built, panicking on two paths it cannot
+    /// tell apart. Nothing else here constructs the real table — the tests below use minimal
+    /// routers — so without this a conflicting path would first be discovered at startup.
+    #[test]
+    fn service_routes_table_has_no_conflicts() {
+        let _ = service_routes();
+    }
+
+    /// The lockout counters ride along with the user record, and reading them tells the account
+    /// exactly how to pace attempts underneath the threshold — so a caller who does not administer
+    /// the named org gets nothing. Which administrators *are* admitted is unit-tested against
+    /// `validate_user_admin` in the handler crate.
+    ///
+    /// The caller is seeded as a real member of both organizations, holding a role that is not an
+    /// administrator's. An unseeded caller would be refused for having no row to read a role from,
+    /// which would pass this test against a check that admitted every user it could find.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn user_read_refuses_a_caller_who_administers_nothing() {
+        use config::meta::user::{UserRole, UserType};
+
+        use crate::common::infra::config::{ORG_USERS, USERS};
+
+        let caller = "viewer@user-read-routes.test";
+        let target = "target@example.com";
+        USERS.insert(
+            caller.to_string(),
+            infra::table::users::UserRecord {
+                email: caller.to_string(),
+                first_name: "V".to_string(),
+                last_name: "R".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root: false,
+                password_ext: None,
+                user_type: UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        // The target is seeded as a member too, so the caller's role is the ONLY thing left that
+        // can refuse these requests. Without it a check that admitted the caller would still
+        // answer — for the target not being a member — and this test could not tell the two apart.
+        for (org, email) in [("acme", caller), ("_meta", caller), ("acme", target)] {
+            ORG_USERS.insert(
+                format!("{org}/{email}"),
+                infra::table::org_users::OrgUserRecord {
+                    role: UserRole::Viewer,
+                    token: "token".to_string(),
+                    rum_token: None,
+                    org_id: org.to_string(),
+                    email: email.to_string(),
+                    created_at: 0,
+                    allow_static_token: true,
+                },
+            );
+        }
+
+        let app = Router::new().route("/{org_id}/users/{email_id}", get(users::get));
+
+        for (uri, case) in [
+            (
+                "/acme/users/target@example.com",
+                "read on an org the caller does not administer",
+            ),
+            (
+                "/_meta/users/target@example.com",
+                "read by a non-admin on the meta org",
+            ),
+        ] {
+            let refused = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri(uri)
+                        .header("user_id", caller)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+
+            // Answered from the caches above, so this never reaches the database.
+            assert_eq!(refused.status(), StatusCode::FORBIDDEN, "{case}");
+        }
+
+        USERS.remove(caller);
+        for (org, email) in [("acme", caller), ("_meta", caller), ("acme", target)] {
+            ORG_USERS.remove(&format!("{org}/{email}"));
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn password_complexity_route_is_readable_by_any_org() {
+        // The counterpart to the test above: the projection is deliberately not org-gated, since
+        // a user blocked for a forced reset holds no settings grant anywhere.
+        let app = Router::new().route(
+            "/{org_id}/password_complexity",
+            get(organization::password_policy::get_password_complexity),
+        );
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/acme/password_complexity")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_ne!(
+            response.status(),
+            StatusCode::FORBIDDEN,
+            "complexity must stay readable outside _meta"
         );
     }
 

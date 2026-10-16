@@ -15,6 +15,10 @@ Object.defineProperty(window, 'localStorage', {
   value: mockLocalStorage,
 });
 
+vi.mock('@/components/common/UpdatePasswordDialog.vue', () => ({
+  default: { name: 'UpdatePasswordDialog', render: () => null }
+}));
+
 // Mock aws-exports
 vi.mock('@/aws-exports', () => ({
   default: {

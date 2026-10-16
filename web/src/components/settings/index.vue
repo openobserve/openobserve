@@ -93,6 +93,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <q-route-tab
                   v-if="config.isEnterprise == 'true' && isMetaOrg"
+                  data-test="password-policy-tab"
+                  name="password_policy"
+                  :to="{
+                    name: 'passwordPolicy',
+                    query: {
+                      org_identifier: store.state.selectedOrganization?.identifier,
+                    },
+                  }"
+                  icon="lock"
+                  :label="t('settings.passwordPolicy')"
+                  content-class="tab_content"
+                />
+                <q-route-tab
+                  v-if="config.isEnterprise == 'true' && isMetaOrg"
                   data-test="announcement-banners-tab"
                   name="announcements"
                   :to="{
@@ -293,7 +307,12 @@ import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 
-const META_ORG_ONLY_ROUTES = ["license", "announcementBanners", "announcementBannerEditor"];
+const META_ORG_ONLY_ROUTES = [
+  "license",
+  "passwordPolicy",
+  "announcementBanners",
+  "announcementBannerEditor",
+];
 
 export default defineComponent({
   name: "AppSettings",

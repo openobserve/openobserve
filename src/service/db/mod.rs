@@ -41,6 +41,7 @@ pub mod metrics;
 pub mod ofga;
 pub mod org_users;
 pub mod organization;
+pub mod password_policy;
 pub mod pipeline;
 pub mod pipeline_errors;
 #[cfg(feature = "vectorscan")]

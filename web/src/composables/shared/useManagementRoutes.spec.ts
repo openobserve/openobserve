@@ -119,7 +119,7 @@ describe("useManagementRoutes", () => {
 
   describe("Base Children Routes", () => {
     let routes: any;
-    
+
     beforeEach(() => {
       routes = useManagementRoutes();
     });
@@ -319,10 +319,10 @@ describe("useManagementRoutes", () => {
     it("should have beforeEnter hooks for all enterprise routes", () => {
       const routes = useManagementRoutes();
       const enterpriseRoutes = [
-        "query_management", "cipherKeys", "pipelineDestinations", 
+        "query_management", "cipherKeys", "pipelineDestinations",
         "nodes", "domainManagement", "regexPatterns"
       ];
-      
+
       enterpriseRoutes.forEach(routeName => {
         const route = routes[0].children.find((child: any) => child.name === routeName);
         expect(typeof route.beforeEnter).toBe("function");
@@ -343,19 +343,19 @@ describe("useManagementRoutes", () => {
     it("should have components defined for all enterprise routes", () => {
       const routes = useManagementRoutes();
       const enterpriseRoutes = [
-        "query_management", "cipherKeys", "pipelineDestinations", 
+        "query_management", "cipherKeys", "pipelineDestinations",
         "nodes", "domainManagement", "regexPatterns"
       ];
-      
+
       enterpriseRoutes.forEach(routeName => {
         const route = routes[0].children.find((child: any) => child.name === routeName);
         expect(route.component).toBeDefined();
       });
     });
 
-    it("should have exactly 13 children routes when enterprise is enabled", () => {
+    it("should have exactly 15 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(14); // 4 base + 10 enterprise (query_management, cipherKeys, aiToolsets, pipelineDestinations, nodes, domainManagement, announcements, regexPatterns, correlationSettings, license)
+      expect(routes[0].children).toHaveLength(15); // 4 base + 11 enterprise (query_management, cipherKeys, aiToolsets, pipelineDestinations, nodes, domainManagement, passwordPolicy, announcements, regexPatterns, correlationSettings, license)
     });
   });
 
@@ -423,18 +423,18 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 14 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 16 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(15); // 4 base + 10 enterprise + 1 cloud
+      expect(routes[0].children).toHaveLength(16); // 4 base + 11 enterprise + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
       const routes = useManagementRoutes();
       const enterpriseRoutes = [
-        "query_management", "cipherKeys", "pipelineDestinations", 
+        "query_management", "cipherKeys", "pipelineDestinations",
         "nodes", "domainManagement", "regexPatterns"
       ];
-      
+
       enterpriseRoutes.forEach(routeName => {
         const route = routes[0].children.find((child: any) => child.name === routeName);
         expect(route).toBeDefined();
@@ -604,13 +604,13 @@ describe("useManagementRoutes", () => {
       config.isCloud = "true";
       const routes1 = useManagementRoutes();
       const routes2 = useManagementRoutes();
-      
+
       // Compare the structure rather than object references
       expect(routes1.length).toBe(routes2.length);
       expect(routes1[0].path).toBe(routes2[0].path);
       expect(routes1[0].name).toBe(routes2[0].name);
       expect(routes1[0].children.length).toBe(routes2[0].children.length);
-      
+
       // Compare child routes structure
       routes1[0].children.forEach((child1: any, index: number) => {
         const child2 = routes2[0].children[index];
@@ -623,21 +623,21 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes1 = useManagementRoutes();
-      
+
       config.isEnterprise = "true";
       config.isCloud = "true";
       const routes2 = useManagementRoutes();
-      
+
       expect(routes1[0].children.length).toBeLessThan(routes2[0].children.length);
     });
 
     it("should maintain immutability of the returned routes array", () => {
       const routes = useManagementRoutes();
       const originalLength = routes[0].children.length;
-      
+
       // Attempt to modify the returned array
       routes[0].children.push({ name: "test", path: "test" });
-      
+
       // Get new routes and verify original structure is maintained
       const newRoutes = useManagementRoutes();
       expect(newRoutes[0].children.length).toBe(originalLength);

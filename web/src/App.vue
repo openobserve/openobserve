@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <router-view
     :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   ></router-view>
+  <UpdatePasswordDialog />
 </template>
 
 <script lang="ts">
@@ -26,8 +27,12 @@ import { useRouter } from "vue-router";
 import { onMounted, watch } from "vue";
 import config from "@/aws-exports";
 import { applyThemeColors } from "@/utils/theme";
+import UpdatePasswordDialog from "@/components/common/UpdatePasswordDialog.vue";
 
 export default {
+  components: {
+    UpdatePasswordDialog,
+  },
   setup() {
     const store = useStore();
     const router = useRouter();
