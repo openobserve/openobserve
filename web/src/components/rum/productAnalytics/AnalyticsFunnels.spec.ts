@@ -227,6 +227,7 @@ describe("AnalyticsFunnels", () => {
             template: "<div><slot /></div>",
           },
           ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+          ODropdownSub: { template: '<div><slot name="trigger" /><slot /></div>' },
           OPopover: {
             props: ["open"],
             emits: ["update:open"],
@@ -626,6 +627,11 @@ describe("AnalyticsFunnels", () => {
     expect(funnelSqls().at(-1)).toContain("SELECT dim, ");
     expect(text("rum-analytics-funnel-breakdown-row-0")).toContain("Chrome");
     expect(text("rum-analytics-funnel-breakdown")).toContain("200");
+    expect(funnelSqls().at(-1)).toContain("AS mt1");
+    expect(wrapper!.text()).not.toContain("Time to convert is shown");
+    expect(text("rum-analytics-funnel-breakdown-summary")).toMatch(
+      /^Chrome 40\.0%\s*·\s*Firefox 40\.0%$/,
+    );
     expect(wrapper!.find('[data-test="rum-analytics-funnel-step-1-time"]').exists()).toBe(false);
     expect((decodeDef(router.currentRoute.value.query.funnel as string) as { b: string }).b).toBe(
       "browser",
@@ -2138,6 +2144,71 @@ describe("AnalyticsFunnels", () => {
       });
     });
 
+    it("an attribute filter few step-1 sessions carry gets its notice without opening Why N?, and Break down swaps it", async () => {
+      const PAY = "context_payment_method";
+      withSchema(["usr_email", PAY]);
+      routes = [[/AS opened/, [{ opened: 84, kept: 8, carry1: 36 }]], ...baseRoutes()];
+      respond();
+      await mountFunnels();
+      await twoSteps();
+      const whySql = () => sqls().filter((q) => q.includes("AS opened"));
+      expect(whySql()).toHaveLength(0);
+      const pa = useProductAnalytics();
+      layout().vm.$emit("update:def", {
+        ...pa.funnel.value,
+        f: [{ field: PAY, op: "in", values: ["upi"] }],
+      });
+      await settle();
+      await settle();
+      expect(whySql()).toHaveLength(1);
+      expect(whySql()[0]).toContain("AS carry1");
+      expect(layout().props("filterNotice")).toEqual({
+        field: PAY,
+        kept: 8,
+        opened: 84,
+        carry: 36,
+      });
+      layout().vm.$emit("break-down", PAY);
+      await settle();
+      expect(pa.funnel.value.f).toBeUndefined();
+      expect(pa.funnel.value.breakdown).toEqual({ f: PAY });
+    });
+
+    it("a built-in filter never runs Why N? on its own and gets no notice", async () => {
+      withSchema(["usr_email", "geo_info_country"]);
+      await mountFunnels();
+      await twoSteps();
+      layout().vm.$emit("update:def", {
+        ...useProductAnalytics().funnel.value,
+        f: [{ field: "geo_info_country", op: "in", values: ["India"] }],
+      });
+      await settle();
+      expect(sqls().filter((q) => q.includes("AS opened"))).toHaveLength(0);
+      expect(layout().props("filterNotice")).toBeNull();
+    });
+
+    it("the step-field sample runs once per funnel on request and hands its fields to the layout", async () => {
+      const PAY = "context_payment_method";
+      withSchema(["usr_email", PAY, "view_url"]);
+      routes = [[/AS st, ROW_NUMBER\(\) OVER/, [{ st: 2, [PAY]: "card" }]], ...baseRoutes()];
+      respond();
+      await mountFunnels();
+      await twoSteps();
+      const sampleSql = () => sqls().filter((q) => q.includes("AS st, ROW_NUMBER() OVER"));
+      expect(sampleSql()).toHaveLength(0);
+      expect(layout().props("fieldSampleState")).toBe("idle");
+      layout().vm.$emit("load-fields");
+      await settle();
+      layout().vm.$emit("load-fields");
+      await settle();
+      expect(sampleSql()).toHaveLength(1);
+      expect(sampleSql()[0]).toContain(`"${PAY}"`);
+      expect(sampleSql()[0]).not.toContain('view_url"');
+      expect(layout().props("fieldSample")).toEqual({
+        fields: [{ field: PAY, steps: [2], top: ["card"], more: 0, many: false }],
+      });
+    });
+
     it("Why N? runs its own query only when opened, and its lines add up to the entry count", async () => {
       routes = [
         [
@@ -2432,8 +2503,8 @@ describe("AnalyticsFunnels", () => {
         .findAll("[data-test^=rum-analytics-funnel-breakdown-row-]")
         .find((c) => c.text() === "Safari")!
         .element.closest("tr")!.textContent!;
-      // Steps and this period's conversion are dashes; only the previous period has a value.
-      expect(safari).toBe("Safari———50.0%—");
+      // Steps, this period's conversion and its median are dashes; only the previous period has a value.
+      expect(safari).toBe("Safari————50.0%—");
     });
   });
 
@@ -2484,6 +2555,33 @@ describe("AnalyticsFunnels", () => {
       expect(trendCalls()).toHaveLength(1);
       expect(funnelSqls()).toHaveLength(stepsRuns);
       expect(wrapper!.find('[data-test="rum-analytics-funnel-steps-table"]').exists()).toBe(true);
+    });
+
+    it("an attribute breakdown's lines rank at its pinned step, or wait for the funnel's start step", async () => {
+      const PAY = "context_payment_method";
+      const { performanceState } = usePerformance();
+      performanceState.data.streams._rumdata = {
+        name: "_rumdata",
+        schema: { usr_email: { name: "usr_email" }, [PAY]: { name: PAY } },
+      };
+      routes.unshift([
+        /SELECT dim, /,
+        () => [
+          { dim: "card", c1: 20, c2: 18, c3: 17, c4: 17, dc1: 0, dc2: 0, dc3: 17, dc4: 17 },
+          { dim: null, c1: 60, c2: 30, c3: 3, c4: 1, dc1: 0, dc2: 0, dc3: 0, dc4: 0 },
+        ],
+      ]);
+      await mountFunnels({ fv: "trend" });
+      await setSteps(fourSteps);
+      const pa = useProductAnalytics();
+      pa.funnel.value = { ...pa.funnel.value, breakdown: { f: PAY, s: 2 } };
+      await settle();
+      expect(trendCalls().at(-1)!.sql).toContain("SUM(r2) AS c2, SUM(r1) AS ca");
+      pa.funnel.value = { ...pa.funnel.value, breakdown: { f: PAY } };
+      await settle();
+      await settle();
+      expect(trendCalls().at(-1)!.sql).toContain("SUM(r3) AS c3, SUM(r1) AS ca");
+      expect(trendCalls().at(-1)!.sql).toContain("un = 0 AND tot > 0 AND rk <= 5");
     });
 
     it("a pair from the link picks its own reach columns; a pair the funnel cannot hold falls back", async () => {

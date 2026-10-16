@@ -61,6 +61,8 @@ interface TrendDeps {
   timezone: ComputedRef<string>;
   funnelKey: ComputedRef<string>;
   compareActive: ComputedRef<boolean>;
+  /** The step a breakdown's lines are ranked at; null while it is still unknown. */
+  rankStep?: ComputedRef<number | null>;
 }
 
 const WAITING: PanelState<unknown> = {
@@ -106,10 +108,13 @@ export default function useFunnelTrend(deps: TrendDeps) {
   // A breakdown's lines are its own comparison, so the previous period runs only without one.
   const comparing = computed(() => deps.compareActive.value && !breakdown.value);
 
+  const rank = computed(() => (deps.rankStep ? deps.rankStep.value : 1));
+
+  // An unknown rank holds the run, so its lines never start from a ranking the table will not use.
   const key = computed(() => {
     const p = periods.value;
-    return p
-      ? `${deps.funnelKey.value}|trend|${pairParam(pair.value)}|${p.boundariesUs.join(",")}`
+    return p && rank.value !== null
+      ? `${deps.funnelKey.value}|trend|${pairParam(pair.value)}|${p.boundariesUs.join(",")}|${rank.value}`
       : null;
   });
 
@@ -271,6 +276,7 @@ export default function useFunnelTrend(deps: TrendDeps) {
               events: deps.events.value,
               sample: 1,
             },
+            rank.value ?? 1,
           ),
           ...pa.newUsersRange(cur, d.unit === "users" && !!deps.identitySql.value),
           limit: p.boundariesUs.length * (d.breakdown ? BREAKDOWN_TOP + 1 : 1),
