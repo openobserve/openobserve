@@ -1090,7 +1090,7 @@ describe("ConfigPanel", () => {
           parentValue: "other-locale",
         }),
       );
-      expect(options.some((o: any) => o.header)).toBe(false);
+      expect(options[0]).toEqual({ label: "Number", header: true });
     });
 
     it("saves a picked locale in the unit and leaves unit_custom alone", async () => {
