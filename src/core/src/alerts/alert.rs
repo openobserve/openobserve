@@ -2308,6 +2308,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             // Manual triggers evaluate nothing; no level to map.
             None,
             None,
+            None,
         )
         .await
         {
@@ -2422,6 +2423,7 @@ pub async fn trigger_by_name(
             notify,
             now,
             // Manual triggers evaluate nothing; no level to map.
+            None,
             None,
             None,
         )
@@ -3390,9 +3392,9 @@ pub(crate) async fn dispatch_notification(
 ) -> Result<String, anyhow::Error> {
     match dest_type {
         DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
-        // Incident notifications build one payload with no HTML/plaintext
-        // split, so both parts carry the same string — byte-identical to the
-        // MIME this path emitted before the signature took two bodies.
+        // Callers build one payload with no HTML/plaintext split, so both
+        // parts carry the same string — byte-identical to the MIME this path
+        // emitted before the signature took two bodies.
         DestinationType::Email(email) => {
             send_email_notification(subject, email, msg.clone(), msg).await
         }
@@ -3416,7 +3418,7 @@ pub(crate) async fn dispatch_notification(
 /// `send_http_notification` / `send_email_notification` / `send_sns_notification`
 /// transports this module already owns. Kept as a distinct, narrowly-scoped
 /// function rather than removing the `#[cfg]` from `dispatch_notification`
-/// itself, so the enterprise-only incident-notification call sites are
+/// itself, so the enterprise-only synthetics and downtime call sites are
 /// untouched.
 pub(crate) async fn dispatch_test_message(
     dest_type: &DestinationType,

@@ -1193,6 +1193,7 @@ async fn handle_composite_alert_trigger(
                     &rows,
                     now,
                     Some(evaluated.level),
+                    Some(i32::from(evaluated.result) as f64),
                     None,
                 )
                 .await
@@ -2692,6 +2693,7 @@ pub(crate) async fn correlate_muted_incident(
         rows,
         triggered_at,
         eval_level,
+        None,
         Some(downtime),
     )
     .await
@@ -3917,6 +3919,7 @@ async fn handle_alert_triggers(
                 correlation_rows,
                 triggered_at,
                 eval_level,
+                trigger_results.actual_value,
                 None,
             )
             .await

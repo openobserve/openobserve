@@ -58,6 +58,14 @@ struct FilteredSemanticResult {
     key_type: config::meta::alerts::incidents::KeyType,
 }
 
+/// One rendering of an incident notification and the destinations it goes to.
+#[cfg(feature = "enterprise")]
+struct IncidentSend<'a> {
+    ctx: crate::alerts::notifications::NotificationContext,
+    dest_names: Vec<String>,
+    alert_template: Option<&'a config::meta::destinations::Template>,
+}
+
 /// Identity being correlated into an incident.
 ///
 /// Decouples correlation/incident-creation from the concrete `Alert` type so that
@@ -348,10 +356,12 @@ async fn collect_incident_destinations(
 
 /// Send an incident notification rendered with the template `alert`'s own notification would use.
 #[cfg(feature = "enterprise")]
+#[allow(clippy::too_many_arguments)]
 async fn send_incident_notifications(
     alert: &Alert,
     notify_rows: &[Map<String, Value>],
     level: Option<config::meta::alerts::level::AlertLevel>,
+    actual_value: Option<f64>,
     incident_id: &str,
     event: &str,
     triggered_at: i64,
@@ -360,47 +370,71 @@ async fn send_incident_notifications(
     if dest_names.is_empty() {
         return None;
     }
-    let ctx = crate::alerts::alert::build_send_context(
-        alert,
-        notify_rows,
-        triggered_at,
-        None,
-        triggered_at,
-        level,
-        None,
-        None,
-        None,
-        false,
-    )
-    .await;
+    // The rows are this alert's data; destinations merged in from other alerts never received it.
+    let (own, others): (Vec<String>, Vec<String>) = dest_names
+        .iter()
+        .cloned()
+        .partition(|name| alert.destinations.contains(name));
     let alert_template = match alert.template.as_ref().filter(|n| !n.is_empty()) {
         Some(name) => crate::db::alerts::templates::get(&alert.org_id, name)
             .await
             .ok(),
         None => None,
     };
-    send_incident_notifications_inner(
-        &alert.org_id,
-        incident_id,
-        event,
-        dest_names,
-        ctx,
-        alert_template.as_ref(),
-    )
-    .await
+
+    let mut sends = Vec::with_capacity(2);
+    if !own.is_empty() {
+        let ctx = crate::alerts::alert::build_send_context(
+            alert,
+            notify_rows,
+            triggered_at,
+            None,
+            triggered_at,
+            level,
+            actual_value,
+            None,
+            None,
+            false,
+        )
+        .await;
+        sends.push(IncidentSend {
+            ctx,
+            dest_names: own,
+            alert_template: alert_template.as_ref(),
+        });
+    }
+    if !others.is_empty() {
+        let ctx = crate::alerts::alert::build_send_context(
+            alert,
+            &[],
+            triggered_at,
+            None,
+            triggered_at,
+            level,
+            None,
+            None,
+            None,
+            false,
+        )
+        .await;
+        sends.push(IncidentSend {
+            ctx,
+            dest_names: others,
+            alert_template: None,
+        });
+    }
+    send_incident_notifications_inner(&alert.org_id, incident_id, event, sends).await
 }
 
-/// Render the incident into `ctx` and send it through each destination's template.
+/// Render the incident into each send's context and deliver it through each destination's template.
 #[cfg(feature = "enterprise")]
 async fn send_incident_notifications_inner(
     org_id: &str,
     incident_id: &str,
     event: &str,
-    dest_names: &[String],
-    mut ctx: crate::alerts::notifications::NotificationContext,
-    alert_template: Option<&config::meta::destinations::Template>,
+    sends: Vec<IncidentSend<'_>>,
 ) -> Option<String> {
-    if dest_names.is_empty() {
+    if sends.iter().all(|send| send.dest_names.is_empty()) {
         return None;
     }
 
@@ -427,35 +461,37 @@ async fn send_incident_notifications_inner(
         cfg.common.web_url
     );
     let subject = format!("[{event}] {title}");
-    apply_incident_to_context(
-        &mut ctx,
-        incident_id,
-        event,
-        title,
-        severity,
-        service_name,
-        incident_url,
-    );
 
     let mut success_parts: Vec<String> = Vec::new();
     let mut err_parts: Vec<String> = Vec::new();
 
-    for dest_name in dest_names {
-        match crate::alerts::alert::send_templated_to_destination(
-            org_id,
-            &subject,
-            dest_name,
-            alert_template,
-            &mut ctx,
-        )
-        .await
-        {
-            Ok(resp) => success_parts.push(format!("{dest_name}: {resp}")),
-            Err(e) => {
-                log::error!(
-                    "[incidents] Failed to notify {dest_name} for incident {org_id}/{incident_id}: {e}"
-                );
-                err_parts.push(format!("{dest_name}: {e}"));
+    for mut send in sends {
+        apply_incident_to_context(
+            &mut send.ctx,
+            incident_id,
+            event,
+            &title,
+            &severity,
+            &service_name,
+            &incident_url,
+        );
+        for dest_name in &send.dest_names {
+            match crate::alerts::alert::send_templated_to_destination(
+                org_id,
+                &subject,
+                dest_name,
+                send.alert_template,
+                &mut send.ctx,
+            )
+            .await
+            {
+                Ok(resp) => success_parts.push(format!("{dest_name}: {resp}")),
+                Err(e) => {
+                    log::error!(
+                        "[incidents] Failed to notify {dest_name} for incident {org_id}/{incident_id}: {e}"
+                    );
+                    err_parts.push(format!("{dest_name}: {e}"));
+                }
             }
         }
     }
@@ -481,21 +517,24 @@ fn apply_incident_to_context(
     ctx: &mut crate::alerts::notifications::NotificationContext,
     incident_id: &str,
     event: &str,
-    title: String,
-    severity: String,
-    service_name: String,
-    incident_url: String,
+    title: &str,
+    severity: &str,
+    service_name: &str,
+    incident_url: &str,
 ) {
     // The alert's own link points at its search; an incident notification must open the incident.
-    ctx.alert_url = incident_url.clone();
-    ctx.context_attributes.extend([
-        ("incident_id".to_string(), incident_id.to_string()),
-        ("incident_title".to_string(), title),
-        ("incident_event".to_string(), event.to_string()),
-        ("incident_severity".to_string(), severity),
-        ("incident_service".to_string(), service_name),
-        ("incident_url".to_string(), incident_url),
-    ]);
+    ctx.alert_url = incident_url.to_string();
+    ctx.context_attributes.extend(
+        [
+            ("incident_id", incident_id),
+            ("incident_title", title),
+            ("incident_event", event),
+            ("incident_severity", severity),
+            ("incident_service", service_name),
+            ("incident_url", incident_url),
+        ]
+        .map(|(key, value)| (key.to_string(), value.to_string())),
+    );
 }
 
 /// Notification context for an incident subject with no alert behind it.
@@ -578,6 +617,7 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
         &first_alert,
         &[],
         None,
+        None,
         incident_id,
         "severity_changed",
         chrono::Utc::now().timestamp_micros(),
@@ -613,6 +653,7 @@ pub async fn correlate_alert_to_incident(
     // Warning → P3). None (manual triggers, single-level alerts) keeps the
     // enterprise default.
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    actual_value: Option<f64>,
     downtime: Option<&config::meta::downtimes::ActiveDowntime>,
 ) -> Result<Option<CorrelatedIncident>, anyhow::Error> {
     let mut labels = labels_from_row(result_row);
@@ -836,6 +877,7 @@ pub async fn correlate_alert_to_incident(
                     alert,
                     notify_rows,
                     eval_level,
+                    actual_value,
                     incident_id,
                     event,
                     triggered_at,
@@ -964,16 +1006,12 @@ pub async fn correlate_external_event(
             let merged_destinations =
                 collect_incident_destinations(org_id, incident_id, &subject.base_destinations)
                     .await;
-            let ctx = subject_notification_context(org_id, &subject.name, triggered_at).await;
-            send_incident_notifications_inner(
-                org_id,
-                incident_id,
-                event,
-                &merged_destinations,
-                ctx,
-                None,
-            )
-            .await;
+            let send = IncidentSend {
+                ctx: subject_notification_context(org_id, &subject.name, triggered_at).await,
+                dest_names: merged_destinations,
+                alert_template: None,
+            };
+            send_incident_notifications_inner(org_id, incident_id, event, vec![send]).await;
         }
         IncidentCorrelationOutcome::ExistingAlertRepeated { incident_id, .. } => {
             log::debug!(
@@ -3892,10 +3930,10 @@ mod tests {
             &mut ctx,
             "inc-1",
             "new_incident_created",
-            "go_gc_rate_high on coredns".into(),
-            "P2".into(),
-            "coredns".into(),
-            incident_url.into(),
+            "go_gc_rate_high on coredns",
+            "P2",
+            "coredns",
+            incident_url,
         );
         assert_eq!(ctx.alert_url, incident_url);
 
