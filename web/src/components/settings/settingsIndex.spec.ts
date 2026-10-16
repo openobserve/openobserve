@@ -372,7 +372,7 @@ describe("SettingsIndex.vue", () => {
       expect(group.items[0].icon).toMatch(/^img:.*slack/);
     });
 
-    it.each(["flag", "master_key", "home_region_unset", "other_region"])(
+    it.each(["flag", "master_key", "super_cluster"])(
       "shows self-hosted enterprise the disabled screen entry for reason %s",
       (reason) => {
         config.isEnterprise = "true";
@@ -381,11 +381,14 @@ describe("SettingsIndex.vue", () => {
       },
     );
 
-    it("AC-1.7 hides Slack from an org outside the allowlist", () => {
-      config.isEnterprise = "true";
-      wrapper = createWrapper(slackConfig(false, "allowlist"));
-      expect(findSlack(wrapper)?.visible).toBe(false);
-    });
+    it.each(["home_region_unset", "other_region", "allowlist"])(
+      "hides Slack for the removed reason %s",
+      (reason) => {
+        config.isEnterprise = "true";
+        wrapper = createWrapper(slackConfig(false, reason));
+        expect(findSlack(wrapper)?.visible).toBe(false);
+      },
+    );
 
     it("AC-1.4 hides Slack on Cloud while it is disabled", () => {
       config.isEnterprise = "true";

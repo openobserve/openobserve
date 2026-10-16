@@ -25068,10 +25068,6 @@
       "flagDescription": "Set {variable} to true in the server environment and restart OpenObserve to turn on the Slack app.",
       "masterKeyTitle": "Slack needs an encryption key",
       "masterKeyDescription": "Set {variable} in the server environment and restart OpenObserve. Slack tokens are stored encrypted with it.",
-      "homeRegionTitle": "Slack needs a home region",
-      "homeRegionDescription": "This super cluster has no region set for Slack. Set {variable} to the same region in every region, then restart.",
-      "otherRegionTitle": "Slack runs in another region",
-      "otherRegionDescription": "Slack for this deployment runs in region {region}. Open OpenObserve in that region to manage it.",
       "superClusterTitle": "Slack is not yet available on super-cluster deployments"
     },
     "prereq": {
@@ -25087,7 +25083,6 @@
       "names": {
         "master_key": "Encryption key",
         "delegation_key": "Delegation key",
-        "home_region": "Home region",
         "web_url": "Web URL",
         "agent": "AI agent"
       }
@@ -25454,6 +25449,7 @@
       "ownChannels": "Each organization's Admin maps its own channels and alert destinations.",
       "metaAlways": "_meta is always included",
       "picker": "Organizations",
+      "selectedList": "Selected",
       "members": "{count} member | {count} members",
       "columnOrg": "Org",
       "columnAdded": "Added",
@@ -25474,7 +25470,8 @@
       "removeThreads": "Open threads in {org} get no more answers",
       "removeDestinations": "Alert destinations in {org} are not changed.",
       "remove": "Remove",
-      "saved": "Organizations saved"
+      "saved": "Organizations saved",
+      "saveFailed": "The organizations could not be saved."
     }
   }
 }

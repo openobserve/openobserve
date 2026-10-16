@@ -24,6 +24,7 @@ import Slack from "./Slack.vue";
 import {
   axiosError,
   installationView,
+  instanceView,
   linkingView,
   makeSlackStore,
   ok,
@@ -53,6 +54,7 @@ const STUBS = {
   SlackChannelDefaults: stub("SlackChannelDefaults", ["installationId"]),
   SlackUninstallDialog: stub("SlackUninstallDialog", ["open", "mode", "installation"]),
   SlackPrerequisites: stub("SlackPrerequisites", ["checks"]),
+  SlackOrgAccess: stub("SlackOrgAccess", ["installation"]),
 };
 
 const switchOrg = async (store: ReturnType<typeof makeSlackStore>, identifier: string) => {
@@ -141,28 +143,25 @@ describe("Slack settings: disabled screens (self-hosted enterprise)", () => {
     expect(w.find('[data-test-stub="SlackPrerequisites"]').exists()).toBe(false);
   });
 
-  it("AC-3.3 home_region_unset names O2_SLACK_HOME_REGION", async () => {
-    const w = mountSlack(disabled("home_region_unset"));
+  it("super_cluster shows the not-yet-available title with no variable or Step 0", async () => {
+    const store = makeSlackStore(disabled("super_cluster", { meta_org: "_meta" }));
+    store.state.selectedOrganization.identifier = "_meta";
+    const w = mount(Slack, { global: { plugins: [i18n, store], stubs: STUBS } });
     await flushPromises();
-    expect(w.find('[data-test="slack-disabled"]').text()).toContain("O2_SLACK_HOME_REGION");
+    const screen = w.find('[data-test="slack-disabled"]');
+    expect(screen.text()).toContain("Slack is not yet available on super-cluster deployments");
+    expect(screen.text()).not.toMatch(/O2_[A-Z_]+/);
     expect(slack.getPrerequisites).not.toHaveBeenCalled();
-  });
-
-  it("AC-3.3 other_region names the region that owns Slack", async () => {
-    const w = mountSlack(disabled("other_region", { slack_home_region: "us-west" }));
-    await flushPromises();
-    const text = w.find('[data-test="slack-other-region"]').text();
-    expect(text).toContain("us-west");
-    expect(text).toContain("Open OpenObserve in that region");
+    expect(w.find('[data-test="slack-disabled-step0"]').exists()).toBe(false);
+    expect(slack.listInstallations).not.toHaveBeenCalled();
   });
 
   it("AC-1.4 AC-3.3 shows nothing on Cloud while Slack is disabled", async () => {
     config.isCloud = "true";
-    for (const reason of ["flag", "other_region", "allowlist"]) {
-      const w = mountSlack(disabled(reason, { slack_home_region: "us-west" }));
+    for (const reason of ["flag", "super_cluster"]) {
+      const w = mountSlack(disabled(reason));
       await flushPromises();
       expect(w.find('[data-test="slack-disabled"]').exists()).toBe(false);
-      expect(w.find('[data-test="slack-other-region"]').exists()).toBe(false);
       w.unmount();
     }
     expect(slack.listInstallations).not.toHaveBeenCalled();
@@ -374,5 +373,93 @@ describe("Slack settings: enabled", () => {
     expect(confirmation.text()).toContain("Connected to Acme Corp");
     expect(confirmation.text()).not.toContain("Alerts post to");
     expect(confirmation.text()).not.toContain("null");
+  });
+});
+
+describe("Slack settings: several workspaces (R-89)", () => {
+  const labs = installationView({
+    id: "inst-labs",
+    team_name: "Acme Labs",
+    created_at: 1_750_000_000_000_000,
+  });
+  const instance = instanceView({
+    id: "inst-acme",
+    team_name: "Acme Corp",
+    managed: true,
+    created_at: 1_760_000_000_000_000,
+  });
+  const tabs = (w: ReturnType<typeof mountSlack>) => w.findAll('[data-test="slack-workspace-tab"]');
+
+  it("renders one tab per workspace with the instance workspace first", async () => {
+    vi.mocked(slack.listInstallations).mockReturnValue(
+      ok({ installations: [labs, instance] }) as any,
+    );
+    const w = mountSlack({ slack_enabled: true });
+    await flushPromises();
+    expect(tabs(w).map((tab) => tab.text())).toEqual(["Acme Corp Instance", "Acme Labs"]);
+    expect(w.findComponent({ name: "SlackWorkspaceCard" }).props("installation")).toEqual(instance);
+
+    await tabs(w)[1].trigger("mousedown", { button: 0 });
+    await flushPromises();
+    expect(w.findComponent({ name: "SlackWorkspaceCard" }).props("installation")).toEqual(labs);
+    expect(w.findComponent({ name: "SlackLinkingSection" }).props("installation")).toEqual(labs);
+    expect(w.findComponent({ name: "SlackChannelDefaults" }).props("installationId")).toBe(
+      "inst-labs",
+    );
+  });
+
+  it("shows no tabs with one workspace", async () => {
+    vi.mocked(slack.listInstallations).mockReturnValue(ok({ installations: [instance] }) as any);
+    const w = mountSlack({ slack_enabled: true });
+    await flushPromises();
+    expect(w.find('[data-test="slack-workspace-tabs"]').exists()).toBe(false);
+    expect(w.findComponent({ name: "SlackWorkspaceCard" }).props("installation")).toEqual(instance);
+  });
+
+  it("Add another workspace opens the setup for another team", async () => {
+    const available = [{ installation_id: "i9", team_name: "Other WS" }];
+    vi.mocked(slack.listInstallations).mockReturnValue(
+      ok({ installations: [instance], available }) as any,
+    );
+    const w = mountSlack({ slack_enabled: true });
+    await flushPromises();
+    expect(w.find('[data-test-stub="SlackConnectEmpty"]').exists()).toBe(false);
+
+    await w.find('[data-test="slack-add-workspace"]').trigger("click");
+    await flushPromises();
+    const empty = w.findComponent({ name: "SlackConnectEmpty" });
+    expect(empty.props("available")).toEqual(available);
+    expect(w.find('[data-test-stub="SlackWorkspaceCard"]').exists()).toBe(false);
+
+    empty.vm.$emit("setup");
+    await flushPromises();
+    expect(w.findComponent({ name: "SlackSelfHostedWizard" }).props("installation")).toBe(null);
+
+    w.findComponent({ name: "SlackSelfHostedWizard" }).vm.$emit("cancel");
+    await flushPromises();
+    expect(w.find('[data-test-stub="SlackWorkspaceCard"]').exists()).toBe(true);
+  });
+
+  it("shows the org access card only in _meta for an instance workspace", async () => {
+    const meta = instanceView({ id: "inst-acme", team_name: "Acme Corp" });
+    vi.mocked(slack.listInstallations).mockImplementation(
+      (org: string) => ok({ installations: org === "_meta" ? [meta, labs] : [instance] }) as any,
+    );
+    const store = makeSlackStore({ slack_enabled: true, meta_org: "_meta" });
+    store.state.selectedOrganization.identifier = "_meta";
+    const w = mount(Slack, { global: { plugins: [i18n, store], stubs: STUBS } });
+    await flushPromises();
+    expect(w.findComponent({ name: "SlackOrgAccess" }).props("installation")).toEqual(meta);
+
+    await w.findAll('[data-test="slack-workspace-tab"]')[1].trigger("mousedown", { button: 0 });
+    await flushPromises();
+    expect(w.findComponent({ name: "SlackOrgAccess" }).exists()).toBe(false);
+
+    const outside = mountSlack({ slack_enabled: true, meta_org: "_meta" });
+    await flushPromises();
+    expect(outside.findComponent({ name: "SlackWorkspaceCard" }).props("installation")).toEqual(
+      instance,
+    );
+    expect(outside.findComponent({ name: "SlackOrgAccess" }).exists()).toBe(false);
   });
 });

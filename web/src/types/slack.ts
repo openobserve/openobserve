@@ -37,14 +37,7 @@ export type SlackThreadKind = "question" | "link";
 
 export type SlackSetFrom = "settings" | "install" | "destination";
 
-export type SlackDisabledReason =
-  | "edition"
-  | "flag"
-  | "allowlist"
-  | "master_key"
-  | "home_region_unset"
-  | "other_region"
-  | "super_cluster";
+export type SlackDisabledReason = "edition" | "flag" | "master_key" | "super_cluster";
 
 export type SlackInstallationStatus = "pending" | "revoked" | "degraded" | "healthy";
 
@@ -70,7 +63,6 @@ export type SlackCheckStatus = "pass" | "fail" | "warn";
 export interface SlackOrgConfig {
   slack_enabled?: boolean;
   slack_disabled_reason?: SlackDisabledReason | null;
-  slack_home_region?: string | null;
 }
 
 /** O2's error body for every `/api/{org}/slack/*` refusal. */
@@ -215,8 +207,7 @@ export interface SlackInstallConfirmation {
   linkAll: SlackLinkAllResult | null;
 }
 
-export type SlackPrerequisiteId =
-  "master_key" | "delegation_key" | "home_region" | "web_url" | "agent";
+export type SlackPrerequisiteId = "master_key" | "delegation_key" | "web_url" | "agent";
 
 export interface SlackPrerequisiteCheck {
   id: SlackPrerequisiteId;

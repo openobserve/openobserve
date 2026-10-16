@@ -13,26 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { SlackDisabledReason, SlackOrgConfig } from "@/types/slack";
+import type { InstallationView, SlackDisabledReason, SlackOrgConfig } from "@/types/slack";
 
 export interface SlackOrgState {
   enabled: boolean;
   reason: SlackDisabledReason | null;
-  homeRegion: string | null;
 }
 
 /** Disabled reasons a self-hosted enterprise admin can fix, so Settings › Slack explains them. */
 export const SLACK_SCREEN_REASONS: readonly SlackDisabledReason[] = [
   "flag",
   "master_key",
-  "home_region_unset",
-  "other_region",
+  "super_cluster",
 ];
 
 const DISABLED_VARIABLES: Partial<Record<SlackDisabledReason, string>> = {
   flag: "O2_SLACK_ENABLED",
   master_key: "O2_MASTER_ENCRYPTION_KEY",
-  home_region_unset: "O2_SLACK_HOME_REGION",
 };
 
 // Never prefilled or accepted as a linking domain; the server refuses them too.
@@ -68,7 +65,6 @@ export function readSlackOrgConfig(zoConfig: SlackOrgConfig | null | undefined):
   return {
     enabled,
     reason: enabled ? null : (zoConfig?.slack_disabled_reason ?? "edition"),
-    homeRegion: zoConfig?.slack_home_region ?? null,
   };
 }
 
@@ -89,6 +85,15 @@ export function isSlackSettingsVisible(
 
 export function slackDisabledVariable(reason: SlackDisabledReason | null): string | null {
   return reason ? (DISABLED_VARIABLES[reason] ?? null) : null;
+}
+
+/** Settings › Slack order: the instance workspace first, then by install time. */
+export function orderInstallations(installations: readonly InstallationView[]): InstallationView[] {
+  return [...installations].sort(
+    (a, b) =>
+      Number(b.scope === "instance") - Number(a.scope === "instance") ||
+      a.created_at - b.created_at,
+  );
 }
 
 export function domainOfEmail(email: string): string {

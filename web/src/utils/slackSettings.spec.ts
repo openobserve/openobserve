@@ -21,27 +21,20 @@ import {
   isPublicEmailDomain,
   isSlackSettingsVisible,
   readSlackOrgConfig,
+  SLACK_SCREEN_REASONS,
   slackDisabledVariable,
 } from "./slackSettings";
 
 describe("readSlackOrgConfig", () => {
-  it("reads the three Slack fields of the org config", () => {
+  it("reads the two Slack fields of the org config", () => {
     expect(
-      readSlackOrgConfig({
-        slack_enabled: false,
-        slack_disabled_reason: "other_region",
-        slack_home_region: "us-west",
-      }),
-    ).toEqual({ enabled: false, reason: "other_region", homeRegion: "us-west" });
+      readSlackOrgConfig({ slack_enabled: false, slack_disabled_reason: "super_cluster" }),
+    ).toEqual({ enabled: false, reason: "super_cluster" });
   });
 
   it("treats a config from a server without Slack fields as the OSS edition", () => {
-    expect(readSlackOrgConfig({})).toEqual({ enabled: false, reason: "edition", homeRegion: null });
-    expect(readSlackOrgConfig(undefined)).toEqual({
-      enabled: false,
-      reason: "edition",
-      homeRegion: null,
-    });
+    expect(readSlackOrgConfig({})).toEqual({ enabled: false, reason: "edition" });
+    expect(readSlackOrgConfig(undefined)).toEqual({ enabled: false, reason: "edition" });
   });
 
   it("drops a stale reason once Slack is enabled", () => {
@@ -55,8 +48,8 @@ describe("isSlackSettingsVisible", () => {
   const selfHosted = { isEnterprise: true, isCloud: false };
   const cloud = { isEnterprise: true, isCloud: true };
   const oss = { isEnterprise: false, isCloud: false };
-  const on = { enabled: true, reason: null, homeRegion: null };
-  const off = (reason: any) => ({ enabled: false, reason, homeRegion: null });
+  const on = { enabled: true, reason: null };
+  const off = (reason: any) => ({ enabled: false, reason });
 
   it("shows an enabled org on Cloud and self-hosted, never in OSS", () => {
     expect(isSlackSettingsVisible(cloud, on)).toBe(true);
@@ -65,12 +58,15 @@ describe("isSlackSettingsVisible", () => {
   });
 
   it("shows the self-hosted disabled screens only for reasons the admin can fix", () => {
-    for (const reason of ["flag", "master_key", "home_region_unset", "other_region"]) {
+    for (const reason of SLACK_SCREEN_REASONS) {
       expect(isSlackSettingsVisible(selfHosted, off(reason))).toBe(true);
       expect(isSlackSettingsVisible(cloud, off(reason))).toBe(false);
     }
-    expect(isSlackSettingsVisible(selfHosted, off("allowlist"))).toBe(false);
     expect(isSlackSettingsVisible(selfHosted, off("edition"))).toBe(false);
+  });
+
+  it("the screen reasons are flag, master_key and super_cluster", () => {
+    expect([...SLACK_SCREEN_REASONS]).toEqual(["flag", "master_key", "super_cluster"]);
   });
 });
 
@@ -78,8 +74,11 @@ describe("slackDisabledVariable", () => {
   it("names the variable each disabled screen asks for", () => {
     expect(slackDisabledVariable("flag")).toBe("O2_SLACK_ENABLED");
     expect(slackDisabledVariable("master_key")).toBe("O2_MASTER_ENCRYPTION_KEY");
-    expect(slackDisabledVariable("home_region_unset")).toBe("O2_SLACK_HOME_REGION");
-    expect(slackDisabledVariable("allowlist")).toBe(null);
+    expect(slackDisabledVariable("edition")).toBe(null);
+  });
+
+  it("super_cluster has no variable", () => {
+    expect(slackDisabledVariable("super_cluster")).toBe(null);
   });
 });
 

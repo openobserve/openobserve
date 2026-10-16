@@ -19,18 +19,32 @@ import { computed, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { slackInstallationsQuery, slackPrerequisitesQuery } from "@/services/slack.queries";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
-import type { InstallationView, SlackInstallConfirmation as Confirmation } from "@/types/slack";
-import { readSlackOrgConfig, slackDisabledVariable } from "@/utils/slackSettings";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import type {
+  InstallationView,
+  SlackDisabledReason,
+  SlackInstallConfirmation as Confirmation,
+} from "@/types/slack";
+import {
+  orderInstallations,
+  readSlackOrgConfig,
+  SLACK_SCREEN_REASONS,
+  slackDisabledVariable,
+} from "@/utils/slackSettings";
 import SlackChannelDefaults from "./SlackChannelDefaults.vue";
 import SlackConnectEmpty from "./SlackConnectEmpty.vue";
 import SlackInstallConfirmation from "./SlackInstallConfirmation.vue";
 import SlackLinkingSection from "./SlackLinkingSection.vue";
+import SlackOrgAccess from "./SlackOrgAccess.vue";
 import SlackPrerequisites from "./SlackPrerequisites.vue";
 import SlackSelfHostedWizard from "./SlackSelfHostedWizard.vue";
 import SlackUninstallDialog from "./SlackUninstallDialog.vue";
@@ -47,22 +61,14 @@ const isCloud = computed(() => config.isCloud == "true");
 const selfHostedEnterprise = computed(() => config.isEnterprise == "true" && !isCloud.value);
 const slackState = computed(() => readSlackOrgConfig(store.state.zoConfig));
 
-const disabledReason = computed(() => {
+const disabledReason = computed<SlackDisabledReason | null>(() => {
   const reason = slackState.value.reason;
-  if (!selfHostedEnterprise.value || slackState.value.enabled) return null;
-  return reason === "flag" || reason === "master_key" || reason === "home_region_unset"
-    ? reason
-    : null;
+  if (!selfHostedEnterprise.value || slackState.value.enabled || !reason) return null;
+  return SLACK_SCREEN_REASONS.includes(reason) ? reason : null;
 });
-const otherRegion = computed(
-  () =>
-    selfHostedEnterprise.value &&
-    !slackState.value.enabled &&
-    slackState.value.reason === "other_region",
-);
 const disabledVariable = computed(() => slackDisabledVariable(disabledReason.value) ?? "");
 
-const disabledCopy = computed<{ title: I18nText; description: I18nText } | null>(() => {
+const disabledCopy = computed<{ title: I18nText; description?: I18nText } | null>(() => {
   const variable = disabledVariable.value;
   switch (disabledReason.value) {
     case "flag":
@@ -75,11 +81,8 @@ const disabledCopy = computed<{ title: I18nText; description: I18nText } | null>
         title: t("slackApp.disabled.masterKeyTitle"),
         description: t("slackApp.disabled.masterKeyDescription", { variable }),
       };
-    case "home_region_unset":
-      return {
-        title: t("slackApp.disabled.homeRegionTitle"),
-        description: t("slackApp.disabled.homeRegionDescription", { variable }),
-      };
+    case "super_cluster":
+      return { title: t("slackApp.disabled.superClusterTitle") };
     default:
       return null;
   }
@@ -105,11 +108,21 @@ const forbidden = computed(() => {
   const err = installations.error.value as { response?: { status?: number } } | null;
   return err?.response?.status === 403;
 });
+const ordered = computed(() => orderInstallations(installations.data.value?.installations ?? []));
+const selectedId = ref<string | null>(null);
 const current = computed<InstallationView | null>(
-  () => installations.data.value?.installations?.[0] ?? null,
+  () => ordered.value.find((i) => i.id === selectedId.value) ?? ordered.value[0] ?? null,
 );
+const selectedTab = computed<string>({
+  get: () => current.value?.id ?? "",
+  set: (id) => (selectedId.value = id),
+});
+const pendingId = computed(() => ordered.value.find((i) => i.status === "pending")?.id ?? null);
+const showOrgAccess = computed(() => isMetaOrg.value && current.value?.scope === "instance");
 
 const wizardActive = ref(false);
+const wizardInstallationId = ref<string | null>(null);
+const adding = ref(false);
 const confirmation = ref<Confirmation | null>(null);
 const dialogMode = ref<DialogMode>("uninstall");
 const dialogOpen = ref(false);
@@ -118,19 +131,41 @@ const dialogInstallation = ref<InstallationView | null>(null);
 
 // A pending install keeps the wizard up past its own install step, until the wizard says done.
 watch(
-  () => [org.value, current.value?.status] as const,
-  ([orgId, status], previous) => {
+  () => [org.value, pendingId.value] as const,
+  ([orgId, pending], previous) => {
     if (previous && previous[0] !== orgId) {
       wizardActive.value = false;
+      wizardInstallationId.value = null;
+      adding.value = false;
+      selectedId.value = null;
       confirmation.value = null;
       dialogOpen.value = false;
       dialogInstallation.value = null;
     }
-    if (status === "pending") wizardActive.value = true;
+    if (pending) {
+      wizardActive.value = true;
+      wizardInstallationId.value = pending;
+    }
   },
   { immediate: true },
 );
 const showWizard = computed(() => !isCloud.value && wizardActive.value);
+// Pinned by id so the wizard keeps its installation after it stops being pending.
+const wizardInstallation = computed(
+  () => ordered.value.find((i) => i.id === wizardInstallationId.value) ?? null,
+);
+
+const closeWizard = (done: boolean): void => {
+  if (done && wizardInstallationId.value) selectedId.value = wizardInstallationId.value;
+  wizardActive.value = false;
+  wizardInstallationId.value = null;
+  adding.value = false;
+};
+
+const showConfirmation = (value: Confirmation): void => {
+  adding.value = false;
+  confirmation.value = value;
+};
 
 const openDialog = (mode: DialogMode): void => {
   if (!current.value) return;
@@ -172,20 +207,6 @@ const openDialog = (mode: DialogMode): void => {
       </OCard>
     </template>
 
-    <OCard v-else-if="otherRegion" variant="outlined" data-test="slack-other-region">
-      <OEmptyState
-        size="block"
-        illustration="connect"
-        :title="t('slackApp.disabled.otherRegionTitle')"
-        :description="
-          t('slackApp.disabled.otherRegionDescription', {
-            region: slackState.homeRegion ?? '',
-          })
-        "
-        :backdrop="false"
-      />
-    </OCard>
-
     <!-- Keyed by org: every step, ticket and popup below belongs to the org it started in. -->
     <div v-else-if="slackState.enabled" :key="org" class="flex flex-col gap-6">
       <div v-if="installations.isPending.value" class="flex justify-center py-16">
@@ -211,29 +232,79 @@ const openDialog = (mode: DialogMode): void => {
       />
       <SlackSelfHostedWizard
         v-else-if="showWizard"
-        :installation="current"
-        @done="wizardActive = false"
-        @cancel="wizardActive = false"
+        :installation="wizardInstallation"
+        @done="closeWizard(true)"
+        @cancel="closeWizard(false)"
       />
-      <template v-else-if="current">
+      <template v-else-if="current && !adding">
+        <div
+          class="flex items-end justify-between gap-3"
+          :class="ordered.length > 1 ? 'border-border-default border-b' : ''"
+        >
+          <OTabs
+            v-if="ordered.length > 1"
+            v-model="selectedTab"
+            class="min-w-0"
+            data-test="slack-workspace-tabs"
+          >
+            <OTab
+              v-for="inst in ordered"
+              :key="inst.id"
+              :name="inst.id"
+              data-test="slack-workspace-tab"
+            >
+              <span class="inline-flex items-center gap-2">
+                {{ raw(inst.team_name) }}
+                <OTag
+                  v-if="inst.scope === 'instance'"
+                  variant="primary-soft"
+                  size="sm"
+                  :label="t('slackApp.card.instanceTag')"
+                />
+              </span>
+            </OTab>
+          </OTabs>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            class="ms-auto"
+            data-test="slack-add-workspace"
+            @click="adding = true"
+          >
+            {{ t("slackApp.workspaces.addAnother") }}
+          </OButton>
+        </div>
         <SlackWorkspaceCard
+          :key="current.id"
           :installation="current"
           :is-cloud="isCloud"
           @disconnect="openDialog('disconnect')"
           @uninstall="openDialog('uninstall')"
         >
+          <SlackOrgAccess v-if="showOrgAccess" :installation="current" />
           <SlackChannelDefaults :installation-id="current.id" />
           <SlackLinkingSection :installation="current" />
         </SlackWorkspaceCard>
       </template>
-      <SlackConnectEmpty
-        v-else
-        :is-cloud="isCloud"
-        :available="installations.data.value?.available ?? []"
-        :upgrade-candidates="installations.data.value?.upgrade_candidates ?? []"
-        @setup="wizardActive = true"
-        @installed="confirmation = $event"
-      />
+      <template v-else>
+        <div v-if="adding" class="flex justify-end">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            data-test="slack-add-workspace-cancel"
+            @click="adding = false"
+          >
+            {{ t("common.cancel") }}
+          </OButton>
+        </div>
+        <SlackConnectEmpty
+          :is-cloud="isCloud"
+          :available="installations.data.value?.available ?? []"
+          :upgrade-candidates="installations.data.value?.upgrade_candidates ?? []"
+          @setup="wizardActive = true"
+          @installed="showConfirmation"
+        />
+      </template>
     </div>
 
     <SlackUninstallDialog

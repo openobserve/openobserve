@@ -593,16 +593,6 @@ describe("SlackDestinationSetup with the two-way Slack app", () => {
     expect(wrapper.find('[data-test="slack-form-upgrade-banner"]').exists()).toBe(false);
   });
 
-  it("allowlist: an org outside O2_SLACK_ALLOWED_ORGS keeps the webhook flow (AC-1.7)", async () => {
-    wrapper = mountSetup(true, true, { slack_enabled: false, slack_disabled_reason: "allowlist" });
-    await connectAndCallback(wrapper);
-    expect(slack.installStart).not.toHaveBeenCalled();
-    expect(destinationService.startSlackOAuth).toHaveBeenCalled();
-    expect(wrapper.find('[data-test="slack-oauth-permission-note"]').text()).toContain(
-      "cannot read workspace messages",
-    );
-  });
-
   it("AC-6.1 runs install/start with source destination_form and fills the form from install/exchange", async () => {
     wrapper = mountSetup(true, true, { slack_enabled: true });
     await connectAndCallback(wrapper);
