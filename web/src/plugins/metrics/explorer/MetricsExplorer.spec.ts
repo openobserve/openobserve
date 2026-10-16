@@ -1787,6 +1787,18 @@ describe("MetricsExplorer wiring", () => {
       shortcuts.handlers = {};
     });
 
+    it("applies a picked range at once in Visualize and keeps the picker's Apply in Explore", async () => {
+      const wrapper = mountExplorer();
+      const picker = () => wrapper.findComponent({ name: "DateTimePickerDashboard" });
+      expect(picker().props("autoApplyDashboard")).toBe(false);
+      (wrapper.vm as any).setMode("visualize");
+      await flushPromises();
+      expect(picker().props("autoApplyDashboard")).toBe(true);
+      (wrapper.vm as any).setMode("explore");
+      await flushPromises();
+      expect(picker().props("autoApplyDashboard")).toBe(false);
+    });
+
     describe("the Run query split button", () => {
       const OPTIONS = '[data-test="metrics-explorer-run-options"]';
       const REFRESH_CACHE = '[data-test="metrics-explorer-refresh-cache-run"]';
