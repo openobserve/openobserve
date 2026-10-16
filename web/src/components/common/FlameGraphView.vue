@@ -15,18 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    ref="rootEl"
-    class="bg-surface-panel rounded-default border-border-default relative border p-2"
-  >
+  <div ref="rootEl" class="relative">
+    <!-- Flat inside its card, as the Traces flame graph is: no frame or tint of its own. -->
     <div v-if="!hasData" class="text-text-secondary flex h-40 items-center justify-center text-sm">
       {{ emptyLabel }}
     </div>
 
-    <div
-      v-else
-      class="bg-theme-body-bg-secondary rounded-default border-border-default border p-1.5"
-    >
+    <div v-else>
       <div class="mb-1.5 flex min-w-0 flex-nowrap items-center gap-2">
         <span
           class="border-border-default bg-surface-page text-text-secondary rounded-default inline-flex shrink-0 items-center px-2 py-1 text-xs whitespace-nowrap"
@@ -69,7 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-label="t('profiles.alignLeft')"
               data-test="flame-graph-align-left"
               @click="labelAlign = 'left'"
-            />
+            >
+              <OTooltip :content="t('profiles.alignLeft')" />
+            </OButton>
             <OButton
               :variant="labelAlign === 'right' ? 'primary' : 'ghost'"
               size="xs"
@@ -77,17 +74,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-label="t('profiles.alignRight')"
               data-test="flame-graph-align-right"
               @click="labelAlign = 'right'"
-            />
+            >
+              <OTooltip :content="t('profiles.alignRight')" />
+            </OButton>
           </div>
           <div class="flex shrink-0 items-center gap-1.5">
             <span class="text-text-secondary text-xs whitespace-nowrap">{{
-              t("profiles.inverted")
+              t("profiles.rootAtBottom")
             }}</span>
             <OSwitch
-              v-model="inverted"
+              v-model="rootAtBottom"
               size="sm"
-              :aria-label="t('profiles.inverted')"
-              data-test="flame-graph-inverted"
+              :aria-label="t('profiles.rootAtBottom')"
+              data-test="flame-graph-root-at-bottom"
             />
           </div>
         </div>
@@ -98,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div :style="{ height: `${chartHeight}px`, minWidth: '100%' }">
           <ChartRenderer
             v-if="hasData"
+            ref="chartRendererRef"
             :data="chartData"
             class="h-full w-full"
             @click="onChartClick"
@@ -106,9 +106,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <!-- A column, so the menu is as wide as its longest item: inline buttons would size it as one long line. -->
     <div
       v-if="menu"
-      class="border-border-default bg-surface-panel rounded-default absolute z-20 min-w-40 border p-1 shadow-none"
+      ref="menuEl"
+      class="border-border-default bg-surface-panel rounded-default absolute z-20 flex min-w-40 flex-col border p-1 shadow-none"
       data-test="flame-graph-frame-menu"
       :style="menuStyle"
     >
@@ -130,12 +132,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("profiles.focusBlock") }}
       </OButton>
+      <OButton
+        variant="ghost"
+        size="sm"
+        class="w-full justify-start"
+        data-test="flame-graph-search-function"
+        @click="searchFunction"
+      >
+        {{ t("profiles.searchForFunction") }}
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="sm"
+        class="w-full justify-start"
+        data-test="flame-graph-sandwich"
+        @click="showSandwich"
+      >
+        {{ t("profiles.showCallersAndCallees") }}
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="sm"
+        class="w-full justify-start"
+        data-test="flame-graph-details"
+        @click="showDetails"
+      >
+        {{ t("profiles.functionDetails") }}
+      </OButton>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import type {
   CustomSeriesOption,
   CustomSeriesRenderItemAPI,
@@ -144,9 +181,12 @@ import type {
 } from "echarts";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { copyToClipboard } from "@/utils/clipboard";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { escapeHtml } from "@/utils/html";
 import { cssToken } from "@/utils/theme";
+import { paletteIndexFor } from "./flameGraphPackage";
 import { useI18nTyped } from "@/types/i18n";
 
 export interface FlameGraphNode {
@@ -164,9 +204,14 @@ type FlameBlock = {
   width: number;
   total: number;
   self: number;
+  /** Total of the calling frame; 0 for the root. */
+  callerTotal: number;
   fill: string;
   textColor: string;
   matched: boolean;
+  /** A stand-in for frames the graph does not show one by one ("other", "[truncated]", small frames). */
+  grouped: boolean;
+  hint: string;
 };
 type FlameSeriesDatum = {
   value: [number, number, number, number];
@@ -203,6 +248,8 @@ const props = withDefaults(
     emptyLabel?: string;
     valueFormatter?: (value: number) => string;
     searchQuery?: string;
+    /** Start with the root at the bottom, as the Sandwich view's callers graph does. */
+    initialRootAtBottom?: boolean;
   }>(),
   {
     root: null,
@@ -217,8 +264,13 @@ const { t } = useI18nTyped();
 const rootEl = ref<HTMLElement | null>(null);
 const focusPath = ref<string | null>(null);
 const labelAlign = ref<LabelAlign>("left");
-const inverted = ref(false);
+// Only flips the drawing; it does not regroup stacks by leaf function (a bottom-up view).
+const rootAtBottom = ref(props.initialRootAtBottom ?? false);
 const menu = ref<FrameMenu | null>(null);
+const menuEl = ref<HTMLElement | null>(null);
+const chartRendererRef = ref<{
+  chart?: { setOption: (option: object) => void; dispatchAction: (action: object) => void };
+} | null>(null);
 
 const BLOCK_HEIGHT = 24;
 const BLOCK_PADDING = 2;
@@ -226,18 +278,17 @@ const BLOCK_PADDING = 2;
 const tokenColor = (token: string, fallbackToken: string) =>
   cssToken(token, cssToken(fallbackToken, ""));
 
-const palette = [
-  tokenColor("--color-primary-400", "--color-accent"),
-  tokenColor("--color-accent", "--color-primary-500"),
-  tokenColor("--color-series-b", "--color-warning-500"),
-  tokenColor("--color-success-500", "--color-primary-400"),
-  tokenColor("--color-warning-500", "--color-series-b"),
-  tokenColor("--color-indigo-400", "--color-primary-400"),
-  tokenColor("--color-emerald-400", "--color-success-500"),
-  tokenColor("--color-amber-400", "--color-warning-500"),
-];
+// Cool hues of the dashboard series palette only: no red, pink, amber or green (mint included), which read as status.
+const palette = [1, 5, 7, 9].map((step) =>
+  tokenColor(`--color-chart-series-${step}`, "--color-chart-series-1"),
+);
 
-const textColor = tokenColor("--color-text-body", "--color-text-inverse");
+// Dark in both themes, because the frame fills are light in both.
+const textColor = tokenColor("--color-flame-frame-text", "--color-text-heading");
+const groupedFill = tokenColor("--color-border-strong", "--color-border-default");
+// Synthetic frame names from the merge API (src/core/src/profiles/query.rs).
+const OTHER_FRAME = "other";
+const TRUNCATED_FRAME = "[truncated]";
 const borderColor = tokenColor("--color-border-default", "--color-border-strong");
 const matchTextBg = tokenColor("--color-status-warning-bg", "--color-warning-500");
 const matchBorder = tokenColor("--color-warning-600", "--color-warning-500");
@@ -300,14 +351,12 @@ const collectBlocks = (root: FlameGraphNode | null): FlameBlock[] => {
   if (!root || (root.total || 0) <= 0) return [];
   const blocks: FlameBlock[] = [];
 
-  const colorFor = (name: string, depth: number) => {
-    if (depth === 0) return tokenColor("--color-accent", "--color-primary-500");
-    let hash = 0;
-    for (let index = 0; index < name.length; index += 1) {
-      hash = (hash << 5) - hash + name.charCodeAt(index);
-      hash |= 0;
-    }
-    return palette[Math.abs(hash) % palette.length];
+  const colorFor = (name: string) => palette[paletteIndexFor(name, palette.length)];
+
+  const hintFor = (name: string) => {
+    if (name === OTHER_FRAME) return t("profiles.otherFrameHint");
+    if (name === TRUNCATED_FRAME) return t("profiles.truncatedFrameHint");
+    return "";
   };
 
   const walk = (
@@ -317,12 +366,16 @@ const collectBlocks = (root: FlameGraphNode | null): FlameBlock[] => {
     width: number,
     parentTotal: number,
     path: string,
+    callerTotal: number,
   ) => {
     const self =
       node.self ??
       Math.max(0, node.total - (node.children ?? []).reduce((sum, child) => sum + child.total, 0));
+    const hint = depth === 0 ? "" : hintFor(node.name);
     const matched =
-      searchNeedle.value.length > 0 && node.name.toLowerCase().includes(searchNeedle.value);
+      !hint &&
+      searchNeedle.value.length > 0 &&
+      node.name.toLowerCase().includes(searchNeedle.value);
     blocks.push({
       id: path,
       name: node.name,
@@ -331,31 +384,56 @@ const collectBlocks = (root: FlameGraphNode | null): FlameBlock[] => {
       width,
       total: node.total,
       self,
-      fill: colorFor(node.name, depth),
+      callerTotal,
+      fill: hint ? groupedFill : colorFor(node.name),
       textColor,
       matched,
+      grouped: !!hint,
+      hint,
     });
     if (!node.children?.length || parentTotal <= 0) return;
     const children = [...node.children].sort((a, b) => b.total - a.total);
     let offset = left;
+    // Children are sorted by total, so the ones too thin to draw sit together at the end.
+    const small = { count: 0, total: 0, left: 0 };
     for (const [index, child] of children.entries()) {
       const childWidth = width * (child.total / parentTotal);
       if (childWidth <= 0.1) {
+        if (!small.count) small.left = offset;
+        small.count += 1;
+        small.total += child.total;
         offset += childWidth;
         continue;
       }
-      walk(child, depth + 1, offset, childWidth, child.total, `${path}/${index}`);
+      walk(child, depth + 1, offset, childWidth, child.total, `${path}/${index}`, node.total);
       offset += childWidth;
+    }
+    if (small.count) {
+      blocks.push({
+        id: `${path}/small`,
+        name: t("profiles.smallFrames", { count: small.count }, small.count),
+        depth: depth + 1,
+        left: small.left,
+        width: width * (small.total / parentTotal),
+        total: small.total,
+        self: 0,
+        callerTotal: node.total,
+        fill: groupedFill,
+        textColor,
+        matched: false,
+        grouped: true,
+        hint: t("profiles.smallFramesHint"),
+      });
     }
   };
 
-  walk(root, 0, 0, 100, root.total, focusPath.value || "root");
+  walk(root, 0, 0, 100, root.total, focusPath.value || "root", 0);
   return blocks;
 };
 
 const blocks = computed(() => {
   const collected = collectBlocks(displayRoot.value);
-  if (!inverted.value) return collected;
+  if (!rootAtBottom.value) return collected;
   const maxDepth = collected.reduce((max, block) => Math.max(max, block.depth), 0);
   return collected.map((block) => ({ ...block, depth: maxDepth - block.depth }));
 });
@@ -383,7 +461,9 @@ const onChartClick = (params: {
   const block = params.data?.block;
   const root = rootEl.value;
   const native = params.event?.event;
-  if (!block || !root || !native) return;
+  // Grouped frames stand for many functions, so there is nothing to copy or focus.
+  if (!block || block.grouped || !root || !native) return;
+  chartRendererRef.value?.chart?.dispatchAction({ type: "hideTip" });
   // offsetX/offsetY are canvas-local; the menu is positioned against rootEl.
   const rect = root.getBoundingClientRect();
   menu.value = {
@@ -391,18 +471,68 @@ const onChartClick = (params: {
     y: native.clientY - rect.top - root.clientTop,
     block,
   };
+  nextTick(fitMenu);
+};
+
+/** The box the menu must stay inside: the nearest ancestor that clips it, else the window. */
+const clipBox = (el: HTMLElement) => {
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    const { overflowX, overflowY } = getComputedStyle(node);
+    if (/auto|scroll|hidden/.test(`${overflowX} ${overflowY}`)) return node.getBoundingClientRect();
+  }
+  return { top: 0, left: 0, right: window.innerWidth, bottom: window.innerHeight };
+};
+
+/** Opens the menu above or to the left of the pointer when it would be cut off below or on the right. */
+const fitMenu = () => {
+  const current = menu.value;
+  const el = menuEl.value;
+  if (!current || !el) return;
+  const box = el.getBoundingClientRect();
+  const clip = clipBox(el);
+  let { x, y } = current;
+  if (box.bottom > clip.bottom) y = Math.max(y - box.height, y - (box.top - clip.top));
+  if (box.right > clip.right) x = Math.max(x - box.width, x - (box.left - clip.left));
+  if (x !== current.x || y !== current.y) menu.value = { ...current, x, y };
 };
 
 const copyFunctionName = async () => {
   const name = menu.value?.block.name;
   if (!name) return;
-  try {
-    await navigator.clipboard.writeText(name);
-  } catch {
-    // Clipboard may be unavailable in non-secure contexts; ignore.
-  }
+  await copyToClipboard(name, t, { successMessage: t("common.copiedToClipboard") });
   closeMenu();
 };
+
+const emit = defineEmits<{
+  search: [name: string];
+  sandwich: [name: string];
+  details: [name: string];
+}>();
+
+const searchFunction = () => {
+  const name = menu.value?.block.name;
+  if (name) emit("search", name);
+  closeMenu();
+};
+
+const showSandwich = () => {
+  const name = menu.value?.block.name;
+  if (name) emit("sandwich", name);
+  closeMenu();
+};
+
+const showDetails = () => {
+  const name = menu.value?.block.name;
+  if (name) emit("details", name);
+  closeMenu();
+};
+
+/** Focus a frame by its path ("root/0/2"); the Call Tree uses the same ids. */
+const focus = (path: string) => {
+  focusPath.value = path;
+  closeMenu();
+};
+defineExpose({ focus });
 
 const focusBlock = () => {
   const id = menu.value?.block.id;
@@ -411,18 +541,27 @@ const focusBlock = () => {
   closeMenu();
 };
 
+// Any click outside the menu closes it, the graph included; a click on a frame then opens the menu there.
 const onDocumentClick = (event: MouseEvent) => {
-  if (!menu.value || !rootEl.value) return;
-  if (!rootEl.value.contains(event.target as Node)) {
-    closeMenu();
-  }
+  if (!menu.value || menuEl.value?.contains(event.target as Node)) return;
+  closeMenu();
+};
+const onDocumentKeydown = (event: KeyboardEvent) => {
+  if (menu.value && event.key === "Escape") closeMenu();
 };
 
 onMounted(() => {
   document.addEventListener("click", onDocumentClick, true);
+  document.addEventListener("keydown", onDocumentKeydown);
 });
 onBeforeUnmount(() => {
   document.removeEventListener("click", onDocumentClick, true);
+  document.removeEventListener("keydown", onDocumentKeydown);
+});
+
+// No hover card over an open frame menu. Set on the chart itself, so the frame blocks are not rebuilt.
+watch(menu, (open) => {
+  chartRendererRef.value?.chart?.setOption({ tooltip: { show: !open } });
 });
 
 watch(
@@ -457,6 +596,11 @@ const chartData = computed(() => {
     options: {
       animation: false,
       tooltip: {
+        // On the body, as dashboard charts do: the graph's scroll box would cut off a tooltip above the top row.
+        appendToBody: true,
+        // Gone at once (no 100 ms delay, no 0.4 s fade), so it never sits on top of the frame menu.
+        hideDelay: 0,
+        transitionDuration: 0,
         trigger: "item",
         backgroundColor: tokenColor("--color-surface-base", "--color-surface-panel"),
         borderColor: tokenColor("--color-border-default", "--color-border-strong"),
@@ -464,23 +608,21 @@ const chartData = computed(() => {
         extraCssText: "max-width: 28rem; white-space: normal; word-break: break-word;",
         formatter: (params) => {
           const block = (params as unknown as { data: { block: FlameBlock } }).data.block;
+          const percentOf = (value: number, base: number) =>
+            base > 0 ? `${((value / base) * 100).toFixed(2)}%` : "—";
+          const row = (label: string, value: string, percent: string) => `
+            <span>${escapeHtml(label)}</span>
+            <span style="text-align: right;">${value}</span>
+            <span style="text-align: right; opacity: 0.75;">${percent}</span>`;
           return `
             <div style="padding: 0.25rem 0;">
               <div style="font-weight: 600; margin-bottom: 0.25rem;">${escapeHtml(block.name)}</div>
-              <div style="font-size: 0.75rem; line-height: 1.5;">
-                <div style="display:flex; justify-content:space-between; gap:1rem;">
-                  <span>${escapeHtml(t("profiles.total"))}</span>
-                  <span>${props.valueFormatter(block.total)}</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; gap:1rem;">
-                  <span>${escapeHtml(t("profiles.self"))}</span>
-                  <span>${props.valueFormatter(block.self)}</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; gap:1rem;">
-                  <span>${escapeHtml(t("profiles.share"))}</span>
-                  <span>${((block.total / shareBase) * 100).toFixed(2)}%</span>
-                </div>
+              <div style="display: grid; grid-template-columns: auto auto auto; column-gap: 1rem; font-size: 0.75rem; line-height: 1.5;">
+                ${row(t("profiles.total"), props.valueFormatter(block.total), percentOf(block.total, shareBase))}
+                ${row(t("profiles.self"), props.valueFormatter(block.self), percentOf(block.self, shareBase))}
+                ${block.callerTotal ? row(t("profiles.shareOfCaller"), "", percentOf(block.total, block.callerTotal)) : ""}
               </div>
+              ${block.hint ? `<div style="font-size: 0.75rem; margin-top: 0.375rem; opacity: 0.8;">${escapeHtml(block.hint)}</div>` : ""}
             </div>
           `;
         },
