@@ -72,6 +72,7 @@ pub enum ViewOp {
     Ref,
 }
 
+/// How a rule value is compared with a field: `in` lists every value, the rest take one each.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum MatchOp {
@@ -115,6 +116,7 @@ pub enum Rule {
     },
 }
 
+/// A built-in session field a rule can select on, named as its `_rumdata` column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SessionField {
@@ -130,6 +132,7 @@ pub enum SessionField {
     Version,
 }
 
+/// An app filter that hides sessions whose `field` matches one of `values`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SessionRule {
@@ -146,6 +149,7 @@ pub struct PageRule {
     pub value: String,
 }
 
+/// How an ignored-page rule compares its value with a page key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum PageOp {
@@ -154,6 +158,7 @@ pub enum PageOp {
     Regex,
 }
 
+/// The body of a settings PUT: the built-in bot switch, session rules and ignored pages.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PutAppSettings {

@@ -240,6 +240,7 @@ pub async fn get_app_settings<C: ConnectionTrait>(
         .map_or_else(|| AppSettings::unsaved(scope.app), AppSettings::from))
 }
 
+/// Saves at the version the caller read: 0 creates, any other must equal the stored version.
 pub async fn put_app_settings<C: ConnectionTrait + TransactionTrait>(
     db: &C,
     scope: Scope<'_>,
