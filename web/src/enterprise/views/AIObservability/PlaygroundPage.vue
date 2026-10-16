@@ -315,6 +315,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";
 import { copyToClipboard } from "@/utils/clipboard";
+import { computeLlmObservabilityKey } from "@/utils/llmObservabilityKey";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
 import PlaygroundExpectedBar from "@/enterprise/components/AIObservability/PlaygroundExpectedBar.vue";
 import PlaygroundSampleDialog from "@/enterprise/components/AIObservability/PlaygroundSampleDialog.vue";
@@ -1303,22 +1304,40 @@ const recentDrafts = ref<RecentDraftEntry[]>([]);
 /** Identifies the draft being worked on now; a new one starts on Reset. */
 const draftSessionId = ref(playgroundId("draft"));
 
-// Same hash O2AIChat uses; an org-only key leaks one user's drafts to the next login on a shared profile.
-let cachedUserOrgRaw = "";
-let cachedUserOrgKeyPromise: Promise<string> | null = null;
+// LLM observability's own salted hash, so clearing the assistant's userOrgKey storage never touches drafts.
+let cachedStorageRaw = "";
+let cachedStorageKeyPromise: Promise<string> | null = null;
 
-function getUserOrgKey(): Promise<string> {
+function getStorageKey(): Promise<string> {
   const email = store.state.userInfo?.email ?? "";
   const raw = `${email}:${orgId.value}`;
-  if (raw !== cachedUserOrgRaw) {
-    cachedUserOrgRaw = raw;
-    cachedUserOrgKeyPromise = computeUserOrgKey(email, orgId.value);
+  if (raw !== cachedStorageRaw) {
+    cachedStorageRaw = raw;
+    cachedStorageKeyPromise = computeLlmObservabilityKey(email, orgId.value);
   }
-  return cachedUserOrgKeyPromise!;
+  return cachedStorageKeyPromise!;
 }
 
-async function storageKey(): Promise<string> {
-  return `o2-playground-drafts:${await getUserOrgKey()}`;
+async function keyedName(prefix: string): Promise<string> {
+  return `${prefix}:${await getStorageKey()}`;
+}
+
+function storageKey(): Promise<string> {
+  return keyedName("o2-playground-drafts");
+}
+
+/** Reads `prefix:<key>`, moving a value saved under the assistant's userOrgKey hash over once. */
+async function readKeyed(prefix: string): Promise<string | null> {
+  const key = await keyedName(prefix);
+  const stored = localStorage.getItem(key);
+  if (stored !== null) return stored;
+  const email = store.state.userInfo?.email ?? "";
+  const previousKey = `${prefix}:${await computeUserOrgKey(email, orgId.value)}`;
+  const previous = previousKey === key ? null : localStorage.getItem(previousKey);
+  if (previous === null) return null;
+  localStorage.setItem(key, previous);
+  localStorage.removeItem(previousKey);
+  return previous;
 }
 
 function removeLegacyStorage() {
@@ -1332,7 +1351,7 @@ function removeLegacyStorage() {
 
 async function loadRecentDrafts() {
   try {
-    const stored = localStorage.getItem(await storageKey());
+    const stored = await readKeyed("o2-playground-drafts");
     recentDrafts.value = stored ? (JSON.parse(stored) as RecentDraftEntry[]) : [];
   } catch {
     recentDrafts.value = [];
@@ -1398,13 +1417,13 @@ interface StoredSession {
   results: PlaygroundResults;
 }
 
-async function sessionKey(): Promise<string> {
-  return `o2-playground-session:${await getUserOrgKey()}`;
+function sessionKey(): Promise<string> {
+  return keyedName("o2-playground-session");
 }
 
 async function restoreSession() {
   try {
-    const stored = localStorage.getItem(await sessionKey());
+    const stored = await readKeyed("o2-playground-session");
     if (!stored) return;
     const session = JSON.parse(stored) as StoredSession;
     if (!session?.draft?.variants?.length) return;

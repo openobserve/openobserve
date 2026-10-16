@@ -56,6 +56,11 @@ import { PlaygroundRunError } from "@/services/llm-playground.service";
 vi.mock("@/utils/userOrgKey", () => ({
   computeUserOrgKey: (email: string, org: string) => Promise.resolve(`${email}:${org}`),
 }));
+vi.mock("@/utils/llmObservabilityKey", () => ({
+  // Distinct from the userOrgKey mock, so the one-time move from the old keys really runs.
+  computeLlmObservabilityKey: (email: string, org: string) =>
+    Promise.resolve(`llm:${email}:${org}`),
+}));
 
 vi.mock("@/types/i18n", async () => {
   const actual = await vi.importActual<typeof import("@/types/i18n")>("@/types/i18n");
@@ -433,6 +438,39 @@ describe("PlaygroundPage", () => {
     const second = vm(await mountPage());
     expect(second.draft.variants[0].messages[1].content).toBe("keep me");
     expect(second.draft.vars).toEqual({ input: "bound" });
+  });
+
+  // IW-01 moved drafts and the session onto llmObservabilityKey; values saved under the old key must survive.
+  it("moves drafts and the session saved under the old userOrgKey onto the new key once", async () => {
+    const first = await mountPage();
+    vm(first).draft.variants[0].messages[1].content = "saved before the move";
+    first.unmount();
+    await flushPromises();
+
+    const newSessionKey = Object.keys(localStorage).find((k) =>
+      k.startsWith("o2-playground-session:llm:"),
+    )!;
+    const suffix = newSessionKey.slice("o2-playground-session:llm:".length);
+    const oldSessionKey = `o2-playground-session:${suffix}`;
+    const oldDraftsKey = `o2-playground-drafts:${suffix}`;
+    const newDraftsKey = `o2-playground-drafts:llm:${suffix}`;
+    const session = localStorage.getItem(newSessionKey)!;
+    const drafts = JSON.stringify([
+      { id: "d1", summary: "checkout latency", savedAt: 1, draft: JSON.parse(session).draft },
+    ]);
+    localStorage.removeItem(newSessionKey);
+    localStorage.removeItem(newDraftsKey);
+    localStorage.setItem(oldSessionKey, session);
+    localStorage.setItem(oldDraftsKey, drafts);
+
+    const second = await mountPage();
+    expect(vm(second).draft.variants[0].messages[1].content).toBe("saved before the move");
+    const recent = (second.vm as unknown as { recentDrafts: { id: string }[] }).recentDrafts;
+    expect(recent.map((entry) => entry.id)).toEqual(["d1"]);
+    expect(localStorage.getItem(newDraftsKey)).toBe(drafts);
+    expect(localStorage.getItem(newSessionKey)).not.toBeNull();
+    expect(localStorage.getItem(oldSessionKey)).toBeNull();
+    expect(localStorage.getItem(oldDraftsKey)).toBeNull();
   });
 
   // Ids outlive the page load now (session, recent drafts, snapshots) while the

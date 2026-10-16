@@ -114,7 +114,7 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "SC 1.4.11 decorative: a container hairline, not information required to identify a component or its state",
   },
   {
-    fg: "--color-chat-bubble-user-border",
+    fg: "--color-trace-thread-user-border",
     category: "exempt",
     why: "SC 1.4.11 decorative: a container hairline, not information required to identify a component or its state",
   },

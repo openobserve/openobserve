@@ -1,0 +1,11 @@
+{
+  "_source": "B-01 error envelope contract (00 §18); not produced until B-01 lands",
+  "shape": "B-01",
+  "body": {
+    "type": "error",
+    "code": "stale_epoch",
+    "message": "B-01 envelope for stale_epoch",
+    "retryable": false,
+    "action": "reload"
+  }
+}

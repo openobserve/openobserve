@@ -1,0 +1,8 @@
+{
+  "_source": "web/src/components/O2AIChat.reducer.ts reduceText whole-block message form",
+  "_item": "today",
+  "frame": {
+    "type": "message",
+    "content": "The checkout service returned 214 errors between 12:40 and 12:55."
+  }
+}

@@ -625,6 +625,94 @@ jobs:
         if: always()
         run: cat o2.log
 
+  # The O2 Assistant flows that rewrite the edition (forceOssBuild / forceCloudBuild: GATE-01,
+  # ADMIN-14, CRED-*, CONS-*) need the Vite dev server, because only it serves aws-exports.ts
+  # as a module; the matrix shard runs the embedded production bundle, where they skip.
+  assistant_editions:
+    timeout-minutes: 30
+    name: e2e / Assistant editions
+    needs: [resolve_binary, build_binary]
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.resolve_binary.result == 'success' &&
+      (needs.resolve_binary.outputs.reuse == 'true' || needs.build_binary.result == 'success')
+    runs-on:
+      labels: eks-openobserve-standard-8
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ needs.resolve_binary.outputs.binary_artifact_name }}
+          path: release-ci-binary
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.resolve_binary.outputs.run_id }}
+
+      - name: Start OpenObserve
+        run: chmod +x ./release-ci-binary/openobserve && ./release-ci-binary/openobserve > o2.log 2>&1 &
+
+      - name: Wait for start
+        run: |
+          for i in $(seq 1 120); do
+            if curl -sf http://localhost:5080/web/login > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server failed to start in 120s"
+          exit 1
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Start the Vite dev server against the binary
+        env:
+          VITE_OPENOBSERVE_ENDPOINT: http://localhost:5080
+        run: |
+          cd web && npm ci
+          nohup npx vite --base /web/ --port 8093 --strictPort > ../vite.log 2>&1 &
+          for i in $(seq 1 180); do
+            if curl -sf http://localhost:8093/web/ > /dev/null 2>&1; then
+              echo "Vite ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Vite failed to start in 180s"
+          exit 1
+
+      - name: Run the @edition assistant flows
+        env:
+          O2_VITE_DEV: "1"
+          O2_APP_URL: http://localhost:8093/web
+          O2_BACKEND: http://localhost:5080
+        run: |
+          {
+            echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}"
+            echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}"
+            echo "ZO_BASE_URL=${ZO_BASE_URL}"
+            echo "INGESTION_URL=${INGESTION_URL}"
+            echo "ORGNAME=${ORGNAME}"
+          } > tests/ui-testing/.env
+          cd tests/ui-testing && npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test playwright-tests/assistant --grep @edition --pass-with-no-tests
+
+      - name: Check OpenObserve and Vite logs
+        if: always()
+        run: |
+          cat o2.log
+          cat vite.log || true
+
   merge_reports:
     timeout-minutes: 20
     name: Merge Reports & Report to Kinora

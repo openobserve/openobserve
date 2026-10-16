@@ -1,0 +1,12 @@
+{
+  "_source": "B-04 decision frame (00 §18)",
+  "_item": "B-04",
+  "frame": {
+    "type": "confirmation_resolved",
+    "id": "call_7",
+    "approved": true,
+    "by": "root@example.com",
+    "at": 1760000000000,
+    "scope": "once"
+  }
+}
