@@ -8198,7 +8198,7 @@
       "openAlert": "Open alert"
     },
     "dashboard": {
-      "latestRunCaption": "Latest run: {start} to {end}, written {time}",
+      "latestRunAgo": "Latest run {time}",
       "findings": "Findings",
       "alertsInScope": "Alerts in scope",
       "coverage": "Coverage",

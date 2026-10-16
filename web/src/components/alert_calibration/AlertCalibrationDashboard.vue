@@ -89,32 +89,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <section class="flex flex-col gap-2">
         <OStatStrip :items="latestStats" data-test="alert-calibration-dashboard-latest" />
-        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <div class="flex min-w-0 flex-col">
-            <OText v-for="note in coverageNotes(t, latest)" :key="note" variant="meta" as="p">{{
-              note
-            }}</OText>
-          </div>
-          <OText variant="meta" as="p" class="ms-auto text-end">
-            {{
-              t("alertCalibration.dashboard.latestRunCaption", {
-                start: formatTime(latest.window_start),
-                end: formatTime(latest.window_end),
-                time: formatAgo(latest.emitted_at),
-              })
-            }}
-          </OText>
-        </div>
+        <OText v-for="note in coverageNotes(t, latest)" :key="note" variant="meta" as="p">{{
+          note
+        }}</OText>
       </section>
 
       <section class="flex flex-col gap-3" data-test="alert-calibration-dashboard-attention">
-        <div class="flex flex-col gap-0.5">
-          <OText variant="card-title" as="h2">{{
-            t("alertCalibration.dashboard.attention")
-          }}</OText>
-          <OText variant="meta" as="p">{{
-            t("alertCalibration.dashboard.attentionCaption")
-          }}</OText>
+        <div class="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+          <div class="flex min-w-0 flex-col gap-0.5">
+            <OText variant="card-title" as="h2">{{
+              t("alertCalibration.dashboard.attention")
+            }}</OText>
+            <OText variant="meta" as="p">{{
+              t("alertCalibration.dashboard.attentionCaption")
+            }}</OText>
+          </div>
+          <OText
+            variant="meta"
+            as="p"
+            class="shrink-0"
+            data-test="alert-calibration-dashboard-latest-age"
+          >
+            {{
+              t("alertCalibration.dashboard.latestRunAgo", { time: formatAgo(latest.emitted_at) })
+            }}
+          </OText>
         </div>
 
         <OBanner v-if="latest.finding_count === 0" variant="success" icon="check-circle">
@@ -210,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
-import { format, formatDistanceToNowStrict } from "date-fns";
+import { formatDistanceToNowStrict } from "date-fns";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -256,7 +255,6 @@ const { search, orgId } = useDigestSearch();
 const configQuery = useQuery(() => alertCalibrationConfigQuery(orgId.value));
 const config = computed(() => configQuery.data.value ?? null);
 
-const formatTime = (micros: number) => raw(format(micros / 1000, "MMM d, HH:mm"));
 const formatAgo = (micros: number) =>
   raw(formatDistanceToNowStrict(micros / 1000, { addSuffix: true }));
 

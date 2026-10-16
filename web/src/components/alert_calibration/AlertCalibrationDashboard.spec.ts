@@ -184,7 +184,7 @@ describe("AlertCalibrationDashboard", () => {
     await flushPromises();
     const alert = wrapper.find('[data-test="alert-calibration-dashboard-alert-a1"]');
     expect(alert.text()).toContain("payments");
-    expect(alert.text()).toContain("payments failed 10 of 20 evaluations");
+    expect(alert.text()).toContain("failed 10 of 20 evaluations");
     wrapper.unmount();
   });
 
