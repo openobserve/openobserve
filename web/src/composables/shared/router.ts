@@ -163,7 +163,6 @@ const alertCalibrationRouteGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
-// The left menu hides Profiles when the flag is off; a typed or bookmarked URL must not open it either.
 // `=== false`, as for Downtimes: a cold load with `/config` still in flight must not bounce.
 const profilesRouteGuard = (to: any, from: any, next: any) => {
   if (store.state.zoConfig?.profiling_enabled === false) {

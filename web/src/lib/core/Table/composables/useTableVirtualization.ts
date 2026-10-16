@@ -77,9 +77,7 @@ export function useTableVirtualization(options: VirtualizationOptions) {
     return {
       count: toValue(totalCount) ?? rows.value.length,
       getScrollElement: () => resolvedScrollEl,
-      // Before the scroll element is measured the virtualizer sees height 0 and returns no rows,
-      // and OTableBody then falls back to rendering EVERY row, only to swap them for the window
-      // a moment later. Starting from the viewport height renders the first window directly.
+      // At height 0 the virtualizer returns no rows and the body renders every row, so start from the window height.
       initialRect: { width: 0, height: typeof window !== "undefined" ? window.innerHeight : 0 },
       scrollMargin,
       estimateSize: (index: number) => {

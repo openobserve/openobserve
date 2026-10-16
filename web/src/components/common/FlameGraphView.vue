@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div ref="rootEl" class="relative">
-    <!-- Flat inside its card, as the Traces flame graph is: no frame or tint of its own. -->
     <div v-if="!hasData" class="text-text-secondary flex h-40 items-center justify-center text-sm">
       {{ emptyLabel }}
     </div>
@@ -106,7 +105,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- A column, so the menu is as wide as its longest item: inline buttons would size it as one long line. -->
     <div
       v-if="menu"
       ref="menuEl"
