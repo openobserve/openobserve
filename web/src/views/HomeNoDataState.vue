@@ -143,9 +143,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <EmptyStateIngestionChip
           v-if="store.state.zoConfig?.profiling_enabled"
-          icon="bar-chart"
+          icon="memory"
           data-test="home-no-data-profiles-btn"
-          @click="go('profiles')"
+          @click="go('ingestProfiles')"
         >
           {{ t("home.noDataState.profiles") }}
         </EmptyStateIngestionChip>
