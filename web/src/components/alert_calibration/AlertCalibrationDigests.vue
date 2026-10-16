@@ -335,9 +335,7 @@ const columns = computed<OTableColumnDef<RunRow>[]>(() => [
     accessorFn: (row) => row.window_end,
     sortable: true,
     // The slack goes to the run, so the badge columns keep their width.
-    autoWidth: true,
-    fillRemaining: true,
-    meta: { align: "left", isName: true },
+    meta: { align: "left", isName: true, autoWidth: true, fillRemaining: true },
   },
   {
     id: "findings",
