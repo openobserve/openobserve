@@ -15,34 +15,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard :data-test="`alert-calibration-finding-${finding.rule_id}`">
-    <div class="flex flex-col gap-3">
-      <div class="flex items-start gap-3">
-        <OIcon :name="meta.icon" size="md" class="text-text-secondary mt-0.5 shrink-0" />
-        <div class="flex min-w-0 flex-1 flex-col gap-1">
-          <OText variant="body-strong" as="div">{{ finding.title }}</OText>
-          <div class="flex flex-wrap items-center gap-1.5">
-            <OBadge :variant="SEVERITY_BADGE[finding.severity]" size="xs" shape="rounded">
-              {{ t(SEVERITY_LABEL[finding.severity]) }}
-            </OBadge>
-            <OBadge variant="default-soft" size="xs" shape="rounded">
-              {{ t(CONFIDENCE_LABEL[finding.confidence]) }}
-            </OBadge>
-            <OBadge variant="default-outline" size="xs" shape="rounded">{{
-              t(meta.labelKey)
-            }}</OBadge>
-          </div>
+  <OCard variant="glass" :data-test="`alert-calibration-finding-${finding.rule_id}`">
+    <OCardSection role="header" class="items-start gap-3 py-3">
+      <span
+        class="rounded-default inline-flex size-7 shrink-0 items-center justify-center"
+        :class="SEVERITY_TILE[finding.severity]"
+        data-test="alert-calibration-finding-tile"
+      >
+        <OIcon :name="meta.icon" size="sm" />
+      </span>
+      <div class="flex min-w-0 flex-1 flex-col gap-1">
+        <OText variant="body-strong" as="div">{{ finding.title }}</OText>
+        <div class="flex flex-wrap items-center gap-1.5">
+          <OBadge :variant="SEVERITY_BADGE[finding.severity]" size="xs" shape="rounded">
+            {{ t(SEVERITY_LABEL[finding.severity]) }}
+          </OBadge>
+          <OBadge variant="default-soft" size="xs" shape="rounded">
+            {{ t(CONFIDENCE_LABEL[finding.confidence]) }}
+          </OBadge>
+          <OBadge variant="default-outline" size="xs" shape="rounded">{{
+            t(meta.labelKey)
+          }}</OBadge>
         </div>
       </div>
+    </OCardSection>
 
+    <OSeparator />
+
+    <OCardSection role="body" class="flex flex-col gap-3 pt-3">
       <div class="flex flex-col gap-1.5">
         <OText variant="label" as="div">{{ t("alertCalibration.detail.evidence") }}</OText>
-        <dl class="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
-          <div
-            v-for="row in evidence"
-            :key="row.column"
-            class="flex min-w-0 items-baseline justify-between gap-3"
-          >
+        <dl class="grid grid-cols-1 gap-x-10 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3">
+          <div v-for="row in evidence" :key="row.column" class="flex min-w-0 items-baseline gap-2">
             <dt class="text-text-secondary shrink-0 text-xs">{{ row.label }}</dt>
             <OTruncatedText as="dd" class="text-text-body min-w-0 text-xs font-medium tabular-nums">
               {{ row.value }}
@@ -53,13 +57,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-if="finding.alert_name" class="flex flex-col gap-1.5">
         <OText variant="label" as="div">{{ t("alertCalibration.detail.alert") }}</OText>
-        <div>
+        <div class="flex flex-wrap items-center gap-2">
           <OTag
             icon="notifications"
             variant="default-soft"
             size="sm"
             :label="raw(finding.alert_name)"
           />
+          <OButton
+            v-if="finding.alert_id"
+            variant="outline"
+            size="sm"
+            icon-left="open-in-new"
+            data-test="alert-calibration-finding-open-alert"
+            @click="openAlert"
+          >
+            {{ t("alertCalibration.detail.openAlert") }}
+          </OButton>
         </div>
       </div>
 
@@ -77,28 +91,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-    </div>
+    </OCardSection>
   </OCard>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useRouter } from "vue-router";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { FindingRecord } from "./digests";
 import { ACTION_META, isProposedAction, RULE_META } from "./rules";
-import { CONFIDENCE_LABEL, formatEvidence, SEVERITY_BADGE, SEVERITY_LABEL } from "./format";
+import {
+  CONFIDENCE_LABEL,
+  formatEvidence,
+  SEVERITY_BADGE,
+  SEVERITY_LABEL,
+  SEVERITY_TILE,
+} from "./format";
 
 const props = defineProps<{ finding: FindingRecord }>();
 
 const { t } = useI18nTyped();
+const router = useRouter();
+const orgId = useOrgId();
 
 const meta = computed(() => RULE_META[props.finding.rule_id]);
+
+const openAlert = () =>
+  router.push({
+    name: "alertDetail",
+    params: { alert_id: props.finding.alert_id },
+    query: { org_identifier: orgId.value },
+  });
 
 const evidence = computed(() =>
   meta.value.evidence.map((field) => ({

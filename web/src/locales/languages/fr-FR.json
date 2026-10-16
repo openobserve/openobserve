@@ -8049,7 +8049,6 @@
     "refresh": "Actualiser",
     "retry": "Réessayer",
     "tabs": {
-      "digests": "Synthèses",
       "dashboard": "Tableau de bord"
     },
     "duration": {
@@ -8144,7 +8143,6 @@
       "searchPlaceholder": "Rechercher des exécutions par nom d'alerte",
       "colRun": "Exécution",
       "colFindings": "Constats",
-      "colDeclined": "Refusés",
       "colCoverage": "Couverture",
       "colGenerated": "Généré",
       "clean": "Sain",
@@ -8198,20 +8196,11 @@
       "proposedActions": "Actions proposées"
     },
     "dashboard": {
-      "lastDays": "{days} derniers jours",
       "latestRun": "Dernière exécution",
       "latestRunCaption": "Fenêtre de {start} à {end}, écrite à {time}",
       "findings": "Constats",
-      "thisRunOnly": "Cette exécution uniquement",
       "alertsInScope": "Alertes dans le périmètre",
-      "declined": "Refusées",
       "coverage": "Couverture",
-      "byRule": "Alertes signalées par règle",
-      "byRuleCaption": "Alertes distinctes, pas des constats. Exécutions dans la même plage : {runs}, avec une lacune de couverture : {gaps}, n'ayant rien mesuré : {blind}.",
-      "colRule": "Règle",
-      "colAlertsFlagged": "Alertes signalées",
-      "colRunsFlagging": "Exécutions avec au moins un signalement",
-      "panelQuery": "Requête du panneau",
       "emptyTitle": "Aucune exécution au cours des {days} derniers jours",
       "emptyDescription": "Le tableau de bord se remplit dès que la calibration des alertes s'est exécutée."
     },
@@ -8240,10 +8229,7 @@
       "saveFailed": "Les réglages n'ont pas pu être enregistrés : {message}",
       "loadFailed": "Les réglages n'ont pas pu être chargés : {message}",
       "lastSaved": "Dernier enregistrement {time}",
-      "runNowHeading": "Exécuter maintenant",
-      "findingsHeading": "Constats et accès",
-      "findingsDesc": "Chaque exécution écrit ses constats sous forme d'enregistrements de logs dans le flux {stream} de cette organisation, conservés selon la rétention de ce flux.",
-      "accessNote": "La permission Calibration des alertes d'un rôle détermine l'accès : Get pour consulter les constats, Update pour modifier ces réglages, et Create pour demander une exécution. Les constats couvrent toutes les alertes de l'organisation, y compris les alertes que le lecteur ne peut pas ouvrir. La calibration des alertes n'envoie aucune notification."
+      "runNowHeading": "Exécuter maintenant"
     }
   },
   "alerts": {

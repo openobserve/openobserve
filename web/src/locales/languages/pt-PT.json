@@ -8049,7 +8049,6 @@
     "refresh": "Atualizar",
     "retry": "Tentar novamente",
     "tabs": {
-      "digests": "Resumos",
       "dashboard": "Painel"
     },
     "duration": {
@@ -8144,7 +8143,6 @@
       "searchPlaceholder": "Pesquisar execuções por nome do alerta",
       "colRun": "Execução",
       "colFindings": "Descobertas",
-      "colDeclined": "Recusadas",
       "colCoverage": "Cobertura",
       "colGenerated": "Gerado",
       "clean": "Limpo",
@@ -8198,20 +8196,11 @@
       "proposedActions": "Ações propostas"
     },
     "dashboard": {
-      "lastDays": "Últimos {days} dias",
       "latestRun": "Execução mais recente",
       "latestRunCaption": "Janela de {start} a {end}, gravada em {time}",
       "findings": "Achados",
-      "thisRunOnly": "Apenas esta execução",
       "alertsInScope": "Alertas no escopo",
-      "declined": "Recusados",
       "coverage": "Cobertura",
-      "byRule": "Alertas sinalizados por regra",
-      "byRuleCaption": "Alertas distintos, não achados. Execuções no mesmo intervalo: {runs}, com lacuna de cobertura: {gaps}, não mediram nada: {blind}.",
-      "colRule": "Regra",
-      "colAlertsFlagged": "Alertas sinalizados",
-      "colRunsFlagging": "Execuções sinalizando algum",
-      "panelQuery": "Consulta do painel",
       "emptyTitle": "Nenhuma execução nos últimos {days} dias",
       "emptyDescription": "O painel é preenchido assim que a calibração de alertas for executada."
     },
@@ -8240,10 +8229,7 @@
       "saveFailed": "Não foi possível salvar as configurações: {message}",
       "loadFailed": "Não foi possível carregar as configurações: {message}",
       "lastSaved": "Última gravação {time}",
-      "runNowHeading": "Executar agora",
-      "findingsHeading": "Achados e acesso",
-      "findingsDesc": "Cada execução grava seus achados como registros de log no stream {stream} desta organização, mantidos conforme a retenção desse stream.",
-      "accessNote": "A permissão Calibração de alertas em um papel determina o acesso: Get para ler os resultados, Update para alterar estas configurações e Create para solicitar uma execução. Os resultados abrangem todos os alertas da organização, inclusive alertas que o leitor não pode abrir. A calibração de alertas não envia notificações."
+      "runNowHeading": "Executar agora"
     }
   },
   "alerts": {

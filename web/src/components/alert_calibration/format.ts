@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { format } from "date-fns";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { Confidence, CoverageVerdict, Severity } from "./digests";
 import type { EvidenceFormat } from "./rules";
@@ -33,6 +34,10 @@ export function formatMinutes(t: TranslateFn, minutes: number): I18nText {
     return count("alertCalibration.duration.hours", minutes / 60);
   return count("alertCalibration.duration.minutes", minutes);
 }
+
+/** A run as one line: its window, ending at the run's time, as "Sep 15 → Oct 15, 23:14". */
+export const formatWindow = (startMicros: number, endMicros: number): I18nText =>
+  raw(`${format(startMicros / 1000, "MMM d")} → ${format(endMicros / 1000, "MMM d, HH:mm")}`);
 
 export function formatSeconds(t: TranslateFn, secs: number): I18nText {
   const rounded = Math.round(secs);
@@ -61,6 +66,14 @@ export const SEVERITY_BADGE: Record<
   Medium: "warning-soft",
   Low: "primary-soft",
   Info: "default-soft",
+};
+
+/** The rule icon's tile takes the severity badge's tone, so the two read as one signal. */
+export const SEVERITY_TILE: Record<Severity, string> = {
+  High: "bg-badge-error-soft-bg text-badge-error-soft-text",
+  Medium: "bg-badge-warning-soft-bg text-badge-warning-soft-text",
+  Low: "bg-badge-primary-soft-bg text-badge-primary-soft-text",
+  Info: "bg-badge-default-soft-bg text-badge-default-soft-text",
 };
 
 export const SEVERITY_LABEL: Record<Severity, I18nKey> = {

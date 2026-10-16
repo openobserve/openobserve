@@ -8049,7 +8049,6 @@
     "refresh": "새로 고침",
     "retry": "다시 시도",
     "tabs": {
-      "digests": "다이제스트",
       "dashboard": "대시보드"
     },
     "duration": {
@@ -8144,7 +8143,6 @@
       "searchPlaceholder": "알림 이름으로 실행 검색",
       "colRun": "실행",
       "colFindings": "발견 사항",
-      "colDeclined": "거부됨",
       "colCoverage": "커버리지",
       "colGenerated": "생성됨",
       "clean": "정상",
@@ -8198,20 +8196,11 @@
       "proposedActions": "제안된 작업"
     },
     "dashboard": {
-      "lastDays": "최근 {days}일",
       "latestRun": "최근 실행",
       "latestRunCaption": "기간 {start} ~ {end}, {time}에 기록됨",
       "findings": "발견 사항",
-      "thisRunOnly": "이 실행만",
       "alertsInScope": "범위 내 알림",
-      "declined": "판정 제외",
       "coverage": "커버리지",
-      "byRule": "규칙별로 표시된 알림",
-      "byRuleCaption": "발견 사항이 아닌 고유 알림입니다. 동일 범위의 실행: {runs}, 커버리지 공백 있음: {gaps}, 아무것도 측정하지 못함: {blind}.",
-      "colRule": "규칙",
-      "colAlertsFlagged": "플래그된 알림",
-      "colRunsFlagging": "하나라도 플래그한 실행",
-      "panelQuery": "패널 쿼리",
       "emptyTitle": "최근 {days}일 동안 실행 없음",
       "emptyDescription": "알림 캘리브레이션이 실행되면 대시보드가 채워집니다."
     },
@@ -8240,10 +8229,7 @@
       "saveFailed": "설정을 저장할 수 없습니다: {message}",
       "loadFailed": "설정을 불러올 수 없습니다: {message}",
       "lastSaved": "마지막 저장 {time}",
-      "runNowHeading": "지금 실행",
-      "findingsHeading": "결과 및 접근",
-      "findingsDesc": "각 실행은 결과를 이 조직의 {stream} 스트림에 로그 레코드로 기록하며, 해당 스트림의 보존 기간 동안 보관됩니다.",
-      "accessNote": "역할의 알림 캘리브레이션 권한이 액세스를 결정합니다: 결과를 읽으려면 Get, 이 설정을 변경하려면 Update, 실행을 요청하려면 Create가 필요합니다. 결과는 조직의 모든 알림을 포함하며, 읽는 사람이 열 수 없는 알림도 포함됩니다. 알림 캘리브레이션은 알림을 전송하지 않습니다."
+      "runNowHeading": "지금 실행"
     }
   },
   "alerts": {

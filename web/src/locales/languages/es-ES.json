@@ -8049,7 +8049,6 @@
     "refresh": "Actualizar",
     "retry": "Reintentar",
     "tabs": {
-      "digests": "Resúmenes",
       "dashboard": "Dashboard"
     },
     "duration": {
@@ -8144,7 +8143,6 @@
       "searchPlaceholder": "Buscar ejecuciones por nombre de alerta",
       "colRun": "Ejecución",
       "colFindings": "Hallazgos",
-      "colDeclined": "Rechazados",
       "colCoverage": "Cobertura",
       "colGenerated": "Generado",
       "clean": "Limpio",
@@ -8198,20 +8196,11 @@
       "proposedActions": "Acciones propuestas"
     },
     "dashboard": {
-      "lastDays": "Últimos {days} días",
       "latestRun": "Última ejecución",
       "latestRunCaption": "Ventana de {start} a {end}, registrada {time}",
       "findings": "Hallazgos",
-      "thisRunOnly": "Solo esta ejecución",
       "alertsInScope": "Alertas en alcance",
-      "declined": "Rechazadas",
       "coverage": "Cobertura",
-      "byRule": "Alertas marcadas por regla",
-      "byRuleCaption": "Alertas distintas, no hallazgos. Ejecuciones en el mismo rango: {runs}, con brecha de cobertura: {gaps}, que no midieron nada: {blind}.",
-      "colRule": "Regla",
-      "colAlertsFlagged": "Alertas marcadas",
-      "colRunsFlagging": "Ejecuciones que marcan alguna",
-      "panelQuery": "Consulta del panel",
       "emptyTitle": "Sin ejecuciones en los últimos {days} días",
       "emptyDescription": "El dashboard se completa una vez que se haya ejecutado la calibración de alertas."
     },
@@ -8240,10 +8229,7 @@
       "saveFailed": "No se pudieron guardar los ajustes: {message}",
       "loadFailed": "No se pudieron cargar los ajustes: {message}",
       "lastSaved": "Último guardado {time}",
-      "runNowHeading": "Ejecutar ahora",
-      "findingsHeading": "Hallazgos y acceso",
-      "findingsDesc": "Cada ejecución escribe sus hallazgos como registros de log en el stream {stream} de esta organización, conservados según la retención de ese stream.",
-      "accessNote": "El permiso Calibración de alertas en un rol determina el acceso: Get para leer los hallazgos, Update para cambiar esta configuración y Create para solicitar una ejecución. Los hallazgos abarcan todas las alertas de la organización, incluidas las alertas que el lector no puede abrir. La calibración de alertas no envía notificaciones."
+      "runNowHeading": "Ejecutar ahora"
     }
   },
   "alerts": {

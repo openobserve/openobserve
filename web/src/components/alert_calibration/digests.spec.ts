@@ -18,11 +18,13 @@ import { gt } from "@/types/i18n";
 import {
   coverageNotes,
   coverageVerdict,
+  findingsByRule,
   isClean,
   latestEmission,
   latestPerWindow,
   latestRun,
   type DigestRecord,
+  type FindingRecord,
   type RuleId,
   type RunRow,
   type Severity,
@@ -143,6 +145,22 @@ describe("a run's verdict", () => {
     const later = run({ window_end: 900, emitted_at: 1 });
     expect(latestRun([run({ emitted_at: 2 }), later])).toBe(later);
     expect(latestRun([])).toBeNull();
+  });
+});
+
+describe("the dashboard grouping", () => {
+  it("lists every rule, worst first, with its findings in severity order", () => {
+    const f = (rule_id: RuleId, severity: Severity, alert_name: string) =>
+      ({ rule_id, severity, alert_name }) as FindingRecord;
+    const groups = findingsByRule(
+      ["failure", "noise", "silent"],
+      [f("noise", "Low", "b"), f("failure", "High", "a"), f("noise", "Medium", "c")],
+    );
+    expect(groups.map((g) => [g.rule_id, g.severity, g.findings.length])).toEqual([
+      ["failure", "High", 1],
+      ["noise", "Low", 2],
+      ["silent", null, 0],
+    ]);
   });
 });
 

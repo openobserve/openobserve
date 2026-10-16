@@ -8049,7 +8049,6 @@
     "refresh": "更新",
     "retry": "再試行",
     "tabs": {
-      "digests": "ダイジェスト",
       "dashboard": "ダッシュボード"
     },
     "duration": {
@@ -8144,7 +8143,6 @@
       "searchPlaceholder": "アラート名で実行を検索",
       "colRun": "実行",
       "colFindings": "検出結果",
-      "colDeclined": "却下",
       "colCoverage": "カバレッジ",
       "colGenerated": "生成",
       "clean": "クリーン",
@@ -8198,20 +8196,11 @@
       "proposedActions": "提案されたアクション"
     },
     "dashboard": {
-      "lastDays": "過去 {days} 日間",
       "latestRun": "最新の実行",
       "latestRunCaption": "ウィンドウ {start} から {end}、書き込み {time}",
       "findings": "検出結果",
-      "thisRunOnly": "この実行のみ",
       "alertsInScope": "対象範囲のアラート",
-      "declined": "判断対象外",
       "coverage": "カバレッジ",
-      "byRule": "ルール別にフラグが立てられたアラート",
-      "byRuleCaption": "検出結果ではなく、重複を除いたアラート数。同じ範囲の実行: {runs}、カバレッジの欠落あり: {gaps}、何も測定せず: {blind}。",
-      "colRule": "ルール",
-      "colAlertsFlagged": "フラグが付いたアラート",
-      "colRunsFlagging": "いずれかにフラグを付けた実行",
-      "panelQuery": "パネルクエリ",
       "emptyTitle": "過去 {days} 日間に実行はありません",
       "emptyDescription": "アラートキャリブレーションが実行されると、ダッシュボードに表示されます。"
     },
@@ -8240,10 +8229,7 @@
       "saveFailed": "設定を保存できませんでした: {message}",
       "loadFailed": "設定を読み込めませんでした: {message}",
       "lastSaved": "最終保存 {time}",
-      "runNowHeading": "今すぐ実行",
-      "findingsHeading": "検出事項とアクセス",
-      "findingsDesc": "各実行は検出事項をこの組織の {stream} ストリームにログレコードとして書き込み、そのストリームの保持期間に従って保持されます。",
-      "accessNote": "ロール内のアラートキャリブレーション権限がアクセスを決定します。Get は検出結果の読み取り、Update はこれらの設定の変更、Create は実行のリクエストに使用します。検出結果は組織内のすべてのアラートを対象とし、読み取り権限のないアラートも含まれます。アラートキャリブレーションは通知を送信しません。"
+      "runNowHeading": "今すぐ実行"
     }
   },
   "alerts": {

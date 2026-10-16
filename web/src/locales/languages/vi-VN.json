@@ -8049,7 +8049,6 @@
     "refresh": "Làm mới",
     "retry": "Thử lại",
     "tabs": {
-      "digests": "Bản tóm tắt",
       "dashboard": "Bảng điều khiển"
     },
     "duration": {
@@ -8144,7 +8143,6 @@
       "searchPlaceholder": "Tìm kiếm lần chạy theo tên cảnh báo",
       "colRun": "Lần chạy",
       "colFindings": "Phát hiện",
-      "colDeclined": "Bị từ chối",
       "colCoverage": "Bao phủ",
       "colGenerated": "Đã tạo",
       "clean": "Sạch",
@@ -8198,20 +8196,11 @@
       "proposedActions": "Hành động đề xuất"
     },
     "dashboard": {
-      "lastDays": "{days} ngày qua",
       "latestRun": "Lượt chạy mới nhất",
       "latestRunCaption": "Cửa sổ từ {start} đến {end}, được ghi lúc {time}",
       "findings": "Phát hiện",
-      "thisRunOnly": "Chỉ lượt chạy này",
       "alertsInScope": "Cảnh báo trong phạm vi",
-      "declined": "Bị từ chối",
       "coverage": "Bao phủ",
-      "byRule": "Cảnh báo được đánh dấu theo quy tắc",
-      "byRuleCaption": "Các cảnh báo riêng biệt, không phải phát hiện. Các lượt chạy trong cùng khoảng: {runs}, có khoảng trống bao phủ: {gaps}, không đo được gì: {blind}.",
-      "colRule": "Quy tắc",
-      "colAlertsFlagged": "Cảnh báo bị gắn cờ",
-      "colRunsFlagging": "Lần chạy gắn cờ bất kỳ",
-      "panelQuery": "Truy vấn panel",
       "emptyTitle": "Không có lần chạy nào trong {days} ngày qua",
       "emptyDescription": "Bảng điều khiển sẽ hiển thị dữ liệu sau khi hiệu chuẩn cảnh báo chạy."
     },
@@ -8240,10 +8229,7 @@
       "saveFailed": "Không thể lưu cài đặt: {message}",
       "loadFailed": "Không thể tải cài đặt: {message}",
       "lastSaved": "Lưu lần cuối {time}",
-      "runNowHeading": "Chạy ngay",
-      "findingsHeading": "Kết quả và quyền truy cập",
-      "findingsDesc": "Mỗi lần chạy ghi kết quả của nó dưới dạng bản ghi nhật ký vào stream {stream} của tổ chức này, được lưu theo thời gian lưu trữ của stream đó.",
-      "accessNote": "Quyền Hiệu chỉnh cảnh báo trong một vai trò quyết định quyền truy cập: Get để đọc các phát hiện, Update để thay đổi các cài đặt này và Create để yêu cầu một lần chạy. Các phát hiện bao gồm mọi cảnh báo trong tổ chức, kể cả những cảnh báo mà người đọc không thể mở. Hiệu chỉnh cảnh báo không gửi thông báo nào."
+      "runNowHeading": "Chạy ngay"
     }
   },
   "alerts": {

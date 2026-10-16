@@ -72,17 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("alertCalibration.runNeedsConfig") }}
               </OText>
             </div>
-          </div>
-        </OFormSection>
-
-        <OFormSection :title="t('alertCalibration.settings.findingsHeading')">
-          <div class="flex flex-col gap-3">
-            <OText variant="body" as="p">
+            <OText variant="meta" as="p">
               {{ t("alertCalibration.settings.findingsDesc", { stream: DIGEST_STREAM }) }}
             </OText>
-            <OBanner variant="info" icon="lock" data-test="alert-calibration-settings-access-note">
-              {{ t("alertCalibration.settings.accessNote") }}
-            </OBanner>
           </div>
         </OFormSection>
       </template>

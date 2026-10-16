@@ -8049,7 +8049,6 @@
     "refresh": "刷新",
     "retry": "重试",
     "tabs": {
-      "digests": "摘要",
       "dashboard": "仪表盘"
     },
     "duration": {
@@ -8144,7 +8143,6 @@
       "searchPlaceholder": "按告警名称搜索运行",
       "colRun": "运行",
       "colFindings": "发现",
-      "colDeclined": "已拒绝",
       "colCoverage": "覆盖",
       "colGenerated": "生成时间",
       "clean": "无问题",
@@ -8198,20 +8196,11 @@
       "proposedActions": "建议的操作"
     },
     "dashboard": {
-      "lastDays": "最近 {days} 天",
       "latestRun": "最新运行",
       "latestRunCaption": "窗口 {start} 至 {end}，写入于 {time}",
       "findings": "发现项",
-      "thisRunOnly": "仅此次运行",
       "alertsInScope": "范围内的告警",
-      "declined": "未判定",
       "coverage": "覆盖率",
-      "byRule": "按规则标记的告警",
-      "byRuleCaption": "去重后的告警数，而非发现项数。同一范围内的运行次数：{runs}，存在覆盖缺口的：{gaps}，未测得任何内容的：{blind}。",
-      "colRule": "规则",
-      "colAlertsFlagged": "已标记告警",
-      "colRunsFlagging": "标记任意告警的运行",
-      "panelQuery": "面板查询",
       "emptyTitle": "过去 {days} 天内没有运行记录",
       "emptyDescription": "告警校准运行后，仪表盘才会填充数据。"
     },
@@ -8240,10 +8229,7 @@
       "saveFailed": "无法保存设置：{message}",
       "loadFailed": "无法加载设置：{message}",
       "lastSaved": "上次保存于 {time}",
-      "runNowHeading": "立即运行",
-      "findingsHeading": "发现与访问权限",
-      "findingsDesc": "每次运行都会将发现作为日志记录写入此组织的 {stream} 数据流，并保留至该数据流的保留期。",
-      "accessNote": "角色中的告警校准权限决定访问范围：Get 可查看发现结果，Update 可更改这些设置，Create 可请求运行。发现结果涵盖组织中的所有告警，包括查看者无法打开的告警。告警校准不发送任何通知。"
+      "runNowHeading": "立即运行"
     }
   },
   "alerts": {

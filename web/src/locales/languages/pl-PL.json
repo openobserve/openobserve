@@ -8049,7 +8049,6 @@
     "refresh": "Odśwież",
     "retry": "Ponów",
     "tabs": {
-      "digests": "Podsumowania",
       "dashboard": "Pulpit"
     },
     "duration": {
@@ -8144,7 +8143,6 @@
       "searchPlaceholder": "Szukaj uruchomień według nazwy alertu",
       "colRun": "Uruchomienie",
       "colFindings": "Ustalenia",
-      "colDeclined": "Odrzucone",
       "colCoverage": "Pokrycie",
       "colGenerated": "Wygenerowano",
       "clean": "Bez zastrzeżeń",
@@ -8198,20 +8196,11 @@
       "proposedActions": "Proponowane działania"
     },
     "dashboard": {
-      "lastDays": "Ostatnie {days} dni",
       "latestRun": "Najnowsze uruchomienie",
       "latestRunCaption": "Okno od {start} do {end}, zapisano {time}",
       "findings": "Ustalenia",
-      "thisRunOnly": "Tylko to uruchomienie",
       "alertsInScope": "Alerty w zakresie",
-      "declined": "Odrzucone",
       "coverage": "Pokrycie",
-      "byRule": "Alerty oznaczone przez regułę",
-      "byRuleCaption": "Unikalne alerty, nie ustalenia. Uruchomienia w tym samym zakresie: {runs}, z luką w pokryciu: {gaps}, nic nie zmierzyły: {blind}.",
-      "colRule": "Reguła",
-      "colAlertsFlagged": "Oznaczone alerty",
-      "colRunsFlagging": "Uruchomienia, które coś oznaczyły",
-      "panelQuery": "Zapytanie panelu",
       "emptyTitle": "Brak uruchomień w ciągu ostatnich {days} dni",
       "emptyDescription": "Pulpit wypełni się po uruchomieniu kalibracji alertów."
     },
@@ -8240,10 +8229,7 @@
       "saveFailed": "Nie udało się zapisać ustawień: {message}",
       "loadFailed": "Nie udało się wczytać ustawień: {message}",
       "lastSaved": "Ostatnio zapisano {time}",
-      "runNowHeading": "Uruchom teraz",
-      "findingsHeading": "Ustalenia i dostęp",
-      "findingsDesc": "Każde uruchomienie zapisuje swoje ustalenia jako rekordy logów w strumieniu {stream} tej organizacji, przechowywane zgodnie z okresem retencji tego strumienia.",
-      "accessNote": "Uprawnienie Kalibracja alertów w roli decyduje o dostępie: Get umożliwia odczyt ustaleń, Update — zmianę tych ustawień, a Create — zlecenie uruchomienia. Ustalenia obejmują każdy alert w organizacji, w tym alerty, których czytelnik nie może otworzyć. Kalibracja alertów nie wysyła żadnych powiadomień."
+      "runNowHeading": "Uruchom teraz"
     }
   },
   "alerts": {

@@ -8049,7 +8049,7 @@
     "refresh": "Refresh",
     "retry": "Retry",
     "tabs": {
-      "digests": "Digests",
+      "runs": "Runs",
       "dashboard": "Dashboard"
     },
     "duration": {
@@ -8144,7 +8144,6 @@
       "searchPlaceholder": "Search runs by alert name",
       "colRun": "Run",
       "colFindings": "Findings",
-      "colDeclined": "Declined",
       "colCoverage": "Coverage",
       "colGenerated": "Generated",
       "clean": "Clean",
@@ -8195,23 +8194,24 @@
       "declinedNotWritten": "The per-alert reasons are not written to the stream, only this count.",
       "evidence": "Evidence",
       "alert": "Alert",
-      "proposedActions": "Proposed actions"
+      "proposedActions": "Proposed actions",
+      "openAlert": "Open alert"
     },
     "dashboard": {
-      "lastDays": "Last {days} days",
       "latestRun": "Latest run",
       "latestRunCaption": "Window {start} to {end}, written {time}",
       "findings": "Findings",
-      "thisRunOnly": "This run only",
       "alertsInScope": "Alerts in scope",
-      "declined": "Declined",
       "coverage": "Coverage",
-      "byRule": "Alerts flagged by rule",
-      "byRuleCaption": "Distinct alerts, not findings. Runs in the same range: {runs}, with a coverage gap: {gaps}, measured nothing: {blind}.",
-      "colRule": "Rule",
-      "colAlertsFlagged": "Alerts flagged",
-      "colRunsFlagging": "Runs flagging any",
-      "panelQuery": "Panel query",
+      "attention": "What needs attention",
+      "attentionCaption": "From the latest run. Open a rule to see the alerts it flagged.",
+      "alertsFlagged": "{count} alert | {count} alerts",
+      "nothingFlagged": "No alert flagged by this rule in the latest run.",
+      "allClear": "The latest run found nothing to fix.",
+      "openAlert": "Open alert",
+      "viewEvidence": "View evidence",
+      "notEnabledTitle": "Alert calibration is not running for this organization",
+      "notEnabledDescription": "Turn it on in the settings. The first run is due as soon as it is on.",
       "emptyTitle": "No runs in the last {days} days",
       "emptyDescription": "The dashboard fills in once alert calibration has run."
     },
@@ -8243,9 +8243,7 @@
       "loadFailed": "The settings could not be loaded: {message}",
       "lastSaved": "Last saved {time}",
       "runNowHeading": "Run now",
-      "findingsHeading": "Findings and access",
-      "findingsDesc": "Each run writes its findings as log records to the {stream} stream of this organization, kept for that stream's retention.",
-      "accessNote": "The Alert Calibration permission in a role decides access: Get to read findings, Update to change these settings, and Create to request a run. Findings cover every alert in the organization, including alerts the reader cannot open. Alert calibration sends no notifications.",
+      "findingsDesc": "Findings are written to the {stream} stream of this organization and kept for that stream's retention. Alert calibration sends no notifications.",
       "frequencyRange": "Choose a cadence between 1 hour and 30 days.",
       "windowRange": "Choose a window between 1 minute and 90 days."
     }

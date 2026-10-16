@@ -8049,7 +8049,6 @@
     "refresh": "Aggiorna",
     "retry": "Riprova",
     "tabs": {
-      "digests": "Riepiloghi",
       "dashboard": "Dashboard"
     },
     "duration": {
@@ -8144,7 +8143,6 @@
       "searchPlaceholder": "Cerca esecuzioni per nome dell'avviso",
       "colRun": "Esecuzione",
       "colFindings": "Riscontri",
-      "colDeclined": "Rifiutati",
       "colCoverage": "Copertura",
       "colGenerated": "Generato",
       "clean": "Pulito",
@@ -8198,20 +8196,11 @@
       "proposedActions": "Azioni proposte"
     },
     "dashboard": {
-      "lastDays": "Ultimi {days} giorni",
       "latestRun": "Ultima esecuzione",
       "latestRunCaption": "Finestra da {start} a {end}, scritto il {time}",
       "findings": "Riscontri",
-      "thisRunOnly": "Solo questa esecuzione",
       "alertsInScope": "Avvisi nell'ambito",
-      "declined": "Rifiutati",
       "coverage": "Copertura",
-      "byRule": "Avvisi segnalati per regola",
-      "byRuleCaption": "Avvisi distinti, non riscontri. Esecuzioni nello stesso intervallo: {runs}, con una lacuna di copertura: {gaps}, che non hanno misurato nulla: {blind}.",
-      "colRule": "Regola",
-      "colAlertsFlagged": "Avvisi segnalati",
-      "colRunsFlagging": "Esecuzioni con almeno una segnalazione",
-      "panelQuery": "Query del pannello",
       "emptyTitle": "Nessuna esecuzione negli ultimi {days} giorni",
       "emptyDescription": "La dashboard si popola dopo la prima esecuzione della calibrazione degli avvisi."
     },
@@ -8240,10 +8229,7 @@
       "saveFailed": "Impossibile salvare le impostazioni: {message}",
       "loadFailed": "Impossibile caricare le impostazioni: {message}",
       "lastSaved": "Ultimo salvataggio {time}",
-      "runNowHeading": "Esegui ora",
-      "findingsHeading": "Risultati e accesso",
-      "findingsDesc": "Ogni esecuzione scrive i propri risultati come record di log nello stream {stream} di questa organizzazione, conservati secondo la retention di quello stream.",
-      "accessNote": "Il permesso Calibrazione avvisi in un ruolo determina l'accesso: Get per leggere i risultati, Update per modificare queste impostazioni e Create per richiedere un'esecuzione. I risultati coprono ogni avviso nell'organizzazione, inclusi gli avvisi che il lettore non può aprire. La calibrazione avvisi non invia notifiche."
+      "runNowHeading": "Esegui ora"
     }
   },
   "alerts": {

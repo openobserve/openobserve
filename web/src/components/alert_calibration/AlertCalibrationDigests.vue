@@ -100,12 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-window="{ row }">
-            <div class="flex min-w-0 flex-col">
-              <OTimeCell :value="row.window_end" unit="us" mode="absolute" />
-              <span class="text-text-secondary truncate text-xs">
-                <OTimeCell :value="row.window_start" unit="us" mode="date" />
-              </span>
-            </div>
+            <span class="truncate">{{ formatWindow(row.window_start, row.window_end) }}</span>
           </template>
 
           <template #cell-findings="{ row }">
@@ -238,7 +233,7 @@ import {
   SEARCH_SIZE,
   type RunRow,
 } from "./digests";
-import { COVERAGE_BADGE, formatMinutes } from "./format";
+import { COVERAGE_BADGE, formatMinutes, formatWindow } from "./format";
 
 type Scope = "all" | "findings" | "gaps";
 
@@ -347,14 +342,6 @@ const columns = computed<OTableColumnDef<RunRow>[]>(() => [
     sortable: true,
     size: COL.status,
     meta: { align: "left" },
-  },
-  {
-    id: "declined",
-    header: t("alertCalibration.digests.colDeclined"),
-    accessorKey: "skip_count",
-    sortable: true,
-    size: COL.count,
-    meta: { align: "right" },
   },
   {
     id: "coverage",

@@ -8049,7 +8049,6 @@
     "refresh": "Yenile",
     "retry": "Yeniden dene",
     "tabs": {
-      "digests": "Özetler",
       "dashboard": "Gösterge panosu"
     },
     "duration": {
@@ -8144,7 +8143,6 @@
       "searchPlaceholder": "Uyarı adına göre çalıştırma ara",
       "colRun": "Çalıştırma",
       "colFindings": "Bulgular",
-      "colDeclined": "Reddedilen",
       "colCoverage": "Kapsam",
       "colGenerated": "Oluşturulma",
       "clean": "Temiz",
@@ -8198,20 +8196,11 @@
       "proposedActions": "Önerilen eylemler"
     },
     "dashboard": {
-      "lastDays": "Son {days} gün",
       "latestRun": "En son çalıştırma",
       "latestRunCaption": "Pencere {start} ile {end} arası, {time} yazıldı",
       "findings": "Bulgular",
-      "thisRunOnly": "Yalnızca bu çalıştırma",
       "alertsInScope": "Kapsamdaki uyarılar",
-      "declined": "Reddedildi",
       "coverage": "Kapsam",
-      "byRule": "Kurala göre işaretlenen uyarılar",
-      "byRuleCaption": "Bulgu değil, farklı uyarılar. Aynı aralıktaki çalıştırmalar: {runs}, kapsam boşluğu olan: {gaps}, hiçbir şey ölçmeyen: {blind}.",
-      "colRule": "Kural",
-      "colAlertsFlagged": "İşaretlenen uyarılar",
-      "colRunsFlagging": "Herhangi birini işaretleyen çalışmalar",
-      "panelQuery": "Panel sorgusu",
       "emptyTitle": "Son {days} günde çalışma yok",
       "emptyDescription": "Gösterge paneli, uyarı kalibrasyonu çalıştırıldıktan sonra dolar."
     },
@@ -8240,10 +8229,7 @@
       "saveFailed": "Ayarlar kaydedilemedi: {message}",
       "loadFailed": "Ayarlar yüklenemedi: {message}",
       "lastSaved": "Son kaydedilme {time}",
-      "runNowHeading": "Şimdi çalıştır",
-      "findingsHeading": "Bulgular ve erişim",
-      "findingsDesc": "Her çalışma, bulgularını bu organizasyonun {stream} akışına günlük kaydı olarak yazar ve bu kayıtlar o akışın saklama süresi boyunca tutulur.",
-      "accessNote": "Bir roldeki Uyarı Kalibrasyonu izni erişimi belirler: Bulguları okumak için Get, bu ayarları değiştirmek için Update ve çalıştırma istemek için Create. Bulgular, okuyucunun açamadığı uyarılar dahil olmak üzere organizasyondaki her uyarıyı kapsar. Uyarı kalibrasyonu hiçbir bildirim göndermez."
+      "runNowHeading": "Şimdi çalıştır"
     }
   },
   "alerts": {

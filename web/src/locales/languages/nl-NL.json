@@ -8049,7 +8049,6 @@
     "refresh": "Vernieuwen",
     "retry": "Opnieuw proberen",
     "tabs": {
-      "digests": "Samenvattingen",
       "dashboard": "Dashboard"
     },
     "duration": {
@@ -8144,7 +8143,6 @@
       "searchPlaceholder": "Zoek runs op alarmnaam",
       "colRun": "Run",
       "colFindings": "Bevindingen",
-      "colDeclined": "Afgewezen",
       "colCoverage": "Dekking",
       "colGenerated": "Gegenereerd",
       "clean": "Schoon",
@@ -8198,20 +8196,11 @@
       "proposedActions": "Voorgestelde acties"
     },
     "dashboard": {
-      "lastDays": "Afgelopen {days} dagen",
       "latestRun": "Laatste run",
       "latestRunCaption": "Venster {start} tot {end}, geschreven {time}",
       "findings": "Bevindingen",
-      "thisRunOnly": "Alleen deze run",
       "alertsInScope": "Alarmen binnen bereik",
-      "declined": "Afgewezen",
       "coverage": "Dekking",
-      "byRule": "Alarmen gemarkeerd per regel",
-      "byRuleCaption": "Afzonderlijke alarmen, geen bevindingen. Runs in hetzelfde bereik: {runs}, met een dekkingsgat: {gaps}, die niets maten: {blind}.",
-      "colRule": "Regel",
-      "colAlertsFlagged": "Gemarkeerde alarmen",
-      "colRunsFlagging": "Uitvoeringen die er een markeren",
-      "panelQuery": "Paneelquery",
       "emptyTitle": "Geen uitvoeringen in de afgelopen {days} dagen",
       "emptyDescription": "Het dashboard wordt gevuld zodra de alarmkalibratie is uitgevoerd."
     },
@@ -8240,10 +8229,7 @@
       "saveFailed": "De instellingen konden niet worden opgeslagen: {message}",
       "loadFailed": "De instellingen konden niet worden geladen: {message}",
       "lastSaved": "Laatst opgeslagen {time}",
-      "runNowHeading": "Nu uitvoeren",
-      "findingsHeading": "Bevindingen en toegang",
-      "findingsDesc": "Elke uitvoering schrijft zijn bevindingen als logrecords naar de {stream}-stream van deze organisatie, bewaard volgens de retentie van die stream.",
-      "accessNote": "De machtiging Alarmkalibratie in een rol bepaalt de toegang: Get om bevindingen te lezen, Update om deze instellingen te wijzigen en Create om een uitvoering aan te vragen. Bevindingen omvatten elk alarm in de organisatie, inclusief alarmen die de lezer niet kan openen. Alarmkalibratie verstuurt geen meldingen."
+      "runNowHeading": "Nu uitvoeren"
     }
   },
   "alerts": {

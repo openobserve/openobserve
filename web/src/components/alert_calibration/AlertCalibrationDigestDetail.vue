@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText v-else-if="findings.length !== run.finding_count" variant="meta" as="div">
           {{ t("alertCalibration.detail.perAlertNote") }}
         </OText>
-        <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        <div class="flex flex-col gap-3">
           <AlertCalibrationFindingCard
             v-for="finding in visibleFindings"
             :key="`${finding.rule_id}:${finding.alert_id}`"
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -216,19 +216,20 @@ import {
   type RuleId,
 } from "./digests";
 import { COVERAGE_BADGE, formatMinutes } from "./format";
-import { RULE_META } from "./rules";
+import { isRuleId, RULE_META } from "./rules";
 
 const props = defineProps<{ windowStart: string | number; windowEnd: string | number }>();
 
 const { t } = useI18nTyped();
 useLeaveIfAlertCalibrationOff("alertList");
 const router = useRouter();
+const route = useRoute();
 const { search, orgId } = useDigestSearch();
 
 const windowStart = computed(() => Number(props.windowStart));
 const windowEnd = computed(() => Number(props.windowEnd));
 const digestsRoute = computed(() => ({
-  name: "alertCalibration",
+  name: "alertCalibrationRuns",
   query: { org_identifier: orgId.value },
 }));
 
@@ -261,6 +262,16 @@ const loadError = computed<I18nText | null>(() => {
 
 const ruleFilter = ref<"all" | RuleId>("all");
 const presentRules = computed(() => [...new Set(findings.value.map((f) => f.rule_id))]);
+/** The dashboard links here per rule, so the filter it names starts selected once the records arrive. */
+const requestedRule = computed(() => {
+  const rule = route.query.rule;
+  return typeof rule === "string" && isRuleId(rule) ? rule : null;
+});
+watch(presentRules, (rules) => {
+  if (requestedRule.value && rules.includes(requestedRule.value)) {
+    ruleFilter.value = requestedRule.value;
+  }
+});
 const visibleFindings = computed(() =>
   ruleFilter.value === "all"
     ? findings.value

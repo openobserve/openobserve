@@ -45,16 +45,12 @@ const orgId = useOrgId();
 
 /** Each tab's name is also its route name. */
 const tabs = computed<{ name: string; label: I18nText; icon: IconName }[]>(() => [
-  { name: "alertCalibration", label: t("alertCalibration.tabs.digests"), icon: "history" },
-  {
-    name: "alertCalibrationDashboard",
-    label: t("alertCalibration.tabs.dashboard"),
-    icon: "insights",
-  },
+  { name: "alertCalibration", label: t("alertCalibration.tabs.dashboard"), icon: "insights" },
+  { name: "alertCalibrationRuns", label: t("alertCalibration.tabs.runs"), icon: "history" },
 ]);
 
 const active = computed(() =>
-  route.name === "alertCalibrationDashboard" ? "alertCalibrationDashboard" : "alertCalibration",
+  route.name === "alertCalibrationRuns" ? "alertCalibrationRuns" : "alertCalibration",
 );
 
 const go = (name: unknown) => {

@@ -8049,7 +8049,6 @@
     "refresh": "Aktualisieren",
     "retry": "Wiederholen",
     "tabs": {
-      "digests": "Zusammenfassungen",
       "dashboard": "Dashboard"
     },
     "duration": {
@@ -8144,7 +8143,6 @@
       "searchPlaceholder": "Läufe nach Alarmname durchsuchen",
       "colRun": "Lauf",
       "colFindings": "Ergebnisse",
-      "colDeclined": "Abgelehnt",
       "colCoverage": "Abdeckung",
       "colGenerated": "Erstellt",
       "clean": "Sauber",
@@ -8198,20 +8196,11 @@
       "proposedActions": "Vorgeschlagene Aktionen"
     },
     "dashboard": {
-      "lastDays": "Letzte {days} Tage",
       "latestRun": "Letzter Lauf",
       "latestRunCaption": "Fenster {start} bis {end}, geschrieben {time}",
       "findings": "Befunde",
-      "thisRunOnly": "Nur dieser Lauf",
       "alertsInScope": "Alarme im Geltungsbereich",
-      "declined": "Abgelehnt",
       "coverage": "Abdeckung",
-      "byRule": "Von Regeln markierte Alarme",
-      "byRuleCaption": "Eindeutige Alarme, keine Befunde. Läufe im selben Bereich: {runs}, mit einer Abdeckungslücke: {gaps}, haben nichts gemessen: {blind}.",
-      "colRule": "Regel",
-      "colAlertsFlagged": "Markierte Alarme",
-      "colRunsFlagging": "Läufe mit Markierungen",
-      "panelQuery": "Panel-Abfrage",
       "emptyTitle": "Keine Läufe in den letzten {days} Tagen",
       "emptyDescription": "Das Dashboard füllt sich, sobald die Alarmkalibrierung gelaufen ist."
     },
@@ -8240,10 +8229,7 @@
       "saveFailed": "Die Einstellungen konnten nicht gespeichert werden: {message}",
       "loadFailed": "Die Einstellungen konnten nicht geladen werden: {message}",
       "lastSaved": "Zuletzt gespeichert {time}",
-      "runNowHeading": "Jetzt ausführen",
-      "findingsHeading": "Befunde und Zugriff",
-      "findingsDesc": "Jeder Lauf schreibt seine Befunde als Log-Datensätze in den Stream {stream} dieser Organisation, die gemäß der Aufbewahrung dieses Streams aufbewahrt werden.",
-      "accessNote": "Die Berechtigung „Alarmkalibrierung“ in einer Rolle entscheidet über den Zugriff: Get zum Lesen der Befunde, Update zum Ändern dieser Einstellungen und Create zum Anfordern eines Laufs. Befunde umfassen jeden Alarm in der Organisation, einschließlich Alarmen, die der Leser nicht öffnen kann. Die Alarmkalibrierung sendet keine Benachrichtigungen."
+      "runNowHeading": "Jetzt ausführen"
     }
   },
   "alerts": {
