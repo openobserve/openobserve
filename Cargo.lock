@@ -8112,6 +8112,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "urlencoding",
  "utoipa",
  "utoipa-swagger-ui",
  "zstd 0.13.3",
