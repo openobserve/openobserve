@@ -183,6 +183,7 @@ describe("groupNavLinks", () => {
       "functionList",
       "enrichmentTables",
       "ingestion",
+      "fleet",
     ]);
   });
 
@@ -205,6 +206,7 @@ describe("groupNavLinks", () => {
       "functionList",
       "enrichmentTables",
       "ingestion",
+      "fleet",
     ]);
   });
 
@@ -521,6 +523,7 @@ describe("groupNavLinks", () => {
       "pipelines",
       "functionList",
       "enrichmentTables",
+      "fleet",
     ]);
   });
 

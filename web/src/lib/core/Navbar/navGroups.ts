@@ -377,6 +377,13 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "ingestion",
         requires: "ingestion",
       },
+      // Lit on the config editor too, which is its own route rather than a tab of /fleet.
+      {
+        titleKey: "menu.fleet",
+        icon: "workspaces",
+        name: "fleet",
+        activeOnRoutes: ["fleetConfigEditor"],
+      },
     ],
   },
   {

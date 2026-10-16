@@ -209,6 +209,7 @@ mod m20260928_000001_add_alert_recovery_destinations;
 mod m20261001_000001_add_anomaly_band_settings;
 mod m20261003_000001_create_rum_pa_tables;
 mod m20261004_000001_create_query_history;
+mod m20261005_000001_create_fleet;
 mod m20261006_000001_create_ai_chat_shares;
 mod m20261007_000001_create_ai_chat_turns;
 mod m20261007_000001_scope_alert_dedup_state_by_org;
@@ -226,6 +227,24 @@ mod m20261013_000002_create_org_telephony;
 mod m20261015_000001_reports_add_last_run_columns;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
+
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn create_fleet_collectors_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm::ConnectionTrait;
+
+    let manager = SchemaManager::new(db);
+    m20261005_000001_create_fleet::Migration
+        .up(&manager)
+        .await?;
+    // Folder rows are what fleet writes lock, so the fleet tests need the shared table too.
+    let backend = db.get_database_backend();
+    let mut folders =
+        sea_orm::Schema::new(backend).create_table_from_entity(super::entity::folders::Entity);
+    db.execute(backend.build(folders.if_not_exists())).await?;
+    Ok(())
+}
 
 #[cfg(test)]
 pub(crate) async fn create_llm_prompt_schema_for_test(
@@ -577,6 +596,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261013_000001_create_oncall_phone_verifications::Migration),
             Box::new(m20261013_000002_create_org_telephony::Migration),
             Box::new(m20261015_000001_reports_add_last_run_columns::Migration),
+            Box::new(m20261005_000001_create_fleet::Migration),
         ]
     }
 }
@@ -645,6 +665,7 @@ mod tests {
         (107, "m20261007_000002_add_redact_tools_to_ai_chat_shares"),
         (108, "m20261013_000002_create_org_telephony"),
         (109, "m20261015_000001_reports_add_last_run_columns"),
+        (110, "m20261005_000001_create_fleet"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

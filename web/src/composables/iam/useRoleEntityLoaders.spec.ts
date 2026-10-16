@@ -495,6 +495,27 @@ describe("useRoleEntityLoaders - folder loaders", () => {
   });
 });
 
+describe("useRoleEntityLoaders - fleets", () => {
+  it("loads fleets entities from the fleet list, with default added and no children", async () => {
+    const { getResourceEntities, updateResourceEntities } = setup();
+    const resource = row({ resourceName: "fleets" });
+
+    await getResourceEntities(resource as any);
+
+    expect(commonService.list_Folders).toHaveBeenCalledWith(ORG, "fleets");
+    expect(updateResourceEntities).toHaveBeenCalledWith(
+      "fleets",
+      ["folderId"],
+      [
+        { folderId: "default", name: "default" },
+        { folderId: "f9", name: "F9" },
+      ],
+      false,
+      "name",
+    );
+  });
+});
+
 describe("useRoleEntityLoaders - folder children", () => {
   // BUG pinned, not fixed: getDashboards flattens each dashboard to its first
   // truthy value before building rows, so the rows are plain strings — the

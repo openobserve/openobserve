@@ -1928,6 +1928,49 @@ export const BADGE_GROUPS = {
     },
     fallback: { variant: "default-soft" },
   },
+
+  // Fleet Manager rollout lifecycle — dot + soft colour, attention states run hot.
+  fleetRolloutStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      scheduled: { variant: "default-soft", labelKey: "fleet.badge.scheduled" },
+      inprogress: { variant: "primary-soft", labelKey: "fleet.badge.inProgress" },
+      completed: { variant: "success-soft", labelKey: "fleet.badge.completed" },
+      halted: { variant: "error-soft", labelKey: "fleet.badge.halted" },
+      superseded: { variant: "default-soft", labelKey: "fleet.badge.superseded" },
+      // A completed rollout of an empty fleet; not a status the server sends.
+      empty: { variant: "default-soft", labelKey: "fleet.rollouts.noneTargeted" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Fleet Manager rollout strategy — a category, so plain with one hue per kind.
+  fleetStrategy: {
+    mode: "plain",
+    shape: "pill",
+    values: {
+      immediate: { variant: "default-soft", labelKey: "fleet.badge.immediate" },
+      canary: { variant: "amber-soft", labelKey: "fleet.badge.canary" },
+      progressive: { variant: "blue-soft", labelKey: "fleet.badge.progressive" },
+      scheduled: { variant: "purple-soft", labelKey: "fleet.badge.scheduledStrategy" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Fleet Manager config delivery — the one vocabulary for a collector's config lifecycle.
+  fleetDelivery: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      assigned: { variant: "default-soft", labelKey: "fleet.delivery.assigned" },
+      sent: { variant: "blue-soft", labelKey: "fleet.delivery.sent" },
+      accepted: { variant: "teal-soft", labelKey: "fleet.delivery.accepted" },
+      running: { variant: "success-soft", labelKey: "fleet.delivery.running" },
+      rejected: { variant: "error-soft", labelKey: "fleet.delivery.rejected" },
+    },
+    fallback: { variant: "default-soft" },
+  },
 } satisfies Record<string, BadgeGroupConfig>;
 
 export type BadgeGroupName = keyof typeof BADGE_GROUPS;

@@ -333,6 +333,14 @@ mod tests {
 
     const MINUTE: i64 = 60_000_000;
     const WINDOW_START: i64 = 1_640_995_200_000_000;
+    const QUEUE_AT: i64 = WINDOW_START + 60 * MINUTE;
+    /// `(instance, version, size, capacity)` of each instance of group `c`.
+    const QUEUE_INSTANCES: [(&str, &str, f64, f64); 4] = [
+        ("a", "3", 50.0, 100.0),
+        ("b", "3", 90.0, 100.0),
+        ("c", "4", 30.0, 100.0),
+        ("d", "4", 5.0, 0.0),
+    ];
 
     /// One series whose rows each carry the rolling exemplar array an OTLP exporter sends.
     struct SpreadExemplarProvider {
@@ -388,6 +396,89 @@ mod tests {
                             .collect::<Vec<_>>(),
                     )),
                     Arc::new(StringArray::from(vec!["prod"; n])),
+                ],
+            )
+            .unwrap();
+            let ctx = datafusion::prelude::SessionContext::new();
+            ctx.register_batch(stream_name, batch).unwrap();
+            Ok(vec![crate::ScanContext::table(
+                ctx,
+                schema,
+                ScanStats::default(),
+                true,
+            )])
+        }
+    }
+
+    /// Two gauges as stored: `start_time` differs between the two metrics of one instance.
+    struct QueueGaugeProvider;
+
+    #[async_trait::async_trait]
+    impl TableProvider for QueueGaugeProvider {
+        async fn create_context(
+            &self,
+            _org_id: &str,
+            stream_name: &str,
+            _time_range: (i64, i64),
+            _matchers: promql_parser::label::Matchers,
+            _label_selector: hashbrown::HashSet<String>,
+            _filters: &mut [(String, Vec<String>)],
+            _streaming: bool,
+        ) -> Result<Vec<crate::ScanContext>> {
+            use datafusion::arrow::{
+                array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+                datatypes::{DataType, Field, Schema},
+            };
+            let is_size = stream_name == "job_queue_size";
+            let labels = [
+                "group_id",
+                "group_version",
+                "instance",
+                "sink",
+                "kind",
+                "start_time",
+            ];
+            let mut fields = vec![
+                Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new(VALUE_LABEL, DataType::Float64, false),
+                Field::new(HASH_LABEL, DataType::UInt64, false),
+            ];
+            fields.extend(labels.iter().map(|l| Field::new(*l, DataType::Utf8, false)));
+            let schema = Arc::new(Schema::new(fields));
+            let n = QUEUE_INSTANCES.len();
+            let column = |values: Vec<String>| -> Arc<dyn datafusion::arrow::array::Array> {
+                Arc::new(StringArray::from(values))
+            };
+            let per = |f: &dyn Fn(usize, &(&str, &str, f64, f64)) -> String| {
+                column(
+                    QUEUE_INSTANCES
+                        .iter()
+                        .enumerate()
+                        .map(|(i, c)| f(i, c))
+                        .collect(),
+                )
+            };
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    Arc::new(Int64Array::from(vec![QUEUE_AT - 10_000_000; n])),
+                    Arc::new(Float64Array::from(
+                        QUEUE_INSTANCES
+                            .iter()
+                            .map(|c| if is_size { c.2 } else { c.3 })
+                            .collect::<Vec<_>>(),
+                    )),
+                    Arc::new(UInt64Array::from(
+                        (0..n as u64)
+                            .map(|i| if is_size { i + 1 } else { i + 11 })
+                            .collect::<Vec<_>>(),
+                    )),
+                    per(&|_, _| "c".to_string()),
+                    per(&|_, c| c.1.to_string()),
+                    per(&|_, c| c.0.to_string()),
+                    per(&|_, _| "sink_a".to_string()),
+                    per(&|_, _| "k1".to_string()),
+                    per(&|i, _| format!("{}", if is_size { 100 + i } else { 200 + i })),
                 ],
             )
             .unwrap();
@@ -647,5 +738,69 @@ mod tests {
             instances(&query, 2 * MINUTE).await,
             ["host1a", "host10a", "host2a", "host2b"]
         );
+    }
+
+    #[tokio::test]
+    async fn test_queue_ratio_matches_across_start_time_and_skips_zero_capacity() {
+        let query = "max by (group_id, group_version, sink, kind) \
+                     (sum by (group_id, group_version, instance, sink, kind) \
+                     (last_over_time(job_queue_size{group_id!=\"\"}[45s])) \
+                     / (sum by (group_id, group_version, instance, sink, kind) \
+                     (last_over_time(job_queue_capacity{group_id!=\"\"}[45s])) \
+                     > 0))";
+        let trace_id = "test_queue_ratio";
+        let query_ctx = Arc::new(QueryContext {
+            trace_id: trace_id.to_string(),
+            org_id: "org".to_string(),
+            query_exemplars: false,
+            query_data: false,
+            need_wal: false,
+            use_cache: false,
+            timeout: 30,
+            search_event_type: None,
+            regions: vec![],
+            clusters: vec![],
+            is_super_cluster: false,
+            search_event_context: None,
+        });
+        let mut ctx = PromqlContext::new(query_ctx, QueueGaugeProvider, vec![]);
+        let at = std::time::UNIX_EPOCH + Duration::from_micros(QUEUE_AT as u64);
+        let stmt = EvalStmt {
+            expr: parser::parse(query).unwrap(),
+            start: at,
+            end: at,
+            interval: Duration::from_secs(15),
+            lookback_delta: DEFAULT_LOOKBACK,
+        };
+        let (value, ..) = ctx.exec(trace_id, stmt).await.unwrap();
+        let Value::Vector(rows) = value else {
+            panic!("expected a vector, got {value:?}");
+        };
+        let mut got: Vec<(String, String, String, String, f64)> = rows
+            .iter()
+            .map(|r| {
+                assert_eq!(r.labels.get_value("instance"), "");
+                assert_eq!(r.labels.get_value("start_time"), "");
+                (
+                    r.labels.get_value("group_id"),
+                    r.labels.get_value("group_version"),
+                    r.labels.get_value("sink"),
+                    r.labels.get_value("kind"),
+                    r.sample.value,
+                )
+            })
+            .collect();
+        got.sort_by(|a, b| a.1.cmp(&b.1));
+        let row = |v: &str, ratio: f64| {
+            (
+                "c".to_string(),
+                v.to_string(),
+                "sink_a".to_string(),
+                "k1".to_string(),
+                ratio,
+            )
+        };
+        assert_eq!(got, vec![row("3", 0.9), row("4", 0.3)]);
+        assert!(got.iter().all(|r| r.4.is_finite()));
     }
 }

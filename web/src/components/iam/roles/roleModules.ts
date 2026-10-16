@@ -198,6 +198,7 @@ const ICON_OF: Record<string, IconName> = {
   experiment: "science",
   playground: "psychology",
   pfolder: "folder",
+  fleets: "folder",
   prompt: "edit-note",
   prompt_label: "label",
   ai: "smart-toy",
