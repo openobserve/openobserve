@@ -179,19 +179,6 @@ impl PyWhatAdapter {
             })
             .collect()
     }
-
-    /// Get all unique tags from patterns
-    pub fn get_all_tags(patterns: &[BuiltInPatternResponse]) -> Vec<String> {
-        let mut tags: Vec<String> = patterns
-            .iter()
-            .flat_map(|p| p.tags.clone())
-            .collect::<std::collections::HashSet<_>>()
-            .into_iter()
-            .collect();
-
-        tags.sort();
-        tags
-    }
 }
 
 #[cfg(test)]
@@ -243,21 +230,6 @@ mod tests {
 
         let filtered = PyWhatAdapter::filter_by_tags(patterns.clone(), &[]);
         assert_eq!(filtered.len(), 3);
-    }
-
-    #[test]
-    fn test_get_all_tags() {
-        let patterns = vec![
-            create_test_pattern("SSH Key", vec!["Credentials", "SSH"]),
-            create_test_pattern("Email", vec!["PII"]),
-            create_test_pattern("Password", vec!["Credentials"]),
-        ];
-
-        let tags = PyWhatAdapter::get_all_tags(&patterns);
-        assert_eq!(tags.len(), 3);
-        assert!(tags.contains(&"Credentials".to_string()));
-        assert!(tags.contains(&"SSH".to_string()));
-        assert!(tags.contains(&"PII".to_string()));
     }
 
     #[test]
