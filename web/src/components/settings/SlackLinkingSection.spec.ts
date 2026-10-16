@@ -23,9 +23,10 @@ import {
   installationView,
   linkingView,
   makeSlackStore,
+  managedView,
   ok,
 } from "@/test/unit/helpers/slack";
-import type { LinkingView } from "@/types/slack";
+import type { InstallationView, LinkingView } from "@/types/slack";
 
 vi.mock("@/services/slack", () => ({
   default: { getLinking: vi.fn(), updateLinking: vi.fn(), linkAll: vi.fn() },
@@ -37,10 +38,13 @@ const PeopleStub = {
   template: '<div data-test-stub="people" :data-open="open" />',
 };
 
-const mountSection = async (linking: LinkingView) => {
+const mountSection = async (
+  linking: LinkingView,
+  installation: InstallationView = installationView(),
+) => {
   vi.mocked(slack.getLinking).mockReturnValue(ok(linking) as any);
   const w = mount(SlackLinkingSection, {
-    props: { installation: installationView() },
+    props: { installation },
     attachTo: document.body,
     global: { plugins: [i18n, makeSlackStore()], stubs: { SlackLinkedPeople: PeopleStub } },
   });
@@ -167,5 +171,22 @@ describe("SlackLinkingSection (row 11)", () => {
     await flushPromises();
     expect(slack.getLinking).toHaveBeenCalledTimes(2);
     expect(w.find('[data-test="slack-linking-summary"]').exists()).toBe(true);
+  });
+
+  it("a managed workspace shows linking read-only, set by your instance admin", async () => {
+    const w = await mountSection(linkingView(), managedView());
+    expect(w.find('[data-test="slack-linking"]').text()).toContain("Set by your instance admin");
+    expect(w.find('[data-test="slack-linking-counts"]').text()).toBe(
+      "38 of your members are linked: 31 automatically, 7 with Link your account",
+    );
+    expect(
+      w.find('[data-test="slack-linking-switch"] button').attributes("disabled"),
+    ).toBeDefined();
+    expect(w.find('[data-test="slack-linking-edit"]').exists()).toBe(false);
+    expect(w.find('[data-test="slack-linking-matches"]').exists()).toBe(false);
+    expect(w.find('[data-test="slack-linking-summary"]').exists()).toBe(false);
+    await w.find('[data-test="slack-linking-switch"] button').trigger("click");
+    await flushPromises();
+    expect(slack.updateLinking).not.toHaveBeenCalled();
   });
 });

@@ -15,17 +15,22 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
+import { createStore } from "vuex";
 import i18n from "@/locales";
+import { queryClient } from "@/composables/query/queryClient";
 import slack from "@/services/slack";
 import SlackChannelDefaults from "./SlackChannelDefaults.vue";
 import {
   ConfirmDialogStub,
   OTableStub,
   axiosError,
+  installationView,
+  instanceView,
   makeSlackStore,
+  managedView,
   ok,
 } from "@/test/unit/helpers/slack";
-import type { SlackChannelDefaultRow } from "@/types/slack";
+import type { InstallationView, SlackChannelDefaultRow } from "@/types/slack";
 
 vi.mock("@/services/slack", () => ({
   default: {
@@ -33,6 +38,7 @@ vi.mock("@/services/slack", () => ({
     putChannelDefault: vi.fn(),
     deleteChannelDefault: vi.fn(),
     listChannels: vi.fn(),
+    listInstallations: vi.fn(),
   },
 }));
 
@@ -60,6 +66,31 @@ const mountDefaults = async (list = rows, realTable = false) => {
   return mountWith(realTable);
 };
 
+const metaStore = () =>
+  createStore({
+    state: {
+      selectedOrganization: { identifier: "_meta", name: "_meta" },
+      userInfo: { email: "root@acme.example" },
+      zoConfig: { slack_enabled: true, meta_org: "_meta" },
+    },
+  });
+
+const mountOn = async (installation: InstallationView, store = makeSlackStore()) => {
+  queryClient.clear();
+  vi.mocked(slack.listChannelDefaults).mockReturnValue(ok({ defaults: rows }) as any);
+  vi.mocked(slack.listInstallations).mockReturnValue(ok({ installations: [installation] }) as any);
+  const w = mount(SlackChannelDefaults, {
+    props: { installationId: installation.id },
+    attachTo: document.body,
+    global: {
+      plugins: [i18n, store],
+      stubs: { OTable: OTableStub, ConfirmDialog: ConfirmDialogStub },
+    },
+  });
+  await flushPromises();
+  return w;
+};
+
 const mountWith = async (realTable = false) => {
   const w = mount(SlackChannelDefaults, {
     props: { installationId: "inst-1" },
@@ -77,6 +108,9 @@ const mountWith = async (realTable = false) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(slack.listInstallations).mockReturnValue(
+    ok({ installations: [installationView()] }) as any,
+  );
   vi.mocked(slack.putChannelDefault).mockReturnValue(ok(rows[0]) as any);
   vi.mocked(slack.deleteChannelDefault).mockReturnValue(ok(undefined) as any);
   vi.mocked(slack.listChannels).mockReturnValue(
@@ -283,5 +317,62 @@ describe("SlackChannelDefaults (rows 21-22)", () => {
     const w = await mountWith(true);
     await vi.waitFor(() => expect(w.find('[data-test="o2-table-forbidden"]').exists()).toBe(true));
     expect(w.text()).not.toContain("No channel has a default org yet");
+  });
+
+  it("another org's channel reads Instance admin only with no Edit for an org admin", async () => {
+    const w = await mountOn(managedView());
+    const [mine, theirs] = w.findAll('[data-test-stub="otable-row"]');
+    expect(theirs.find('[data-col="default_org"]').text()).toBe("Another org");
+    expect(theirs.find('[data-test="slack-channel-instance-only"]').text()).toBe(
+      "Instance admin only",
+    );
+    expect(w.find('[data-test="slack-channel-edit-C2"]').exists()).toBe(false);
+    expect(w.find('[data-test="slack-channel-remove-C2"]').exists()).toBe(false);
+    expect(mine.find('[data-test="slack-channel-instance-only"]').exists()).toBe(false);
+    expect(w.find('[data-test="slack-channel-edit-C1"]').exists()).toBe(true);
+    const orgWorkspace = await mountOn(installationView());
+    expect(orgWorkspace.find('[data-test="slack-channel-instance-only"]').exists()).toBe(false);
+  });
+
+  it("the drawer offers only this org on an instance workspace", async () => {
+    const w = await mountOn(managedView());
+    await w.find('[data-test="slack-channel-set-default"]').trigger("click");
+    await flushPromises();
+    const org = body().find('[data-test="slack-channel-default-org"]');
+    expect((org.find("input").element as HTMLInputElement).value).toBe("acme (this org)");
+    expect(org.text()).toContain("On an instance workspace you map channels to your own org");
+    expect(body().text()).toContain("Unclaimed channels and channels acme owns");
+    await w.find('[data-test="slack-channel-edit-C1"]').trigger("click");
+    await flushPromises();
+    await body().find("form").trigger("submit");
+    await vi.waitFor(() =>
+      expect(slack.putChannelDefault).toHaveBeenCalledWith("acme", "inst-1", "C1", {
+        org_id: "acme",
+        answer_mode: "thread",
+      }),
+    );
+    w.unmount();
+    const orgWorkspace = await mountOn(installationView());
+    await orgWorkspace.find('[data-test="slack-channel-set-default"]').trigger("click");
+    await flushPromises();
+    expect(body().find("form").exists()).toBe(true);
+    expect(body().find('[data-test="slack-channel-default-org"]').exists()).toBe(false);
+    expect(body().text()).not.toContain("On an instance workspace");
+  });
+
+  it("a _meta admin can edit any channel", async () => {
+    const w = await mountOn(instanceView(), metaStore());
+    expect(w.find('[data-test="slack-channel-instance-only"]').exists()).toBe(false);
+    expect(w.find('[data-test="slack-channel-remove-C2"]').exists()).toBe(true);
+    await w.find('[data-test="slack-channel-edit-C2"]').trigger("click");
+    await flushPromises();
+    await body().find('[data-test="slack-channel-answer-thread"]').trigger("click");
+    await body().find("form").trigger("submit");
+    await vi.waitFor(() =>
+      expect(slack.putChannelDefault).toHaveBeenCalledWith("_meta", "inst-1", "C2", {
+        org_id: "_meta",
+        answer_mode: "thread",
+      }),
+    );
   });
 });

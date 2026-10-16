@@ -43,6 +43,8 @@ const { t } = useI18nTyped();
 const store = useStore();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const id = computed(() => props.installation.id);
+// Linking is installation-wide, so on a managed workspace it is the instance admin's.
+const managed = computed(() => props.installation.managed);
 
 const linking = useQuery(() => slackLinkingQuery(org.value, id.value));
 const update = useMutation(() => updateLinkingMutation(org.value, id.value));
@@ -65,7 +67,7 @@ const summary = computed(() => {
 const autoCount = computed(() =>
   view.value ? view.value.counts.email + view.value.counts.admin_bulk : 0,
 );
-const matches = computed(() => view.value?.counts.matches_not_linked ?? 0);
+const matches = computed(() => (managed.value ? 0 : (view.value?.counts.matches_not_linked ?? 0)));
 const formDefaults = computed<LinkingForm>(() => ({
   enabled: view.value?.enabled ?? true,
   domains: [...(view.value?.domains ?? [])],
@@ -107,7 +109,11 @@ const runLinkAll = async (): Promise<void> => {
         <h2 class="text-text-heading m-0 text-lg font-semibold">
           {{ t("slackApp.linking.title") }}
         </h2>
-        <p class="text-text-secondary m-0 text-sm">{{ t("slackApp.linking.removedUsers") }}</p>
+        <p class="text-text-secondary m-0 text-sm">
+          {{
+            managed ? t("slackApp.linking.setByInstanceAdmin") : t("slackApp.linking.removedUsers")
+          }}
+        </p>
       </div>
       <OButton
         variant="ghost-primary"
@@ -135,16 +141,31 @@ const runLinkAll = async (): Promise<void> => {
             <span class="text-text-heading text-sm font-medium">
               {{ t("slackApp.linking.auto") }}
             </span>
-            <span class="text-text-secondary text-sm" data-test="slack-linking-summary">
-              {{ summary }}
+            <span
+              v-if="managed"
+              class="text-text-secondary text-sm"
+              data-test="slack-linking-counts"
+            >
+              {{
+                t("slackApp.linking.managedCounts", {
+                  linked: autoCount + view.counts.oidc,
+                  auto: autoCount,
+                  manual: view.counts.oidc,
+                })
+              }}
             </span>
-            <span class="text-text-secondary text-xs" data-test="slack-linking-counts">
-              {{ t("slackApp.linking.counts", { auto: autoCount, oidc: view.counts.oidc }) }}
-            </span>
+            <template v-else>
+              <span class="text-text-secondary text-sm" data-test="slack-linking-summary">
+                {{ summary }}
+              </span>
+              <span class="text-text-secondary text-xs" data-test="slack-linking-counts">
+                {{ t("slackApp.linking.counts", { auto: autoCount, oidc: view.counts.oidc }) }}
+              </span>
+            </template>
           </div>
           <div class="flex items-center gap-2">
             <OButton
-              v-if="view.source === 'manual' && !editing"
+              v-if="view.source === 'manual' && !editing && !managed"
               variant="outline"
               size="sm"
               data-test="slack-linking-edit"
@@ -156,17 +177,17 @@ const runLinkAll = async (): Promise<void> => {
               :model-value="view.enabled"
               :label="view.enabled ? t('slackApp.linking.on') : t('slackApp.linking.off')"
               label-position="left"
-              :disabled="update.isPending.value"
+              :disabled="managed || update.isPending.value"
               data-test="slack-linking-switch"
               @update:model-value="toggle"
             />
           </div>
         </div>
-        <p v-if="view.source === 'mapping'" class="text-text-secondary m-0 text-xs">
+        <p v-if="view.source === 'mapping' && !managed" class="text-text-secondary m-0 text-xs">
           {{ t("slackApp.linking.mappedReadonly") }}
         </p>
         <OForm
-          v-if="editing"
+          v-if="editing && !managed"
           :schema="schema"
           :default-values="formDefaults"
           class="flex flex-col gap-3"

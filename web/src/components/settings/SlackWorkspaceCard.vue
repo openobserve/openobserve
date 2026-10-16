@@ -105,6 +105,12 @@ const reinstall = useSlackOAuthPopup<SlackInstallExchangeResponse>({
 });
 
 const selfHosted = computed(() => !props.isCloud);
+// An instance workspace seen outside _meta: installation-wide controls belong to the instance admin.
+const managed = computed(() => props.installation.managed);
+const isInstance = computed(() => props.installation.scope === "instance");
+const ownsInstallation = computed(() => selfHosted.value && !managed.value);
+// Row 17 refuses an instance workspace; _meta removes orgs through org access instead.
+const showDisconnect = computed(() => !isInstance.value);
 const modeLabel = computed(() =>
   props.installation.mode === "socket"
     ? t("slackApp.card.modeSocket")
@@ -217,22 +223,45 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
               {{ raw(installation.team_name) }}
             </h2>
             <span class="text-text-secondary text-sm" data-test="slack-workspace-meta">
-              {{
-                t("slackApp.card.connectedBy", {
-                  mode: modeLabel,
-                  user: installation.this_org.connected_by,
-                  date: connectedDate,
-                })
-              }}
+              <template v-if="managed">
+                {{ modeLabel }} {{ raw("·") }} {{ t("slackApp.card.managedBy") }}
+              </template>
+              <template v-else>
+                {{
+                  t("slackApp.card.connectedBy", {
+                    mode: modeLabel,
+                    user: installation.this_org.connected_by,
+                    date: connectedDate,
+                  })
+                }}
+              </template>
             </span>
           </div>
         </div>
-        <OTag
-          type="slackInstallStatus"
-          :value="installation.status"
-          data-test="slack-workspace-status"
-        />
+        <div class="flex items-center gap-2">
+          <OTag
+            v-if="isInstance"
+            variant="primary-soft"
+            shape="pill"
+            size="sm"
+            :label="t('slackApp.card.instanceTag')"
+            data-test="slack-workspace-instance-tag"
+          />
+          <OTag
+            type="slackInstallStatus"
+            :value="installation.status"
+            data-test="slack-workspace-status"
+          />
+        </div>
       </div>
+
+      <OBanner v-if="managed" variant="info" icon="info" data-test="slack-managed-banner">
+        <span class="font-semibold">{{ t("slackApp.card.managedTitle") }}</span>
+        {{ t("slackApp.card.managedDetail", { team: installation.team_name }) }}
+        <template v-if="installation.instance_help_contact">
+          {{ t("slackApp.card.managedQuestions", { contact: installation.instance_help_contact }) }}
+        </template>
+      </OBanner>
 
       <OBanner
         v-if="!installation.credentials_readable"
@@ -245,7 +274,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
             ? t("slackApp.card.credentialsUnreadable")
             : t("slackApp.card.credentialsUnreadableCloud")
         }}
-        <template #actions>
+        <template v-if="!managed" #actions>
           <OButton
             v-if="selfHosted"
             variant="outline"
@@ -329,7 +358,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           {{ appTokenWarning }}
         </span>
         <span
-          v-if="selfHosted"
+          v-if="ownsInstallation"
           class="flex flex-wrap items-center justify-between gap-2 text-sm md:col-span-2"
         >
           <span class="text-text-secondary flex items-center gap-2">
@@ -350,7 +379,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           </OButton>
         </span>
         <span
-          v-if="selfHosted && installation.has_config_refresh_token"
+          v-if="ownsInstallation && installation.has_config_refresh_token"
           class="flex flex-wrap items-center gap-2 text-sm md:col-span-2"
           data-test="slack-refresh-token"
         >
@@ -379,6 +408,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           {{ t("slackApp.card.test") }}
         </OButton>
         <OButton
+          v-if="!managed"
           variant="outline"
           size="sm-action"
           :loading="reinstall.connecting.value"
@@ -388,7 +418,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           {{ t("slackApp.card.reinstall") }}
         </OButton>
         <OButton
-          v-if="selfHosted"
+          v-if="ownsInstallation"
           variant="outline"
           size="sm-action"
           data-test="slack-update-credentials"
@@ -428,7 +458,7 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
       </div>
     </OCard>
 
-    <section class="flex flex-col gap-3" data-test="slack-connected-orgs">
+    <section v-if="!isInstance" class="flex flex-col gap-3" data-test="slack-connected-orgs">
       <div class="flex flex-col gap-0.5">
         <h2 class="text-text-heading m-0 text-lg font-semibold">
           {{ t("slackApp.card.connectedOrgs") }}
@@ -484,12 +514,12 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
       </OForm>
     </section>
 
-    <section class="flex flex-col gap-3">
+    <section v-if="showDisconnect || ownsInstallation" class="flex flex-col gap-3">
       <h2 class="text-text-heading m-0 text-lg font-semibold">
         {{ t("slackApp.card.disconnectSection") }}
       </h2>
       <OCard variant="outlined" class="p-5">
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <div v-if="showDisconnect" class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex min-w-0 flex-col gap-0.5">
             <span class="text-text-heading text-sm font-medium">
               {{ t("slackApp.card.disconnectThisOrg") }}
@@ -508,8 +538,9 @@ const saveHelpContact = async (value: HelpContactForm): Promise<void> => {
           </OButton>
         </div>
         <div
-          v-if="selfHosted"
-          class="border-border-default mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4"
+          v-if="ownsInstallation"
+          class="flex flex-wrap items-center justify-between gap-3"
+          :class="showDisconnect && 'border-border-default mt-4 border-t pt-4'"
         >
           <div class="flex min-w-0 flex-col gap-0.5">
             <span class="text-text-heading text-sm font-medium">

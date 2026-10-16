@@ -15,6 +15,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { createStore } from "vuex";
 import i18n from "@/locales";
 import slack from "@/services/slack";
 import SlackSelfHostedWizard from "./SlackSelfHostedWizard.vue";
@@ -30,6 +31,7 @@ import {
   linkingView,
   makeSlackStore,
   ok,
+  orgAccessView,
   postCallback,
   selfHostedSettingsExchange,
 } from "@/test/unit/helpers/slack";
@@ -53,6 +55,9 @@ vi.mock("@/services/slack", () => ({
     updateLinking: vi.fn(),
     linkAll: vi.fn(),
     connectInstallation: vi.fn(),
+    listInstallations: vi.fn(),
+    getOrgAccess: vi.fn(),
+    putOrgAccess: vi.fn(),
   },
 }));
 
@@ -84,15 +89,25 @@ const passing = [
 
 const errorHandler = vi.fn();
 
+const metaStore = () =>
+  createStore({
+    state: {
+      selectedOrganization: { identifier: "_meta", name: "_meta" },
+      userInfo: { email: "root@acme.example" },
+      zoConfig: { slack_enabled: true, meta_org: "_meta" },
+    },
+  });
+
 const mountWizard = async (
   installation: InstallationView | null = null,
   email = "ana@acme.example",
+  store = makeSlackStore({ slack_enabled: true }, email),
 ) => {
   const w = mount(SlackSelfHostedWizard, {
     props: { installation },
     attachTo: document.body,
     global: {
-      plugins: [i18n, makeSlackStore({ slack_enabled: true }, email)],
+      plugins: [i18n, store],
       config: { errorHandler },
       stubs: { OTable: OTableStub, ConfirmDialog: ConfirmDialogStub },
     },
@@ -110,6 +125,7 @@ const step = (w: VueWrapper) => w.find('[data-test="slack-wizard"]').attributes(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(slack.listInstallations).mockReturnValue(ok({ installations: [] }) as any);
   popup = fakePopup();
   vi.spyOn(window, "open").mockReturnValue(popup);
   vi.mocked(slack.getPrerequisites).mockReturnValue(ok({ checks: passing }) as any);
@@ -686,5 +702,197 @@ describe("SlackSelfHostedWizard Step 4", () => {
     await button.trigger("click");
     await flushPromises();
     expect(slack.linkAll).toHaveBeenCalledWith("acme", "inst-1");
+  });
+});
+
+const INSTANCE_TEAM =
+  "This workspace is your instance workspace. Ask your instance admin to add your org.";
+const TAKE_OVER =
+  "OpenObserve is already installed in Acme Corp by another organization. Make that installation the instance workspace instead.";
+const TOKEN_REFUSED =
+  "Slack refused this refresh token: each one works once and it was already used or replaced. Generate a new token and paste its refresh token";
+
+/** An O2 refusal body with the `error_detail` and `hint` row 2 and row 6 send (P-6). */
+const refusal = (
+  status: number,
+  message: string,
+  extra: { error_detail?: string; hint?: string },
+) =>
+  Object.assign(new Error(message), {
+    response: { status, data: { code: status, message, ...extra } },
+  });
+
+const instanceNotice = {
+  installations: [],
+  instance: { installation_id: "inst-i", team_name: "Acme Corp", help_contact: "#o2-platform" },
+};
+
+const toCreate = async (w: VueWrapper) => {
+  await next(w);
+  await next(w);
+};
+
+const submitToken = async (w: VueWrapper) => {
+  await w.find('[data-test="slack-wizard-config-token"] input').setValue("xoxe-1-sample");
+  await w.find('[data-test="slack-wizard-create-form"]').trigger("submit");
+  await vi.waitFor(() => expect(slack.createInstallation).toHaveBeenCalled());
+  await flushPromises();
+};
+
+describe("SlackSelfHostedWizard on an instance workspace's team (M3, R-81, R-82)", () => {
+  const writeText = vi.mocked(navigator.clipboard.writeText);
+
+  beforeEach(() => {
+    writeText.mockReset().mockResolvedValue(undefined);
+    vi.mocked(slack.putOrgAccess).mockReturnValue(ok(orgAccessView()) as any);
+  });
+
+  it("a finish-install instance-team refusal shows the message, the contact, Copy request and Start over", async () => {
+    vi.mocked(slack.listInstallations).mockReturnValue(ok(instanceNotice) as any);
+    vi.mocked(slack.installExchange).mockReturnValue(
+      Promise.reject(
+        refusal(409, INSTANCE_TEAM, { error_detail: "instance_team", hint: "#o2-platform" }),
+      ) as any,
+    );
+    const w = await mountWizard(pending);
+    await w.find('[data-test="slack-wizard-allow"]').trigger("click");
+    await flushPromises();
+    postCallback(popup);
+    await flushPromises();
+
+    const banner = w.find('[data-test="slack-wizard-instance-team"]');
+    expect(banner.text()).toContain(INSTANCE_TEAM);
+    expect(banner.text()).toContain(
+      "Acme Corp already has OpenObserve for this server. OpenObserve removed the app you just installed from Acme Corp; Start over also deletes it from your Slack apps.",
+    );
+    expect(banner.text()).toContain("Your instance admin: #o2-platform");
+    expect(toast).not.toHaveBeenCalled();
+    expect(w.find('[data-test="slack-wizard-allow"]').exists()).toBe(false);
+
+    await w.find('[data-test="slack-copy-request"]').trigger("click");
+    await flushPromises();
+    expect(writeText).toHaveBeenCalledWith(
+      "Please add the OpenObserve organization acme (acme) to the Slack workspace Acme Corp, in _meta › Settings › Slack › Organizations.",
+    );
+
+    await w.find('[data-test="slack-wizard-start-over"]').trigger("click");
+    await w.find('[data-test-stub="confirm-ok"]').trigger("click");
+    await flushPromises();
+    expect(slack.uninstallInstallation).toHaveBeenCalledWith("acme", "inst-1");
+    expect(step(w)).toBe("2");
+    expect(w.find('[data-test="slack-wizard-instance-team"]').exists()).toBe(false);
+  });
+
+  it("a config-token instance-team refusal says no Slack app was created", async () => {
+    vi.mocked(slack.listInstallations).mockReturnValue(ok(instanceNotice) as any);
+    vi.mocked(slack.createInstallation).mockReturnValue(
+      Promise.reject(
+        refusal(409, INSTANCE_TEAM, { error_detail: "instance_team", hint: "#o2-platform" }),
+      ) as any,
+    );
+    const w = await mountWizard();
+    await toCreate(w);
+    await submitToken(w);
+    expect(step(w)).toBe("2");
+    const banner = w.find('[data-test="slack-wizard-instance-team"]');
+    expect(banner.text()).toContain(INSTANCE_TEAM);
+    expect(banner.text()).toContain("No Slack app was created.");
+    expect(banner.text()).not.toContain("Start over");
+    expect(toast).not.toHaveBeenCalled();
+    const token = w.find('[data-test="slack-wizard-config-token"] input')
+      .element as HTMLInputElement;
+    expect(token.value).toBe("xoxe-1-sample");
+  });
+
+  it("_meta sees Make it the instance workspace for active org workspaces", async () => {
+    const listed = {
+      installations: [],
+      available: [{ installation_id: "inst-7", team_name: "Acme Corp" }],
+    };
+    vi.mocked(slack.listInstallations).mockReturnValue(ok(listed) as any);
+    const w = await mountWizard(null, "root@acme.example", metaStore());
+    await toCreate(w);
+    const offer = w.find('[data-test="slack-wizard-take-over"]');
+    expect(offer.text()).toContain("Use a workspace that is already installed");
+    expect(offer.text()).toContain("Acme Corp");
+    expect(offer.find('[data-test="slack-wizard-take-over-inst-7"]').text()).toBe(
+      "Make it the instance workspace",
+    );
+
+    w.unmount();
+    const other = await mountWizard();
+    await toCreate(other);
+    expect(other.find('[data-test="slack-wizard-take-over"]').exists()).toBe(false);
+  });
+
+  it("take over sends the org-access PUT with the workspace's orgs and _meta", async () => {
+    vi.mocked(slack.listInstallations).mockReturnValue(
+      ok({
+        installations: [],
+        available: [{ installation_id: "inst-7", team_name: "Acme Corp" }],
+      }) as any,
+    );
+    vi.mocked(slack.getOrgAccess).mockReturnValue(
+      ok(
+        orgAccessView({
+          orgs: orgAccessView().orgs.filter((o) => ["prod", "payments"].includes(o.org_id)),
+        }),
+      ) as any,
+    );
+    const w = await mountWizard(null, "root@acme.example", metaStore());
+    await toCreate(w);
+    await w.find('[data-test="slack-wizard-take-over-inst-7"]').trigger("click");
+    await flushPromises();
+    expect(slack.getOrgAccess).toHaveBeenCalledWith("_meta", "inst-7");
+    expect(slack.putOrgAccess).toHaveBeenCalledWith("_meta", "inst-7", {
+      orgs: ["prod", "payments", "_meta"],
+    });
+    expect(slack.createInstallation).not.toHaveBeenCalled();
+    expect(w.emitted("done")).toHaveLength(1);
+  });
+
+  it("a take_over refusal lists the candidates", async () => {
+    vi.mocked(slack.installExchange).mockReturnValue(
+      Promise.reject(
+        refusal(409, TAKE_OVER, {
+          error_detail: JSON.stringify({
+            take_over: [
+              { installation_id: "inst-7", team_name: "Acme Corp", org_ids: ["prod", "payments"] },
+            ],
+          }),
+        }),
+      ) as any,
+    );
+    const w = await mountWizard(pending, "root@acme.example", metaStore());
+    await w.find('[data-test="slack-wizard-allow"]').trigger("click");
+    await flushPromises();
+    postCallback(popup);
+    await flushPromises();
+
+    expect(toast).not.toHaveBeenCalled();
+    const offer = w.find('[data-test="slack-wizard-take-over"]');
+    expect(offer.text()).toContain(TAKE_OVER);
+    expect(offer.text()).toContain("Used by prod, payments");
+    await offer.find('[data-test="slack-wizard-take-over-inst-7"]').trigger("click");
+    await flushPromises();
+    expect(slack.getOrgAccess).not.toHaveBeenCalled();
+    expect(slack.putOrgAccess).toHaveBeenCalledWith("_meta", "inst-7", {
+      orgs: ["prod", "payments", "_meta"],
+    });
+    expect(slack.uninstallInstallation).toHaveBeenCalledWith("_meta", "inst-1");
+    expect(w.emitted("done")).toHaveLength(1);
+  });
+
+  it("a refused config token shows the server message verbatim", async () => {
+    vi.mocked(slack.createInstallation).mockReturnValue(
+      Promise.reject(refusal(400, TOKEN_REFUSED, {})) as any,
+    );
+    const w = await mountWizard();
+    await toCreate(w);
+    await submitToken(w);
+    expect(step(w)).toBe("2");
+    expect(w.find('[data-test="slack-wizard-create-error"]').text()).toBe(TOKEN_REFUSED);
+    expect(w.find('[data-test="slack-wizard-instance-team"]').exists()).toBe(false);
+    expect(toast).not.toHaveBeenCalled();
   });
 });

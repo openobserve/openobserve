@@ -21,19 +21,23 @@ import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import {
   deleteChannelDefaultMutation,
   putChannelDefaultMutation,
   slackChannelDefaultsQuery,
   slackChannelsQuery,
+  slackInstallationsQuery,
 } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { SlackChannel, SlackChannelDefaultRow } from "@/types/slack";
@@ -48,6 +52,19 @@ const SEARCH_DEBOUNCE_MS = 300;
 const { t } = useI18nTyped();
 const store = useStore();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+const { isMetaOrg } = useIsMetaOrg();
+
+const installations = useQuery(() => slackInstallationsQuery(org.value));
+const onInstance = computed(
+  () =>
+    installations.data.value?.installations.find((i) => i.id === props.installationId)?.scope ===
+    "instance",
+);
+// R-80: on an instance workspace a channel another org owns changes only through _meta.
+const instanceAdmin = computed(() => onInstance.value && isMetaOrg.value);
+const ownOrgOnly = computed(() => onInstance.value && !isMetaOrg.value);
+const canChange = (row: SlackChannelDefaultRow): boolean =>
+  row.set_by_this_org || instanceAdmin.value;
 
 const defaults = useQuery(() => slackChannelDefaultsQuery(org.value, props.installationId));
 const put = useMutation(() => putChannelDefaultMutation(org.value, props.installationId));
@@ -70,7 +87,7 @@ const channels = useInfiniteQuery(() =>
 
 const rows = computed<SlackChannelDefaultRow[]>(() => defaults.data.value?.defaults ?? []);
 const otherOrgChannels = computed(
-  () => new Set(rows.value.filter((r) => !r.set_by_this_org).map((r) => r.channel_id)),
+  () => new Set(rows.value.filter((r) => !canChange(r)).map((r) => r.channel_id)),
 );
 
 watch(
@@ -118,7 +135,7 @@ const columns = computed<OTableColumnDef<SlackChannelDefaultRow>[]>(() => [
   { id: "answers", header: t("slackApp.channels.columnAnswers"), size: 130 },
   { id: "alert_routes", header: t("slackApp.channels.columnAlertRoutes"), size: 120 },
   { id: "set_by", header: t("slackApp.channels.columnSetBy"), size: 220 },
-  { id: "actions", header: raw(""), size: 100, isAction: true },
+  { id: "actions", header: raw(""), size: ownOrgOnly.value ? 170 : 100, isAction: true },
 ]);
 
 const openDrawer = (row: SlackChannelDefaultRow | null): void => {
@@ -190,20 +207,24 @@ const save = async (value: ChannelDefaultForm): Promise<void> => {
         }}
       </template>
       <template #cell-answers="{ row }">
-        {{
-          row.answer_mode === "thread"
-            ? t("slackApp.channels.thread")
-            : t("slackApp.channels.private")
-        }}
+        <span v-if="!canChange(row) && ownOrgOnly" class="text-text-muted">{{ raw("—") }}</span>
+        <template v-else>
+          {{
+            row.answer_mode === "thread"
+              ? t("slackApp.channels.thread")
+              : t("slackApp.channels.private")
+          }}
+        </template>
       </template>
       <template #cell-alert_routes>
         <span class="text-text-muted">{{ raw("—") }}</span>
       </template>
       <template #cell-set_by="{ row }">
-        {{ t(`slackApp.channels.setFrom.${row.set_from}`) }}
+        <span v-if="!canChange(row) && ownOrgOnly" class="text-text-muted">{{ raw("—") }}</span>
+        <template v-else>{{ t(`slackApp.channels.setFrom.${row.set_from}`) }}</template>
       </template>
       <template #cell-actions="{ row }">
-        <span v-if="row.set_by_this_org" class="flex justify-end gap-1">
+        <span v-if="canChange(row)" class="flex justify-end gap-1">
           <OButton
             variant="ghost"
             size="icon-sm"
@@ -220,6 +241,14 @@ const save = async (value: ChannelDefaultForm): Promise<void> => {
             :data-test="`slack-channel-remove-${row.channel_id}`"
             @click="askRemove(row)"
           />
+        </span>
+        <span
+          v-else-if="ownOrgOnly"
+          class="text-text-secondary flex items-center justify-end gap-1 text-xs"
+          data-test="slack-channel-instance-only"
+        >
+          <OIcon name="lock" size="xs" />
+          {{ t("slackApp.channels.instanceAdminOnly") }}
         </span>
       </template>
       <template #error>
@@ -277,7 +306,11 @@ const save = async (value: ChannelDefaultForm): Promise<void> => {
             :loading="channels.isFetching.value"
             :disabled="!!editing"
             :search-debounce="SEARCH_DEBOUNCE_MS"
-            :help-text="t('slackApp.channels.privateHint')"
+            :help-text="
+              ownOrgOnly
+                ? t('slackApp.channels.claimableHint', { org })
+                : t('slackApp.channels.privateHint')
+            "
             required
             data-test="slack-channel-select"
             @search="channelSearch = $event.trim()"
@@ -294,6 +327,15 @@ const save = async (value: ChannelDefaultForm): Promise<void> => {
             {{ t("slackApp.channels.loadMore") }}
           </OButton>
         </div>
+        <OInput
+          v-if="onInstance"
+          :model-value="t('slackApp.card.thisOrg', { org })"
+          :label="t('slackApp.channels.columnDefaultOrg')"
+          :help-text="t('slackApp.channels.ownOrgOnlyHint')"
+          readonly
+          disabled
+          data-test="slack-channel-default-org"
+        />
         <div class="flex flex-col gap-2">
           <span class="text-text-label text-compact font-medium">
             {{ t("slackApp.channels.answers") }}

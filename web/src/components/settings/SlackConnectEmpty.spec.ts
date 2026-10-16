@@ -15,6 +15,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
+import { createStore } from "vuex";
 import i18n from "@/locales";
 import slack from "@/services/slack";
 import SlackConnectEmpty from "./SlackConnectEmpty.vue";
@@ -36,6 +37,7 @@ vi.mock("@/services/slack", () => ({
     connectInstallation: vi.fn(),
     startConnection: vi.fn(),
     confirmConnection: vi.fn(),
+    listInstallations: vi.fn(),
   },
 }));
 
@@ -56,6 +58,7 @@ const mountEmpty = (props: Record<string, unknown> = {}) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(slack.listInstallations).mockReturnValue(ok({ installations: [] }) as any);
   popup = fakePopup();
   vi.spyOn(window, "open").mockReturnValue(popup);
   vi.mocked(slack.installStart).mockReturnValue(ok({ authorization_url: AUTH_URL }) as any);
@@ -276,5 +279,86 @@ describe("SlackConnectEmpty self-hosted (A1)", () => {
     expect(w.emitted("installed")).toEqual([
       [{ team: "Acme Corp", destination: null, linking: null, linkAll: null }],
     ]);
+  });
+});
+
+describe("SlackConnectEmpty for an org the instance workspace does not serve (M4)", () => {
+  const writeText = vi.mocked(navigator.clipboard.writeText);
+  const labsStore = () =>
+    createStore({
+      state: {
+        selectedOrganization: { identifier: "labs", name: "Labs" },
+        userInfo: { email: "lee@acme.example" },
+        zoConfig: { slack_enabled: true, meta_org: "_meta" },
+      },
+    });
+  const mountUnserved = async (
+    helpContact: string | null,
+    available: { installation_id: string; team_name: string }[] = [],
+  ) => {
+    vi.mocked(slack.listInstallations).mockReturnValue(
+      ok({
+        installations: [],
+        available,
+        instance: { installation_id: "inst-i", team_name: "Acme Corp", help_contact: helpContact },
+      }) as any,
+    );
+    const w = mount(SlackConnectEmpty, {
+      props: { isCloud: false, available, upgradeCandidates: [] },
+      attachTo: document.body,
+      global: { plugins: [i18n, labsStore()] },
+    });
+    await flushPromises();
+    return w;
+  };
+
+  beforeEach(() => {
+    writeText.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("an unserved org sees the not-included banner and Copy request copies the request text", async () => {
+    const w = await mountUnserved("#o2-platform");
+    const banner = w.find('[data-test="slack-not-included"]');
+    expect(banner.text()).toContain(
+      "Acme Corp is set up for this server by your instance admin, but labs is not included yet.",
+    );
+    expect(banner.text()).toContain(
+      "Ask #o2-platform to add labs. You don't need to install anything.",
+    );
+    expect(w.text()).toContain(
+      "For a different Slack workspace than Acme Corp · OpenObserve creates your own Slack app from one configuration token",
+    );
+    await banner.find('[data-test="slack-copy-request"]').trigger("click");
+    await flushPromises();
+    expect(writeText).toHaveBeenCalledWith(
+      "Please add the OpenObserve organization Labs (labs) to the Slack workspace Acme Corp, in _meta › Settings › Slack › Organizations.",
+    );
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "success", message: "Request copied" }),
+    );
+  });
+
+  it("the banner without a contact asks the instance admin", async () => {
+    const w = await mountUnserved(null);
+    expect(w.find('[data-test="slack-not-included"]').text()).toContain(
+      "Ask your instance admin to add labs. You don't need to install anything.",
+    );
+    vi.mocked(slack.listInstallations).mockReturnValue(ok({ installations: [] }) as any);
+    const served = mountEmpty({ isCloud: false });
+    await flushPromises();
+    expect(served.find('[data-test="slack-not-included"]').exists()).toBe(false);
+    expect(served.text()).toContain(
+      "OpenObserve creates your own Slack app from one configuration token",
+    );
+    expect(served.text()).not.toContain("For a different Slack workspace");
+  });
+
+  it("the instance workspace is never offered under Connect existing", async () => {
+    const w = await mountUnserved("#o2-platform", [
+      { installation_id: "inst-i", team_name: "Acme Corp" },
+      { installation_id: "inst-9", team_name: "Acme Labs" },
+    ]);
+    expect(w.find('[data-test="slack-available-inst-i"]').exists()).toBe(false);
+    expect(w.find('[data-test="slack-available-inst-9"]').text()).toContain("Acme Labs");
   });
 });

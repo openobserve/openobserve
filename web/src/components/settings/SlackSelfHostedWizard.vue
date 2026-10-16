@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import { useMutation, useQuery } from "@tanstack/vue-query";
+import { computed, nextTick, ref, watch } from "vue";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -36,6 +36,7 @@ import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import { useSlackOAuthPopup } from "@/composables/slack/useSlackOAuthPopup";
+import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import {
   checkConnectivityMutation,
   confirmConnectionMutation,
@@ -44,8 +45,11 @@ import {
   installExchangeMutation,
   installUrlMutation,
   linkAllMutation,
+  putOrgAccessMutation,
+  slackInstallationsQuery,
   slackLinkingQuery,
   slackManifestQuery,
+  slackOrgAccessQuery,
   slackPrerequisitesQuery,
   startConnectionMutation,
   testInstallationMutation,
@@ -57,14 +61,17 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
   InstallationView,
   SlackAlreadyInstalledResponse,
+  SlackApiError,
   SlackConnectionConfirmResponse,
   SlackConnectivityResponse,
   SlackCreateInstallationRequest,
   SlackCreateInstallationResponse,
   SlackInstallExchangeResponse,
+  SlackTakeOverCandidate,
   SlackTestResponse,
   SlackUninstallResponse,
 } from "@/types/slack";
+import { copyToClipboard } from "@/utils/clipboard";
 import { buildSlackManifestUrlFrom } from "@/utils/slackManifest";
 import { isSlackUrl, serverMessageOf, statusOf } from "@/utils/slackLink";
 import { installerDomainDefault } from "@/utils/slackSettings";
@@ -84,12 +91,56 @@ const props = defineProps<{ installation: InstallationView | null }>();
 
 const emit = defineEmits<{ done: []; cancel: [] }>();
 
+/** A 409 from row 2 or row 6 for the Slack team of an instance workspace (R-81) or of org workspaces (R-82). */
+interface WizardRefusal {
+  message: string;
+  instanceTeam: boolean;
+  contact: string | null;
+  candidates: SlackTakeOverCandidate[];
+}
+
+/** `org_ids` is null when only row 24 knows which orgs the workspace serves. */
+interface TakeOverOption {
+  installation_id: string;
+  team_name: string;
+  org_ids: string[] | null;
+}
+
 const SLACK_APPS_URL = "https://api.slack.com/apps";
+const INSTANCE_TEAM_DETAIL = "instance_team";
+
+const takeOverOf = (detail: unknown): SlackTakeOverCandidate[] => {
+  if (typeof detail !== "string" || !detail.startsWith("{")) return [];
+  try {
+    const parsed = JSON.parse(detail) as { take_over?: unknown };
+    return Array.isArray(parsed.take_over) ? (parsed.take_over as SlackTakeOverCandidate[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+const refusalOf = (error: unknown): WizardRefusal | null => {
+  const message = serverMessageOf(error);
+  if (!message) return null;
+  const body = (error as { response?: { data?: Partial<SlackApiError> } }).response?.data;
+  return {
+    message,
+    instanceTeam: body?.error_detail === INSTANCE_TEAM_DETAIL,
+    contact: body?.hint?.trim() || null,
+    candidates: takeOverOf(body?.error_detail),
+  };
+};
 
 const { t } = useI18nTyped();
 const store = useStore();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const userEmail = computed<string>(() => store.state.userInfo?.email ?? "");
+const orgName = computed<string>(() => store.state.selectedOrganization?.name || org.value);
+const { isMetaOrg } = useIsMetaOrg();
+const queryClient = useQueryClient();
+const installations = useQuery(() =>
+  Object.assign(slackInstallationsQuery(org.value), { enabled: !!org.value }),
+);
 
 const initialStep = (): number => {
   if (!props.installation) return 0;
@@ -155,7 +206,12 @@ watch(
 );
 
 const manual = ref(false);
-const createInstallation = useMutation(() => createInstallationMutation(org.value));
+const createRefusal = ref<WizardRefusal | null>(null);
+// The Create step shows every refusal in place, beside the token it refused.
+const createInstallation = useMutation(() => {
+  const options = createInstallationMutation(org.value);
+  return { ...options, meta: { ...options.meta, silentError: true } };
+});
 const createApp = async (value: CreateAppForm): Promise<void> => {
   const body: SlackCreateInstallationRequest = manual.value
     ? {
@@ -170,7 +226,18 @@ const createApp = async (value: CreateAppForm): Promise<void> => {
         config_refresh_token: value.config_refresh_token,
         channel_history: value.channel_history,
       };
-  created.value = await createInstallation.mutateAsync(body);
+  createRefusal.value = null;
+  try {
+    created.value = await createInstallation.mutateAsync(body);
+  } catch (error) {
+    createRefusal.value = refusalOf(error) ?? {
+      message: t("common.unknownError"),
+      instanceTeam: false,
+      contact: null,
+      candidates: [],
+    };
+    return;
+  }
   leftApp.value = null;
   installedTeam.value = null;
   step.value = 3;
@@ -198,6 +265,7 @@ const manifestCode = computed(() =>
 );
 
 const installedTeam = ref<string | null>(null);
+const installRefusal = ref<WizardRefusal | null>(null);
 const alreadyInstalled = ref<SlackAlreadyInstalledResponse | null>(null);
 const appTokenSaved = ref(false);
 const startOverOpen = ref(false);
@@ -210,14 +278,27 @@ const connectInstallation = useMutation(() => connectInstallationMutation(org.va
 const updateCredentials = useMutation(() =>
   updateCredentialsMutation(org.value, installationId.value),
 );
-const installPopup = useSlackOAuthPopup<SlackInstallExchangeResponse>({
+// A same-team refusal is shown in place; any other failure keeps the popup's toast.
+const exchangeInstall = async (code: string, state: string) => {
+  installRefusal.value = null;
+  try {
+    return await installExchange.mutateAsync({ code, state });
+  } catch (error) {
+    const refusal = refusalOf(error);
+    if (!refusal || (!refusal.instanceTeam && !refusal.candidates.length)) throw error;
+    installRefusal.value = refusal;
+    return null;
+  }
+};
+const installPopup = useSlackOAuthPopup<SlackInstallExchangeResponse | null>({
   start: async () => {
     const fresh = created.value;
     if (fresh && fresh.installation.id === installationId.value) return fresh.authorize_url;
     return (await installUrl.mutateAsync(installationId.value)).authorize_url;
   },
-  exchange: ({ code, state }) => installExchange.mutateAsync({ code, state }),
+  exchange: ({ code, state }) => exchangeInstall(code, state),
   onSuccess: (result) => {
+    if (!result) return;
     if ("already_installed" in result) {
       alreadyInstalled.value = result;
       return;
@@ -265,9 +346,78 @@ const startOver = async (): Promise<void> => {
       : null;
   created.value = null;
   installedTeam.value = null;
+  installRefusal.value = null;
   alreadyInstalled.value = null;
   appTokenSaved.value = false;
   step.value = 2;
+};
+
+const instanceTeam = computed(() => {
+  const data = installations.data.value;
+  return (
+    data?.instance?.team_name ??
+    data?.installations.find((i) => i.scope === "instance")?.team_name ??
+    ""
+  );
+});
+const instanceContact = computed(
+  () => installRefusal.value?.contact ?? installations.data.value?.instance?.help_contact ?? null,
+);
+const copyRequest = (): void => {
+  void copyToClipboard(
+    t("slackApp.connect.requestText", {
+      name: orgName.value,
+      org: org.value,
+      team: instanceTeam.value,
+    }),
+    t,
+    { successMessage: t("slackApp.connect.requestCopied") },
+  );
+};
+
+// R-82: _meta takes over an active org workspace instead of installing a second app in its team.
+const takeOverRefusal = computed(() => {
+  for (const refusal of [installRefusal.value, createRefusal.value]) {
+    if (refusal?.candidates.length) return refusal;
+  }
+  return null;
+});
+const takeOverOptions = computed<TakeOverOption[]>(() => {
+  const refused = takeOverRefusal.value;
+  if (refused) return refused.candidates.map((c) => ({ ...c }));
+  if (!isMetaOrg.value || step.value !== 2) return [];
+  return (installations.data.value?.available ?? []).map((a) => ({ ...a, org_ids: null }));
+});
+const takeOverTarget = ref("");
+const takingOver = ref<string | null>(null);
+const takeOverError = ref<string | null>(null);
+const putOrgAccess = useMutation(() => {
+  const options = putOrgAccessMutation(org.value, takeOverTarget.value);
+  return { ...options, meta: { ...options.meta, silentError: true } };
+});
+const servedOrgIds = async (option: TakeOverOption): Promise<string[]> => {
+  if (option.org_ids) return option.org_ids;
+  const view = await queryClient.fetchQuery(slackOrgAccessQuery(org.value, option.installation_id));
+  return view.orgs.map((row) => row.org_id);
+};
+const takeOver = async (option: TakeOverOption): Promise<void> => {
+  takingOver.value = option.installation_id;
+  takeOverError.value = null;
+  const pendingId = installationId.value;
+  try {
+    const orgIds = await servedOrgIds(option);
+    takeOverTarget.value = option.installation_id;
+    // useMutation re-reads its options on the next tick.
+    await nextTick();
+    await putOrgAccess.mutateAsync({ orgs: [...new Set([...orgIds, org.value])] });
+  } catch (error) {
+    takeOverError.value = serverMessageOf(error) ?? t("common.unknownError");
+    return;
+  } finally {
+    takingOver.value = null;
+  }
+  if (pendingId) await uninstall.mutateAsync(pendingId).catch(() => undefined);
+  emit("done");
 };
 // The team already runs this app for another org: join that installation, then drop the unused pending one.
 const connectWithTicket = async (): Promise<void> => {
@@ -373,6 +523,51 @@ const nextBlocked = computed(() => {
       <p class="text-text-secondary m-0 text-sm">{{ t("slackApp.wizard.subtitle") }}</p>
     </div>
 
+    <OCard
+      v-if="takeOverOptions.length"
+      variant="outlined"
+      class="gap-3 p-5"
+      data-test="slack-wizard-take-over"
+    >
+      <h3 class="text-text-heading m-0 text-base font-semibold">
+        {{ t("slackApp.wizard.takeOverTitle") }}
+      </h3>
+      <OBanner v-if="takeOverRefusal" variant="error-soft" dense icon="error-outline">
+        {{ raw(takeOverRefusal.message) }}
+      </OBanner>
+      <OBanner
+        v-if="takeOverError"
+        variant="error-soft"
+        dense
+        icon="error-outline"
+        data-test="slack-wizard-take-over-error"
+      >
+        {{ raw(takeOverError) }}
+      </OBanner>
+      <div
+        v-for="option in takeOverOptions"
+        :key="option.installation_id"
+        class="border-border-default flex flex-wrap items-center justify-between gap-3 border-t pt-3"
+      >
+        <div class="flex min-w-0 flex-col gap-0.5">
+          <span class="text-text-body text-sm font-medium">{{ raw(option.team_name) }}</span>
+          <span v-if="option.org_ids?.length" class="text-text-secondary text-xs">
+            {{ t("slackApp.wizard.takeOverOrgs", { orgs: option.org_ids.join(", ") }) }}
+          </span>
+        </div>
+        <OButton
+          variant="outline"
+          size="sm-action"
+          :loading="takingOver === option.installation_id"
+          :disabled="takingOver !== null && takingOver !== option.installation_id"
+          :data-test="`slack-wizard-take-over-${option.installation_id}`"
+          @click="takeOver(option)"
+        >
+          {{ t("slackApp.wizard.takeOverAction") }}
+        </OButton>
+      </div>
+    </OCard>
+
     <OStepper :model-value="step" :animated="false" orientation="horizontal">
       <OStep :name="0" :title="t('slackApp.wizard.steps.prerequisites')" :done="step > 0">
         <div class="flex flex-col gap-3 pt-3">
@@ -455,7 +650,12 @@ const nextBlocked = computed(() => {
         </div>
       </OStep>
 
-      <OStep :name="2" :title="t('slackApp.wizard.steps.createApp')" :done="step > 2">
+      <OStep
+        :name="2"
+        :title="t('slackApp.wizard.steps.createApp')"
+        :done="step > 2"
+        :error="!!createRefusal"
+      >
         <OForm
           :form="createForm"
           class="flex flex-col gap-5 pt-3"
@@ -464,6 +664,22 @@ const nextBlocked = computed(() => {
           <h3 class="text-text-heading m-0 text-base font-semibold">
             {{ t("slackApp.wizard.create.title") }}
           </h3>
+          <OBanner
+            v-if="createRefusal && !createRefusal.candidates.length"
+            variant="error-soft"
+            icon="error-outline"
+            :data-test="
+              createRefusal.instanceTeam
+                ? 'slack-wizard-instance-team'
+                : 'slack-wizard-create-error'
+            "
+          >
+            <template v-if="createRefusal.instanceTeam">
+              <span class="font-semibold">{{ raw(createRefusal.message) }}</span>
+              {{ t("slackApp.wizard.noAppCreated") }}
+            </template>
+            <template v-else>{{ raw(createRefusal.message) }}</template>
+          </OBanner>
           <OBanner
             v-if="leftApp"
             variant="warning"
@@ -661,13 +877,56 @@ const nextBlocked = computed(() => {
         </OForm>
       </OStep>
 
-      <OStep :name="3" :title="t('slackApp.wizard.steps.install')" :done="step > 3">
+      <OStep
+        :name="3"
+        :title="t('slackApp.wizard.steps.install')"
+        :done="step > 3"
+        :error="!!installRefusal"
+      >
         <div class="flex flex-col gap-4 pt-3">
           <h3 class="text-text-heading m-0 text-base font-semibold">
             {{ t("slackApp.wizard.install.title") }}
           </h3>
+          <template v-if="installRefusal">
+            <OBanner
+              v-if="installRefusal.instanceTeam"
+              variant="error-soft"
+              icon="error-outline"
+              data-test="slack-wizard-instance-team"
+            >
+              <div class="flex flex-col gap-1">
+                <span class="font-semibold">{{ raw(installRefusal.message) }}</span>
+                <span>
+                  {{ t("slackApp.wizard.instanceTeamRemoved", { team: instanceTeam }) }}
+                  <template v-if="instanceContact">
+                    {{ t("slackApp.wizard.instanceAdminContact", { contact: instanceContact }) }}
+                  </template>
+                </span>
+              </div>
+            </OBanner>
+            <div class="flex flex-wrap justify-end gap-2">
+              <OButton
+                v-if="installRefusal.instanceTeam"
+                variant="outline"
+                size="sm-action"
+                icon-left="content-copy"
+                data-test="slack-copy-request"
+                @click="copyRequest"
+              >
+                {{ t("slackApp.connect.copyRequest") }}
+              </OButton>
+              <OButton
+                variant="primary"
+                size="sm-action"
+                data-test="slack-wizard-start-over"
+                @click="startOverOpen = true"
+              >
+                {{ t("slackApp.wizard.install.startOver") }}
+              </OButton>
+            </div>
+          </template>
           <OBanner
-            v-if="pendingInstall"
+            v-else-if="pendingInstall"
             variant="warning"
             icon="schedule"
             data-test="slack-wizard-pending"
@@ -709,7 +968,11 @@ const nextBlocked = computed(() => {
               </OButton>
             </template>
           </OBanner>
-          <OCard v-else-if="installedTeam === null" variant="outlined" class="gap-3 p-4">
+          <OCard
+            v-else-if="installedTeam === null && !installRefusal"
+            variant="outlined"
+            class="gap-3 p-4"
+          >
             <p class="text-text-secondary m-0 text-sm">
               {{ t("slackApp.wizard.install.allowHint") }}
             </p>
@@ -738,7 +1001,11 @@ const nextBlocked = computed(() => {
               </OButton>
             </div>
           </OCard>
-          <span v-else class="flex items-center gap-2 text-sm" data-test="slack-wizard-installed">
+          <span
+            v-else-if="!installRefusal"
+            class="flex items-center gap-2 text-sm"
+            data-test="slack-wizard-installed"
+          >
             <OIcon name="check-circle" size="sm" class="text-status-positive" />
             {{ t("slackApp.wizard.install.installed", { team: installedTeam }) }}
           </span>
@@ -800,7 +1067,7 @@ const nextBlocked = computed(() => {
               t("slackApp.wizard.install.verifyHelp")
             }}</span>
           </div>
-          <OBanner variant="info" dense icon="info">
+          <OBanner v-if="!installRefusal" variant="info" dense icon="info">
             {{ t("slackApp.wizard.install.collaborator") }}
           </OBanner>
         </div>
@@ -902,7 +1169,10 @@ const nextBlocked = computed(() => {
       </OStep>
     </OStepper>
 
-    <div v-if="step !== 2 && step !== 4" class="flex flex-wrap justify-end gap-2">
+    <div
+      v-if="step !== 2 && step !== 4 && !installRefusal"
+      class="flex flex-wrap justify-end gap-2"
+    >
       <OButton
         v-if="step === 0"
         variant="outline"

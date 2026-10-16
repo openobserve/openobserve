@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useMutation } from "@tanstack/vue-query";
+import { useMutation, useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import addToSlackImage from "@/assets/images/common/add_to_slack.png";
 import addToSlackImage2x from "@/assets/images/common/add_to_slack@2x.png";
@@ -31,6 +31,7 @@ import {
   connectInstallationMutation,
   installExchangeMutation,
   installStartMutation,
+  slackInstallationsQuery,
   startConnectionMutation,
 } from "@/services/slack.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -43,6 +44,7 @@ import type {
   SlackInstallSource,
   SlackUpgradeCandidate,
 } from "@/types/slack";
+import { copyToClipboard } from "@/utils/clipboard";
 import { statusOf } from "@/utils/slackLink";
 
 type PopupAction =
@@ -59,6 +61,27 @@ const emit = defineEmits<{ setup: []; installed: [confirmation: SlackInstallConf
 const { t } = useI18nTyped();
 const store = useStore();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+const orgName = computed<string>(() => store.state.selectedOrganization?.name || org.value);
+
+// Row 9's `instance`: an instance workspace on this server that does not serve this org (M4).
+const installations = useQuery(() => slackInstallationsQuery(org.value));
+const instance = computed(() => installations.data.value?.instance ?? null);
+const offered = computed(() =>
+  props.available.filter((item) => item.installation_id !== instance.value?.installation_id),
+);
+const copyRequest = (): void => {
+  const notice = instance.value;
+  if (!notice) return;
+  void copyToClipboard(
+    t("slackApp.connect.requestText", {
+      name: orgName.value,
+      org: org.value,
+      team: notice.team_name,
+    }),
+    t,
+    { successMessage: t("slackApp.connect.requestCopied") },
+  );
+};
 
 const installStart = useMutation(() => installStartMutation(org.value));
 const installExchange = useMutation(() => installExchangeMutation(org.value));
@@ -142,6 +165,38 @@ const addToSlackSrcset = `${addToSlackImage2x} 2x`;
 
 <template>
   <div class="flex flex-col gap-4" data-test="slack-connect-empty">
+    <OBanner
+      v-if="instance"
+      variant="info"
+      icon="info"
+      inline-actions
+      data-test="slack-not-included"
+    >
+      <div class="flex flex-col gap-0.5">
+        <span class="font-semibold">
+          {{ t("slackApp.connect.notIncludedTitle", { team: instance.team_name, org }) }}
+        </span>
+        <span>
+          {{
+            instance.help_contact
+              ? t("slackApp.connect.notIncludedDetail", { contact: instance.help_contact, org })
+              : t("slackApp.connect.notIncludedNoContact", { org })
+          }}
+        </span>
+      </div>
+      <template #actions>
+        <OButton
+          variant="outline"
+          size="sm-action"
+          icon-left="content-copy"
+          data-test="slack-copy-request"
+          @click="copyRequest"
+        >
+          {{ t("slackApp.connect.copyRequest") }}
+        </OButton>
+      </template>
+    </OBanner>
+
     <OBanner
       v-if="isCloud && candidate"
       variant="info"
@@ -245,7 +300,13 @@ const addToSlackSrcset = `${addToSlackImage2x} 2x`;
             </li>
           </ul>
           <span class="text-text-secondary text-xs">
-            {{ isCloud ? t("slackApp.connect.popupHint") : t("slackApp.connect.selfHostedHint") }}
+            {{
+              isCloud
+                ? t("slackApp.connect.popupHint")
+                : instance
+                  ? t("slackApp.connect.setupAppOtherTeam", { team: instance.team_name })
+                  : t("slackApp.connect.selfHostedHint")
+            }}
           </span>
           <span class="text-text-secondary text-xs">
             {{ t("slackApp.connect.permissionHint") }}
@@ -264,7 +325,7 @@ const addToSlackSrcset = `${addToSlackImage2x} 2x`;
     </OCard>
 
     <OCard
-      v-if="!isCloud && available.length"
+      v-if="!isCloud && offered.length"
       variant="outlined"
       class="gap-3 p-5"
       data-test="slack-available"
@@ -278,7 +339,7 @@ const addToSlackSrcset = `${addToSlackImage2x} 2x`;
         </p>
       </div>
       <div
-        v-for="item in available"
+        v-for="item in offered"
         :key="item.installation_id"
         class="border-border-default flex items-center justify-between gap-3 border-t pt-3"
         :data-test="`slack-available-${item.installation_id}`"

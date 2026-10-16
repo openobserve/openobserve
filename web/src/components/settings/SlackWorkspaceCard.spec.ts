@@ -24,7 +24,9 @@ import {
   axiosError,
   fakePopup,
   installationView,
+  instanceView,
   makeSlackStore,
+  managedView,
   ok,
   postCallback,
   selfHostedSettingsExchange,
@@ -317,6 +319,57 @@ describe("SlackWorkspaceCard (A3)", () => {
     const cloud = mountCard(installationView(), true);
     expect(cloud.find('[data-test="slack-disconnect-org"]').exists()).toBe(true);
     expect(cloud.find('[data-test="slack-uninstall"]').exists()).toBe(false);
+  });
+
+  it("a managed workspace shows Managed by your instance admin with the _meta contact", () => {
+    const w = mountCard(managedView());
+    const banner = w.find('[data-test="slack-managed-banner"]');
+    expect(banner.text()).toContain("Managed by your instance admin.");
+    expect(banner.text()).toContain(
+      "Credentials, linking and which organizations use Acme Corp are set in _meta.",
+    );
+    expect(banner.text()).toContain("Questions: #o2-platform");
+    expect(w.find('[data-test="slack-workspace-meta"]').text()).toBe(
+      "Socket Mode · managed by your instance admin",
+    );
+    expect(mountCard().find('[data-test="slack-managed-banner"]').exists()).toBe(false);
+  });
+
+  it("a managed workspace hides credentials, reinstall, forget, disconnect and uninstall", () => {
+    const w = mountCard(managedView({ credentials_readable: false }));
+    for (const id of [
+      "slack-update-credentials",
+      "slack-reinstall",
+      "slack-credentials-reinstall",
+      "slack-refresh-token",
+      "slack-forget-token",
+      "slack-disconnect-org",
+      "slack-uninstall",
+      "slack-collaborators",
+      "slack-connected-orgs",
+    ]) {
+      expect(w.find(`[data-test="${id}"]`).exists(), id).toBe(false);
+    }
+    expect(w.find('[data-test="slack-credentials-unreadable"] button').exists()).toBe(false);
+  });
+
+  it("keeps Test connection on a managed workspace", async () => {
+    const w = mountCard(managedView());
+    await w.find('[data-test="slack-test-connection"]').trigger("click");
+    await flushPromises();
+    expect(slack.testInstallation).toHaveBeenCalledWith("acme", "inst-1", {});
+    expect(w.find('[data-test="slack-test-results"]').text()).toContain("Bot token works");
+    expect(w.find('[data-test="slack-help-contact-form"]').exists()).toBe(true);
+  });
+
+  it("shows the Instance tag in _meta", () => {
+    const w = mountCard(instanceView());
+    expect(w.find('[data-test="slack-workspace-instance-tag"]').text()).toBe("Instance");
+    expect(w.find('[data-test="slack-managed-banner"]').exists()).toBe(false);
+    expect(w.find('[data-test="slack-connected-orgs"]').exists()).toBe(false);
+    expect(w.find('[data-test="slack-disconnect-org"]').exists()).toBe(false);
+    expect(w.find('[data-test="slack-uninstall"]').exists()).toBe(true);
+    expect(mountCard().find('[data-test="slack-workspace-instance-tag"]').exists()).toBe(false);
   });
 
   it("reminds self-hosted admins to add a second app collaborator", () => {
