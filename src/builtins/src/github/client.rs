@@ -16,7 +16,6 @@
 use std::time::Duration;
 
 use bytes::Bytes;
-use serde::de::DeserializeOwned;
 
 use super::{
     cache::CacheManager,
@@ -91,28 +90,9 @@ impl GitHubDataService {
         Ok(data)
     }
 
-    /// Fetch and parse JSON from URL with caching
-    ///
-    /// # Arguments
-    /// * `url` - The URL to fetch JSON from
-    ///
-    /// # Returns
-    /// Parsed JSON data of type T
-    pub async fn fetch_json<T: DeserializeOwned>(&self, url: &str) -> Result<T, GitHubError> {
-        let data = self.fetch_with_cache(url, false).await?;
-        let parsed = serde_json::from_slice(&data)?;
-        Ok(parsed)
-    }
-
     /// Fetch raw bytes from URL without caching
     pub async fn fetch_raw(&self, url: &str) -> Result<Bytes, GitHubError> {
         self.fetch_with_retry(url).await
-    }
-
-    /// Invalidate cache for a specific URL
-    pub async fn invalidate_cache(&self, url: &str) {
-        let cache_key = url.to_string();
-        self.cache.invalidate(&cache_key).await;
     }
 
     /// Clear all cached data

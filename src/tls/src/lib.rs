@@ -21,45 +21,8 @@ use std::{
 };
 
 use itertools::Itertools;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
+use rustls::pki_types::{CertificateDer, pem::PemObject};
 use x509_parser::prelude::*;
-
-pub fn http_tls_config() -> Result<rustls::ServerConfig, anyhow::Error> {
-    let cfg = config::get_config();
-    let cert_file =
-        &mut BufReader::new(std::fs::File::open(&cfg.http.tls_cert_path).map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to open TLS certificate file {}: {}",
-                cfg.http.tls_cert_path,
-                e
-            )
-        })?);
-    let key_file =
-        &mut BufReader::new(std::fs::File::open(&cfg.http.tls_key_path).map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to open TLS key file {}: {}",
-                cfg.http.tls_key_path,
-                e
-            )
-        })?);
-
-    let cert_chain = CertificateDer::pem_reader_iter(cert_file);
-    let versions: &[&'_ rustls::SupportedProtocolVersion] = match cfg.http.tls_min_version.as_str()
-    {
-        "1.3" => &[&rustls::version::TLS13],
-        "1.2" => rustls::DEFAULT_VERSIONS,
-        _ => rustls::DEFAULT_VERSIONS,
-    };
-
-    let tls_config = rustls::ServerConfig::builder_with_protocol_versions(versions)
-        .with_no_client_auth()
-        .with_single_cert(
-            cert_chain.try_collect::<_, Vec<_>, _>()?,
-            PrivateKeyDer::from_pem_reader(key_file)?,
-        )?;
-
-    Ok(tls_config)
-}
 
 pub fn client_tls_config() -> Result<rustls::ClientConfig, anyhow::Error> {
     let cfg = config::get_config();
