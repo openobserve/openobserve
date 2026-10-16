@@ -129,6 +129,30 @@ TERMS = {
         "records",
         "zh-CN": "流水线",
         "zh-TW": "管線",
+        "fr-FR": "pipeline",
+    },
+    "downtime": {
+        "sense": "a scheduled window that mutes alert notifications (a maintenance "
+        "window) — never an outage or unavailability",
+        "fr-FR": "période de maintenance",
+    },
+    "burn rate": {
+        "sense": "how fast an SLO's error budget is being spent — never combustion",
+        "fr-FR": "taux d'épuisement",
+    },
+    "page": {
+        "sense": "in on-call: a notification that summons a responder, and the "
+        "record it opens — not a web page",
+        "fr-FR": "notification",
+    },
+    "scorer": {
+        "sense": "an evaluator that grades LLM output — never a sports scorer",
+        "fr-FR": "évaluateur",
+    },
+    "RUM": {
+        "sense": "Real User Monitoring, a product module name — keep the "
+        "acronym 'RUM' wherever the source says RUM",
+        "fr-FR": "RUM",
     },
     "destination": {
         "sense": "a configured endpoint that alerts or pipeline output are "
@@ -489,6 +513,12 @@ def _system_prompt(locale, module_terms):
         "- Copy vue-i18n literal escapes verbatim: {'@'}, {'{'}, {'}'}, {'|'} — keep the "
         "quotes and braces exactly, never translate or unescape them.\n"
         "- Keep any HTML tags, markdown, and URLs intact.\n"
+        "- Keep quoted code literals verbatim — field names, enum values and query "
+        "values in quotes ('metrics', 'role', level = 'error') are typed by users "
+        "and must not be translated.\n"
+        "- A short label that starts with a verb ('Copy Key', 'Import dashboard', "
+        "'Search Role') is an action: translate it as a command, never as a noun "
+        "phrase.\n"
         "- Do not translate the product name 'OpenObserve' or other proper nouns/brand names.\n"
         "- Preserve leading/trailing whitespace and terminal punctuation.\n"
         "- Produce natural, concise wording appropriate for buttons, labels, and short UI messages.\n"

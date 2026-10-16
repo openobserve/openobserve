@@ -31,7 +31,7 @@ use config::{
     },
     utils::json,
 };
-use dashmap::DashMap;
+use dashmap::{DashMap, mapref::entry::Entry};
 
 /// Keyed by [`batch_key`]: a fingerprint carries no org, so it alone would merge two orgs' batches.
 static PENDING_BATCHES: Lazy<Arc<DashMap<String, PendingBatch>>> =
@@ -188,36 +188,38 @@ pub fn add_to_batch(
     // fingerprint — so this is set once, when the batch is created.
     group_labels: Option<std::collections::BTreeMap<String, String>>,
 ) -> BatchAdmission {
-    let mut refused = false;
-    let full = PENDING_BATCHES
-        .entry(batch_key(&org_id, &fingerprint))
-        .and_modify(|batch| {
-            if batch.add_alert(alert.clone(), rows.clone(), trigger_data.clone()) {
-                log::debug!(
-                    "[grouping] Added alert '{}' to existing batch {} (count: {}/{})",
-                    alert.name,
-                    fingerprint,
-                    batch.alerts.len(),
-                    batch.max_group_size
-                );
-                if batch.is_full() {
-                    log::info!(
-                        "[grouping] Batch {} reached max size ({}), ready to send",
-                        fingerprint,
-                        batch.max_group_size
-                    );
-                }
-            } else {
-                refused = true;
+    match PENDING_BATCHES.entry(batch_key(&org_id, &fingerprint)) {
+        Entry::Occupied(mut entry) => {
+            let batch = entry.get_mut();
+            let alert_name = alert.name.clone();
+            if !batch.add_alert(alert, rows, trigger_data) {
                 log::warn!(
                     "[grouping] Failed to add alert '{}' to batch {} (already full), org_id: {}",
-                    alert.name,
+                    alert_name,
                     fingerprint,
                     org_id
                 );
+                return BatchAdmission::Refused;
             }
-        })
-        .or_insert_with(|| {
+            log::debug!(
+                "[grouping] Added alert '{}' to existing batch {} (count: {}/{})",
+                alert_name,
+                fingerprint,
+                batch.alerts.len(),
+                batch.max_group_size
+            );
+            if batch.is_full() {
+                log::info!(
+                    "[grouping] Batch {} reached max size ({}), ready to send",
+                    fingerprint,
+                    batch.max_group_size
+                );
+                BatchAdmission::Ready
+            } else {
+                BatchAdmission::Queued
+            }
+        }
+        Entry::Vacant(entry) => {
             log::info!(
                 "[grouping] Created new batch for fingerprint {}, alert: '{}', org: {}, wait_seconds: {}, max_size: {}",
                 fingerprint,
@@ -226,8 +228,8 @@ pub fn add_to_batch(
                 group_wait_seconds,
                 max_group_size
             );
-            PendingBatch::new(
-                fingerprint.clone(),
+            let batch = entry.insert(PendingBatch::new(
+                fingerprint,
                 org_id,
                 alert,
                 rows,
@@ -236,15 +238,13 @@ pub fn add_to_batch(
                 max_group_size,
                 level,
                 group_labels,
-            )
-        })
-        .is_full();
-    if refused {
-        BatchAdmission::Refused
-    } else if full {
-        BatchAdmission::Ready
-    } else {
-        BatchAdmission::Queued
+            ));
+            if batch.is_full() {
+                BatchAdmission::Ready
+            } else {
+                BatchAdmission::Queued
+            }
+        }
     }
 }
 

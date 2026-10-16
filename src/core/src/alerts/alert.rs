@@ -2384,115 +2384,6 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     })
 }
 
-pub async fn trigger_by_name(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    name: &str,
-) -> Result<ManualTrigger, AlertError> {
-    let (_folder, alert) =
-        match db::alerts::alert::get_by_name_with_folder(org_id, stream_type, stream_name, name)
-            .await
-        {
-            Ok(Some(found)) => found,
-            _ => {
-                return Err(AlertError::AlertNotFound);
-            }
-        };
-    let now = Utc::now().timestamp_micros();
-    #[cfg(feature = "enterprise")]
-    if let Some(downtime) = suppressed_manual_trigger(&alert, &_folder.folder_id, now).await {
-        return Ok(ManualTrigger::Suppressed(downtime));
-    }
-
-    // For creates_incident=true alerts the incident correlation path handles
-    // the notification. For all other cases send the direct notification.
-    #[cfg(feature = "enterprise")]
-    let (incident_notified, incident_notify_error) = if alert.creates_incident
-        && o2_enterprise::enterprise::common::config::get_config()
-            .incidents
-            .enabled
-    {
-        let synthetic_row = manual_trigger_row(&alert);
-        let notify = std::slice::from_ref(&synthetic_row);
-
-        match crate::alerts::incidents::correlate_alert_to_incident(
-            &alert,
-            &synthetic_row,
-            notify,
-            now,
-            // Manual triggers evaluate nothing; no level to map.
-            None,
-            None,
-        )
-        .await
-        {
-            Ok(Some(correlated)) => {
-                log::info!(
-                    "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
-                    alert.name,
-                    correlated.outcome.incident_id(),
-                    correlated.outcome.service_name(),
-                );
-                (
-                    incident_path_notified(&correlated.outcome),
-                    correlated.notify_error,
-                )
-            }
-            Ok(None) => {
-                log::debug!(
-                    "No incident correlation for manually triggered alert {org_id}/{}",
-                    alert.name
-                );
-                (false, None)
-            }
-            Err(e) => {
-                log::error!(
-                    "Error correlating manual trigger to incident, falling back to direct notification: {e}"
-                );
-                (false, None)
-            }
-        }
-    } else {
-        (false, None)
-    };
-
-    #[cfg(not(feature = "enterprise"))]
-    let (incident_notified, incident_notify_error) = (false, None);
-
-    let trace_id = config::ider::generate_trace_id();
-    let trace_id = format!("trig_name_{trace_id}");
-    // Always sent: alert-attached workflows dispatch only from here. When the
-    // incident path already notified the destinations, they are skipped so the
-    // same manual trigger cannot page them twice.
-    let skip_destinations: &[String] = if incident_notified {
-        &alert.destinations
-    } else {
-        &[]
-    };
-    let rows = vec![manual_trigger_row(&alert)];
-    let outcome = alert
-        .send_notification(
-            &trace_id,
-            &rows,
-            now,
-            None,
-            now,
-            None,
-            None,
-            None,
-            skip_destinations,
-            None,
-        )
-        .await?;
-    let error_message = with_incident_notify_error(outcome.error_message, incident_notify_error);
-
-    Ok(ManualTrigger::Sent {
-        success_message: outcome.success_message,
-        error_message,
-    })
-}
-
 /// A manual trigger inside a window is suppressed like a scheduled run: no page, no un-mute.
 #[cfg(feature = "enterprise")]
 async fn suppressed_manual_trigger(
@@ -2678,8 +2569,8 @@ impl AlertExt for Alert {
         // every surface below (each destination's template, and the workflow
         // trigger metadata). An SLO alert reports its SLO where an ordinary
         // alert reports its stream, and the SLO's NAME is on the evaluation
-        // row rather than on the alert — so the rowless paths
-        // (`trigger_by_id`, `trigger_by_name`) need one primary-key read to
+        // row rather than on the alert — so the rowless path
+        // (`trigger_by_id`) needs one primary-key read to
         // say the same thing a firing says. Resolving it here rather than
         // inside the renderer is what keeps that at one read per notification
 
@@ -3481,12 +3372,15 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         Ok(v) => v,
         Err(e) => {
             log::error!("error sending request to {} with error {e:?}", endpoint.url);
-            return Err(anyhow::anyhow!("error sending request : {e:?}"));
+            return Err(anyhow::anyhow!(
+                "error sending request : {:?}",
+                e.without_url()
+            ));
         }
     };
     let resp_status = resp.status();
     let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
-    let resp_body = resp.text().await?;
+    let resp_body = resp.text().await.map_err(reqwest::Error::without_url)?;
 
     log::debug!(
         "Alert sent to destination {} with status: {}, body:\n{}",
@@ -3657,10 +3551,15 @@ async fn send_discord_with_attachment(
                 .mime_str("image/png")?,
         );
 
-    let resp = client.post(url).multipart(form).send().await?;
+    let resp = client
+        .post(url)
+        .multipart(form)
+        .send()
+        .await
+        .map_err(reqwest::Error::without_url)?;
     let resp_status = resp.status();
     let hide_body = config::utils::ssrf_guard::admitted_only_by_allowlist(&resp);
-    let resp_body = resp.text().await?;
+    let resp_body = resp.text().await.map_err(reqwest::Error::without_url)?;
     if !resp_status.is_success() {
         log::error!(
             "Alert discord notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
@@ -3772,11 +3671,25 @@ fn process_row_templates_plain(
     let alert_count = rows.len();
     let mut rows_tpl = Vec::with_capacity(rows.len());
 
-    // For JSON row template type, try to parse the template as JSON
     let is_json_template = row_type == RowTemplateType::Json;
 
     for (row, tpl) in rows.iter().zip(templates) {
+        let spread_enabled = !row.contains_key("...row");
+        if spread_enabled && tpl.template.trim() == "{...row}" {
+            rows_tpl.push(if is_json_template {
+                Value::Object(row.clone())
+            } else {
+                Value::String(serde_json::to_string(row).unwrap_or_default())
+            });
+            continue;
+        }
         let mut resp = tpl.template.clone();
+        // Protect source tokens so row values cannot introduce or alter a spread expansion.
+        let spread_marker = (spread_enabled && resp.contains("{...row}")).then(|| {
+            let marker = format!("\u{e000}{:032x}\u{e001}", rand::random::<u128>());
+            resp = resp.replace("{...row}", &marker);
+            marker
+        });
         let mut alert_start_time = 0;
         let mut alert_end_time = 0;
         for (key, value) in row.iter() {
@@ -3886,6 +3799,9 @@ fn process_row_templates_plain(
         }
 
         resp = tpl.finish(resp);
+        if let Some(marker) = spread_marker {
+            resp = resp.replace(&marker, &serde_json::to_string(row).unwrap_or_default());
+        }
 
         // If this is a JSON row template, try to parse it as JSON
         if is_json_template {
@@ -4877,7 +4793,7 @@ mod send_path_tests {
     };
     use crate::{
         alerts::notifications::platform::{Platform, send_resolve},
-        ssrf_test_support::{isolated, secret_server},
+        ssrf_test_support::{isolated, secret_server, truncated_server},
     };
 
     #[test]
@@ -5117,6 +5033,72 @@ mod send_path_tests {
                 for shown in &seen {
                     let (Ok(s) | Err(s)) = shown;
                     assert!(s.contains("secret"), "{s}");
+                }
+            },
+        );
+    }
+
+    #[test]
+    fn a_destination_that_cannot_be_reached_keeps_its_url_out_of_the_error() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_destination_that_cannot_be_reached_keeps_its_url_out_of_the_error"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let port = std::net::TcpListener::bind("127.0.0.1:0")
+                    .unwrap()
+                    .local_addr()
+                    .unwrap()
+                    .port();
+                let dest = endpoint(
+                    &format!("http://127.0.0.1:{port}"),
+                    "/hooks/T0/hooktoken?key=querytoken",
+                );
+                let png = std::sync::Arc::new(vec![0u8; 8]);
+                let seen = [
+                    send_http_notification(&dest, "{}".into()).await,
+                    send_discord_with_attachment(&dest, "{}".into(), png).await,
+                    send_resolve(Platform::PagerDuty, &dest, "ep-1").await,
+                ];
+                for (path, shown) in ["http", "discord", "resolve"].into_iter().zip(seen) {
+                    let shown = shown.expect_err("nothing listens on the port").to_string();
+                    assert!(
+                        !shown.contains("hooktoken") && !shown.contains("querytoken"),
+                        "{path}: {shown}"
+                    );
+                }
+            },
+        );
+    }
+
+    #[test]
+    fn a_destination_that_drops_its_body_keeps_its_url_out_of_the_error() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::a_destination_that_drops_its_body_keeps_its_url_out_of_the_error"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let dest = endpoint(
+                    &truncated_server().await,
+                    "/hooks/T0/hooktoken?key=querytoken",
+                );
+                let png = std::sync::Arc::new(vec![0u8; 8]);
+                let seen = [
+                    send_http_notification(&dest, "{}".into()).await,
+                    send_discord_with_attachment(&dest, "{}".into(), png).await,
+                ];
+                for (path, shown) in ["http", "discord"].into_iter().zip(seen) {
+                    let shown = shown.expect_err("the body is cut short").to_string();
+                    assert!(
+                        shown.contains("decoding response body")
+                            && !shown.contains("hooktoken")
+                            && !shown.contains("querytoken"),
+                        "{path}: {shown}"
+                    );
                 }
             },
         );
@@ -5913,6 +5895,190 @@ mod tests {
         assert_eq!(result.len(), 1);
         // Should fallback to string when JSON parsing fails
         assert!(result[0].is_string());
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_json_type() {
+        let row_template = "{...row}".to_string();
+        let mut row1 = Map::new();
+        row1.insert("host".to_string(), json!("web-1"));
+        row1.insert("cpu".to_string(), json!(92.5));
+        let mut row2 = Map::new();
+        row2.insert("host".to_string(), json!("web-2"));
+        row2.insert("cpu".to_string(), json!(88.1));
+        let rows = vec![row1, row2];
+
+        let mut alert = Alert::default();
+        alert.row_template_type = RowTemplateType::Json;
+
+        let result = process_row_template(
+            "test_org",
+            &row_template,
+            &alert,
+            RowTemplateType::Json,
+            &rows,
+        );
+
+        assert_eq!(result.len(), 2);
+        assert!(result[0].is_object());
+        assert_eq!(
+            result[0].get("host").and_then(|v| v.as_str()),
+            Some("web-1")
+        );
+        assert_eq!(result[0].get("cpu").and_then(|v| v.as_f64()), Some(92.5));
+        assert!(result[1].is_object());
+        assert_eq!(
+            result[1].get("host").and_then(|v| v.as_str()),
+            Some("web-2")
+        );
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_string_type() {
+        let row_template = "{...row}".to_string();
+        let mut row1 = Map::new();
+        row1.insert("host".to_string(), json!("web-1"));
+        row1.insert("cpu".to_string(), json!(92.5));
+        let rows = vec![row1];
+
+        let alert = Alert::default();
+
+        let result = process_row_template(
+            "test_org",
+            &row_template,
+            &alert,
+            RowTemplateType::String,
+            &rows,
+        );
+
+        assert_eq!(result.len(), 1);
+        assert!(result[0].is_string());
+        let s = result[0].as_str().unwrap();
+        let v: Value = serde_json::from_str(s).unwrap();
+        assert_eq!(v.get("host").and_then(|v| v.as_str()), Some("web-1"));
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_with_surrounding_whitespace() {
+        let row_template = "  {...row}  ".to_string();
+        let mut row1 = Map::new();
+        row1.insert("level".to_string(), json!("error"));
+        let rows = vec![row1];
+
+        let mut alert = Alert::default();
+        alert.row_template_type = RowTemplateType::Json;
+
+        let result = process_row_template(
+            "test_org",
+            &row_template,
+            &alert,
+            RowTemplateType::Json,
+            &rows,
+        );
+
+        assert_eq!(result.len(), 1);
+        assert!(result[0].is_object());
+        assert_eq!(
+            result[0].get("level").and_then(|v| v.as_str()),
+            Some("error")
+        );
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_embedded_json_with_modifiers() {
+        let row = json!({
+            "host": "web-1",
+            "message": "{alert_name} {...row} {host|humanize}",
+            "nested": {"values": [true, null, 42]},
+            "ratio": 0.5
+        });
+        let rows = vec![serde_json::from_value(row.clone()).unwrap()];
+        let result = process_row_template(
+            "test_org",
+            r#"{"payload":{...row},"host":"{host}","ratio":"{ratio|humanizePercentage}"}"#,
+            &Alert::default(),
+            RowTemplateType::Json,
+            &rows,
+        );
+        assert_eq!(
+            result,
+            vec![json!({"payload": row, "host": "web-1", "ratio": "50%"})]
+        );
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_does_not_expand_row_values() {
+        let row = json!({"message": "{...row}"});
+        let rows = vec![serde_json::from_value(row.clone()).unwrap()];
+        let json = serde_json::to_string(&row).unwrap();
+        let result = process_row_template(
+            "test_org",
+            "{message} | {...row} | {...row}",
+            &Alert::default(),
+            RowTemplateType::String,
+            &rows,
+        );
+        assert_eq!(
+            result,
+            vec![Value::String(format!("{{...row}} | {json} | {json}"))]
+        );
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_empty_inputs() {
+        for row_type in [RowTemplateType::Json, RowTemplateType::String] {
+            assert!(
+                process_row_template("test_org", "{...row}", &Alert::default(), row_type, &[])
+                    .is_empty()
+            );
+            let result = process_row_template(
+                "test_org",
+                "{...row}",
+                &Alert::default(),
+                row_type,
+                &[Map::new()],
+            );
+            let expected = if row_type == RowTemplateType::Json {
+                json!({})
+            } else {
+                json!("{}")
+            };
+            assert_eq!(result, vec![expected]);
+        }
+    }
+
+    #[test]
+    fn test_process_row_template_spread_row_preserves_literal_field_precedence() {
+        let rows = vec![
+            serde_json::from_value(json!({
+                "...row": "literal value",
+                "host": "web-1"
+            }))
+            .unwrap(),
+        ];
+        for row_type in [RowTemplateType::String, RowTemplateType::Json] {
+            for (template, expected) in [
+                ("{...row}", "literal value"),
+                ("  {...row}  ", "  literal value  "),
+                ("{...row:4}", "lite"),
+                ("{...row} | {...row:4}", "literal value | lite"),
+            ] {
+                assert_eq!(
+                    process_row_template("test_org", template, &Alert::default(), row_type, &rows),
+                    vec![Value::String(expected.into())]
+                );
+            }
+        }
+        assert_eq!(
+            process_row_template(
+                "test_org",
+                r#"{"value":"{...row}","short":"{...row:4}"}"#,
+                &Alert::default(),
+                RowTemplateType::Json,
+                &rows,
+            ),
+            vec![json!({"value": "literal value", "short": "lite"})]
+        );
     }
 
     #[test]

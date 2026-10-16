@@ -186,7 +186,7 @@ pub(super) async fn handle_triggers(
 ) -> Result<(), anyhow::Error> {
     let started_at = now_micros();
     let read = read_config(&trigger).await;
-    let (_, max_retries) = get_scheduler_max_retries();
+    let max_retries = get_scheduler_max_retries();
     let pass = Pass::decide(read.as_ref(), trigger.retries, max_retries);
     let analysis = match &pass {
         Pass::Due(config) => {

@@ -111,8 +111,6 @@ function makeHarness(options: HarnessOptions = {}) {
   const store: AutoRunStore = {
     meta: {
       liveMode: options.liveMode ?? true,
-      nlpMode: false,
-      nlDetected: false,
       editorDirty: false,
       executed: null,
       pendingExecution: null,
@@ -257,21 +255,13 @@ afterEach(() => {
 
 describe("predicates", () => {
   it.each([
-    [false, false, false, false, false],
-    [false, true, false, false, false], // D1: stale oo_toggle_auto_run=true with AQE off
-    [true, false, false, false, false],
-    [true, true, false, false, true],
-    [true, true, true, false, false],
-    [true, true, true, true, true],
-    [true, true, false, true, true],
-  ])(
-    "isAutoRunActive(aqe=%s, liveMode=%s, nl=%s, nlpMode=%s) = %s",
-    (aqe, liveMode, nl, nlp, expected) => {
-      expect(
-        isAutoRunActive({ auto_query_enabled: aqe }, { liveMode, nlDetected: nl, nlpMode: nlp }),
-      ).toBe(expected);
-    },
-  );
+    [false, false, false],
+    [false, true, false], // D1: stale oo_toggle_auto_run=true with AQE off
+    [true, false, false],
+    [true, true, true],
+  ])("isAutoRunActive(aqe=%s, liveMode=%s) = %s", (aqe, liveMode, expected) => {
+    expect(isAutoRunActive({ auto_query_enabled: aqe }, { liveMode })).toBe(expected);
+  });
 
   it("D1: a stale liveMode never makes a time change run while AQE is off", () => {
     const h = makeHarness({ aqe: false, liveMode: true });
