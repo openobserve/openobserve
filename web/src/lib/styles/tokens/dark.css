@@ -407,6 +407,7 @@
   --color-select-border-error: var(--color-error-400);
   --color-select-content-bg: var(--color-surface-overlay);
   --color-select-content-border: var(--color-border-default);
+  --spacing-select-group-gap: 0.75rem;
   --color-select-item-hover-bg: var(--color-surface-accent-hover);
   --color-select-item-selected-bg: var(--color-surface-accent-active);
   --color-select-item-selected-text: var(--color-primary-200);
@@ -690,6 +691,7 @@
   --chart-area-fill-top-opacity: 1;
   --chart-area-fill-bottom-opacity: 1;
   --chart-metric-contrast-threshold: 0.8;
+  --chart-threshold-band-opacity: 0.5;
 }
 
 /* ── Theme-driven runtime tokens, dark mode (utils/theme.ts) ──

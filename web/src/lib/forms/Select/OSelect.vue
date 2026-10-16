@@ -388,7 +388,11 @@ watch(popoverOpen, (open) => {
 const nestedFilteredOptions = computed(() => {
   const base = baseFilteredOptions.value;
   if (!hasNestedOptions.value) return base;
-  if (isSearching.value) return base.filter((o) => !o.expandable);
+  if (isSearching.value) {
+    const flat = base.filter((o) => !o.expandable);
+    // A header kept only for a matching expandable row has nothing left under it.
+    return flat.filter((o, i) => !o.header || (flat[i + 1] !== undefined && !flat[i + 1].header));
+  }
   return base.filter((o) => o.parentKey === undefined || expandedParents.value.has(o.parentKey));
 });
 
@@ -858,33 +862,52 @@ function handleDropdownKeydown(e: KeyboardEvent) {
   }
 }
 
+// The group gap is a theme token, so the row height follows the theme without branching on it.
+const groupGapPx = ref(0);
+function readGroupGap() {
+  if (typeof document === "undefined" || typeof getComputedStyle === "undefined") return;
+  const style = getComputedStyle(document.documentElement);
+  const gap = parseFloat(style.getPropertyValue("--spacing-select-group-gap"));
+  const rootFontPx = parseFloat(style.fontSize) || 16;
+  groupGapPx.value = Number.isFinite(gap) ? gap * rootFontPx : 0;
+}
+watch(popoverOpen, (open) => {
+  if (open) readGroupGap();
+});
+const isSpacedHeader = (index: number) =>
+  index > 0 && filteredOptions.value[index]?.header === true;
+
 const virtualizer = useVirtualizer(
-  computed(() => ({
-    count: filteredOptions.value.length,
-    getScrollElement: () => listboxScrollEl.value,
-    estimateSize: (index: number) => {
-      const opt = filteredOptions.value[index];
-      if (!opt) return 28;
-      const hasSubLabel = !!opt.subLabel;
-      const isInline = !!opt.subLabelInline;
-      const hasPalette = !!opt.colorPalette?.length;
-      const hasBadge = !!opt.badge;
-      // Inline subLabel renders on the same line — single-row height.
-      if (hasSubLabel && isInline) return 28;
-      // py-2(16) + label(20) + gap(4) + 2-line subLabel(34) + gap(4) + gradient(6) = 84px
-      if (hasPalette && hasSubLabel) return 84;
-      // py-2(16) + label(20) + gap(4) + gradient(6) = 46px  — no subLabel
-      if (hasPalette) return 46;
-      // badge+subLabel: py-2(16) + label+badge(20) + gap(4) + 1-line subLabel(16) = 56px
-      if (hasBadge && hasSubLabel) return 56;
-      // py-2(16) + label(20) + gap(4) + 1-line subLabel(16) = 56px
-      if (hasSubLabel) return 56;
-      // badge is inline with label — same single-row height
-      if (hasBadge) return 28;
-      return 28;
-    },
-    overscan: 8,
-  })),
+  computed(() => {
+    const groupGap = groupGapPx.value;
+    return {
+      count: filteredOptions.value.length,
+      getScrollElement: () => listboxScrollEl.value,
+      estimateSize: (index: number) => {
+        const opt = filteredOptions.value[index];
+        if (!opt) return 28;
+        if (isSpacedHeader(index)) return 28 + groupGap;
+        const hasSubLabel = !!opt.subLabel;
+        const isInline = !!opt.subLabelInline;
+        const hasPalette = !!opt.colorPalette?.length;
+        const hasBadge = !!opt.badge;
+        // Inline subLabel renders on the same line — single-row height.
+        if (hasSubLabel && isInline) return 28;
+        // py-2(16) + label(20) + gap(4) + 2-line subLabel(34) + gap(4) + gradient(6) = 84px
+        if (hasPalette && hasSubLabel) return 84;
+        // py-2(16) + label(20) + gap(4) + gradient(6) = 46px  — no subLabel
+        if (hasPalette) return 46;
+        // badge+subLabel: py-2(16) + label+badge(20) + gap(4) + 1-line subLabel(16) = 56px
+        if (hasBadge && hasSubLabel) return 56;
+        // py-2(16) + label(20) + gap(4) + 1-line subLabel(16) = 56px
+        if (hasSubLabel) return 56;
+        // badge is inline with label — same single-row height
+        if (hasBadge) return 28;
+        return 28;
+      },
+      overscan: 8,
+    };
+  }),
 );
 
 /** Build a CSS linear-gradient string from an array of color stops. */
@@ -1557,6 +1580,7 @@ const fieldWidthClass = computed(() => {
                       v-for="vRow in virtualizer.getVirtualItems()"
                       :key="`${vRow.key}-${toRekaString(filteredOptions[vRow.index].value)}`"
                       :data-vrow="vRow.index"
+                      :class="isSpacedHeader(vRow.index) ? 'pt-select-group-gap' : undefined"
                       :style="{
                         position: 'absolute',
                         top: 0,

@@ -1,0 +1,531 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import { defineComponent, h, reactive, ref } from "vue";
+
+// JSDOM has no layout, so the real virtualizer renders no rows; render them all.
+vi.mock("@tanstack/vue-virtual", async () => {
+  const { computed: vueComputed, unref } = await import("vue");
+  return {
+    useVirtualizer: (options: any) =>
+      vueComputed(() => {
+        const count = unref(options).count;
+        return {
+          getVirtualItems: () =>
+            Array.from({ length: count }, (_, index) => ({
+              index,
+              key: index,
+              start: index * 28,
+              size: 28,
+              end: (index + 1) * 28,
+              lane: 0,
+            })),
+          getTotalSize: () => count * 28,
+          scrollToIndex: () => {},
+          measureElement: () => {},
+        };
+      }),
+  };
+});
+
+// JSDOM loads no stylesheet, so the status tokens need the values base.css gives them.
+vi.mock("@/utils/chartTheme", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, any>;
+  const status: Record<string, string> = {
+    "--color-success-500": "#22c55e",
+    "--color-amber-500": "#f59e0b",
+    "--color-error-500": "#ef4444",
+  };
+  return {
+    ...actual,
+    chartColor: (token: `--${string}`) => status[token] ?? actual.chartColor(token),
+  };
+});
+
+import ThresholdsConfig from "./ThresholdsConfig.vue";
+import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
+import { getColorPalette } from "@/utils/dashboard/colorPalette";
+
+const GREEN = "#22c55e";
+const AMBER = "#f59e0b";
+const RED = "#ef4444";
+const PALETTE = getColorPalette().slice(0, 5);
+
+type Props = Record<string, unknown>;
+
+let wrapper: VueWrapper<any> | undefined;
+
+afterEach(() => {
+  wrapper?.unmount();
+  wrapper = undefined;
+  document.body.innerHTML = "";
+});
+
+const mountConfig = (props: Props = {}) => {
+  wrapper = mount(ThresholdsConfig, {
+    attachTo: document.body,
+    props: { chartType: "line", unit: "milliseconds", ...props },
+    global: { plugins: [i18n, store] },
+  });
+  return wrapper;
+};
+
+// A parent that writes every emit back, like ConfigPanel does with the panel config.
+const mountBound = (initialProps: Props = {}, initial?: Record<string, unknown>) => {
+  const props = reactive<Props>({ ...initialProps });
+  const model = ref<any>(initial);
+  const emits: unknown[] = [];
+  const Parent = defineComponent({
+    setup: () => () =>
+      h(ThresholdsConfig, {
+        chartType: "line",
+        unit: "milliseconds",
+        ...props,
+        modelValue: model.value,
+        "onUpdate:modelValue": (value: unknown) => {
+          emits.push(value);
+          model.value = value;
+        },
+      }),
+  });
+  wrapper = mount(Parent, { attachTo: document.body, global: { plugins: [i18n, store] } });
+  return { model, emits, props };
+};
+
+const find = (test: string) => wrapper!.find(`[data-test="${test}"]`);
+const stepInput = (index: number) => find(`dashboard-config-thresholds-step-${index}-value-field`);
+const stepText = (index: number) => find(`dashboard-config-thresholds-step-${index}`).text();
+const addStep = async () => {
+  await find("dashboard-config-thresholds-add-step").trigger("click");
+  await flushPromises();
+};
+const typeStep = async (index: number, text: string) => {
+  await stepInput(index).trigger("focus");
+  await stepInput(index).setValue(text);
+  await flushPromises();
+};
+// Blur plus a focusout whose next target is outside the step list (or the given element).
+const blurStep = async (index: number, next: Element | null = null) => {
+  const input = stepInput(index).element;
+  await stepInput(index).trigger("blur");
+  input.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: next }));
+  await flushPromises();
+};
+const selectOptions = async () => {
+  await find("dashboard-config-thresholds-show-as-trigger").trigger("click");
+  await flushPromises();
+  return [
+    ...document.body.querySelectorAll<HTMLElement>(
+      '[data-test="dashboard-config-thresholds-show-as-option"]',
+    ),
+  ].map((el) => el.dataset.testValue);
+};
+
+const twoSteps = {
+  mode: "absolute",
+  showAs: "color_line",
+  steps: [
+    { value: 500, color: AMBER },
+    { value: 1000, color: RED },
+  ],
+};
+
+describe("ThresholdsConfig", () => {
+  describe("the rule: nothing is written until a step exists", () => {
+    it("never emits on mount, with or without thresholds", async () => {
+      mountConfig();
+      await flushPromises();
+      expect(wrapper!.emitted("update:modelValue")).toBeUndefined();
+      wrapper!.unmount();
+      mountConfig({ modelValue: twoSteps });
+      await flushPromises();
+      expect(wrapper!.emitted("update:modelValue")).toBeUndefined();
+    });
+
+    it("keeps Mode, Show as and Base picked before the first step, and writes them with it", async () => {
+      const { emits, model } = mountBound();
+      await find("dashboard-config-thresholds-mode-percentage").trigger("click");
+      await find("dashboard-config-thresholds-base-color-swatch-0").trigger("click");
+      await flushPromises();
+      expect(emits).toEqual([]);
+      await addStep();
+      expect(model.value).toEqual({
+        mode: "percentage",
+        showAs: "color_line",
+        baseColor: GREEN,
+        steps: [{ value: 80, color: AMBER }],
+      });
+    });
+
+    it("emits undefined when the last step is removed", async () => {
+      const { emits, model } = mountBound({}, { ...twoSteps, steps: [twoSteps.steps[0]] });
+      await find("dashboard-config-thresholds-step-0-remove").trigger("click");
+      await flushPromises();
+      expect(emits).toEqual([undefined]);
+      expect(model.value).toBeUndefined();
+      expect(find("dashboard-config-thresholds-empty").exists()).toBe(true);
+    });
+
+    it("omits baseColor when None is picked and showAs on gauge and metric", async () => {
+      const { model } = mountBound({ chartType: "gauge" }, { ...twoSteps, baseColor: GREEN });
+      await find("dashboard-config-thresholds-base-color-none").trigger("click");
+      await flushPromises();
+      expect(model.value).toEqual({ mode: "absolute", steps: twoSteps.steps });
+      expect("baseColor" in model.value).toBe(false);
+    });
+  });
+
+  describe("adding and removing steps", () => {
+    it("adds each step above the highest, amber then red then the palette", async () => {
+      const { model } = mountBound();
+      await addStep();
+      await addStep();
+      await addStep();
+      await addStep();
+      expect(model.value.steps).toEqual([
+        { value: 80, color: AMBER },
+        { value: 90, color: RED },
+        { value: 100, color: PALETTE[0] },
+        { value: 200, color: PALETTE[1] },
+      ]);
+      expect(model.value).toEqual({
+        mode: "absolute",
+        showAs: "color_line",
+        steps: model.value.steps,
+      });
+    });
+
+    it("caps a new percentage step at 100", async () => {
+      const { model } = mountBound(
+        {},
+        { mode: "percentage", steps: [{ value: 95, color: AMBER }] },
+      );
+      await addStep();
+      expect(model.value.steps[1].value).toBe(100);
+    });
+
+    it("focuses the new step's value so it can be typed over", async () => {
+      mountBound();
+      await addStep();
+      expect(document.activeElement).toBe(stepInput(0).element);
+    });
+
+    it("removes the clicked step only", async () => {
+      const { model } = mountBound({}, twoSteps);
+      await find("dashboard-config-thresholds-step-0-remove").trigger("click");
+      await flushPromises();
+      expect(model.value.steps).toEqual([{ value: 1000, color: RED }]);
+    });
+  });
+
+  describe("typing values", () => {
+    it("stores the raw number of a typed unit and echoes it", async () => {
+      const { model } = mountBound();
+      await addStep();
+      await typeStep(0, "500 ms");
+      await blurStep(0);
+      await addStep();
+      await typeStep(1, "1 s");
+      await blurStep(1);
+      expect(model.value.steps).toEqual([
+        { value: 500, color: AMBER },
+        { value: 1000, color: RED },
+      ]);
+      expect(stepText(0)).toContain("= 500.00ms (raw 500)");
+      expect(stepText(1)).toContain("= 1.00s (raw 1000)");
+    });
+
+    it("shows the stored value in the panel unit once the field is left", async () => {
+      mountBound({}, twoSteps);
+      expect((stepInput(0).element as HTMLInputElement).value).toBe("500ms");
+      expect((stepInput(1).element as HTMLInputElement).value).toBe("1s");
+    });
+
+    it("treats a bare number as raw", async () => {
+      const { model } = mountBound({ unit: "bytes" }, twoSteps);
+      await typeStep(0, "2048");
+      expect(model.value.steps[0].value).toBe(2048);
+      expect(stepText(0)).toContain("= 2.00KB (raw 2048)");
+    });
+
+    it("shows an inline error for text that does not fit and saves nothing", async () => {
+      const { emits } = mountBound({}, twoSteps);
+      await typeStep(0, "4 GB");
+      expect(emits).toEqual([]);
+      expect(find("dashboard-config-thresholds-step-0-value-error").exists()).toBe(true);
+      expect(stepText(0)).toContain("does not fit this unit");
+      await typeStep(0, "abc");
+      expect(stepText(0)).toContain("Type a number, like 500 ms");
+      await blurStep(0);
+      expect((stepInput(0).element as HTMLInputElement).value).toBe("abc");
+      expect(emits).toEqual([]);
+    });
+
+    it("restores the stored value when the field is left empty", async () => {
+      const { emits } = mountBound({}, twoSteps);
+      await typeStep(0, "");
+      await blurStep(0);
+      expect(emits).toEqual([]);
+      expect((stepInput(0).element as HTMLInputElement).value).toBe("500ms");
+    });
+
+    it("sorts rows ascending by value on blur, not while typing", async () => {
+      const { model } = mountBound({}, twoSteps);
+      await typeStep(1, "200 ms");
+      expect(model.value.steps.map((s: any) => s.value)).toEqual([500, 200]);
+      await blurStep(1);
+      expect(model.value.steps).toEqual([
+        { value: 200, color: RED },
+        { value: 500, color: AMBER },
+      ]);
+      expect((stepInput(0).element as HTMLInputElement).value).toBe("200ms");
+    });
+
+    it("waits for a click to finish before sorting, so the clicked swatch colours its own row", async () => {
+      const { model } = mountBound({}, twoSteps);
+      await typeStep(1, "200 ms");
+      const root = find("dashboard-config-thresholds").element;
+      root.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+      await blurStep(1);
+      expect(model.value.steps.map((s: any) => s.value)).toEqual([500, 200]);
+      await find("dashboard-config-thresholds-step-1-color-swatch-0").trigger("click");
+      document.dispatchEvent(new Event("pointerup"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await flushPromises();
+      expect(model.value.steps).toEqual([
+        { value: 200, color: GREEN },
+        { value: 500, color: AMBER },
+      ]);
+    });
+  });
+
+  describe("unit change", () => {
+    it("re-reads typed text that did not fit the old unit", async () => {
+      const { model, props } = mountBound({}, twoSteps);
+      await typeStep(0, "4 GB");
+      expect(stepText(0)).toContain("does not fit this unit");
+      props.unit = "bytes";
+      await flushPromises();
+      expect(model.value.steps[0].value).toBe(4294967296);
+      expect(find("dashboard-config-thresholds-step-0-value-error").exists()).toBe(false);
+    });
+
+    it("keeps the error, with the new unit hints, when the text still does not fit", async () => {
+      mountConfig({ modelValue: twoSteps });
+      await typeStep(0, "4 GB");
+      await wrapper!.setProps({ unit: "seconds" });
+      await flushPromises();
+      expect(stepText(0)).toContain("does not fit this unit");
+    });
+  });
+
+  describe("fix round 2", () => {
+    it("keeps the last valid value while the text is invalid, so a half-typed 4 never reaches the chart", async () => {
+      const { model } = mountBound({}, twoSteps);
+      await typeStep(0, "4");
+      expect(model.value.steps[0].value).toBe(4);
+      await stepInput(0).setValue("4 GB");
+      await flushPromises();
+      expect(model.value.steps[0].value).toBe(500);
+      await blurStep(0);
+      expect(model.value.steps[0].value).toBe(500);
+      expect((stepInput(0).element as HTMLInputElement).value).toBe("4 GB");
+    });
+
+    it("does not re-sort while focus moves between step fields", async () => {
+      const { model } = mountBound({}, twoSteps);
+      await typeStep(0, "2 s");
+      await blurStep(0, stepInput(1).element);
+      expect(model.value.steps.map((s: any) => s.value)).toEqual([2000, 1000]);
+      await typeStep(1, "3 s");
+      expect(model.value.steps.map((s: any) => s.value)).toEqual([2000, 3000]);
+      await blurStep(1);
+      expect(model.value.steps.map((s: any) => s.value)).toEqual([2000, 3000]);
+      await typeStep(1, "1 s");
+      await blurStep(1);
+      expect(model.value.steps.map((s: any) => s.value)).toEqual([1000, 2000]);
+    });
+
+    it.each([
+      ["percent-1", undefined, [0.8, 0.9, 1, 1]],
+      ["percent", undefined, [80, 90, 100, 100]],
+      ["milliseconds", "percentage", [80, 90, 100, 100]],
+      ["milliseconds", undefined, [80, 90, 100, 200]],
+      ["bytes", undefined, [80, 90, 100, 200]],
+    ])("adds sensible defaults on %s (%s mode)", async (unit, mode, expected) => {
+      const { model } = mountBound({ unit }, mode ? { mode, steps: [] } : undefined);
+      for (let i = 0; i < 4; i++) await addStep();
+      expect(model.value.steps.map((s: any) => s.value)).toEqual(expected);
+    });
+
+    it("steps a large previous value by its magnitude", async () => {
+      const { model } = mountBound(
+        { unit: "bytes" },
+        { steps: [{ value: 4294967296, color: AMBER }] },
+      );
+      await addStep();
+      expect(model.value.steps[1].value).toBe(5294967296);
+    });
+  });
+
+  describe("colour pickers", () => {
+    it("offers None on the base row, selected by default, and none on step rows", () => {
+      mountConfig({ modelValue: twoSteps });
+      const none = find("dashboard-config-thresholds-base-color-none");
+      expect(none.exists()).toBe(true);
+      expect(none.attributes("aria-pressed")).toBe("true");
+      expect(find("dashboard-config-thresholds-step-0-color-none").exists()).toBe(false);
+      expect(find("dashboard-config-thresholds-step-1-color-none").exists()).toBe(false);
+    });
+
+    it("offers green, amber, red and five palette colours", () => {
+      mountConfig({ modelValue: twoSteps });
+      const swatches = wrapper!
+        .findAll('[data-test^="dashboard-config-thresholds-step-0-color-swatch-"]')
+        .map((el) => el.attributes("aria-label"));
+      expect(swatches).toEqual([GREEN, AMBER, RED, ...PALETTE]);
+    });
+
+    it("writes the picked hex for a step and for the base", async () => {
+      const { model } = mountBound({}, twoSteps);
+      await find("dashboard-config-thresholds-step-1-color-swatch-3").trigger("click");
+      await find("dashboard-config-thresholds-base-color-swatch-0").trigger("click");
+      await flushPromises();
+      expect(model.value.steps[1].color).toBe(PALETTE[0]);
+      expect(model.value.baseColor).toBe(GREEN);
+    });
+
+    it("captions None by chart type", () => {
+      mountConfig({ chartType: "line" });
+      expect(find("dashboard-config-thresholds-base").text()).toContain(
+        "None: each series keeps its own color",
+      );
+      wrapper!.unmount();
+      mountConfig({ chartType: "metric" });
+      expect(find("dashboard-config-thresholds-base").text()).toContain(
+        "None: uses the Background color",
+      );
+    });
+  });
+
+  describe("mode", () => {
+    it("disables Percentage on metric with the reason", () => {
+      mountConfig({ chartType: "metric" });
+      const item = find("dashboard-config-thresholds-mode-percentage");
+      expect(item.attributes("disabled")).toBeDefined();
+      expect(
+        find("dashboard-config-thresholds-mode-absolute").attributes("disabled"),
+      ).toBeUndefined();
+    });
+
+    it("reads 0 to 100 in Percentage mode and echoes the share of the range", async () => {
+      const { model, emits } = mountBound(
+        { chartType: "gauge" },
+        { mode: "percentage", steps: [{ value: 70, color: AMBER }] },
+      );
+      expect((stepInput(0).element as HTMLInputElement).value).toBe("70%");
+      await typeStep(0, "80");
+      expect(model.value.steps[0].value).toBe(80);
+      expect(stepText(0)).toContain("= 80% of range");
+      await typeStep(0, "120");
+      expect(stepText(0)).toContain("Type a percentage from 0 to 100");
+      expect(emits).toHaveLength(1);
+    });
+
+    it("switches the whole list between Absolute and Percentage", async () => {
+      const { model } = mountBound({}, twoSteps);
+      await find("dashboard-config-thresholds-mode-percentage").trigger("click");
+      await flushPromises();
+      expect(model.value.mode).toBe("percentage");
+      expect(model.value.steps).toEqual(twoSteps.steps);
+    });
+  });
+
+  describe("Show as", () => {
+    it.each(["line", "area", "bar", "h-bar", "scatter"])(
+      "offers four choices on %s",
+      async (chartType) => {
+        mountConfig({ chartType, modelValue: twoSteps });
+        expect(await selectOptions()).toEqual(["color_line", "color", "line", "color_band"]);
+      },
+    );
+
+    it("offers only Limit line and Shaded band on stacked area, with the hint", async () => {
+      mountConfig({ chartType: "area-stacked", modelValue: twoSteps });
+      expect(find("dashboard-config-thresholds").text()).toContain(
+        "Stacked areas are not recolored; limits are drawn as lines or bands.",
+      );
+      expect(await selectOptions()).toEqual(["line", "color_band"]);
+    });
+
+    it("writes Limit line only as the stacked-area default", async () => {
+      const { model } = mountBound({ chartType: "area-stacked" });
+      await addStep();
+      expect(model.value.showAs).toBe("line");
+    });
+
+    it("writes the picked choice", async () => {
+      const { model } = mountBound({}, twoSteps);
+      await selectOptions();
+      document.body
+        .querySelector<HTMLElement>(
+          '[data-test="dashboard-config-thresholds-show-as-option"][data-test-value="color_band"]',
+        )!
+        .click();
+      await flushPromises();
+      expect(model.value.showAs).toBe("color_band");
+    });
+
+    it.each(["bar", "h-bar", "scatter"])(
+      "allows Percentage and writes showAs on %s",
+      async (chartType) => {
+        const { model } = mountBound({ chartType });
+        expect(
+          find("dashboard-config-thresholds-mode-percentage").attributes("disabled"),
+        ).toBeUndefined();
+        await find("dashboard-config-thresholds-mode-percentage").trigger("click");
+        await addStep();
+        expect(model.value).toEqual({
+          mode: "percentage",
+          showAs: "color_line",
+          steps: [{ value: 80, color: AMBER }],
+        });
+      },
+    );
+
+    it.each(["gauge", "metric"])("is hidden on %s", (chartType) => {
+      mountConfig({ chartType });
+      expect(find("dashboard-config-thresholds-show-as").exists()).toBe(false);
+    });
+  });
+
+  describe("metric value mappings note", () => {
+    it("shows only on metric with coloured value mappings", () => {
+      mountConfig({ chartType: "metric", hasColouredValueMappings: true });
+      expect(find("dashboard-config-thresholds-mapping-note").text()).toBe(
+        "Value mappings win over these steps",
+      );
+      wrapper!.unmount();
+      mountConfig({ chartType: "metric", hasColouredValueMappings: false });
+      expect(find("dashboard-config-thresholds-mapping-note").exists()).toBe(false);
+      wrapper!.unmount();
+      mountConfig({ chartType: "gauge", hasColouredValueMappings: true });
+      expect(find("dashboard-config-thresholds-mapping-note").exists()).toBe(false);
+    });
+  });
+});

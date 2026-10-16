@@ -193,6 +193,8 @@
   --color-tabs-bar-border: var(--color-border-default);
   --spacing-tabs-height: var(--spacing-10);
   --spacing-tabs-height-dense: var(--spacing-8);
+  /* Space above every OSelect group header but the first; dark.css opens it up. */
+  --spacing-select-group-gap: 0rem;
 
   /* Card */
   --color-card-bg: var(--color-surface-panel);
@@ -1475,6 +1477,7 @@
   --color-tabs-bar-border: var(--color-tabs-bar-border);
   --spacing-tabs-height: var(--spacing-tabs-height);
   --spacing-tabs-height-dense: var(--spacing-tabs-height-dense);
+  --spacing-select-group-gap: var(--spacing-select-group-gap);
 
   /* Field semantic widths (used by OInput, OTextarea, OSelect) */
   --spacing-field-width-xs: var(--spacing-field-width-xs);
