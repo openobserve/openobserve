@@ -87,8 +87,14 @@ pub async fn run(ctx: &TraceSearchContext, plan: &TraceListPlan) -> Result<Trace
     if response.hits.is_empty() {
         return Ok(TraceListResult::Empty(Box::new(response)));
     }
-    let mut batch = TraceBatch::from_hits(&response.hits, options.range);
-    drop(response);
+    let hits = ctx
+        .summarize_traces(plan, &request, response.hits, options.range)
+        .await
+        .inspect_err(|error| {
+            log::error!("get traces latest full-summary error: {error:?}");
+        })?;
+    let mut batch = TraceBatch::from_hits(&hits, options.range);
+    drop(hits);
     // Unlike streaming, the breakdown keeps the requested range instead of the widened batch.range.
     ctx.fill_services(&mut batch, &request, &plan.columns, options.range)
         .await

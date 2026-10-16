@@ -649,6 +649,8 @@ async fn merge_matrix_query(
     }
     let mut merged_data = merged_data
         .into_iter()
+        // Prometheus never answers a range query with a series that has no samples
+        .filter(|(_, samples)| !samples.is_empty())
         .map(|(sig, samples)| {
             let mut samples = samples
                 .into_iter()
@@ -895,6 +897,37 @@ mod tests {
                 vec![(1_000_000, 1.0), (2_000_000, 2.0), (3_000_000, 3.0)]
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_merge_matrix_drops_series_without_samples() {
+        let mut response = cluster_rpc::MetricsQueryResponse::default();
+        grpc::add_value(
+            &mut response,
+            Value::Range(RangeValue::new(
+                vec![Arc::new(Label::new("pod", "recovered"))],
+                Vec::<Sample>::new(),
+            )),
+        );
+        grpc::add_value(
+            &mut response,
+            Value::Range(RangeValue::new(
+                vec![Arc::new(Label::new("pod", "waiting"))],
+                vec![Sample::new(1_000_000, 1.0)],
+            )),
+        );
+
+        let value = merge_matrix_query(&response.series, "test_merge_empty_series", &mut vec![])
+            .await
+            .unwrap();
+        let Value::Matrix(matrix) = value else {
+            panic!("expected matrix result");
+        };
+        assert_eq!(matrix.len(), 1);
+        assert_eq!(
+            matrix[0].labels,
+            vec![Arc::new(Label::new("pod", "waiting"))]
+        );
     }
 
     #[tokio::test]

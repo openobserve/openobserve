@@ -141,6 +141,10 @@ export const oncallKeys = {
   myOnCall: (org: string) => orgKey(org, "oncall", "my", "teams"),
   myDeliveries: (org: string, filters: Record<string, unknown> = {}) =>
     orgKey(org, "oncall", "my", "deliveries", stableFilters(filters)),
+  /** Every member's contact; a provider change moves `phone_provider_available` on all of them. */
+  contactsAll: (org: string) => orgKey(org, "oncall", "contacts"),
+  contact: (org: string, userEmail: string) => orgKey(org, "oncall", "contacts", userEmail),
+  telephony: (org: string) => orgKey(org, "oncall", "telephony"),
 
   routingConfig: (org: string) => orgKey(org, "oncall", "routing", "config"),
 };

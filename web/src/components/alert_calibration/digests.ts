@@ -22,7 +22,8 @@ export const RUNS_LOOKBACK_DAYS = 14;
 
 const MICROS_PER_DAY = 86_400_000_000;
 
-export type RuleId = "failure" | "no_destination" | "noise" | "notify_failed" | "silent";
+export type RuleId =
+  "failure" | "no_destination" | "noise" | "notify_failed" | "scheduler_health" | "silent";
 export type Severity = "Info" | "Low" | "Medium" | "High";
 export type Confidence = "Low" | "Medium" | "High";
 
@@ -69,6 +70,14 @@ export type FindingRecord = DigestRecord &
   Required<Pick<DigestRecord, "rule_id" | "severity" | "confidence" | "title" | "actions">>;
 
 export type CoverageVerdict = "none" | "gap" | "full";
+
+/** One org or hour a cluster finding lists; the digest stores each list as one JSON column. */
+export interface LagRow {
+  key: string | number;
+  skipped_windows: number;
+  late_evaluations: number;
+  evaluations: number;
+}
 
 const COVERAGE_COLUMNS: (keyof Coverage)[] = [
   "coverage_unreadable_definitions",
@@ -164,6 +173,30 @@ const findingOrder = (a: FindingRecord, b: FindingRecord) =>
   a.rule_id.localeCompare(b.rule_id) ||
   (a.alert_name ?? "").localeCompare(b.alert_name ?? "");
 
+export interface RuleGroup {
+  rule_id: RuleId;
+  /** In severity order, as `latestEmission` sorts them. */
+  findings: FindingRecord[];
+  severity: Severity | null;
+}
+
+/** Every rule, worst first, so a rule that flagged nothing still shows as clear rather than missing. */
+export function findingsByRule(rules: RuleId[], findings: FindingRecord[]): RuleGroup[] {
+  const rank = (s: Severity | null) => (s ? SEVERITY_RANK[s] + 1 : 0);
+  return rules
+    .map((rule_id) => {
+      const mine = findings.filter((f) => f.rule_id === rule_id);
+      return { rule_id, findings: mine, severity: mine[0]?.severity ?? null };
+    })
+    .sort((a, b) => rank(b.severity) - rank(a.severity) || b.findings.length - a.findings.length);
+}
+
+/** A title restates the alert's name, which a row that already shows the name can drop. */
+export const titleAfterName = (f: FindingRecord): string =>
+  f.alert_name && f.title.startsWith(f.alert_name)
+    ? f.title.slice(f.alert_name.length).trimStart()
+    : f.title;
+
 export const latestRun = (rows: RunRow[]): RunRow | null =>
   rows.reduce<RunRow | null>((a, b) => (!a || b.window_end > a.window_end ? b : a), null);
 
@@ -171,12 +204,37 @@ export const latestRun = (rows: RunRow[]): RunRow | null =>
 export const isClean = (row: RunRow) =>
   row.finding_count === 0 && !row.coverage_gap && row.skip_count === 0;
 
+/** A missing or malformed column lists nothing, and a row without a usable key is dropped. */
+export function parseLagRows(value: unknown, keyField: "org_id" | "hour_start_micros"): LagRow[] {
+  if (typeof value !== "string" || value === "") return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+    .filter((item) =>
+      keyField === "org_id"
+        ? typeof item.org_id === "string" && item.org_id.trim() !== ""
+        : Number.isFinite(item.hour_start_micros),
+    )
+    .map((item) => ({
+      key: item[keyField] as string | number,
+      skipped_windows: Number(item.skipped_windows) || 0,
+      late_evaluations: Number(item.late_evaluations) || 0,
+      evaluations: Number(item.evaluations) || 0,
+    }));
+}
+
 export function coverageVerdict(row: RunRow): CoverageVerdict {
   if (row.coverage_stream_substrate_empty) return "none";
   return row.coverage_gap ? "gap" : "full";
 }
 
-/** Every coverage column off its default, including the two `coverage_gap` does not count. */
+/** Every coverage column off its default, including the ones `coverage_gap` does not count. */
 export function coverageNotes(t: TranslateFn, row: RunRow): I18nText[] {
   const notes: I18nText[] = [];
   if (row.coverage_stream_substrate_empty)

@@ -216,7 +216,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         requires: "alertList",
         gate: "alertCalibration",
         activeOnRoutes: [
-          "alertCalibrationDashboard",
+          "alertCalibrationRuns",
           "alertCalibrationDigest",
           "alertCalibrationSettings",
         ],
