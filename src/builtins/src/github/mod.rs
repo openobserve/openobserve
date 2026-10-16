@@ -24,11 +24,10 @@
 //!
 //! # async fn example() -> Result<(), openobserve_builtins::github::GitHubError> {
 //! let service = GitHubDataService::new();
-//! let data = service
-//!     .fetch_json::<Vec<serde_json::Value>>(
-//!         "https://raw.githubusercontent.com/openobserve/sdr_patterns/main/regex.json",
-//!     )
+//! let bytes = service
+//!     .fetch_raw("https://raw.githubusercontent.com/openobserve/sdr_patterns/main/regex.json")
 //!     .await?;
+//! let data: Vec<serde_json::Value> = serde_json::from_slice(&bytes).unwrap();
 //! # Ok(())
 //! # }
 //! ```

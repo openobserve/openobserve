@@ -1,6 +1,7 @@
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import { withFeatureGate } from "@/utils/enterpriseFeatures";
+import { oncallRouteGuard } from "./oncallRouteGuard";
 
 const Settings = () => import("@/components/settings/index.vue");
 
@@ -207,6 +208,16 @@ const useManagementRoutes = () => {
           },
           component: () => import("@/components/alerts/PipelinesDestinationList.vue"),
           beforeEnter: withFeatureGate("pipelineDestinations", routeGuard),
+        },
+        // Its API is mounted with on-call's, so the page exists only where on-call is on.
+        {
+          path: "telephony",
+          name: "telephonySettings",
+          meta: {
+            titleKey: "telephony.title",
+          },
+          component: () => import("@/components/settings/TelephonySettings.vue"),
+          beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
         },
         {
           path: "storage_settings",

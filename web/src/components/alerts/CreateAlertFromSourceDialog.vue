@@ -41,16 +41,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onConfirm"
   >
     <div v-if="prefill" class="flex flex-col gap-5">
-      <!-- Query picker — only when the surface had several queries and could not tell which. -->
-      <OSelect
-        v-if="queryOptions.length > 1"
-        :model-value="prefill.queryIndex"
-        :options="queryOptions"
-        :label="t('alerts.prefill.dialog.queryChoiceLabel')"
-        :searchable="false"
-        data-test="create-alert-query-picker"
-        @update:model-value="onQueryChange"
-      />
+      <div v-if="queryOptions.length > 1" class="flex flex-col gap-2">
+        <label
+          v-if="pickQueryOnly"
+          :for="queryPickerId"
+          class="text-text-body text-sm"
+          data-test="create-alert-query-picker-intro"
+        >
+          {{ t("alerts.prefill.dialog.pickQueryIntro") }}
+        </label>
+        <OSelect
+          :id="queryPickerId"
+          :model-value="prefill.queryIndex"
+          :options="queryOptions"
+          :label="pickQueryOnly ? undefined : t('alerts.prefill.dialog.queryChoiceLabel')"
+          :searchable="false"
+          :dropdown-style="QUERY_PICKER_DROPDOWN"
+          data-test="create-alert-query-picker"
+          @update:model-value="onQueryChange"
+        />
+      </div>
+
+      <div v-if="pickQueryOnly && pickedQuery" data-test="create-alert-picked-query">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold tracking-wider">
+            {{ t("alerts.prefill.dialog.queryLabel") }}
+          </span>
+          <OButton
+            variant="ghost-primary"
+            size="sm"
+            icon-left="content-copy"
+            data-test="create-alert-picked-query-copy"
+            @click="copyToClipboard(pickedQuery, t)"
+          >
+            {{ t("common.copy") }}
+          </OButton>
+        </div>
+        <div
+          class="rounded-default bg-theme-body-bg-primary border-card-glass-border [&::-webkit-scrollbar-thumb]:bg-border-default [&::-webkit-scrollbar-thumb:hover]:bg-border-strong mt-1 max-h-40 [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap [&::-webkit-scrollbar]:size-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
+          data-test="create-alert-picked-query-text"
+          v-html="pickedQueryHtml"
+        ></div>
+      </div>
 
       <!-- Stream picker — only when the surface offered a choice. Alerts are
            single-stream; silently taking the first one is a trap. -->
@@ -116,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- How the alert counts what the query returns. -->
-      <div class="flex flex-col gap-2">
+      <div v-if="!pickQueryOnly" class="flex flex-col gap-2">
         <span class="text-text-secondary text-xs font-medium">
           {{ t("alerts.prefill.dialog.thresholdLabel") }}
         </span>
@@ -136,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- The rolling window the alert will evaluate. -->
-      <div v-if="prefill.periodMinutes" class="flex flex-col gap-1">
+      <div v-if="!pickQueryOnly && prefill.periodMinutes" class="flex flex-col gap-1">
         <span class="text-text-secondary text-xs font-medium">
           {{ t("alerts.prefill.dialog.windowLabel") }}
         </span>
@@ -162,9 +194,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Every lossy transform the adapters performed, stated plainly. -->
-      <div v-if="prefill.warnings.length" class="flex flex-col gap-2">
+      <div v-if="shownWarnings.length" class="flex flex-col gap-2">
         <OBanner
-          v-for="(warning, index) in prefill.warnings"
+          v-for="(warning, index) in shownWarnings"
           :key="`${warning.key}-${index}`"
           dense
           :variant="bannerVariant(warning.level)"
@@ -177,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, useId, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
@@ -187,6 +219,10 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { useColorizedQuery } from "@/composables/useColorizedQuery";
+import { copyToClipboard } from "@/utils/clipboard";
+import { escapeHtml } from "@/utils/html";
 import type {
   AlertBuildOptions,
   AlertPatternMode,
@@ -199,7 +235,7 @@ import { isPrefillBlocked } from "@/utils/alerts/alertPrefill";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { formatSqlForDisplay } from "@/utils/query/formatSql";
 
-const QUERY_LABEL_MAX = 60;
+const QUERY_PICKER_DROPDOWN = { width: "var(--reka-select-trigger-width)" };
 
 const props = defineProps<{
   open: boolean;
@@ -238,17 +274,50 @@ const onPatternModeChange = (value: unknown) => {
 
 const queryOptions = computed(() =>
   (props.prefill?.queryChoices ?? []).map((choice) => {
-    const query = choice.query.replace(/\s+/g, " ").trim();
     return {
       value: choice.index,
       label: t("alerts.prefill.dialog.queryChoiceOption", {
         name:
           choice.tabName || choice.legend || choice.ref || String.fromCharCode(65 + choice.index),
-        query: query.length > QUERY_LABEL_MAX ? `${query.slice(0, QUERY_LABEL_MAX - 1)}…` : query,
+        query: choice.query.replace(/\s+/g, " ").trim(),
       }),
     };
   }),
 );
+
+const queryPickerId = useId();
+
+const pickQueryOnly = computed(
+  () =>
+    !!props.prefill &&
+    !!getAlertSource(props.prefill.source).pickQueryOnly &&
+    queryOptions.value.length > 1,
+);
+
+// Non-blocking warnings still ride the prefill to the form's banner; only a blocker must stop here.
+const shownWarnings = computed(() => {
+  const warnings = props.prefill?.warnings ?? [];
+  return pickQueryOnly.value ? warnings.filter((w) => w.level === "blocking") : warnings;
+});
+
+/** The executed text of the picked query, as the option tooltip shows it but with its own line breaks. */
+const pickedQuery = computed(
+  () =>
+    props.prefill?.queryChoices?.find((choice) => choice.index === props.prefill?.queryIndex)
+      ?.query ?? "",
+);
+
+const pickedQueryColoured = useColorizedQuery(
+  () => ({
+    query: pickQueryOnly.value ? pickedQuery.value : "",
+    language: props.prefill?.queryType === "promql" ? "promql" : "sql",
+  }),
+  // Loaded on demand: the colorizer pulls in Monaco, and this dialog sits in the app shell.
+  (query, language) =>
+    import("@/utils/query/colorizeQuery").then((module) => module.colorizeQuery(query, language)),
+);
+
+const pickedQueryHtml = computed(() => pickedQueryColoured.value || escapeHtml(pickedQuery.value));
 
 const onQueryChange = (value: unknown) => {
   if (typeof value !== "number" || value === props.prefill?.queryIndex) return;
@@ -256,7 +325,7 @@ const onQueryChange = (value: unknown) => {
 };
 
 const showQuery = computed(() => {
-  if (!props.prefill) return false;
+  if (!props.prefill || pickQueryOnly.value) return false;
   return getAlertSource(props.prefill.source).showQueryPreview && !!previewQuery.value;
 });
 

@@ -599,7 +599,7 @@ dependencies = [
  "arrow-select",
  "flatbuffers",
  "lz4_flex 0.14.0",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -1045,7 +1045,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "chrono",
  "config",
  "log",
  "o2_enterprise",
@@ -1900,7 +1899,7 @@ dependencies = [
  "arrayvec",
  "cc",
  "cfg-if",
- "constant_time_eq",
+ "constant_time_eq 0.4.2",
  "cpufeatures 0.3.0",
 ]
 
@@ -2697,8 +2696,8 @@ dependencies = [
  "flate2",
  "liblzma",
  "memchr",
- "zstd",
- "zstd-safe",
+ "zstd 0.13.3",
+ "zstd-safe 7.2.4",
 ]
 
 [[package]]
@@ -2903,6 +2902,15 @@ name = "constant_time_eq"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
+
+[[package]]
+name = "constant_time_eq"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9eb6feb175df65d0a3ccd3e73484e940d0ac664e8034f0519fd49a93db3071d9"
+dependencies = [
+ "rustversion",
+]
 
 [[package]]
 name = "convert_case"
@@ -3378,7 +3386,7 @@ dependencies = [
  "tokio",
  "url",
  "uuid",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -3502,7 +3510,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "url",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -4594,7 +4602,6 @@ dependencies = [
  "compaction",
  "config",
  "csv",
- "datafusion",
  "db",
  "enrichment",
  "futures",
@@ -6806,9 +6813,9 @@ dependencies = [
 
 [[package]]
 name = "lzma-rust2"
-version = "0.16.5"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca93e534d1142d1d0dcca6d25fe302508a5dfb40b302802904577725ea0b695b"
+checksum = "fde178a3caf126c440fa15628147772d8ee590a39477d711353fbe2e58a73a5b"
 dependencies = [
  "sha2 0.11.0",
 ]
@@ -6982,7 +6989,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -7977,8 +7984,8 @@ dependencies = [
  "web",
  "webpki-roots 1.0.9",
  "x509-parser",
- "zip 8.6.0",
- "zstd",
+ "zip 9.0.3",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -8107,7 +8114,7 @@ dependencies = [
  "url",
  "utoipa",
  "utoipa-swagger-ui",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -8195,7 +8202,7 @@ dependencies = [
  "usage_reporting",
  "utoipa",
  "uuid",
- "zip 8.6.0",
+ "zip 9.0.3",
 ]
 
 [[package]]
@@ -8307,7 +8314,6 @@ dependencies = [
  "anyhow",
  "argon2",
  "arrow",
- "arrow-json",
  "arrow-schema",
  "async-trait",
  "audit",
@@ -8327,7 +8333,6 @@ dependencies = [
  "enrichment",
  "flate2",
  "futures",
- "futures-util",
  "hashbrown 0.17.1",
  "hmac 0.12.1",
  "http 1.5.0",
@@ -8418,7 +8423,6 @@ dependencies = [
  "ingester",
  "ingestion-common",
  "log",
- "metrics_index",
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
@@ -8522,7 +8526,7 @@ dependencies = [
  "sourcemap",
  "tokio",
  "tonic",
- "zip 8.6.0",
+ "zip 9.0.3",
 ]
 
 [[package]]
@@ -8559,12 +8563,10 @@ dependencies = [
  "config",
  "itertools 0.14.0",
  "log",
- "rcgen",
  "reqwest 0.13.4",
  "rustls",
  "rustls-native-certs",
  "webpki-roots 1.0.9",
- "x509-parser",
 ]
 
 [[package]]
@@ -8850,7 +8852,7 @@ dependencies = [
  "snap",
  "tokio",
  "twox-hash",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -11378,7 +11380,6 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.19",
  "tokio",
- "tokio-stream",
  "tonic",
  "tracing",
  "tracing-opentelemetry",
@@ -11426,7 +11427,6 @@ dependencies = [
  "search",
  "serde_json",
  "sqlparser",
- "svix-ksuid",
  "tokio",
  "tonic",
  "tracing",
@@ -12714,7 +12714,7 @@ dependencies = [
  "tantivy-bitpacker",
  "tantivy-common",
  "tantivy-fst",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -12760,7 +12760,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "vortex",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -13142,7 +13142,7 @@ dependencies = [
  "tower-service",
  "tracing",
  "webpki-roots 1.0.9",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -14506,7 +14506,7 @@ dependencies = [
  "vortex-error",
  "vortex-mask",
  "vortex-session",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -14619,7 +14619,7 @@ dependencies = [
  "webbrowser",
  "woothee",
  "xxhash-rust",
- "zstd",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -15544,13 +15544,13 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "8.6.0"
+version = "9.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d04a6b5381502aa6087c94c669499eb1602eb9c5e8198e534de571f7154809b"
+checksum = "c2d98561b612a84ae525331a7a094429ef8a5772514ed507ff6db5f54badc971"
 dependencies = [
  "aes 0.9.2",
  "bzip2",
- "constant_time_eq",
+ "constant_time_eq 0.6.1",
  "crc32fast",
  "deflate64",
  "flate2",
@@ -15559,6 +15559,7 @@ dependencies = [
  "indexmap 2.14.0",
  "lzma-rust2",
  "memchr",
+ "nix 0.31.3",
  "pbkdf2",
  "ppmd-rust",
  "sha1 0.11.0",
@@ -15566,7 +15567,7 @@ dependencies = [
  "typed-path",
  "zeroize",
  "zopfli",
- "zstd",
+ "zstd 0.14.2",
 ]
 
 [[package]]
@@ -15599,7 +15600,16 @@ version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a"
 dependencies = [
- "zstd-safe",
+ "zstd-safe 7.2.4",
+]
+
+[[package]]
+name = "zstd"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "057cfd910cfac363a0ada849592624b4c9ff2e10bef504c3433810d78ed96f93"
+dependencies = [
+ "zstd-safe 8.1.0",
 ]
 
 [[package]]
@@ -15612,10 +15622,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "zstd-sys"
-version = "2.0.16+zstd.1.5.7"
+name = "zstd-safe"
+version = "8.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91e19ebc2adc8f83e43039e79776e3fda8ca919132d68a1fed6a5faca2683748"
+checksum = "bdd44c6a7284e91f3717755b24315a302edd9153a01f753c3cba3d765e8eafac"
+dependencies = [
+ "zstd-sys",
+]
+
+[[package]]
+name = "zstd-sys"
+version = "2.1.1+zstd.1.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aeec9eaf2dffbbd09201e23bd0ffcbaa33bb8e9266a10734fd7ed90a85eca078"
 dependencies = [
  "cc",
  "pkg-config",

@@ -22,7 +22,7 @@ use config::{
 use hashbrown::HashMap;
 
 use super::{
-    query::{build_llm_trace_query, build_trace_query},
+    query::{build_llm_trace_query, build_trace_query, trace_id_list_sql},
     response::TraceResponseItem,
 };
 use crate::{common::utils::http::get_use_cache_from_request, traces::schema_compat};
@@ -62,13 +62,52 @@ impl TraceListPlan {
         }
     }
 
+    /// Re-aggregates the selected traces over all their spans, or `None` when the page was
+    /// unfiltered and its aggregates already cover every span.
+    pub fn summary_request(
+        &self,
+        stream_name: &str,
+        base_request: &Request,
+        trace_ids: &[String],
+        range: (i64, i64),
+    ) -> Option<Request> {
+        if self.filter().is_empty() || trace_ids.is_empty() {
+            return None;
+        }
+        let mut request = base_request.clone();
+        request.query.sql = format!(
+            "{} WHERE trace_id IN ({}) GROUP BY trace_id",
+            self.select_sql(stream_name),
+            trace_id_list_sql(trace_ids)
+        );
+        request.query.from = 0;
+        request.query.size = trace_ids.len() as i64;
+        request.query.start_time = range.0;
+        request.query.end_time = range.1;
+        Some(request)
+    }
+
     fn sql(&self, stream_name: &str) -> String {
+        let sql = self.select_sql(stream_name);
+        let filter = self.filter();
+        let order = self.sort.sql();
+        if filter.is_empty() {
+            format!("{sql} GROUP BY trace_id ORDER BY {order}")
+        } else {
+            format!("{sql} WHERE {filter} GROUP BY trace_id ORDER BY {order}")
+        }
+    }
+
+    fn select_sql(&self, stream_name: &str) -> String {
         let extra_selects = self.columns.aggregate_selects();
-        let sql = match &self.llm_schema {
+        match &self.llm_schema {
             Some(llm_schema) => build_llm_trace_query(stream_name, llm_schema, &extra_selects),
             None => build_trace_query(stream_name, &extra_selects),
-        };
-        let filter = match self.mode {
+        }
+    }
+
+    fn filter(&self) -> String {
+        match self.mode {
             TraceListMode::Complete => self.options.filter.clone(),
             TraceListMode::Streaming => self
                 .options
@@ -77,12 +116,6 @@ impl TraceListPlan {
                 .replace(';', "")
                 .trim()
                 .to_string(),
-        };
-        let order = self.sort.sql();
-        if filter.is_empty() {
-            format!("{sql} GROUP BY trace_id ORDER BY {order}")
-        } else {
-            format!("{sql} WHERE {filter} GROUP BY trace_id ORDER BY {order}")
         }
     }
 }
@@ -375,6 +408,57 @@ mod tests {
                 sql.contains("reference_parent_span_id IS NULL OR reference_parent_span_id = ''")
             );
             assert!(sql.ends_with("FROM \"trace\"\" stream\" WHERE service_name = 'api' OR span_status = 'ERROR' GROUP BY trace_id ORDER BY zo_sql_duration ASC"));
+        }
+    }
+
+    #[test]
+    fn summary_request_drops_the_filter_and_keys_on_the_selected_traces() {
+        let ids = ["t1".to_string(), "t2".to_string()];
+        for mode in [TraceListMode::Complete, TraceListMode::Streaming] {
+            let mut query = query();
+            query.insert("timeout".to_string(), "17".to_string());
+            query.insert("from".to_string(), "10".to_string());
+            query.insert("size".to_string(), "25".to_string());
+            let unfiltered = TraceListPlan {
+                options: TraceListOptions::parse(&query, mode).unwrap(),
+                sort: TraceSort::parse(&query).unwrap(),
+                columns: TraceColumns::default(),
+                llm_schema: None,
+                mode,
+            };
+            let base = unfiltered.request("traces");
+            assert!(
+                unfiltered
+                    .summary_request("traces", &base, &ids, (1, 2))
+                    .is_none()
+            );
+
+            query.insert("filter".to_string(), "service_name = 'api'".to_string());
+            let filtered = TraceListPlan {
+                options: TraceListOptions::parse(&query, mode).unwrap(),
+                ..unfiltered
+            };
+            let base = filtered.request("traces");
+            assert!(
+                filtered
+                    .summary_request("traces", &base, &[], (1, 2))
+                    .is_none()
+            );
+            let request = filtered
+                .summary_request("traces", &base, &ids, (1, 2))
+                .unwrap();
+            assert!(!request.query.sql.contains("service_name = 'api'"));
+            assert!(request.query.sql.contains("count(*) AS span_count"));
+            assert!(
+                request
+                    .query
+                    .sql
+                    .ends_with("FROM \"traces\" WHERE trace_id IN ('t1','t2') GROUP BY trace_id")
+            );
+            assert_eq!((request.query.from, request.query.size), (0, 2));
+            assert_eq!((request.query.start_time, request.query.end_time), (1, 2));
+            assert_eq!(request.timeout, 17);
+            assert_eq!(request.search_type, base.search_type);
         }
     }
 

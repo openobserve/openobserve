@@ -167,8 +167,8 @@ const trendClass = computed(() =>
       <div class="flex min-w-0 items-baseline gap-1.5">
         <!-- The VALUE never shrinks: it is the payload, and a clipped "499.51…" is
              a useless number. When the tile is too narrow (5 tiles on a laptop),
-             the squeeze is absorbed by the label below, which stays readable
-             truncated because the tone icon already identifies the metric. -->
+             the squeeze is absorbed by the label, which truncates but stays: a
+             bare number under an icon does not say which metric it is. -->
         <span
           class="shrink-0 text-2xl leading-none font-semibold whitespace-nowrap max-lg:text-lg"
           :class="isMuted ? 'text-text-muted' : tc.value"
@@ -181,11 +181,9 @@ const trendClass = computed(() =>
           />
           <slot v-else name="value">{{ displayValue }}</slot>
         </span>
-        <OTruncatedText
-          v-if="label"
-          class="text-text-secondary text-xs font-medium max-lg:hidden"
-          >{{ label }}</OTruncatedText
-        >
+        <OTruncatedText v-if="label" class="text-text-secondary text-xs font-medium">{{
+          label
+        }}</OTruncatedText>
         <span v-if="trend" class="text-2xs shrink-0 font-semibold max-lg:hidden" :class="trendClass"
           >{{ trendArrow }} {{ trend.label }}</span
         >
