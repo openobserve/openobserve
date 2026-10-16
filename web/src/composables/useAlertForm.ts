@@ -1855,7 +1855,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // Otherwise: with a threshold expressed inside the query (HAVING / promql
       // condition), the trigger itself only needs "at least one row came back".
       const hasQueryThreshold =
-        !!prefill.promqlCondition || !!prefill.meta?.sqlHaving || !!prefill.aggregation;
+        !!prefill.promqlCondition ||
+        !!prefill.meta?.sqlHaving ||
+        (!!prefill.aggregation && !getAlertSource(prefill.source).aggregationIsSeed);
       if (prefill.triggerThreshold !== undefined) {
         data.trigger_condition.threshold = prefill.triggerThreshold;
         if (prefill.triggerOperator) {

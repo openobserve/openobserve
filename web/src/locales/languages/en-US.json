@@ -1132,8 +1132,6 @@
     "regionTitle": "Select a Region",
     "userDefinedSchemaLabel": "User-Defined Schema",
     "allFieldsLabel": "All Fields",
-    "generateQuery": "Ask AI",
-    "generateQueryTooltip": "Ask AI to help with your query",
     "nlQueryGenerationFailed": "Failed to generate query. Please try again.",
     "askAIPlaceholder": "Ask AI to help with your query...",
     "askAIFunctionPlaceholder": "Ask AI to help with your function...",
@@ -8076,6 +8074,7 @@
       "noDestination": "No destination",
       "noise": "Noise",
       "notifyFailed": "Notification failed",
+      "schedulerHealth": "Scheduler lag",
       "silent": "Silent"
     },
     "evidence": {
@@ -8092,6 +8091,12 @@
       "failureRatio": "Failure ratio",
       "history": "History",
       "deliveredThroughIncidents": "Delivered through incidents",
+      "affectedOrgs": "Affected orgs",
+      "congestedHours": "Congested hours",
+      "skippedWindows": "Skipped windows",
+      "lateEvaluations": "Late evaluations",
+      "lateRatio": "Late share",
+      "longestDelay": "Longest delay",
       "yes": "Yes",
       "no": "No"
     },
@@ -8109,7 +8114,9 @@
       "repairDestination": "Repair destination",
       "repairDestinationDesc": "Delivery fails on a destination the alert uses.",
       "attachDestination": "Attach destination",
-      "attachDestinationDesc": "Give the alert somewhere to deliver to."
+      "attachDestinationDesc": "Give the alert somewhere to deliver to.",
+      "scaleAlertScheduler": "Scale the alert scheduler",
+      "scaleAlertSchedulerDesc": "Raise {concurrency}, add alert nodes, or raise {pullers}."
     },
     "severity": {
       "high": "High",
@@ -8189,7 +8196,7 @@
       "suggestionsOnly": "Suggestions only, nothing is applied automatically",
       "filterAll": "All",
       "showingCapped": "Showing {shown} of {total} findings: the search stopped at {count} records.",
-      "perAlertNote": "The stream holds one record per finding per named alert, so a finding that names no alert has no card.",
+      "perSubjectNote": "A finding that names several alerts has one card for each, so the cards outnumber the findings.",
       "nothingTitle": "Nothing to report",
       "nothingDescription": "No coverage gap and nothing declined: across {count} alerts in scope, alert calibration found nothing.",
       "noneFoundTitle": "None found",
@@ -8198,6 +8205,9 @@
       "noneFoundNotClearance": "Zero findings here is not a clearance.",
       "evidence": "Evidence",
       "alert": "Alert",
+      "topOrgs": "Most affected orgs",
+      "worstHours": "Worst hours",
+      "lagImpact": "{skipped} skipped, {late} of {evaluations} late",
       "proposedActions": "Proposed actions",
       "openAlert": "Open alert"
     },
@@ -8210,6 +8220,7 @@
       "attentionCaption": "From the latest run. Open a rule to see the alerts it flagged.",
       "alertsFlagged": "{count} alert | {count} alerts",
       "nothingFlagged": "No alert flagged by this rule in the latest run.",
+      "nothingCongested": "The alert scheduler kept up in the latest run.",
       "allClear": "The latest run found nothing to fix.",
       "openAlert": "Open alert",
       "viewEvidence": "View evidence",
@@ -9725,6 +9736,7 @@
         "continue": "Continue to alert",
         "queryChoiceLabel": "Alert on query",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "There are multiple queries. Select which one to create the alert from.",
         "streamLabel": "Stream",
         "thresholdLabel": "Alert on",
         "thresholdMatchingRows": "Matching rows",
@@ -9806,7 +9818,9 @@
         "rumFunnelSnapshot": "This alert keeps a copy of the funnel's SQL. Later edits to the funnel or its named events do not change it.",
         "rumFunnelSteps": "A funnel needs at least two steps before it can alert on conversion.",
         "textFilterDropped": "Your search filter was not carried over because this stream has no full-text search (FTS) fields. Add it to the alert query if you need it.",
-        "heldFilterDropped": "Your search filter was not carried over because it needs a Run as choice on the logs page first. Add it to the alert query if you need it."
+        "heldFilterDropped": "Your search filter was not carried over because it needs a Run as choice on the logs page first. Add it to the alert query if you need it.",
+        "thresholdColumnGuessed": "The threshold was applied to {column}; check it is the value you meant.",
+        "thresholdNotCarried": "The {value} threshold from the chart wasn't applied because you picked a different query."
       }
     },
     "saveFailed": "Could not save the alert.",
@@ -13330,7 +13344,6 @@
   },
   "nlMode": {
     "toggle": "Natural Language Mode",
-    "noAdditionalOptions": "No additional options",
     "executingTool": "Executing {tool}...",
     "toolFailed": "Tool failed: {message}",
     "processing": "Processing..."

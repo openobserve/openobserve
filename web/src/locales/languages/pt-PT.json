@@ -1132,8 +1132,6 @@
     "regionTitle": "Selecione a região",
     "userDefinedSchemaLabel": "Esquema definido pelo usuário",
     "allFieldsLabel": "Todos os campos",
-    "generateQuery": "Pergunte à IA",
-    "generateQueryTooltip": "Peça ajuda à IA com sua consulta",
     "nlQueryGenerationFailed": "Falha ao gerar consulta. Por favor, tente novamente.",
     "askAIPlaceholder": "Peça ajuda à IA com sua consulta...",
     "askAIFunctionPlaceholder": "Peça ajuda à IA com sua função...",
@@ -8076,6 +8074,7 @@
       "noDestination": "Sem destino",
       "noise": "Ruído",
       "notifyFailed": "Falha na notificação",
+      "schedulerHealth": "Atraso do agendador",
       "silent": "Silencioso"
     },
     "evidence": {
@@ -8092,6 +8091,12 @@
       "failureRatio": "Taxa de falhas",
       "history": "Histórico",
       "deliveredThroughIncidents": "Entregue por meio de incidentes",
+      "affectedOrgs": "Organizações afetadas",
+      "congestedHours": "Horas congestionadas",
+      "skippedWindows": "Janelas ignoradas",
+      "lateEvaluations": "Avaliações atrasadas",
+      "lateRatio": "Proporção de atrasos",
+      "longestDelay": "Maior atraso",
       "yes": "Sim",
       "no": "Não"
     },
@@ -8109,7 +8114,9 @@
       "repairDestination": "Reparar o destino",
       "repairDestinationDesc": "A entrega falha em um destino usado pelo alerta.",
       "attachDestination": "Anexar destino",
-      "attachDestinationDesc": "Dê ao alerta um destino para entrega."
+      "attachDestinationDesc": "Dê ao alerta um destino para entrega.",
+      "scaleAlertScheduler": "Escale o agendador de alertas",
+      "scaleAlertSchedulerDesc": "Aumente {concurrency}, adicione nós de alerta ou aumente {pullers}."
     },
     "severity": {
       "high": "Alta",
@@ -8189,7 +8196,7 @@
       "suggestionsOnly": "Apenas sugestões, nada é aplicado automaticamente",
       "filterAll": "Todos",
       "showingCapped": "Exibindo {shown} de {total} achados: a busca parou em {count} registros.",
-      "perAlertNote": "O stream contém um registro por achado por alerta nomeado, portanto um achado que não nomeia nenhum alerta não tem cartão.",
+      "perSubjectNote": "Uma constatação que nomeia vários alertas tem um cartão para cada um, então os cartões são mais numerosos que as constatações.",
       "nothingTitle": "Nada a relatar",
       "nothingDescription": "Sem lacuna de cobertura e nada recusado: em {count} alertas no escopo, a calibração de alertas não encontrou nada.",
       "noneFoundTitle": "Nenhum encontrado",
@@ -8198,6 +8205,9 @@
       "noneFoundNotClearance": "Zero achados aqui não é uma liberação.",
       "evidence": "Evidências",
       "alert": "Alerta",
+      "topOrgs": "Organizações mais afetadas",
+      "worstHours": "Piores horas",
+      "lagImpact": "{skipped} ignoradas, {late} de {evaluations} atrasadas",
       "proposedActions": "Ações propostas",
       "openAlert": "Abrir alerta"
     },
@@ -8210,6 +8220,7 @@
       "attentionCaption": "Da última execução. Abra uma regra para ver os alertas que ela sinalizou.",
       "alertsFlagged": "{count} alerta | {count} alertas",
       "nothingFlagged": "Nenhum alerta sinalizado por esta regra na última execução.",
+      "nothingCongested": "O agendador de alertas acompanhou o ritmo na execução mais recente.",
       "allClear": "A última execução não encontrou nada a corrigir.",
       "openAlert": "Abrir alerta",
       "viewEvidence": "Ver evidências",
@@ -9725,6 +9736,7 @@
         "continue": "Continuar para o alerta",
         "queryChoiceLabel": "Alertar sobre a consulta",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "Existem várias consultas. Selecione a partir de qual deseja criar o alerta.",
         "streamLabel": "Stream",
         "thresholdLabel": "Alertar sobre",
         "thresholdMatchingRows": "Linhas correspondentes",
@@ -9806,7 +9818,9 @@
         "rumFunnelSnapshot": "Este alerta mantém uma cópia do SQL do funil. Edições posteriores no funil ou em seus eventos nomeados não a alteram.",
         "rumFunnelSteps": "Um funil precisa de pelo menos duas etapas antes de poder alertar sobre conversão.",
         "textFilterDropped": "Seu filtro de pesquisa não foi transferido porque este stream não tem campos de pesquisa de texto completo (FTS). Adicione-o à consulta do alerta se precisar.",
-        "heldFilterDropped": "Seu filtro de pesquisa não foi transferido porque ele precisa primeiro de uma opção \"Executar como\" na página de registros. Adicione-o à consulta do alerta se precisar."
+        "heldFilterDropped": "Seu filtro de pesquisa não foi transferido porque ele precisa primeiro de uma opção \"Executar como\" na página de registros. Adicione-o à consulta do alerta se precisar.",
+        "thresholdColumnGuessed": "O limite foi aplicado a {column}; verifique se é o valor pretendido.",
+        "thresholdNotCarried": "O limite {value} do gráfico não foi aplicado porque escolheu uma consulta diferente."
       }
     },
     "saveFailed": "Não foi possível salvar o alerta.",
@@ -13330,7 +13344,6 @@
   },
   "nlMode": {
     "toggle": "Modo de linguagem natural",
-    "noAdditionalOptions": "Sem opções adicionais",
     "executingTool": "Executando {tool}...",
     "toolFailed": "Falha na ferramenta: {message}",
     "processing": "Processando..."
