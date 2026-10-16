@@ -36,8 +36,23 @@ export const reportKeys = {
     ),
   detail: (org: string, id: string) => orgKey(org, "reports", "detail", id),
   historyAll: (org: string) => orgKey(org, "reports", "history"),
-  run: (org: string, reportId: string | undefined, timestamp: number, retries: number) =>
-    orgKey(org, "reports", "history", "run", reportId ?? "__legacy__", timestamp, retries),
+  run: (
+    org: string,
+    reportId: string | undefined,
+    timestamp: number,
+    retries: number,
+    orgWide: boolean,
+  ) =>
+    orgKey(
+      org,
+      "reports",
+      "history",
+      "run",
+      orgWide ? "org" : "report",
+      reportId ?? "__legacy__",
+      timestamp,
+      retries,
+    ),
   history: (org: string, query: ReportHistoryQuery) =>
     orgKey(
       org,

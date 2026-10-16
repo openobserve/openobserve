@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -56,16 +56,23 @@ const RESPONSE = {
   ],
 };
 
-const mountHistory = (props: Record<string, unknown> = {}) =>
-  mount(ReportRunHistory, {
+const mounted: ReturnType<typeof mount>[] = [];
+const mountHistory = (props: Record<string, unknown> = {}) => {
+  const wrapper = mount(ReportRunHistory, {
     props: { reportId: "r1", ...props },
     global: {
       plugins: [i18n, store, withQueryClient()],
       stubs: { OTable: { template: "<div><slot name='subheader' /><slot name='empty' /></div>" } },
     },
   });
+  mounted.push(wrapper);
+  return wrapper;
+};
 
 describe("ReportRunHistory", () => {
+  afterEach(() => {
+    for (const wrapper of mounted.splice(0)) wrapper.unmount();
+  });
   beforeEach(() => {
     for (const k of Object.keys(routeQuery)) delete routeQuery[k];
     vi.mocked(reports.getHistory).mockReset();
@@ -190,7 +197,7 @@ describe("ReportRunHistory", () => {
         ({
           data: {
             ...RESPONSE,
-            hits: query.report_id === "r2" ? [target] : [RESPONSE.hits[0], target],
+            hits: query.run_report_id === "r2" ? [target] : [RESPONSE.hits[0], target],
           },
         }) as any,
     );
@@ -200,7 +207,9 @@ describe("ReportRunHistory", () => {
     expect(
       vi
         .mocked(reports.getHistory)
-        .mock.calls.some(([, q]) => q.report_id === "r2" && q.start_time === 10),
+        .mock.calls.some(
+          ([, q]) => q.run_report_id === "r2" && q.report_id === undefined && q.start_time === 10,
+        ),
     ).toBe(true);
   });
 
@@ -295,7 +304,90 @@ describe("ReportRunHistory", () => {
     expect((w.vm as any).totalCount).toBe(51);
     (w.vm as any).onPaginationChange({ page: 2, size: 50 });
     await flushPromises();
-    expect(vi.mocked(reports.getHistory).mock.calls.at(-1)![1].from).toBe(49);
+    expect(
+      vi
+        .mocked(reports.getHistory)
+        .mock.calls.some(([, q]) => q.retries === undefined && q.from === 49),
+    ).toBe(true);
     expect((w.vm as any).rows).toHaveLength(1);
+  });
+  it("opens a dense org-wide link through list visibility even when report GET is denied", async () => {
+    const target = { ...RESPONSE.hits[0], report_id: "visible-not-gettable", retries: 4 };
+    routeQuery.run = "10-4";
+    routeQuery.run_report_id = target.report_id;
+    vi.mocked(reports.getHistory).mockImplementation(async (_org, query) => {
+      if (query.report_id) throw { response: { status: 403 } };
+      if (query.run_report_id) return { data: { ...RESPONSE, total: 1, hits: [target] } } as any;
+      return {
+        data: {
+          ...RESPONSE,
+          total: 2001,
+          hits: Array.from({ length: 50 }, (_, i) => ({ ...target, report_id: `other-${i}` })),
+        },
+      } as any;
+    });
+    const w = mountHistory({ reportId: undefined });
+    await flushPromises();
+    expect((w.vm as any).selectedRun).toEqual(target);
+    expect((w.vm as any).linkedRunMessage).toBeNull();
+    expect(
+      vi.mocked(reports.getHistory).mock.calls.every(([, q]) => q.report_id === undefined),
+    ).toBe(true);
+    expect(
+      vi
+        .mocked(reports.getHistory)
+        .mock.calls.some(([, q]) => q.run_report_id === target.report_id && q.retries === 4),
+    ).toBe(true);
+  });
+
+  it("reconciles an ingested manual row while staying on page two", async () => {
+    const ts = Date.now() * 1000 - 1000;
+    const target = {
+      ...RESPONSE.hits[0],
+      report_id: "ingestion-later-page",
+      timestamp: ts,
+      trigger_source: "manual",
+    } as ReportRunHit;
+    rememberManualRun(store.state.selectedOrganization.identifier, target);
+    const older = Array.from({ length: 50 }, (_, i) => ({
+      ...target,
+      timestamp: ts - (i + 1) * 1000,
+    }));
+    let ingested = false;
+    vi.mocked(reports.getHistory).mockImplementation(async (_org, query) => {
+      if (query.retries !== undefined)
+        return {
+          data: { ...RESPONSE, total: ingested ? 1 : 0, hits: ingested ? [target] : [] },
+        } as any;
+      const all = ingested ? [target, ...older] : older;
+      return {
+        data: {
+          ...RESPONSE,
+          total: all.length,
+          counts: { succeeded: 0, cached: 0, error: all.length, skipped: 0, total: all.length },
+          hits: all.slice(query.from ?? 0, (query.from ?? 0) + (query.size ?? 50)),
+        },
+      } as any;
+    });
+    const w = mountHistory({ reportId: target.report_id });
+    await flushPromises();
+    expect((w.vm as any).totalCount).toBe(51);
+    expect((w.vm as any).counts.total).toBe(51);
+    (w.vm as any).onPaginationChange({ page: 2, size: 50 });
+    await flushPromises();
+    ingested = true;
+    (w.vm as any).refresh();
+    await flushPromises();
+    expect((w.vm as any).pending).toEqual([]);
+    expect((w.vm as any).currentPage).toBe(2);
+    expect((w.vm as any).totalCount).toBe(51);
+    expect((w.vm as any).counts.total).toBe(51);
+    expect((w.vm as any).rows).toEqual([older[49]]);
+    expect(
+      vi
+        .mocked(reports.getHistory)
+        .mock.calls.filter(([, q]) => q.retries === undefined)
+        .at(-1)![1].from,
+    ).toBe(50);
   });
 });

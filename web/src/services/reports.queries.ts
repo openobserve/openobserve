@@ -63,13 +63,14 @@ export const reportRunQuery = (
   reportId: string | undefined,
   timestamp: number,
   retries: number,
+  orgWide = false,
 ) =>
   queryOptions({
-    queryKey: reportKeys.run(org, reportId, timestamp, retries),
+    queryKey: reportKeys.run(org, reportId, timestamp, retries, orgWide),
     queryFn: async (): Promise<ReportHistoryResponse> =>
       (
         await reports.getHistory(org, {
-          report_id: reportId,
+          ...(orgWide ? { run_report_id: reportId } : { report_id: reportId }),
           start_time: timestamp,
           end_time: timestamp + 1,
           retries,

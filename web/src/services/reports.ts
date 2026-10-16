@@ -139,6 +139,8 @@ const reports = {
   getHistory: (org_identifier: string, query: ReportHistoryQuery) => {
     const params = new URLSearchParams();
     if (query.report_id) params.append("report_id", query.report_id);
+    if (query.run_report_id) params.append("run_report_id", query.run_report_id);
+    if (typeof query.retries === "number") params.append("retries", String(query.retries));
     params.append("start_time", String(query.start_time));
     params.append("end_time", String(query.end_time));
     for (const status of query.status ?? []) params.append("status", status);
@@ -176,6 +178,7 @@ export type ReportTriggerSource = "scheduled" | "manual";
 
 export interface ReportHistoryQuery {
   report_id?: string;
+  run_report_id?: string;
   start_time: number;
   end_time: number;
   status?: ReportRunStatus[];

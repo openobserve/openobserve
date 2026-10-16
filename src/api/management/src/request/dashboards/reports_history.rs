@@ -50,6 +50,7 @@ const MODULE_CACHED_REPORT: &str = "cached_report";
 pub struct ReportHistoryQuery {
     /// Report KSUID; omitted for every report in the org.
     pub report_id: Option<String>,
+    pub run_report_id: Option<String>,
     /// Start time in Unix timestamp microseconds
     pub start_time: Option<i64>,
     /// End time in Unix timestamp microseconds
@@ -211,6 +212,7 @@ struct HistoryFilter {
     start_time: i64,
     end_time: i64,
     report_id: Option<Ksuid>,
+    run_report_id: Option<Ksuid>,
     /// None means every report; Some holds the report ids the user may read.
     permitted: Option<Vec<Ksuid>>,
     trigger_source: Option<&'static str>,
@@ -238,6 +240,9 @@ impl HistoryFilter {
                 .collect::<Vec<_>>()
                 .join(" OR ");
             sql.push_str(&format!(" AND ({any})"));
+        }
+        if let Some(id) = &self.run_report_id {
+            sql.push_str(&format!(" AND key LIKE '%/{id}'"));
         }
         if let Some(retries) = self.retries {
             if retries == 0 {
@@ -310,6 +315,7 @@ impl HistoryFilter {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("report_id" = Option<String>, Query, description = "Report ID (KSUID); omit for every report"),
+        ("run_report_id" = Option<String>, Query, description = "Run report ID within the org-wide visibility policy"),
         ("start_time" = Option<i64>, Query, description = "Start time in Unix microseconds (default: 7 days ago)"),
         ("end_time" = Option<i64>, Query, description = "End time in Unix microseconds (default: now)"),
         ("status" = Option<Vec<String>>, Query, description = "Repeatable: succeeded, error, skipped"),
@@ -459,6 +465,21 @@ fn parse_filter(org_id: &str, query: &ReportHistoryQuery) -> Result<HistoryFilte
         ),
         None => None,
     };
+    let run_report_id = query
+        .run_report_id
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(|raw| {
+            raw.parse::<Ksuid>()
+                .map_err(|_| format!("Invalid run_report_id: '{raw}'"))
+        })
+        .transpose()?;
+    if report_id
+        .zip(run_report_id)
+        .is_some_and(|(selected, run)| selected != run)
+    {
+        return Err("report_id and run_report_id must match".to_string());
+    }
     let statuses = query
         .status
         .iter()
@@ -487,6 +508,7 @@ fn parse_filter(org_id: &str, query: &ReportHistoryQuery) -> Result<HistoryFilte
         start_time,
         end_time,
         report_id,
+        run_report_id,
         permitted: None,
         trigger_source,
         statuses,
@@ -611,16 +633,20 @@ async fn permitted_report_ids(
     };
     Ok(Some(resolve_permitted_ids(
         &permitted,
-        reports
-            .iter()
-            .map(|r| (r.report_name.as_str(), r.report_id.as_str())),
+        reports.iter().map(|r| {
+            (
+                r.report_name.as_str(),
+                r.report_id.as_str(),
+                r.folder_id.as_str(),
+            )
+        }),
     )))
 }
 
 #[cfg(any(feature = "enterprise", test))]
 fn resolve_permitted_ids<'a>(
     permitted: &[String],
-    reports: impl Iterator<Item = (&'a str, &'a str)>,
+    reports: impl Iterator<Item = (&'a str, &'a str, &'a str)>,
 ) -> Vec<Ksuid> {
     let entries = permitted
         .iter()
@@ -630,12 +656,23 @@ fn resolve_permitted_ids<'a>(
         .iter()
         .filter_map(|id| id.parse::<Ksuid>().ok())
         .collect::<Vec<_>>();
-    // KSUID-shaped grants always identify IDs, even when another report uses that text as its name.
-    for (name, id) in reports {
-        if name.parse::<Ksuid>().is_err() && entries.contains(&name) {
-            if let Ok(id) = id.parse::<Ksuid>() {
-                ids.push(id);
+    // Scoped grants require the current folder; deleted reports have no match.
+    for (name, raw_id, folder) in reports {
+        let Ok(id) = raw_id.parse::<Ksuid>() else {
+            continue;
+        };
+        if entries.iter().any(|entry| {
+            if entry.parse::<Ksuid>().is_ok() {
+                return false;
             }
+            if let Some((grant_folder, grant_id)) = entry.rsplit_once('/')
+                && grant_id.parse::<Ksuid>().is_ok()
+            {
+                return grant_folder == folder && grant_id == raw_id;
+            }
+            *entry == name
+        }) {
+            ids.push(id);
         }
     }
     ids.sort();
@@ -1007,8 +1044,12 @@ mod tests {
         let legacy_string = legacy.to_string();
         let permitted = vec![format!("report:{granted}"), "report:daily".to_string()];
         let reports = [
-            (granted_string.as_str(), collision_string.as_str()),
-            ("daily", legacy_string.as_str()),
+            (
+                granted_string.as_str(),
+                collision_string.as_str(),
+                "default",
+            ),
+            ("daily", legacy_string.as_str(), "default"),
         ];
         let ids = resolve_permitted_ids(&permitted, reports.into_iter());
         assert!(ids.contains(&granted));
@@ -1028,5 +1069,66 @@ mod tests {
         };
         assert!(f.base_where().contains("AND retries = 2"));
         assert!(f.page_where().contains("AND retries = 2"));
+    }
+    #[test]
+    fn scoped_grants_follow_current_folder_and_never_match_names() {
+        let allowed = ksuid().to_string();
+        let moved = ksuid().to_string();
+        let collision = ksuid().to_string();
+        let permitted = vec![
+            format!("report:folder/{allowed}"),
+            format!("report:old/{moved}"),
+        ];
+        let collision_name = format!("folder/{allowed}");
+        let reports = [
+            ("daily", allowed.as_str(), "folder"),
+            ("moved", moved.as_str(), "new"),
+            (collision_name.as_str(), collision.as_str(), "folder"),
+        ];
+        assert_eq!(
+            resolve_permitted_ids(&permitted, reports.into_iter()),
+            vec![allowed.parse::<Ksuid>().unwrap()]
+        );
+        assert!(resolve_permitted_ids(&permitted, std::iter::empty()).is_empty());
+    }
+
+    #[test]
+    fn org_run_selector_intersects_permitted_ids_without_selecting_get_policy() {
+        let allowed = ksuid();
+        let denied = ksuid();
+        let q = ReportHistoryQuery {
+            run_report_id: Some(denied.to_string()),
+            ..Default::default()
+        };
+        let mut f = parse_filter("org", &q).unwrap();
+        assert!(f.report_id.is_none());
+        f.permitted = Some(vec![allowed]);
+        let sql = f.base_where();
+        assert!(sql.contains(&format!(
+            "AND (key LIKE '%/{allowed}') AND key LIKE '%/{denied}'"
+        )));
+        assert_eq!(sql.matches("key LIKE").count(), 2);
+    }
+
+    #[test]
+    fn run_selector_validates_ids_and_rejects_conflicting_selected_report() {
+        let id = ksuid().to_string();
+        let q = ReportHistoryQuery {
+            report_id: Some(id.clone()),
+            run_report_id: Some(ksuid().to_string()),
+            ..Default::default()
+        };
+        assert!(parse_filter("org", &q).is_err());
+        let q = ReportHistoryQuery {
+            report_id: Some(id.clone()),
+            run_report_id: Some(id),
+            ..Default::default()
+        };
+        assert!(parse_filter("org", &q).unwrap().report_id.is_some());
+        let q = ReportHistoryQuery {
+            run_report_id: Some("invalid".to_string()),
+            ..Default::default()
+        };
+        assert!(parse_filter("org", &q).is_err());
     }
 }

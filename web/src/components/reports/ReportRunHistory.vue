@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { useQuery } from "@tanstack/vue-query";
+import { useQuery, useQueries } from "@tanstack/vue-query";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
@@ -384,6 +384,28 @@ const history = useQuery(() =>
   Object.assign(reportHistoryQuery(orgId.value, query.value), { enabled: !!orgId.value }),
 );
 
+const pendingProbes = useQueries({
+  queries: () =>
+    pending.value.map((hit) => ({
+      ...reportRunQuery(orgId.value, hit.report_id, hit.timestamp, hit.retries, !props.reportId),
+      enabled: !!orgId.value && history.isSuccess.value,
+    })),
+});
+watch(pendingProbes, (results) => {
+  const candidates = new Set(pending.value.map(runIdentity));
+  const known = new Set(searchableRunKeys.value);
+  for (const result of results) {
+    for (const hit of result.data?.hits ?? []) {
+      const key = runIdentity(hit);
+      if (candidates.has(key)) known.add(key);
+    }
+  }
+  if (known.size !== searchableRunKeys.value.size) searchableRunKeys.value = known;
+});
+watch([currentPage, history.dataUpdatedAt], () => {
+  for (const probe of pendingProbes.value) void probe.refetch();
+});
+
 const forbidden = computed(() => {
   const e: any = history.error.value;
   return e?.response?.status === 403;
@@ -418,7 +440,17 @@ const rows = computed<ReportRunHit[]>(() => [
 const rowKeyOf = (row: ReportRunHit) => `${row.report_id}:${runKey(row)}`;
 const rowClass = (row: ReportRunHit) => (row.status === "error" ? "!bg-status-error-bg" : "");
 
-const counts = computed(() => history.data.value?.counts);
+const counts = computed(() => {
+  const stored = history.data.value?.counts;
+  if (!stored) return undefined;
+  const counts = { ...stored };
+  for (const hit of pending.value) {
+    counts.total += 1;
+    if (hit.status === "succeeded") counts[hit.is_cached ? "cached" : "succeeded"] += 1;
+    else if (hit.status === "error" || hit.status === "skipped") counts[hit.status] += 1;
+  }
+  return counts;
+});
 const tiles = computed<StatItem[]>(() => {
   const c = counts.value;
   const items: StatItem[] = [
@@ -522,6 +554,7 @@ const widenRange = () => {
 const refresh = () => {
   anchor.value = Date.now();
   void history.refetch();
+  for (const probe of pendingProbes.value) void probe.refetch();
 };
 
 let lateReread: ReturnType<typeof setTimeout> | undefined;
@@ -582,6 +615,7 @@ const linkedRun = useQuery(() => {
       identity?.reportId,
       identity?.timestamp ?? 0,
       identity?.retries ?? 0,
+      !props.reportId,
     ),
     {
       enabled: !!orgId.value && !!identity,
