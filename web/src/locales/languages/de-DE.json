@@ -8125,7 +8125,6 @@
       "noneShort": "Keine",
       "substrateEmpty": "Die Organisation hat Alarme, aber der Lauf fand keine Auslösezeilen für sein Fenster und hat daher nichts gemessen.",
       "unreadableDefinitions": "{count} Alarmdefinition konnte nicht gelesen werden. | {count} Alarmdefinitionen konnten nicht gelesen werden.",
-      "factsWithoutDefinition": "{count} Alarm hatte Auslösezeilen, aber keine Definition. | {count} Alarme hatten Auslösezeilen, aber keine Definition.",
       "errorClustersUnattributed": "{count} Fehlerzeile konnte keinem Alarm zugeordnet werden. | {count} Fehlerzeilen konnten keinem Alarm zugeordnet werden.",
       "definitionsWithoutFacts": "{count} Alarm hatte keine Auslösezeilen im Fenster, was nicht als Lücke gezählt wird. | {count} Alarme hatten keine Auslösezeilen im Fenster, was nicht als Lücke gezählt wird.",
       "transitionsTruncated": "Zustandsübergänge wurden abgeschnitten.",

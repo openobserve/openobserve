@@ -8125,7 +8125,6 @@
       "noneShort": "없음",
       "substrateEmpty": "조직에 알림이 있지만, 해당 실행의 기간에 트리거 행을 찾지 못해 아무것도 측정하지 못했습니다.",
       "unreadableDefinitions": "{count}개의 알림 정의를 읽을 수 없습니다. | {count}개의 알림 정의를 읽을 수 없습니다.",
-      "factsWithoutDefinition": "{count}개의 알림에 트리거 행이 있지만 정의가 없습니다. | {count}개의 알림에 트리거 행이 있지만 정의가 없습니다.",
       "errorClustersUnattributed": "{count}개의 오류 행을 알림에 귀속할 수 없습니다. | {count}개의 오류 행을 알림에 귀속할 수 없습니다.",
       "definitionsWithoutFacts": "{count}개의 알림은 해당 기간에 트리거 행이 없으며, 이는 공백으로 계산되지 않습니다. | {count}개의 알림은 해당 기간에 트리거 행이 없으며, 이는 공백으로 계산되지 않습니다.",
       "transitionsTruncated": "상태 전환이 잘렸습니다.",

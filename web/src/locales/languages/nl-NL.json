@@ -8125,7 +8125,6 @@
       "noneShort": "Geen",
       "substrateEmpty": "De organisatie heeft alarmen, maar de run vond geen triggerrijen voor het venster, dus er is niets gemeten.",
       "unreadableDefinitions": "{count} alarmdefinitie kon niet worden gelezen. | {count} alarmdefinities konden niet worden gelezen.",
-      "factsWithoutDefinition": "{count} alarm had triggerrijen maar geen definitie. | {count} alarmen hadden triggerrijen maar geen definitie.",
       "errorClustersUnattributed": "{count} foutrij kon niet aan een alarm worden toegewezen. | {count} foutrijen konden niet aan een alarm worden toegewezen.",
       "definitionsWithoutFacts": "{count} alarm had geen triggerrijen in het venster, wat niet als een gat wordt geteld. | {count} alarmen hadden geen triggerrijen in het venster, wat niet als een gat wordt geteld.",
       "transitionsTruncated": "Statusovergangen zijn afgekapt.",

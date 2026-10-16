@@ -8125,7 +8125,6 @@
       "noneShort": "Brak",
       "substrateEmpty": "Organizacja ma alerty, ale uruchomienie nie znalazło żadnych wierszy wyzwalaczy w swoim oknie, więc nic nie zmierzono.",
       "unreadableDefinitions": "{count} definicji alertu nie udało się odczytać. | {count} definicji alertów nie udało się odczytać.",
-      "factsWithoutDefinition": "{count} alert miał wiersze wyzwalaczy, ale brak mu definicji. | {count} alertów miało wiersze wyzwalaczy, ale brak im definicji.",
       "errorClustersUnattributed": "Nie udało się przypisać {count} wiersza błędu do alertu. | Nie udało się przypisać {count} wierszy błędów do alertu.",
       "definitionsWithoutFacts": "{count} alert nie miał wierszy wyzwalaczy w oknie, co nie jest liczone jako luka. | {count} alertów nie miało wierszy wyzwalaczy w oknie, co nie jest liczone jako luka.",
       "transitionsTruncated": "Przejścia stanów zostały obcięte.",
