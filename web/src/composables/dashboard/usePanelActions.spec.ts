@@ -273,6 +273,8 @@ describe("usePanelActions", () => {
           query: 'select approx_percentile_cont(latency, 0.95) as "p95" from logs',
           fields: { stream: "logs" },
         },
+        { query: "select max(latency) as `slowest` from logs", fields: { stream: "logs" } },
+        { query: "select now() as moment from logs", fields: { stream: "logs" } },
       );
       const api = usePanelAlertCreation(args);
       args.contextMenuData.value = { seriesName: "errors" };
@@ -286,8 +288,14 @@ describe("usePanelActions", () => {
         value: 10,
       });
 
-      // No column of its own to find: better no HAVING than one on the clicked query's column.
       rebuildAlertPrefill({ queryIndex: 2 });
+      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving?.column).toBe("p95");
+
+      rebuildAlertPrefill({ queryIndex: 3 });
+      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving?.column).toBe("slowest");
+
+      // No column of its own to find: better no HAVING than one on the clicked query's column.
+      rebuildAlertPrefill({ queryIndex: 4 });
       expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toBeUndefined();
 
       rebuildAlertPrefill({ queryIndex: 0 });

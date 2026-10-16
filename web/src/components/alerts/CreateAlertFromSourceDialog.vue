@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <div
-          class="rounded-default bg-theme-body-bg-primary border-card-glass-border mt-1 max-h-40 [scrollbar-width:thin] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap"
+          class="rounded-default bg-theme-body-bg-primary border-card-glass-border [&::-webkit-scrollbar-thumb]:bg-border-default [&::-webkit-scrollbar-thumb:hover]:bg-border-strong mt-1 max-h-40 [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap [&::-webkit-scrollbar]:size-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
           data-test="create-alert-picked-query-text"
           v-html="pickedQueryHtml"
         ></div>

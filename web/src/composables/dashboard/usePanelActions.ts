@@ -22,7 +22,12 @@ import {
   type PanelQueryShape,
 } from "@/utils/alerts/prefill/fromPanel";
 import { requestAlertCreation, useAlertCreation } from "@/composables/alerts/useAlertCreation";
-import { needsConfirmation, normalizePrefill, warn } from "@/utils/alerts/alertPrefill";
+import {
+  firstAggregateAlias,
+  needsConfirmation,
+  normalizePrefill,
+  warn,
+} from "@/utils/alerts/alertPrefill";
 import type { AlertBuildOptions, AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import {
   FORECAST_FREQUENCY_MINUTES,
@@ -67,12 +72,6 @@ export const forecastPointOf = (series: any, dataIndex: number | undefined) => {
   };
 };
 
-/** The alias of the first aggregate in a SQL query: count(...) as alias, avg(...) as alias, etc. */
-const aggregateAliasOf = (sqlQuery: string): string | null =>
-  sqlQuery.match(
-    /(?:count|sum|avg|min|max|median)\s*\([^)]+\)\s+as\s+["']?([^"',\s)]+)["']?/i,
-  )?.[1] || null;
-
 /** The SQL column a right-clicked threshold applies to, read off the query's y-axis or its SQL. */
 const sqlYAxisColumnOf = (
   query: any,
@@ -116,7 +115,7 @@ const sqlYAxisColumnOf = (
       yAxisColumn = match[1];
     } else {
       // Last resort: extract any aggregation column from SQL (first one found)
-      yAxisColumn = aggregateAliasOf(sqlQuery) ?? clickedSeriesName;
+      yAxisColumn = firstAggregateAlias(sqlQuery) ?? clickedSeriesName;
     }
   }
   return yAxisColumn;
@@ -129,7 +128,7 @@ const ownYAxisColumnOf = (
 ): string | null =>
   query?.fields?.y?.length
     ? sqlYAxisColumnOf(query, executedQuery, undefined)
-    : aggregateAliasOf(executedQuery || query?.query || "");
+    : firstAggregateAlias(executedQuery || query?.query || "");
 
 export function usePanelAlertCreation({
   panelSchema,

@@ -19,7 +19,7 @@
  * Replaces the two hand-rolled payload builders that used to live in
  * PanelContainer.vue and usePanelActions.ts. Pure and synchronous (invariant 5):
  * the one piece that genuinely needs the async SQL parser — injecting a HAVING
- * clause into a raw SQL panel query — is carried as `meta.sqlHaving` and applied
+ * clause into a SQL panel query, raw or built — is carried as `meta.sqlHaving` and applied
  * by the consumer, which already owns the parser.
  */
 
