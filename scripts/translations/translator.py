@@ -397,6 +397,7 @@ TERMS = {
         "ja-JP": "インシデント",
         "ko-KR": "인시던트",
         "tr-TR": "vaka",
+        "ar-SA": "الحادث",
     },
     "service account": {
         "sense": "a non-human IAM identity used for API access",
@@ -507,6 +508,11 @@ TERMS = {
         "sense": "an auth/API/ingestion credential or an LLM usage unit — never "
         "a coin or game token",
         "tr-TR": "token",
+    },
+    "run": {
+        "sense": "one execution of a check, eval, job or workflow — never a round "
+        "of a game or a season",
+        "ar-SA": "التشغيل",
     },
     "destination": {
         "sense": "a configured endpoint that alerts or pipeline output are "
