@@ -9725,6 +9725,7 @@
         "continue": "Continuar a la alerta",
         "queryChoiceLabel": "Alertar sobre la consulta",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "Hay varias consultas. Selecciona desde cuál crear la alerta.",
         "streamLabel": "Stream",
         "thresholdLabel": "Alertar sobre",
         "thresholdMatchingRows": "Filas coincidentes",
@@ -9806,7 +9807,9 @@
         "rumFunnelSnapshot": "Esta alerta conserva una copia del SQL del embudo. Las ediciones posteriores del embudo o de sus eventos con nombre no la modifican.",
         "rumFunnelSteps": "Un embudo necesita al menos dos pasos para poder alertar sobre la conversión.",
         "textFilterDropped": "Tu filtro de búsqueda no se conservó porque este stream no tiene campos de búsqueda de texto completo (FTS). Añádelo a la consulta de la alerta si lo necesitas.",
-        "heldFilterDropped": "Tu filtro de búsqueda no se conservó porque primero necesita una opción Ejecutar como en la página de Logs. Añádelo a la consulta de la alerta si lo necesitas."
+        "heldFilterDropped": "Tu filtro de búsqueda no se conservó porque primero necesita una opción Ejecutar como en la página de Logs. Añádelo a la consulta de la alerta si lo necesitas.",
+        "thresholdColumnGuessed": "El umbral se aplicó a {column}; comprueba que es el valor que querías.",
+        "thresholdNotCarried": "El umbral {value} del gráfico no se aplicó porque elegiste una consulta diferente."
       }
     },
     "saveFailed": "No se pudo guardar la alerta.",

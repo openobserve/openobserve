@@ -9725,6 +9725,7 @@
         "continue": "继续到告警",
         "queryChoiceLabel": "告警所针对的查询",
         "queryChoiceOption": "{name}：{query}",
+        "pickQueryIntro": "有多个查询。请选择用于创建告警的查询。",
         "streamLabel": "数据流",
         "thresholdLabel": "告警条件",
         "thresholdMatchingRows": "匹配行",
@@ -9806,7 +9807,9 @@
         "rumFunnelSnapshot": "此告警保留了漏斗 SQL 的副本。之后对漏斗或其命名事件的编辑不会更改它。",
         "rumFunnelSteps": "漏斗至少需要两个步骤才能对转化进行告警。",
         "textFilterDropped": "您的搜索过滤器未带入，因为此数据流没有全文搜索（FTS）字段。如需使用，请将其添加到告警查询中。",
-        "heldFilterDropped": "您的搜索过滤器未带入，因为它需要先在日志页面选择运行身份。如需使用，请将其添加到告警查询中。"
+        "heldFilterDropped": "您的搜索过滤器未带入，因为它需要先在日志页面选择运行身份。如需使用，请将其添加到告警查询中。",
+        "thresholdColumnGuessed": "阈值已应用于 {column}；请确认这是您想要的值。",
+        "thresholdNotCarried": "由于您选择了其他查询，图表中的阈值 {value} 未被应用。"
       }
     },
     "saveFailed": "无法保存告警。",

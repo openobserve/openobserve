@@ -9725,6 +9725,7 @@
         "continue": "Tiếp tục đến cảnh báo",
         "queryChoiceLabel": "Cảnh báo theo truy vấn",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "Có nhiều truy vấn. Hãy chọn truy vấn để tạo cảnh báo.",
         "streamLabel": "Luồng",
         "thresholdLabel": "Cảnh báo trên",
         "thresholdMatchingRows": "Các hàng khớp",
@@ -9806,7 +9807,9 @@
         "rumFunnelSnapshot": "Cảnh báo này giữ một bản sao SQL của phễu. Các chỉnh sửa sau đó đối với phễu hoặc các sự kiện có tên của nó sẽ không làm thay đổi nó.",
         "rumFunnelSteps": "Phễu cần ít nhất hai bước trước khi có thể cảnh báo về chuyển đổi.",
         "textFilterDropped": "Bộ lọc tìm kiếm của bạn không được chuyển sang vì stream này không có trường tìm kiếm toàn văn (FTS). Hãy thêm nó vào truy vấn cảnh báo nếu bạn cần.",
-        "heldFilterDropped": "Bộ lọc tìm kiếm của bạn không được chuyển sang vì trước tiên nó cần một lựa chọn Run as trên trang nhật ký. Hãy thêm nó vào truy vấn cảnh báo nếu bạn cần."
+        "heldFilterDropped": "Bộ lọc tìm kiếm của bạn không được chuyển sang vì trước tiên nó cần một lựa chọn Run as trên trang nhật ký. Hãy thêm nó vào truy vấn cảnh báo nếu bạn cần.",
+        "thresholdColumnGuessed": "Ngưỡng đã được áp dụng cho {column}; hãy kiểm tra đó có phải là giá trị bạn muốn không.",
+        "thresholdNotCarried": "Ngưỡng {value} từ biểu đồ không được áp dụng vì bạn đã chọn một truy vấn khác."
       }
     },
     "saveFailed": "Không thể lưu cảnh báo.",
