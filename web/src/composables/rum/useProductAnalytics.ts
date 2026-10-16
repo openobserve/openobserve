@@ -62,6 +62,7 @@ import {
   parsePathsDef,
   parseRetentionDef,
   parseScope,
+  pinnedAfter,
   resolveIdentity,
   samplingRatio,
   stepRefParam,
@@ -804,7 +805,13 @@ export default function useProductAnalytics() {
     // A saved funnel keeps a deleted event's step, tagged, so it stays editable.
     const saved = !!openedFunnel.value || !!pendingSavedId.value;
     if (!saved && f.steps.some(missing)) {
-      funnel.value = { ...f, steps: f.steps.filter((s) => !missing(s)) };
+      const pos = (k: number) =>
+        missing(f.steps[k - 1]) ? null : f.steps.slice(0, k).filter((s) => !missing(s)).length;
+      funnel.value = {
+        ...f,
+        steps: f.steps.filter((s) => !missing(s)),
+        breakdown: pinnedAfter(f.breakdown, pos),
+      };
       dropped = true;
     }
     const p = dropCohortSteps(paths.value, missing);

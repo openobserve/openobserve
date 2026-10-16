@@ -2099,6 +2099,7 @@
         "reachedNoValue": "Reached step {step}, no value",
         "breakdownFromStep": "{field} is set at step {step} on {covered} of {reached} {unit} that reached it, so value rates start at step {step}.",
         "breakdownFromAnyStep": "{field} is set on {covered} of {reached} {unit} at some step, so value rates start at step 1.",
+        "breakdownFieldMissing": "{field} is not a field in this app's data, so all {unit} read as not set.",
         "total": "Total",
         "conversion": "Conversion",
         "usersFallback": "This link counts users, but no user identity resolves for this app and range, so it counts sessions.",

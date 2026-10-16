@@ -1639,7 +1639,9 @@ const breakdownField = (scope: AnalyticsScope, def: FunnelDef): DimSql | null =>
   if (isAttributeBreakdown(b)) {
     if (!has(scope, b.f)) return null;
     // Empty text reads as no value, and MIN would otherwise pick it over a real one.
-    return { col: `NULLIF(${filterValue(b.f)}, '')`, attr: true, step: b.s ?? null };
+    // A pin past the last step can only come from a stale definition, and reads as automatic.
+    const step = b.s !== undefined && b.s <= def.steps.length ? b.s : null;
+    return { col: `NULLIF(${filterValue(b.f)}, '')`, attr: true, step };
   }
   const field = DIMENSIONS[b];
   // Every scope already filters on application_id, so the stream always has it.
@@ -1655,7 +1657,7 @@ const sessionDim = (dim: DimSql, n: number): string => {
     const any = range1(n)
       .map((i) => `m${i} = 1`)
       .join(" OR ");
-    return `first_value(dim ORDER BY CASE WHEN dim IS NOT NULL AND (${any}) THEN 0 ELSE 1 END, t) AS dim`;
+    return `first_value(CASE WHEN ${any} THEN dim END ORDER BY CASE WHEN dim IS NOT NULL AND (${any}) THEN 0 ELSE 1 END, t) AS dim`;
   }
   const k = dim.step;
   return `first_value(CASE WHEN m${k} = 1 THEN dim END ORDER BY CASE WHEN m${k} = 1 AND dim IS NOT NULL THEN 0 ELSE 1 END, t) AS dim`;
@@ -1750,7 +1752,7 @@ export function funnelTrendSql(
       `SELECT ${bk} AS bk, SUM(r${a}) AS ca, SUM(r${b}) AS cb FROM ${from}${users ? " AND" : " WHERE"} r${a} = 1 GROUP BY bk ORDER BY bk LIMIT ${m}`,
     );
   }
-  // Ranked by step-1 units, like the breakdown table, so both show the same values.
+  // Ranked by step-1 units like a built-in breakdown table; an attribute table ranks from its start step instead.
   const top = `un = 0 AND rk <= ${BREAKDOWN_TOP}`;
   return withCtes(
     [
@@ -1825,33 +1827,50 @@ export function funnelAlertSql(
 /** Sessions that opened step 1 (`opened`) and those of them inside Filter all steps (`kept`), for "Why N?". */
 export function whyEnteredSql(scope: AnalyticsScope, def: FunnelDef, opts: BuildOpts): string {
   const s1 = def.steps[0];
-  const conds = [
-    ...(s1.f?.vc ?? []).map((c) => viewCondRaw(c, scope)),
-    ...(s1.f?.pc ?? []).map((r) => rowFilterMatch(scope, r)),
-  ]
-    .map((c) => ` AND ${c}`)
-    .join("");
+  const conds = (s1.f?.vc ?? []).map((c) => ` AND ${viewCondRaw(c, scope)}`).join("");
   const opened = `(${stepPredicateRaw(s1, scope, opts.events)}${conds})`;
   const keeps = funnelFilters(def, false).map((r) => rowFilterMatch(scope, r));
   const kept = [opened, ...keeps].join(" AND ");
   const base = sessionPass(scope);
   const ids = funnelFilters(def, true);
   const widen = `${base?.widen ?? ""}${sessionFilterWiden(scope, ids)}`;
-  const g = [
-    "session_id AS sid",
-    `MAX(CASE WHEN ${opened} THEN 1 ELSE 0 END) AS o1`,
-    `MAX(CASE WHEN ${kept} THEN 1 ELSE 0 END) AS k1`,
-    ...sessionFilterFlags(scope, ids),
-    ...(base ? [base.xi] : []),
-  ];
+  const pc = s1.f?.pc ?? [];
+  const where = `"_rumdata" WHERE ${scopeClause(scope, opts.sample)} AND (${opened}${widen})`;
+  const flags = [...sessionFilterFlags(scope, ids), ...(base ? [base.xi] : [])];
   const inFilter = ["k1 = 1", ...ids.map((r, i) => sessionFilterKeep(r, `ki${i + 1}`))].join(
     " AND ",
   );
+  const tail = `SELECT SUM(o1) AS opened, SUM(CASE WHEN ${inFilter} THEN 1 ELSE 0 END) AS kept FROM g${base ? " WHERE xi = 0" : ""} LIMIT 1`;
+  if (!pc.length) {
+    const g = [
+      "session_id AS sid",
+      `MAX(CASE WHEN ${opened} THEN 1 ELSE 0 END) AS o1`,
+      `MAX(CASE WHEN ${kept} THEN 1 ELSE 0 END) AS k1`,
+      ...flags,
+    ];
+    return withCtes([`g AS (SELECT ${g.join(", ")} FROM ${where} GROUP BY session_id)`], tail);
+  }
+  // As in the funnel, a property rule holds when any row of step 1's view or action group matches it.
+  const g0 = [
+    "session_id AS sid",
+    `MAX(CASE WHEN ${opened} THEN 1 ELSE 0 END) AS o0`,
+    `MAX(CASE WHEN ${kept} THEN 1 ELSE 0 END) AS k0`,
+    ...pc.map((r, j) => `MAX(CASE WHEN ${filterMatch(scope, r)} THEN 1 ELSE 0 END) AS p${j + 1}`),
+    ...flags,
+  ];
+  const props = pc.map((r, j) => ` AND ${sessionFilterKeep(r, `p${j + 1}`)}`).join("");
+  const g = [
+    "sid",
+    `MAX(CASE WHEN o0 = 1${props} THEN 1 ELSE 0 END) AS o1`,
+    `MAX(CASE WHEN k0 = 1${props} THEN 1 ELSE 0 END) AS k1`,
+    ...flags.map((c) => colAlias(c)).map((c) => `MAX(${c}) AS ${c}`),
+  ];
   return withCtes(
     [
-      `g AS (SELECT ${g.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, opts.sample)} AND (${opened}${widen}) GROUP BY session_id)`,
+      `g0 AS (SELECT ${g0.join(", ")} FROM ${where} GROUP BY session_id, type, ${groupKey(scope, true)})`,
+      `g AS (SELECT ${g.join(", ")} FROM g0 GROUP BY sid)`,
     ],
-    `SELECT SUM(o1) AS opened, SUM(CASE WHEN ${inFilter} THEN 1 ELSE 0 END) AS kept FROM g${base ? " WHERE xi = 0" : ""} LIMIT 1`,
+    tail,
   );
 }
 

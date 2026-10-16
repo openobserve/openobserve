@@ -632,6 +632,25 @@ describe("AnalyticsFunnels", () => {
     );
   });
 
+  it("says when a linked attribute breakdown names a field this app's data lacks", async () => {
+    await mountFunnels();
+    await setSteps([
+      ["p", "/a"],
+      ["c", "b"],
+    ]);
+    useProductAnalytics().funnel.value = {
+      ...useProductAnalytics().funnel.value,
+      breakdown: { f: "context_missing" },
+    };
+    await settle();
+    expect(text("rum-analytics-funnel-breakdown-start")).toBe(
+      "context_missing is not a field in this app's data, so all sessions read as not set.",
+    );
+    expect((decodeDef(router.currentRoute.value.query.funnel as string) as { b: string }).b).toBe(
+      "context_missing",
+    );
+  });
+
   it("a drop-off opens the drawer for that step in one click and See paths hands over the cohort (AC-16, AC-25)", async () => {
     await mountFunnels();
     await setSteps([
