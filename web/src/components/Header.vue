@@ -225,7 +225,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            Leads the utility-icon cluster, set off by a separator from the
            org selector so it reads as the primary action in this group.
            Shown locked (not hidden) in builds that don't unlock it. -->
-          <template v-if="aiButtonVisible">
+          <AssistantHeaderButton v-if="assistantV2" />
+          <template v-else-if="aiButtonVisible">
             <OButton
               variant="ghost"
               size="icon-toolbar"
@@ -476,7 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType, computed, nextTick, ref } from "vue";
+import { defineAsyncComponent, defineComponent, PropType, computed, nextTick, ref } from "vue";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
@@ -497,10 +498,15 @@ import { isGateOpen, useNavGateContext } from "@/lib/core/Navbar/useNavGateConte
 
 import { getImageURL } from "@/utils/zincutils";
 import { chartColor } from "@/utils/chartTheme";
+import { isAssistantV2 } from "@/composables/assistant/flags";
 
 export default defineComponent({
   name: "HeaderComponent",
   components: {
+    // Async, so the flag-off build never loads the assistant chunk.
+    AssistantHeaderButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantHeaderButton.vue"),
+    ),
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OrganizationSelector,
@@ -619,6 +625,7 @@ export default defineComponent({
     const showLanguageSubmenu = ref(false);
     const languageListRef = ref<HTMLElement | null>(null);
     const { lgUp } = useBreakpoint();
+    const assistantV2 = isAssistantV2();
 
     const languageItems = (): HTMLElement[] =>
       Array.from(
@@ -809,6 +816,7 @@ export default defineComponent({
     };
 
     return {
+      assistantV2,
       isDark,
       t,
       raw,

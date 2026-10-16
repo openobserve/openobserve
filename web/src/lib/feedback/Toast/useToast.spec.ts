@@ -92,6 +92,16 @@ describe("toast()", () => {
     const unique = new Set(ids);
     expect(unique.size).toBe(3);
   });
+
+  it("keeps mask and live on the record only when given", () => {
+    toast({ message: "Answer ready", mask: true, live: "off" });
+    toast({ message: "Saved" });
+    const [masked, plain] = toastRecords.slice(-2);
+    expect(masked.mask).toBe(true);
+    expect(masked.live).toBe("off");
+    expect("mask" in plain).toBe(false);
+    expect("live" in plain).toBe(false);
+  });
 });
 
 describe("useToast()", () => {

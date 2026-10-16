@@ -1,0 +1,217 @@
+// Copyright 2026 OpenObserve Inc.
+// WP-04 shell flows with the flag on (SHELL-01, 02, 08, the full view and A11Y-09); WP-05 adds the composer half.
+
+import { test, expect } from "@playwright/test";
+import { AssistantPage } from "../../pages/assistantPage.js";
+
+// Playwright compiles a static import to require(), which would load the .mjs harness as CommonJS; import() keeps it ESM.
+const loadHarness = () => import("./harness/setup.mjs");
+
+test.describe("assistant shell", () => {
+  let assistant;
+  let harness;
+
+  const logsUrl = () =>
+    `${harness.ENV.appUrl}/logs?org_identifier=${harness.ENV.org}&stream=e2e_automate&stream_type=logs`;
+
+  async function gotoLogs(page) {
+    await page.goto(logsUrl(), { waitUntil: "domcontentloaded" });
+    await expect(assistant.headerButton).toHaveAttribute("data-state", "idle", {
+      timeout: 30_000,
+    });
+  }
+
+  test.beforeEach(async ({ context, page }) => {
+    harness = await loadHarness();
+    await harness.setFlag(context, true);
+    await harness.installMocks(context, harness.createMockState());
+    await harness.login(page);
+    assistant = new AssistantPage(page);
+  });
+
+  test("SHELL-01 the chord opens the sidebar, focuses it and never closes it", async ({
+    page,
+  }) => {
+    await gotoLogs(page);
+    await page.locator("body").click({ position: { x: 5, y: 300 } });
+    await assistant.open("chord");
+    await expect(assistant.sidebar).toBeVisible();
+    const focusedInside = () =>
+      page.evaluate(
+        () => !!document.activeElement?.closest("[data-assistant-root]"),
+      );
+    await expect.poll(focusedInside).toBe(true);
+    await page.keyboard.press("ControlOrMeta+i");
+    await expect(assistant.sidebar).toBeVisible();
+    const events = await harness.captureTelemetry(page);
+    expect(
+      events
+        .filter((e) => e.name === "ai_shortcut")
+        .map((e) => e.properties.effect),
+    ).toEqual(expect.arrayContaining(["open"]));
+  });
+
+  test("SHELL-02 Escape closes the menu first, then the container, and focus returns to the button", async ({
+    page,
+  }) => {
+    await gotoLogs(page);
+    await assistant.open("header");
+    await expect(assistant.headerButton).toHaveAttribute("data-state", "open");
+    await expect(assistant.headerButton).toHaveAttribute(
+      "aria-label",
+      "O2 Assistant, open",
+    );
+    await assistant.sidebar
+      .locator('[data-test="assistant-shell-menu"]')
+      .click();
+    const menu = page.locator('[role="menu"]');
+    await expect(menu).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    await expect(assistant.sidebar).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(assistant.sidebar).toBeHidden();
+    await expect(assistant.headerButton).toBeFocused();
+    await expect(
+      page.locator('[data-test="assistant-container-status"]'),
+    ).toHaveText("O2 Assistant closed.");
+    await expect(assistant.headerButton).toHaveAttribute("data-state", "idle");
+  });
+
+  test("the empty sidebar shows the welcome with grounded starters and the chrome", async ({
+    page,
+  }) => {
+    await gotoLogs(page);
+    await assistant.open("header");
+    await expect(assistant.welcome).toBeVisible();
+    await expect(
+      assistant.welcome.locator('[data-test="assistant-welcome-capability"]'),
+    ).toContainText("It runs read-only queries");
+    await expect(
+      assistant.welcome.locator('[data-test^="assistant-starter-"]'),
+    ).toHaveCount(3);
+    await expect(assistant.sidebar).toHaveAttribute(
+      "aria-label",
+      "O2 Assistant",
+    );
+    await expect(
+      assistant.sidebar.locator('[data-test="assistant-shell-close"]'),
+    ).toHaveAttribute("aria-label", "Close O2 Assistant");
+    const aiRequests = await page.evaluate(
+      () => window.__o2mock.requests.length,
+    );
+    expect(aiRequests).toBe(0);
+  });
+
+  test("the full view takes over from the sidebar and hands the session back", async ({
+    page,
+  }) => {
+    await gotoLogs(page);
+    await assistant.open("header");
+    await assistant.sidebar
+      .locator('[data-test="assistant-shell-open-in-full-view"]')
+      .click();
+    await expect(page).toHaveURL(/\/assistant\//);
+    await expect(page.locator('[data-test="assistant-container-status"]')).not.toHaveText(/closed/);
+    await expect(assistant.full).toBeVisible();
+    await expect(
+      page.locator('[data-test="assistant-welcome"][data-variant="roomy"]'),
+    ).toBeVisible();
+    await expect(page).toHaveTitle(/O2 Assistant/);
+    const landmarks = page.locator(
+      'aside[aria-label="O2 Assistant"], [role="region"][aria-label="O2 Assistant"]',
+    );
+    await expect(landmarks.filter({ visible: true })).toHaveCount(1);
+    await expect(assistant.headerButton).toHaveAttribute("data-state", "open");
+    await assistant.full.locator('[data-test="assistant-shell-menu"]').click();
+    await page.locator('[data-test="assistant-shell-open-in-sidebar"]').click();
+    await expect(page).toHaveURL(/\/logs/);
+    await expect(assistant.sidebar).toBeVisible();
+  });
+
+  test("SHELL-08 below lg the sidebar is a non-modal snap sheet that insets the page", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await gotoLogs(page);
+    await assistant.open("header");
+    const sheet = assistant.sheet;
+    await expect(sheet).toHaveAttribute("role", "dialog");
+    await expect(sheet).toHaveAttribute("aria-modal", "false");
+    await expect(sheet).toHaveAttribute("aria-label", "O2 Assistant");
+    await expect(sheet).toHaveAttribute("data-snap", "half");
+    const focusedInside = () =>
+      page.evaluate(() => !!document.activeElement?.closest("[data-assistant-root]"));
+    await expect.poll(focusedInside).toBe(true);
+    await expect(sheet.locator('[data-test="assistant-status-region"]')).toHaveText("O2 Assistant opened.");
+    await sheet.locator('[data-test="assistant-shell-sheet-peek"]').click();
+    await expect(sheet).toHaveAttribute("data-snap", "peek");
+    await expect(sheet.locator('[data-test="assistant-shell-sheet-peek-row"]')).toContainText("New chat");
+    await sheet.locator('[data-test="assistant-shell-sheet-peek-row"]').click();
+    await expect(sheet).toHaveAttribute("data-snap", "half");
+    await sheet.locator('[data-test="assistant-shell-sheet-expand"]').click();
+    await expect(sheet).toHaveAttribute("data-snap", "full");
+    await sheet.locator('[data-test="assistant-shell-sheet-peek"]').click();
+    await expect(sheet).toHaveAttribute("data-snap", "half");
+    const inset = await page.evaluate(() =>
+      Number(
+        document.documentElement.style.getPropertyValue(
+          "--o-assistant-inset-bottom",
+        ),
+      ),
+    );
+    expect(inset).toBeGreaterThan(300);
+    const padding = await page.evaluate(
+      () =>
+        getComputedStyle(document.querySelector(".o2-content-scroll"))
+          .paddingBottom,
+    );
+    expect(parseFloat(padding)).toBeGreaterThan(300);
+    await expect(
+      page.locator('[data-test="assistant-container-status"]'),
+    ).toHaveText("Collapsed.");
+  });
+
+  test("A11Y-09 no page control Tab reaches lies under the sheet", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await gotoLogs(page);
+    await assistant.open("header");
+    const sheetTop = await assistant.sheet.evaluate(
+      (el) => el.getBoundingClientRect().top,
+    );
+    await page.locator('[data-test="main-content"]').evaluate((el) => {
+      const first = el.querySelector("button, a[href], input, [tabindex='0']");
+      first?.focus();
+    });
+    const obscured = [];
+    for (let i = 0; i < 40; i++) {
+      const hit = await page.evaluate((top) => {
+        const el = document.activeElement;
+        if (
+          !el ||
+          el.closest("[data-assistant-root]") ||
+          !el.closest('[data-test="main-content"]')
+        )
+          return null;
+        const rect = el.getBoundingClientRect();
+        if (rect.height === 0) return null;
+        return rect.bottom > top + 1
+          ? (el.getAttribute("data-test") ?? el.tagName)
+          : null;
+      }, sheetTop);
+      if (hit) obscured.push(hit);
+      await page.keyboard.press("Tab");
+    }
+    expect(obscured).toEqual([]);
+    const contentBottom = await page
+      .locator(".o2-content-scroll")
+      .evaluate(
+        (el) =>
+          el.getBoundingClientRect().bottom -
+          parseFloat(getComputedStyle(el).paddingBottom),
+      );
+    expect(contentBottom).toBeLessThanOrEqual(sheetTop + 1);
+  });
+});

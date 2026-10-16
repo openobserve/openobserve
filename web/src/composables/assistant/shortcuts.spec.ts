@@ -28,6 +28,7 @@ import { resetAssistantV2ForTests } from "./flags";
 import {
   onAssistantOpen,
   registerAssistantFocusTarget,
+  registerContainerCloser,
   registerEscapeRung,
   resetAssistantShortcutsForTests,
   runEscapeLadder,
@@ -223,6 +224,64 @@ describe("the Escape ladder", () => {
     expect(closeDialog).toHaveBeenCalledTimes(1);
     expect(rung).toHaveBeenCalledTimes(1);
     wrapper.unmount();
+  });
+});
+
+describe("container rungs f and h", () => {
+  const rootWith = (placement: string) => {
+    const root = document.createElement("div");
+    root.setAttribute("data-assistant-root", "");
+    root.dataset.placement = placement;
+    const input = document.createElement("textarea");
+    root.appendChild(input);
+    document.body.appendChild(root);
+    return input;
+  };
+  const escapeFrom = (target: Element) => {
+    const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true });
+    Object.defineProperty(event, "target", { value: target });
+    return event;
+  };
+
+  it("closes the sidebar or sheet from anywhere inside it, the composer included", async () => {
+    const { wrapper } = mountShortcuts("available");
+    await flushPromises();
+    const close = vi.fn();
+    registerContainerCloser(close);
+    expect(runEscapeLadder(escapeFrom(rootWith("sidebar")))).toBe(true);
+    expect(close).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
+
+  it("keeps the full view open and swallows the key there", async () => {
+    const { wrapper } = mountShortcuts("available");
+    await flushPromises();
+    const close = vi.fn();
+    registerContainerCloser(close);
+    expect(runEscapeLadder(escapeFrom(rootWith("full")))).toBe(true);
+    expect(close).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("leaves a docked container to rung g and an IME candidate list alone", async () => {
+    const { wrapper } = mountShortcuts("available");
+    await flushPromises();
+    const close = vi.fn();
+    registerContainerCloser(close);
+    expect(runEscapeLadder(escapeFrom(rootWith("docked")))).toBe(false);
+    const composing = new KeyboardEvent("keydown", { key: "Escape", isComposing: true });
+    expect(runEscapeLadder(composing)).toBe(false);
+    expect(close).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("drops the rungs when the binding unmounts", async () => {
+    const { wrapper } = mountShortcuts("available");
+    await flushPromises();
+    const close = vi.fn();
+    registerContainerCloser(close);
+    wrapper.unmount();
+    expect(runEscapeLadder(escapeFrom(rootWith("sidebar")))).toBe(false);
   });
 });
 
