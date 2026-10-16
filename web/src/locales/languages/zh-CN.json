@@ -1478,7 +1478,7 @@
     "runQuery": "运行查询",
     "runOptions": "运行选项",
     "timeSeriesTitle": "性能值时间序列",
-    "viewTop": "Top 表",
+    "viewTop": "热门表",
     "viewFlame": "火焰图",
     "viewTree": "调用树",
     "childCount": "{count} 个子节点",

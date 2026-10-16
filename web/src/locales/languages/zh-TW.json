@@ -1478,7 +1478,7 @@
     "runQuery": "執行查詢",
     "runOptions": "執行選項",
     "timeSeriesTitle": "剖析值隨時間變化",
-    "viewTop": "排名表格",
+    "viewTop": "熱門表格",
     "viewFlame": "火焰圖",
     "viewTree": "呼叫樹",
     "childCount": "{count} 個子節點",

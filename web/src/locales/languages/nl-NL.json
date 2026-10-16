@@ -1480,7 +1480,7 @@
     "timeSeriesTitle": "Profielwaarden in de tijd",
     "viewTop": "Toptabel",
     "viewFlame": "Vlammengrafiek",
-    "viewTree": "Aanroepboom",
+    "viewTree": "Oproepboom",
     "childCount": "{count} kind | {count} kinderen",
     "nodeCount": "{count} knooppunt | {count} knooppunten",
     "viewSandwich": "Sandwich",
