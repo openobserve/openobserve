@@ -14575,7 +14575,6 @@
   },
   "nlMode": {
     "executingTool": "09bfb9b1fff74e37",
-    "noAdditionalOptions": "753995618ef61568",
     "processing": "f40a853e58a18759",
     "toggle": "1bccca661d1a65f1",
     "toolFailed": "b55600b1dc0467de"
@@ -19071,8 +19070,6 @@
     "functionErrorLabel": "1a4e1c8d58ec9068",
     "functionLabel": "c803710302d5769d",
     "functionPlaceholder": "3f3563e6f0504c3a",
-    "generateQuery": "ea9e45ac7083cf49",
-    "generateQueryTooltip": "e09a89c28311c28c",
     "generatingQuery": "6e2eda4d82b1411d",
     "hide": "ac20a57bfde0bbc4",
     "hideHistogram": "458ad0c60e466c24",

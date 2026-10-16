@@ -1132,8 +1132,6 @@
     "regionTitle": "選擇區域",
     "userDefinedSchemaLabel": "使用者定義結構描述",
     "allFieldsLabel": "所有欄位",
-    "generateQuery": "詢問 AI",
-    "generateQueryTooltip": "請 AI 協助查詢",
     "nlQueryGenerationFailed": "查詢產生失敗，請重試。",
     "askAIPlaceholder": "請 AI 協助查詢...",
     "askAIFunctionPlaceholder": "請 AI 協助函式...",
@@ -13341,7 +13339,6 @@
   },
   "nlMode": {
     "toggle": "自然語言模式",
-    "noAdditionalOptions": "無額外選項",
     "executingTool": "正在執行 {tool}...",
     "toolFailed": "工具失敗：{message}",
     "processing": "處理中..."

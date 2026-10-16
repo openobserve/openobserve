@@ -1132,8 +1132,6 @@
     "regionTitle": "Wählen Sie eine Region",
     "userDefinedSchemaLabel": "Benutzerdefiniertes Schema",
     "allFieldsLabel": "Alle Felder",
-    "generateQuery": "Frag KI",
-    "generateQueryTooltip": "Bitten Sie KI um Hilfe bei Ihrer Anfrage",
     "nlQueryGenerationFailed": "Die Abfrage konnte nicht generiert werden. Bitte versuchen Sie es erneut.",
     "askAIPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Anfrage...",
     "askAIFunctionPlaceholder": "Bitten Sie KI um Hilfe bei Ihrer Funktion...",
@@ -13346,7 +13344,6 @@
   },
   "nlMode": {
     "toggle": "Modus für natürliche Sprache",
-    "noAdditionalOptions": "Keine zusätzlichen Optionen",
     "executingTool": "Ausführung von {tool}...",
     "toolFailed": "Tool fehlgeschlagen: {message}",
     "processing": "Verarbeitung..."

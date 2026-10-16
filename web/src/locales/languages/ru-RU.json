@@ -1132,8 +1132,6 @@
     "regionTitle": "Выберите регион",
     "userDefinedSchemaLabel": "Схема, определённая пользователем",
     "allFieldsLabel": "Все поля",
-    "generateQuery": "Спросить AI",
-    "generateQueryTooltip": "Попросите AI помочь с запросом",
     "nlQueryGenerationFailed": "Не удалось сгенерировать запрос. Пожалуйста, попробуйте снова.",
     "askAIPlaceholder": "Попросите AI помочь с запросом...",
     "askAIFunctionPlaceholder": "Попросите AI помочь с функцией...",
@@ -13346,7 +13344,6 @@
   },
   "nlMode": {
     "toggle": "Режим естественного языка",
-    "noAdditionalOptions": "Нет дополнительных опций",
     "executingTool": "Выполняется {tool}...",
     "toolFailed": "Сбой инструмента: {message}",
     "processing": "Обработка..."

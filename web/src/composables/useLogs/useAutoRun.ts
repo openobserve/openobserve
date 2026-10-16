@@ -165,8 +165,6 @@ export interface AutoRunBlocked {
 
 export interface AutoRunMeta {
   liveMode: boolean;
-  nlpMode?: boolean;
-  nlDetected?: boolean;
   editorDirty?: boolean;
   executed?: ExecutedRecord | null;
   lastRunAttempt?: Pick<ExecutedRecord, "generation" | "signature"> | null;
@@ -428,7 +426,7 @@ function patchRequestBounds(req: unknown, startUs: number, endUs: number): void 
 }
 
 export function isAutoRunActive(config: AutoRunConfig, meta: AutoRunMeta): boolean {
-  return !!config.auto_query_enabled && !!meta.liveMode && !(meta.nlDetected && !meta.nlpMode);
+  return !!config.auto_query_enabled && !!meta.liveMode;
 }
 
 export function isGuardActive(config: AutoRunConfig): boolean {
