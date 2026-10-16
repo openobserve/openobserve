@@ -52,7 +52,12 @@ test.describe("Report History", () => {
     // The trigger response carries the run row, so it shows before the stream copy is searchable.
     const firstStatus = page.locator('[data-test="reports-reportrunhistory-status"]').first();
     await expect(firstStatus).toBeVisible({ timeout: 120000 });
-    await expect(page.locator('[data-test="reports-reportrunhistory-table"]')).toContainText('Manual');
+    const firstTriggerSource = page
+      .locator(
+        '[data-test="reports-reportrunhistory-table"] [data-test="o2-table-cell-trigger_source"]'
+      )
+      .first();
+    await expect(firstTriggerSource).toContainText('Manual');
 
     testLogger.info('Opening the run drawer from the row');
     await firstStatus.click();
