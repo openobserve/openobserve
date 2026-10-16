@@ -29,8 +29,38 @@ function buildPanel(id, title, index) {
         fields: {
           stream: STREAM,
           stream_type: "logs",
-          x: [{ label: "Timestamp", alias: "x_axis_1", column: "_timestamp", color: null, aggregationFunction: "histogram" }],
-          y: [{ label: "Count", alias: "y_axis_1", column: "_timestamp", color: "#5960b2", aggregationFunction: "count" }],
+          // v8 field shape, as the app's DEFAULT_SQL_X_FIELD / DEFAULT_SQL_Y_FIELD_COUNT build it; the panel editor rejects v5 fields.
+          x: [
+            {
+              label: "Timestamp",
+              alias: "x_axis_1",
+              column: "_timestamp",
+              color: null,
+              type: "build",
+              functionName: "histogram",
+              args: [
+                { type: "field", value: { field: "_timestamp" } },
+                { type: "histogramInterval", value: null },
+              ],
+              sortBy: "ASC",
+              isDerived: false,
+              havingConditions: [],
+            },
+          ],
+          y: [
+            {
+              label: "Count",
+              alias: "y_axis_1",
+              column: "_timestamp",
+              color: "#5960b2",
+              type: "build",
+              functionName: "count",
+              args: [{ type: "field", value: { field: "_timestamp" } }],
+              sortBy: null,
+              isDerived: false,
+              havingConditions: [],
+            },
+          ],
           z: [],
           breakdown: [],
           filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
