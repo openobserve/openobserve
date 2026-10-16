@@ -1,0 +1,31 @@
+{
+  "feature_slug": "create-alert-from-panel",
+  "feature_title": "Create Alert from Dashboard Panel",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "alerts-from-panel.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-from-panel.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alerts/CreateAlertFromSourceDialog.vue",
+    "web/src/composables/dashboard/usePanelActions.ts",
+    "web/src/utils/alerts/prefill/fromPanel.ts",
+    "web/src/utils/alerts/alertSourceRegistry.ts",
+    "web/src/components/dashboards/panels/ChartRenderer.vue",
+    "web/src/components/dashboards/PanelContainer.vue",
+    "web/src/composables/useAlertForm.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 39 changed paths live under web/src/** plus scripts/translations/.translation_state.json; none are under enterprise/, o2_enterprise/, or any enterprise-owned module, and no enterprise keywords (SAML/SSO/SDR/cipher/etc.) appear. This is an open-source frontend change, so edition is oss.",
+    "skip": "No opt-out marker is present: trigger_comment.txt and feature_hint.txt are empty and no tests-added label was passed. The diff touches user-facing Vue components and composables (alert dialog, dashboard panels, chart renderer), so it is not docs-only or CI-only and does not get skipped.",
+    "e2e": "The change reworks a real UI flow: right-clicking a series on a dashboard chart and creating an alert from it. It adds a multi-query picker, a colorized query preview with a copy button in the confirm dialog, and injects SQL thresholds as HAVING clauses. These are user-exercisable interactions in web/src/** and warrant an E2E spec.",
+    "area": "The functional core lives in web/src/components/alerts/, web/src/composables/, and web/src/utils/alerts/ (prefill from panel, alert source registry, confirm dialog), and the outcome is alert creation. The existing Alerts E2E folder (alerts-*.spec.js) is the closest home even though the entry point is a dashboard panel.",
+    "group": "The Alerts shard group already runs alerts-e2e-flow, alerts-ui-operations, alerts-advanced, and siblings, so an alerts-from-panel spec belongs there rather than creating a new shard.",
+    "existing_tests": "No E2E specs in the diff. The only test files changed are Vitest unit tests under web/src/** (*.spec.ts) and Rust/none backend tests, none of which are Playwright E2E coverage under tests/ui-testing/playwright-tests/."
+  }
+}

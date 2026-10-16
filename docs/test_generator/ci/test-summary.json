@@ -1,0 +1,27 @@
+[
+  {
+    "title": "should open the query-picker confirm dialog from a multi-query panel and land on the pre-filled alert form",
+    "action": "new",
+    "verifies": "a panel with two visible SQL queries opens the confirm dialog in pickQueryOnly mode (query picker + picked query, threshold/window/preview suppressed) and Continue routes to the pre-filled alert form"
+  },
+  {
+    "title": "should update the picked-query text when a different query is selected in the dialog",
+    "action": "new",
+    "verifies": "selecting the other query re-runs the panel adapter and the picked-query text follows the selection"
+  },
+  {
+    "title": "should close the confirm dialog on Cancel and stay on the dashboard",
+    "action": "new",
+    "verifies": "Cancel closes the confirm dialog with no route change to the alert form"
+  },
+  {
+    "title": "should disable the Create Alert menu item with a reason when the panel has no visible query",
+    "action": "new",
+    "verifies": "a panel with all queries hidden renders the Create Alert item disabled with the no-queries reason"
+  },
+  {
+    "title": "should block Continue in the confirm dialog when the prefill carries an unresolved-query warning — deferred: unresolved-variable panel setup unproven in CI (fromPanel.ts:293-295)",
+    "action": "new",
+    "verifies": "a blocking unresolved-query warning disables Continue in the confirm dialog (deferred: setup not deterministic in CI)"
+  }
+]

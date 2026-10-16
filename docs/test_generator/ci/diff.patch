@@ -1,0 +1,4087 @@
+===== COMPLETE LIST OF CHANGED FILES (39 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+scripts/translations/.translation_state.json
+web/src/components/alerts/AddAlert.panelPrefill.spec.ts
+web/src/components/alerts/CreateAlertFromSourceDialog.spec.ts
+web/src/components/alerts/CreateAlertFromSourceDialog.vue
+web/src/components/dashboards/PanelContainer.spec.ts
+web/src/components/dashboards/PanelContainer.vue
+web/src/components/dashboards/PanelSchemaRenderer.spec.ts
+web/src/components/dashboards/PanelSchemaRenderer.vue
+web/src/components/dashboards/panels/ChartRenderer.spec.ts
+web/src/components/dashboards/panels/ChartRenderer.vue
+web/src/components/dbm/DbmQueryText.vue
+web/src/composables/dashboard/usePanelActions.spec.ts
+web/src/composables/dashboard/usePanelActions.ts
+web/src/composables/useAlertForm.ts
+web/src/composables/useColorizedQuery.spec.ts
+web/src/composables/useColorizedQuery.ts
+web/src/locales/languages/ar-SA.json
+web/src/locales/languages/de-DE.json
+web/src/locales/languages/en-US.json
+web/src/locales/languages/es-ES.json
+web/src/locales/languages/fr-FR.json
+web/src/locales/languages/it-IT.json
+web/src/locales/languages/ja-JP.json
+web/src/locales/languages/ko-KR.json
+web/src/locales/languages/nl-NL.json
+web/src/locales/languages/pl-PL.json
+web/src/locales/languages/pt-PT.json
+web/src/locales/languages/ru-RU.json
+web/src/locales/languages/tr-TR.json
+web/src/locales/languages/vi-VN.json
+web/src/locales/languages/zh-CN.json
+web/src/locales/languages/zh-TW.json
+web/src/utils/alerts/alertSourceRegistry.spec.ts
+web/src/utils/alerts/alertSourceRegistry.ts
+web/src/utils/alerts/prefill/fromPanel.spec.ts
+web/src/utils/alerts/prefill/fromPanel.ts
+web/src/utils/dashboard/lineSeriesAtPoint.spec.ts
+web/src/utils/dashboard/lineSeriesAtPoint.ts
+web/src/utils/dashboard/lineStrokeEvents.spec.ts
+===== END CHANGED FILES =====
+
+diff --git a/scripts/translations/.translation_state.json b/scripts/translations/.translation_state.json
+index d03d957a5893..968a2f12d434 100644
+--- a/scripts/translations/.translation_state.json
++++ b/scripts/translations/.translation_state.json
+@@ -4688,6 +4688,7 @@
+         "patternsNone": "d4fdd8f09e4bbfb2",
+         "patternsScopeAll": "d545cfadc92b6638",
+         "patternsScopeFiltered": "84831d5cb11e2d69",
++        "pickQueryIntro": "eecbfe01444643f2",
+         "queryChoiceLabel": "30ef72d7baa09e82",
+         "queryChoiceOption": "7c9f5e99b9d5a837",
+         "queryCopied": "30c07770b92bac5d",
+@@ -4765,6 +4766,8 @@
+         "savedFunctionCopied": "9910ad637d3c9e37",
+         "sqlModeFilterDropped": "91395d8105dd72fd",
+         "textFilterDropped": "1af3560e95f9e483",
++        "thresholdColumnGuessed": "4595598009f195f5",
++        "thresholdNotCarried": "386d5f1dc39548e0",
+         "unresolvedQuery": "4cd999a9b4222ad7",
+         "unsupportedPanelType": "1f9928c4b86b85bb"
+       }
+diff --git a/web/src/components/alerts/AddAlert.panelPrefill.spec.ts b/web/src/components/alerts/AddAlert.panelPrefill.spec.ts
+new file mode 100644
+index 000000000000..298f02060887
+--- /dev/null
++++ b/web/src/components/alerts/AddAlert.panelPrefill.spec.ts
+@@ -0,0 +1,331 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++// A right-clicked threshold on a builder query must reach the saved alert once, as a HAVING in its SQL.
++
++import { flushPromises, mount } from "@vue/test-utils";
++import { describe, it, expect, vi, afterEach } from "vitest";
++import AddAlert from "@/components/alerts/AddAlert.vue";
++import store from "@/test/unit/helpers/store";
++import i18n from "@/locales";
++import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
++import { normalizePrefill, warn } from "@/utils/alerts/alertPrefill";
++import { ALERT_PREFILL_KEY } from "@/utils/alerts/alertPrefillStorage";
++import { usePanelAlertCreation } from "@/composables/dashboard/usePanelActions";
++import {
++  alertCreationDialog,
++  closeAlertCreationDialog,
++  rebuildAlertPrefill,
++} from "@/composables/alerts/useAlertCreation";
++import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
++
++vi.mock("@/composables/useStreams", () => ({
++  default: () => ({
++    getStream: vi.fn().mockResolvedValue({
++      schema: [
++        { name: "_timestamp", type: "int" },
++        { name: "level", type: "string" },
++      ],
++    }),
++    getStreams: vi.fn().mockResolvedValue({ list: [{ name: "triggers" }] }),
++  }),
++}));
++
++vi.mock("@/composables/useFunctions", () => ({
++  default: () => ({ getAllFunctions: vi.fn().mockResolvedValue({ functions: [] }) }),
++}));
++
++// The SQL preview asks the backend for the query's result shape; a GROUP BY shape keeps the chart a line.
++vi.mock("@/services/search", () => ({
++  default: {
++    search: vi.fn(),
++    result_schema: vi.fn(() =>
++      Promise.resolve({
++        data: {
++          group_by: ["k8s_cluster"],
++          projections: ["event_count", "k8s_cluster"],
++          timeseries_field: null,
++        },
++      }),
++    ),
++  },
++}));
++
++vi.mock("@/utils/zincutils", async () => {
++  const actual = await vi.importActual<typeof import("@/utils/zincutils")>("@/utils/zincutils");
++  return {
++    ...actual,
++    getUUID: vi.fn(() => "mock-uuid"),
++    getTimezonesByOffset: vi.fn(() => Promise.resolve(["UTC"])),
++  };
++});
++
++vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn(() => vi.fn()) }));
++
++// The form reads `route.query.prefill` to decide whether a prefill is pending.
++const prefillRoute = {
++  value: {
++    query: { prefill: "panel", folder: "default" },
++    params: {},
++    name: "addAlert",
++    path: "/alerts/add",
++  },
++};
++vi.mock("vue-router", async () => {
++  const actual = await vi.importActual<typeof import("vue-router")>("vue-router");
++  return {
++    ...actual,
++    useRouter: () => ({
++      currentRoute: prefillRoute,
++      push: vi.fn(),
++      replace: vi.fn(),
++      resolve: () => ({ href: "" }),
++    }),
++    useRoute: () => prefillRoute.value,
++  };
++});
++
++vi.mock("@/services/alerts", () => ({
++  default: {
++    create_by_alert_id: vi.fn(() => Promise.resolve({ data: {} })),
++    update_by_alert_id: vi.fn(() => Promise.resolve({ data: {} })),
++    generate_sql: vi.fn(() => Promise.resolve({ data: { sql: "SELECT * FROM test" } })),
++    listByFolderId: vi.fn(() => Promise.resolve({ data: { list: [] } })),
++  },
++}));
++vi.mock("@/services/anomaly_detection", () => ({ default: { get: vi.fn() } }));
++vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
++vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn() }) }));
++
++// QueryConfig stays real: it is what seeds the SQL and aggregation this spec checks.
++const stubs = {
++  AlertSettings: true,
++  CompareWithPast: true,
++  Deduplication: true,
++  Advanced: true,
++  PanelSchemaRenderer: true,
++  AlertSummary: true,
++  AnomalyDetectionConfig: true,
++  AnomalyAlerting: true,
++  AnomalySummary: true,
++  QueryEditor: true,
++  JsonEditor: true,
++  InlineSelectFolderDropdown: true,
++  OPageHeader: true,
++};
++
++const builtQuery = {
++  query:
++    'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "triggers" GROUP BY x_axis_1',
++  customQuery: false,
++  fields: {
++    stream: "triggers",
++    stream_type: "logs",
++    x: [{ alias: "x_axis_1" }],
++    y: [{ alias: "y_axis_1", column: "_timestamp", aggregationFunction: "count" }],
++  },
++};
++
++interface AlertFormView {
++  formData: {
++    query_condition: {
++      type: string;
++      sql: string;
++      aggregation: { having: Record<string, unknown> } | null;
++    };
++    trigger_condition: { threshold: number; operator: string };
++  };
++  getAlertPayload: () => {
++    query_condition: { type: string; sql: string; aggregation: unknown };
++    trigger_condition: { threshold: number; operator: string };
++  };
++}
++
++const formOf = (wrapper: ReturnType<typeof mount>) => wrapper.vm as unknown as AlertFormView;
++
++const openBuilderQuery = async (picked: boolean, guessed = false) => {
++  const prefill = buildPrefillFromPanel({
++    panelTitle: "Retries",
++    panelType: "line",
++    queryType: "sql",
++    queries: picked ? [builtQuery, builtQuery] : [builtQuery],
++    queryIndex: picked ? 1 : 0,
++    ...(picked
++      ? {
++          queryChoices: [
++            { index: 0, query: builtQuery.query },
++            { index: 1, query: builtQuery.query },
++          ],
++        }
++      : {}),
++    executedQuery: builtQuery.query,
++    threshold: 4.42,
++    condition: "above",
++    yAxisColumn: "y_axis_1",
++    timeRange: { value_type: "relative", relative_value: 15, relative_period: "Minutes" },
++  });
++  if (guessed)
++    prefill.warnings.push(warn("thresholdColumnGuessed", "warning", { column: "y_axis_1" }));
++  return mountWithPrefill(prefill);
++};
++
++const mountWithPrefill = async (prefill: AlertPrefill) => {
++  sessionStorage.setItem(ALERT_PREFILL_KEY, JSON.stringify(normalizePrefill(prefill)));
++  const wrapper = mount(AddAlert, {
++    global: { provide: { store }, plugins: [i18n], stubs },
++    props: { modelValue: {}, isUpdated: false, destinations: [] },
++  });
++  for (let round = 0; round < 5; round++) await flushPromises();
++  return wrapper;
++};
++
++/** Right-click query B's line, then pick builder query A in the dialog, as a user would. */
++const openAfterPickingAnotherQuery = async () => {
++  closeAlertCreationDialog();
++  usePanelAlertCreation({
++    panelSchema: {
++      value: { id: "p", title: "Retries", queryType: "sql", queries: [builtQuery, builtQuery] },
++    },
++    allowAlertCreation: { value: true },
++    metadata: { value: { queries: [] } },
++    selectedTimeObj: {
++      value: { value_type: "relative", relative_value: 15, relative_period: "Minutes" },
++    },
++    contextMenuData: { value: null },
++    store,
++    router: { push: vi.fn() },
++    emit: vi.fn(),
++  }).handleCreateAlert({ condition: "above", threshold: 4.42, panelQueryIndex: 1 });
++  rebuildAlertPrefill({ queryIndex: 0 });
++  const prefill = alertCreationDialog.value?.prefill;
++  closeAlertCreationDialog();
++  if (!prefill) throw new Error("the multi-query dialog did not open");
++  return mountWithPrefill(prefill);
++};
++
++describe("AddAlert — a threshold right-clicked on a builder query", () => {
++  let wrapper: ReturnType<typeof mount> | null = null;
++
++  afterEach(() => {
++    wrapper?.unmount();
++    wrapper = null;
++    sessionStorage.clear();
++    vi.clearAllMocks();
++  });
++
++  it.each([
++    ["picked in the multi-query dialog", true],
++    ["on a single-query panel", false],
++  ])("%s, is saved once, as a HAVING in the SQL", async (_name, picked) => {
++    wrapper = await openBuilderQuery(picked);
++    const condition = formOf(wrapper).formData.query_condition;
++
++    expect(condition.type).toBe("sql");
++    expect(condition.sql.match(/HAVING/g)).toHaveLength(1);
++    expect(condition.sql).toContain('HAVING "y_axis_1" >= 4.42');
++    expect(condition.aggregation?.having).toMatchObject({ operator: ">=", value: 1 });
++
++    const saved = formOf(wrapper).getAlertPayload().query_condition;
++    expect(saved.type).toBe("sql");
++    expect(saved.sql.match(/HAVING/g)).toHaveLength(1);
++    expect(saved.sql).toContain('HAVING "y_axis_1" >= 4.42');
++    expect(saved.aggregation).toBeNull();
++  });
++
++  it("states on the form when the threshold column was a guess", async () => {
++    wrapper = await openBuilderQuery(false, true);
++
++    expect(
++      wrapper.find('[data-test="add-alert-prefill-warning-thresholdColumnGuessed"]').text(),
++    ).toContain("The threshold was applied to y_axis_1; check it is the value you meant.");
++  });
++
++  it("leaves the trigger at the form default when the clicked threshold is not carried", async () => {
++    wrapper = await openAfterPickingAnotherQuery();
++    const form = formOf(wrapper).formData;
++
++    expect(form.query_condition.type).toBe("sql");
++    expect(form.query_condition.sql).not.toContain("HAVING");
++    expect(form.trigger_condition).toMatchObject({ operator: ">=", threshold: 3 });
++
++    const saved = formOf(wrapper).getAlertPayload();
++    expect(saved.query_condition.aggregation).toBeNull();
++    expect(saved.trigger_condition).toMatchObject({ operator: ">=", threshold: 3 });
++    expect(
++      wrapper.find('[data-test="add-alert-prefill-warning-thresholdNotCarried"]').exists(),
++    ).toBe(true);
++  });
++
++  describe("a builder query with no threshold placed in its SQL", () => {
++    const savedState = (mounted: ReturnType<typeof mount>) => {
++      const form = formOf(mounted).formData;
++      const saved = formOf(mounted).getAlertPayload();
++      return {
++        type: form.query_condition.type,
++        hasHaving: /HAVING/.test(form.query_condition.sql),
++        formAggregation: form.query_condition.aggregation?.having ?? null,
++        formTrigger: form.trigger_condition,
++        savedAggregation: saved.query_condition.aggregation,
++        savedTrigger: saved.trigger_condition,
++      };
++    };
++    const fromPanelMenu = (picked: boolean) =>
++      mountWithPrefill(
++        buildPrefillFromPanel({
++          panelTitle: "Retries",
++          panelType: "line",
++          queryType: "sql",
++          queries: picked ? [builtQuery, builtQuery] : [builtQuery],
++          queryIndex: 0,
++          ...(picked
++            ? {
++                queryChoices: [
++                  { index: 0, query: builtQuery.query },
++                  { index: 1, query: builtQuery.query },
++                ],
++              }
++            : {}),
++          executedQuery: builtQuery.query,
++          timeRange: { value_type: "relative", relative_value: 15, relative_period: "Minutes" },
++        }),
++      );
++
++    it("keeps the form's default trigger from the panel menu and the right-click alike", async () => {
++      const states = [];
++      for (const open of [
++        () => fromPanelMenu(false),
++        () => fromPanelMenu(true),
++        openAfterPickingAnotherQuery,
++      ]) {
++        wrapper = await open();
++        states.push(savedState(wrapper));
++        wrapper.unmount();
++        wrapper = null;
++        sessionStorage.clear();
++      }
++
++      expect(states[0]).toEqual({
++        type: "sql",
++        hasHaving: false,
++        formAggregation: { column: "y_axis_1", operator: ">=", value: 1 },
++        formTrigger: expect.objectContaining({ operator: ">=", threshold: 3 }),
++        savedAggregation: null,
++        savedTrigger: expect.objectContaining({ operator: ">=", threshold: 3 }),
++      });
++      expect(states[1]).toEqual(states[0]);
++      expect(states[2]).toEqual(states[0]);
++    });
++  });
++});
+diff --git a/web/src/components/alerts/CreateAlertFromSourceDialog.spec.ts b/web/src/components/alerts/CreateAlertFromSourceDialog.spec.ts
+index 6252877e2f3c..5c672e0cc317 100644
+--- a/web/src/components/alerts/CreateAlertFromSourceDialog.spec.ts
++++ b/web/src/components/alerts/CreateAlertFromSourceDialog.spec.ts
+@@ -13,12 +13,23 @@
+ // You should have received a copy of the GNU Affero General Public License
+ // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+-import { describe, expect, it, afterEach } from "vitest";
+-import { mount } from "@vue/test-utils";
++import { describe, expect, it, afterEach, vi } from "vitest";
++import { flushPromises, mount } from "@vue/test-utils";
+ import i18n from "@/locales";
+ 
+ import CreateAlertFromSourceDialog from "@/components/alerts/CreateAlertFromSourceDialog.vue";
+ import { ALERT_PREFILL_VERSION, type AlertPrefill } from "@/ts/interfaces/alertPrefill";
++import { buildPrefillFromPanel, panelQueryChoices } from "@/utils/alerts/prefill/fromPanel";
++import { normalizePrefill } from "@/utils/alerts/alertPrefill";
++
++const { copyToClipboard } = vi.hoisted(() => ({ copyToClipboard: vi.fn() }));
++vi.mock("@/utils/clipboard", () => ({ copyToClipboard }));
++// Monaco's tokenizer does not run in jsdom; the markup it yields is all this dialog renders.
++const colorized = async (query: string, lang: string) =>
++  `<span class="text-query-syntax-keyword" data-lang="${lang}">${query}</span><script>x</script>`;
++const { colorizeQuery } = vi.hoisted(() => ({ colorizeQuery: vi.fn() }));
++vi.mock("@/utils/query/colorizeQuery", () => ({ colorizeQuery }));
++colorizeQuery.mockImplementation(colorized);
+ 
+ // ODialog and OCodeBlock are portal/highlighter heavy — stub them down to what
+ // this component's own logic needs.
+@@ -46,7 +57,7 @@ const stubs = {
+   },
+   OSelect: {
+     name: "OSelect",
+-    props: ["modelValue", "options"],
++    props: ["modelValue", "options", "dropdownStyle"],
+     emits: ["update:modelValue"],
+     template: `<div data-test="query-select-stub" />`,
+   },
+@@ -284,24 +295,22 @@ describe("CreateAlertFromSourceDialog", () => {
+       expect(labels).toEqual(["requests: sum(rate(requests[5m]))", "C: sum(rate(errors[5m]))"]);
+     });
+ 
+-    it("cuts a long expression short in its option label", () => {
+-      const long = `sum by (instance) (rate(${"a".repeat(80)}[5m]))`;
++    it("keeps the whole query in its option label, collapsed to one line, for the select to cut", () => {
++      const long = `SELECT histogram(_timestamp, '1 minute') as "x_axis_1",\n  sum(${"a".repeat(80)}) as "y_axis_1"`;
+       wrapper = mountDialog(
+         prefill({
+-          queryType: "promql",
+-          sql: undefined,
+-          promql: long,
+           queryIndex: 0,
+           queryChoices: [
+-            { index: 0, query: long },
+-            { index: 1, query: "avg(disk_used)" },
++            { index: 0, tabName: "Total retries", query: long },
++            { index: 1, query: "SELECT 1" },
+           ],
+         }),
+       );
+-      const label = String(wrapper.findComponent({ name: "OSelect" }).props("options")[0].label);
+-      expect(label.startsWith("A: sum by (instance) (rate(aaa")).toBe(true);
+-      expect(label.endsWith("…")).toBe(true);
+-      expect(label.length).toBeLessThan(long.length);
++      const select = wrapper.findComponent({ name: "OSelect" });
++      expect(String(select.props("options")[0].label)).toBe(
++        `Total retries: ${long.replace(/\s+/g, " ")}`,
++      );
++      expect(select.props("dropdownStyle")).toEqual({ width: "var(--reka-select-trigger-width)" });
+     });
+ 
+     it("rebuilds the prefill for the chosen query", async () => {
+@@ -320,6 +329,197 @@ describe("CreateAlertFromSourceDialog", () => {
+     });
+   });
+ 
++  describe("dashboard panel with several queries", () => {
++    const choices = [
++      { index: 0, query: "avg(disk_used)" },
++      { index: 1, tabName: "IO", query: "sum(rate(io_ops[1m]))" },
++    ];
++    const panelPick = (overrides: Partial<AlertPrefill> = {}) =>
++      prefill({
++        source: "panel",
++        queryType: "promql",
++        sql: undefined,
++        promql: "sum(rate(io_ops[1m]))",
++        queryIndex: 1,
++        queryChoices: choices,
++        warnings: [{ key: "absoluteToRolling", level: "warning", params: { minutes: 30 } }],
++        ...overrides,
++      });
++    const has = (dataTest: string) => wrapper!.find(`[data-test="${dataTest}"]`).exists();
++
++    it("asks only which query, with the one line of context", () => {
++      wrapper = mountDialog(panelPick());
++
++      expect(wrapper.find('[data-test="create-alert-query-picker-intro"]').text()).toBe(
++        "There are multiple queries. Select which one to create the alert from.",
++      );
++      const select = wrapper.findComponent({ name: "OSelect" });
++      expect(select.props("modelValue")).toBe(1);
++      expect(has("create-alert-threshold-shape")).toBe(false);
++      expect(has("create-alert-window")).toBe(false);
++      expect(has("create-alert-query-preview")).toBe(false);
++      expect(has("create-alert-warning-absoluteToRolling")).toBe(false);
++    });
++
++    it("shows the whole picked query, colorized like the Query Inspector, and copies it", async () => {
++      const multiLine = "sum by (instance) (\n  rate(io_ops[1m])\n)";
++      wrapper = mountDialog(
++        panelPick({
++          queryChoices: [choices[0], { ...choices[1], query: multiLine }],
++        }),
++      );
++      await flushPromises();
++
++      const block = wrapper.find('[data-test="create-alert-picked-query"]');
++      expect(block.text()).toContain("Query");
++      const text = wrapper.find('[data-test="create-alert-picked-query-text"]');
++      expect(text.classes()).toEqual(
++        expect.arrayContaining(["font-mono", "whitespace-pre-wrap", "break-all", "max-h-40"]),
++      );
++      const keyword = text.find(".text-query-syntax-keyword");
++      expect(keyword.attributes("data-lang")).toBe("promql");
++      expect(keyword.element.textContent).toBe(multiLine);
++      expect(text.find("script").exists()).toBe(false);
++
++      await wrapper.find('[data-test="create-alert-picked-query-copy"]').trigger("click");
++      expect(copyToClipboard).toHaveBeenCalledWith(multiLine, expect.any(Function));
++    });
++
++    it("follows the pick, showing the newly chosen query", async () => {
++      wrapper = mountDialog(panelPick());
++      await flushPromises();
++      expect(wrapper.find('[data-test="create-alert-picked-query-text"]').text()).toBe(
++        "sum(rate(io_ops[1m]))",
++      );
++
++      await wrapper.setProps({ prefill: panelPick({ queryIndex: 0, promql: "avg(disk_used)" }) });
++      await flushPromises();
++      expect(wrapper.find('[data-test="create-alert-picked-query-text"]').text()).toBe(
++        "avg(disk_used)",
++      );
++    });
++
++    it("keeps the plain query when the colorizer fails to load", async () => {
++      colorizeQuery.mockRejectedValueOnce(new Error("chunk failed"));
++      wrapper = mountDialog(
++        panelPick({ queryChoices: [choices[0], { ...choices[1], query: "a < b" }] }),
++      );
++      await flushPromises();
++
++      const text = wrapper.find('[data-test="create-alert-picked-query-text"]');
++      expect(text.text()).toBe("a < b");
++      expect(text.find(".text-query-syntax-keyword").exists()).toBe(false);
++    });
++
++    it("keeps the latest coloring when an earlier run for the same text finishes last", async () => {
++      let finishFirst: (html: string) => void = () => {};
++      colorizeQuery.mockImplementationOnce(
++        () => new Promise<string>((resolve) => (finishFirst = resolve)),
++      );
++      wrapper = mountDialog(panelPick());
++      await flushPromises();
++      await wrapper.setProps({ prefill: panelPick({ queryType: "sql" }) });
++      await flushPromises();
++
++      finishFirst('<span class="stale">sum(rate(io_ops[1m]))</span>');
++      await flushPromises();
++      const text = wrapper.find('[data-test="create-alert-picked-query-text"]');
++      expect(text.find(".stale").exists()).toBe(false);
++      expect(text.find(".text-query-syntax-keyword").attributes("data-lang")).toBe("sql");
++    });
++
++    it("hands the hidden non-blocking warnings on to the form", async () => {
++      wrapper = mountDialog(panelPick());
++      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
++
++      const confirmed = wrapper.emitted("confirm")![0][0] as AlertPrefill;
++      expect(confirmed.warnings.map((w) => w.key)).toEqual(["absoluteToRolling"]);
++      expect(confirmed.queryIndex).toBe(1);
++    });
++
++    it("still states a blocking warning and keeps Continue disabled", () => {
++      wrapper = mountDialog(
++        panelPick({
++          warnings: [
++            { key: "absoluteToRolling", level: "warning", params: { minutes: 30 } },
++            { key: "unresolvedQuery", level: "blocking" },
++          ],
++        }),
++      );
++
++      expect(has("create-alert-warning-unresolvedQuery")).toBe(true);
++      expect(has("create-alert-warning-absoluteToRolling")).toBe(false);
++      expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(true);
++    });
++
++    it("is minimal for a metrics-explorer chart too", () => {
++      wrapper = mountDialog(panelPick({ source: "explorer" }));
++      expect(has("create-alert-query-picker-intro")).toBe(true);
++      expect(has("create-alert-query-preview")).toBe(false);
++    });
++
++    it("leaves a single-query panel's dialog as it was", () => {
++      wrapper = mountDialog(
++        panelPick({
++          queryChoices: undefined,
++          queryIndex: undefined,
++          warnings: [{ key: "unresolvedQuery", level: "blocking" }],
++        }),
++      );
++      expect(has("create-alert-query-picker-intro")).toBe(false);
++      expect(has("create-alert-picked-query")).toBe(false);
++      expect(has("create-alert-threshold-shape")).toBe(true);
++      expect(has("create-alert-query-preview")).toBe(true);
++    });
++
++    it("leaves other sources' query choice dialog unchanged", () => {
++      wrapper = mountDialog(panelPick({ source: "logs" }));
++      expect(has("create-alert-picked-query")).toBe(false);
++      expect(has("create-alert-query-picker-intro")).toBe(false);
++      expect(has("create-alert-threshold-shape")).toBe(true);
++      expect(has("create-alert-window")).toBe(true);
++      expect(has("create-alert-query-preview")).toBe(true);
++      expect(has("create-alert-warning-absoluteToRolling")).toBe(true);
++    });
++
++    it("labels the real query select with the intro and shows the preselected query", async () => {
++      const queries = [
++        { query: "avg(disk_used)", fields: { stream: "disk_used", stream_type: "metrics" } },
++        {
++          query: "sum(rate(io_ops[1m]))",
++          tabName: "IO",
++          fields: { stream: "io_ops", stream_type: "metrics" },
++        },
++      ];
++      const built = normalizePrefill(
++        buildPrefillFromPanel({
++          panelTitle: "Disk and IO",
++          queries,
++          queryType: "promql",
++          queryIndex: 1,
++          queryChoices: panelQueryChoices(queries, undefined),
++          executedQuery: "sum(rate(io_ops[1m]))",
++          timeRange: { value_type: "relative", relative_value: 15, relative_period: "Minutes" },
++        }),
++      );
++      const { OSelect: _select, ...withoutSelectStub } = stubs;
++      wrapper = mount(CreateAlertFromSourceDialog, {
++        props: { open: true, prefill: built },
++        global: { plugins: [i18n], stubs: withoutSelectStub },
++      });
++
++      await flushPromises();
++
++      const intro = wrapper.find('[data-test="create-alert-query-picker-intro"]');
++      const trigger = wrapper.find(`#${intro.attributes("for")}`);
++      expect(trigger.exists()).toBe(true);
++      expect(trigger.text()).toContain("IO: sum(rate(io_ops[1m]))");
++      expect(trigger.find('[data-test="o-truncated-text"]').text()).toBe(
++        "IO: sum(rate(io_ops[1m]))",
++      );
++    });
++  });
++
+   it("renders nothing but the shell when there is no prefill", () => {
+     wrapper = mountDialog(null);
+     expect(wrapper.find('[data-test="create-alert-query-preview"]').exists()).toBe(false);
+diff --git a/web/src/components/alerts/CreateAlertFromSourceDialog.vue b/web/src/components/alerts/CreateAlertFromSourceDialog.vue
+index c46ecab782e5..98320df9e08b 100644
+--- a/web/src/components/alerts/CreateAlertFromSourceDialog.vue
++++ b/web/src/components/alerts/CreateAlertFromSourceDialog.vue
+@@ -41,16 +41,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+     @click:primary="onConfirm"
+   >
+     <div v-if="prefill" class="flex flex-col gap-5">
+-      <!-- Query picker — only when the surface had several queries and could not tell which. -->
+-      <OSelect
+-        v-if="queryOptions.length > 1"
+-        :model-value="prefill.queryIndex"
+-        :options="queryOptions"
+-        :label="t('alerts.prefill.dialog.queryChoiceLabel')"
+-        :searchable="false"
+-        data-test="create-alert-query-picker"
+-        @update:model-value="onQueryChange"
+-      />
++      <div v-if="queryOptions.length > 1" class="flex flex-col gap-2">
++        <label
++          v-if="pickQueryOnly"
++          :for="queryPickerId"
++          class="text-text-body text-sm"
++          data-test="create-alert-query-picker-intro"
++        >
++          {{ t("alerts.prefill.dialog.pickQueryIntro") }}
++        </label>
++        <OSelect
++          :id="queryPickerId"
++          :model-value="prefill.queryIndex"
++          :options="queryOptions"
++          :label="pickQueryOnly ? undefined : t('alerts.prefill.dialog.queryChoiceLabel')"
++          :searchable="false"
++          :dropdown-style="QUERY_PICKER_DROPDOWN"
++          data-test="create-alert-query-picker"
++          @update:model-value="onQueryChange"
++        />
++      </div>
++
++      <div v-if="pickQueryOnly && pickedQuery" data-test="create-alert-picked-query">
++        <div class="flex items-center justify-between">
++          <span class="text-xs font-bold tracking-wider">
++            {{ t("alerts.prefill.dialog.queryLabel") }}
++          </span>
++          <OButton
++            variant="ghost-primary"
++            size="sm"
++            icon-left="content-copy"
++            data-test="create-alert-picked-query-copy"
++            @click="copyToClipboard(pickedQuery, t)"
++          >
++            {{ t("common.copy") }}
++          </OButton>
++        </div>
++        <div
++          class="rounded-default bg-theme-body-bg-primary border-card-glass-border [&::-webkit-scrollbar-thumb]:bg-border-default [&::-webkit-scrollbar-thumb:hover]:bg-border-strong mt-1 max-h-40 [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap [&::-webkit-scrollbar]:size-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
++          data-test="create-alert-picked-query-text"
++          v-html="pickedQueryHtml"
++        ></div>
++      </div>
+ 
+       <!-- Stream picker — only when the surface offered a choice. Alerts are
+            single-stream; silently taking the first one is a trap. -->
+@@ -116,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       </div>
+ 
+       <!-- How the alert counts what the query returns. -->
+-      <div class="flex flex-col gap-2">
++      <div v-if="!pickQueryOnly" class="flex flex-col gap-2">
+         <span class="text-text-secondary text-xs font-medium">
+           {{ t("alerts.prefill.dialog.thresholdLabel") }}
+         </span>
+@@ -136,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       </div>
+ 
+       <!-- The rolling window the alert will evaluate. -->
+-      <div v-if="prefill.periodMinutes" class="flex flex-col gap-1">
++      <div v-if="!pickQueryOnly && prefill.periodMinutes" class="flex flex-col gap-1">
+         <span class="text-text-secondary text-xs font-medium">
+           {{ t("alerts.prefill.dialog.windowLabel") }}
+         </span>
+@@ -162,9 +194,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       </div>
+ 
+       <!-- Every lossy transform the adapters performed, stated plainly. -->
+-      <div v-if="prefill.warnings.length" class="flex flex-col gap-2">
++      <div v-if="shownWarnings.length" class="flex flex-col gap-2">
+         <OBanner
+-          v-for="(warning, index) in prefill.warnings"
++          v-for="(warning, index) in shownWarnings"
+           :key="`${warning.key}-${index}`"
+           dense
+           :variant="bannerVariant(warning.level)"
+@@ -177,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ </template>
+ 
+ <script setup lang="ts">
+-import { computed, ref, watch } from "vue";
++import { computed, ref, useId, watch } from "vue";
+ import { raw, useI18nTyped } from "@/types/i18n";
+ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+ import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+@@ -187,6 +219,10 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+ import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
++import OButton from "@/lib/core/Button/OButton.vue";
++import { useColorizedQuery } from "@/composables/useColorizedQuery";
++import { copyToClipboard } from "@/utils/clipboard";
++import { escapeHtml } from "@/utils/html";
+ import type {
+   AlertBuildOptions,
+   AlertPatternMode,
+@@ -199,7 +235,7 @@ import { isPrefillBlocked } from "@/utils/alerts/alertPrefill";
+ import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
+ import { formatSqlForDisplay } from "@/utils/query/formatSql";
+ 
+-const QUERY_LABEL_MAX = 60;
++const QUERY_PICKER_DROPDOWN = { width: "var(--reka-select-trigger-width)" };
+ 
+ const props = defineProps<{
+   open: boolean;
+@@ -238,25 +274,58 @@ const onPatternModeChange = (value: unknown) => {
+ 
+ const queryOptions = computed(() =>
+   (props.prefill?.queryChoices ?? []).map((choice) => {
+-    const query = choice.query.replace(/\s+/g, " ").trim();
+     return {
+       value: choice.index,
+       label: t("alerts.prefill.dialog.queryChoiceOption", {
+         name:
+           choice.tabName || choice.legend || choice.ref || String.fromCharCode(65 + choice.index),
+-        query: query.length > QUERY_LABEL_MAX ? `${query.slice(0, QUERY_LABEL_MAX - 1)}…` : query,
++        query: choice.query.replace(/\s+/g, " ").trim(),
+       }),
+     };
+   }),
+ );
+ 
++const queryPickerId = useId();
++
++const pickQueryOnly = computed(
++  () =>
++    !!props.prefill &&
++    !!getAlertSource(props.prefill.source).pickQueryOnly &&
++    queryOptions.value.length > 1,
++);
++
++// Non-blocking warnings still ride the prefill to the form's banner; only a blocker must stop here.
++const shownWarnings = computed(() => {
++  const warnings = props.prefill?.warnings ?? [];
++  return pickQueryOnly.value ? warnings.filter((w) => w.level === "blocking") : warnings;
++});
++
++/** The executed text of the picked query, as the option tooltip shows it but with its own line breaks. */
++const pickedQuery = computed(
++  () =>
++    props.prefill?.queryChoices?.find((choice) => choice.index === props.prefill?.queryIndex)
++      ?.query ?? "",
++);
++
++const pickedQueryColoured = useColorizedQuery(
++  () => ({
++    query: pickQueryOnly.value ? pickedQuery.value : "",
++    language: props.prefill?.queryType === "promql" ? "promql" : "sql",
++  }),
++  // Loaded on demand: the colorizer pulls in Monaco, and this dialog sits in the app shell.
++  (query, language) =>
++    import("@/utils/query/colorizeQuery").then((module) => module.colorizeQuery(query, language)),
++);
++
++const pickedQueryHtml = computed(() => pickedQueryColoured.value || escapeHtml(pickedQuery.value));
++
+ const onQueryChange = (value: unknown) => {
+   if (typeof value !== "number" || value === props.prefill?.queryIndex) return;
+   emit("rebuild", { queryIndex: value });
+ };
+ 
+ const showQuery = computed(() => {
+-  if (!props.prefill) return false;
++  if (!props.prefill || pickQueryOnly.value) return false;
+   return getAlertSource(props.prefill.source).showQueryPreview && !!previewQuery.value;
+ });
+ 
+diff --git a/web/src/components/dashboards/PanelContainer.spec.ts b/web/src/components/dashboards/PanelContainer.spec.ts
+index 40992a3bdcc0..0299599073cf 100644
+--- a/web/src/components/dashboards/PanelContainer.spec.ts
++++ b/web/src/components/dashboards/PanelContainer.spec.ts
+@@ -21,6 +21,8 @@ import i18n from "@/locales";
+ import store from "@/test/unit/helpers/store";
+ import router from "@/test/unit/helpers/router";
+ import config from "@/aws-exports";
++import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
++import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
+ 
+ // Mock shortURL service
+ vi.mock("@/services/short_url", () => ({
+@@ -939,6 +941,9 @@ describe("PanelContainer", () => {
+         'avg(disk_used{host=~"a"})',
+         "sum(rate(io_ops[1m]))",
+       ]);
++      // The panel menu always opens the query-only dialog for a multi-query panel.
++      expect(needsConfirmation(normalizePrefill(first))).toBe(true);
++      expect(getAlertSource(first.source).pickQueryOnly).toBe(true);
+ 
+       const second = wrapper.vm.buildPanelAlertPrefill({ queryIndex: 1 });
+       expect(second.promql).toBe("sum(rate(io_ops[1m]))");
+@@ -946,6 +951,30 @@ describe("PanelContainer", () => {
+       expect(second.queryIndex).toBe(1);
+     });
+ 
++    it("offers no empty query slot as an alert target", async () => {
++      const query = (text: string) => ({
++        query: text,
++        fields: { stream: "io_ops", stream_type: "metrics" },
++      });
++      wrapper = createWrapper({
++        data: { ...mockPanelData, queryType: "promql", queries: [query("up"), query(" ")] },
++      });
++      await wrapper.vm.metaDataValue({ queries: [{ query: "up", panelQueryIndex: 0 }] });
++      expect(wrapper.vm.buildPanelAlertPrefill().queryChoices).toBeUndefined();
++
++      wrapper = createWrapper({
++        data: {
++          ...mockPanelData,
++          queryType: "promql",
++          queries: [query("up"), query(""), query("rate(io_ops[1m])")],
++        },
++      });
++      await wrapper.vm.metaDataValue({ queries: [] });
++      expect(
++        wrapper.vm.buildPanelAlertPrefill().queryChoices.map((c: { index: number }) => c.index),
++      ).toEqual([0, 2]);
++    });
++
+     describe("with a formula and hidden inputs", () => {
+       const combined = "(sum(rate(errors[1m]))) / (sum(rate(requests[1m]))) * 100";
+       const formulaPanel = (hideA: boolean) => ({
+diff --git a/web/src/components/dashboards/PanelContainer.vue b/web/src/components/dashboards/PanelContainer.vue
+index 039f17d7b68b..a911273d6eba 100644
+--- a/web/src/components/dashboards/PanelContainer.vue
++++ b/web/src/components/dashboards/PanelContainer.vue
+@@ -540,6 +540,8 @@ import {
+   buildPrefillFromPanel,
+   executedPanelQuery,
+   panelQueryChoices,
++  alertableQueryIndexes,
++  type PanelQueryShape,
+ } from "@/utils/alerts/prefill/fromPanel";
+ import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
+ import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
+@@ -1320,7 +1322,10 @@ export default defineComponent({
+     buildPanelAlertPrefill(options: AlertBuildOptions = {}) {
+       const queries = this.props.data.queries || [];
+       // A saved-hidden query is not drawn, so it is not what the user means to alert on.
+-      const visible = queries.flatMap((query: any, i: number) => (query?.config?.hide ? [] : [i]));
++      const visible = alertableQueryIndexes(
++        queries,
++        queries.flatMap((query: PanelQueryShape, i: number) => (query?.config?.hide ? [] : [i])),
++      );
+       const queryIndex = options.queryIndex ?? visible[0] ?? 0;
+       return buildPrefillFromPanel({
+         panelTitle: this.props.data.title,
+diff --git a/web/src/components/dashboards/PanelSchemaRenderer.spec.ts b/web/src/components/dashboards/PanelSchemaRenderer.spec.ts
+index 42dca8c2ac4d..bf6e6c52959b 100644
+--- a/web/src/components/dashboards/PanelSchemaRenderer.spec.ts
++++ b/web/src/components/dashboards/PanelSchemaRenderer.spec.ts
+@@ -233,7 +233,11 @@ describe("PanelSchemaRenderer", () => {
+           $t: (key: string) => key,
+         },
+         stubs: {
+-          ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
++          ChartRenderer: {
++            name: "ChartRenderer",
++            props: ["findLineOnContextMenu"],
++            template: '<div data-test="chart-renderer"></div>',
++          },
+           TableRenderer: { template: '<div data-test="table-renderer"></div>' },
+           GeoMapRenderer: { template: '<div data-test="geomap-renderer"></div>' },
+           MapsRenderer: { template: '<div data-test="maps-renderer"></div>' },
+@@ -247,6 +251,28 @@ describe("PanelSchemaRenderer", () => {
+     });
+   };
+ 
++  /** Whether the panel asks the chart to name the line under a right-click. */
++  const findsLine = async () => {
++    await nextTick();
++    return wrapper.findComponent({ name: "ChartRenderer" }).props("findLineOnContextMenu");
++  };
++
++  /** The loader's state for the next mount: data and metadata as the executors store them. */
++  const mockLoadedData = (data: unknown[], metadataQueries: Record<string, unknown>[]) =>
++    vi.mocked(usePanelDataLoader).mockReturnValueOnce({
++      data: ref(data),
++      loading: ref(false),
++      errorDetail: ref({ message: "", code: "" }),
++      metadata: ref({ queries: metadataQueries }),
++      resultMetaData: ref({}),
++      annotations: ref([]),
++      lastTriggeredAt: ref(null),
++      isCachedDataDifferWithCurrentTimeRange: ref(false),
++      searchRequestTraceIds: ref([]),
++      loadingProgressPercentage: ref(0),
++      isPartialData: ref(false),
++    } as unknown as ReturnType<typeof usePanelDataLoader>);
++
+   describe("Component Initialization", () => {
+     it("should render component with default props", () => {
+       wrapper = createWrapper();
+@@ -2256,6 +2282,152 @@ describe("PanelSchemaRenderer", () => {
+       expect(wrapper.vm.contextMenuData.panelQueryIndex).toBeUndefined();
+     });
+ 
++    it("maps a SQL series past a hidden query to its own panel query", () => {
++      mockLoadedData(
++        [[], [], []],
++        [{ panelQueryIndex: 0 }, { panelQueryIndex: 1 }, { panelQueryIndex: 2 }],
++      );
++      const query = defaultProps.panelSchema.queries[0];
++      wrapper = createWrapper({
++        allowAlertCreation: true,
++        panelSchema: {
++          ...defaultProps.panelSchema,
++          queries: [query, { ...query, config: { hide: true } }, query],
++        },
++      });
++      // convertSQLData read the unfiltered metadata, so the second kept series claims query 1.
++      wrapper.vm.panelData = {
++        options: {
++          series: [
++            { name: "a", _queryIndex: 0, _panelQueryIndex: 0 },
++            { name: "c", _queryIndex: 1, _panelQueryIndex: 1, yAxisGroup: 1 },
++          ],
++        },
++      };
++
++      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 1 });
++      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(2);
++      expect(wrapper.vm.contextMenuData.yField).toBe(1);
++
++      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0 });
++      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(0);
++    });
++
++    describe("a multi-query SQL panel's series mapped back to their query", () => {
++      const clickedQuery = (position: number) => {
++        wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: position });
++        return wrapper.vm.contextMenuData.panelQueryIndex;
++      };
++      const query = defaultProps.panelSchema.queries[0];
++      const series = (count: number) =>
++        Array.from({ length: count }, (_, position) => ({
++          name: `s${position}`,
++          _queryIndex: position,
++        }));
++
++      it("sends a time-shifted series to its parent query", () => {
++        mockLoadedData(
++          [[], [], []],
++          [
++            { panelQueryIndex: 0, timeRangeGap: { seconds: 0 } },
++            { panelQueryIndex: 0, timeRangeGap: { seconds: 86400 } },
++            { panelQueryIndex: 1, timeRangeGap: { seconds: 0 } },
++          ],
++        );
++        wrapper = createWrapper({
++          allowAlertCreation: true,
++          panelSchema: { ...defaultProps.panelSchema, queries: [query, query] },
++        });
++        wrapper.vm.panelData = { options: { series: series(3) } };
++
++        expect(clickedQuery(1)).toBe(0);
++        expect(clickedQuery(2)).toBe(1);
++      });
++
++      it("maps past an empty query slot the executor never ran, which leaves a hole in its data", async () => {
++        const holey = <T>(first: T, third: T): T[] => {
++          const entries: T[] = [];
++          entries[0] = first;
++          entries[2] = third;
++          return entries;
++        };
++        mockLoadedData(holey([], []), holey({ panelQueryIndex: 0 }, { panelQueryIndex: 2 }));
++        wrapper = createWrapper({
++          allowAlertCreation: true,
++          panelSchema: {
++            ...defaultProps.panelSchema,
++            queries: [query, { ...query, query: "" }, query],
++          },
++        });
++        wrapper.vm.panelData = {
++          options: {
++            series: [
++              { name: "a", _queryIndex: 0, _panelQueryIndex: 0 },
++              { name: "c", _queryIndex: 2, _panelQueryIndex: 2, yAxisGroup: 0 },
++            ],
++          },
++        };
++
++        expect(await findsLine()).toBe(true);
++        expect(clickedQuery(0)).toBe(0);
++        expect(clickedQuery(1)).toBe(2);
++        expect(wrapper.vm.contextMenuData.yField).toBe(0);
++      });
++    });
++
++    it("maps the one visible, time-shifted SQL query's series past a hidden one", async () => {
++      mockLoadedData(
++        [[], [], []],
++        [
++          { panelQueryIndex: 0, timeRangeGap: { seconds: 0 } },
++          { panelQueryIndex: 1, timeRangeGap: { seconds: 0 } },
++          { panelQueryIndex: 1, timeRangeGap: { seconds: 86400 } },
++        ],
++      );
++      const query = defaultProps.panelSchema.queries[0];
++      wrapper = createWrapper({
++        allowAlertCreation: true,
++        panelSchema: {
++          ...defaultProps.panelSchema,
++          queries: [{ ...query, config: { hide: true } }, query],
++        },
++      });
++      // convertSQLData labels these from the unfiltered metadata, so they claim the hidden query.
++      wrapper.vm.panelData = {
++        options: {
++          series: [
++            { name: "b", _queryIndex: 0, _panelQueryIndex: 0, yAxisGroup: 1 },
++            { name: "b (1 day ago)", _queryIndex: 1, _panelQueryIndex: 0 },
++          ],
++        },
++      };
++
++      expect(await findsLine()).toBe(false);
++      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0 });
++      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(1);
++      expect(wrapper.vm.contextMenuData.yField).toBe(1);
++      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 1 });
++      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(1);
++    });
++
++    it("looks for the clicked line on a single query plotting two y fields", async () => {
++      const query = defaultProps.panelSchema.queries[0];
++      wrapper = createWrapper({
++        allowAlertCreation: true,
++        panelSchema: {
++          ...defaultProps.panelSchema,
++          queries: [
++            {
++              ...query,
++              fields: { ...query.fields, y: [...query.fields.y, { alias: "avg", label: "Avg" }] },
++            },
++          ],
++        },
++      });
++
++      expect(await findsLine()).toBe(true);
++    });
++
+     it("reads a forecast line's start and the clicked point's time, for the forecast alert", () => {
+       wrapper = createWrapper({ allowAlertCreation: true });
+       wrapper.vm.panelData = {
+diff --git a/web/src/components/dashboards/PanelSchemaRenderer.vue b/web/src/components/dashboards/PanelSchemaRenderer.vue
+index 69bc2bab4ed7..9aba6e3ee583 100644
+--- a/web/src/components/dashboards/PanelSchemaRenderer.vue
++++ b/web/src/components/dashboards/PanelSchemaRenderer.vue
+@@ -103,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           @click="onChartClick"
+           @contextmenu="onChartContextMenu"
+           @domcontextmenu="onChartDomContextMenu"
++          :find-line-on-context-menu="findsLineOnContextMenu"
+           @mouseover="exemplarInteraction.onMouseOver"
+           @mouseout="exemplarInteraction.onMouseOut"
+           @finished="onChartFinished"
+@@ -324,6 +325,7 @@ import {
+   usePanelDownload,
+ } from "@/composables/dashboard/usePanelActions";
+ import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
++import { alertableQueryIndexes } from "@/utils/alerts/prefill/fromPanel";
+ import { overlayNewDataOnOldOptions, isOverlayEligible } from "@/utils/dashboard/streaming";
+ import { usePanelExemplars } from "@/composables/dashboard/usePanelExemplars";
+ import { usePanelExemplarInteraction } from "@/composables/dashboard/usePanelExemplarInteraction";
+@@ -847,22 +849,18 @@ export default defineComponent({
+           : index,
+       );
+ 
++    // One rule for filteredData and the series mapping; null means data passes through untouched.
++    const keptDataIndexes = computed((): number[] | null => {
++      if (!data.value || !hiddenQueries.value?.length || !Array.isArray(data.value)) return null;
++      return data.value
++        .map((_: unknown, index: number) => index)
++        .filter((index: number) => !isHiddenAt(index));
++    });
++
+     // Filter data based on hiddenQueries for PromQL panels
+     const filteredData = computed(() => {
+-      // If no data, return as is
+-      if (!data.value) {
+-        return data.value;
+-      }
+-
+-      // If no hidden queries or empty array, return as is
+-      if (!hiddenQueries.value || hiddenQueries.value.length === 0 || !Array.isArray(data.value)) {
+-        return data.value;
+-      }
+-
+-      // Filter out hidden queries by index (works for both SQL and PromQL)
+-      const filtered = data.value.filter((_: any, index: number) => !isHiddenAt(index));
+-
+-      return filtered;
++      const kept = keptDataIndexes.value;
++      return kept === null ? data.value : kept.map((index: number) => data.value[index]);
+     });
+ 
+     // PromQL: metadata.queries and resultMetaData stay index-aligned with filteredData.
+@@ -1177,15 +1175,41 @@ export default defineComponent({
+       hideChartTooltip: () => chartRendererRef.value?.chart?.dispatchAction({ type: "hideTip" }),
+       alertSource,
+     });
++    const alertableQueries = computed(() =>
++      alertableQueryIndexes(panelSchema.value?.queries ?? [], visibleQueryIndexes.value),
++    );
++    // Several alertable queries mean the alert has to learn which one a right-click meant.
++    const hasSeveralVisibleQueries = computed(() => alertableQueries.value.length > 1);
++    // A threshold needs the clicked line when there are several queries, or several y fields of one.
++    const findsLineOnContextMenu = computed(
++      () =>
++        hasSeveralVisibleQueries.value ||
++        (panelSchema.value?.queryType !== "promql" &&
++          (panelSchema.value?.queries?.[alertableQueries.value[0]]?.fields?.y?.length ?? 0) > 1),
++    );
++    // SQL drops hidden queries' data but not their metadata, so a series' position counts the kept entries only.
++    const sqlPanelQueryIndex = (position: number): number | undefined => {
++      const kept = keptDataIndexes.value;
++      const index = kept === null ? position : kept[position];
++      return index === undefined
++        ? undefined
++        : (metadata.value?.queries?.[index]?.panelQueryIndex ?? index);
++    };
+     // ECharts' seriesIndex is the position in the series we rendered, which carry their query.
+     const onChartDomContextMenu = (event: any) => {
+       const series =
+         typeof event?.seriesIndex === "number"
+           ? panelData.value?.options?.series?.[event.seriesIndex]
+           : undefined;
++      const panelQueryIndex =
++        panelSchema.value?.queryType !== "promql" && typeof series?._queryIndex === "number"
++          ? sqlPanelQueryIndex(series._queryIndex)
++          : series?._panelQueryIndex;
+       openAlertContextMenu({
+         ...event,
+-        panelQueryIndex: series?._panelQueryIndex,
++        // A query plotting several y fields needs to know which one the clicked series drew.
++        ...(typeof series?.yAxisGroup === "number" ? { yField: series.yAxisGroup } : {}),
++        panelQueryIndex,
+         seriesRole: series?._seriesRole,
+         ...(series?._seriesRole === "forecast"
+           ? { forecastPoint: forecastPointOf(series, event.dataIndex) }
+@@ -2265,6 +2289,7 @@ export default defineComponent({
+       contextMenuData,
+       onChartContextMenu,
+       onChartDomContextMenu,
++      findsLineOnContextMenu,
+       hideContextMenu,
+       handleCreateAlert,
+       cellDrawer,
+diff --git a/web/src/components/dashboards/panels/ChartRenderer.spec.ts b/web/src/components/dashboards/panels/ChartRenderer.spec.ts
+index 070a289afe74..10a52bd93aa2 100644
+--- a/web/src/components/dashboards/panels/ChartRenderer.spec.ts
++++ b/web/src/components/dashboards/panels/ChartRenderer.spec.ts
+@@ -43,6 +43,7 @@ vi.mock("echarts/core", () => ({
+     }),
+     dispatchAction: vi.fn(),
+     convertFromPixel: vi.fn(),
++    convertToPixel: vi.fn(),
+   }),
+   dispose: vi.fn(),
+ }));
+@@ -594,6 +595,289 @@ describe("ChartRenderer", () => {
+       });
+     });
+ 
++    describe("a line's own stroke", () => {
++      const strokeEvent = (seriesIndex: number) => ({
++        componentType: "series",
++        componentSubType: "line",
++        selfType: "line",
++        seriesIndex,
++        event: {
++          offsetX: 75,
++          offsetY: 81,
++          event: { clientX: 7, clientY: 8, preventDefault: vi.fn(), stopPropagation: vi.fn() },
++        },
++      });
++      const chartMock = async () => {
++        const echarts = await import("echarts/core");
++        return vi.mocked(echarts.init).mock.results[0]?.value;
++      };
++      const handlerFor = (mockChart: { on: { mock: { calls: unknown[][] } } }, name: string) =>
++        mockChart.on.mock.calls.find((call) => call[0] === name)?.[1] as (params: unknown) => void;
++
++      it("reports events only while the panel needs to know which line was meant", async () => {
++        const mockChart = await chartMock();
++        const series = [{ type: "line" }, { type: "bar" }];
++        const lastCall = () => vi.mocked(mockChart.setOption).mock.calls.at(-1);
++
++        await wrapper.setProps({
++          data: { ...mockChartData, options: { ...mockChartData.options, series } },
++        });
++        await flushPromises();
++        expect(
++          (lastCall()?.[0].series as Record<string, unknown>[]).map((entry) => entry.triggerEvent),
++        ).toEqual([undefined, undefined]);
++
++        vi.mocked(mockChart.getOption).mockReturnValue({ series });
++        vi.mocked(mockChart.setOption).mockClear();
++        await wrapper.setProps({ findLineOnContextMenu: true });
++        await flushPromises();
++        expect(mockChart.setOption).toHaveBeenCalledTimes(1);
++        expect(lastCall()).toEqual([
++          { series: [{ triggerEvent: "line" }, {}] },
++          { lazyUpdate: true },
++        ]);
++
++        await wrapper.setProps({ findLineOnContextMenu: false });
++        await flushPromises();
++        expect(lastCall()).toEqual([
++          { series: [{ triggerEvent: false }, {}] },
++          { lazyUpdate: true },
++        ]);
++      });
++
++      it("keeps stroke events away from click, hover and move, which drive drilldown and exemplars", async () => {
++        const mockChart = await chartMock();
++        mockHoveredSeriesState.value.setHoveredSeriesName = vi.fn();
++        mockHoveredSeriesState.value.setIndex = vi.fn();
++        for (const name of ["click", "mouseover", "mouseout", "mousemove"]) {
++          handlerFor(mockChart, name)(strokeEvent(0));
++          expect(wrapper.emitted(name)).toBeUndefined();
++          handlerFor(mockChart, name)({ seriesIndex: 0, dataIndex: 2 });
++          expect(wrapper.emitted(name)).toHaveLength(1);
++        }
++      });
++
++      it("names the right-clicked line, reading the threshold at the cursor, or a stacked line's own value", async () => {
++        const mockChart = await chartMock();
++        vi.mocked(mockChart.getOption).mockReturnValue({
++          series: [
++            {
++              type: "line",
++              smooth: true,
++              data: [
++                [0, 1],
++                [1, 9],
++              ],
++            },
++            {
++              type: "line",
++              smooth: true,
++              stack: "s",
++              data: [
++                [0, 5],
++                [1, 9],
++              ],
++            },
++          ],
++        });
++        vi.mocked(mockChart.convertFromPixel).mockReturnValue([0.75, 6]);
++        vi.mocked(mockChart.convertToPixel).mockImplementation(
++          (_finder: unknown, value: number[]) => [value[0] * 100, value[1] * 10],
++        );
++
++        handlerFor(mockChart, "contextmenu")(strokeEvent(0));
++        await flushPromises();
++        expect(mockChart.convertFromPixel).toHaveBeenLastCalledWith({ seriesIndex: 0 }, [75, 81]);
++        expect(wrapper.emitted("domcontextmenu")?.at(-1)?.[0]).toEqual({
++          x: 7,
++          y: 8,
++          value: 6,
++          seriesIndex: 0,
++          dataIndex: 1,
++        });
++
++        handlerFor(mockChart, "contextmenu")(strokeEvent(1));
++        await flushPromises();
++        expect(wrapper.emitted("domcontextmenu")?.at(-1)?.[0]).toEqual({
++          x: 7,
++          y: 8,
++          value: 9,
++          seriesIndex: 1,
++          dataIndex: 1,
++        });
++        expect(wrapper.emitted("contextmenu")).toBeUndefined();
++      });
++    });
++
++    describe("a right-click on a line between its symbols", () => {
++      const twoLines = async (extra: Record<string, unknown> = {}, second = {}) => {
++        const echarts = await import("echarts/core");
++        const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
++        vi.mocked(mockChart.getOption).mockReturnValue({
++          series: [
++            {
++              type: "line",
++              name: "a",
++              data: [
++                [0, 1],
++                [1, 1],
++              ],
++            },
++            {
++              type: "line",
++              name: "b",
++              data: [
++                [0, 5],
++                [1, 9],
++              ],
++              ...second,
++            },
++          ],
++          ...extra,
++        });
++        vi.mocked(mockChart.convertFromPixel).mockReturnValue([0, 6]);
++        // Pixel x is 100 per step and pixel y is 10 per unit, so series 1 runs from (0, 50) to (100, 90).
++        vi.mocked(mockChart.convertToPixel).mockImplementation(
++          (_finder: unknown, value: number[]) => [value[0] * 100, value[1] * 10],
++        );
++        return mockChart;
++      };
++      const rightClick = async (clientX: number, clientY: number) => {
++        await wrapper.find('[data-test="chart-renderer"]').trigger("contextmenu", {
++          clientX,
++          clientY,
++        });
++        await flushPromises();
++        return wrapper.emitted("domcontextmenu")?.at(-1)?.[0];
++      };
++
++      it("reads a near-missed line's value on its own subplot axis", async () => {
++        const mockChart = await twoLines();
++        vi.mocked(mockChart.convertFromPixel).mockImplementation(
++          (finder: { gridIndex?: number }) => (finder.gridIndex === 0 ? [0, -14.43] : [0, 9.53]),
++        );
++        await wrapper.setProps({ findLineOnContextMenu: true });
++
++        expect(await rightClick(75, 81)).toMatchObject({ seriesIndex: 1, value: 9.53 });
++        expect(await rightClick(50, 300)).toEqual({ x: 50, y: 300, value: -14.43 });
++      });
++
++      it("names the line when asked, so a multi-query alert knows its query", async () => {
++        await twoLines();
++        await wrapper.setProps({ findLineOnContextMenu: true });
++
++        expect(await rightClick(75, 81)).toEqual({
++          x: 75,
++          y: 81,
++          value: 6,
++          seriesIndex: 1,
++          dataIndex: 1,
++        });
++        expect(await rightClick(50, 300)).not.toHaveProperty("seriesIndex");
++      });
++
++      it.each([
++        ["stacked", { stack: "q1-stack" }],
++        ["step", { step: "end" }],
++        ["smooth", { smooth: true }],
++        ["null-bridging", { connectNulls: true }],
++      ])(
++        "leaves a near miss on a %s line unnamed, since its stroke is not straight segments",
++        async (_shape, second) => {
++          await twoLines({}, second);
++          await wrapper.setProps({ findLineOnContextMenu: true });
++
++          expect(await rightClick(75, 81)).toEqual({ x: 75, y: 81, value: 6 });
++        },
++      );
++
++      const oneLine = async (data: unknown[]) => {
++        const echarts = await import("echarts/core");
++        const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
++        vi.mocked(mockChart.getOption).mockReturnValue({ series: [{ type: "line", data }] });
++        vi.mocked(mockChart.convertFromPixel).mockReturnValue([0, 6]);
++        vi.mocked(mockChart.convertToPixel).mockImplementation(
++          (_finder: unknown, value: (string | number)[]) => [
++            Number(value[0]) * 100,
++            Number(value[1]) * 10,
++          ],
++        );
++        await wrapper.setProps({ findLineOnContextMenu: true });
++      };
++
++      it("treats PromQL NaN samples as gaps and still finds the line past them", async () => {
++        await oneLine([
++          [0, 1],
++          [1, 1],
++          [2, "NaN"],
++          [3, 5],
++          [4, 9],
++        ]);
++
++        expect(await rightClick(350, 70)).toMatchObject({ seriesIndex: 0 });
++        expect(await rightClick(200, 30)).not.toHaveProperty("seriesIndex");
++      });
++
++      it("finds a line whose rows come newest first", async () => {
++        await oneLine([
++          [3, 9],
++          [2, 5],
++          [1, 1],
++          [0, 1],
++        ]);
++
++        expect(await rightClick(250, 70)).toMatchObject({ seriesIndex: 0, dataIndex: 0 });
++      });
++
++      it("skips a line switched off in the legend", async () => {
++        await twoLines({ legend: [{ selected: { a: true, b: false } }] });
++        await wrapper.setProps({ findLineOnContextMenu: true });
++
++        expect(await rightClick(75, 81)).toEqual({ x: 75, y: 81, value: 6 });
++      });
++
++      it("places only the points near the cursor, however long the line", async () => {
++        const echarts = await import("echarts/core");
++        const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
++        const data = Array.from({ length: 10_000 }, (_, index) => [index, 1]);
++        vi.mocked(mockChart.getOption).mockReturnValue({ series: [{ type: "line", data }] });
++        vi.mocked(mockChart.convertFromPixel).mockReturnValue([5000, 1]);
++        vi.mocked(mockChart.convertToPixel).mockReset();
++        vi.mocked(mockChart.convertToPixel).mockImplementation(
++          (_finder: unknown, value: number[]) => [value[0] / 10, value[1] * 10],
++        );
++        await wrapper.setProps({ findLineOnContextMenu: true });
++
++        vi.mocked(mockChart.getOption).mockClear();
++        expect(await rightClick(500, 10)).toMatchObject({ seriesIndex: 0, dataIndex: 5000 });
++        expect(mockChart.getOption).toHaveBeenCalledTimes(1);
++        expect(vi.mocked(mockChart.convertToPixel).mock.calls.length).toBeLessThan(250);
++      });
++
++      it("finds a time-axis line past the bare nulls a merged x-axis leaves, without bridging them", async () => {
++        const echarts = await import("echarts/core");
++        const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
++        const data = [[1000, 1], [2000, 9], null, null, null, null, null, null, [9000, 9]];
++        vi.mocked(mockChart.getOption).mockReturnValue({ series: [{ type: "line", data }] });
++        vi.mocked(mockChart.convertFromPixel).mockReturnValue([1500, 5]);
++        vi.mocked(mockChart.convertToPixel).mockImplementation(
++          (_finder: unknown, value: number[]) => [value[0] / 10, value[1] * 10],
++        );
++        await wrapper.setProps({ findLineOnContextMenu: true });
++
++        expect(await rightClick(150, 50)).toMatchObject({ seriesIndex: 0, dataIndex: 0 });
++        expect(await rightClick(550, 90)).not.toHaveProperty("seriesIndex");
++      });
++
++      it("emits only the cursor reading by default, and never looks for the line", async () => {
++        const mockChart = await twoLines();
++        vi.mocked(mockChart.convertToPixel).mockClear();
++
++        expect(await rightClick(75, 81)).toEqual({ x: 75, y: 81, value: 6 });
++        expect(mockChart.convertToPixel).not.toHaveBeenCalled();
++      });
++    });
++
+     it("leaves the tooltip alone on both right-click paths; only an opened alert menu hides it", async () => {
+       const echarts = await import("echarts/core");
+       const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
+diff --git a/web/src/components/dashboards/panels/ChartRenderer.vue b/web/src/components/dashboards/panels/ChartRenderer.vue
+index 324d03713624..25456002c97a 100644
+--- a/web/src/components/dashboards/panels/ChartRenderer.vue
++++ b/web/src/components/dashboards/panels/ChartRenderer.vue
+@@ -115,6 +115,17 @@ import {
+ import { LabelLayout, UniversalTransition } from "echarts/features";
+ import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
+ import { withChartFont } from "@/utils/fonts";
++import {
++  indexesNearX,
++  isLineStrokeEvent,
++  lineSeriesAtPoint,
++  lineStrokeEventsPatch,
++  nearestIndexByX,
++  withLineStrokeEvents,
++  type LineStrokeEvent,
++  type LineSeriesPixels,
++  type PixelPoint,
++} from "@/utils/dashboard/lineSeriesAtPoint";
+ 
+ echarts.use([
+   TitleComponent,
+@@ -148,6 +159,35 @@ echarts.use([
+ // Right-click reads a y-axis value, so only cartesian series types can answer it
+ const CONTEXT_MENU_SERIES_TYPES = ["bar", "line", "scatter"];
+ 
++interface LineSeriesOption {
++  type?: string;
++  name?: string;
++  stack?: string;
++  step?: string | boolean;
++  smooth?: boolean | number;
++  connectNulls?: boolean;
++  data?: unknown;
++}
++
++interface ChartOptionLike {
++  series?: unknown;
++  legend?: unknown;
++}
++
++// A line datum is `[x, y]`, `{ value: [x, y] }`, or a bare y on a category axis.
++const datumValue = (datum: unknown, dataIndex: number): (string | number)[] => {
++  if (Array.isArray(datum)) return datum;
++  const inner = (datum as { value?: unknown } | null)?.value;
++  if (Array.isArray(inner)) return inner;
++  return [dataIndex, (inner ?? datum) as string | number];
++};
++
++/** A datum the line does not draw: missing, or with no finite y (PromQL sends "NaN" samples). */
++const isGap = (datum: unknown): boolean => {
++  const y = datum === null || datum === undefined ? null : datumValue(datum, 0)[1];
++  return y === null || y === undefined || y === "" || !Number.isFinite(Number(y));
++};
++
+ export default defineComponent({
+   name: "ChartRenderer",
+   emits: [
+@@ -176,6 +216,11 @@ export default defineComponent({
+       type: String,
+       default: "100%",
+     },
++    /** Name the line under a right-click that hit no symbol, so the alert can tell which query was meant. */
++    findLineOnContextMenu: {
++      type: Boolean,
++      default: false,
++    },
+   },
+   setup(props: any, { emit }) {
+     const chartRef: any = ref(null);
+@@ -324,8 +369,62 @@ export default defineComponent({
+       });
+     };
+ 
++    const chartOptions = (options: Record<string, unknown>) =>
++      withChartFont(withLineStrokeEvents(options, props.findLineOnContextMenu));
++
++    // The data point nearest the cursor along x, for a right-click on a line's stroke between points.
++    const nearestDataIndex = (seriesIndex: number, data: unknown[], cursorX: number) => {
++      const xAt = (dataIndex: number) => {
++        if (isGap(data[dataIndex])) return null;
++        const pixel = chart?.convertToPixel(
++          { seriesIndex },
++          datumValue(data[dataIndex], dataIndex),
++        );
++        return Array.isArray(pixel) && Number.isFinite(pixel[0]) ? Number(pixel[0]) : null;
++      };
++      return nearestIndexByX(data.length, cursorX, xAt);
++    };
++
++    // The stroke has no data point of its own, so the threshold is read at the cursor.
++    const handleLineStrokeContextMenu = (params: LineStrokeEvent) => {
++      const event = params.event?.event;
++      const series = (chart?.getOption()?.series as LineSeriesOption[] | undefined)?.[
++        params.seriesIndex
++      ];
++      const data = Array.isArray(series?.data) ? series.data : [];
++      const cursorX = Number(params.event?.offsetX);
++      const dataIndex = nearestDataIndex(params.seriesIndex, data, cursorX);
++      // The series' own grid, so a trellis subplot reads its own axis.
++      const point = chart?.convertFromPixel({ seriesIndex: params.seriesIndex }, [
++        cursorX,
++        params.event?.offsetY,
++      ]);
++      // A stacked line is drawn at the stack total, so its own value is read at the nearest point instead.
++      const value = series?.stack
++        ? dataIndex === undefined
++          ? NaN
++          : Number(datumValue(data[dataIndex], dataIndex)[1])
++        : Array.isArray(point)
++          ? Number(point[1])
++          : NaN;
++      if (!event || !Number.isFinite(value)) return;
++      event.preventDefault();
++      event.stopPropagation();
++      emit("domcontextmenu", {
++        x: event.clientX,
++        y: event.clientY,
++        value,
++        seriesIndex: params.seriesIndex,
++        dataIndex,
++      });
++    };
++
+     // Handle ECharts contextmenu event when clicking on data points
+     const handleContextMenu = (params: any) => {
++      if (isLineStrokeEvent(params)) {
++        handleLineStrokeContextMenu(params);
++        return;
++      }
+       // Get chart type from the first series
+       const chartType = chart?.getOption()?.series?.[0]?.type;
+ 
+@@ -387,12 +486,63 @@ export default defineComponent({
+       }
+     };
+ 
++    const linePixels = (cursor: PixelPoint, option: ChartOptionLike): LineSeriesPixels[] => {
++      const series = (Array.isArray(option.series) ? option.series : []) as LineSeriesOption[];
++      // Off-stroke clicks only: a stacked, step, smooth or null-bridging line is not straight segments between neighbours.
++      if (
++        series.some(
++          (entry) =>
++            entry?.type === "line" &&
++            (entry.stack || entry.step || entry.smooth || entry.connectNulls),
++        )
++      )
++        return [];
++      const legends = (Array.isArray(option.legend) ? option.legend : []) as {
++        selected?: Record<string, boolean>;
++      }[];
++      const legendOff = (name: string | undefined) =>
++        name !== undefined && legends.some((legend) => legend?.selected?.[name] === false);
++      return series.flatMap((entry, seriesIndex) => {
++        const data = entry?.data;
++        if (entry?.type !== "line" || !Array.isArray(data) || legendOff(entry.name)) return [];
++        const pixelOf = (value: (string | number)[]) => {
++          const pixel = chart?.convertToPixel({ seriesIndex }, value);
++          return Array.isArray(pixel) && pixel.every(Number.isFinite)
++            ? (pixel as PixelPoint)
++            : null;
++        };
++        // A merged x-axis leaves bare nulls whose x is unknown, so the search steps over them.
++        const xAt = (dataIndex: number) =>
++          isGap(data[dataIndex])
++            ? null
++            : (pixelOf(datumValue(data[dataIndex], dataIndex))?.[0] ?? null);
++        const nearby = indexesNearX(data.length, cursor[0], xAt);
++        if (!nearby) return [];
++        const points: (PixelPoint | null)[] = [];
++        for (let dataIndex = nearby[0]; dataIndex <= nearby[1]; dataIndex++) {
++          const datum = data[dataIndex];
++          points.push(isGap(datum) ? null : pixelOf(datumValue(datum, dataIndex)));
++        }
++        return [{ seriesIndex, offset: nearby[0], points }];
++      });
++    };
++
++    // The series lookup only refines the menu; a failure must not cost the user the menu itself.
++    const lineSeriesHit = (pixelPoint: PixelPoint, option: ChartOptionLike) => {
++      try {
++        return lineSeriesAtPoint(pixelPoint, linePixels(pixelPoint, option));
++      } catch {
++        return null;
++      }
++    };
++
+     // Handle native DOM contextmenu event for alert creation
+     // This handles right-clicks anywhere on the chart (including empty space)
+     const handleNativeContextMenu = async (event: MouseEvent) => {
+       // Get chart type from the first series
+       await nextTick();
+-      const chartType = chart?.getOption()?.series?.[0]?.type;
++      const option = chart?.getOption();
++      const chartType = option?.series?.[0]?.type;
+ 
+       if (!chartType || !CONTEXT_MENU_SERIES_TYPES.includes(chartType)) {
+         return;
+@@ -420,10 +570,20 @@ export default defineComponent({
+ 
+           // Emit domcontextmenu event for alert creation
+           if (yAxisValue !== null && yAxisValue !== undefined && !isNaN(Number(yAxisValue))) {
++            // A click just off a straight line still names it; a click on any stroke arrives as a line-stroke event.
++            const hit = props.findLineOnContextMenu
++              ? lineSeriesHit(pixelPoint as PixelPoint, option ?? {})
++              : null;
++            // A trellis subplot past the first has its own axis, so a named line is read on it.
++            const ownPoint = hit
++              ? chart.convertFromPixel({ seriesIndex: hit.seriesIndex }, pixelPoint)
++              : null;
++            const ownValue = Array.isArray(ownPoint) ? Number(ownPoint[1]) : NaN;
+             emit("domcontextmenu", {
+               x: event.clientX,
+               y: event.clientY,
+-              value: Number(yAxisValue),
++              value: Number.isFinite(ownValue) ? ownValue : Number(yAxisValue),
++              ...(hit ?? {}),
+             });
+           }
+         }
+@@ -434,10 +594,12 @@ export default defineComponent({
+ 
+     const chartInitialSetUp = () => {
+       chart?.on("mousemove", (params: any) => {
++        if (isLineStrokeEvent(params)) return;
+         emit("mousemove", params);
+         mouseHoverEffectFn(params);
+       });
+       chart?.on("mouseout", (params: any) => {
++        if (isLineStrokeEvent(params)) return;
+         emit("mouseout", params);
+         mouseOutEffectFn();
+       });
+@@ -497,10 +659,12 @@ export default defineComponent({
+         }
+       });
+       chart?.on("click", function (params: any) {
++        if (isLineStrokeEvent(params)) return;
+         emit("click", params);
+       });
+ 
+       chart?.on("mouseover", function (params: any) {
++        if (isLineStrokeEvent(params)) return;
+         emit("mouseover", params);
+       });
+ 
+@@ -613,7 +777,7 @@ export default defineComponent({
+           // Use notMerge flag from data prop if available, otherwise default to true
+           const notMerge = props.data?.notMerge !== undefined ? props.data.notMerge : true;
+           const lazyUpdate = props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
+-          chart?.setOption(withChartFont(options), { lazyUpdate, notMerge });
++          chart?.setOption(chartOptions(options), { lazyUpdate, notMerge });
+           chart?.setOption({ animation: true }, { lazyUpdate: true });
+         } catch (e: any) {
+           emit("error", {
+@@ -649,7 +813,7 @@ export default defineComponent({
+           chart = echarts.init(chartRef.value, theme, {
+             renderer: props.renderType,
+           });
+-          chart?.setOption(withChartFont(props?.data?.options || {}), {
++          chart?.setOption(chartOptions(props?.data?.options || {}), {
+             lazyUpdate: true,
+             notMerge: true,
+           });
+@@ -708,7 +872,7 @@ export default defineComponent({
+           }
+           observeContainerResize();
+         }
+-        chart?.setOption(withChartFont(props?.data?.options || {}), {
++        chart?.setOption(chartOptions(props?.data?.options || {}), {
+           lazyUpdate: true,
+           notMerge: true,
+         });
+@@ -798,7 +962,7 @@ export default defineComponent({
+             renderer: props.renderType,
+           });
+         }
+-        chart?.setOption(withChartFont(props?.data?.options || {}), {
++        chart?.setOption(chartOptions(props?.data?.options || {}), {
+           lazyUpdate: true,
+           notMerge: true,
+         });
+@@ -824,6 +988,20 @@ export default defineComponent({
+       cleanupChart();
+     });
+ 
++    watch(
++      () => props.findLineOnContextMenu,
++      (on) => {
++        try {
++          // Merge only the switch, so zoom and other interactive state survive the flip.
++          chart?.setOption(lineStrokeEventsPatch(chart.getOption()?.series, on), {
++            lazyUpdate: true,
++          });
++        } catch (error) {
++          console.error("Error during setOption", error);
++        }
++      },
++    );
++
+     watch(
+       () => props.height,
+       async () => {
+@@ -844,7 +1022,7 @@ export default defineComponent({
+           await nextTick();
+           chart?.resize();
+           try {
+-            chart?.setOption(withChartFont(props?.data?.options || {}), {
++            chart?.setOption(chartOptions(props?.data?.options || {}), {
+               lazyUpdate: true,
+               notMerge: true,
+             });
+diff --git a/web/src/components/dbm/DbmQueryText.vue b/web/src/components/dbm/DbmQueryText.vue
+index 7373cd1e53ed..ff94c73ffc75 100644
+--- a/web/src/components/dbm/DbmQueryText.vue
++++ b/web/src/components/dbm/DbmQueryText.vue
+@@ -46,9 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ </template>
+ 
+ <script setup lang="ts">
+-import DOMPurify from "dompurify";
+-import { ref, watch } from "vue";
+-
++import { useColorizedQuery } from "@/composables/useColorizedQuery";
+ import { colorizeQuery } from "@/utils/query/colorizeQuery";
+ 
+ const props = withDefaults(
+@@ -76,20 +74,9 @@ const languageFor = (system: string): string => {
+   }
+ };
+ 
+-const highlighted = ref("");
+-
+-watch(
+-  () => [props.query, props.dbSystem] as const,
+-  async ([query, dbSystem]) => {
+-    if (!query) {
+-      highlighted.value = "";
+-      return;
+-    }
+-    const html = await colorizeQuery(query, languageFor(dbSystem));
+-    // The plain-text branch above stays visible if this races or fails, so a
+-    // highlighting problem degrades to unstyled text rather than a blank box.
+-    if (props.query === query) highlighted.value = DOMPurify.sanitize(html);
+-  },
+-  { immediate: true },
++// The plain-text branch stays visible until this lands, so a highlighting problem degrades to unstyled text.
++const highlighted = useColorizedQuery(
++  () => ({ query: props.query, language: languageFor(props.dbSystem) }),
++  colorizeQuery,
+ );
+ </script>
+diff --git a/web/src/composables/dashboard/usePanelActions.spec.ts b/web/src/composables/dashboard/usePanelActions.spec.ts
+index bf4a75897bad..63ef363a070c 100644
+--- a/web/src/composables/dashboard/usePanelActions.spec.ts
++++ b/web/src/composables/dashboard/usePanelActions.spec.ts
+@@ -13,7 +13,8 @@
+ // You should have received a copy of the GNU Affero General Public License
+ // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+-import { describe, expect, it, beforeEach, vi } from "vitest";
++import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
++import { setLanguage } from "@/utils/cookies";
+ import { gt } from "@/types/i18n";
+ import { wrapCsvValue, usePanelAlertCreation, usePanelDownload } from "./usePanelActions";
+ import { downloadFile } from "@/utils/dom";
+@@ -29,6 +30,26 @@ vi.mock("@/utils/dom", () => ({
+   downloadFile: vi.fn(),
+ }));
+ 
++interface TestQuery {
++  query: string;
++  customQuery?: boolean;
++  fields: {
++    stream?: string;
++    stream_type?: string;
++    y?: { column: string; alias: string; aggregationFunction?: string }[];
++  };
++}
++
++/** The same query as one built in the panel editor, counting its y-axis column. */
++const builderQuery = (query: TestQuery): TestQuery => ({
++  ...query,
++  customQuery: false,
++  fields: {
++    ...query.fields,
++    y: (query.fields.y ?? []).map((y) => ({ ...y, aggregationFunction: "count" })),
++  },
++});
++
+ describe("usePanelActions", () => {
+   beforeEach(() => {
+     vi.clearAllMocks();
+@@ -64,7 +85,7 @@ describe("usePanelActions", () => {
+                 y: [{ column: "errors", alias: "errors" }],
+               },
+             },
+-          ],
++          ] as TestQuery[],
+         },
+       };
+ 
+@@ -170,6 +191,280 @@ describe("usePanelActions", () => {
+       expect(alertCreationDialog.value?.prefill.warnings.map((w) => w.key)).toContain("noStream");
+     });
+ 
++    it("leaves another query's threshold to the form when a series was clicked", () => {
++      closeAlertCreationDialog();
++      const args = makeBase();
++      args.panelSchema.value.queries.push({
++        query: 'select count(*) as "warns" from logs',
++        fields: { stream: "logs", stream_type: "logs", y: [{ column: "warns", alias: "warns" }] },
++      });
++      const api = usePanelAlertCreation(args);
++      args.contextMenuData.value = { seriesName: "errors" };
++
++      api.handleCreateAlert({ condition: "above", threshold: 10, panelQueryIndex: 0 });
++      expect(args.router.push).not.toHaveBeenCalled();
++      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toEqual({
++        column: "errors",
++        operator: ">=",
++        value: 10,
++      });
++
++      rebuildAlertPrefill({ queryIndex: 1 });
++      expect(alertCreationDialog.value?.prefill.sql).toBe('select count(*) as "warns" from logs');
++      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toBeUndefined();
++      expect(alertCreationDialog.value?.prefill.warnings.map((w) => w.key)).toContain(
++        "thresholdNotCarried",
++      );
++
++      rebuildAlertPrefill({ queryIndex: 0 });
++      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving?.value).toBe(10);
++      expect(alertCreationDialog.value?.prefill.warnings.map((w) => w.key)).not.toContain(
++        "thresholdNotCarried",
++      );
++      closeAlertCreationDialog();
++    });
++
++    it("keeps the clicked query's threshold on its own SQL alias when the event names no series", () => {
++      closeAlertCreationDialog();
++      const args = makeBase();
++      args.panelSchema.value.queries[0] = {
++        query: 'select histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" from logs',
++        fields: { stream: "logs", stream_type: "logs" },
++      };
++      args.metadata.value = { queries: [] };
++      args.panelSchema.value.queries.push({ ...args.panelSchema.value.queries[0] });
++      const api = usePanelAlertCreation(args);
++
++      api.handleCreateAlert({ condition: "above", threshold: 4.42, panelQueryIndex: 0 });
++
++      expect(alertCreationDialog.value?.prefill.queryIndex).toBe(0);
++      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toEqual({
++        column: "y_axis_1",
++        operator: ">=",
++        value: 4.42,
++      });
++      closeAlertCreationDialog();
++    });
++
++    it("puts a single raw-SQL query's threshold on its own alias when it has no y-axis fields", () => {
++      const args = makeBase();
++      args.panelSchema.value.queries[0] = {
++        query: 'select histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" from logs',
++        fields: { stream: "logs", stream_type: "logs" },
++      };
++      args.metadata.value = { queries: [] };
++      const api = usePanelAlertCreation(args);
++
++      api.handleCreateAlert({ condition: "above", threshold: 4.42, panelQueryIndex: 0 });
++
++      expect(args.router.push).toHaveBeenCalledTimes(1);
++      expect(readAlertPrefill()?.meta?.sqlHaving).toEqual({
++        column: "y_axis_1",
++        operator: ">=",
++        value: 4.42,
++      });
++    });
++
++    it("puts an empty-area threshold on a picked raw-SQL query's own column", () => {
++      closeAlertCreationDialog();
++      const args = makeBase();
++      args.panelSchema.value.queries.push(
++        { query: 'select avg(latency) as "p50" from logs', fields: { stream: "logs" } },
++        {
++          query: 'select approx_percentile_cont(latency, 0.95) as "p95" from logs',
++          fields: { stream: "logs" },
++        },
++        { query: "select max(latency) as `slowest` from logs", fields: { stream: "logs" } },
++        { query: "select now() as moment from logs", fields: { stream: "logs" } },
++      );
++      const api = usePanelAlertCreation(args);
++      args.contextMenuData.value = { seriesName: "errors" };
++
++      // An empty-area click ties the value to no series, so it rides to whichever query is picked.
++      api.handleCreateAlert({ condition: "above", threshold: 10 });
++      rebuildAlertPrefill({ queryIndex: 1 });
++      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toEqual({
++        column: "p50",
++        operator: ">=",
++        value: 10,
++      });
++
++      rebuildAlertPrefill({ queryIndex: 2 });
++      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving?.column).toBe("p95");
++
++      rebuildAlertPrefill({ queryIndex: 3 });
++      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving?.column).toBe("slowest");
++
++      // No column of its own to find: better no HAVING than one on the clicked query's column.
++      rebuildAlertPrefill({ queryIndex: 4 });
++      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toBeUndefined();
++
++      rebuildAlertPrefill({ queryIndex: 0 });
++      expect(alertCreationDialog.value?.prefill.meta?.sqlHaving?.column).toBe("errors");
++      closeAlertCreationDialog();
++    });
++
++    it("keeps a builder query's right-clicked threshold in the SQL the form saves", () => {
++      closeAlertCreationDialog();
++      const args = makeBase();
++      const built = builderQuery(args.panelSchema.value.queries[0]);
++      args.panelSchema.value.queries = [built, { ...built }];
++      const api = usePanelAlertCreation(args);
++
++      api.handleCreateAlert({ condition: "above", threshold: 4.42 });
++
++      const prefill = alertCreationDialog.value?.prefill;
++      expect(prefill?.queryIndex).toBe(0);
++      expect(prefill?.meta?.sqlHaving).toEqual({ column: "errors", operator: ">=", value: 4.42 });
++      closeAlertCreationDialog();
++    });
++
++    it("writes a single builder query's right-clicked threshold into the SQL it saves", () => {
++      const args = makeBase();
++      args.panelSchema.value.queries = [builderQuery(args.panelSchema.value.queries[0])];
++      const api = usePanelAlertCreation(args);
++
++      api.handleCreateAlert({
++        condition: "above",
++        threshold: 4.179104477611935,
++        panelQueryIndex: 0,
++      });
++
++      expect(args.router.push).toHaveBeenCalledTimes(1);
++      const stored = readAlertPrefill();
++      expect(stored?.queryChoices).toBeUndefined();
++      expect(stored?.meta?.sqlHaving).toEqual({
++        column: "errors",
++        operator: ">=",
++        value: 4.179104477611935,
++      });
++      expect(stored?.aggregation?.having).toMatchObject({ operator: ">=", value: 1 });
++    });
++
++    describe("a builder query plotting two y fields", () => {
++      const twoY = () => {
++        const args = makeBase();
++        args.panelSchema.value.queries = [
++          {
++            query: 'select count(*) as "y_axis_1", avg(took) as "y_axis_2" from logs',
++            customQuery: false,
++            fields: {
++              stream: "logs",
++              stream_type: "logs",
++              y: [
++                { column: "_timestamp", alias: "y_axis_1", aggregationFunction: "count" },
++                { column: "took", alias: "y_axis_2", aggregationFunction: "avg" },
++              ],
++            },
++          },
++          { query: 'select count(*) as "warns" from logs', fields: { stream: "logs" } },
++        ];
++        args.metadata.value = { queries: [] };
++        return args;
++      };
++      beforeEach(() => closeAlertCreationDialog());
++
++      it("writes the threshold on the y field the clicked series drew", () => {
++        const args = twoY();
++        args.contextMenuData.value = { yField: 1 };
++        usePanelAlertCreation(args).handleCreateAlert({
++          condition: "above",
++          threshold: 250,
++          panelQueryIndex: 0,
++        });
++
++        expect(alertCreationDialog.value?.prefill.meta?.sqlHaving).toEqual({
++          column: "y_axis_2",
++          operator: ">=",
++          value: 250,
++        });
++      });
++
++      it("falls back to the first y field and says so when the click names none", () => {
++        const args = twoY();
++        usePanelAlertCreation(args).handleCreateAlert({
++          condition: "above",
++          threshold: 250,
++          panelQueryIndex: 0,
++        });
++
++        const prefill = alertCreationDialog.value?.prefill;
++        expect(prefill?.meta?.sqlHaving).toEqual({
++          column: "y_axis_1",
++          operator: ">=",
++          value: 250,
++        });
++        expect(prefill?.aggregation?.having).toMatchObject({ operator: ">=", value: 1 });
++        expect(prefill?.warnings).toContainEqual({
++          key: "thresholdColumnGuessed",
++          level: "warning",
++          params: { column: "y_axis_1" },
++        });
++      });
++
++      it("works the same on a single-query panel, which still goes straight to the form", () => {
++        const args = twoY();
++        args.panelSchema.value.queries.pop();
++        args.contextMenuData.value = { yField: 1 };
++        const api = usePanelAlertCreation(args);
++
++        api.handleCreateAlert({ condition: "above", threshold: 250 });
++        expect(alertCreationDialog.value).toBeNull();
++        expect(readAlertPrefill()?.meta?.sqlHaving).toEqual({
++          column: "y_axis_2",
++          operator: ">=",
++          value: 250,
++        });
++
++        expect(readAlertPrefill()?.warnings.map((w) => w.key)).not.toContain(
++          "thresholdColumnGuessed",
++        );
++
++        args.contextMenuData.value = {};
++        api.handleCreateAlert({ condition: "above", threshold: 250 });
++        expect(alertCreationDialog.value).toBeNull();
++        expect(readAlertPrefill()?.meta?.sqlHaving).toEqual({
++          column: "y_axis_1",
++          operator: ">=",
++          value: 250,
++        });
++        expect(readAlertPrefill()?.warnings.map((w) => w.key)).toContain("thresholdColumnGuessed");
++        expect(args.router.push).toHaveBeenCalledTimes(2);
++      });
++    });
++
++    describe("an empty query slot", () => {
++      beforeEach(() => closeAlertCreationDialog());
++
++      it("is no alert target, so the one real query goes straight to the form", () => {
++        const args = makeBase();
++        args.panelSchema.value.queries.push({ query: "  ", fields: { stream: "logs" } });
++        const api = usePanelAlertCreation(args);
++
++        api.handleCreateAlert({ condition: "above", threshold: 10 });
++        expect(alertCreationDialog.value).toBeNull();
++        expect(args.router.push).toHaveBeenCalledTimes(1);
++        expect(readAlertPrefill()?.sql).toContain("where level");
++
++        api.handleCreateAlert({ condition: "above", threshold: 10, panelQueryIndex: 0 });
++        expect(alertCreationDialog.value).toBeNull();
++        expect(args.router.push).toHaveBeenCalledTimes(2);
++      });
++
++      it("is left out of the choices beside two real queries", () => {
++        const args = makeBase();
++        args.panelSchema.value.queries.push(
++          { query: "", fields: { stream: "logs" } },
++          { query: 'select count(*) as "warns" from logs', fields: { stream: "logs" } },
++        );
++        usePanelAlertCreation(args).handleCreateAlert({ condition: "above", threshold: 10 });
++
++        expect(alertCreationDialog.value?.prefill.queryChoices?.map((c) => c.index)).toEqual([
++          0, 2,
++        ]);
++      });
++    });
++
+     it("does nothing when query is missing", () => {
+       const args = makeBase();
+       args.panelSchema.value.queries = [];
+@@ -224,7 +519,7 @@ describe("usePanelActions", () => {
+ 
+     beforeEach(() => closeAlertCreationDialog());
+ 
+-    it("prefills the clicked series' query with its executed text", () => {
++    it("asks which query on a series click too, preselecting the clicked series' query", () => {
+       const args = makePromql();
+       const api = usePanelAlertCreation(args as any);
+ 
+@@ -235,11 +530,38 @@ describe("usePanelActions", () => {
+         seriesRole: "primary",
+       });
+ 
+-      expect(args.router.push).toHaveBeenCalledTimes(1);
+-      const stored = readAlertPrefill();
+-      expect(stored?.streamName).toBe("io_ops");
+-      expect(stored?.promql).toBe("sum(rate(io_ops[1m]))");
+-      expect(stored?.promqlCondition).toEqual({ column: "value", operator: ">=", value: 5 });
++      expect(args.router.push).not.toHaveBeenCalled();
++      const prefill = alertCreationDialog.value?.prefill;
++      expect(prefill?.queryChoices?.map((c) => c.index)).toEqual([0, 1]);
++      expect(prefill?.queryIndex).toBe(1);
++      expect(prefill?.streamName).toBe("io_ops");
++      expect(prefill?.promql).toBe("sum(rate(io_ops[1m]))");
++      expect(prefill?.promqlCondition).toEqual({ column: "value", operator: ">=", value: 5 });
++    });
++
++    it("does not carry a clicked series' value to a query on another scale", () => {
++      const args = makePromql();
++      const api = usePanelAlertCreation(args);
++
++      api.handleCreateAlert({ condition: "below", threshold: 3, panelQueryIndex: 1 });
++      rebuildAlertPrefill({ queryIndex: 0 });
++
++      const prefill = alertCreationDialog.value?.prefill;
++      expect(prefill?.queryIndex).toBe(0);
++      expect(prefill?.promql).toBe("avg(disk_used)");
++      expect(prefill?.promqlCondition).toBeUndefined();
++      expect(prefill?.warnings).toContainEqual({
++        key: "thresholdNotCarried",
++        level: "warning",
++        params: { value: "3" },
++      });
++
++      rebuildAlertPrefill({ queryIndex: 1 });
++      expect(alertCreationDialog.value?.prefill.promqlCondition).toEqual({
++        column: "value",
++        operator: "<=",
++        value: 3,
++      });
+     });
+ 
+     it("alerts a shifted series on its parent's current-period query", () => {
+@@ -253,9 +575,92 @@ describe("usePanelActions", () => {
+         seriesRole: "shifted",
+       });
+ 
++      const prefill = alertCreationDialog.value?.prefill;
++      expect(prefill?.queryIndex).toBe(1);
++      expect(prefill?.promql).toBe("sum(rate(io_ops[1m]))");
++      expect(prefill?.promqlCondition?.operator).toBe("<=");
++    });
++
++    it("keeps the source override through a query switch, so the explorer dialog stays minimal", () => {
++      const args = { ...makePromql(), alertSource: { value: "explorer" } };
++      const api = usePanelAlertCreation(args);
++
++      api.handleCreateAlert({ condition: "above", threshold: 5, panelQueryIndex: 0 });
++      expect(alertCreationDialog.value?.prefill.source).toBe("explorer");
++
++      rebuildAlertPrefill({ queryIndex: 1 });
++      expect(alertCreationDialog.value?.prefill.source).toBe("explorer");
++    });
++
++    it("treats a series naming a hidden query as no series, carrying its value to the visible one", () => {
++      const args = { ...makePromql(), visibleQueryIndexes: { value: [1] } };
++      const api = usePanelAlertCreation(args);
++
++      api.handleCreateAlert({ condition: "above", threshold: 5, panelQueryIndex: 0 });
++
++      expect(alertCreationDialog.value).toBeNull();
+       const stored = readAlertPrefill();
+       expect(stored?.promql).toBe("sum(rate(io_ops[1m]))");
+-      expect(stored?.promqlCondition?.operator).toBe("<=");
++      expect(stored?.promqlCondition).toEqual({ column: "value", operator: ">=", value: 5 });
++      expect(stored?.warnings.map((w) => w.key)).not.toContain("thresholdNotCarried");
++    });
++
++    it("on several visible queries, asks without a preselection and carries the value like an empty-area click", () => {
++      const args = makePromql();
++      args.panelSchema.value.queries.push({
++        query: "max(disk_used)",
++        fields: { stream: "disk_used", stream_type: "metrics" },
++      });
++      const api = usePanelAlertCreation({ ...args, visibleQueryIndexes: { value: [0, 2] } });
++
++      api.handleCreateAlert({ condition: "above", threshold: 5, panelQueryIndex: 1 });
++
++      const prefill = alertCreationDialog.value?.prefill;
++      expect(prefill?.queryChoices?.map((c) => c.index)).toEqual([0, 2]);
++      expect(prefill?.queryIndex).toBe(0);
++      expect(prefill?.promqlCondition?.value).toBe(5);
++
++      rebuildAlertPrefill({ queryIndex: 2 });
++      expect(alertCreationDialog.value?.prefill.promqlCondition?.value).toBe(5);
++      expect(alertCreationDialog.value?.prefill.warnings.map((w) => w.key)).not.toContain(
++        "thresholdNotCarried",
++      );
++    });
++
++    describe("the not-carried threshold in the form's banner", () => {
++      afterEach(() => {
++        setLanguage("");
++        vi.restoreAllMocks();
++      });
++
++      const shownValue = () => {
++        closeAlertCreationDialog();
++        const api = usePanelAlertCreation(makePromql());
++        api.handleCreateAlert({ condition: "above", threshold: 1234.5678, panelQueryIndex: 1 });
++        rebuildAlertPrefill({ queryIndex: 0 });
++        return alertCreationDialog.value?.prefill.warnings.find(
++          (w) => w.key === "thresholdNotCarried",
++        )?.params?.value;
++      };
++
++      it("is written in the app's language, not the browser's", () => {
++        vi.spyOn(navigator, "language", "get").mockReturnValue("de-DE");
++        setLanguage("en-us");
++        expect(shownValue()).toBe("1,234.57");
++        setLanguage("de");
++        expect(shownValue()).toBe("1.234,57");
++      });
++    });
++
++    it("skips the dialog for a clicked series when only its query is visible", () => {
++      const args = { ...makePromql(), visibleQueryIndexes: { value: [1] } };
++      const api = usePanelAlertCreation(args);
++
++      api.handleCreateAlert({ condition: "above", threshold: 5, panelQueryIndex: 1 });
++
++      expect(alertCreationDialog.value).toBeNull();
++      expect(args.router.push).toHaveBeenCalledTimes(1);
++      expect(readAlertPrefill()?.promqlCondition?.value).toBe(5);
+     });
+ 
+     it("asks which query when the click hit no series and the panel has several", () => {
+@@ -477,6 +882,34 @@ describe("usePanelActions", () => {
+         H: 3,
+       });
+     });
++
++    it("stays on the clicked query of a multi-query card, since the forecast is fitted to it", () => {
++      closeAlertCreationDialog();
++      const args = explorerPanel("avg(node_disk_used_ratio)", "node_disk_used_ratio");
++      args.panelSchema.value.queries.push({
++        query: "max(node_disk_used_ratio)",
++        fields: { stream: "node_disk_used_ratio", stream_type: "metrics" },
++      });
++      const api = usePanelAlertCreation(args);
++
++      api.handleCreateAlert({
++        condition: "forecast",
++        threshold: 0.9,
++        panelQueryIndex: 0,
++        seriesRole: "forecast",
++      });
++
++      expect(alertCreationDialog.value).toBeNull();
++      expect(args.router.push).toHaveBeenCalledTimes(1);
++      expect(readAlertPrefill()?.promql).toBe(
++        buildForecastAlertPromql({
++          U: executed("avg(node_disk_used_ratio)"),
++          T: 0.9,
++          direction: "rises",
++          W: "6h",
++        }),
++      );
++    });
+   });
+ 
+   describe("usePanelDownload", () => {
+diff --git a/web/src/composables/dashboard/usePanelActions.ts b/web/src/composables/dashboard/usePanelActions.ts
+index fdd5ceed5e1c..f41509b509b9 100644
+--- a/web/src/composables/dashboard/usePanelActions.ts
++++ b/web/src/composables/dashboard/usePanelActions.ts
+@@ -17,10 +17,17 @@ import {
+   buildPrefillFromPanel,
+   dateToMicros,
+   executedPanelQuery,
++  alertableQueryIndexes,
+   panelQueryChoices,
++  type PanelQueryShape,
+ } from "@/utils/alerts/prefill/fromPanel";
+ import { requestAlertCreation, useAlertCreation } from "@/composables/alerts/useAlertCreation";
+-import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
++import {
++  firstAggregateAlias,
++  needsConfirmation,
++  normalizePrefill,
++  warn,
++} from "@/utils/alerts/alertPrefill";
+ import type { AlertBuildOptions, AlertPrefill } from "@/ts/interfaces/alertPrefill";
+ import {
+   FORECAST_FREQUENCY_MINUTES,
+@@ -30,6 +37,7 @@ import {
+ } from "@/utils/alerts/forecastAlert";
+ import { ref } from "vue";
+ import { downloadFile } from "@/utils/dom";
++import { getNumberLocale } from "@/locales/numberFormat";
+ import type { TranslateFn } from "@/types/i18n";
+ 
+ const PERIOD_WARNINGS = ["absoluteToRolling", "periodClamped"];
+@@ -70,6 +78,7 @@ const sqlYAxisColumnOf = (
+   query: any,
+   executedQuery: string | undefined,
+   clickedSeriesName: string | undefined,
++  yFieldIndex = 0,
+ ): string | null => {
+   let yAxisColumn = null;
+   const sqlQuery = executedQuery || query.query;
+@@ -77,7 +86,7 @@ const sqlYAxisColumnOf = (
+   // First, try to get from query.fields.y if available (most reliable for query builder)
+   if (query.fields?.y && query.fields.y.length > 0) {
+     // For query builder queries, use the Y-axis field
+-    const yField = query.fields.y[0];
++    const yField = query.fields.y[yFieldIndex];
+     const aliasOrColumn = yField.alias || yField.column;
+ 
+     // Extract from SQL to get the exact case (without quotes)
+@@ -107,20 +116,21 @@ const sqlYAxisColumnOf = (
+       yAxisColumn = match[1];
+     } else {
+       // Last resort: extract any aggregation column from SQL (first one found)
+-      // Pattern: count(...) as alias, avg(...) as alias, etc.
+-      const aggRegex =
+-        /(?:count|sum|avg|min|max|median)\s*\([^)]+\)\s+as\s+["']?([^"',\s)]+)["']?/i;
+-      const aggMatch = sqlQuery.match(aggRegex);
+-      if (aggMatch && aggMatch[1]) {
+-        yAxisColumn = aggMatch[1];
+-      } else {
+-        yAxisColumn = clickedSeriesName;
+-      }
++      yAxisColumn = firstAggregateAlias(sqlQuery) ?? clickedSeriesName;
+     }
+   }
+   return yAxisColumn;
+ };
+ 
++/** A query's own y-axis column, for a query the user picked rather than clicked. */
++const ownYAxisColumnOf = (
++  query: PanelQueryShape | undefined,
++  executedQuery: string | undefined,
++): string | null =>
++  query?.fields?.y?.length
++    ? sqlYAxisColumnOf(query, executedQuery, undefined)
++    : firstAggregateAlias(executedQuery || query?.query || "");
++
+ export function usePanelAlertCreation({
+   panelSchema,
+   allowAlertCreation,
+@@ -211,10 +221,20 @@ export function usePanelAlertCreation({
+     hideContextMenu();
+ 
+     const queries: any[] = panelSchema.value.queries ?? [];
+-    const visible = visibleQueryIndexes?.value ?? queries.map((_, index) => index);
+-    // A click on empty chart area hit no series, so only a lone visible query is certain.
+-    const queryIndex = selection.panelQueryIndex ?? (visible.length === 1 ? visible[0] : undefined);
+-    const query = queries[queryIndex ?? visible[0]];
++    const visible = alertableQueryIndexes(
++      queries,
++      visibleQueryIndexes?.value ?? queries.map((_, index) => index),
++    );
++    const point = contextMenuData.value?.forecastPoint;
++    const isForecast = selection.condition === "forecast" && !!point;
++    // A forecast is fitted to the clicked series, so it cannot move to another query.
++    const offerChoice = visible.length > 1 && !isForecast;
++    const named = selection.panelQueryIndex;
++    // A hidden query draws nothing, so a series naming one was mislabelled and counts as no series; a forecast keeps its query.
++    const clicked =
++      named !== undefined && (isForecast || visible.includes(named)) ? named : undefined;
++    const queryIndex = clicked ?? visible[0];
++    const query = queries[queryIndex];
+     if (!query) {
+       return;
+     }
+@@ -228,23 +248,57 @@ export function usePanelAlertCreation({
+ 
+     const executedQueryOf = (index: number) =>
+       executedPanelQuery(metadata.value?.queries, index) || queries[index]?.query;
++    const clickedYField = contextMenuData.value?.yField;
++    // Single-query series carry no query index, so the lone query owns the click.
++    const clickOwner = clicked ?? (offerChoice ? undefined : queryIndex);
++    // The y field the clicked series drew; with several and none named, the first is only a guess.
++    const yFieldOf = (index: number): { field: number; guessed: boolean } => {
++      const count = queries[index]?.fields?.y?.length ?? 0;
++      return index === clickOwner && typeof clickedYField === "number" && clickedYField < count
++        ? { field: clickedYField, guessed: false }
++        : { field: 0, guessed: count > 1 };
++    };
+     // Only a SQL threshold needs the y-axis column; PromQL compares the series value.
+-    const yAxisColumnOf = (index: number) =>
+-      queryType === "sql"
+-        ? sqlYAxisColumnOf(
+-            queries[index],
+-            executedQueryOf(index),
+-            contextMenuData.value?.seriesName,
+-          )
+-        : null;
++    const yAxisColumnOf = (index: number) => {
++      if (queryType !== "sql") return null;
++      // Right-click events carry no series name, so a query falls back to its own SQL alias.
++      return (
++        (index === clickOwner
++          ? sqlYAxisColumnOf(
++              queries[index],
++              executedQueryOf(index),
++              contextMenuData.value?.seriesName,
++              yFieldOf(index).field,
++            )
++          : null) ?? ownYAxisColumnOf(queries[index], executedQueryOf(index))
++      );
++    };
++    // The clicked value is on that series' scale, so a query the user switched to gets the form's default.
++    const carriesThreshold = (index: number) => clicked === undefined || index === clicked;
++    const thresholdFor = (index: number) =>
++      carriesThreshold(index)
++        ? { threshold: selection.threshold, condition: selection.condition as "above" | "below" }
++        : {};
++    const shownThreshold = selection.threshold.toLocaleString(getNumberLocale(), {
++      maximumFractionDigits: 2,
++    });
++    // Both cases change what the chart click asked for, so the form's banner has to say so.
++    const thresholdWarnings = (prefill: AlertPrefill, index: number) => {
++      if (!carriesThreshold(index)) {
++        return [warn("thresholdNotCarried", "warning", { value: shownThreshold })];
++      }
++      const having = prefill.meta?.sqlHaving as { column?: string } | undefined;
++      return queryType === "sql" && yFieldOf(index).guessed && having?.column
++        ? [warn("thresholdColumnGuessed", "warning", { column: having.column })]
++        : [];
++    };
+ 
+     // The menu already chose the threshold, so the dialog is only for which query, which stream, or why not.
+-    const queryChoices =
+-      queryIndex === undefined
+-        ? panelQueryChoices(queries, metadata.value?.queries, visible)
+-        : undefined;
++    const queryChoices = offerChoice
++      ? panelQueryChoices(queries, metadata.value?.queries, visible)
++      : undefined;
+     const build = (options: AlertBuildOptions = {}) => {
+-      const index = options.queryIndex ?? queryIndex ?? visible[0] ?? 0;
++      const index = options.queryIndex ?? queryIndex;
+       const prefill = buildPrefillFromPanel({
+         panelTitle: panelSchema.value.title || "Unnamed Panel",
+         panelId: panelSchema.value.id,
+@@ -253,20 +307,17 @@ export function usePanelAlertCreation({
+         queryIndex: index,
+         queryChoices,
+         timeRange: selectedTimeObj.value,
+-        threshold: selection.threshold,
+-        condition: selection.condition as "above" | "below",
++        ...thresholdFor(index),
+         yAxisColumn: yAxisColumnOf(index),
+         executedQuery: executedQueryOf(index),
+         metadataQueries: metadata.value?.queries,
+       });
++      prefill.warnings.push(...thresholdWarnings(prefill, index));
+       return alertSource?.value ? { ...prefill, source: alertSource.value } : prefill;
+     };
+ 
+-    const point = contextMenuData.value?.forecastPoint;
+     const prefill = normalizePrefill(
+-      selection.condition === "forecast" && point
+-        ? forecastPrefill(build(), selection.threshold, point)
+-        : build(),
++      isForecast ? forecastPrefill(build(), selection.threshold, point) : build(),
+     );
+     if (needsConfirmation(prefill)) {
+       requestAlertCreation(prefill, {}, build);
+diff --git a/web/src/composables/useAlertForm.ts b/web/src/composables/useAlertForm.ts
+index 5f43ee6d66a1..28b7a6f20247 100644
+--- a/web/src/composables/useAlertForm.ts
++++ b/web/src/composables/useAlertForm.ts
+@@ -1855,7 +1855,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
+       // Otherwise: with a threshold expressed inside the query (HAVING / promql
+       // condition), the trigger itself only needs "at least one row came back".
+       const hasQueryThreshold =
+-        !!prefill.promqlCondition || !!prefill.meta?.sqlHaving || !!prefill.aggregation;
++        !!prefill.promqlCondition ||
++        !!prefill.meta?.sqlHaving ||
++        (!!prefill.aggregation && !getAlertSource(prefill.source).aggregationIsSeed);
+       if (prefill.triggerThreshold !== undefined) {
+         data.trigger_condition.threshold = prefill.triggerThreshold;
+         if (prefill.triggerOperator) {
+diff --git a/web/src/composables/useColorizedQuery.spec.ts b/web/src/composables/useColorizedQuery.spec.ts
+new file mode 100644
+index 000000000000..faf69299a6d8
+--- /dev/null
++++ b/web/src/composables/useColorizedQuery.spec.ts
+@@ -0,0 +1,67 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, expect, it, vi } from "vitest";
++import { flushPromises } from "@vue/test-utils";
++import { nextTick, ref } from "vue";
++import { useColorizedQuery } from "./useColorizedQuery";
++
++const coloured = (query: string, language: string) =>
++  Promise.resolve(`<span data-lang="${language}">${query}</span><img src=x onerror="x()">`);
++
++describe("useColorizedQuery", () => {
++  it("returns sanitized coloured HTML for the query's language", async () => {
++    const html = useColorizedQuery(() => ({ query: "up", language: "promql" }), coloured);
++    await flushPromises();
++    expect(html.value).toContain('<span data-lang="promql">up</span>');
++    expect(html.value).not.toContain("onerror");
++  });
++
++  it("stays empty for an empty query, so the caller shows nothing coloured", async () => {
++    const colorize = vi.fn(coloured);
++    const html = useColorizedQuery(() => ({ query: "", language: "sql" }), colorize);
++    await flushPromises();
++    expect(html.value).toBe("");
++    expect(colorize).not.toHaveBeenCalled();
++  });
++
++  it("stays empty when colouring fails, leaving the caller's plain text", async () => {
++    const html = useColorizedQuery(
++      () => ({ query: "up", language: "promql" }),
++      () => Promise.reject(new Error("chunk failed")),
++    );
++    await flushPromises();
++    expect(html.value).toBe("");
++  });
++
++  it("keeps only the latest query's colouring when an earlier one finishes last", async () => {
++    let finishFirst: (value: string) => void = () => undefined;
++    const query = ref("first");
++    const html = useColorizedQuery(
++      () => ({ query: query.value, language: "sql" }),
++      (text, language) =>
++        text === "first"
++          ? new Promise((resolve) => (finishFirst = resolve))
++          : coloured(text, language),
++    );
++    query.value = "second";
++    await nextTick();
++    await flushPromises();
++    finishFirst("<b>stale</b>");
++    await flushPromises();
++    expect(html.value).toContain("second");
++    expect(html.value).not.toContain("stale");
++  });
++});
+diff --git a/web/src/composables/useColorizedQuery.ts b/web/src/composables/useColorizedQuery.ts
+new file mode 100644
+index 000000000000..473b99bf4221
+--- /dev/null
++++ b/web/src/composables/useColorizedQuery.ts
+@@ -0,0 +1,51 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import DOMPurify from "dompurify";
++import { ref, watch, type Ref } from "vue";
++
++export interface ColorizeSource {
++  query: string;
++  /** A Monaco language id: "sql", "promql", "json", "plaintext", … */
++  language: string;
++}
++
++/** Sanitized, syntax-coloured HTML for a query; empty until it is coloured, so callers show plain text meanwhile. */
++export const useColorizedQuery = (
++  source: () => ColorizeSource,
++  colorize: (query: string, language: string) => Promise<string>,
++): Ref<string> => {
++  const html = ref("");
++  let run = 0;
++
++  watch(
++    [() => source().query, () => source().language],
++    async ([query, language]) => {
++      const current = ++run;
++      html.value = "";
++      if (!query) return;
++      try {
++        const coloured = await colorize(query, language);
++        // A later query started its own run while this one awaited.
++        if (current === run) html.value = DOMPurify.sanitize(coloured);
++      } catch {
++        // The caller's plain text stays as the fallback when the colorizer fails.
++      }
++    },
++    { immediate: true },
++  );
++
++  return html;
++};
+diff --git a/web/src/locales/languages/ar-SA.json b/web/src/locales/languages/ar-SA.json
+index 6492f5172ec8..89517e464b80 100644
+--- a/web/src/locales/languages/ar-SA.json
++++ b/web/src/locales/languages/ar-SA.json
+@@ -9730,6 +9730,7 @@
+         "continue": "استمر في التنبيه",
+         "queryChoiceLabel": "تنبيه على الاستعلام",
+         "queryChoiceOption": "{name}: {query}",
++        "pickQueryIntro": "توجد عدة استعلامات. اختر الاستعلام الذي سيتم إنشاء التنبيه منه.",
+         "streamLabel": "البث",
+         "thresholdLabel": "تنبيه مفعل",
+         "thresholdMatchingRows": "الصفوف المتطابقة",
+@@ -9811,7 +9812,9 @@
+         "rumFunnelSnapshot": "يحتفظ هذا التنبيه بنسخة من SQL الخاصة بالقمع. التعديلات اللاحقة على القمع أو أحداثه المسماة لا تغيّرها.",
+         "rumFunnelSteps": "يحتاج القمع إلى خطوتين على الأقل قبل أن يمكنه التنبيه عند التحويل.",
+         "textFilterDropped": "لم يتم نقل مرشح البحث الخاص بك لأن هذا الجدول لا يحتوي على حقول البحث النصي الكامل (FTS). أضفه إلى استعلام التنبيه إذا كنت بحاجة إليه.",
+-        "heldFilterDropped": "لم يتم نقل مرشح البحث الخاص بك لأنه يحتاج أولاً إلى خيار التشغيل باسم في صفحة السجلات. أضفه إلى استعلام التنبيه إذا كنت بحاجة إليه."
++        "heldFilterDropped": "لم يتم نقل مرشح البحث الخاص بك لأنه يحتاج أولاً إلى خيار التشغيل باسم في صفحة السجلات. أضفه إلى استعلام التنبيه إذا كنت بحاجة إليه.",
++        "thresholdColumnGuessed": "تم تطبيق العتبة على {column}؛ تحقق من أنها القيمة التي تقصدها.",
++        "thresholdNotCarried": "لم يتم تطبيق العتبة {value} من المخطط لأنك اخترت استعلامًا مختلفًا."
+       }
+     },
+     "saveFailed": "لم أتمكن من حفظ التنبيه.",
+diff --git a/web/src/locales/languages/de-DE.json b/web/src/locales/languages/de-DE.json
+index 6ca4ac96f17a..88bde853e931 100644
+--- a/web/src/locales/languages/de-DE.json
++++ b/web/src/locales/languages/de-DE.json
+@@ -9730,6 +9730,7 @@
+         "continue": "Weiter zum Alarm",
+         "queryChoiceLabel": "Warnmeldung für Abfrage",
+         "queryChoiceOption": "{name}: {query}",
++        "pickQueryIntro": "Es gibt mehrere Abfragen. Wählen Sie aus, aus welcher der Alarm erstellt werden soll.",
+         "streamLabel": "Stream",
+         "thresholdLabel": "Alarm bei",
+         "thresholdMatchingRows": "Übereinstimmende Zeilen",
+@@ -9811,7 +9812,9 @@
+         "rumFunnelSnapshot": "Diese Warnmeldung behält eine Kopie des SQL des Funnels. Spätere Änderungen am Funnel oder an seinen benannten Events ändern sie nicht.",
+         "rumFunnelSteps": "Ein Funnel benötigt mindestens zwei Schritte, bevor er bei Konversionen eine Warnmeldung auslösen kann.",
+         "textFilterDropped": "Ihr Suchfilter wurde nicht übernommen, da dieser Stream keine Volltextsuchfelder (FTS) hat. Fügen Sie ihn der Alarmabfrage hinzu, wenn Sie ihn benötigen.",
+-        "heldFilterDropped": "Ihr Suchfilter wurde nicht übernommen, da dafür zuerst eine Auswahl unter „Ausführen als“ auf der Logs-Seite erforderlich ist. Fügen Sie ihn der Alarmabfrage hinzu, wenn Sie ihn benötigen."
++        "heldFilterDropped": "Ihr Suchfilter wurde nicht übernommen, da dafür zuerst eine Auswahl unter „Ausführen als“ auf der Logs-Seite erforderlich ist. Fügen Sie ihn der Alarmabfrage hinzu, wenn Sie ihn benötigen.",
++        "thresholdColumnGuessed": "Der Schwellenwert wurde auf {column} angewendet; prüfen Sie, ob das der gemeinte Wert ist.",
++        "thresholdNotCarried": "Der Schwellenwert {value} aus dem Diagramm wurde nicht übernommen, weil Sie eine andere Abfrage gewählt haben."
+       }
+     },
+     "saveFailed": "Der Alert konnte nicht gespeichert werden.",
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 0de73b8343a4..15b535eedf57 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -9730,6 +9730,7 @@
+         "continue": "Continue to alert",
+         "queryChoiceLabel": "Alert on query",
+         "queryChoiceOption": "{name}: {query}",
++        "pickQueryIntro": "There are multiple queries. Select which one to create the alert from.",
+         "streamLabel": "Stream",
+         "thresholdLabel": "Alert on",
+         "thresholdMatchingRows": "Matching rows",
+@@ -9811,7 +9812,9 @@
+         "rumFunnelSnapshot": "This alert keeps a copy of the funnel's SQL. Later edits to the funnel or its named events do not change it.",
+         "rumFunnelSteps": "A funnel needs at least two steps before it can alert on conversion.",
+         "textFilterDropped": "Your search filter was not carried over because this stream has no full-text search (FTS) fields. Add it to the alert query if you need it.",
+-        "heldFilterDropped": "Your search filter was not carried over because it needs a Run as choice on the logs page first. Add it to the alert query if you need it."
++        "heldFilterDropped": "Your search filter was not carried over because it needs a Run as choice on the logs page first. Add it to the alert query if you need it.",
++        "thresholdColumnGuessed": "The threshold was applied to {column}; check it is the value you meant.",
++        "thresholdNotCarried": "The {value} threshold from the chart wasn't applied because you picked a different query."
+       }
+     },
+     "saveFailed": "Could not save the alert.",
+diff --git a/web/src/locales/languages/es-ES.json b/web/src/locales/languages/es-ES.json
+index 0cb17948749e..c9f338dc83e5 100644
+--- a/web/src/locales/languages/es-ES.json
++++ b/web/src/locales/languages/es-ES.json
+@@ -9730,6 +9730,7 @@
+         "continue": "Continuar a la alerta",
+         "queryChoiceLabel": "Alertar sobre la consulta",
+         "queryChoiceOption": "{name}: {query}",
++        "pickQueryIntro": "Hay varias consultas. Selecciona desde cuál crear la alerta.",
+         "streamLabel": "Stream",
+         "thresholdLabel": "Alertar sobre",
+         "thresholdMatchingRows": "Filas coincidentes",
+@@ -9811,7 +9812,9 @@
+         "rumFunnelSnapshot": "Esta alerta conserva una copia del SQL del embudo. Las ediciones posteriores del embudo o de sus eventos con nombre no la modifican.",
+         "rumFunnelSteps": "Un embudo necesita al menos dos pasos para poder alertar sobre la conversión.",
+         "textFilterDropped": "Tu filtro de búsqueda no se conservó porque este stream no tiene campos de búsqueda de texto completo (FTS). Añádelo a la consulta de la alerta si lo necesitas.",
+-        "heldFilterDropped": "Tu filtro de búsqueda no se conservó porque primero necesita una opción Ejecutar como en la página de Logs. Añádelo a la consulta de la alerta si lo necesitas."
++        "heldFilterDropped": "Tu filtro de búsqueda no se conservó porque primero necesita una opción Ejecutar como en la página de Logs. Añádelo a la consulta de la alerta si lo necesitas.",
++        "thresholdColumnGuessed": "El umbral se aplicó a {column}; comprueba que es el valor que querías.",
++        "thresholdNotCarried": "El umbral {value} del gráfico no se aplicó porque elegiste una consulta diferente."
+       }
+     },
+     "saveFailed": "No se pudo guardar la alerta.",
+diff --git a/web/src/locales/languages/fr-FR.json b/web/src/locales/languages/fr-FR.json
+index 597c2a81fbcc..19797df8ab21 100644
+--- a/web/src/locales/languages/fr-FR.json
++++ b/web/src/locales/languages/fr-FR.json
+@@ -9730,6 +9730,7 @@
+         "continue": "Continuer vers l'alerte",
+         "queryChoiceLabel": "Alerter sur la requête",
+         "queryChoiceOption": "{name} : {query}",
++        "pickQueryIntro": "Il y a plusieurs requêtes. Sélectionnez celle à partir de laquelle créer l'alerte.",
+         "streamLabel": "Flux",
+         "thresholdLabel": "Alerte sur",
+         "thresholdMatchingRows": "Lignes correspondantes",
+@@ -9811,7 +9812,9 @@
+         "rumFunnelSnapshot": "Cette alerte conserve une copie du SQL de l'entonnoir. Les modifications ultérieures de l'entonnoir ou de ses événements nommés ne la modifient pas.",
+         "rumFunnelSteps": "Un entonnoir doit comporter au moins deux étapes pour pouvoir alerter sur la conversion.",
+         "textFilterDropped": "Votre filtre de recherche n'a pas été reporté car ce flux n'a pas de champs de recherche en texte intégral (FTS). Ajoutez-le à la requête d'alerte si vous en avez besoin.",
+-        "heldFilterDropped": "Votre filtre de recherche n'a pas été reporté car il nécessite d'abord un choix « Exécuter en tant que » sur la page des logs. Ajoutez-le à la requête d'alerte si vous en avez besoin."
++        "heldFilterDropped": "Votre filtre de recherche n'a pas été reporté car il nécessite d'abord un choix « Exécuter en tant que » sur la page des logs. Ajoutez-le à la requête d'alerte si vous en avez besoin.",
++        "thresholdColumnGuessed": "Le seuil a été appliqué à {column} ; vérifiez qu'il s'agit bien de la valeur voulue.",
++        "thresholdNotCarried": "Le seuil {value} du graphique n'a pas été appliqué car vous avez choisi une autre requête."
+       }
+     },
+     "saveFailed": "Impossible d'enregistrer l'alerte.",
+diff --git a/web/src/locales/languages/it-IT.json b/web/src/locales/languages/it-IT.json
+index e00eb25a3ff7..1a0427916246 100644
+--- a/web/src/locales/languages/it-IT.json
++++ b/web/src/locales/languages/it-IT.json
+@@ -9730,6 +9730,7 @@
+         "continue": "Continua all'avviso",
+         "queryChoiceLabel": "Avvisa sulla query",
+         "queryChoiceOption": "{name}: {query}",
++        "pickQueryIntro": "Ci sono più query. Seleziona quella da cui creare l'avviso.",
+         "streamLabel": "Stream",
+         "thresholdLabel": "Avviso su",
+         "thresholdMatchingRows": "Righe corrispondenti",
+@@ -9811,7 +9812,9 @@
+         "rumFunnelSnapshot": "Questo avviso mantiene una copia dell'SQL del funnel. Modifiche successive al funnel o ai suoi eventi denominati non lo cambiano.",
+         "rumFunnelSteps": "Un funnel necessita di almeno due passaggi prima di poter generare avvisi sulla conversione.",
+         "textFilterDropped": "Il filtro di ricerca non è stato trasferito perché questo stream non ha campi di ricerca full-text (FTS). Aggiungilo alla query dell'avviso se ti serve.",
+-        "heldFilterDropped": "Il filtro di ricerca non è stato trasferito perché richiede prima la scelta \"Esegui come\" nella pagina dei log. Aggiungilo alla query dell'avviso se ti serve."
++        "heldFilterDropped": "Il filtro di ricerca non è stato trasferito perché richiede prima la scelta \"Esegui come\" nella pagina dei log. Aggiungilo alla query dell'avviso se ti serve.",
++        "thresholdColumnGuessed": "La soglia è stata applicata a {column}; controlla che sia il valore che intendevi.",
++        "thresholdNotCarried": "La soglia {value} del grafico non è stata applicata perché hai scelto una query diversa."
+       }
+     },
+     "saveFailed": "Impossibile salvare l'avviso.",
+diff --git a/web/src/locales/languages/ja-JP.json b/web/src/locales/languages/ja-JP.json
+index c59cb0df37aa..eef1f0647927 100644
+--- a/web/src/locales/languages/ja-JP.json
++++ b/web/src/locales/languages/ja-JP.json
+@@ -9730,6 +9730,7 @@
+         "continue": "アラートに進む",
+         "queryChoiceLabel": "クエリでアラート",
+         "queryChoiceOption": "{name}: {query}",
++        "pickQueryIntro": "複数のクエリがあります。アラートを作成するクエリを選択してください。",
+         "streamLabel": "ストリーム",
+         "thresholdLabel": "アラート対象",
+         "thresholdMatchingRows": "一致する行",
+@@ -9811,7 +9812,9 @@
+         "rumFunnelSnapshot": "このアラートはファネルの SQL のコピーを保持します。後でファネルやその名前付きイベントを編集しても、このアラートは変更されません。",
+         "rumFunnelSteps": "ファネルでコンバージョンをアラートするには、少なくとも 2 つのステップが必要です。",
+         "textFilterDropped": "このストリームには全文検索（FTS）フィールドがないため、検索フィルターは引き継がれませんでした。必要な場合はアラートクエリに追加してください。",
+-        "heldFilterDropped": "ログページで先に「Run as」を選択する必要があるため、検索フィルターは引き継がれませんでした。必要な場合はアラートクエリに追加してください。"
++        "heldFilterDropped": "ログページで先に「Run as」を選択する必要があるため、検索フィルターは引き継がれませんでした。必要な場合はアラートクエリに追加してください。",
++        "thresholdColumnGuessed": "しきい値は {column} に適用されました。意図した値であることを確認してください。",
++        "thresholdNotCarried": "別のクエリを選択したため、チャートのしきい値 {value} は適用されませんでした。"
+       }
+     },
+     "saveFailed": "アラートを保存できませんでした。",
+diff --git a/web/src/locales/languages/ko-KR.json b/web/src/locales/languages/ko-KR.json
+index 992184629b8b..c40e5777dd11 100644
+--- a/web/src/locales/languages/ko-KR.json
++++ b/web/src/locales/languages/ko-KR.json
+@@ -9730,6 +9730,7 @@
+         "continue": "경고로 계속",
+         "queryChoiceLabel": "알림 대상 쿼리",
+         "queryChoiceOption": "{name}: {query}",
++        "pickQueryIntro": "여러 쿼리가 있습니다. 경고를 생성할 쿼리를 선택하십시오.",
+         "streamLabel": "스트림",
+         "thresholdLabel": "경고 대상",
+         "thresholdMatchingRows": "일치하는 행",
+@@ -9811,7 +9812,9 @@
+         "rumFunnelSnapshot": "이 알림은 퍼널의 SQL 사본을 유지합니다. 나중에 퍼널이나 명명된 이벤트를 편집해도 변경되지 않습니다.",
+         "rumFunnelSteps": "퍼널이 전환에 대해 알림을 보내려면 단계가 최소 두 개 필요합니다.",
+         "textFilterDropped": "이 스트림에 전체 텍스트 검색(FTS) 필드가 없어 검색 필터가 반영되지 않았습니다. 필요한 경우 알림 쿼리에 추가하세요.",
+-        "heldFilterDropped": "로그 페이지에서 먼저 Run as를 선택해야 하므로 검색 필터가 반영되지 않았습니다. 필요한 경우 알림 쿼리에 추가하세요."
++        "heldFilterDropped": "로그 페이지에서 먼저 Run as를 선택해야 하므로 검색 필터가 반영되지 않았습니다. 필요한 경우 알림 쿼리에 추가하세요.",
++        "thresholdColumnGuessed": "임계값이 {column}에 적용되었습니다. 의도한 값인지 확인하십시오.",
++        "thresholdNotCarried": "다른 쿼리를 선택했기 때문에 차트의 임계값 {value}이(가) 적용되지 않았습니다."
+       }
+     },
+     "saveFailed": "경고를 저장할 수 없습니다.",
+diff --git a/web/src/locales/languages/nl-NL.json b/web/src/locales/languages/nl-NL.json
+index 924f722a71bc..49b3f366e0e9 100644
+--- a/web/src/locales/languages/nl-NL.json
++++ b/web/src/locales/languages/nl-NL.json
+@@ -9730,6 +9730,7 @@
+         "continue": "Doorgaan naar alert",
+         "queryChoiceLabel": "Alarm op query",
+         "queryChoiceOption": "{name}: {query}",
++        "pickQueryIntro": "Er zijn meerdere query's. Kies op basis van welke query je het alert wilt maken.",
+         "streamLabel": "Stream",
+         "thresholdLabel": "Alert op",
+         "thresholdMatchingRows": "Overeenkomende rijen",
+@@ -9811,7 +9812,9 @@
+         "rumFunnelSnapshot": "Dit alarm bewaart een kopie van de SQL van de funnel. Latere wijzigingen aan de funnel of de bijbehorende benoemde gebeurtenissen veranderen dit niet.",
+         "rumFunnelSteps": "Een funnel heeft minstens twee stappen nodig voordat er op conversie kan worden gealarmeerd.",
+         "textFilterDropped": "Je zoekfilter is niet overgenomen omdat deze stream geen velden voor volledige tekstzoekopdracht (FTS) heeft. Voeg het toe aan de alarmquery als je het nodig hebt.",
+-        "heldFilterDropped": "Je zoekfilter is niet overgenomen omdat er eerst een keuze voor 'Uitvoeren als' op de logboekenpagina nodig is. Voeg het toe aan de alarmquery als je het nodig hebt."
++        "heldFilterDropped": "Je zoekfilter is niet overgenomen omdat er eerst een keuze voor 'Uitvoeren als' op de logboekenpagina nodig is. Voeg het toe aan de alarmquery als je het nodig hebt.",
++        "thresholdColumnGuessed": "De drempelwaarde is toegepast op {column}; controleer of dat de bedoelde waarde is.",
++        "thresholdNotCarried": "De drempelwaarde {value} uit de grafiek is niet toegepast omdat je een andere query hebt gekozen."
+       }
+     },
+     "saveFailed": "Kon de waarschuwing niet opslaan.",
+diff --git a/web/src/locales/languages/pl-PL.json b/web/src/locales/languages/pl-PL.json
+index 50f35b656a2d..1dea2a7e4889 100644
+--- a/web/src/locales/languages/pl-PL.json
++++ b/web/src/locales/languages/pl-PL.json
+@@ -9730,6 +9730,7 @@
+         "continue": "Przejdź do alertu",
+         "queryChoiceLabel": "Alert dla zapytania",
+         "queryChoiceOption": "{name}: {query}",
++        "pickQueryIntro": "Dostępnych jest kilka zapytań. Wybierz, na podstawie którego utworzyć alert.",
+         "streamLabel": "Strumień",
+         "thresholdLabel": "Alert na",
+         "thresholdMatchingRows": "Pasujące wiersze",
+@@ -9811,7 +9812,9 @@
+         "rumFunnelSnapshot": "Ten alert przechowuje kopię SQL lejka. Późniejsze zmiany lejka lub jego zdarzeń nazwanych nie wpływają na nią.",
+         "rumFunnelSteps": "Lejek wymaga co najmniej dwóch kroków, zanim będzie mógł alertować o konwersji.",
+         "textFilterDropped": "Twój filtr wyszukiwania nie został przeniesiony, ponieważ ten strumień nie ma pól wyszukiwania pełnotekstowego (FTS). Dodaj go do zapytania alertu, jeśli jest potrzebny.",
+-        "heldFilterDropped": "Twój filtr wyszukiwania nie został przeniesiony, ponieważ najpierw wymaga wyboru „Uruchom jako” na stronie logów. Dodaj go do zapytania alertu, jeśli jest potrzebny."
++        "heldFilterDropped": "Twój filtr wyszukiwania nie został przeniesiony, ponieważ najpierw wymaga wyboru „Uruchom jako” na stronie logów. Dodaj go do zapytania alertu, jeśli jest potrzebny.",
++        "thresholdColumnGuessed": "Próg zastosowano do {column}; sprawdź, czy to wartość, o którą chodziło.",
++        "thresholdNotCarried": "Próg {value} z wykresu nie został zastosowany, ponieważ wybrano inne zapytanie."
+       }
+     },
+     "saveFailed": "Nie można zapisać alertu.",
+diff --git a/web/src/locales/languages/pt-PT.json b/web/src/locales/languages/pt-PT.json
+index c9bff6c6a35e..1deba25915ef 100644
+--- a/web/src/locales/languages/pt-PT.json
++++ b/web/src/locales/languages/pt-PT.json
+@@ -9730,6 +9730,7 @@
+         "continue": "Continuar para o alerta",
+         "queryChoiceLabel": "Alertar sobre a consulta",
+         "queryChoiceOption": "{name}: {query}",
++        "pickQueryIntro": "Existem várias consultas. Selecione a partir de qual deseja criar o alerta.",
+         "streamLabel": "Stream",
+         "thresholdLabel": "Alertar sobre",
+         "thresholdMatchingRows": "Linhas correspondentes",
+@@ -9811,7 +9812,9 @@
+         "rumFunnelSnapshot": "Este alerta mantém uma cópia do SQL do funil. Edições posteriores no funil ou em seus eventos nomeados não a alteram.",
+         "rumFunnelSteps": "Um funil precisa de pelo menos duas etapas antes de poder alertar sobre conversão.",
+         "textFilterDropped": "Seu filtro de pesquisa não foi transferido porque este stream não tem campos de pesquisa de texto completo (FTS). Adicione-o à consulta do alerta se precisar.",
+-        "heldFilterDropped": "Seu filtro de pesquisa não foi transferido porque ele precisa primeiro de uma opção \"Executar como\" na página de registros. Adicione-o à consulta do alerta se precisar."
++        "heldFilterDropped": "Seu filtro de pesquisa não foi transferido porque ele precisa primeiro de uma opção \"Executar como\" na página de registros. Adicione-o à consulta do alerta se precisar.",
++        "thresholdColumnGuessed": "O limite foi aplicado a {column}; verifique se é o valor pretendido.",
++        "thresholdNotCarried": "O limite {value} do gráfico não foi aplicado porque escolheu uma consulta diferente."
+       }
+     },
+     "saveFailed": "Não foi possível salvar o alerta.",
+diff --git a/web/src/locales/languages/ru-RU.json b/web/src/locales/languages/ru-RU.json
+index ecb732eaaaa3..79f8165b06c5 100644
+--- a/web/src/locales/languages/ru-RU.json
++++ b/web/src/locales/languages/ru-RU.json
+@@ -9730,6 +9730,7 @@
+         "continue": "Перейти к оповещению",
+         "queryChoiceLabel": "Оповещение по запросу",
+         "queryChoiceOption": "{name}: {query}",
++        "pickQueryIntro": "Есть несколько запросов. Выберите, на основе какого создать оповещение.",
+         "streamLabel": "Поток",
+         "thresholdLabel": "Оповещение по",
+         "thresholdMatchingRows": "Совпадающие строки",
+@@ -9811,7 +9812,9 @@
+         "rumFunnelSnapshot": "Это оповещение хранит копию SQL воронки. Последующие изменения воронки или её именованных событий не влияют на него.",
+         "rumFunnelSteps": "Воронке нужно как минимум два шага, прежде чем она сможет оповещать о конверсии.",
+         "textFilterDropped": "Ваш поисковый фильтр не был перенесён, так как в этом потоке нет полей полнотекстового поиска (FTS). Добавьте его в запрос оповещения, если он вам нужен.",
+-        "heldFilterDropped": "Ваш поисковый фильтр не был перенесён, так как для него сначала нужно выбрать параметр «Запуск от имени» на странице логов. Добавьте его в запрос оповещения, если он вам нужен."
++        "heldFilterDropped": "Ваш поисковый фильтр не был перенесён, так как для него сначала нужно выбрать параметр «Запуск от имени» на странице логов. Добавьте его в запрос оповещения, если он вам нужен.",
++        "thresholdColumnGuessed": "Порог применён к {column}; убедитесь, что это нужное значение.",
++        "thresholdNotCarried": "Порог {value} с графика не применён, так как вы выбрали другой запрос."
+       }
+     },
+     "saveFailed": "Не удалось сохранить оповещение.",
+diff --git a/web/src/locales/languages/tr-TR.json b/web/src/locales/languages/tr-TR.json
+index ba1fce9eedf7..3e5760309cca 100644
+--- a/web/src/locales/languages/tr-TR.json
++++ b/web/src/locales/languages/tr-TR.json
+@@ -9730,6 +9730,7 @@
+         "continue": "Uyarıya devam et",
+         "queryChoiceLabel": "Uyarılacak sorgu",
+         "queryChoiceOption": "{name}: {query}",
++        "pickQueryIntro": "Birden fazla sorgu var. Uyarının oluşturulacağı sorguyu seçin.",
+         "streamLabel": "Akış",
+         "thresholdLabel": "Uyarı kaynağı",
+         "thresholdMatchingRows": "Eşleşen satırlar",
+@@ -9811,7 +9812,9 @@
+         "rumFunnelSnapshot": "Bu uyarı, huninin SQL'inin bir kopyasını tutar. Hunide veya adlandırılmış olaylarında sonradan yapılan düzenlemeler bunu değiştirmez.",
+         "rumFunnelSteps": "Bir huninin dönüşüm üzerine uyarı verebilmesi için en az iki adıma ihtiyacı vardır.",
+         "textFilterDropped": "Arama filtreniz taşınamadı çünkü bu akışta tam metin arama (FTS) alanı yok. Gerekirse uyarı sorgusuna ekleyin.",
+-        "heldFilterDropped": "Arama filtreniz taşınamadı çünkü önce günlükler sayfasında bir 'Run as' seçimi gerekiyor. Gerekirse uyarı sorgusuna ekleyin."
++        "heldFilterDropped": "Arama filtreniz taşınamadı çünkü önce günlükler sayfasında bir 'Run as' seçimi gerekiyor. Gerekirse uyarı sorgusuna ekleyin.",
++        "thresholdColumnGuessed": "Eşik {column} için uygulandı; kastettiğiniz değer olduğunu kontrol edin.",
++        "thresholdNotCarried": "Farklı bir sorgu seçtiğiniz için grafikteki {value} eşiği uygulanmadı."
+       }
+     },
+     "saveFailed": "Uyarı kaydedilemedi.",
+diff --git a/web/src/locales/languages/vi-VN.json b/web/src/locales/languages/vi-VN.json
+index 4337634aaaee..541d2d87b4a9 100644
+--- a/web/src/locales/languages/vi-VN.json
++++ b/web/src/locales/languages/vi-VN.json
+@@ -9730,6 +9730,7 @@
+         "continue": "Tiếp tục đến cảnh báo",
+         "queryChoiceLabel": "Cảnh báo theo truy vấn",
+         "queryChoiceOption": "{name}: {query}",
++        "pickQueryIntro": "Có nhiều truy vấn. Hãy chọn truy vấn để tạo cảnh báo.",
+         "streamLabel": "Luồng",
+         "thresholdLabel": "Cảnh báo trên",
+         "thresholdMatchingRows": "Các hàng khớp",
+@@ -9811,7 +9812,9 @@
+         "rumFunnelSnapshot": "Cảnh báo này giữ một bản sao SQL của phễu. Các chỉnh sửa sau đó đối với phễu hoặc các sự kiện có tên của nó sẽ không làm thay đổi nó.",
+         "rumFunnelSteps": "Phễu cần ít nhất hai bước trước khi có thể cảnh báo về chuyển đổi.",
+         "textFilterDropped": "Bộ lọc tìm kiếm của bạn không được chuyển sang vì stream này không có trường tìm kiếm toàn văn (FTS). Hãy thêm nó vào truy vấn cảnh báo nếu bạn cần.",
+-        "heldFilterDropped": "Bộ lọc tìm kiếm của bạn không được chuyển sang vì trước tiên nó cần một lựa chọn Run as trên trang nhật ký. Hãy thêm nó vào truy vấn cảnh báo nếu bạn cần."
++        "heldFilterDropped": "Bộ lọc tìm kiếm của bạn không được chuyển sang vì trước tiên nó cần một lựa chọn Run as trên trang nhật ký. Hãy thêm nó vào truy vấn cảnh báo nếu bạn cần.",
++        "thresholdColumnGuessed": "Ngưỡng đã được áp dụng cho {column}; hãy kiểm tra đó có phải là giá trị bạn muốn không.",
++        "thresholdNotCarried": "Ngưỡng {value} từ biểu đồ không được áp dụng vì bạn đã chọn một truy vấn khác."
+       }
+     },
+     "saveFailed": "Không thể lưu cảnh báo.",
+diff --git a/web/src/locales/languages/zh-CN.json b/web/src/locales/languages/zh-CN.json
+index 2586a333caed..e4b78eede722 100644
+--- a/web/src/locales/languages/zh-CN.json
++++ b/web/src/locales/languages/zh-CN.json
+@@ -9730,6 +9730,7 @@
+         "continue": "继续到告警",
+         "queryChoiceLabel": "告警所针对的查询",
+         "queryChoiceOption": "{name}：{query}",
++        "pickQueryIntro": "有多个查询。请选择用于创建告警的查询。",
+         "streamLabel": "数据流",
+         "thresholdLabel": "告警条件",
+         "thresholdMatchingRows": "匹配行",
+@@ -9811,7 +9812,9 @@
+         "rumFunnelSnapshot": "此告警保留了漏斗 SQL 的副本。之后对漏斗或其命名事件的编辑不会更改它。",
+         "rumFunnelSteps": "漏斗至少需要两个步骤才能对转化进行告警。",
+         "textFilterDropped": "您的搜索过滤器未带入，因为此数据流没有全文搜索（FTS）字段。如需使用，请将其添加到告警查询中。",
+-        "heldFilterDropped": "您的搜索过滤器未带入，因为它需要先在日志页面选择运行身份。如需使用，请将其添加到告警查询中。"
++        "heldFilterDropped": "您的搜索过滤器未带入，因为它需要先在日志页面选择运行身份。如需使用，请将其添加到告警查询中。",
++        "thresholdColumnGuessed": "阈值已应用于 {column}；请确认这是您想要的值。",
++        "thresholdNotCarried": "由于您选择了其他查询，图表中的阈值 {value} 未被应用。"
+       }
+     },
+     "saveFailed": "无法保存告警。",
+diff --git a/web/src/locales/languages/zh-TW.json b/web/src/locales/languages/zh-TW.json
+index d54444962120..f4759f69e9e6 100644
+--- a/web/src/locales/languages/zh-TW.json
++++ b/web/src/locales/languages/zh-TW.json
+@@ -9725,6 +9725,7 @@
+         "continue": "繼續前往警示",
+         "queryChoiceLabel": "對查詢發出警示",
+         "queryChoiceOption": "{name}: {query}",
++        "pickQueryIntro": "有多個查詢。請選擇要用來建立警示的查詢。",
+         "streamLabel": "串流",
+         "thresholdLabel": "警示條件",
+         "thresholdMatchingRows": "符合的資料列",
+@@ -9806,7 +9807,9 @@
+         "rumFunnelSnapshot": "此警示會保留漏斗 SQL 的副本。之後對漏斗或其具名事件的編輯不會改變它。",
+         "rumFunnelSteps": "漏斗至少需要兩個步驟,才能對轉換率發出警示。",
+         "textFilterDropped": "您的搜尋篩選條件未一併帶入，因為此串流沒有全文搜尋（FTS）欄位。如需使用，請將其加入警示查詢。",
+-        "heldFilterDropped": "您的搜尋篩選條件未一併帶入，因為它需要先在日誌頁面選擇執行身分。如需使用，請將其加入警示查詢。"
++        "heldFilterDropped": "您的搜尋篩選條件未一併帶入，因為它需要先在日誌頁面選擇執行身分。如需使用，請將其加入警示查詢。",
++        "thresholdColumnGuessed": "閾值已套用至 {column}；請確認這是您想要的值。",
++        "thresholdNotCarried": "由於您選擇了其他查詢，圖表中的閾值 {value} 未被套用。"
+       }
+     },
+     "saveFailed": "無法儲存警示。",
+diff --git a/web/src/utils/alerts/alertSourceRegistry.spec.ts b/web/src/utils/alerts/alertSourceRegistry.spec.ts
+index 2c5f8e475cf8..dd982cb0151f 100644
+--- a/web/src/utils/alerts/alertSourceRegistry.spec.ts
++++ b/web/src/utils/alerts/alertSourceRegistry.spec.ts
+@@ -38,6 +38,21 @@ describe("alertSourceRegistry", () => {
+     }
+   });
+ 
++  it("keeps the query-only dialog to the dashboard panel and metrics explorer flows", () => {
++    const pickers = Object.values(ALERT_SOURCES)
++      .filter((definition) => definition.pickQueryOnly)
++      .map((definition) => definition.id);
++    expect(pickers).toEqual(["panel", "explorer"]);
++    expect(DEFAULT_ALERT_SOURCE.pickQueryOnly).toBeFalsy();
++  });
++
++  it("treats only the panel flows' aggregation as a Builder seed rather than a trigger", () => {
++    const seeds = Object.values(ALERT_SOURCES)
++      .filter((definition) => definition.aggregationIsSeed)
++      .map((definition) => definition.id);
++    expect(seeds).toEqual(["panel", "explorer"]);
++  });
++
+   it("names the Metrics Explorer in an Explorer alert's toast", () => {
+     expect(getAlertSource("explorer").toastKey).toBe("alerts.prefill.sources.explorer.toast");
+     expect(i18n.global.t(getAlertSource("explorer").toastKey)).toBe(
+diff --git a/web/src/utils/alerts/alertSourceRegistry.ts b/web/src/utils/alerts/alertSourceRegistry.ts
+index bdcbe14938bc..cb54a782ff38 100644
+--- a/web/src/utils/alerts/alertSourceRegistry.ts
++++ b/web/src/utils/alerts/alertSourceRegistry.ts
+@@ -39,6 +39,10 @@ export interface AlertSourceDefinition {
+   defaultThreshold: AlertPrefillThresholdShape;
+   /** Whether the confirm dialog shows the resolved query. */
+   showQueryPreview: boolean;
++  /** With several queries to choose from, the confirm dialog asks only which one. */
++  pickQueryOnly?: boolean;
++  /** Its aggregation is a Builder-tab seed, not a threshold, so it must not set the trigger on its own. */
++  aggregationIsSeed?: boolean;
+ }
+ 
+ export const DEFAULT_ALERT_SOURCE: AlertSourceDefinition = {
+@@ -87,6 +91,8 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
+     icon: "shield-alert-outline",
+     defaultThreshold: "matching-rows",
+     showQueryPreview: true,
++    pickQueryOnly: true,
++    aggregationIsSeed: true,
+   },
+   explorer: {
+     id: "explorer",
+@@ -95,6 +101,8 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
+     icon: "shield-alert-outline",
+     defaultThreshold: "matching-rows",
+     showQueryPreview: true,
++    pickQueryOnly: true,
++    aggregationIsSeed: true,
+   },
+   dbm: {
+     id: "dbm",
+diff --git a/web/src/utils/alerts/prefill/fromPanel.spec.ts b/web/src/utils/alerts/prefill/fromPanel.spec.ts
+index 5ee9b0dc694c..8a86516fe798 100644
+--- a/web/src/utils/alerts/prefill/fromPanel.spec.ts
++++ b/web/src/utils/alerts/prefill/fromPanel.spec.ts
+@@ -154,6 +154,46 @@ describe("buildPrefillFromPanel", () => {
+     expect(p.meta?.sqlHaving).toEqual({ column: "cnt", operator: ">=", value: 42 });
+   });
+ 
++  describe("a chart threshold on a built query", () => {
++    const builtQuery = {
++      query: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"',
++      customQuery: false,
++      fields: {
++        stream: "triggers",
++        stream_type: "logs",
++        y: [{ alias: "y_axis_1", aggregationFunction: "count" }],
++      },
++    };
++    const thresholdPanel = (overrides: Partial<PanelPrefillInput> = {}) =>
++      sqlPanel({
++        threshold: 4.42,
++        condition: "above",
++        yAxisColumn: "y_axis_1",
++        queries: [builtQuery, builtQuery],
++        ...overrides,
++      });
++
++    it("is written into the SQL when the query was picked, since the form saves the SQL", () => {
++      const p = buildPrefillFromPanel(
++        thresholdPanel({
++          queryChoices: [
++            { index: 0, query: builtQuery.query },
++            { index: 1, query: builtQuery.query },
++          ],
++        }),
++        makeId,
++      );
++      expect(p.meta?.sqlHaving).toEqual({ column: "y_axis_1", operator: ">=", value: 4.42 });
++      expect(p.aggregation?.having).toEqual({ column: "y_axis_1", operator: ">=", value: 1 });
++    });
++
++    it("is written into the SQL on a single-query panel too, leaving the aggregation at its default", () => {
++      const p = buildPrefillFromPanel(thresholdPanel({ queries: [builtQuery] }), makeId);
++      expect(p.meta?.sqlHaving).toEqual({ column: "y_axis_1", operator: ">=", value: 4.42 });
++      expect(p.aggregation?.having).toEqual({ column: "y_axis_1", operator: ">=", value: 1 });
++    });
++  });
++
+   it("maps list filters onto alert conditions", () => {
+     const p = buildPrefillFromPanel(
+       sqlPanel({
+@@ -351,6 +391,26 @@ describe("buildPrefillFromPanel — the query the user points at", () => {
+     expect(needsConfirmation(p)).toBe(true);
+   });
+ 
++  it("applies the chart threshold to whichever query was chosen", () => {
++    const choices = [
++      { index: 0, query: "avg(disk_used)" },
++      { index: 1, query: "sum(rate(io_ops[1m]))" },
++    ];
++    const p = buildPrefillFromPanel(
++      promqlPanel({
++        queryIndex: 0,
++        queryChoices: choices,
++        threshold: 4,
++        condition: "below",
++        executedQuery: "avg(disk_used)",
++      }),
++      makeId,
++    );
++    expect(p.promql).toBe("avg(disk_used)");
++    expect(p.queryIndex).toBe(0);
++    expect(p.promqlCondition).toEqual({ column: "value", operator: "<=", value: 4 });
++  });
++
+   it("does not ask for a dialog when there is only one choice", () => {
+     const p = normalizePrefill(
+       buildPrefillFromPanel(
+@@ -390,6 +450,93 @@ describe("buildPrefillFromPanel — unresolved dashboard variables", () => {
+   });
+ });
+ 
++describe("buildPrefillFromPanel — a code-mode PromQL query's stream", () => {
++  const codeQuery = (query: string, stream: string) => ({
++    query,
++    customQuery: true,
++    fields: { stream, stream_type: "metrics" },
++  });
++  const LEFTOVER = "traces_service_graph_request_server_failed_total";
++  const other = codeQuery("up", "up");
++  const promqlPanel = (overrides: Partial<PanelPrefillInput> = {}): PanelPrefillInput => {
++    const queries = [...(overrides.queries ?? []), other];
++    return {
++      panelTitle: "Disk",
++      panelType: "line",
++      queryType: "promql",
++      ...overrides,
++      queries,
++      queryChoices: queries.map((query, index) => ({ index, query: query.query })),
++    };
++  };
++
++  it("reads the same stream whether the query stands alone or beside a sibling", () => {
++    const query = codeQuery("traces_service_graph_request_client_seconds_count", LEFTOVER);
++    const executedQuery = "traces_service_graph_request_client_seconds_count";
++    const alone = buildPrefillFromPanel(
++      { panelTitle: "Disk", queryType: "promql", queries: [query], executedQuery },
++      makeId,
++    );
++    const picked = buildPrefillFromPanel(promqlPanel({ queries: [query], executedQuery }), makeId);
++    expect(alone.streamName).toBe(executedQuery);
++    expect(picked.streamName).toBe(alone.streamName);
++    expect(alone.streamCandidates).toBeUndefined();
++  });
++
++  it("takes the metric the query reads, not the editor's leftover stream pick", () => {
++    const p = buildPrefillFromPanel(
++      promqlPanel({
++        queries: [codeQuery("traces_service_graph_request_client_seconds_count", LEFTOVER)],
++        executedQuery: "traces_service_graph_request_client_seconds_count",
++      }),
++      makeId,
++    );
++    expect(p.streamName).toBe("traces_service_graph_request_client_seconds_count");
++    expect(p.streamCandidates).toBeUndefined();
++  });
++
++  it("offers each metric when the query reads several", () => {
++    const p = buildPrefillFromPanel(
++      promqlPanel({
++        queries: [codeQuery("sum(rate(errors[5m])) / sum(rate(requests[5m]))", LEFTOVER)],
++        executedQuery: "sum(rate(errors[5m])) / sum(rate(requests[5m]))",
++      }),
++      makeId,
++    );
++    expect(p.streamName).toBe("errors");
++    expect(p.streamCandidates?.map((c) => c.name)).toEqual(["errors", "requests"]);
++  });
++
++  it("keeps the stream pick when the query reads it", () => {
++    const p = buildPrefillFromPanel(
++      promqlPanel({
++        queries: [codeQuery("rate(req_total[5m]) / rate(req_errors[5m])", "req_errors")],
++        executedQuery: "rate(req_total[5m]) / rate(req_errors[5m])",
++      }),
++      makeId,
++    );
++    expect(p.streamName).toBe("req_errors");
++    expect(p.streamCandidates).toBeUndefined();
++  });
++
++  it("keeps a builder query's stream, and the pick when the text names no metric", () => {
++    const builder = buildPrefillFromPanel(
++      promqlPanel({
++        queries: [{ ...codeQuery("rate(cpu[5m])", "cpu_seconds"), customQuery: false }],
++        executedQuery: "rate(cpu[5m])",
++      }),
++      makeId,
++    );
++    expect(builder.streamName).toBe("cpu_seconds");
++
++    const constant = buildPrefillFromPanel(
++      promqlPanel({ queries: [codeQuery("vector(1)", LEFTOVER)], executedQuery: "vector(1)" }),
++      makeId,
++    );
++    expect(constant.streamName).toBe(LEFTOVER);
++  });
++});
++
+ describe("buildPrefillFromPanel — the Date pair a rendered panel holds", () => {
+   const TWO_HOURS_US = 2 * 3_600_000_000;
+   const START_US = 1_700_000_000_000_000;
+diff --git a/web/src/utils/alerts/prefill/fromPanel.ts b/web/src/utils/alerts/prefill/fromPanel.ts
+index 387344d1403a..0be52d8df80e 100644
+--- a/web/src/utils/alerts/prefill/fromPanel.ts
++++ b/web/src/utils/alerts/prefill/fromPanel.ts
+@@ -19,7 +19,7 @@
+  * Replaces the two hand-rolled payload builders that used to live in
+  * PanelContainer.vue and usePanelActions.ts. Pure and synchronous (invariant 5):
+  * the one piece that genuinely needs the async SQL parser — injecting a HAVING
+- * clause into a raw SQL panel query — is carried as `meta.sqlHaving` and applied
++ * clause into a SQL panel query, raw or built — is carried as `meta.sqlHaving` and applied
+  * by the consumer, which already owns the parser.
+  */
+ 
+@@ -37,6 +37,14 @@ import { selectorMetricNames } from "@/utils/dashboard/exemplars/exemplarPlaceme
+ /** Panel types whose shape has no meaningful row count to alert on. */
+ const UNSUPPORTED_PANEL_TYPES = ["markdown", "html", "geomap", "sankey"];
+ 
++/** The parts of a dashboard panel query the alert adapters read. */
++export interface PanelQueryShape {
++  query?: string;
++  customQuery?: boolean;
++  fields?: { stream?: string; y?: { alias?: string; column?: string }[] };
++  config?: { formula?: string; hide?: boolean };
++}
++
+ export interface PanelPrefillInput {
+   panelTitle?: string;
+   panelId?: string;
+@@ -212,6 +220,26 @@ const formulaInputStreams = (
+   return [...new Set(names)].map((name) => ({ name, type: "metrics" }));
+ };
+ 
++/** The metrics a code-mode query's text selects, when its inherited `fields.stream` is not one of them. */
++const codeModeStreams = (
++  query: PanelQueryShape | undefined,
++  text: string,
++): AlertPrefillStreamCandidate[] => {
++  if (query?.customQuery !== true) return [];
++  const names = selectorMetricNames(withoutComments(text));
++  const stream = query.fields?.stream;
++  if (stream && names.includes(stream)) return [];
++  return names.map((name) => ({ name, type: "metrics" }));
++};
++
++/** A query with something to alert on: its own text, or a formula over other queries. */
++const isAlertableQuery = (query: PanelQueryShape | undefined): boolean =>
++  isFormulaQuery(query) || !!query?.query?.trim();
++
++/** The shown queries an alert can target; an empty slot runs nothing, but a lone shown query is kept as is. */
++export const alertableQueryIndexes = (queries: PanelQueryShape[], shown: number[]): number[] =>
++  shown.length > 1 ? shown.filter((index) => isAlertableQuery(queries[index])) : shown;
++
+ /** The executed text of a panel query's current-period window; shifted windows follow the primaries. */
+ export const executedPanelQuery = (
+   metadataQueries: any[] | undefined,
+@@ -255,11 +283,12 @@ export const buildPrefillFromPanel = (
+   }
+ 
+   const isPromql = input.queryType === "promql";
+-  const inputStreams =
+-    isPromql && isFormulaQuery(query)
+-      ? formulaInputStreams(input.queries ?? [], query.config.formula, input.metadataQueries)
+-      : [];
+   const sourceQuery = input.executedQuery || query?.query || "";
++  const inputStreams = !isPromql
++    ? []
++    : isFormulaQuery(query)
++      ? formulaInputStreams(input.queries ?? [], query.config.formula, input.metadataQueries)
++      : codeModeStreams(query, sourceQuery);
+   // Raw text from a query that never ran may still hold dashboard variables the evaluator cannot fill.
+   if (!input.executedQuery && /\$(\w|\{)/.test(sourceQuery)) {
+     warnings.push(warn("unresolvedQuery", "blocking"));
+@@ -278,8 +307,10 @@ export const buildPrefillFromPanel = (
+ 
+   const hasThreshold = input.threshold !== undefined && !!input.condition;
+   const operator = input.condition === "above" ? ">=" : "<=";
++  // The form saves a SQL alert's query text and drops its aggregation, so the threshold must live in the HAVING.
++  const thresholdInSql = hasThreshold && !isPromql && !!input.yAxisColumn;
+ 
+-  if (hasThreshold && aggregation) {
++  if (hasThreshold && aggregation && !thresholdInSql) {
+     aggregation.having.value = input.threshold as number;
+     aggregation.having.operator = operator;
+   }
+@@ -317,9 +348,8 @@ export const buildPrefillFromPanel = (
+     }
+   } else {
+     prefill.sql = sourceQuery;
+-    // Raw-SQL panels get their threshold as a HAVING clause injected into the
+-    // query text, which needs the SQL parser — the consumer applies this.
+-    if (hasThreshold && !aggregation && input.yAxisColumn) {
++    // Injecting the HAVING needs the async SQL parser, so the consumer applies it.
++    if (thresholdInSql) {
+       prefill.meta = {
+         ...prefill.meta,
+         sqlHaving: {
+diff --git a/web/src/utils/dashboard/lineSeriesAtPoint.spec.ts b/web/src/utils/dashboard/lineSeriesAtPoint.spec.ts
+new file mode 100644
+index 000000000000..80a8b1081ca7
+--- /dev/null
++++ b/web/src/utils/dashboard/lineSeriesAtPoint.spec.ts
+@@ -0,0 +1,129 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, expect, it } from "vitest";
++import {
++  indexesNearX,
++  lineSeriesAtPoint,
++  nearestIndexByX,
++  type LineSeriesPixels,
++} from "./lineSeriesAtPoint";
++
++const flat: LineSeriesPixels = {
++  seriesIndex: 0,
++  points: [
++    [0, 100],
++    [100, 100],
++    [200, 100],
++  ],
++};
++const spike: LineSeriesPixels = {
++  seriesIndex: 2,
++  points: [
++    [0, 100],
++    [100, 20],
++    [200, 100],
++  ],
++};
++
++describe("lineSeriesAtPoint", () => {
++  it("finds the line a click lands on between its points, with the nearer point", () => {
++    expect(lineSeriesAtPoint([75, 40], [flat, spike])).toEqual({ seriesIndex: 2, dataIndex: 1 });
++    expect(lineSeriesAtPoint([30, 101], [flat, spike])).toEqual({ seriesIndex: 0, dataIndex: 0 });
++  });
++
++  it("finds nothing away from every line", () => {
++    expect(lineSeriesAtPoint([50, 300], [flat, spike])).toBeNull();
++  });
++
++  it("does not bridge a gap the chart leaves undrawn", () => {
++    const gapped: LineSeriesPixels = { seriesIndex: 1, points: [[0, 50], null, [200, 50]] };
++    expect(lineSeriesAtPoint([100, 50], [gapped])).toBeNull();
++    expect(lineSeriesAtPoint([2, 51], [gapped])).toEqual({ seriesIndex: 1, dataIndex: 0 });
++  });
++
++  it("takes the first of two lines drawn on top of each other", () => {
++    const twin = { ...flat, seriesIndex: 3 };
++    expect(lineSeriesAtPoint([50, 100], [flat, twin])?.seriesIndex).toBe(0);
++  });
++
++  it("reports the data index of a window that starts past the series' first point", () => {
++    expect(lineSeriesAtPoint([75, 40], [{ ...spike, offset: 500 }])).toEqual({
++      seriesIndex: 2,
++      dataIndex: 501,
++    });
++  });
++});
++
++describe("indexesNearX", () => {
++  const every10 = (index: number) => index * 10;
++
++  it("takes the points within reach of the cursor plus one either side", () => {
++    expect(indexesNearX(100, 505, every10, 6)).toEqual([49, 52]);
++  });
++
++  it("clamps to the series' ends", () => {
++    expect(indexesNearX(3, -50, every10, 6)).toEqual([0, 0]);
++    expect(indexesNearX(3, 500, every10, 6)).toEqual([2, 2]);
++  });
++
++  it("steps over gaps whose x is unknown", () => {
++    const gaps = new Set([2, 3, 4, 5, 6, 7]);
++    const xAt = (index: number) => (gaps.has(index) ? null : index * 10);
++    expect(indexesNearX(9, 15, xAt, 6)).toEqual([0, 2]);
++    expect(indexesNearX(9, 85, xAt, 6)).toEqual([1, 8]);
++  });
++
++  it("searches rows that run right to left", () => {
++    expect(indexesNearX(100, 505, (index) => (99 - index) * 10, 6)).toEqual([47, 50]);
++  });
++
++  it("steps over points whose x cannot be placed", () => {
++    const xAt = (index: number) => (index === 4 ? NaN : index * 10);
++    expect(indexesNearX(9, 45, xAt, 6)).toEqual([3, 6]);
++  });
++
++  it("gives up on a series whose x cannot be placed, or that has no points", () => {
++    expect(indexesNearX(10, 50, () => NaN)).toBeNull();
++    expect(indexesNearX(0, 50, every10)).toBeNull();
++  });
++});
++
++describe("nearestIndexByX", () => {
++  const xsAt = (xs: (number | null)[]) => (index: number) => xs[index] ?? null;
++
++  it("looks past a run of gaps to the next drawn point on the right", () => {
++    expect(nearestIndexByX(5, 48, xsAt([10, 20, null, null, 50]))).toBe(4);
++    expect(nearestIndexByX(5, 22, xsAt([10, 20, null, null, 50]))).toBe(1);
++  });
++
++  it("takes the first drawn point when the cursor is left of it, past leading gaps", () => {
++    expect(nearestIndexByX(6, 29, xsAt([null, null, null, 30, 40, 50]))).toBe(3);
++  });
++
++  it("takes the last drawn point when the cursor is right of it, before trailing gaps", () => {
++    expect(nearestIndexByX(4, 40, xsAt([10, 20, null, null]))).toBe(1);
++  });
++
++  it("finds the nearer point in rows that run right to left", () => {
++    const descending = xsAt([50, 40, null, 20, 10]);
++    expect(nearestIndexByX(5, 38, descending)).toBe(1);
++    expect(nearestIndexByX(5, 25, descending)).toBe(3);
++  });
++
++  it("finds nothing in a series with no drawn point", () => {
++    expect(nearestIndexByX(3, 10, xsAt([null, null, null]))).toBeUndefined();
++  });
++});
+diff --git a/web/src/utils/dashboard/lineSeriesAtPoint.ts b/web/src/utils/dashboard/lineSeriesAtPoint.ts
+new file mode 100644
+index 000000000000..19b0e326c8d1
+--- /dev/null
++++ b/web/src/utils/dashboard/lineSeriesAtPoint.ts
+@@ -0,0 +1,207 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++export type PixelPoint = [number, number];
++
++export interface LineSeriesPixels {
++  seriesIndex: number;
++  /** Data index of `points[0]`. */
++  offset?: number;
++  /** One entry per data index from `offset`; null where the series draws nothing. */
++  points: (PixelPoint | null)[];
++}
++
++export interface LineSeriesHit {
++  seriesIndex: number;
++  dataIndex: number;
++}
++
++export interface LineStrokeEvent {
++  seriesIndex: number;
++  event?: { offsetX?: number; offsetY?: number; event?: MouseEvent };
++}
++
++/** Makes each line's drawn stroke report mouse events, whatever its shape, while `on`. */
++export const withLineStrokeEvents = (
++  options: Record<string, unknown>,
++  on: boolean,
++): Record<string, unknown> =>
++  on && Array.isArray(options.series)
++    ? {
++        ...options,
++        series: (options.series as { type?: string }[]).map((entry) =>
++          entry?.type === "line" ? { ...entry, triggerEvent: "line" } : entry,
++        ),
++      }
++    : options;
++
++/** A merge-mode patch that turns the line strokes' events on or off, leaving every other option as it is. */
++export const lineStrokeEventsPatch = (series: unknown, on: boolean) => ({
++  series: (Array.isArray(series) ? (series as { type?: string }[]) : []).map((entry) =>
++    entry?.type === "line" ? { triggerEvent: on ? "line" : false } : {},
++  ),
++});
++
++/** An event from a line's stroke rather than a data point; only `withLineStrokeEvents` makes strokes report. */
++export const isLineStrokeEvent = (params: unknown): params is LineStrokeEvent => {
++  const event = params as { selfType?: string; seriesIndex?: unknown } | null;
++  return event?.selfType === "line" && typeof event.seriesIndex === "number";
++};
++
++/** Screen pixels a click may miss a drawn line by and still count as on it. */
++export const LINE_HIT_TOLERANCE = 6;
++
++const distanceToSegment = (p: PixelPoint, a: PixelPoint, b: PixelPoint): number => {
++  const dx = b[0] - a[0];
++  const dy = b[1] - a[1];
++  const lengthSquared = dx * dx + dy * dy;
++  const t =
++    lengthSquared === 0
++      ? 0
++      : Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lengthSquared));
++  return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
++};
++
++/** The placed index nearest `mid` within [low, high], skipping gaps; null when all are gaps. */
++const placedNear = (
++  mid: number,
++  low: number,
++  high: number,
++  xAt: (index: number) => number | null,
++): { index: number; x: number } | null => {
++  for (let step = 0; mid - step >= low || mid + step <= high; step++) {
++    for (const index of step === 0 ? [mid] : [mid - step, mid + step]) {
++      if (index < low || index > high) continue;
++      const x = xAt(index);
++      if (x !== null && Number.isFinite(x)) return { index, x };
++    }
++  }
++  return null;
++};
++
++/** Last placed index whose x is at or left of `x`, -1 when none, for points ascending in x. */
++const lastIndexAtOrBefore = (
++  count: number,
++  x: number,
++  xAt: (index: number) => number | null,
++): number => {
++  let low = 0;
++  let high = count - 1;
++  let last = -1;
++  while (low <= high) {
++    const mid = (low + high) >> 1;
++    const placed = placedNear(mid, low, high, xAt);
++    if (!placed) break;
++    // Indexes between `mid` and the placed one are gaps, so the search may skip past both.
++    if (placed.x <= x) {
++      last = placed.index;
++      low = Math.max(placed.index, mid) + 1;
++    } else {
++      high = Math.min(placed.index, mid) - 1;
++    }
++  }
++  return last;
++};
++
++const nearAscendingX = (
++  count: number,
++  cursorX: number,
++  xAt: (index: number) => number | null,
++  tolerance: number,
++): [number, number] => {
++  const from = lastIndexAtOrBefore(count, cursorX - tolerance, xAt);
++  const to = lastIndexAtOrBefore(count, cursorX + tolerance, xAt);
++  return [Math.max(0, from), Math.min(count - 1, to + 1)];
++};
++
++/** The data indexes whose segments can pass within `tolerance` of `cursorX`; `xAt` is null for a gap. */
++export const indexesNearX = (
++  count: number,
++  cursorX: number,
++  xAt: (index: number) => number | null,
++  tolerance: number = LINE_HIT_TOLERANCE,
++): [number, number] | null => {
++  const first = count > 0 ? placedNear(0, 0, count - 1, xAt) : null;
++  const last = count > 0 ? placedNear(count - 1, 0, count - 1, xAt) : null;
++  if (!first || !last) return null;
++  if (first.x <= last.x) return nearAscendingX(count, cursorX, xAt, tolerance);
++  // Rows sorted newest first run right to left, so search them mirrored.
++  const [from, to] = nearAscendingX(count, cursorX, (index) => xAt(count - 1 - index), tolerance);
++  return [count - 1 - to, count - 1 - from];
++};
++
++/** The placed index whose x is closest to `cursorX`, or undefined when nothing is placed. */
++export const nearestIndexByX = (
++  count: number,
++  cursorX: number,
++  xAt: (index: number) => number | null,
++): number | undefined => {
++  const first = count > 0 ? placedNear(0, 0, count - 1, xAt) : null;
++  const last = count > 0 ? placedNear(count - 1, 0, count - 1, xAt) : null;
++  if (!first || !last) return undefined;
++  // Rows sorted newest first run right to left, so search them mirrored.
++  const descending = first.x > last.x;
++  const toData = (index: number) => (descending ? count - 1 - index : index);
++  const at = (index: number) => {
++    const x = xAt(toData(index));
++    return x !== null && Number.isFinite(x) ? x : null;
++  };
++  const left = lastIndexAtOrBefore(count, cursorX, at);
++  // The neighbour on the right may sit past a run of gaps.
++  let right = left + 1;
++  while (right < count && at(right) === null) right++;
++  const candidates = [left, right].filter((index) => index >= 0 && index < count);
++  const nearest = candidates.reduce((best, index) =>
++    Math.abs((at(index) as number) - cursorX) < Math.abs((at(best) as number) - cursorX)
++      ? index
++      : best,
++  );
++  return toData(nearest);
++};
++
++const gap = (a: PixelPoint, b: PixelPoint): number => Math.hypot(a[0] - b[0], a[1] - b[1]);
++
++const nearestOnSeries = (
++  cursor: PixelPoint,
++  points: (PixelPoint | null)[],
++): { distance: number; dataIndex: number } | null => {
++  let best: { distance: number; dataIndex: number } | null = null;
++  for (let index = 0; index < points.length; index++) {
++    const point = points[index];
++    if (!point) continue;
++    const next = points[index + 1] ?? null;
++    const distance = distanceToSegment(cursor, point, next ?? point);
++    if (best && distance >= best.distance) continue;
++    const nearerNext = !!next && gap(cursor, next) < gap(cursor, point);
++    best = { distance, dataIndex: nearerNext ? index + 1 : index };
++  }
++  return best;
++};
++
++/** The line series drawn under a cursor that hit no symbol, with the data point nearest it. */
++export const lineSeriesAtPoint = (
++  cursor: PixelPoint,
++  series: LineSeriesPixels[],
++  tolerance: number = LINE_HIT_TOLERANCE,
++): LineSeriesHit | null => {
++  let best: (LineSeriesHit & { distance: number }) | null = null;
++  for (const { seriesIndex, offset = 0, points } of series) {
++    const hit = nearestOnSeries(cursor, points);
++    if (hit && hit.distance <= tolerance && (!best || hit.distance < best.distance)) {
++      best = { seriesIndex, distance: hit.distance, dataIndex: offset + hit.dataIndex };
++    }
++  }
++  return best && { seriesIndex: best.seriesIndex, dataIndex: best.dataIndex };
++};
+diff --git a/web/src/utils/dashboard/lineStrokeEvents.spec.ts b/web/src/utils/dashboard/lineStrokeEvents.spec.ts
+new file mode 100644
+index 000000000000..4e462a137da4
+--- /dev/null
++++ b/web/src/utils/dashboard/lineStrokeEvents.spec.ts
+@@ -0,0 +1,288 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { afterEach, describe, expect, it } from "vitest";
++import * as echarts from "echarts";
++import {
++  isLineStrokeEvent,
++  lineStrokeEventsPatch,
++  withLineStrokeEvents,
++} from "./lineSeriesAtPoint";
++
++// Real ECharts with the SVG renderer: hit-testing is zrender's path math, so jsdom can drive it.
++const WIDTH = 400;
++const HEIGHT = 300;
++const EVENTS = ["click", "mouseover", "mouseout", "mousemove", "contextmenu"];
++const TOOLTIP_EVENTS = ["showtip", "hidetip", "highlight", "downplay"];
++
++interface Recorded {
++  name: string;
++  selfType?: string;
++  seriesIndex?: number;
++  dataIndex?: number;
++}
++
++let charts: echarts.ECharts[] = [];
++
++const render = (series: Record<string, unknown>[], trigger: string, on: boolean) => {
++  const el = document.createElement("div");
++  document.body.appendChild(el);
++  const chart = echarts.init(el, null, { renderer: "svg", width: WIDTH, height: HEIGHT });
++  charts.push(chart);
++  chart.setOption(
++    withLineStrokeEvents(
++      {
++        animation: false,
++        grid: { left: 0, right: 0, top: 0, bottom: 0 },
++        xAxis: { type: "value", min: 0, max: 4 },
++        yAxis: { type: "value", min: 0, max: 20 },
++        tooltip: { trigger, showDelay: 0, hideDelay: 0, transitionDuration: 0 },
++        series,
++      },
++      on,
++    ),
++  );
++  const recorded: Recorded[] = [];
++  for (const name of [...EVENTS, ...TOOLTIP_EVENTS]) {
++    chart.on(name, (params: unknown) => {
++      const p = params as Omit<Recorded, "name">;
++      recorded.push({
++        name,
++        selfType: p.selfType,
++        seriesIndex: p.seriesIndex,
++        dataIndex: p.dataIndex,
++      });
++    });
++  }
++  const pointer = (type: string, [zrX, zrY]: number[]) =>
++    chart.getZr().handler.dispatch(type, {
++      zrX,
++      zrY,
++      preventDefault: () => undefined,
++      stopPropagation: () => undefined,
++    });
++  const gesture = (at: number[]) => {
++    for (const type of ["mousemove", "mousedown", "mouseup", "click", "contextmenu"]) {
++      pointer(type, at);
++    }
++  };
++  return { chart, recorded, gesture };
++};
++
++/** The pixel where a vertical line at data x crosses the drawn stroke of a series. */
++const strokeAt = (series: Record<string, unknown>[], seriesIndex: number, x: number) => {
++  const { chart, recorded, gesture } = render(series, "item", true);
++  const column = chart.convertToPixel({ xAxisIndex: 0 }, x) as number;
++  for (let y = 0; y < HEIGHT; y++) {
++    recorded.length = 0;
++    gesture([column, y]);
++    const hit = recorded.find((event) => event.name === "contextmenu");
++    if (hit && hit.seriesIndex === seriesIndex) return [column, y];
++  }
++  return null;
++};
++
++afterEach(() => {
++  charts.forEach((chart) => chart.dispose());
++  charts = [];
++});
++
++describe("a line's drawn stroke as a right-click target", () => {
++  const smooth = [
++    {
++      type: "line",
++      smooth: true,
++      showSymbol: false,
++      data: [
++        [0, 1],
++        [1, 9],
++        [2, 8],
++        [3, 1],
++      ],
++    },
++  ];
++  const step = [
++    {
++      type: "line",
++      step: "end",
++      showSymbol: false,
++      data: [
++        [0, 2],
++        [1, 9],
++        [2, 2],
++      ],
++    },
++  ];
++  const stacked = [
++    {
++      type: "line",
++      stack: "s",
++      showSymbol: false,
++      data: [
++        [0, 2],
++        [1, 2],
++        [2, 2],
++      ],
++    },
++    {
++      type: "line",
++      stack: "s",
++      showSymbol: false,
++      data: [
++        [0, 3],
++        [1, 3],
++        [2, 3],
++      ],
++    },
++  ];
++
++  it.each([
++    ["smooth", smooth, 0, 1.5],
++    ["step", step, 0, 0.5],
++    ["stacked", stacked, 1, 0.5],
++  ])("names a %s line between its points", (_shape, series, seriesIndex, x) => {
++    const at = strokeAt(series, seriesIndex, x);
++    expect(at).not.toBeNull();
++
++    const { recorded, gesture } = render(series, "item", true);
++    gesture(at as number[]);
++    const hit = recorded.find((event) => event.name === "contextmenu");
++    expect(isLineStrokeEvent({ ...hit, seriesIndex: hit?.seriesIndex })).toBe(true);
++    expect(hit?.seriesIndex).toBe(seriesIndex);
++  });
++
++  it("names the upper of two stacked lines at its drawn height, not its own values", () => {
++    const { chart, recorded, gesture } = render(stacked, "item", true);
++    const column = chart.convertToPixel({ xAxisIndex: 0 }, 0.5) as number;
++    const lineAt = (value: number) => {
++      recorded.length = 0;
++      gesture([column, chart.convertToPixel({ yAxisIndex: 0 }, value) as number]);
++      return recorded.find((event) => event.name === "contextmenu")?.seriesIndex;
++    };
++
++    expect(lineAt(2 + 3)).toBe(1);
++    expect(lineAt(3)).not.toBe(1);
++  });
++
++  it("names a step-after line on its riser, and none at the diagonal midpoint its path never crosses", () => {
++    const { chart, recorded, gesture } = render(step, "item", true);
++    const lineAt = (x: number, value: number) => {
++      recorded.length = 0;
++      gesture([
++        chart.convertToPixel({ xAxisIndex: 0 }, x) as number,
++        chart.convertToPixel({ yAxisIndex: 0 }, value) as number,
++      ]);
++      return recorded.find((event) => event.name === "contextmenu")?.seriesIndex;
++    };
++
++    expect(lineAt(1, 5.5)).toBe(0);
++    expect(lineAt(0.5, 2)).toBe(0);
++    expect(lineAt(0.5, 5.5)).toBeUndefined();
++  });
++
++  it("reads a trellis subplot's value on its own axis, which the first grid's would misread", () => {
++    const el = document.createElement("div");
++    document.body.appendChild(el);
++    const chart = echarts.init(el, null, { renderer: "svg", width: WIDTH, height: HEIGHT });
++    charts.push(chart);
++    chart.setOption({
++      animation: false,
++      grid: [
++        { left: 0, width: 200, top: 0, bottom: 0 },
++        { left: 200, width: 200, top: 0, bottom: 0 },
++      ],
++      xAxis: [
++        { type: "value", gridIndex: 0, min: 0, max: 2 },
++        { type: "value", gridIndex: 1, min: 0, max: 2 },
++      ],
++      yAxis: [
++        { type: "value", gridIndex: 0, min: 0, max: 10 },
++        { type: "value", gridIndex: 1, min: 0, max: 1000 },
++      ],
++      series: [
++        {
++          type: "line",
++          xAxisIndex: 0,
++          yAxisIndex: 0,
++          data: [
++            [0, 5],
++            [2, 5],
++          ],
++        },
++        {
++          type: "line",
++          xAxisIndex: 1,
++          yAxisIndex: 1,
++          data: [
++            [0, 500],
++            [2, 500],
++          ],
++        },
++      ],
++    });
++    const pixel = chart.convertToPixel({ seriesIndex: 1 }, [1, 500]) as number[];
++
++    expect((chart.convertFromPixel({ seriesIndex: 1 }, pixel) as number[])[1]).toBeCloseTo(500);
++    expect((chart.convertFromPixel({ gridIndex: 0 }, pixel) as number[])[1]).not.toBeCloseTo(500);
++  });
++
++  it("turns stroke events on and off by merging the patch, keeping the zoom", () => {
++    const at = strokeAt(smooth, 0, 1.5) as number[];
++    const { chart, recorded, gesture } = render(smooth, "item", false);
++    const strokeHits = () => {
++      recorded.length = 0;
++      gesture(at);
++      return recorded.filter((event) => isLineStrokeEvent(event)).length;
++    };
++    chart.setOption(lineStrokeEventsPatch(chart.getOption().series, true));
++    expect(strokeHits()).toBeGreaterThan(0);
++
++    chart.setOption(lineStrokeEventsPatch(chart.getOption().series, false));
++    expect(strokeHits()).toBe(0);
++
++    chart.setOption({ dataZoom: [{ type: "inside", startValue: 0.5, endValue: 3 }] });
++    chart.setOption(lineStrokeEventsPatch(chart.getOption().series, true));
++    expect((chart.getOption().dataZoom as { startValue?: number }[])[0].startValue).toBe(0.5);
++  });
++
++  it("stays silent on a stroke while the option is off", () => {
++    const at = strokeAt(smooth, 0, 1.5) as number[];
++    const { recorded, gesture } = render(smooth, "item", false);
++    gesture(at);
++    expect(recorded.filter((event) => EVENTS.includes(event.name))).toEqual([]);
++  });
++
++  it.each(["item", "axis"])(
++    "leaves every other event, tooltip included (%s trigger), as it was",
++    (trigger) => {
++      const series = [{ ...smooth[0], showSymbol: true }];
++      const at = strokeAt(smooth, 0, 1.5) as number[];
++      const { chart } = render(series, trigger, false);
++      const symbol = chart.convertToPixel({ seriesIndex: 0 }, [1, 9]) as number[];
++      const path = [symbol, at, [20, HEIGHT - 5]];
++
++      const off = render(series, trigger, false);
++      const on = render(series, trigger, true);
++      for (const point of path) {
++        off.gesture(point);
++        on.gesture(point);
++      }
++
++      const unchanged = on.recorded.filter((event) => !isLineStrokeEvent(event));
++      expect(on.recorded.some((event) => isLineStrokeEvent(event))).toBe(true);
++      expect(unchanged).toEqual(off.recorded);
++    },
++  );
++});
