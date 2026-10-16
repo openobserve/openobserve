@@ -776,6 +776,7 @@
   /* Row height tokens: change these to resize all OTable rows globally. */
   --table-row-height-dense: 2.375rem; /* 38px */
   --table-row-height-normal: 2.75rem; /* 44px */
+  --table-row-height-compact: 1.5625rem; /* 25px */
 
   /* ── Chart panel bar ───────────────────────────────────────
      The title strip at the top of every chart panel (dashboard panels via

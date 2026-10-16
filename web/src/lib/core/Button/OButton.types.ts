@@ -85,6 +85,7 @@ export type ButtonSize =
   | "sidebar-button"
   // 30px labeled button — matches toolbar icon height for labeled outline toolbar buttons
   | "sm-toolbar"
+  | "xs-grouped"
   // Chip with fixed 12px font — for dashboard query builder axis field chips
   | "chip-12";
 
