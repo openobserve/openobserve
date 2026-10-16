@@ -2971,6 +2971,21 @@ pub struct DeleteResultCacheResponse {
     #[prost(bool, tag = "1")]
     pub deleted: bool,
 }
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct PublicDashboardStatusRequest {
+    #[prost(string, tag = "1")]
+    pub org_id: ::prost::alloc::string::String,
+    #[prost(string, repeated, tag = "2")]
+    pub link_ids: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(bool, tag = "3")]
+    pub with_sources: bool,
+}
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct PublicDashboardStatusResponse {
+    /// JSON list of link status reports.
+    #[prost(string, tag = "1")]
+    pub reports: ::prost::alloc::string::String,
+}
 /// Generated client implementations.
 pub mod query_cache_client {
     #![allow(
@@ -3086,6 +3101,31 @@ pub mod query_cache_client {
                 .insert(GrpcMethod::new("cluster.QueryCache", "DeleteResultCache"));
             self.inner.unary(req, path, codec).await
         }
+        /// Per-range state of public dashboard links from the querier holding their result files.
+        pub async fn public_dashboard_status(
+            &mut self,
+            request: impl tonic::IntoRequest<super::PublicDashboardStatusRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::PublicDashboardStatusResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.QueryCache/PublicDashboardStatus",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("cluster.QueryCache", "PublicDashboardStatus"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -3106,6 +3146,14 @@ pub mod query_cache_server {
             request: tonic::Request<super::DeleteResultCacheRequest>,
         ) -> std::result::Result<
             tonic::Response<super::DeleteResultCacheResponse>,
+            tonic::Status,
+        >;
+        /// Per-range state of public dashboard links from the querier holding their result files.
+        async fn public_dashboard_status(
+            &self,
+            request: tonic::Request<super::PublicDashboardStatusRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::PublicDashboardStatusResponse>,
             tonic::Status,
         >;
     }
@@ -3216,6 +3264,52 @@ pub mod query_cache_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = DeleteResultCacheSvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.QueryCache/PublicDashboardStatus" => {
+                    #[allow(non_camel_case_types)]
+                    struct PublicDashboardStatusSvc<T: QueryCache>(pub Arc<T>);
+                    impl<
+                        T: QueryCache,
+                    > tonic::server::UnaryService<super::PublicDashboardStatusRequest>
+                    for PublicDashboardStatusSvc<T> {
+                        type Response = super::PublicDashboardStatusResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::PublicDashboardStatusRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as QueryCache>::public_dashboard_status(&inner, request)
+                                    .await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = PublicDashboardStatusSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

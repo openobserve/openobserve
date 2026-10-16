@@ -77,6 +77,7 @@ struct PendingMigrations {
     query_history: bool,
     downtimes: bool,
     ai_chat_shares: bool,
+    public_dashboards: bool,
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -542,6 +543,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.ai_chat_shares {
         keys.push("ai_chat_shares");
     }
+    if pending.public_dashboards {
+        keys.push("public_dashboards");
+    }
     keys
 }
 
@@ -584,6 +588,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_53 = version_compare::Version::from("0.0.53").unwrap();
     let v0_0_54 = version_compare::Version::from("0.0.54").unwrap();
     let v0_0_55 = version_compare::Version::from("0.0.55").unwrap();
+    let v0_0_57 = version_compare::Version::from("0.0.57").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -712,6 +717,10 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] AI chat share permissions migration needed");
         pending.ai_chat_shares = true;
     }
+    if meta_version >= v0_0_57 && existing_model_version < v0_0_57 {
+        log::info!("[OFGA:Local] public dashboards permissions migration needed");
+        pending.public_dashboards = true;
+    }
 
     pending
 }
@@ -764,5 +773,17 @@ mod tests {
 
         assert!(!pending_migrations("0.0.54", "0.0.53").ai_chat_shares);
         assert!(all_org_ownership_keys(&pending_migrations("0.0.55", "0.0.55")).is_empty());
+    }
+
+    #[test]
+    fn public_dashboards_back_fill_runs_once_across_0_0_57() {
+        assert!(pending_migrations("0.0.57", "0.0.56").public_dashboards);
+        assert!(!pending_migrations("0.0.57", "0.0.57").public_dashboards);
+        assert!(!pending_migrations("0.0.56", "0.0.55").public_dashboards);
+        let pending = PendingMigrations {
+            public_dashboards: true,
+            ..Default::default()
+        };
+        assert_eq!(all_org_ownership_keys(&pending), vec!["public_dashboards"]);
     }
 }

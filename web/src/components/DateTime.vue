@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="date-time-container inline-flex items-stretch"
     :class="{
       'rounded-default border-button-outline-border min-h-7.5 border': !hideRangeShift,
+      'w-full [&>*]:flex-1': fieldAppearance,
     }"
   >
     <OTooltip v-if="!hideRangeShift" :content="t('common.previous')">
@@ -49,21 +50,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="datetimeBtn"
           data-cy="date-time-button"
           :variant="variant"
-          size="sm-toolbar"
+          :size="fieldAppearance ? 'sm' : 'sm-toolbar'"
           :class="{
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
             'md:min-w-71.5': !disableRelative && selectedType === 'absolute',
             'w-fit': disableRelative,
             'h-auto! rounded-none! border-0!': !hideRangeShift,
+            'border-select-border! enabled:hover:border-select-border-hover! w-full':
+              fieldAppearance,
           }"
           class="max-md:max-w-full max-md:min-w-0"
           :disabled="disable"
           icon-left="schedule"
         >
-          <OTruncatedText class="date-time-label flex-1 text-left font-semibold">{{
-            triggerLabel
-          }}</OTruncatedText>
+          <OTruncatedText
+            class="date-time-label flex-1 text-left"
+            :class="fieldAppearance ? 'font-normal' : 'font-semibold'"
+            >{{ triggerLabel }}</OTruncatedText
+          >
           <template #icon-right
             ><OIcon
               name="arrow-drop-down"
@@ -471,6 +476,11 @@ export default defineComponent({
     variant: {
       type: String as PropType<ButtonVariant>,
       default: "outline",
+    },
+    /** Sizes the trigger like a form field (full width, field height and border) instead of a toolbar button. */
+    fieldAppearance: {
+      type: Boolean,
+      default: false,
     },
   },
 

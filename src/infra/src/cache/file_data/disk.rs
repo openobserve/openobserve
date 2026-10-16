@@ -28,7 +28,7 @@ use std::{
 use async_recursion::async_recursion;
 use bytes::Bytes;
 use config::{
-    RwAHashMap, get_config, metrics, spawn_pausable_job,
+    RwAHashMap, RwHashMap, get_config, metrics, spawn_pausable_job,
     utils::{
         file::*,
         hash::{Sum64, gxhash},
@@ -111,6 +111,12 @@ pub const METRICS_RESULT_CACHE_FILE_PREFIX: &str = "v2_";
 
 const RESULT_CACHE_MAX_ENTRIES_PER_KEY: usize = 10;
 
+/// Public dashboard result files: one per key, in the result buckets and under their budget.
+pub const PUBLIC_DASHBOARDS_PREFIX: &str = "public_dashboards/";
+
+/// Incarnations of each public dashboard key with a memory copy, so a drop is a point removal.
+static PUBLIC_DASHBOARD_BODIES: Lazy<RwHashMap<String, Vec<u64>>> = Lazy::new(Default::default);
+
 static METRICS_RESULT_CACHE_EVICT_HOOK: OnceLock<fn(Vec<String>)> = OnceLock::new();
 
 static TRASH_ID: AtomicUsize = AtomicUsize::new(0);
@@ -140,6 +146,7 @@ pub enum FileType {
 struct EvictionCleanup {
     metrics_files: Vec<String>,
     trash_files: Vec<String>,
+    public_dashboards: Vec<String>,
 }
 
 /// While held, the file's disk cache bucket cannot evict, so the file stays on disk.
@@ -177,11 +184,15 @@ impl Default for FileData {
 
 impl Drop for EvictionCleanup {
     fn drop(&mut self) {
-        if self.metrics_files.is_empty() && self.trash_files.is_empty() {
+        if self.metrics_files.is_empty()
+            && self.trash_files.is_empty()
+            && self.public_dashboards.is_empty()
+        {
             return;
         }
         let metrics_files = std::mem::take(&mut self.metrics_files);
         let trash_files = std::mem::take(&mut self.trash_files);
+        let public_dashboards = std::mem::take(&mut self.public_dashboards);
         let Ok(handle) = tokio::runtime::Handle::try_current() else {
             log::error!(
                 "File disk cache eviction cleanup dropped outside a runtime, index entries may be stale"
@@ -200,6 +211,9 @@ impl Drop for EvictionCleanup {
                 {
                     log::error!("File disk cache remove trash file {trash_file} error: {e}");
                 }
+            }
+            for key in public_dashboards {
+                drop_public_dashboard_bodies(&key).await;
             }
         });
     }
@@ -428,6 +442,8 @@ impl FileData {
                 remove_result_files.push(key);
             } else if is_metrics_key {
                 cleanup.metrics_files.push(key);
+            } else if key.starts_with(PUBLIC_DASHBOARDS_PREFIX) {
+                cleanup.public_dashboards.push(key);
             }
 
             if release_size >= need_release_size {
@@ -611,6 +627,29 @@ pub async fn init() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn drop_public_dashboard_bodies(key: &str) {
+    let Some((_, incarnations)) = PUBLIC_DASHBOARD_BODIES.remove(key) else {
+        return;
+    };
+    for incarnation in incarnations {
+        let mem_key = public_dashboards_memory_key(key, incarnation);
+        if let Err(e) = super::memory::forget(&mem_key).await {
+            log::error!("public dashboard memory copy {mem_key} remove error: {e}");
+        }
+    }
+}
+
+fn public_dashboards_memory_key(key: &str, incarnation: u64) -> String {
+    format!("{key}#{incarnation}")
+}
+
+fn track_public_dashboard_body(key: &str, incarnation: u64) {
+    let mut incarnations = PUBLIC_DASHBOARD_BODIES.entry(key.to_string()).or_default();
+    if !incarnations.contains(&incarnation) {
+        incarnations.push(incarnation);
+    }
+}
+
 fn key_escapes(file: &str) -> bool {
     use std::path::Component;
     Path::new(file)
@@ -647,6 +686,7 @@ fn update_key_metrics(key: &str, delta: i64) {
                 .with_label_values(&[org, stream_type, "aggregations"])
                 .add(delta)
         }
+        (Some("public_dashboards"), ..) => metrics::PUBLIC_DASHBOARD_FILE_CACHE_BYTES.add(delta),
         _ => log::warn!("disk cache key {key} has no metric labels, skipping metrics"),
     }
 }
@@ -979,6 +1019,104 @@ pub async fn indexed_file_guard(file: &str) -> Option<IndexedFileGuard> {
     Some(IndexedFileGuard { _guard: files })
 }
 
+/// Atomically replaces a public dashboard file (temp, fsync, rename) and accounts the size change.
+pub async fn public_dashboards_replace(
+    key: &str,
+    incarnation: u64,
+    data: Bytes,
+) -> Result<(), anyhow::Error> {
+    if !key.starts_with(PUBLIC_DASHBOARDS_PREFIX) {
+        anyhow::bail!("not a public dashboard key: {key}");
+    }
+    if !get_config().disk_cache.enabled {
+        anyhow::bail!("the disk cache is disabled");
+    }
+    let idx = get_bucket_idx(key);
+    let Some(path) = RESULT_FILES[idx].read().await.safe_file_path(key) else {
+        anyhow::bail!("public dashboard key escapes the cache root: {key}");
+    };
+    let tmp = format!("{path}.{incarnation}.tmp");
+    let size = data.len();
+    let tmp_path = tmp.clone();
+    let parent = Path::new(&path).parent().map(Path::to_path_buf);
+    tokio::task::spawn_blocking(move || -> std::io::Result<()> {
+        use std::io::Write;
+        if let Some(parent) = parent {
+            std::fs::create_dir_all(parent)?;
+        }
+        let mut f = std::fs::File::create(&tmp_path)?;
+        f.write_all(&data)?;
+        f.sync_all()
+    })
+    .await??;
+    let mut files = RESULT_FILES[idx].write().await;
+    let old = files.data.remove_key(key).map_or(0, |(_, old)| old);
+    files.cur_size -= old;
+    if files.cur_size + size >= files.max_size {
+        let need = min(
+            files.max_size,
+            max(size, files.cur_size + size - files.max_size),
+        );
+        files.gc(need).await;
+    }
+    if let Err(e) = std::fs::rename(&tmp, &path) {
+        files.cur_size += old;
+        if old > 0 {
+            files.data.insert(key.to_string(), old);
+        }
+        drop(files);
+        _ = std::fs::remove_file(&tmp);
+        anyhow::bail!("rename {tmp} over {path}: {e}");
+    }
+    files.cur_size += size;
+    files.data.insert(key.to_string(), size);
+    drop(files);
+    update_key_metrics(key, size as i64 - old as i64);
+    drop_public_dashboard_bodies(key).await;
+    Ok(())
+}
+
+/// Removes a public dashboard result file, indexed or not, and every memory copy of its body.
+pub async fn public_dashboards_evict(key: &str) -> Result<(), anyhow::Error> {
+    if !key.starts_with(PUBLIC_DASHBOARDS_PREFIX) {
+        anyhow::bail!("not a public dashboard key: {key}");
+    }
+    remove(key).await?;
+    // A file the startup scan has not indexed yet is still on disk.
+    if let Some(path) = get_file_path(key)
+        && let Err(e) = tokio::fs::remove_file(&path).await
+        && e.kind() != std::io::ErrorKind::NotFound
+    {
+        log::error!("public dashboard file {path} remove error: {e}");
+    }
+    drop_public_dashboard_bodies(key).await;
+    Ok(())
+}
+
+/// Whether the index holds this public dashboard file; a read lock, no file system access.
+pub async fn public_dashboards_indexed(key: &str) -> bool {
+    get_config().disk_cache.enabled
+        && RESULT_FILES[get_bucket_idx(key)]
+            .read()
+            .await
+            .exist(key)
+            .await
+}
+
+/// The memory copy of one written version of a public dashboard body.
+pub async fn public_dashboards_memory_get(key: &str, incarnation: u64) -> Option<Bytes> {
+    super::memory::get(&public_dashboards_memory_key(key, incarnation), None).await
+}
+
+/// Keeps a memory copy of one written version; every write or eviction of the key drops it.
+pub async fn public_dashboards_memory_put(key: &str, incarnation: u64, data: Bytes) {
+    if !get_config().memory_cache.enabled {
+        return;
+    }
+    track_public_dashboard_body(key, incarnation);
+    _ = super::memory::set(&public_dashboards_memory_key(key, incarnation), data).await;
+}
+
 /// The hook runs on a detached task and may run concurrently with held disk cache locks.
 pub fn set_metrics_result_cache_evict_hook(hook: fn(Vec<String>)) {
     if METRICS_RESULT_CACHE_EVICT_HOOK.set(hook).is_err() {
@@ -1213,6 +1351,12 @@ async fn load(
                             .add(data_size as i64);
 
                         metrics_cache.push(file_key);
+                    } else if file_key.starts_with(PUBLIC_DASHBOARDS_PREFIX) {
+                        let mut w = RESULT_FILES[idx].write().await;
+                        w.cur_size += data_size;
+                        w.data.insert(file_key.clone(), data_size);
+                        drop(w);
+                        update_key_metrics(&file_key, data_size as i64);
                     } else if file_key.starts_with("aggregations") {
                         let Some((org_id, stream_type, ..)) =
                             parse_aggregation_cache_key(&file_key)
@@ -2540,5 +2684,166 @@ mod tests {
         drop(listed);
         assert!(!exist(&legacy_key).await);
         remove(&current_key).await.unwrap();
+    }
+
+    // These tests share the result buckets' size accounting.
+    static PUBLIC_DASHBOARD_TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    fn public_key(range: &str) -> (String, String) {
+        let link = config::ider::uuid();
+        (
+            link.clone(),
+            format!("{PUBLIC_DASHBOARDS_PREFIX}org/{link}/{range}"),
+        )
+    }
+
+    async fn indexed_size(key: &str) -> Option<usize> {
+        let files = RESULT_FILES[get_bucket_idx(key)].read().await;
+        match &files.data {
+            CacheStrategy::Lru(cache) => cache.peek(key).copied(),
+            CacheStrategy::Fifo(queue, _) => queue.iter().find(|(k, _)| k == key).map(|e| e.1),
+            CacheStrategy::TimeLru(_, caches, _) => {
+                caches.iter().find_map(|c| c.peek(key).copied())
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn public_dashboard_replace_overwrites_and_accounts_the_difference() {
+        let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
+        let (_, key) = public_key("r3600");
+        let bucket = get_bucket_idx(&key);
+        let before = RESULT_FILES[bucket].read().await.cur_size;
+        public_dashboards_replace(&key, 1, Bytes::from_static(b"0123456789"))
+            .await
+            .unwrap();
+        assert_eq!(
+            get(&key, None).await.unwrap(),
+            Bytes::from_static(b"0123456789")
+        );
+        assert_eq!(indexed_size(&key).await, Some(10));
+        // No skip-if-exists: the same key takes the new bytes.
+        public_dashboards_replace(&key, 2, Bytes::from(vec![7u8; 25]))
+            .await
+            .unwrap();
+        assert_eq!(get(&key, None).await.unwrap().len(), 25);
+        assert_eq!(indexed_size(&key).await, Some(25));
+        let after = RESULT_FILES[bucket].read().await.cur_size;
+        assert_eq!(after, before + 25);
+        let path = get_file_path(&key).unwrap();
+        assert!(!Path::new(&format!("{path}.2.tmp")).exists());
+        public_dashboards_evict(&key).await.unwrap();
+        assert!(get(&key, None).await.is_none());
+        assert_eq!(indexed_size(&key).await, None);
+        assert_eq!(RESULT_FILES[bucket].read().await.cur_size, before);
+    }
+
+    #[tokio::test]
+    async fn public_dashboard_files_have_no_per_key_entry_limit_and_no_result_metas() {
+        let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
+        let link = config::ider::uuid();
+        let keys: Vec<String> = (0..RESULT_CACHE_MAX_ENTRIES_PER_KEY + 2)
+            .map(|i| format!("{PUBLIC_DASHBOARDS_PREFIX}org/{link}/r{}", (i + 1) * 60))
+            .collect();
+        for (i, key) in keys.iter().enumerate() {
+            public_dashboards_replace(key, i as u64, Bytes::from_static(b"x"))
+                .await
+                .unwrap();
+        }
+        for key in &keys {
+            assert_eq!(indexed_size(key).await, Some(1), "{key}");
+            assert!(get(key, None).await.is_some());
+        }
+        let metas = QUERY_RESULT_CACHE.read().await;
+        assert!(!metas.keys().any(|k| k.contains(&link)));
+        drop(metas);
+        for key in &keys {
+            public_dashboards_evict(key).await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn public_dashboard_files_are_reindexed_after_a_restart() {
+        let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
+        let (link, key) = public_key("a1-2");
+        public_dashboards_replace(&key, 9, Bytes::from_static(b"survives"))
+            .await
+            .unwrap();
+        let path = get_file_path(&key).unwrap();
+        // A crash between write and rename leaves a temp file; the scan removes it.
+        std::fs::write(format!("{path}.10.tmp"), b"torn").unwrap();
+        // Restart: the in-memory index is gone, the files are not.
+        {
+            let mut files = RESULT_FILES[get_bucket_idx(&key)].write().await;
+            let (_, size) = files.data.remove_key(&key).unwrap();
+            files.cur_size -= size;
+        }
+        assert_eq!(indexed_size(&key).await, None);
+        let root = tokio::fs::canonicalize(get_dir().await).await.unwrap();
+        let scan = root.join(format!("{PUBLIC_DASHBOARDS_PREFIX}org/{link}"));
+        load(&root, &scan, &mut Vec::new()).await.unwrap();
+        assert_eq!(indexed_size(&key).await, Some(8));
+        assert_eq!(
+            get(&key, None).await.unwrap(),
+            Bytes::from_static(b"survives")
+        );
+        assert!(!Path::new(&format!("{path}.10.tmp")).exists());
+        public_dashboards_evict(&key).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn public_dashboard_eviction_removes_a_file_the_scan_has_not_indexed() {
+        let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
+        let (_, key) = public_key("r60");
+        let path = get_file_path(&key).unwrap();
+        std::fs::create_dir_all(Path::new(&path).parent().unwrap()).unwrap();
+        std::fs::write(&path, b"unindexed").unwrap();
+        public_dashboards_evict(&key).await.unwrap();
+        assert!(!Path::new(&path).exists());
+        assert!(
+            public_dashboards_replace("results/x", 1, Bytes::new())
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn gate06_a_write_or_eviction_drops_the_memory_copies_of_its_key() {
+        let _serial = PUBLIC_DASHBOARD_TESTS.lock().await;
+        let (_, key) = public_key("r3600");
+        let other = format!("{key}0");
+        for (k, inc) in [(&key, 1), (&key, 2), (&other, 1)] {
+            track_public_dashboard_body(k, inc);
+            super::super::memory::set_for_test(
+                &public_dashboards_memory_key(k, inc),
+                Bytes::from_static(b"body"),
+            )
+            .await;
+        }
+        public_dashboards_replace(&key, 3, Bytes::from_static(b"new"))
+            .await
+            .unwrap();
+        assert!(!super::super::memory::holds(&public_dashboards_memory_key(
+            &key, 1
+        )));
+        assert!(!super::super::memory::holds(&public_dashboards_memory_key(
+            &key, 2
+        )));
+        assert!(super::super::memory::holds(&public_dashboards_memory_key(
+            &other, 1
+        )));
+        assert!(public_dashboards_indexed(&key).await);
+        track_public_dashboard_body(&key, 3);
+        super::super::memory::set_for_test(
+            &public_dashboards_memory_key(&key, 3),
+            Bytes::from_static(b"new"),
+        )
+        .await;
+        public_dashboards_evict(&key).await.unwrap();
+        assert!(!super::super::memory::holds(&public_dashboards_memory_key(
+            &key, 3
+        )));
+        assert!(!public_dashboards_indexed(&key).await);
+        drop_public_dashboard_bodies(&other).await;
     }
 }

@@ -79,6 +79,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <OTooltip :content="curatedBadgeTooltip" side="bottom" />
         </OTag>
+        <!-- A note the injected result carries about itself, such as the public view's retained or truncated data. -->
+        <OTag
+          v-if="injectedNotice"
+          variant="default-soft"
+          size="sm"
+          class="shrink-0 @max-[8rem]/panelbar:hidden"
+          data-test="dashboard-panel-injected-notice"
+        >
+          {{ injectedNotice }}
+        </OTag>
         <OTag
           v-if="
             exemplarsEligible && exemplarsOn && PanleSchemaRendererRef?.exemplarsStatus === 'empty'
@@ -231,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :error="errorData"
           :maxQueryRangeWarning="maxQueryRangeWarning"
           :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-          v-bind="noticeProps"
+          v-bind="panelNoticeProps"
           :sparklineWarning="sparklineWarning"
           :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
           :isPartialData="isPartialData"
@@ -393,7 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       class="drag-cancel relative min-h-0 flex-1"
-      :class="curatedBadge ? 'opacity-60' : undefined"
+      :class="curatedBadge || props.injectedPanelData?.dimmed ? 'opacity-60' : undefined"
       data-test="dashboard-panel-body"
       :data-curated-stale="curatedBadge ? 'true' : 'false'"
     >
@@ -417,6 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :viewOnly="viewOnly"
         :shouldRefreshWithoutCache="props.shouldRefreshWithoutCache"
         :exemplars-override="exemplarOverride"
+        :injectedPromqlData="props.injectedPanelData"
         @loading-state-change="handleLoadingStateChange"
         @metadata-update="metaDataValue"
         @limit-number-of-series-warning-message-update="
@@ -438,7 +449,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @is-partial-data-update="handleIsPartialDataUpdate"
         @contextmenu="$emit('contextmenu', $event)"
         ref="PanleSchemaRendererRef"
-        :allowAnnotationsAdd="true"
+        :allowAnnotationsAdd="!props.injectedPanelData"
+        :allowDrilldown="!props.injectedPanelData"
         :allowAlertCreation="allowAlertCreation"
         @show-legends="showLegendsDialog = true"
         :showLegendsButton="props.showLegendsButton"
@@ -604,6 +616,7 @@ export default defineComponent({
     "shouldRefreshWithoutCache",
     "showLegendsButton",
     "isTimeRangeWaiting",
+    "injectedPanelData",
     "layoutMode",
   ],
   components: {
@@ -663,6 +676,7 @@ export default defineComponent({
       curatedBadge.value ? t(curatedBadge.value.key as never, curatedBadgeParams.value) : raw(""),
     );
     // Both halves are already translated; joining them widens to string without untranslating either.
+    const injectedNotice = computed(() => props.injectedPanelData?.notice);
     const curatedBadgeTooltip = computed(() =>
       raw(`${curatedBadgeText.value} · ${t("infra.curated.staleBadgeTooltip")}`),
     );
@@ -813,7 +827,16 @@ export default defineComponent({
     const canEditFromNotice = computed(
       () => !props.viewOnly && !props.simplifiedPanelView && !isLayoutEditing.value,
     );
-    const canRefreshFromNotice = computed(() => !props.simplifiedPanelView);
+    // An injected result (the public viewer) has no query to re-run, so its notices offer no Refresh.
+    const canRefreshFromNotice = computed(
+      () => !props.simplifiedPanelView && !props.injectedPanelData,
+    );
+    // The public viewer's server marks a panel partial itself; it reads as the server's Partial notice.
+    const injectedPartial = computed(() => !!props.injectedPanelData?.serverPartial);
+    const panelNoticeProps = computed(() => ({
+      ...noticeProps.value,
+      serverPartial: noticeProps.value.serverPartial || injectedPartial.value,
+    }));
     const canInspectFromNotice = computed(
       () => !props.simplifiedPanelView && (metaData.value?.queries?.length ?? 0) > 0,
     );
@@ -831,6 +854,7 @@ export default defineComponent({
         !!limitNumberOfSeriesWarningMessage.value ||
         !!seriesLimit.value ||
         !!panelDiagnostics.value?.serverPartial ||
+        injectedPartial.value ||
         !!panelDiagnostics.value?.functionErrors?.length ||
         (isPartialData.value && !isPanelLoading.value),
     );
@@ -1233,6 +1257,7 @@ export default defineComponent({
       curatedBadgeParams,
       curatedBadgeText,
       curatedBadgeTooltip,
+      injectedNotice,
       curatedNoData,
       curatedAllClear,
       curatedTile,
@@ -1291,6 +1316,7 @@ export default defineComponent({
       handleSeriesLimitUpdate,
       canEditFromNotice,
       canRefreshFromNotice,
+      panelNoticeProps,
       canInspectFromNotice,
     };
   },

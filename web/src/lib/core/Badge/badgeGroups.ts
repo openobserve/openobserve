@@ -161,6 +161,54 @@ export const BADGE_GROUPS = {
     },
   },
 
+  // Public dashboard link state, derived server-side; only live is green so exceptions stand out.
+  publicLinkStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      live: { variant: "success-soft", labelKey: "components.badge.publicLinkStatus.live" },
+      paused: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.paused" },
+      notviewed: {
+        variant: "default-soft",
+        labelKey: "components.badge.publicLinkStatus.notViewed",
+      },
+      needsattention: {
+        variant: "warning-soft",
+        labelKey: "components.badge.publicLinkStatus.needsAttention",
+      },
+      expired: { variant: "default-soft", labelKey: "components.badge.publicLinkStatus.expired" },
+      dashboarddeleted: {
+        variant: "error-soft",
+        labelKey: "components.badge.publicLinkStatus.dashboardDeleted",
+      },
+    },
+  },
+
+  // One range of a public link, as its owning querier reports it; never viewed is a not-cached link nobody opened.
+  publicLinkRangeState: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      cached: { variant: "success-soft", labelKey: "components.badge.publicLinkRangeState.cached" },
+      building: {
+        variant: "blue-soft",
+        labelKey: "components.badge.publicLinkRangeState.building",
+      },
+      notcached: {
+        variant: "default-soft",
+        labelKey: "components.badge.publicLinkRangeState.notCached",
+      },
+      neverviewed: {
+        variant: "default-soft",
+        labelKey: "components.badge.publicLinkRangeState.neverViewed",
+      },
+      needsattention: {
+        variant: "warning-soft",
+        labelKey: "components.badge.publicLinkRangeState.needsAttention",
+      },
+    },
+  },
+
   // One chip per downtime target, plus the shared condition. The caller always supplies the label.
   downtimeTarget: {
     mode: "icon",

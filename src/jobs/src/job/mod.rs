@@ -69,6 +69,7 @@ mod pipeline_error_cleanup;
 mod prompt_webhook_delivery;
 mod promql;
 mod promql_self_consume;
+mod public_dashboards_outbox;
 mod query_history_reaper;
 #[cfg(feature = "enterprise")]
 mod red_insights;
@@ -612,6 +613,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     tokio::task::spawn(usage_reporting::run());
+
+    // Public dashboard reads are counted on the querier that owns the slug.
+    if LOCAL_NODE.is_querier() {
+        spawn_pausable_job!(
+            "public_dashboards_access_flush",
+            openobserve_core::public_dashboards::access::FLUSH_INTERVAL_SECS,
+            {
+                openobserve_core::public_dashboards::access::flush().await;
+            }
+        );
+    }
 
     // cache short_urls
     tokio::task::spawn(db::short_url::watch());
@@ -1340,6 +1352,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // copy or it grows without bound.
     alert_eval_ledger_reaper::run();
     query_history_reaper::run();
+    public_dashboards_outbox::run();
     // Reconciliation is what makes the rolling window actually roll: the
     // ingest pass only ever ADDS, so without this a 7-day SLO's covered_slices
     // climbs past what its window can hold. Also releases expired budget

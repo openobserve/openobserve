@@ -508,6 +508,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     timed_annotations::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/timed_annotations: {e}"))?;
+    crate::public_dashboards::revoke_all_for_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/public_dashboards: {e}"))?;
     // dashboards must be deleted before folders (FK constraint)
     dashboards::delete_by_org(org_id)
         .await
@@ -980,12 +983,17 @@ pub async fn promote_expired() -> Result<usize, anyhow::Error> {
     Ok(promoted)
 }
 
-/// Background job: hourly, promote expired pending_deletion orgs to `deleting`.
+/// Hourly: promote expired pending_deletion orgs and hard-delete links revoked 30 days ago.
 pub async fn run_promotion_scheduler() -> Result<(), anyhow::Error> {
     spawn_pausable_job!("org_deletion_promotion", POLL_INTERVAL_SECS, {
         match promote_expired().await {
             Ok(n) if n > 0 => log::info!("[org_cleanup] promoted {n} orgs to deleting"),
             Err(e) => log::error!("[org_cleanup] promotion error: {e}"),
+            _ => {}
+        }
+        match crate::public_dashboards::purge_deleted().await {
+            Ok(n) if n > 0 => log::info!("[org_cleanup] purged {n} revoked public links"),
+            Err(e) => log::error!("[org_cleanup] public link purge error: {e}"),
             _ => {}
         }
     });

@@ -223,8 +223,38 @@ mod m20261009_000005_create_downtime_notifications;
 mod m20261012_000001_create_alert_calibration_configs;
 mod m20261013_000001_create_oncall_phone_verifications;
 mod m20261013_000002_create_org_telephony;
+mod m20261015_000001_create_public_dashboards;
+mod m20261015_000002_add_search_type_to_search_queue;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
+
+pub(crate) use m20261015_000001_create_public_dashboards::forget_draft_migrations;
+
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) async fn create_public_dashboards_schema_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20261015_000001_create_public_dashboards::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+/// The search queue as migrations 109 and earlier leave it.
+#[cfg(test)]
+pub(crate) async fn create_search_queue_schema_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    let manager = SchemaManager::new(db);
+    m20241204_143100_create_table_search_queue::Migration
+        .up(&manager)
+        .await?;
+    m20251219_000001_add_org_id_to_search_queue::Migration
+        .up(&manager)
+        .await?;
+    m20261015_000002_add_search_type_to_search_queue::Migration
+        .up(&manager)
+        .await
+}
 
 #[cfg(test)]
 pub(crate) async fn create_llm_prompt_schema_for_test(
@@ -575,6 +605,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261007_000002_add_redact_tools_to_ai_chat_shares::Migration),
             Box::new(m20261013_000001_create_oncall_phone_verifications::Migration),
             Box::new(m20261013_000002_create_org_telephony::Migration),
+            Box::new(m20261015_000001_create_public_dashboards::Migration),
+            Box::new(m20261015_000002_add_search_type_to_search_queue::Migration),
         ]
     }
 }
@@ -642,6 +674,8 @@ mod tests {
         (106, "m20261007_000001_create_ai_chat_turns"),
         (107, "m20261007_000002_add_redact_tools_to_ai_chat_shares"),
         (108, "m20261013_000002_create_org_telephony"),
+        (109, "m20261015_000001_create_public_dashboards"),
+        (110, "m20261015_000002_add_search_type_to_search_queue"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

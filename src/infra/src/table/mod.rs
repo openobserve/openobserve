@@ -74,6 +74,7 @@ pub mod org_telephony;
 pub mod org_users;
 pub mod organizations;
 pub mod providers;
+pub mod public_dashboards;
 pub mod query_history;
 pub mod ratelimit;
 pub mod re_pattern;
@@ -124,6 +125,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
 pub async fn migrate() -> Result<(), anyhow::Error> {
     let locker = dist_lock::lock("/database/migration", 0).await?;
     let client = get_orm_client_ddl().await;
+    // Reading the history fails on the draft migrations' missing files, so forget them first.
+    migration::forget_draft_migrations(client).await?;
     // read the history under the same lock the migrations write it under
     check_migration_history(client).await?;
     // This is a hack to fix the failing alerts migration

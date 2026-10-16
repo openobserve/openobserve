@@ -30,8 +30,9 @@ use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
-    kv, metrics_usage, model_pricing, organization, query_history, rum_analytics, service_accounts,
-    short_url, slos, sourcemaps, status, status_pages, stream, synthetics, users,
+    kv, metrics_usage, model_pricing, organization, public_dashboards, query_history,
+    rum_analytics, service_accounts, short_url, slos, sourcemaps, status, status_pages, stream,
+    synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -119,7 +120,11 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-parent-id"),
             header::HeaderName::from_static("x-openobserve-sampling-priority"),
             X_O2_ASSISTANT_SESSION_ID,
+            // The public dashboard viewer polls conditionally.
+            header::IF_NONE_MATCH,
         ])
+        // Its validator, poll hint and clock source, unreadable cross-origin unless exposed.
+        .expose_headers([header::ETAG, header::RETRY_AFTER, header::DATE])
         // Restrict CORS to the configured web_url origin, plus any extra origins in
         // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
         // allows any origin to make credentialed requests — effectively disabling same-origin
@@ -681,6 +686,49 @@ pub async fn proxy(Path(params): Path<PathParamProxyURL>) -> impl IntoResponse {
 }
 
 /// Create proxy routes
+/// Public dashboard links admin CRUD; handlers 404 when the feature is off.
+fn public_dashboard_admin_routes(router: Router) -> Router {
+    router
+        .route(
+            "/{org_id}/public_dashboards",
+            get(public_dashboards::admin::list_org),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links",
+            get(public_dashboards::admin::list).post(public_dashboards::admin::create),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}",
+            get(public_dashboards::admin::get)
+                .put(public_dashboards::admin::update)
+                .delete(public_dashboards::admin::delete),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/pause",
+            post(public_dashboards::admin::pause),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/resume",
+            post(public_dashboards::admin::resume),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/refresh",
+            post(public_dashboards::admin::refresh),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/status",
+            get(public_dashboards::status::link),
+        )
+        .route(
+            "/{org_id}/public_dashboards/status",
+            get(public_dashboards::status::batch),
+        )
+        .route(
+            "/{org_id}/settings/public_dashboards",
+            get(public_dashboards::settings::get).put(public_dashboards::settings::put),
+        )
+}
+
 pub fn proxy_routes(enable_auth: bool) -> Router {
     let mut router = Router::new().route("/proxy/{org_id}/{*target_url}", get(proxy));
 
@@ -840,6 +888,19 @@ pub fn basic_routes() -> Router {
             .route("/status/{slug}", get(status_pages::public::page));
     }
 
+    // Not on routers: they have no result files, so these paths fall to the slug-keyed proxy.
+    if !config::cluster::LOCAL_NODE.is_router() {
+        router = router
+            .route(
+                "/api/public_dashboards/{slug}",
+                get(public_dashboards::public::config),
+            )
+            .route(
+                "/api/public_dashboards/{slug}/data",
+                get(public_dashboards::public::data),
+            );
+    }
+
     // Unauthenticated like status pages: the share token is checked in the handler.
     #[cfg(feature = "enterprise")]
     if get_config().public_ai_chat.enabled {
@@ -945,7 +1006,7 @@ pub fn service_routes() -> Router {
     let server = cfg.common.instance_name_short.to_string();
 
     // Downtimes live in their own table to keep this function under the line limit.
-    let mut router = Router::new().merge(downtime_routes());
+    let mut router = public_dashboard_admin_routes(Router::new().merge(downtime_routes()));
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));
@@ -3605,6 +3666,40 @@ mod tests {
     }
 
     // ── is_origin_allowed unit tests ──────────────────────────────────────────
+
+    #[tokio::test]
+    async fn public_dashboard_polls_pass_cors_and_read_their_headers() {
+        let app = Router::new()
+            .route("/x", get(|| async { "ok" }))
+            .layer(cors_layer());
+        let preflight = Request::builder()
+            .method(Method::OPTIONS)
+            .uri("/x")
+            .header(header::ORIGIN, "http://localhost:5080")
+            .header(header::ACCESS_CONTROL_REQUEST_METHOD, "GET")
+            .header(header::ACCESS_CONTROL_REQUEST_HEADERS, "if-none-match")
+            .body(Body::empty())
+            .unwrap();
+        let get_req = Request::builder()
+            .uri("/x")
+            .header(header::ORIGIN, "http://localhost:5080")
+            .body(Body::empty())
+            .unwrap();
+        let preflight = app.clone().oneshot(preflight).await.unwrap();
+        let get_resp = app.oneshot(get_req).await.unwrap();
+        let allowed = preflight.headers()[header::ACCESS_CONTROL_ALLOW_HEADERS]
+            .to_str()
+            .unwrap()
+            .to_lowercase();
+        assert!(allowed.contains("if-none-match"), "{allowed}");
+        let exposed = get_resp.headers()[header::ACCESS_CONTROL_EXPOSE_HEADERS]
+            .to_str()
+            .unwrap()
+            .to_lowercase();
+        for name in ["etag", "retry-after", "date"] {
+            assert!(exposed.contains(name), "{exposed}");
+        }
+    }
 
     #[test]
     fn test_cors_exact_match_allowed() {
