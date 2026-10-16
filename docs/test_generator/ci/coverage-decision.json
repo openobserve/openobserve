@@ -1,0 +1,14 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Reports/reportHistory.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Reports/reportHistory.spec.js",
+    "tests/ui-testing/playwright-tests/Reports/scheduledReportsDrawer.spec.js",
+    "tests/ui-testing/playwright-tests/Reports/reportsScheduleNow.spec.js",
+    "tests/ui-testing/playwright-tests/Reports/reportsScheduleLater.spec.js",
+    "tests/ui-testing/playwright-tests/Reports/reportFolders.spec.js",
+    "tests/ui-testing/playwright-tests/Reports/reports-bulk-operations.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "The dev-authored spec `reportHistory.spec.js` already exists (new file in the diff) and covers the two P0/P1 core paths: (P0) Run now writes a manual run that appears at once + drawer opens, and (P1) the org-wide History tab renders. No other Reports spec references the history selectors (`reportrunhistory`/`reportrundrawer`/`tab-history`), so there is no duplication to merge. The cheapest non-duplicative action is to APPEND the missing scenarios (cached-run drawer detail, per-report empty state, filtered-empty/widen, trigger-source filter negative, linked-run banner, disabled fixme) as new `test()` blocks inside this same spec, reusing its imports, serial setup and cleanup pattern. NOTE on needs_registration: although the action is append (not new), the spec file is a brand-new file that is NOT yet listed in `tests/ui-testing/ci-matrix/ci_matrix.json` run_files for the `Reports` testfolder (it currently lists only the 7 pre-existing reports specs). Without registration the appended tests will never run in CI, so `needs_registration` is set true: the Engineer must add `reportHistory.spec.js` to the Reports `run_files` array."
+}

@@ -90,6 +90,7 @@ import { RumProductAnalyticsPage } from "./rumPages/rumProductAnalyticsPage.js";
 import { ReportsPage } from "./reportsPages/reportsPage.js";
 import { ReportFoldersPage } from "./reportsPages/reportFoldersPage.js";
 import { ReportsFormValidationPage } from "./reportsPages/reportsFormValidationPage.js";
+import { ReportHistoryPage } from "./reportsPages/reportHistoryPage.js";
 import { DataPage } from "./generalPages/dataPage.js";
 import { IamPage } from "./iamPages/iamPage.js";
 import { IngestionTokensPage } from "./iamPages/ingestionTokensPage.js";
@@ -269,6 +270,7 @@ class PageManager {
     this.reportsPage = new ReportsPage(page);
     this.reportFoldersPage = new ReportFoldersPage(page);
     this.reportsFormValidation = new ReportsFormValidationPage(page);
+    this.reportHistoryPage = new ReportHistoryPage(page);
     this.dataPage = new DataPage(page);
     this.iamPage = new IamPage(page);
     this.ingestionTokensPage = new IngestionTokensPage(page);
