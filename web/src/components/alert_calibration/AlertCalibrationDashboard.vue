@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OText v-if="!group.findings.length" variant="meta" as="p" class="px-4 pb-3">
               {{ t("alertCalibration.dashboard.nothingFlagged") }}
             </OText>
-            <div v-else class="border-border-default bg-surface-subtle border-t">
+            <div v-else class="border-border-default border-t">
               <ul class="divide-border-default flex flex-col divide-y">
                 <li
                   v-for="finding in group.findings"
