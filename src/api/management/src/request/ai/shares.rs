@@ -47,14 +47,18 @@ use o2_enterprise::enterprise::ai::chat::{
     batcher::DurableEvent,
     lease::{self, LeaseError},
 };
-use openobserve_core::ai_chat::{ReadError, projection};
+use openobserve_core::ai_chat::{
+    ReadError,
+    admission::{normalize_uuid, resolve_owner},
+    projection,
+};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use tokio::sync::{Semaphore, SemaphorePermit};
 use utoipa::ToSchema;
 
 use super::chats::{
-    MAX_TITLE_CHARS, attach_turn_status_at, load_turns, normalize_uuid, owned_chat, resolve_owner,
+    MAX_TITLE_CHARS, admit_error_response, attach_turn_status_at, load_turns, owned_chat,
     running_since, user_email,
 };
 use crate::{
@@ -525,7 +529,7 @@ pub async fn create(
     };
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
-        Err(resp) => return resp,
+        Err(e) => return admit_error_response(e),
     };
     let chat = match owned_chat(&org_id, &session_id, &owner).await {
         Ok(chat) if req.mode == MODE_SNAPSHOT => settled_chat(&chat, &owner).await,
@@ -599,7 +603,7 @@ pub async fn list_for_chat(
     };
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
-        Err(resp) => return resp,
+        Err(e) => return admit_error_response(e),
     };
     let chat = match owned_chat(&org_id, &session_id, &owner).await {
         Ok(chat) => chat,
@@ -665,7 +669,7 @@ pub async fn list_mine(
     } else {
         let owner = match resolve_owner(&user_email).await {
             Ok(owner) => owner,
-            Err(resp) => return resp,
+            Err(e) => return admit_error_response(e),
         };
         let shares = ai_chat_shares::list_live_for_creator(&org_id, &owner, now).await;
         (shares, format!("{org_id}/{owner}"), Some(owner))
@@ -721,7 +725,7 @@ pub async fn update(
     };
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
-        Err(resp) => return resp,
+        Err(e) => return admit_error_response(e),
     };
     let now = now_micros();
     let Served { share, chat } = match owned_share(&org_id, &share_id, &owner, now).await {
@@ -797,7 +801,7 @@ pub async fn revoke(
     };
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
-        Err(resp) => return resp,
+        Err(e) => return admit_error_response(e),
     };
     let share = match ai_chat_shares::get(&org_id, &share_id).await {
         Ok(Some(share)) => share,
@@ -916,7 +920,7 @@ pub async fn fork(
     }
     let owner = match resolve_owner(&user_email).await {
         Ok(owner) => owner,
-        Err(resp) => return resp,
+        Err(e) => return admit_error_response(e),
     };
     let Served { share, chat } = match resolve(&token, Some(&org_id), false).await {
         Ok(Some(served)) => served,

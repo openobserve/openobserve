@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import incidents from "./incidents";
+import incidents, {
+  type CancelRcaResponse,
+  type RcaThreadResponse,
+  type TriggerRcaResponse,
+} from "./incidents";
 import http from "./http";
 import serviceStreamsApi from "./service_streams";
 import { gt } from "@/types/i18n";
@@ -165,6 +169,16 @@ describe("incidents service", () => {
       );
     });
 
+    it("resolves the 202 body {message, run_id} (02 TH13)", async () => {
+      const body: TriggerRcaResponse = { message: "Analysis started", run_id: "run-7" };
+      mockHttp.post.mockResolvedValue({ status: 202, data: body });
+
+      const res = await incidents.triggerRca("test-org", "incident-123");
+
+      expect(res.status).toBe(202);
+      expect(res.data).toEqual({ message: "Analysis started", run_id: "run-7" });
+    });
+
     it("should pass reanalysis params and the abort signal", () => {
       mockHttp.post.mockResolvedValue({ data: { run_id: "run-1" } });
       const controller = new AbortController();
@@ -209,6 +223,32 @@ describe("incidents service", () => {
     });
   });
 
+  describe("getRcaThread", () => {
+    it("calls GET …/rca/runs/{run_id}/thread without known_version on the first read", () => {
+      mockHttp.get.mockResolvedValue({ data: { not_modified: true, state_version: "1.2.3" } });
+
+      incidents.getRcaThread("test-org", "incident-123", "run-1");
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/incident-123/rca/runs/run-1/thread",
+        { params: {} },
+      );
+    });
+
+    it("sends known_version when given (02 TH31)", async () => {
+      const body: RcaThreadResponse = { not_modified: true, state_version: "4.5.6" };
+      mockHttp.get.mockResolvedValue({ data: body });
+
+      const res = await incidents.getRcaThread("test-org", "incident-123", "run-1", "4.5.6");
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/v2/test-org/alerts/incidents/incident-123/rca/runs/run-1/thread",
+        { params: { known_version: "4.5.6" } },
+      );
+      expect(res.data).toEqual({ not_modified: true, state_version: "4.5.6" });
+    });
+  });
+
   describe("cancelRca", () => {
     it("should call DELETE …/rca", () => {
       mockHttp.delete.mockResolvedValue({ data: { run_id: "run-1" } });
@@ -218,6 +258,16 @@ describe("incidents service", () => {
       expect(mockHttp.delete).toHaveBeenCalledWith(
         "/api/v2/test-org/alerts/incidents/incident-123/rca",
       );
+    });
+
+    it("resolves {run_id, cancelled} (02 TH41)", async () => {
+      const body: CancelRcaResponse = { run_id: "run-1", cancelled: true };
+      mockHttp.delete.mockResolvedValue({ data: body });
+
+      const res = await incidents.cancelRca("test-org", "incident-123");
+
+      expect(res.data).toEqual({ run_id: "run-1", cancelled: true });
+      expect(res.data).not.toHaveProperty("aborted_local_task");
     });
   });
 

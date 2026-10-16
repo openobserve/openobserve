@@ -20,12 +20,6 @@
 import DOMPurify from "dompurify";
 import { Marked, type Tokens } from "marked";
 
-export interface RcaTocEntry {
-  id: string;
-  text: string;
-  level: number;
-}
-
 const escapeHtml = (text: string): string =>
   text
     .replace(/&/g, "&amp;")
@@ -138,7 +132,7 @@ const convertKeyValueListsToTables = (content: string): string => {
 };
 
 // Colours/backgrounds for these rca-* classes come from the `:deep(.rca-report-content)`
-// rules in IncidentRCAAnalysis.vue. Those rules are unlayered, so they beat any layered
+// rules in components/alerts/rca/RcaReportContent.vue. Those rules are unlayered, so they beat any layered
 // colour utility named here; only structural utilities (spacing, size, weight,
 // border-width) are live.
 const HEADING_CLASSES = [
@@ -231,6 +225,9 @@ const ALLOWED_ATTR = ["class", "id"];
 const VERDICT_FENCE = "```";
 
 /**
+ * Kept only for reports stored before Phase 2, which ended in a ```json verdict
+ * block; newer reports come from `submit_report` and carry none.
+ *
  * Removes every ```json verdict block: machine input, not report prose. The line
  * rules mirror the server's `last_verdict_block`: a block opens on a line that,
  * trimmed, is ``` followed by exactly the words `json verdict`, and closes on the
@@ -274,13 +271,3 @@ export const renderRcaReport = (md: string): string => {
   }) as string;
   return `<div class="rca-report-content">${sanitized}</div>`;
 };
-
-/** Lists the report's h2/h3 sections with the ids `renderRcaReport` gives them. */
-export const extractRcaToc = (md: string): RcaTocEntry[] =>
-  rcaMarked
-    .lexer(prepare(md))
-    .filter(
-      (token): token is Tokens.Heading =>
-        token.type === "heading" && token.depth >= 2 && token.depth <= 3,
-    )
-    .map((token) => ({ id: headingId(token.text), text: token.text.trim(), level: token.depth }));

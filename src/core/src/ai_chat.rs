@@ -15,7 +15,10 @@
 
 //! The `_o2_ai_chat_events` store behind persisted chat turns, and its verified reader.
 
+pub mod admission;
+pub mod cancel;
 pub mod projection;
+pub mod rca_thread;
 
 use std::{
     collections::{BTreeMap, HashSet},

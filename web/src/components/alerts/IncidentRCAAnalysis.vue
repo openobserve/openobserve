@@ -14,811 +14,393 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!-- The Analysis tab (contract E5): a left analysis column (analysis bar, verdict
+     card, report) and the right "Investigation thread" column (02 TH38). -->
 <template>
-  <div data-test="rca-analysis-container" class="flex flex-1 flex-col overflow-hidden">
-    <!-- Stale (02 TH40 N): the server flagged a live run with no update past the
-         stale threshold. It can still be cancelled (01 RR-19). -->
-    <OBanner
-      v-if="live && stale"
-      data-test="rca-stale-banner"
-      variant="warning"
-      icon="warning"
-      inline-actions
-      class="mb-2 flex-shrink-0"
-    >
-      <p data-test="rca-stale-message" class="text-banner-warning-text mb-0 text-sm">
-        {{ t("alerts.incidents.rcaRun.stale", { time: staleSinceLabel }) }}
-      </p>
-      <p
-        v-if="reportRun"
-        data-test="rca-earlier-report-note"
-        class="text-banner-warning-text mt-0.5 mb-0 text-xs"
-      >
-        {{ earlierReportNote }}
-      </p>
-      <template #actions>
-        <OButton
-          data-test="rca-cancel-btn"
-          variant="outline"
-          size="sm"
-          :disabled="cancelling"
-          @click="$emit('cancel-rca')"
-        >
-          {{ cancelling ? t("alerts.incidents.rcaCancelling") : t("alerts.incidents.rcaCancel") }}
-        </OButton>
-      </template>
-    </OBanner>
-
-    <!-- Live run. With an earlier completed run (02 TH40 M) the banner names the
-         re-run's mode and the earlier report stays readable below. -->
-    <OBanner
-      v-else-if="live"
-      data-test="rca-inflight-container"
-      variant="info"
-      inline-actions
-      class="mb-2 flex-shrink-0"
-    >
-      <template #icon>
-        <OSpinner variant="dots" size="xs" />
-      </template>
-
-      <div class="flex items-center gap-2">
-        <p data-test="rca-inflight-message" class="text-banner-info-text mb-0 text-sm font-medium">
-          {{ liveMessage }}
-        </p>
-        <span
-          v-if="elapsedLabel"
-          data-test="rca-elapsed"
-          class="text-banner-info-text text-xs whitespace-nowrap"
-        >
-          {{ t("alerts.incidents.rcaStartedAgo", { time: elapsedLabel }) }}
-        </span>
-      </div>
-      <p class="text-banner-info-text mt-0.5 mb-0 text-xs">
-        {{ reportRun ? earlierReportNote : t("alerts.incidents.rcaAnalyzingHint") }}
-      </p>
-
-      <template #actions>
-        <OButton
-          data-test="rca-cancel-btn"
-          variant="outline"
-          size="sm"
-          :disabled="cancelling"
-          @click="$emit('cancel-rca')"
-        >
-          {{ cancelling ? t("alerts.incidents.rcaCancelling") : t("alerts.incidents.rcaCancel") }}
-        </OButton>
-      </template>
-    </OBanner>
-
-    <!-- Latest run failed (02 TH40 L, 01 RR-47): the reason is the heading, the
-         details stay collapsed, and any earlier report stays readable below. -->
-    <OBanner
-      v-else-if="error"
-      data-test="rca-error-banner"
-      variant="error"
-      icon="error-outline"
-      class="mb-2 flex-shrink-0"
-    >
-      <p data-test="rca-error-reason" class="text-banner-error-text mb-0 font-medium">
-        {{ error.reason || t("alerts.incidents.rcaFailed") }}
-      </p>
-      <p
-        v-if="reportRun"
-        data-test="rca-earlier-report-note"
-        class="text-banner-error-text mt-0.5 mb-0 text-xs"
-      >
-        {{ earlierReportNote }}
-      </p>
-      <template v-if="error.details">
-        <button
-          type="button"
-          data-test="rca-error-details-toggle"
-          class="text-banner-error-text mt-1 cursor-pointer self-start border-none bg-transparent p-0 text-xs underline"
-          :aria-expanded="showErrorDetails"
-          @click="showErrorDetails = !showErrorDetails"
-        >
-          {{
-            showErrorDetails
-              ? t("alerts.incidents.rcaRun.hideDetails")
-              : t("alerts.incidents.rcaRun.showDetails")
-          }}
-        </button>
-        <p
-          v-if="showErrorDetails"
-          data-test="rca-error-details"
-          class="text-banner-error-text mt-1 mb-0 text-xs break-words whitespace-pre-wrap"
-        >
-          {{ error.details }}
-        </p>
-      </template>
-      <template #actions>
-        <!-- With a report to build on, Retry offers both modes, the failed run's first.
-             `banner-dismiss` inherits the banner's white text, so the action keeps
-             AA contrast on the solid error fill in both themes (01 RR-47). -->
-        <ODropdown v-if="reportRun" align="end">
-          <template #trigger>
-            <OButton
-              data-test="rca-retry-btn"
-              variant="banner-dismiss"
-              size="sm"
-              :loading="triggering"
-            >
-              <OIcon name="refresh" size="sm" class="me-1" />
-              {{ t("alerts.incidents.rcaRetry") }}
-              <OIcon name="keyboard-arrow-down" size="xs" class="ms-1" />
-            </OButton>
-          </template>
-          <ODropdownItem
-            v-for="option in retryOptions"
-            :key="option.dataTest"
-            :data-test="option.dataTest"
-            @select="$emit('trigger-rca', { buildOnPrevious: option.buildOnPrevious })"
-          >
-            {{ option.label }}
-          </ODropdownItem>
-        </ODropdown>
-        <OButton
-          v-else
-          data-test="rca-retry-btn"
-          variant="banner-dismiss"
-          size="sm"
-          :loading="triggering"
-          @click="$emit('trigger-rca', { buildOnPrevious: false })"
-        >
-          <OIcon name="refresh" size="sm" class="me-1" />
-          {{ t("alerts.incidents.rcaRetry") }}
-        </OButton>
-      </template>
-    </OBanner>
-
-    <!-- Latest run cancelled (02 TH40 E, Phase 1 form). -->
-    <OBanner
-      v-else-if="state === 'cancelled'"
-      data-test="rca-cancelled-banner"
-      variant="default"
-      icon="cancel"
-      class="mb-2 flex-shrink-0"
-    >
-      <p data-test="rca-cancelled-message" class="text-banner-default-text mb-0 text-sm">
-        {{ cancelledMessage }}
-      </p>
-      <p
-        v-if="reportRun"
-        data-test="rca-earlier-report-note"
-        class="text-banner-default-text mt-0.5 mb-0 text-xs"
-      >
-        {{ earlierReportNote }}
-      </p>
-    </OBanner>
-
-    <!-- Nothing to show yet and nothing running: offer the first run. -->
-    <div
-      v-if="!reportRun && !live && !error"
+  <!-- K: nothing ran yet (02 TH40). -->
+  <div
+    v-if="!rca"
+    data-test="rca-analysis-container"
+    class="flex min-h-0 flex-1 flex-col overflow-auto px-7 pt-4 pb-10"
+  >
+    <section
       data-test="rca-trigger-section"
-      class="mb-2 flex-shrink-0"
+      class="rounded-default border-border-default bg-surface-base flex max-w-215 flex-col items-start gap-2 border p-6"
     >
+      <h2 class="text-text-heading m-0 text-base font-bold">
+        {{ t("alerts.incidents.rcaRun.noAnalysisTitle") }}
+      </h2>
+      <p class="text-text-body text-compact m-0">
+        {{ t("alerts.incidents.rcaRun.noAnalysisText") }}
+      </p>
       <OButton
         data-test="trigger-rca-btn"
-        variant="outline"
+        variant="primary"
         size="sm"
+        icon-left="auto-awesome"
         :loading="triggering"
         @click="$emit('trigger-rca', { buildOnPrevious: false })"
       >
         {{ t("alerts.incidents.rcaAnalyzeIncident") }}
       </OButton>
-    </div>
+    </section>
+  </div>
 
-    <!-- Report toolbar: which run, and what you can do with its report. -->
-    <div
-      v-if="reportRun"
-      data-test="rca-toolbar"
-      class="mb-2 flex flex-shrink-0 flex-wrap items-center gap-2"
-    >
-      <span
-        v-if="analyzedAgoLabel"
-        data-test="rca-analyzed-ago"
-        class="text-text-secondary text-xs"
-      >
-        {{ t("alerts.incidents.rcaAnalyzedAgo", { time: analyzedAgoLabel }) }}
-      </span>
-
-      <!-- Run picker (01 §12.3): every run by trigger and start time; only
-           completed runs open a report. -->
-      <ODropdown v-if="history.length > 1" align="start">
-        <template #trigger>
-          <OButton data-test="rca-history-btn" variant="ghost-muted" size="sm">
-            <OIcon name="history" size="sm" class="me-1" />
-            {{ t("alerts.incidents.rcaHistory") }}
-            <OIcon name="keyboard-arrow-down" size="xs" class="ms-1" />
-          </OButton>
-        </template>
-
-        <ODropdownItem
-          v-for="(item, idx) in historyItems"
-          :key="item.runId"
-          :data-test="`rca-history-item-${idx}`"
-          :disabled="!item.openable || item.displayed"
-          @select="$emit('view-run', item.isReportRun ? null : item.runId)"
-        >
-          <span class="flex flex-col">
-            <span data-test="rca-history-item-label">{{ item.label }}</span>
-            <span class="text-text-secondary text-xs">
-              {{ item.startedAt }}
-              <template v-if="item.stateLabel"> · {{ item.stateLabel }}</template>
-            </span>
-          </span>
-        </ODropdownItem>
-      </ODropdown>
-
-      <div class="flex-1" />
-
-      <OButton
-        data-test="rca-copy-btn"
-        variant="ghost-muted"
-        size="sm"
-        @click="$emit('copy-report')"
-      >
-        <OIcon name="content-copy" size="sm" class="me-1" />
-        {{ t("alerts.incidents.rcaCopy") }}
-      </OButton>
-      <OButton
-        data-test="rca-download-btn"
-        variant="ghost-muted"
-        size="sm"
-        @click="$emit('download-report')"
-      >
-        <OIcon name="download" size="sm" class="me-1" />
-        {{ t("alerts.incidents.rcaDownload") }}
-      </OButton>
-
-      <!-- Re-run. Fresh is the default; continuity is the deliberate choice. -->
-      <ODropdown v-if="!live && !error" align="end">
-        <template #trigger>
-          <OButton data-test="rca-reanalyze-btn" variant="outline" size="sm" :loading="triggering">
-            <OIcon name="refresh" size="sm" class="me-1" />
-            {{ t("alerts.incidents.rcaReanalyze") }}
-            <OIcon name="keyboard-arrow-down" size="xs" class="ms-1" />
-          </OButton>
-        </template>
-
-        <ODropdownItem
-          data-test="rca-reanalyze-fresh"
-          @select="$emit('trigger-rca', { buildOnPrevious: false })"
-        >
-          <span class="flex flex-col">
-            <span>{{ t("alerts.incidents.rcaFreshAnalysis") }}</span>
-            <span class="text-text-secondary text-xs">
-              {{ t("alerts.incidents.rcaFreshAnalysisHint") }}
-            </span>
-          </span>
-        </ODropdownItem>
-        <ODropdownItem
-          data-test="rca-reanalyze-build"
-          @select="$emit('trigger-rca', { buildOnPrevious: true })"
-        >
-          <span class="flex flex-col">
-            <span>{{ t("alerts.incidents.rcaBuildOnPrevious") }}</span>
-            <span class="text-text-secondary text-xs">
-              {{ t("alerts.incidents.rcaBuildOnPreviousHint") }}
-            </span>
-          </span>
-        </ODropdownItem>
-      </ODropdown>
-    </div>
-
-    <!-- Viewing an earlier run's report: make it unmistakable this is not the newest. -->
-    <OBanner
-      v-if="viewedRun"
-      data-test="rca-archived-banner"
-      variant="warning"
-      icon="history"
-      dense
-      inline-actions
-      class="mb-2 flex-shrink-0"
-    >
-      <p class="text-banner-warning-text mb-0">
-        {{ t("alerts.incidents.rcaViewingArchived") }}
-      </p>
-      <template #actions>
-        <OButton
-          data-test="rca-back-to-current-btn"
-          variant="outline"
-          size="sm"
-          @click="$emit('view-run', null)"
-        >
-          {{ t("alerts.incidents.rcaBackToCurrent") }}
-        </OButton>
-      </template>
-    </OBanner>
-
-    <div
-      v-if="reportRun && reportLoading && !formattedRcaContent"
-      data-test="rca-report-loading"
-      class="text-text-secondary flex items-center gap-2 p-3 text-sm"
-    >
-      <OSpinner variant="dots" size="xs" />
-      {{ t("alerts.incidents.rcaRun.loadingReport") }}
-    </div>
-
-    <!-- The newest completed report (or the picked earlier one). It stays mounted
-         while a re-run is live, failed or cancelled. -->
-    <div
-      v-else-if="reportRun"
-      data-test="rca-existing-container"
-      class="rca-container rounded-default bg-surface-base border-border-default flex-1 overflow-auto border p-3"
-    >
-      <div
-        data-test="rca-existing-content"
-        class="rca-content text-sm whitespace-pre-wrap"
-        v-html="formattedRcaContent"
+  <div
+    v-else
+    data-test="rca-analysis-container"
+    class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_25rem] overflow-hidden"
+  >
+    <div class="flex min-w-0 flex-col gap-6 overflow-auto px-7 pt-4 pb-10">
+      <RcaAnalysisBar
+        :runs="history"
+        :latest-run-id="rca.run_id"
+        :selected-run-id="cardRunId"
+        :live="live"
+        :subtitle="subtitle"
+        :has-report="!!reportText"
+        :can-build-on-previous="!!reportRun"
+        :has-thread="!!thread && thread.transcript === 'available'"
+        :triggering="triggering"
+        :cancelling="cancelling"
+        @select-run="$emit('view-run', $event)"
+        @reanalyze="$emit('trigger-rca', $event)"
+        @cancel="$emit('cancel-rca')"
+        @copy-report="copyReport"
+        @download-report="downloadReport"
+        @copy-thread="copyThread"
       />
+
+      <RcaVerdictCard
+        :card-state="cardState"
+        :run-id="cardRunId"
+        :stale="stale"
+        :stale-since="staleSince"
+        :stage-index="rca.summary.stage_index"
+        :stage="rca.summary.stage"
+        :live-mode="currentRun?.mode ?? null"
+        :failed-mode="currentRun?.mode ?? null"
+        :earlier-report-note="earlierReportNote"
+        :error="error"
+        :cancelled-text="cancelledText"
+        :triggering="triggering"
+        :cancelling="cancelling"
+        @cancel="$emit('cancel-rca')"
+        @follow-thread="followThread"
+        @retry="$emit('trigger-rca', $event)"
+      />
+
+      <p
+        v-if="reportLoading && !reportText"
+        data-test="rca-report-loading"
+        class="text-text-secondary m-0 flex items-center gap-2 text-sm"
+      >
+        <OSpinner variant="dots" size="xs" />
+        {{ t("alerts.incidents.rcaRun.loadingReport") }}
+      </p>
+      <RcaReportContent
+        v-else-if="reportText"
+        data-test="rca-existing-container"
+        class="max-w-215"
+        :html="formattedReport"
+        :is-dark-mode="isDark"
+      />
+      <p
+        v-else-if="live && !reportRun"
+        data-test="rca-report-pending"
+        class="text-text-secondary text-compact m-0"
+      >
+        {{ t("alerts.incidents.rcaRun.reportAfterRun") }}
+      </p>
     </div>
+
+    <RcaThreadColumn
+      ref="threadColumn"
+      :thread="thread"
+      :status="threadStatus"
+      :run-live="threadLive"
+      :run-state="threadRunState"
+      :trigger-label="threadTriggerLabel"
+      :context-used="threadContextUsed"
+      :run-stats="threadRunStats"
+      @retry="retryThread"
+    />
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent, computed, ref, watch, onUnmounted, type PropType } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+<script setup lang="ts">
+import { computed, onUnmounted, ref, toRef, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { formatTimestamp, formatTimestampInTimezone, formatToTimeCompact } from "@/utils/date";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import type {
+  RcaContextUsed,
+  RcaRunError,
+  RcaRunItem,
+  RcaRunState,
+  RcaRunStats,
+  RcaSummary,
+} from "@/services/incidents";
+import { useRcaThread } from "@/composables/useRcaThread";
+import { formatTimestampInTimezone } from "@/utils/date";
 import { humanizeElapsed, isLiveRca, userLocalPart } from "@/utils/incidents/rcaCell";
-import type { RcaRunError, RcaRunItem, RcaSummary } from "@/services/incidents";
+import { renderRcaReport } from "@/utils/incidents/rcaReportMarkdown";
+import {
+  finishedStepCount,
+  formatRcaClock,
+  formatRcaDuration,
+  formatRcaElapsed,
+  rcaThreadPlainText,
+  rcaTriggerLabel,
+  type RcaCardState,
+} from "@/utils/incidents/rcaThread";
+import RcaAnalysisBar from "./rca/RcaAnalysisBar.vue";
+import RcaThreadColumn from "./rca/RcaThreadColumn.vue";
+import RcaVerdictCard from "./rca/RcaVerdictCard.vue";
+import RcaReportContent from "./rca/RcaReportContent.vue";
+import { useTheme } from "@/composables/useTheme";
 
-export default defineComponent({
-  name: "IncidentRCAAnalysis",
-  components: { OBanner, OButton, ODropdown, ODropdownItem, OIcon, OSpinner },
-  props: {
+const props = withDefaults(
+  defineProps<{
+    orgId: string;
+    incidentId: string;
     /** Run summary of the latest run with the detail fields, or null when none ran. */
-    rca: {
-      type: Object as PropType<RcaSummary | null>,
-      default: null,
-    },
+    rca: RcaSummary | null;
     /** Newest completed run; its report shows unless an earlier one is picked. */
-    reportRun: {
-      type: Object as PropType<RcaRunItem | null>,
-      default: null,
-    },
-    /** An earlier completed run picked from the history, or null. */
-    viewedRun: {
-      type: Object as PropType<RcaRunItem | null>,
-      default: null,
-    },
+    reportRun?: RcaRunItem | null;
+    /** A completed run picked from the history, or null to follow the latest run. */
+    viewedRun?: RcaRunItem | null;
     /** Runs of this incident, newest first. */
-    history: {
-      type: Array as PropType<RcaRunItem[]>,
-      default: () => [],
-    },
+    history?: RcaRunItem[];
     /** Server flag: the live run has had no update past the stale threshold. */
-    stale: {
-      type: Boolean,
-      default: false,
-    },
+    stale?: boolean;
     /** The latest run's failure, or null when it did not fail. */
-    error: {
-      type: Object as PropType<RcaRunError | null>,
-      default: null,
-    },
-    formattedRcaContent: {
-      type: String,
-      default: "",
-    },
-    reportLoading: {
-      type: Boolean,
-      default: false,
-    },
-    triggering: {
-      type: Boolean,
-      default: false,
-    },
-    cancelling: {
-      type: Boolean,
-      default: false,
-    },
-    isDarkMode: {
-      type: Boolean,
-      required: true,
-    },
+    error?: RcaRunError | null;
+    /** Markdown of the shown report. */
+    reportText?: string;
+    reportLoading?: boolean;
+    /** The run whose thread shows: the picked run, else the latest. */
+    threadRunId?: string | null;
+    /** The thread's run is live; its thread is polled (02 TH32). */
+    threadLive?: boolean;
+    triggering?: boolean;
+    cancelling?: boolean;
+  }>(),
+  {
+    reportRun: null,
+    viewedRun: null,
+    history: () => [],
+    stale: false,
+    error: null,
+    reportText: "",
+    reportLoading: false,
+    threadRunId: null,
+    threadLive: false,
+    triggering: false,
+    cancelling: false,
   },
-  emits: ["trigger-rca", "cancel-rca", "view-run", "copy-report", "download-report"],
-  setup(props) {
-    const { t } = useI18nTyped();
+);
 
-    const state = computed(() => props.rca?.state ?? null);
-    const live = computed(() => isLiveRca(props.rca));
-    const currentRun = computed(() => props.rca?.current_run ?? null);
+defineEmits<{
+  "trigger-rca": [options: { buildOnPrevious: boolean }];
+  "cancel-rca": [];
+  "view-run": [runId: string | null];
+}>();
 
-    // Ticks once a second while a run is live so "Started X ago" stays current.
-    const now = ref(Date.now());
-    let tickTimer: number | null = null;
-    watch(
-      live,
-      (isLive) => {
-        if (isLive && tickTimer === null) {
-          now.value = Date.now();
-          tickTimer = window.setInterval(() => (now.value = Date.now()), 1000);
-        } else if (!isLive && tickTimer !== null) {
-          clearInterval(tickTimer);
-          tickTimer = null;
-        }
-      },
-      { immediate: true },
-    );
-    onUnmounted(() => {
-      if (tickTimer !== null) clearInterval(tickTimer);
-    });
+const { t } = useI18nTyped();
+const { isDark } = useTheme();
 
-    const elapsedLabel = computed(() => {
-      if (!live.value || !props.rca) return "";
-      const elapsed = now.value - props.rca.started_at / 1000;
-      return elapsed < 0 ? "" : humanizeElapsed(elapsed);
-    });
+const live = computed(() => isLiveRca(props.rca));
+const currentRun = computed(() => props.rca?.current_run ?? null);
 
-    const liveMessage = computed(() => {
-      if (!props.reportRun) return t("alerts.incidents.rcaAnalyzing");
-      return currentRun.value?.mode === "build_on_previous"
-        ? t("alerts.incidents.rcaRun.reanalyzingBuildOnPrevious")
-        : t("alerts.incidents.rcaRun.reanalyzingFresh");
-    });
+const {
+  thread,
+  status: threadStatus,
+  retry: retryThread,
+} = useRcaThread(
+  toRef(props, "orgId"),
+  toRef(props, "incidentId"),
+  toRef(props, "threadRunId"),
+  toRef(props, "threadLive"),
+);
 
-    // Names the report shown below: a picked earlier run, else the newest one.
-    const earlierReportNote = computed(() => {
-      const shown = props.viewedRun ?? props.reportRun;
-      return shown
-        ? t("alerts.incidents.rcaRun.earlierReportBelow", {
-            time: formatTimestamp(shown.started_at, "HH:mm"),
-          })
-        : "";
-    });
-
-    const staleSinceLabel = computed(() =>
-      props.rca ? formatTimestamp(props.rca.updated_at, "HH:mm:ss") : "",
-    );
-
-    const cancelledMessage = computed(() => {
-      const rca = props.rca;
-      if (!rca) return "";
-      const run = currentRun.value;
-      const endedAt = run?.ended_at ?? rca.updated_at;
-      const durationMs = run?.stats?.duration_ms ?? (endedAt - rca.started_at) / 1000;
-      const time = formatTimestampInTimezone(endedAt, "HH:mm:ss", "UTC");
-      const duration = humanizeElapsed(Math.max(durationMs, 0));
-      const user = run?.cancelled_by ?? rca.summary.cancelled_by;
-      return user
-        ? t("alerts.incidents.rcaRun.cancelledBy", { user: userLocalPart(user), time, duration })
-        : t("alerts.incidents.rcaRun.cancelledAt", { time, duration });
-    });
-
-    // Details stay collapsed for every new failure (01 RR-47).
-    const showErrorDetails = ref(false);
-    watch(
-      () => props.rca?.run_id,
-      () => (showErrorDetails.value = false),
-    );
-
-    const retryOptions = computed(() => {
-      const fresh = {
-        buildOnPrevious: false,
-        dataTest: "rca-retry-fresh",
-        label: t("alerts.incidents.rcaFreshAnalysis"),
-      };
-      const build = {
-        buildOnPrevious: true,
-        dataTest: "rca-retry-build",
-        label: t("alerts.incidents.rcaBuildOnPrevious"),
-      };
-      return currentRun.value?.mode === "build_on_previous" ? [build, fresh] : [fresh, build];
-    });
-
-    const triggerLabel = (run: RcaRunItem): string => {
-      const user = userLocalPart(run.started_by);
-      switch (run.trigger) {
-        case "auto_new_incident":
-          return t("alerts.incidents.rcaRun.trigger.autoNewIncident");
-        case "auto_new_alert_type":
-          return t("alerts.incidents.rcaRun.trigger.autoNewAlertType");
-        case "auto_reopen":
-          return t("alerts.incidents.rcaRun.trigger.autoReopen");
-        case "manual":
-          return t("alerts.incidents.rcaRun.trigger.manual", { user });
-        case "reanalyze":
-          return t("alerts.incidents.rcaRun.trigger.reanalyze", { user });
-        case "oncall_page":
-          return t("alerts.incidents.rcaRun.trigger.oncallPage");
-        case "resume":
-          return t("alerts.incidents.rcaRun.trigger.resume", { user });
-        case "legacy":
-          return t("alerts.incidents.rcaRun.trigger.legacy");
-      }
-    };
-
-    const historyItems = computed(() => {
-      const displayedId = props.viewedRun?.run_id ?? props.reportRun?.run_id ?? null;
-      return props.history.map((run) => ({
-        runId: run.run_id,
-        label: triggerLabel(run),
-        startedAt: formatToTimeCompact(run.started_at),
-        stateLabel:
-          run.state === "failed"
-            ? t("alerts.incidents.rcaRun.state.failed")
-            : run.state === "cancelled"
-              ? t("alerts.incidents.rcaRun.state.cancelled")
-              : "",
-        openable: run.state === "completed",
-        displayed: run.run_id === displayedId,
-        isReportRun: run.run_id === props.reportRun?.run_id,
-      }));
-    });
-
-    const analyzedAgoLabel = computed(() => {
-      const endedAt = (props.viewedRun ?? props.reportRun)?.ended_at;
-      if (!endedAt) return "";
-      // Timestamps arrive as microseconds since epoch.
-      const elapsed = now.value - endedAt / 1000;
-      return elapsed < 0 ? "" : humanizeElapsed(elapsed);
-    });
-
-    return {
-      t,
-      state,
-      live,
-      elapsedLabel,
-      liveMessage,
-      earlierReportNote,
-      staleSinceLabel,
-      cancelledMessage,
-      showErrorDetails,
-      retryOptions,
-      historyItems,
-      analyzedAgoLabel,
-    };
+// Ticks so the ages in the bar stay current: every second while live, else every 30 s.
+const now = ref(Date.now());
+let tickTimer: number | null = null;
+watch(
+  live,
+  (isLive) => {
+    if (tickTimer !== null) clearInterval(tickTimer);
+    now.value = Date.now();
+    tickTimer = window.setInterval(() => (now.value = Date.now()), isLive ? 1_000 : 30_000);
   },
+  { immediate: true },
+);
+onUnmounted(() => {
+  if (tickTimer !== null) clearInterval(tickTimer);
 });
+
+/** The card shows a picked completed run, else the latest run. */
+const cardState = computed<RcaCardState>(() => {
+  if (props.viewedRun) return "analyzed";
+  switch (props.rca?.state) {
+    case "running":
+    case "waiting_input":
+      return "investigating";
+    case "failed":
+      return "failed";
+    case "cancelled":
+      return "cancelled";
+    default:
+      return "analyzed";
+  }
+});
+
+const cardRunId = computed(() => props.viewedRun?.run_id ?? props.rca?.run_id ?? "");
+
+const findRun = (runId: string | null | undefined) =>
+  runId ? (props.history.find((run) => run.run_id === runId) ?? null) : null;
+
+/** Trigger + age of the shown run: "Auto on incident open · started 1m47s ago". */
+const subtitle = computed<I18nText | string>(() => {
+  const rca = props.rca;
+  if (!rca) return "";
+  const item = props.viewedRun ?? findRun(rca.run_id);
+  const trigger = item
+    ? rcaTriggerLabel(item.trigger, item.started_by)
+    : currentRun.value
+      ? rcaTriggerLabel(currentRun.value.trigger, currentRun.value.started_by)
+      : null;
+  const sinceMs = (us: number) => Math.max(0, now.value - us / 1000);
+  let age: I18nText;
+  if (props.viewedRun || rca.state === "completed") {
+    const endedAt = (props.viewedRun ?? item)?.ended_at ?? rca.updated_at;
+    age = t("alerts.incidents.rcaRun.analyzedAgo", { time: humanizeElapsed(sinceMs(endedAt)) });
+  } else if (live.value) {
+    age = t("alerts.incidents.rcaRun.startedAgo", {
+      time: formatRcaElapsed(sinceMs(rca.started_at)),
+    });
+  } else if (rca.state === "cancelled") {
+    age = t("alerts.incidents.rcaRun.stoppedAfter", { duration: runDuration.value });
+  } else {
+    const endedAt = currentRun.value?.ended_at ?? rca.updated_at;
+    age = t("alerts.incidents.rcaRun.failedAgo", { time: humanizeElapsed(sinceMs(endedAt)) });
+  }
+  return trigger ? raw(`${trigger} · ${age}`) : age;
+});
+
+/** Run time of the latest run, from its stats or its timestamps. */
+const runDuration = computed(() => {
+  const rca = props.rca;
+  if (!rca) return "";
+  const endedAt = currentRun.value?.ended_at ?? rca.updated_at;
+  const ms = currentRun.value?.stats?.duration_ms ?? (endedAt - rca.started_at) / 1000;
+  return formatRcaDuration(ms);
+});
+
+// Names the report shown below while the latest run has none of its own (02 TH40 M, L, E).
+const earlierReportNote = computed<I18nText | null>(() => {
+  if (cardState.value === "analyzed") return null;
+  const shown = props.reportRun;
+  if (!shown || shown.run_id === props.rca?.run_id) return null;
+  return t("alerts.incidents.rcaRun.earlierReportBelow", {
+    time: formatTimestampInTimezone(shown.started_at, "HH:mm", "UTC"),
+  });
+});
+
+const staleSince = computed(() => (props.rca ? formatRcaClock(props.rca.updated_at) : ""));
+
+// E: "Cancelled by <user> at HH:MM:SS UTC after <duration>. <n> of <m> checks finished; …"
+const cancelledText = computed<I18nText | null>(() => {
+  const rca = props.rca;
+  if (!rca || rca.state !== "cancelled") return null;
+  const endedAt = currentRun.value?.ended_at ?? rca.updated_at;
+  const time = formatTimestampInTimezone(endedAt, "HH:mm:ss", "UTC");
+  const current = thread.value?.run_id === rca.run_id ? thread.value : null;
+  // The summary can count a step the last thread read did not see yet.
+  const total = Math.max(current?.steps.length ?? 0, rca.summary.steps);
+  // Without a thread, the step that was open at the cancel is the one not counted.
+  const done = current ? finishedStepCount(current) : Math.max(total - 1, 0);
+  const user = currentRun.value?.cancelled_by ?? rca.summary.cancelled_by;
+  const values = { time, duration: runDuration.value, done, total };
+  return user
+    ? t("alerts.incidents.rcaRun.cancelledByChecks", { ...values, user: userLocalPart(user) })
+    : t("alerts.incidents.rcaRun.cancelledAtChecks", values);
+});
+
+const formattedReport = computed(() => (props.reportText ? renderRcaReport(props.reportText) : ""));
+
+// The thread column describes the thread's run, which is not always the latest.
+const threadRunState = computed<RcaRunState | null>(() => {
+  if (!props.threadRunId) return null;
+  if (props.threadRunId === props.rca?.run_id) return props.rca.state;
+  return findRun(props.threadRunId)?.state ?? null;
+});
+
+const threadTriggerLabel = computed<I18nText | null>(() => {
+  const item = findRun(props.threadRunId);
+  if (item) return rcaTriggerLabel(item.trigger, item.started_by);
+  const run = currentRun.value;
+  return run && run.run_id === props.threadRunId
+    ? rcaTriggerLabel(run.trigger, run.started_by)
+    : null;
+});
+
+const threadContextUsed = computed<RcaContextUsed | null>(() => {
+  const run = currentRun.value;
+  return run && run.run_id === props.threadRunId ? (run.context_used ?? null) : null;
+});
+
+// The run's own stats keep the stats line when the thread has none (legacy, 410, 503).
+const threadRunStats = computed<RcaRunStats | null>(() => {
+  const run = currentRun.value;
+  return run && run.run_id === props.threadRunId ? (run.stats ?? null) : null;
+});
+
+const threadColumn = ref<InstanceType<typeof RcaThreadColumn> | null>(null);
+const followThread = () => void threadColumn.value?.scrollToLatest();
+
+const copyText = async (text: string, success: I18nText, failure: I18nText) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast({ variant: "success", message: success });
+  } catch (error) {
+    console.error("Failed to copy to the clipboard:", error);
+    toast({ variant: "error", message: failure });
+  }
+};
+
+const copyReport = () => {
+  if (!props.reportText) return;
+  void copyText(
+    props.reportText,
+    t("alerts.incidents.rcaCopied"),
+    t("alerts.incidents.rcaCopyFailed"),
+  );
+};
+
+const downloadReport = () => {
+  if (!props.reportText) return;
+  const blob = new Blob([props.reportText], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `incident-${props.incidentId}-rca.md`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+// Copy thread (02 TH38): step titles, notes, tool names and key arguments as plain text.
+const copyThread = () => {
+  const current = thread.value;
+  if (!current || current.transcript !== "available") return;
+  void copyText(
+    rcaThreadPlainText(current, t("alerts.incidents.rcaThread.title")),
+    t("alerts.incidents.rcaThread.copied"),
+    t("alerts.incidents.rcaThread.copyFailed"),
+  );
+};
 </script>
-
-<style scoped>
-/* keep(generated-content): the RCA report is markdown rendered through
-   `v-html="formattedRcaContent"` above — the .rca-report-content wrapper and all
-   of its children are built and sanitized as an HTML string by renderRcaReport in
-   utils/incidents/rcaReportMarkdown.ts, so there is no template to hang Tailwind utilities on. This
-   is ladder step 5 of O2_STYLE_MIGRATION_PLAN.md §3.1.
-
-   Moved out of the token layer (W1.a, F9), tokenised in W2.c. `:deep()` is required
-   and deliberate: v-html children never receive the scope id, so a plain scoped
-   selector would not match them. The private --rca-* vocabulary now aliases global
-   tokens; entries whose token already flips in dark mode carry no dark override.
-   Judgment mappings (near-identical values, flagged for the §7.4 eyeball pass):
-   slate text → neutral text tokens; inline-code pink (rose-700) → status-error-text. */
-:deep(.rca-report-content) {
-  --rca-bg-primary: var(--color-blue-50);
-  --rca-bg-secondary: var(--color-blue-50);
-  --rca-bg-code: var(--color-surface-subtle);
-  --rca-bg-table-even: var(--color-blue-50);
-  --rca-bg-table-hover: var(--color-blue-100);
-  --rca-bg-section: color-mix(in srgb, var(--color-blue-600) 5%, transparent);
-  --rca-bg-blockquote: var(--color-blue-50);
-
-  --rca-text-primary: var(--color-text-heading);
-  --rca-text-secondary: var(--color-text-body);
-  --rca-text-tertiary: var(--color-text-secondary);
-  --rca-text-heading: var(--color-blue-600);
-  --rca-text-code: var(--color-status-error-text);
-  --rca-text-blockquote: var(--color-blue-800);
-  --rca-text-em: var(--color-text-secondary);
-  --rca-text-list: var(--color-text-body);
-
-  --rca-border-primary: var(--color-border-strong);
-  --rca-border-secondary: var(--color-blue-200);
-  --rca-border-tertiary: var(--color-border-default);
-  --rca-border-table: var(--color-blue-200);
-  --rca-border-accent: var(--color-blue-500);
-
-  --rca-icon-color: var(--color-text-body);
-  --rca-shadow: var(--shadow-md);
-
-  font-family: var(--font-sans);
-  line-height: 1.6;
-  color: var(--rca-text-secondary);
-}
-
-/* `.dark` lives on <html>, which never carries this component's scope id, so
-   `.dark :deep(.rca-report-content)` would compile to `.dark[data-v] .rca-report-content`
-   and never match — dark mode would silently fall back to the light blue-50 washes.
-   Anchoring on `.rca-content` (a real element in this template, and a descendant of
-   html.dark) puts the scope id where it belongs: `.dark .rca-content[data-v] .rca-report-content`. */
-.dark .rca-content :deep(.rca-report-content) {
-  /* Only the entries whose dark value differs from what the aliased token flips
-     to on its own: the info-blue washes go neutral/deep-blue, accents brighten. */
-  --rca-bg-primary: var(--color-surface-panel);
-  --rca-bg-secondary: var(--color-surface-subtle);
-  --rca-bg-table-even: color-mix(in srgb, var(--color-blue-900) 35%, var(--color-surface-base));
-  --rca-bg-table-hover: color-mix(in srgb, var(--color-blue-800) 30%, var(--color-surface-panel));
-  --rca-bg-section: color-mix(in srgb, var(--color-blue-400) 8%, transparent);
-  --rca-bg-blockquote: var(--color-blue-900);
-
-  --rca-text-heading: var(--color-blue-400);
-  --rca-text-blockquote: var(--color-blue-400);
-
-  --rca-border-secondary: var(--color-border-default);
-  --rca-border-table: var(--color-border-default);
-  --rca-border-accent: var(--color-blue-400);
-
-  --rca-shadow: var(--shadow-lg);
-}
-
-:deep(.rca-report-content) {
-  .rca-h1 {
-    color: var(--rca-text-primary);
-    border-bottom-color: var(--rca-border-primary);
-  }
-
-  .rca-h2 {
-    color: var(--rca-text-heading);
-    border-left-color: var(--rca-text-heading);
-  }
-
-  .rca-section-bg {
-    background-color: var(--rca-bg-section);
-  }
-
-  .rca-h3 {
-    color: var(--rca-text-secondary);
-    position: relative;
-    padding-left: 1rem;
-
-    &::before {
-      content: "»";
-      position: absolute;
-      left: 0rem;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--rca-icon-color);
-      font-size: var(--text-xl);
-      line-height: 1;
-    }
-  }
-
-  .rca-h4 {
-    color: var(--rca-text-tertiary);
-  }
-
-  .rca-ul,
-  .rca-ol {
-    list-style-position: outside;
-  }
-
-  .rca-ul {
-    list-style-type: disc;
-  }
-
-  .rca-list-item {
-    color: var(--rca-text-list);
-  }
-
-  .rca-ol-item {
-    color: var(--rca-text-list);
-  }
-
-  .rca-code-block {
-    background-color: var(--rca-bg-code);
-    border-color: var(--rca-border-tertiary);
-
-    pre {
-      color: var(--rca-text-list);
-    }
-  }
-
-  .rca-inline-code {
-    background-color: var(--rca-bg-code);
-    color: var(--rca-text-code);
-  }
-
-  .rca-table-wrapper {
-    border-radius: var(--radius-surface);
-    overflow: hidden;
-    box-shadow: var(--rca-shadow);
-  }
-
-  .rca-table {
-    border-collapse: separate;
-    border-spacing: 0;
-    background-color: var(--rca-bg-primary);
-    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
-    border: 1px solid var(--rca-border-secondary);
-
-    thead {
-      background: linear-gradient(
-        to bottom,
-        var(--rca-bg-secondary) 0%,
-        var(--rca-bg-secondary) 100%
-      );
-      border-bottom: 0.125rem solid var(--rca-border-primary);
-    }
-
-    th {
-      padding: 0.5rem 0.75rem;
-      color: var(--rca-text-primary);
-      font-weight: 700;
-      font-size: var(--text-3xs);
-      letter-spacing: 0.08em;
-      text-align: left;
-      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
-      border-right: 1px solid var(--rca-border-secondary);
-
-      &:last-child {
-        border-right: none;
-      }
-    }
-
-    td {
-      padding: 0.5rem 0.75rem;
-      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
-      border-bottom: 1px solid var(--rca-border-table);
-      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
-      border-right: 1px solid var(--rca-border-table);
-      color: var(--rca-text-secondary);
-      font-size: var(--text-compact);
-      line-height: 1.6;
-      vertical-align: top;
-
-      &:last-child {
-        border-right: none;
-      }
-    }
-
-    tbody {
-      tr {
-        &:last-child td {
-          border-bottom: none;
-        }
-
-        &:hover {
-          background-color: var(--rca-bg-table-hover);
-        }
-      }
-    }
-
-    td:first-child,
-    td.rca-first-cell {
-      font-weight: 600;
-      color: var(--rca-text-tertiary);
-      white-space: nowrap;
-      background-color: var(--rca-bg-secondary);
-      min-width: 10rem;
-    }
-
-    tbody tr:hover td:first-child,
-    tbody tr:hover td.rca-first-cell {
-      background-color: var(--rca-bg-table-hover);
-    }
-  }
-
-  .rca-blockquote {
-    background-color: var(--rca-bg-blockquote);
-    border-left-color: var(--rca-border-accent);
-    color: var(--rca-text-blockquote);
-  }
-
-  hr {
-    border-top-color: var(--rca-border-tertiary);
-  }
-
-  /* Emphasis, not a link: same colour as the prose around it. */
-  strong {
-    color: var(--rca-text-secondary);
-  }
-
-  em {
-    color: var(--rca-text-em);
-  }
-
-  p {
-    color: var(--rca-text-secondary);
-  }
-}
-</style>

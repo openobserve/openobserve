@@ -196,25 +196,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Tab Content Container -->
         <div class="flex flex-1 overflow-hidden">
-          <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
-          <div
-            v-if="activeTab === 'incidentAnalysis'"
-            class="order-1 flex h-full w-100 max-w-100 min-w-100 flex-shrink-0 flex-col"
-          >
-            <!-- Table of Contents (only on Incident Analysis) -->
-            <IncidentTableOfContents
-              :table-of-contents="tableOfContents"
-              :expanded-sections="expandedSections"
-              :is-dark-mode="isDarkMode"
-              @scroll-to-section="scrollToSection"
-              @toggle-section="toggleSection"
+          <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <!-- Incident Analysis tab: its own analysis column + thread column (02 E5) -->
+            <IncidentRCAAnalysis
+              v-if="activeTab === 'incidentAnalysis'"
+              :org-id="incidentOrgId"
+              :incident-id="incidentDetails?.id || ''"
+              :rca="rcaSummary"
+              :report-run="rcaReportRun"
+              :viewed-run="rcaViewedRun"
+              :history="rcaHistory"
+              :stale="rcaStale"
+              :error="rcaError"
+              :report-text="rcaReportText"
+              :report-loading="rcaReportLoading"
+              :thread-run-id="rcaThreadRunId"
+              :thread-live="rcaThreadLive"
+              :triggering="rcaTriggering"
+              :cancelling="rcaCancelling"
+              @trigger-rca="triggerRca"
+              @cancel-rca="cancelRca"
+              @view-run="viewRcaRun"
             />
-          </div>
 
-          <!-- Right Column: Content -->
-          <div class="order-2 flex min-w-0 flex-1 flex-col overflow-hidden">
             <!-- Tab Content Area -->
-            <div class="px-page-edge relative flex flex-1 flex-col overflow-hidden pt-4 pb-2">
+            <div
+              v-else
+              class="px-page-edge relative flex flex-1 flex-col overflow-hidden pt-4 pb-2"
+            >
               <!-- Overview Tab Content - REDESIGNED -->
               <div v-if="activeTab === 'overview'" class="flex flex-1 flex-col overflow-hidden">
                 <!-- SECTION 1: Hero Metrics (100px height) -->
@@ -943,28 +952,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :visible="activeTab === 'activity'"
                 :refresh-trigger="timelineRefreshTrigger"
               />
-
-              <!-- Incident Analysis Tab Content -->
-              <IncidentRCAAnalysis
-                v-if="activeTab === 'incidentAnalysis'"
-                :rca="rcaSummary"
-                :report-run="rcaReportRun"
-                :viewed-run="rcaViewedRun"
-                :history="rcaHistory"
-                :stale="rcaStale"
-                :error="rcaError"
-                :formatted-rca-content="formattedRcaContent"
-                :report-loading="rcaReportLoading"
-                :triggering="rcaTriggering"
-                :cancelling="rcaCancelling"
-                :is-dark-mode="isDarkMode"
-                @trigger-rca="triggerRca"
-                @cancel-rca="cancelRca"
-                @view-run="viewRcaRun"
-                @copy-report="copyReport"
-                @download-report="downloadReport"
-              />
-
               <!-- Service Graph Tab Content -->
               <div v-if="activeTab === 'serviceGraph'" class="absolute inset-0">
                 <IncidentServiceGraph
@@ -1519,12 +1506,10 @@ import serviceStreamsApi, {
   buildChipDimensionsFromFilters,
   type CorrelationResponse,
 } from "@/services/service_streams";
-import { extractRcaToc, renderRcaReport } from "@/utils/incidents/rcaReportMarkdown";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
-import IncidentTableOfContents from "./IncidentTableOfContents.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
 import IncidentTimeline from "./IncidentTimeline.vue";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
@@ -1556,7 +1541,6 @@ export default defineComponent({
     CorrelatedLogsTable,
     IncidentServiceGraph,
     IncidentAlertTriggersTable,
-    IncidentTableOfContents,
     IncidentRCAAnalysis,
     IncidentTimeline,
     CustomChartRenderer,
@@ -1736,16 +1720,6 @@ export default defineComponent({
       { label: t("alerts.incidents.severityP4"), value: "P4" },
     ];
 
-    // Table of Contents
-    interface TocItem {
-      id: string;
-      text: string;
-      level: number;
-      children: TocItem[];
-      expanded: boolean;
-    }
-    const expandedSections = ref<Record<string, boolean>>({});
-
     // Telemetry correlation state
     const correlationData = ref<IncidentCorrelatedStreams | null>(null);
     const correlationLoading = ref(false);
@@ -1793,6 +1767,8 @@ export default defineComponent({
       viewedRun: rcaViewedRun,
       reportText: rcaReportText,
       reportLoading: rcaReportLoading,
+      threadRunId: rcaThreadRunId,
+      threadLive: rcaThreadLive,
       triggering: rcaTriggering,
       cancelling: rcaCancelling,
       reload: reloadRca,
@@ -2266,41 +2242,6 @@ export default defineComponent({
       // FTS fields can be empty for now, as the log streams will determine this
       return [];
     });
-
-    const formattedRcaContent = computed(() =>
-      rcaReportText.value ? renderRcaReport(rcaReportText.value) : "",
-    );
-
-    // h2 sections are top-level TOC entries, h3 nest under the h2 above them.
-    const tableOfContents = computed<TocItem[]>(() => {
-      const toc: TocItem[] = [];
-      let parent: TocItem | null = null;
-      for (const { id, text, level } of extractRcaToc(rcaReportText.value)) {
-        const item: TocItem = { id, text, level: level - 1, children: [], expanded: true };
-        if (level === 3 && parent) {
-          parent.children.push(item);
-        } else {
-          toc.push(item);
-          if (level === 2) parent = item;
-        }
-      }
-      return toc;
-    });
-
-    // Sections start expanded; a section the user collapsed stays collapsed.
-    watch(
-      tableOfContents,
-      (toc) => {
-        const ids = toc.flatMap((item) => [item.id, ...item.children.map((child) => child.id)]);
-        const unseen = ids.filter((id) => expandedSections.value[id] === undefined);
-        if (unseen.length === 0) return;
-        expandedSections.value = {
-          ...expandedSections.value,
-          ...Object.fromEntries(unseen.map((id) => [id, true])),
-        };
-      },
-      { immediate: true },
-    );
 
     // Alert Activity Chart Data - groups triggers by day and creates a bar chart
     const alertActivityChartData = computed(() => {
@@ -3017,81 +2958,6 @@ export default defineComponent({
       }
     };
 
-    // Scroll to a section in the RCA report
-    const scrollToSection = (id: string) => {
-      // Use setTimeout to ensure DOM is ready
-      setTimeout(() => {
-        // Only search within RCA content areas (not left sidebar)
-        const rcaContainers = Array.from(document.querySelectorAll(".rca-container"));
-        let element: HTMLElement | null = null;
-        let scrollContainer: Element | null = null;
-
-        // Search for the element only within RCA containers
-        for (const container of rcaContainers) {
-          const foundElement = container.querySelector(`#${id}`) as HTMLElement;
-          if (foundElement) {
-            element = foundElement;
-            scrollContainer = container;
-            break;
-          }
-        }
-
-        if (element && scrollContainer) {
-          // Get the element's position relative to the scroll container
-          const containerRect = scrollContainer.getBoundingClientRect();
-          const elementRect = element.getBoundingClientRect();
-          const relativeTop = elementRect.top - containerRect.top;
-          const offsetPosition = scrollContainer.scrollTop + relativeTop - 20;
-
-          // Scroll within the container with offset
-          scrollContainer.scrollTo({
-            top: offsetPosition,
-            behavior: "smooth",
-          });
-        }
-      }, 50);
-    };
-
-    // Toggle section expansion in TOC
-    const toggleSection = (item: TocItem, event?: Event) => {
-      if (event) {
-        event.stopPropagation();
-      }
-      // Create a new object to avoid triggering reactive updates during render
-      expandedSections.value = {
-        ...expandedSections.value,
-        [item.id]: !expandedSections.value[item.id],
-      };
-    };
-
-    const copyReport = async () => {
-      const content = rcaReportText.value;
-      if (!content) return;
-
-      try {
-        await navigator.clipboard.writeText(content);
-        toast({ variant: "success", message: t("alerts.incidents.rcaCopied") });
-      } catch (error) {
-        console.error("Failed to copy RCA report:", error);
-        toast({ variant: "error", message: t("alerts.incidents.rcaCopyFailed") });
-      }
-    };
-
-    const downloadReport = () => {
-      const content = rcaReportText.value;
-      if (!content || !incidentDetails.value) return;
-
-      const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `incident-${incidentDetails.value.id}-rca.md`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    };
-
     // Humanize key_type for display
     const getCorrelationMethodLabel = (keyType: string | undefined) => {
       switch (keyType?.toLowerCase()) {
@@ -3124,6 +2990,7 @@ export default defineComponent({
       alerts,
       selectedAlertIndex,
       isSelectedComposite,
+      incidentOrgId,
       rcaSummary,
       rcaStale,
       rcaError,
@@ -3132,19 +2999,16 @@ export default defineComponent({
       rcaViewedRun,
       rcaReportText,
       rcaReportLoading,
+      rcaThreadRunId,
+      rcaThreadLive,
       rcaTriggering,
       rcaCancelling,
       reloadRca,
       viewRcaRun,
       cancelRca,
-      copyReport,
-      downloadReport,
       isDarkMode,
       activeTab,
       timelineRefreshTrigger,
-      tableOfContents,
-      expandedSections,
-      formattedRcaContent,
       correlationData,
       correlationMatchedSetId,
       correlationChipDimensions,
@@ -3181,8 +3045,6 @@ export default defineComponent({
       cancelTitleEdit,
       saveTitleEdit,
       triggerRca,
-      scrollToSection,
-      toggleSection,
       editableStatus,
       editableSeverity,
       statusOptions,

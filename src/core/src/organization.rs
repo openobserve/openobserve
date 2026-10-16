@@ -1281,7 +1281,7 @@ pub fn is_system_service_account(email: &str) -> bool {
 /// `org_users` insert hits a foreign-key violation. This bites any org whose
 /// identifier is a ksuid (mixed case by design).
 #[cfg(feature = "enterprise")]
-fn sre_agent_email(org_id: &str) -> String {
+pub fn sre_agent_email(org_id: &str) -> String {
     format!("{O2_SRE_AGENT_EMAIL_PREFIX}{org_id}{O2_SRE_AGENT_EMAIL_SUFFIX}").to_lowercase()
 }
 

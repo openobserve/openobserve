@@ -69,6 +69,8 @@ pub struct NewRun {
     pub mode: RunMode,
     pub started_by: String,
     pub guidance: Option<String>,
+    /// Serialized `Vec<SubjectRef>`: the pending on-call records of an alert run.
+    pub oncall_subjects: Option<serde_json::Value>,
 }
 
 /// The values [start_run] decides with.
@@ -86,6 +88,9 @@ pub struct StartGuards {
 pub enum StartResult {
     Started {
         run_id: String,
+        /// The trigger of a stale run this start ended `failed`/`stale` (RR-6), so the
+        /// caller counts that end (TH44).
+        replaced_stale: Option<RunTrigger>,
     },
     /// The latest run is live and not stale (RR-9), or a concurrent start won (RR-5).
     InFlight,
@@ -108,6 +113,17 @@ pub struct RunUpdate {
     pub summary: Option<RunSummaryPatch>,
     pub steered_by_add: Option<String>,
     pub session_id: Option<String>,
+    /// Current stage of the seven-stage protocol; mirrored into `rca_summary.stage`.
+    pub stage: Option<String>,
+    /// 1-based stage index; mirrored into `rca_summary.stage_index`.
+    pub stage_index: Option<i16>,
+    /// `{past_causes: [{id, summary}], skills: [name], toolsets: [name]}`.
+    pub context_used: Option<serde_json::Value>,
+    /// Adds one to `continuations` in SQL.
+    pub continuations_inc: bool,
+    /// The final stats of a run in any state: writes only `stats` and, while the incident
+    /// still names the run, `rca_summary.steps`/`tool_calls`. Every other field is ignored.
+    pub final_stats_only: bool,
     /// Appended to the incident's timeline in the same transaction (incident subjects).
     pub event: Option<IncidentEvent>,
     pub now_us: i64,
@@ -181,6 +197,7 @@ pub async fn start_run_with<C: TransactionTrait>(
     let txn = db.begin().await?;
     let now = guards.now_us;
 
+    let mut replaced_stale = None;
     if new.subject_type == RunSubjectType::Incident {
         let query = alert_incidents::Entity::find_by_id(new.subject_id.as_str())
             .filter(alert_incidents::Column::OrgId.eq(new.org_id.as_str()))
@@ -294,7 +311,7 @@ pub async fn start_run_with<C: TransactionTrait>(
             && seen_state
                 .is_some_and(|state| is_stale(state, seen_updated_at, now, guards.rca_timeout_secs))
         {
-            fail_stale_with(&txn, &new.org_id, seen_run_id, now).await?;
+            replaced_stale = fail_stale_with(&txn, &new.org_id, seen_run_id, now).await?;
         }
     }
 
@@ -320,6 +337,11 @@ pub async fn start_run_with<C: TransactionTrait>(
         error: Set(None),
         session_id: Set(None),
         stats: Set(None),
+        stage: Set(None),
+        stage_index: Set(None),
+        context_used: Set(None),
+        continuations: Set(0),
+        oncall_subjects: Set(new.oncall_subjects.clone()),
     }
     .insert(&txn)
     .await?;
@@ -340,16 +362,20 @@ pub async fn start_run_with<C: TransactionTrait>(
     .await?;
 
     txn.commit().await?;
-    Ok(StartResult::Started { run_id: new.run_id })
+    Ok(StartResult::Started {
+        run_id: new.run_id,
+        replaced_stale,
+    })
 }
 
-/// Ends a `running` run as `failed`/`stale` (RR-6). No timeline event (D9).
+/// Ends a `running` run as `failed`/`stale` (RR-6). No timeline event (D9). Returns the
+/// run's trigger when this write ended it.
 async fn fail_stale_with(
     txn: &DatabaseTransaction,
     org_id: &str,
     run_id: &str,
     now: i64,
-) -> Result<(), DbErr> {
+) -> Result<Option<RunTrigger>, DbErr> {
     let Some(run) = locked(
         txn,
         rca_runs::Entity::find_by_id(run_id).filter(rca_runs::Column::OrgId.eq(org_id)),
@@ -357,7 +383,7 @@ async fn fail_stale_with(
     .one(txn)
     .await?
     else {
-        return Ok(());
+        return Ok(None);
     };
     let error = RunError {
         code: STALE_ERROR_CODE.to_string(),
@@ -370,7 +396,7 @@ async fn fail_stale_with(
         None,
         Some(duration_ms(run.started_at, now)),
     );
-    rca_runs::Entity::update_many()
+    let ended = rca_runs::Entity::update_many()
         .col_expr(
             rca_runs::Column::State,
             Expr::value(RunState::Failed.as_str()),
@@ -390,7 +416,8 @@ async fn fail_stale_with(
         .filter(rca_runs::Column::State.eq(RunState::Running.as_str()))
         .exec(txn)
         .await?;
-    Ok(())
+    Ok((ended.rows_affected > 0)
+        .then(|| parse_or(&run.trigger, RunTrigger::Legacy, &run.run_id, "trigger")))
 }
 
 /// RR-25: keep the subject's newest `history_limit + 1` runs and its newest `completed` run;
@@ -498,6 +525,18 @@ fn merge_stats(
 }
 
 /// The incident's `rca_summary` after `upd`. `previous` is never touched (RR-41).
+/// The stage a write sets: the run fields, else the summary patch.
+fn run_stage(upd: &RunUpdate) -> (Option<String>, Option<i16>) {
+    let patch = upd.summary.as_ref();
+    (
+        upd.stage
+            .clone()
+            .or_else(|| patch.and_then(|p| p.stage.clone())),
+        upd.stage_index
+            .or_else(|| patch.and_then(|p| p.stage_index).map(i16::from)),
+    )
+}
+
 fn merge_summary(mut summary: RunSummaryFields, upd: &RunUpdate) -> RunSummaryFields {
     // The summary mirrors the run: a cancel names its user and a failure its reason,
     // unless the patch says otherwise (D7).
@@ -506,6 +545,14 @@ fn merge_summary(mut summary: RunSummaryFields, upd: &RunUpdate) -> RunSummaryFi
     }
     if let Some(error) = upd.error.as_ref() {
         summary.detail = Some(error.reason.clone());
+    }
+    // The run's stage columns and the summary carry the same stage.
+    let (stage, stage_index) = run_stage(upd);
+    if stage.is_some() {
+        summary.stage = stage;
+    }
+    if let Some(index) = stage_index.and_then(|i| u8::try_from(i).ok()) {
+        summary.stage_index = Some(index);
     }
     if let Some(p) = upd.summary.as_ref() {
         if p.stage.is_some() {
@@ -560,6 +607,9 @@ pub async fn update_run_with<C: TransactionTrait>(
     run_id: &str,
     upd: RunUpdate,
 ) -> Result<bool, DbErr> {
+    if upd.final_stats_only {
+        return final_stats_with(db, org_id, run_id, &upd).await;
+    }
     let txn = db.begin().await?;
     let now = upd.now_us;
     let from = allowed_from(upd.state);
@@ -673,6 +723,25 @@ pub async fn update_run_with<C: TransactionTrait>(
     if let Some(session_id) = upd.session_id.as_ref() {
         update = update.col_expr(rca_runs::Column::SessionId, Expr::value(session_id.clone()));
     }
+    let (stage, stage_index) = run_stage(&upd);
+    if let Some(stage) = stage {
+        update = update.col_expr(rca_runs::Column::Stage, Expr::value(stage));
+    }
+    if let Some(stage_index) = stage_index {
+        update = update.col_expr(rca_runs::Column::StageIndex, Expr::value(stage_index));
+    }
+    if let Some(context_used) = upd.context_used.as_ref() {
+        update = update.col_expr(
+            rca_runs::Column::ContextUsed,
+            Expr::value(context_used.clone()),
+        );
+    }
+    if upd.continuations_inc {
+        update = update.col_expr(
+            rca_runs::Column::Continuations,
+            Expr::col(rca_runs::Column::Continuations).add(1),
+        );
+    }
     if update.exec(&txn).await?.rows_affected == 0 {
         txn.rollback().await?;
         return Ok(false);
@@ -716,6 +785,90 @@ pub async fn update_run_with<C: TransactionTrait>(
         }
     }
 
+    txn.commit().await?;
+    Ok(true)
+}
+
+/// The `final_stats_only` write of [update_run_with], on any run state. Locks the incident
+/// before the run, as every other write does; never changes the state, report or timeline.
+async fn final_stats_with<C: TransactionTrait>(
+    db: &C,
+    org_id: &str,
+    run_id: &str,
+    upd: &RunUpdate,
+) -> Result<bool, DbErr> {
+    let txn = db.begin().await?;
+    let Some((subject_type, subject_id)) = rca_runs::Entity::find_by_id(run_id)
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .select_only()
+        .columns([rca_runs::Column::SubjectType, rca_runs::Column::SubjectId])
+        .into_tuple::<(String, String)>()
+        .one(&txn)
+        .await?
+    else {
+        txn.rollback().await?;
+        return Ok(false);
+    };
+
+    if subject_type == RunSubjectType::Incident.as_str()
+        && let Some(stored) = locked(
+            &txn,
+            alert_incidents::Entity::find_by_id(subject_id.as_str())
+                .filter(alert_incidents::Column::OrgId.eq(org_id))
+                .filter(alert_incidents::Column::RcaRunId.eq(run_id))
+                .select_only()
+                .column(alert_incidents::Column::RcaSummary),
+        )
+        .into_tuple::<Option<serde_json::Value>>()
+        .one(&txn)
+        .await?
+    {
+        let mut summary = decode_summary(stored.as_ref());
+        if let Some(p) = upd.summary.as_ref() {
+            if let Some(steps) = p.steps {
+                summary.steps = steps;
+            }
+            if let Some(tool_calls) = p.tool_calls {
+                summary.tool_calls = tool_calls;
+            }
+        }
+        alert_incidents::Entity::update_many()
+            .col_expr(
+                alert_incidents::Column::RcaSummary,
+                Expr::value(encode(&summary, "rca_summary")?),
+            )
+            .filter(alert_incidents::Column::Id.eq(subject_id.as_str()))
+            .filter(alert_incidents::Column::OrgId.eq(org_id))
+            .filter(alert_incidents::Column::RcaRunId.eq(run_id))
+            .exec(&txn)
+            .await?;
+    }
+
+    let Some(stored_stats) = locked(
+        &txn,
+        rca_runs::Entity::find_by_id(run_id)
+            .filter(rca_runs::Column::OrgId.eq(org_id))
+            .select_only()
+            .column(rca_runs::Column::Stats),
+    )
+    .into_tuple::<Option<serde_json::Value>>()
+    .one(&txn)
+    .await?
+    else {
+        txn.rollback().await?;
+        return Ok(false);
+    };
+    let stats = merge_stats(stored_stats.as_ref(), upd.stats.as_ref(), None);
+    rca_runs::Entity::update_many()
+        .col_expr(
+            rca_runs::Column::Stats,
+            Expr::value(encode(&stats, "stats")?),
+        )
+        .col_expr(rca_runs::Column::UpdatedAt, Expr::value(upd.now_us))
+        .filter(rca_runs::Column::RunId.eq(run_id))
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .exec(&txn)
+        .await?;
     txn.commit().await?;
     Ok(true)
 }
@@ -813,15 +966,10 @@ async fn newest_completed_with<C: ConnectionTrait>(
         .await
 }
 
-/// `running` runs with no write for longer than `stale_threshold_us` (RR-40), oldest first.
-pub async fn list_stale_running(
-    now_us: i64,
-    stale_threshold_us: i64,
-    limit: u64,
-) -> Result<Vec<Model>, DbErr> {
+/// `running` runs, least recently written first, `limit` at most (TH28, RR-40).
+pub async fn list_running(limit: u64) -> Result<Vec<Model>, DbErr> {
     rca_runs::Entity::find()
         .filter(rca_runs::Column::State.eq(RunState::Running.as_str()))
-        .filter(rca_runs::Column::UpdatedAt.lt(now_us.saturating_sub(stale_threshold_us)))
         .order_by_asc(rca_runs::Column::UpdatedAt)
         .limit(limit)
         .all(get_orm_client_rw().await)
@@ -889,6 +1037,11 @@ pub fn to_run(m: Model) -> RcaRun {
         report: m.report,
         result: m.result,
         session_id: m.session_id,
+        stage: m.stage,
+        stage_index: m.stage_index,
+        context_used: m.context_used,
+        continuations: m.continuations,
+        oncall_subjects: m.oncall_subjects,
     }
 }
 
@@ -1034,6 +1187,7 @@ mod tests {
             mode: RunMode::Fresh,
             started_by: "a.rao@acme.io".to_string(),
             guidance: None,
+            oncall_subjects: None,
         }
     }
 
@@ -1057,7 +1211,7 @@ mod tests {
         .await
         .unwrap()
         {
-            StartResult::Started { run_id } => run_id,
+            StartResult::Started { run_id, .. } => run_id,
             other => panic!("expected Started, got {other:?}"),
         }
     }
@@ -1341,7 +1495,23 @@ mod tests {
         assert_eq!(early, StartResult::InFlight);
 
         let now = T0 + 721 * SEC;
-        let r2 = start(&db, "inc-1", now).await;
+        let replacing = start_run_with(
+            &db,
+            new_run(RunSubjectType::Incident, "inc-1"),
+            guards(now),
+            Some(IncidentEvent::ai_analysis_begin()),
+        )
+        .await
+        .unwrap();
+        // TH44: the start names the trigger of the run it ended, so the caller counts it.
+        let StartResult::Started {
+            run_id: r2,
+            replaced_stale,
+        } = replacing.clone()
+        else {
+            panic!("expected Started, got {replacing:?}");
+        };
+        assert_eq!(replaced_stale, Some(RunTrigger::Manual));
         let stale = run(&db, &r1).await.unwrap();
         assert_eq!(stale.state, "failed");
         assert_eq!(stale.ended_at, Some(now));
@@ -1641,7 +1811,7 @@ mod tests {
         .await
         .unwrap()
         {
-            StartResult::Started { run_id } => run_id,
+            StartResult::Started { run_id, .. } => run_id,
             other => panic!("expected Started, got {other:?}"),
         }
     }
@@ -1768,6 +1938,146 @@ mod tests {
         assert!(read.report.is_some());
         assert_eq!(get_with(&db, "other-org", &r1).await.unwrap(), None);
         assert_eq!(get_with(&db, ORG, "missing").await.unwrap(), None);
+    }
+
+    fn stats_of(m: &Model) -> RunStats {
+        serde_json::from_value(m.stats.clone().unwrap_or_default()).unwrap_or_default()
+    }
+
+    /// TH22, TH42: a stats-only write works on every state, writes `stats` and the summary
+    /// counts, and ignores every other field: no state, report, error or event.
+    #[tokio::test]
+    async fn a_stats_only_write_changes_only_the_counts_in_any_state() {
+        use RunState::*;
+        for state in [Running, WaitingInput, Completed, Failed, Cancelled] {
+            let db = db().await;
+            let run_id = run_in_state(&db, "inc-1", state).await;
+            let before = run(&db, &run_id).await.unwrap();
+            let events_before = event_types(&db, "inc-1").await.len();
+
+            let mut upd = finish_update(Completed, T0 + 5 * SEC);
+            upd.report = Some("never stored".to_string());
+            upd.state = Some(Failed);
+            upd.final_stats_only = true;
+            upd.stage = Some("converge".to_string());
+            upd.continuations_inc = true;
+            upd.stats = Some(RunStats {
+                steps: Some(5),
+                tool_calls: Some(11),
+                tokens: Some(serde_json::json!({"input": 10})),
+                ..Default::default()
+            });
+            upd.summary = Some(RunSummaryPatch {
+                steps: Some(5),
+                tool_calls: Some(11),
+                ..Default::default()
+            });
+            assert!(
+                update_run_with(&db, ORG, &run_id, upd).await.unwrap(),
+                "{state}"
+            );
+
+            let after = run(&db, &run_id).await.unwrap();
+            assert_eq!(after.state, before.state, "{state}");
+            assert_eq!(after.report, before.report, "{state}");
+            assert_eq!(after.error, before.error, "{state}");
+            assert_eq!(after.ended_at, before.ended_at, "{state}");
+            assert_eq!(after.stage, before.stage, "{state}");
+            assert_eq!(after.continuations, before.continuations, "{state}");
+            assert_eq!(after.updated_at, T0 + 5 * SEC, "{state}");
+            let stats = stats_of(&after);
+            assert_eq!(
+                (stats.steps, stats.tool_calls),
+                (Some(5), Some(11)),
+                "{state}"
+            );
+            assert_eq!(stats.duration_ms, stats_of(&before).duration_ms, "{state}");
+            let incident = inc(&db, "inc-1").await;
+            assert_eq!(incident.rca_state, Some(before.state.clone()), "{state}");
+            let summary = summary_of(&incident);
+            assert_eq!((summary.steps, summary.tool_calls), (5, 11), "{state}");
+            assert_eq!(
+                event_types(&db, "inc-1").await.len(),
+                events_before,
+                "{state}"
+            );
+        }
+    }
+
+    /// TH22: a stats-only write for a run the incident no longer names writes the run's
+    /// stats and leaves the newer run's summary alone; an unknown run writes nothing.
+    #[tokio::test]
+    async fn a_stats_only_write_for_a_replaced_run_leaves_the_summary() {
+        let db = db().await;
+        incident(&db, "inc-1").await;
+        let old = start(&db, "inc-1", T0).await;
+        finish(&db, &old, RunState::Cancelled, T0 + SEC).await;
+        let new = start(&db, "inc-1", T0 + 2 * SEC).await;
+
+        let mut upd = update(None, T0 + 3 * SEC);
+        upd.final_stats_only = true;
+        upd.stats = Some(RunStats {
+            tool_calls: Some(7),
+            ..Default::default()
+        });
+        upd.summary = Some(RunSummaryPatch {
+            tool_calls: Some(7),
+            ..Default::default()
+        });
+        assert!(update_run_with(&db, ORG, &old, upd.clone()).await.unwrap());
+
+        assert_eq!(stats_of(&run(&db, &old).await.unwrap()).tool_calls, Some(7));
+        let incident = inc(&db, "inc-1").await;
+        assert_eq!(incident.rca_run_id.as_deref(), Some(new.as_str()));
+        assert_eq!(summary_of(&incident).tool_calls, 0);
+        assert!(!update_run_with(&db, ORG, "missing", upd).await.unwrap());
+    }
+
+    /// TH1 (7.1), TH25, TH27: a progress write stores the session, stage, context and
+    /// continuation columns, and the stage reaches the summary.
+    #[tokio::test]
+    async fn a_progress_write_stores_the_run_progress_columns() {
+        let db = db().await;
+        incident(&db, "inc-1").await;
+        let run_id = start(&db, "inc-1", T0).await;
+        let fresh = run(&db, &run_id).await.unwrap();
+        assert_eq!(
+            (
+                fresh.stage.clone(),
+                fresh.stage_index,
+                fresh.continuations,
+                fresh.context_used.clone()
+            ),
+            (None, None, 0, None)
+        );
+
+        let context = serde_json::json!({"past_causes": [], "skills": ["k8s"], "toolsets": ["o2"]});
+        let mut upd = update(None, T0 + SEC);
+        upd.session_id = Some("ses-1".to_string());
+        upd.stage = Some("traces".to_string());
+        upd.stage_index = Some(4);
+        upd.context_used = Some(context.clone());
+        upd.continuations_inc = true;
+        assert!(update_run_with(&db, ORG, &run_id, upd).await.unwrap());
+        let mut again = update(None, T0 + 2 * SEC);
+        again.continuations_inc = true;
+        assert!(update_run_with(&db, ORG, &run_id, again).await.unwrap());
+
+        let row = run(&db, &run_id).await.unwrap();
+        assert_eq!(row.session_id.as_deref(), Some("ses-1"));
+        assert_eq!(
+            (row.stage.as_deref(), row.stage_index),
+            (Some("traces"), Some(4))
+        );
+        assert_eq!(row.context_used, Some(context));
+        assert_eq!(row.continuations, 2);
+        let item = to_run(row);
+        assert_eq!(item.continuations, 2);
+        let summary = summary_of(&inc(&db, "inc-1").await);
+        assert_eq!(
+            (summary.stage.as_deref(), summary.stage_index),
+            (Some("traces"), Some(4))
+        );
     }
 
     /// The PostgreSQL lane (`ZO_META_POSTGRES_DSN` set) runs this against a throwaway

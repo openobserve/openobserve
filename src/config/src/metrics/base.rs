@@ -2751,6 +2751,81 @@ pub static AI_CHAT_SHARE_READS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+// RCA runs (incident analysis; see core::alerts::rca_turn)
+pub static RCA_RUNS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_runs_total",
+            "Ended RCA runs by trigger, end state and error code (empty when none)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "trigger", "state", "error_code"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_DURATION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "rca_run_duration_seconds",
+            "Wall time of an ended RCA run by end state",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![
+            10.0, 30.0, 60.0, 120.0, 300.0, 600.0, 1200.0, 1800.0, 3600.0,
+        ]),
+        &["organization", "state"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_STEPS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "rca_run_steps",
+            "Narrated steps recorded by an ended RCA run",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_TOOL_CALLS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new("rca_run_tool_calls", "Tool calls made by an ended RCA run")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels())
+            .buckets(vec![1.0, 5.0, 10.0, 20.0, 40.0, 80.0, 150.0, 300.0]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUN_CONTINUATIONS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_run_continuations_total",
+            "Continuation turns started for RCA runs that ended without a report",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static RCA_RUNS_WITHOUT_REPORT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "rca_runs_without_report_total",
+            "RCA runs whose turns ended without a submitted report",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
 // Deliberate: spec §14.1 says `org_id` and four `result` values; `organization` is the house label.
 pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -3435,6 +3510,12 @@ pub(crate) fn register(registry: &Registry) {
         Box::new(AI_CHAT_RESTORE_EVENTS.clone()),
         Box::new(AI_CHAT_RESTORE_BYTES.clone()),
         Box::new(AI_CHAT_REPLICA_PURGES_TOTAL.clone()),
+        Box::new(RCA_RUNS_TOTAL.clone()),
+        Box::new(RCA_RUN_DURATION_SECONDS.clone()),
+        Box::new(RCA_RUN_STEPS.clone()),
+        Box::new(RCA_RUN_TOOL_CALLS.clone()),
+        Box::new(RCA_RUN_CONTINUATIONS_TOTAL.clone()),
+        Box::new(RCA_RUNS_WITHOUT_REPORT_TOTAL.clone()),
     ] {
         registry.register(metric).expect("Metric registered");
     }

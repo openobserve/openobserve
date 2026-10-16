@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import { marked } from "marked";
-import { extractRcaToc, renderRcaReport, stripVerdictFence } from "./rcaReportMarkdown";
+import { renderRcaReport, stripVerdictFence } from "./rcaReportMarkdown";
 
 const toDom = (html: string): HTMLElement => {
   const host = document.createElement("div");
@@ -81,16 +81,6 @@ describe("rcaReportMarkdown", () => {
     expect(second).toBe(first);
     expect(marked.defaults.renderer).toBe(rendererBefore);
     expect(marked.getDefaults()).toEqual(defaultsBefore);
-  });
-
-  it("gives TOC ids equal to the rendered h2/h3 heading ids", () => {
-    const md = "## Root Cause\n\ntext\n\n### Contributing factors\n\n#### Detail\n\n## Next Steps";
-    const toc = extractRcaToc(md);
-    const rendered = Array.from(
-      toDom(renderRcaReport(md)).querySelectorAll(".rca-h2, .rca-h3"),
-    ).map((el) => el.id);
-    expect(toc.map((e) => e.id)).toEqual(rendered);
-    expect(toc.map((e) => e.level)).toEqual([2, 3, 2]);
   });
 
   it("strips script tags from model output", () => {
@@ -189,19 +179,30 @@ describe("rcaReportMarkdown", () => {
       "",
       "__Executive Summary__",
     ].join("\n");
-    expect(extractRcaToc(md).map((e) => e.text)).toEqual([
-      "Incident Details",
-      "Evidence",
-      "Executive Summary",
-    ]);
-    expect(toDom(renderRcaReport(md)).querySelector("pre code")?.textContent).toContain(
-      "**not a heading**",
+    const dom = toDom(renderRcaReport(md));
+    expect(Array.from(dom.querySelectorAll(".rca-h2")).map((el) => el.textContent?.trim())).toEqual(
+      ["Incident Details", "Evidence", "Executive Summary"],
     );
+    // A bold line glued to text stays an inline label in its paragraph.
+    const inline = Array.from(dom.querySelectorAll("strong")).find(
+      (el) => el.textContent === "Inline label",
+    );
+    expect(inline?.closest("p")?.textContent).toContain("The ingester restarted.");
+    expect(dom.querySelector("pre code")?.textContent).toContain("**not a heading**");
   });
 
   it("keeps bold sub-labels when the report already has sections", () => {
     const md = "## Root Cause\n\n**Timeline:**\n\n- 10:02 restart\n\n### Contributing factors";
-    expect(extractRcaToc(md).map((e) => e.text)).toEqual(["Root Cause", "Contributing factors"]);
+    const dom = toDom(renderRcaReport(md));
     expect(renderRcaReport(md)).not.toContain('id="section-timeline"');
+    expect(
+      Array.from(dom.querySelectorAll(".rca-h2, .rca-h3")).map((el) => el.textContent?.trim()),
+    ).toEqual(["Root Cause", "Contributing factors"]);
+    // The sub-label stays inline bold text in a paragraph, not a heading.
+    const label = Array.from(dom.querySelectorAll("strong")).find((el) =>
+      el.textContent?.startsWith("Timeline"),
+    );
+    expect(label?.closest("p")).not.toBeNull();
+    expect(label?.closest(".rca-h2, .rca-h3, .rca-h4")).toBeNull();
   });
 });

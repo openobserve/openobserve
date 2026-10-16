@@ -62,6 +62,7 @@ vi.mock("@/services/incidents", async (importOriginal) => {
       triggerRca: vi.fn(),
       cancelRca: vi.fn(),
       getRcaRun: vi.fn(),
+      getRcaThread: vi.fn(),
       getCorrelatedStreams: vi.fn(),
       getEvents: vi.fn(),
       updateIncident: vi.fn(),
@@ -249,6 +250,26 @@ describe("IncidentDetailDrawer.vue", () => {
         data: { run_id: runId, report: `## Root Cause Analysis\n\nReport of ${runId}` },
       } as never),
     );
+
+    vi.mocked(incidentsService.getRcaThread).mockResolvedValue({
+      data: {
+        run_id: "run-2",
+        state_version: "1.1.1",
+        not_modified: false,
+        active: true,
+        transcript: "available",
+        started: { at: 1700000000000000, prompt: "Analyze incident 1" },
+        steps: [],
+        user_messages: [],
+        questions: [],
+        report_submitted: false,
+        stats: { steps: 0, tool_calls: 0, duration_ms: 0 },
+      },
+    } as never);
+
+    vi.mocked(incidentsService.cancelRca).mockResolvedValue({
+      data: { run_id: "run-2", cancelled: true },
+    } as never);
 
     (incidentsService.getEvents as any).mockResolvedValue({
       data: { events: [] },
@@ -1443,6 +1464,42 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(get.mock.calls.length).toBe(afterLoad + 2);
       expect(incidentsService.getRcaRun).toHaveBeenCalledWith("default", "1", "run-2");
       expect(wrapper.vm.rcaReportText).toContain("Report of run-2");
+    });
+
+    it("E5 / TH32: the Analysis tab shows the analysis and thread columns and reads the live run's thread", async () => {
+      vi.mocked(incidentsService.get).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "1", rca: summaryFor("running", "run-1") }),
+      } as never);
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      wrapper.vm.activeTab = "incidentAnalysis";
+      await flushPromises();
+
+      const panel = wrapper.find('[data-test="rca-analysis-container"]');
+      expect(panel.find('[data-test="rca-analysis-bar"]').exists()).toBe(true);
+      expect(panel.find('[data-test="rca-verdict-card"]').exists()).toBe(true);
+      expect(panel.find('[data-test="rca-thread-column"]').exists()).toBe(true);
+      expect(panel.find('[data-test="rca-thread-live-pill"]').exists()).toBe(true);
+      expect(panel.findAll('[role="tab"]')).toHaveLength(0);
+      expect(incidentsService.getRcaThread).toHaveBeenCalledWith(
+        "default",
+        "1",
+        "run-2",
+        undefined,
+      );
+    });
+
+    it("K: with no run the Analysis tab offers Analyze and reads no thread", async () => {
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      wrapper.vm.activeTab = "incidentAnalysis";
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="trigger-rca-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rca-thread-column"]').exists()).toBe(false);
+      expect(incidentsService.getRcaThread).not.toHaveBeenCalled();
     });
   });
 

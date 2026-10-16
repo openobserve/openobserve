@@ -1329,6 +1329,7 @@ export default defineComponent({
         org_storage_enabled: false,
         domain_org_mappings: [],
         red_insights_enabled: false,
+        ai_rca_thread_tool_output: false,
       };
 
       try {
@@ -1375,6 +1376,9 @@ export default defineComponent({
           domain_org_mappings: orgSettings?.data?.data?.domain_org_mappings ?? [],
           red_insights_enabled:
             orgSettings?.data?.data?.red_insights_enabled ?? defaultSettings.red_insights_enabled,
+          ai_rca_thread_tool_output:
+            orgSettings?.data?.data?.ai_rca_thread_tool_output ??
+            defaultSettings.ai_rca_thread_tool_output,
         });
 
         // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
