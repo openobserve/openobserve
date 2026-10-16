@@ -193,6 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @dropoff="(k) => emit('dropoff', k)"
                   @filter-values="(f) => emit('filter-values', f)"
                   @load-fields="emit('load-fields')"
+                  @break-down-step="(k) => emit('break-down-step', k)"
                 />
               </div>
               <slot name="footer" />

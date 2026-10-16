@@ -41,15 +41,15 @@ describe("isSampledField", () => {
 
 describe("foldFieldSample", () => {
   const rows = [
-    { st: 1, context_category: "shoes" },
-    { st: 1, context_category: "bags" },
-    { st: 1, context_category: "shoes" },
-    { st: 2, context_payment_method: "card" },
-    { st: 2, context_payment_method: "upi" },
-    { st: 2, context_payment_method: "card" },
-    { st: 2, context_payment_method: "cod" },
-    { st: 2, context_payment_method: "paypal" },
-    { st: 3, context_payment_method: "card", context_coupon: "" },
+    { s1: 1, s2: 0, s3: 0, context_category: "shoes" },
+    { s1: 1, s2: 0, s3: 0, context_category: "bags" },
+    { s1: 1, s2: 0, s3: 0, context_category: "shoes" },
+    { s1: 0, s2: 1, s3: 0, context_payment_method: "card" },
+    { s1: 0, s2: 1, s3: 0, context_payment_method: "upi" },
+    { s1: 0, s2: 1, s3: 0, context_payment_method: "card" },
+    { s1: 0, s2: 1, s3: 0, context_payment_method: "cod" },
+    { s1: 0, s2: 1, s3: 0, context_payment_method: "paypal" },
+    { s1: 0, s2: 0, s3: 1, context_payment_method: "card", context_coupon: "" },
   ];
 
   it("lists each field at the first step that carries it, with its top values there", () => {
@@ -61,14 +61,19 @@ describe("foldFieldSample", () => {
   });
 
   it("flags a field with more distinct values than a breakdown can show", () => {
-    const many = Array.from({ length: 51 }, (_, i) => ({ st: 1, context_category: `c${i}` }));
+    const many = Array.from({ length: 51 }, (_, i) => ({
+      s1: 1,
+      s2: 0,
+      s3: 0,
+      context_category: `c${i}`,
+    }));
     expect(foldFieldSample(many, STEPS, FIELDS).fields[0]).toMatchObject({ many: true });
   });
 
-  it("gives a repeated step the sample of its first occurrence", () => {
-    const steps = [STEPS[0], STEPS[1], STEPS[0]];
-    const { fields } = foldFieldSample(rows, steps, FIELDS);
-    expect(fields.find((f) => f.field === "context_category")?.steps).toEqual([1, 3]);
+  it("gives a row that matches two steps to both", () => {
+    const both = [{ s1: 1, s2: 1, s3: 0, context_category: "shoes" }];
+    const { fields } = foldFieldSample(both, STEPS, FIELDS);
+    expect(fields[0]).toMatchObject({ field: "context_category", steps: [1, 2] });
   });
 
   it("limits a step's list to the fields its events carry", () => {

@@ -260,37 +260,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ><OTooltip :content="t('rum.analytics.funnel.stepMenu')"
                 /></OButton>
               </template>
-              <ODropdownSub
-                :text-value="t('rum.analytics.funnel.breakDownByStep')"
+              <ODropdownItem
+                icon-left="alt-route"
                 :data-test="`rum-analytics-funnel-step-${i}-break-down`"
+                @select="emit('break-down-step', i + 1)"
+                >{{ t("rum.analytics.funnel.breakDownByStep") }}</ODropdownItem
               >
-                <template #trigger>{{ t("rum.analytics.funnel.breakDownByStep") }}</template>
-                <ODropdownItem
-                  v-if="fieldSampleState !== 'ok'"
-                  disabled
-                  :data-test="`rum-analytics-funnel-step-${i}-break-down-state`"
-                  >{{
-                    fieldSampleState === "error"
-                      ? t("rum.analytics.funnel.stepFieldsFailed")
-                      : t("rum.analytics.funnel.stepFieldsLoading")
-                  }}</ODropdownItem
-                >
-                <ODropdownItem
-                  v-else-if="!stepFields(i).length"
-                  disabled
-                  :data-test="`rum-analytics-funnel-step-${i}-break-down-state`"
-                  >{{ t("rum.analytics.funnel.stepFieldsNone") }}</ODropdownItem
-                >
-                <ODropdownItem
-                  v-for="f in stepFields(i)"
-                  v-else
-                  :key="f.field"
-                  :description="fieldHint(f)"
-                  :data-test="`rum-analytics-funnel-step-${i}-break-down-${f.field}`"
-                  @select="breakDownAt(i, f.field)"
-                  ><span class="font-mono">{{ f.field }}</span></ODropdownItem
-                >
-              </ODropdownSub>
             </ODropdown>
             <OButton
               variant="ghost"
@@ -381,7 +356,6 @@ import FunnelChangeCell from "@/components/rum/productAnalytics/funnelParts/Funn
 import StepConditionPopover from "@/components/rum/productAnalytics/funnelParts/StepConditionPopover.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import useStepLabels from "@/components/rum/productAnalytics/funnelParts/useStepLabels";
 import {
   removeStep,
@@ -426,6 +400,7 @@ const emit = defineEmits<{
   dropoff: [number];
   "filter-values": [string];
   "load-fields": [];
+  "break-down-step": [number];
 }>();
 const { t } = useI18nTyped();
 const { labelOf, kindLabel, kindVariant, filterChips } = useStepLabels(
@@ -561,16 +536,6 @@ const apply = (edit: FunnelEdit | null) => {
 };
 
 const stepFields = (i: number): SeenField[] => fieldsOnStep(props.fieldSample ?? null, i + 1);
-
-const fieldHint = (f: SeenField): I18nText => {
-  if (f.many) return t("rum.analytics.funnel.stepFieldMany");
-  const values = raw(f.top.join(", "));
-  return f.more ? t("rum.analytics.funnel.stepFieldValues", { values, more: f.more }) : values;
-};
-
-// Breaking down from a step's menu pins the value to that step.
-const breakDownAt = (i: number, field: string) =>
-  emit("update:def", { ...props.def, breakdown: { f: field, s: i + 1 } });
 
 const replaceStep = (i: number, step: StepRef) =>
   emit("update:def", { ...props.def, steps: props.def.steps.map((s, j) => (j === i ? step : s)) });

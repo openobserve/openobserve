@@ -783,7 +783,7 @@ export function filterValuesSql(scope: AnalyticsScope, field: FunnelFilter["fiel
   return `SELECT ${v} AS v, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${rowScope(scope)} AND ${filterColumn(field)} IS NOT NULL AND ${v} <> '' GROUP BY ${v} ORDER BY sessions DESC, v LIMIT 20`;
 }
 
-/** The latest `perStep` rows of each step's events with `fields`, tagged `st` with the first step they match. */
+/** The latest `perStep` rows of each step's events with `fields`; `sN` flags the rows sampled for step N. */
 export function stepFieldSampleSql(
   scope: AnalyticsScope,
   def: FunnelDef,
@@ -792,11 +792,19 @@ export function stepFieldSampleSql(
   perStep: number,
 ): string {
   const preds = def.steps.map((s) => stepPredicateRaw(s, scope, events));
-  const st = `CASE ${preds.map((p, i) => `WHEN ${p} THEN ${i + 1}`).join(" ")} END`;
+  const n = range1(preds.length);
+  const hit = (i: number) => `CASE WHEN ${preds[i - 1]} THEN 1 ELSE 0 END`;
+  // A row can match several steps, so each step ranks its own rows rather than the first step a row matches.
+  const ranks = n.map(
+    (i) =>
+      `${hit(i)} AS s${i}, ROW_NUMBER() OVER (PARTITION BY ${hit(i)} ORDER BY _timestamp DESC) AS r${i}`,
+  );
   // A field name is parsed to [a-z0-9_] before it gets here, so quoting it is safe.
   const cols = fields.filter((f) => has(scope, f)).map((f) => `"${f}"`);
   const picked = cols.length ? `, ${cols.join(", ")}` : "";
-  return `SELECT st${picked} FROM (SELECT ${st} AS st, ROW_NUMBER() OVER (PARTITION BY ${st} ORDER BY _timestamp DESC) AS rn${picked} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (${preds.join(" OR ")})) WHERE rn <= ${Math.trunc(perStep)}`;
+  const flags = n.map((i) => `s${i}`).join(", ");
+  const kept = n.map((i) => `(s${i} = 1 AND r${i} <= ${Math.trunc(perStep)})`).join(" OR ");
+  return `SELECT ${flags}${picked} FROM (SELECT ${ranks.join(", ")}${picked} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (${preds.join(" OR ")})) WHERE ${kept}`;
 }
 
 /** Top browser and device families over the scope without any exclusion, for the likely-bot suggestions. */
@@ -1778,12 +1786,13 @@ export function funnelTrendSql(
   return withCtes(
     [
       ...ctes,
-      `tb AS (SELECT dim, CASE WHEN r${a} = 1 THEN ${bk} END AS bk, SUM(r${k}) AS c${k}, SUM(r${a}) AS ca, SUM(r${b}) AS cb FROM ${from} GROUP BY dim, CASE WHEN r${a} = 1 THEN ${bk} END)`,
-      `tk AS (SELECT *, SUM(c${k}) OVER (PARTITION BY dim) AS tot, CASE WHEN dim IS NULL OR dim = '' THEN 1 ELSE 0 END AS un FROM tb)`,
-      "tr AS (SELECT *, DENSE_RANK() OVER (ORDER BY un, tot DESC, dim) AS rk FROM tk)",
-      `tg AS (SELECT CASE WHEN ${top} THEN dim END AS gd, un, tot, bk, ca, cb FROM tr WHERE bk IS NOT NULL)`,
+      `tb AS (SELECT dim, CASE WHEN r${a} = 1 THEN ${bk} END AS bk, ${k > 1 ? "SUM(r1) AS c1, " : ""}SUM(r${k}) AS c${k}, SUM(r${a}) AS ca, SUM(r${b}) AS cb FROM ${from} GROUP BY dim, CASE WHEN r${a} = 1 THEN ${bk} END)`,
+      `tk AS (SELECT *, SUM(c${k}) OVER (PARTITION BY dim) AS tot${k > 1 ? ", SUM(c1) OVER (PARTITION BY dim) AS t1" : ""}, CASE WHEN dim IS NULL OR dim = '' THEN 1 ELSE 0 END AS un FROM tb)`,
+      // Ties at step k fall back to step-1 units, as the table's rows do.
+      `tr AS (SELECT *, DENSE_RANK() OVER (ORDER BY un, tot DESC, ${k > 1 ? "t1 DESC, " : ""}dim) AS rk FROM tk)`,
+      `tg AS (SELECT CASE WHEN ${top} THEN dim END AS gd, un, tot, ${k > 1 ? "t1, " : ""}bk, ca, cb FROM tr WHERE bk IS NOT NULL)`,
     ],
-    `SELECT gd AS dim, MIN(un) AS un, MAX(tot) AS tot, bk, SUM(ca) AS ca, SUM(cb) AS cb FROM tg GROUP BY gd, bk ORDER BY bk, gd LIMIT ${m * (BREAKDOWN_TOP + 1)}`,
+    `SELECT gd AS dim, MIN(un) AS un, MAX(tot) AS tot, ${k > 1 ? "MAX(t1) AS t1, " : ""}bk, SUM(ca) AS ca, SUM(cb) AS cb FROM tg GROUP BY gd, bk ORDER BY bk, gd LIMIT ${m * (BREAKDOWN_TOP + 1)}`,
   );
 }
 

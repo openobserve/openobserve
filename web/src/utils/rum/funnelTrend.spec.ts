@@ -244,6 +244,14 @@ describe("foldTrend", () => {
     expect(foldTrend(tied, p, ctx(), true).map((s) => s.value)).toEqual(["Safari", "chrome"]);
   });
 
+  it("an attribute ranked at step k breaks ties by step-1 units before the name, like the table", () => {
+    const tied = [
+      { dim: "card", un: 0, tot: 8, t1: 10, bk: 1, ca: 4, cb: 1 },
+      { dim: "upi", un: 0, tot: 8, t1: 30, bk: 1, ca: 4, cb: 1 },
+    ];
+    expect(foldTrend(tied, p, ctx(), true).map((s) => s.value)).toEqual(["upi", "card"]);
+  });
+
   it("a breakdown value's average pools closed buckets and leaves the still-converting one out", () => {
     const hits = [
       { dim: "Chrome", un: 0, bk: 1, ca: 10, cb: 5 },
