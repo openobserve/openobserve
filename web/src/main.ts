@@ -116,7 +116,11 @@ const getConfig = async () => {
     if (res.data.commit_hash) {
       buildVersionChecker.setInitialVersion(res.data.commit_hash);
     }
-    if (isAssistantV2()) void initAssistant(res.data.commit_hash?.slice(0, 12) ?? "unknown");
+    // A failed chunk load leaves the assistant off; the rest of the app is unaffected.
+    if (isAssistantV2())
+      initAssistant(res.data.commit_hash?.slice(0, 12) ?? "unknown").catch((err) =>
+        console.error("Assistant runtime failed to load", err),
+      );
     if (res.data.rum?.enabled) {
       const options = {
         clientToken: res.data.rum.client_token,
@@ -257,6 +261,10 @@ async function initAssistant(uiVersion: string) {
       };
     },
     isOrgAdmin: () => share.orgAdminFlag(store.state),
+    getOrganizations: () =>
+      (store.state.organizations as { identifier?: string }[])
+        .map((org) => org.identifier)
+        .filter((id): id is string => !!id),
     router,
   });
   setAssistantTelemetryContext(assistantStore.telemetryContext(uiVersion));

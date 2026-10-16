@@ -1,12 +1,27 @@
-import { afterEach, describe, it, expect } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import { computed, onScopeDispose } from "vue";
 
 import { resetAssistantV2ForTests } from "@/composables/assistant/flags";
+import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
+
+import ShortcutCheatsheet from "../ShortcutCheatsheet.vue";
 import {
   getShortcutDef,
   SHORTCUT_MODULES,
   SHORTCUT_REGISTRY,
   type ShortcutCapabilities,
 } from "../shortcutRegistry";
+
+const { capabilityDisposed } = vi.hoisted(() => ({ capabilityDisposed: vi.fn() }));
+
+vi.mock("@/composables/assistant", () => ({
+  useAssistantCapability: () => {
+    onScopeDispose(capabilityDisposed);
+    return { assistantCanChat: computed(() => true) };
+  },
+}));
 
 const OSS: ShortcutCapabilities = {
   isEnterprise: false,
@@ -367,5 +382,30 @@ describe("assistant entries", () => {
       "assistantComposerRecall",
     ])
       expect(getShortcutDef(id), id).toBeUndefined();
+  });
+});
+
+describe("cheatsheet with the assistant flag on", () => {
+  afterEach(() => {
+    delete window.__O2_ASSISTANT_V2__;
+    resetAssistantV2ForTests();
+    document.body.innerHTML = "";
+  });
+
+  it("names the product through {product} and stops its capability reader on unmount", async () => {
+    window.__O2_ASSISTANT_V2__ = true;
+    store.state.zoConfig = { ...store.state.zoConfig, ai_enabled: true };
+    const wrapper = mount(ShortcutCheatsheet, {
+      props: { open: true },
+      attachTo: document.body,
+      global: { plugins: [store, i18n] },
+    });
+    await flushPromises();
+    await vi.waitFor(() => expect(document.body.textContent).toContain("Open O2 Assistant"));
+    expect(document.body.textContent).toContain("O2 Assistant composer");
+    expect(document.body.textContent).not.toContain("{product}");
+    expect(capabilityDisposed).not.toHaveBeenCalled();
+    wrapper.unmount();
+    expect(capabilityDisposed).toHaveBeenCalledTimes(1);
   });
 });

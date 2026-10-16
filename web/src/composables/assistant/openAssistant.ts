@@ -46,6 +46,9 @@ export const THREAD_APPEND_WINDOW_MS = 30 * 60_000;
 
 export const DEFAULT_TITLE_CHARS = 40;
 
+/** A second activation of the same door inside this window returns the first one's result. */
+export const DOOR_REPEAT_MS = 1_000;
+
 const SEND_VERBS: ReadonlySet<OpenAssistantArgs["entryVerb"]> = new Set([
   "explain",
   "troubleshoot",
@@ -93,7 +96,7 @@ type SendVerb = "explain" | "troubleshoot" | "fix";
 export type OpenAssistantCall = (
   | (OpenAssistantArgs & { intent: "open" | "stage" })
   | (OpenAssistantArgs & { intent: "send"; entryVerb: SendVerb })
-  | (OpenAssistantArgs & { intent: "send"; entryKind: "home_launcher" })
+  | (OpenAssistantArgs & { intent: "send"; entryKind: "home_launcher"; entryVerb: "ask" })
 ) & {
   /** The `userOrgKey` the payload was built under; a stale tab's payload is refused. */
   userOrgKey?: string;
@@ -116,6 +119,8 @@ export interface OpenAssistantEnv {
 
 interface DoorPlan {
   target: Placement;
+  /** Pinned for this open only, so the floating card does not cover the door's source. */
+  forcePinned: boolean;
   session: AssistantSession | null;
   sends: boolean;
   queued: boolean;
@@ -123,7 +128,7 @@ interface DoorPlan {
   drafted: boolean;
 }
 
-/** The only way into the assistant (`00` §4.5); calls are serialised so two doors in one tick see each other. */
+/** The only way into the assistant (`00` §4.5); a door runs synchronously, so two doors in one tick see each other. */
 export function openAssistant(args: OpenAssistantCall): Promise<OpenAssistantResult> {
   return getAssistantRuntime().openAssistant(args);
 }
@@ -131,11 +136,15 @@ export function openAssistant(args: OpenAssistantCall): Promise<OpenAssistantRes
 export function createOpenAssistant(
   env: OpenAssistantEnv,
 ): (args: OpenAssistantCall) => Promise<OpenAssistantResult> {
-  let queue: Promise<unknown> = Promise.resolve();
-  return (args) => {
-    const run = queue.then(() => runDoor(env, args));
-    queue = run.catch(() => undefined);
-    return run;
+  let last: { key: string; at: number; result: OpenAssistantResult } | null = null;
+  return async (args) => {
+    const key = doorKey(env, args);
+    // Closing in between makes the next press a new open, never a stale answer.
+    const open = env.store.state.shell.placement.kind !== "hidden";
+    if (open && last?.key === key && env.now() - last.at < DOOR_REPEAT_MS) return last.result;
+    const result = runDoor(env, args);
+    last = result.ok ? { key, at: env.now(), result } : null;
+    return result;
   };
 }
 
@@ -144,10 +153,15 @@ function runDoor(env: OpenAssistantEnv, args: OpenAssistantCall): OpenAssistantR
   const gate = env.capability().gate;
   if (!OPEN_GATES.has(gate)) {
     if (isGateReason(gate)) trackAssistant("ai_gate_blocked", { reason: gate });
+    else trackAssistant("ai_entry_clicked", entryProps(args, null, gate));
     return { ok: false, reason: gate };
   }
-  if (!store.state.ready) return { ok: false, reason: "loading" };
+  if (!store.state.ready) {
+    trackAssistant("ai_entry_clicked", entryProps(args, null, gate));
+    return { ok: false, reason: "loading" };
+  }
   if (isForeignPayload(env, args)) {
+    trackAssistant("ai_entry_clicked", entryProps(args, null, gate));
     notify(env, "assistant.entry.orgChanged");
     return { ok: false, reason: "org_changed" };
   }
@@ -159,7 +173,7 @@ function runDoor(env: OpenAssistantEnv, args: OpenAssistantCall): OpenAssistantR
   const wasVisible = store.state.shell.placement.kind !== "hidden";
   // A send into a visible container leaves focus on the source page (`95` §4).
   const focus = plan.sends && wasVisible ? "none" : "composer";
-  store.open(plan.target, { sid, focus, invoker: args.invoker });
+  store.open(plan.target, { sid, focus, invoker: args.invoker, forcePinned: plan.forcePinned });
   if (plan.target.kind === "full" && env.routeName() !== "assistant")
     env.pushRoute({ name: "assistant", params: { chatId: sid } });
   if (plan.sends) void store.send(sid, args.mode ? { mode: args.mode } : undefined);
@@ -169,13 +183,14 @@ function runDoor(env: OpenAssistantEnv, args: OpenAssistantCall): OpenAssistantR
 
 function planDoor(env: OpenAssistantEnv, args: OpenAssistantCall): DoorPlan {
   const target = resolveContainer(env, args);
-  const session = resolveThread(env, args);
+  const session = resolveThread(env, args, target);
   const composerEmpty = !session || session.composer.text.trim() === "";
   const running = !!session && isRunning(session.turn);
   const carded = !!session && (!!session.pendingApproval || !!session.pendingConsent);
   const wantsSend = args.intent === "send";
   return {
     target,
+    forcePinned: target.kind === "sidebar" && coversInvoker(env, target, args.invoker),
     session,
     sends: wantsSend && composerEmpty && !running && !carded,
     queued: wantsSend && running,
@@ -196,33 +211,72 @@ function resolveContainer(env: OpenAssistantEnv, args: OpenAssistantCall): Place
   if (wanted === "auto" && shell.placement.kind === "docked" && FOCUS_DOORS.has(args.entryKind))
     return { ...shell.placement };
   if (shell.placement.kind === "sidebar") return { ...shell.placement };
-  return { kind: "sidebar", mode: sidebarMode(env, args.invoker) };
+  return { kind: "sidebar", mode: sidebarMode(env) };
+}
+
+function sidebarMode(env: OpenAssistantEnv): "pinned" | "floating" {
+  const { store } = env;
+  const remembered = store.state.shell.sidebarMode;
+  return !store.hasStoredSidebarMode() && env.routePrefersFloating() ? "floating" : remembered;
 }
 
 // A floating card that would hide the door's source opens pinned for this open only (`20` §2.1, round 1 X-14).
-function sidebarMode(env: OpenAssistantEnv, invoker?: HTMLElement | null): "pinned" | "floating" {
-  const { store } = env;
-  const remembered = store.state.shell.sidebarMode;
-  const mode =
-    !store.hasStoredSidebarMode() && env.routePrefersFloating() ? "floating" : remembered;
-  if (mode === "pinned" || !env.lgUp() || !invoker) return mode;
-  const cardLeft = env.viewportPx() - store.state.shell.sidebarWidthRem * 16;
-  return invoker.getBoundingClientRect().right > cardLeft ? "pinned" : "floating";
+function coversInvoker(
+  env: OpenAssistantEnv,
+  target: Extract<Placement, { kind: "sidebar" }>,
+  invoker?: HTMLElement | null,
+): boolean {
+  const { shell } = env.store.state;
+  if (target.mode === "pinned" || shell.placement.kind === "sidebar" || !env.lgUp() || !invoker)
+    return false;
+  const cardLeft = env.viewportPx() - shell.sidebarWidthRem * 16;
+  return invoker.getBoundingClientRect().right > cardLeft;
 }
 
 /** `new` for titled verbs, `current` for add-to-chat, else append within 30 min of the last turn. */
-function resolveThread(env: OpenAssistantEnv, args: OpenAssistantCall): AssistantSession | null {
+function resolveThread(
+  env: OpenAssistantEnv,
+  args: OpenAssistantCall,
+  target: Placement,
+): AssistantSession | null {
   const { store } = env;
-  const active = store.state.shell.activeSid
-    ? store.state.sessions[store.state.shell.activeSid]
-    : undefined;
-  const current = active && active.userOrgKey === store.state.userOrgKey ? active : null;
+  const current = containerSession(store, target);
   const thread = args.thread ?? defaultThread(args.entryVerb);
   if (thread === "current" || !current) return current;
   if (thread === "new") return isBlank(current) ? current : null;
   const last = store.lastTurnAt(current.sid);
   const fresh = last !== null && env.now() - last < THREAD_APPEND_WINDOW_MS;
   return fresh || isBlank(current) ? current : null;
+}
+
+// The session the target container shows: the visible one, else that container's latest (`10` §3.3).
+function containerSession(
+  store: AssistantStoreInternal,
+  target: Placement,
+): AssistantSession | null {
+  const { state } = store;
+  const own = (sid: Sid | null) => {
+    const session = sid ? state.sessions[sid] : undefined;
+    return session && session.userOrgKey === state.userOrgKey ? session : null;
+  };
+  if (sameContainer(state.shell.placement, target)) return own(state.shell.activeSid);
+  const dock = target.kind === "docked" ? `docked.${target.hostId}` : null;
+  for (const sid of [state.shell.activeSid, ...state.recent]) {
+    const session = own(sid);
+    if (session && dockOf(session) === dock) return session;
+  }
+  return null;
+}
+
+function sameContainer(current: Placement, target: Placement): boolean {
+  if (current.kind === "hidden" || current.kind !== target.kind) return false;
+  return (
+    current.kind !== "docked" || (target.kind === "docked" && current.hostId === target.hostId)
+  );
+}
+
+function dockOf(session: AssistantSession): string | null {
+  return session.origin.container.startsWith("docked.") ? session.origin.container : null;
 }
 
 function defaultThread(verb: OpenAssistantArgs["entryVerb"]): "new" | "current" | "auto" {
@@ -235,17 +289,18 @@ function createSession(
   args: OpenAssistantCall,
   container: Container,
 ): Sid {
+  const transcript = args.payload?.transcript ?? [];
   const sid = store.createSession({
     origin: { entryKind: args.entryKind, objectKind: args.objectKind, container },
     thread: "new",
+    ...(transcript.length > 0 && {
+      messages: transcript.map((m) => ({ role: m.role, content: raw(m.text) })),
+    }),
   });
-  const session = store.state.sessions[sid];
   const prompt = args.payload?.text?.trim();
   // The default title is the visible prompt, never the serialised chip (`00` §10.1).
-  if (prompt && session.title === null)
+  if (prompt && store.state.sessions[sid].title === null)
     store.setTitle(sid, raw(prompt.slice(0, DEFAULT_TITLE_CHARS)), "generated");
-  if (args.payload?.transcript?.length && session.messages.length === 0)
-    session.messages = args.payload.transcript.map((m) => ({ role: m.role, content: raw(m.text) }));
   return sid;
 }
 
@@ -259,16 +314,21 @@ function stagePayload(
   if (!payload) return 0;
   const session = store.state.sessions[sid];
   const before = session.composer.chips.length;
-  const empty = session.composer.text.trim() === "";
+  const textBefore = session.composer.text;
+  const empty = textBefore.trim() === "";
   store.stage(sid, {
     chips: payload.chips,
     text: payload.text,
     mode: empty ? "replace" : "append",
   });
   if (payload.title) store.setTitle(sid, payload.title, "object");
+  const staged = store.state.sessions[sid].composer.chips.length - before;
+  // A repeated prompt the store skipped adds nothing, so the helper line would claim a change that did not happen.
+  const changed = staged > 0 || store.state.sessions[sid].composer.text !== textBefore;
+  if (!changed) return staged;
   if (plan.queued) store.setEntryNotice(sid, "assistant.entry.queuedWhileRunning");
   else if (plan.drafted) store.setEntryNotice(sid, "assistant.entry.addedToDraft");
-  return store.state.sessions[sid].composer.chips.length - before;
+  return staged;
 }
 
 function isForeignPayload(env: OpenAssistantEnv, args: OpenAssistantCall): boolean {
@@ -290,21 +350,42 @@ function isBlank(session: AssistantSession): boolean {
   );
 }
 
+// A refused door (`plan` null) still reports the click, with nothing sent or queued.
 function entryProps(
   args: OpenAssistantCall,
-  plan: DoorPlan,
+  plan: DoorPlan | null,
   gate: GateCode,
 ): AiEventProps["ai_entry_clicked"] {
   return {
     entry_kind: args.entryKind,
     entry_verb: args.entryVerb,
     object_kind: args.objectKind,
-    sends: plan.sends,
+    sends: plan?.sends ?? false,
     gate,
-    queued: plan.queued,
+    queued: plan?.queued ?? false,
     ...(args.dockHost && { host: args.dockHost }),
     ...(args.payload?.text !== undefined && { text_len_bucket: lengthBucket(args.payload.text) }),
   };
+}
+
+// Same door, same payload, same user+org; the invoker element is not part of it.
+function doorKey(env: OpenAssistantEnv, args: OpenAssistantCall): string {
+  const chips = (args.payload?.chips ?? []).map(
+    (chip) => `${chip.kind}:${chip.ref?.type ?? ""}:${chip.ref?.id ?? chip.id}`,
+  );
+  return JSON.stringify([
+    env.store.state.userOrgKey,
+    args.entryKind,
+    args.entryVerb,
+    args.objectKind,
+    args.intent,
+    args.thread ?? null,
+    args.container ?? null,
+    args.dockHost ?? null,
+    args.payload?.text ?? null,
+    args.payload?.title ?? null,
+    chips,
+  ]);
 }
 
 function lengthBucket(text: string): LengthBucket {

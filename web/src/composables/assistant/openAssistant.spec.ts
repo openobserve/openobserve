@@ -30,6 +30,7 @@ import type { ContextChip } from "./context/types";
 import { createDraftStore } from "./drafts";
 import {
   ASSISTANT_QUERY_KEYS,
+  DOOR_REPEAT_MS,
   THREAD_APPEND_WINDOW_MS,
   createOpenAssistant,
   type OpenAssistantCall,
@@ -187,11 +188,20 @@ describe("gate first (DG-02 AC 8)", () => {
     },
   );
 
-  it("opens nothing during loading and reports no gate reason", async () => {
+  it("opens nothing during loading and reports the click without a gate reason", async () => {
     const { store, open } = setup({ gate: "loading" });
     await expect(open(headerOpen)).resolves.toEqual({ ok: false, reason: "loading" });
     expect(store.state.shell.placement.kind).toBe("hidden");
-    expect(events()).toEqual([]);
+    expect(events().map((e) => e.name)).toEqual(["ai_entry_clicked"]);
+    expect(events()[0].properties).toMatchObject({ gate: "loading", sends: false, queued: false });
+  });
+
+  it("reports the click when the store is not ready yet behind an open gate", async () => {
+    const { store, open } = setup();
+    store.setIdentity(null);
+    await expect(open(explain())).resolves.toEqual({ ok: false, reason: "loading" });
+    expect(events().map((e) => e.name)).toEqual(["ai_entry_clicked"]);
+    expect(events()[0].properties).toMatchObject({ gate: "available", sends: false });
   });
 
   it.each(["available", "unhealthy"] as const)("lets doors through on %s", async (gate) => {
@@ -248,7 +258,7 @@ describe("intent × thread", () => {
     await store.send(sid);
     clock.now += THREAD_APPEND_WINDOW_MS - 1;
     expect(ok(await open({ ...headerOpen, thread: "auto" })).sid).toBe(sid);
-    clock.now += 2;
+    clock.now += DOOR_REPEAT_MS;
     expect(ok(await open({ ...headerOpen, thread: "auto" })).sid).not.toBe(sid);
   });
 
@@ -258,6 +268,24 @@ describe("intent × thread", () => {
     const b = ok(await open({ ...headerOpen, thread: "current" }));
     expect(b.sid).toBe(a.sid);
     expect(Object.keys(store.state.sessions)).toHaveLength(1);
+  });
+
+  it("decides the thread on the target container's session, not on the other container's", async () => {
+    const { open, store } = setup({ mounted: ["alert_query"] });
+    const sidebar = ok(await open(headerOpen)).sid;
+    await store.send(sidebar);
+    const dockDoor = {
+      ...headerOpen,
+      entryKind: "editor_toggle",
+      dockHost: "alert_query",
+      thread: "auto",
+    } as const;
+    const docked = ok(await open(dockDoor));
+    expect(docked.container).toBe("docked.alert_query");
+    expect(docked.sid).not.toBe(sidebar);
+    expect(store.state.sessions[docked.sid].origin.container).toBe("docked.alert_query");
+    const page = ok(await open(addToChat()));
+    expect(page).toMatchObject({ container: "sidebar", sid: sidebar });
   });
 
   it("send + auto with a stale chat starts a new one", async () => {
@@ -289,6 +317,18 @@ describe("send degrades to stage", () => {
     expect(result).toMatchObject({ sent: false, queued: false });
     expect(store.state.sessions[sid].composer.text).toBe("what I was typing\nExplain this log row");
     expect(store.entryNotice(sid)).toBe("assistant.entry.addedToDraft");
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("shows no helper line when the door's prompt and chip are already in the draft", async () => {
+    const { store, open, send } = setup();
+    const { sid } = ok(await open(headerOpen));
+    store.addChip(sid, chip("r1"));
+    store.setDraft(sid, { text: "Explain this log row" });
+    const result = ok(await open(explain({ thread: "current" })));
+    expect(result).toMatchObject({ sid, sent: false, staged: 0 });
+    expect(store.state.sessions[sid].composer.text).toBe("Explain this log row");
+    expect(store.entryNotice(sid)).toBeNull();
     expect(send).not.toHaveBeenCalled();
   });
 
@@ -374,7 +414,12 @@ describe("container resolution (10 §3.3)", () => {
     const right = document.createElement("div");
     right.getBoundingClientRect = () => ({ right: 1200 }) as DOMRect;
     ok(await open({ ...headerOpen, invoker: right }));
-    expect(store.state.shell.placement).toEqual({ kind: "sidebar", mode: "pinned" });
+    expect(store.sidebarForcedPinned.value).toBe(true);
+    expect(store.state.shell.placement).toEqual({ kind: "sidebar", mode: "floating" });
+    expect(JSON.parse(sessionStorage.getItem("o2.assistant.placement:k1")!).placement).toEqual({
+      kind: "sidebar",
+      mode: "floating",
+    });
     expect(store.state.shell.sidebarMode).toBe("pinned");
     expect(store.hasStoredSidebarMode()).toBe(false);
   });
@@ -405,10 +450,37 @@ describe("org safety and ordering", () => {
     expect(store.state.sessions).toEqual({});
   });
 
-  it("serialises two doors in one tick so the second sees the first's session", async () => {
+  it("runs two doors in one tick in call order, so the second sees the first's session", async () => {
     const { open } = setup();
     const [first, second] = await Promise.all([open(explain()), open(addToChat())]);
     expect(ok(second).sid).toBe(ok(first).sid);
+  });
+
+  it("answers a repeated activation of the same door with the first result", async () => {
+    const { open, store, send, clock } = setup();
+    const first = ok(await open(explain()));
+    const again = await open(explain());
+    expect(again).toBe(first);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(store.state.sessions[first.sid].composer.text).toBe("Explain this log row");
+    expect(Object.keys(store.state.sessions)).toHaveLength(1);
+    clock.now += DOOR_REPEAT_MS;
+    expect(ok(await open(explain())).sid).not.toBe(first.sid);
+  });
+
+  it("runs a repeated door again once its container was closed", async () => {
+    const { open, store } = setup();
+    ok(await open(headerOpen));
+    store.close("escape");
+    ok(await open(headerOpen));
+    expect(store.state.shell.placement.kind).toBe("sidebar");
+  });
+
+  it("reports the click on an org_changed refusal", async () => {
+    const { open } = setup();
+    await open({ ...addToChat(), userOrgKey: "k-stale" });
+    expect(events().map((e) => e.name)).toEqual(["ai_entry_clicked"]);
+    expect(events()[0].properties).toMatchObject({ entry_verb: "add_to_chat", sends: false });
   });
 
   it("emits ai_entry_clicked with the door envelope and no content", async () => {
@@ -452,6 +524,12 @@ describe("types", () => {
       objectKind: "none";
       intent: "send";
     }>().toMatchTypeOf<OpenAssistantCall>();
+    expectTypeOf<{
+      entryKind: "home_launcher";
+      entryVerb: "add_to_chat";
+      objectKind: "none";
+      intent: "send";
+    }>().not.toMatchTypeOf<OpenAssistantCall>();
     const { open } = setup();
     // @ts-expect-error -- add_to_chat never sends (DG-02 rule 3)
     void open({

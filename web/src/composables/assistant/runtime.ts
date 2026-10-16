@@ -74,6 +74,8 @@ export interface AssistantRuntimeContext {
   /** `null` until the authenticated config has resolved (the gate stays `loading`). */
   getConfig(): AssistantServerConfig | null;
   isOrgAdmin(): boolean | undefined;
+  /** Identifiers of every org of the user, so sign-out drops each org's recall. */
+  getOrganizations?(): string[];
   router?: Pick<Router, "currentRoute" | "push">;
 }
 
@@ -129,7 +131,8 @@ function buildRuntime(): AssistantRuntime {
     });
     // Services: each later package appends one `deps.<name> = create…()` line here, in WP order.
 
-    const store = createAssistantStore(deps);
+    const store = createAssistantStore(deps, { signOutKeys: () => orgKeysOf(context.value) });
+    flushDraftsOnLeave(store);
     const capability = createAssistantCapability(capabilityDeps(context));
     const hosts = createHostRegistry();
     const { lgUp } = useBreakpoint();
@@ -178,7 +181,7 @@ function capabilityDeps(context: ShallowRef<AssistantRuntimeContext | null>): Ca
       const observer = new QueryObserver(queryClient, options);
       const report = () => {
         const result = observer.getCurrentResult();
-        if (result.isFetched || result.isError) onResult(result.data ?? null);
+        if (result.isFetched || result.isError) onResult(result.data ?? null, result.dataUpdatedAt);
       };
       const stop = observer.subscribe(report);
       report();
@@ -190,6 +193,21 @@ function capabilityDeps(context: ShallowRef<AssistantRuntimeContext | null>): Ca
         refetchType: "none",
       }),
   };
+}
+
+async function orgKeysOf(context: AssistantRuntimeContext | null): Promise<string[]> {
+  const email = context?.getUser()?.email;
+  const orgs = context?.getOrganizations?.() ?? [];
+  if (!email) return [];
+  return Promise.all(orgs.map((org) => computeUserOrgKey(email, org)));
+}
+
+// The debounce would drop the last 250 ms of typing on a reload or tab close.
+function flushDraftsOnLeave(store: AssistantStoreInternal): void {
+  if (typeof window === "undefined") return;
+  const flush = () => store.drafts.flush();
+  window.addEventListener("pagehide", flush);
+  window.addEventListener("beforeunload", flush);
 }
 
 // The user+org key is async (SHA-256), so a slower stale computation must not win over a newer one.
