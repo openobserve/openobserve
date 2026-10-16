@@ -1109,6 +1109,13 @@ describe("OnCallResponses", () => {
       expect(data.map((row) => row.latest.id)).toEqual(["a"]);
     });
 
+    /// The profile menu's "My on-call" opens a page; this button only narrows the list, so it must not share that name.
+    it("is named as a filter, apart from the My on-call page", async () => {
+      const wrapper = await withMyShift([page({ id: "a" })]);
+
+      expect(wrapper.find(mineBtn).text()).toBe("Only mine");
+    });
+
     it("filters in place instead of navigating", async () => {
       const wrapper = await withMyShift([
         page({ id: "a" }),

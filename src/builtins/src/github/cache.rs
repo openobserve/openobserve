@@ -77,13 +77,6 @@ impl CacheManager {
         Ok(())
     }
 
-    /// Invalidate a specific cache entry
-    pub async fn invalidate(&self, key: &str) {
-        let mut cache = self.cache.write().await;
-        cache.remove(key);
-        log::debug!("Invalidated cache for key: {}", key);
-    }
-
     /// Clear all cache entries
     pub async fn clear(&self) {
         let mut cache = self.cache.write().await;
@@ -142,16 +135,6 @@ mod tests {
         let result = cache.get("key1").await;
         assert!(result.is_some());
         assert_eq!(result.unwrap(), bytes::Bytes::from("hello"));
-    }
-
-    #[tokio::test]
-    async fn test_invalidate_removes_entry() {
-        let cache = CacheManager::new(1024 * 1024);
-        let data = CachedData::new(bytes::Bytes::from("value"), 3600);
-        cache.set("key2".to_string(), data).await.unwrap();
-        assert!(cache.get("key2").await.is_some());
-        cache.invalidate("key2").await;
-        assert!(cache.get("key2").await.is_none());
     }
 
     #[tokio::test]
