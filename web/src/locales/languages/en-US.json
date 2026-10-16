@@ -1132,8 +1132,6 @@
     "regionTitle": "Select a Region",
     "userDefinedSchemaLabel": "User-Defined Schema",
     "allFieldsLabel": "All Fields",
-    "generateQuery": "Ask AI",
-    "generateQueryTooltip": "Ask AI to help with your query",
     "nlQueryGenerationFailed": "Failed to generate query. Please try again.",
     "askAIPlaceholder": "Ask AI to help with your query...",
     "askAIFunctionPlaceholder": "Ask AI to help with your function...",
@@ -13335,7 +13333,6 @@
   },
   "nlMode": {
     "toggle": "Natural Language Mode",
-    "noAdditionalOptions": "No additional options",
     "executingTool": "Executing {tool}...",
     "toolFailed": "Tool failed: {message}",
     "processing": "Processing..."

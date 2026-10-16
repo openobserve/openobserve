@@ -1132,8 +1132,6 @@
     "regionTitle": "Bölge Seçiniz",
     "userDefinedSchemaLabel": "Kullanıcı Tanımlı Şema",
     "allFieldsLabel": "Tüm Alanlar",
-    "generateQuery": "Yapay zekaya sor",
-    "generateQueryTooltip": "Yapay zekadan sorgunuzla ilgili yardım isteyin",
     "nlQueryGenerationFailed": "Sorgu oluşturulamadı. Lütfen tekrar deneyin.",
     "askAIPlaceholder": "Yapay zekadan sorgunuzla ilgili yardım isteyin...",
     "askAIFunctionPlaceholder": "Yapay zekadan işlevinize yardım etmesini isteyin...",
@@ -13335,7 +13333,6 @@
   },
   "nlMode": {
     "toggle": "Doğal Dil Modu",
-    "noAdditionalOptions": "Ek seçenek yok",
     "executingTool": "{tool} çalıştırılıyor...",
     "toolFailed": "Araç başarısız oldu: {message}",
     "processing": "İşleniyor..."

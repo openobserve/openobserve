@@ -1132,8 +1132,6 @@
     "regionTitle": "지역 선택",
     "userDefinedSchemaLabel": "사용자 정의 스키마",
     "allFieldsLabel": "모든 필드",
-    "generateQuery": "AI에게 물어보세요",
-    "generateQueryTooltip": "AI가 쿼리에 도움을 요청하세요",
     "nlQueryGenerationFailed": "쿼리를 생성하지 못했습니다.다시 시도해 주세요.",
     "askAIPlaceholder": "AI에게 문의에 도움을 요청하세요...",
     "askAIFunctionPlaceholder": "AI에게 당신의 기능을 도와달라고 요청하세요...",
@@ -13335,7 +13333,6 @@
   },
   "nlMode": {
     "toggle": "자연어 모드",
-    "noAdditionalOptions": "추가 옵션 없음",
     "executingTool": "{tool} 실행 중...",
     "toolFailed": "도구 실패: {message}",
     "processing": "처리 중..."

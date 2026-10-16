@@ -1132,8 +1132,6 @@
     "regionTitle": "Wybierz region",
     "userDefinedSchemaLabel": "Schemat zdefiniowany przez użytkownika",
     "allFieldsLabel": "Wszystkie pola",
-    "generateQuery": "Zapytaj AI",
-    "generateQueryTooltip": "Zapytaj AI o pomoc w zapytaniu",
     "nlQueryGenerationFailed": "Nie udało się wygenerować zapytania. Spróbuj ponownie.",
     "askAIPlaceholder": "Zapytaj AI o pomoc w zapytaniu...",
     "askAIFunctionPlaceholder": "Zapytaj AI o pomoc w funkcji...",
@@ -13335,7 +13333,6 @@
   },
   "nlMode": {
     "toggle": "Tryb języka naturalnego",
-    "noAdditionalOptions": "Brak dodatkowych opcji",
     "executingTool": "Wykonywanie {tool}...",
     "toolFailed": "Błąd narzędzia: {message}",
     "processing": "Przetwarzanie..."

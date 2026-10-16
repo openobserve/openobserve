@@ -1132,8 +1132,6 @@
     "regionTitle": "Regio selecteren",
     "userDefinedSchemaLabel": "Door de gebruiker gedefinieerd schema",
     "allFieldsLabel": "Alle velden",
-    "generateQuery": "Vraag het aan AI",
-    "generateQueryTooltip": "Vraag AI om hulp bij je vraag",
     "nlQueryGenerationFailed": "Het genereren van een query is mislukt. Probeer het opnieuw.",
     "askAIPlaceholder": "Vraag AI om hulp bij je vraag...",
     "askAIFunctionPlaceholder": "Vraag AI om hulp bij je functie...",
@@ -13335,7 +13333,6 @@
   },
   "nlMode": {
     "toggle": "Modus voor natuurlijke taal",
-    "noAdditionalOptions": "Geen aanvullende opties",
     "executingTool": "Uitvoeren {tool}...",
     "toolFailed": "Tool mislukt: {message}",
     "processing": "Verwerken..."
