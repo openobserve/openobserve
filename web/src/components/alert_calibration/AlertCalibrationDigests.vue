@@ -335,6 +335,8 @@ const columns = computed<OTableColumnDef<RunRow>[]>(() => [
     accessorFn: (row) => row.window_end,
     sortable: true,
     size: COL.date,
+    // The slack goes to the run, so the badge columns keep their width.
+    fillRemaining: true,
     meta: { align: "left", isName: true },
   },
   {
@@ -351,6 +353,7 @@ const columns = computed<OTableColumnDef<RunRow>[]>(() => [
     accessorFn: (row) => coverageVerdict(row),
     sortable: true,
     size: COL.status,
+    maxSize: COL.status,
     meta: { align: "left" },
   },
 ]);
