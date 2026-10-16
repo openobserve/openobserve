@@ -315,6 +315,7 @@ pub fn calculate_cost_from_definition(
 /// Calculate cost using `usage`, but select conditional pricing tiers with `tier_usage`.
 /// This lets callers price uncached input separately while selecting context-length tiers from
 /// total input tokens, including cached tokens.
+/// `ctx` holds the span attributes rules read; [`PricingContext::unknown`] skips rule tiers.
 pub fn calculate_cost_from_definition_with_tier_usage(
     definition: &ModelPricingDefinition,
     usage: &HashMap<String, i64>,
@@ -1715,7 +1716,6 @@ mod tests {
         )]));
         let result = calculate_cost_from_definition(&def, &usage, None, &ctx);
         assert_eq!(result.tier_name, "Flex");
-        // 100K tokens at $1/MTok
         assert!((result.cost["input"] - 0.1).abs() < 1e-12);
     }
 
@@ -1885,9 +1885,13 @@ mod tests {
             enabled: true,
             ..service_tier_definition()
         }]);
-        assert_eq!(
+        assert!(matches!(
             entries[0].definition.rule_attribute_keys(),
-            vec!["openairequestservicetier", "openairesponseservicetier"]
+            std::borrow::Cow::Borrowed(_)
+        ));
+        assert_eq!(
+            entries[0].definition.rule_attribute_keys().as_ref(),
+            ["openairequestservicetier", "openairesponseservicetier"]
         );
     }
 }

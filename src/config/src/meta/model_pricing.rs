@@ -48,6 +48,9 @@ pub const MAX_RULE_KEYS: usize = 16;
 pub const MAX_RULE_VALUES: usize = 64;
 pub const MAX_TIER_PRIORITY: i32 = 1000;
 
+/// Attribute keys longer than this are skipped unread; no rule key comes close to it.
+const MAX_CONTEXT_KEY_LEN: usize = 512;
+
 /// Ownership source of a model pricing definition.
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -136,6 +139,9 @@ pub struct ModelPricingDefinition {
     /// Only populated in list responses — not stored in the database.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<ModelPricingDefinition>,
+    #[serde(skip)]
+    #[schema(ignore)]
+    pub prepared_rule_keys: PreparedRuleKeys,
 }
 
 impl ModelPricingDefinition {
@@ -156,19 +162,15 @@ impl ModelPricingDefinition {
         for rule in self.tiers.iter_mut().flat_map(|t| t.rules.iter_mut()) {
             rule.prepare();
         }
+        self.prepared_rule_keys = PreparedRuleKeys(Some(self.collect_rule_attribute_keys()));
     }
 
     /// Normalized attribute keys the rules read, so only those are copied into the context.
-    pub fn rule_attribute_keys(&self) -> Vec<Cow<'_, str>> {
-        let mut keys: Vec<Cow<'_, str>> = self
-            .tiers
-            .iter()
-            .flat_map(|t| &t.rules)
-            .flat_map(TierRule::attribute_keys)
-            .collect();
-        keys.sort_unstable();
-        keys.dedup();
-        keys
+    pub fn rule_attribute_keys(&self) -> Cow<'_, [String]> {
+        match &self.prepared_rule_keys.0 {
+            Some(keys) => Cow::Borrowed(keys),
+            None => Cow::Owned(self.collect_rule_attribute_keys()),
+        }
     }
 
     /// Checks the tiers; the sync allows unknown operators since such a tier never matches.
@@ -190,7 +192,23 @@ impl ModelPricingDefinition {
             .iter()
             .try_for_each(|t| t.validate(allow_unknown_ops))
     }
+
+    fn collect_rule_attribute_keys(&self) -> Vec<String> {
+        let mut keys: Vec<String> = self
+            .tiers
+            .iter()
+            .flat_map(|t| &t.rules)
+            .flat_map(TierRule::attribute_keys)
+            .collect();
+        keys.sort_unstable();
+        keys.dedup();
+        keys
+    }
 }
+
+/// Rule keys cached by [`ModelPricingDefinition::prepare`]; never serialized.
+#[derive(Clone, Debug, Default)]
+pub struct PreparedRuleKeys(Option<Vec<String>>);
 
 /// A pricing tier within a model definition.
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -249,6 +267,7 @@ impl PricingTierDefinition {
         self.restriction_count() == 0
     }
 
+    /// Checks the tier; `allow_unknown_ops` accepts rules whose operator this build does not know.
     pub fn validate(&self, allow_unknown_ops: bool) -> Result<(), String> {
         if let Some(ref cond) = self.condition {
             if cond.usage_key.trim().is_empty() {
@@ -427,12 +446,13 @@ impl TierOperator {
 }
 
 /// A rule on a span attribute; `keys` are tried in order and the first present one is compared.
-#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 #[serde(default)]
 pub struct TierRule {
     /// Attribute keys tried in order; compared ignoring case and `_`/`-`/`.` separators.
     #[serde(deserialize_with = "lenient_strings")]
     pub keys: Vec<String>,
+    /// Comparison operator; one this build does not know parses as `unknown` and never matches.
     pub op: RuleOp,
     /// Accepted values for `in` / `not_in`, compared trimmed and case-insensitively.
     #[serde(
@@ -462,20 +482,16 @@ impl TierRule {
         }
     }
 
-    /// An absent attribute fails every operator except `not_in` and `not_exists`; a missing
-    /// usage count reads as 0, like the legacy `condition`.
+    /// An absent attribute fails all but `not_in`/`not_exists`; a missing usage count reads 0.
     pub fn matches(&self, ctx: &PricingContext, usage: &HashMap<String, i64>) -> bool {
         let found = self.lookup(ctx, usage);
         match self.op {
             RuleOp::Exists => found.is_some(),
             RuleOp::NotExists => found.is_none(),
-            RuleOp::In => found.is_some_and(|v| self.accepts(&v)),
-            RuleOp::NotIn => !found.is_some_and(|v| self.accepts(&v)),
+            RuleOp::In => found.is_some_and(|v| self.accepts(v)),
+            RuleOp::NotIn => !found.is_some_and(|v| self.accepts(v)),
             RuleOp::Gt | RuleOp::Gte | RuleOp::Lt | RuleOp::Lte => {
-                let actual = found
-                    .and_then(|v| v.trim().parse::<f64>().ok())
-                    .filter(|v| v.is_finite());
-                match (actual, self.value) {
+                match (found.and_then(RuleInput::number), self.value) {
                     (Some(actual), Some(threshold)) => self.op.compare(actual, threshold),
                     _ => false,
                 }
@@ -504,7 +520,7 @@ impl TierRule {
             .any(|s| s.len() > MAX_CONTEXT_VALUE_LEN)
         {
             return Err(format!(
-                "rule keys and values must be at most {MAX_CONTEXT_VALUE_LEN} characters"
+                "rule keys and values must be at most {MAX_CONTEXT_VALUE_LEN} bytes"
             ));
         }
         if self
@@ -513,6 +529,14 @@ impl TierRule {
             .any(|k| usage_key(k).is_some_and(|u| u.trim().is_empty()))
         {
             return Err("rule usage key must name a usage type after 'usage.'".to_string());
+        }
+        if matches!(self.op, RuleOp::Exists | RuleOp::NotExists)
+            && self.keys.iter().any(|k| usage_key(k).is_some())
+        {
+            return Err(
+                "exists and not_exists cannot test a 'usage.' key; a missing count reads as 0"
+                    .to_string(),
+            );
         }
         match self.op {
             RuleOp::In | RuleOp::NotIn if self.values.iter().all(|v| v.trim().is_empty()) => {
@@ -533,49 +557,44 @@ impl TierRule {
     }
 
     fn lookup<'a>(
-        &'a self,
+        &self,
         ctx: &'a PricingContext,
         usage: &HashMap<String, i64>,
-    ) -> Option<Cow<'a, str>> {
+    ) -> Option<RuleInput<'a>> {
         let read = |key: &RuleKey| match key {
-            RuleKey::Usage(k) => Some(Cow::Owned(usage.get(k).copied().unwrap_or(0).to_string())),
-            RuleKey::Attr(k) => ctx.get_normalized(k).map(Cow::Borrowed),
+            RuleKey::Usage(k) => Some(RuleInput::Count(usage.get(k).copied().unwrap_or(0))),
+            RuleKey::Attr(k) => ctx.get_normalized(k).map(RuleInput::Text),
         };
         if self.prepared.len() == self.keys.len() {
             self.prepared.iter().find_map(read)
         } else {
-            self.keys
-                .iter()
-                .map(|k| RuleKey::parse(k))
-                .find_map(|k| read(&k).map(|v| Cow::Owned(v.into_owned())))
+            self.keys.iter().find_map(|k| read(&RuleKey::parse(k)))
         }
     }
 
-    fn accepts(&self, actual: &str) -> bool {
-        let actual = actual.trim();
-        self.values
-            .iter()
-            .any(|v| v.trim().eq_ignore_ascii_case(actual))
+    fn accepts(&self, actual: RuleInput<'_>) -> bool {
+        let text = actual.text();
+        let number = actual.number();
+        self.values.iter().any(|v| {
+            let v = v.trim();
+            text.is_some_and(|t| v.eq_ignore_ascii_case(t))
+                || number.is_some_and(|n| parse_finite(v) == Some(n))
+        })
     }
 
-    fn attribute_keys(&self) -> Vec<Cow<'_, str>> {
-        if self.prepared.len() == self.keys.len() {
-            return self
-                .prepared
-                .iter()
-                .filter_map(|k| match k {
-                    RuleKey::Attr(k) => Some(Cow::Borrowed(k.as_str())),
-                    RuleKey::Usage(_) => None,
-                })
-                .collect();
-        }
-        self.keys
-            .iter()
-            .filter_map(|k| match RuleKey::parse(k) {
-                RuleKey::Attr(k) => Some(Cow::Owned(k)),
-                RuleKey::Usage(_) => None,
-            })
-            .collect()
+    fn attribute_keys(&self) -> impl Iterator<Item = String> + '_ {
+        self.keys.iter().filter_map(|k| match RuleKey::parse(k) {
+            RuleKey::Attr(k) => Some(k),
+            RuleKey::Usage(_) => None,
+        })
+    }
+}
+
+impl PartialEq for TierRule {
+    // The prepared cache only mirrors `keys`, so it must not make equal rules differ.
+    fn eq(&self, other: &Self) -> bool {
+        (&self.keys, self.op, &self.values, self.value)
+            == (&other.keys, other.op, &other.values, other.value)
     }
 }
 
@@ -591,6 +610,29 @@ impl RuleKey {
         match usage_key(key) {
             Some(usage) => RuleKey::Usage(usage.trim().to_string()),
             None => RuleKey::Attr(normalize_attribute_key(key)),
+        }
+    }
+}
+
+/// The value a rule read: an attribute string or a usage count.
+#[derive(Clone, Copy, Debug)]
+enum RuleInput<'a> {
+    Text(&'a str),
+    Count(i64),
+}
+
+impl<'a> RuleInput<'a> {
+    fn text(self) -> Option<&'a str> {
+        match self {
+            RuleInput::Text(s) => Some(s.trim()),
+            RuleInput::Count(_) => None,
+        }
+    }
+
+    fn number(self) -> Option<f64> {
+        match self {
+            RuleInput::Text(s) => parse_finite(s),
+            RuleInput::Count(n) => Some(n as f64),
         }
     }
 }
@@ -634,14 +676,6 @@ pub struct PricingContext {
     known: bool,
 }
 
-/// One attribute value plus what decides a normalized-key collision deterministically.
-#[derive(Clone, Debug)]
-struct ContextEntry {
-    namespaced: bool,
-    raw_key: String,
-    value: String,
-}
-
 impl PricingContext {
     /// No span is known (e.g. the eval cost calculator): every rule-restricted tier is skipped.
     pub fn unknown() -> Self {
@@ -659,9 +693,7 @@ impl PricingContext {
     /// A known context holding `attrs` as raw span attributes.
     pub fn from_strings(attrs: &HashMap<String, String>) -> Self {
         let mut ctx = Self::known();
-        for (k, v) in attrs {
-            ctx.insert("", k, v, None);
-        }
+        ctx.extend_strings("", attrs, None);
         ctx
     }
 
@@ -683,7 +715,7 @@ impl PricingContext {
         &mut self,
         prefix: &str,
         attrs: &HashMap<String, json::Value>,
-        wanted: Option<&[&str]>,
+        wanted: Option<&[String]>,
     ) {
         self.extend_json_mapped(prefix, attrs, wanted, |k| k);
     }
@@ -693,7 +725,7 @@ impl PricingContext {
         &mut self,
         prefix: &str,
         attrs: &HashMap<String, json::Value>,
-        wanted: Option<&[&str]>,
+        wanted: Option<&[String]>,
         map: impl Fn(&str) -> &str,
     ) {
         if !prefix_wanted(prefix, wanted) {
@@ -701,11 +733,14 @@ impl PricingContext {
         }
         for (k, v) in attrs {
             let k = map(k);
+            let Some(normalized) = context_key(prefix, k, wanted) else {
+                continue;
+            };
             match v {
-                json::Value::String(s) => self.insert(prefix, k, s, wanted),
-                json::Value::Number(n) => self.insert(prefix, k, &n.to_string(), wanted),
+                json::Value::String(s) => self.insert(normalized, prefix, k, s),
+                json::Value::Number(n) => self.insert(normalized, prefix, k, &n.to_string()),
                 json::Value::Bool(b) => {
-                    self.insert(prefix, k, if *b { "true" } else { "false" }, wanted)
+                    self.insert(normalized, prefix, k, if *b { "true" } else { "false" })
                 }
                 _ => {}
             }
@@ -717,13 +752,15 @@ impl PricingContext {
         &mut self,
         prefix: &str,
         attrs: &HashMap<String, String>,
-        wanted: Option<&[&str]>,
+        wanted: Option<&[String]>,
     ) {
         if !prefix_wanted(prefix, wanted) {
             return;
         }
         for (k, v) in attrs {
-            self.insert(prefix, k, v, wanted);
+            if let Some(normalized) = context_key(prefix, k, wanted) {
+                self.insert(normalized, prefix, k, v);
+            }
         }
     }
 
@@ -731,24 +768,20 @@ impl PricingContext {
         self.entries.get(normalized).map(|e| e.value.as_str())
     }
 
-    fn insert(&mut self, prefix: &str, key: &str, value: &str, wanted: Option<&[&str]>) {
+    fn insert(&mut self, normalized: Cow<'_, str>, prefix: &str, key: &str, value: &str) {
         if value.trim().is_empty() || value.len() > MAX_CONTEXT_VALUE_LEN {
-            return;
-        }
-        let normalized = normalize_attribute_key(&format!("{prefix}{key}"));
-        if wanted.is_some_and(|w| !w.contains(&normalized.as_str())) {
             return;
         }
         let namespaced = !prefix.is_empty();
         // Namespaced (resource./param.) values beat raw span keys, then the smaller raw key wins.
-        if let Some(existing) = self.entries.get(&normalized)
+        if let Some(existing) = self.entries.get(normalized.as_ref())
             && (existing.namespaced, existing.raw_key.as_str()) != (namespaced, key)
             && (!existing.namespaced, existing.raw_key.as_str()) <= (!namespaced, key)
         {
             return;
         }
         self.entries.insert(
-            normalized,
+            normalized.into_owned(),
             ContextEntry {
                 namespaced,
                 raw_key: key.to_string(),
@@ -758,16 +791,42 @@ impl PricingContext {
     }
 }
 
+/// One attribute value plus what decides a normalized-key collision deterministically.
+#[derive(Clone, Debug)]
+struct ContextEntry {
+    namespaced: bool,
+    raw_key: String,
+    value: String,
+}
+
 /// Lowercase with `_`/`-`/`.` removed, so `serviceTier` and `service_tier` name the same attribute.
 pub fn normalize_attribute_key(key: &str) -> String {
+    normalized_chars(key).collect()
+}
+
+/// The normalized context key of `prefix` + `key`, or `None` when no wanted key equals it.
+fn context_key<'w>(prefix: &str, key: &str, wanted: Option<&'w [String]>) -> Option<Cow<'w, str>> {
+    if key.len() > MAX_CONTEXT_KEY_LEN {
+        return None;
+    }
+    let normalized = || normalized_chars(prefix).chain(normalized_chars(key));
+    match wanted {
+        Some(wanted) => wanted
+            .iter()
+            .find(|w| normalized().eq(w.chars()))
+            .map(|w| Cow::Borrowed(w.as_str())),
+        None => Some(Cow::Owned(normalized().collect())),
+    }
+}
+
+fn normalized_chars(key: &str) -> impl Iterator<Item = char> + '_ {
     key.chars()
         .filter(|c| !matches!(c, '_' | '-' | '.'))
         .flat_map(char::to_lowercase)
-        .collect()
 }
 
 /// Whether any wanted key can sit under `prefix`, so whole attribute maps are skipped otherwise.
-fn prefix_wanted(prefix: &str, wanted: Option<&[&str]>) -> bool {
+fn prefix_wanted(prefix: &str, wanted: Option<&[String]>) -> bool {
     let prefix = normalize_attribute_key(prefix);
     wanted.is_none_or(|w| w.iter().any(|k| k.starts_with(&prefix)))
 }
@@ -778,6 +837,11 @@ fn usage_key(key: &str) -> Option<&str> {
     key.get(..USAGE_KEY_PREFIX.len())
         .filter(|p| p.eq_ignore_ascii_case(USAGE_KEY_PREFIX))
         .map(|_| &key[USAGE_KEY_PREFIX.len()..])
+}
+
+/// A trimmed string parsed as a finite number.
+fn parse_finite(s: &str) -> Option<f64> {
+    s.trim().parse::<f64>().ok().filter(|v| v.is_finite())
 }
 
 /// Accepts a list of scalars or one scalar; anything else errors rather than being dropped.
@@ -1388,7 +1452,7 @@ mod tests {
                 ),
                 ("gen_ai.request.model".to_string(), json::json!("gpt-6")),
             ]),
-            Some(&["openairesponseservicetier"]),
+            Some(&["openairesponseservicetier".to_string()]),
         );
         assert_eq!(c.get("openai.response.service_tier"), Some("flex"));
         assert_eq!(c.get("gen_ai.request.model"), None);
@@ -1462,13 +1526,19 @@ mod tests {
     fn test_context_skips_prefixes_no_rule_reads_and_maps_keys() {
         let attrs = HashMap::from([("service_cloud.region".to_string(), json::json!("eu"))]);
         let mut c = PricingContext::known();
-        c.extend_json_mapped("resource.", &attrs, Some(&["servicetier"]), |k| {
-            k.trim_start_matches("service_")
-        });
+        c.extend_json_mapped(
+            "resource.",
+            &attrs,
+            Some(&["servicetier".to_string()]),
+            |k| k.trim_start_matches("service_"),
+        );
         assert!(c.is_empty());
-        c.extend_json_mapped("resource.", &attrs, Some(&["resourcecloudregion"]), |k| {
-            k.trim_start_matches("service_")
-        });
+        c.extend_json_mapped(
+            "resource.",
+            &attrs,
+            Some(&["resourcecloudregion".to_string()]),
+            |k| k.trim_start_matches("service_"),
+        );
         assert_eq!(c.get("resource.cloud.region"), Some("eu"));
     }
 
@@ -1533,17 +1603,82 @@ mod tests {
             }],
             ..Default::default()
         };
-        let unprepared: Vec<String> = def
-            .rule_attribute_keys()
-            .into_iter()
-            .map(Cow::into_owned)
-            .collect();
+        let unprepared = def.rule_attribute_keys().into_owned();
+        assert!(matches!(def.rule_attribute_keys(), Cow::Owned(_)));
         def.prepare();
-        assert_eq!(def.rule_attribute_keys(), unprepared);
+        assert!(matches!(def.rule_attribute_keys(), Cow::Borrowed(_)));
+        assert_eq!(def.rule_attribute_keys().as_ref(), unprepared.as_slice());
         assert_eq!(
-            def.rule_attribute_keys(),
-            vec!["openairequestservicetier", "openairesponseservicetier"]
+            def.rule_attribute_keys().as_ref(),
+            ["openairequestservicetier", "openairesponseservicetier"]
         );
+        let json = serde_json::to_value(&def).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("prepared_rule_keys"));
+    }
+
+    #[test]
+    fn test_rule_equality_ignores_prepared_cache() {
+        let unprepared = service_tier_in(&["flex"]);
+        let mut prepared = unprepared.clone();
+        prepared.prepare();
+        assert_eq!(prepared, unprepared);
+        assert_ne!(prepared, service_tier_in(&["priority"]));
+    }
+
+    #[test]
+    fn test_rule_set_operators_compare_numbers_numerically() {
+        let usage = HashMap::new();
+        let r = rule(&["n"], RuleOp::In, &["1", "flex"]);
+        assert!(r.matches(&ctx(&[("n", "1.0")]), &usage));
+        assert!(r.matches(&ctx(&[("n", " 1e0 ")]), &usage));
+        assert!(!r.matches(&ctx(&[("n", "1.5")]), &usage));
+        assert!(!r.matches(&ctx(&[("n", "NaN")]), &usage));
+        let mut json_ctx = PricingContext::known();
+        json_ctx.extend_json(
+            "",
+            &HashMap::from([("n".to_string(), json::json!(1.0))]),
+            None,
+        );
+        assert!(r.matches(&json_ctx, &usage));
+        assert!(!rule(&["n"], RuleOp::NotIn, &["1"]).matches(&json_ctx, &usage));
+        let counts = HashMap::from([("input".to_string(), 100i64)]);
+        assert!(rule(&["usage.input"], RuleOp::In, &["100.0"]).matches(&ctx(&[]), &counts));
+        assert!(!rule(&["usage.input"], RuleOp::In, &["99"]).matches(&ctx(&[]), &counts));
+    }
+
+    #[test]
+    fn test_rule_usage_numeric_reads_count_directly() {
+        let mut r = rule(&["usage.input"], RuleOp::Gte, &[]);
+        r.value = Some(i64::MAX as f64);
+        let usage = HashMap::from([("input".to_string(), i64::MAX)]);
+        assert!(r.matches(&ctx(&[]), &usage));
+        r.prepare();
+        assert!(r.matches(&ctx(&[]), &usage));
+    }
+
+    #[test]
+    fn test_rule_presence_ops_reject_usage_keys() {
+        for op in [RuleOp::Exists, RuleOp::NotExists] {
+            let err = rule(&["service_tier", "usage.input"], op, &[])
+                .validate()
+                .unwrap_err();
+            assert!(err.contains("usage."), "{err}");
+            assert!(rule(&["service_tier"], op, &[]).validate().is_ok());
+        }
+        let mut gt = rule(&["usage.input"], RuleOp::Gt, &[]);
+        gt.value = Some(0.0);
+        assert!(gt.validate().is_ok());
+    }
+
+    #[test]
+    fn test_context_skips_overlong_keys() {
+        let long = format!("service_tier{}", "_".repeat(MAX_CONTEXT_KEY_LEN));
+        let attrs = HashMap::from([(long, "flex".to_string())]);
+        let mut c = PricingContext::known();
+        c.extend_strings("", &attrs, Some(&["servicetier".to_string()]));
+        assert!(c.is_empty());
+        c.extend_strings("", &attrs, None);
+        assert!(c.is_empty());
     }
 
     #[test]

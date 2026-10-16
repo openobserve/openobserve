@@ -703,8 +703,7 @@ impl OtelIngestionProcessor {
     }
 }
 
-/// Raw span attributes, resource attributes under `resource.`, model parameters under `param.`;
-/// only the keys some rule reads are copied.
+/// Context of the attributes rules read: raw, `resource.` resource, `param.` model parameters.
 pub fn pricing_context(
     definition: &ModelPricingDefinition,
     span_attributes: &HashMap<String, json::Value>,
@@ -713,22 +712,21 @@ pub fn pricing_context(
 ) -> PricingContext {
     let mut ctx = PricingContext::known();
     let keys = definition.rule_attribute_keys();
-    let wanted: Vec<&str> = keys.iter().map(|k| k.as_ref()).collect();
-    if !wanted.is_empty() {
-        ctx.extend_json("", span_attributes, Some(&wanted));
+    if !keys.is_empty() {
+        ctx.extend_json("", span_attributes, Some(&keys));
         ctx.extend_json_mapped(
             "resource.",
             resource_attributes,
-            Some(&wanted),
+            Some(&keys),
             original_resource_key,
         );
-        ctx.extend_strings("param.", model_params, Some(&wanted));
+        ctx.extend_strings("param.", model_params, Some(&keys));
     }
     ctx
 }
 
 /// Test-endpoint context; with no scope it lacks Vercel AI SDK-only `param.*` keys.
-pub fn test_pricing_context(
+pub fn pricing_context_for_test_endpoint(
     definition: &ModelPricingDefinition,
     attributes: &HashMap<String, json::Value>,
 ) -> PricingContext {
@@ -736,11 +734,21 @@ pub fn test_pricing_context(
     pricing_context(definition, attributes, &HashMap::new(), &model_params)
 }
 
-// Ingestion stores resource attributes as `service_<key>`; rules name the OTel key.
+// Inverts `traces::resource_attribute_key`, which stores raw `name` and `attr_name` alike.
 fn original_resource_key(key: &str) -> &str {
-    key.strip_prefix("service_attr_")
-        .or_else(|| key.strip_prefix("service_"))
-        .unwrap_or(key)
+    let Some(raw) = key.strip_prefix("service_") else {
+        return key;
+    };
+    match raw.strip_prefix("attr_") {
+        Some(inner) if is_reserved_resource_key(inner) => inner,
+        _ => raw,
+    }
+}
+
+fn is_reserved_resource_key(raw: &str) -> bool {
+    let stored = format!("{}_{raw}", crate::traces::SERVICE);
+    crate::traces::RESERVED_SPAN_FIELDS
+        .contains(&config::utils::flatten::format_label_name_cow(&stored).as_ref())
 }
 
 fn build_pricing_usage(
@@ -2120,11 +2128,46 @@ mod tests {
     }
 
     #[test]
+    fn test_original_resource_key_inverts_ingestion_keys() {
+        for raw in [
+            "cloud.region",
+            "attr_x",
+            "attr_cloud.region",
+            "name",
+            "Name",
+        ] {
+            let stored = crate::traces::resource_attribute_key(raw.to_string());
+            assert_eq!(original_resource_key(&stored), raw, "stored as {stored}");
+        }
+        assert_eq!(original_resource_key("service.name"), "service.name");
+        assert_eq!(original_resource_key("service_attr_name"), "name");
+    }
+
+    #[test]
+    fn test_pricing_context_reads_resource_attr_prefixed_key() {
+        use config::meta::model_pricing::{PricingTierDefinition, RuleOp, TierRule};
+        let definition = ModelPricingDefinition {
+            tiers: vec![PricingTierDefinition {
+                rules: vec![TierRule::new(
+                    &["resource.attr_x"],
+                    RuleOp::In,
+                    &["v"],
+                    None,
+                )],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let resource = HashMap::from([("service_attr_x".to_string(), json::json!("v"))]);
+        let ctx = pricing_context(&definition, &HashMap::new(), &resource, &HashMap::new());
+        assert_eq!(ctx.get("resource.attr_x"), Some("v"));
+        assert_eq!(ctx.get("resource.x"), None);
+    }
+
+    #[test]
     fn test_process_span_attribute_rule_pricing() {
         let close = |a: f64, b: f64| (a - b).abs() < 1e-12;
-        // No service tier → standard rate.
         assert!(close(service_tier_input_cost(&[], &[]), 0.002));
-        // A raw span attribute selects the tier.
         assert!(close(
             service_tier_input_cost(&[("openai.request.service_tier", "flex")], &[]),
             0.001

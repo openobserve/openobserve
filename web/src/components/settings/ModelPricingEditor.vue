@@ -369,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="w-30 shrink-0">
                         <OFormSelect
                           :name="`tiers[${idx}].rules[${ruleIdx}].op`"
-                          :options="ruleOperators"
+                          :options="ruleOperatorOptions(rule.op)"
                           :label="t('modelPricing.ruleOperator')"
                           label-key="label"
                           value-key="value"
@@ -387,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :data-test="`model-pricing-tier-rule-values-input-${idx}-${ruleIdx}`"
                         />
                       </div>
-                      <div v-else-if="!PRESENCE_RULE_OPS.includes(rule.op)" class="w-35 shrink-0">
+                      <div v-else-if="NUMERIC_RULE_OPS.includes(rule.op)" class="w-35 shrink-0">
                         <OFormInput
                           :name="`tiers[${idx}].rules[${ruleIdx}].value`"
                           :label="t('modelPricing.threshold')"
@@ -435,6 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="outline"
                       size="sm-action"
                       type="button"
+                      :disabled="tierRules(tier).length >= MAX_RULES_PER_TIER"
                       :data-test="`model-pricing-tier-add-rule-btn-${idx}`"
                       @click="addRule(idx)"
                     >
@@ -669,11 +670,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </li>
                 </ul>
               </OBanner>
+              <OBanner
+                v-if="unreachableTierPairs.length"
+                variant="warning"
+                icon="warning"
+                data-test="model-pricing-tier-unreachable-warning"
+              >
+                <div class="text-xs font-semibold">
+                  {{ t("modelPricing.tierUnreachableWarning") }}
+                </div>
+                <ul class="m-0 mt-1 ps-4 text-xs">
+                  <li v-for="pair in unreachableTierPairs" :key="pair.join('-')">
+                    {{
+                      t("modelPricing.tierUnreachablePair", {
+                        first: formTiers[pair[0]]?.name || `#${pair[0] + 1}`,
+                        second: formTiers[pair[1]]?.name || `#${pair[1] + 1}`,
+                      })
+                    }}
+                  </li>
+                </ul>
+              </OBanner>
               <OButton
                 variant="outline"
                 size="sm-action"
                 type="button"
                 class="self-start"
+                :disabled="formTiers.length >= MAX_TIERS"
                 data-test="model-pricing-add-tier-btn"
                 @click="addTier"
               >
@@ -740,10 +762,13 @@ import { formatUtcWindowsInTz } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   findAmbiguousTiers,
+  findUnreachableTiers,
+  KNOWN_RULE_OPS,
   makeModelPricingSchema,
+  MAX_RULES_PER_TIER,
+  MAX_TIERS,
   NUMERIC_RULE_OPS,
   splitList,
-  PRESENCE_RULE_OPS,
   SET_RULE_OPS,
   type ModelPricingForm,
   type ModelPricingTier,
@@ -813,6 +838,7 @@ const form = useOForm<ModelPricingForm>({
 // mutations (a plain form.state.values read in a computed would not).
 const formTiers = form.useStore((s): ModelPricingTier[] => s.values.tiers ?? []);
 const ambiguousTierPairs = computed(() => findAmbiguousTiers(formTiers.value));
+const unreachableTierPairs = computed(() => findUnreachableTiers(formTiers.value));
 
 function createEmptyModel() {
   return {
@@ -915,11 +941,13 @@ function tierRules(tier: any): ModelPricingTierRule[] {
 }
 
 function ruleToForm(rule: any): ModelPricingTierRule {
+  const op = rule?.op ?? "in";
   return {
     keys: (rule?.keys ?? []).join(", "),
-    op: rule?.op ?? "in",
+    op,
     values: (rule?.values ?? []).join(", "),
-    value: Number(rule?.value ?? 0) || 0,
+    // An operator this build does not know keeps its threshold verbatim until the user picks one.
+    value: KNOWN_RULE_OPS.includes(op) ? Number(rule?.value ?? 0) || 0 : (rule?.value ?? ""),
   };
 }
 
@@ -930,9 +958,22 @@ function ruleToModel(rule: any) {
     keys: splitList(rule?.keys),
     op,
   };
-  if (SET_RULE_OPS.includes(op)) out.values = splitList(rule?.values);
+  const values = splitList(rule?.values);
+  const value = String(rule?.value ?? "").trim();
+  if (SET_RULE_OPS.includes(op)) out.values = values;
   else if (NUMERIC_RULE_OPS.includes(op)) out.value = Number(rule?.value);
+  else if (!KNOWN_RULE_OPS.includes(op)) {
+    if (values.length) out.values = values;
+    if (value !== "" && Number.isFinite(Number(value))) out.value = Number(value);
+  }
   return out;
+}
+
+/** The operator list, plus a loaded operator this build does not know so the select still shows it. */
+function ruleOperatorOptions(op: string) {
+  return !op || KNOWN_RULE_OPS.includes(op)
+    ? ruleOperators
+    : [...ruleOperators, { label: raw(op), value: op }];
 }
 
 /** True when the tier has no restriction at all, i.e. the backend treats it as the default. */
@@ -956,7 +997,7 @@ function modelToForm(m: any): ModelPricingForm {
       condition: i === 0 || !tier.condition ? null : { ...tier.condition },
       utc_windows: i === 0 ? [] : windows,
       rules: i === 0 ? [] : (tier.rules ?? []).map(ruleToForm),
-      priority: i === 0 ? 0 : Number(tier.priority) || 0,
+      priority: Number(tier.priority) || 0,
       prices: Object.entries(tier.prices ?? {}).map(([k, v]) => ({
         key: k,
         value: toPerMillion(Number(v)),
@@ -1012,7 +1053,7 @@ function formToModelTiers(tiers: any[]): any[] {
       utc_windows: utcWindows,
       rules: i === 0 ? [] : (tier.rules ?? []).map(ruleToModel),
       prices,
-      ...(i > 0 && Number(tier.priority) ? { priority: Math.trunc(Number(tier.priority)) } : {}),
+      ...(Number(tier.priority) ? { priority: Math.trunc(Number(tier.priority)) } : {}),
     };
   });
 }

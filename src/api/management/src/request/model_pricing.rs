@@ -721,8 +721,10 @@ pub async fn test_model_match(
     let matched = model_pricing::find_pricing_sync_at(&entries, &req.model_name, req.timestamp);
 
     let (tier, tier_index, costs, total_cost) = if let Some(ref def) = matched {
-        let ctx =
-            openobserve_core::traces::otel::processor::test_pricing_context(def, &req.attributes);
+        let ctx = openobserve_core::traces::otel::processor::pricing_context_for_test_endpoint(
+            def,
+            &req.attributes,
+        );
         let result =
             model_pricing::calculate_cost_from_definition(def, &req.usage, req.timestamp, &ctx);
         let total = result.cost.get("total").copied().unwrap_or(0.0);

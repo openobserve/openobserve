@@ -54,6 +54,7 @@ impl TryFrom<Model> for ModelPricingDefinition {
             created_at: model.created_at,
             updated_at: model.updated_at,
             children: Vec::new(),
+            prepared_rule_keys: Default::default(),
         })
     }
 }

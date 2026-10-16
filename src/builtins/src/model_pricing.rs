@@ -116,6 +116,7 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
             created_at: 0, // set by DB layer
             updated_at: 0,
             children: Vec::new(),
+            prepared_rule_keys: Default::default(),
         };
         // An invalid entry could overprice every span; keep the previously stored row.
         if let Err(e) = definition.validate_tiers(true) {

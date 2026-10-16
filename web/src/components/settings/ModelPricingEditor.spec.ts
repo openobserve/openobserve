@@ -20,7 +20,11 @@ import ModelPricingEditor from "./ModelPricingEditor.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import i18n from "@/locales";
-import { findAmbiguousTiers, makeModelPricingSchema } from "./ModelPricingEditor.schema";
+import {
+  findAmbiguousTiers,
+  findUnreachableTiers,
+  makeModelPricingSchema,
+} from "./ModelPricingEditor.schema";
 
 // Service mocks
 vi.mock("@/services/model_pricing", async (importOriginal) => {
@@ -973,6 +977,222 @@ describe("ModelPricingEditor.vue", () => {
       it("ignores tier 0 and unrestricted tiers", () => {
         expect(findAmbiguousTiers([base, base, { ...base, condition: extended }])).toEqual([]);
       });
+    });
+  });
+
+  describe("Schema validation: backend limits", () => {
+    const schema = makeModelPricingSchema(i18n.global.t as any);
+    const defaultTier = { name: "Default", condition: null, prices: [{ key: "input", value: 1 }] };
+    const issueAt = (tiers: any[], path: Array<string | number>) => {
+      const res = schema.safeParse({ name: "X", match_pattern: "gpt", tiers });
+      if (res.success) return "";
+      return (
+        res.error.issues.find((iss: any) => JSON.stringify(iss.path) === JSON.stringify(path))
+          ?.message ?? ""
+      );
+    };
+    const ruleIssue = (rule: Record<string, any>, field: string) =>
+      issueAt(
+        [defaultTier, { name: "Flex", condition: null, rules: [rule], prices: [] }],
+        ["tiers", 1, "rules", 0, field],
+      );
+    const setRule = (overrides: Record<string, any> = {}) => ({
+      keys: "service_tier",
+      op: "in",
+      values: "flex",
+      value: 0,
+      ...overrides,
+    });
+
+    it("bounds priority to plus or minus 1000 on the priority field", () => {
+      const withPriority = (priority: number) =>
+        issueAt(
+          [defaultTier, { name: "Fast", rules: [setRule()], priority, prices: [] }],
+          ["tiers", 1, "priority"],
+        );
+      expect(withPriority(1000)).toBe("");
+      expect(withPriority(-1000)).toBe("");
+      expect(withPriority(1001)).toContain("between -1000 and 1000");
+      expect(withPriority(-5000)).toContain("between -1000 and 1000");
+    });
+
+    it("allows at most 32 tiers and flags the first extra one", () => {
+      const extra = Array.from({ length: 32 }, (_, i) => ({
+        name: `T${i}`,
+        rules: [setRule({ values: `v${i}` })],
+        prices: [],
+      }));
+      expect(issueAt([defaultTier, ...extra.slice(0, 31)], ["tiers", 31, "name"])).toBe("");
+      expect(issueAt([defaultTier, ...extra], ["tiers", 32, "name"])).toContain(
+        "At most 32 pricing tiers",
+      );
+    });
+
+    it("allows at most 8 rules per tier", () => {
+      const rules = Array.from({ length: 9 }, () => setRule());
+      const tiers = [defaultTier, { name: "Many", rules, prices: [] }];
+      expect(issueAt(tiers, ["tiers", 1, "rules", 7, "keys"])).toBe("");
+      expect(issueAt(tiers, ["tiers", 1, "rules", 8, "keys"])).toContain("at most 8");
+    });
+
+    it("allows at most 16 keys and 64 values per rule", () => {
+      const list = (n: number) => Array.from({ length: n }, (_, i) => `k${i}`).join(", ");
+      expect(ruleIssue(setRule({ keys: list(16) }), "keys")).toBe("");
+      expect(ruleIssue(setRule({ keys: list(17) }), "keys")).toContain("at most 16 keys");
+      expect(ruleIssue(setRule({ values: list(64) }), "values")).toBe("");
+      expect(ruleIssue(setRule({ values: list(65) }), "values")).toContain("64 values");
+    });
+
+    it("measures the 256 limit on keys and values in UTF-8 bytes", () => {
+      expect(ruleIssue(setRule({ keys: "a".repeat(256) }), "keys")).toBe("");
+      expect(ruleIssue(setRule({ keys: "a".repeat(257) }), "keys")).toContain("256 bytes");
+      expect(ruleIssue(setRule({ values: "é".repeat(128) }), "values")).toBe("");
+      expect(ruleIssue(setRule({ values: "é".repeat(129) }), "values")).toContain("256 bytes");
+    });
+
+    it("rejects a bare usage. key", () => {
+      expect(ruleIssue(setRule({ keys: "Usage. ", op: "gt", value: 1 }), "keys")).toContain(
+        "usage type",
+      );
+      expect(ruleIssue(setRule({ keys: "usage.input", op: "gt", value: 1 }), "keys")).toBe("");
+    });
+
+    it("rejects exists and not_exists on a usage. key on the operator field", () => {
+      for (const op of ["exists", "not_exists"]) {
+        expect(ruleIssue(setRule({ keys: "service_tier, usage.input", op }), "op")).toContain(
+          "missing count reads as 0",
+        );
+        expect(ruleIssue(setRule({ keys: "service_tier", op }), "op")).toBe("");
+      }
+    });
+
+    it("flags an operator this build does not know on the operator field", () => {
+      expect(ruleIssue(setRule({ op: "regex" }), "op")).toContain('operator "regex"');
+      expect(ruleIssue(setRule({ op: "regex" }), "values")).toBe("");
+    });
+  });
+
+  describe("Loaded rules and priorities this editor cannot change", () => {
+    const loadTiers = async (tiers: any[]) => {
+      mockService.get.mockResolvedValue({
+        data: { id: "m", name: "M", match_pattern: "m", enabled: true, tiers },
+      });
+      const wrapper = createWrapper({ query: { id: "m" } });
+      await flushPromises();
+      return wrapper;
+    };
+
+    it("keeps an unknown operator with its values and threshold and blocks save", async () => {
+      const wrapper = await loadTiers([
+        { name: "Default", prices: { input: 0.000001 } },
+        {
+          name: "Future",
+          rules: [{ keys: ["service_tier"], op: "regex", values: ["fl.*"], value: 3 }],
+          prices: { input: 0.000002 },
+        },
+      ]);
+      const rule = getForm(wrapper).state.values.tiers[1].rules[0];
+      expect(rule).toMatchObject({ keys: "service_tier", op: "regex", values: "fl.*", value: 3 });
+      expect((wrapper.vm as any).ruleToModel(rule)).toEqual({
+        keys: ["service_tier"],
+        op: "regex",
+        values: ["fl.*"],
+        value: 3,
+      });
+      expect((wrapper.vm as any).ruleOperatorOptions("regex").map((o: any) => o.value)).toContain(
+        "regex",
+      );
+      expect((wrapper.vm as any).ruleOperatorOptions("in").map((o: any) => o.value)).not.toContain(
+        "regex",
+      );
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+      expect(mockService.update).not.toHaveBeenCalled();
+    });
+
+    it("round-trips a priority on the default tier", async () => {
+      const wrapper = await loadTiers([
+        { name: "Default", priority: 3, prices: { input: 0.000001 } },
+        { name: "Long", condition: { usage_key: "input", operator: "gt", value: 1 }, prices: {} },
+      ]);
+      expect(getForm(wrapper).state.values.tiers[0].priority).toBe(3);
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+      const call = mockService.update.mock.calls[0];
+      expect(call[call.length - 1].tiers[0].priority).toBe(3);
+    });
+  });
+
+  describe("Tier selection mode warnings", () => {
+    const base = { condition: null, utc_windows: [], rules: [], priority: 0 };
+    const extended = { usage_key: "input", operator: "gt", value: 272000 };
+    const peak = [{ start: "01:00", end: "04:00" }];
+    const flexRule = { keys: "service_tier", op: "in", values: "flex", value: 0 };
+
+    it("does not report a tie in first-match mode", () => {
+      const tiers = [base, { ...base, condition: extended }, { ...base, utc_windows: peak }];
+      expect(findAmbiguousTiers(tiers)).toEqual([]);
+      expect(findUnreachableTiers(tiers)).toEqual([]);
+    });
+
+    it("reports a combined tier shadowed by an earlier tier in first-match mode", () => {
+      const tiers = [
+        base,
+        { ...base, condition: extended },
+        { ...base, utc_windows: peak },
+        { ...base, condition: extended, utc_windows: peak },
+      ];
+      expect(findUnreachableTiers(tiers)).toEqual([[1, 3]]);
+      expect(findAmbiguousTiers(tiers)).toEqual([]);
+    });
+
+    it("treats a wider usage bound as covering a narrower one", () => {
+      const over = (value: number, operator = "gt") => ({
+        ...base,
+        condition: { usage_key: "input", operator, value },
+      });
+      expect(findUnreachableTiers([base, over(200000), over(272000)])).toEqual([[1, 2]]);
+      expect(findUnreachableTiers([base, over(272000), over(200000)])).toEqual([]);
+      expect(findUnreachableTiers([base, over(200000, "gte"), over(200000)])).toEqual([[1, 2]]);
+      expect(findUnreachableTiers([base, over(200000), over(200000, "gte")])).toEqual([]);
+    });
+
+    it("treats numerically equal rule values as the same value", () => {
+      const tierIn = (values: string) => ({
+        ...base,
+        rules: [{ keys: "n", op: "in", values, value: 0 }],
+      });
+      expect(findAmbiguousTiers([base, tierIn("1"), tierIn("1.0")])).toEqual([[1, 2]]);
+      expect(findAmbiguousTiers([base, tierIn("1"), tierIn("2")])).toEqual([]);
+    });
+
+    it("switches to the ranked tie check once a tier has a rule or a priority", () => {
+      const firstMatch = [base, { ...base, condition: extended }, { ...base, utc_windows: peak }];
+      const ranked = [{ ...base, priority: 1 }, ...firstMatch.slice(1)];
+      expect(findAmbiguousTiers(ranked)).toEqual([[1, 2]]);
+      const withRule = [...firstMatch, { ...base, rules: [flexRule] }];
+      expect(findUnreachableTiers(withRule)).toEqual([]);
+    });
+
+    it("shows the unreachable banner instead of the tie banner in first-match mode", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({ name: "Extended", condition: extended, prices: [row("input", 2)] }),
+        tier({ name: "Peak", utc_windows: peak, prices: [row("input", 3)] }),
+        tier({
+          name: "Peak Extended",
+          condition: extended,
+          utc_windows: peak,
+          prices: [row("input", 4)],
+        }),
+      ]);
+      await nextTick();
+      expect(wrapper.find('[data-test="model-pricing-tier-tie-warning"]').exists()).toBe(false);
+      const banner = wrapper.find('[data-test="model-pricing-tier-unreachable-warning"]');
+      expect(banner.exists()).toBe(true);
+      expect(banner.text()).toContain('"Peak Extended" is always preceded by "Extended"');
     });
   });
 
