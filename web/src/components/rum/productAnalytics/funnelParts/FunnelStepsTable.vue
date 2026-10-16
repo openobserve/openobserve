@@ -40,7 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <VueDraggableNext
       :model-value="def.steps"
       handle=".funnel-drag-handle"
-      item-key="key"
       @update:model-value="onDrag"
     >
       <div v-for="(step, i) in def.steps" :key="`${step.kind}:${step.key}:${i}`">

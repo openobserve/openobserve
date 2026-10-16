@@ -819,7 +819,7 @@ pub fn rules_hash(bots: bool, sessions: &serde_json::Value) -> String {
     let canonical = serde_json::json!({
         "bots": bots,
         "builtin_version": builtin_version,
-        "sessions": sessions,
+        "sessions": sorted_keys(sessions),
     });
     sha256_hex(canonical.to_string().as_bytes())[..RULES_HASH_LENGTH].to_string()
 }
@@ -1121,6 +1121,26 @@ fn as_def(e: RumPaError) -> RumPaError {
     match e {
         RumPaError::InvalidRules(message) => invalid_def(message),
         other => other,
+    }
+}
+
+// Postgres jsonb reorders object keys, so the hash must not depend on the order they were sent in.
+fn sorted_keys(value: &serde_json::Value) -> serde_json::Value {
+    match value {
+        serde_json::Value::Object(map) => {
+            let mut entries: Vec<_> = map.iter().collect();
+            entries.sort_unstable_by(|a, b| a.0.cmp(b.0));
+            serde_json::Value::Object(
+                entries
+                    .into_iter()
+                    .map(|(k, v)| (k.clone(), sorted_keys(v)))
+                    .collect(),
+            )
+        }
+        serde_json::Value::Array(items) => {
+            serde_json::Value::Array(items.iter().map(sorted_keys).collect())
+        }
+        other => other.clone(),
     }
 }
 
@@ -1483,6 +1503,13 @@ mod tests {
                 "{op}"
             );
         }
+    }
+
+    #[test]
+    fn p2_r9_the_rules_hash_ignores_object_key_order() {
+        let sent = serde_json::json!([{"field": "env", "op": "eq", "values": ["prod"]}]);
+        let jsonb = serde_json::json!([{"op": "eq", "field": "env", "values": ["prod"]}]);
+        assert_eq!(rules_hash(true, &sent), rules_hash(true, &jsonb));
     }
 
     #[test]

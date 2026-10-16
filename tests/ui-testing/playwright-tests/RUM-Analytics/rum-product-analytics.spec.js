@@ -1328,6 +1328,7 @@ test.describe('RUM Product Analytics', () => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
       const mix = await seedBuilt(page, buildSyntheticMixSeed(`${facts.appId}-syn`, Date.now()));
       await pa.goto('overview', { app: mix.appId, period: '7d' });
+      await pa.openExclusions();
       await expect(pa.syntheticExcluded).toContainText(String(mix.synthetic), { timeout: 30000 });
       await expect(pa.kpiSessions).toContainText(new RegExp(`\\b${mix.real}\\b`), { timeout: 30000 });
       await expect(pa.kpiSessions).not.toContainText(new RegExp(`\\b${mix.real + mix.synthetic}\\b`));

@@ -103,6 +103,8 @@ export class RumProductAnalyticsPage {
         this.invalidLink = page.locator('[data-test="rum-analytics-invalid-link"]');
         this.invalidLinkDismiss = page.locator('[data-test="rum-analytics-invalid-link-dismiss"]');
         this.deletedEventLink = page.locator('[data-test="rum-analytics-deleted-event-link"]');
+        this.exclusionsChip = page.locator('[data-test="rum-analytics-exclusions-chip"]');
+        this.exclusionsDrawer = page.locator('[data-test="rum-analytics-exclusions-drawer"]');
         this.syntheticExcluded = page.locator('[data-test="rum-analytics-app-filters-synthetic"]');
         this.kpiSessions = page.locator('[data-test="rum-analytics-kpi-sessions"]');
 
@@ -329,6 +331,11 @@ export class RumProductAnalyticsPage {
 
     topPathSessionsBtn(i) {
         return this.page.locator(`[data-test="rum-analytics-paths-top-row-${i}-sessions-btn"]`);
+    }
+
+    async openExclusions() {
+        await this.exclusionsChip.click();
+        await expect(this.exclusionsDrawer).toBeVisible();
     }
 
     async openDropoff(i) {
