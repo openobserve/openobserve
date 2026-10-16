@@ -8125,6 +8125,7 @@
       "noneShort": "Aucune",
       "substrateEmpty": "L'organisation a des alertes, mais l'exécution n'a trouvé aucune ligne de déclenchement pour sa fenêtre, donc elle n'a rien mesuré.",
       "unreadableDefinitions": "{count} définition d'alerte n'a pas pu être lue. | {count} définitions d'alerte n'ont pas pu être lues.",
+      "factsWithoutDefinition": "{count} alerte avait des lignes de déclenchement mais aucune définition, généralement une supprimée pendant la fenêtre ; non comptée comme une lacune. | {count} alertes avaient des lignes de déclenchement mais aucune définition, généralement supprimées pendant la fenêtre ; non comptées comme des lacunes.",
       "errorClustersUnattributed": "{count} ligne d'erreur n'a pas pu être attribuée à une alerte. | {count} lignes d'erreur n'ont pas pu être attribuées à une alerte.",
       "definitionsWithoutFacts": "{count} alerte n'avait aucune ligne de déclenchement dans la fenêtre, ce qui n'est pas compté comme une lacune. | {count} alertes n'avaient aucune ligne de déclenchement dans la fenêtre, ce qui n'est pas compté comme une lacune.",
       "transitionsTruncated": "Les transitions d'état ont été tronquées.",

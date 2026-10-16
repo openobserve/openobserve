@@ -8125,6 +8125,7 @@
       "noneShort": "Ninguna",
       "substrateEmpty": "La organización tiene alertas, pero la ejecución no encontró filas de activación para su ventana, por lo que no midió nada.",
       "unreadableDefinitions": "{count} definición de alerta no se pudo leer. | {count} definiciones de alerta no se pudieron leer.",
+      "factsWithoutDefinition": "{count} alerta tenía filas de activación pero ninguna definición, normalmente una eliminada durante la ventana; no se cuenta como una brecha. | {count} alertas tenían filas de activación pero ninguna definición, normalmente eliminadas durante la ventana; no se cuentan como brechas.",
       "errorClustersUnattributed": "{count} fila de error no se pudo atribuir a una alerta. | {count} filas de error no se pudieron atribuir a una alerta.",
       "definitionsWithoutFacts": "{count} alerta no tenía filas de activación en la ventana, lo que no se cuenta como una brecha. | {count} alertas no tenían filas de activación en la ventana, lo que no se cuenta como una brecha.",
       "transitionsTruncated": "Las transiciones de estado se truncaron.",

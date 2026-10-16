@@ -8125,6 +8125,7 @@
       "noneShort": "Không có",
       "substrateEmpty": "Tổ chức có cảnh báo, nhưng lần chạy không tìm thấy dòng kích hoạt nào trong cửa sổ của nó, nên nó không đo được gì.",
       "unreadableDefinitions": "{count} định nghĩa cảnh báo không thể đọc được. | {count} định nghĩa cảnh báo không thể đọc được.",
+      "factsWithoutDefinition": "{count} cảnh báo có các dòng kích hoạt nhưng không có định nghĩa, thường là một cảnh báo đã bị xóa trong khoảng thời gian này; không được tính là khoảng trống. | {count} cảnh báo có các dòng kích hoạt nhưng không có định nghĩa, thường là những cảnh báo đã bị xóa trong khoảng thời gian này; không được tính là khoảng trống.",
       "errorClustersUnattributed": "{count} dòng lỗi không thể được gán cho một cảnh báo. | {count} dòng lỗi không thể được gán cho một cảnh báo.",
       "definitionsWithoutFacts": "{count} cảnh báo không có dòng kích hoạt nào trong cửa sổ, điều này không được tính là lỗ hổng. | {count} cảnh báo không có dòng kích hoạt nào trong cửa sổ, điều này không được tính là lỗ hổng.",
       "transitionsTruncated": "Các chuyển đổi trạng thái đã bị cắt bớt.",

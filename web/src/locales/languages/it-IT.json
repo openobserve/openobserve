@@ -8125,6 +8125,7 @@
       "noneShort": "Nessuna",
       "substrateEmpty": "L'organizzazione ha avvisi, ma l'esecuzione non ha trovato righe di attivazione per la sua finestra, quindi non ha misurato nulla.",
       "unreadableDefinitions": "{count} definizione di avviso non è stata letta. | {count} definizioni di avviso non sono state lette.",
+      "factsWithoutDefinition": "{count} avviso aveva righe di trigger ma nessuna definizione, di solito uno eliminato durante la finestra; non conteggiato come lacuna. | {count} avvisi avevano righe di trigger ma nessuna definizione, di solito eliminati durante la finestra; non conteggiati come lacuna.",
       "errorClustersUnattributed": "{count} riga di errore non è stata attribuita a un avviso. | {count} righe di errore non sono state attribuite a un avviso.",
       "definitionsWithoutFacts": "{count} avviso non aveva righe di attivazione nella finestra, il che non è conteggiato come lacuna. | {count} avvisi non avevano righe di attivazione nella finestra, il che non è conteggiato come lacuna.",
       "transitionsTruncated": "Le transizioni di stato sono state troncate.",

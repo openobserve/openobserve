@@ -8120,6 +8120,7 @@
       "noneShort": "無",
       "substrateEmpty": "組織有警示，但這次執行在其時間範圍內找不到觸發資料列，因此未量測任何項目。",
       "unreadableDefinitions": "{count} 個警示定義無法讀取。 | {count} 個警示定義無法讀取。",
+      "factsWithoutDefinition": "{count} 個警示有觸發資料列但沒有定義，通常是視窗期間被刪除的警示；不計為缺口。 | {count} 個警示有觸發資料列但沒有定義，通常是視窗期間被刪除的警示；不計為缺口。",
       "errorClustersUnattributed": "{count} 個錯誤資料列無法歸因於任何警示。 | {count} 個錯誤資料列無法歸因於任何警示。",
       "definitionsWithoutFacts": "{count} 個警示在時間範圍內沒有觸發資料列，這不計為缺口。 | {count} 個警示在時間範圍內沒有觸發資料列，這不計為缺口。",
       "transitionsTruncated": "狀態轉換已被截斷。",

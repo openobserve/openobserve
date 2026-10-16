@@ -8125,6 +8125,7 @@
       "noneShort": "无",
       "substrateEmpty": "该组织有告警，但本次运行在其时间窗口内未找到任何触发记录，因此未测量到任何内容。",
       "unreadableDefinitions": "{count} 个告警定义无法读取。 | {count} 个告警定义无法读取。",
+      "factsWithoutDefinition": "{count} 个告警有触发行但缺少定义，通常是在窗口期内被删除的；不计为缺口。 | {count} 个告警有触发行但缺少定义，通常是在窗口期内被删除的；不计为缺口。",
       "errorClustersUnattributed": "{count} 条错误记录无法归属到某个告警。 | {count} 条错误记录无法归属到某个告警。",
       "definitionsWithoutFacts": "{count} 个告警在该窗口内没有触发记录，不计为覆盖缺口。 | {count} 个告警在该窗口内没有触发记录，不计为覆盖缺口。",
       "transitionsTruncated": "状态转换被截断。",

@@ -8125,6 +8125,7 @@
       "noneShort": "Nenhuma",
       "substrateEmpty": "A organização tem alertas, mas a execução não encontrou linhas de gatilho para a sua janela, então não mediu nada.",
       "unreadableDefinitions": "{count} definição de alerta não pôde ser lida. | {count} definições de alerta não puderam ser lidas.",
+      "factsWithoutDefinition": "{count} alerta tinha linhas de gatilho, mas nenhuma definição, geralmente um excluído durante a janela; não contado como lacuna. | {count} alertas tinham linhas de gatilho, mas nenhuma definição, geralmente excluídos durante a janela; não contados como lacuna.",
       "errorClustersUnattributed": "{count} linha de erro não pôde ser atribuída a um alerta. | {count} linhas de erro não puderam ser atribuídas a um alerta.",
       "definitionsWithoutFacts": "{count} alerta não tinha linhas de gatilho na janela, o que não é contado como lacuna. | {count} alertas não tinham linhas de gatilho na janela, o que não é contado como lacuna.",
       "transitionsTruncated": "As transições de estado foram truncadas.",

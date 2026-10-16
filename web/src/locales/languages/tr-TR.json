@@ -8125,6 +8125,7 @@
       "noneShort": "Yok",
       "substrateEmpty": "Organizasyonun uyarıları var, ancak çalıştırma penceresi için hiçbir tetikleyici satır bulamadı, bu yüzden hiçbir şey ölçmedi.",
       "unreadableDefinitions": "{count} uyarı tanımı okunamadı. | {count} uyarı tanımı okunamadı.",
+      "factsWithoutDefinition": "{count} uyarının tetikleyici satırları vardı ancak tanımı yoktu; bu genellikle pencere sırasında silinmiş bir tanımdır ve boşluk olarak sayılmaz. | {count} uyarının tetikleyici satırları vardı ancak tanımı yoktu; bu genellikle pencere sırasında silinmiş bir tanımdır ve boşluk olarak sayılmaz.",
       "errorClustersUnattributed": "{count} hata satırı bir uyarıyla ilişkilendirilemedi. | {count} hata satırı bir uyarıyla ilişkilendirilemedi.",
       "definitionsWithoutFacts": "{count} uyarının pencerede tetikleyici satırı yoktu, bu bir boşluk olarak sayılmaz. | {count} uyarının pencerede tetikleyici satırı yoktu, bu bir boşluk olarak sayılmaz.",
       "transitionsTruncated": "Durum geçişleri kısaltıldı.",
