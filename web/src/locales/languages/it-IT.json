@@ -9738,6 +9738,7 @@
         "continue": "Continua all'avviso",
         "queryChoiceLabel": "Avvisa sulla query",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "Ci sono più query. Seleziona quella da cui creare l'avviso.",
         "streamLabel": "Stream",
         "thresholdLabel": "Avviso su",
         "thresholdMatchingRows": "Righe corrispondenti",
@@ -9819,7 +9820,9 @@
         "rumFunnelSnapshot": "Questo avviso mantiene una copia dell'SQL del funnel. Modifiche successive al funnel o ai suoi eventi denominati non lo cambiano.",
         "rumFunnelSteps": "Un funnel necessita di almeno due passaggi prima di poter generare avvisi sulla conversione.",
         "textFilterDropped": "Il filtro di ricerca non è stato trasferito perché questo stream non ha campi di ricerca full-text (FTS). Aggiungilo alla query dell'avviso se ti serve.",
-        "heldFilterDropped": "Il filtro di ricerca non è stato trasferito perché richiede prima la scelta \"Esegui come\" nella pagina dei log. Aggiungilo alla query dell'avviso se ti serve."
+        "heldFilterDropped": "Il filtro di ricerca non è stato trasferito perché richiede prima la scelta \"Esegui come\" nella pagina dei log. Aggiungilo alla query dell'avviso se ti serve.",
+        "thresholdColumnGuessed": "La soglia è stata applicata a {column}; controlla che sia il valore che intendevi.",
+        "thresholdNotCarried": "La soglia {value} del grafico non è stata applicata perché hai scelto una query diversa."
       }
     },
     "saveFailed": "Impossibile salvare l'avviso.",

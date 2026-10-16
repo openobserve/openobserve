@@ -9738,6 +9738,7 @@
         "continue": "Continue to alert",
         "queryChoiceLabel": "Alert on query",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "There are multiple queries. Select which one to create the alert from.",
         "streamLabel": "Stream",
         "thresholdLabel": "Alert on",
         "thresholdMatchingRows": "Matching rows",
@@ -9819,7 +9820,9 @@
         "rumFunnelSnapshot": "This alert keeps a copy of the funnel's SQL. Later edits to the funnel or its named events do not change it.",
         "rumFunnelSteps": "A funnel needs at least two steps before it can alert on conversion.",
         "textFilterDropped": "Your search filter was not carried over because this stream has no full-text search (FTS) fields. Add it to the alert query if you need it.",
-        "heldFilterDropped": "Your search filter was not carried over because it needs a Run as choice on the logs page first. Add it to the alert query if you need it."
+        "heldFilterDropped": "Your search filter was not carried over because it needs a Run as choice on the logs page first. Add it to the alert query if you need it.",
+        "thresholdColumnGuessed": "The threshold was applied to {column}; check it is the value you meant.",
+        "thresholdNotCarried": "The {value} threshold from the chart wasn't applied because you picked a different query."
       }
     },
     "saveFailed": "Could not save the alert.",

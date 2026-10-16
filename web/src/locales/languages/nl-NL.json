@@ -9738,6 +9738,7 @@
         "continue": "Doorgaan naar alert",
         "queryChoiceLabel": "Alarm op query",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "Er zijn meerdere query's. Kies op basis van welke query je het alert wilt maken.",
         "streamLabel": "Stream",
         "thresholdLabel": "Alert op",
         "thresholdMatchingRows": "Overeenkomende rijen",
@@ -9819,7 +9820,9 @@
         "rumFunnelSnapshot": "Dit alarm bewaart een kopie van de SQL van de funnel. Latere wijzigingen aan de funnel of de bijbehorende benoemde gebeurtenissen veranderen dit niet.",
         "rumFunnelSteps": "Een funnel heeft minstens twee stappen nodig voordat er op conversie kan worden gealarmeerd.",
         "textFilterDropped": "Je zoekfilter is niet overgenomen omdat deze stream geen velden voor volledige tekstzoekopdracht (FTS) heeft. Voeg het toe aan de alarmquery als je het nodig hebt.",
-        "heldFilterDropped": "Je zoekfilter is niet overgenomen omdat er eerst een keuze voor 'Uitvoeren als' op de logboekenpagina nodig is. Voeg het toe aan de alarmquery als je het nodig hebt."
+        "heldFilterDropped": "Je zoekfilter is niet overgenomen omdat er eerst een keuze voor 'Uitvoeren als' op de logboekenpagina nodig is. Voeg het toe aan de alarmquery als je het nodig hebt.",
+        "thresholdColumnGuessed": "De drempelwaarde is toegepast op {column}; controleer of dat de bedoelde waarde is.",
+        "thresholdNotCarried": "De drempelwaarde {value} uit de grafiek is niet toegepast omdat je een andere query hebt gekozen."
       }
     },
     "saveFailed": "Kon de waarschuwing niet opslaan.",

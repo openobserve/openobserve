@@ -9738,6 +9738,7 @@
         "continue": "Continuer vers l'alerte",
         "queryChoiceLabel": "Alerter sur la requête",
         "queryChoiceOption": "{name} : {query}",
+        "pickQueryIntro": "Il y a plusieurs requêtes. Sélectionnez celle à partir de laquelle créer l'alerte.",
         "streamLabel": "Flux",
         "thresholdLabel": "Alerte sur",
         "thresholdMatchingRows": "Lignes correspondantes",
@@ -9819,7 +9820,9 @@
         "rumFunnelSnapshot": "Cette alerte conserve une copie du SQL de l'entonnoir. Les modifications ultérieures de l'entonnoir ou de ses événements nommés ne la modifient pas.",
         "rumFunnelSteps": "Un entonnoir doit comporter au moins deux étapes pour pouvoir alerter sur la conversion.",
         "textFilterDropped": "Votre filtre de recherche n'a pas été reporté car ce flux n'a pas de champs de recherche en texte intégral (FTS). Ajoutez-le à la requête d'alerte si vous en avez besoin.",
-        "heldFilterDropped": "Votre filtre de recherche n'a pas été reporté car il nécessite d'abord un choix « Exécuter en tant que » sur la page des logs. Ajoutez-le à la requête d'alerte si vous en avez besoin."
+        "heldFilterDropped": "Votre filtre de recherche n'a pas été reporté car il nécessite d'abord un choix « Exécuter en tant que » sur la page des logs. Ajoutez-le à la requête d'alerte si vous en avez besoin.",
+        "thresholdColumnGuessed": "Le seuil a été appliqué à {column} ; vérifiez qu'il s'agit bien de la valeur voulue.",
+        "thresholdNotCarried": "Le seuil {value} du graphique n'a pas été appliqué car vous avez choisi une autre requête."
       }
     },
     "saveFailed": "Impossible d'enregistrer l'alerte.",

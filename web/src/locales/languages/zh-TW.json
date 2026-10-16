@@ -9733,6 +9733,7 @@
         "continue": "繼續前往警示",
         "queryChoiceLabel": "對查詢發出警示",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "有多個查詢。請選擇要用來建立警示的查詢。",
         "streamLabel": "串流",
         "thresholdLabel": "警示條件",
         "thresholdMatchingRows": "符合的資料列",
@@ -9814,7 +9815,9 @@
         "rumFunnelSnapshot": "此警示會保留漏斗 SQL 的副本。之後對漏斗或其具名事件的編輯不會改變它。",
         "rumFunnelSteps": "漏斗至少需要兩個步驟,才能對轉換率發出警示。",
         "textFilterDropped": "您的搜尋篩選條件未一併帶入，因為此串流沒有全文搜尋（FTS）欄位。如需使用，請將其加入警示查詢。",
-        "heldFilterDropped": "您的搜尋篩選條件未一併帶入，因為它需要先在日誌頁面選擇執行身分。如需使用，請將其加入警示查詢。"
+        "heldFilterDropped": "您的搜尋篩選條件未一併帶入，因為它需要先在日誌頁面選擇執行身分。如需使用，請將其加入警示查詢。",
+        "thresholdColumnGuessed": "閾值已套用至 {column}；請確認這是您想要的值。",
+        "thresholdNotCarried": "由於您選擇了其他查詢，圖表中的閾值 {value} 未被套用。"
       }
     },
     "saveFailed": "無法儲存警示。",

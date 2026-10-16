@@ -9738,6 +9738,7 @@
         "continue": "경고로 계속",
         "queryChoiceLabel": "알림 대상 쿼리",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "여러 쿼리가 있습니다. 경고를 생성할 쿼리를 선택하십시오.",
         "streamLabel": "스트림",
         "thresholdLabel": "경고 대상",
         "thresholdMatchingRows": "일치하는 행",
@@ -9819,7 +9820,9 @@
         "rumFunnelSnapshot": "이 알림은 퍼널의 SQL 사본을 유지합니다. 나중에 퍼널이나 명명된 이벤트를 편집해도 변경되지 않습니다.",
         "rumFunnelSteps": "퍼널이 전환에 대해 알림을 보내려면 단계가 최소 두 개 필요합니다.",
         "textFilterDropped": "이 스트림에 전체 텍스트 검색(FTS) 필드가 없어 검색 필터가 반영되지 않았습니다. 필요한 경우 알림 쿼리에 추가하세요.",
-        "heldFilterDropped": "로그 페이지에서 먼저 Run as를 선택해야 하므로 검색 필터가 반영되지 않았습니다. 필요한 경우 알림 쿼리에 추가하세요."
+        "heldFilterDropped": "로그 페이지에서 먼저 Run as를 선택해야 하므로 검색 필터가 반영되지 않았습니다. 필요한 경우 알림 쿼리에 추가하세요.",
+        "thresholdColumnGuessed": "임계값이 {column}에 적용되었습니다. 의도한 값인지 확인하십시오.",
+        "thresholdNotCarried": "다른 쿼리를 선택했기 때문에 차트의 임계값 {value}이(가) 적용되지 않았습니다."
       }
     },
     "saveFailed": "경고를 저장할 수 없습니다.",

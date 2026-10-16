@@ -9738,6 +9738,7 @@
         "continue": "Weiter zum Alarm",
         "queryChoiceLabel": "Warnmeldung für Abfrage",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "Es gibt mehrere Abfragen. Wählen Sie aus, aus welcher der Alarm erstellt werden soll.",
         "streamLabel": "Stream",
         "thresholdLabel": "Alarm bei",
         "thresholdMatchingRows": "Übereinstimmende Zeilen",
@@ -9819,7 +9820,9 @@
         "rumFunnelSnapshot": "Diese Warnmeldung behält eine Kopie des SQL des Funnels. Spätere Änderungen am Funnel oder an seinen benannten Events ändern sie nicht.",
         "rumFunnelSteps": "Ein Funnel benötigt mindestens zwei Schritte, bevor er bei Konversionen eine Warnmeldung auslösen kann.",
         "textFilterDropped": "Ihr Suchfilter wurde nicht übernommen, da dieser Stream keine Volltextsuchfelder (FTS) hat. Fügen Sie ihn der Alarmabfrage hinzu, wenn Sie ihn benötigen.",
-        "heldFilterDropped": "Ihr Suchfilter wurde nicht übernommen, da dafür zuerst eine Auswahl unter „Ausführen als“ auf der Logs-Seite erforderlich ist. Fügen Sie ihn der Alarmabfrage hinzu, wenn Sie ihn benötigen."
+        "heldFilterDropped": "Ihr Suchfilter wurde nicht übernommen, da dafür zuerst eine Auswahl unter „Ausführen als“ auf der Logs-Seite erforderlich ist. Fügen Sie ihn der Alarmabfrage hinzu, wenn Sie ihn benötigen.",
+        "thresholdColumnGuessed": "Der Schwellenwert wurde auf {column} angewendet; prüfen Sie, ob das der gemeinte Wert ist.",
+        "thresholdNotCarried": "Der Schwellenwert {value} aus dem Diagramm wurde nicht übernommen, weil Sie eine andere Abfrage gewählt haben."
       }
     },
     "saveFailed": "Der Alert konnte nicht gespeichert werden.",

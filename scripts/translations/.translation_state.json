@@ -4696,6 +4696,7 @@
         "patternsNone": "d4fdd8f09e4bbfb2",
         "patternsScopeAll": "d545cfadc92b6638",
         "patternsScopeFiltered": "84831d5cb11e2d69",
+        "pickQueryIntro": "eecbfe01444643f2",
         "queryChoiceLabel": "30ef72d7baa09e82",
         "queryChoiceOption": "7c9f5e99b9d5a837",
         "queryCopied": "30c07770b92bac5d",
@@ -4773,6 +4774,8 @@
         "savedFunctionCopied": "9910ad637d3c9e37",
         "sqlModeFilterDropped": "91395d8105dd72fd",
         "textFilterDropped": "1af3560e95f9e483",
+        "thresholdColumnGuessed": "4595598009f195f5",
+        "thresholdNotCarried": "386d5f1dc39548e0",
         "unresolvedQuery": "4cd999a9b4222ad7",
         "unsupportedPanelType": "1f9928c4b86b85bb"
       }
