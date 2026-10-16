@@ -8055,6 +8055,7 @@
     "refresh": "Aktualisieren",
     "retry": "Wiederholen",
     "tabs": {
+      "runs": "Läufe",
       "dashboard": "Dashboard"
     },
     "duration": {
@@ -8063,6 +8064,12 @@
       "hours": "{count} Stunde | {count} Stunden",
       "days": "{count} Tag | {count} Tage",
       "years": "{count} Jahr | {count} Jahre"
+    },
+    "unit": {
+      "minutes": "Minute | Minuten",
+      "hours": "Stunde | Stunden",
+      "days": "Tag | Tage",
+      "years": "Jahr | Jahre"
     },
     "rules": {
       "failure": "Fehlschlag",
@@ -8124,6 +8131,7 @@
       "noneShort": "Keine",
       "substrateEmpty": "Die Organisation hat Alarme, aber der Lauf fand keine Auslösezeilen für sein Fenster und hat daher nichts gemessen.",
       "unreadableDefinitions": "{count} Alarmdefinition konnte nicht gelesen werden. | {count} Alarmdefinitionen konnten nicht gelesen werden.",
+      "factsWithoutDefinition": "{count} Alarm hatte Auslösezeilen, aber keine Definition, meist einer, der während des Zeitfensters gelöscht wurde; nicht als Lücke gezählt. | {count} Alarme hatten Auslösezeilen, aber keine Definition, meist welche, die während des Zeitfensters gelöscht wurden; nicht als Lücke gezählt.",
       "errorClustersUnattributed": "{count} Fehlerzeile konnte keinem Alarm zugeordnet werden. | {count} Fehlerzeilen konnten keinem Alarm zugeordnet werden.",
       "definitionsWithoutFacts": "{count} Alarm hatte keine Auslösezeilen im Fenster, was nicht als Lücke gezählt wird. | {count} Alarme hatten keine Auslösezeilen im Fenster, was nicht als Lücke gezählt wird.",
       "transitionsTruncated": "Zustandsübergänge wurden abgeschnitten.",
@@ -8135,6 +8143,7 @@
       "schedule": "Zeitplan",
       "off": "Aus",
       "notConfigured": "Nicht konfiguriert",
+      "noScheduledRun": "Kein geplanter Lauf",
       "window": "Analysefenster",
       "latestFindings": "Ergebnisse des letzten Laufs",
       "trend": "Trend der Ergebnisse",
@@ -8174,6 +8183,7 @@
       "statAlertsInScope": "Alarme im Geltungsbereich",
       "statDeclined": "Abgelehnt",
       "statDeclinedSub": "Abgelehnt, nicht freigegeben",
+      "statDeclinedTooltip": "Regel-Alarm-Paare, die eine Regel nicht bewerten würde, weil der Alarm zu wenig Historie oder zu wenige Stichproben dafür hatte. Eine Hürde, keine Freigabe; die Gründe je Alarm werden nicht in den Stream geschrieben.",
       "statWindow": "Fenster",
       "findingsHeading": "Befunde",
       "suggestionsOnly": "Nur Vorschläge, nichts wird automatisch angewendet",
@@ -8188,12 +8198,23 @@
       "noneFoundNotClearance": "Null Befunde hier sind keine Freigabe.",
       "evidence": "Nachweise",
       "alert": "Alarm",
-      "proposedActions": "Vorgeschlagene Aktionen"
+      "proposedActions": "Vorgeschlagene Aktionen",
+      "openAlert": "Alarm öffnen"
     },
     "dashboard": {
+      "latestRunAgo": "Letzter Lauf {time}",
       "findings": "Befunde",
       "alertsInScope": "Alarme im Geltungsbereich",
       "coverage": "Abdeckung",
+      "attention": "Was Aufmerksamkeit erfordert",
+      "attentionCaption": "Aus dem letzten Lauf. Öffnen Sie eine Regel, um die von ihr markierten Alarme zu sehen.",
+      "alertsFlagged": "{count} Alarm | {count} Alarme",
+      "nothingFlagged": "Kein Alarm wurde von dieser Regel im letzten Lauf markiert.",
+      "allClear": "Der letzte Lauf hat nichts zu beheben gefunden.",
+      "openAlert": "Alarm öffnen",
+      "viewEvidence": "Belege ansehen",
+      "notEnabledTitle": "Die Alarmkalibrierung läuft für diese Organisation nicht",
+      "notEnabledDescription": "Aktivieren Sie sie in den Einstellungen. Der erste Lauf erfolgt, sobald sie aktiviert ist.",
       "emptyTitle": "Keine Läufe in den letzten {days} Tagen",
       "emptyDescription": "Das Dashboard füllt sich, sobald die Alarmkalibrierung gelaufen ist."
     },
@@ -8208,7 +8229,9 @@
       "enabled": "Alarmkalibrierung für diese Organisation ausführen",
       "enabledHelp": "Im ausgeschalteten Zustand hat die Organisation keinen geplanten Lauf. Beim Einschalten ist der erste Lauf sofort fällig.",
       "frequency": "Ausführen alle",
+      "frequencyHelp": "Zwischen 1 Stunde und 30 Tagen.",
       "window": "Analysefenster",
+      "windowHelp": "Wie weit jeder Lauf zurückblickt, zwischen 1 Minute und 90 Tagen. Ein Fenster, das länger als der Rhythmus ist, lässt aufeinanderfolgende Läufe überlappen und dieselben Ergebnisse erneut melden.",
       "noConfig": "Diese Organisation hat noch keine Einstellungen für die Alarmkalibrierung. Die folgenden Werte sind die Standardwerte, die beim ersten Speichern gespeichert werden.",
       "warnGap": "Läuft alle {every}, blickt aber nur {window} zurück, sodass die Zeit zwischen den Fenstern nie analysiert wird.",
       "warnStarved": "Ein Fenster von {window} ist zu kurz für {rules}, sodass jeder Lauf sie für jeden Alarm ablehnt.",
@@ -8222,7 +8245,10 @@
       "saveFailed": "Die Einstellungen konnten nicht gespeichert werden: {message}",
       "loadFailed": "Die Einstellungen konnten nicht geladen werden: {message}",
       "lastSaved": "Zuletzt gespeichert {time}",
-      "runNowHeading": "Jetzt ausführen"
+      "runNowHeading": "Jetzt ausführen",
+      "findingsDesc": "Ergebnisse werden in den Stream {stream} dieser Organisation geschrieben und gemäß der Aufbewahrung dieses Streams aufbewahrt. Die Alarmkalibrierung sendet keine Benachrichtigungen.",
+      "frequencyRange": "Wählen Sie einen Rhythmus zwischen 1 Stunde und 30 Tagen.",
+      "windowRange": "Wählen Sie ein Fenster zwischen 1 Minute und 90 Tagen."
     }
   },
   "alerts": {

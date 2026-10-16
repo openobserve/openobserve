@@ -8050,6 +8050,7 @@
     "refresh": "重新整理",
     "retry": "重試",
     "tabs": {
+      "runs": "執行記錄",
       "dashboard": "儀表板"
     },
     "duration": {
@@ -8058,6 +8059,12 @@
       "hours": "{count} 小時 | {count} 小時",
       "days": "{count} 天 | {count} 天",
       "years": "{count} 年 | {count} 年"
+    },
+    "unit": {
+      "minutes": "分鐘 | 分鐘",
+      "hours": "小時 | 小時",
+      "days": "天 | 天",
+      "years": "年 | 年"
     },
     "rules": {
       "failure": "失敗",
@@ -8119,6 +8126,7 @@
       "noneShort": "無",
       "substrateEmpty": "組織有警示，但這次執行在其時間範圍內找不到觸發資料列，因此未量測任何項目。",
       "unreadableDefinitions": "{count} 個警示定義無法讀取。 | {count} 個警示定義無法讀取。",
+      "factsWithoutDefinition": "{count} 個警示有觸發資料列但沒有定義，通常是視窗期間被刪除的警示；不計為缺口。 | {count} 個警示有觸發資料列但沒有定義，通常是視窗期間被刪除的警示；不計為缺口。",
       "errorClustersUnattributed": "{count} 個錯誤資料列無法歸因於任何警示。 | {count} 個錯誤資料列無法歸因於任何警示。",
       "definitionsWithoutFacts": "{count} 個警示在時間範圍內沒有觸發資料列，這不計為缺口。 | {count} 個警示在時間範圍內沒有觸發資料列，這不計為缺口。",
       "transitionsTruncated": "狀態轉換已被截斷。",
@@ -8130,6 +8138,7 @@
       "schedule": "排程",
       "off": "關閉",
       "notConfigured": "未設定",
+      "noScheduledRun": "沒有排定的執行",
       "window": "分析時間範圍",
       "latestFindings": "最新執行的發現",
       "trend": "發現趨勢",
@@ -8169,6 +8178,7 @@
       "statAlertsInScope": "範圍內的警示",
       "statDeclined": "已拒絕",
       "statDeclinedSub": "已拒絕，並非已排除",
+      "statDeclinedTooltip": "規則未進行判斷的規則與警示組合，因為該警示的歷史紀錄過少或樣本數不足。這是一道關卡，而非放行；各警示的原因不會寫入串流。",
       "statWindow": "時間範圍",
       "findingsHeading": "發現項目",
       "suggestionsOnly": "僅為建議，不會自動套用任何變更",
@@ -8183,12 +8193,23 @@
       "noneFoundNotClearance": "這裡零發現並不代表已排除。",
       "evidence": "證據",
       "alert": "警示",
-      "proposedActions": "建議動作"
+      "proposedActions": "建議動作",
+      "openAlert": "開啟警示"
     },
     "dashboard": {
+      "latestRunAgo": "最近一次執行 {time}",
       "findings": "發現項目",
       "alertsInScope": "範圍內的警示",
       "coverage": "涵蓋範圍",
+      "attention": "需要注意的事項",
+      "attentionCaption": "來自最近一次執行。開啟規則即可查看它標記的警示。",
+      "alertsFlagged": "{count} 個警示 | {count} 個警示",
+      "nothingFlagged": "最近一次執行中，此規則未標記任何警示。",
+      "allClear": "最近一次執行未發現任何需要修正的問題。",
+      "openAlert": "開啟警示",
+      "viewEvidence": "檢視佐證",
+      "notEnabledTitle": "此組織未執行警示校準",
+      "notEnabledDescription": "請在管理中開啟。一旦開啟就會立即進行第一次執行。",
       "emptyTitle": "過去 {days} 天沒有執行",
       "emptyDescription": "警示校準執行後，儀表板就會填入資料。"
     },
@@ -8203,7 +8224,9 @@
       "enabled": "為此組織執行警示校準",
       "enabledHelp": "關閉時，此組織沒有排程執行。開啟後，首次執行會立即到期。",
       "frequency": "執行頻率",
+      "frequencyHelp": "介於 1 小時到 30 天之間。",
       "window": "分析時間範圍",
+      "windowHelp": "每次執行回溯的時間範圍，介於 1 分鐘到 90 天之間。若時間範圍長於執行頻率，連續執行會重疊並再次回報相同的發現。",
       "noConfig": "此組織尚無警示校準設定。下列值是您首次儲存時所儲存的預設值。",
       "warnGap": "每 {every} 執行一次，但只往回查看 {window}，因此兩次時間範圍之間的時間永遠不會被分析。",
       "warnStarved": "對 {rules} 而言，{window} 的時間範圍太短，因此每次執行都會對每個警示略過它們。",
@@ -8217,7 +8240,10 @@
       "saveFailed": "無法儲存設定：{message}",
       "loadFailed": "無法載入設定：{message}",
       "lastSaved": "上次儲存 {time}",
-      "runNowHeading": "立即執行"
+      "runNowHeading": "立即執行",
+      "findingsDesc": "發現會寫入此組織的 {stream} 串流，並依該串流的保留期保存。警示校準不會傳送任何通知。",
+      "frequencyRange": "請選擇介於 1 小時到 30 天之間的執行頻率。",
+      "windowRange": "請選擇介於 1 分鐘到 90 天之間的時間範圍。"
     }
   },
   "alerts": {

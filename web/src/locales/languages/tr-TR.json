@@ -8055,6 +8055,7 @@
     "refresh": "Yenile",
     "retry": "Yeniden dene",
     "tabs": {
+      "runs": "Çalıştırmalar",
       "dashboard": "Gösterge panosu"
     },
     "duration": {
@@ -8063,6 +8064,12 @@
       "hours": "{count} saat | {count} saat",
       "days": "{count} gün | {count} gün",
       "years": "{count} yıl | {count} yıl"
+    },
+    "unit": {
+      "minutes": "dakika | dakika",
+      "hours": "saat | saat",
+      "days": "gün | gün",
+      "years": "yıl | yıl"
     },
     "rules": {
       "failure": "Başarısızlık",
@@ -8124,6 +8131,7 @@
       "noneShort": "Yok",
       "substrateEmpty": "Organizasyonun uyarıları var, ancak çalıştırma penceresi için hiçbir tetikleyici satır bulamadı, bu yüzden hiçbir şey ölçmedi.",
       "unreadableDefinitions": "{count} uyarı tanımı okunamadı. | {count} uyarı tanımı okunamadı.",
+      "factsWithoutDefinition": "{count} uyarının tetikleyici satırları vardı ancak tanımı yoktu; bu genellikle pencere sırasında silinmiş bir tanımdır ve boşluk olarak sayılmaz. | {count} uyarının tetikleyici satırları vardı ancak tanımı yoktu; bu genellikle pencere sırasında silinmiş bir tanımdır ve boşluk olarak sayılmaz.",
       "errorClustersUnattributed": "{count} hata satırı bir uyarıyla ilişkilendirilemedi. | {count} hata satırı bir uyarıyla ilişkilendirilemedi.",
       "definitionsWithoutFacts": "{count} uyarının pencerede tetikleyici satırı yoktu, bu bir boşluk olarak sayılmaz. | {count} uyarının pencerede tetikleyici satırı yoktu, bu bir boşluk olarak sayılmaz.",
       "transitionsTruncated": "Durum geçişleri kısaltıldı.",
@@ -8135,6 +8143,7 @@
       "schedule": "Zamanlama",
       "off": "Kapalı",
       "notConfigured": "Yapılandırılmadı",
+      "noScheduledRun": "Planlanmış çalıştırma yok",
       "window": "Analiz penceresi",
       "latestFindings": "Son çalıştırma bulguları",
       "trend": "Bulgu eğilimi",
@@ -8174,6 +8183,7 @@
       "statAlertsInScope": "Kapsamdaki uyarılar",
       "statDeclined": "Reddedildi",
       "statDeclinedSub": "Reddedildi, temiz değil",
+      "statDeclinedTooltip": "Bir kuralın değerlendirmeyeceği kural-uyarı çiftleri; çünkü uyarının geçmişi çok kısa ya da örnek sayısı onun için yetersizdi. Bu bir onay değil, bir geçittir; uyarı başına gerekçeler akışa yazılmaz.",
       "statWindow": "Pencere",
       "findingsHeading": "Bulgular",
       "suggestionsOnly": "Yalnızca öneriler, hiçbir şey otomatik uygulanmaz",
@@ -8188,12 +8198,23 @@
       "noneFoundNotClearance": "Burada sıfır bulgu olması temiz olduğu anlamına gelmez.",
       "evidence": "Kanıt",
       "alert": "Uyarı",
-      "proposedActions": "Önerilen eylemler"
+      "proposedActions": "Önerilen eylemler",
+      "openAlert": "Uyarıyı aç"
     },
     "dashboard": {
+      "latestRunAgo": "Son çalıştırma {time}",
       "findings": "Bulgular",
       "alertsInScope": "Kapsamdaki uyarılar",
       "coverage": "Kapsam",
+      "attention": "Nelere dikkat edilmeli",
+      "attentionCaption": "Son çalıştırmadan. İşaretlediği uyarıları görmek için bir kural açın.",
+      "alertsFlagged": "{count} uyarı | {count} uyarı",
+      "nothingFlagged": "Son çalıştırmada bu kural tarafından işaretlenen uyarı yok.",
+      "allClear": "Son çalıştırma düzeltilecek bir şey bulamadı.",
+      "openAlert": "Uyarıyı aç",
+      "viewEvidence": "Kanıtı görüntüle",
+      "notEnabledTitle": "Bu organizasyon için uyarı kalibrasyonu çalışmıyor",
+      "notEnabledDescription": "Ayarlardan etkinleştirin. Etkinleştirilir etkinleştirilmez ilk çalıştırma yapılacaktır.",
       "emptyTitle": "Son {days} günde çalışma yok",
       "emptyDescription": "Gösterge paneli, uyarı kalibrasyonu çalıştırıldıktan sonra dolar."
     },
@@ -8208,7 +8229,9 @@
       "enabled": "Bu organizasyon için uyarı kalibrasyonunu çalıştır",
       "enabledHelp": "Kapalıyken, organizasyonun zamanlanmış bir çalışması olmaz. Açıldığında, ilk çalışma hemen başlar.",
       "frequency": "Çalıştırma sıklığı",
+      "frequencyHelp": "1 saat ile 30 gün arasında.",
       "window": "Analiz penceresi",
+      "windowHelp": "Her çalıştırmanın ne kadar geriye baktığı; 1 dakika ile 90 gün arasında. Pencerenin periyottan uzun olması, ardışık çalıştırmaların çakışmasına ve aynı bulguları yeniden raporlamasına yol açar.",
       "noConfig": "Bu organizasyonun henüz uyarı kalibrasyonu ayarları yok. Aşağıdaki değerler, ilk kaydınızda saklanacak varsayılanlardır.",
       "warnGap": "Her {every} çalışır ancak yalnızca {window} geriye bakar, bu nedenle pencereler arasındaki süre hiç analiz edilmez.",
       "warnStarved": "{window} penceresi {rules} için çok kısa, bu nedenle her çalışma her uyarı için bunları reddeder.",
@@ -8222,7 +8245,10 @@
       "saveFailed": "Ayarlar kaydedilemedi: {message}",
       "loadFailed": "Ayarlar yüklenemedi: {message}",
       "lastSaved": "Son kaydedilme {time}",
-      "runNowHeading": "Şimdi çalıştır"
+      "runNowHeading": "Şimdi çalıştır",
+      "findingsDesc": "Bulgular bu organizasyonun {stream} akışına yazılır ve o akışın saklama süresi boyunca tutulur. Uyarı kalibrasyonu hiçbir bildirim göndermez.",
+      "frequencyRange": "1 saat ile 30 gün arasında bir periyot seçin.",
+      "windowRange": "1 dakika ile 90 gün arasında bir pencere seçin."
     }
   },
   "alerts": {

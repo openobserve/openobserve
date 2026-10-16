@@ -8055,6 +8055,7 @@
     "refresh": "Atualizar",
     "retry": "Tentar novamente",
     "tabs": {
+      "runs": "Execuções",
       "dashboard": "Painel"
     },
     "duration": {
@@ -8063,6 +8064,12 @@
       "hours": "{count} hora | {count} horas",
       "days": "{count} dia | {count} dias",
       "years": "{count} ano | {count} anos"
+    },
+    "unit": {
+      "minutes": "minuto | minutos",
+      "hours": "hora | horas",
+      "days": "dia | dias",
+      "years": "ano | anos"
     },
     "rules": {
       "failure": "Falha",
@@ -8124,6 +8131,7 @@
       "noneShort": "Nenhuma",
       "substrateEmpty": "A organização tem alertas, mas a execução não encontrou linhas de gatilho para a sua janela, então não mediu nada.",
       "unreadableDefinitions": "{count} definição de alerta não pôde ser lida. | {count} definições de alerta não puderam ser lidas.",
+      "factsWithoutDefinition": "{count} alerta tinha linhas de gatilho, mas nenhuma definição, geralmente um excluído durante a janela; não contado como lacuna. | {count} alertas tinham linhas de gatilho, mas nenhuma definição, geralmente excluídos durante a janela; não contados como lacuna.",
       "errorClustersUnattributed": "{count} linha de erro não pôde ser atribuída a um alerta. | {count} linhas de erro não puderam ser atribuídas a um alerta.",
       "definitionsWithoutFacts": "{count} alerta não tinha linhas de gatilho na janela, o que não é contado como lacuna. | {count} alertas não tinham linhas de gatilho na janela, o que não é contado como lacuna.",
       "transitionsTruncated": "As transições de estado foram truncadas.",
@@ -8135,6 +8143,7 @@
       "schedule": "Agendamento",
       "off": "Desativado",
       "notConfigured": "Não configurado",
+      "noScheduledRun": "Nenhuma execução agendada",
       "window": "Janela de análise",
       "latestFindings": "Descobertas da execução mais recente",
       "trend": "Tendência de descobertas",
@@ -8174,6 +8183,7 @@
       "statAlertsInScope": "Alertas no escopo",
       "statDeclined": "Recusados",
       "statDeclinedSub": "Recusados, não liberados",
+      "statDeclinedTooltip": "Pares de regra e alerta que a regra não avaliaria, porque o alerta tinha histórico insuficiente ou amostras de menos. Uma barreira, não uma liberação; os motivos por alerta não são gravados no stream.",
       "statWindow": "Janela",
       "findingsHeading": "Achados",
       "suggestionsOnly": "Apenas sugestões, nada é aplicado automaticamente",
@@ -8188,12 +8198,23 @@
       "noneFoundNotClearance": "Zero achados aqui não é uma liberação.",
       "evidence": "Evidências",
       "alert": "Alerta",
-      "proposedActions": "Ações propostas"
+      "proposedActions": "Ações propostas",
+      "openAlert": "Abrir alerta"
     },
     "dashboard": {
+      "latestRunAgo": "Última execução {time}",
       "findings": "Achados",
       "alertsInScope": "Alertas no escopo",
       "coverage": "Cobertura",
+      "attention": "O que precisa de atenção",
+      "attentionCaption": "Da última execução. Abra uma regra para ver os alertas que ela sinalizou.",
+      "alertsFlagged": "{count} alerta | {count} alertas",
+      "nothingFlagged": "Nenhum alerta sinalizado por esta regra na última execução.",
+      "allClear": "A última execução não encontrou nada a corrigir.",
+      "openAlert": "Abrir alerta",
+      "viewEvidence": "Ver evidências",
+      "notEnabledTitle": "A calibração de alertas não está em execução para esta organização",
+      "notEnabledDescription": "Ative-a nas configurações. A primeira execução ocorre assim que ela estiver ativada.",
       "emptyTitle": "Nenhuma execução nos últimos {days} dias",
       "emptyDescription": "O painel é preenchido assim que a calibração de alertas for executada."
     },
@@ -8208,7 +8229,9 @@
       "enabled": "Executar a calibração de alertas para esta organização",
       "enabledHelp": "Enquanto desativada, a organização não tem execução agendada. Ao ativá-la, a primeira execução vence imediatamente.",
       "frequency": "Executar a cada",
+      "frequencyHelp": "Entre 1 hora e 30 dias.",
       "window": "Janela de análise",
+      "windowHelp": "Até onde cada execução retrocede, entre 1 minuto e 90 dias. Uma janela maior que a cadência faz execuções consecutivas se sobreporem e relatarem os mesmos achados novamente.",
       "noConfig": "Esta organização ainda não tem configurações de calibração de alertas. Os valores abaixo são os padrões que sua primeira gravação armazena.",
       "warnGap": "Executa a cada {every}, mas retrocede apenas {window}, então o tempo entre as janelas nunca é analisado.",
       "warnStarved": "Uma janela de {window} é curta demais para {rules}, então cada execução os descarta para cada alerta.",
@@ -8222,7 +8245,10 @@
       "saveFailed": "Não foi possível salvar as configurações: {message}",
       "loadFailed": "Não foi possível carregar as configurações: {message}",
       "lastSaved": "Última gravação {time}",
-      "runNowHeading": "Executar agora"
+      "runNowHeading": "Executar agora",
+      "findingsDesc": "Os achados são gravados no stream {stream} desta organização e mantidos conforme a retenção desse stream. A calibração de alertas não envia notificações.",
+      "frequencyRange": "Escolha uma cadência entre 1 hora e 30 dias.",
+      "windowRange": "Escolha uma janela entre 1 minuto e 90 dias."
     }
   },
   "alerts": {
