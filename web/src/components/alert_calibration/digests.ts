@@ -194,7 +194,10 @@ export function parseAffectedAlerts(value: unknown): AffectedAlert[] {
   return parsed
     .filter(
       (item): item is Record<string, unknown> =>
-        typeof item === "object" && item !== null && typeof item.alert_name === "string",
+        typeof item === "object" &&
+        item !== null &&
+        typeof item.alert_name === "string" &&
+        item.alert_name.trim() !== "",
     )
     .map((item) => ({
       alert_id: String(item.alert_id ?? ""),

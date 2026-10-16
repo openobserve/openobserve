@@ -193,10 +193,12 @@ describe("an org-wide finding's affected alerts", () => {
     ]);
   });
 
-  it("lists nothing for a missing or malformed column, and drops entries without a name", () => {
+  it("lists nothing for a missing or malformed column, and drops entries without a usable name", () => {
     for (const value of [undefined, "", "not json", "{}", 42]) {
       expect(parseAffectedAlerts(value)).toEqual([]);
     }
-    expect(parseAffectedAlerts(JSON.stringify([{ alert_id: "a1" }, null, "x"]))).toEqual([]);
+    expect(
+      parseAffectedAlerts(JSON.stringify([{ alert_id: "a1" }, { alert_name: " " }, null, "x"])),
+    ).toEqual([]);
   });
 });
