@@ -179,7 +179,7 @@ export function foldTrend(
   const total = (id: string) => Math.max(0, ...(groups.get(id) ?? []).map((r) => num(r.tot)));
   const ids = [...groups.keys()]
     .filter((id) => id !== REST_ID)
-    .sort((x, y) => total(y) - total(x) || x.localeCompare(y));
+    .sort((x, y) => total(y) - total(x) || (x < y ? -1 : x > y ? 1 : 0));
   const series = ids.map((id) => toSeries(id, id, "value", groups.get(id)!, periods, ctx));
   const rest = groups.get(REST_ID);
   if (rest) {

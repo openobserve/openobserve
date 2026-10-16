@@ -55,7 +55,6 @@ const def = (patch: Partial<FunnelDef> = {}): FunnelDef => ({
 const full: FunnelPair = { a: 1, b: 4 };
 
 const ctesOf = (sql: string) => sql.slice(0, sql.lastIndexOf("\n"));
-// Removes only what the trend adds, so the rest must equal the steps query's CTEs.
 // The step-1 gate CTE reads one source; dropping it points its reader back at that source.
 const withoutGate = (sql: string) => {
   const m =
@@ -70,6 +69,7 @@ const withoutGate = (sql: string) => {
     .split(" AND t >= t1w")
     .join("");
 };
+// Removes only what the trend adds, so the rest must equal the steps query's CTEs.
 const withoutEntry = (sql: string, a: number) =>
   withoutGate(ctesOf(sql))
     .split(",\ntb AS (")[0]
