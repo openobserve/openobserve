@@ -141,7 +141,6 @@ pub(crate) async fn create_context(
     let cache_start = std::time::Instant::now();
     let hash_streams = hash_column_streams(&schema);
     let block_eligible = preference.streaming
-        && get_config().compact.metrics_index_enabled
         && get_config().search.feature_metrics_streaming_agg_enabled
         && hash_streams
         && files.iter().all(block_parent_eligible)
