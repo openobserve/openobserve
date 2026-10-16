@@ -29,4 +29,4 @@ export type * from "./actions/types";
 
 /** Lets a readonly transcript read messages without importing the runtime store. */
 export const assistantSessionSourceKey: InjectionKey<(sid: Sid) => ComputedRef<ChatMessage[]>> =
-  Symbol("assistantSessionSource");
+  /* @__PURE__ */ Symbol("assistantSessionSource");

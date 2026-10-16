@@ -2378,7 +2378,7 @@
 
 /* ── Trace thread view (LLM observability) owns its colours so the assistant's tokens can change alone ── */
 :root {
-  --color-trace-thread-model: var(--color-ai-accent);
+  --color-trace-thread-model: #7b61ff;
   --color-trace-thread-model-strong: var(--color-purple-400);
   --color-trace-thread-avatar-wash: var(--color-purple-100);
   --color-trace-thread-user-border: var(--color-indigo-100);

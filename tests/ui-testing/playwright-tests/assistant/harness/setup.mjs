@@ -47,10 +47,7 @@ const json = (route, body, status = 200) =>
     body: JSON.stringify(body),
   });
 
-/**
- * Mutable per-context mock state, so a test can flip scenarios between steps.
- * Knobs below the first block are no-ops until the WP that owns them fills in behaviour (99 §5).
- */
+/** Mutable per-context mock state; knobs past the first block are no-ops until their WP fills them in (99 §5). */
 export function createMockState(overrides = {}) {
   return {
     chats: CHATS.map((c) => ({ ...c })),

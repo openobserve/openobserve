@@ -212,7 +212,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :side-offset="6"
             />
           </div>
-          <span class="sr-only">{{ t("traces.threadView.user") }}</span>
+          <span class="sr-only">{{
+            group.userId
+              ? t("llmObservability.threadView.userNamed", { user: raw(group.userId) })
+              : t("traces.threadView.user")
+          }}</span>
           <div class="thread-user-row__text min-w-0 flex-1 self-center">{{ group.userQuery }}</div>
         </div>
 

@@ -132,12 +132,18 @@ export const BANNED_PROPERTY_NAMES = [
 
 export const MAX_STRING_PROPERTY_LENGTH = 64;
 
+/** Held sends kept at once; a turn abandoned without admission or `ai_turn_ended` is evicted oldest first. */
+export const MAX_PENDING_ADMISSIONS = 50;
+
 // `ai_feedback.value` is the catalogue's own enum (up | down), so the banned name is pinned there by type instead.
 const BANNED_NAME_EXEMPTIONS: ReadonlySet<string> = new Set(["ai_feedback.value"]);
 
 const TURN_SCOPED: ReadonlySet<string> = new Set(TURN_SCOPED_EVENTS);
 
 const DOOR_FIELDS = ["entry_kind", "entry_verb", "object_kind"] as const;
+
+// A lost stream ends the answer the way the legacy stream failure did.
+const FAILED_OUTCOMES: ReadonlySet<string> = new Set(["failed", "lost", "refused"]);
 
 // Context and scope own these; a property of the same name would silently override the envelope.
 const ENVELOPE_FIELDS: ReadonlySet<string> = new Set([
@@ -162,6 +168,9 @@ const ENVELOPE_OVERRIDES: ReadonlySet<string> = new Set([
   "ai_panel_resized.viewport",
 ]);
 
+// `ai_turn_sent` fires at `queued`, but its legacy event waits for admission (`99` §3.4), so the send is held per turn.
+const pendingAdmission = new Map<string, PendingSend>();
+
 let context: TelemetryContextGetters = {
   getContainer: () => "home",
   getRoute: () => "",
@@ -178,10 +187,10 @@ export type AiEventName = (typeof AI_EVENT_NAMES)[number];
 
 export type TurnScopedEventName = (typeof TURN_SCOPED_EVENTS)[number];
 
-/** The `ai_turn_ended.error_code` enum: exactly the codes of `99` §3.5. */
+/** The `ai_turn_ended.error_code` enum: the codes of `99` §3.5 plus `stopped_before_send`, a Stop while still queued. */
 export type AiErrorCode = Exclude<
   AssistantErrorCode,
-  "off_for_org" | "data_level_blocked" | "permission_denied_tool"
+  "history_unavailable" | "off_for_org" | "data_level_blocked" | "permission_denied_tool"
 >;
 
 export type Viewport = "mobile" | "tablet" | "desktop";
@@ -492,13 +501,25 @@ export interface TelemetryScope {
   traceId?: string;
 }
 
+export type TurnTelemetryScope = TelemetryScope & { sid: Sid; turnId: string };
+
 export type TrackArgs<N extends AiEventName> = N extends TurnScopedEventName
-  ? [props: AiEventProps[N], scope: TelemetryScope & { turnId: string }]
+  ? [props: AiEventProps[N], scope: TurnTelemetryScope]
   : [props: AiEventProps[N], scope?: TelemetryScope];
+
+/** What the incident RCA's legacy `incident_rca_requested` keeps from the old request. */
+export interface AdmissionLegacyOptions {
+  buildOnPrevious?: boolean;
+}
 
 export interface TrackedEvent {
   name: string;
   properties: Record<string, unknown>;
+}
+
+interface PendingSend {
+  props: Record<string, unknown>;
+  container: unknown;
 }
 
 export function setAssistantTelemetryContext(ctx: TelemetryContextGetters): void {
@@ -517,7 +538,26 @@ export function trackAssistant<N extends AiEventName>(name: N, ...args: TrackArg
   }
   const properties = { ...buildEnvelope(props, scope), ...props };
   emit({ name, properties });
-  for (const legacy of legacyEventsFor(name, props, properties)) emit(legacy);
+  for (const legacy of legacyEventsFor(name, props)) emit(legacy);
+  if (scope?.turnId && name === "ai_turn_sent") holdSend(scope.turnId, props, properties.container);
+  if (scope?.turnId && name === "ai_turn_ended") pendingAdmission.delete(scope.turnId);
+}
+
+/** The server admitted the turn: the only place the legacy send events fire for assistant turns (`99` §3.4). */
+export function trackAssistantAdmitted(
+  scope: TurnTelemetryScope,
+  options: AdmissionLegacyOptions = {},
+): void {
+  const pending = pendingAdmission.get(scope.turnId);
+  if (!pending) {
+    if (import.meta.env.DEV)
+      throw new Error("trackAssistantAdmitted: no ai_turn_sent for this turn");
+    return;
+  }
+  pendingAdmission.delete(scope.turnId);
+  for (const legacy of admissionLegacyEvents(pending.props, pending.container, options)) {
+    emit(legacy);
+  }
 }
 
 /** Every content-rule violation of one event (`99` §3.4); empty when it may be sent. */
@@ -528,6 +568,7 @@ export function assistantEventProblems(
 ): string[] {
   const problems: string[] = [];
   if (TURN_SCOPED.has(name) && !scope?.turnId) problems.push("turn-scoped event without turn_id");
+  if (TURN_SCOPED.has(name) && !scope?.sid) problems.push("turn-scoped event without session_id");
   if (name === "ai_feedback" && props.outcome !== "done") problems.push("feedback outside done");
   for (const [key, value] of Object.entries(props)) {
     if (isBannedName(name, key)) problems.push(`banned property "${key}"`);
@@ -540,28 +581,11 @@ export function assistantEventProblems(
 }
 
 /** The one-release continuity events built from the new ones (`99` §3.4). */
-export function legacyEventsFor(
-  name: string,
-  props: Record<string, unknown>,
-  envelope: Record<string, unknown>,
-): TrackedEvent[] {
-  if (name === "ai_turn_sent") {
-    return envelope.container === "rca"
-      ? [{ name: "incident_rca_requested", properties: {} }]
-      : [
-          {
-            name: "ai_assistant_message_sent",
-            properties: {
-              has_images: Number(props.image_count) > 0,
-              new_session: props.new_session,
-            },
-          },
-        ];
-  }
+export function legacyEventsFor(name: string, props: Record<string, unknown>): TrackedEvent[] {
   if (name === "ai_turn_ended" && props.outcome === "done") {
     return [{ name: "ai_assistant_answer_completed", properties: {} }];
   }
-  if (name === "ai_turn_ended" && (props.outcome === "failed" || props.outcome === "refused")) {
+  if (name === "ai_turn_ended" && FAILED_OUTCOMES.has(String(props.outcome))) {
     const stage = props.outcome === "refused" ? "request" : "stream";
     return [{ name: "ai_assistant_answer_failed", properties: { stage } }];
   }
@@ -579,6 +603,28 @@ export function legacyEventsFor(
     return [{ name: "ai_query_generated", properties: {} }];
   }
   return [];
+}
+
+/** The legacy send event of one admitted `ai_turn_sent`, from its props and its container. */
+export function admissionLegacyEvents(
+  sent: Record<string, unknown>,
+  container: unknown,
+  options: AdmissionLegacyOptions = {},
+): TrackedEvent[] {
+  if (container === "rca") {
+    return [
+      {
+        name: "incident_rca_requested",
+        properties: { build_on_previous: options.buildOnPrevious === true },
+      },
+    ];
+  }
+  return [
+    {
+      name: "ai_assistant_message_sent",
+      properties: { has_images: Number(sent.image_count) > 0, new_session: sent.new_session },
+    },
+  ];
 }
 
 function buildEnvelope(props: Record<string, unknown>, scope?: TelemetryScope): AiEnvelope {
@@ -601,6 +647,15 @@ function buildEnvelope(props: Record<string, unknown>, scope?: TelemetryScope): 
     if (typeof props[field] === "string") Object.assign(envelope, { [field]: props[field] });
   }
   return envelope;
+}
+
+function holdSend(turnId: string, props: Record<string, unknown>, container: unknown): void {
+  // Re-inserting moves a retried turn to the newest end, so eviction always drops the oldest send.
+  pendingAdmission.delete(turnId);
+  pendingAdmission.set(turnId, { props, container });
+  if (pendingAdmission.size > MAX_PENDING_ADMISSIONS) {
+    pendingAdmission.delete(pendingAdmission.keys().next().value as string);
+  }
 }
 
 function emit(event: TrackedEvent): void {

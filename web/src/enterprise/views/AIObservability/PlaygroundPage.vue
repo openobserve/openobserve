@@ -1299,6 +1299,8 @@ interface RecentDraftEntry {
   draft: PlaygroundDraft;
 }
 
+const RECENT_DRAFTS_LIMIT = 10;
+
 const recentDrafts = ref<RecentDraftEntry[]>([]);
 
 /** Identifies the draft being worked on now; a new one starts on Reset. */
@@ -1308,36 +1310,64 @@ const draftSessionId = ref(playgroundId("draft"));
 let cachedStorageRaw = "";
 let cachedStorageKeyPromise: Promise<string> | null = null;
 
-function getStorageKey(): Promise<string> {
-  const email = store.state.userInfo?.email ?? "";
-  const raw = `${email}:${orgId.value}`;
+function currentEmail(): string {
+  return store.state.userInfo?.email ?? "";
+}
+
+function getStorageKey(email: string, org: string): Promise<string> {
+  const raw = `${email}:${org}`;
   if (raw !== cachedStorageRaw) {
     cachedStorageRaw = raw;
-    cachedStorageKeyPromise = computeLlmObservabilityKey(email, orgId.value);
+    cachedStorageKeyPromise = computeLlmObservabilityKey(email, org);
   }
   return cachedStorageKeyPromise!;
 }
 
-async function keyedName(prefix: string): Promise<string> {
-  return `${prefix}:${await getStorageKey()}`;
+async function keyedName(prefix: string, email = currentEmail(), org = orgId.value) {
+  return `${prefix}:${await getStorageKey(email, org)}`;
 }
 
 function storageKey(): Promise<string> {
   return keyedName("o2-playground-drafts");
 }
 
-/** Reads `prefix:<key>`, moving a value saved under the assistant's userOrgKey hash over once. */
-async function readKeyed(prefix: string): Promise<string | null> {
-  const key = await keyedName(prefix);
+/** Reads `prefix:<key>`, moving a value saved under the assistant's userOrgKey hash over once; `merge` joins the two when both exist. */
+async function readKeyed(
+  prefix: string,
+  merge: (current: string, previous: string) => string = (current) => current,
+): Promise<string | null> {
+  // Captured once, so an org switch mid-read never files one org's value under another's key.
+  const email = currentEmail();
+  const org = orgId.value;
+  const key = await keyedName(prefix, email, org);
+  const previousKey = `${prefix}:${await computeUserOrgKey(email, org)}`;
   const stored = localStorage.getItem(key);
-  if (stored !== null) return stored;
-  const email = store.state.userInfo?.email ?? "";
-  const previousKey = `${prefix}:${await computeUserOrgKey(email, orgId.value)}`;
   const previous = previousKey === key ? null : localStorage.getItem(previousKey);
-  if (previous === null) return null;
-  localStorage.setItem(key, previous);
+  if (previous === null) return stored;
+  const value = stored === null ? previous : merge(stored, previous);
+  localStorage.setItem(key, value);
   localStorage.removeItem(previousKey);
-  return previous;
+  return value;
+}
+
+/** One entry per draft id, the most recently saved winning, newest first. */
+function mergeRecentDrafts(current: string, previous: string): string {
+  const byId = new Map<string, RecentDraftEntry>();
+  for (const entry of [...parseRecentDrafts(previous), ...parseRecentDrafts(current)]) {
+    const kept = byId.get(entry.id);
+    if (!kept || entry.savedAt >= kept.savedAt) byId.set(entry.id, entry);
+  }
+  const merged = [...byId.values()].sort((a, b) => b.savedAt - a.savedAt);
+  return JSON.stringify(merged.slice(0, RECENT_DRAFTS_LIMIT));
+}
+
+function parseRecentDrafts(stored: string): RecentDraftEntry[] {
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    return Array.isArray(parsed) ? (parsed as RecentDraftEntry[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 function removeLegacyStorage() {
@@ -1351,7 +1381,7 @@ function removeLegacyStorage() {
 
 async function loadRecentDrafts() {
   try {
-    const stored = await readKeyed("o2-playground-drafts");
+    const stored = await readKeyed("o2-playground-drafts", mergeRecentDrafts);
     recentDrafts.value = stored ? (JSON.parse(stored) as RecentDraftEntry[]) : [];
   } catch {
     recentDrafts.value = [];
@@ -1494,7 +1524,7 @@ async function persistDraft() {
   // One entry per working session, not per keystroke. Keying on the text meant
   // every edit forked a near-duplicate and buried the drafts worth returning to.
   const others = recentDrafts.value.filter((candidate) => candidate.id !== entry.id);
-  recentDrafts.value = [entry, ...others].slice(0, 10);
+  recentDrafts.value = [entry, ...others].slice(0, RECENT_DRAFTS_LIMIT);
   try {
     localStorage.setItem(await storageKey(), JSON.stringify(recentDrafts.value));
   } catch {

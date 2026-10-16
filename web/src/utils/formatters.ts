@@ -317,6 +317,10 @@ const abbrFormatters = new Map<string, Intl.DateTimeFormat | null>();
 const orgTimeFormatters = new Map<string, Intl.DateTimeFormat | null>();
 const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
 const DAY_MS = 86_400_000;
+// The store imports this module (directly and via zincutils), so it registers its zone here; importing it would cycle.
+let orgTimeZoneSource: () => string | undefined = () => undefined;
+
+type ElapsedSymbol = "ms" | "s" | "min" | "h";
 
 function cachedFormatter(
   cache: Map<string, Intl.DateTimeFormat | null>,
@@ -435,6 +439,11 @@ export const formatMicrosDuration = (micros: number): string => {
   return remHours ? `${days}d ${remHours}h` : `${days}d`;
 };
 
+/** Supplies the org zone that `formatOrgTime` and `formatOrgRange` use when no `timeZone` is passed. */
+export function setOrgTimeZoneSource(source: () => string | undefined): void {
+  orgTimeZoneSource = source;
+}
+
 /** The Intl locale of the UI language; an unknown code is tried as-is before falling back to en-US. */
 export function uiIntlLocale(): string {
   const current = i18n.global.locale as unknown as string | { value: string };
@@ -451,20 +460,27 @@ export function uiIntlLocale(): string {
 /** Minute-precision time in the org zone: "13:57" today, weekday this week, date older; `absolute` is the tooltip form. */
 export function formatOrgTime(
   ts: number,
-  opts: { tz: string; precision?: "minute"; showZone?: boolean; absolute?: boolean; now?: number },
+  opts: {
+    precision?: "minute";
+    showZone?: boolean;
+    timeZone?: string;
+    absolute?: boolean;
+    now?: number;
+  } = {},
 ): string {
   const locale = uiIntlLocale();
-  if (opts.absolute) return absoluteOrgTime(ts, opts.tz, locale);
+  const tz = opts.timeZone ?? orgTimeZone();
+  if (opts.absolute) return absoluteOrgTime(ts, tz, locale);
   const now = opts.now ?? Date.now();
-  const time = orgParts(ts, opts.tz, locale, { hour: "2-digit", minute: "2-digit" });
-  const day = dayDistance(ts, now, opts.tz);
-  const zone = opts.showZone ? ` ${zoneName(ts, opts.tz, locale)}` : "";
+  const time = orgParts(ts, tz, locale, { hour: "2-digit", minute: "2-digit" });
+  const day = dayDistance(ts, now, tz);
+  const zone = opts.showZone ? ` ${zoneName(ts, tz, locale)}` : "";
   if (day === 0) return `${time}${zone}`;
   if (day > 0 && day < 7) {
-    return `${orgParts(ts, opts.tz, locale, { weekday: "short" })} ${time}${zone}`;
+    return `${orgParts(ts, tz, locale, { weekday: "short" })} ${time}${zone}`;
   }
-  const sameYear = orgYear(ts, opts.tz) === orgYear(now, opts.tz);
-  const date = orgParts(ts, opts.tz, locale, {
+  const sameYear = orgYear(ts, tz) === orgYear(now, tz);
+  const date = orgParts(ts, tz, locale, {
     day: "numeric",
     month: "short",
     ...(sameYear ? {} : { year: "numeric" }),
@@ -473,8 +489,9 @@ export function formatOrgTime(
 }
 
 /** "13:42–13:58 GMT+5:30": one zone, always named, en dash between the ends. */
-export function formatOrgRange(from: number, to: number, tz: string): string {
+export function formatOrgRange(from: number, to: number, opts: { timeZone?: string } = {}): string {
   const locale = uiIntlLocale();
+  const tz = opts.timeZone ?? orgTimeZone();
   const zone = zoneName(to, tz, locale);
   const clock = (ts: number) => orgParts(ts, tz, locale, { hour: "2-digit", minute: "2-digit" });
   if (dayDistance(from, to, tz) === 0) return `${clock(from)}–${clock(to)} ${zone}`;
@@ -483,12 +500,12 @@ export function formatOrgRange(from: number, to: number, tz: string): string {
   return `${dated(from)} – ${dated(to)} ${zone}`;
 }
 
-/** "3 minutes ago" through `Intl.RelativeTimeFormat` in the UI locale. */
+/** "just now", then the short `Intl.RelativeTimeFormat` style of the UI locale ("3 min. ago" in en-US, "3 min ago" in en-GB). */
 export function formatRelative(ts: number, now: number = Date.now()): string {
-  const rtf = new Intl.RelativeTimeFormat(uiIntlLocale(), { numeric: "auto" });
   const seconds = Math.round((ts - now) / 1000);
   const abs = Math.abs(seconds);
-  if (abs < 45) return rtf.format(0, "second");
+  if (abs < 45) return gt("common.justNow");
+  const rtf = new Intl.RelativeTimeFormat(uiIntlLocale(), { numeric: "auto", style: "short" });
   if (abs < 3600) return rtf.format(Math.round(seconds / 60), "minute");
   if (abs < DAY_MS / 1000) return rtf.format(Math.round(seconds / 3600), "hour");
   if (abs < (30 * DAY_MS) / 1000) return rtf.format(Math.round(seconds / 86_400), "day");
@@ -496,27 +513,22 @@ export function formatRelative(ts: number, now: number = Date.now()): string {
   return rtf.format(Math.round(seconds / 31_536_000), "year");
 }
 
-/** "380 ms", "12 sec", "1 min 4 sec"; named apart from the older `formatDuration`, whose callers keep their output. */
+/** "380 ms", "12 s", "1 min 4 s"; named apart from the older `formatDuration`, whose callers keep their output. */
 export function formatElapsed(ms: number): string {
-  const locale = uiIntlLocale();
-  const unit = (value: number, name: "millisecond" | "second" | "minute" | "hour") =>
-    new Intl.NumberFormat(locale, { style: "unit", unit: name, unitDisplay: "short" }).format(
-      value,
-    );
   if (!Number.isFinite(ms) || ms < 0) return "—";
-  // Round before choosing the unit, so 999.6 ms reads "1 sec", never "1,000 ms".
+  const number = new Intl.NumberFormat(uiIntlLocale(), { maximumFractionDigits: 0 });
+  // SI symbols are language-neutral, unlike Intl's short units ("12 sec", "12 Sek.").
+  const unit = (value: number, symbol: ElapsedSymbol) => `${number.format(value)} ${symbol}`;
+  // Round before choosing the unit, so 999.6 ms reads "1 s", never "1,000 ms".
   const wholeMs = Math.round(ms);
-  if (wholeMs < 1000) return unit(wholeMs, "millisecond");
+  if (wholeMs < 1000) return unit(wholeMs, "ms");
   const totalSeconds = Math.floor(wholeMs / 1000);
-  if (totalSeconds < 60) return unit(totalSeconds, "second");
+  if (totalSeconds < 60) return unit(totalSeconds, "s");
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  if (hours > 0)
-    return minutes ? `${unit(hours, "hour")} ${unit(minutes, "minute")}` : unit(hours, "hour");
-  return seconds
-    ? `${unit(minutes, "minute")} ${unit(seconds, "second")}`
-    : unit(minutes, "minute");
+  if (hours > 0) return minutes ? `${unit(hours, "h")} ${unit(minutes, "min")}` : unit(hours, "h");
+  return seconds ? `${unit(minutes, "min")} ${unit(seconds, "s")}` : unit(minutes, "min");
 }
 
 /** Locale digit grouping for a whole count; the caller pluralises the noun with the same count. */
@@ -555,6 +567,10 @@ function orgParts(
   options: Intl.DateTimeFormatOptions,
 ): string {
   return orgFormatter(locale, tz, options)?.format(new Date(ts)) ?? "";
+}
+
+function orgTimeZone(): string {
+  return orgTimeZoneSource() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
 function orgYear(ts: number, tz: string): number {

@@ -3,6 +3,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 
 import i18n from "@/locales";
+import store from "@/stores";
 
 // Mock @/utils/date before importing formatters
 vi.mock("@/utils/date", () => ({
@@ -734,14 +735,16 @@ describe("assistant formatters", () => {
     beforeEach(() => setLocale("en-us"));
 
     it("renders today at minute precision in the org zone", () => {
-      expect(formatOrgTime(NOW, { tz: TZ, precision: "minute", now: NOW })).toBe("13:57");
-      expect(formatOrgTime(NOW, { tz: "UTC", now: NOW })).toBe("08:27");
+      expect(formatOrgTime(NOW, { timeZone: TZ, precision: "minute", now: NOW })).toBe("13:57");
+      expect(formatOrgTime(NOW, { timeZone: "UTC", now: NOW })).toBe("08:27");
     });
 
     it("renders this week with the weekday and older with the date", () => {
-      expect(formatOrgTime(NOW - 86_400_000, { tz: TZ, now: NOW })).toBe("Tue 13:57");
-      expect(formatOrgTime(Date.UTC(2026, 9, 5, 8, 27), { tz: TZ, now: NOW })).toBe("Oct 5 13:57");
-      expect(formatOrgTime(Date.UTC(2025, 9, 5, 8, 27), { tz: TZ, now: NOW })).toBe(
+      expect(formatOrgTime(NOW - 86_400_000, { timeZone: TZ, now: NOW })).toBe("Tue 13:57");
+      expect(formatOrgTime(Date.UTC(2026, 9, 5, 8, 27), { timeZone: TZ, now: NOW })).toBe(
+        "Oct 5 13:57",
+      );
+      expect(formatOrgTime(Date.UTC(2025, 9, 5, 8, 27), { timeZone: TZ, now: NOW })).toBe(
         "Oct 5, 2025 13:57",
       );
     });
@@ -749,17 +752,32 @@ describe("assistant formatters", () => {
     it("uses the org day, not the UTC day", () => {
       // 23:50 UTC on the 13th is already the 14th in Kolkata.
       const lateUtc = Date.UTC(2026, 9, 13, 23, 50);
-      expect(formatOrgTime(lateUtc, { tz: TZ, now: NOW })).toBe("05:20");
+      expect(formatOrgTime(lateUtc, { timeZone: TZ, now: NOW })).toBe("05:20");
     });
 
     it("renders the absolute tooltip form and the inline zone", () => {
-      expect(formatOrgTime(NOW, { tz: TZ, absolute: true })).toBe("2026-10-14 13:57 GMT+5:30");
-      expect(formatOrgTime(NOW, { tz: TZ, showZone: true, now: NOW })).toBe("13:57 GMT+5:30");
+      expect(formatOrgTime(NOW, { timeZone: TZ, absolute: true })).toBe(
+        "2026-10-14 13:57 GMT+5:30",
+      );
+      expect(formatOrgTime(NOW, { timeZone: TZ, showZone: true, now: NOW })).toBe("13:57 GMT+5:30");
     });
 
     it("renders in the en-XA pseudo-locale without throwing", () => {
       setLocale("en-XA");
-      expect(formatOrgTime(NOW, { tz: TZ, now: NOW })).toBe("13:57");
+      expect(formatOrgTime(NOW, { timeZone: TZ, now: NOW })).toBe("13:57");
+    });
+
+    it("defaults to the org zone from the store", () => {
+      const previous = store.state.timezone;
+      store.state.timezone = TZ;
+      try {
+        expect(formatOrgTime(NOW, { now: NOW })).toBe("13:57");
+        expect(formatOrgRange(NOW - 15 * 60_000, NOW)).toBe("13:42–13:57 GMT+5:30");
+        store.state.timezone = "UTC";
+        expect(formatOrgTime(NOW, { now: NOW })).toBe("08:27");
+      } finally {
+        store.state.timezone = previous;
+      }
     });
   });
 
@@ -767,25 +785,30 @@ describe("assistant formatters", () => {
     beforeEach(() => setLocale("en-us"));
 
     it("names one zone and joins the ends with an en dash", () => {
-      expect(formatOrgRange(NOW - 15 * 60_000, NOW + 60_000, TZ)).toBe("13:42–13:58 GMT+5:30");
+      expect(formatOrgRange(NOW - 15 * 60_000, NOW + 60_000, { timeZone: TZ })).toBe(
+        "13:42–13:58 GMT+5:30",
+      );
     });
 
     it("dates both ends when they fall on different org days", () => {
-      expect(formatOrgRange(NOW - 86_400_000, NOW, TZ)).toBe(
+      expect(formatOrgRange(NOW - 86_400_000, NOW, { timeZone: TZ })).toBe(
         "Oct 13 13:57 – Oct 14 13:57 GMT+5:30",
       );
     });
   });
 
   describe("formatRelative", () => {
-    it("speaks recency in the UI locale", () => {
+    it("speaks recency in the UI locale's short style", () => {
       setLocale("en-us");
-      expect(formatRelative(NOW - 10_000, NOW)).toBe("now");
-      expect(formatRelative(NOW - 3 * 60_000, NOW)).toBe("3 minutes ago");
-      expect(formatRelative(NOW - 2 * 3_600_000, NOW)).toBe("2 hours ago");
+      expect(formatRelative(NOW - 10_000, NOW)).toBe("just now");
+      expect(formatRelative(NOW + 10_000, NOW)).toBe("just now");
+      expect(formatRelative(NOW - 3 * 60_000, NOW)).toBe("3 min. ago");
+      expect(formatRelative(NOW - 2 * 3_600_000, NOW)).toBe("2 hr. ago");
       expect(formatRelative(NOW - 86_400_000, NOW)).toBe("yesterday");
+      setLocale("en-gb");
+      expect(formatRelative(NOW - 3 * 60_000, NOW)).toBe("3 min ago");
       setLocale("de");
-      expect(formatRelative(NOW - 3 * 60_000, NOW)).toBe("vor 3 Minuten");
+      expect(formatRelative(NOW - 3 * 60_000, NOW)).toBe("vor 3 Min.");
     });
   });
 
@@ -796,11 +819,17 @@ describe("assistant formatters", () => {
       expect(formatElapsed(380)).toBe("380 ms");
       expect(formatElapsed(380.4)).toBe("380 ms");
       expect(formatElapsed(999.4)).toBe("999 ms");
-      expect(formatElapsed(999.6)).toBe("1 sec");
-      expect(formatElapsed(12_400)).toBe("12 sec");
-      expect(formatElapsed(64_000)).toBe("1 min 4 sec");
+      expect(formatElapsed(999.6)).toBe("1 s");
+      expect(formatElapsed(12_400)).toBe("12 s");
+      expect(formatElapsed(64_000)).toBe("1 min 4 s");
       expect(formatElapsed(120_000)).toBe("2 min");
-      expect(formatElapsed(3_900_000)).toBe("1 hr 5 min");
+      expect(formatElapsed(3_900_000)).toBe("1 h 5 min");
+    });
+
+    it("groups the number by the UI locale and keeps the SI symbol", () => {
+      setLocale("de");
+      expect(formatElapsed(12_400)).toBe("12 s");
+      expect(formatElapsed(64_000)).toBe("1 min 4 s");
     });
 
     it("renders an impossible duration as a dash", () => {

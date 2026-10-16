@@ -267,6 +267,18 @@ describe("ThreadView", () => {
       expect(userBubble.text()).toContain("Hello, world!");
     });
 
+    it("should name the user and their id in the sr-only sender text", () => {
+      wrapper = mountThreadView({
+        spans: [makeRootSpan({ user_email: "alice@example.com" }), makeLLMSpan()],
+      });
+      expect(wrapper.get(".thread-user-row .sr-only").text()).toBe("User alice@example.com");
+    });
+
+    it("should fall back to the plain user label when no user id is known", () => {
+      wrapper = mountThreadView({ spans: [makeLLMSpan()] });
+      expect(wrapper.get(".thread-user-row .sr-only").text()).toBe("User");
+    });
+
     it("should render the assistant reply bubble", () => {
       const llm = makeLLMSpan();
       wrapper = mountThreadView({ spans: [llm] });

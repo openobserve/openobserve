@@ -670,8 +670,7 @@ noLegacyO2Tokens.rules["no-missing-gt-keys"] = {
   },
 };
 
-// Flat config replaces a rule's options per matching block instead of merging them, so every block
-// that sets no-restricted-imports or no-restricted-syntax repeats these shared entries.
+// Flat config replaces rule options per block instead of merging them, so every block repeats these shared entries.
 const I18N_IMPORT_BAN = {
   name: "vue-i18n",
   importNames: ["useI18n"],

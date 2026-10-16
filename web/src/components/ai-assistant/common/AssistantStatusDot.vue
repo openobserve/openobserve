@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <span
-    aria-hidden="true"
     data-test="assistant-status-dot"
     :data-state="state"
     :data-shape="shape"
@@ -27,10 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <span
       v-if="shape === 'ring'"
+      aria-hidden="true"
       class="ring-assistant-signal-working size-2 rounded-full bg-transparent ring-2 motion-safe:animate-pulse motion-reduce:animate-none forced-colors:border"
     />
     <template v-else-if="shape === 'dot-count'">
-      <span :class="['bg-assistant-signal-attention size-2 rounded-full', dotRing]" />
+      <span
+        aria-hidden="true"
+        :class="['bg-assistant-signal-attention size-2 rounded-full', dotRing]"
+      />
       <span
         v-if="count"
         class="text-text-secondary text-2xs font-medium tabular-nums max-md:sr-only"
@@ -39,11 +42,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <span
       v-else-if="shape === 'glyph'"
+      aria-hidden="true"
       class="text-assistant-signal-failed inline-flex size-3 items-center justify-center"
     >
       <OIcon :name="assistantGlyph.failed" size="xs" />
     </span>
-    <span v-else :class="['bg-assistant-signal-unread size-2 rounded-full', dotRing]" />
+    <span
+      v-else
+      aria-hidden="true"
+      :class="['bg-assistant-signal-unread size-2 rounded-full', dotRing]"
+    />
   </span>
 </template>
 
