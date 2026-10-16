@@ -148,7 +148,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               pagination="none"
               sorting="none"
               :show-global-filter="false"
-              :loading="loading"
+              :loading="waitingForFirstChunk"
+              :streaming="loading && rows.length > 0"
               :error="loadError ? t('billing.usageV2.trendsLoadFailed') : null"
               :row-class="meterRowClass"
               class="min-h-0 flex-1"
@@ -213,7 +214,6 @@ import { timestampToTimezoneDate } from "@/utils/timezone";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import organizations from "@/services/organizations";
-import searchService from "@/services/search";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import UsageKpiCard from "./UsageKpiCard.vue";
 import UsagePaneHeader from "./UsagePaneHeader.vue";
@@ -226,6 +226,7 @@ import {
   type MeteringDetails,
 } from "./meteringModel";
 import { buildTrendsChartOption, meterColorFor } from "./usageCharts";
+import { useUsageSearch } from "./useUsageSearch";
 import { trendsCostSql } from "./usageQueries";
 import {
   bucketSeconds,
@@ -465,32 +466,38 @@ const bucket = computed(() => trendBucket(range.value.start, range.value.end));
 let latestLoad = 0;
 
 /** The chart's own query at a daily bucket, so the totals are exactly what the bars add up to. */
-const loadCosts = async () => {
+const { search } = useUsageSearch();
+
+const toCostRows = (hits: Record<string, unknown>[]): CostRow[] =>
+  hits.map((hit) => ({
+    ts: bucketSeconds(hit.x_axis_1),
+    event: String(hit.breakdown_1 ?? ""),
+    cost: Number(hit.y_axis_1) || 0,
+  }));
+
+/** Days stream oldest first, so the run rate and projection are only right once all have landed; the KPIs wait for that and only the list streams. */
+const waitingForFirstChunk = computed(() => loading.value && !rows.value.length);
+
+const loadCosts = async (refresh = false) => {
   if (!usageStreamEnabled.value) return;
   const loadId = ++latestLoad;
   loading.value = true;
   loadError.value = false;
+  // Cleared, so streamed days never mix with the previous range's.
+  rows.value = [];
   try {
-    // Log search is never cached by house rule, so this goes to the service directly.
-    const response = await searchService.search({
-      org_identifier: orgId.value,
-      page_type: "logs",
-      query: {
-        query: {
-          sql: trendsCostSql(usageOrg.value, prices.value, bucket.value),
-          start_time: range.value.start * 1_000_000,
-          end_time: range.value.end * 1_000_000,
-          from: 0,
-          size: 10_000,
-        },
+    const hits = await search(trendsCostSql(usageOrg.value, prices.value, bucket.value), {
+      start: range.value.start * 1_000_000,
+      end: range.value.end * 1_000_000,
+      size: 10_000,
+      key: "trends",
+      refresh,
+      onRows: (partial) => {
+        if (loadId === latestLoad) rows.value = toCostRows(partial);
       },
     });
     if (loadId !== latestLoad) return;
-    rows.value = ((response?.data?.hits ?? []) as Record<string, unknown>[]).map((hit) => ({
-      ts: bucketSeconds(hit.x_axis_1),
-      event: String(hit.breakdown_1 ?? ""),
-      cost: Number(hit.y_axis_1) || 0,
-    }));
+    rows.value = toCostRows(hits);
     streamMissing.value = false;
     lastLoadedAt.value = Date.now();
   } catch (err: any) {
@@ -505,14 +512,14 @@ const loadCosts = async () => {
   }
 };
 
-watch([range, prices, usageStreamEnabled, usageOrg], loadCosts, { immediate: true });
+watch([range, prices, usageStreamEnabled, usageOrg], () => loadCosts(), { immediate: true });
 
 const emit = defineEmits<{ refresh: [] }>();
 
 /** Reloads the metering response too, so new cycles and rates come with the new usage. */
 const refresh = () => {
   emit("refresh");
-  loadCosts();
+  loadCosts(true);
 };
 
 /** KPIs and the forecast count days, whatever bucket the chart uses. */

@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="min-h-0 flex-1"
       :row-class="rowClass"
       :loading="loading"
+      :streaming="streaming"
       data-test="billings-usagemetertable-table"
       @row-click="onRowClick"
     >
@@ -136,6 +137,8 @@ const props = defineProps<{
   /** Header of the share column, "Share of Bill" by default. */
   shareHeader?: I18nText;
   loading?: boolean;
+  /** Rows are still arriving; they show with OTable's streaming indicator instead of a skeleton. */
+  streaming?: boolean;
 }>();
 const emit = defineEmits<{ select: [key: string] }>();
 

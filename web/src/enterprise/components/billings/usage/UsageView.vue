@@ -55,29 +55,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'overflow-auto'
       "
     >
-      <UsageOverview
-        v-if="activeTab === 'overview'"
-        :details="details"
-        :billing-orgs="billingOrgs"
-        :last-loaded-at="lastLoadedAt"
-        :refreshing="loading"
-        @refresh="loadDetails"
-      />
-      <UsageTrends
-        v-else-if="activeTab === 'trends'"
-        :details="details"
-        :cycles="cycles"
-        :oldest-ts="response?.oldest_ts"
-        :billing-orgs="billingOrgs"
-        @refresh="loadDetails"
-      />
-      <UsageSuperBudget
-        v-else-if="activeTab === 'budget' && billingOrgs.length"
-        :details="details"
-        :billing-orgs="billingOrgs"
-      />
-      <UsageBudget v-else-if="activeTab === 'budget'" :details="details" />
-      <UsageEstimator v-else :details="details" />
+      <!-- Kept alive, so a tab seen once comes back as it was left, with no new queries. -->
+      <KeepAlive>
+        <UsageOverview
+          v-if="activeTab === 'overview'"
+          :details="details"
+          :billing-orgs="billingOrgs"
+          :last-loaded-at="lastLoadedAt"
+          :refreshing="loading"
+          @refresh="loadDetails"
+        />
+        <UsageTrends
+          v-else-if="activeTab === 'trends'"
+          :details="details"
+          :cycles="cycles"
+          :oldest-ts="response?.oldest_ts"
+          :billing-orgs="billingOrgs"
+          @refresh="loadDetails"
+        />
+        <UsageSuperBudget
+          v-else-if="activeTab === 'budget' && billingOrgs.length"
+          :details="details"
+          :billing-orgs="billingOrgs"
+        />
+        <UsageBudget v-else-if="activeTab === 'budget'" :details="details" />
+        <UsageEstimator v-else :details="details" />
+      </KeepAlive>
     </div>
   </div>
 </template>
@@ -152,35 +155,35 @@ const lastLoadedAt = ref<number | null>(null);
 const billingOrgs = ref<BillingOrg[]>([]);
 
 /** A failure reads as "not a super org", so the page still shows the bill by meter. */
-const loadBillingOrgs = async () => {
+const fetchBillingOrgs = async (): Promise<BillingOrg[]> => {
   const orgId = store.state.selectedOrganization.identifier;
   try {
     const res = await BillingService.list_billing_group_members(orgId);
-    billingOrgs.value = billingGroupOrgs(res?.data, orgId);
+    return billingGroupOrgs(res?.data, orgId);
   } catch {
-    billingOrgs.value = [];
+    return [];
   }
 };
 
-/** The endpoint still takes a range segment, but the metering path ignores it and returns the cycle. */
+/** Never cached by house rule; the range segment is ignored and the cycle comes back. */
+const fetchMetering = async () => {
+  if (USE_METERING_MOCK) return mockMeteringResponse();
+  const apiResponse = await BillingService.get_data_usage(
+    store.state.selectedOrganization.identifier,
+    "30days",
+    "gb",
+  );
+  return parseMeteringResponse(apiResponse?.data?.price_details);
+};
+
 const loadDetails = async () => {
   loading.value = true;
   loadError.value = null;
   try {
-    if (USE_METERING_MOCK) {
-      response.value = mockMeteringResponse();
-      lastLoadedAt.value = Date.now();
-      return;
-    }
-    // Billing reads are never cached by house rule, so this calls the service directly.
-    const apiResponse = await BillingService.get_data_usage(
-      store.state.selectedOrganization.identifier,
-      "30days",
-      "gb",
-    );
-    response.value = parseMeteringResponse(apiResponse?.data?.price_details);
-    // Reloaded with the bill, so Refresh also picks up an org that joined the group.
-    loadBillingOrgs();
+    // Published together: the bill alone renders the plain meter view, which then flips to the org view.
+    const [metering, orgs] = await Promise.all([fetchMetering(), fetchBillingOrgs()]);
+    response.value = metering;
+    billingOrgs.value = orgs;
     lastLoadedAt.value = Date.now();
   } catch (e: any) {
     response.value = null;

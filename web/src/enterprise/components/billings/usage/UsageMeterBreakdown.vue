@@ -45,7 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="none"
         :show-global-filter="false"
         class="min-h-0 flex-1"
-        :loading="loading"
+        :loading="loading && !rows.length"
+        :streaming="loading && rows.length > 0"
         :error="error"
         show-index
         :default-columns="false"
@@ -110,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onActivated, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -120,7 +121,6 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { queryClient } from "@/composables/query/queryClient";
-import searchService from "@/services/search";
 import { pipelinesQuery } from "@/services/pipelines.queries";
 import { syntheticsMonitorsQuery } from "@/services/synthetics.queries";
 import { streamNameListQuery, streamSchemaQuery } from "@/services/stream.queries";
@@ -141,6 +141,7 @@ import {
   type DrilldownSection,
 } from "./usageQueries";
 import { meterColorFor } from "./usageCharts";
+import { useUsageSearch } from "./useUsageSearch";
 import { totalsGridTemplate } from "./totalsBar";
 
 interface BreakdownRow {
@@ -315,23 +316,24 @@ const cachedRead = async <T,>(options: { queryKey: readonly unknown[] }, force: 
   return queryClient.fetchQuery(options as never) as Promise<T>;
 };
 
-/** Log search is never cached by house rule, so these go to the service directly. */
-const runSearch = async (sql: string, size: number) => {
-  const response = await searchService.search({
-    org_identifier: orgId.value,
-    page_type: "logs",
-    query: {
-      query: {
-        sql,
-        start_time: props.details.cycle_start * 1_000_000,
-        end_time: props.details.cycle_end * 1_000_000,
-        from: 0,
-        size,
-      },
-    },
+const { search } = useUsageSearch();
+
+/** Keyed, so switching meter or group stops the superseded query on the server. */
+const runSearch = (
+  sql: string,
+  size: number,
+  key: string,
+  refresh: boolean,
+  onRows?: (rows: Record<string, unknown>[]) => void,
+) =>
+  search(sql, {
+    start: props.details.cycle_start * 1_000_000,
+    end: props.details.cycle_end * 1_000_000,
+    size,
+    key,
+    refresh,
+    onRows,
   });
-  return (response?.data?.hits ?? []) as Record<string, unknown>[];
-};
 
 const loadRetention = async (force: boolean) => {
   const lists = await Promise.all(
@@ -348,67 +350,85 @@ const loadRetention = async (force: boolean) => {
   return { raws: all.sort((a, b) => b.volume - a.volume).slice(0, DRILLDOWN_LIMIT), sum };
 };
 
-/** Keyed by id; a deleted entity keeps its id and reads with a suffix rather than vanishing. */
-const resolveNames = async (
-  raws: RawRow[],
-  force: boolean,
-  options: { queryKey: readonly unknown[] },
-  idOf: (item: any) => string,
-  missingKey: I18nKey,
-) => {
+type Labeler = (raws: RawRow[]) => RawRow[];
+
+const keepNames: Labeler = (raws) => raws;
+
+/** Pipeline and synthetics usage is recorded by id; a deleted entity keeps its id with a suffix. */
+const nameLabeler = async (force: boolean): Promise<Labeler> => {
+  const source =
+    props.meterKey === "pipeline"
+      ? {
+          options: pipelinesQuery(usageOrgId.value),
+          idOf: (pipeline: any) => String(pipeline?.pipeline_id ?? pipeline?.id),
+          missingKey: "billing.usageV2.unknownPipeline" as I18nKey,
+        }
+      : props.meterKey === "synthetics_browser" || props.meterKey === "synthetics_protocol"
+        ? {
+            options: syntheticsMonitorsQuery(usageOrgId.value),
+            idOf: (check: any) => String(check?.id),
+            missingKey: "billing.usageV2.unknownCheck" as I18nKey,
+          }
+        : null;
+  if (!source) return keepNames;
   try {
-    const list = await cachedRead<any[]>(options, force);
+    const list = await cachedRead<any[]>(source.options, force);
     const names = new Map<string, string>(
-      list.map((item: any) => [idOf(item), String(item?.name ?? "")]),
+      list.map((item: any) => [source.idOf(item), String(item?.name ?? "")]),
     );
-    return raws.map((entry) => ({
-      ...entry,
-      name: names.get(entry.name) || `${entry.name} (${t(missingKey)})`,
-    }));
+    return (raws) =>
+      raws.map((entry) => ({
+        ...entry,
+        name: names.get(entry.name) || `${entry.name} (${t(source.missingKey)})`,
+      }));
   } catch {
-    return raws;
+    return keepNames;
   }
 };
 
-/** Pipeline and synthetics usage is recorded by id, so the table swaps each id for its name. */
-const labelRows = (raws: RawRow[], force: boolean) => {
-  if (props.meterKey === "pipeline") {
-    return resolveNames(
-      raws,
-      force,
-      pipelinesQuery(usageOrgId.value),
-      (pipeline) => String(pipeline?.pipeline_id ?? pipeline?.id),
-      "billing.usageV2.unknownPipeline",
-    );
-  }
-  if (props.meterKey === "synthetics_browser" || props.meterKey === "synthetics_protocol") {
-    return resolveNames(
-      raws,
-      force,
-      syntheticsMonitorsQuery(usageOrgId.value),
-      (check) => String(check?.id),
-      "billing.usageV2.unknownCheck",
-    );
-  }
-  return Promise.resolve(raws);
-};
+const toRaws = (hits: Record<string, unknown>[]): RawRow[] =>
+  hits.map((hit) => ({ name: String(hit.name ?? ""), volume: Number(hit.volume) || 0 }));
 
-const loadSection = async (spec: DrilldownSection) => {
+/** Both queries stream running aggregates; `onPartial` gets the latest of each as they land. */
+const loadSection = async (
+  spec: DrilldownSection,
+  force: boolean,
+  onPartial: (raws: RawRow[], sum: number) => void,
+) => {
+  let partialRaws: RawRow[] = [];
+  let partialSum = 0;
   const [hits, totals] = await Promise.all([
-    runSearch(spec.sql(usageOrgId.value), DRILLDOWN_LIMIT),
-    runSearch(meterTotalSql(usageOrgId.value, [spec.event]), 1),
+    runSearch(spec.sql(usageOrgId.value), DRILLDOWN_LIMIT, "rows", force, (rows) => {
+      partialRaws = toRaws(rows);
+      onPartial(partialRaws, partialSum);
+    }),
+    runSearch(meterTotalSql(usageOrgId.value, [spec.event]), 1, "total", force, (rows) => {
+      partialSum = Number(rows[0]?.total) || 0;
+      onPartial(partialRaws, partialSum);
+    }),
   ]);
-  const raws = hits.map((hit) => ({
-    name: String(hit.name ?? ""),
-    volume: Number(hit.volume) || 0,
-  }));
-  return { raws, sum: Number(totals[0]?.total) || 0 };
+  return { raws: toRaws(hits), sum: Number(totals[0]?.total) || 0 };
 };
 
 const isStreamMissing = (e: any) => {
   const message = String(e?.response?.data?.message ?? e?.message ?? "").toLowerCase();
   return message.includes("stream not found") && message.includes(USAGE_STREAM_NAME);
 };
+
+type TopNames = { section: DrilldownSection | null; names: string[] };
+
+/** The last names sent up, re-sent when a kept-alive breakdown is shown again so the chart can find its view. */
+let lastTopNames: TopNames | null = null;
+
+const emitTopNames = (payload: TopNames) => {
+  lastTopNames = payload;
+  emit("top-names", payload);
+};
+
+onActivated(() => {
+  emit("sections", { sections: sections.value, activeId: activeSection.value?.id });
+  if (lastTopNames) emit("top-names", lastTopNames);
+});
 
 /** A counter drops a slow earlier response that lands after the user switched meters. */
 let latestLoad = 0;
@@ -418,28 +438,40 @@ const load = async (force = false) => {
   loading.value = true;
   error.value = null;
   streamMissing.value = false;
+  // Cleared, so streamed rows never sit under another group's header.
+  rows.value = [];
+  total.value = 0;
+  rest.value = 0;
+  // Resolved alongside the queries, so a partial render never shows a raw id.
+  let labeler: Labeler | null = null;
+  const labelerReady = nameLabeler(force).then((resolved) => (labeler = resolved));
+  const showPartial = (raws: RawRow[], sum: number) => {
+    if (loadId !== latestLoad || !labeler) return;
+    total.value = sum;
+    rows.value = toRows(labeler(raws), sum);
+  };
   try {
     const result = isRetention.value
       ? await loadRetention(force)
       : activeSection.value
-        ? await loadSection(activeSection.value)
+        ? await loadSection(activeSection.value, force, showPartial)
         : { raws: [], sum: 0 };
     if (loadId !== latestLoad) return;
-    // The chart bands by the raw grouping value, so take names before ids become labels.
-    emit("top-names", {
+    // Final only: the chart bands by these raw values, and a partial set would re-key it.
+    emitTopNames({
       section: isRetention.value ? null : (activeSection.value ?? null),
       names: result.raws.slice(0, CHART_TOP).map((entry) => entry.name),
     });
-    const raws = await labelRows(result.raws, force);
+    const label = await labelerReady;
     if (loadId !== latestLoad) return;
     total.value = result.sum;
-    rows.value = toRows(raws, result.sum);
+    rows.value = toRows(label(result.raws), result.sum);
   } catch (e: any) {
     if (loadId !== latestLoad) return;
     rows.value = [];
     total.value = 0;
     rest.value = 0;
-    emit("top-names", { section: null, names: [] });
+    emitTopNames({ section: null, names: [] });
     if (isStreamMissing(e)) streamMissing.value = true;
     else error.value = String(e?.message ?? t("billing.usageV2.drilldownFailed"));
   } finally {

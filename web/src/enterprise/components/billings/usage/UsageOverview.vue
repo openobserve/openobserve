@@ -162,55 +162,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <UsagePaneHeader v-else :title="t('billing.usageV2.costByMeter')" />
 
-            <UsageMeterBreakdown
-              v-if="selectedMeter"
-              :key="`${selectedOrg?.id ?? 'self'}-${selectedMeter}`"
-              :meter-key="selectedMeter"
-              :scope-org-id="selectedOrg?.id"
-              :details="details"
-              :group="selectedGroup"
-              :refresh-token="refreshToken"
-              @update:group="selectGroup"
-              @top-names="onTopNames"
-              @sections="onSections"
-            />
-            <OEmptyState
-              v-else-if="isSuperOrg && !selectedOrg && orgCostsFailed"
-              size="inline"
-              :title="t('billing.usageV2.orgCostsFailed')"
-              data-test="billings-usageoverview-org-error"
-            />
-            <UsageMeterTable
-              v-else-if="isSuperOrg && !selectedOrg"
-              :rows="orgRows"
-              :total="orgTotals.total"
-              :gross="orgTotals.gross"
-              :discount="orgTotals.discount"
-              :color-for="orgColor"
-              :name-header="t('billing.usageV2.colOrganization')"
-              :loading="orgCostsLoading"
-              data-test="billings-usageoverview-org-table"
-              @select="selectOrg"
-            />
-            <UsageMeterTable
-              v-else-if="selectedOrg"
-              :rows="scopedRows"
-              :total="scopedTotals.total"
-              :gross="scopedTotals.gross"
-              :discount="scopedTotals.discount"
-              :share-header="t('billing.usageV2.shareOfOrg', { org: selectedOrg.name })"
-              :loading="orgVolumesLoading"
-              data-test="billings-usageoverview-org-meters"
-              @select="(key) => selectMeter(key as MeterKey)"
-            />
-            <UsageMeterTable
-              v-else
-              :rows="meterRows"
-              :total="total"
-              :gross="subtotal"
-              :discount="discountAmount"
-              @select="(key) => selectMeter(key as MeterKey)"
-            />
+            <!-- Each meter's breakdown is kept, so drilling back into it shows its table without querying again. -->
+            <KeepAlive :max="BREAKDOWN_CACHE_SIZE">
+              <UsageMeterBreakdown
+                v-if="selectedMeter"
+                :key="`${selectedOrg?.id ?? 'self'}-${selectedMeter}`"
+                :meter-key="selectedMeter"
+                :scope-org-id="selectedOrg?.id"
+                :details="details"
+                :group="selectedGroup"
+                :refresh-token="refreshToken"
+                @update:group="selectGroup"
+                @top-names="onTopNames"
+                @sections="onSections"
+              />
+            </KeepAlive>
+            <template v-if="!selectedMeter">
+              <OEmptyState
+                v-if="isSuperOrg && !selectedOrg && orgCostsFailed"
+                size="inline"
+                :title="t('billing.usageV2.orgCostsFailed')"
+                data-test="billings-usageoverview-org-error"
+              />
+              <UsageMeterTable
+                v-else-if="isSuperOrg && !selectedOrg"
+                :rows="orgRows"
+                :total="orgTotals.total"
+                :gross="orgTotals.gross"
+                :discount="orgTotals.discount"
+                :color-for="orgColor"
+                :name-header="t('billing.usageV2.colOrganization')"
+                :loading="orgCostsLoading && !hasOrgCosts"
+                :streaming="orgCostsLoading && hasOrgCosts"
+                data-test="billings-usageoverview-org-table"
+                @select="selectOrg"
+              />
+              <UsageMeterTable
+                v-else-if="selectedOrg"
+                :rows="scopedRows"
+                :total="scopedTotals.total"
+                :gross="scopedTotals.gross"
+                :discount="scopedTotals.discount"
+                :share-header="t('billing.usageV2.shareOfOrg', { org: selectedOrg.name })"
+                :loading="orgVolumesLoading && !hasOrgVolumes"
+                :streaming="orgVolumesLoading && hasOrgVolumes"
+                data-test="billings-usageoverview-org-meters"
+                @select="(key) => selectMeter(key as MeterKey)"
+              />
+              <UsageMeterTable
+                v-else
+                :rows="meterRows"
+                :total="total"
+                :gross="subtotal"
+                :discount="discountAmount"
+                :streaming="refreshing"
+                @select="(key) => selectMeter(key as MeterKey)"
+              />
+            </template>
           </div>
 
           <aside
@@ -219,28 +227,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="billings-usageoverview-daily-pane"
           >
             <UsagePaneHeader :title="t('billing.usageV2.dailyCost')" :subtitle="chartSubtitle" />
-            <!-- The renderer sizes itself with h-full, so the flex chain above must stay height-definite. -->
-            <div v-if="chartSchema" class="relative min-h-60 w-full flex-1 p-2">
-              <!-- The renderer only suppresses its own "no data" once it knows it is
-                   loading, so it flashes empty on the first tick; the skeleton covers
-                   that window and every reload after it. -->
-              <UsageChartSkeleton
-                v-if="chartBusy"
-                class="absolute inset-0 z-10 p-4"
-                data-test="billings-usageoverview-daily-loading"
-              />
-              <PanelSchemaRenderer
-                :key="chartKey"
-                class="h-full w-full"
-                :panel-schema="chartSchema"
-                :selected-time-obj="elapsedTimeObj"
-                :variables-data="{}"
-                data-test="billings-usageoverview-daily-chart"
-                @loading-state-change="onChartLoading"
-              />
+            <!-- v-show, not v-if: the KeepAlive inside must survive the moment a drilldown has no chart yet. -->
+            <div v-show="chartSchema" class="relative min-h-60 w-full flex-1 p-2">
+              <!-- Each view is kept per key, so leaving a drilldown shows the drawn chart instead of querying again. -->
+              <KeepAlive :max="CHART_CACHE_SIZE">
+                <UsageCachedChart
+                  v-if="chartSchema"
+                  :key="chartKey"
+                  :panel-schema="chartSchema"
+                  :selected-time-obj="elapsedTimeObj"
+                  data-test="billings-usageoverview-daily-chart"
+                />
+              </KeepAlive>
+            </div>
+            <div v-if="chartPending" class="relative min-h-60 w-full flex-1 p-2">
+              <UsageChartSkeleton data-test="billings-usageoverview-daily-pending" />
             </div>
             <OEmptyState
-              v-else
+              v-else-if="!chartSchema"
               size="inline"
               :title="chartEmptyTitle"
               data-test="billings-usageoverview-daily-empty"
@@ -265,8 +269,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
-import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
-import searchService from "@/services/search";
+import { useUsageSearch } from "./useUsageSearch";
 import { formatSizeFromMB } from "@/utils/formatters";
 import useBreakpoint from "@/composables/useBreakpoint";
 import UsageKpiCard from "./UsageKpiCard.vue";
@@ -274,6 +277,7 @@ import UsageBillStrip from "./UsageBillStrip.vue";
 import UsageMeterTable from "./UsageMeterTable.vue";
 import UsageMeterBreakdown from "./UsageMeterBreakdown.vue";
 import UsagePaneHeader from "./UsagePaneHeader.vue";
+import UsageCachedChart from "./UsageCachedChart.vue";
 import UsageChartSkeleton from "./UsageChartSkeleton.vue";
 import {
   buildMeterRows,
@@ -346,13 +350,14 @@ const chartSection = ref<DrilldownSection | null>(null);
 const groupSections = ref<DrilldownSection[]>([]);
 const activeGroupId = ref<string | undefined>(undefined);
 const chartNames = ref<string[]>([]);
+/** The view the breakdown names were loaded for; names from another meter must not shape this chart. */
+const chartNamesFor = ref<string | null>(null);
 
-/** Starts busy: the renderer reports "not loading" until its first query starts. */
-const chartBusy = ref(true);
+/** Views a user moves between in one visit: all meters, a few drilldowns, a few orgs. */
+const CHART_CACHE_SIZE = 8;
 
-const onChartLoading = (value: boolean) => {
-  chartBusy.value = value;
-};
+/** Meter breakdowns kept alive at once; each holds only its own top-N rows. */
+const BREAKDOWN_CACHE_SIZE = 8;
 
 const orgId = computed<string>(() => store.state.selectedOrganization.identifier);
 
@@ -415,22 +420,20 @@ const {
   window: cycleWindow,
 } = useOrgCosts(toRef(props, "details"), toRef(props, "billingOrgs"), refreshToken);
 
-const searchUsage = async (sql: string) => {
-  const response = await searchService.search({
-    org_identifier: orgId.value,
-    page_type: "logs",
-    query: {
-      query: {
-        sql,
-        start_time: cycleWindow.value.start,
-        end_time: cycleWindow.value.end,
-        from: 0,
-        size: 1000,
-      },
-    },
+/** Partial costs stream in, so the skeleton only covers the wait for the first chunk. */
+const hasOrgCosts = computed(() => Object.keys(orgCosts.value).length > 0);
+
+const { search, cancel } = useUsageSearch();
+
+/** Keyed, so picking another org stops the previous org's query instead of racing it. */
+const searchUsage = (sql: string, onRows?: (rows: Record<string, unknown>[]) => void) =>
+  search(sql, {
+    start: cycleWindow.value.start,
+    end: cycleWindow.value.end,
+    size: 1000,
+    key: "orgVolumes",
+    onRows,
   });
-  return (response?.data?.hits ?? []) as Record<string, unknown>[];
-};
 
 /** Every org with its cost, plus retention, which writes no usage events to split by org. */
 const orgRows = computed<BillRow[]>(() => {
@@ -478,17 +481,32 @@ const orgTotals = computed(() => sumRows(orgRows.value));
 
 const orgVolumes = ref<Record<string, number>>({});
 const orgVolumesLoading = ref(false);
+const hasOrgVolumes = computed(() => Object.keys(orgVolumes.value).length > 0);
+
+/** Each org's volumes for the bill on screen, so going back into an org shows its table without querying again. */
+const orgVolumeCache = new Map<string, Record<string, number>>();
 
 const loadOrgVolumes = async () => {
   const org = selectedOrg.value;
   if (!org || !props.details) return;
+  const cached = orgVolumeCache.get(org.id);
+  if (cached) {
+    // Stops another org's query still streaming, or its rows would land on this org's table.
+    cancel("orgVolumes");
+    orgVolumes.value = cached;
+    orgVolumesLoading.value = false;
+    return;
+  }
   orgVolumesLoading.value = true;
   orgVolumes.value = {};
+  const toVolumes = (hits: Record<string, unknown>[]) =>
+    Object.fromEntries(hits.map((hit) => [String(hit.name ?? ""), Number(hit.volume) || 0]));
   try {
-    const hits = await searchUsage(orgEventVolumeSql(org.id));
-    orgVolumes.value = Object.fromEntries(
-      hits.map((hit) => [String(hit.name ?? ""), Number(hit.volume) || 0]),
-    );
+    const hits = await searchUsage(orgEventVolumeSql(org.id), (partial) => {
+      orgVolumes.value = toVolumes(partial);
+    });
+    orgVolumes.value = toVolumes(hits);
+    orgVolumeCache.set(org.id, orgVolumes.value);
   } catch {
     orgVolumes.value = {};
   } finally {
@@ -496,9 +514,15 @@ const loadOrgVolumes = async () => {
   }
 };
 
-watch([() => selectedOrg.value?.id, () => props.details, refreshToken], loadOrgVolumes, {
-  immediate: true,
-});
+watch(
+  [() => selectedOrg.value?.id, () => props.details, refreshToken],
+  (_, previous) => {
+    // A new bill or a Refresh makes every kept org stale; only picking an org may reuse one.
+    if (previous[1] !== props.details || previous[2] !== refreshToken.value) orgVolumeCache.clear();
+    loadOrgVolumes();
+  },
+  { immediate: true },
+);
 
 /** The selected org's meters, priciest first. */
 const scopedRows = computed<MeterRow[]>(() =>
@@ -665,6 +689,20 @@ const elapsedTimeObj = computed(() => {
   return { start_time: new Date(start), end_time: new Date(Math.max(end, start)) };
 });
 
+const viewKey = computed(
+  () => `${selectedOrg.value?.id ?? "self"}-${selectedMeter.value ?? "all"}`,
+);
+
+/** A meter's chart is drawn from the breakdown's top names, so until they land it is loading, not empty. */
+const chartPending = computed(
+  () =>
+    !!props.details &&
+    usageStreamEnabled.value &&
+    !!selectedMeter.value &&
+    selectedMeter.value !== "retention" &&
+    chartNamesFor.value !== viewKey.value,
+);
+
 const chartSchema = computed(() => {
   if (!props.details || !usageStreamEnabled.value) return null;
   const meterKey = selectedMeter.value;
@@ -693,7 +731,7 @@ const chartSchema = computed(() => {
     });
   }
   const spec = chartSection.value;
-  if (!spec || !chartNames.value.length) return null;
+  if (!spec || !chartNames.value.length || chartNamesFor.value !== viewKey.value) return null;
   const otherLabel = t("billing.usageV2.otherBand");
   return buildStackedCostPanelSchema({
     id: `usage-overview-${meterKey}-${spec.id}`,
@@ -709,10 +747,13 @@ const chartSchema = computed(() => {
   });
 });
 
-const chartKey = computed(
-  () =>
-    `${selectedOrg.value?.id ?? "orgs"}-${selectedMeter.value ?? "all"}-${chartSection.value?.id}-${chartNames.value.join("|")}-${refreshToken.value}`,
-);
+/** Refresh re-runs a chart through the new bill's window, not its key; only a meter view depends on the names. */
+const chartKey = computed(() => {
+  const view = selectedOrg.value?.id ?? "orgs";
+  return selectedMeter.value
+    ? `${view}-${selectedMeter.value}-${chartSection.value?.id}-${chartNames.value.join("|")}`
+    : `${view}-all`;
+});
 
 const chartSubtitle = computed(() =>
   selectedMeter.value
@@ -738,6 +779,7 @@ const chartEmptyTitle = computed(() =>
 const onTopNames = (payload: { section: DrilldownSection | null; names: string[] }) => {
   chartSection.value = payload.section;
   chartNames.value = payload.names;
+  chartNamesFor.value = viewKey.value;
 };
 
 const selectMeter = async (key: MeterKey | null) => {

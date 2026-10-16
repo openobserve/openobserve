@@ -21,7 +21,7 @@ import {
   dailyOrgCostSql,
   dailyTopSql,
   meterTotalSql,
-  orgCostSql,
+  orgVolumeSql,
   orgEventVolumeSql,
   searchScanRateSql,
   trendsCostSql,
@@ -182,17 +182,12 @@ describe("usageQueries", () => {
   });
 
   describe("super org", () => {
-    const withDiscount = {
-      ...details,
-      ingestion: { ...meter(0.5, 1024), percent_discount: 10 },
-    } as MeteringDetails;
-
-    it("prices each org at gross and at the discounted rate, across every org in the stream", () => {
-      const sql = orgCostSql(cyclePrices([withDiscount]), cyclePrices([withDiscount], true));
+    it("reads every org's volume per event, with no per-row price expressions", () => {
+      const sql = orgVolumeSql();
+      expect(sql).toContain("sum(size) as volume");
       expect(sql).toContain("group by org_id, event");
       expect(sql).not.toContain("org_id =");
-      expect(sql).toContain(`when event = 'Ingestion' then ${0.5 / 1024}`);
-      expect(sql).toContain(`when event = 'Ingestion' then ${(0.5 / 1024) * 0.9}`);
+      expect(sql).not.toContain("case");
     });
 
     it("reads one org's volume per event", () => {

@@ -202,8 +202,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { formatSizeFromMB } from "@/utils/formatters";
-import searchService from "@/services/search";
 import UsagePaneHeader from "./UsagePaneHeader.vue";
+import { useUsageSearch } from "./useUsageSearch";
 import {
   estimateCost,
   formatCost,
@@ -445,21 +445,16 @@ const fields = computed(() =>
   }),
 );
 
-const runScalarQuery = async (sql: string) => {
-  const response = await searchService.search({
-    org_identifier: store.state.selectedOrganization.identifier,
-    page_type: "logs",
-    query: {
-      query: {
-        sql,
-        start_time: (props.details?.cycle_start ?? 0) * 1_000_000,
-        end_time: (props.details?.cycle_end ?? 0) * 1_000_000,
-        from: 0,
-        size: 1,
-      },
-    },
+const { search } = useUsageSearch();
+
+const runScalarQuery = async (sql: string, key: string) => {
+  const hits = await search(sql, {
+    start: (props.details?.cycle_start ?? 0) * 1_000_000,
+    end: (props.details?.cycle_end ?? 0) * 1_000_000,
+    size: 1,
+    key,
   });
-  return (response?.data?.hits ?? [])[0] ?? {};
+  return hits[0] ?? {};
 };
 
 /** Defaults come from history; a failed query just leaves the field at zero for the user to fill. */
@@ -467,8 +462,8 @@ const loadDefaults = async () => {
   if (!props.details) return;
   try {
     const [streams, scan] = await Promise.all([
-      runScalarQuery(averageStreamSizeSql(store.state.selectedOrganization.identifier)),
-      runScalarQuery(searchScanRateSql(store.state.selectedOrganization.identifier)),
+      runScalarQuery(averageStreamSizeSql(store.state.selectedOrganization.identifier), "streams"),
+      runScalarQuery(searchScanRateSql(store.state.selectedOrganization.identifier), "scan"),
     ]);
     const streamCount = Number(streams.streams) || 0;
     inputs.avgStreamMb = streamCount > 0 ? round(Number(streams.total) / streamCount) : 0;

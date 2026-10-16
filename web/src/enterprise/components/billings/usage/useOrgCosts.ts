@@ -14,16 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, ref, watch, type Ref } from "vue";
-import { useStore } from "vuex";
-import searchService from "@/services/search";
 import {
   meterForEvent,
   type BillingOrg,
   type MeterKey,
   type MeteringDetails,
 } from "./meteringModel";
-import { orgCostSql } from "./usageQueries";
+import { orgVolumeSql } from "./usageQueries";
 import { cyclePrices } from "./trendsModel";
+import { useUsageSearch } from "./useUsageSearch";
 
 export interface OrgCost {
   gross: number;
@@ -32,6 +31,33 @@ export interface OrgCost {
   ingested: number;
   /** Billed cost per meter; retention writes no usage events, so it is never here. */
   byMeter: Partial<Record<MeterKey, number>>;
+}
+
+/** Prices each org's per-event volume at this cycle's list and discounted rates. */
+export function priceOrgVolumes(
+  hits: Record<string, unknown>[],
+  cycle: MeteringDetails,
+): Record<string, OrgCost> {
+  const billedRates = cyclePrices([cycle])[0]?.rates ?? {};
+  const grossRates = cyclePrices([cycle], true)[0]?.rates ?? {};
+  const byOrg: Record<string, OrgCost> = {};
+  for (const hit of hits) {
+    const event = String(hit.event ?? "");
+    const volume = Number(hit.volume) || 0;
+    const org = (byOrg[String(hit.name ?? "")] ??= {
+      gross: 0,
+      billed: 0,
+      ingested: 0,
+      byMeter: {},
+    });
+    const billed = volume * (billedRates[event] ?? 0);
+    org.gross += volume * (grossRates[event] ?? 0);
+    org.billed += billed;
+    if (event === "Ingestion") org.ingested += volume;
+    const meter = meterForEvent(event)?.key;
+    if (meter) org.byMeter[meter] = (org.byMeter[meter] ?? 0) + billed;
+  }
+  return byOrg;
 }
 
 /**
@@ -46,7 +72,7 @@ export function useOrgCosts(
   billingOrgs: Ref<BillingOrg[]>,
   refreshToken: Ref<number>,
 ) {
-  const store = useStore();
+  const { search } = useUsageSearch();
   const costs = ref<Record<string, OrgCost>>({});
   const loading = ref(false);
   /** A failed read shows as an error, never as every org at $0.00. */
@@ -67,38 +93,20 @@ export function useOrgCosts(
     const id = ++latest;
     loading.value = true;
     failed.value = false;
+    costs.value = {};
     try {
-      const response = await searchService.search({
-        org_identifier: store.state.selectedOrganization.identifier,
-        page_type: "logs",
-        query: {
-          query: {
-            sql: orgCostSql(cyclePrices([cycle]), cyclePrices([cycle], true)),
-            start_time: window.value.start,
-            end_time: window.value.end,
-            from: 0,
-            size: 1000,
-          },
+      // The server streams ~one partial aggregate per time slice; showing each beats a long skeleton.
+      const hits = await search(orgVolumeSql(), {
+        start: window.value.start,
+        end: window.value.end,
+        size: 1000,
+        key: "orgCosts",
+        onRows: (rows) => {
+          if (id === latest) costs.value = priceOrgVolumes(rows, cycle);
         },
       });
       if (id !== latest) return;
-      const hits = (response?.data?.hits ?? []) as Record<string, unknown>[];
-      const byOrg: Record<string, OrgCost> = {};
-      for (const hit of hits) {
-        const org = (byOrg[String(hit.name ?? "")] ??= {
-          gross: 0,
-          billed: 0,
-          ingested: 0,
-          byMeter: {},
-        });
-        const billed = Number(hit.billed) || 0;
-        org.gross += Number(hit.gross) || 0;
-        org.billed += billed;
-        org.ingested += Number(hit.ingested) || 0;
-        const meter = meterForEvent(String(hit.event ?? ""))?.key;
-        if (meter) org.byMeter[meter] = (org.byMeter[meter] ?? 0) + billed;
-      }
-      costs.value = byOrg;
+      costs.value = priceOrgVolumes(hits, cycle);
     } catch {
       if (id !== latest) return;
       costs.value = {};

@@ -239,23 +239,12 @@ export function trendsCostSql(
   );
 }
 
-/**
- * A super org's cost per org and event, so a caller can total an org or split it by meter.
- * Members report their usage into the super org's own
- * stream, each row keeping its org_id, so one query splits the bill across orgs.
- */
-export function orgCostSql(
-  prices: CyclePrice[],
-  grossPrices: CyclePrice[],
-  events: string[] = PRICED_EVENTS,
-): string {
+/** Each org's volume per event across the stream; priced in code, since a cycle gives each event one rate. */
+export function orgVolumeSql(events: string[] = PRICED_EVENTS): string {
   const inList = events.map((event) => `'${escapeLiteral(event)}'`).join(", ");
   return (
-    `select org_id as name, event, ` +
-    `sum(size * ${priceCaseSql(grossPrices, events)}) as gross, ` +
-    `sum(size * ${priceCaseSql(prices, events)}) as billed, ` +
-    `sum(case when event = 'Ingestion' then size else 0 end) as ingested ` +
-    `from "${USAGE_STREAM_NAME}" where event in (${inList}) group by org_id, event`
+    `select org_id as name, event, sum(size) as volume from "${USAGE_STREAM_NAME}" ` +
+    `where event in (${inList}) group by org_id, event`
   );
 }
 
