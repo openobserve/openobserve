@@ -30,9 +30,9 @@ use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 
 use super::{
-    plan::{TraceColumns, TraceListPlan},
+    plan::TraceListPlan,
     query::{TraceSearchContext, build_partition_query},
-    response::{TraceBatch, TraceResponseItem},
+    response::TraceBatch,
 };
 use crate::search::error_utils::map_error_to_http_response;
 
@@ -288,8 +288,8 @@ async fn run(
 
         let Some(batch) = load_batch(
             &ctx,
-            &plan.columns,
-            &deliverable_q1,
+            &plan,
+            deliverable_q1,
             (p_start, p_end),
             &base_req,
             &sender,
@@ -357,8 +357,8 @@ async fn run(
 
         let Some(batch) = load_batch(
             &ctx,
-            &plan.columns,
-            &deliverable_q1,
+            &plan,
+            deliverable_q1,
             (start_time, end_time),
             &base_req,
             &sender,
@@ -369,15 +369,8 @@ async fn run(
             return;
         };
 
-        let partition_hits: Vec<&TraceResponseItem> = deliverable_q1
-            .iter()
-            .filter_map(|item| {
-                let tid = item.get("trace_id").and_then(|v| v.as_str())?;
-                batch.traces.get(tid)
-            })
-            .collect();
-
-        let deliverable: Vec<serde_json::Value> = partition_hits
+        let deliverable: Vec<serde_json::Value> = batch
+            .into_sorted_items(plan.sort)
             .iter()
             .map(|t| serde_json::to_value(t).unwrap_or(serde_json::Value::Null))
             .collect();
@@ -411,20 +404,31 @@ async fn run(
 
 async fn load_batch(
     ctx: &TraceSearchContext,
-    columns: &TraceColumns,
-    hits: &[json::Value],
+    plan: &TraceListPlan,
+    hits: Vec<json::Value>,
     range: (i64, i64),
     base_request: &Request,
     sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     log_ctx: &str,
 ) -> Option<TraceBatch> {
-    let mut batch = TraceBatch::from_hits(hits, range);
+    let hits = match ctx.summarize_traces(plan, base_request, hits, range).await {
+        Ok(hits) => hits,
+        Err(error) => {
+            log::error!(
+                "[TRACES_STREAM trace_id {}] Q2a error ({log_ctx}): {error}",
+                ctx.trace_id
+            );
+            let _ = sender.send(Err(error)).await;
+            return None;
+        }
+    };
+    let mut batch = TraceBatch::from_hits(&hits, range);
     if !batch.multi_service_ids.is_empty() && sender.is_closed() {
         return None;
     }
     let service_range = batch.range;
     if let Err(error) = ctx
-        .fill_services(&mut batch, base_request, columns, service_range)
+        .fill_services(&mut batch, base_request, &plan.columns, service_range)
         .await
     {
         log::error!(
