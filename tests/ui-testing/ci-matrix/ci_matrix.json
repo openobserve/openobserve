@@ -474,7 +474,8 @@
       "rum-onboarding-snippets.spec.js",
       "sourcemap-ui.spec.js",
       "sourcemap-upload-pretty.spec.js",
-      "rum-form-validation.spec.js"
+      "rum-form-validation.spec.js",
+      "app-performance.spec.js"
     ],
     "disabled": []
   },
