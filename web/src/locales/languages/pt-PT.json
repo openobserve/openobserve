@@ -8226,9 +8226,7 @@
       "enabled": "Executar a calibração de alertas para esta organização",
       "enabledHelp": "Enquanto desativada, a organização não tem execução agendada. Ao ativá-la, a primeira execução vence imediatamente.",
       "frequency": "Executar a cada",
-      "frequencyHelp": "Entre 1 minuto e 30 dias.",
       "window": "Janela de análise",
-      "windowHelp": "Até onde cada execução retrocede, entre 1 minuto e 1 ano. Uma janela maior que a cadência faz execuções consecutivas se sobreporem e relatarem os mesmos achados novamente.",
       "noConfig": "Esta organização ainda não tem configurações de calibração de alertas. Os valores abaixo são os padrões que sua primeira gravação armazena.",
       "warnGap": "Executa a cada {every}, mas retrocede apenas {window}, então o tempo entre as janelas nunca é analisado.",
       "warnStarved": "Uma janela de {window} é curta demais para {rules}, então cada execução os descarta para cada alerta.",
@@ -8245,9 +8243,7 @@
       "runNowHeading": "Executar agora",
       "findingsHeading": "Achados e acesso",
       "findingsDesc": "Cada execução grava seus achados como registros de log no stream {stream} desta organização, mantidos conforme a retenção desse stream.",
-      "accessNote": "A permissão Calibração de alertas em um papel determina o acesso: Get para ler os resultados, Update para alterar estas configurações e Create para solicitar uma execução. Os resultados abrangem todos os alertas da organização, inclusive alertas que o leitor não pode abrir. A calibração de alertas não envia notificações.",
-      "frequencyRange": "Escolha uma cadência entre 1 minuto e 30 dias.",
-      "windowRange": "Escolha uma janela entre 1 minuto e 1 ano."
+      "accessNote": "A permissão Calibração de alertas em um papel determina o acesso: Get para ler os resultados, Update para alterar estas configurações e Create para solicitar uma execução. Os resultados abrangem todos os alertas da organização, inclusive alertas que o leitor não pode abrir. A calibração de alertas não envia notificações."
     }
   },
   "alerts": {

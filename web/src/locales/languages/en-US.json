@@ -8226,9 +8226,9 @@
       "enabled": "Run alert calibration for this organization",
       "enabledHelp": "While off, the organization has no scheduled run. Turning it on makes the first run due immediately.",
       "frequency": "Run every",
-      "frequencyHelp": "Between 1 minute and 30 days.",
+      "frequencyHelp": "Between 1 hour and 30 days.",
       "window": "Analysis window",
-      "windowHelp": "How far back each run looks, between 1 minute and 1 year. A window longer than the cadence makes consecutive runs overlap and report the same findings again.",
+      "windowHelp": "How far back each run looks, between 1 minute and 90 days. A window longer than the cadence makes consecutive runs overlap and report the same findings again.",
       "noConfig": "This organization has no alert calibration settings yet. The values below are the defaults your first save stores.",
       "warnGap": "Runs every {every} but looks back only {window}, so the time between windows is never analysed.",
       "warnStarved": "A window of {window} is too short for {rules}, so every run declines them for every alert.",
@@ -8246,8 +8246,8 @@
       "findingsHeading": "Findings and access",
       "findingsDesc": "Each run writes its findings as log records to the {stream} stream of this organization, kept for that stream's retention.",
       "accessNote": "The Alert Calibration permission in a role decides access: Get to read findings, Update to change these settings, and Create to request a run. Findings cover every alert in the organization, including alerts the reader cannot open. Alert calibration sends no notifications.",
-      "frequencyRange": "Choose a cadence between 1 minute and 30 days.",
-      "windowRange": "Choose a window between 1 minute and 1 year."
+      "frequencyRange": "Choose a cadence between 1 hour and 30 days.",
+      "windowRange": "Choose a window between 1 minute and 90 days."
     }
   },
   "alerts": {

@@ -8226,9 +8226,7 @@
       "enabled": "Ejecutar la calibración de alertas para esta organización",
       "enabledHelp": "Mientras está desactivada, la organización no tiene ejecuciones programadas. Al activarla, la primera ejecución vence de inmediato.",
       "frequency": "Ejecutar cada",
-      "frequencyHelp": "Entre 1 minuto y 30 días.",
       "window": "Ventana de análisis",
-      "windowHelp": "Hasta dónde mira atrás cada ejecución, entre 1 minuto y 1 año. Una ventana más larga que la cadencia hace que las ejecuciones consecutivas se solapen y reporten los mismos hallazgos otra vez.",
       "noConfig": "Esta organización aún no tiene ajustes de calibración de alertas. Los valores a continuación son los predeterminados que almacenará tu primer guardado.",
       "warnGap": "Se ejecuta cada {every} pero solo mira atrás {window}, así que el tiempo entre ventanas nunca se analiza.",
       "warnStarved": "Una ventana de {window} es demasiado corta para {rules}, así que cada ejecución las descarta en todas las alertas.",
@@ -8245,9 +8243,7 @@
       "runNowHeading": "Ejecutar ahora",
       "findingsHeading": "Hallazgos y acceso",
       "findingsDesc": "Cada ejecución escribe sus hallazgos como registros de log en el stream {stream} de esta organización, conservados según la retención de ese stream.",
-      "accessNote": "El permiso Calibración de alertas en un rol determina el acceso: Get para leer los hallazgos, Update para cambiar esta configuración y Create para solicitar una ejecución. Los hallazgos abarcan todas las alertas de la organización, incluidas las alertas que el lector no puede abrir. La calibración de alertas no envía notificaciones.",
-      "frequencyRange": "Elige una cadencia entre 1 minuto y 30 días.",
-      "windowRange": "Elige una ventana entre 1 minuto y 1 año."
+      "accessNote": "El permiso Calibración de alertas en un rol determina el acceso: Get para leer los hallazgos, Update para cambiar esta configuración y Create para solicitar una ejecución. Los hallazgos abarcan todas las alertas de la organización, incluidas las alertas que el lector no puede abrir. La calibración de alertas no envía notificaciones."
     }
   },
   "alerts": {

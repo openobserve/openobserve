@@ -8226,9 +8226,7 @@
       "enabled": "Chạy hiệu chuẩn cảnh báo cho tổ chức này",
       "enabledHelp": "Khi tắt, tổ chức không có lần chạy theo lịch nào. Bật lên sẽ khiến lần chạy đầu tiên đến hạn ngay lập tức.",
       "frequency": "Chạy mỗi",
-      "frequencyHelp": "Từ 1 phút đến 30 ngày.",
       "window": "Cửa sổ phân tích",
-      "windowHelp": "Mỗi lần chạy xem lại bao xa, từ 1 phút đến 1 năm. Cửa sổ dài hơn chu kỳ chạy khiến các lần chạy liên tiếp chồng lấn và báo cáo lại cùng một kết quả.",
       "noConfig": "Tổ chức này chưa có cài đặt hiệu chuẩn cảnh báo. Các giá trị bên dưới là mặc định mà lần lưu đầu tiên của bạn sẽ ghi lại.",
       "warnGap": "Chạy mỗi {every} nhưng chỉ xem lại {window}, nên khoảng thời gian giữa các cửa sổ không bao giờ được phân tích.",
       "warnStarved": "Cửa sổ {window} quá ngắn đối với {rules}, nên mọi lần chạy đều bỏ qua chúng cho mọi cảnh báo.",
@@ -8245,9 +8243,7 @@
       "runNowHeading": "Chạy ngay",
       "findingsHeading": "Kết quả và quyền truy cập",
       "findingsDesc": "Mỗi lần chạy ghi kết quả của nó dưới dạng bản ghi nhật ký vào stream {stream} của tổ chức này, được lưu theo thời gian lưu trữ của stream đó.",
-      "accessNote": "Quyền Hiệu chỉnh cảnh báo trong một vai trò quyết định quyền truy cập: Get để đọc các phát hiện, Update để thay đổi các cài đặt này và Create để yêu cầu một lần chạy. Các phát hiện bao gồm mọi cảnh báo trong tổ chức, kể cả những cảnh báo mà người đọc không thể mở. Hiệu chỉnh cảnh báo không gửi thông báo nào.",
-      "frequencyRange": "Chọn chu kỳ từ 1 phút đến 30 ngày.",
-      "windowRange": "Chọn cửa sổ từ 1 phút đến 1 năm."
+      "accessNote": "Quyền Hiệu chỉnh cảnh báo trong một vai trò quyết định quyền truy cập: Get để đọc các phát hiện, Update để thay đổi các cài đặt này và Create để yêu cầu một lần chạy. Các phát hiện bao gồm mọi cảnh báo trong tổ chức, kể cả những cảnh báo mà người đọc không thể mở. Hiệu chỉnh cảnh báo không gửi thông báo nào."
     }
   },
   "alerts": {

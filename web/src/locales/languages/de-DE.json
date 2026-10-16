@@ -8226,9 +8226,7 @@
       "enabled": "Alarmkalibrierung für diese Organisation ausführen",
       "enabledHelp": "Im ausgeschalteten Zustand hat die Organisation keinen geplanten Lauf. Beim Einschalten ist der erste Lauf sofort fällig.",
       "frequency": "Ausführen alle",
-      "frequencyHelp": "Zwischen 1 Minute und 30 Tagen.",
       "window": "Analysefenster",
-      "windowHelp": "Wie weit jeder Lauf zurückblickt, zwischen 1 Minute und 1 Jahr. Ein Fenster, das länger als das Intervall ist, lässt aufeinanderfolgende Läufe überlappen und dieselben Befunde erneut melden.",
       "noConfig": "Diese Organisation hat noch keine Einstellungen für die Alarmkalibrierung. Die folgenden Werte sind die Standardwerte, die beim ersten Speichern gespeichert werden.",
       "warnGap": "Läuft alle {every}, blickt aber nur {window} zurück, sodass die Zeit zwischen den Fenstern nie analysiert wird.",
       "warnStarved": "Ein Fenster von {window} ist zu kurz für {rules}, sodass jeder Lauf sie für jeden Alarm ablehnt.",
@@ -8245,9 +8243,7 @@
       "runNowHeading": "Jetzt ausführen",
       "findingsHeading": "Befunde und Zugriff",
       "findingsDesc": "Jeder Lauf schreibt seine Befunde als Log-Datensätze in den Stream {stream} dieser Organisation, die gemäß der Aufbewahrung dieses Streams aufbewahrt werden.",
-      "accessNote": "Die Berechtigung „Alarmkalibrierung“ in einer Rolle entscheidet über den Zugriff: Get zum Lesen der Befunde, Update zum Ändern dieser Einstellungen und Create zum Anfordern eines Laufs. Befunde umfassen jeden Alarm in der Organisation, einschließlich Alarmen, die der Leser nicht öffnen kann. Die Alarmkalibrierung sendet keine Benachrichtigungen.",
-      "frequencyRange": "Wählen Sie ein Intervall zwischen 1 Minute und 30 Tagen.",
-      "windowRange": "Wählen Sie ein Fenster zwischen 1 Minute und 1 Jahr."
+      "accessNote": "Die Berechtigung „Alarmkalibrierung“ in einer Rolle entscheidet über den Zugriff: Get zum Lesen der Befunde, Update zum Ändern dieser Einstellungen und Create zum Anfordern eines Laufs. Befunde umfassen jeden Alarm in der Organisation, einschließlich Alarmen, die der Leser nicht öffnen kann. Die Alarmkalibrierung sendet keine Benachrichtigungen."
     }
   },
   "alerts": {

@@ -8226,9 +8226,7 @@
       "enabled": "Uruchamiaj kalibrację alertów dla tej organizacji",
       "enabledHelp": "Gdy opcja jest wyłączona, organizacja nie ma zaplanowanego uruchomienia. Włączenie jej sprawia, że pierwsze uruchomienie ma nastąpić natychmiast.",
       "frequency": "Uruchamiaj co",
-      "frequencyHelp": "Od 1 minuty do 30 dni.",
       "window": "Okno analizy",
-      "windowHelp": "Jak daleko wstecz sięga każde uruchomienie — od 1 minuty do 1 roku. Okno dłuższe niż częstotliwość powoduje, że kolejne uruchomienia nakładają się i ponownie raportują te same ustalenia.",
       "noConfig": "Ta organizacja nie ma jeszcze ustawień kalibracji alertów. Poniższe wartości to ustawienia domyślne, które zostaną zapisane przy pierwszym zapisie.",
       "warnGap": "Uruchamia się co {every}, ale analizuje tylko {window} wstecz, więc czas między oknami nigdy nie jest analizowany.",
       "warnStarved": "Okno {window} jest zbyt krótkie dla {rules}, więc każde uruchomienie odrzuca je dla każdego alertu.",
@@ -8245,9 +8243,7 @@
       "runNowHeading": "Uruchom teraz",
       "findingsHeading": "Ustalenia i dostęp",
       "findingsDesc": "Każde uruchomienie zapisuje swoje ustalenia jako rekordy logów w strumieniu {stream} tej organizacji, przechowywane zgodnie z okresem retencji tego strumienia.",
-      "accessNote": "Uprawnienie Kalibracja alertów w roli decyduje o dostępie: Get umożliwia odczyt ustaleń, Update — zmianę tych ustawień, a Create — zlecenie uruchomienia. Ustalenia obejmują każdy alert w organizacji, w tym alerty, których czytelnik nie może otworzyć. Kalibracja alertów nie wysyła żadnych powiadomień.",
-      "frequencyRange": "Wybierz częstotliwość od 1 minuty do 30 dni.",
-      "windowRange": "Wybierz okno od 1 minuty do 1 roku."
+      "accessNote": "Uprawnienie Kalibracja alertów w roli decyduje o dostępie: Get umożliwia odczyt ustaleń, Update — zmianę tych ustawień, a Create — zlecenie uruchomienia. Ustalenia obejmują każdy alert w organizacji, w tym alerty, których czytelnik nie może otworzyć. Kalibracja alertów nie wysyła żadnych powiadomień."
     }
   },
   "alerts": {

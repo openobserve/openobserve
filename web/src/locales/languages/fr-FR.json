@@ -8226,9 +8226,7 @@
       "enabled": "Exécuter la calibration des alertes pour cette organisation",
       "enabledHelp": "Lorsqu'elle est désactivée, l'organisation n'a aucune exécution planifiée. L'activer rend la première exécution due immédiatement.",
       "frequency": "Exécuter toutes les",
-      "frequencyHelp": "Entre 1 minute et 30 jours.",
       "window": "Fenêtre d'analyse",
-      "windowHelp": "La profondeur d'analyse de chaque exécution, entre 1 minute et 1 an. Une fenêtre plus longue que la cadence fait se chevaucher les exécutions consécutives et leur fait signaler à nouveau les mêmes constats.",
       "noConfig": "Cette organisation n'a pas encore de réglages de calibration des alertes. Les valeurs ci-dessous sont les valeurs par défaut enregistrées lors de votre première sauvegarde.",
       "warnGap": "S'exécute toutes les {every} mais ne remonte que sur {window} : la période entre les fenêtres n'est jamais analysée.",
       "warnStarved": "Une fenêtre de {window} est trop courte pour {rules} ; chaque exécution les écarte donc pour toutes les alertes.",
@@ -8245,9 +8243,7 @@
       "runNowHeading": "Exécuter maintenant",
       "findingsHeading": "Constats et accès",
       "findingsDesc": "Chaque exécution écrit ses constats sous forme d'enregistrements de logs dans le flux {stream} de cette organisation, conservés selon la rétention de ce flux.",
-      "accessNote": "La permission Calibration des alertes d'un rôle détermine l'accès : Get pour consulter les constats, Update pour modifier ces réglages, et Create pour demander une exécution. Les constats couvrent toutes les alertes de l'organisation, y compris les alertes que le lecteur ne peut pas ouvrir. La calibration des alertes n'envoie aucune notification.",
-      "frequencyRange": "Choisissez une cadence entre 1 minute et 30 jours.",
-      "windowRange": "Choisissez une fenêtre entre 1 minute et 1 an."
+      "accessNote": "La permission Calibration des alertes d'un rôle détermine l'accès : Get pour consulter les constats, Update pour modifier ces réglages, et Create pour demander une exécution. Les constats couvrent toutes les alertes de l'organisation, y compris les alertes que le lecteur ne peut pas ouvrir. La calibration des alertes n'envoie aucune notification."
     }
   },
   "alerts": {

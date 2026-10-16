@@ -8226,9 +8226,7 @@
       "enabled": "Bu organizasyon için uyarı kalibrasyonunu çalıştır",
       "enabledHelp": "Kapalıyken, organizasyonun zamanlanmış bir çalışması olmaz. Açıldığında, ilk çalışma hemen başlar.",
       "frequency": "Çalıştırma sıklığı",
-      "frequencyHelp": "1 dakika ile 30 gün arasında.",
       "window": "Analiz penceresi",
-      "windowHelp": "Her çalışmanın ne kadar geriye baktığı, 1 dakika ile 1 yıl arasında. Sıklıktan daha uzun bir pencere, ardışık çalışmaların örtüşmesine ve aynı bulguların tekrar raporlanmasına neden olur.",
       "noConfig": "Bu organizasyonun henüz uyarı kalibrasyonu ayarları yok. Aşağıdaki değerler, ilk kaydınızda saklanacak varsayılanlardır.",
       "warnGap": "Her {every} çalışır ancak yalnızca {window} geriye bakar, bu nedenle pencereler arasındaki süre hiç analiz edilmez.",
       "warnStarved": "{window} penceresi {rules} için çok kısa, bu nedenle her çalışma her uyarı için bunları reddeder.",
@@ -8245,9 +8243,7 @@
       "runNowHeading": "Şimdi çalıştır",
       "findingsHeading": "Bulgular ve erişim",
       "findingsDesc": "Her çalışma, bulgularını bu organizasyonun {stream} akışına günlük kaydı olarak yazar ve bu kayıtlar o akışın saklama süresi boyunca tutulur.",
-      "accessNote": "Bir roldeki Uyarı Kalibrasyonu izni erişimi belirler: Bulguları okumak için Get, bu ayarları değiştirmek için Update ve çalıştırma istemek için Create. Bulgular, okuyucunun açamadığı uyarılar dahil olmak üzere organizasyondaki her uyarıyı kapsar. Uyarı kalibrasyonu hiçbir bildirim göndermez.",
-      "frequencyRange": "1 dakika ile 30 gün arasında bir sıklık seçin.",
-      "windowRange": "1 dakika ile 1 yıl arasında bir pencere seçin."
+      "accessNote": "Bir roldeki Uyarı Kalibrasyonu izni erişimi belirler: Bulguları okumak için Get, bu ayarları değiştirmek için Update ve çalıştırma istemek için Create. Bulgular, okuyucunun açamadığı uyarılar dahil olmak üzere organizasyondaki her uyarıyı kapsar. Uyarı kalibrasyonu hiçbir bildirim göndermez."
     }
   },
   "alerts": {

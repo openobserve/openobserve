@@ -8226,9 +8226,7 @@
       "enabled": "Alarmkalibratie uitvoeren voor deze organisatie",
       "enabledHelp": "Als dit uit staat, heeft de organisatie geen geplande uitvoering. Als je het aanzet, is de eerste uitvoering onmiddellijk aan de beurt.",
       "frequency": "Uitvoeren elke",
-      "frequencyHelp": "Tussen 1 minuut en 30 dagen.",
       "window": "Analysevenster",
-      "windowHelp": "Hoe ver elke uitvoering terugkijkt, tussen 1 minuut en 1 jaar. Een venster dat langer is dan de cadans zorgt ervoor dat opeenvolgende uitvoeringen elkaar overlappen en dezelfde bevindingen opnieuw rapporteren.",
       "noConfig": "Deze organisatie heeft nog geen instellingen voor alarmkalibratie. De onderstaande waarden zijn de standaardwaarden die bij de eerste opslag worden bewaard.",
       "warnGap": "Voert elke {every} uit, maar kijkt slechts {window} terug, zodat de tijd tussen vensters nooit wordt geanalyseerd.",
       "warnStarved": "Een venster van {window} is te kort voor {rules}, dus elke uitvoering wijst ze af voor elk alarm.",
@@ -8245,9 +8243,7 @@
       "runNowHeading": "Nu uitvoeren",
       "findingsHeading": "Bevindingen en toegang",
       "findingsDesc": "Elke uitvoering schrijft zijn bevindingen als logrecords naar de {stream}-stream van deze organisatie, bewaard volgens de retentie van die stream.",
-      "accessNote": "De machtiging Alarmkalibratie in een rol bepaalt de toegang: Get om bevindingen te lezen, Update om deze instellingen te wijzigen en Create om een uitvoering aan te vragen. Bevindingen omvatten elk alarm in de organisatie, inclusief alarmen die de lezer niet kan openen. Alarmkalibratie verstuurt geen meldingen.",
-      "frequencyRange": "Kies een cadans tussen 1 minuut en 30 dagen.",
-      "windowRange": "Kies een venster tussen 1 minuut en 1 jaar."
+      "accessNote": "De machtiging Alarmkalibratie in een rol bepaalt de toegang: Get om bevindingen te lezen, Update om deze instellingen te wijzigen en Create om een uitvoering aan te vragen. Bevindingen omvatten elk alarm in de organisatie, inclusief alarmen die de lezer niet kan openen. Alarmkalibratie verstuurt geen meldingen."
     }
   },
   "alerts": {

@@ -8226,9 +8226,7 @@
       "enabled": "Esegui la calibrazione degli avvisi per questa organizzazione",
       "enabledHelp": "Se disattivata, l'organizzazione non ha esecuzioni pianificate. Attivandola, la prima esecuzione è prevista subito.",
       "frequency": "Esegui ogni",
-      "frequencyHelp": "Tra 1 minuto e 30 giorni.",
       "window": "Finestra di analisi",
-      "windowHelp": "Quanto indietro guarda ogni esecuzione, tra 1 minuto e 1 anno. Una finestra più lunga della cadenza fa sovrapporre le esecuzioni consecutive, che riportano di nuovo gli stessi risultati.",
       "noConfig": "Questa organizzazione non ha ancora impostazioni di calibrazione degli avvisi. I valori seguenti sono i valori predefiniti che verranno memorizzati al primo salvataggio.",
       "warnGap": "L'esecuzione avviene ogni {every} ma guarda indietro solo di {window}, quindi il tempo tra le finestre non viene mai analizzato.",
       "warnStarved": "Una finestra di {window} è troppo breve per {rules}, quindi ogni esecuzione li scarta per ogni avviso.",
@@ -8245,9 +8243,7 @@
       "runNowHeading": "Esegui ora",
       "findingsHeading": "Risultati e accesso",
       "findingsDesc": "Ogni esecuzione scrive i propri risultati come record di log nello stream {stream} di questa organizzazione, conservati secondo la retention di quello stream.",
-      "accessNote": "Il permesso Calibrazione avvisi in un ruolo determina l'accesso: Get per leggere i risultati, Update per modificare queste impostazioni e Create per richiedere un'esecuzione. I risultati coprono ogni avviso nell'organizzazione, inclusi gli avvisi che il lettore non può aprire. La calibrazione avvisi non invia notifiche.",
-      "frequencyRange": "Scegli una cadenza tra 1 minuto e 30 giorni.",
-      "windowRange": "Scegli una finestra tra 1 minuto e 1 anno."
+      "accessNote": "Il permesso Calibrazione avvisi in un ruolo determina l'accesso: Get per leggere i risultati, Update per modificare queste impostazioni e Create per richiedere un'esecuzione. I risultati coprono ogni avviso nell'organizzazione, inclusi gli avvisi che il lettore non può aprire. La calibrazione avvisi non invia notifiche."
     }
   },
   "alerts": {

@@ -16,9 +16,10 @@
 import { z } from "zod";
 import type { TranslateFn } from "@/types/i18n";
 
-/** The server's bounds: a month of cadence and a year of window. */
+/** The server's bounds: a cadence from an hour to a month, and a window of up to 90 days. */
+export const MIN_FREQUENCY_MINUTES = 60;
 export const MAX_FREQUENCY_MINUTES = 43_200;
-export const MAX_WINDOW_MINUTES = 525_600;
+export const MAX_WINDOW_MINUTES = 129_600;
 
 /** The columns' defaults, which the first save stores for any field it leaves out. */
 export const CONFIG_DEFAULTS = {
@@ -33,7 +34,7 @@ export const makeAlertCalibrationSettingsSchema = (t: TranslateFn) =>
     frequency_minutes: z
       .number()
       .int()
-      .min(1, t("alertCalibration.settings.frequencyRange"))
+      .min(MIN_FREQUENCY_MINUTES, t("alertCalibration.settings.frequencyRange"))
       .max(MAX_FREQUENCY_MINUTES, t("alertCalibration.settings.frequencyRange")),
     window_minutes: z
       .number()
