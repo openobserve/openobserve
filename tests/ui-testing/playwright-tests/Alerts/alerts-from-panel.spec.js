@@ -114,9 +114,11 @@ test.describe("Create Alert from Dashboard Panel testcases", () => {
       // The panel payload rides sessionStorage, not the URL.
       expect(currentUrl).not.toContain("panelData=");
 
-      const alertNameInput = pm.alertsPage.getAlertNameInput();
-      await expect(alertNameInput).toBeVisible({ timeout: 30000 });
-      expect(await alertNameInput.inputValue()).toContain("Alert_from_");
+      // The alert name is an OFormInlineEdit title: in display mode the value
+      // is a span, not an <input>, so read the committed value via the helper.
+      const alertNameValue = pm.alertsPage.getAlertNameValueLocator();
+      await expect(alertNameValue).toBeVisible({ timeout: 30000 });
+      expect((await alertNameValue.textContent()) ?? "").toContain("Alert_from_");
       testLogger.info("Landed on the alert form pre-filled from the panel");
 
       // Navigate back to the dashboard folder and clean up.
@@ -304,21 +306,28 @@ test.describe("Create Alert from Dashboard Panel testcases", () => {
         "y"
       );
 
+      // The visibility toggle only appears from the second query onwards, so
+      // add a second query and hide BOTH to leave the panel with no visible query.
+      await pm.dashboardMultiSQL.addQueryTab(1);
+      await pm.chartTypeSelector.selectStreamType("logs");
+      await pm.chartTypeSelector.selectStream("e2e_automate");
+      await pm.chartTypeSelector.searchAndAddField(
+        "kubernetes_namespace_name",
+        "y"
+      );
+
       const streamPromise = waitForStreamComplete(page);
       await pm.dashboardPanelActions.applyDashboardBtn();
       await streamPromise;
       await pm.dashboardPanelActions.waitForChartToRender();
 
-      // Hide the only query, then save so the panel has no visible query.
+      // Hide both queries so the saved panel has zero visible queries.
       await pm.dashboardMultiSQL.toggleQueryVisibility(0);
+      await pm.dashboardMultiSQL.toggleQueryVisibility(1);
 
       const dashboardStreamPromise = waitForStreamComplete(page, 30000);
       await pm.dashboardPanelActions.savePanel();
       await dashboardStreamPromise;
-      await pm.dashboardPanelActions
-        .getChartRendererCanvasElement()
-        .first()
-        .waitFor({ state: "visible", timeout: 15000 });
 
       await pm.dashboardPanelEdit.getPanelContainer().first().hover();
       await pm.dashboardPanelActions.getEditPanelDropdown(panelName).click();
