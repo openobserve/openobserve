@@ -8076,6 +8076,7 @@
       "noDestination": "无目标",
       "noise": "噪声",
       "notifyFailed": "通知失败",
+      "schedulerHealth": "调度器延迟",
       "silent": "静默"
     },
     "evidence": {
@@ -8092,6 +8093,12 @@
       "failureRatio": "失败率",
       "history": "历史",
       "deliveredThroughIncidents": "通过事件投递",
+      "affectedOrgs": "受影响的组织",
+      "congestedHours": "拥堵时段",
+      "skippedWindows": "跳过的窗口",
+      "lateEvaluations": "延迟评估",
+      "lateRatio": "延迟占比",
+      "longestDelay": "最长延迟",
       "yes": "是",
       "no": "否"
     },
@@ -8109,7 +8116,9 @@
       "repairDestination": "修复目标",
       "repairDestinationDesc": "告警使用的某个目标投递失败。",
       "attachDestination": "附加目标",
-      "attachDestinationDesc": "为告警提供一个投递目标。"
+      "attachDestinationDesc": "为告警提供一个投递目标。",
+      "scaleAlertScheduler": "扩容告警调度器",
+      "scaleAlertSchedulerDesc": "提高 {concurrency}、增加告警节点，或提高 {pullers}。"
     },
     "severity": {
       "high": "高",
@@ -8189,7 +8198,7 @@
       "suggestionsOnly": "仅为建议，不会自动应用任何更改",
       "filterAll": "全部",
       "showingCapped": "显示 {total} 个发现项中的 {shown} 个：搜索在 {count} 条记录处停止。",
-      "perAlertNote": "数据流中每个具名告警的每条发现项各占一条记录，因此未指明告警的发现项没有卡片。",
+      "perSubjectNote": "一条发现若涉及多个告警，会为每个告警各生成一张卡片，因此卡片数量多于发现数量。",
       "nothingTitle": "无内容可报告",
       "nothingDescription": "没有覆盖缺口，也没有未判定项：在范围内的 {count} 个告警中，告警校准未发现任何问题。",
       "noneFoundTitle": "未发现任何项",
@@ -8198,6 +8207,9 @@
       "noneFoundNotClearance": "此处零发现项并不代表已排除。",
       "evidence": "证据",
       "alert": "告警",
+      "topOrgs": "受影响最严重的组织",
+      "worstHours": "最糟糕的时段",
+      "lagImpact": "{skipped} 个跳过，{evaluations} 个中 {late} 个延迟",
       "proposedActions": "建议的操作",
       "openAlert": "打开告警"
     },
@@ -8210,6 +8222,7 @@
       "attentionCaption": "来自最近一次运行。打开规则即可查看其标记的告警。",
       "alertsFlagged": "{count} 条告警 | {count} 条告警",
       "nothingFlagged": "最近一次运行中，该规则未标记任何告警。",
+      "nothingCongested": "在最近一次运行中，告警调度器保持了同步。",
       "allClear": "最近一次运行未发现需要修复的问题。",
       "openAlert": "打开告警",
       "viewEvidence": "查看证据",
@@ -9725,6 +9738,7 @@
         "continue": "继续到告警",
         "queryChoiceLabel": "告警所针对的查询",
         "queryChoiceOption": "{name}：{query}",
+        "pickQueryIntro": "有多个查询。请选择用于创建告警的查询。",
         "streamLabel": "数据流",
         "thresholdLabel": "告警条件",
         "thresholdMatchingRows": "匹配行",
@@ -9806,7 +9820,9 @@
         "rumFunnelSnapshot": "此告警保留了漏斗 SQL 的副本。之后对漏斗或其命名事件的编辑不会更改它。",
         "rumFunnelSteps": "漏斗至少需要两个步骤才能对转化进行告警。",
         "textFilterDropped": "您的搜索过滤器未带入，因为此数据流没有全文搜索（FTS）字段。如需使用，请将其添加到告警查询中。",
-        "heldFilterDropped": "您的搜索过滤器未带入，因为它需要先在日志页面选择运行身份。如需使用，请将其添加到告警查询中。"
+        "heldFilterDropped": "您的搜索过滤器未带入，因为它需要先在日志页面选择运行身份。如需使用，请将其添加到告警查询中。",
+        "thresholdColumnGuessed": "阈值已应用于 {column}；请确认这是您想要的值。",
+        "thresholdNotCarried": "由于您选择了其他查询，图表中的阈值 {value} 未被应用。"
       }
     },
     "saveFailed": "无法保存告警。",

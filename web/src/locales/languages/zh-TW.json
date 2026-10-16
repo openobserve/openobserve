@@ -8071,6 +8071,7 @@
       "noDestination": "無目標",
       "noise": "雜訊",
       "notifyFailed": "通知失敗",
+      "schedulerHealth": "排程器延遲",
       "silent": "靜默"
     },
     "evidence": {
@@ -8087,6 +8088,12 @@
       "failureRatio": "失敗率",
       "history": "歷史記錄",
       "deliveredThroughIncidents": "透過事件遞送",
+      "affectedOrgs": "受影響的組織",
+      "congestedHours": "壅塞時段",
+      "skippedWindows": "略過的視窗",
+      "lateEvaluations": "延遲的評估",
+      "lateRatio": "延遲比例",
+      "longestDelay": "最長延遲",
       "yes": "是",
       "no": "否"
     },
@@ -8104,7 +8111,9 @@
       "repairDestination": "修復目標",
       "repairDestinationDesc": "警示使用的目標發生遞送失敗。",
       "attachDestination": "附加目標",
-      "attachDestinationDesc": "為警示提供一個可傳送的目標。"
+      "attachDestinationDesc": "為警示提供一個可傳送的目標。",
+      "scaleAlertScheduler": "擴充警示排程器",
+      "scaleAlertSchedulerDesc": "提高 {concurrency}、新增警示節點，或提高 {pullers}。"
     },
     "severity": {
       "high": "高",
@@ -8184,7 +8193,7 @@
       "suggestionsOnly": "僅為建議，不會自動套用任何變更",
       "filterAll": "全部",
       "showingCapped": "顯示 {total} 筆發現項目中的 {shown} 筆：搜尋在 {count} 筆紀錄停止。",
-      "perAlertNote": "串流會為每個具名警示的每筆發現項目保留一筆紀錄，因此未指名警示的發現項目不會有卡片。",
+      "perSubjectNote": "若一項發現涉及多個警示，每個警示各有一張卡片，因此卡片數量會多於發現數量。",
       "nothingTitle": "沒有可報告的內容",
       "nothingDescription": "沒有涵蓋缺口且沒有任何項目被拒絕：在範圍內的 {count} 個警示中，警示校準未發現任何問題。",
       "noneFoundTitle": "未發現任何項目",
@@ -8193,6 +8202,9 @@
       "noneFoundNotClearance": "這裡零發現並不代表已排除。",
       "evidence": "證據",
       "alert": "警示",
+      "topOrgs": "受影響最嚴重的組織",
+      "worstHours": "最嚴重的時段",
+      "lagImpact": "略過 {skipped}，{evaluations} 次中有 {late} 次延遲",
       "proposedActions": "建議動作",
       "openAlert": "開啟警示"
     },
@@ -8205,6 +8217,7 @@
       "attentionCaption": "來自最近一次執行。開啟規則即可查看它標記的警示。",
       "alertsFlagged": "{count} 個警示 | {count} 個警示",
       "nothingFlagged": "最近一次執行中，此規則未標記任何警示。",
+      "nothingCongested": "警示排程器在最近一次執行中跟上了進度。",
       "allClear": "最近一次執行未發現任何需要修正的問題。",
       "openAlert": "開啟警示",
       "viewEvidence": "檢視佐證",
@@ -9720,6 +9733,7 @@
         "continue": "繼續前往警示",
         "queryChoiceLabel": "對查詢發出警示",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "有多個查詢。請選擇要用來建立警示的查詢。",
         "streamLabel": "串流",
         "thresholdLabel": "警示條件",
         "thresholdMatchingRows": "符合的資料列",
@@ -9801,7 +9815,9 @@
         "rumFunnelSnapshot": "此警示會保留漏斗 SQL 的副本。之後對漏斗或其具名事件的編輯不會改變它。",
         "rumFunnelSteps": "漏斗至少需要兩個步驟,才能對轉換率發出警示。",
         "textFilterDropped": "您的搜尋篩選條件未一併帶入，因為此串流沒有全文搜尋（FTS）欄位。如需使用，請將其加入警示查詢。",
-        "heldFilterDropped": "您的搜尋篩選條件未一併帶入，因為它需要先在日誌頁面選擇執行身分。如需使用，請將其加入警示查詢。"
+        "heldFilterDropped": "您的搜尋篩選條件未一併帶入，因為它需要先在日誌頁面選擇執行身分。如需使用，請將其加入警示查詢。",
+        "thresholdColumnGuessed": "閾值已套用至 {column}；請確認這是您想要的值。",
+        "thresholdNotCarried": "由於您選擇了其他查詢，圖表中的閾值 {value} 未被套用。"
       }
     },
     "saveFailed": "無法儲存警示。",

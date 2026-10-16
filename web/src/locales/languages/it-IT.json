@@ -8076,6 +8076,7 @@
       "noDestination": "Nessuna destinazione",
       "noise": "Rumore",
       "notifyFailed": "Notifica non riuscita",
+      "schedulerHealth": "Ritardo dello scheduler",
       "silent": "Silenzioso"
     },
     "evidence": {
@@ -8092,6 +8093,12 @@
       "failureRatio": "Rapporto di fallimenti",
       "history": "Cronologia",
       "deliveredThroughIncidents": "Consegnate tramite incidenti",
+      "affectedOrgs": "Organizzazioni interessate",
+      "congestedHours": "Ore congestionate",
+      "skippedWindows": "Finestre saltate",
+      "lateEvaluations": "Valutazioni in ritardo",
+      "lateRatio": "Quota in ritardo",
+      "longestDelay": "Ritardo più lungo",
       "yes": "Sì",
       "no": "No"
     },
@@ -8109,7 +8116,9 @@
       "repairDestination": "Ripara la destinazione",
       "repairDestinationDesc": "La consegna fallisce su una destinazione utilizzata dall'avviso.",
       "attachDestination": "Collega destinazione",
-      "attachDestinationDesc": "Dai all'avviso una destinazione a cui recapitare i dati."
+      "attachDestinationDesc": "Dai all'avviso una destinazione a cui recapitare i dati.",
+      "scaleAlertScheduler": "Scala lo scheduler degli avvisi",
+      "scaleAlertSchedulerDesc": "Aumenta {concurrency}, aggiungi nodi di avviso o aumenta {pullers}."
     },
     "severity": {
       "high": "Alta",
@@ -8189,7 +8198,7 @@
       "suggestionsOnly": "Solo suggerimenti, nulla viene applicato automaticamente",
       "filterAll": "Tutti",
       "showingCapped": "Visualizzazione di {shown} riscontri su {total}: la ricerca si è fermata a {count} record.",
-      "perAlertNote": "Lo stream contiene un record per riscontro per ogni avviso denominato, quindi un riscontro che non nomina alcun avviso non ha una scheda.",
+      "perSubjectNote": "Un riscontro che nomina più avvisi ha una scheda per ciascuno, quindi le schede superano i riscontri.",
       "nothingTitle": "Niente da segnalare",
       "nothingDescription": "Nessuna lacuna di copertura e nulla rifiutato: su {count} avvisi nell'ambito, la calibrazione degli avvisi non ha trovato nulla.",
       "noneFoundTitle": "Nessun riscontro trovato",
@@ -8198,6 +8207,9 @@
       "noneFoundNotClearance": "Zero riscontri qui non è un via libera.",
       "evidence": "Evidenze",
       "alert": "Avviso",
+      "topOrgs": "Organizzazioni più interessate",
+      "worstHours": "Ore peggiori",
+      "lagImpact": "{skipped} saltate, {late} di {evaluations} in ritardo",
       "proposedActions": "Azioni proposte",
       "openAlert": "Apri avviso"
     },
@@ -8210,6 +8222,7 @@
       "attentionCaption": "Dall'ultima esecuzione. Apri una regola per vedere gli avvisi che ha segnalato.",
       "alertsFlagged": "{count} avviso | {count} avvisi",
       "nothingFlagged": "Nessun avviso segnalato da questa regola nell'ultima esecuzione.",
+      "nothingCongested": "Lo scheduler degli avvisi ha tenuto il passo nell'ultima esecuzione.",
       "allClear": "L'ultima esecuzione non ha trovato nulla da correggere.",
       "openAlert": "Apri avviso",
       "viewEvidence": "Visualizza evidenze",
@@ -9725,6 +9738,7 @@
         "continue": "Continua all'avviso",
         "queryChoiceLabel": "Avvisa sulla query",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "Ci sono più query. Seleziona quella da cui creare l'avviso.",
         "streamLabel": "Stream",
         "thresholdLabel": "Avviso su",
         "thresholdMatchingRows": "Righe corrispondenti",
@@ -9806,7 +9820,9 @@
         "rumFunnelSnapshot": "Questo avviso mantiene una copia dell'SQL del funnel. Modifiche successive al funnel o ai suoi eventi denominati non lo cambiano.",
         "rumFunnelSteps": "Un funnel necessita di almeno due passaggi prima di poter generare avvisi sulla conversione.",
         "textFilterDropped": "Il filtro di ricerca non è stato trasferito perché questo stream non ha campi di ricerca full-text (FTS). Aggiungilo alla query dell'avviso se ti serve.",
-        "heldFilterDropped": "Il filtro di ricerca non è stato trasferito perché richiede prima la scelta \"Esegui come\" nella pagina dei log. Aggiungilo alla query dell'avviso se ti serve."
+        "heldFilterDropped": "Il filtro di ricerca non è stato trasferito perché richiede prima la scelta \"Esegui come\" nella pagina dei log. Aggiungilo alla query dell'avviso se ti serve.",
+        "thresholdColumnGuessed": "La soglia è stata applicata a {column}; controlla che sia il valore che intendevi.",
+        "thresholdNotCarried": "La soglia {value} del grafico non è stata applicata perché hai scelto una query diversa."
       }
     },
     "saveFailed": "Impossibile salvare l'avviso.",

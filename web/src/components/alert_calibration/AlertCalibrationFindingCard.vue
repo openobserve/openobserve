@@ -69,6 +69,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </dl>
 
       <div
+        v-for="list in lagLists"
+        :key="list.column"
+        class="flex flex-col gap-1.5"
+        :data-test="`alert-calibration-finding-${list.key}-list`"
+      >
+        <OText variant="label" as="div">{{ list.label }}</OText>
+        <ul class="flex flex-col gap-1">
+          <li
+            v-for="row in list.rows"
+            :key="row.key"
+            class="flex min-w-0 items-baseline justify-between gap-3"
+            data-test="alert-calibration-finding-lag-row"
+          >
+            <OTruncatedText class="text-text-body min-w-0 text-xs font-medium">
+              {{ row.label }}
+            </OTruncatedText>
+            <span class="text-text-secondary shrink-0 text-xs tabular-nums">
+              {{
+                t("alertCalibration.detail.lagImpact", {
+                  skipped: formatEvidence(t, row.skipped_windows, "count"),
+                  late: formatEvidence(t, row.late_evaluations, "count"),
+                  evaluations: formatEvidence(t, row.evaluations, "count"),
+                })
+              }}
+            </span>
+          </li>
+        </ul>
+      </div>
+
+      <div
         v-if="actions.length"
         class="rounded-default bg-surface-subtle border-s-border-strong flex flex-col gap-1 border-s-4 px-3 py-2"
         data-test="alert-calibration-finding-actions"
@@ -90,6 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRouter } from "vue-router";
+import { format } from "date-fns";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -100,7 +131,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import type { FindingRecord } from "./digests";
+import { parseLagRows, type FindingRecord } from "./digests";
 import { ACTION_META, isProposedAction, RULE_META } from "./rules";
 import {
   CONFIDENCE_LABEL,
@@ -138,6 +169,24 @@ const evidence = computed(() =>
   })),
 );
 
+/** Only lists that name something show, each row labelled by its org or its hour. */
+const lagLists = computed(() =>
+  (meta.value.lagLists ?? [])
+    .map((list) => ({
+      column: list.column,
+      key: list.key,
+      label: t(list.labelKey),
+      rows: parseLagRows(props.finding[list.column], list.key).map((row) => ({
+        ...row,
+        label:
+          list.key === "org_id"
+            ? raw(String(row.key))
+            : raw(format(Number(row.key) / 1000, "MMM d, HH:mm")),
+      })),
+    }))
+    .filter((list) => list.rows.length > 0),
+);
+
 /** `actions` is comma-joined; an action this build does not know still shows, by its raw name. */
 const actions = computed<{ name: string; label: I18nText; description?: I18nText }[]>(() =>
   (props.finding.actions ?? "")
@@ -148,7 +197,10 @@ const actions = computed<{ name: string; label: I18nText; description?: I18nText
         ? {
             name,
             label: t(ACTION_META[name].labelKey),
-            description: t(ACTION_META[name].descriptionKey),
+            description: t(
+              ACTION_META[name].descriptionKey,
+              ACTION_META[name].descriptionParams ?? {},
+            ),
           }
         : { name, label: raw(name) },
     ),

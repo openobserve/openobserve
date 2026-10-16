@@ -8076,6 +8076,7 @@
       "noDestination": "Geen bestemming",
       "noise": "Ruis",
       "notifyFailed": "Melding mislukt",
+      "schedulerHealth": "Scheduler-vertraging",
       "silent": "Stil"
     },
     "evidence": {
@@ -8092,6 +8093,12 @@
       "failureRatio": "Mislukkingsratio",
       "history": "Geschiedenis",
       "deliveredThroughIncidents": "Afgeleverd via incidenten",
+      "affectedOrgs": "Getroffen organisaties",
+      "congestedHours": "Overbelaste uren",
+      "skippedWindows": "Overgeslagen vensters",
+      "lateEvaluations": "Late evaluaties",
+      "lateRatio": "Aandeel te laat",
+      "longestDelay": "Langste vertraging",
       "yes": "Ja",
       "no": "Nee"
     },
@@ -8109,7 +8116,9 @@
       "repairDestination": "Bestemming repareren",
       "repairDestinationDesc": "De aflevering mislukt bij een bestemming die het alarm gebruikt.",
       "attachDestination": "Bestemming koppelen",
-      "attachDestinationDesc": "Geef het alarm een plek om naartoe te leveren."
+      "attachDestinationDesc": "Geef het alarm een plek om naartoe te leveren.",
+      "scaleAlertScheduler": "Schaal de alarmscheduler",
+      "scaleAlertSchedulerDesc": "Verhoog {concurrency}, voeg alarmnodes toe of verhoog {pullers}."
     },
     "severity": {
       "high": "Hoog",
@@ -8189,7 +8198,7 @@
       "suggestionsOnly": "Alleen suggesties, er wordt niets automatisch toegepast",
       "filterAll": "Alle",
       "showingCapped": "Toont {shown} van {total} bevindingen: de zoekopdracht stopte bij {count} records.",
-      "perAlertNote": "De stream bevat één record per bevinding per benoemd alarm, dus een bevinding zonder benoemd alarm heeft geen kaart.",
+      "perSubjectNote": "Een bevinding die meerdere alarmen benoemt, krijgt voor elk daarvan een kaart, dus het aantal kaarten is groter dan het aantal bevindingen.",
       "nothingTitle": "Niets te melden",
       "nothingDescription": "Geen dekkingsgat en niets afgewezen: over {count} alarmen binnen bereik vond alarmkalibratie niets.",
       "noneFoundTitle": "Niets gevonden",
@@ -8198,6 +8207,9 @@
       "noneFoundNotClearance": "Nul bevindingen hier is geen vrijgave.",
       "evidence": "Bewijs",
       "alert": "Alarm",
+      "topOrgs": "Meest getroffen organisaties",
+      "worstHours": "Slechtste uren",
+      "lagImpact": "{skipped} overgeslagen, {late} van {evaluations} te laat",
       "proposedActions": "Voorgestelde acties",
       "openAlert": "Alarm openen"
     },
@@ -8210,6 +8222,7 @@
       "attentionCaption": "Van de laatste uitvoering. Open een regel om de alarmen te zien die erdoor zijn gemarkeerd.",
       "alertsFlagged": "{count} alarm | {count} alarmen",
       "nothingFlagged": "Geen alarm gemarkeerd door deze regel in de laatste uitvoering.",
+      "nothingCongested": "De alarmplanner bleef bij in de laatste uitvoering.",
       "allClear": "De laatste uitvoering vond niets om op te lossen.",
       "openAlert": "Alarm openen",
       "viewEvidence": "Bewijs bekijken",
@@ -9725,6 +9738,7 @@
         "continue": "Doorgaan naar alert",
         "queryChoiceLabel": "Alarm op query",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "Er zijn meerdere query's. Kies op basis van welke query je het alert wilt maken.",
         "streamLabel": "Stream",
         "thresholdLabel": "Alert op",
         "thresholdMatchingRows": "Overeenkomende rijen",
@@ -9806,7 +9820,9 @@
         "rumFunnelSnapshot": "Dit alarm bewaart een kopie van de SQL van de funnel. Latere wijzigingen aan de funnel of de bijbehorende benoemde gebeurtenissen veranderen dit niet.",
         "rumFunnelSteps": "Een funnel heeft minstens twee stappen nodig voordat er op conversie kan worden gealarmeerd.",
         "textFilterDropped": "Je zoekfilter is niet overgenomen omdat deze stream geen velden voor volledige tekstzoekopdracht (FTS) heeft. Voeg het toe aan de alarmquery als je het nodig hebt.",
-        "heldFilterDropped": "Je zoekfilter is niet overgenomen omdat er eerst een keuze voor 'Uitvoeren als' op de logboekenpagina nodig is. Voeg het toe aan de alarmquery als je het nodig hebt."
+        "heldFilterDropped": "Je zoekfilter is niet overgenomen omdat er eerst een keuze voor 'Uitvoeren als' op de logboekenpagina nodig is. Voeg het toe aan de alarmquery als je het nodig hebt.",
+        "thresholdColumnGuessed": "De drempelwaarde is toegepast op {column}; controleer of dat de bedoelde waarde is.",
+        "thresholdNotCarried": "De drempelwaarde {value} uit de grafiek is niet toegepast omdat je een andere query hebt gekozen."
       }
     },
     "saveFailed": "Kon de waarschuwing niet opslaan.",

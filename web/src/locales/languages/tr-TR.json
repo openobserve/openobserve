@@ -8076,6 +8076,7 @@
       "noDestination": "Hedef yok",
       "noise": "Gürültü",
       "notifyFailed": "Bildirim başarısız",
+      "schedulerHealth": "Zamanlayıcı gecikmesi",
       "silent": "Sessiz"
     },
     "evidence": {
@@ -8092,6 +8093,12 @@
       "failureRatio": "Başarısızlık oranı",
       "history": "Geçmiş",
       "deliveredThroughIncidents": "Olaylar üzerinden iletildi",
+      "affectedOrgs": "Etkilenen kuruluşlar",
+      "congestedHours": "Yoğun saatler",
+      "skippedWindows": "Atlanan pencereler",
+      "lateEvaluations": "Geç değerlendirmeler",
+      "lateRatio": "Geç oranı",
+      "longestDelay": "En uzun gecikme",
       "yes": "Evet",
       "no": "Hayır"
     },
@@ -8109,7 +8116,9 @@
       "repairDestination": "Hedefi onar",
       "repairDestinationDesc": "Uyarının kullandığı bir hedefte teslimat başarısız olur.",
       "attachDestination": "Hedef ekle",
-      "attachDestinationDesc": "Uyarıya teslim edecek bir yer verin."
+      "attachDestinationDesc": "Uyarıya teslim edecek bir yer verin.",
+      "scaleAlertScheduler": "Uyarı zamanlayıcısını ölçeklendirin",
+      "scaleAlertSchedulerDesc": "{concurrency} değerini yükseltin, uyarı düğümleri ekleyin veya {pullers} değerini yükseltin."
     },
     "severity": {
       "high": "Yüksek",
@@ -8189,7 +8198,7 @@
       "suggestionsOnly": "Yalnızca öneriler, hiçbir şey otomatik uygulanmaz",
       "filterAll": "Tümü",
       "showingCapped": "{total} bulgunun {shown} tanesi gösteriliyor: arama {count} kayıtta durdu.",
-      "perAlertNote": "Akış, adlandırılmış her uyarı için her bulguya bir kayıt tutar, bu nedenle hiçbir uyarı adı belirtmeyen bir bulgunun kartı yoktur.",
+      "perSubjectNote": "Birden fazla uyarıyı belirten bir bulgunun her biri için bir kartı olur, bu nedenle kartlar bulgulardan daha fazladır.",
       "nothingTitle": "Bildirilecek bir şey yok",
       "nothingDescription": "Kapsam boşluğu yok ve hiçbir şey reddedilmedi: kapsamdaki {count} uyarı genelinde uyarı kalibrasyonu hiçbir şey bulamadı.",
       "noneFoundTitle": "Hiçbiri bulunamadı",
@@ -8198,6 +8207,9 @@
       "noneFoundNotClearance": "Burada sıfır bulgu olması temiz olduğu anlamına gelmez.",
       "evidence": "Kanıt",
       "alert": "Uyarı",
+      "topOrgs": "En çok etkilenen kuruluşlar",
+      "worstHours": "En kötü saatler",
+      "lagImpact": "{skipped} atlandı, {evaluations} değerlendirmenin {late} tanesi geç",
       "proposedActions": "Önerilen eylemler",
       "openAlert": "Uyarıyı aç"
     },
@@ -8210,6 +8222,7 @@
       "attentionCaption": "Son çalıştırmadan. İşaretlediği uyarıları görmek için bir kural açın.",
       "alertsFlagged": "{count} uyarı | {count} uyarı",
       "nothingFlagged": "Son çalıştırmada bu kural tarafından işaretlenen uyarı yok.",
+      "nothingCongested": "Uyarı zamanlayıcısı en son çalıştırmada geri kalmadı.",
       "allClear": "Son çalıştırma düzeltilecek bir şey bulamadı.",
       "openAlert": "Uyarıyı aç",
       "viewEvidence": "Kanıtı görüntüle",
@@ -9725,6 +9738,7 @@
         "continue": "Uyarıya devam et",
         "queryChoiceLabel": "Uyarılacak sorgu",
         "queryChoiceOption": "{name}: {query}",
+        "pickQueryIntro": "Birden fazla sorgu var. Uyarının oluşturulacağı sorguyu seçin.",
         "streamLabel": "Akış",
         "thresholdLabel": "Uyarı kaynağı",
         "thresholdMatchingRows": "Eşleşen satırlar",
@@ -9806,7 +9820,9 @@
         "rumFunnelSnapshot": "Bu uyarı, huninin SQL'inin bir kopyasını tutar. Hunide veya adlandırılmış olaylarında sonradan yapılan düzenlemeler bunu değiştirmez.",
         "rumFunnelSteps": "Bir huninin dönüşüm üzerine uyarı verebilmesi için en az iki adıma ihtiyacı vardır.",
         "textFilterDropped": "Arama filtreniz taşınamadı çünkü bu akışta tam metin arama (FTS) alanı yok. Gerekirse uyarı sorgusuna ekleyin.",
-        "heldFilterDropped": "Arama filtreniz taşınamadı çünkü önce günlükler sayfasında bir 'Run as' seçimi gerekiyor. Gerekirse uyarı sorgusuna ekleyin."
+        "heldFilterDropped": "Arama filtreniz taşınamadı çünkü önce günlükler sayfasında bir 'Run as' seçimi gerekiyor. Gerekirse uyarı sorgusuna ekleyin.",
+        "thresholdColumnGuessed": "Eşik {column} için uygulandı; kastettiğiniz değer olduğunu kontrol edin.",
+        "thresholdNotCarried": "Farklı bir sorgu seçtiğiniz için grafikteki {value} eşiği uygulanmadı."
       }
     },
     "saveFailed": "Uyarı kaydedilemedi.",
