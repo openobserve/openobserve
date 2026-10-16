@@ -98,7 +98,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OText variant="meta" as="p">{{ t("alertCalibration.detail.suggestionsOnly") }}</OText>
           </div>
           <OToggleGroup
-            v-if="presentRules.length > 1"
             :model-value="ruleFilter"
             mobile-dropdown
             data-test="alert-calibration-digest-rule-filter"
@@ -107,7 +106,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OToggleGroupItem value="all" size="xs">{{
               t("alertCalibration.detail.filterAll")
             }}</OToggleGroupItem>
-            <OToggleGroupItem v-for="rule in presentRules" :key="rule" :value="rule" size="xs">
+            <OToggleGroupItem
+              v-for="rule in RULE_IDS"
+              :key="rule"
+              :value="rule"
+              size="xs"
+              :disabled="!presentRules.includes(rule)"
+            >
               {{ t(RULE_META[rule].labelKey) }}
             </OToggleGroupItem>
           </OToggleGroup>
@@ -190,7 +195,7 @@ import {
   type RuleId,
 } from "./digests";
 import { COVERAGE_BADGE, formatMinutes } from "./format";
-import { isRuleId, RULE_META } from "./rules";
+import { isRuleId, RULE_IDS, RULE_META } from "./rules";
 
 const props = defineProps<{ windowStart: string | number; windowEnd: string | number }>();
 
